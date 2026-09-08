@@ -444,20 +444,19 @@ WTA | Iga Swiatek | Aryna Sabalenka | 2026-09-08 | 18:30"></textarea>
             const startOfToday = new Date();
             startOfToday.setHours(0, 0, 0, 0);
             const upcoming = events
-                .filter(g => g.dateEvent && g.strHomeTeam && g.strAwayTeam)
-                .map(g => {
-    // Search our automated daily pipeline file to find matches for these team names
-    const pipelineMatch = (window.pipelinePredictions || []).find(p => 
-        p.home_team?.toLowerCase() === g.strHomeTeam?.toLowerCase() || 
-        p.player_1?.toLowerCase() === g.strHomeTeam?.toLowerCase()
-    );
-    // Attach your real calculated data if found, otherwise keep standard fallbacks
-    if (pipelineMatch) {
-        g.fairOdds = { home: pipelineMatch.fair_Odds?.p1 || 2.00 };
-        g.probabilities = { home: pipelineMatch.probabilities?.p1 || 0.50 };
-    }
-    return { g, kickoff: new Date(`${g.dateEvent}T${(g.strTime || "15:00:00").slice(0, 5)}:00`) };
-})
+            .filter(g => g.dateEvent && g.strHomeTeam && g.strAwayTeam)
+            .map(g => {
+                const pipelineMatch = (window.pipelinePredictions || []).find(p => 
+                    p.home_team?.toLowerCase() === g.strHomeTeam?.toLowerCase() || 
+                    p.player_1?.toLowerCase() === g.strHomeTeam?.toLowerCase()
+                );
+                if (pipelineMatch) {
+                    g.fairOdds = { home: pipelineMatch.fair_odds?.p1 || 2.00 };
+                    g.probabilities = { home: pipelineMatch.probabilities?.p1 || 0.50 };
+                }
+                return { g, kickoff: new Date(`${g.dateEvent}T${(g.strTime || "15:00:00").slice(0, 5)}:00`) };
+            })
+            .sort((a, b) => a.kickoff - b.kickoff);
                 .filter(x => x.kickoff >= startOfToday)
                 .sort((a, b) => a.kickoff - b.kickoff);
 
