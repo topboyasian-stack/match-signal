@@ -445,7 +445,19 @@ WTA | Iga Swiatek | Aryna Sabalenka | 2026-09-08 | 18:30"></textarea>
             startOfToday.setHours(0, 0, 0, 0);
             const upcoming = events
                 .filter(g => g.dateEvent && g.strHomeTeam && g.strAwayTeam)
-                .map(g => ({ g, kickoff: new Date(`${g.dateEvent}T${(g.strTime || "15:00:00").slice(0, 5)}:00`) }))
+                .map(g => {
+    // Search our automated daily pipeline file to find matches for these team names
+    const pipelineMatch = (window.pipelinePredictions || []).find(p => 
+        p.home_team?.toLowerCase() === g.strHomeTeam?.toLowerCase() || 
+        p.player_1?.toLowerCase() === g.strHomeTeam?.toLowerCase()
+    );
+    // Attach your real calculated data if found, otherwise keep standard fallbacks
+    if (pipelineMatch) {
+        g.fairOdds = { home: pipelineMatch.fair_Odds?.p1 || 2.00 };
+        g.probabilities = { home: pipelineMatch.probabilities?.p1 || 0.50 };
+    }
+    return { g, kickoff: new Date(`${g.dateEvent}T${(g.strTime || "15:00:00").slice(0, 5)}:00`) };
+})
                 .filter(x => x.kickoff >= startOfToday)
                 .sort((a, b) => a.kickoff - b.kickoff);
 
@@ -525,9 +537,12 @@ isDemo: false
             if (events === null) continue;
             sawAnyResponse = true;
             events.forEach(ev => {
-                if (!ev.dateEvent || !ev.strHomeTeam || !ev.strAwayTeam) return;
-                const tour = /wta/i.test(ev.strLeague || "") ? "WTA" : "ATP";
-                const timeStr = (ev.strTime || "12:00:00").slice(0, 5);
+                const pipelineMatch = (window.pipelinePredictions || []).find(p => 
+    p.player_1?.toLowerCase() === ev.strHomeTeam?.toLowerCase()
+);
+if (pipelineMatch) {
+    ev.probabilities = { p1: pipelineMatch.probabilities.p1, p2: pipelineMatch.probabilities.p2 };
+}
                 fresh.push({
                     tour, p1: ev.strHomeTeam, p2: ev.strAwayTeam,
 p1_prob: ev.probabilities ? ev.probabilities.p1 : 0.50,
@@ -960,6 +975,20 @@ isDemo: false
     setInterval(tick, 1000);
     maybeRunDailyAutoSync();
     setInterval(maybeRunDailyAutoSync, 60 * 60 * 1000);
-</script>
+<// AUTOMATED DATA INJECTOR: Overrides raw API data with your real GitHub pipeline calculations
+async function injectPipelineData() {
+    try {
+        const response = await fetch('./data/predictions.json');
+        if (!response.ok) return;
+        const realData = await response.json();
+        
+        console.log("🚀 GitHub Actions Pipeline Data Loaded Successfully:", realData);
+        // This makes your dashboard look at the real predictive metrics you built
+        window.pipelinePredictions = realData; 
+    } catch (e) {
+        console.log("Pipeline data file not compiled yet, using live streams.");
+    }
+}
+document.addEventListener("DOMContentLoaded", injectPipelineData);>
 </body>
 </html>
