@@ -450,13 +450,12 @@ WTA | Iga Swiatek | Aryna Sabalenka | 2026-09-08 | 18:30"></textarea>
                 .sort((a, b) => a.kickoff - b.kickoff);
 
             if (upcoming.length === 0) throw new Error("no upcoming matches in response");
-
-            footballDB[leagueKey] = upcoming.slice(0, 4).map(x => ({
-                home: x.g.strHomeTeam, away: x.g.strAwayTeam,
-                time: (x.g.strTime || "15:00:00").slice(0, 5),
-                round: x.g.intRound ? `Matchweek ${x.g.intRound}` : "Upcoming Fixture",
-                odds: (1.4 + Math.random() * 2).toFixed(2), ev: Math.random() > 0.4,
-                isDemo: false
+home: x.g.strHomeTeam, away: x.g.strAwayTeam,
+time: (x.g.strTime || "15:00:00").slice(0, 5),
+round: x.g.intRound ? `Matchweek ${x.g.intRound}` : "Upcoming Fixture",
+odds: x.g.fairOdds ? x.g.fairOdds.home.toFixed(2) : "2.00",
+ev: x.g.probabilities ? x.g.probabilities.home > 0.45 : false,
+isDemo: false
             }));
             logSync(leagueKey, "ok", `synced ${footballDB[leagueKey].length} upcoming fixtures.`);
             return true;
@@ -531,10 +530,11 @@ WTA | Iga Swiatek | Aryna Sabalenka | 2026-09-08 | 18:30"></textarea>
                 const timeStr = (ev.strTime || "12:00:00").slice(0, 5);
                 fresh.push({
                     tour, p1: ev.strHomeTeam, p2: ev.strAwayTeam,
-                    p1_spw: modelServeWinPct(ev.strHomeTeam), p2_spw: modelServeWinPct(ev.strAwayTeam),
-                    date: ev.dateEvent, start_time: timeStr,
-                    duration_mins: tour === "ATP" ? 180 : 125,
-                    isDemo: false
+p1_prob: ev.probabilities ? ev.probabilities.p1 : 0.50,
+p2_prob: ev.probabilities ? ev.probabilities.p2 : 0.50,
+date: ev.dateEvent, start_time: timeStr,
+duration_mins: tour === "ATP" ? 180 : 125,
+isDemo: false
                 });
             });
         }
