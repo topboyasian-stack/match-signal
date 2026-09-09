@@ -25,7 +25,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 2
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -45,7 +45,8 @@ jobs:
           git add data/predictions.json data/prediction_history.json data/accuracy.json data/pipeline_status.json
           if git diff --cached --quiet; then
             echo "No generated data changes."
-          else
-            git commit -m "🤖 Refresh Match Signal predictions and accuracy"
-            git push origin main
+            exit 0
           fi
+          git commit -m "🤖 Refresh Match Signal predictions and accuracy"
+          git pull --rebase origin main
+          git push origin main
