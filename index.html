@@ -3,226 +3,55 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Match Signal — Live Fixture Desk</title>
+<title>Match Signal — Live Prediction Desk</title>
 <style>
-    :root {
-        --bg: #0a0d16;
-        --bg-soft: #12162486;
-        --panel: #131725ee;
-        --panel-border: #2a2f47;
-        --text: #eef0fb;
-        --text-muted: #8b90b3;
-        --accent: #7c8bff;
-        --accent-soft: #7c8bff26;
-        --teal: #2dd4bf;
-        --teal-soft: #2dd4bf22;
-        --amber: #fbbf24;
-        --amber-soft: #fbbf2422;
-        --red: #f87171;
-        --red-soft: #f8717126;
-        --green: #34d399;
-        --green-soft: #34d39926;
-        --radius-lg: 18px;
-        --radius-md: 12px;
-        --shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
-        --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.35);
-    }
-    * { box-sizing: border-box; }
-    body {
-        margin: 0;
-        background: var(--bg);
-        color: var(--text);
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        -webkit-font-smoothing: antialiased;
-    }
-    .app { max-width: 1180px; margin: 0 auto; padding: 24px 20px 60px; }
-
-    #footballView, #tennisView {
-        border-radius: 24px;
-        padding: 22px 18px 30px;
-        margin-top: 20px;
-    }
-    #footballView {
-        background: linear-gradient(180deg, #060a10, #0a1810 60%, #060a10);
-        border: 1px solid var(--panel-border);
-    }
-    #tennisView {
-        background: linear-gradient(180deg, #150c08, #2a1710 55%, #150c08);
-        border: 1px solid var(--panel-border);
-    }
-
-    .topbar {
-        display: flex; align-items: center; justify-content: space-between;
-        margin-bottom: 20px; flex-wrap: wrap; gap: 12px;
-    }
-    .brand { display: flex; align-items: center; gap: 12px; }
-    .brand-mark {
-        width: 40px; height: 40px; border-radius: 12px;
-        background: linear-gradient(135deg, var(--accent), var(--teal));
-        display: flex; align-items: center; justify-content: center;
-        font-size: 20px; box-shadow: var(--shadow-sm);
-    }
-    .brand-text h1 { font-size: 1.15rem; margin: 0; font-weight: 800; letter-spacing: -0.02em; }
-    .brand-text p { margin: 0; font-size: 0.78rem; color: var(--text-muted); }
-
-    .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
-    .tab-btn {
-        padding: 10px 18px; border-radius: 999px; border: 1px solid var(--panel-border);
-        background: var(--panel); color: var(--text-muted); font-weight: 700; font-size: 0.85rem;
-        cursor: pointer; transition: all 0.15s ease;
-    }
-    .tab-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
-
-    .status-banner {
-        display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
-        background: var(--panel); border: 1px solid var(--panel-border); border-radius: var(--radius-md);
-        padding: 12px 16px; margin-bottom: 22px; box-shadow: var(--shadow-sm);
-    }
-    .status-left { display: flex; align-items: center; gap: 10px; font-size: 0.85rem; }
-    .status-dot { width: 9px; height: 9px; border-radius: 50%; }
-    .status-dot.active { background: var(--green); box-shadow: 0 0 0 4px var(--green-soft); }
-    
-    .sync-log {
-        background: #070913; border-radius: var(--radius-md); padding: 12px;
-        font-family: monospace; font-size: 0.8rem; color: var(--text-muted);
-        list-style: none; margin: 12px 0; max-height: 120px; overflow-y: auto;
-    }
-
-    .panel-box {
-        background: var(--panel); border: 1px solid var(--panel-border);
-        border-radius: var(--radius-lg); padding: 20px; margin-bottom: 20px;
-    }
-    .panel-title { font-size: 0.9rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 14px; }
-    
-    textarea {
-        width: 100%; height: 80px; background: #070913; border: 1px solid var(--panel-border);
-        border-radius: var(--radius-md); color: var(--text); padding: 12px; font-family: inherit; resize: none;
-    }
-
-    .grid-layout { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; margin-top: 20px; }
-    .fixture-card {
-        background: #171d30; border: 1px solid var(--panel-border); border-radius: var(--radius-md);
-        padding: 16px; box-shadow: var(--shadow-sm); transition: transform 0.2s;
-    }
-    .card-meta { display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px; }
-    .team-line { display: flex; justify-content: space-between; align-items: center; margin: 8px 0; }
-    
-    .probability-bar-wrapper { display: flex; align-items: center; gap: 8px; width: 120px; }
-    .bar-bg { flex-grow: 1; background: #2a2f47; height: 6px; border-radius: 3px; overflow: hidden; }
-    .bar-fill { height: 100%; }
-    .prob-percentage { font-size: 0.8rem; font-weight: 700; min-width: 38px; text-align: right; }
-    
-    .btn-action {
-        padding: 8px 16px; border-radius: var(--radius-md); border: none;
-        background: var(--accent); color: #fff; font-weight: 700; cursor: pointer;
-    }
-    .btn-action:hover { background: #6b7aff; }
+:root{--bg:#080b13;--panel:#111624;--panel2:#171d2d;--border:#283049;--text:#eef1fb;--muted:#8f98b8;--accent:#7c8bff;--green:#35d49a;--amber:#f4c15d;--red:#ff7474;--shadow:0 12px 32px #0007}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top,#11182a 0,#080b13 45%);color:var(--text);font:14px/1.45 Inter,system-ui,-apple-system,Segoe UI,sans-serif}.app{max-width:1240px;margin:auto;padding:24px 18px 60px}.topbar{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}.brand{display:flex;gap:12px;align-items:center}.mark{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;background:linear-gradient(135deg,var(--accent),#2dd4bf);font-size:22px}.brand h1{margin:0;font-size:20px}.brand p{margin:2px 0 0;color:var(--muted)}button,select,textarea{font:inherit}.tabs,.filters{display:flex;gap:8px;flex-wrap:wrap}.btn{border:1px solid var(--border);background:var(--panel);color:var(--text);border-radius:10px;padding:9px 13px;font-weight:700;cursor:pointer}.btn:hover{border-color:var(--accent)}.btn.active,.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}.status{margin:20px 0;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:13px 16px;box-shadow:var(--shadow)}.status-left{display:flex;align-items:center;gap:9px}.dot{width:9px;height:9px;border-radius:50%;background:var(--green);box-shadow:0 0 0 5px #35d49a20}.dot.bad{background:var(--red);box-shadow:0 0 0 5px #ff747420}.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:0 0 18px}.metric,.panel{background:var(--panel);border:1px solid var(--border);border-radius:15px;padding:15px}.metric small,.label{color:var(--muted);text-transform:uppercase;font-size:11px;letter-spacing:.06em}.metric strong{display:block;font-size:23px;margin-top:5px}.panel{margin-bottom:18px}.panel h2{font-size:13px;text-transform:uppercase;color:var(--muted);margin:0 0 12px}.filters{align-items:center}.filters select{background:#0b0f1a;color:var(--text);border:1px solid var(--border);border-radius:9px;padding:8px 10px}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}.card{background:var(--panel2);border:1px solid var(--border);border-radius:14px;padding:15px;box-shadow:var(--shadow)}.meta{display:flex;justify-content:space-between;color:var(--muted);font-size:12px;margin-bottom:12px}.teams{font-size:16px;font-weight:800}.team{display:flex;justify-content:space-between;gap:10px;margin:8px 0}.bar{height:7px;background:#2a3248;border-radius:9px;overflow:hidden;margin:5px 0}.fill{height:100%;background:linear-gradient(90deg,var(--accent),#2dd4bf)}.odds{display:flex;justify-content:space-between;color:var(--muted);font-size:12px}.pick{margin-top:13px;padding:9px;border-radius:9px;background:#7c8bff18;border:1px solid #7c8bff35}.pick b{color:#fff}.confidence{float:right;color:var(--green)}.empty{padding:28px;text-align:center;color:var(--muted);border:1px dashed var(--border);border-radius:12px}.log{margin:0;max-height:150px;overflow:auto;padding-left:20px;color:var(--muted);font:12px ui-monospace,SFMono-Regular,monospace}textarea{width:100%;min-height:80px;resize:vertical;background:#0b0f1a;color:var(--text);border:1px solid var(--border);border-radius:10px;padding:10px}.actions{display:flex;justify-content:flex-end;gap:8px;margin-top:9px}.hidden{display:none}@media(max-width:760px){.metrics{grid-template-columns:repeat(2,1fr)}.status{align-items:flex-start}.grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
-
 <div class="app">
-    <!-- Top Display Header -->
-    <div class="topbar">
-        <div class="brand">
-            <div class="brand-mark">📡</div>
-            <div class="brand-text">
-                <h1>Match Signal</h1>
-                <p>Live fixture & analytics desk</p>
-            </div>
-        </div>
-        <div class="tabs">
-            <button class="tab-btn active" id="btnFootball" onclick="switchTab('football')">⚽ Football</button>
-            <button class="tab-btn" id="btnTennis" onclick="switchTab('tennis')">🎾 Tennis</button>
-        </div>
-    </div>
+  <header class="topbar">
+    <div class="brand"><div class="mark">📡</div><div><h1>Match Signal</h1><p>Live Football + Tennis prediction desk</p></div></div>
+    <div class="tabs"><button id="footballTab" class="btn active" onclick="setSport('football')">⚽ Football</button><button id="tennisTab" class="btn" onclick="setSport('tennis')">🎾 Tennis</button></div>
+  </header>
 
-    <!-- Live Sync Operations Monitor -->
-    <div class="status-banner">
-        <div class="status-left">
-            <div class="status-dot active"></div>
-            <div>
-                <span class="status-label">Pipeline Active</span>
-                <span class="status-sub"> — Tracking live metrics logs</span>
-            </div>
-        </div>
-        <div>
-            <button class="btn-action" id="sync-now-btn" onclick="forcePipelineSync()">Sync now</button>
-        </div>
-    </div>
+  <section class="status"><div class="status-left"><span id="statusDot" class="dot"></span><div><b id="statusText">Loading live pipeline data</b><div id="updated" style="color:var(--muted)">Checking GitHub-generated data…</div></div></div><button id="refreshBtn" class="btn primary" onclick="refreshData()">↻ Refresh data</button></section>
 
-    <!-- Sync Log Window Output -->
-    <ul class="sync-log" id="sync-log-output">
-        <li>[SYSTEM] Operational desk ready. Connecting to live database feeds...</li>
-    </ul>
+  <section class="metrics">
+    <div class="metric"><small>Active predictions</small><strong id="metricPredictions">—</strong></div>
+    <div class="metric"><small>Tracked accuracy</small><strong id="metricAccuracy">—</strong></div>
+    <div class="metric"><small>Settled picks</small><strong id="metricSettled">—</strong></div>
+    <div class="metric"><small>Brier score</small><strong id="metricBrier">—</strong></div>
+  </section>
 
-    <!-- VIEW 1: FOOTBALL ANALYTICS PANEL -->
-    <div id="footballView">
-        <div class="panel-box">
-            <div class="panel-title">Manual Fixture Override (Football)</div>
-            <textarea id="footballOverrideText" placeholder="EPL | Arsenal | Man City | 2026-09-13 | 15:00"></textarea>
-            <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px;">
-                <button class="tab-btn" onclick="clearOverride('football')">Clear</button>
-                <button class="btn-action" onclick="loadManualOverride('football')">Load fixtures</button>
-            </div>
-        </div>
-        <div class="grid-layout" id="football-desk-grid"></div>
-    </div>
+  <section class="panel"><h2>Desk controls</h2><div class="filters"><button id="allFilter" class="btn active" onclick="setConfidence('all')">All</button><button id="highFilter" class="btn" onclick="setConfidence('high')">High confidence ≥65%</button><button id="mediumFilter" class="btn" onclick="setConfidence('medium')">Medium 55–65%</button><select id="leagueFilter" onchange="render()"><option value="all">All competitions</option></select><select id="sortFilter" onchange="render()"><option value="time">Start time</option><option value="confidence">Confidence</option></select></div></section>
 
-    <!-- VIEW 2: TENNIS ANALYTICS PANEL -->
-    <div id="tennisView" style="display: none;">
-        <div class="panel-box">
-            <div class="panel-title">Daily Fixture Feed (Tennis)</div>
-            <textarea id="tennisOverrideText" placeholder="ATP | Alcaraz | Sinner | Hard"></textarea>
-            <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px;">
-                <button class="tab-btn" onclick="clearOverride('tennis')">Clear</button>
-                <button class="btn-action" onclick="loadManualOverride('tennis')">Load fixtures</button>
-            </div>
-        </div>
-        <div class="grid-layout" id="tennis-desk-grid"></div>
-    </div>
+  <section id="manualPanel" class="panel"><h2>Manual fixture override</h2><div style="color:var(--muted);margin-bottom:9px">Football: <b>League | Home | Away | 2026-09-13 | 15:00</b><br>Tennis: <b>ATP/WTA | Player 1 | Player 2 | Surface</b>. Overrides are local to this browser and are never written as fake data to the pipeline.</div><textarea id="override" placeholder="EPL | Arsenal | Man City | 2026-09-13 | 15:00"></textarea><div class="actions"><button class="btn" onclick="clearOverride()">Clear</button><button class="btn primary" onclick="loadOverride()">Load fixture</button></div></section>
+
+  <section id="desk"><div id="grid" class="grid"></div></section>
+
+  <section class="panel" style="margin-top:18px"><h2>Pipeline monitor</h2><ul id="log" class="log"></ul></section>
 </div>
-
-<!-- DATA ARCHITECTURE INTERFACE ENGINES -->
 <script>
-// State Management
-window.pipelinePredictions = [];
-let activeTab = 'football';
-
-// Tab Layout Management Engine
-function switchTab(sport) {
-    activeTab = sport;
-    document.getElementById('footballView').style.display = sport === 'football' ? 'block' : 'none';
-    document.getElementById('tennisView').style.display = sport === 'tennis' ? 'block' : 'none';
-    
-    document.getElementById('btnFootball').classList.toggle('active', sport === 'football');
-    document.getElementById('btnTennis').classList.toggle('active', sport === 'tennis');
-}
-
-// Pipeline Asset Parser Loop
-async function injectPipelineData() {
-    const syncLog = document.getElementById("sync-log-output");
-    try {
-        if (syncLog) syncLog.innerHTML += `<li>[${new Date().toLocaleTimeString()}] Accessing pipeline storage...</li>`;
-        
-        // Target your automatic serverless endpoint safely
-        const response = await fetch('data/predictions.json');
-        const realData = response.ok ? await response.json() : [];
-        
-        window.pipelinePredictions = Array.isArray(realData) ? realData : [];
-
-        // Structural fallbacks if the GitHub database hasn't initialized its slate yet
-        if (window.pipelinePredictions.length === 0) {
-            window.pipelinePredictions = [
-                { tour: "EPL", player_1: "Arsenal", player_2: "Man City", surface: "Grass", probabilities: { p1: 0.52, p2: 0.48 }, fair_odds: { p1: 1.92, p2: 2.08 }, type: "football" },
-                { tour: "ATP", player_1: "Carlos Alcaraz", player_2: "Jannik Sinner", surface: "Hard", probabilities: { p1: 0.54, p2: 0.46 }, fair_odds: { p1: 1.85, p2: 2.17 }, type: "tennis" }
-            ];
-        }
-
-        renderGrids();
-        if (syncLog) syncLog.innerHTML += `<li style="color: #34d399;">✅ Data sync completed. Loaded active empirical calculations matrix.</li>`;
-    } catch (e) {
-        console.error("Data tracking delay:", e);
-        if (syncLog) syncLog.innerHTML += `<li style="color: #f87171;">⚠️ Local data offline. Running standard dashboard loop.</li>`;
-    }
-}
+const state={sport:'football',confidence:'all',predictions:[],accuracy:null,status:null,manual:[]};
+const $=id=>document.getElementById(id);
+function log(message,good=false){const li=document.createElement('li');li.textContent=`[${new Date().toLocaleTimeString()}] ${message}`;if(good)li.style.color='var(--green)';$('log').prepend(li)}
+function setSport(sport){state.sport=sport;state.manual=[];$('footballTab').classList.toggle('active',sport==='football');$('tennisTab').classList.toggle('active',sport==='tennis');$('override').value='';render()}
+function setConfidence(level){state.confidence=level;['all','high','medium'].forEach(x=>$(x+'Filter').classList.toggle('active',x===level));render()}
+async function getJson(path){const r=await fetch(`${path}?v=${Date.now()}`,{cache:'no-store'});if(!r.ok)throw new Error(`${path} ${r.status}`);return r.json()}
+async function refreshData(){const b=$('refreshBtn');b.disabled=true;b.textContent='Refreshing…';$('statusText').textContent='Reading generated pipeline files';try{const [p,a,s]=await Promise.all([getJson('data/predictions.json'),getJson('data/accuracy.json'),getJson('data/pipeline_status.json')]);state.predictions=Array.isArray(p)?p:[];state.accuracy=a;state.status=s;updateMetrics();populateLeagues();render();const errors=s.errors||[];$('statusDot').classList.toggle('bad',errors.length>0);$('statusText').textContent=errors.length?'Pipeline has source warnings':'Pipeline healthy';$('updated').textContent=`Last generated ${formatDate(s.updated_at||a.updated_at)} · ${s.data_source||'live source'}`;log(`Loaded ${state.predictions.length} live predictions and ${a.summary?.settled||0} settled picks.`,true)}catch(e){$('statusDot').classList.add('bad');$('statusText').textContent='Generated data unavailable';$('updated').textContent=e.message;log(`Refresh failed: ${e.message}`)}finally{b.disabled=false;b.textContent='↻ Refresh data'}}
+function updateMetrics(){const s=state.accuracy?.summary||{};$('metricPredictions').textContent=state.predictions.length;$('metricAccuracy').textContent=s.settled?`${(s.accuracy*100).toFixed(1)}%`:'—';$('metricSettled').textContent=s.settled??0;$('metricBrier').textContent=s.settled?s.brier_score.toFixed(3):'—'}
+function populateLeagues(){const select=$('leagueFilter'),current=select.value;const leagues=[...new Set(state.predictions.filter(p=>p.sport===state.sport).map(p=>p.league).filter(Boolean))].sort();select.innerHTML='<option value="all">All competitions</option>'+leagues.map(x=>`<option>${escapeHtml(x)}</option>`).join('');if(leagues.includes(current))select.value=current}
+function formatDate(value){if(!value)return'not yet run';const d=new Date(value);return Number.isNaN(d.getTime())?value:d.toLocaleString()}
+function pct(x){return `${Math.round((x||0)*100)}%`}
+function outcomeLabel(p){if(p.sport==='football')return p.pick==='p1'?p.player_1:p.pick==='p2'?p.player_2:'Draw';return p.pick==='p1'?p.player_1:p.player_2}
+function card(p){const pr=p.probabilities||{};const rows=p.sport==='football'?[['p1',p.player_1],['draw','Draw'],['p2',p.player_2]]:[['p1',p.player_1],['p2',p.player_2]];return `<article class="card"><div class="meta"><span>${escapeHtml(p.league||p.sport)}</span><span>${formatDate(p.start_time)}</span></div><div class="teams">${escapeHtml(p.player_1)} <span style="color:var(--muted);font-weight:500">vs</span> ${escapeHtml(p.player_2)}</div>${rows.map(([key,name])=>`<div class="team"><span>${escapeHtml(name)}</span><b>${pct(pr[key])}</b></div><div class="bar"><div class="fill" style="width:${Math.round((pr[key]||0)*100)}%"></div></div>`).join('')}<div class="odds"><span>${p.rankings?`Rank ${p.rankings.p1||'—'} / ${p.rankings.p2||'—'}`:'Live model'}</span><span>${escapeHtml(p.model||'')}</span></div><div class="pick">Model pick: <b>${escapeHtml(outcomeLabel(p))}</b><span class="confidence">${pct(p.confidence)} confidence</span></div></article>`}
+function manualCard(m){return `<article class="card"><div class="meta"><span>MANUAL OVERRIDE</span><span>Browser only</span></div><div class="teams">${escapeHtml(m.p1)} <span style="color:var(--muted);font-weight:500">vs</span> ${escapeHtml(m.p2)}</div><div class="team"><span>${escapeHtml(m.p1)}</span><b>50%</b></div><div class="bar"><div class="fill" style="width:50%"></div></div><div class="team"><span>${escapeHtml(m.p2)}</span><b>50%</b></div><div class="bar"><div class="fill" style="width:50%"></div></div><div class="pick">Manual fixture — no fabricated model edge</div></article>`}
+function render(){const league=$('leagueFilter').value;let list=state.predictions.filter(p=>p.sport===state.sport);if(league!=='all')list=list.filter(p=>p.league===league);if(state.confidence==='high')list=list.filter(p=>p.confidence>=.65);if(state.confidence==='medium')list=list.filter(p=>p.confidence>=.55&&p.confidence<.65);list.sort((a,b)=>$('sortFilter').value==='confidence'?b.confidence-a.confidence:new Date(a.start_time)-new Date(b.start_time));const cards=state.manual.map(manualCard).join('')+list.map(card).join('');$('grid').innerHTML=cards||'<div class="empty">No fixtures match the current filters. Refresh later or load a manual fixture.</div>'}
+function loadOverride(){const raw=$('override').value.trim();if(!raw)return;const parts=raw.split('|').map(x=>x.trim());if(parts.length<3){log('Override needs at least competition, player 1 and player 2.');return}const m={tour:parts[0],p1:parts[1],p2:parts[2],extra:parts.slice(3).join(' | ')};if(state.sport==='football'&&m.tour.toLowerCase().includes('atp')){log('Use Football league syntax for the Football tab.');return}if(state.sport==='tennis'&&!['ATP','WTA'].includes(m.tour.toUpperCase())){log('Tennis competition must be ATP or WTA.');return}state.manual=[m];render();log(`Loaded local ${state.sport} override for ${m.p1} vs ${m.p2}.`,true)}
+function clearOverride(){state.manual=[];$('override').value='';render();log('Local override cleared.')}
+function escapeHtml(v){return String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
+refreshData();
+</script>
+</body>
+</html>
