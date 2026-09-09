@@ -1,49 +1,47 @@
-name: Match Signal Automated Tennis Pipeline
+name: Match Signal Live Prediction Pipeline
 
 on:
   schedule:
-    # Runs automatically every day at 05:00 AM UTC (Perfect timing for daily tournament slates)
-    - cron: '0 5 * * *'
+    - cron: '0 */6 * * *'
   workflow_dispatch:
-    # Allows you to manually trigger the pipeline from the GitHub Actions tab anytime
 
 permissions:
   contents: write
 
+concurrency:
+  group: match-signal-pipeline
+  cancel-in-progress: true
+
 jobs:
   run-pipeline:
     runs-on: ubuntu-latest
-
+    timeout-minutes: 10
     steps:
-    - name: Checkout Repository Code
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
-    - name: Set Up Python Environment
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.10'
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
 
-    - name: Install System and Python Dependencies
-      run: |
-        python -m pip install --upgrade pip
-        # Install your data parsing, scraping, and math modeling libraries
-        pip install pandas numpy scikit-learn requests BeautifulSoup4
+      - name: Install dependencies
+        run: python -m pip install --upgrade requests
 
-    - name: Execute Prediction Model Pipeline
-      run: |
-        # Runs your primary Python script to fetch schedules, get player form, and calculate odds
-        python scripts/predict_today.py
+      - name: Build live predictions and settle historical picks
+        run: python scripts/predict_today.py
 
-    - name: Commit and Push Generated Predictions JSON
-      run: |
-        git config --global user.name "github-actions[bot]"
-        git config --global user.email "41898282+github-actions[bot]@://github.com"
-        
-        # Only commit changes if the predictions file actually updated
-        git add data/predictions.json
-        if git diff-index --quiet HEAD; then
-          echo "No new prediction data to commit today."
-        else
-          git commit -m "🤖 Auto-updated daily tennis predictions [skip ci]"
-          git push origin main
-        fi
+      - name: Commit generated data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/predictions.json data/prediction_history.json data/accuracy.json data/pipeline_status.json
+          if git diff --cached --quiet; then
+            echo "No generated data changes."
+          else
+            git commit -m "🤖 Refresh Match Signal predictions and accuracy"
+            git push origin main
+          fi
