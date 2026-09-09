@@ -974,20 +974,26 @@ isDemo: false
     setInterval(tick, 1000);
     maybeRunDailyAutoSync();
     setInterval(maybeRunDailyAutoSync, 60 * 60 * 1000);
-<// AUTOMATED DATA INJECTOR: Overrides raw API data with your real GitHub pipeline calculations
+<!-- AUTOMATED DATA INJECTOR: Overrides raw API data with your real GitHub pipeline calculations -->
+<script>
 async function injectPipelineData() {
     try {
-        const response = await fetch('./data/predictions.json');
+        const response = await fetch('data/predictions.json');
         if (!response.ok) return;
         const realData = await response.json();
         
         console.log("🚀 GitHub Actions Pipeline Data Loaded Successfully:", realData);
-        // This makes your dashboard look at the real predictive metrics you built
         window.pipelinePredictions = realData; 
+        
+        // Force-trigger view rendering if the pipeline data arrives after the primary stream mount
+        if (typeof renderFootballView === 'function') renderFootballView();
+        if (typeof renderTennisView === 'function') renderTennisView();
+        if (typeof renderStatusBanner === 'function') renderStatusBanner();
     } catch (e) {
-        console.log("Pipeline data file not compiled yet, using live streams.");
+        console.log("Pipeline data file not compiled yet, using live streams.", e);
     }
 }
-document.addEventListener("DOMContentLoaded", injectPipelineData);>
+document.addEventListener("DOMContentLoaded", injectPipelineData);
+</script>
 </body>
 </html>
