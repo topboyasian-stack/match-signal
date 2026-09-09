@@ -1,6 +1,11 @@
 name: Match Signal Live Prediction Pipeline
 
 on:
+  push:
+    paths:
+      - 'scripts/**'
+      - 'data/**'
+      - '.github/workflows/tennis_pipeline.yml'
   schedule:
     - cron: '0 */6 * * *'
   workflow_dispatch:
