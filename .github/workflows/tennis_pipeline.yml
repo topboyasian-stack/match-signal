@@ -35,6 +35,9 @@ jobs:
       - name: Install dependencies
         run: python -m pip install --upgrade requests
 
+      - name: Sync with latest main before generation
+        run: git pull --rebase origin main
+
       - name: Build live predictions and settle historical picks
         run: python scripts/run_pipeline.py
 
@@ -48,5 +51,4 @@ jobs:
             exit 0
           fi
           git commit -m "🤖 Refresh Match Signal predictions and accuracy"
-          git pull --rebase origin main
           git push origin main
