@@ -42,19 +42,25 @@ def tennis_rank_quality(prediction):
 
 def dedupe_tennis_predictions(predictions, qc):
     """Keep one prediction per real tennis match even when ESPN exposes it in multiple tour feeds."""
-    groups = {}
-    others = []
+    event_groups = {}
     for prediction in predictions:
         if prediction.get("sport") != "tennis":
-            others.append(prediction)
             continue
         event_id = str(prediction.get("event_id") or "")
-        key = ("event", event_id) if event_id else ("match", canonical_tennis_key(prediction))
-        groups.setdefault(key, []).append(prediction)
+        if event_id:
+            event_groups.setdefault(event_id, []).append(prediction)
 
-    # A second pass catches the same match appearing under different ESPN event IDs.
+    # First collapse exact ESPN-event duplicates.
+    collapsed = []
+    for group in event_groups.values():
+        ranked = sorted(group, key=lambda p: (tennis_rank_quality(p), float(p.get("confidence") or 0)), reverse=True)
+        collapsed.append(ranked[0])
+        if len(group) > 1:
+            qc["deduplicated_matches"] += len(group) - 1
+
+    # Then catch the same real match exposed under different event IDs/tours.
     canonical_groups = {}
-    for prediction in [p for group in groups.values() for p in group]:
+    for prediction in collapsed:
         canonical_groups.setdefault(canonical_tennis_key(prediction), []).append(prediction)
 
     kept = []
@@ -70,15 +76,15 @@ def dedupe_tennis_predictions(predictions, qc):
         )
         winner = ranked[0]
         kept.append(winner)
-        removed = len(group) - 1
-        if removed:
-            qc["deduplicated_matches"] = qc.get("deduplicated_matches", 0) + removed
+        if len(group) > 1:
+            removed = ranked[1:]
+            qc["deduplicated_matches"] += len(removed)
             qc.setdefault("deduplicated_examples", []).append({
                 "match": f"{winner.get('player_1')} vs {winner.get('player_2')}",
                 "kept_tour": winner.get("league"),
-                "removed_tours": [p.get("league") for p in ranked[1:]],
+                "removed_tours": [p.get("league") for p in removed],
             })
-    return others + kept
+    return [p for p in predictions if p.get("sport") != "tennis"] + kept
 
 
 ns = runpy.run_path("scripts/predict_today.py")
@@ -132,7 +138,7 @@ def fetch_current_predictions():
     form_start = today - timedelta(days=60)
     for tour in TENNIS_LEAGUES:
         try:
-            board = fetch_scoreboard("tennis", tour.lower(), f"{today:%Y%m%d}-{tennis_end:%Y%m%d")
+            board = fetch_scoreboard("tennis", tour.lower(), f"{today:%Y%m%d}-{tennis_end:%Y%m%d}")
             rankings = tennis_rankings(tour)
             form_map = build_tennis_form(tour, form_start, today - timedelta(days=1))
             accepted = 0
