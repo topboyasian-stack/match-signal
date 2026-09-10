@@ -1,4 +1,4 @@
-"""Production pipeline entrypoint with ESPN-aware tennis quality control."""
+"""Authoritative Match Signal pipeline runner with production tennis QC."""
 import runpy
 from datetime import datetime, timedelta, timezone
 
@@ -28,15 +28,20 @@ def tennis_fixture_quality(event):
     return True, None
 
 
-namespace = runpy.run_path("scripts/predict_today.py")
-fetch_scoreboard = namespace["fetch_scoreboard"]
-flatten_tennis_board = namespace["flatten_tennis_board"]
-tennis_rankings = namespace["tennis_rankings"]
-build_tennis_form = namespace["build_tennis_form"]
-tennis_prediction = namespace["tennis_prediction"]
-football_prediction = namespace["football_prediction"]
-FOOTBALL_LEAGUES = namespace["FOOTBALL_LEAGUES"]
-TENNIS_LEAGUES = namespace["TENNIS_LEAGUES"]
+ns = runpy.run_path("scripts/predict_today.py")
+fetch_scoreboard = ns["fetch_scoreboard"]
+flatten_tennis_board = ns["flatten_tennis_board"]
+tennis_rankings = ns["tennis_rankings"]
+build_tennis_form = ns["build_tennis_form"]
+tennis_prediction = ns["tennis_prediction"]
+football_prediction = ns["football_prediction"]
+settle_predictions = ns["settle_predictions"]
+accuracy_summary = ns["accuracy_summary"]
+load_json = ns["load_json"]
+save_json = ns["save_json"]
+DATA = ns["DATA"]
+FOOTBALL_LEAGUES = ns["FOOTBALL_LEAGUES"]
+TENNIS_LEAGUES = ns["TENNIS_LEAGUES"]
 
 
 def fetch_current_predictions():
@@ -92,5 +97,40 @@ def fetch_current_predictions():
     return predictions, errors, qc
 
 
-namespace["fetch_current_predictions"] = fetch_current_predictions
-namespace["main"]()
+def main():
+    print("Match Signal 3.0 — analytical Football + Tennis pipeline with fixture QC")
+    history_path = DATA / "prediction_history.json"
+    accuracy_path = DATA / "accuracy.json"
+    history = load_json(history_path, [])
+    history = settle_predictions(history)
+    predictions, errors, qc = fetch_current_predictions()
+    now = datetime.now(timezone.utc).isoformat()
+    for prediction in predictions:
+        prediction["calculated_at"] = now
+    existing_ids = {p.get("event_id") for p in history if not p.get("settled")}
+    for prediction in predictions:
+        if prediction["event_id"] not in existing_ids:
+            history.append(prediction.copy())
+    history = history[-2500:]
+    summary = accuracy_summary(history)
+    save_json(DATA / "predictions.json", predictions)
+    save_json(history_path, history)
+    save_json(accuracy_path, {"updated_at": now, "summary": summary, "recent_settled": [p for p in history if p.get("settled")][-50:]})
+    save_json(DATA / "pipeline_status.json", {
+        "updated_at": now,
+        "prediction_count": len(predictions),
+        "football_count": sum(p.get("sport") == "football" for p in predictions),
+        "tennis_count": sum(p.get("sport") == "tennis" for p in predictions),
+        "errors": errors,
+        "quality_control": qc,
+        "data_source": "ESPN public scoreboards + ESPN ATP/WTA rankings",
+        "free_server_cost": True,
+        "model_version": "3.0 analytical markets",
+    })
+    print(f"Predictions: {len(predictions)} | Football: {sum(p.get('sport') == 'football' for p in predictions)} | Tennis: {sum(p.get('sport') == 'tennis' for p in predictions)} | Settled: {summary['settled']} | QC rejected: {qc['rejected_total']}")
+    for error in errors:
+        print(" -", error)
+
+
+if __name__ == "__main__":
+    main()
