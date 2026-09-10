@@ -28,6 +28,45 @@ def tennis_fixture_quality(event):
     return True, None
 
 
+def canonical_tennis_key(prediction):
+    names = sorted([str(prediction.get("player_1", "")).strip().lower(), str(prediction.get("player_2", "")).strip().lower()])
+    start = str(prediction.get("start_time") or "")[:16]
+    return (start, tuple(names))
+
+
+def tennis_rank_quality(prediction):
+    rankings = prediction.get("rankings") or {}
+    return sum(1 for key in ("p1", "p2") if rankings.get(key) not in (None, "", 0))
+
+
+def dedupe_tennis_predictions(predictions, qc):
+    """Keep one prediction per real tennis match when ESPN exposes it in both tour feeds."""
+    groups = {}
+    others = []
+    for prediction in predictions:
+        if prediction.get("sport") != "tennis":
+            others.append(prediction)
+            continue
+        groups.setdefault(canonical_tennis_key(prediction), []).append(prediction)
+
+    kept = []
+    for key, group in groups.items():
+        if len(group) == 1:
+            kept.append(group[0])
+            continue
+        ranked = sorted(group, key=lambda p: (tennis_rank_quality(p), 1 if p.get("confidence") is not None else 0), reverse=True)
+        winner = ranked[0]
+        kept.append(winner)
+        removed = len(group) - 1
+        qc["deduplicated_matches"] = qc.get("deduplicated_matches", 0) + removed
+        qc.setdefault("deduplicated_examples", []).append({
+            "match": f"{winner.get('player_1')} vs {winner.get('player_2')}",
+            "kept_tour": winner.get("league"),
+            "removed_tours": [p.get("league") for p in ranked[1:]],
+        })
+    return others + kept
+
+
 ns = runpy.run_path("scripts/predict_today.py")
 fetch_scoreboard = ns["fetch_scoreboard"]
 flatten_tennis_board = ns["flatten_tennis_board"]
@@ -46,7 +85,7 @@ TENNIS_LEAGUES = ns["TENNIS_LEAGUES"]
 
 def fetch_current_predictions():
     predictions, errors = [], []
-    qc = {"rejected_total": 0, "rejected_by_reason": {}, "rejected_by_tour": {}}
+    qc = {"rejected_total": 0, "rejected_by_reason": {}, "rejected_by_tour": {}, "deduplicated_matches": 0, "deduplicated_examples": []}
 
     def reject(tour, reason):
         qc["rejected_total"] += 1
@@ -71,7 +110,7 @@ def fetch_current_predictions():
     form_start = today - timedelta(days=60)
     for tour in TENNIS_LEAGUES:
         try:
-            board = fetch_scoreboard("tennis", tour.lower(), f"{today:%Y%m%d}-{tennis_end:%Y%m%d}")
+            board = fetch_scoreboard("tennis", tour.lower(), f"{today:%Y%m%d}-{tennis_end:%Y%m%d")
             rankings = tennis_rankings(tour)
             form_map = build_tennis_form(tour, form_start, today - timedelta(days=1))
             accepted = 0
@@ -93,6 +132,7 @@ def fetch_current_predictions():
         except Exception as exc:
             errors.append(f"tennis:{tour}:{exc}")
 
+    predictions = dedupe_tennis_predictions(predictions, qc)
     predictions.sort(key=lambda p: (p.get("start_time") or "", p["sport"], p["player_1"]))
     return predictions, errors, qc
 
@@ -127,7 +167,7 @@ def main():
         "free_server_cost": True,
         "model_version": "3.0 analytical markets",
     })
-    print(f"Predictions: {len(predictions)} | Football: {sum(p.get('sport') == 'football' for p in predictions)} | Tennis: {sum(p.get('sport') == 'tennis' for p in predictions)} | Settled: {summary['settled']} | QC rejected: {qc['rejected_total']}")
+    print(f"Predictions: {len(predictions)} | Football: {sum(p.get('sport') == 'football' for p in predictions)} | Tennis: {sum(p.get('sport') == 'tennis' for p in predictions)} | Settled: {summary['settled']} | QC rejected: {qc['rejected_total']} | Deduplicated: {qc['deduplicated_matches']}")
     for error in errors:
         print(" -", error)
 
