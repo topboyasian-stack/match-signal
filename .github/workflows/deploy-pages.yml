@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'index.html'
+      - 'performance.html'
       - 'data/**'
       - '.github/workflows/deploy-pages.yml'
   workflow_dispatch:
@@ -19,7 +20,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  MATCH_SIGNAL_DEPLOY_REV: "2026-09-10-calibrated-data-refresh"
+  MATCH_SIGNAL_DEPLOY_REV: "2026-09-10-performance-dashboard-recovery"
 
 jobs:
   deploy:
