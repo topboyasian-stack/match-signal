@@ -263,6 +263,31 @@ def tennis_rankings(tour):
         return {}
 
 
+GENERIC_TENNIS_NAMES = {"", "player 1", "player 2", "tbd", "tba", "unknown", "unknown player", "team 1", "team 2"}
+DOUBLES_DRAW_MARKERS = ("double", "doubles", "mixed", "team")
+
+
+def tennis_fixture_quality(event):
+    draw_type = str(event.get("draw_type") or "").strip().lower()
+    if any(marker in draw_type for marker in DOUBLES_DRAW_MARKERS):
+        return False, "non-singles draw"
+    competitors = event.get("competitors", [])
+    if len(competitors) != 2:
+        return False, "not exactly two competitors"
+    names = []
+    for competitor in competitors:
+        athlete = competitor.get("athlete") or {}
+        name = (athlete.get("displayName") or competitor.get("displayName") or "").strip()
+        if not athlete.get("id"):
+            return False, "missing athlete id"
+        if name.lower() in GENERIC_TENNIS_NAMES or len(name) < 3:
+            return False, "missing real player name"
+        names.append(name)
+    if names[0].lower() == names[1].lower():
+        return False, "duplicate player names"
+    return True, None
+
+
 def tennis_competitors(event):
     competitors = event.get("competitors", [])
     return competitors[:2] if len(competitors) >= 2 else None
@@ -297,8 +322,10 @@ def tennis_prediction(event, tour, rankings, form_map):
     p1, p2 = pair
     a1, a2 = p1.get("athlete", {}), p2.get("athlete", {})
     id1, id2 = str(p1.get("id", "")), str(p2.get("id", ""))
-    name1 = a1.get("displayName") or p1.get("displayName") or "Player 1"
-    name2 = a2.get("displayName") or p2.get("displayName") or "Player 2"
+    name1 = a1.get("displayName") or p1.get("displayName")
+    name2 = a2.get("displayName") or p2.get("displayName")
+    if not name1 or not name2:
+        return None
     rank1 = rankings.get(id1) or p1.get("rank") or a1.get("rank")
     rank2 = rankings.get(id2) or p2.get("rank") or a2.get("rank")
     f1 = form_map.get(id1, {}).get("score", 0.5)
@@ -348,6 +375,8 @@ def build_tennis_form(tour, start_date, end_date):
         for event in flatten_tennis_board(board):
             if not event.get("status", {}).get("type", {}).get("completed"):
                 continue
+            if not tennis_fixture_quality(event)[0]:
+                continue
             pair = tennis_competitors(event)
             if not pair:
                 continue
@@ -368,6 +397,14 @@ def build_tennis_form(tour, start_date, end_date):
 
 def fetch_current_predictions():
     predictions, errors = [], []
+    qc = {"rejected_total": 0, "rejected_by_reason": {}, "rejected_by_tour": {}}
+
+    def record_rejection(tour, reason):
+        qc["rejected_total"] += 1
+        qc["rejected_by_reason"][reason] = qc["rejected_by_reason"].get(reason, 0) + 1
+        tour_bucket = qc["rejected_by_tour"].setdefault(tour, {})
+        tour_bucket[reason] = tour_bucket.get(reason, 0) + 1
+
     for label, league in FOOTBALL_LEAGUES.items():
         try:
             board = fetch_scoreboard("soccer", league)
@@ -387,18 +424,26 @@ def fetch_current_predictions():
             board = fetch_scoreboard("tennis", tour.lower(), f"{today:%Y%m%d}-{tennis_end:%Y%m%d}")
             rankings = tennis_rankings(tour)
             form_map = build_tennis_form(tour, form_start, today - timedelta(days=1))
+            accepted_for_tour = 0
             for event in flatten_tennis_board(board):
                 if event.get("status", {}).get("type", {}).get("completed"):
+                    continue
+                valid, reason = tennis_fixture_quality(event)
+                if not valid:
+                    record_rejection(tour, reason)
                     continue
                 prediction = tennis_prediction(event, tour, rankings, form_map)
                 if prediction:
                     predictions.append(prediction)
-            if not any(p.get("sport") == "tennis" and p.get("league") == tour for p in predictions):
-                errors.append(f"tennis:{tour}:no scheduled matches in next 7 days")
+                    accepted_for_tour += 1
+                else:
+                    record_rejection(tour, "prediction construction failed")
+            if accepted_for_tour == 0:
+                errors.append(f"tennis:{tour}:no valid singles matches in next 7 days")
         except Exception as exc:
             errors.append(f"tennis:{tour}:{exc}")
     predictions.sort(key=lambda p: (p.get("start_time") or "", p["sport"], p["player_1"]))
-    return predictions, errors
+    return predictions, errors, qc
 
 
 def load_json(path, default):
@@ -485,7 +530,7 @@ def main():
     accuracy_path = DATA / "accuracy.json"
     history = load_json(history_path, [])
     history = settle_predictions(history)
-    predictions, errors = fetch_current_predictions()
+    predictions, errors, qc = fetch_current_predictions()
     now = datetime.now(timezone.utc).isoformat()
     for prediction in predictions:
         prediction["calculated_at"] = now
@@ -498,8 +543,8 @@ def main():
     save_json(DATA / "predictions.json", predictions)
     save_json(history_path, history)
     save_json(accuracy_path, {"updated_at": now, "summary": summary, "recent_settled": [p for p in history if p.get("settled")][-50:]})
-    save_json(DATA / "pipeline_status.json", {"updated_at": now, "prediction_count": len(predictions), "football_count": sum(p.get("sport") == "football" for p in predictions), "tennis_count": sum(p.get("sport") == "tennis" for p in predictions), "errors": errors, "data_source": "ESPN public scoreboards + ESPN ATP/WTA rankings", "free_server_cost": True, "model_version": "3.0 analytical markets"})
-    print(f"Predictions: {len(predictions)} | Football: {sum(p.get('sport') == 'football' for p in predictions)} | Tennis: {sum(p.get('sport') == 'tennis' for p in predictions)} | Settled: {summary['settled']}")
+    save_json(DATA / "pipeline_status.json", {"updated_at": now, "prediction_count": len(predictions), "football_count": sum(p.get("sport") == "football" for p in predictions), "tennis_count": sum(p.get("sport") == "tennis" for p in predictions), "errors": errors, "quality_control": qc, "data_source": "ESPN public scoreboards + ESPN ATP/WTA rankings", "free_server_cost": True, "model_version": "3.0 analytical markets"})
+    print(f"Predictions: {len(predictions)} | Football: {sum(p.get('sport') == 'football' for p in predictions)} | Tennis: {sum(p.get('sport') == 'tennis' for p in predictions)} | Settled: {summary['settled']} | QC rejected: {qc['rejected_total']}")
     for error in errors:
         print(" -", error)
 
