@@ -7,7 +7,7 @@ on:
       - 'data/**'
       - '.github/workflows/tennis_pipeline.yml'
   schedule:
-    - cron: '*/5 * * * *'
+    - cron: '0 */6 * * *'
   workflow_dispatch:
 
 permissions:
@@ -36,7 +36,7 @@ jobs:
         run: python -m pip install --upgrade requests
 
       - name: Build live predictions and settle historical picks
-        run: python scripts/predict_today.py
+        run: python scripts/run_pipeline.py
 
       - name: Commit generated data
         run: |
