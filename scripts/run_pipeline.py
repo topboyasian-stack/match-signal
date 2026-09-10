@@ -50,7 +50,7 @@ def dedupe_tennis_predictions(predictions, qc):
         groups.setdefault(canonical_tennis_key(prediction), []).append(prediction)
 
     kept = []
-    for key, group in groups.items():
+    for group in groups.values():
         if len(group) == 1:
             kept.append(group[0])
             continue
@@ -110,7 +110,7 @@ def fetch_current_predictions():
     form_start = today - timedelta(days=60)
     for tour in TENNIS_LEAGUES:
         try:
-            board = fetch_scoreboard("tennis", tour.lower(), f"{today:%Y%m%d}-{tennis_end:%Y%m%d")
+            board = fetch_scoreboard("tennis", tour.lower(), f"{today:%Y%m%d}-{tennis_end:%Y%m%d}")
             rankings = tennis_rankings(tour)
             form_map = build_tennis_form(tour, form_start, today - timedelta(days=1))
             accepted = 0
