@@ -19,8 +19,9 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  MATCH_SIGNAL_DEPLOY_REV: "2026-09-11-stake-basketball"
+  MATCH_SIGNAL_DEPLOY_REV: "2026-09-11-oddspapi-basketball"
   STAKE_ODDS_API_KEY: ${{ secrets.STAKE_ODDS_API_KEY }}
+  ODDSPAPI_API_KEY: ${{ secrets.ODDSPAPI_API_KEY }}
 
 jobs:
   run-pipeline:
@@ -43,7 +44,7 @@ jobs:
         run: python scripts/run_pipeline.py
       - name: Refine weak-signal tennis analytics
         run: python scripts/calibrate_tennis_analytics.py
-      - name: Build basketball coverage and Stake market signals
+      - name: Build basketball coverage and OddsPapi/Stake market signals
         run: PYTHONPATH=. python scripts/basketball_hybrid.py
       - name: Run prediction QA gate
         run: python qa/prediction_qa.py
@@ -51,7 +52,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/predictions.json data/prediction_history.json data/accuracy.json data/pipeline_status.json data/basketball_predictions.json data/basketball_history.json data/basketball_accuracy.json qa/report.json
+          git add data/predictions.json data/prediction_history.json data/accuracy.json data/pipeline_status.json data/basketball_predictions.json data/basketball_history.json data/basketball_accuracy.json data/basketball_provider_cache.json qa/report.json
           if git diff --cached --quiet; then
             echo "No generated data or QA changes."
             exit 0
