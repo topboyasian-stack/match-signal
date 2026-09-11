@@ -44,8 +44,11 @@ jobs:
       - name: Refine weak-signal tennis analytics
         run: python scripts/calibrate_tennis_analytics.py
 
-      - name: Build basketball predictions, O/U analytics and settlement tracking
+      - name: Build ESPN basketball predictions and settlement tracking
         run: python scripts/basketball_pipeline.py
+
+      - name: Add German Cup and international club-friendly basketball coverage
+        run: python scripts/basketball_sofascore.py
 
       - name: Commit generated data
         run: |
