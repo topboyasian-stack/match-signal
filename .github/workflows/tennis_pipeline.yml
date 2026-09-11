@@ -18,6 +18,9 @@ concurrency:
   group: match-signal-pipeline
   cancel-in-progress: true
 
+env:
+  MATCH_SIGNAL_DEPLOY_REV: "2026-09-11-sportscore-basketball"
+
 jobs:
   run-pipeline:
     runs-on: ubuntu-latest
@@ -41,8 +44,8 @@ jobs:
         run: python scripts/calibrate_tennis_analytics.py
       - name: Build ESPN basketball predictions and settlement tracking
         run: python scripts/basketball_pipeline.py
-      - name: Build target basketball coverage from independent public web sources
-        run: PYTHONPATH=. python scripts/basketball_public_web.py
+      - name: Build target basketball coverage from SportScore public API
+        run: python scripts/basketball_sportscore.py
       - name: Run prediction QA gate
         run: python qa/prediction_qa.py
       - name: Commit generated data and QA report
