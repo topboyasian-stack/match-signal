@@ -2,10 +2,10 @@
 import json, math, re
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-import requests
+from curl_cffi import requests
 ROOT=Path(__file__).resolve().parents[1]; DATA=ROOT/"data"; BASE="https://api.sofascore.com/api/v1"
 TOURNAMENTS={"German Basketball Cup":359,"International Club Friendly":1195}
-S=requests.Session(); S.headers.update({"User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/151.0 Safari/537.36","Accept":"application/json,text/plain,*/*","Referer":"https://www.sofascore.com/"})
+S=requests.Session(impersonate="chrome"); S.headers.update({"Accept":"application/json,text/plain,*/*","Referer":"https://www.sofascore.com/"})
 def get(path):
     r=S.get(BASE+path,timeout=25); r.raise_for_status(); return r.json()
 def load(path,default):
@@ -24,20 +24,17 @@ def season(tid):
 def scheduled_events(tid,days_back=21,days_forward=7):
     out=[];seen=set();base=datetime.now(timezone.utc).date()
     for offset in range(-days_back,days_forward+1):
-        d=base+timedelta(days=offset)
-        try:p=get(f"/sport/basketball/scheduled-events/{d.isoformat()}")
+        try:p=get(f"/sport/basketball/scheduled-events/{(base+timedelta(days=offset)).isoformat()}")
         except Exception:continue
         for e in p.get("events") or []:
-            ut=((e.get("tournament") or {}).get("uniqueTournament") or {})
-            uid=ut.get("id")
-            if uid==tid or str(uid)==str(tid):
-                eid=str(e.get("id") or "")
-                if eid and eid not in seen:seen.add(eid);out.append(e)
+            uid=(((e.get("tournament") or {}).get("uniqueTournament") or {}).get("id"))
+            if str(uid)!=str(tid):continue
+            eid=str(e.get("id") or "")
+            if eid and eid not in seen:seen.add(eid);out.append(e)
     return out
 def events_for(tid):
-    se=season(tid)
+    se=season(tid);out=[];seen=set()
     if se:
-        out=[];seen=set()
         for page in range(2):
             for direction in ("next","last"):
                 try:p=get(f"/unique-tournament/{tid}/season/{se['id']}/events/{direction}/{page}")
@@ -106,7 +103,7 @@ def predict(e,league,se,f):
         fs=.5 if ft is None else 1/(1+math.exp(-(ft-t["line"])/8));ov=max(.05,min(.95,.9*t["over"]+.1*fs));un=1-ov;td={**t,"over":round(ov,4),"under":round(un,4),"pick":"over" if ov>un else "under","expected_total":round(t["line"]+(ov-.5)*8,1)}
     else:td={"line":None,"over":.5,"under":.5,"pick":None,"expected_total":round(ft,1) if ft is not None else None,"source":"No published total odds"}
     td["settlement"]="Official final score including overtime";q=sum(bool(x) for x in (m["moneyline"],m["total"],m["spread"],len(hf.get("wins",[]))>=3,len(af.get("wins",[]))>=3));conf=.5+(max(hp,ap)-.5)*(.92 if q>=3 else .8)
-    return {"sport":"basketball","league":league,"source":"SofaScore","event_id":str(e.get("id")),"season":se.get("name") if se else None,"start_time":datetime.fromtimestamp(e.get("startTimestamp",0),timezone.utc).isoformat(),"player_1":hn,"player_2":an,"probabilities":{"p1":round(hp,4),"p2":round(ap,4)},"pick":"p1" if hp>=ap else "p2","confidence":round(conf,4),"markets":{"moneyline":m["moneyline"],"total_ou":td,"spread":m["spread"]},"form":{"p1_win_rate":round(hfwr,3),"p2_win_rate":round(afwr,3),"p1_sample":len(hf.get("wins",[])),"p2_sample":len(af.get("wins",[]))},"signal_quality":{"components":q,"max_components":5,"moneyline_available":bool(m["moneyline"]),"total_available":bool(m["total"]),"spread_available":bool(m["spread"])},"model":"SofaScore odds + recent form" if m["moneyline"] else "recent form + home edge","rules_note":"Basketball total settlement uses the official final score, including overtime."}
+    return {"sport":"basketball","league":league,"source":"SofaScore","event_id":str(e.get("id")),"season":se.get("name") if se else "scheduled-events fallback","start_time":datetime.fromtimestamp(e.get("startTimestamp",0),timezone.utc).isoformat(),"player_1":hn,"player_2":an,"probabilities":{"p1":round(hp,4),"p2":round(ap,4)},"pick":"p1" if hp>=ap else "p2","confidence":round(conf,4),"markets":{"moneyline":m["moneyline"],"total_ou":td,"spread":m["spread"]},"form":{"p1_win_rate":round(hfwr,3),"p2_win_rate":round(afwr,3),"p1_sample":len(hf.get("wins",[])),"p2_sample":len(af.get("wins",[]))},"signal_quality":{"components":q,"max_components":5,"moneyline_available":bool(m["moneyline"]),"total_available":bool(m["total"]),"spread_available":bool(m["spread"])},"model":"SofaScore odds + recent form" if m["moneyline"] else "recent form + home edge","rules_note":"Basketball total settlement uses the official final score, including overtime."}
 def settle(history):
     for p in history:
         if p.get("settled"):continue
@@ -129,11 +126,11 @@ def main():
             if done(e) or (e.get("startTimestamp") or 0)<now-3600:continue
             p=predict(e,league,se or {},f)
             if p:predictions.append(p);accepted+=1
-        src.append({"competition":league,"tournament_id":tid,"season":se.get("name") if se else None,"events_seen":len(ev),"events":accepted})
+        src.append({"competition":league,"tournament_id":tid,"season":se.get("name") if se else "scheduled-events fallback","events_seen":len(ev),"events":accepted})
     history=load(DATA/"basketball_history.json",[]);known={(str(x.get("event_id")),x.get("league")) for x in history}
     for p in predictions:
         if (p["event_id"],p["league"]) not in known:history.append(p)
     history=settle(history);settled=[x for x in history if x.get("settled")];tot=[x for x in settled if x.get("total_correct") is not None];correct=sum(bool(x.get("correct")) for x in settled);tc=sum(bool(x.get("total_correct")) for x in tot)
     save(DATA/"basketball_predictions.json",sorted(predictions,key=lambda x:x["start_time"]));save(DATA/"basketball_history.json",history);save(DATA/"basketball_accuracy.json",{"updated_at":datetime.now(timezone.utc).isoformat(),"settled":len(settled),"correct":correct,"accuracy":correct/len(settled) if settled else None,"total_ou_settled":len(tot),"total_ou_correct":tc,"total_ou_accuracy":tc/len(tot) if tot else None})
-    status=load(DATA/"pipeline_status.json",{});status.update({"basketball_count":len(predictions),"basketball_settled":len(settled),"basketball_sources":src,"basketball_source_status":"SofaScore public JSON with scheduled-event fallback","basketball_updated_at":datetime.now(timezone.utc).isoformat(),"basketball_rules":"Totals settle on official final score including overtime"});save(DATA/"pipeline_status.json",status);print(f"SofaScore basketball: {len(predictions)} predictions; sources={src}; settled={len(settled)}")
+    status=load(DATA/"pipeline_status.json",{});status.update({"basketball_count":len(predictions),"basketball_settled":len(settled),"basketball_sources":src,"basketball_source_status":"SofaScore via curl_cffi + scheduled-event fallback","basketball_updated_at":datetime.now(timezone.utc).isoformat(),"basketball_rules":"Totals settle on official final score including overtime"});save(DATA/"pipeline_status.json",status);print(f"SofaScore basketball: {len(predictions)} predictions; sources={src}; settled={len(settled)}")
 if __name__=="__main__":main()
