@@ -1,6 +1,6 @@
 """Basketball coverage for BBL-Pokal and international club friendlies."""
 import json, math, re
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 import requests
 ROOT=Path(__file__).resolve().parents[1]; DATA=ROOT/"data"; BASE="https://api.sofascore.com/api/v1"
@@ -21,18 +21,32 @@ def season(tid):
     try:
         rows=get(f"/unique-tournament/{tid}/seasons").get("seasons") or []; return rows[0] if rows else None
     except Exception:return None
-def events_for(tid):
-    se=season(tid)
-    if not se:return [],None
-    out=[];seen=set()
-    for page in range(2):
-        for direction in ("next","last"):
-            try:p=get(f"/unique-tournament/{tid}/season/{se['id']}/events/{direction}/{page}")
-            except Exception:continue
-            for e in p.get("events") or []:
+def scheduled_events(tid,days_back=21,days_forward=7):
+    out=[];seen=set();base=datetime.now(timezone.utc).date()
+    for offset in range(-days_back,days_forward+1):
+        d=base+timedelta(days=offset)
+        try:p=get(f"/sport/basketball/scheduled-events/{d.isoformat()}")
+        except Exception:continue
+        for e in p.get("events") or []:
+            ut=((e.get("tournament") or {}).get("uniqueTournament") or {})
+            uid=ut.get("id")
+            if uid==tid or str(uid)==str(tid):
                 eid=str(e.get("id") or "")
                 if eid and eid not in seen:seen.add(eid);out.append(e)
-    return out,se
+    return out
+def events_for(tid):
+    se=season(tid)
+    if se:
+        out=[];seen=set()
+        for page in range(2):
+            for direction in ("next","last"):
+                try:p=get(f"/unique-tournament/{tid}/season/{se['id']}/events/{direction}/{page}")
+                except Exception:continue
+                for e in p.get("events") or []:
+                    eid=str(e.get("id") or "")
+                    if eid and eid not in seen:seen.add(eid);out.append(e)
+        if out:return out,se
+    return scheduled_events(tid),None
 def prob(x):
     try:x=float(x);return 1/x if x>1 else None
     except (TypeError,ValueError,ZeroDivisionError):return None
@@ -121,5 +135,5 @@ def main():
         if (p["event_id"],p["league"]) not in known:history.append(p)
     history=settle(history);settled=[x for x in history if x.get("settled")];tot=[x for x in settled if x.get("total_correct") is not None];correct=sum(bool(x.get("correct")) for x in settled);tc=sum(bool(x.get("total_correct")) for x in tot)
     save(DATA/"basketball_predictions.json",sorted(predictions,key=lambda x:x["start_time"]));save(DATA/"basketball_history.json",history);save(DATA/"basketball_accuracy.json",{"updated_at":datetime.now(timezone.utc).isoformat(),"settled":len(settled),"correct":correct,"accuracy":correct/len(settled) if settled else None,"total_ou_settled":len(tot),"total_ou_correct":tc,"total_ou_accuracy":tc/len(tot) if tot else None})
-    status=load(DATA/"pipeline_status.json",{});status.update({"basketball_count":len(predictions),"basketball_settled":len(settled),"basketball_sources":src,"basketball_source_status":"SofaScore public JSON","basketball_updated_at":datetime.now(timezone.utc).isoformat(),"basketball_rules":"Totals settle on official final score including overtime"});save(DATA/"pipeline_status.json",status);print(f"SofaScore basketball: {len(predictions)} predictions; sources={src}; settled={len(settled)}")
+    status=load(DATA/"pipeline_status.json",{});status.update({"basketball_count":len(predictions),"basketball_settled":len(settled),"basketball_sources":src,"basketball_source_status":"SofaScore public JSON with scheduled-event fallback","basketball_updated_at":datetime.now(timezone.utc).isoformat(),"basketball_rules":"Totals settle on official final score including overtime"});save(DATA/"pipeline_status.json",status);print(f"SofaScore basketball: {len(predictions)} predictions; sources={src}; settled={len(settled)}")
 if __name__=="__main__":main()
