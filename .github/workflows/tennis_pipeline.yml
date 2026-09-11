@@ -45,7 +45,7 @@ jobs:
       - name: Refine weak-signal tennis analytics
         run: python scripts/calibrate_tennis_analytics.py
       - name: Build basketball coverage and OddsPapi/Stake market signals
-        run: PYTHONPATH=. python scripts/basketball_hybrid.py
+        run: PYTHONPATH=. python scripts/basketball_oddspapi_runner.py
       - name: Run prediction QA gate
         run: python qa/prediction_qa.py
       - name: Commit generated data and QA report
