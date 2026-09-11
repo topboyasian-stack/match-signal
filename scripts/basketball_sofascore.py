@@ -3,11 +3,16 @@ import json, math, re
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from curl_cffi import requests
-ROOT=Path(__file__).resolve().parents[1]; DATA=ROOT/"data"; BASE="https://api.sofascore.com/api/v1"
+ROOT=Path(__file__).resolve().parents[1]; DATA=ROOT/"data"; BASES=["https://api.sofascore.com/api/v1","https://www.sofascore.com/api/v1"]
 TOURNAMENTS={"German Basketball Cup":359,"International Club Friendly":1195}
-S=requests.Session(impersonate="chrome"); S.headers.update({"Accept":"application/json,text/plain,*/*","Referer":"https://www.sofascore.com/"})
+S=requests.Session(impersonate="chrome"); S.headers.update({"Accept":"application/json,text/plain,*/*","Accept-Language":"en-US,en;q=0.9","Referer":"https://www.sofascore.com/"})
 def get(path):
-    r=S.get(BASE+path,timeout=25); r.raise_for_status(); return r.json()
+    last=None
+    for base in BASES:
+        try:
+            r=S.get(base+path,timeout=25); r.raise_for_status(); return r.json()
+        except Exception as e:last=e
+    raise last
 def load(path,default):
     try:return json.loads(path.read_text(encoding="utf-8"))
     except (FileNotFoundError,json.JSONDecodeError):return default
@@ -132,5 +137,5 @@ def main():
         if (p["event_id"],p["league"]) not in known:history.append(p)
     history=settle(history);settled=[x for x in history if x.get("settled")];tot=[x for x in settled if x.get("total_correct") is not None];correct=sum(bool(x.get("correct")) for x in settled);tc=sum(bool(x.get("total_correct")) for x in tot)
     save(DATA/"basketball_predictions.json",sorted(predictions,key=lambda x:x["start_time"]));save(DATA/"basketball_history.json",history);save(DATA/"basketball_accuracy.json",{"updated_at":datetime.now(timezone.utc).isoformat(),"settled":len(settled),"correct":correct,"accuracy":correct/len(settled) if settled else None,"total_ou_settled":len(tot),"total_ou_correct":tc,"total_ou_accuracy":tc/len(tot) if tot else None})
-    status=load(DATA/"pipeline_status.json",{});status.update({"basketball_count":len(predictions),"basketball_settled":len(settled),"basketball_sources":src,"basketball_source_status":"SofaScore via curl_cffi + scheduled-event fallback","basketball_updated_at":datetime.now(timezone.utc).isoformat(),"basketball_rules":"Totals settle on official final score including overtime"});save(DATA/"pipeline_status.json",status);print(f"SofaScore basketball: {len(predictions)} predictions; sources={src}; settled={len(settled)}")
+    status=load(DATA/"pipeline_status.json",{});status.update({"basketball_count":len(predictions),"basketball_settled":len(settled),"basketball_sources":src,"basketball_source_status":"SofaScore API/web API via curl_cffi","basketball_updated_at":datetime.now(timezone.utc).isoformat(),"basketball_rules":"Totals settle on official final score including overtime"});save(DATA/"pipeline_status.json",status);print(f"SofaScore basketball: {len(predictions)} predictions; sources={src}; settled={len(settled)}")
 if __name__=="__main__":main()
