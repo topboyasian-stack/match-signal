@@ -19,7 +19,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  MATCH_SIGNAL_DEPLOY_REV: "2026-09-11-hybrid-basketball"
+  MATCH_SIGNAL_DEPLOY_REV: "2026-09-11-stake-basketball"
+  STAKE_ODDS_API_KEY: ${{ secrets.STAKE_ODDS_API_KEY }}
 
 jobs:
   run-pipeline:
@@ -42,7 +43,7 @@ jobs:
         run: python scripts/run_pipeline.py
       - name: Refine weak-signal tennis analytics
         run: python scripts/calibrate_tennis_analytics.py
-      - name: Build target basketball coverage from official/public web sources
+      - name: Build basketball coverage and Stake market signals
         run: PYTHONPATH=. python scripts/basketball_hybrid.py
       - name: Run prediction QA gate
         run: python qa/prediction_qa.py
