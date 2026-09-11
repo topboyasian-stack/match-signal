@@ -44,7 +44,7 @@ jobs:
       - name: Add German Cup and international club-friendly basketball coverage
         run: python scripts/basketball_sofascore.py
       - name: Recover basketball fixtures from public SofaScore HTML when API is unavailable
-        run: python scripts/basketball_web_discovery.py
+        run: PYTHONPATH=. python scripts/basketball_web_discovery.py
       - name: Run prediction QA gate
         run: python qa/prediction_qa.py
       - name: Commit generated data and QA report
