@@ -10,6 +10,7 @@ on:
       - 'tennis.html'
       - 'live-timer.js'
       - 'nav-fix.js'
+      - 'metrics-fix.js'
       - 'data/**'
       - '.github/workflows/deploy-pages.yml'
   workflow_dispatch:
@@ -24,7 +25,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  MATCH_SIGNAL_DEPLOY_REV: "2026-09-13-nav-fix-v2"
+  MATCH_SIGNAL_DEPLOY_REV: "2026-09-13-frontend-fixes-v3"
 
 jobs:
   deploy:
@@ -35,32 +36,28 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-
       - name: Setup Pages
         uses: actions/configure-pages@v5
-
-      - name: Install hard navigation fallback
+      - name: Install production frontend fixes
         run: |
           python - <<'PY'
           from pathlib import Path
-          tag = '<script src="./nav-fix.js"></script>'
           for path in Path('.').glob('*.html'):
-              text = path.read_text(encoding='utf-8')
-              if tag not in text:
-                  text = text.replace('</body>', tag + '\n</body>', 1)
-              marker = '<style id="match-signal-nav-fix">'
-              style = marker + '.tabs a,.nav a{pointer-events:auto!important;position:relative;z-index:9999;cursor:pointer!important;touch-action:manipulation}</style>'
-              if marker not in text:
-                  text = text.replace('</head>', style + '</head>', 1)
-              path.write_text(text, encoding='utf-8')
-              print(f'Navigation fallback installed: {path}')
+              text=path.read_text(encoding='utf-8')
+              for src in ('./nav-fix.js','./metrics-fix.js','./live-timer.js'):
+                  tag=f'<script src="{src}"></script>'
+                  if tag not in text:
+                      text=text.replace('</body>',tag+'\n</body>',1)
+              marker='<style id="match-signal-nav-fix">'
+              style=marker+'.tabs a,.nav a{pointer-events:auto!important;position:relative;z-index:9999;cursor:pointer!important;touch-action:manipulation}</style>'
+              if marker not in text: text=text.replace('</head>',style+'</head>',1)
+              path.write_text(text,encoding='utf-8')
+              print(f'Frontend fixes installed: {path}')
           PY
-
       - name: Upload site artifact
         uses: actions/upload-pages-artifact@v4
         with:
           path: '.'
-
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
