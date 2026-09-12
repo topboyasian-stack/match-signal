@@ -64,9 +64,11 @@ jobs:
           echo "changed=true" >> "$GITHUB_OUTPUT"
 
       - name: Setup GitHub Pages
+        if: steps.commit-results.outputs.changed == 'true'
         uses: actions/configure-pages@v5
 
       - name: Inject live match timer
+        if: steps.commit-results.outputs.changed == 'true'
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -80,10 +82,12 @@ jobs:
           PY
 
       - name: Upload site artifact
+        if: steps.commit-results.outputs.changed == 'true'
         uses: actions/upload-pages-artifact@v4
         with:
           path: '.'
 
       - name: Deploy to GitHub Pages
+        if: steps.commit-results.outputs.changed == 'true'
         id: deployment
         uses: actions/deploy-pages@v4
