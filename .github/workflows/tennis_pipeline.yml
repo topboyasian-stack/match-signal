@@ -21,7 +21,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  MATCH_SIGNAL_DEPLOY_REV: "2026-09-13-pipeline-pages-fix"
+  MATCH_SIGNAL_DEPLOY_REV: "2026-09-13-model-guard-v1"
   STAKE_ODDS_API_KEY: ${{ secrets.STAKE_ODDS_API_KEY }}
   ODDSPAPI_API_KEY: ${{ secrets.ODDSPAPI_API_KEY }}
 
@@ -54,6 +54,8 @@ jobs:
         run: python scripts/calibrate_tennis_analytics.py
       - name: Build basketball coverage and OddsPapi/Stake market signals
         run: PYTHONPATH=. python scripts/basketball_oddspapi_runner.py
+      - name: Run empirical model risk gate
+        run: python scripts/model_guard.py
       - name: Run prediction QA gate
         run: python qa/prediction_qa.py
       - name: Commit generated data and QA report
@@ -62,28 +64,33 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/predictions.json data/prediction_history.json data/accuracy.json data/pipeline_status.json data/basketball_predictions.json data/basketball_history.json data/basketball_accuracy.json data/basketball_provider_cache.json qa/report.json
+          git add data/predictions.json data/prediction_history.json data/accuracy.json data/pipeline_status.json data/risk_gate.json data/basketball_predictions.json data/basketball_history.json data/basketball_accuracy.json data/basketball_provider_cache.json qa/report.json
           if git diff --cached --quiet; then
             echo "No generated data or QA changes."
             echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          git commit -m "🤖 Refresh predictions, basketball, accuracy and QA"
+          git commit -m "🤖 Refresh predictions, risk gate, basketball, accuracy and QA"
           git push origin main
           echo "changed=true" >> "$GITHUB_OUTPUT"
       - name: Setup GitHub Pages
         uses: actions/configure-pages@v5
-      - name: Inject live match timer
+      - name: Inject production frontend fixes
         run: |
           python - <<'PY'
           from pathlib import Path
           path = Path('index.html')
           text = path.read_text(encoding='utf-8')
-          tag = '<script src="./live-timer.js"></script>'
-          if tag not in text:
-              text = text.replace('</body>', tag + '\n</body>')
-              path.write_text(text, encoding='utf-8')
-          print('Live timer injected into index.html')
+          for src in ('./nav-fix.js','./metrics-fix.js','./live-timer.js'):
+              tag = f'<script src="{src}"></script>'
+              if tag not in text:
+                  text = text.replace('</body>', tag + '\n</body>', 1)
+          marker = '<style id="match-signal-nav-fix">'
+          style = marker + '.tabs a,.nav a{pointer-events:auto!important;position:relative;z-index:9999;cursor:pointer!important;touch-action:manipulation}</style>'
+          if marker not in text:
+              text = text.replace('</head>', style + '</head>', 1)
+          path.write_text(text, encoding='utf-8')
+          print('Injected navigation, sport-specific metrics and live timer fixes')
           PY
       - name: Upload site artifact
         uses: actions/upload-pages-artifact@v4
