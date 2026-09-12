@@ -9,6 +9,7 @@ on:
       - 'basketball.html'
       - 'tennis.html'
       - 'live-timer.js'
+      - 'nav-fix.js'
       - 'data/**'
       - '.github/workflows/deploy-pages.yml'
   workflow_dispatch:
@@ -23,7 +24,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  MATCH_SIGNAL_DEPLOY_REV: "2026-09-13-nav-fix"
+  MATCH_SIGNAL_DEPLOY_REV: "2026-09-13-nav-fix-v2"
 
 jobs:
   deploy:
@@ -38,46 +39,21 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
-      - name: Fix navigation links
+      - name: Install hard navigation fallback
         run: |
           python - <<'PY'
           from pathlib import Path
-          import re
-
-          base = 'https://topboyasian-stack.github.io/match-signal/'
-          routes = {
-              './index.html?sport=football': base + 'index.html?sport=football',
-              './index.html?sport=tennis': base + 'index.html?sport=tennis',
-              './basketball.html': base + 'basketball.html',
-              './performance.html': base + 'performance.html',
-              './': base,
-          }
-
+          tag = '<script src="./nav-fix.js"></script>'
           for path in Path('.').glob('*.html'):
               text = path.read_text(encoding='utf-8')
-              for old, new in routes.items():
-                  text = text.replace(f'href="{old}"', f'href="{new}"')
-                  text = text.replace(f"href='{old}'", f"href='{new}'")
-              # Make the dashboard navigation immune to accidental pointer-event overrides.
+              if tag not in text:
+                  text = text.replace('</body>', tag + '\n</body>', 1)
               marker = '<style id="match-signal-nav-fix">'
-              style = marker + '.tabs a,.nav a{pointer-events:auto!important;position:relative;z-index:20;cursor:pointer!important}</style>'
+              style = marker + '.tabs a,.nav a{pointer-events:auto!important;position:relative;z-index:9999;cursor:pointer!important;touch-action:manipulation}</style>'
               if marker not in text:
                   text = text.replace('</head>', style + '</head>', 1)
               path.write_text(text, encoding='utf-8')
-              print(f'Navigation fixed: {path}')
-          PY
-
-      - name: Inject live match timer
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          path = Path('index.html')
-          text = path.read_text(encoding='utf-8')
-          tag = '<script src="./live-timer.js"></script>'
-          if tag not in text:
-              text = text.replace('</body>', tag + '\n</body>')
-              path.write_text(text, encoding='utf-8')
-          print('Live timer injected into index.html')
+              print(f'Navigation fallback installed: {path}')
           PY
 
       - name: Upload site artifact
