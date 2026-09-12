@@ -1,10 +1,6 @@
-"""Settle completed Match Signal fixtures from the same day and recent days.
-
-The main pipeline intentionally looks at dates before today. This companion pass
-also checks today's scoreboard so finished matches are recorded immediately.
-"""
+"""Settle completed Match Signal fixtures from authoritative ESPN event summaries."""
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
@@ -24,7 +20,7 @@ FOOTBALL_LEAGUES = {
 }
 TENNIS_LEAGUES = {"ATP": "atp", "WTA": "wta"}
 SESSION = requests.Session()
-SESSION.headers.update({"User-Agent": "MatchSignal/3.0 (+https://github.com/topboyasian-stack/match-signal)"})
+SESSION.headers.update({"User-Agent": "MatchSignal/3.2 (+https://github.com/topboyasian-stack/match-signal)"})
 
 
 def load(path, default):
@@ -40,19 +36,20 @@ def save(path, value):
         json.dump(value, f, indent=2, ensure_ascii=False)
 
 
-def scoreboard(sport, league, date):
-    r = SESSION.get(f"{ESPN}/{sport}/{league}/scoreboard", params={"dates": date}, timeout=30)
+def event_summary(sport, league, event_id):
+    r = SESSION.get(
+        f"{ESPN}/{sport}/{league}/summary",
+        params={"event": event_id},
+        timeout=30,
+    )
     r.raise_for_status()
     return r.json()
 
 
-def flatten_tennis(board):
-    out = []
-    for tournament in board.get("events", []):
-        for grouping in tournament.get("groupings", []):
-            for comp in grouping.get("competitions", []):
-                out.append(comp)
-    return out
+def extract_competition(summary):
+    header = summary.get("header") or {}
+    competitions = header.get("competitions") or summary.get("competitions") or []
+    return competitions[0] if competitions else None
 
 
 def brier(probs, actual):
@@ -61,40 +58,48 @@ def brier(probs, actual):
 
 def settle(history):
     now = datetime.now(timezone.utc)
-    today = now.date()
-    pending = [p for p in history if not p.get("settled") and p.get("start_time")]
-    dates = sorted({p["start_time"][:10] for p in pending})
-    dates = [d for d in dates if d <= today.isoformat()][-10:]
-    if not dates:
+    pending = [p for p in history if not p.get("settled") and p.get("event_id")]
+    if not pending:
         return 0
 
-    boards = {}
-    for date in dates:
-        for label, league in FOOTBALL_LEAGUES.items():
-            try:
-                for event in scoreboard("soccer", league, date).get("events", []):
-                    boards[f"football:{event.get('id')}"] = event
-            except Exception as exc:
-                print(f"football {label} {date}: {exc}")
-        for tour, league in TENNIS_LEAGUES.items():
-            try:
-                for event in flatten_tennis(scoreboard("tennis", league, date)):
-                    boards[f"tennis:{event.get('id')}"] = event
-            except Exception as exc:
-                print(f"tennis {tour} {date}: {exc}")
+    competitions = {}
+    for prediction in pending:
+        sport = str(prediction.get("sport") or "").lower()
+        label = prediction.get("league")
+        league = FOOTBALL_LEAGUES.get(label) if sport == "football" else TENNIS_LEAGUES.get(label)
+        if not league:
+            continue
+        key = f"{sport}:{league}:{prediction.get('event_id')}"
+        if key in competitions:
+            continue
+        try:
+            summary = event_summary("soccer" if sport == "football" else "tennis", league, prediction.get("event_id"))
+            competition = extract_competition(summary)
+            if competition:
+                competitions[key] = competition
+        except Exception as exc:
+            print(f"{sport} {label} {prediction.get('event_id')}: {exc}")
 
     settled = 0
     for prediction in history:
         if prediction.get("settled"):
             continue
-        event = boards.get(f"{prediction.get('sport')}:{prediction.get('event_id')}")
-        if not event or not event.get("status", {}).get("type", {}).get("completed"):
+        sport = str(prediction.get("sport") or "").lower()
+        label = prediction.get("league")
+        league = FOOTBALL_LEAGUES.get(label) if sport == "football" else TENNIS_LEAGUES.get(label)
+        if not league:
             continue
-        competitors = event.get("competitions", [{}])[0].get("competitors", []) or event.get("competitors", [])
+        competition = competitions.get(f"{sport}:{league}:{prediction.get('event_id')}")
+        if not competition:
+            continue
+        status_type = (competition.get("status") or {}).get("type") or {}
+        if not status_type.get("completed"):
+            continue
+        competitors = competition.get("competitors") or []
         if len(competitors) < 2:
             continue
         try:
-            if prediction.get("sport") == "football":
+            if sport == "football":
                 home = next(c for c in competitors if c.get("homeAway") == "home")
                 away = next(c for c in competitors if c.get("homeAway") == "away")
                 hs, ass = float(home.get("score", 0)), float(away.get("score", 0))
@@ -120,7 +125,7 @@ def settle(history):
                 "brier": brier(prediction.get("probabilities", {}), actual),
             })
             settled += 1
-            print(f"Settled {prediction.get('player_1')} vs {prediction.get('player_2')}: {prediction.get('final_score')} ({'WIN' if prediction.get('correct') else 'LOSS'})")
+            print(f"Settled {prediction.get('event_id')}: {prediction.get('final_score')} ({'WIN' if prediction.get('correct') else 'LOSS'})")
         except (TypeError, ValueError, KeyError, StopIteration) as exc:
             print(f"Could not settle {prediction.get('event_id')}: {exc}")
     return settled
@@ -152,7 +157,7 @@ def main():
         "summary": summary,
         "recent_settled": [p for p in history if p.get("settled")][-50:],
     })
-    print(f"Same-day settlement complete: {count} newly settled | total settled {summary['settled']}")
+    print(f"Settlement complete: {count} newly settled | total settled {summary['settled']}")
 
 
 if __name__ == "__main__":
