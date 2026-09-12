@@ -3,9 +3,10 @@
   async function apply() {
     const sport = new URLSearchParams(location.search).get('sport') === 'tennis' ? 'tennis' : 'football';
     try {
-      const [ar, hr] = await Promise.all([
+      const [ar, hr, rr] = await Promise.all([
         fetch('./data/accuracy.json?metrics=' + Date.now(), {cache:'no-store'}),
-        fetch('./data/prediction_history.json?metrics=' + Date.now(), {cache:'no-store'})
+        fetch('./data/prediction_history.json?metrics=' + Date.now(), {cache:'no-store'}),
+        fetch('./data/risk_gate.json?metrics=' + Date.now(), {cache:'no-store'})
       ]);
       if (!ar.ok || !hr.ok) return;
       const d = await ar.json();
@@ -16,7 +17,17 @@
       document.getElementById('accuracy').textContent = rows.length ? ((Number(s.accuracy || 0) * 100).toFixed(1) + '%') : '—';
       document.getElementById('settled').textContent = String(s.settled || 0);
       document.getElementById('brier').textContent = brier == null ? '—' : brier.toFixed(3);
-    } catch (e) { console.warn('sport metrics fix failed', e); }
+      if (rr.ok) {
+        const risk = await rr.json();
+        const gate = (risk.gate || {})[sport];
+        if (gate && gate.live_eligible !== true) {
+          const status = document.getElementById('statusText');
+          const updated = document.getElementById('updated');
+          status.textContent = 'PAPER MODE — live betting not approved';
+          updated.textContent = 'Model outputs are being tracked for validation; Telegram live picks are gated.';
+        }
+      }
+    } catch (e) { console.warn('sport metrics/risk fix failed', e); }
   }
   document.addEventListener('DOMContentLoaded', apply);
   setTimeout(apply, 1500);
