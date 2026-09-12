@@ -34,7 +34,8 @@ jobs:
           echo "Deployed Worker: $WORKER_URL"
           echo "WORKER_URL=$WORKER_URL" >> "$GITHUB_ENV"
 
-      - name: Configure Telegram webhook
+      - name: Provision Telegram bot secret
+        working-directory: telegram-worker
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         run: |
@@ -42,6 +43,12 @@ jobs:
             echo "Missing TELEGRAM_BOT_TOKEN secret"
             exit 1
           fi
+          printf '%s' "$TELEGRAM_BOT_TOKEN" | npx wrangler@latest secret put TELEGRAM_BOT_TOKEN
+
+      - name: Configure Telegram webhook
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: |
           WEBHOOK_SECRET=$(printf '%s' "$TELEGRAM_BOT_TOKEN" | sha256sum | cut -d' ' -f1)
           RESPONSE=$(curl -fsS "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook" \
             --data-urlencode "url=${WORKER_URL}/telegram/webhook" \
