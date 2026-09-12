@@ -1,0 +1,107 @@
+name: Publish Match Signal to Telegram
+
+on:
+  workflow_run:
+    workflows: ["Match Signal Live Prediction Pipeline"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout latest generated data
+        uses: actions/checkout@v4
+
+      - name: Publish qualified signals
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          python - <<'PY'
+          import json, os, urllib.request
+          from datetime import datetime, timezone, timedelta
+
+          token = os.environ.get("TELEGRAM_BOT_TOKEN")
+          chat_id = os.environ.get("TELEGRAM_CHAT_ID")
+          if not token or not chat_id:
+              raise SystemExit("Missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID secret")
+
+          def load(path):
+              try:
+                  with open(path, encoding="utf-8") as f:
+                      value = json.load(f)
+                  return value if isinstance(value, list) else []
+              except Exception:
+                  return []
+
+          def pct(v):
+              return f"{float(v or 0)*100:.1f}%"
+
+          def esc(v):
+              return str(v or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+          predictions = load("data/predictions.json")
+          basketball = load("data/basketball_predictions.json")
+          now = datetime.now(timezone.utc)
+          cutoff = now + timedelta(hours=30)
+          rows = []
+          for p in predictions + basketball:
+              raw = p.get("start_time") or p.get("commence_time")
+              try:
+                  start = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+              except Exception:
+                  continue
+              if start < now - timedelta(hours=2) or start > cutoff:
+                  continue
+              if float(p.get("confidence") or 0) >= 0.55 or p.get("qualified_signal") is True:
+                  p["_start"] = start
+                  rows.append(p)
+
+          rows.sort(key=lambda p: p["_start"])
+          rows = rows[:8]
+          if not rows:
+              print("No qualified upcoming signals to publish.")
+              raise SystemExit(0)
+
+          blocks = ["📡 <b>MATCH SIGNAL — LIVE PICKS</b>"]
+          for p in rows:
+              sport = str(p.get("sport", "")).lower()
+              if sport == "basketball":
+                  home = p.get("home_team") or p.get("team_1") or "Home"
+                  away = p.get("away_team") or p.get("team_2") or "Away"
+                  market = p.get("market") or "O/U"
+                  pick = p.get("pick") or p.get("selection") or "Qualified signal"
+                  blocks.append(f"🏀 <b>{esc(home)} vs {esc(away)}</b>\n{esc(market)}: <b>{esc(pick)}</b> — {pct(p.get('confidence'))}")
+              elif sport == "tennis":
+                  pick = p.get("player_1") if p.get("pick") == "p1" else p.get("player_2") if p.get("pick") == "p2" else p.get("pick")
+                  blocks.append(f"🎾 <b>{esc(p.get('player_1'))} vs {esc(p.get('player_2'))}</b>\nPick: <b>{esc(pick)}</b> — {pct(p.get('confidence'))}")
+              else:
+                  home = p.get("home_team") or p.get("team_1") or "Home"
+                  away = p.get("away_team") or p.get("team_2") or "Away"
+                  pick = p.get("pick") or p.get("prediction") or "Qualified signal"
+                  blocks.append(f"⚽ <b>{esc(home)} vs {esc(away)}</b>\nPick: <b>{esc(pick)}</b> — {pct(p.get('confidence'))}")
+
+          blocks.append("\n<a href=\"https://topboyasian-stack.github.io/match-signal/\">Open Match Signal →</a>")
+          payload = json.dumps({
+              "chat_id": chat_id,
+              "text": "\n\n".join(blocks),
+              "parse_mode": "HTML",
+              "disable_web_page_preview": True,
+          }).encode()
+          req = urllib.request.Request(
+              f"https://api.telegram.org/bot{token}/sendMessage",
+              data=payload,
+              headers={"Content-Type": "application/json"},
+              method="POST",
+          )
+          with urllib.request.urlopen(req, timeout=20) as response:
+              result = json.loads(response.read().decode())
+          if not result.get("ok"):
+              raise SystemExit(result)
+          print("Telegram publication succeeded.")
+          PY
