@@ -12,6 +12,12 @@ async function telegram(env, method, body) {
   return data.result;
 }
 
+async function webhookSecret(token) {
+  const bytes = new TextEncoder().encode(token);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 async function loadJson(name) {
   const response = await fetch(`${DATA_BASE}${name}`, { cf: { cacheTtl: 60 } });
   if (!response.ok) throw new Error(`${name}: HTTP ${response.status}`);
@@ -83,7 +89,7 @@ async function handleCommand(chatId, text, env) {
     const bAccuracy = basketball.accuracy ?? basketball.overall_accuracy ?? basketball.hit_rate ?? null;
     return telegram(env, "sendMessage", {
       chat_id: chatId,
-      text: `📈 <b>MATCH SIGNAL PERFORMANCE</b>\n\nFootball/Tennis: <b>${accuracy == null ? "Pending settlement" : pct(accuracy)}</b>\nBasketball: <b>${bAccuracy == null ? "Pending settlement" : pct(bAccuracy)}</b>\n\n<a href="${SITE_URL}performance.html">View full performance →</a>`,
+      text: `📈 <b>MATCH SIGNAL PERFORMANCE</b>\n\nFootball/Tennis: <b>${accuracy == null ? "Pending settlement" : pct(accuracy)}</b>\nBasketball: <b>${bAccuracy == null ? "Pending settlement" : pct(bAccuracy)} </b>\n\n<a href="${SITE_URL}performance.html">View full performance →</a>`,
       parse_mode: "HTML",
       disable_web_page_preview: true,
     });
@@ -96,7 +102,7 @@ export default {
     const url = new URL(request.url);
     if (request.method === "GET") return new Response("Match Signal Telegram Worker is online.", { status: 200 });
     if (request.method !== "POST" || url.pathname !== "/telegram/webhook") return new Response("Not found", { status: 404 });
-    if (request.headers.get("X-Telegram-Bot-Api-Secret-Token") !== env.TELEGRAM_WEBHOOK_SECRET) return new Response("Unauthorized", { status: 401 });
+    if (request.headers.get("X-Telegram-Bot-Api-Secret-Token") !== await webhookSecret(env.TELEGRAM_BOT_TOKEN)) return new Response("Unauthorized", { status: 401 });
     try {
       const update = await request.json();
       const message = update.message;
