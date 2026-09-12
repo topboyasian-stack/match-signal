@@ -1,6 +1,11 @@
 name: Match Signal Result Settlement
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/settle_same_day.py'
+      - '.github/workflows/settle-results.yml'
   schedule:
     - cron: '7,22,37,52 * * * *'
   workflow_dispatch:
