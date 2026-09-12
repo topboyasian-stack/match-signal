@@ -2,9 +2,9 @@ name: Match Signal Live Prediction Pipeline
 
 on:
   push:
+    branches: [main]
     paths:
       - 'scripts/**'
-      - 'data/**'
       - 'qa/**'
       - '.github/workflows/tennis_pipeline.yml'
   schedule:
@@ -19,7 +19,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  MATCH_SIGNAL_DEPLOY_REV: "2026-09-12-same-day-settlement-v2"
+  MATCH_SIGNAL_DEPLOY_REV: "2026-09-12-pipeline-race-fix"
   STAKE_ODDS_API_KEY: ${{ secrets.STAKE_ODDS_API_KEY }}
   ODDSPAPI_API_KEY: ${{ secrets.ODDSPAPI_API_KEY }}
 
@@ -39,7 +39,9 @@ jobs:
       - name: Install dependencies
         run: python -m pip install --upgrade requests curl_cffi
       - name: Sync with latest main before generation
-        run: git pull --rebase origin main
+        run: |
+          git fetch origin main
+          git reset --hard origin/main
       - name: Build live football and tennis predictions and settle historical picks
         run: python scripts/run_pipeline.py
       - name: Settle newly completed same-day fixtures
@@ -54,7 +56,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git pull --rebase origin main
           git add data/predictions.json data/prediction_history.json data/accuracy.json data/pipeline_status.json data/basketball_predictions.json data/basketball_history.json data/basketball_accuracy.json data/basketball_provider_cache.json qa/report.json
           if git diff --cached --quiet; then
             echo "No generated data or QA changes."
