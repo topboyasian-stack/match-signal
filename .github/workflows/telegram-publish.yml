@@ -132,6 +132,7 @@ jobs:
           rows.sort(key=lambda p: p['_start'])
           rows = rows[:8]
           if not rows:
+              open('.telegram-published', 'w', encoding='utf-8').write('no-qualified-signals\n')
               print('No qualified upcoming signals to publish.')
               raise SystemExit(0)
 
