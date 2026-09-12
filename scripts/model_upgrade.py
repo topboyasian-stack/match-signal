@@ -1,6 +1,5 @@
 import json
 import math
-from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
@@ -11,8 +10,18 @@ from value_decision import edge_and_ev, decision
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
 ESPN = "https://site.api.espn.com/apis/site/v2/sports"
+FOOTBALL_LEAGUES = {
+    "EPL": "eng.1",
+    "La Liga": "esp.1",
+    "Bundesliga": "ger.1",
+    "Serie A": "ita.1",
+    "Ligue 1": "fra.1",
+    "Champions League": "uefa.champions",
+    "MLS": "usa.1",
+    "Primeira Liga": "por.1",
+}
 SESSION = requests.Session()
-SESSION.headers.update({"User-Agent": "MatchSignal/4.0 independent-model"})
+SESSION.headers.update({"User-Agent": "MatchSignal/4.1 independent-model"})
 
 
 def get_json(url):
@@ -73,6 +82,12 @@ def load(path, default):
         return default
 
 
+def fetch_event(event_id, league):
+    """Use the same ESPN league slug that generated the fixture; /soccer/all is unreliable for summary-by-event."""
+    slug = FOOTBALL_LEAGUES.get(league, "eng.1")
+    return get_json(f"{ESPN}/soccer/{slug}/summary?event={event_id}")
+
+
 def main():
     pred_path = DATA / "predictions.json"
     history_path = DATA / "prediction_history.json"
@@ -81,6 +96,7 @@ def main():
     history = load(history_path, [])
     calibration = load(calibration_path, {})
     upgraded = 0
+    warnings = 0
     paper_value = 0
 
     for row in predictions:
@@ -92,10 +108,7 @@ def main():
         if not event_id:
             continue
         try:
-            event = get_json(f"{ESPN}/soccer/all/summary?event={event_id}")
-            # Some ESPN responses wrap the event under a competition/event object.
-            if not event.get("competitions"):
-                event = event.get("header", {}).get("competitions", [{}])[0] if event.get("header") else event
+            event = fetch_event(event_id, row.get("league") or "")
             independent = independent_prediction(
                 event,
                 row.get("league") or "global",
@@ -107,6 +120,8 @@ def main():
             raw = [independent["p1"], independent["draw"], independent["p2"]]
             calibrated = softmax_temperature(raw, calibration_temperature(calibration, "football"))
             market = market_1x2(event)
+            row["independent_probabilities"] = {"p1": independent["p1"], "draw": independent["draw"], "p2": independent["p2"]}
+            row["calibrated_probabilities"] = {"p1": round(calibrated[0], 4), "draw": round(calibrated[1], 4), "p2": round(calibrated[2], 4)}
             row["probabilities"] = {"p1": round(calibrated[0], 4), "draw": round(calibrated[1], 4), "p2": round(calibrated[2], 4)}
             row["pick"] = ["p1", "draw", "p2"][calibrated.index(max(calibrated))]
             row["confidence"] = round(max(calibrated), 4)
@@ -114,9 +129,13 @@ def main():
             row["architecture"] = "independent statistical + market benchmark + calibration + value"
             row["model"] = independent["method"]
             row["market"] = market or {"available": False}
+            row["market_probabilities"] = None if not market else {"p1": round(market["p1"], 4), "draw": round(market["draw"], 4), "p2": round(market["p2"], 4)}
+            row["market_odds"] = None if not market else market["odds"]
             row["edge"] = None
             row["value"] = None
             row["decision"] = "PAPER ONLY"
+            row["live_eligible"] = False
+            row["testing_mode"] = "paper"
             if market:
                 pick_idx = calibrated.index(max(calibrated))
                 edge, ev = edge_and_ev(calibrated[pick_idx], market["odds"][pick_idx])
@@ -125,14 +144,15 @@ def main():
                 dec = decision(calibrated[pick_idx], market["odds"][pick_idx], sample_ok=False)
                 row["decision"] = dec["decision"]
                 row["decision_reason"] = dec["reason"]
-                if dec["decision"] == "PAPER ONLY" and edge is not None and edge > 0:
+                if edge is not None and edge >= 0.035 and ev is not None and ev >= 0.05:
                     paper_value += 1
             upgraded += 1
         except Exception as exc:
+            warnings += 1
             row.setdefault("upgrade_warnings", []).append(str(exc)[:180])
 
     pred_path.write_text(json.dumps(predictions, indent=2, ensure_ascii=False), encoding="utf-8")
-    print(json.dumps({"status": "ok", "football_upgraded": upgraded, "positive_edge_paper_candidates": paper_value}, indent=2))
+    print(json.dumps({"status": "ok", "football_upgraded": upgraded, "positive_edge_paper_candidates": paper_value, "warnings": warnings}, indent=2))
 
 
 if __name__ == "__main__":
