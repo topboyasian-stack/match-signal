@@ -1,6 +1,3 @@
-import math
-
-
 def american_to_decimal(odds):
     try:
         odds = float(odds)
@@ -24,13 +21,11 @@ def edge_and_ev(model_prob, american_odds):
 
 
 def decision(model_prob, american_odds=None, *, min_edge=0.035, min_ev=0.05, min_confidence=0.55, sample_ok=True, data_ok=True):
-    """Conservative decision layer. Missing odds can never produce a live bet."""
+    """Value-first decision layer. Live eligibility remains separately gated."""
     try:
         p = float(model_prob)
     except (TypeError, ValueError):
         return {"decision": "NO BET", "reason": "invalid_probability"}
-    if not sample_ok:
-        return {"decision": "PAPER ONLY", "reason": "insufficient_historical_support"}
     if not data_ok:
         return {"decision": "NO BET", "reason": "data_quality_gate"}
     if american_odds is None:
@@ -42,4 +37,6 @@ def decision(model_prob, american_odds=None, *, min_edge=0.035, min_ev=0.05, min
         return {"decision": "NO BET", "reason": "low_probability", "edge": edge, "ev": ev}
     if edge < min_edge or ev < min_ev:
         return {"decision": "NO BET", "reason": "insufficient_value", "edge": edge, "ev": ev}
+    if not sample_ok:
+        return {"decision": "PAPER ONLY", "reason": "value_detected_but_live_gate_closed", "edge": edge, "ev": ev}
     return {"decision": "PAPER ONLY", "reason": "value_detected_but_live_gate_closed", "edge": edge, "ev": ev}
