@@ -1,10 +1,7 @@
 {
-  "generated_at": "2026-09-12T23:26:12.354892+00:00",
-  "status": "PASS",
-  "qa_score": 100,
-  "live_trading_approved": false,
-  "testing_mode": "PAPER_ONLY",
-  "empirical_metrics": {
+  "generated_at": "2026-09-12T23:26:12.313380+00:00",
+  "mode": "PAPER_ONLY",
+  "metrics": {
     "football": {
       "settled": 58,
       "accuracy": 0.3966,
@@ -64,18 +61,30 @@
       "bins": []
     }
   },
-  "prediction_counts": {
-    "football_tennis": 38,
-    "basketball": 3
-  },
-  "issues": [],
-  "warnings": [],
-  "checks": {
-    "probabilities_valid": true,
-    "confidence_valid": true,
-    "duplicates_checked": true,
-    "placeholder_names_checked": true,
-    "basketball_source_coverage_checked": true,
-    "empirical_risk_gate_checked": true
+  "gate": {
+    "football": {
+      "live_eligible": false,
+      "paper_only": true,
+      "reasons": [
+        "need >=100 settled picks (have 58)",
+        "positive-EV testing also requires contemporaneous market odds"
+      ]
+    },
+    "tennis": {
+      "live_eligible": false,
+      "paper_only": true,
+      "reasons": [
+        "need >=100 settled picks (have 0)",
+        "positive-EV testing also requires contemporaneous market odds"
+      ]
+    },
+    "basketball": {
+      "live_eligible": false,
+      "paper_only": true,
+      "reasons": [
+        "need >=100 settled picks (have 0)",
+        "positive-EV testing also requires contemporaneous market odds"
+      ]
+    }
   }
 }
