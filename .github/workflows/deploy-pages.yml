@@ -23,7 +23,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  MATCH_SIGNAL_DEPLOY_REV: "2026-09-12-live-timers"
+  MATCH_SIGNAL_DEPLOY_REV: "2026-09-13-nav-fix"
 
 jobs:
   deploy:
@@ -37,6 +37,35 @@ jobs:
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
+
+      - name: Fix navigation links
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          base = 'https://topboyasian-stack.github.io/match-signal/'
+          routes = {
+              './index.html?sport=football': base + 'index.html?sport=football',
+              './index.html?sport=tennis': base + 'index.html?sport=tennis',
+              './basketball.html': base + 'basketball.html',
+              './performance.html': base + 'performance.html',
+              './': base,
+          }
+
+          for path in Path('.').glob('*.html'):
+              text = path.read_text(encoding='utf-8')
+              for old, new in routes.items():
+                  text = text.replace(f'href="{old}"', f'href="{new}"')
+                  text = text.replace(f"href='{old}'", f"href='{new}'")
+              # Make the dashboard navigation immune to accidental pointer-event overrides.
+              marker = '<style id="match-signal-nav-fix">'
+              style = marker + '.tabs a,.nav a{pointer-events:auto!important;position:relative;z-index:20;cursor:pointer!important}</style>'
+              if marker not in text:
+                  text = text.replace('</head>', style + '</head>', 1)
+              path.write_text(text, encoding='utf-8')
+              print(f'Navigation fixed: {path}')
+          PY
 
       - name: Inject live match timer
         run: |
