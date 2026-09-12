@@ -13,20 +13,24 @@ on:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 concurrency:
   group: match-signal-pipeline
   cancel-in-progress: true
 
 env:
-  MATCH_SIGNAL_DEPLOY_REV: "2026-09-12-pipeline-race-fix"
+  MATCH_SIGNAL_DEPLOY_REV: "2026-09-13-pipeline-pages-fix"
   STAKE_ODDS_API_KEY: ${{ secrets.STAKE_ODDS_API_KEY }}
   ODDSPAPI_API_KEY: ${{ secrets.ODDSPAPI_API_KEY }}
 
 jobs:
   run-pipeline:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
+    environment:
+      name: github-pages
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -53,13 +57,38 @@ jobs:
       - name: Run prediction QA gate
         run: python qa/prediction_qa.py
       - name: Commit generated data and QA report
+        id: commit-data
+        shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/predictions.json data/prediction_history.json data/accuracy.json data/pipeline_status.json data/basketball_predictions.json data/basketball_history.json data/basketball_accuracy.json data/basketball_provider_cache.json qa/report.json
           if git diff --cached --quiet; then
             echo "No generated data or QA changes."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           git commit -m "🤖 Refresh predictions, basketball, accuracy and QA"
           git push origin main
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+      - name: Setup GitHub Pages
+        uses: actions/configure-pages@v5
+      - name: Inject live match timer
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('index.html')
+          text = path.read_text(encoding='utf-8')
+          tag = '<script src="./live-timer.js"></script>'
+          if tag not in text:
+              text = text.replace('</body>', tag + '\n</body>')
+              path.write_text(text, encoding='utf-8')
+          print('Live timer injected into index.html')
+          PY
+      - name: Upload site artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: '.'
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
