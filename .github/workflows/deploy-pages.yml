@@ -8,6 +8,7 @@ on:
       - 'performance.html'
       - 'basketball.html'
       - 'tennis.html'
+      - 'live-timer.js'
       - 'data/**'
       - '.github/workflows/deploy-pages.yml'
   workflow_dispatch:
@@ -22,7 +23,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  MATCH_SIGNAL_DEPLOY_REV: "2026-09-11-frontend-fix-2"
+  MATCH_SIGNAL_DEPLOY_REV: "2026-09-12-live-timers"
 
 jobs:
   deploy:
@@ -36,6 +37,19 @@ jobs:
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
+
+      - name: Inject live match timer
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('index.html')
+          text = path.read_text(encoding='utf-8')
+          tag = '<script src="./live-timer.js"></script>'
+          if tag not in text:
+              text = text.replace('</body>', tag + '\n</body>')
+              path.write_text(text, encoding='utf-8')
+          print('Live timer injected into index.html')
+          PY
 
       - name: Upload site artifact
         uses: actions/upload-pages-artifact@v4
