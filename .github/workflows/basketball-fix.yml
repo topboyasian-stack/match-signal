@@ -1,0 +1,103 @@
+name: Match Signal basketball market fix
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Harden basketball total-market parsing
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json
+
+          p = Path('scripts/basketball_hybrid.py')
+          s = p.read_text(encoding='utf-8')
+
+          old = '''ODDSPAPI_BASE = "https://api.oddspapi.io"\nSTAKE_BASE = "https://odds-data.stake.com"'''
+          new = '''ODDSPAPI_BASE = "https://api.oddspapi.io"\nSTAKE_BASE = "https://odds-data.stake.com"\n\n# Basketball game totals are normally well above a single-digit spread/handicap.\n# Reject values that are structurally consistent with a spread rather than a\n# full-game total. This prevents OddsPapi outcome labels such as "Over -2" or\n# "Over 5" from being published as total-points markets.\nMIN_VALID_TOTAL = 100.0\nMAX_VALID_TOTAL = 260.0'''
+          if old in s and 'MIN_VALID_TOTAL = 100.0' not in s:
+              s = s.replace(old, new, 1)
+
+          old = '''    candidates = [(line, sides) for line, sides in totals.items() if "over" in sides and "under" in sides]'''
+          new = '''    candidates = [\n        (line, sides)\n        for line, sides in totals.items()\n        if "over" in sides\n        and "under" in sides\n        and MIN_VALID_TOTAL <= line <= MAX_VALID_TOTAL\n    ]'''
+          if old not in s:
+              raise SystemExit('Missing OddsPapi total candidate patch target')
+          s = s.replace(old, new, 1)
+
+          old = '''    pairs = [(line, d) for line, d in totals.items() if "over" in d and "under" in d]'''
+          new = '''    pairs = [\n        (line, d)\n        for line, d in totals.items()\n        if "over" in d\n        and "under" in d\n        and MIN_VALID_TOTAL <= line <= MAX_VALID_TOTAL\n    ]'''
+          if old not in s:
+              raise SystemExit('Missing Stake total candidate patch target')
+          s = s.replace(old, new, 1)
+          p.write_text(s, encoding='utf-8')
+
+          p = Path('scripts/basketball_pipeline.py')
+          s = p.read_text(encoding='utf-8')
+          old = '''    if op is None or up is None:\n        return None\n    probs = normalise([op, up])\n    return {"line": line, "over": probs[0], "under": probs[1]}'''
+          new = '''    if op is None or up is None:\n        return None\n    # Reject handicap/spread values accidentally exposed through the total field.\n    if not 100.0 <= line <= 260.0:\n        return None\n    probs = normalise([op, up])\n    return {"line": line, "over": probs[0], "under": probs[1]}'''
+          if old in s and 'Reject handicap/spread values accidentally exposed' not in s:
+              s = s.replace(old, new, 1)
+          p.write_text(s, encoding='utf-8')
+
+          path = Path('data/basketball_predictions.json')
+          data = json.loads(path.read_text(encoding='utf-8'))
+          changed = False
+          for row in data:
+              ou = ((row.get('markets') or {}).get('total_ou') or {})
+              line = ou.get('line')
+              if line is not None and not 100 <= float(line) <= 260:
+                  row['prediction_status'] = 'no_qualified_signal'
+                  row['markets']['total_ou'] = {\
+                      'line': None, 'over': 0.5, 'under': 0.5, 'pick': None,\
+                      'expected_total': None,\
+                      'source': 'Rejected invalid total market; awaiting refresh',\
+                      'settlement': 'Official final score including overtime',\
+                      'odds': None\
+                  }
+                  row['signal_quality']['market_total_available'] = False
+                  row['signal_quality']['components'] = 0
+                  changed = True
+          if changed:
+              path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+          PY
+      - name: Validate basketball fixes
+        run: |
+          python -m py_compile scripts/basketball_hybrid.py scripts/basketball_pipeline.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          rows=json.loads(Path('data/basketball_predictions.json').read_text())
+          bad=[]
+          for r in rows:
+              line=(r.get('markets') or {}).get('total_ou',{}).get('line')
+              if line is not None and not 100 <= float(line) <= 260:
+                  bad.append((r.get('event_id'),line))
+          assert not bad, bad
+          print(f'Basketball smoke test PASS: {len(rows)} rows, no invalid total lines')
+          PY
+      - name: Commit fixes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/basketball_hybrid.py scripts/basketball_pipeline.py data/basketball_predictions.json
+          if git diff --cached --quiet; then echo "No changes"; exit 0; fi
+          git commit -m "fix: validate basketball total markets"
+          git push origin main
+      - name: Remove one-time workflow
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm -f .github/workflows/basketball-fix.yml || true
+          git commit -m "chore: remove one-time basketball fix workflow" || true
+          git push origin main || true
