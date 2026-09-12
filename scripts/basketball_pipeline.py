@@ -102,6 +102,9 @@ def total_market(event):
     up = american_to_prob(uc.get("odds"))
     if op is None or up is None:
         return None
+    # Reject handicap/spread values accidentally exposed through the total field.
+    if not 100.0 <= line <= 260.0:
+        return None
     probs = normalise([op, up])
     return {"line": line, "over": probs[0], "under": probs[1]}
 

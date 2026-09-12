@@ -20,6 +20,13 @@ ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
 ODDSPAPI_BASE = "https://api.oddspapi.io"
 STAKE_BASE = "https://odds-data.stake.com"
+
+# Basketball game totals are normally well above a single-digit spread/handicap.
+# Reject values that are structurally consistent with a spread rather than a
+# full-game total. This prevents OddsPapi outcome labels such as "Over -2" or
+# "Over 5" from being published as total-points markets.
+MIN_VALID_TOTAL = 100.0
+MAX_VALID_TOTAL = 260.0
 CACHE_PATH = DATA / "basketball_provider_cache.json"
 
 BBL = [
@@ -165,7 +172,13 @@ def parse_oddspapi_markets(payload, home, away):
             result["p2"] = inv2 / denom
             result["moneyline_odds"] = by_side
 
-    candidates = [(line, sides) for line, sides in totals.items() if "over" in sides and "under" in sides]
+    candidates = [
+        (line, sides)
+        for line, sides in totals.items()
+        if "over" in sides
+        and "under" in sides
+        and MIN_VALID_TOTAL <= line <= MAX_VALID_TOTAL
+    ]
     if candidates:
         line, sides = min(candidates, key=lambda x: (0 if abs(x[0] * 2 - round(x[0] * 2)) < 0.01 else 1, abs(x[0] - 167.5)))
         po, pu = 1 / sides["over"], 1 / sides["under"]
@@ -294,7 +307,13 @@ def stake_markets(home, away):
         inv = [1 / x[1] for x in money[:2]]
         d = sum(inv)
         result.update({"p1": inv[0] / d, "p2": inv[1] / d})
-    pairs = [(line, d) for line, d in totals.items() if "over" in d and "under" in d]
+    pairs = [
+        (line, d)
+        for line, d in totals.items()
+        if "over" in d
+        and "under" in d
+        and MIN_VALID_TOTAL <= line <= MAX_VALID_TOTAL
+    ]
     if pairs:
         line, d = min(pairs, key=lambda x: abs(x[0] - 167.5))
         po, pu = 1 / d["over"], 1 / d["under"]
