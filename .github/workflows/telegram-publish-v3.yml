@@ -1,0 +1,58 @@
+name: Publish Approved Match Signal to Telegram
+
+on:
+  workflow_run:
+    workflows: ["Match Signal Live Prediction Pipeline"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: match-signal-telegram-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.run_attempt == 1 }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout generated data
+        uses: actions/checkout@v4
+      - name: Publish only live-eligible signals
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          python - <<'PY'
+          import json, os, urllib.request
+          from datetime import datetime, timezone, timedelta
+          token=os.environ.get('TELEGRAM_BOT_TOKEN'); chat=os.environ.get('TELEGRAM_CHAT_ID')
+          if not token or not chat: raise SystemExit('Missing Telegram secrets')
+          def load(p):
+              try:
+                  v=json.load(open(p,encoding='utf-8')); return v if isinstance(v,list) else []
+              except Exception: return []
+          rows=[]; now=datetime.now(timezone.utc); cutoff=now+timedelta(hours=30)
+          for p in load('data/predictions.json')+load('data/basketball_predictions.json'):
+              if p.get('live_eligible') is not True: continue
+              raw=p.get('start_time') or p.get('commence_time')
+              try: start=datetime.fromisoformat(raw.replace('Z','+00:00'))
+              except Exception: continue
+              if now-timedelta(hours=2)<=start<=cutoff: p['_start']=start; rows.append(p)
+          rows.sort(key=lambda x:x['_start']); rows=rows[:8]
+          if not rows:
+              print('No live-eligible signals. Telegram remains silent by design.'); raise SystemExit(0)
+          esc=lambda x:str(x or '').replace('&','&amp;').replace('<','&lt;').replace('>','&gt;')
+          blocks=['📡 <b>MATCH SIGNAL — APPROVED LIVE PICKS</b>']
+          for p in rows:
+              sport=str(p.get('sport','')).lower(); pick=p.get('pick') or p.get('selection') or p.get('prediction')
+              if sport=='tennis': pick=p.get('player_1') if pick=='p1' else p.get('player_2') if pick=='p2' else pick
+              blocks.append(f"{'🎾' if sport=='tennis' else '🏀' if sport=='basketball' else '⚽'} <b>{esc(p.get('player_1'))} vs {esc(p.get('player_2'))}</b>\nPick: <b>{esc(pick)}</b> — {float(p.get('confidence') or 0)*100:.1f}%")
+          blocks.append('\n<a href="https://topboyasian-stack.github.io/match-signal/">Open Match Signal →</a>')
+          payload=json.dumps({'chat_id':chat,'text':'\n\n'.join(blocks),'parse_mode':'HTML','disable_web_page_preview':True}).encode()
+          req=urllib.request.Request(f'https://api.telegram.org/bot{token}/sendMessage',data=payload,headers={'Content-Type':'application/json'},method='POST')
+          with urllib.request.urlopen(req,timeout=20) as r: result=json.loads(r.read().decode())
+          if not result.get('ok'): raise SystemExit(result)
+          print('Approved signals published.')
+          PY
