@@ -1,7 +1,7 @@
 (function(){
   'use strict';
   const pad=n=>String(n).padStart(2,'0');
-  const format(ms)=>{
+  const format=ms=>{
     const total=Math.max(0,Math.floor(ms/1000));
     const h=Math.floor(total/3600),m=Math.floor((total%3600)/60),s=total%60;
     return h ? `${h}h ${pad(m)}m ${pad(s)}s` : `${m}m ${pad(s)}s`;
@@ -35,7 +35,7 @@
     }
   });
   const style=document.createElement('style');
-  style.textContent='.live-timer{font-weight:800;letter-spacing:.04em;color:var(--amber);margin-right:auto}.live-timer.live{color:var(--green)}.live-timer.live::first-letter{font-size:10px}';
+  style.textContent='.live-timer{font-weight:800;letter-spacing:.04em;color:var(--amber);margin-right:auto}.live-timer.live{color:var(--green)}';
   document.head.appendChild(style);
   new MutationObserver(update).observe(document.body,{childList:true,subtree:true});
   update();
