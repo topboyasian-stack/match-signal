@@ -21,7 +21,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  MATCH_SIGNAL_DEPLOY_REV: "2026-09-13-model-guard-v1"
+  MATCH_SIGNAL_DEPLOY_REV: "2026-09-13-model-v4-statistical-value"
   STAKE_ODDS_API_KEY: ${{ secrets.STAKE_ODDS_API_KEY }}
   ODDSPAPI_API_KEY: ${{ secrets.ODDSPAPI_API_KEY }}
 
@@ -54,6 +54,10 @@ jobs:
         run: python scripts/calibrate_tennis_analytics.py
       - name: Build basketball coverage and OddsPapi/Stake market signals
         run: PYTHONPATH=. python scripts/basketball_oddspapi_runner.py
+      - name: Fit walk-forward statistical calibration
+        run: PYTHONPATH=. python scripts/calibrate_models.py
+      - name: Apply independent statistical model, market benchmark and value layer
+        run: PYTHONPATH=. python scripts/model_upgrade.py
       - name: Run empirical model risk gate
         run: python scripts/model_guard.py
       - name: Run prediction QA gate
@@ -64,13 +68,13 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/predictions.json data/prediction_history.json data/accuracy.json data/pipeline_status.json data/risk_gate.json data/basketball_predictions.json data/basketball_history.json data/basketball_accuracy.json data/basketball_provider_cache.json qa/report.json
+          git add data/predictions.json data/prediction_history.json data/accuracy.json data/pipeline_status.json data/risk_gate.json data/calibration.json data/basketball_predictions.json data/basketball_history.json data/basketball_accuracy.json data/basketball_provider_cache.json qa/report.json
           if git diff --cached --quiet; then
             echo "No generated data or QA changes."
             echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          git commit -m "🤖 Refresh predictions, risk gate, basketball, accuracy and QA"
+          git commit -m "🤖 Refresh statistical predictions, calibration, value and QA"
           git push origin main
           echo "changed=true" >> "$GITHUB_OUTPUT"
       - name: Setup GitHub Pages
