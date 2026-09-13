@@ -1,29 +1,36 @@
 /* Match Signal live model trace + next-match behavior context — PAPER ONLY. */
 (function(){'use strict';
 const qs=new URLSearchParams(location.search),eventId=qs.get('event_id');
-const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const esc=v=>{const d=document.createElement('div');d.textContent=String(v??'');return d.innerHTML};
 const pct=v=>Math.round((Number(v)||0)*1000)/10;
-const leagues={EPL:'eng.1','La Liga':'esp.1',Bundesliga:'ger.1','Serie A':'ita.1','Ligue 1':'fra.1','Champions League':'uefa.champions',MLS:'usa.1','Primeira Liga':'por.1',NBA:'nba',WNBA:'wnba',NCAAM:'mens-college-basketball',NCAAW:'womens-college-basketball',Euroleague:'euroleague',ACB:'acb',BBL:'eng.1',BSL:'tur.1'};
+const leagues={EPL:'eng.1','La Liga':'esp.1',Bundesliga:'ger.1','Serie A':'ita.1',Ligue 1:'fra.1',Champions League:'uefa.champions',MLS:'usa.1',Primeira Liga:'por.1',NBA:'nba',WNBA:'wnba',NCAAM:'mens-college-basketball',NCAAW:'womens-college-basketball',Euroleague:'euroleague',ACB:'acb',BBL:'eng.1',BSL:'tur.1'};
 async function get(u){const r=await fetch(u,{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);return r.json()}
 async function run(){
  try{
   const preds=await get('./data/predictions.json?v='+Date.now());const p=(Array.isArray(preds)?preds:[]).find(x=>String(x.event_id)===String(eventId));if(!p)return;
   let e=null;
-  if(p.sport==='football'){const s=leagues[p.league];if(s){const d=await get('https://site.api.espn.com/apis/site/v2/sports/soccer/'+s+'/scoreboard');e=(d.events||[]).find(x=>String(x.id)===String(eventId));}}
-  else if(p.sport==='basketball'){const s=leagues[p.league]||String(p.league||'').toLowerCase().replace(/\s+/g,'.');const d=await get('https://site.api.espn.com/apis/site/v2/sports/basketball/'+s+'/scoreboard');e=(d.events||[]).find(x=>String(x.id)===String(eventId));}
-  else if(p.sport==='tennis'){for(const t of ['atp','wta']){try{const d=await get('https://site.api.espn.com/apis/site/v2/sports/tennis/'+t+'/scoreboard');for(const g of d.events||[])for(const z of g.groupings||[])for(const c of z.competitions||[])if(String(c.id)===String(eventId))e={id:eventId,status:c.status,competitions:[c]};if(e)break}catch(_) {}}
+  if(p.sport==='football'){
+   const s=leagues[p.league];if(s){const d=await get('https://site.api.espn.com/apis/site/v2/sports/soccer/'+s+'/scoreboard');e=(d.events||[]).find(x=>String(x.id)===String(eventId));}
+  } else if(p.sport==='basketball'){
+   const s=leagues[p.league]||String(p.league||'').toLowerCase().replace(/\s+/g,'.');const d=await get('https://site.api.espn.com/apis/site/v2/sports/basketball/'+s+'/scoreboard');e=(d.events||[]).find(x=>String(x.id)===String(eventId));
+  } else if(p.sport==='tennis'){
+   for(const t of ['atp','wta']){
+    try{
+     const d=await get('https://site.api.espn.com/apis/site/v2/sports/tennis/'+t+'/scoreboard');
+     for(const g of d.events||[]) for(const z of g.groupings||[]) for(const c of z.competitions||[]) if(String(c.id)===String(eventId)) e={id:eventId,status:c.status,competitions:[c]};
+     if(e)break;
+    }catch(_){}
+   }
+  }
   if(!e)return;
   const a=window.MatchSignalLiveAnalysis?.[p.sport]?.(p,e);if(!a)return;
   const key='ms-live-trace:'+eventId,now=Date.now(),prev=JSON.parse(localStorage.getItem(key)||'null');
   const cur={at:now,prob:a.live_probabilities,score:a.score,period:a.period||a.round||'',state:a.state||a.status||''};
   const deltas={};for(const k of Object.keys(a.live_probabilities||{}))deltas[k]=prev?.prob?.[k]!=null?(a.live_probabilities[k]-prev.prob[k]):null;
-  localStorage.setItem(key,JSON.stringify(cur));
-  renderTrace(p,a,deltas,prev);
-  await renderBehavior(p);
+  localStorage.setItem(key,JSON.stringify(cur));renderTrace(a,deltas,prev);await renderBehavior(p);
  }catch(err){console.debug('live trace',err)}
 }
-function renderTrace(p,a,d,prev){
+function renderTrace(a,d,prev){
  let box=document.getElementById('ms-live-trace');if(!box){box=document.createElement('section');box.id='ms-live-trace';box.className='panel';const anchor=document.getElementById('app');if(anchor)anchor.appendChild(box);}
  const rows=Object.entries(a.live_probabilities||{}).map(([k,v])=>{const dlt=d[k];const sign=dlt==null?'':(dlt>=0?'+':'');return '<div class="heroMetric"><small>'+esc(k)+' probability</small><b>'+pct(v)+'% <span style="font-size:11px;color:'+(dlt==null?'#9eb0d4':dlt>=0?'#19e6a2':'#ff4d6d')+'">'+(dlt==null?'first snapshot':sign+pct(dlt)+' pp')+'</span></b></div>'}).join('');
  box.innerHTML='<h2>Live model change trace</h2><div class="heroGrid">'+rows+'</div><div class="notice">'+(prev?'Compared with the previous tracker snapshot.':'First tracker snapshot recorded; subsequent refreshes will show probability movement.')+' Current state: <b>'+esc(a.trajectory||'')+'</b></div><div class="paper">PAPER LIVE ANALYSIS — UNVALIDATED</div>';
