@@ -1,17 +1,7 @@
-"""Maintain a clean, append-only V4 paper ledger and validation metrics.
-
-The ledger is deliberately separate from the legacy prediction_history.json so
-old market-heavy predictions cannot contaminate V4 evaluation.
-
-One row represents one sport/league/event/model-version.  While an event is
-still upcoming, the latest model/market snapshot is retained.  Once kickoff
-has passed, the snapshot is frozen and settlement is copied from the normal
-settlement history on a later pipeline run.
-"""
+"""Maintain a clean, append-only V4 paper ledger and validation metrics."""
 from __future__ import annotations
 
 import json
-import math
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -38,8 +28,7 @@ def parse_dt(value):
     if not value:
         return None
     try:
-        text = str(value).replace("Z", "+00:00")
-        dt = datetime.fromisoformat(text)
+        dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
         return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
     except ValueError:
         return None
@@ -63,30 +52,19 @@ def key_for(row):
     ])
 
 
-def candidate(row):
+def candidate_snapshot(snapshot):
     try:
-        probs = row.get("calibrated_probabilities") or row.get("probabilities") or {}
-        pick = row.get("pick")
-        p = float(probs.get(pick))
-        edge = float(row.get("edge"))
-        ev = float((row.get("value") or {}).get("expected_value"))
+        p = float(snapshot.get("pick_probability"))
+        edge = float(snapshot.get("edge"))
+        ev = float(snapshot.get("expected_value"))
         return p >= 0.55 and edge >= 0.035 and ev >= 0.05
     except (TypeError, ValueError):
         return False
 
 
-def implied_probability(american):
-    try:
-        odds = float(american)
-        decimal = 1 + odds / 100 if odds > 0 else 1 + 100 / abs(odds)
-        return 1 / decimal
-    except (TypeError, ValueError, ZeroDivisionError):
-        return None
-
-
 def profit_for_result(row):
     """Flat one-unit paper stake profit using the frozen American price."""
-    if row.get("actual") != row.get("pick"):
+    if row.get("actual") != row.get("frozen_pick"):
         return -1.0
     try:
         odds = float(row.get("frozen_odds"))
@@ -119,18 +97,20 @@ def sync_ledger(predictions, history, ledger):
             ledger.append(row)
 
         current_time = pred.get("calculated_at") or now_iso()
-        row["latest_seen_at"] = current_time
-        row["sport"] = pred.get("sport")
-        row["league"] = pred.get("league")
-        row["event_id"] = str(pred.get("event_id"))
-        row["start_time"] = pred.get("start_time")
-        row["player_1"] = pred.get("player_1")
-        row["player_2"] = pred.get("player_2")
-        row["model_version"] = pred.get("model_version")
-        row["calibration_version"] = pred.get("calibration_version")
-        row["architecture"] = pred.get("architecture")
-        row["testing_mode"] = "paper"
-        row["live_eligible"] = False
+        row.update({
+            "latest_seen_at": current_time,
+            "sport": pred.get("sport"),
+            "league": pred.get("league"),
+            "event_id": str(pred.get("event_id")),
+            "start_time": pred.get("start_time"),
+            "player_1": pred.get("player_1"),
+            "player_2": pred.get("player_2"),
+            "model_version": pred.get("model_version"),
+            "calibration_version": pred.get("calibration_version"),
+            "architecture": pred.get("architecture"),
+            "testing_mode": "paper",
+            "live_eligible": False,
+        })
 
         probs = pred.get("calibrated_probabilities") or pred.get("probabilities") or {}
         market = pred.get("market_probabilities") or {}
@@ -163,8 +143,6 @@ def sync_ledger(predictions, history, ledger):
 
         kickoff = parse_dt(pred.get("start_time"))
         if kickoff and datetime.now(timezone.utc) >= kickoff and not row.get("frozen_at"):
-            # Freeze the last available pre-kickoff snapshot. This prevents
-            # later model/odds changes from rewriting the evaluated forecast.
             row["frozen_at"] = now_iso()
             row["frozen_snapshot"] = snapshot
             row["frozen_pick"] = pick
@@ -173,7 +151,7 @@ def sync_ledger(predictions, history, ledger):
             row["frozen_odds"] = pick_odds
             row["frozen_edge"] = pred.get("edge")
             row["frozen_expected_value"] = (pred.get("value") or {}).get("expected_value")
-            row["paper_value_candidate"] = candidate(pred)
+            row["paper_value_candidate"] = candidate_snapshot(snapshot)
 
     # Copy authoritative settlement fields once the normal settlement workflow
     # has settled the same V4 event in prediction_history.json.
