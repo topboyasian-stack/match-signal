@@ -33,11 +33,6 @@ def softmax_temperature(probs, temperature):
 
 
 def row_to_event(row):
-    """Build the minimal event needed by the independent model.
-
-    The model only needs team identities. It deliberately does not fetch an ESPN
-    summary by event id; those summary requests were returning 403s.
-    """
     return {
         "competitions": [{
             "competitors": [
@@ -73,10 +68,6 @@ def main():
     history = load(history_path, [])
     external_team_history = load(team_history_path, [])
     calibration = load(calibration_path, {})
-
-    # The independent model gets no bookmaker features. ESPN completed scores
-    # are used only to estimate team attack/defence strength. The older paper
-    # ledger is retained as an additional source when team names match.
     model_history = history + external_team_history
 
     upgraded = 0
@@ -118,7 +109,7 @@ def main():
             row["expected_goals"] = {"p1": independent["xg_home"], "p2": independent["xg_away"], "total": round(independent["xg_home"] + independent["xg_away"], 4)}
             row["architecture"] = "independent statistical + market benchmark + calibration + value"
             row["model"] = independent["method"]
-            row["model_version"] = "4.2-independent-90d-score-history"
+            row["model_version"] = "4.3-recency-weighted-365d"
             row["calibration_version"] = calibration.get("version")
             row["live_eligible"] = False
             row["testing_mode"] = "paper"
@@ -151,6 +142,7 @@ def main():
                 "sample_away": independent.get("sample_away", 0),
                 "history_sufficient": independent.get("sample_home", 0) >= 2 and independent.get("sample_away", 0) >= 2,
                 "history_source": "ESPN completed scoreboards + settled paper ledger",
+                "recency_half_life_days": 120,
                 "market_available": bool(market),
             }
             upgraded += 1
