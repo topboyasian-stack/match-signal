@@ -10,7 +10,7 @@ DATA = ROOT / "data"
 LEDGER_PATH = DATA / "v4_paper_ledger.json"
 REPORT_PATH = DATA / "v4_validation.json"
 START_AT = "2026-09-13T00:00:00+00:00"
-MODEL_PREFIX = "4.3"
+MODEL_PREFIX = "4."
 
 
 def load(path, default):
@@ -89,7 +89,7 @@ def sync_ledger(predictions, history, ledger):
         if row is None:
             row = {
                 "ledger_key": ledger_key,
-                "prediction_id": f"V4-{str(pred.get('event_id'))}-{str(pred.get('calculated_at') or now_iso()).replace(':', '').replace('.', '')}",
+                "prediction_id": f"V4-{str(pred.get('event_id'))}-{str(pred.get('model_version'))}",
                 "first_seen_at": pred.get("calculated_at") or now_iso(),
                 "first_snapshot": {},
             }
