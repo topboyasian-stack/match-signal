@@ -18,13 +18,12 @@ FOOTBALL_LEAGUES = {
     "Primeira Liga": "por.1",
 }
 
-# Keep this independent from bookmaker data: only completed scores are used.
 SESSION = requests.Session()
 
 
 def main():
     today = datetime.now(timezone.utc).date()
-    start = today - timedelta(days=90)
+    start = today - timedelta(days=365)
     date_range = f"{start:%Y%m%d}-{today:%Y%m%d}"
     history = []
     errors = []
@@ -34,7 +33,7 @@ def main():
             response = SESSION.get(
                 f"{ESPN}/{slug}/scoreboard",
                 params={"dates": date_range, "limit": 1000},
-                timeout=45,
+                timeout=60,
             )
             response.raise_for_status()
             for event in response.json().get("events", []):
