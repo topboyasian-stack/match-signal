@@ -7,6 +7,7 @@ from value_decision import edge_and_ev, decision
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
+MODEL_VERSION = "4.4-venue-aware-dixon-coles"
 
 
 def load(path, default):
@@ -109,7 +110,7 @@ def main():
             row["expected_goals"] = {"p1": independent["xg_home"], "p2": independent["xg_away"], "total": round(independent["xg_home"] + independent["xg_away"], 4)}
             row["architecture"] = "independent statistical + market benchmark + calibration + value"
             row["model"] = independent["method"]
-            row["model_version"] = "4.3-recency-weighted-365d"
+            row["model_version"] = MODEL_VERSION
             row["calibration_version"] = calibration.get("version")
             row["live_eligible"] = False
             row["testing_mode"] = "paper"
@@ -140,9 +141,19 @@ def main():
             row["independent_diagnostics"] = {
                 "sample_home": independent.get("sample_home", 0),
                 "sample_away": independent.get("sample_away", 0),
+                "effective_sample": independent.get("effective_sample", 0),
                 "history_sufficient": independent.get("sample_home", 0) >= 2 and independent.get("sample_away", 0) >= 2,
                 "history_source": "ESPN completed scoreboards + settled paper ledger",
                 "recency_half_life_days": 120,
+                "venue_aware": True,
+                "dixon_coles": True,
+                "dixon_coles_rho": independent.get("dixon_coles_rho"),
+                "home_attack": independent.get("home_attack"),
+                "home_defence": independent.get("home_defence"),
+                "away_attack": independent.get("away_attack"),
+                "away_defence": independent.get("away_defence"),
+                "league_home_xg": independent.get("league_home_xg"),
+                "league_away_xg": independent.get("league_away_xg"),
                 "market_available": bool(market),
             }
             upgraded += 1
@@ -153,6 +164,7 @@ def main():
     pred_path.write_text(json.dumps(predictions, indent=2, ensure_ascii=False), encoding="utf-8")
     print(json.dumps({
         "status": "ok",
+        "model_version": MODEL_VERSION,
         "football_upgraded": upgraded,
         "positive_edge_paper_candidates": paper_value,
         "warnings": warnings,
