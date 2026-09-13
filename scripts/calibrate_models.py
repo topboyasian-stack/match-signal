@@ -23,8 +23,8 @@ def fit_temperature(samples):
     if len(samples) < 20:
         return 1.0, {"status": "insufficient_sample", "n": len(samples)}
     best_t, best_loss = 1.0, float("inf")
-    for i in range(51):
-        t = 0.5 + i * 0.03
+    for i in range(81):
+        t = 0.4 + i * 0.025
         loss = 0.0
         for probs, actual in samples:
             logits = [math.log(max(1e-9, p)) / t for p in probs]
@@ -39,9 +39,12 @@ def fit_temperature(samples):
 
 
 def main():
-    history = load(DATA / "prediction_history.json", [])
+    ledger = load(DATA / "prediction_history.json", [])
+    external = load(DATA / "football_team_history.json", [])
+    model_history = ledger + external
     samples = []
-    for row in history:
+
+    for row in ledger:
         if row.get("sport") != "football" or not row.get("settled") or not row.get("final_score"):
             continue
         try:
@@ -53,13 +56,24 @@ def main():
                     {"homeAway": "away", "team": {"displayName": row.get("player_2")}},
                 ]}],
             }
-            model = independent_prediction(event, row.get("league") or "global", history, cutoff=row.get("calculated_at") or row.get("start_time"))
+            model = independent_prediction(
+                event,
+                row.get("league") or "global",
+                model_history,
+                cutoff=row.get("calculated_at") or row.get("start_time"),
+            )
             if model:
                 samples.append(([model["p1"], model["draw"], model["p2"]], actual))
         except Exception:
             continue
+
     temperature, meta = fit_temperature(samples)
-    output = {"version": "4.0", "football": {"temperature": temperature, **meta}, "generated_from": "walk-forward historical settled predictions"}
+    output = {
+        "version": "4.3",
+        "football": {"temperature": temperature, **meta},
+        "generated_from": "walk-forward independent model + 365-day ESPN score history",
+        "calibration_holdout": "settled prediction ledger",
+    }
     (DATA / "calibration.json").write_text(json.dumps(output, indent=2), encoding="utf-8")
     print(json.dumps(output, indent=2))
 
