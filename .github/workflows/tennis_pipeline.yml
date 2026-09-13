@@ -60,6 +60,8 @@ jobs:
         run: PYTHONPATH=. python scripts/calibrate_models.py
       - name: Apply independent statistical model, market benchmark and value layer
         run: PYTHONPATH=. python scripts/model_upgrade.py
+      - name: Record clean V4 paper ledger and validation metrics
+        run: PYTHONPATH=. python scripts/v4_validation.py
       - name: Run empirical model risk gate
         run: python scripts/model_guard.py
       - name: Run prediction QA gate
@@ -70,7 +72,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/predictions.json data/prediction_history.json data/accuracy.json data/pipeline_status.json data/risk_gate.json data/calibration.json data/football_team_history.json data/basketball_predictions.json data/basketball_history.json data/basketball_accuracy.json data/basketball_provider_cache.json qa/report.json
+          git add data/predictions.json data/prediction_history.json data/accuracy.json data/pipeline_status.json data/risk_gate.json data/calibration.json data/football_team_history.json data/basketball_predictions.json data/basketball_history.json data/basketball_accuracy.json data/basketball_provider_cache.json data/v4_paper_ledger.json data/v4_validation.json qa/report.json
           if git diff --cached --quiet; then
             echo "No generated data or QA changes."
             echo "changed=false" >> "$GITHUB_OUTPUT"
