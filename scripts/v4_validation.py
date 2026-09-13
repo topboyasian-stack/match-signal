@@ -75,11 +75,22 @@ def profit_for_result(row):
 
 def sync_ledger(predictions, history, ledger):
     by_key = {str(row.get("ledger_key")): row for row in ledger if row.get("ledger_key")}
+
+    # prediction_history.json is the authoritative settlement store, but older
+    # settlement rows do not carry model_version/testing_mode. V4 ledger rows
+    # must therefore match settlement by immutable event identity, not by model
+    # family. This does NOT import legacy prediction probabilities into V4:
+    # only the final event outcome/score/settlement fields are copied.
     history_by_event = {}
     for row in history:
-        if not model_is_v4(row):
+        if not row.get("settled") or not row.get("event_id"):
             continue
-        history_by_event[(str(row.get("sport")), str(row.get("league")), str(row.get("event_id")))] = row
+        event_key = (
+            str(row.get("sport")),
+            str(row.get("league")),
+            str(row.get("event_id")),
+        )
+        history_by_event[event_key] = row
 
     for pred in predictions:
         if not model_is_v4(pred) or not pred.get("event_id"):
@@ -153,12 +164,12 @@ def sync_ledger(predictions, history, ledger):
             row["frozen_expected_value"] = (pred.get("value") or {}).get("expected_value")
             row["paper_value_candidate"] = candidate_snapshot(snapshot)
 
-    # Copy authoritative settlement fields once the normal settlement workflow
-    # has settled the same V4 event in prediction_history.json.
     for row in ledger:
         hist = history_by_event.get((str(row.get("sport")), str(row.get("league")), str(row.get("event_id"))))
-        if not hist or not hist.get("settled"):
+        if not hist:
             continue
+        # Only update settlement fields. Never copy the historical model,
+        # probabilities, confidence, or pick into the V4 ledger.
         row.update({
             "settled": True,
             "settled_at": hist.get("settled_at"),
@@ -237,6 +248,8 @@ def main():
             "value_candidate_min_edge": 0.035,
             "value_candidate_min_ev": 0.05,
             "legacy_history_excluded_from_v4_metrics": True,
+            "settlement_match_key": "sport+league+event_id",
+            "historical_probabilities_imported": False,
         },
     }
     save(REPORT_PATH, report)
