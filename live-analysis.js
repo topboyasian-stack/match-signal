@@ -1,29 +1,67 @@
 /* Match Signal live analysis engine — PAPER ONLY.
- * Uses current ESPN scoreboard state and freezes no live bet. It produces
- * analytical probabilities/trajectory, not an executable betting signal.
+ * State-aware live trajectory model. No executable or real-money betting signal.
+ * Inputs: pre-match probabilities + current ESPN score/clock/period/linescores
+ * and, when available, basic competition statistics.
  */
 (function(){'use strict';
-window.MatchSignalLiveAnalysis={
-  clamp:function(x,a,b){return Math.max(a,Math.min(b,x));},
-  football:function(p,e){
-    const c=e&&e.competitions&&e.competitions[0], hs=Number(c&&c.competitors&&c.competitors.find(x=>x.homeAway==='home')?.score||0), as=Number(c&&c.competitors&&c.competitors.find(x=>x.homeAway==='away')?.score||0);
-    const period=String(e?.status?.type?.description||'In progress');
-    const minute=Number(e?.status?.clock||0)/60; const base=p.probabilities||{};
-    let h=Number(base.p1||0), d=Number(base.draw||0), a=Number(base.p2||0);
-    const margin=hs-as, late=this.clamp((minute-45)/45,0,1);
-    if(margin>0){h+=0.12+0.08*late;d-=0.06;a-=0.06}else if(margin<0){a+=0.12+0.08*late;d-=0.06;h-=0.06}else{h+=0.02; a+=0.02; d-=0.04;}
-    const s=h+d+a||1; h/=s;d/=s;a/=s;
-    return {sport:'football',score:hs+' - '+as,clock:period,live_probabilities:{home:h,draw:d,away:a},trajectory: h>=d&&h>=a?'Home-favored from current state':a>=d&&a>=h?'Away-favored from current state':'Draw-favored from current state'};
-  },
-  basketball:function(p,e){
-    const c=e&&e.competitions&&e.competitions[0], comps=c?.competitors||[], home=comps.find(x=>x.homeAway==='home'), away=comps.find(x=>x.homeAway==='away');
-    const hs=Number(home?.score||0),as=Number(away?.score||0), period=e?.status?.period||0, clock=e?.status?.displayClock||e?.status?.clock||'—';
-    const q=[]; comps.forEach(x=>(x.linescores||[]).forEach((l,i)=>{q[i]=q[i]||{};q[i][x.homeAway]=l.displayValue??l.value}));
-    const base=p.probabilities||{}, margin=hs-as; let h=Number(base.p1||0.5),a=Number(base.p2||0.5); const adj=this.clamp(margin*0.012,-0.18,0.18);h+=adj;a-=adj;const s=h+a||1;
-    return {sport:'basketball',score:hs+' - '+as,period:'Q'+period,clock:String(clock),linescores:q,live_probabilities:{home:h/s,away:a/s},trajectory:margin>0?'Home currently leading':margin<0?'Away currently leading':'Game tied'};
-  },
-  tennis:function(p,e){
-    const c=e&&e.competitions&&e.competitions[0], comps=c?.competitors||[]; const sets=comps.map(x=>({side:x.homeAway,score:x.score||'0',linescores:(x.linescores||[]).map(l=>l.displayValue??l.value)}));
-    return {sport:'tennis',score:sets.map(x=>x.score).join(' - '),status:e?.status?.type?.description||'In progress',sets:sets,trajectory:'Live set/match state tracked from current scoreboard'};
-  }
-};})();
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+const num=x=>{const n=Number(x);return Number.isFinite(n)?n:null;};
+const pct=x=>Math.round(clamp(x,0,1)*1000)/10;
+function statMap(e){
+  const out={};
+  const cs=e?.competitions?.[0]?.competitors||[];
+  cs.forEach(c=>(c.statistics||[]).forEach(s=>{
+    const k=String(s.name||s.abbreviation||s.displayName||'').toLowerCase().replace(/[^a-z0-9]+/g,'_');
+    const v=num(String(s.displayValue??s.value??'').replace('%',''));
+    if(k&&v!==null) out[c.homeAway+'_'+k]=v;
+  }));
+  return out;
+}
+function normalize3(h,d,a){const s=Math.max(h+d+a,1e-9);return {home:h/s,draw:d/s,away:a/s};}
+function football(p,e){
+  const c=e?.competitions?.[0], cs=c?.competitors||[];
+  const home=cs.find(x=>x.homeAway==='home'), away=cs.find(x=>x.homeAway==='away');
+  const hs=num(home?.score)??0, as=num(away?.score)??0;
+  const clock=String(e?.status?.displayClock||e?.status?.clock||'—');
+  const state=String(e?.status?.type?.description||e?.status?.type?.shortDetail||'In progress');
+  const base=p?.probabilities||{}; let h=num(base.p1)??.5,d=num(base.draw)??.25,a=num(base.p2)??.25;
+  const minute=Math.max(0,Math.min(120,(num(e?.status?.clock)??0)/60));
+  const elapsed=clamp(minute/95,0,1), margin=hs-as;
+  const late=clamp((minute-55)/40,0,1);
+  // Score-state likelihood: leading teams become increasingly protected late;
+  // trailing/draw states retain uncertainty rather than forcing a winner.
+  if(margin>0){h+=.10+.14*late;d-=.045+.035*late;a-=.055+.105*late;}
+  else if(margin<0){a+=.10+.14*late;d-=.045+.035*late;h-=.055+.105*late;}
+  else {h+=.012*(1-late);a+=.012*(1-late);d-=.024*(1-late);}
+  const sm=statMap(e);
+  const shotsH=sm.home_shots_on_target??sm.home_shotsontarget, shotsA=sm.away_shots_on_target??sm.away_shotsontarget;
+  if(shotsH!==null&&shotsA!==null){const diff=clamp((shotsH-shotsA)*.012,-.06,.06);h+=diff;a-=diff;}
+  const redH=sm.home_red_cards, redA=sm.away_red_cards;
+  if(redH!==null||redA!==null){const diff=clamp(((redA||0)-(redH||0))*.10,-.12,.12);h+=diff;a-=diff;}
+  const out=normalize3(Math.max(h,.001),Math.max(d,.001),Math.max(a,.001));
+  const leader=margin>0?'Home':margin<0?'Away':'Draw';
+  const max=Math.max(out.home,out.draw,out.away);
+  return {sport:'football',score:hs+' - '+as,clock,state,elapsed_minute:Math.round(minute*10)/10,live_probabilities:out,trajectory:leader+' state; live model probability '+pct(max)+'%',data_quality:{clock:Number.isFinite(minute),score:true,shots:shotsH!==null&&shotsA!==null,red_cards:redH!==null||redA!==null},method:'pre-match prior + score/time state adjustment + available live statistics',paper_only:true};
+}
+function basketball(p,e){
+  const c=e?.competitions?.[0],cs=c?.competitors||[],home=cs.find(x=>x.homeAway==='home'),away=cs.find(x=>x.homeAway==='away');
+  const hs=num(home?.score)??0,as=num(away?.score)??0,period=num(e?.status?.period)??0,clock=String(e?.status?.displayClock||e?.status?.clock||'—');
+  const base=p?.probabilities||{};let h=num(base.p1)??.5,a=num(base.p2)??.5;
+  const margin=hs-as, regulation=4, progress=clamp((period-1)/regulation,0,1);
+  const adj=clamp(margin*(.009+.009*progress),-.24,.24);h+=adj;a-=adj;
+  const sm=statMap(e);const fgH=sm.home_field_goal_pct??sm.home_fieldgoal_pct,fgA=sm.away_field_goal_pct??sm.away_fieldgoal_pct;
+  if(fgH!==null&&fgA!==null){const diff=clamp((fgH-fgA)/100*.10,-.05,.05);h+=diff;a-=diff;}
+  const out=(()=>{const s=Math.max(h+a,1e-9);return {home:h/s,away:a/s};})();
+  const q=[];cs.forEach(x=>(x.linescores||[]).forEach((l,i)=>{q[i]=q[i]||{};q[i][x.homeAway]=l.displayValue??l.value;}));
+  return {sport:'basketball',score:hs+' - '+as,period:period?'Q'+period:'—',clock,linescores:q,live_probabilities:out,trajectory:margin>0?'Home currently leading':margin<0?'Away currently leading':'Game tied',data_quality:{clock:!!clock&&clock!=='—',score:true,period:period>0,quarter_scores:q.length>0},method:'pre-match prior + score/period state adjustment + available live statistics',paper_only:true};
+}
+function tennis(p,e){
+  const c=e?.competitions?.[0],cs=c?.competitors||[];const sets=cs.map(x=>({side:x.homeAway,score:x.score||'0',linescores:(x.linescores||[]).map(l=>l.displayValue??l.value)}));
+  const base=p?.probabilities||{};let a=num(base.p1)??.5,b=num(base.p2)??.5;
+  const sa=Number(sets.find(x=>x.side==='home')?.score||0),sb=Number(sets.find(x=>x.side==='away')?.score||0);
+  if(Number.isFinite(sa)&&Number.isFinite(sb)){const diff=clamp((sa-sb)*.07,-.20,.20);a+=diff;b-=diff;}
+  const s=Math.max(a+b,1e-9);
+  return {sport:'tennis',score:sets.map(x=>x.score).join(' - '),status:e?.status?.type?.description||'In progress',sets,live_probabilities:{home:a/s,away:b/s},trajectory:sa>sb?'Home currently ahead on sets':sb>sa?'Away currently ahead on sets':'Set score level',data_quality:{score:true,set_scores:sets.length>0},method:'pre-match prior + current set-state adjustment',paper_only:true};
+}
+window.MatchSignalLiveAnalysis={football,basketball,tennis,clamp};
+})();
