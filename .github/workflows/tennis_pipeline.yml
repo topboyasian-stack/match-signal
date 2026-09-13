@@ -29,8 +29,6 @@ jobs:
   run-pipeline:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    environment:
-      name: github-pages
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -77,29 +75,3 @@ jobs:
           git commit -m "🤖 Refresh statistical predictions, calibration, value and QA"
           git push origin main
           echo "changed=true" >> "$GITHUB_OUTPUT"
-      - name: Setup GitHub Pages
-        uses: actions/configure-pages@v5
-      - name: Inject production frontend fixes
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          path = Path('index.html')
-          text = path.read_text(encoding='utf-8')
-          for src in ('./nav-fix.js','./metrics-fix.js','./live-timer.js'):
-              tag = f'<script src="{src}"></script>'
-              if tag not in text:
-                  text = text.replace('</body>', tag + '\n</body>', 1)
-          marker = '<style id="match-signal-nav-fix">'
-          style = marker + '.tabs a,.nav a{pointer-events:auto!important;position:relative;z-index:9999;cursor:pointer!important;touch-action:manipulation}</style>'
-          if marker not in text:
-              text = text.replace('</head>', style + '</head>', 1)
-          path.write_text(text, encoding='utf-8')
-          print('Injected navigation, sport-specific metrics and live timer fixes')
-          PY
-      - name: Upload site artifact
-        uses: actions/upload-pages-artifact@v4
-        with:
-          path: '.'
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
