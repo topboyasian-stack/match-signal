@@ -33,19 +33,16 @@ def softmax_temperature(probs, temperature):
 
 
 def row_to_event(row):
-    """Build the minimal ESPN-shaped event needed by the independent model.
+    """Build the minimal event needed by the independent model.
 
-    The model only needs team identities. Re-fetching an ESPN summary by event id
-    was causing 403 failures and made the independent layer depend on a second API
-    call that was not actually needed.
+    The model only needs team identities. It deliberately does not fetch an ESPN
+    summary by event id; those summary requests were returning 403s.
     """
-    home = row.get("player_1") or "Home"
-    away = row.get("player_2") or "Away"
     return {
         "competitions": [{
             "competitors": [
-                {"homeAway": "home", "team": {"displayName": home}},
-                {"homeAway": "away", "team": {"displayName": away}},
+                {"homeAway": "home", "team": {"displayName": row.get("player_1") or "Home"}},
+                {"homeAway": "away", "team": {"displayName": row.get("player_2") or "Away"}},
             ]
         }]
     }
@@ -58,9 +55,7 @@ def valid_market(row):
         return None
     try:
         values = [float(probs["p1"]), float(probs["draw"]), float(probs["p2"])]
-        if abs(sum(values) - 1.0) > 0.02:
-            return None
-        if any(not (0 < v < 1) for v in values):
+        if abs(sum(values) - 1.0) > 0.02 or any(not (0 < v < 1) for v in values):
             return None
         if any(o is None for o in odds):
             return None
@@ -73,9 +68,17 @@ def main():
     pred_path = DATA / "predictions.json"
     history_path = DATA / "prediction_history.json"
     calibration_path = DATA / "calibration.json"
+    team_history_path = DATA / "football_team_history.json"
     predictions = load(pred_path, [])
     history = load(history_path, [])
+    external_team_history = load(team_history_path, [])
     calibration = load(calibration_path, {})
+
+    # The independent model gets no bookmaker features. ESPN completed scores
+    # are used only to estimate team attack/defence strength. The older paper
+    # ledger is retained as an additional source when team names match.
+    model_history = history + external_team_history
+
     upgraded = 0
     warnings = 0
     paper_value = 0
@@ -89,11 +92,10 @@ def main():
             continue
 
         try:
-            event = row_to_event(row)
             independent = independent_prediction(
-                event,
+                row_to_event(row),
                 row.get("league") or "global",
-                history,
+                model_history,
                 cutoff=row.get("calculated_at") or row.get("start_time"),
             )
             if not independent:
@@ -108,51 +110,27 @@ def main():
             calibrated = softmax_temperature(raw, calibration_temperature(calibration, "football"))
             market = valid_market(row)
 
-            row["independent_probabilities"] = {
-                "p1": independent["p1"],
-                "draw": independent["draw"],
-                "p2": independent["p2"],
-            }
-            row["calibrated_probabilities"] = {
-                "p1": round(calibrated[0], 4),
-                "draw": round(calibrated[1], 4),
-                "p2": round(calibrated[2], 4),
-            }
-            row["probabilities"] = {
-                "p1": round(calibrated[0], 4),
-                "draw": round(calibrated[1], 4),
-                "p2": round(calibrated[2], 4),
-            }
+            row["independent_probabilities"] = {"p1": independent["p1"], "draw": independent["draw"], "p2": independent["p2"]}
+            row["calibrated_probabilities"] = {"p1": round(calibrated[0], 4), "draw": round(calibrated[1], 4), "p2": round(calibrated[2], 4)}
+            row["probabilities"] = {"p1": round(calibrated[0], 4), "draw": round(calibrated[1], 4), "p2": round(calibrated[2], 4)}
             row["pick"] = ["p1", "draw", "p2"][calibrated.index(max(calibrated))]
             row["confidence"] = round(max(calibrated), 4)
-            row["expected_goals"] = {
-                "p1": independent["xg_home"],
-                "p2": independent["xg_away"],
-                "total": round(independent["xg_home"] + independent["xg_away"], 4),
-            }
+            row["expected_goals"] = {"p1": independent["xg_home"], "p2": independent["xg_away"], "total": round(independent["xg_home"] + independent["xg_away"], 4)}
             row["architecture"] = "independent statistical + market benchmark + calibration + value"
             row["model"] = independent["method"]
-            row["model_version"] = "4.1-independent-no-summary-fetch"
+            row["model_version"] = "4.2-independent-90d-score-history"
             row["calibration_version"] = calibration.get("version")
             row["live_eligible"] = False
             row["testing_mode"] = "paper"
 
             if market:
-                row["market_probabilities"] = {
-                    "p1": round(market["p1"], 4),
-                    "draw": round(market["draw"], 4),
-                    "p2": round(market["p2"], 4),
-                }
+                row["market_probabilities"] = {"p1": round(market["p1"], 4), "draw": round(market["draw"], 4), "p2": round(market["p2"], 4)}
                 row["market_odds"] = market["odds"]
                 row["market_source"] = row.get("market_source") or "stored contemporaneous market"
                 pick_idx = calibrated.index(max(calibrated))
                 edge, ev = edge_and_ev(calibrated[pick_idx], market["odds"][pick_idx])
                 row["edge"] = edge
-                row["value"] = {
-                    "expected_value": ev,
-                    "odds": market["odds"][pick_idx],
-                    "market_implied": market[["p1", "draw", "p2"][pick_idx]],
-                }
+                row["value"] = {"expected_value": ev, "odds": market["odds"][pick_idx], "market_implied": market[["p1", "draw", "p2"][pick_idx]]}
                 dec = decision(calibrated[pick_idx], market["odds"][pick_idx], sample_ok=False)
                 row["decision"] = dec["decision"]
                 row["decision_reason"] = dec["reason"]
@@ -168,12 +146,11 @@ def main():
                 row["decision"] = "PAPER ONLY"
                 row["decision_reason"] = "no_contemporaneous_market_data"
 
-            # Explicit diagnostics make failures visible instead of silently
-            # reverting to the old market-heavy model.
             row["independent_diagnostics"] = {
                 "sample_home": independent.get("sample_home", 0),
                 "sample_away": independent.get("sample_away", 0),
                 "history_sufficient": independent.get("sample_home", 0) >= 2 and independent.get("sample_away", 0) >= 2,
+                "history_source": "ESPN completed scoreboards + settled paper ledger",
                 "market_available": bool(market),
             }
             upgraded += 1
@@ -189,6 +166,7 @@ def main():
         "warnings": warnings,
         "football_without_sufficient_team_history": no_history,
         "football_without_contemporaneous_market": no_market,
+        "external_team_history_rows": len(external_team_history),
     }, indent=2))
 
 
