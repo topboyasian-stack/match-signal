@@ -1,0 +1,38 @@
+name: NBA Strict Out-of-Sample Value Test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/nba_oos_value_test.py'
+      - '.github/workflows/nba_oos_value.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  oos-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run strict chronological holdout test
+        run: python scripts/nba_oos_value_test.py
+      - name: Commit research result
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/nba_oos_value_test.json
+          if git diff --cached --quiet; then
+            echo "No OOS result changes."
+            exit 0
+          fi
+          git commit -m "🧪 Record strict NBA out-of-sample value test"
+          git push origin main
