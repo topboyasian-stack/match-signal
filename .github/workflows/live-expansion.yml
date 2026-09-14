@@ -50,6 +50,19 @@ jobs:
       - name: Repair and publish Eredivisie from resilient current-season sources
         run: python scripts/repair_ere_live.py
 
+      - name: Assert current Eredivisie fixtures were actually published
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path('data/ere_divisie_predictions.json').read_text())
+          status = json.loads(Path('data/expansion_status.json').read_text())
+          fixtures = status.get('competitions', {}).get('Eredivisie', {}).get('current_fixtures', 0)
+          if fixtures < 1 or len(data) < 1:
+              raise SystemExit(f'ABORT: live Eredivisie publication is empty (fixtures={fixtures}, predictions={len(data)})')
+          print(f'Publication guard passed: {fixtures} fixtures / {len(data)} predictions')
+          PY
+
       - name: QA Eredivisie predictions before settlement/publication
         run: python scripts/qa_ere_live.py
 
