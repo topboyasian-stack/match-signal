@@ -13,8 +13,6 @@ on:
 
 permissions:
   contents: write
-  pages: write
-  id-token: write
 
 concurrency:
   group: match-signal-live-expansion
@@ -50,31 +48,16 @@ jobs:
         run: python scripts/settle_expansion.py
 
       - name: Commit generated expansion data
-        id: commit
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/ere_divisie_history.json data/nba_history.json data/ere_divisie_predictions.json data/nba_predictions.json data/expansion_status.json data/expansion_prediction_history.json data/expansion_live_performance.json
           if git diff --cached --quiet; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "No expansion data changes."
             exit 0
           fi
           git commit -m "🤖 Refresh live experimental NBA and Eredivisie signals"
           git push origin main
-          echo "changed=true" >> "$GITHUB_OUTPUT"
 
-      - name: Configure GitHub Pages
-        if: steps.commit.outputs.changed == 'true'
-        uses: actions/configure-pages@v5
-
-      - name: Upload Pages artifact
-        if: steps.commit.outputs.changed == 'true'
-        uses: actions/upload-pages-artifact@v4
-        with:
-          path: '.'
-
-      - name: Deploy Pages
-        if: steps.commit.outputs.changed == 'true'
-        uses: actions/deploy-pages@v4
+      # data/** changes automatically trigger the existing deploy-pages.yml workflow.
