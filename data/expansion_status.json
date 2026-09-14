@@ -1,34 +1,32 @@
 {
-  "updated_at": "2026-09-14T19:27:26.538939+00:00",
-  "release_mode": "LIVE_EXPERIMENTAL",
+  "updated_at": "2026-09-14T19:28:37.366423+00:00",
+  "paper_only": true,
   "live_trading_approved": false,
   "competitions": {
     "NBA": {
-      "historical_events": 0,
+      "historical_events": 1316,
       "current_fixtures": 0,
-      "collection_errors": 2,
-      "status": "PRESEASON_READY"
+      "collection_errors": 0,
+      "status": "research",
+      "source": "ESPN primary; llimllib/nba_data parquet; DataHub/FiveThirtyEight NBA Elo CSV fallback"
     },
     "Eredivisie": {
-      "historical_events": 111,
-      "current_fixtures": 10,
-      "published_predictions": 10,
+      "historical_events": 70,
+      "current_fixtures": 0,
       "collection_errors": 0,
-      "status": "LIVE_EXPERIMENTAL",
-      "fixture_source": "FixtureDownload JSON primary; openfootball current-season fallback",
-      "history_source": "openfootball current season + retained Match Signal history"
+      "status": "research"
     }
   },
-  "monitoring": {
-    "settlement": "expansion_prediction_history.json",
-    "promotion_rule": "live evidence + calibration + market benchmark; automatic demotion on data failure",
-    "market_data_is_benchmark_only": true
+  "release_gate": {
+    "minimum_walk_forward_settled": 100,
+    "requires_market_benchmark": true,
+    "requires_calibration": true,
+    "requires_positive_out_of_sample_evidence": true
   },
   "notes": [
     "Independent probabilities never consume market probabilities.",
-    "LIVE_EXPERIMENTAL signals are real generated predictions, not guarantees or live-trading approval.",
-    "NBA remains preseason-ready until 2026-10-20, then enters live experimental mode automatically.",
-    "Eredivisie uses current-season fixtures and free current odds when ESPN does not return upcoming fixtures.",
-    "Eredivisie repair source added after free Football-Data endpoint rate limiting; no market odds are fabricated when unavailable."
+    "Expansion outputs remain research-only until walk-forward validation passes.",
+    "Historical fallback sources are source-tagged and retained for auditability.",
+    "NBA fallback order: ESPN, verified team-box parquet, then stable DataHub/FiveThirtyEight NBA Elo CSV. The Elo dataset is updated periodically and may end before the current season, so its coverage date is retained in the source URL."
   ]
 }
