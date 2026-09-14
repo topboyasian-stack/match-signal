@@ -8,6 +8,8 @@ on:
     branches: [main]
     paths:
       - 'scripts/live_expansion_pipeline.py'
+      - 'scripts/repair_ere_live.py'
+      - 'scripts/eredivisie_source.py'
       - 'scripts/settle_expansion.py'
       - '.github/workflows/live-expansion.yml'
 
@@ -43,6 +45,9 @@ jobs:
 
       - name: Generate live-experimental NBA + Eredivisie signals
         run: python scripts/live_expansion_pipeline.py
+
+      - name: Repair and publish Eredivisie from resilient current-season sources
+        run: python scripts/repair_ere_live.py
 
       - name: Settle completed expansion signals
         run: python scripts/settle_expansion.py
