@@ -21,7 +21,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  MATCH_SIGNAL_DEPLOY_REV: "2026-09-14-narrow-football-scope-performance-ledger-breakdown"
+  MATCH_SIGNAL_DEPLOY_REV: "2026-09-14-cross-sport-evaluation-selective-gate"
   STAKE_ODDS_API_KEY: ${{ secrets.STAKE_ODDS_API_KEY }}
   ODDSPAPI_API_KEY: ${{ secrets.ODDSPAPI_API_KEY }}
 
@@ -77,6 +77,10 @@ jobs:
         run: python scripts/model_guard.py
       - name: Run prediction QA gate
         run: python qa/prediction_qa.py
+      - name: Evaluate all settled sports, tournaments and selections
+        run: PYTHONPATH=. python scripts/sports_evaluation.py
+      - name: Apply conservative accuracy elevation candidate gate
+        run: PYTHONPATH=. python scripts/selective_prediction_gate.py
       - name: Generate prediction-type, confidence, league and model breakdown
         run: PYTHONPATH=. python scripts/prediction_breakdown.py
       - name: Commit generated data and QA report
@@ -85,12 +89,12 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/predictions.json data/prediction_history.json data/accuracy.json data/pipeline_status.json data/risk_gate.json data/calibration.json data/football_team_history.json data/basketball_predictions.json data/basketball_history.json data/basketball_accuracy.json data/basketball_provider_cache.json data/behavior_profiles.json data/individual_behavior.json data/behavior_validation.json data/current_performance.json data/v4_paper_ledger.json data/v4_validation.json data/prediction_breakdown.json qa/report.json
+          git add data/predictions.json data/prediction_pool.json data/selection_gate.json data/prediction_history.json data/accuracy.json data/pipeline_status.json data/risk_gate.json data/calibration.json data/football_team_history.json data/basketball_predictions.json data/basketball_history.json data/basketball_accuracy.json data/basketball_provider_cache.json data/behavior_profiles.json data/individual_behavior.json data/behavior_validation.json data/current_performance.json data/v4_paper_ledger.json data/v4_validation.json data/prediction_breakdown.json data/sports_evaluation.json qa/report.json
           if git diff --cached --quiet; then
             echo "No generated data or QA changes."
             echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          git commit -m "🤖 Refresh scoped predictions, settlement, performance and QA"
+          git commit -m "🤖 Refresh scoped predictions, settlement, evaluation and selective gate"
           git push origin main
           echo "changed=true" >> "$GITHUB_OUTPUT"
