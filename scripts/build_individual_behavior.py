@@ -60,7 +60,6 @@ def extract_stats(summary):
     for competitor in comp.get("competitors") or []:
         identity = athlete_identity(competitor)
         if not identity:
-            # Some provider payloads place athletes under statistics.
             for stat_group in competitor.get("statistics") or []:
                 identity = athlete_identity(stat_group)
                 if identity:
@@ -102,9 +101,6 @@ def main():
     enriched = 0
     for row in candidates[:300]:
         league = str(row.get("league") or "")
-        # Tennis ATP/WTA feeds may be served by ESPN's sport league endpoints;
-        # basketball uses the same summary structure. We only accept payloads
-        # that actually expose athlete IDs.
         slug = LEAGUES.get(league)
         if not slug:
             continue
@@ -150,6 +146,7 @@ def main():
         "version": "individual-behavior-v1",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "mode": "PAPER_ONLY",
+        "status": "ok",
         "attempted_events": attempted,
         "provider_enriched_events": enriched,
         "verified_observations": len(observations),
