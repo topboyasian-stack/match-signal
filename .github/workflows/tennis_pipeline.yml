@@ -21,7 +21,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  MATCH_SIGNAL_DEPLOY_REV: "2026-09-14-nba-gamelog-expansion"
+  MATCH_SIGNAL_DEPLOY_REV: "2026-09-14-nba-gamelog-normalized"
   STAKE_ODDS_API_KEY: ${{ secrets.STAKE_ODDS_API_KEY }}
   ODDSPAPI_API_KEY: ${{ secrets.ODDSPAPI_API_KEY }}
 
@@ -44,22 +44,44 @@ jobs:
         run: |
           git fetch origin main
           git reset --hard origin/main
-      - name: Pin NBA fallback to verified 2026 gamelog parquet
+      - name: Normalize NBA 2026 team gamelog into game-level history
         run: |
           python - <<'PY'
+          import io, json, requests
+          from datetime import datetime, timedelta, timezone
           from pathlib import Path
-          p = Path('scripts/expansion_pipeline.py')
-          s = p.read_text()
-          s = s.replace(
-              "NBA_PARQUET='https://raw.githubusercontent.com/llimllib/nba_data/main/data/espn/team_box.parquet'",
-              "NBA_PARQUET='https://raw.githubusercontent.com/llimllib/nba_data/main/data/gamelog_2026.parquet'"
-          )
-          s = s.replace(
-              "NBA_ELO_CSV='https://datahub.io/fivethirtyeight/nba-elo/_r/-/data/nbaallelo.csv'",
-              "NBA_ELO_CSV='https://raw.githubusercontent.com/fivethirtyeight/data/master/nba-elo/nbaallelo.csv'"
-          )
+          import pandas as pd
+          url='https://raw.githubusercontent.com/llimllib/nba_data/main/data/gamelog_2026.parquet'
+          r=requests.get(url,timeout=90,headers={'User-Agent':'MatchSignal/1.0'})
+          r.raise_for_status()
+          df=pd.read_parquet(io.BytesIO(r.content))
+          required={'game_id','game_date','matchup','team_name','pts'}
+          missing=required-set(df.columns)
+          if missing: raise RuntimeError(f'NBA gamelog schema missing {sorted(missing)}')
+          cutoff=datetime.now(timezone.utc)-timedelta(days=365)
+          rows=[]
+          for gid,g in df.groupby('game_id',sort=False):
+              home=g[g['matchup'].astype(str).str.contains(' vs\\. ',regex=True,na=False)]
+              away=g[g['matchup'].astype(str).str.contains(' @ ',regex=True,na=False)]
+              if home.empty or away.empty: continue
+              h=home.iloc[0]; a=away.iloc[0]
+              try: d=pd.to_datetime(h['game_date'],utc=True).to_pydatetime()
+              except: continue
+              if d<cutoff or d>datetime.now(timezone.utc): continue
+              try: hs=float(h['pts']); as_=float(a['pts'])
+              except: continue
+              rows.append({'event_id':str(gid),'date':d.isoformat(),'home':str(h['team_name']).strip(),'away':str(a['team_name']).strip(),'home_id':str(h['team_id'] if 'team_id' in g.columns else ''),'away_id':str(a['team_id'] if 'team_id' in g.columns else ''),'home_score':hs,'away_score':as_,'markets':{},'source':url})
+          rows=sorted({x['event_id']:x for x in rows}.values(),key=lambda x:x['date'])
+          if not rows: raise RuntimeError('NBA gamelog normalized to zero games')
+          Path('data/nba_fallback.json').write_text(json.dumps(rows,indent=2))
+          p=Path('scripts/expansion_pipeline.py'); s=p.read_text()
+          needle='def nba_fallback():\\n'
+          inject="def nba_fallback():\\n local=DATA/'nba_fallback.json'\\n if local.exists():\\n  return json.loads(local.read_text()),[]\\n"
+          if 'nba_fallback.json' not in s: s=s.replace(needle,inject,1)
+          s=s.replace('team-box parquet, then stable DataHub/FiveThirtyEight NBA Elo CSV fallback','normalized llimllib/nba_data gamelog_2026 parquet, then stable FiveThirtyEight NBA Elo CSV fallback')
           p.write_text(s)
-          print('NBA fallback source:', 'llimllib/nba_data gamelog_2026.parquet')
+          print(f'NBA normalized games: {len(rows)}')
+          print(f'NBA range: {rows[0]["date"]} -> {rows[-1]["date"]}')
           PY
       - name: Build scoped daily Football and Tennis predictions and settle historical picks
         run: python scripts/scoped_pipeline.py
@@ -116,6 +138,6 @@ jobs:
             echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          git commit -m "🤖 Run NBA gamelog expansion validation"
+          git commit -m "🤖 Run NBA normalized gamelog expansion validation"
           git push origin main
           echo "changed=true" >> "$GITHUB_OUTPUT"
