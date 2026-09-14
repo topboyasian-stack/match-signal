@@ -1,0 +1,64 @@
+name: Match Signal Post-Pipeline Live Feed Reconcile
+
+on:
+  workflow_run:
+    workflows: ["Match Signal Live Prediction Pipeline"]
+    types: [completed]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: match-signal-live-expansion
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 2
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: python -m pip install --upgrade requests
+
+      - name: Repair and publish Eredivisie live-experimental feed
+        run: python scripts/repair_ere_live.py
+
+      - name: QA the repaired Eredivisie feed
+        run: python scripts/qa_ere_live.py
+
+      - name: Assert main feed contains current Eredivisie predictions
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          main_feed = json.loads(Path('data/predictions.json').read_text())
+          ere = [p for p in main_feed if p.get('league') == 'Eredivisie']
+          if not ere:
+              raise SystemExit('ABORT: post-pipeline main prediction feed has no Eredivisie rows')
+          print(f'Post-pipeline reconciliation passed: {len(ere)} Eredivisie rows in main feed')
+          PY
+
+      - name: Commit reconciled live feed
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/predictions.json data/ere_divisie_history.json data/ere_divisie_predictions.json data/expansion_status.json data/ere_divisie_qa.json
+          if git diff --cached --quiet; then
+            echo "No reconciliation changes."
+            exit 0
+          fi
+          git commit -m "🤖 Reconcile live experimental feed after core pipeline"
+          git push origin main
