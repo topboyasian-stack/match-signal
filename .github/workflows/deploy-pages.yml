@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'index.html'
+      - 'expansion.html'
       - 'performance.html'
       - 'basketball.html'
       - 'tennis.html'
@@ -26,7 +27,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  MATCH_SIGNAL_DEPLOY_REV: "2026-09-13-pages-recovery-v1"
+  MATCH_SIGNAL_DEPLOY_REV: "2026-09-14-expansion-desk-v1"
 
 jobs:
   deploy:
@@ -59,9 +60,10 @@ jobs:
       - name: Verify site entrypoint
         run: |
           test -s index.html
-          echo "index.html present: $(wc -c < index.html) bytes"
+          test -s expansion.html
           test -s basketball.html
           test -s performance.html
+          echo "Expansion desk present: $(wc -c < expansion.html) bytes"
       - name: Upload site artifact
         uses: actions/upload-pages-artifact@v4
         with:
