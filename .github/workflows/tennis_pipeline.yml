@@ -21,7 +21,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  MATCH_SIGNAL_DEPLOY_REV: "2026-09-14-nba-gamelog-competitive-only"
+  MATCH_SIGNAL_DEPLOY_REV: "2026-09-14-nba-market-benchmark"
   STAKE_ODDS_API_KEY: ${{ secrets.STAKE_ODDS_API_KEY }}
   ODDSPAPI_API_KEY: ${{ secrets.ODDSPAPI_API_KEY }}
 
@@ -65,7 +65,7 @@ jobs:
               gid_text = str(gid)
               if gid_text.startswith(('001','003')):
                   continue
-              home = g[g['matchup'].astype(str).str.contains(r' vs\. ', regex=True, na=False)]
+              home = g[g['matchup'].astype(str).str.contains(r' vs\\. ', regex=True, na=False)]
               away = g[g['matchup'].astype(str).str.contains(r' @ ', regex=True, na=False)]
               if home.empty or away.empty:
                   continue
@@ -112,6 +112,8 @@ jobs:
         run: PYTHONPATH=. python scripts/basketball_oddspapi_runner.py
       - name: Build NBA + Eredivisie expansion research datasets
         run: PYTHONPATH=. python scripts/expansion_pipeline.py
+      - name: Benchmark NBA model against public closing moneyline market
+        run: PYTHONPATH=. python scripts/nba_market_validation.py
       - name: Deep walk-forward validate NBA + Eredivisie and build recent-form snapshots
         run: PYTHONPATH=. python scripts/expansion_validation.py
       - name: Build current empirical performance snapshot from previous settled predictions
@@ -147,12 +149,12 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/predictions.json data/prediction_pool.json data/selection_gate.json data/prediction_history.json data/accuracy.json data/pipeline_status.json data/risk_gate.json data/calibration.json data/football_team_history.json data/basketball_predictions.json data/basketball_history.json data/basketball_accuracy.json data/basketball_provider_cache.json data/behavior_profiles.json data/individual_behavior.json data/behavior_validation.json data/current_performance.json data/v4_paper_ledger.json data/v4_validation.json data/prediction_breakdown.json data/sports_evaluation.json data/nba_history.json data/nba_predictions.json data/ere_divisie_history.json data/ere_divisie_predictions.json data/expansion_status.json data/expansion_validation.json data/expansion_team_form.json qa/report.json
+          git add data/predictions.json data/prediction_pool.json data/selection_gate.json data/prediction_history.json data/accuracy.json data/pipeline_status.json data/risk_gate.json data/calibration.json data/football_team_history.json data/basketball_predictions.json data/basketball_history.json data/basketball_accuracy.json data/basketball_provider_cache.json data/behavior_profiles.json data/individual_behavior.json data/behavior_validation.json data/current_performance.json data/v4_paper_ledger.json data/v4_validation.json data/prediction_breakdown.json data/sports_evaluation.json data/nba_history.json data/nba_predictions.json data/ere_divisie_history.json data/ere_divisie_predictions.json data/expansion_status.json data/expansion_validation.json data/expansion_team_form.json data/nba_market_validation.json data/nba_market_matches.json qa/report.json
           if git diff --cached --quiet; then
             echo "No generated data or QA changes."
             echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          git commit -m "🤖 Run NBA competitive-only expansion validation"
+          git commit -m "🤖 Benchmark NBA model against closing market"
           git push origin main
           echo "changed=true" >> "$GITHUB_OUTPUT"
