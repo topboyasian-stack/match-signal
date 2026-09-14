@@ -15,7 +15,7 @@ BASE='https://site.api.espn.com/apis/site/v2/sports'
 HEAD={'User-Agent':'Mozilla/5.0 (compatible; MatchSignal/1.0)'}
 S=requests.Session(); S.headers.update(HEAD)
 NOW=datetime.now(timezone.utc)
-
+NBA_2026_START=datetime(2026,10,20,tzinfo=timezone.utc)
 SPORTS={'NBA':'basketball/nba','Eredivisie':'soccer/ned.1'}
 
 def get(url, params=None):
@@ -77,13 +77,11 @@ def fetch(competition,start,end):
     return get(f'{BASE}/{slug}/scoreboard',{'dates':f'{start:%Y%m%d}-{end:%Y%m%d}'}).get('events',[])
 
 def collect(competition,days=365):
-    end=NOW; start=end-timedelta(days=days); rows=[]; seen=set(); cur=start
-    errors=[]
+    end=NOW; start=end-timedelta(days=days); rows=[]; seen=set(); cur=start; errors=[]
     while cur<end:
         nxt=min(end,cur+timedelta(days=30))
         try: events=fetch(competition,cur,nxt)
-        except Exception as exc:
-            errors.append(str(exc)); events=[]
+        except Exception as exc: errors.append(str(exc)); events=[]
         for e in events:
             if not completed(e): continue
             cs=competitors(e); sc=scores(e)
@@ -100,8 +98,14 @@ def collect(competition,days=365):
     return rows,errors
 
 def current(competition,days=7):
+    # The 2026-27 NBA regular season starts Oct 20. Before that date there are
+    # no regular-season fixtures to publish; do not query a future ESPN window.
+    if competition=='NBA' and NOW < NBA_2026_START:
+        return []
     start=NOW-timedelta(days=1); end=NOW+timedelta(days=days); rows=[]
-    for e in fetch(competition,start,end):
+    try: events=fetch(competition,start,end)
+    except Exception: return rows
+    for e in events:
         cs=competitors(e)
         if len(cs)!=2: continue
         home=next((c for c in cs if c.get('homeAway')=='home'),cs[0]); away=next((c for c in cs if c.get('homeAway')=='away'),cs[1])
