@@ -21,7 +21,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  MATCH_SIGNAL_DEPLOY_REV: "2026-09-14-nba-gamelog-normalized-v3"
+  MATCH_SIGNAL_DEPLOY_REV: "2026-09-14-nba-gamelog-competitive-only"
   STAKE_ODDS_API_KEY: ${{ secrets.STAKE_ODDS_API_KEY }}
   ODDSPAPI_API_KEY: ${{ secrets.ODDSPAPI_API_KEY }}
 
@@ -44,7 +44,7 @@ jobs:
         run: |
           git fetch origin main
           git reset --hard origin/main
-      - name: Normalize NBA 2026 team gamelog into game-level history
+      - name: Normalize NBA 2026 team gamelog into competitive game-level history
         run: |
           python - <<'PY'
           import io, json, requests
@@ -62,6 +62,9 @@ jobs:
           cutoff = datetime.now(timezone.utc) - timedelta(days=365)
           rows = []
           for gid, g in df.groupby('game_id', sort=False):
+              gid_text = str(gid)
+              if gid_text.startswith(('001','003')):
+                  continue
               home = g[g['matchup'].astype(str).str.contains(r' vs\. ', regex=True, na=False)]
               away = g[g['matchup'].astype(str).str.contains(r' @ ', regex=True, na=False)]
               if home.empty or away.empty:
@@ -79,10 +82,10 @@ jobs:
                   as_ = float(a['pts'])
               except Exception:
                   continue
-              rows.append({'event_id':str(gid),'date':d.isoformat(),'home':str(h['team_name']).strip(),'away':str(a['team_name']).strip(),'home_id':str(h['team_id']) if 'team_id' in g.columns else '','away_id':str(a['team_id']) if 'team_id' in g.columns else '','home_score':hs,'away_score':as_,'markets':{},'source':url})
+              rows.append({'event_id':gid_text,'date':d.isoformat(),'home':str(h['team_name']).strip(),'away':str(a['team_name']).strip(),'home_id':str(h['team_id']) if 'team_id' in g.columns else '','away_id':str(a['team_id']) if 'team_id' in g.columns else '','home_score':hs,'away_score':as_,'markets':{},'source':url})
           rows = sorted({x['event_id']: x for x in rows}.values(), key=lambda x:x['date'])
           if not rows:
-              raise RuntimeError('NBA gamelog normalized to zero games')
+              raise RuntimeError('NBA competitive gamelog normalized to zero games')
           Path('data/nba_fallback.json').write_text(json.dumps(rows, indent=2))
           p = Path('scripts/expansion_pipeline.py')
           s = p.read_text()
@@ -90,9 +93,9 @@ jobs:
           inject = "def nba_fallback():" + chr(10) + " local=DATA/'nba_fallback.json'" + chr(10) + " if local.exists():" + chr(10) + "  return json.loads(local.read_text()),[]" + chr(10)
           if 'nba_fallback.json' not in s:
               s = s.replace(needle, inject, 1)
-          s = s.replace('team-box parquet, then stable DataHub/FiveThirtyEight NBA Elo CSV fallback', 'normalized llimllib/nba_data gamelog_2026 parquet, then stable FiveThirtyEight NBA Elo CSV fallback')
+          s = s.replace('team-box parquet, then stable DataHub/FiveThirtyEight NBA Elo CSV fallback', 'normalized competitive llimllib/nba_data gamelog_2026 parquet; preseason and All-Star excluded')
           p.write_text(s)
-          print(f'NBA normalized games: {len(rows)}')
+          print(f'NBA competitive normalized games: {len(rows)}')
           print(f'NBA range: {rows[0]["date"]} -> {rows[-1]["date"]}')
           PY
       - name: Build scoped daily Football and Tennis predictions and settle historical picks
@@ -150,6 +153,6 @@ jobs:
             echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          git commit -m "🤖 Run NBA normalized gamelog expansion validation"
+          git commit -m "🤖 Run NBA competitive-only expansion validation"
           git push origin main
           echo "changed=true" >> "$GITHUB_OUTPUT"
