@@ -21,7 +21,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  MATCH_SIGNAL_DEPLOY_REV: "2026-09-14-nba-market-benchmark"
+  MATCH_SIGNAL_DEPLOY_REV: "2026-09-14-nba-market-benchmark-v2"
   STAKE_ODDS_API_KEY: ${{ secrets.STAKE_ODDS_API_KEY }}
   ODDSPAPI_API_KEY: ${{ secrets.ODDSPAPI_API_KEY }}
 
@@ -65,7 +65,7 @@ jobs:
               gid_text = str(gid)
               if gid_text.startswith(('001','003')):
                   continue
-              home = g[g['matchup'].astype(str).str.contains(r' vs\\. ', regex=True, na=False)]
+              home = g[g['matchup'].astype(str).str.contains(r' vs\. ', regex=True, na=False)]
               away = g[g['matchup'].astype(str).str.contains(r' @ ', regex=True, na=False)]
               if home.empty or away.empty:
                   continue
