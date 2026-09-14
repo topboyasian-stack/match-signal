@@ -6,15 +6,17 @@ from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from independent_football_model import independent_prediction
-from eredivisie_source import current_fixtures, current_results
+from eredivisie_source import current_fixtures, current_results, norm_team
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
 
 
 def load(path, default):
-    try: return json.loads(path.read_text(encoding="utf-8")) if path.exists() else default
-    except Exception: return default
+    try:
+        return json.loads(path.read_text(encoding="utf-8")) if path.exists() else default
+    except Exception:
+        return default
 
 
 def previous_history():
@@ -30,8 +32,18 @@ def merge_rows(*groups):
     for group in groups:
         for x in group or []:
             eid = str(x.get("event_id") or "")
-            if eid: out[eid] = x
-    return sorted(out.values(), key=lambda x: str(x.get("date")))
+            if eid:
+                y = dict(x)
+                if y.get("home"):
+                    y["home"] = norm_team(y["home"])
+                if y.get("away"):
+                    y["away"] = norm_team(y["away"])
+                if y.get("player_1"):
+                    y["player_1"] = norm_team(y["player_1"])
+                if y.get("player_2"):
+                    y["player_2"] = norm_team(y["player_2"])
+                out[eid] = y
+    return sorted(out.values(), key=lambda x: str(x.get("date") or x.get("start_time")))
 
 
 def main():
@@ -41,18 +53,23 @@ def main():
     history = merge_rows(prior, existing, season)
     fixtures = current_fixtures()
 
-    model_hist = [{
-        "sport": "football", "settled": True,
-        "final_score": [r["home_score"], r["away_score"]],
-        "event_id": r["event_id"], "start_time": r["date"],
-        "league": "Eredivisie", "player_1": r["home"], "player_2": r["away"]
-    } for r in history if r.get("home_score") is not None and r.get("away_score") is not None]
+    model_hist = []
+    for r in history:
+        if r.get("home_score") is None or r.get("away_score") is None:
+            continue
+        model_hist.append({
+            "sport": "football", "settled": True,
+            "final_score": [r["home_score"], r["away_score"]],
+            "event_id": r["event_id"], "start_time": r["date"],
+            "league": "Eredivisie", "player_1": norm_team(r["home"]), "player_2": norm_team(r["away"])
+        })
 
     predictions = []
     for f in fixtures:
+        home, away = norm_team(f["home"]), norm_team(f["away"])
         event = {"id": f["event_id"], "competitions": [{"competitors": [
-            {"homeAway": "home", "team": {"displayName": f["home"]}},
-            {"homeAway": "away", "team": {"displayName": f["away"]}},
+            {"homeAway": "home", "team": {"displayName": home}},
+            {"homeAway": "away", "team": {"displayName": away}},
         ]}]}
         try:
             p = independent_prediction(event, "Eredivisie", model_hist, cutoff=f["date"])
@@ -69,13 +86,13 @@ def main():
         probs = {"p1": round(p["p1"], 6), "draw": round(p["draw"], 6), "p2": round(p["p2"], 6)}
         predictions.append({
             "sport": "football", "league": "Eredivisie", "event_id": f["event_id"],
-            "start_time": f["date"], "player_1": f["home"], "player_2": f["away"],
+            "start_time": f["date"], "player_1": home, "player_2": away,
             "probabilities": probs, "pick": max(probs, key=probs.get),
             "confidence": round(max(probs.values()), 6),
-            "expected_goals": {"p1": round(xh, 4), "p2": round(xa, 4), "total": round(xh+xa, 4)},
+            "expected_goals": {"p1": round(xh, 4), "p2": round(xa, 4), "total": round(xh + xa, 4)},
             "markets": {
                 "over_under": {"line": 2.5, "over": round(over25, 6), "under": round(under25, 6), "pick": "over" if over25 >= under25 else "under"},
-                "btts": {"yes": round(btts, 6), "no": round(1-btts, 6), "pick": "yes" if btts >= .5 else "no"}
+                "btts": {"yes": round(btts, 6), "no": round(1 - btts, 6), "pick": "yes" if btts >= .5 else "no"}
             },
             "market": {"odds": {}, "value_by_outcome": {}, "best_value": None, "status": "NO_FREE_CURRENT_ODDS_SOURCE"},
             "model": p.get("method", "independent_football_model"),
@@ -104,4 +121,5 @@ def main():
     print(json.dumps({"fixtures": len(fixtures), "predictions": len(predictions), "history": len(history)}, indent=2))
 
 
-if __name__ == "__main__": main()
+if __name__ == "__main__":
+    main()
