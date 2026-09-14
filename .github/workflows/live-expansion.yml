@@ -1,0 +1,80 @@
+name: Match Signal Live Expansion
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/live_expansion_pipeline.py'
+      - 'scripts/settle_expansion.py'
+      - '.github/workflows/live-expansion.yml'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: match-signal-live-expansion
+  cancel-in-progress: false
+
+jobs:
+  live-expansion:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: python -m pip install --upgrade requests pandas pyarrow
+
+      - name: Sync with latest main
+        run: |
+          git fetch origin main
+          git reset --hard origin/main
+
+      - name: Generate live-experimental NBA + Eredivisie signals
+        run: python scripts/live_expansion_pipeline.py
+
+      - name: Settle completed expansion signals
+        run: python scripts/settle_expansion.py
+
+      - name: Commit generated expansion data
+        id: commit
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/ere_divisie_history.json data/nba_history.json data/ere_divisie_predictions.json data/nba_predictions.json data/expansion_status.json data/expansion_prediction_history.json data/expansion_live_performance.json
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No expansion data changes."
+            exit 0
+          fi
+          git commit -m "🤖 Refresh live experimental NBA and Eredivisie signals"
+          git push origin main
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Configure GitHub Pages
+        if: steps.commit.outputs.changed == 'true'
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        if: steps.commit.outputs.changed == 'true'
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: '.'
+
+      - name: Deploy Pages
+        if: steps.commit.outputs.changed == 'true'
+        uses: actions/deploy-pages@v4
