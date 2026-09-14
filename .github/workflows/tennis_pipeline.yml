@@ -21,7 +21,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  MATCH_SIGNAL_DEPLOY_REV: "2026-09-13-model-v4-individual-behavior"
+  MATCH_SIGNAL_DEPLOY_REV: "2026-09-14-narrow-football-scope-performance-ledger"
   STAKE_ODDS_API_KEY: ${{ secrets.STAKE_ODDS_API_KEY }}
   ODDSPAPI_API_KEY: ${{ secrets.ODDSPAPI_API_KEY }}
 
@@ -44,9 +44,9 @@ jobs:
         run: |
           git fetch origin main
           git reset --hard origin/main
-      - name: Build live football and tennis predictions and settle historical picks
-        run: python scripts/run_pipeline.py
-      - name: Build 90-day independent football team history
+      - name: Build scoped daily Football and Tennis predictions and settle historical picks
+        run: python scripts/scoped_pipeline.py
+      - name: Build scoped 365-day independent football team history
         run: python scripts/build_football_team_history.py
       - name: Enrich football predictions with pure market snapshot
         run: python scripts/enrich_market_snapshot.py
@@ -56,6 +56,8 @@ jobs:
         run: python scripts/calibrate_tennis_analytics.py
       - name: Build basketball coverage and OddsPapi/Stake market signals
         run: PYTHONPATH=. python scripts/basketball_oddspapi_runner.py
+      - name: Build current empirical performance snapshot from previous settled predictions
+        run: PYTHONPATH=. python scripts/current_performance.py
       - name: Fit walk-forward statistical calibration
         run: PYTHONPATH=. python scripts/calibrate_models.py
       - name: Apply independent statistical model, market benchmark and value layer
@@ -63,6 +65,7 @@ jobs:
       - name: Build reusable team and player behavior profiles
         run: PYTHONPATH=. python scripts/build_behavior_profiles.py
       - name: Build verified individual athlete behavior observations
+        continue-on-error: true
         run: PYTHONPATH=. python scripts/build_individual_behavior.py
       - name: Attach behavior context to next-match predictions
         run: PYTHONPATH=. python scripts/apply_behavior_context.py
@@ -80,12 +83,12 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/predictions.json data/prediction_history.json data/accuracy.json data/pipeline_status.json data/risk_gate.json data/calibration.json data/football_team_history.json data/basketball_predictions.json data/basketball_history.json data/basketball_accuracy.json data/basketball_provider_cache.json data/behavior_profiles.json data/individual_behavior.json data/behavior_validation.json data/v4_paper_ledger.json data/v4_validation.json qa/report.json
+          git add data/predictions.json data/prediction_history.json data/accuracy.json data/pipeline_status.json data/risk_gate.json data/calibration.json data/football_team_history.json data/basketball_predictions.json data/basketball_history.json data/basketball_accuracy.json data/basketball_provider_cache.json data/behavior_profiles.json data/individual_behavior.json data/behavior_validation.json data/current_performance.json data/v4_paper_ledger.json data/v4_validation.json qa/report.json
           if git diff --cached --quiet; then
             echo "No generated data or QA changes."
             echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          git commit -m "🤖 Refresh predictions, individual behavior, validation and QA"
+          git commit -m "🤖 Refresh scoped predictions, settlement, performance and QA"
           git push origin main
           echo "changed=true" >> "$GITHUB_OUTPUT"
