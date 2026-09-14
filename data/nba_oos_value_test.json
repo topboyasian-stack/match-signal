@@ -1,0 +1,32 @@
+{
+  "generated_at": "2026-09-14T19:11:37.819081+00:00",
+  "paper_only": true,
+  "test": "strict chronological 80/20 holdout",
+  "source": "data/nba_market_matches.json",
+  "model_source": "persisted walk-forward model probabilities",
+  "ev_threshold": 0.025,
+  "total_usable_matched_games": 803,
+  "development_games": 642,
+  "holdout_games": 161,
+  "development_end": "2026-01-20T00:00:00+00:00",
+  "holdout_start": "2026-01-21T00:00:00+00:00",
+  "holdout_end": "2026-02-12T00:00:00+00:00",
+  "holdout": {
+    "n": 161,
+    "model_accuracy": 0.5900621118012422,
+    "market_accuracy": 0.639751552795031,
+    "accuracy_delta": -0.049689440993788817,
+    "model_brier": 0.24415596629617606,
+    "model_logloss": 0.68209279165281,
+    "market_brier": 0.2115705329127809,
+    "ev_threshold": 0.025,
+    "value_bets": 50,
+    "value_coverage": 0.3105590062111801,
+    "mean_ev": 0.3152770462740621,
+    "roi": -0.1708005698005698,
+    "profit_units": -8.54002849002849,
+    "value_accuracy": 0.36
+  },
+  "release_decision": "RESEARCH_ONLY",
+  "reason": "Strict holdout is a diagnostic only; NBA remains paper-only until a pre-registered value rule produces positive out-of-sample ROI with adequate contemporaneous market coverage."
+}
