@@ -60,7 +60,11 @@ jobs:
           fixtures = status.get('competitions', {}).get('Eredivisie', {}).get('current_fixtures', 0)
           if fixtures < 1 or len(data) < 1:
               raise SystemExit(f'ABORT: live Eredivisie publication is empty (fixtures={fixtures}, predictions={len(data)})')
-          print(f'Publication guard passed: {fixtures} fixtures / {len(data)} predictions')
+          main_feed = json.loads(Path('data/predictions.json').read_text())
+          ere_main = [p for p in main_feed if p.get('league') == 'Eredivisie']
+          if len(ere_main) < 1:
+              raise SystemExit(f'ABORT: main prediction feed is missing Eredivisie rows (rows={len(ere_main)})')
+          print(f'Publication guard passed: {fixtures} fixtures / {len(data)} Eredivisie predictions / {len(ere_main)} main-feed rows')
           PY
 
       - name: QA Eredivisie predictions before settlement/publication
@@ -74,7 +78,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/ere_divisie_history.json data/nba_history.json data/ere_divisie_predictions.json data/nba_predictions.json data/expansion_status.json data/expansion_prediction_history.json data/expansion_live_performance.json data/ere_divisie_qa.json
+          git add data/predictions.json data/ere_divisie_history.json data/nba_history.json data/ere_divisie_predictions.json data/nba_predictions.json data/expansion_status.json data/expansion_prediction_history.json data/expansion_live_performance.json data/ere_divisie_qa.json
           if git diff --cached --quiet; then
             echo "No expansion data changes."
             exit 0
