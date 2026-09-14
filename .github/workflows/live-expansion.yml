@@ -10,6 +10,7 @@ on:
       - 'scripts/live_expansion_pipeline.py'
       - 'scripts/repair_ere_live.py'
       - 'scripts/eredivisie_source.py'
+      - 'scripts/qa_ere_live.py'
       - 'scripts/settle_expansion.py'
       - '.github/workflows/live-expansion.yml'
 
@@ -49,6 +50,9 @@ jobs:
       - name: Repair and publish Eredivisie from resilient current-season sources
         run: python scripts/repair_ere_live.py
 
+      - name: QA Eredivisie predictions before settlement/publication
+        run: python scripts/qa_ere_live.py
+
       - name: Settle completed expansion signals
         run: python scripts/settle_expansion.py
 
@@ -57,7 +61,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/ere_divisie_history.json data/nba_history.json data/ere_divisie_predictions.json data/nba_predictions.json data/expansion_status.json data/expansion_prediction_history.json data/expansion_live_performance.json
+          git add data/ere_divisie_history.json data/nba_history.json data/ere_divisie_predictions.json data/nba_predictions.json data/expansion_status.json data/expansion_prediction_history.json data/expansion_live_performance.json data/ere_divisie_qa.json
           if git diff --cached --quiet; then
             echo "No expansion data changes."
             exit 0
@@ -66,4 +70,3 @@ jobs:
           git push origin main
 
       # data/** changes automatically trigger the existing deploy-pages.yml workflow.
-      # Verification pass: resilient Eredivisie repair must be the final writer before commit.
