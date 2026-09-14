@@ -5,8 +5,9 @@ our independently generated NBA walk-forward predictions. This is a benchmark
 only: market prices are never fed into the independent model.
 """
 import io, json, math, re, zipfile
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
+from difflib import SequenceMatcher
 
 import pandas as pd
 import requests
@@ -31,11 +32,45 @@ def american_to_prob(x):
 def norm_team(x):
     s = re.sub(r'[^a-z0-9]', '', str(x).lower())
     aliases = {
-        'lalakers':'losangeleslakers', 'lacippers':'losangelesclippers',
-        'nyknicks':'newyorkknicks', 'gswarriors':'goldenstatewarriors',
-        'okcthunder':'oklahomacitythunder', 'phxsuns':'phoenixsuns',
-        'sas':'sanantoniospurs', 'sa':'sanantoniospurs', 'utahjazz':'utahjazz',
-        'nopelicans':'neworleanspelicans', 'ny':'newyorkknicks',
+        'lalakers':'losangeleslakers','lalakers':'losangeleslakers','lakers':'losangeleslakers',
+        'lacippers':'losangelesclippers','clippers':'losangelesclippers',
+        'nyknicks':'newyorkknicks','knicks':'newyorkknicks',
+        'gswarriors':'goldenstatewarriors','warriors':'goldenstatewarriors',
+        'okcthunder':'oklahomacitythunder','thunder':'oklahomacitythunder',
+        'phxsuns':'phoenixsuns','suns':'phoenixsuns',
+        'sas':'sanantoniospurs','spurs':'sanantoniospurs',
+        'utahjazz':'utahjazz','jazz':'utahjazz',
+        'nopelicans':'neworleanspelicans','pelicans':'neworleanspelicans',
+        'memgrizzlies':'memphisgrizzlies','grizzlies':'memphisgrizzlies',
+        'minwolves':'minnesotatimberwolves','wolves':'minnesotatimberwolves',
+        'sackings':'sacramentokings','kings':'sacramentokings',
+        'phila76ers':'philadelphia76ers','sixers':'philadelphia76ers','76ers':'philadelphia76ers',
+        'bknets':'brooklynnets','nets':'brooklynnets',
+        'torraptors':'torontoraptors','raptors':'torontoraptors',
+        'chibulls':'chicagobulls','bulls':'chicagobulls',
+        'clecavaliers':'clevelandcavaliers','cavaliers':'clevelandcavaliers',
+        'detpistons':'detroitpistons','pistons':'detroitpistons',
+        'indpacers':'indianapacers','pacers':'indianapacers',
+        'milbucks':'milwaukeebucks','bucks':'milwaukeebucks',
+        'atlhawks':'atlantahawks','hawks':'atlantahawks',
+        'cha':'charlottehornets','hornets':'charlottehornets',
+        'miaheat':'miamiheat','heat':'miamiheat',
+        'orlmagic':'orlandomagic','magic':'orlandomagic',
+        'washwizards':'washingtonwizards','wizards':'washingtonwizards',
+        'dennuggets':'denvernuggets','nuggets':'denvernuggets',
+        'hourockets':'houstonrockets','rockets':'houstonrockets',
+        'dalmavericks':'dallasmavericks','mavericks':'dallasmavericks',
+        'portrailblazers':'portlandtrailblazers','trailblazers':'portlandtrailblazers',
+        'sacramento':'sacramentokings',
+        'newyork':'newyorkknicks','brooklyn':'brooklynnets','boston':'bostonceltics',
+        'atlanta':'atlantahawks','charlotte':'charlottehornets','chicago':'chicagobulls',
+        'cleveland':'clevelandcavaliers','dallas':'dallasmavericks','denver':'denvernuggets',
+        'detroit':'detroitpistons','goldenstate':'goldenstatewarriors','houston':'houstonrockets',
+        'indiana':'indianapacers','losangeles':'losangeleslakers','memphis':'memphisgrizzlies',
+        'miami':'miamiheat','milwaukee':'milwaukeebucks','minnesota':'minnesotatimberwolves',
+        'neworleans':'neworleanspelicans','oklahomacity':'oklahomacitythunder','orlando':'orlandomagic',
+        'philadelphia':'philadelphia76ers','phoenix':'phoenixsuns','portland':'portlandtrailblazers',
+        'sanantonio':'sanantoniospurs','toronto':'torontoraptors','utah':'utahjazz','washington':'washingtonwizards',
     }
     return aliases.get(s, s)
 
@@ -76,6 +111,30 @@ def model_probability(r, hist):
     return float(p.get('home', .5)), float(p.get('away', .5))
 
 
+def market_match(index, market_dates, d, home, away):
+    """Match ESPN UTC dates to market local dates; NBA games can straddle UTC date."""
+    h, a = norm_team(home), norm_team(away)
+    base = datetime.fromisoformat(d).date()
+    dates = [base, base-timedelta(days=1), base+timedelta(days=1)]
+    for day in dates:
+        ds = str(day)
+        for mh, ma, orientation in ((h,a,'normal'),(a,h,'reversed')):
+            m = index.get((ds,mh,ma))
+            if m is not None:
+                return m, orientation
+    # Last-resort fuzzy team match on the same +/-1 day, with a strict threshold.
+    best=None
+    for day in dates:
+        for rec in market_dates.get(str(day), []):
+            sh=SequenceMatcher(None,h,rec['home_key']).ratio()
+            sa=SequenceMatcher(None,a,rec['away_key']).ratio()
+            sr=SequenceMatcher(None,h,rec['away_key']).ratio()+SequenceMatcher(None,a,rec['home_key']).ratio()
+            if sh+sa >= 1.65 and sh+sa >= sr:
+                best=(rec,'normal'); break
+        if best: break
+    return best if best else (None,None)
+
+
 def main():
     hist = load_model_rows()
     market, source_file = load_dataset()
@@ -83,32 +142,41 @@ def main():
     market['home_key'] = market['home_team'].map(norm_team)
     market['away_key'] = market['away_team'].map(norm_team)
     idx = {}
+    by_date = {}
     for _, r in market.iterrows():
-        k = (r['date_key'], r['home_key'], r['away_key'])
-        idx[k] = r
+        if not r['date_key'] or r['date_key'] == 'NaT':
+            continue
+        rec = r
+        idx[(r['date_key'], r['home_key'], r['away_key'])] = rec
+        by_date.setdefault(r['date_key'], []).append(rec)
 
     rows = []
+    orientation_counts = {'normal':0,'reversed':0}
+    unmatched_examples=[]
     for r in hist:
         d = str(r['date'])[:10]
-        k = (d, norm_team(r['home']), norm_team(r['away']))
-        m = idx.get(k)
+        m, orientation = market_match(idx, by_date, d, r['home'], r['away'])
         if m is None:
+            if len(unmatched_examples) < 20:
+                unmatched_examples.append({'date':d,'home':r['home'],'away':r['away']})
             continue
+        orientation_counts[orientation] += 1
         hp = american_to_prob(m.get('money_home_odds'))
         ap = american_to_prob(m.get('money_away_odds'))
         if hp is None or ap is None:
             continue
+        if orientation == 'reversed':
+            hp, ap = ap, hp
         total = hp + ap
         if total <= 0:
             continue
-        # Remove vig by normalizing the two implied probabilities.
         mh, ma = hp/total, ap/total
         rows.append({'event_id':r['event_id'],'date':r['date'],'home':r['home'],'away':r['away'],
                      'home_score':r['home_score'],'away_score':r['away_score'],
                      'market_home_prob':mh,'market_away_prob':ma,
-                     'home_ml':m.get('money_home_odds'),'away_ml':m.get('money_away_odds')})
+                     'home_ml':m.get('money_home_odds') if orientation=='normal' else m.get('money_away_odds'),
+                     'away_ml':m.get('money_away_odds') if orientation=='normal' else m.get('money_home_odds')})
 
-    # Recompute independent predictions with a strict pre-game cutoff.
     by_id = {r['event_id']:r for r in hist}
     evaluated=[]
     for r in rows:
@@ -117,7 +185,6 @@ def main():
         actual_home = float(source['home_score']) > float(source['away_score'])
         model_pick = 'home' if hp >= ap else 'away'
         market_pick = 'home' if r['market_home_prob'] >= r['market_away_prob'] else 'away'
-        # Fair-odds EV for a $1 stake at the recorded closing ML.
         ml = float(r['home_ml'] if model_pick == 'home' else r['away_ml'])
         if ml > 0: dec = 1 + ml/100
         else: dec = 1 + 100/(-ml)
@@ -139,7 +206,8 @@ def main():
     pos_roi=(pos_profit/len(positive)) if positive else None
     payload={'generated_at':NOW.isoformat(),'paper_only':True,'source':'Kaggle MGM Grand NBA betting data','source_file':source_file,
              'market_definition':'closing moneyline; vig-normalized implied probability; one-book benchmark',
-             'coverage':{'model_history_events':len(hist),'market_rows':len(market),'matched_games':len(evaluated),'coverage_rate':round(len(evaluated)/len(hist),4) if hist else 0},
+             'coverage':{'model_history_events':len(hist),'market_rows':len(market),'matched_games':len(evaluated),'coverage_rate':round(len(evaluated)/len(hist),4) if hist else 0,
+                         'orientation_counts':orientation_counts,'unmatched_examples':unmatched_examples},
              'model_vs_market':{'model_accuracy':round(model_acc,4) if model_acc is not None else None,'market_accuracy':round(market_acc,4) if market_acc is not None else None,
                                 'mean_model_edge':avg('model_edge_vs_market'),'mean_closing_ev':avg('closing_ev'),
                                 'positive_ev_threshold':0.025,'positive_ev_games':len(positive),'positive_ev_roi':round(pos_roi,4) if pos_roi is not None else None},
