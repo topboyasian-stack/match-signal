@@ -21,7 +21,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  MATCH_SIGNAL_DEPLOY_REV: "2026-09-14-nba-eredivisie-expansion-deep-validation"
+  MATCH_SIGNAL_DEPLOY_REV: "2026-09-14-nba-parquet-expansion-validation"
   STAKE_ODDS_API_KEY: ${{ secrets.STAKE_ODDS_API_KEY }}
   ODDSPAPI_API_KEY: ${{ secrets.ODDSPAPI_API_KEY }}
 
@@ -39,7 +39,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install dependencies
-        run: python -m pip install --upgrade requests curl_cffi
+        run: python -m pip install --upgrade requests curl_cffi pandas pyarrow
       - name: Sync with latest main before generation
         run: |
           git fetch origin main
@@ -93,12 +93,12 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/predictions.json data/prediction_pool.json data/selection_gate.json data/prediction_history.json data/accuracy.json data/pipeline_status.json data/risk_gate.json data/calibration.json data/football_team_history.json data/basketball_predictions.json data/basketball_history.json data/basketball_accuracy.json data/basketball_provider_cache.json data/behavior_profiles.json data/individual_behavior.json data/behavior_validation.json data/current_performance.json data/v4_paper_ledger.json data/v4_validation.json data/prediction_breakdown.json data/sports_evaluation.json data/nba_history.json data/nba_predictions.json data/ere_divisie_history.json data/ere_divisie_predictions.json data/expansion_status.json data/expansion_validation.json qa/report.json
+          git add data/predictions.json data/prediction_pool.json data/selection_gate.json data/prediction_history.json data/accuracy.json data/pipeline_status.json data/risk_gate.json data/calibration.json data/football_team_history.json data/basketball_predictions.json data/basketball_history.json data/basketball_accuracy.json data/basketball_provider_cache.json data/behavior_profiles.json data/individual_behavior.json data/behavior_validation.json data/current_performance.json data/v4_paper_ledger.json data/v4_validation.json data/prediction_breakdown.json data/sports_evaluation.json data/nba_history.json data/nba_predictions.json data/ere_divisie_history.json data/ere_divisie_predictions.json data/expansion_status.json data/expansion_validation.json data/expansion_team_form.json qa/report.json
           if git diff --cached --quiet; then
             echo "No generated data or QA changes."
             echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          git commit -m "🤖 Run deep NBA and Eredivisie expansion validation"
+          git commit -m "🤖 Run NBA parquet expansion validation"
           git push origin main
           echo "changed=true" >> "$GITHUB_OUTPUT"
