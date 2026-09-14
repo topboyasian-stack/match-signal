@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-09-14T19:23:31.070791+00:00",
+  "updated_at": "2026-09-14T19:27:26.538939+00:00",
   "release_mode": "LIVE_EXPERIMENTAL",
   "live_trading_approved": false,
   "competitions": {
@@ -10,12 +10,13 @@
       "status": "PRESEASON_READY"
     },
     "Eredivisie": {
-      "historical_events": 70,
-      "current_fixtures": 0,
-      "published_predictions": 0,
+      "historical_events": 111,
+      "current_fixtures": 10,
+      "published_predictions": 10,
       "collection_errors": 0,
-      "status": "NO_CURRENT_FIXTURES",
-      "fixture_source": "ESPN primary; Football-Data.co.uk current-season fallback"
+      "status": "LIVE_EXPERIMENTAL",
+      "fixture_source": "FixtureDownload JSON primary; openfootball current-season fallback",
+      "history_source": "openfootball current season + retained Match Signal history"
     }
   },
   "monitoring": {
@@ -27,6 +28,7 @@
     "Independent probabilities never consume market probabilities.",
     "LIVE_EXPERIMENTAL signals are real generated predictions, not guarantees or live-trading approval.",
     "NBA remains preseason-ready until 2026-10-20, then enters live experimental mode automatically.",
-    "Eredivisie uses current-season fixtures and free current odds when ESPN does not return upcoming fixtures."
+    "Eredivisie uses current-season fixtures and free current odds when ESPN does not return upcoming fixtures.",
+    "Eredivisie repair source added after free Football-Data endpoint rate limiting; no market odds are fabricated when unavailable."
   ]
 }
