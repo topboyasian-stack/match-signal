@@ -46,6 +46,22 @@ def merge_rows(*groups):
     return sorted(out.values(), key=lambda x: str(x.get("date") or x.get("start_time")))
 
 
+def publish_to_main_feed(predictions):
+    """Keep the normal Predictions page aware of the expansion feed.
+
+    Existing football/tennis/basketball predictions remain untouched. Any stale
+    Eredivisie rows are replaced atomically by the current experimental rows.
+    """
+    existing = load(DATA / "predictions.json", [])
+    if not isinstance(existing, list):
+        existing = []
+    kept = [p for p in existing if str(p.get("league") or "") != "Eredivisie"]
+    combined = kept + predictions
+    combined.sort(key=lambda x: str(x.get("start_time") or ""))
+    DATA.joinpath("predictions.json").write_text(json.dumps(combined, indent=2), encoding="utf-8")
+    return len(combined)
+
+
 def main():
     existing = load(DATA / "ere_divisie_history.json", [])
     prior = previous_history()
@@ -103,6 +119,7 @@ def main():
 
     DATA.joinpath("ere_divisie_history.json").write_text(json.dumps(history, indent=2), encoding="utf-8")
     DATA.joinpath("ere_divisie_predictions.json").write_text(json.dumps(predictions, indent=2), encoding="utf-8")
+    main_feed_count = publish_to_main_feed(predictions)
 
     status = load(DATA / "expansion_status.json", {})
     status["updated_at"] = datetime.now(timezone.utc).isoformat()
@@ -117,8 +134,10 @@ def main():
     }
     status.setdefault("monitoring", {})["market_data_is_benchmark_only"] = True
     status.setdefault("notes", []).append("Eredivisie repair source added after free Football-Data endpoint rate limiting; no market odds are fabricated when unavailable.")
+    status["main_prediction_feed_merged"] = True
+    status["main_prediction_feed_count"] = main_feed_count
     DATA.joinpath("expansion_status.json").write_text(json.dumps(status, indent=2), encoding="utf-8")
-    print(json.dumps({"fixtures": len(fixtures), "predictions": len(predictions), "history": len(history)}, indent=2))
+    print(json.dumps({"fixtures": len(fixtures), "predictions": len(predictions), "history": len(history), "main_prediction_feed_count": main_feed_count}, indent=2))
 
 
 if __name__ == "__main__":
