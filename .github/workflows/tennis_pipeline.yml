@@ -21,7 +21,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  MATCH_SIGNAL_DEPLOY_REV: "2026-09-14-nba-gamelog-normalized-v2"
+  MATCH_SIGNAL_DEPLOY_REV: "2026-09-14-nba-gamelog-normalized-v3"
   STAKE_ODDS_API_KEY: ${{ secrets.STAKE_ODDS_API_KEY }}
   ODDSPAPI_API_KEY: ${{ secrets.ODDSPAPI_API_KEY }}
 
@@ -79,13 +79,7 @@ jobs:
                   as_ = float(a['pts'])
               except Exception:
                   continue
-              rows.append({
-                  'event_id': str(gid), 'date': d.isoformat(),
-                  'home': str(h['team_name']).strip(), 'away': str(a['team_name']).strip(),
-                  'home_id': str(h['team_id']) if 'team_id' in g.columns else '',
-                  'away_id': str(a['team_id']) if 'team_id' in g.columns else '',
-                  'home_score': hs, 'away_score': as_, 'markets': {}, 'source': url
-              })
+              rows.append({'event_id':str(gid),'date':d.isoformat(),'home':str(h['team_name']).strip(),'away':str(a['team_name']).strip(),'home_id':str(h['team_id']) if 'team_id' in g.columns else '','away_id':str(a['team_id']) if 'team_id' in g.columns else '','home_score':hs,'away_score':as_,'markets':{},'source':url})
           rows = sorted({x['event_id']: x for x in rows}.values(), key=lambda x:x['date'])
           if not rows:
               raise RuntimeError('NBA gamelog normalized to zero games')
@@ -93,11 +87,7 @@ jobs:
           p = Path('scripts/expansion_pipeline.py')
           s = p.read_text()
           needle = "def nba_fallback():\n"
-          inject = """def nba_fallback():
- local=DATA/'nba_fallback.json'
- if local.exists():
-  return json.loads(local.read_text()),[]
-"""
+          inject = "def nba_fallback():" + chr(10) + " local=DATA/'nba_fallback.json'" + chr(10) + " if local.exists():" + chr(10) + "  return json.loads(local.read_text()),[]" + chr(10)
           if 'nba_fallback.json' not in s:
               s = s.replace(needle, inject, 1)
           s = s.replace('team-box parquet, then stable DataHub/FiveThirtyEight NBA Elo CSV fallback', 'normalized llimllib/nba_data gamelog_2026 parquet, then stable FiveThirtyEight NBA Elo CSV fallback')
