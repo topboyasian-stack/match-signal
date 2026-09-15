@@ -47,11 +47,6 @@ def merge_rows(*groups):
 
 
 def publish_to_main_feed(predictions):
-    """Keep the normal Predictions page aware of the expansion feed.
-
-    Existing football/tennis/basketball predictions remain untouched. Any stale
-    Eredivisie rows are replaced atomically by the current experimental rows.
-    """
     existing = load(DATA / "predictions.json", [])
     if not isinstance(existing, list):
         existing = []
@@ -86,7 +81,7 @@ def main():
         event = {"id": f["event_id"], "competitions": [{"competitors": [
             {"homeAway": "home", "team": {"displayName": home}},
             {"homeAway": "away", "team": {"displayName": away}},
-        ]}]}
+        }]}
         try:
             p = independent_prediction(event, "Eredivisie", model_hist, cutoff=f["date"])
         except Exception:
@@ -94,8 +89,8 @@ def main():
         if not p:
             continue
         xh, xa = float(p.get("xg_home", 0)), float(p.get("xg_away", 0))
-        import math
         total = max(0.05, xh + xa)
+        import math
         under25 = sum(math.exp(-total) * total**k / math.factorial(k) for k in range(3))
         over25 = 1 - under25
         btts = 1 - math.exp(-xh) - math.exp(-xa) + math.exp(-total)
@@ -113,7 +108,8 @@ def main():
             "market": {"odds": {}, "value_by_outcome": {}, "best_value": None, "status": "NO_FREE_CURRENT_ODDS_SOURCE"},
             "model": p.get("method", "independent_football_model"),
             "signal_quality": {"effective_sample": p.get("effective_sample"), "home_sample": p.get("sample_home"), "away_sample": p.get("sample_away"), "status": "LIVE_EXPERIMENTAL", "history_events": len(model_hist)},
-            "prediction_status": "live_experimental", "paper_only": False, "live_experimental": True,
+            "prediction_status": "live_experimental", "paper_only": True, "live_experimental": True,
+            "live_trading_approved": False,
             "source": {"fixtures": f.get("source"), "history": "openfootball current season + retained Match Signal history"},
         })
 
