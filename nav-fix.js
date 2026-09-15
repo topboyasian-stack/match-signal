@@ -1,3 +1,4 @@
+// Match Signal production deployment trigger: recovered live prediction feed.
 (() => {
   'use strict';
   const routes = {
