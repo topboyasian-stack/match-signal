@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Apply the research-derived selective candidate gate.
+"""Apply the research-derived selective candidate gate without hiding predictions.
 
-The full raw prediction pool is preserved in data/prediction_pool.json. The public
-prediction feed is reduced to candidates whose tournament and selection segments
-have enough settled history, sufficient realized accuracy, and current confidence
->= 0.65. No probabilities are modified. PAPER ONLY; live eligibility stays false.
+The full prediction feed remains visible and auditable. The gate produces a
+separate selected-candidate artifact; it never replaces data/predictions.json
+with an empty subset. This prevents a research filter from making the product
+look like the prediction engine produced no fixtures.
+PAPER ONLY; live eligibility stays false.
 """
 from __future__ import annotations
 
@@ -15,8 +16,8 @@ ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
 PREDICTIONS = DATA / "predictions.json"
 POOL = DATA / "prediction_pool.json"
+SELECTED = DATA / "selection_candidates.json"
 EVAL = DATA / "sports_evaluation.json"
-
 MIN_CONFIDENCE = 0.65
 
 
@@ -49,23 +50,20 @@ def main():
     evaluation = load(EVAL, {})
     if not isinstance(predictions, list):
         predictions = []
+
+    # Keep an immutable raw snapshot for research and settlement.
     POOL.write_text(json.dumps(predictions, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
     qualified_tournaments = evaluation.get("qualified_tournaments", {})
     qualified_selections = evaluation.get("qualified_selections", {})
-    qualified_pairs = {
-        sport: {(x.get("tournament"), x.get("selection")) for x in rows}
-        for sport, rows in qualified_selections.items()
-    }
-    qualified_tour = {
-        sport: {x.get("tournament") for x in rows}
-        for sport, rows in qualified_tournaments.items()
-    }
+    qualified_pairs = {sport: {(x.get("tournament"), x.get("selection")) for x in rows} for sport, rows in qualified_selections.items()}
+    qualified_tour = {sport: {x.get("tournament") for x in rows} for sport, rows in qualified_tournaments.items()}
 
     selected = []
     rejected = 0
     reasons = {}
-    for row in predictions:
+    for original in predictions:
+        row = dict(original)
         sport = str(row.get("sport") or "").lower()
         tour = tournament(row)
         pick = selection(row)
@@ -78,27 +76,28 @@ def main():
         if not isinstance(conf, (int, float)) or float(conf) < MIN_CONFIDENCE:
             reasons_list.append("confidence_below_0.65")
 
-        row = dict(row)
+        row["candidate_status"] = "SELECTED" if not reasons_list else "RESEARCH_FILTERED"
+        row["selection_gate"] = {
+            "status": "passed" if not reasons_list else "filtered",
+            "sport": sport,
+            "tournament": tour,
+            "selection": pick,
+            "confidence_threshold": MIN_CONFIDENCE,
+            "mode": "PAPER_ONLY",
+            "reasons": reasons_list,
+        }
+        row["live_eligible"] = False
         if not reasons_list:
-            row["candidate_status"] = "SELECTED"
-            row["selection_gate"] = {
-                "status": "passed",
-                "sport": sport,
-                "tournament": tour,
-                "selection": pick,
-                "confidence_threshold": MIN_CONFIDENCE,
-                "mode": "PAPER_ONLY",
-            }
-            row["live_eligible"] = False
             selected.append(row)
         else:
             rejected += 1
-            reasons[" + ".join(reasons_list)] = reasons.get(" + ".join(reasons_list), 0) + 1
+            reason = " + ".join(reasons_list)
+            reasons[reason] = reasons.get(reason, 0) + 1
 
-    # The dashboard-facing feed is deliberately the selected subset. The full
-    # pool remains available for research/audit and settlement history is kept
-    # separately, so filtering does not erase historical observations.
-    PREDICTIONS.write_text(json.dumps(selected, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    # IMPORTANT: do not replace the public feed with the selected subset.
+    # The full prediction engine output remains in predictions.json.
+    PREDICTIONS.write_text(json.dumps(predictions, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    SELECTED.write_text(json.dumps(selected, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
     summary = {
         "status": "ok",
@@ -108,7 +107,9 @@ def main():
         "filtered_predictions": rejected,
         "selection_rate": round(len(selected) / len(predictions), 4) if predictions else 0.0,
         "rejection_reasons": reasons,
-        "policy": "Only tournament+selection segments meeting historical minimums and current confidence >= 0.65 are surfaced. Raw predictions remain in prediction_pool.json.",
+        "public_feed_preserved": True,
+        "selected_artifact": "data/selection_candidates.json",
+        "policy": "Selection is an analysis layer; it never deletes raw/current predictions from the public feed.",
     }
     (DATA / "selection_gate.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(json.dumps(summary, indent=2))
