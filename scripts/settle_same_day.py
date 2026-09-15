@@ -1,4 +1,9 @@
-"""Settle completed Match Signal fixtures from authoritative ESPN event summaries."""
+"""Settle completed Match Signal fixtures from authoritative ESPN data.
+
+Primary lookup uses event summary. If ESPN rejects summary requests (400/403),
+settlement falls back to the scoreboard endpoint for the prediction's match
+calendar date. This prevents the settlement ledger from silently stalling.
+"""
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -8,47 +13,40 @@ import requests
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
 ESPN = "https://site.api.espn.com/apis/site/v2/sports"
-FOOTBALL_LEAGUES = {
-    "EPL": "eng.1",
-    "La Liga": "esp.1",
-    "Bundesliga": "ger.1",
-    "Serie A": "ita.1",
-    "Ligue 1": "fra.1",
-    "Champions League": "uefa.champions",
-    "MLS": "usa.1",
-    "Primeira Liga": "por.1",
-}
-TENNIS_LEAGUES = {"ATP": "atp", "WTA": "wta"}
+FOOTBALL_LEAGUES = {"EPL":"eng.1","La Liga":"esp.1","Bundesliga":"ger.1","Serie A":"ita.1","Ligue 1":"fra.1","Champions League":"uefa.champions","MLS":"usa.1","Primeira Liga":"por.1"}
+TENNIS_LEAGUES = {"ATP":"atp","WTA":"wta"}
 SESSION = requests.Session()
-SESSION.headers.update({"User-Agent": "MatchSignal/3.2 (+https://github.com/topboyasian-stack/match-signal)"})
+SESSION.headers.update({"User-Agent": "MatchSignal/3.3 (+https://github.com/topboyasian-stack/match-signal)"})
 
 
 def load(path, default):
     try:
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return default
+        with open(path, "r", encoding="utf-8") as f: return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError): return default
 
 
 def save(path, value):
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(value, f, indent=2, ensure_ascii=False)
+    with open(path, "w", encoding="utf-8") as f: json.dump(value, f, indent=2, ensure_ascii=False)
 
 
 def event_summary(sport, league, event_id):
-    r = SESSION.get(
-        f"{ESPN}/{sport}/{league}/summary",
-        params={"event": event_id},
-        timeout=30,
-    )
+    r = SESSION.get(f"{ESPN}/{sport}/{league}/summary", params={"event": event_id}, timeout=30)
     r.raise_for_status()
     return r.json()
 
 
-def extract_competition(summary):
-    header = summary.get("header") or {}
-    competitions = header.get("competitions") or summary.get("competitions") or []
+def scoreboard_event(sport, league, event_id, date):
+    r = SESSION.get(f"{ESPN}/{sport}/{league}/scoreboard", params={"dates": date, "limit": 1000}, timeout=30)
+    r.raise_for_status()
+    for event in r.json().get("events", []):
+        if str(event.get("id")) == str(event_id):
+            return event
+    return None
+
+
+def extract_competition(payload):
+    header = payload.get("header") or {}
+    competitions = header.get("competitions") or payload.get("competitions") or []
     return competitions[0] if competitions else None
 
 
@@ -56,48 +54,54 @@ def brier(probs, actual):
     return round(sum((float(probs.get(k, 0)) - (1 if actual == k else 0)) ** 2 for k in probs), 6)
 
 
+def prediction_date(prediction):
+    try:
+        dt = datetime.fromisoformat(str(prediction.get("start_time")).replace("Z", "+00:00"))
+        return dt.strftime("%Y%m%d")
+    except Exception:
+        return datetime.now(timezone.utc).strftime("%Y%m%d")
+
+
 def settle(history):
     now = datetime.now(timezone.utc)
     pending = [p for p in history if not p.get("settled") and p.get("event_id")]
-    if not pending:
-        return 0
-
+    if not pending: return 0
     competitions = {}
     for prediction in pending:
         sport = str(prediction.get("sport") or "").lower()
         label = prediction.get("league")
         league = FOOTBALL_LEAGUES.get(label) if sport == "football" else TENNIS_LEAGUES.get(label)
-        if not league:
-            continue
+        if not league: continue
         key = f"{sport}:{league}:{prediction.get('event_id')}"
-        if key in competitions:
-            continue
+        if key in competitions: continue
+        provider_sport = "soccer" if sport == "football" else "tennis"
         try:
-            summary = event_summary("soccer" if sport == "football" else "tennis", league, prediction.get("event_id"))
+            summary = event_summary(provider_sport, league, prediction.get("event_id"))
             competition = extract_competition(summary)
-            if competition:
-                competitions[key] = competition
-        except Exception as exc:
-            print(f"{sport} {label} {prediction.get('event_id')}: {exc}")
+            if competition: competitions[key] = competition
+        except Exception as summary_exc:
+            try:
+                competition = scoreboard_event(provider_sport, league, prediction.get("event_id"), prediction_date(prediction))
+                if competition:
+                    competitions[key] = competition
+                    print(f"Fallback scoreboard settlement source used for {label} {prediction.get('event_id')} after summary error: {summary_exc}")
+                else:
+                    print(f"No scoreboard event found for {label} {prediction.get('event_id')} after summary error: {summary_exc}")
+            except Exception as fallback_exc:
+                print(f"{sport} {label} {prediction.get('event_id')}: summary={summary_exc}; scoreboard={fallback_exc}")
 
     settled = 0
     for prediction in history:
-        if prediction.get("settled"):
-            continue
-        sport = str(prediction.get("sport") or "").lower()
-        label = prediction.get("league")
+        if prediction.get("settled"): continue
+        sport = str(prediction.get("sport") or "").lower(); label = prediction.get("league")
         league = FOOTBALL_LEAGUES.get(label) if sport == "football" else TENNIS_LEAGUES.get(label)
-        if not league:
-            continue
+        if not league: continue
         competition = competitions.get(f"{sport}:{league}:{prediction.get('event_id')}")
-        if not competition:
-            continue
+        if not competition: continue
         status_type = (competition.get("status") or {}).get("type") or {}
-        if not status_type.get("completed"):
-            continue
+        if not status_type.get("completed"): continue
         competitors = competition.get("competitors") or []
-        if len(competitors) < 2:
-            continue
+        if len(competitors) < 2: continue
         try:
             if sport == "football":
                 home = next(c for c in competitors if c.get("homeAway") == "home")
@@ -105,25 +109,15 @@ def settle(history):
                 hs, ass = float(home.get("score", 0)), float(away.get("score", 0))
                 actual = "p1" if hs > ass else "p2" if ass > hs else "draw"
                 line = float(prediction.get("markets", {}).get("over_under", {}).get("line", 2.5))
-                prediction["actual_markets"] = {
-                    "over_under": "over" if hs + ass > line else "under",
-                    "btts": "yes" if hs > 0 and ass > 0 else "no",
-                }
+                prediction["actual_markets"] = {"over_under": "over" if hs + ass > line else "under", "btts": "yes" if hs > 0 and ass > 0 else "no"}
                 prediction["final_score"] = [int(hs) if hs.is_integer() else hs, int(ass) if ass.is_integer() else ass]
             else:
                 c1, c2 = competitors[0], competitors[1]
-                s1 = sum(float(x.get("value", 0)) for x in c1.get("linescores", []))
-                s2 = sum(float(x.get("value", 0)) for x in c2.get("linescores", []))
+                s1 = sum(float(x.get("value", 0)) for x in c1.get("linescores", [])); s2 = sum(float(x.get("value", 0)) for x in c2.get("linescores", []))
                 actual = "p1" if c1.get("winner") else "p2"
                 prediction["actual_markets"] = {"total_games": s1 + s2, "sets": len(c1.get("linescores", []))}
                 prediction["final_score"] = [s1, s2]
-            prediction.update({
-                "settled": True,
-                "settled_at": now.isoformat(),
-                "actual": actual,
-                "correct": prediction.get("pick") == actual,
-                "brier": brier(prediction.get("probabilities", {}), actual),
-            })
+            prediction.update({"settled": True, "settled_at": now.isoformat(), "actual": actual, "correct": prediction.get("pick") == actual, "brier": brier(prediction.get("probabilities", {}), actual)})
             settled += 1
             print(f"Settled {prediction.get('event_id')}: {prediction.get('final_score')} ({'WIN' if prediction.get('correct') else 'LOSS'})")
         except (TypeError, ValueError, KeyError, StopIteration) as exc:
@@ -132,33 +126,14 @@ def settle(history):
 
 
 def main():
-    history_path = DATA / "prediction_history.json"
-    accuracy_path = DATA / "accuracy.json"
-    history = load(history_path, [])
-    count = settle(history)
-    settled = [p for p in history if p.get("settled")]
-    summary = {
-        "settled": len(settled),
-        "correct": sum(bool(p.get("correct")) for p in settled),
-        "accuracy": round(sum(bool(p.get("correct")) for p in settled) / len(settled), 4) if settled else 0.0,
-        "brier_score": round(sum(float(p.get("brier", 0)) for p in settled) / len(settled), 4) if settled else 0.0,
-        "markets": {},
-    }
+    history_path = DATA / "prediction_history.json"; accuracy_path = DATA / "accuracy.json"
+    history = load(history_path, []); count = settle(history); settled = [p for p in history if p.get("settled")]
+    summary = {"settled": len(settled), "correct": sum(bool(p.get("correct")) for p in settled), "accuracy": round(sum(bool(p.get("correct")) for p in settled) / len(settled), 4) if settled else 0.0, "brier_score": round(sum(float(p.get("brier", 0)) for p in settled) / len(settled), 4) if settled else 0.0, "markets": {}}
     for sport in ("football", "tennis"):
         group = [p for p in settled if p.get("sport") == sport]
-        summary[sport] = {
-            "settled": len(group),
-            "correct": sum(bool(p.get("correct")) for p in group),
-            "accuracy": round(sum(bool(p.get("correct")) for p in group) / len(group), 4) if group else 0.0,
-        }
-    save(history_path, history[-2500:])
-    save(accuracy_path, {
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-        "summary": summary,
-        "recent_settled": [p for p in history if p.get("settled")][-50:],
-    })
+        summary[sport] = {"settled": len(group), "correct": sum(bool(p.get("correct")) for p in group), "accuracy": round(sum(bool(p.get("correct")) for p in group) / len(group), 4) if group else 0.0}
+    save(history_path, history[-2500:]); save(accuracy_path, {"updated_at": datetime.now(timezone.utc).isoformat(), "summary": summary, "recent_settled": [p for p in history if p.get("settled")][-50:]})
     print(f"Settlement complete: {count} newly settled | total settled {summary['settled']}")
 
 
-if __name__ == "__main__":
-    main()
+if __name__ == "__main__": main()
