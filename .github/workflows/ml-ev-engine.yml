@@ -1,0 +1,51 @@
+name: Match Signal ML EV Engine
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/15 * * * *'
+
+permissions:
+  contents: write
+
+jobs:
+  ml-ev:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run chronological evaluation
+        run: python scripts/ml_probability_engine.py
+
+      - name: Run model council status
+        run: python scripts/model_council.py
+
+      - name: Guard public output
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('data/model_council_status.json')
+          d = json.loads(p.read_text())
+          assert d['client_exposure']['provider_credentials'] is False
+          assert d['client_exposure']['raw_vendor_payloads'] is False
+          assert d['real_money_approved'] is False
+          m = json.loads(Path('data/model_performance.json').read_text())
+          assert m['leakage_guard'] is True
+          assert m['real_money_approved'] is False
+          print('ML/EV privacy + leakage guards: PASS')
+          PY
+
+      - name: Commit derived research artifacts
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/model_performance.json data/model_council_status.json
+          git diff --cached --quiet || git commit -m 'chore: refresh ML EV research status'
+          git push
