@@ -6,6 +6,8 @@ The goal is to prevent one transient source failure from deleting another
 sport/competition from the public feed.
 PAPER ONLY.
 """
+# Publication invariant: this wrapper must never erase a sport or experimental
+# competition merely because an auxiliary provider returned an empty response.
 from __future__ import annotations
 
 import json
@@ -84,9 +86,6 @@ def main():
             generated.extend(old_tennis)
             print(f"WARNING: ATP/WTA refresh returned zero rows; preserved {len(old_tennis)} active tennis rows")
 
-    # Expansion workflows own these competitions, but the canonical pipeline
-    # must never erase them while refreshing the normal feed. Normalize their
-    # safety flags even when the old row predates the safety-field fix.
     experimental = [normalize_experimental(r) for r in preserved if r.get("league") in EXPERIMENTAL_LEAGUES]
     generated = [r for r in generated if r.get("league") not in EXPERIMENTAL_LEAGUES]
     generated.extend(experimental)
