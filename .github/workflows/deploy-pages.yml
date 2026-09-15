@@ -18,6 +18,13 @@ on:
       - 'data/**'
       - '.github/workflows/deploy-pages.yml'
       - '.github/workflows/tennis_pipeline.yml'
+  workflow_run:
+    workflows:
+      - "Match Signal Autopilot Refresh"
+      - "Match Signal Live Expansion"
+      - "Match Signal Post-Pipeline Live Feed Reconcile"
+      - "Match Signal Saudi Pro League Live Experimental"
+    types: [completed]
   workflow_dispatch:
 
 permissions:
@@ -30,17 +37,20 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  MATCH_SIGNAL_DEPLOY_REV: "2026-09-15-live-coverage-v2"
+  MATCH_SIGNAL_DEPLOY_REV: "2026-09-15-live-coverage-v3"
 
 jobs:
   deploy:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Checkout
+      - name: Checkout latest main
         uses: actions/checkout@v6
+        with:
+          ref: main
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Install production frontend fixes
@@ -60,7 +70,7 @@ jobs:
               path.write_text(text,encoding='utf-8')
               print(f'Frontend fixes installed: {path}')
           PY
-      - name: Verify site entrypoint
+      - name: Verify site entrypoint and data
         run: |
           test -s index.html
           test -s expansion.html
@@ -70,6 +80,17 @@ jobs:
           test -s live-analysis.js
           test -s live-data-worker.js
           test -s data/predictions.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          rows=json.loads(Path('data/predictions.json').read_text())
+          assert isinstance(rows,list) and rows, 'prediction feed is empty'
+          leagues=sorted({str(r.get('league')) for r in rows if r.get('league')})
+          print(f'Prediction rows: {len(rows)}')
+          print(f'Leagues: {leagues}')
+          assert any(r.get('sport')=='football' for r in rows), 'no football rows in deploy artifact'
+          assert any(r.get('sport')=='tennis' for r in rows), 'no tennis rows in deploy artifact'
+          PY
           echo "Live page present: $(wc -c < live.html) bytes"
           echo "Prediction feed present: $(wc -c < data/predictions.json) bytes"
       - name: Upload site artifact
