@@ -73,6 +73,29 @@ jobs:
       - name: Settle completed expansion signals
         run: python scripts/settle_expansion.py
 
+      - name: Reconcile expansion publication onto latest main
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp data/predictions.json /tmp/expansion_generated_predictions.json
+          git fetch origin main
+          git reset --hard origin/main
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          latest = json.loads(Path('data/predictions.json').read_text())
+          generated = json.loads(Path('/tmp/expansion_generated_predictions.json').read_text())
+          latest_ids = {str(r.get('event_id')) for r in latest if r.get('event_id')}
+          for row in generated:
+              if row.get('league') != 'Eredivisie':
+                  continue
+              if str(row.get('event_id')) not in latest_ids:
+                  latest.append(row)
+          latest.sort(key=lambda r: (str(r.get('start_time') or ''), str(r.get('sport') or ''), str(r.get('player_1') or '')))
+          Path('data/predictions.json').write_text(json.dumps(latest, indent=2, ensure_ascii=False))
+          print(f'Latest-main-safe expansion merge: {len(latest)} total rows; {sum(r.get("league")=="Eredivisie" for r in latest)} Eredivisie rows')
+          PY
+
       - name: Commit generated expansion data
         shell: bash
         run: |
@@ -85,5 +108,3 @@ jobs:
           fi
           git commit -m "🤖 Refresh live experimental NBA and Eredivisie signals"
           git push origin main
-
-      # data/** changes automatically trigger the existing deploy-pages.yml workflow.
