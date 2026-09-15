@@ -4,6 +4,15 @@ on:
   schedule:
     - cron: '0 */2 * * *'
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/predict_today.py'
+      - 'scripts/run_pipeline.py'
+      - 'scripts/scoped_pipeline.py'
+      - 'scripts/production_pipeline.py'
+      - 'scripts/autopilot_guard.py'
+      - '.github/workflows/autopilot-refresh.yml'
 
 permissions:
   contents: write
@@ -15,7 +24,7 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Checkout latest main
         uses: actions/checkout@v4
@@ -36,7 +45,10 @@ jobs:
           git fetch origin main
           git reset --hard origin/main
 
-      - name: Refresh current football + ATP/WTA predictions
+      - name: Compile production Python modules
+        run: python -m py_compile scripts/predict_today.py scripts/run_pipeline.py scripts/scoped_pipeline.py scripts/production_pipeline.py scripts/autopilot_guard.py
+
+      - name: Refresh current football + ATP/WTA predictions transactionally
         run: python scripts/scoped_pipeline.py
 
       - name: Run autonomous freshness and source coverage guard
