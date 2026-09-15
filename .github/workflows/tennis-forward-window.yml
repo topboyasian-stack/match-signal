@@ -39,8 +39,25 @@ jobs:
           git fetch origin main
           git reset --hard origin/main
 
+      - name: Snapshot latest main feed
+        run: git show origin/main:data/predictions.json > /tmp/latest_predictions.json
+
       - name: Extend ATP/WTA singles discovery to 14 days
         run: python scripts/tennis_forward_window.py
+
+      - name: Merge only new tennis rows into latest main feed
+        run: python scripts/merge_generated_feed.py /tmp/latest_predictions.json data/predictions.json
+
+      - name: Rebase publication onto latest main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git reset --hard origin/main
+          cp /tmp/latest_predictions.json /tmp/pre_window_latest.json
+          # Re-run the window against the latest tree, then merge its genuinely new rows.
+          python scripts/tennis_forward_window.py
+          python scripts/merge_generated_feed.py /tmp/pre_window_latest.json data/predictions.json
 
       - name: Commit extended tennis coverage
         shell: bash
