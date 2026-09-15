@@ -1,14 +1,14 @@
 """Generate Saudi Pro League live-experimental football signals.
 
 Source: ESPN public soccer scoreboard (league id ksa.1).
-The model remains the existing Match Signal football model; this module adds
-Saudi-specific publication metadata and scheduling/tier context. It never
-fabricates fixtures or odds.
+Fetches a forward window so the Predictions page retains upcoming Saudi fixtures,
+while the Live page independently checks ESPN's current scoreboard.
+PAPER ONLY; never fabricate fixtures or odds.
 """
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from predict_today import fetch_scoreboard, football_prediction
@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
 LEAGUE = "Saudi Pro League"
 ESPN_LEAGUE = "ksa.1"
+FORWARD_DAYS = 60
 
 LEVELS = {
     "Level A": {"Al Nassr", "Al Hilal", "Al Ahli", "Al Qadsiah", "Al Ittihad"},
@@ -33,19 +34,14 @@ def team_level(name: str | None) -> str | None:
     return None
 
 
-def load(path: Path, default):
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (FileNotFoundError, json.JSONDecodeError):
-        return default
-
-
 def main() -> None:
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(timezone.utc)
     predictions = []
     errors = []
     try:
-        board = fetch_scoreboard("soccer", ESPN_LEAGUE)
+        end = now + timedelta(days=FORWARD_DAYS)
+        date_range = f"{now:%Y%m%d}-{end:%Y%m%d}"
+        board = fetch_scoreboard("soccer", ESPN_LEAGUE, date_range)
         for event in board.get("events", []):
             if event.get("status", {}).get("type", {}).get("completed"):
                 continue
@@ -73,11 +69,12 @@ def main() -> None:
     predictions.sort(key=lambda p: p.get("start_time") or "")
     DATA.joinpath("saudi_pro_league_predictions.json").write_text(json.dumps(predictions, indent=2, ensure_ascii=False), encoding="utf-8")
     status = {
-        "updated_at": now,
+        "updated_at": now.isoformat(),
         "league": LEAGUE,
         "competition_id": ESPN_LEAGUE,
         "mode": "LIVE_EXPERIMENTAL",
         "live_trading_approved": False,
+        "forward_window_days": FORWARD_DAYS,
         "current_fixtures": len(predictions),
         "prediction_count": len(predictions),
         "errors": errors,
