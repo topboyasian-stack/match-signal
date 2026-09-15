@@ -52,6 +52,8 @@ def main() -> None:
             p2 = prediction.get("player_2")
             prediction.update({
                 "mode": "LIVE_EXPERIMENTAL",
+                "paper_only": True,
+                "live_experimental": True,
                 "live_trading_approved": False,
                 "competition_source": "ESPN public soccer scoreboard",
                 "competition_id": ESPN_LEAGUE,
@@ -73,6 +75,7 @@ def main() -> None:
         "league": LEAGUE,
         "competition_id": ESPN_LEAGUE,
         "mode": "LIVE_EXPERIMENTAL",
+        "paper_only": True,
         "live_trading_approved": False,
         "forward_window_days": FORWARD_DAYS,
         "current_fixtures": len(predictions),
@@ -81,7 +84,7 @@ def main() -> None:
         "source": "ESPN public soccer scoreboard",
         "no_fabricated_fixtures": True,
     }
-    DATA.joinpath("saudi_pro_league_status.json").write_text(json.dumps(status, indent=2, ensure_ascii=False), encoding="utf-8")
+    DATA.joinpath("saudi_pro_league_status.json").write_text(json.dumps(status, indent=2), encoding="utf-8")
     print(json.dumps(status, indent=2))
 
 
