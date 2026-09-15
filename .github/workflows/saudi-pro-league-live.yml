@@ -14,8 +14,9 @@ on:
 permissions:
   contents: write
 
+# Serialize publication with the other feed writers so one sport cannot overwrite another.
 concurrency:
-  group: match-signal-saudi-pro-league
+  group: match-signal-pipeline
   cancel-in-progress: false
 
 jobs:
