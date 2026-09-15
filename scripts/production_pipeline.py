@@ -42,6 +42,15 @@ def valid_active(row, now):
     return dt >= now - timedelta(hours=6) and not row.get("settled")
 
 
+def normalize_experimental(row):
+    out = dict(row)
+    out["paper_only"] = True
+    out["live_experimental"] = True
+    out["live_trading_approved"] = False
+    out["prediction_status"] = "live_experimental"
+    return out
+
+
 def merge_unique(rows):
     by_id = {}
     for row in rows:
@@ -63,8 +72,6 @@ def main():
     generated_core_football = [r for r in generated if r.get("league") in CORE_LEAGUES and r.get("sport") == "football"]
     generated_tennis = [r for r in generated if r.get("league") in TENNIS_LEAGUES and r.get("sport") == "tennis"]
 
-    # A completely empty core sport is treated as a provider failure, not a
-    # legitimate instruction to erase the last known active feed.
     if not generated_core_football:
         old_core = [r for r in preserved if r.get("league") in CORE_LEAGUES and r.get("sport") == "football"]
         if old_core:
@@ -78,8 +85,9 @@ def main():
             print(f"WARNING: ATP/WTA refresh returned zero rows; preserved {len(old_tennis)} active tennis rows")
 
     # Expansion workflows own these competitions, but the canonical pipeline
-    # must never erase them while refreshing the normal feed.
-    experimental = [r for r in preserved if r.get("league") in EXPERIMENTAL_LEAGUES]
+    # must never erase them while refreshing the normal feed. Normalize their
+    # safety flags even when the old row predates the safety-field fix.
+    experimental = [normalize_experimental(r) for r in preserved if r.get("league") in EXPERIMENTAL_LEAGUES]
     generated = [r for r in generated if r.get("league") not in EXPERIMENTAL_LEAGUES]
     generated.extend(experimental)
     generated = merge_unique(generated)
