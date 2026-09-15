@@ -1,10 +1,8 @@
-"""Authoritative Match Signal pipeline entrypoint.
+"""Authoritative Match Signal production pipeline entrypoint.
 
-This wrapper used to narrow production football to three competitions, which
-caused the scheduled production refresh to silently remove other configured
-leagues. Production now uses the canonical league scope from predict_today.py.
-Special experimental competitions (Eredivisie, Saudi Pro League, NBA) keep their
-own dedicated expansion workflows and are reconciled afterward.
+The canonical Football + ATP/WTA engine is wrapped transactionally so a
+transient provider failure cannot erase another sport or an experimental
+competition from the public feed.
 PAPER ONLY.
 """
 from __future__ import annotations
@@ -17,4 +15,5 @@ ROOT = Path(__file__).resolve().parents[1]
 
 if __name__ == "__main__":
     print("Production scope: canonical FOOTBALL_LEAGUES + ATP/WTA from predict_today.py")
-    runpy.run_path(str(ROOT / "scripts" / "run_pipeline.py"), run_name="__main__")
+    print("Publication scope: transactional; preserve active experimental leagues")
+    runpy.run_path(str(ROOT / "scripts" / "production_pipeline.py"), run_name="__main__")
