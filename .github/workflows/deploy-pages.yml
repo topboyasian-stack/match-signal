@@ -9,6 +9,9 @@ on:
       - 'performance.html'
       - 'basketball.html'
       - 'tennis.html'
+      - 'live.html'
+      - 'live-analysis.js'
+      - 'live-data-worker.js'
       - 'live-timer.js'
       - 'nav-fix.js'
       - 'metrics-fix.js'
@@ -27,7 +30,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  MATCH_SIGNAL_DEPLOY_REV: "2026-09-14-expansion-desk-v1"
+  MATCH_SIGNAL_DEPLOY_REV: "2026-09-15-live-coverage-v2"
 
 jobs:
   deploy:
@@ -63,7 +66,12 @@ jobs:
           test -s expansion.html
           test -s basketball.html
           test -s performance.html
-          echo "Expansion desk present: $(wc -c < expansion.html) bytes"
+          test -s live.html
+          test -s live-analysis.js
+          test -s live-data-worker.js
+          test -s data/predictions.json
+          echo "Live page present: $(wc -c < live.html) bytes"
+          echo "Prediction feed present: $(wc -c < data/predictions.json) bytes"
       - name: Upload site artifact
         uses: actions/upload-pages-artifact@v4
         with:
