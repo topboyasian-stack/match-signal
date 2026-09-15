@@ -62,8 +62,6 @@ def main():
     prior = previous_history()
     season = current_results()
     history = merge_rows(prior, existing, season)
-    fixtures = current_fixtures()
-
     model_hist = []
     for r in history:
         if r.get("home_score") is None or r.get("away_score") is None:
@@ -75,13 +73,14 @@ def main():
             "league": "Eredivisie", "player_1": norm_team(r["home"]), "player_2": norm_team(r["away"])
         })
 
+    fixtures = current_fixtures()
     predictions = []
     for f in fixtures:
         home, away = norm_team(f["home"]), norm_team(f["away"])
         event = {"id": f["event_id"], "competitions": [{"competitors": [
             {"homeAway": "home", "team": {"displayName": home}},
             {"homeAway": "away", "team": {"displayName": away}},
-        }]}
+        ]}]}
         try:
             p = independent_prediction(event, "Eredivisie", model_hist, cutoff=f["date"])
         except Exception:
