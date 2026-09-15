@@ -53,6 +53,7 @@ jobs:
       - name: Commit reconciled live feed
         shell: bash
         run: |
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/predictions.json data/ere_divisie_history.json data/ere_divisie_predictions.json data/expansion_status.json data/ere_divisie_qa.json
@@ -61,4 +62,17 @@ jobs:
             exit 0
           fi
           git commit -m "🤖 Reconcile live experimental feed after core pipeline"
-          git push origin main
+          for attempt in 1 2 3 4 5; do
+            git fetch origin main
+            if git rebase origin/main; then
+              if git push origin main; then
+                echo "Reconciliation published successfully on attempt ${attempt}."
+                exit 0
+              fi
+            fi
+            git rebase --abort 2>/dev/null || true
+            echo "Concurrent main update detected; retrying publication (attempt ${attempt})."
+            sleep $((attempt * 3))
+          done
+          echo "ABORT: could not publish reconciled live feed after five synchronized attempts."
+          exit 1
