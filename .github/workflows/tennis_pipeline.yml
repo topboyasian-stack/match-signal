@@ -39,6 +39,10 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install dependencies
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
         run: python -m pip install --upgrade requests curl_cffi pandas pyarrow
       - name: Sync with latest main before generation
         run: |
@@ -65,7 +69,7 @@ jobs:
               gid_text = str(gid)
               if gid_text.startswith(('001','003')):
                   continue
-              home = g[g['matchup'].astype(str).str.contains(r' vs\. ', regex=True, na=False)]
+              home = g[g['matchup'].astype(str).str.contains(r' vs\\. ', regex=True, na=False)]
               away = g[g['matchup'].astype(str).str.contains(r' @ ', regex=True, na=False)]
               if home.empty or away.empty:
                   continue
@@ -89,7 +93,7 @@ jobs:
           Path('data/nba_fallback.json').write_text(json.dumps(rows, indent=2))
           p = Path('scripts/expansion_pipeline.py')
           s = p.read_text()
-          needle = "def nba_fallback():\n"
+          needle = "def nba_fallback():\\n"
           inject = "def nba_fallback():" + chr(10) + " local=DATA/'nba_fallback.json'" + chr(10) + " if local.exists():" + chr(10) + "  return json.loads(local.read_text()),[]" + chr(10)
           if 'nba_fallback.json' not in s:
               s = s.replace(needle, inject, 1)
@@ -153,7 +157,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/predictions.json data/prediction_pool.json data/selection_candidates.json data/selection_gate.json data/prediction_history.json data/accuracy.json data/pipeline_status.json data/risk_gate.json data/calibration.json data/football_team_history.json data/basketball_predictions.json data/basketball_history.json data/basketball_accuracy.json data/basketball_provider_cache.json data/behavior_profiles.json data/individual_behavior.json data/behavior_validation.json data/current_performance.json data/v4_paper_ledger.json data/v4_validation.json data/prediction_breakdown.json data/sports_evaluation.json data/nba_history.json data/nba_predictions.json data/ere_divisie_history.json data/ere_divisie_predictions.json data/expansion_status.json data/expansion_validation.json data/expansion_team_form.json data/nba_market_validation.json data/nba_market_matches.json data/nba_model_candidates.json data/nba_calibration_tournament.json qa/report.json
+          git add data/predictions.json data/prediction_pool.json data/selection_candidates.json data/selection_gate.json data/prediction_history.json data/accuracy.json data/tennis_performance.json data/pipeline_status.json data/risk_gate.json data/calibration.json data/football_team_history.json data/basketball_predictions.json data/basketball_history.json data/basketball_accuracy.json data/basketball_provider_cache.json data/behavior_profiles.json data/individual_behavior.json data/behavior_validation.json data/current_performance.json data/v4_paper_ledger.json data/v4_validation.json data/prediction_breakdown.json data/sports_evaluation.json data/nba_history.json data/nba_predictions.json data/ere_divisie_history.json data/ere_divisie_predictions.json data/expansion_status.json data/expansion_validation.json data/expansion_team_form.json data/nba_market_validation.json data/nba_market_matches.json data/nba_model_candidates.json data/nba_calibration_tournament.json qa/report.json
           if git diff --cached --quiet; then
             echo "No generated data or QA changes."
             echo "changed=false" >> "$GITHUB_OUTPUT"
