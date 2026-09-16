@@ -1,0 +1,51 @@
+name: Match Signal Tennis Model V2
+
+on:
+  workflow_run:
+    workflows: ["Match Signal Live Prediction Pipeline"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: match-signal-tennis-model-v2
+  cancel-in-progress: false
+
+jobs:
+  improve-tennis-model:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run walk-forward tennis model V2
+        run: python scripts/tennis_model_v2.py
+      - name: Validate predictions JSON
+        run: python -m json.tool data/predictions.json >/dev/null
+      - name: Run prediction QA
+        run: python qa/prediction_qa.py
+      - name: Refresh selection candidates after model upgrade
+        run: PYTHONPATH=. python scripts/selective_prediction_gate.py
+      - name: Refresh prediction breakdown
+        run: PYTHONPATH=. python scripts/prediction_breakdown.py
+      - name: Commit model V2 artifacts
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/predictions.json data/tennis_model_v2.json data/selection_candidates.json data/selection_gate.json data/prediction_breakdown.json qa/report.json
+          if git diff --cached --quiet; then
+            echo "No tennis model V2 changes."
+            exit 0
+          fi
+          git commit -m "🤖 Apply walk-forward tennis model V2"
+          git push origin main
