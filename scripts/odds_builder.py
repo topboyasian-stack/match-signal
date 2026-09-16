@@ -5,13 +5,13 @@ candidates are accepted only when they pass the existing research gate or the
 strict tennis paper-selection gate, then still match live SportyBet markets.
 """
 from __future__ import annotations
-import difflib, json, math, re
+import difflib, json, math, re, time
 from datetime import datetime, timezone
 from pathlib import Path
 import requests
 ROOT=Path(__file__).resolve().parents[1]; DATA=ROOT/"data"; CANDIDATES=DATA/"selection_candidates.json"; PREDICTIONS=DATA/"predictions.json"; OUTPUT=DATA/"odds_builder.json"
 SPORTY_BASE="https://www.sportybet.com"; SPORTY_REGION="ng"; MIN_LEGS=3; MAX_LEGS=4; MIN_MODEL_PROB=0.65; MIN_EDGE=0.03; TENNIS_MIN_PROB=0.65
-SESSION=requests.Session(); SESSION.headers.update({"Accept":"application/json,text/plain,*/*","Content-Type":"application/json","Current-Country":"NG","User-Agent":"Mozilla/5.0 (compatible; MatchSignal/1.0; +https://match-signal.pages.dev)"})
+SESSION=requests.Session(); SESSION.headers.update({"Accept":"application/json","Content-Type":"application/json","Current-Country":"NG"})
 
 def load(path, default):
     try: return json.loads(path.read_text(encoding="utf-8"))
@@ -30,8 +30,7 @@ def similarity(a,b):
     return difflib.SequenceMatcher(None,a,b).ratio()
 
 def sporty_response_json(response, label):
-    content_type=(response.headers.get("content-type") or "").lower()
-    text=response.text or ""
+    content_type=(response.headers.get("content-type") or "").lower(); text=response.text or ""
     diagnostic={"http_status":response.status_code,"content_type":content_type,"body_prefix":re.sub(r"\s+"," ",text[:500])}
     if not text.strip(): raise RuntimeError(f"{label}: EMPTY_RESPONSE {json.dumps(diagnostic,ensure_ascii=False)}")
     try: return response.json()
@@ -43,27 +42,32 @@ def sporty_response_json(response, label):
 
 def sportyevents(sport_id,market_ids,label):
     url=f"{SPORTY_BASE}/api/{SPORTY_REGION}/factsCenter/pcUpcomingEvents"
-    params={"sportId":sport_id,"marketId":",".join(market_ids),"pageSize":100,"pageNum":1,"todayGames":"false","timeline":168,"_t":int(datetime.now(timezone.utc).timestamp()*1000)}
-    r=SESSION.get(url,params=params,timeout=30)
-    if r.status_code in (401,403,429): raise RuntimeError(f"{label}: HTTP_ACCESS_{r.status_code} url={url} content_type={r.headers.get('content-type','')} body={re.sub(r'\s+',' ',(r.text or '')[:300])}")
-    r.raise_for_status(); body=sporty_response_json(r,label)
-    if not isinstance(body,dict): raise RuntimeError(f"{label}: INVALID_JSON_ROOT type={type(body).__name__}")
-    if body.get("bizCode") not in (None,10000): raise RuntimeError(f"{label}: SPORTY_BIZCODE_{body.get('bizCode')} message={body.get('message') or body.get('msg')}")
-    data=body.get("data") or {}
-    tournaments=data.get("tournaments") or data.get("tournamentList") or []
-    events=[]
-    for tournament in tournaments:
-        if not isinstance(tournament,dict): continue
-        for event in tournament.get("events") or tournament.get("eventList") or []:
-            if isinstance(event,dict): event["_tournament"]=tournament.get("name") or tournament.get("tournamentName"); events.append(event)
-    if not events:
-        raise RuntimeError(f"{label}: VALID_RESPONSE_BUT_NO_EVENTS schema_keys={sorted(data.keys()) if isinstance(data,dict) else []}")
-    return events
+    params={"sportId":sport_id,"marketId":",".join(market_ids),"pageSize":100,"pageNum":1,"todayGames":"false","timeline":720,"_t":int(datetime.now(timezone.utc).timestamp()*1000)}
+    last_error=None
+    for attempt in range(1,4):
+        try:
+            r=SESSION.get(url,params=params,timeout=20)
+            if r.status_code in (401,403,429): raise RuntimeError(f"{label}: HTTP_ACCESS_{r.status_code} url={url} content_type={r.headers.get('content-type','')} body={re.sub(r'\s+',' ',(r.text or '')[:300])}")
+            r.raise_for_status(); body=sporty_response_json(r,label)
+            if not isinstance(body,dict): raise RuntimeError(f"{label}: INVALID_JSON_ROOT type={type(body).__name__}")
+            if body.get("bizCode") not in (None,10000): raise RuntimeError(f"{label}: SPORTY_BIZCODE_{body.get('bizCode')} message={body.get('message') or body.get('msg')}")
+            data=body.get("data") or {}; tournaments=data.get("tournaments") or data.get("tournamentList") or []
+            events=[]
+            for tournament in tournaments:
+                if not isinstance(tournament,dict): continue
+                for event in tournament.get("events") or tournament.get("eventList") or []:
+                    if isinstance(event,dict): event["_tournament"]=tournament.get("name") or tournament.get("tournamentName"); events.append(event)
+            if events: return events
+            last_error=RuntimeError(f"{label}: VALID_RESPONSE_BUT_NO_EVENTS schema_keys={sorted(data.keys()) if isinstance(data,dict) else []}")
+        except Exception as exc:
+            last_error=exc
+        if attempt<3: time.sleep(0.75*(2**(attempt-1)))
+    raise last_error or RuntimeError(f"{label}: UNKNOWN_SOURCE_ERROR")
 
 def match_candidate(candidate,events):
     best,best_score=None,0.0
     for event in events:
-        score=(similarity(candidate.get("player_1"),event.get("homeTeamName"))+similarity(candidate.get("player_2"),event.get("awayTeamName")))/2
+        score=(similarity(candidate.get("player_1") or candidate.get("home_team"),event.get("homeTeamName"))+similarity(candidate.get("player_2") or candidate.get("away_team"),event.get("awayTeamName")))/2
         if score>best_score: best,best_score=event,score
     return best if best_score>=0.84 else None
 
@@ -94,7 +98,7 @@ def main():
     tennis=tennis_candidates(); tennis.sort(key=lambda x:float(x.get("builder_probability",0) or 0),reverse=True)
     result={"generated_at":datetime.now(timezone.utc).isoformat(),"mode":"PAPER_ONLY","target_legs":"3-4","sports_supported":["football","tennis"],"selection_policy":{"min_model_probability":MIN_MODEL_PROB,"min_model_edge_vs_sporty_implied":MIN_EDGE,"tennis_min_probability":TENNIS_MIN_PROB,"requires_upstream_selection_gate_for_football":True,"tennis_source":"existing predictions.json paper analytics","public_prediction_feed_unchanged":True},"sportybet":{"status":"NOT_RUN","booking_code":None,"share_url":None,"legs":[],"expires_at":None},"stake":{"status":"MANUAL_SHARE_INTERFACE_REQUIRED","booking_url":None,"booking_code":None},"candidates_considered":{"football":len(football),"tennis":len(tennis)},"qualified_legs":[],"notes":["Football selections must come from the existing research gate.","Tennis selections use existing paper predictions only and require a probability of at least 0.65 for either match winner or a published total-games O/U market.","No slip is generated unless 3-4 selections also match live SportyBet markets with the required edge/probability checks.","Stake automatic betslip creation remains disabled until a stable supported share interface is verified."]}
     legs=[]
-    try: football_events=sportyevents("sr:sport:1",["1"],"FOOTBALL_SOURCE")
+    try: football_events=sportyevents("sr:sport:1",["1","18","10","29","11","26","36","14","60100"],"FOOTBALL_SOURCE")
     except Exception as exc: football_events=[]; result["sportybet"]["football_source_error"]=str(exc)
     for candidate in football:
         if len(legs)>=MAX_LEGS: break
@@ -119,8 +123,9 @@ def main():
                 pick_name=outcomes[outcome_id].get("desc"); model_prob=float(candidate.get("builder_probability",0)); odds=float(outcomes[outcome_id].get("odds")); specifier=market.get("specifier")
             else:
                 market,outcomes=market_outcomes(event,{"189"}); total=(candidate.get("analytics") or {}).get("total_games") or {}; target_line=str(total.get("line")); target_outcome="12" if candidate.get("builder_pick")=="over" else "13"; matching=None
-                for oid,outcome in outcomes.items():
-                    if oid==target_outcome and (target_line in str(market.get("specifier", "")) or target_line in str(outcome.get("desc",""))): matching=outcome; break
+                if market:
+                    for oid,outcome in outcomes.items():
+                        if oid==target_outcome and (target_line in str(market.get("specifier", "")) or target_line in str(outcome.get("desc",""))): matching=outcome; break
                 if not market or not matching: continue
                 outcome_id=str(matching.get("id")); pick_name=matching.get("desc"); model_prob=float(candidate.get("builder_probability",0)); odds=float(matching.get("odds")); specifier=market.get("specifier")
             implied=1/odds if odds>1 else 1.0; edge=model_prob-implied
@@ -134,7 +139,8 @@ def main():
         try:
             response=SESSION.post(f"{SPORTY_BASE}/api/{SPORTY_REGION}/orders/share",json=payload,timeout=30); response.raise_for_status(); data=sporty_response_json(response,"BOOKING_ENDPOINT").get("data") or {}; unavailable=data.get("unavailableOutcomes") or []
             if unavailable: result["sportybet"]["status"]="BOOKING_PARTIAL_OR_UNAVAILABLE"; result["sportybet"]["unavailable_outcomes"]=unavailable
-            else: result["sportybet"]["booking_code"]=data.get("shareCode"); result["sportybet"]["share_url"]=data.get("shareURL"); result["sportybet"]["expires_at"]=data.get("deadline")
+            elif data.get("shareCode"): result["sportybet"]["booking_code"]=data.get("shareCode"); result["sportybet"]["share_url"]=data.get("shareURL"); result["sportybet"]["expires_at"]=data.get("deadline")
+            else: result["sportybet"]["status"]="NO_BOOKING_CODE"; result["sportybet"]["error"]="SportyBet returned no shareCode"
         except Exception as exc: result["sportybet"]["status"]="BOOKING_ENDPOINT_ERROR"; result["sportybet"]["error"]=str(exc)
     OUTPUT.write_text(json.dumps(result,indent=2,ensure_ascii=False)+"\n",encoding="utf-8"); print(json.dumps(result,indent=2))
 
