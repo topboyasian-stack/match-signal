@@ -59,7 +59,8 @@ jobs:
               print(f'Validated {name}')
           archive=json.loads(Path('data/tennis_prediction_archive.json').read_text())
           settled=[x for x in archive if x.get('settled')]
-          print(f'Tennis archive rows: {len(archive)} | settled: {len(settled)}')
+          eligible=[x for x in settled if x.get('evaluation_eligible') is True]
+          print(f'Tennis archive rows: {len(archive)} | settled: {len(settled)} | eligible settled: {len(eligible)}')
           PY
 
       - name: Commit recovered tennis history and settlement
@@ -73,4 +74,20 @@ jobs:
             exit 0
           fi
           git commit -m "🎾 Persist and settle historical tennis predictions"
-          git push origin main
+          for attempt in 1 2 3 4 5; do
+            git fetch origin main
+            if git rebase origin/main; then
+              if git push origin main; then
+                echo "Tennis history push succeeded on attempt $attempt"
+                exit 0
+              fi
+            else
+              git rebase --abort || true
+              git reset --soft origin/main
+              git add data/tennis_prediction_archive.json data/prediction_history.json data/accuracy.json data/tennis_performance.json
+              git commit -m "🎾 Persist and settle historical tennis predictions" || true
+            fi
+            sleep $((attempt * 2))
+          done
+          echo "Failed to publish tennis history after retries" >&2
+          exit 1
