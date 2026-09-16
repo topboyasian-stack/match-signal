@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: Match Signal API
   version: 1.0.0
-  description: Read-only API for Match Signal prediction, performance and accumulator research data. Paper/research only.
+  description: Read-only API for Match Signal prediction, performance, accumulator and event-market research data. Paper/research only.
 servers:
   - url: https://match-signal.pages.dev/api/v1
 security:
@@ -10,7 +10,7 @@ security:
 paths:
   /predictions:
     get:
-      summary: Current predictions
+      summary: Current football and tennis predictions
       parameters:
         - in: query
           name: sport
@@ -29,6 +29,12 @@ paths:
       summary: Research-qualified manual 3-4 selection accumulator
       responses:
         '200': {description: Accumulator data}
+        '401': {description: Unauthorized}
+  /market-research:
+    get:
+      summary: Read-only event-market comparison research
+      responses:
+        '200': {description: Market research data}
         '401': {description: Unauthorized}
 components:
   securitySchemes:
