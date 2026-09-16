@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-16T12:06:22.873295+00:00",
+  "generated_at": "2026-09-16T12:16:38.621761+00:00",
   "mode": "PAPER_ONLY",
   "target_legs": "3-4",
   "sports_supported": [
@@ -8,35 +8,83 @@
   ],
   "selection_policy": {
     "min_model_probability": 0.65,
-    "min_model_edge_vs_sporty_implied": 0.03,
-    "tennis_min_probability": 0.65,
-    "requires_upstream_selection_gate_for_football": true,
-    "tennis_source": "existing predictions.json paper analytics",
+    "requires_existing_research_gate_for_football": true,
+    "requires_paper_probability_threshold_for_tennis": true,
     "public_prediction_feed_unchanged": true
   },
-  "sportybet": {
-    "status": "NO_3_LEG_QUALIFIED_SET",
-    "booking_code": null,
-    "share_url": null,
-    "legs": [],
-    "expires_at": null,
-    "football_source_error": "FOOTBALL_SOURCE: HTTP_ACCESS_403 url=https://www.sportybet.com/api/ng/factsCenter/pcUpcomingEvents content_type=text/html body=<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EN\" \"http://www.w3.org/TR/html4/loose.dtd\"> <HTML><HEAD><META HTTP-EQUIV=\"Content-Type\" CONTENT=\"text/html; charset=iso-8859-1\"> <TITLE>ERROR: The request could not be satisfied</TITLE> </HEAD><BODY> <H1>403 ERROR</H1> <H2>The request could ",
-    "tennis_source_error": "TENNIS_SOURCE: HTTP_ACCESS_403 url=https://www.sportybet.com/api/ng/factsCenter/pcUpcomingEvents content_type=text/html body=<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EN\" \"http://www.w3.org/TR/html4/loose.dtd\"> <HTML><HEAD><META HTTP-EQUIV=\"Content-Type\" CONTENT=\"text/html; charset=iso-8859-1\"> <TITLE>ERROR: The request could not be satisfied</TITLE> </HEAD><BODY> <H1>403 ERROR</H1> <H2>The request could "
-  },
-  "stake": {
-    "status": "MANUAL_SHARE_INTERFACE_REQUIRED",
-    "booking_url": null,
-    "booking_code": null
+  "bookmaker_odds": {
+    "status": "MANUAL_CONFIRMATION_REQUIRED",
+    "sportybet_direct_feed": "BLOCKED_FROM_GITHUB_RUNNER",
+    "stake_direct_feed": "NOT_CONNECTED",
+    "instruction": "Verify each displayed selection and enter the actual current bookmaker odds in your betslip before placing any wager."
   },
   "candidates_considered": {
     "football": 0,
     "tennis": 7
   },
-  "qualified_legs": [],
+  "qualified_legs": [
+    {
+      "sport": "tennis",
+      "competition": "WTA",
+      "event_id": "183805",
+      "start_time": "2026-09-16T23:00Z",
+      "match": "Taylor Townsend vs Marta Kostyuk",
+      "market": "winner",
+      "pick": "Taylor Townsend vs Marta Kostyuk — p2",
+      "model_probability": 0.7956,
+      "model_fair_odds": 1.257,
+      "source": "ATP/WTA ranking + recent form",
+      "decision": "PAPER ONLY"
+    },
+    {
+      "sport": "tennis",
+      "competition": "WTA",
+      "event_id": "183804",
+      "start_time": "2026-09-16T20:30Z",
+      "match": "Iva Jovic vs Zeynep Sonmez",
+      "market": "winner",
+      "pick": "Iva Jovic vs Zeynep Sonmez — p1",
+      "model_probability": 0.7104,
+      "model_fair_odds": 1.408,
+      "source": "ATP/WTA ranking + recent form",
+      "decision": "PAPER ONLY"
+    },
+    {
+      "sport": "tennis",
+      "competition": "WTA",
+      "event_id": "183799",
+      "start_time": "2026-09-17T00:30Z",
+      "match": "Liudmila Samsonova vs Kayla Day",
+      "market": "winner",
+      "pick": "Liudmila Samsonova vs Kayla Day — p1",
+      "model_probability": 0.6659,
+      "model_fair_odds": 1.502,
+      "source": "ATP/WTA ranking + recent form",
+      "decision": "PAPER ONLY"
+    },
+    {
+      "sport": "tennis",
+      "competition": "WTA",
+      "event_id": "183850",
+      "start_time": "2026-09-16T15:30Z",
+      "match": "Claire Liu vs Mary Stoiana",
+      "market": "total_games",
+      "pick": "Claire Liu vs Mary Stoiana — Total Games over 22.5",
+      "model_probability": 0.6556,
+      "model_fair_odds": 1.525,
+      "source": "ATP/WTA ranking + recent form",
+      "decision": "PAPER ONLY"
+    }
+  ],
+  "leg_count": 4,
+  "status": "QUALIFIED_ACCUMULATOR",
+  "reference_combined_odds": 4.054,
+  "reference_odds_type": "MODEL_FAIR_ODDS_NOT_BOOKMAKER_PRICE",
+  "actual_combined_odds": null,
   "notes": [
-    "Football selections must come from the existing research gate.",
-    "Tennis selections use existing paper predictions only and require a probability of at least 0.65 for either match winner or a published total-games O/U market.",
-    "No slip is generated unless 3-4 selections also match live SportyBet markets with the required edge/probability checks.",
-    "Stake automatic betslip creation remains disabled until a stable supported share interface is verified."
+    "Booking/share-code generation has been removed.",
+    "The user manually builds the accumulator on SportyBet or Stake.",
+    "Reference combined odds are the product of 1/model-probability and are NOT a quoted bookmaker price.",
+    "No accumulator is forced when fewer than three selections pass the existing research threshold."
   ]
 }
