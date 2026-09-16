@@ -85,7 +85,8 @@ jobs:
               rows.append({'event_id':gid_text,'date':d.isoformat(),'home':str(h['team_name']).strip(),'away':str(a['team_name']).strip(),'home_id':str(h['team_id']) if 'team_id' in g.columns else '','away_id':str(a['team_id']) if 'team_id' in g.columns else '','home_score':hs,'away_score':as_,'markets':{},'source':url})
           rows = sorted({x['event_id']: x for x in rows}.values(), key=lambda x:x['date'])
           if not rows:
-              raise RuntimeError('NBA competitive gamelog normalized to zero games')
+              print('No competitive 2026 NBA games available yet; leaving expansion_pipeline fallback unchanged.')
+              raise SystemExit(0)
           Path('data/nba_fallback.json').write_text(json.dumps(rows, indent=2))
           p = Path('scripts/expansion_pipeline.py')
           s = p.read_text()
