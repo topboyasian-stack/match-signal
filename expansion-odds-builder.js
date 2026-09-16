@@ -10,12 +10,16 @@
   }
   function selectionInfo(leg) {
     var ps = players(leg.match);
-    var pick = String(leg.pick || '').trim().toLowerCase();
-    if ((leg.market === 'winner' || leg.market === 'games_handicap') && (pick === 'p1' || pick === 'p2')) {
-      var pos = pick.toUpperCase();
-      return { position: pos, player: pick === 'p1' ? ps.p1 : ps.p2, text: pos + ' · ' + (pick === 'p1' ? ps.p1 : ps.p2) };
+    var rawPick = String(leg.pick || '').trim();
+    var pick = rawPick.toLowerCase();
+    var positionMatch = pick.match(/(?:—|-|:)\s*(p1|p2)\s*$/i);
+    var position = positionMatch ? positionMatch[1].toLowerCase() : pick;
+    if ((leg.market === 'winner' || leg.market === 'games_handicap') && (position === 'p1' || position === 'p2')) {
+      var pos = position.toUpperCase();
+      var player = position === 'p1' ? ps.p1 : ps.p2;
+      return { position: pos, player: player, text: pos + ' · ' + player };
     }
-    return { position: '', player: '', text: String(leg.pick || '—').replace(/^.*?—\s*/, '') };
+    return { position: '', player: '', text: rawPick.replace(/^.*?—\s*/, '') || '—' };
   }
   function formatElapsed(diff) {
     var total = Math.max(0, Math.floor(diff / 1000));
