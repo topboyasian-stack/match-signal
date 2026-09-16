@@ -11,13 +11,9 @@
   function selectionInfo(leg) {
     var ps = players(leg.match);
     var pick = String(leg.pick || '').trim().toLowerCase();
-    if (leg.market === 'winner' && (pick === 'p1' || pick === 'p2')) {
+    if ((leg.market === 'winner' || leg.market === 'games_handicap') && (pick === 'p1' || pick === 'p2')) {
       var pos = pick.toUpperCase();
       return { position: pos, player: pick === 'p1' ? ps.p1 : ps.p2, text: pos + ' · ' + (pick === 'p1' ? ps.p1 : ps.p2) };
-    }
-    if (leg.market === 'games_handicap' && (pick === 'p1' || pick === 'p2')) {
-      var hpos = pick.toUpperCase();
-      return { position: hpos, player: pick === 'p1' ? ps.p1 : ps.p2, text: hpos + ' · ' + (pick === 'p1' ? ps.p1 : ps.p2) };
     }
     return { position: '', player: '', text: String(leg.pick || '—').replace(/^.*?—\s*/, '') };
   }
@@ -50,30 +46,37 @@
   function settlementFromRecord(r) {
     if (!r || r.settled !== true) return null;
     var pick = String(r.pick || '').toLowerCase();
+    var actual = String(r.actual || '').toLowerCase();
     var correct = null;
-    if (r.market === 'total_games') {
-      var actual = r.actual_markets && r.actual_markets.total_games_result;
-      correct = actual && pick === actual;
-    } else if (pick === 'p1' || pick === 'p2') {
-      correct = String(r.actual || '').toLowerCase() === pick;
+    if (r.market === 'total_games' || r.market === 'total_goals' || r.market === 'over_under') {
+      var markets = r.actual_markets || {};
+      actual = String(markets.total_games_result || markets.total_goals_result || markets.over_under_result || r.actual || '').toLowerCase();
+      if (actual) correct = pick === actual;
+    } else if (pick && actual) {
+      correct = pick === actual;
     }
     if (correct === null) return null;
-    return { settled: true, correct: !!correct, actual: r.actual || (r.actual_markets && r.actual_markets.total_games_result) || '—', settledAt: r.settled_at };
+    return { settled: true, correct: !!correct, actual: r.actual || actual || '—', settledAt: r.settled_at };
   }
   var settlementMap = {};
-  function loadSettlements() {
-    return fetch('./data/tennis_prediction_archive.json?v=' + Date.now(), { cache: 'no-store' }).then(function (r) {
-      if (!r.ok) throw new Error('tennis_prediction_archive.json HTTP ' + r.status);
+  function loadOne(path) {
+    return fetch('./data/' + path + '?v=' + Date.now(), { cache: 'no-store' }).then(function (r) {
+      if (!r.ok) throw new Error(path + ' HTTP ' + r.status);
       return r.json();
-    }).then(function (rows) {
+    }).catch(function () { return []; });
+  }
+  function loadSettlements() {
+    return Promise.all([loadOne('tennis_prediction_archive.json'), loadOne('prediction_history.json')]).then(function (sets) {
       settlementMap = {};
-      (Array.isArray(rows) ? rows : []).forEach(function (r) {
-        if (r && r.event_id != null) {
-          var s = settlementFromRecord(r);
-          if (s) settlementMap[String(r.event_id)] = s;
-        }
+      sets.forEach(function (rows) {
+        (Array.isArray(rows) ? rows : []).forEach(function (r) {
+          if (r && r.event_id != null) {
+            var s = settlementFromRecord(r);
+            if (s) settlementMap[String(r.event_id)] = s;
+          }
+        });
       });
-    }).catch(function () { settlementMap = {}; });
+    });
   }
   function timerMarkup(v, eventId) {
     var c = timerState(v, settlementMap[String(eventId || '')]);
@@ -103,11 +106,10 @@
       var competition = l.competition || (sport === 'tennis' ? 'Tennis' : 'Football');
       var settlement = settlementMap[String(l.event_id || '')] || null;
       var sel = selectionInfo(l);
-      var pickText = sel.text;
-      return '<div class="card"' + cardStyle(settlement) + '><div class="meta"><span>Leg ' + (i + 1) + ' · ' + esc(sport.toUpperCase()) + ' · ' + esc(competition) + '</span><span>Fair odds ' + esc(l.model_fair_odds) + '</span></div><div class="teams">' + esc(l.match) + '</div><div class="pick">Selection: <b>' + esc(pickText) + '</b>' + (sel.position ? '<small style="display:block;color:var(--muted);margin-top:4px">Model position: ' + esc(sel.position) + '</small>' : '') + '<span class="conf">Model ' + pct(l.model_probability) + '</span></div>' + timerMarkup(l.start_time, l.event_id) + '<div class="startTime">Kickoff / start: ' + esc(localStart(l.start_time)) + ' <span>· your browser time</span></div>' + resultMarkup(settlement) + '<div class="section"><div class="row"><span>Market</span><b>' + esc(l.market || '—') + '</b></div><div class="row"><span>Model fair odds</span><b>' + esc(l.model_fair_odds) + '</b></div><div class="row"><span>Actual bookmaker odds</span><b>Verify manually</b></div></div></div>';
+      return '<div class="card"' + cardStyle(settlement) + '><div class="meta"><span>Leg ' + (i + 1) + ' · ' + esc(sport.toUpperCase()) + ' · ' + esc(competition) + '</span><span>Fair odds ' + esc(l.model_fair_odds) + '</span></div><div class="teams">' + esc(l.match) + '</div><div class="pick">Selection: <b>' + esc(sel.text) + '</b>' + (sel.position ? '<small style="display:block;color:var(--muted);margin-top:4px">Model position: ' + esc(sel.position) + '</small>' : '') + '<span class="conf">Model ' + pct(l.model_probability) + '</span></div>' + timerMarkup(l.start_time, l.event_id) + '<div class="startTime">Kickoff / start: ' + esc(localStart(l.start_time)) + ' <span>· your browser time</span></div>' + resultMarkup(settlement) + '<div class="section"><div class="row"><span>Market</span><b>' + esc(l.market || '—') + '</b></div><div class="row"><span>Model fair odds</span><b>' + esc(l.model_fair_odds) + '</b></div><div class="row"><span>Actual bookmaker odds</span><b>Verify manually</b></div></div></div>';
     }).join('');
     var status = x.status === 'QUALIFIED_ACCUMULATOR' ? 'READY FOR MANUAL BUILD' : (x.status || '—');
-    $('oddsBuilder').innerHTML = '<div class="metrics"><div class="metric"><small>Qualified legs</small><strong>' + legs.length + '/4</strong></div><div class="metric"><small>Sports</small><strong>' + esc(legs.length ? Array.from(new Set(legs.map(function (l) { return String(l.sport || '').toUpperCase(); }))).join(' + ') : '—') + '</strong></div><div class="metric"><small>Status</small><strong>' + esc(status) + '</strong></div><div class="metric"><small>Reference combined odds</small><strong>' + esc(x.reference_combined_odds == null ? '—' : x.reference_combined_odds) + '</strong></div></div><div class="panel"><b>Manual 3–4 Selection Accumulator · Football + Tennis</b><div class="sub">Selections are displayed using the model's explicit P1/P2 position. Before placing anything, verify the player names and current bookmaker price in your own betslip. Timers continue through LIVE state and switch to a settled result when the settlement archive records the completed match.</div><div class="grid" style="margin-top:14px">' + (cards || '<div class="empty">No 3–4 selection set currently qualifies. The system will not force an accumulator.</div>') + '</div><div class="section"><div class="row"><span>Bookmaker price</span><b>Manual confirmation required</b></div><div class="row"><span>SportyBet direct feed</span><b>' + esc((x.bookmaker_odds || {}).sportybet_direct_feed || 'Not used') + '</b></div><div class="row"><span>Combined odds</span><b>Recalculate from the actual odds shown in your betslip</b></div></div></div>';
+    $('oddsBuilder').innerHTML = '<div class="metrics"><div class="metric"><small>Qualified legs</small><strong>' + legs.length + '/4</strong></div><div class="metric"><small>Sports</small><strong>' + esc(legs.length ? Array.from(new Set(legs.map(function (l) { return String(l.sport || '').toUpperCase(); }))).join(' + ') : '—') + '</strong></div><div class="metric"><small>Status</small><strong>' + esc(status) + '</strong></div><div class="metric"><small>Reference combined odds</small><strong>' + esc(x.reference_combined_odds == null ? '—' : x.reference_combined_odds) + '</strong></div></div><div class="panel"><b>Manual 3–4 Selection Accumulator · Football + Tennis</b><div class="sub">Selections use the model's explicit P1/P2 position. Timers count down before start, continue as a live elapsed timer after start, and switch to ENDED · SETTLED when the prediction ledger records the final result. Settled correct predictions are green; incorrect predictions are red.</div><div class="grid" style="margin-top:14px">' + (cards || '<div class="empty">No 3–4 selection set currently qualifies. The system will not force an accumulator.</div>') + '</div><div class="section"><div class="row"><span>Bookmaker price</span><b>Manual confirmation required</b></div><div class="row"><span>SportyBet direct feed</span><b>' + esc((x.bookmaker_odds || {}).sportybet_direct_feed || 'Not used') + '</b></div><div class="row"><span>Combined odds</span><b>Recalculate from the actual odds shown in your betslip</b></div></div></div>';
     updateTimers();
   }
   function updateTimers() {
