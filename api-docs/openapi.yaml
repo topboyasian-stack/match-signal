@@ -1,0 +1,38 @@
+openapi: 3.0.3
+info:
+  title: Match Signal API
+  version: 1.0.0
+  description: Read-only API for Match Signal prediction, performance and accumulator research data. Paper/research only.
+servers:
+  - url: https://match-signal.pages.dev/api/v1
+security:
+  - bearerAuth: []
+paths:
+  /predictions:
+    get:
+      summary: Current predictions
+      parameters:
+        - in: query
+          name: sport
+          schema: {type: string, enum: [football, tennis]}
+      responses:
+        '200': {description: Prediction feed}
+        '401': {description: Unauthorized}
+  /performance:
+    get:
+      summary: Verified paper performance aggregates
+      responses:
+        '200': {description: Performance data}
+        '401': {description: Unauthorized}
+  /accumulator:
+    get:
+      summary: Research-qualified manual 3-4 selection accumulator
+      responses:
+        '200': {description: Accumulator data}
+        '401': {description: Unauthorized}
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Cloudflare Pages secret MATCH_SIGNAL_API_KEY
