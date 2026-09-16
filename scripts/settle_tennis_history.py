@@ -1,8 +1,9 @@
 """Batch-settle persisted ATP/WTA predictions using ESPN date scoreboards.
 
 One scoreboard request is made per tour/date instead of one summary request per
-match. This is deliberately separate from the general settlement path so a
-large historical tennis backlog cannot stall football settlement.
+match. Late-captured predictions are recorded but excluded from verified
+performance metrics; only predictions calculated before their start time are
+eligible for the performance ledger.
 PAPER ONLY.
 """
 from __future__ import annotations
@@ -14,7 +15,7 @@ from pathlib import Path
 
 import requests
 
-from settle_same_day import brier, build_tennis_performance
+from settle_same_day import brier
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
@@ -91,10 +92,37 @@ def settle_row(row, event):
         return False
 
 
+def tennis_performance(rows):
+    eligible = [x for x in rows if str(x.get("sport")).lower() == "tennis" and x.get("evaluation_eligible") is True]
+    ou_rows = [x for x in eligible if ((x.get("actual_markets") or {}).get("total_games_result")) in {"over", "under", "push"}]
+    ou_decisions = [x for x in ou_rows if ((x.get("analytics") or {}).get("total_games") or {}).get("pick") in {"over", "under"} and ((x.get("actual_markets") or {}).get("total_games_result")) != "push"]
+    correct = sum(bool(x.get("correct")) for x in eligible)
+    ou_correct = sum(bool((x.get("actual_markets") or {}).get("total_games_correct")) for x in ou_decisions)
+    return {
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "settled_tennis_matches": len(eligible),
+        "match_wins": correct,
+        "match_accuracy": round(correct / len(eligible), 4) if eligible else 0.0,
+        "ou_settled": len(ou_rows),
+        "ou_decisions": len(ou_decisions),
+        "ou_correct": ou_correct,
+        "ou_accuracy": round(ou_correct / len(ou_decisions), 4) if ou_decisions else 0.0,
+        "by_tour": {
+            tour: {
+                "settled": sum(x.get("league") == tour for x in eligible),
+                "correct": sum(bool(x.get("correct")) for x in eligible if x.get("league") == tour),
+                "ou_decisions": sum(x.get("league") == tour for x in ou_decisions),
+                "ou_correct": sum(bool((x.get("actual_markets") or {}).get("total_games_correct")) for x in ou_decisions if x.get("league") == tour),
+            } for tour in ("ATP", "WTA")
+        },
+        "late_captures_excluded": sum(x.get("capture_status") == "LATE_CAPTURE" and x.get("settled") for x in rows),
+        "status": "PAPER_RESEARCH_ONLY",
+    }
+
+
 def main():
     history = load(HISTORY_PATH, [])
     archive = load(ARCHIVE_PATH, [])
-    # Archive is authoritative for tennis; merge any history-only tennis rows.
     rows = {}
     for row in archive + [x for x in history if str(x.get("sport")).lower() == "tennis"]:
         key = f"{row.get('league')}:{row.get('event_id')}"
@@ -125,7 +153,6 @@ def main():
 
     merged_archive = sorted(rows.values(), key=lambda x: str(x.get("start_time", "")))[-5000:]
     save(ARCHIVE_PATH, merged_archive)
-
     non_tennis = [x for x in history if str(x.get("sport")).lower() != "tennis"]
     final = sorted(non_tennis + merged_archive, key=lambda x: str(x.get("start_time", "")))[-5000:]
     save(HISTORY_PATH, final)
@@ -138,21 +165,13 @@ def main():
             "settled": len(settled),
             "correct": sum(bool(x.get("correct")) for x in settled),
             "accuracy": round(sum(bool(x.get("correct")) for x in settled) / len(settled), 4) if settled else 0.0,
-            "football": {
-                "settled": sum(str(x.get("sport")).lower() == "football" for x in settled),
-                "correct": sum(bool(x.get("correct")) for x in settled if str(x.get("sport")).lower() == "football"),
-            },
-            "tennis": {
-                "settled": len(tennis),
-                "correct": sum(bool(x.get("correct")) for x in tennis),
-                "accuracy": round(sum(bool(x.get("correct")) for x in tennis) / len(tennis), 4) if tennis else 0.0,
-            },
+            "tennis": {"settled": len(tennis), "correct": sum(bool(x.get("correct")) for x in tennis), "accuracy": round(sum(bool(x.get("correct")) for x in tennis) / len(tennis), 4) if tennis else 0.0},
         },
         "recent_settled": settled[-50:],
     }
     save(ACCURACY_PATH, all_summary)
-    save(DATA / "tennis_performance.json", build_tennis_performance(settled))
-    print(f"Batch tennis settlement complete: {settled_count} newly settled | total tennis settled {len(tennis)}")
+    save(DATA / "tennis_performance.json", tennis_performance(settled))
+    print(f"Batch tennis settlement complete: {settled_count} newly settled | total tennis settled {len(tennis)} | eligible tennis settled {sum(x.get('evaluation_eligible') is True for x in tennis)}")
 
 
 if __name__ == "__main__":
