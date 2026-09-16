@@ -1,12 +1,6 @@
 name: Match Signal Tennis History Reconciliation
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'scripts/reconcile_tennis_history.py'
-      - 'scripts/settle_tennis_history.py'
-      - '.github/workflows/tennis_history_reconciliation.yml'
   workflow_run:
     workflows: ["Match Signal Live Prediction Pipeline"]
     types: [completed]
@@ -23,7 +17,9 @@ concurrency:
 
 jobs:
   reconcile:
-    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    # Reconcile even when the broader pipeline fails later (for example on an
+    # unrelated NBA research step). Tennis settlement is an independent ledger.
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion != 'cancelled' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
