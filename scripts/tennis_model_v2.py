@@ -231,16 +231,16 @@ def apply_model(predictions, ratings, elo_weight, ou_model, current_rankings):
         row["model_version"] = V2_VERSION
         changed += 1
 
+        # Preserve the continuous O/U signal produced by the upstream model.
+        # The previous V2 implementation replaced every 22.5 line with a
+        # three-set bucket rate, which collapsed the live feed into roughly
+        # the same 30/70 split. V3 now calibrates this continuous prior.
         total = row["analytics"].get("total_games") or {}
         if total.get("line") == 22.5:
-            three = float((row["analytics"].get("three_sets") or 0.5))
-            key = "low" if three < 0.46 else "high" if three > 0.56 else "mid"
-            over = float(ou_model["over_rates"].get(key, 0.5))
-            total["over"] = round(over, 4)
-            total["under"] = round(1.0 - over, 4)
-            total["pick"] = "over" if over >= 0.5 else "under"
-            total["source"] = "empirical settled-tennis calibration"
-            total["calibration_status"] = "PAPER_RESEARCH"
+            prior = float(total.get("base_model_over", total.get("over", 0.5)) or 0.5)
+            total["base_model_over"] = round(prior, 4)
+            total["base_model_under"] = round(1.0 - prior, 4)
+            total["pre_calibration_source"] = "walk-forward tennis set/game model"
             row["analytics"]["total_games"] = total
     return changed, ranking_enriched
 
