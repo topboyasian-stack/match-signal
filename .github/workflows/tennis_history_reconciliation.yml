@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'scripts/reconcile_tennis_history.py'
+      - 'scripts/settle_tennis_history.py'
       - '.github/workflows/tennis_history_reconciliation.yml'
   workflow_run:
     workflows: ["Match Signal Live Prediction Pipeline"]
@@ -42,8 +43,8 @@ jobs:
       - name: Recover recent ATP/WTA predictions from git history
         run: python scripts/reconcile_tennis_history.py
 
-      - name: Settle recovered completed tennis matches
-        run: python scripts/settle_same_day.py
+      - name: Batch-settle recovered completed tennis matches
+        run: PYTHONPATH=scripts python scripts/settle_tennis_history.py
 
       - name: Validate tennis history artifacts
         run: |
