@@ -1,9 +1,9 @@
 """Batch-settle persisted ATP/WTA predictions using ESPN scoreboards with summary fallback.
 
-One scoreboard request is made per tour/date. If a historical event is not
-present in that scoreboard, its event summary is queried individually. Late-
-captured predictions are recorded but excluded from verified performance
-metrics; only predictions calculated before their start time are eligible.
+Uses curl_cffi browser impersonation in CI because ESPN may return HTTP 403 to
+plain automation clients. Late-captured predictions are recorded but excluded
+from verified performance metrics; only predictions calculated before their
+start time are eligible.
 PAPER ONLY.
 """
 from __future__ import annotations
@@ -13,7 +13,10 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
-import requests
+try:
+    from curl_cffi import requests as http
+except ImportError:
+    import requests as http
 
 from settle_same_day import brier
 
@@ -23,8 +26,7 @@ HISTORY_PATH = DATA / "prediction_history.json"
 ARCHIVE_PATH = DATA / "tennis_prediction_archive.json"
 ACCURACY_PATH = DATA / "accuracy.json"
 ESPN = "https://site.api.espn.com/apis/site/v2/sports/tennis"
-SESSION = requests.Session()
-SESSION.headers.update({"User-Agent": "MatchSignal/3.4 (+https://github.com/topboyasian-stack/match-signal)"})
+SESSION = http.Session(impersonate="chrome") if hasattr(http, "Session") else http.Session()
 
 
 def load(path, default):
@@ -42,16 +44,19 @@ def event_date(row):
     return datetime.fromisoformat(str(row["start_time"]).replace("Z", "+00:00")).strftime("%Y%m%d")
 
 
-def scoreboard(league, date):
-    r = SESSION.get(f"{ESPN}/{league}/scoreboard", params={"dates": date, "limit": 1000}, timeout=30)
+def get_json(url, params):
+    r = SESSION.get(url, params=params, timeout=30)
     r.raise_for_status()
-    return {str(e.get("id")): e for e in r.json().get("events", [])}
+    return r.json()
+
+
+def scoreboard(league, date):
+    payload = get_json(f"{ESPN}/{league}/scoreboard", {"dates": date, "limit": 1000})
+    return {str(e.get("id")): e for e in payload.get("events", [])}
 
 
 def summary(league, event_id):
-    r = SESSION.get(f"{ESPN}/{league}/summary", params={"event": event_id}, timeout=30)
-    r.raise_for_status()
-    payload = r.json()
+    payload = get_json(f"{ESPN}/{league}/summary", {"event": event_id})
     competitions = (payload.get("header") or {}).get("competitions") or payload.get("competitions") or []
     return competitions[0] if competitions else None
 
@@ -78,17 +83,9 @@ def settle_row(row, competition):
         line = float(ou.get("line", 22.5))
         total_games = s1 + s2
         actual_ou = "over" if total_games > line else "under" if total_games < line else "push"
-        row["actual_markets"] = {
-            "total_games": total_games,
-            "total_games_line": line,
-            "total_games_result": actual_ou,
-            "total_games_correct": ou.get("pick") in {"over", "under"} and actual_ou == ou.get("pick"),
-            "sets": max(len(lines1), len(lines2)),
-            "sets_won_p1": sum(float(x.get("value", 0)) > float(y.get("value", 0)) for x, y in zip(lines1, lines2)),
-            "sets_won_p2": sum(float(y.get("value", 0)) > float(x.get("value", 0)) for x, y in zip(lines1, lines2)),
-        }
+        row["actual_markets"] = {"total_games": total_games, "total_games_line": line, "total_games_result": actual_ou, "total_games_correct": ou.get("pick") in {"over", "under"} and actual_ou == ou.get("pick"), "sets": max(len(lines1), len(lines2)), "sets_won_p1": sum(float(x.get("value", 0)) > float(y.get("value", 0)) for x, y in zip(lines1, lines2)), "sets_won_p2": sum(float(y.get("value", 0)) > float(x.get("value", 0)) for x, y in zip(lines1, lines2))}
         row["final_score"] = [s1, s2]
-        row.update({"settled": True, "settled_at": datetime.now(timezone.utc).isoformat(), "actual": actual, "correct": row.get("pick") == actual, "brier": brier(row.get("probabilities", {}), actual), "settlement_source": "ESPN tennis scoreboard/summary"})
+        row.update({"settled": True, "settled_at": datetime.now(timezone.utc).isoformat(), "actual": actual, "correct": row.get("pick") == actual, "brier": brier(row.get("probabilities", {}), actual), "settlement_source": "ESPN tennis scoreboard/summary via browser client"})
         return True
     except (TypeError, ValueError, KeyError):
         return False
@@ -100,13 +97,7 @@ def tennis_performance(rows):
     ou_decisions = [x for x in ou_rows if ((x.get("analytics") or {}).get("total_games") or {}).get("pick") in {"over", "under"} and ((x.get("actual_markets") or {}).get("total_games_result")) != "push"]
     correct = sum(bool(x.get("correct")) for x in eligible)
     ou_correct = sum(bool((x.get("actual_markets") or {}).get("total_games_correct")) for x in ou_decisions)
-    return {
-        "updated_at": datetime.now(timezone.utc).isoformat(), "settled_tennis_matches": len(eligible), "match_wins": correct,
-        "match_accuracy": round(correct / len(eligible), 4) if eligible else 0.0, "ou_settled": len(ou_rows), "ou_decisions": len(ou_decisions), "ou_correct": ou_correct,
-        "ou_accuracy": round(ou_correct / len(ou_decisions), 4) if ou_decisions else 0.0,
-        "by_tour": {tour: {"settled": sum(x.get("league") == tour for x in eligible), "correct": sum(bool(x.get("correct")) for x in eligible if x.get("league") == tour), "ou_decisions": sum(x.get("league") == tour for x in ou_decisions), "ou_correct": sum(bool((x.get("actual_markets") or {}).get("total_games_correct")) for x in ou_decisions if x.get("league") == tour)} for tour in ("ATP", "WTA")},
-        "late_captures_excluded": sum(x.get("capture_status") == "LATE_CAPTURE" and x.get("settled") for x in rows), "status": "PAPER_RESEARCH_ONLY",
-    }
+    return {"updated_at": datetime.now(timezone.utc).isoformat(), "settled_tennis_matches": len(eligible), "match_wins": correct, "match_accuracy": round(correct / len(eligible), 4) if eligible else 0.0, "ou_settled": len(ou_rows), "ou_decisions": len(ou_decisions), "ou_correct": ou_correct, "ou_accuracy": round(ou_correct / len(ou_decisions), 4) if ou_decisions else 0.0, "by_tour": {tour: {"settled": sum(x.get("league") == tour for x in eligible), "correct": sum(bool(x.get("correct")) for x in eligible if x.get("league") == tour), "ou_decisions": sum(x.get("league") == tour for x in ou_decisions), "ou_correct": sum(bool((x.get("actual_markets") or {}).get("total_games_correct")) for x in ou_decisions if x.get("league") == tour)} for tour in ("ATP", "WTA")}, "late_captures_excluded": sum(bool(x.get("capture_status") == "LATE_CAPTURE" and x.get("settled")) for x in rows), "status": "PAPER_RESEARCH_ONLY"}
 
 
 def main():
@@ -146,8 +137,8 @@ def main():
                     settled_count += 1
                     summary_fallbacks += 1
                     print(f"Summary fallback settled {league} {row.get('event_id')}")
-            except Exception:
-                continue
+            except Exception as exc:
+                print(f"Could not settle {league} {row.get('event_id')}: {exc}")
 
     merged_archive = sorted(rows.values(), key=lambda x: str(x.get("start_time", "")))[-5000:]
     save(ARCHIVE_PATH, merged_archive)
@@ -158,7 +149,7 @@ def main():
     tennis = [x for x in settled if str(x.get("sport")).lower() == "tennis"]
     save(ACCURACY_PATH, {"updated_at": datetime.now(timezone.utc).isoformat(), "summary": {"settled": len(settled), "correct": sum(bool(x.get("correct")) for x in settled), "accuracy": round(sum(bool(x.get("correct")) for x in settled) / len(settled), 4) if settled else 0.0, "tennis": {"settled": len(tennis), "correct": sum(bool(x.get("correct")) for x in tennis), "accuracy": round(sum(bool(x.get("correct")) for x in tennis) / len(tennis), 4) if tennis else 0.0}}, "recent_settled": settled[-50:]})
     save(DATA / "tennis_performance.json", tennis_performance(final))
-    print(f"Batch tennis settlement complete: {settled_count} newly settled | summary fallbacks {summary_fallbacks} | total tennis settled {len(tennis)} | eligible tennis settled {sum(x.get('evaluation_eligible') is True for x in tennis)}")
+    print(f"Batch tennis settlement complete: {settled_count} newly settled | summary fallbacks {summary_fallbacks} | total tennis settled {len(tennis)} | eligible tennis settled {sum(bool(x.get('evaluation_eligible') is True) for x in tennis)}")
 
 
 if __name__ == "__main__":
