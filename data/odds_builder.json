@@ -1,11 +1,17 @@
 {
-  "generated_at": "2026-09-16T11:38:32.844671+00:00",
+  "generated_at": "2026-09-16T11:46:55.147240+00:00",
   "mode": "PAPER_ONLY",
   "target_legs": "3-4",
+  "sports_supported": [
+    "football",
+    "tennis"
+  ],
   "selection_policy": {
     "min_model_probability": 0.65,
     "min_model_edge_vs_sporty_implied": 0.03,
-    "requires_upstream_selection_gate": true,
+    "tennis_min_probability": 0.65,
+    "requires_upstream_selection_gate_for_football": true,
+    "tennis_source": "existing predictions.json paper analytics",
     "public_prediction_feed_unchanged": true
   },
   "sportybet": {
@@ -13,17 +19,24 @@
     "booking_code": null,
     "share_url": null,
     "legs": [],
-    "expires_at": null
+    "expires_at": null,
+    "football_source_error": "Expecting value: line 1 column 1 (char 0)",
+    "tennis_source_error": "Expecting value: line 1 column 1 (char 0)"
   },
   "stake": {
     "status": "MANUAL_SHARE_INTERFACE_REQUIRED",
     "booking_url": null,
     "booking_code": null
   },
-  "candidates_considered": 0,
+  "candidates_considered": {
+    "football": 0,
+    "tennis": 7
+  },
   "qualified_legs": [],
   "notes": [
-    "No slip is generated unless 3-4 upstream-qualified selections also match live SportyBet 1X2 markets with the required model edge.",
-    "Stake automatic betslip creation is intentionally disabled until a stable supported share interface is verified."
+    "Football selections must come from the existing research gate.",
+    "Tennis selections use existing paper predictions only and require a probability of at least 0.65 for either match winner or a published total-games O/U market.",
+    "No slip is generated unless 3-4 selections also match live SportyBet markets with the required edge/probability checks.",
+    "Stake automatic betslip creation remains disabled until a stable supported share interface is verified."
   ]
 }
