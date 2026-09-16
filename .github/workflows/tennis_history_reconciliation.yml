@@ -38,7 +38,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install dependencies
-        run: python -m pip install --upgrade requests
+        run: python -m pip install --upgrade requests curl_cffi
 
       - name: Recover recent ATP/WTA predictions from git history
         run: python scripts/reconcile_tennis_history.py
