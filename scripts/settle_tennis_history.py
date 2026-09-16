@@ -1,9 +1,10 @@
-"""Batch-settle persisted ATP/WTA predictions using ESPN scoreboards with summary fallback.
+"""Batch-settle persisted ATP/WTA predictions from ESPN's tennis/all board.
 
-Uses curl_cffi browser impersonation in CI because ESPN may return HTTP 403 to
-plain automation clients. Late-captured predictions are recorded but excluded
-from verified performance metrics; only predictions calculated before their
-start time are eligible.
+ESPN's tennis feed uses a date-level `tennis/all/scoreboard` structure with
+nested tournament/grouping containers rather than the standard team-sport WTA/
+ATP board. The parser flattens those nested competitions and falls back to an
+event summary when needed. Late-captured predictions are recorded but excluded
+from verified performance metrics; only pre-event predictions are eligible.
 PAPER ONLY.
 """
 from __future__ import annotations
@@ -50,9 +51,43 @@ def get_json(url, params):
     return r.json()
 
 
-def scoreboard(league, date):
-    payload = get_json(f"{ESPN}/{league}/scoreboard", {"dates": date, "limit": 1000})
-    return {str(e.get("id")): e for e in payload.get("events", [])}
+def flatten_competitions(node):
+    """Flatten ESPN tennis/all nested event/grouping/competition shapes."""
+    found = []
+    if not isinstance(node, dict):
+        return found
+    competitions = node.get("competitions")
+    if isinstance(competitions, list):
+        for competition in competitions:
+            if isinstance(competition, dict):
+                # A real tennis match competition has competitors directly.
+                if isinstance(competition.get("competitors"), list) and len(competition.get("competitors") or []) >= 2:
+                    item = dict(competition)
+                    if not item.get("id") and node.get("id"):
+                        item["id"] = node.get("id")
+                    found.append(item)
+                found.extend(flatten_competitions(competition))
+    for key in ("events", "groupings", "children", "groups"):
+        children = node.get(key)
+        if isinstance(children, list):
+            for child in children:
+                found.extend(flatten_competitions(child))
+    return found
+
+
+def scoreboard(date):
+    payload = get_json(f"{ESPN}/all/scoreboard", {"dates": date, "limit": 1000})
+    rows = []
+    for event in payload.get("events", []):
+        rows.extend(flatten_competitions(event))
+        # Some responses expose competitors at event level.
+        if isinstance(event.get("competitors"), list) and len(event.get("competitors") or []) >= 2:
+            rows.append(event)
+    mapped = {}
+    for row in rows:
+        if row.get("id") is not None:
+            mapped[str(row.get("id"))] = row
+    return mapped
 
 
 def summary(league, event_id):
@@ -85,7 +120,7 @@ def settle_row(row, competition):
         actual_ou = "over" if total_games > line else "under" if total_games < line else "push"
         row["actual_markets"] = {"total_games": total_games, "total_games_line": line, "total_games_result": actual_ou, "total_games_correct": ou.get("pick") in {"over", "under"} and actual_ou == ou.get("pick"), "sets": max(len(lines1), len(lines2)), "sets_won_p1": sum(float(x.get("value", 0)) > float(y.get("value", 0)) for x, y in zip(lines1, lines2)), "sets_won_p2": sum(float(y.get("value", 0)) > float(x.get("value", 0)) for x, y in zip(lines1, lines2))}
         row["final_score"] = [s1, s2]
-        row.update({"settled": True, "settled_at": datetime.now(timezone.utc).isoformat(), "actual": actual, "correct": row.get("pick") == actual, "brier": brier(row.get("probabilities", {}), actual), "settlement_source": "ESPN tennis scoreboard/summary via browser client"})
+        row.update({"settled": True, "settled_at": datetime.now(timezone.utc).isoformat(), "actual": actual, "correct": row.get("pick") == actual, "brier": brier(row.get("probabilities", {}), actual), "settlement_source": "ESPN tennis/all scoreboard"})
         return True
     except (TypeError, ValueError, KeyError):
         return False
@@ -114,31 +149,34 @@ def main():
     groups = defaultdict(list)
     for row in pending:
         try:
-            groups[(row.get("league"), event_date(row))].append(row)
+            groups[event_date(row)].append(row)
         except Exception:
             continue
 
     settled_count = 0
     summary_fallbacks = 0
-    for (league, date), group in sorted(groups.items()):
+    for date, group in sorted(groups.items()):
         try:
-            events = scoreboard(league.lower(), date)
+            events = scoreboard(date)
+            print(f"ESPN tennis/all {date}: {len(events)} flattened match competitions")
         except Exception as exc:
-            print(f"Tennis scoreboard failed {league} {date}: {exc}")
+            print(f"ESPN tennis/all failed {date}: {exc}")
             events = {}
         for row in group:
             competition = events.get(str(row.get("event_id")))
             if competition and settle_row(row, competition):
                 settled_count += 1
                 continue
-            try:
-                competition = summary(league.lower(), row.get("event_id"))
-                if competition and settle_row(row, competition):
-                    settled_count += 1
-                    summary_fallbacks += 1
-                    print(f"Summary fallback settled {league} {row.get('event_id')}")
-            except Exception as exc:
-                print(f"Could not settle {league} {row.get('event_id')}: {exc}")
+            for league in ("wta", "atp"):
+                try:
+                    competition = summary(league, row.get("event_id"))
+                    if competition and settle_row(row, competition):
+                        settled_count += 1
+                        summary_fallbacks += 1
+                        print(f"Summary fallback settled {row.get('league')} {row.get('event_id')}")
+                        break
+                except Exception:
+                    continue
 
     merged_archive = sorted(rows.values(), key=lambda x: str(x.get("start_time", "")))[-5000:]
     save(ARCHIVE_PATH, merged_archive)
