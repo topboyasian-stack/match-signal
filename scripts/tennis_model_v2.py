@@ -9,6 +9,7 @@ PREDICTIONS_PATH = DATA / "predictions.json"
 ARCHIVE_PATH = DATA / "tennis_prediction_archive.json"
 REPORT_PATH = DATA / "tennis_model_v2.json"
 
+V2_VERSION = "2026-09-16-elo-calibration"
 INITIAL_ELO = 1500.0
 K_FACTOR = 24.0
 MIN_TRAIN = 30
@@ -70,8 +71,7 @@ def build_walkforward(records, elo_weight):
         blend = clamp((1.0 - elo_weight) * base + elo_weight * ep)
         actual = outcome_from_record(row)
         scored.append((row, blend, actual, ep, base))
-        expected = ep
-        change = K_FACTOR * (actual - expected)
+        change = K_FACTOR * (actual - ep)
         ratings[p1] = r1 + change
         ratings[p2] = r2 - change
     return scored, ratings
@@ -149,8 +149,6 @@ def apply_model(predictions, ratings, elo_weight, ou_model):
         ep = elo_prob(r1, r2)
         probs = row.get("probabilities") or {}
         base = clamp(float(probs.get("p1", 0.5)))
-        # If both players have historical Elo, blend it with the existing model.
-        # For unseen players, keep the original probability rather than inventing strength.
         has_history = p1 in ratings or p2 in ratings
         if has_history:
             updated = clamp((1.0 - elo_weight) * base + elo_weight * ep)
@@ -168,7 +166,7 @@ def apply_model(predictions, ratings, elo_weight, ou_model):
         quality["components"] = max(int(quality.get("components") or 0), 1 + int(has_history))
         row["signal_quality"] = quality
         row["model"] = "ESPN + ranking/form base + walk-forward player Elo"
-        row["model_version"] = "tennis-v2-elo"
+        row["model_version"] = V2_VERSION
         changed += 1
 
         total = row["analytics"].get("total_games") or {}
@@ -194,12 +192,11 @@ def main():
     elo_weight, selection = choose_elo_weight(records)
     ratings = build_current_ratings(records)
     ou_model = build_ou_empirical(records)
-    before = [r.copy() for r in predictions if r.get("sport") == "tennis"]
     changed = apply_model(predictions, ratings, elo_weight, ou_model)
     PREDICTIONS_PATH.write_text(json.dumps(predictions, indent=2, ensure_ascii=False) + "\n")
     report = {
         "updated_at": datetime.now(timezone.utc).isoformat(),
-        "model_version": "tennis-v2-elo",
+        "model_version": V2_VERSION,
         "status": "PAPER_RESEARCH_ONLY",
         "training_records": len(records),
         "elo_weight": elo_weight,
