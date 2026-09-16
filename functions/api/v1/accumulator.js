@@ -1,7 +1,4 @@
-import {requireApiKey,assetJson,ok} from './_lib.js';
-export async function onRequestGet(context){
-  const denied=await requireApiKey(context); if(denied)return denied;
-  const data=await assetJson(context,'/data/odds_builder.json');
-  if(!data)return new Response(JSON.stringify({error:'ACCUMULATOR_UNAVAILABLE'}),{status:503,headers:{'Content-Type':'application/json'}});
-  return ok({version:'match-signal-api-v1',updated_at:data.updated_at,status:data.status,reference_combined_odds:data.reference_combined_odds,qualified_legs:data.qualified_legs||[],bookmaker_odds:data.bookmaker_odds||{}});
-}
+function headers(){return {'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','Access-Control-Allow-Origin':'*'}}
+async function auth(context){const expected=context.env.MATCH_SIGNAL_API_KEY;const supplied=context.request.headers.get('authorization')||'';if(!expected)return new Response(JSON.stringify({error:'API_NOT_CONFIGURED'}),{status:503,headers:headers()});if(supplied!==`Bearer ${expected}`)return new Response(JSON.stringify({error:'UNAUTHORIZED'}),{status:401,headers:headers()});return null}
+async function assetJson(context,path){const u=new URL(context.request.url);u.pathname=path;const r=await context.env.ASSETS.fetch(u);return r.ok?r.json():null}
+export async function onRequestGet(context){const denied=await auth(context);if(denied)return denied;const data=await assetJson(context,'/data/odds_builder.json');if(!data)return new Response(JSON.stringify({error:'ACCUMULATOR_UNAVAILABLE'}),{status:503,headers:headers()});return new Response(JSON.stringify({version:'match-signal-api-v1',updated_at:data.updated_at,status:data.status,reference_combined_odds:data.reference_combined_odds,qualified_legs:data.qualified_legs||[],bookmaker_odds:data.bookmaker_odds||{}}),{headers:headers()})}
