@@ -1,11 +1,16 @@
 {
-  "updated_at": "2026-09-16T16:55:07.853718+00:00",
+  "updated_at": "2026-09-16T17:22:41.610172+00:00",
   "model_version": "2026-09-16-elo-calibration",
   "status": "PAPER_RESEARCH_ONLY",
   "training_records": 65,
-  "elo_weight": 0.25,
+  "elo_weight": 0.5,
   "weight_selection": {
     "selection_window": 65,
+    "baseline": {
+      "accuracy": 0.5385,
+      "brier": 0.2434,
+      "n": 65
+    },
     "candidates": [
       {
         "elo_weight": 0.25,
@@ -27,13 +32,18 @@
       }
     ],
     "selected": {
-      "elo_weight": 0.25,
-      "accuracy": 0.5385,
-      "brier": 0.2439,
+      "elo_weight": 0.5,
+      "accuracy": 0.5538,
+      "brier": 0.2451,
       "n": 65
     }
   },
   "players_in_elo": 107,
+  "ranking_coverage": {
+    "ATP": 150,
+    "WTA": 150
+  },
+  "current_predictions_with_rank_enrichment": 7,
   "ou_calibration": {
     "bins": {
       "low": [
@@ -59,7 +69,8 @@
   "guardrails": [
     "No future results are used for a fixture before its start time.",
     "Late-captured predictions are excluded from walk-forward model evaluation.",
-    "Unseen players retain the existing model probability.",
+    "Unseen players retain the existing model probability unless a current official ESPN rank is available.",
+    "Current rankings are used only for future fixtures and are not used to score the historical walk-forward test.",
     "O/U calibration is research-only and remains separate from live-money execution."
   ]
 }
