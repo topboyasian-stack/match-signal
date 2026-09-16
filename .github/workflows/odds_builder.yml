@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'data/selection_candidates.json'
+      - 'data/predictions.json'
       - 'scripts/odds_builder.py'
       - '.github/workflows/odds_builder.yml'
   schedule:
@@ -43,13 +44,18 @@ jobs:
           p = Path('data/odds_builder.json')
           data = json.loads(p.read_text())
           assert data.get('mode') == 'PAPER_ONLY'
+          assert set(data.get('sports_supported', [])) >= {'football', 'tennis'}
           assert isinstance(data.get('qualified_legs'), list)
           assert len(data['qualified_legs']) <= 4
           if data['qualified_legs']:
               assert len(data['qualified_legs']) >= 3
+          for leg in data['qualified_legs']:
+              assert leg.get('sport') in {'football', 'tennis'}
           print('Odds Builder QA:', json.dumps({
               'status': data.get('sportybet', {}).get('status'),
               'legs': len(data['qualified_legs']),
+              'sports': sorted({x.get('sport') for x in data['qualified_legs']}),
+              'candidates': data.get('candidates_considered'),
               'stake_status': data.get('stake', {}).get('status')
           }))
           PY
@@ -62,5 +68,5 @@ jobs:
             echo "No Odds Builder changes."
             exit 0
           fi
-          git commit -m "🤖 Refresh research-gated Odds Builder"
+          git commit -m "🤖 Refresh football and tennis Odds Builder"
           git push origin main
