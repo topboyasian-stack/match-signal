@@ -126,17 +126,27 @@ def brier(items):
     return sum((p - actual) ** 2 for _, p, actual, _, _ in items) / len(items)
 
 
+def baseline_metrics(records):
+    items = []
+    for row in records:
+        p = float((row.get("probabilities") or {}).get("p1", 0.5))
+        actual = outcome_from_record(row)
+        if actual is not None:
+            items.append((row, p, actual, 0.5, p))
+    return {"accuracy": round(accuracy(items), 4), "brier": round(brier(items), 4), "n": len(items)}
+
+
 def choose_elo_weight(records):
     if len(records) < MIN_TRAIN:
-        return 0.5, {"reason": "insufficient_history"}
+        return 0.5, {"reason": "insufficient_history", "baseline": baseline_metrics(records)}
     candidates = [0.25, 0.5, 0.75]
     window = records[-RECENT_WINDOW:]
     results = []
     for weight in candidates:
         items, _ = build_walkforward(window, weight)
         results.append({"elo_weight": weight, "accuracy": round(accuracy(items), 4), "brier": round(brier(items), 4), "n": len(items)})
-    best = min(results, key=lambda x: (x["brier"], -x["accuracy"]))
-    return best["elo_weight"], {"selection_window": len(window), "candidates": results, "selected": best}
+    best = max(results, key=lambda x: (x["accuracy"], -x["brier"]))
+    return best["elo_weight"], {"selection_window": len(window), "baseline": baseline_metrics(window), "candidates": results, "selected": best}
 
 
 def build_current_ratings(records):
@@ -187,10 +197,8 @@ def apply_model(predictions, ratings, elo_weight, ou_model, current_rankings):
         ep = elo_prob(r1, r2)
         probs = row.get("probabilities") or {}
         base = clamp(float(probs.get("p1", 0.5)))
-
-        names = [norm_name(p1), norm_name(p2)]
-        rank1 = current_rankings.get(names[0])
-        rank2 = current_rankings.get(names[1])
+        rank1 = current_rankings.get(norm_name(p1))
+        rank2 = current_rankings.get(norm_name(p2))
         rp = rank_prob(rank1, rank2)
         has_history = p1 in ratings or p2 in ratings
 
@@ -210,8 +218,7 @@ def apply_model(predictions, ratings, elo_weight, ou_model, current_rankings):
         row["pick"] = "p1" if updated >= 0.5 else "p2"
         row["confidence"] = round(max(updated, 1.0 - updated), 4)
         row["rankings"] = {"p1": rank1, "p2": rank2, "gap": (rank2 - rank1) if rank1 and rank2 else None}
-        row["analytics"] = row.get("analytics") or {}
-        row["analytics"]["elo"] = {"p1": round(r1, 1), "p2": round(r2, 1), "p1_win_prob": round(ep, 4), "weight": elo_weight}
+        row.setdefault("analytics", {})["elo"] = {"p1": round(r1, 1), "p2": round(r2, 1), "p1_win_prob": round(ep, 4), "weight": elo_weight}
         if rp is not None:
             row["analytics"]["ranking_probability"] = round(rp, 4)
         quality = row.get("signal_quality") or {}
@@ -225,8 +232,7 @@ def apply_model(predictions, ratings, elo_weight, ou_model, current_rankings):
         changed += 1
 
         total = row["analytics"].get("total_games") or {}
-        line = total.get("line")
-        if line == 22.5:
+        if total.get("line") == 22.5:
             three = float((row["analytics"].get("three_sets") or 0.5))
             key = "low" if three < 0.46 else "high" if three > 0.56 else "mid"
             over = float(ou_model["over_rates"].get(key, 0.5))
