@@ -1,9 +1,16 @@
 {
-  "updated_at": "2026-09-16T21:25:53.679045+00:00",
+  "updated_at": "2026-09-16T23:03:06.549232+00:00",
   "summary": {
-    "settled": 298,
-    "correct": 144,
-    "accuracy": 0.4832,
+    "settled": 299,
+    "correct": 145,
+    "accuracy": 0.4849,
+    "brier_score": 0.5294,
+    "markets": {},
+    "football": {
+      "settled": 97,
+      "correct": 44,
+      "accuracy": 0.4536
+    },
     "tennis": {
       "settled": 202,
       "correct": 101,
@@ -11,116 +18,6 @@
     }
   },
   "recent_settled": [
-    {
-      "sport": "tennis",
-      "league": "WTA",
-      "event_id": "183831",
-      "start_time": "2026-09-15T04:00Z",
-      "player_1": "Hayu Kinoshita",
-      "player_2": "Darja Semenistaja",
-      "venue": "São Paulo, Brazil",
-      "surface": "Unknown",
-      "tournament": "SP Open",
-      "round": "Round 1",
-      "rankings": {
-        "p1": null,
-        "p2": 120,
-        "gap": null
-      },
-      "form": {
-        "p1": 0.4,
-        "p2": 0.222,
-        "p1_last10": "WLLWL",
-        "p2_last10": "LLLLWWLLL"
-      },
-      "probabilities": {
-        "p1": 0.5311,
-        "p2": 0.4689
-      },
-      "pick": "p1",
-      "confidence": 0.5311,
-      "analytics": {
-        "set_win_prob": {
-          "p1": 0.5207,
-          "p2": 0.4793
-        },
-        "straight_sets": {
-          "p1": 0.2712,
-          "p2": 0.2297
-        },
-        "three_sets": 0.4991,
-        "expected_sets": 2.5,
-        "total_games": {
-          "line": 22.5,
-          "over": 0.6352,
-          "under": 0.3648,
-          "pick": "over"
-        },
-        "games_handicap": {
-          "estimated_margin_p1": 0.02,
-          "pick": "p1"
-        }
-      },
-      "model": "partial ranking + recent form",
-      "signal_quality": {
-        "components": 3,
-        "max_components": 5,
-        "ranking_gap": null,
-        "form_gap": 0.178,
-        "market_available": false,
-        "secondary_analytics_calibrated": true
-      },
-      "calculated_at": "2026-09-14T16:19:34.539150+00:00",
-      "architecture": "independent statistical + market benchmark + calibration + value",
-      "decision": "PAPER ONLY",
-      "behavior_context": {
-        "version": "behavior-profiles-v2",
-        "matched": false,
-        "teams": {},
-        "source": "behavior_profiles.json",
-        "use": "context_only_unvalidated",
-        "probability_adjustment_applied": false
-      },
-      "individual_behavior_context": {
-        "p1": {
-          "sport": "tennis",
-          "name": "Hayu Kinoshita",
-          "observations": 0,
-          "provider_identity": false,
-          "note": "Awaiting provider athlete identity/statistics feed"
-        },
-        "p2": {
-          "sport": "tennis",
-          "name": "Darja Semenistaja",
-          "observations": 0,
-          "provider_identity": false,
-          "note": "Awaiting provider athlete identity/statistics feed"
-        }
-      },
-      "live_eligible": false,
-      "testing_mode": "paper",
-      "evaluation_eligible": true,
-      "capture_status": "PRE_EVENT",
-      "actual_markets": {
-        "total_games": 22.0,
-        "total_games_line": 22.5,
-        "total_games_result": "under",
-        "total_games_correct": false,
-        "sets": 2,
-        "sets_won_p1": 0,
-        "sets_won_p2": 2
-      },
-      "final_score": [
-        9.0,
-        13.0
-      ],
-      "settled": true,
-      "settled_at": "2026-09-16T16:41:53.867985+00:00",
-      "actual": "p2",
-      "correct": false,
-      "brier": 0.564134,
-      "settlement_source": "ESPN tennis/all scoreboard"
-    },
     {
       "sport": "tennis",
       "league": "WTA",
@@ -4827,6 +4724,63 @@
       "correct": false,
       "brier": 0.548523,
       "settlement_source": "ESPN tennis/all scoreboard"
+    },
+    {
+      "sport": "football",
+      "league": "La Liga",
+      "event_id": "401882871",
+      "start_time": "2026-09-16T19:30Z",
+      "player_1": "Barcelona",
+      "player_2": "Racing Santander",
+      "venue": "Spotify Camp Nou",
+      "surface": "Grass",
+      "probabilities": {
+        "p1": 0.9374,
+        "draw": 0.0527,
+        "p2": 0.0099
+      },
+      "pick": "p1",
+      "confidence": 0.9374,
+      "expected_goals": {
+        "p1": 4.34,
+        "p2": 0.77,
+        "total": 5.1
+      },
+      "markets": {
+        "over_under": {
+          "line": 4.5,
+          "over": 0.5776,
+          "under": 0.4224,
+          "pick": "over",
+          "source": "market O/U calibrated"
+        },
+        "btts": {
+          "yes": 0.528,
+          "no": 0.472,
+          "pick": "yes",
+          "source": "Poisson xG model"
+        }
+      },
+      "handicap": {
+        "line": -3.5,
+        "home_cover": 0.4858,
+        "away_cover": 0.5142
+      },
+      "model": "ESPN market + form + home edge",
+      "calculated_at": "2026-09-16T10:55:39.368830+00:00",
+      "actual_markets": {
+        "over_under": "over",
+        "btts": "yes"
+      },
+      "final_score": [
+        7,
+        2
+      ],
+      "settled": true,
+      "settled_at": "2026-09-16T23:02:53.713323+00:00",
+      "actual": "p1",
+      "correct": true,
+      "brier": 0.006794
     }
   ]
 }
