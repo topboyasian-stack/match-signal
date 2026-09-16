@@ -11,7 +11,7 @@ from pathlib import Path
 import requests
 ROOT=Path(__file__).resolve().parents[1]; DATA=ROOT/"data"; CANDIDATES=DATA/"selection_candidates.json"; PREDICTIONS=DATA/"predictions.json"; OUTPUT=DATA/"odds_builder.json"
 SPORTY_BASE="https://www.sportybet.com"; SPORTY_REGION="ng"; MIN_LEGS=3; MAX_LEGS=4; MIN_MODEL_PROB=0.65; MIN_EDGE=0.03; TENNIS_MIN_PROB=0.65
-SESSION=requests.Session(); SESSION.headers.update({"Accept":"application/json","Content-Type":"application/json","Current-Country":"NG","User-Agent":"MatchSignal/odds-builder"})
+SESSION=requests.Session(); SESSION.headers.update({"Accept":"application/json,text/plain,*/*","Content-Type":"application/json","Current-Country":"NG","User-Agent":"Mozilla/5.0 (compatible; MatchSignal/1.0; +https://match-signal.pages.dev)"})
 
 def load(path, default):
     try: return json.loads(path.read_text(encoding="utf-8"))
@@ -29,14 +29,35 @@ def similarity(a,b):
     if a in b or b in a:return 0.94
     return difflib.SequenceMatcher(None,a,b).ratio()
 
-def sportyevents(sport_id,market_ids):
+def sporty_response_json(response, label):
+    content_type=(response.headers.get("content-type") or "").lower()
+    text=response.text or ""
+    diagnostic={"http_status":response.status_code,"content_type":content_type,"body_prefix":re.sub(r"\s+"," ",text[:500])}
+    if not text.strip(): raise RuntimeError(f"{label}: EMPTY_RESPONSE {json.dumps(diagnostic,ensure_ascii=False)}")
+    try: return response.json()
+    except ValueError as exc:
+        if "text/html" in content_type or re.search(r"<html|<!doctype",text[:300],re.I): kind="HTML_OR_CHALLENGE"
+        elif response.status_code in (401,403,429): kind=f"HTTP_ACCESS_{response.status_code}"
+        else: kind="NON_JSON_RESPONSE"
+        raise RuntimeError(f"{label}: {kind} {json.dumps(diagnostic,ensure_ascii=False)}") from exc
+
+def sportyevents(sport_id,market_ids,label):
     url=f"{SPORTY_BASE}/api/{SPORTY_REGION}/factsCenter/pcUpcomingEvents"
     params={"sportId":sport_id,"marketId":",".join(market_ids),"pageSize":100,"pageNum":1,"todayGames":"false","timeline":168,"_t":int(datetime.now(timezone.utc).timestamp()*1000)}
-    r=SESSION.get(url,params=params,timeout=30); r.raise_for_status(); body=r.json()
-    if body.get("bizCode") not in (None,10000): raise RuntimeError(f"SportyBet returned bizCode={body.get('bizCode')}")
+    r=SESSION.get(url,params=params,timeout=30)
+    if r.status_code in (401,403,429): raise RuntimeError(f"{label}: HTTP_ACCESS_{r.status_code} url={url} content_type={r.headers.get('content-type','')} body={re.sub(r'\s+',' ',(r.text or '')[:300])}")
+    r.raise_for_status(); body=sporty_response_json(r,label)
+    if not isinstance(body,dict): raise RuntimeError(f"{label}: INVALID_JSON_ROOT type={type(body).__name__}")
+    if body.get("bizCode") not in (None,10000): raise RuntimeError(f"{label}: SPORTY_BIZCODE_{body.get('bizCode')} message={body.get('message') or body.get('msg')}")
+    data=body.get("data") or {}
+    tournaments=data.get("tournaments") or data.get("tournamentList") or []
     events=[]
-    for tournament in ((body.get("data") or {}).get("tournaments") or []):
-        for event in tournament.get("events") or []: event["_tournament"]=tournament.get("name"); events.append(event)
+    for tournament in tournaments:
+        if not isinstance(tournament,dict): continue
+        for event in tournament.get("events") or tournament.get("eventList") or []:
+            if isinstance(event,dict): event["_tournament"]=tournament.get("name") or tournament.get("tournamentName"); events.append(event)
+    if not events:
+        raise RuntimeError(f"{label}: VALID_RESPONSE_BUT_NO_EVENTS schema_keys={sorted(data.keys()) if isinstance(data,dict) else []}")
     return events
 
 def match_candidate(candidate,events):
@@ -73,7 +94,7 @@ def main():
     tennis=tennis_candidates(); tennis.sort(key=lambda x:float(x.get("builder_probability",0) or 0),reverse=True)
     result={"generated_at":datetime.now(timezone.utc).isoformat(),"mode":"PAPER_ONLY","target_legs":"3-4","sports_supported":["football","tennis"],"selection_policy":{"min_model_probability":MIN_MODEL_PROB,"min_model_edge_vs_sporty_implied":MIN_EDGE,"tennis_min_probability":TENNIS_MIN_PROB,"requires_upstream_selection_gate_for_football":True,"tennis_source":"existing predictions.json paper analytics","public_prediction_feed_unchanged":True},"sportybet":{"status":"NOT_RUN","booking_code":None,"share_url":None,"legs":[],"expires_at":None},"stake":{"status":"MANUAL_SHARE_INTERFACE_REQUIRED","booking_url":None,"booking_code":None},"candidates_considered":{"football":len(football),"tennis":len(tennis)},"qualified_legs":[],"notes":["Football selections must come from the existing research gate.","Tennis selections use existing paper predictions only and require a probability of at least 0.65 for either match winner or a published total-games O/U market.","No slip is generated unless 3-4 selections also match live SportyBet markets with the required edge/probability checks.","Stake automatic betslip creation remains disabled until a stable supported share interface is verified."]}
     legs=[]
-    try: football_events=sportyevents("sr:sport:1",["1"])
+    try: football_events=sportyevents("sr:sport:1",["1"],"FOOTBALL_SOURCE")
     except Exception as exc: football_events=[]; result["sportybet"]["football_source_error"]=str(exc)
     for candidate in football:
         if len(legs)>=MAX_LEGS: break
@@ -86,7 +107,7 @@ def main():
         if model_prob<MIN_MODEL_PROB or edge<MIN_EDGE: continue
         legs.append({"sport":"football","league":candidate.get("league"),"event_id":candidate.get("event_id"),"sporty_event_id":str(event.get("eventId")),"home":event.get("homeTeamName"),"away":event.get("awayTeamName"),"market":"1X2","pick":candidate.get("pick"),"selection":outcomes[outcome_id].get("desc"),"model_probability":round(model_prob,6),"sporty_odds":odds,"implied_probability":round(implied,6),"edge":round(edge,6),"market_id":str(market.get("id")),"outcome_id":str(outcomes[outcome_id].get("id")),"specifier":market.get("specifier")})
     if len(legs)<MAX_LEGS:
-        try: tennis_events=sportyevents("sr:sport:5",["186","189"])
+        try: tennis_events=sportyevents("sr:sport:5",["186","189"],"TENNIS_SOURCE")
         except Exception as exc: tennis_events=[]; result["sportybet"]["tennis_source_error"]=str(exc)
         for candidate in tennis:
             if len(legs)>=MAX_LEGS: break
@@ -111,7 +132,7 @@ def main():
         result["sportybet"]["status"]="QUALIFIED_BETSLIP"; result["sportybet"]["combined_odds"]=round(math.prod(x["sporty_odds"] for x in legs),4)
         payload={"selections":[{"eventId":x["sporty_event_id"],"marketId":x["market_id"],"specifier":x.get("specifier"),"outcomeId":x["outcome_id"]} for x in legs]}
         try:
-            response=SESSION.post(f"{SPORTY_BASE}/api/{SPORTY_REGION}/orders/share",json=payload,timeout=30); response.raise_for_status(); data=response.json().get("data") or {}; unavailable=data.get("unavailableOutcomes") or []
+            response=SESSION.post(f"{SPORTY_BASE}/api/{SPORTY_REGION}/orders/share",json=payload,timeout=30); response.raise_for_status(); data=sporty_response_json(response,"BOOKING_ENDPOINT").get("data") or {}; unavailable=data.get("unavailableOutcomes") or []
             if unavailable: result["sportybet"]["status"]="BOOKING_PARTIAL_OR_UNAVAILABLE"; result["sportybet"]["unavailable_outcomes"]=unavailable
             else: result["sportybet"]["booking_code"]=data.get("shareCode"); result["sportybet"]["share_url"]=data.get("shareURL"); result["sportybet"]["expires_at"]=data.get("deadline")
         except Exception as exc: result["sportybet"]["status"]="BOOKING_ENDPOINT_ERROR"; result["sportybet"]["error"]=str(exc)
