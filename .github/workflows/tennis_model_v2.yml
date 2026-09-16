@@ -1,6 +1,12 @@
 name: Match Signal Tennis Model V2
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/tennis_model_v2.py'
+      - '.github/workflows/tennis_model_v2.yml'
+      - 'data/tennis_prediction_archive.json'
   workflow_run:
     workflows: ["Match Signal Live Prediction Pipeline"]
     types: [completed]
@@ -15,7 +21,7 @@ concurrency:
 
 jobs:
   improve-tennis-model:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'push' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
