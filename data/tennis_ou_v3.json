@@ -1,19 +1,20 @@
 {
-  "updated_at": "2026-09-16T17:22:41.689148+00:00",
-  "version": "2026-09-16-tennis-ou-v3-nonflat",
+  "updated_at": "2026-09-16T17:41:11.622748+00:00",
+  "version": "2026-09-16-tennis-ou-v4-fixture-specific",
   "status": "PAPER_RESEARCH_ONLY",
   "training_records": 157,
-  "global_over_rate": 0.3533,
+  "global_over_rate": 0.3515,
   "current_predictions_rewritten": 27,
-  "min_current_over": 0.2911,
-  "max_current_over": 0.4487,
+  "min_current_over": 0.2857,
+  "max_current_over": 0.4689,
   "unique_current_over_probabilities": 3,
-  "empirical_weight": 0.35,
+  "empirical_weight": 0.2,
   "guardrails": [
     "No future results are used for a fixture before its start time.",
     "Late-captured records are excluded from calibration training.",
-    "The continuous upstream model remains the primary O/U signal.",
-    "Empirical calibration cannot flatten the entire feed into one probability.",
+    "Fixture-specific upstream probability remains primary.",
+    "Calibration is line-aware and requires support before influencing a fixture.",
+    "No global fallback is applied to individual fixtures.",
     "No bookmaker odds are invented.",
     "Research-only; no live-money execution."
   ]
