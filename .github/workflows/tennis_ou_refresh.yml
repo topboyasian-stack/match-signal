@@ -1,0 +1,63 @@
+name: Match Signal Tennis O/U Calibration Refresh
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'data/predictions.json'
+      - 'data/tennis_prediction_archive.json'
+      - 'scripts/recalibrate_tennis_ou.py'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: match-signal-tennis-ou-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Recalibrate fixture-specific tennis O/U probabilities
+        run: python scripts/recalibrate_tennis_ou.py
+      - name: Validate variation
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          rows = json.loads(Path('data/predictions.json').read_text())
+          vals = []
+          for row in rows:
+              if row.get('sport') != 'tennis':
+                  continue
+              games = (row.get('analytics') or {}).get('total_games') or {}
+              if isinstance(games.get('over'), (int, float)):
+                  vals.append(float(games['over']))
+          distinct = len({round(v, 4) for v in vals})
+          if vals and distinct < 3:
+              raise SystemExit(f'O/U calibration still collapsed: only {distinct} distinct probabilities')
+          print(f'Tennis O/U probabilities: {len(vals)} rows, {distinct} distinct values')
+          PY
+      - name: Commit recalibrated predictions
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/predictions.json data/tennis_ou_calibration.json
+          if git diff --cached --quiet; then
+            echo "No O/U changes."
+            exit 0
+          fi
+          git commit -m "🎾 Refresh fixture-specific tennis O/U probabilities"
+          git push origin main
