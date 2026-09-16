@@ -1,16 +1,16 @@
 """Build a guarded 3-4 leg Match Signal odds slip from qualified candidates.
 
-The builder is an analysis layer only. It never places or stakes a wager.
-SportyBet integration uses the bookmaker's public web endpoints to refresh
-pre-match football markets and, when at least three fully qualified selections
-match live SportyBet markets, requests a SportyBet share/booking code. Stake is
-reported as unsupported for automatic slip creation until a stable supported
-betslip/share interface is verified.
+Analysis layer only: it never places or stakes a wager. SportyBet booking is
+requested only after the upstream research gate has produced 3-4 qualified
+football selections and those selections still match live SportyBet 1X2 odds.
+Stake automatic slip creation remains disabled until a stable supported share
+interface is verified.
 """
 from __future__ import annotations
 
 import difflib
 import json
+import math
 import re
 from datetime import datetime, timezone
 from pathlib import Path
@@ -27,7 +27,6 @@ MIN_LEGS = 3
 MAX_LEGS = 4
 MIN_MODEL_PROB = 0.65
 MIN_EDGE = 0.03
-
 SESSION = requests.Session()
 SESSION.headers.update({"Accept": "application/json", "Content-Type": "application/json", "Current-Country": "NG", "User-Agent": "MatchSignal/odds-builder"})
 
@@ -40,16 +39,9 @@ def load(path, default):
 
 
 def norm(value):
-    s = str(value or "").lower()
-    s = s.replace("&", " and ")
-    s = re.sub(r"[^a-z0-9]+", " ", s)
-    aliases = {
-        "man utd": "manchester united", "man united": "manchester united",
-        "man city": "manchester city", "psv eindhoven": "psv",
-        "sporting lisbon": "sporting cp", "atletico madrid": "atletico madrid",
-        "internazionale": "inter milan", "inter": "inter milan",
-    }
-    return aliases.get(s.strip(), s.strip())
+    s = re.sub(r"[^a-z0-9]+", " ", str(value or "").lower().replace("&", " and ")).strip()
+    aliases = {"man utd": "manchester united", "man united": "manchester united", "man city": "manchester city", "psv eindhoven": "psv", "sporting lisbon": "sporting cp", "internazionale": "inter milan", "inter": "inter milan"}
+    return aliases.get(s, s)
 
 
 def similarity(a, b):
@@ -66,83 +58,39 @@ def similarity(a, b):
 def sportyevents():
     url = f"{SPORTY_BASE}/api/{SPORTY_REGION}/factsCenter/pcUpcomingEvents"
     params = {"sportId": "sr:sport:1", "marketId": "1", "pageSize": 100, "pageNum": 1, "todayGames": "false", "timeline": 168, "_t": int(datetime.now(timezone.utc).timestamp() * 1000)}
-    r = SESSION.get(url, params=params, timeout=30)
-    r.raise_for_status()
-    body = r.json()
+    response = SESSION.get(url, params=params, timeout=30)
+    response.raise_for_status()
+    body = response.json()
     if body.get("bizCode") not in (None, 10000):
         raise RuntimeError(f"SportyBet returned bizCode={body.get('bizCode')}")
-    tournaments = ((body.get("data") or {}).get("tournaments") or [])
     events = []
-    for tournament in tournaments:
+    for tournament in ((body.get("data") or {}).get("tournaments") or []):
         for event in tournament.get("events") or []:
             event["_tournament"] = tournament.get("name")
-            event["_category"] = tournament.get("categoryName")
             events.append(event)
     return events
 
 
-def one_x_two(event):
-    for market in event.get("markets") or []:
-        if str(market.get("id")) != "1":
-            continue
-        out = {str(x.get("id")): x for x in market.get("outcomes") or [] if x.get("isActive", True)}
-        return market, out
-    return None, {}
-
-
 def match_candidate(candidate, events):
-    best = None
-    best_score = 0.0
+    best, best_score = None, 0.0
     for event in events:
-        hs = similarity(candidate.get("player_1"), event.get("homeTeamName"))
-        aw = similarity(candidate.get("player_2"), event.get("awayTeamName"))
-        score = (hs + aw) / 2
+        score = (similarity(candidate.get("player_1"), event.get("homeTeamName")) + similarity(candidate.get("player_2"), event.get("awayTeamName"))) / 2
         if score > best_score:
-            best_score, best = score, event
+            best, best_score = event, score
     return best if best_score >= 0.84 else None
 
 
-def selected_outcome(candidate, market, outcomes):
-    pick = candidate.get("pick")
-    outcome_id = {"p1": "1", "draw": "2", "p2": "3"}.get(pick)
-    if not outcome_id or outcome_id not in outcomes:
-        return None
-    outcome = outcomes[outcome_id]
-    odds = float(outcome.get("odds"))
-    model_prob = float((candidate.get("probabilities") or {}).get(pick, candidate.get("confidence", 0)))
-    implied = 1 / odds if odds > 1 else 1.0
-    edge = model_prob - implied
-    if model_prob < MIN_MODEL_PROB or edge < MIN_EDGE:
-        return None
-    return {
-        "sport": "football",
-        "league": candidate.get("league"),
-        "event_id": candidate.get("event_id"),
-        "sporty_event_id": event_id := event_id_value(event=None),
-        "home": candidate.get("player_1"),
-        "away": candidate.get("player_2"),
-        "market": "1X2",
-        "pick": pick,
-        "selection": outcome.get("desc"),
-        "model_probability": round(model_prob, 6),
-        "sporty_odds": odds,
-        "implied_probability": round(implied, 6),
-        "edge": round(edge, 6),
-        "market_id": str(market.get("id")),
-        "outcome_id": str(outcome.get("id")),
-        "specifier": market.get("specifier"),
-    }
-
-
-def event_id_value(event):
-    return str(event.get("eventId")) if event else ""
+def one_x_two(event):
+    for market in event.get("markets") or []:
+        if str(market.get("id")) == "1":
+            return market, {str(x.get("id")): x for x in market.get("outcomes") or [] if x.get("isActive", True)}
+    return None, {}
 
 
 def main():
     candidates = load(CANDIDATES, [])
     if not isinstance(candidates, list):
         candidates = []
-    # The research gate is intentionally upstream. Do not weaken it here.
     candidates = [x for x in candidates if isinstance(x, dict) and x.get("candidate_status") == "SELECTED" and x.get("sport") == "football"]
     candidates.sort(key=lambda x: (float(x.get("confidence", 0)), float((x.get("signal_quality") or {}).get("components", 0))), reverse=True)
 
@@ -180,21 +128,20 @@ def main():
         market, outcomes = one_x_two(event)
         if not market:
             continue
-        pick = candidate.get("pick")
-        outcome_id = {"p1": "1", "draw": "2", "p2": "3"}.get(pick)
+        outcome_id = {"p1": "1", "draw": "2", "p2": "3"}.get(candidate.get("pick"))
         if outcome_id not in outcomes:
             continue
         outcome = outcomes[outcome_id]
         try:
             odds = float(outcome.get("odds"))
-            model_prob = float((candidate.get("probabilities") or {}).get(pick, candidate.get("confidence", 0)))
+            model_prob = float((candidate.get("probabilities") or {}).get(candidate.get("pick"), candidate.get("confidence", 0)))
         except (TypeError, ValueError):
             continue
         implied = 1 / odds if odds > 1 else 1.0
         edge = model_prob - implied
         if model_prob < MIN_MODEL_PROB or edge < MIN_EDGE:
             continue
-        legs.append({"sport": "football", "league": candidate.get("league"), "event_id": candidate.get("event_id"), "sporty_event_id": event_id_value(event), "home": event.get("homeTeamName"), "away": event.get("awayTeamName"), "market": "1X2", "pick": pick, "selection": outcome.get("desc"), "model_probability": round(model_prob, 6), "sporty_odds": odds, "implied_probability": round(implied, 6), "edge": round(edge, 6), "market_id": str(market.get("id")), "outcome_id": str(outcome.get("id")), "specifier": market.get("specifier")})
+        legs.append({"sport": "football", "league": candidate.get("league"), "event_id": candidate.get("event_id"), "sporty_event_id": str(event.get("eventId")), "home": event.get("homeTeamName"), "away": event.get("awayTeamName"), "market": "1X2", "pick": candidate.get("pick"), "selection": outcome.get("desc"), "model_probability": round(model_prob, 6), "sporty_odds": odds, "implied_probability": round(implied, 6), "edge": round(edge, 6), "market_id": str(market.get("id")), "outcome_id": str(outcome.get("id")), "specifier": market.get("specifier")})
         if len(legs) >= MAX_LEGS:
             break
 
@@ -204,13 +151,12 @@ def main():
         result["sportybet"]["status"] = "FEWER_THAN_3_LIVE_MATCHES"
     else:
         result["sportybet"]["status"] = "QUALIFIED_BETSLIP"
-        result["sportybet"]["combined_odds"] = round(__import__("math").prod(x["sporty_odds"] for x in legs), 4)
+        result["sportybet"]["combined_odds"] = round(math.prod(x["sporty_odds"] for x in legs), 4)
         payload = {"selections": [{"eventId": x["sporty_event_id"], "marketId": x["market_id"], "specifier": x["specifier"], "outcomeId": x["outcome_id"]} for x in legs]}
         try:
             response = SESSION.post(f"{SPORTY_BASE}/api/{SPORTY_REGION}/orders/share", json=payload, timeout=30)
             response.raise_for_status()
-            body = response.json()
-            data = body.get("data") or {}
+            data = (response.json().get("data") or {})
             unavailable = data.get("unavailableOutcomes") or []
             if unavailable:
                 result["sportybet"]["status"] = "BOOKING_PARTIAL_OR_UNAVAILABLE"
