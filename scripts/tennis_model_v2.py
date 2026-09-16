@@ -3,6 +3,8 @@ import math
 from datetime import datetime, timezone
 from pathlib import Path
 
+import requests
+
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
 PREDICTIONS_PATH = DATA / "predictions.json"
@@ -14,6 +16,7 @@ INITIAL_ELO = 1500.0
 K_FACTOR = 24.0
 MIN_TRAIN = 30
 RECENT_WINDOW = 80
+RANKINGS_URL = "https://site.web.api.espn.com/apis/site/v2/sports/tennis/{tour}/rankings?region=us&lang=en"
 
 
 def parse_dt(value):
@@ -29,8 +32,42 @@ def clamp(p, low=0.02, high=0.98):
     return max(low, min(high, float(p)))
 
 
+def norm_name(value):
+    return " ".join(str(value or "").lower().replace("-", " ").split())
+
+
 def elo_prob(a, b):
     return 1.0 / (1.0 + 10.0 ** ((b - a) / 400.0))
+
+
+def rank_prob(rank1, rank2):
+    if not rank1 or not rank2:
+        return None
+    edge = math.log((float(rank2) + 4.0) / (float(rank1) + 4.0))
+    return clamp(1.0 / (1.0 + math.exp(-1.35 * edge)))
+
+
+def fetch_current_rankings():
+    result = {}
+    coverage = {}
+    for tour in ("atp", "wta"):
+        try:
+            response = requests.get(RANKINGS_URL.format(tour=tour), timeout=30, headers={"User-Agent": "MatchSignal/4.0"})
+            response.raise_for_status()
+            payload = response.json()
+            ranks = (payload.get("rankings") or [{}])[0].get("ranks") or []
+            count = 0
+            for item in ranks:
+                athlete = item.get("athlete") or {}
+                name = norm_name(athlete.get("displayName") or item.get("displayName") or athlete.get("fullName"))
+                current = item.get("current") or item.get("rank")
+                if name and current:
+                    result[name] = int(current)
+                    count += 1
+            coverage[tour.upper()] = count
+        except Exception as exc:
+            coverage[tour.upper()] = f"error:{type(exc).__name__}"
+    return result, coverage
 
 
 def outcome_from_record(row):
@@ -49,8 +86,8 @@ def valid_record(row):
         return False
     if outcome_from_record(row) is None:
         return False
-    p1 = str(row.get("player_1") or "").strip().lower()
-    p2 = str(row.get("player_2") or "").strip().lower()
+    p1 = norm_name(row.get("player_1"))
+    p2 = norm_name(row.get("player_2"))
     if p1 in {"", "player 1", "tbd", "tba"} or p2 in {"", "player 2", "tbd", "tba"}:
         return False
     return True
@@ -138,8 +175,9 @@ def build_ou_empirical(records):
     return {"bins": bins, "over_rates": rates}
 
 
-def apply_model(predictions, ratings, elo_weight, ou_model):
+def apply_model(predictions, ratings, elo_weight, ou_model, current_rankings):
     changed = 0
+    ranking_enriched = 0
     for row in predictions:
         if row.get("sport") != "tennis":
             continue
@@ -149,23 +187,40 @@ def apply_model(predictions, ratings, elo_weight, ou_model):
         ep = elo_prob(r1, r2)
         probs = row.get("probabilities") or {}
         base = clamp(float(probs.get("p1", 0.5)))
+
+        names = [norm_name(p1), norm_name(p2)]
+        rank1 = current_rankings.get(names[0])
+        rank2 = current_rankings.get(names[1])
+        rp = rank_prob(rank1, rank2)
         has_history = p1 in ratings or p2 in ratings
-        if has_history:
+
+        if rp is not None and has_history:
+            updated = clamp(0.50 * base + 0.30 * ep + 0.20 * rp)
+            ranking_enriched += 1
+        elif has_history:
             updated = clamp((1.0 - elo_weight) * base + elo_weight * ep)
+        elif rp is not None:
+            updated = clamp(0.70 * base + 0.30 * rp)
+            ranking_enriched += 1
         else:
             updated = base
+
         row.setdefault("probabilities", {})["p1"] = round(updated, 4)
         row["probabilities"]["p2"] = round(1.0 - updated, 4)
         row["pick"] = "p1" if updated >= 0.5 else "p2"
         row["confidence"] = round(max(updated, 1.0 - updated), 4)
+        row["rankings"] = {"p1": rank1, "p2": rank2, "gap": (rank2 - rank1) if rank1 and rank2 else None}
         row["analytics"] = row.get("analytics") or {}
         row["analytics"]["elo"] = {"p1": round(r1, 1), "p2": round(r2, 1), "p1_win_prob": round(ep, 4), "weight": elo_weight}
+        if rp is not None:
+            row["analytics"]["ranking_probability"] = round(rp, 4)
         quality = row.get("signal_quality") or {}
         quality["elo_available"] = has_history
         quality["elo_gap"] = round(r1 - r2, 1) if has_history else None
-        quality["components"] = max(int(quality.get("components") or 0), 1 + int(has_history))
+        quality["ranking_available"] = rp is not None
+        quality["components"] = max(int(quality.get("components") or 0), 1 + int(has_history) + int(rp is not None))
         row["signal_quality"] = quality
-        row["model"] = "ESPN + ranking/form base + walk-forward player Elo"
+        row["model"] = "ESPN + ranking/form base + walk-forward player Elo + current ATP/WTA rank"
         row["model_version"] = V2_VERSION
         changed += 1
 
@@ -181,7 +236,7 @@ def apply_model(predictions, ratings, elo_weight, ou_model):
             total["source"] = "empirical settled-tennis calibration"
             total["calibration_status"] = "PAPER_RESEARCH"
             row["analytics"]["total_games"] = total
-    return changed
+    return changed, ranking_enriched
 
 
 def main():
@@ -192,7 +247,8 @@ def main():
     elo_weight, selection = choose_elo_weight(records)
     ratings = build_current_ratings(records)
     ou_model = build_ou_empirical(records)
-    changed = apply_model(predictions, ratings, elo_weight, ou_model)
+    current_rankings, ranking_coverage = fetch_current_rankings()
+    changed, ranking_enriched = apply_model(predictions, ratings, elo_weight, ou_model, current_rankings)
     PREDICTIONS_PATH.write_text(json.dumps(predictions, indent=2, ensure_ascii=False) + "\n")
     report = {
         "updated_at": datetime.now(timezone.utc).isoformat(),
@@ -202,12 +258,15 @@ def main():
         "elo_weight": elo_weight,
         "weight_selection": selection,
         "players_in_elo": len(ratings),
+        "ranking_coverage": ranking_coverage,
+        "current_predictions_with_rank_enrichment": ranking_enriched,
         "ou_calibration": ou_model,
         "current_tennis_predictions_rewritten": changed,
         "guardrails": [
             "No future results are used for a fixture before its start time.",
             "Late-captured predictions are excluded from walk-forward model evaluation.",
-            "Unseen players retain the existing model probability.",
+            "Unseen players retain the existing model probability unless a current official ESPN rank is available.",
+            "Current rankings are used only for future fixtures and are not used to score the historical walk-forward test.",
             "O/U calibration is research-only and remains separate from live-money execution."
         ]
     }
