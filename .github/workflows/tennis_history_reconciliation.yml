@@ -1,6 +1,11 @@
 name: Match Signal Tennis History Reconciliation
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/reconcile_tennis_history.py'
+      - '.github/workflows/tennis_history_reconciliation.yml'
   workflow_run:
     workflows: ["Match Signal Live Prediction Pipeline"]
     types: [completed]
