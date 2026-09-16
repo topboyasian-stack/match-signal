@@ -3,6 +3,9 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '17 */6 * * *'
+  workflow_run:
+    workflows: ['Match Signal Live Prediction Pipeline']
+    types: [completed]
   push:
     paths:
       - 'scripts/build_monetization_ledger.py'
@@ -18,11 +21,13 @@ concurrency:
   cancel-in-progress: false
 jobs:
   build:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout main
         uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 0
       - name: Set up Python
         uses: actions/setup-python@v5
