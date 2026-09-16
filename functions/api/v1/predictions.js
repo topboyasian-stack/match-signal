@@ -1,9 +1,4 @@
-import {requireApiKey,assetJson,ok} from './_lib.js';
-export async function onRequestGet(context){
-  const denied=await requireApiKey(context); if(denied)return denied;
-  const data=await assetJson(context,'/data/predictions.json');
-  if(!data)return new Response(JSON.stringify({error:'DATA_UNAVAILABLE'}),{status:503,headers:{'Content-Type':'application/json'}});
-  const url=new URL(context.request.url), sport=url.searchParams.get('sport');
-  const rows=(Array.isArray(data)?data:[]).filter(x=>!sport||String(x.sport).toLowerCase()===sport.toLowerCase());
-  return ok({version:'match-signal-api-v1',updated_at:new Date().toISOString(),count:rows.length,sport:sport||'all',predictions:rows});
-}
+function headers(){return {'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','Access-Control-Allow-Origin':'*'}}
+async function auth(context){const expected=context.env.MATCH_SIGNAL_API_KEY;const supplied=context.request.headers.get('authorization')||'';if(!expected)return new Response(JSON.stringify({error:'API_NOT_CONFIGURED'}),{status:503,headers:headers()});if(supplied!==`Bearer ${expected}`)return new Response(JSON.stringify({error:'UNAUTHORIZED'}),{status:401,headers:headers()});return null}
+async function assetJson(context,path){const u=new URL(context.request.url);u.pathname=path;const r=await context.env.ASSETS.fetch(u);return r.ok?r.json():null}
+export async function onRequestGet(context){const denied=await auth(context);if(denied)return denied;const data=await assetJson(context,'/data/predictions.json');if(!data)return new Response(JSON.stringify({error:'DATA_UNAVAILABLE'}),{status:503,headers:headers()});const url=new URL(context.request.url),sport=url.searchParams.get('sport');const rows=(Array.isArray(data)?data:[]).filter(x=>!sport||String(x.sport).toLowerCase()===sport.toLowerCase());return new Response(JSON.stringify({version:'match-signal-api-v1',updated_at:new Date().toISOString(),count:rows.length,sport:sport||'all',predictions:rows}),{headers:headers()})}
