@@ -9,7 +9,7 @@
 
   function pct(v) {
     var n = Number(v);
-    return isFinite(n) ? Math.round(n * 100) + '%' : '—';
+    return isFinite(n) ? (n * 100).toFixed(1) + '%' : '—';
   }
 
   function num(v) {
@@ -32,37 +32,22 @@
   function render(rows) {
     var existing = document.getElementById('tennisOuRoadmap');
     if (existing) existing.remove();
-
-    var tennis = (Array.isArray(rows) ? rows : []).filter(function (x) {
-      return x && x.sport === 'tennis';
-    });
-
+    var tennis = (Array.isArray(rows) ? rows : []).filter(function (x) { return x && x.sport === 'tennis'; });
     var section = document.createElement('section');
     section.id = 'tennisOuRoadmap';
     section.className = 'panel';
     section.innerHTML = '<b>🎾 Tennis O/U roadmap</b>' +
-      '<div class="sub">Private roadmap view only. The public Tennis page is unchanged. These are the model-generated total-games markets already present in the tennis prediction feed.</div>' +
+      '<div class="sub">Private roadmap view only. The public Tennis page is unchanged. Probabilities are shown to one decimal place so fixture-level differences are visible.</div>' +
       '<div id="tennisOuGrid" class="grid" style="margin-top:12px"></div>';
-
     var groups = document.getElementById('groups');
     var host = groups && groups.parentElement;
     if (!host) return;
     host.insertBefore(section, groups);
-
     var grid = document.getElementById('tennisOuGrid');
-    var withOu = tennis.filter(function (x) {
-      return x.analytics && x.analytics.total_games && x.analytics.total_games.line != null;
-    });
-
-    if (!withOu.length) {
-      grid.innerHTML = '<div class="empty">No tennis total-games O/U markets are currently published.</div>';
-      return;
-    }
-
+    var withOu = tennis.filter(function (x) { return x.analytics && x.analytics.total_games && x.analytics.total_games.line != null; });
+    if (!withOu.length) { grid.innerHTML = '<div class="empty">No tennis total-games O/U markets are currently published.</div>'; return; }
     grid.innerHTML = withOu.map(function (x) {
-      var a = x.analytics || {};
-      var ou = a.total_games || {};
-      var gh = a.games_handicap || {};
+      var a = x.analytics || {}, ou = a.total_games || {}, gh = a.games_handicap || {};
       var expectedGames = a.expected_games != null ? a.expected_games : (a.total_games_expected != null ? a.total_games_expected : null);
       var pick = ou.pick ? String(ou.pick).toUpperCase() : '—';
       return '<article class="card">' +
@@ -83,22 +68,14 @@
 
   function refresh() {
     getPredictions().then(render).catch(function (e) {
-      var old = document.getElementById('tennisOuRoadmap');
-      if (old) old.remove();
-      var groups = document.getElementById('groups');
-      if (!groups || !groups.parentElement) return;
-      var section = document.createElement('section');
-      section.id = 'tennisOuRoadmap';
-      section.className = 'panel';
+      var old = document.getElementById('tennisOuRoadmap'); if (old) old.remove();
+      var groups = document.getElementById('groups'); if (!groups || !groups.parentElement) return;
+      var section = document.createElement('section'); section.id = 'tennisOuRoadmap'; section.className = 'panel';
       section.innerHTML = '<b>🎾 Tennis O/U roadmap</b><div class="sub" style="color:var(--red)">Unable to load tennis O/U data: ' + esc(e.message) + '</div>';
       groups.parentElement.insertBefore(section, groups);
     });
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', refresh);
-  } else {
-    refresh();
-  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', refresh); else refresh();
   window.setInterval(refresh, 60000);
 }());
