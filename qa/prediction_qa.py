@@ -29,11 +29,20 @@ def check(rows,label):
     return issues
 
 def main():
-    fb=load('predictions.json',[]); bb=load('basketball_predictions.json',[]); status=load('pipeline_status.json',{}); risk=load('risk_gate.json',{})
+    fb=load('predictions.json',[]); bb=load('basketball_predictions.json',[]); status=load('pipeline_status.json',{}); risk=load('risk_gate.json',{}); tennis_perf=load('tennis_performance.json',{}); v2=load('tennis_model_v2.json',{})
     issues=check(fb,'football/tennis')+check(bb,'basketball')
     sources=status.get('basketball_sources') or []
     warnings=[f"No accepted events for {s.get('competition','unknown')}" for s in sources if s.get('events',0)==0]
     empirical=risk.get('metrics',{})
+    empirical['tennis_verified']={
+        'settled': tennis_perf.get('settled_tennis_matches',0),
+        'accuracy': tennis_perf.get('match_accuracy'),
+        'ou_decisions': tennis_perf.get('ou_decisions',0),
+        'ou_accuracy': tennis_perf.get('ou_accuracy'),
+        'status': tennis_perf.get('status','PAPER_RESEARCH_ONLY'),
+        'model_v2_walkforward_accuracy': ((v2.get('weight_selection') or {}).get('selected') or {}).get('accuracy'),
+        'model_v2_training_records': v2.get('training_records',0),
+    }
     live_approved=any(v.get('live_eligible') for v in (risk.get('gate') or {}).values())
     score=max(0,100-min(60,len(issues)*5)-min(20,len(warnings)*10))
     report={'generated_at':datetime.now(timezone.utc).isoformat(),'status':'PASS' if not issues else 'FAIL','qa_score':score,'live_trading_approved':bool(live_approved),'testing_mode':risk.get('mode','PAPER_ONLY'),'empirical_metrics':empirical,'prediction_counts':{'football_tennis':len(fb),'basketball':len(bb)},'issues':issues[:100],'warnings':warnings,'checks':{'probabilities_valid':not any('invalid probabilities' in x for x in issues),'confidence_valid':not any('invalid confidence' in x for x in issues),'duplicates_checked':True,'placeholder_names_checked':True,'basketball_source_coverage_checked':True,'empirical_risk_gate_checked':bool(risk)}}
