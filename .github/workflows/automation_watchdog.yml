@@ -1,0 +1,105 @@
+name: Match Signal Automation Watchdog
+
+on:
+  schedule:
+    - cron: '7 */2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: match-signal-automation-watchdog
+  cancel-in-progress: false
+
+jobs:
+  watchdog:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Check freshness and self-heal stale workflows
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, subprocess
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          def load(path):
+              try:
+                  return json.loads(Path(path).read_text())
+              except Exception:
+                  return {}
+
+          now = datetime.now(timezone.utc)
+          pipeline = load('data/pipeline_status.json')
+          odds = load('data/odds_builder.json')
+
+          def age_hours(value):
+              if not value:
+                  return 999.0
+              try:
+                  dt = datetime.fromisoformat(str(value).replace('Z', '+00:00'))
+                  return max(0.0, (now - dt).total_seconds() / 3600)
+              except Exception:
+                  return 999.0
+
+          pipeline_age = age_hours(pipeline.get('updated_at'))
+          odds_age = age_hours(odds.get('generated_at'))
+
+          def active(workflow):
+              p = subprocess.run(
+                  ['gh', 'run', 'list', '--workflow', workflow, '--status', 'in_progress', '--json', 'databaseId', '--limit', '5'],
+                  text=True, capture_output=True
+              )
+              if p.returncode != 0:
+                  print(f'WARN unable to inspect {workflow}: {p.stderr.strip()}')
+                  return False
+              try:
+                  return bool(json.loads(p.stdout))
+              except Exception:
+                  return False
+
+          actions = []
+          if pipeline_age > 4 and not active('tennis_pipeline.yml'):
+              r = subprocess.run(['gh', 'workflow', 'run', 'tennis_pipeline.yml', '--ref', 'main'], text=True, capture_output=True)
+              actions.append({'workflow':'tennis_pipeline.yml','action':'dispatch','status':'requested' if r.returncode == 0 else 'failed','detail':(r.stderr.strip() if r.returncode else 'scheduled self-heal')})
+
+          if odds_age > 8 and not active('odds_builder.yml'):
+              r = subprocess.run(['gh', 'workflow', 'run', 'odds_builder.yml', '--ref', 'main'], text=True, capture_output=True)
+              actions.append({'workflow':'odds_builder.yml','action':'dispatch','status':'requested' if r.returncode == 0 else 'failed','detail':(r.stderr.strip() if r.returncode else 'scheduled self-heal')})
+
+          health = {
+              'updated_at': now.isoformat(),
+              'automation_status': 'SELF_HEALING_ENABLED',
+              'pipeline_last_update': pipeline.get('updated_at'),
+              'pipeline_age_hours': round(pipeline_age, 2),
+              'odds_builder_last_update': odds.get('generated_at'),
+              'odds_builder_age_hours': round(odds_age, 2),
+              'thresholds': {'pipeline_hours': 4, 'odds_builder_hours': 8},
+              'actions': actions,
+              'policy': 'Watchdog dispatches workflow_dispatch only when the corresponding generated artifact is stale and no run is already active.'
+          }
+          Path('data/automation_health.json').write_text(json.dumps(health, indent=2) + '\n')
+          print(json.dumps(health, indent=2))
+          PY
+
+      - name: Commit automation health record
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/automation_health.json
+          if git diff --cached --quiet; then
+            echo "No automation health change."
+            exit 0
+          fi
+          git commit -m "🤖 Update automation watchdog health"
+          git push origin main
