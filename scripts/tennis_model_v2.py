@@ -5,6 +5,7 @@ from pathlib import Path
 
 import requests
 
+# Automated prediction-cycle trigger: keep this model in the scheduled pipeline.
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
 PREDICTIONS_PATH = DATA / "predictions.json"
@@ -170,19 +171,10 @@ def build_current_ratings(records):
 
 
 def build_probability_calibration(items):
-    """Build a conservative out-of-sample confidence calibration map.
-
-    The map is learned only from walk-forward predictions. Sparse bins are
-    ignored, and empirical rates are shrunk toward the model probability.
-    """
     bins = [0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95, 1.001]
     rows = []
     for low, high in zip(bins[:-1], bins[1:]):
-        selected = []
-        for item in items:
-            p = max(item[1], 1.0 - item[1])
-            if low <= p < high:
-                selected.append(item)
+        selected = [item for item in items if low <= max(item[1], 1.0 - item[1]) < high]
         n = len(selected)
         correct = sum(((item[1] >= 0.5) == bool(item[2])) for item in selected)
         if n >= MIN_CALIBRATION_BIN:
@@ -198,8 +190,6 @@ def calibrate_probability(p, calibration):
     confidence = max(p, 1.0 - p)
     for item in calibration:
         if item["low"] <= confidence < item["high"] and item["calibrated_confidence"] is not None:
-            # Keep 60% of the walk-forward-calibrated value and 40% of the
-            # raw probability so small historical samples cannot overreact.
             calibrated_conf = 0.60 * item["calibrated_confidence"] + 0.40 * confidence
             return clamp(calibrated_conf if p >= 0.5 else 1.0 - calibrated_conf)
     return clamp(p)
@@ -225,10 +215,7 @@ def build_precision_gate(items):
         acc = correct / n if n else 0.0
         rows.append({"threshold": threshold, "n": n, "correct": correct, "accuracy": round(acc, 4) if n else None, "wilson_lower_90": round(wilson_lower(correct, n), 4) if n else None})
     eligible = [r for r in rows if r["n"] >= MIN_PRECISION_N]
-    if not eligible:
-        selected = {"threshold": 0.65, "reason": "insufficient_sample"}
-    else:
-        selected = max(eligible, key=lambda r: (r["wilson_lower_90"], r["accuracy"], r["n"]))
+    selected = max(eligible, key=lambda r: (r["wilson_lower_90"], r["accuracy"], r["n"])) if eligible else {"threshold": 0.65, "reason": "insufficient_sample"}
     return {"minimum_sample": MIN_PRECISION_N, "candidates": rows, "selected": selected, "mode": "PAPER_ONLY"}
 
 
@@ -245,13 +232,11 @@ def build_ou_empirical(records):
         bucket = bins[key]
         bucket[0] += 1
         bucket[1] += result == "over"
-    rates = {}
-    for key, (n, over) in bins.items():
-        rates[key] = (over + 2) / (n + 4) if n else 0.5
+    rates = {key: (over + 2) / (n + 4) if n else 0.5 for key, (n, over) in bins.items()}
     return {"bins": bins, "over_rates": rates}
 
 
-def apply_model(predictions, ratings, elo_weight, ou_model, current_rankings, calibration):
+def apply_model(predictions, ratings, elo_weight, current_rankings, calibration):
     changed = 0
     ranking_enriched = 0
     for row in predictions:
@@ -267,7 +252,6 @@ def apply_model(predictions, ratings, elo_weight, ou_model, current_rankings, ca
         rank2 = current_rankings.get(norm_name(p2))
         rp = rank_prob(rank1, rank2)
         has_history = p1 in ratings or p2 in ratings
-
         if rp is not None and has_history:
             raw = clamp(0.50 * base + 0.30 * ep + 0.20 * rp)
             ranking_enriched += 1
@@ -278,7 +262,6 @@ def apply_model(predictions, ratings, elo_weight, ou_model, current_rankings, ca
             ranking_enriched += 1
         else:
             raw = base
-
         updated = calibrate_probability(raw, calibration)
         row.setdefault("probabilities", {})["p1"] = round(updated, 4)
         row["probabilities"]["p2"] = round(1.0 - updated, 4)
@@ -299,7 +282,6 @@ def apply_model(predictions, ratings, elo_weight, ou_model, current_rankings, ca
         row["model"] = "ESPN + ranking/form base + walk-forward player Elo + current ATP/WTA rank + walk-forward probability calibration"
         row["model_version"] = V2_VERSION
         changed += 1
-
         total = row.get("analytics", {}).get("total_games") or {}
         if total.get("line") == 22.5:
             prior = float(total.get("base_model_over", total.get("over", 0.5)) or 0.5)
@@ -313,16 +295,14 @@ def apply_model(predictions, ratings, elo_weight, ou_model, current_rankings, ca
 def main():
     predictions = json.loads(PREDICTIONS_PATH.read_text())
     archive = json.loads(ARCHIVE_PATH.read_text()) if ARCHIVE_PATH.exists() else []
-    records = [r for r in archive if valid_record(r)]
-    records.sort(key=lambda x: parse_dt(x.get("start_time")))
+    records = sorted([r for r in archive if valid_record(r)], key=lambda x: parse_dt(x.get("start_time")))
     elo_weight, selection = choose_elo_weight(records)
     ratings = build_current_ratings(records)
-    ou_model = build_ou_empirical(records)
     current_rankings, ranking_coverage = fetch_current_rankings()
     walkforward_items, _ = build_walkforward(records, elo_weight)
     calibration = build_probability_calibration(walkforward_items)
     precision_gate = build_precision_gate(walkforward_items)
-    changed, ranking_enriched = apply_model(predictions, ratings, elo_weight, ou_model, current_rankings, calibration)
+    changed, ranking_enriched = apply_model(predictions, ratings, elo_weight, current_rankings, calibration)
     PREDICTIONS_PATH.write_text(json.dumps(predictions, indent=2, ensure_ascii=False) + "\n")
     report = {
         "updated_at": datetime.now(timezone.utc).isoformat(),
@@ -336,7 +316,6 @@ def main():
         "current_predictions_with_rank_enrichment": ranking_enriched,
         "walkforward_probability_calibration": calibration,
         "precision_gate": precision_gate,
-        "ou_calibration": ou_model,
         "current_tennis_predictions_rewritten": changed,
         "guardrails": [
             "No future results are used for a fixture before its start time.",
