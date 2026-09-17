@@ -24,7 +24,6 @@ def thesportsdb_current_ere():
         raw_time = (event.get("strTime") or "").strip()
         try:
             if raw_time:
-                # TheSportsDB commonly returns HH:MM:SSZ; normalize to UTC.
                 stamp = f"{raw_date}T{raw_time.replace('Z', '+00:00')}"
                 start = datetime.fromisoformat(stamp)
             else:
@@ -100,5 +99,42 @@ def daywise_current_ere():
             return pipeline.sofascore_fixtures()
 
 
+def safe_ere_prediction(fixture, history):
+    """Correctly map model p1/draw/p2 probabilities to home/draw/away odds keys."""
+    event = {
+        "id": fixture["event_id"],
+        "competitions": [{"competitors": [
+            {"homeAway": "home", "team": {"displayName": fixture["home"]}},
+            {"homeAway": "away", "team": {"displayName": fixture["away"]}},
+        ]}],
+    }
+    p = pipeline.independent_prediction(event, "Eredivisie", history, cutoff=fixture["date"])
+    if not p:
+        return None
+    markets = pipeline.goals_markets(p["xg_home"], p["xg_away"])
+    odds = (fixture.get("markets") or {}).get("odds") or {}
+    probs = {"p1": p["p1"], "draw": p["draw"], "p2": p["p2"]}
+    odds_values = {
+        "home": pipeline.market_value(probs["p1"], odds.get("home")),
+        "draw": pipeline.market_value(probs["draw"], odds.get("draw")),
+        "away": pipeline.market_value(probs["p2"], odds.get("away")),
+    }
+    value_candidates = {k: v for k, v in odds_values.items() if v is not None}
+    best_value = max(value_candidates.items(), key=lambda z: z[1]) if value_candidates else None
+    return {
+        "sport": "football", "league": "Eredivisie", "event_id": fixture["event_id"],
+        "start_time": fixture["date"], "player_1": fixture["home"], "player_2": fixture["away"],
+        "probabilities": probs, "pick": max(probs, key=probs.get),
+        "confidence": round(max(probs.values()), 6),
+        "expected_goals": {"p1": p["xg_home"], "p2": p["xg_away"], "total": round(p["xg_home"] + p["xg_away"], 4)},
+        "markets": markets,
+        "market": {"odds": odds, "value_by_outcome": odds_values, "best_value": best_value},
+        "model": p["method"],
+        "signal_quality": {"effective_sample": p["effective_sample"], "home_sample": p["sample_home"], "away_sample": p["sample_away"], "status": "LIVE_EXPERIMENTAL"},
+        "prediction_status": "live_experimental", "paper_only": False, "live_experimental": True,
+    }
+
+
 pipeline.current_ere = daywise_current_ere
+pipeline.ere_prediction = safe_ere_prediction
 pipeline.main()
