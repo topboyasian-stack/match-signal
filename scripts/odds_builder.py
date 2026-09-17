@@ -10,9 +10,11 @@ import json, math
 from datetime import datetime, timezone
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
-DATA=ROOT/'data'; CANDIDATES=DATA/'selection_candidates.json'; PREDICTIONS=DATA/'predictions.json'; OUTPUT=DATA/'odds_builder.json'
+DATA=ROOT/'data'; CANDIDATES=DATA/'selection_candidates.json'; PREDICTIONS=DATA/'predictions.json'; OUTPUT=DATA/'odds_builder.json'; PRECISION=DATA/'tennis_precision_gate.json'; TENNIS_PERF=DATA/'tennis_performance.json'
 MIN_LEGS,MAX_LEGS=3,4
 MIN_PROB=0.65
+MIN_OU_ACCURACY=0.55
+MIN_OU_DECISIONS=30
 
 def load(path,default):
     try:return json.loads(path.read_text(encoding='utf-8'))
@@ -28,6 +30,19 @@ def upcoming(x, now):
 
 def fair_odds(p):return round(1.0/float(p),3) if float(p)>0 else 0.0
 
+def tennis_match_threshold():
+    payload=load(PRECISION,{})
+    selected=payload.get('selected') if isinstance(payload,dict) else None
+    threshold=selected.get('threshold') if isinstance(selected,dict) else None
+    if not isinstance(threshold,(int,float)):return MIN_PROB
+    return max(MIN_PROB,min(0.85,float(threshold)))
+
+def tennis_ou_validated():
+    payload=load(TENNIS_PERF,{})
+    accuracy=payload.get('ou_accuracy')
+    decisions=payload.get('ou_decisions')
+    return isinstance(accuracy,(int,float)) and isinstance(decisions,(int,float)) and accuracy>=MIN_OU_ACCURACY and decisions>=MIN_OU_DECISIONS
+
 def football_candidates(now):
     raw=load(CANDIDATES,[]); out=[]
     if not isinstance(raw,list):return out
@@ -40,7 +55,7 @@ def football_candidates(now):
     return out
 
 def tennis_candidates(now):
-    raw=load(PREDICTIONS,[]); out=[]
+    raw=load(PREDICTIONS,[]); out=[]; match_threshold=tennis_match_threshold(); ou_validated=tennis_ou_validated()
     if not isinstance(raw,list):return out
     for x in raw:
         if not isinstance(x,dict) or x.get('sport')!='tennis' or not upcoming(x,now):continue
@@ -50,8 +65,8 @@ def tennis_candidates(now):
         total=(x.get('analytics') or {}).get('total_games') or {}; ou_pick=total.get('pick')
         try:ou_prob=float(total.get(ou_pick,0) or 0) if ou_pick else 0.0
         except (TypeError,ValueError):ou_prob=0.0
-        if match_prob>=MIN_PROB:out.append({**x,'builder_market':'winner','builder_probability':match_prob,'builder_pick':pick})
-        elif ou_pick in {'over','under'} and ou_prob>=MIN_PROB and total.get('line') is not None:out.append({**x,'builder_market':'total_games','builder_probability':ou_prob,'builder_pick':ou_pick})
+        if match_prob>=match_threshold:out.append({**x,'builder_market':'winner','builder_probability':match_prob,'builder_pick':pick})
+        elif ou_validated and ou_pick in {'over','under'} and ou_prob>=MIN_PROB and total.get('line') is not None:out.append({**x,'builder_market':'total_games','builder_probability':ou_prob,'builder_pick':ou_pick})
     return out
 
 def make_leg(x):
@@ -67,6 +82,6 @@ def main():
     now=datetime.now(timezone.utc); football=football_candidates(now); tennis=tennis_candidates(now); all_candidates=football+tennis
     all_candidates.sort(key=lambda x:float(x.get('builder_probability',0) or 0),reverse=True)
     selected=[make_leg(x) for x in all_candidates[:MAX_LEGS]]
-    result={'generated_at':now.isoformat(),'mode':'PAPER_ONLY','target_legs':'3-4','sports_supported':['football','tennis'],'selection_policy':{'min_model_probability':MIN_PROB,'requires_existing_research_gate_for_football':True,'requires_paper_probability_threshold_for_tennis':True,'upcoming_fixture_only':True,'public_prediction_feed_unchanged':True},'bookmaker_odds':{'status':'MANUAL_CONFIRMATION_REQUIRED','sportybet_direct_feed':'BLOCKED_FROM_GITHUB_RUNNER','stake_direct_feed':'NOT_CONNECTED','instruction':'Verify each displayed selection and enter the actual current bookmaker odds in your betslip before placing any wager.'},'candidates_considered':{'football':len(football),'tennis':len(tennis)},'qualified_legs':selected,'leg_count':len(selected),'status':'QUALIFIED_ACCUMULATOR' if len(selected)>=MIN_LEGS else 'NO_3_LEG_QUALIFIED_SET','reference_combined_odds':round(math.prod(x['model_fair_odds'] for x in selected),3) if selected else None,'reference_odds_type':'MODEL_FAIR_ODDS_NOT_BOOKMAKER_PRICE','actual_combined_odds':None,'notes':['Booking/share-code generation has been removed.','The user manually builds the accumulator on SportyBet or Stake.','Reference combined odds are the product of 1/model-probability and are NOT a quoted bookmaker price.','Started fixtures are excluded automatically.','No accumulator is forced when fewer than three selections pass the existing research threshold.']}
+    result={'generated_at':now.isoformat(),'mode':'PAPER_ONLY','target_legs':'3-4','sports_supported':['football','tennis'],'selection_policy':{'min_model_probability':MIN_PROB,'tennis_match_threshold':tennis_match_threshold(),'tennis_ou_requires_validated_history':True,'tennis_ou_min_accuracy':MIN_OU_ACCURACY,'tennis_ou_min_decisions':MIN_OU_DECISIONS,'requires_existing_research_gate_for_football':True,'upcoming_fixture_only':True,'public_prediction_feed_unchanged':True},'bookmaker_odds':{'status':'MANUAL_CONFIRMATION_REQUIRED','sportybet_direct_feed':'BLOCKED_FROM_GITHUB_RUNNER','stake_direct_feed':'NOT_CONNECTED','instruction':'Verify each displayed selection and enter the actual current bookmaker odds in your betslip before placing any wager.'},'candidates_considered':{'football':len(football),'tennis':len(tennis)},'qualified_legs':selected,'leg_count':len(selected),'status':'QUALIFIED_ACCUMULATOR' if len(selected)>=MIN_LEGS else 'NO_3_LEG_QUALIFIED_SET','reference_combined_odds':round(math.prod(x['model_fair_odds'] for x in selected),3) if selected else None,'reference_odds_type':'MODEL_FAIR_ODDS_NOT_BOOKMAKER_PRICE','actual_combined_odds':None,'notes':['Booking/share-code generation has been removed.','The user manually builds the accumulator on SportyBet or Stake.','Reference combined odds are the product of 1/model-probability and are NOT a quoted bookmaker price.','Started fixtures are excluded automatically.','Tennis O/U is excluded from the trusted accumulator until its persisted out-of-sample accuracy reaches 55% across at least 30 decisions.','No accumulator is forced when fewer than three selections pass the research gates.']}
     OUTPUT.write_text(json.dumps(result,indent=2,ensure_ascii=False)+'\n',encoding='utf-8'); print(json.dumps(result,indent=2))
 if __name__=='__main__':main()
