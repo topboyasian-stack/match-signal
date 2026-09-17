@@ -37,8 +37,8 @@ def football_data_fixtures():
 
     The season result CSV is intentionally not used for upcoming fixtures:
     Football-Data publishes a separate fixtures feed. This avoids treating a
-    result archive as a future schedule and also avoids the redirect problem
-    seen on the season CSV from the GitHub Actions runner.
+    result archive as a future schedule and avoids the redirect problem seen
+    on the season CSV from the GitHub Actions runner.
     """
     urls = (
         "https://football-data.co.uk/fixtures.csv",
@@ -70,8 +70,6 @@ def football_data_fixtures():
         a = (x.get("AwayTeam") or "").strip()
         if not d or not h or not a:
             continue
-        # The fixture feed is a schedule, so retain only the current/upcoming
-        # window. Use the explicit kick-off time when it is present.
         time_value = (x.get("Time") or "").strip()
         if time_value:
             try:
@@ -97,21 +95,67 @@ def football_data_fixtures():
         }
         rows.append({
             "event_id": f"fd-fixture|N1|{d.isoformat()}|{h}|{a}",
-            "date": d.isoformat(),
-            "home": h,
-            "away": a,
+            "date": d.isoformat(), "home": h, "away": a,
             "markets": {"odds": odds, "source": "football-data.co.uk", "source_url": source_url},
             "source": "football-data.co.uk",
         })
     return sorted(rows, key=lambda z: z["date"])
 
 
+def sofascore_fixtures():
+    """Second current-fixture fallback using SofaScore's public daily schedule."""
+    base = "https://api.sofascore.com/api/v1/sport/football/scheduled-events/{}"
+    rows = []
+    errors = []
+    for i in range(0, 11):
+        day = (NOW + timedelta(days=i)).date().isoformat()
+        try:
+            r = S.get(base.format(day), timeout=45)
+            r.raise_for_status()
+            payload = r.json()
+        except Exception as exc:
+            errors.append(f"{day}: {exc}")
+            continue
+        for e in payload.get("events", []):
+            tournament = e.get("tournament") or {}
+            unique = tournament.get("uniqueTournament") or {}
+            if unique.get("id") != 37 and str(unique.get("slug") or "").lower() != "eredivisie":
+                continue
+            status = (e.get("status") or {}).get("type")
+            if status in {"finished", "canceled", "postponed"}:
+                continue
+            ts = e.get("startTimestamp")
+            if not ts:
+                continue
+            d = datetime.fromtimestamp(float(ts), tz=timezone.utc)
+            if d < NOW - timedelta(hours=6) or d > NOW + timedelta(days=10):
+                continue
+            home = (e.get("homeTeam") or {}).get("name")
+            away = (e.get("awayTeam") or {}).get("name")
+            if not home or not away:
+                continue
+            rows.append({
+                "event_id": f"sofa|{e.get('id')}",
+                "date": d.isoformat(), "home": home, "away": away,
+                "markets": {"odds": {}, "source": "sofascore"},
+                "source": "sofascore",
+            })
+    if not rows:
+        raise RuntimeError("SofaScore Eredivisie fixture fallback returned no rows; " + "; ".join(errors[-3:]))
+    return sorted({r["event_id"]: r for r in rows}.values(), key=lambda z: z["date"])
+
+
 def current_ere():
     try:
         rows = current("Eredivisie")
+        if rows:
+            return rows
     except Exception:
-        rows = []
-    return rows or football_data_fixtures()
+        pass
+    try:
+        return football_data_fixtures()
+    except Exception:
+        return sofascore_fixtures()
 
 
 def poisson_pmf(k, lam):
@@ -162,16 +206,14 @@ def ere_prediction(fixture, history):
     return {
         "sport": "football", "league": "Eredivisie", "event_id": fixture["event_id"],
         "start_time": fixture["date"], "player_1": fixture["home"], "player_2": fixture["away"],
-        "probabilities": probs,
-        "pick": max(probs, key=probs.get),
+        "probabilities": probs, "pick": max(probs, key=probs.get),
         "confidence": round(max(probs.values()), 6),
         "expected_goals": {"p1": p["xg_home"], "p2": p["xg_away"], "total": round(p["xg_home"]+p["xg_away"],4)},
         "markets": markets,
         "market": {"odds": odds, "value_by_outcome": odds_values, "best_value": best_value},
         "model": p["method"],
         "signal_quality": {"effective_sample": p["effective_sample"], "home_sample": p["sample_home"], "away_sample": p["sample_away"], "status": "LIVE_EXPERIMENTAL"},
-        "prediction_status": "live_experimental", "paper_only": False,
-        "live_experimental": True,
+        "prediction_status": "live_experimental", "paper_only": False, "live_experimental": True,
     }
 
 
@@ -181,7 +223,6 @@ def main():
     nba_fixtures = [] if NOW < NBA_START else current("NBA")
     ere_fixtures = current_ere()
 
-    # Preserve the historical research files, but publish current fixtures separately.
     ere_hist_for_model = [{
         "sport": "football", "settled": True,
         "final_score": [r["home_score"], r["away_score"]],
@@ -200,12 +241,10 @@ def main():
                 "start_time": f["date"], "player_1": f["home"], "player_2": f["away"],
                 "probabilities": {"p1": round(probs["home"],6), "p2": round(probs["away"],6)},
                 "pick": "p1" if probs["home"] >= probs["away"] else "p2",
-                "confidence": round(max(probs.values()),6),
-                "expected_score": p["expected_score"], "expected_total": p["expected_total"],
-                "markets": {"moneyline": p["moneyline"]},
+                "confidence": round(max(probs.values()),6), "expected_score": p["expected_score"],
+                "expected_total": p["expected_total"], "markets": {"moneyline": p["moneyline"]},
                 "model": p["model"], "signal_quality": {"status":"LIVE_EXPERIMENTAL"},
-                "prediction_status": "live_experimental", "paper_only": False,
-                "live_experimental": True,
+                "prediction_status": "live_experimental", "paper_only": False, "live_experimental": True,
             })
 
     (DATA/"ere_divisie_history.json").write_text(json.dumps(ere_history, indent=2), encoding="utf-8")
@@ -214,14 +253,13 @@ def main():
     (DATA/"nba_predictions.json").write_text(json.dumps(nba_predictions, indent=2), encoding="utf-8")
 
     status = {
-        "updated_at": NOW.isoformat(), "release_mode": "LIVE_EXPERIMENTAL",
-        "live_trading_approved": False,
+        "updated_at": NOW.isoformat(), "release_mode": "LIVE_EXPERIMENTAL", "live_trading_approved": False,
         "competitions": {
             "NBA": {"historical_events": len(nba_history), "current_fixtures": len(nba_fixtures), "collection_errors": len(nba_errors), "status": "LIVE_EXPERIMENTAL" if nba_predictions else ("PRESEASON_READY" if NOW < NBA_START else "NO_CURRENT_FIXTURES")},
-            "Eredivisie": {"historical_events": len(ere_history), "current_fixtures": len(ere_fixtures), "published_predictions": len(ere_predictions), "collection_errors": len(ere_errors), "status": "LIVE_EXPERIMENTAL" if ere_predictions else "NO_CURRENT_FIXTURES", "fixture_source": "ESPN primary; Football-Data fixtures.csv fallback"},
+            "Eredivisie": {"historical_events": len(ere_history), "current_fixtures": len(ere_fixtures), "published_predictions": len(ere_predictions), "collection_errors": len(ere_errors), "status": "LIVE_EXPERIMENTAL" if ere_predictions else "NO_CURRENT_FIXTURES", "fixture_source": "ESPN primary; Football-Data fixtures.csv; SofaScore daily schedule fallback"},
         },
         "monitoring": {"settlement": "expansion_prediction_history.json", "promotion_rule": "live evidence + calibration + market benchmark; automatic demotion on data failure", "market_data_is_benchmark_only": True},
-        "notes": ["Independent probabilities never consume market probabilities.", "LIVE_EXPERIMENTAL signals are real generated predictions, not guarantees or live-trading approval.", "NBA remains preseason-ready until 2026-10-20, then enters live experimental mode automatically.", "Eredivisie uses the current ESPN scoreboard when available and the Football-Data fixtures feed as a resilient current-fixture fallback."],
+        "notes": ["Independent probabilities never consume market probabilities.", "LIVE_EXPERIMENTAL signals are real generated predictions, not guarantees or live-trading approval.", "NBA remains preseason-ready until 2026-10-20, then enters live experimental mode automatically.", "Eredivisie uses ESPN when available, Football-Data's current fixture feed as the first fallback, and SofaScore's daily schedule as the second fallback."],
     }
     (DATA/"expansion_status.json").write_text(json.dumps(status, indent=2), encoding="utf-8")
     print(json.dumps(status, indent=2))
