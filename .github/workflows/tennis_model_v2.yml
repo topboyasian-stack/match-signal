@@ -6,9 +6,11 @@ on:
     paths:
       - 'scripts/tennis_model_v2.py'
       - 'scripts/tennis_ou_v3.py'
+      - 'scripts/selective_prediction_gate.py'
       - 'scripts/predict_today.py'
       - '.github/workflows/tennis_model_v2.yml'
       - 'data/tennis_prediction_archive.json'
+      - 'data/tennis_performance.json'
   workflow_run:
     workflows: ["Match Signal Live Prediction Pipeline"]
     types: [completed]
@@ -54,10 +56,10 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/predictions.json data/tennis_model_v2.json data/tennis_ou_v3.json data/selection_candidates.json data/selection_gate.json data/prediction_breakdown.json qa/report.json
+          git add data/predictions.json data/tennis_model_v2.json data/tennis_precision_gate.json data/tennis_ou_v3.json data/selection_candidates.json data/selection_gate.json data/prediction_breakdown.json qa/report.json
           if git diff --cached --quiet; then
             echo "No tennis model V2 changes."
             exit 0
           fi
-          git commit -m "🎾 Apply fixture-specific tennis O/U calibration"
+          git commit -m "🎾 Apply walk-forward tennis V2 and precision gate"
           git push origin main
