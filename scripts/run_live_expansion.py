@@ -1,12 +1,52 @@
-"""Run the live expansion pipeline with a resilient daywise ESPN fixture probe.
+"""Run the live expansion pipeline with resilient current-fixture probes.
 
-ESPN soccer scoreboards are queried one UTC date at a time here. The previous
-range query could return an empty/error response on GitHub Actions even though
-the single-day Eredivisie scoreboard is available.
+ESPN soccer scoreboards are queried one UTC date at a time. If the GitHub
+Actions runner cannot reach ESPN, TheSportsDB's free upcoming-league feed is
+used before the older Football-Data/SofaScore fallbacks.
 """
 from datetime import datetime, timedelta, timezone
 
 import live_expansion_pipeline as pipeline
+
+
+def thesportsdb_current_ere():
+    url = "https://www.thesportsdb.com/api/v1/json/3/eventsnextleague.php"
+    response = pipeline.S.get(url, params={"id": 4337}, timeout=45)
+    response.raise_for_status()
+    payload = response.json()
+    rows = []
+    for event in payload.get("events") or []:
+        home = (event.get("strHomeTeam") or "").strip()
+        away = (event.get("strAwayTeam") or "").strip()
+        if not home or not away:
+            continue
+        raw_date = (event.get("dateEvent") or "").strip()
+        raw_time = (event.get("strTime") or "").strip()
+        try:
+            if raw_time:
+                # TheSportsDB commonly returns HH:MM:SSZ; normalize to UTC.
+                stamp = f"{raw_date}T{raw_time.replace('Z', '+00:00')}"
+                start = datetime.fromisoformat(stamp)
+            else:
+                start = datetime.fromisoformat(raw_date).replace(tzinfo=timezone.utc)
+            if start.tzinfo is None:
+                start = start.replace(tzinfo=timezone.utc)
+            start = start.astimezone(timezone.utc)
+        except Exception:
+            continue
+        if start < pipeline.NOW - timedelta(hours=6) or start > pipeline.NOW + timedelta(days=10):
+            continue
+        rows.append({
+            "event_id": f"tsdb|{event.get('idEvent')}",
+            "date": start.isoformat(),
+            "home": home,
+            "away": away,
+            "markets": {"odds": {}, "source": "thesportsdb"},
+            "source": "thesportsdb",
+        })
+    if not rows:
+        raise RuntimeError("TheSportsDB returned no current Eredivisie fixtures")
+    return sorted({r["event_id"]: r for r in rows}.values(), key=lambda z: z["date"])
 
 
 def daywise_current_ere():
@@ -51,11 +91,13 @@ def daywise_current_ere():
     if rows:
         return sorted({r["event_id"]: r for r in rows}.values(), key=lambda z: z["date"])
 
-    # Keep the two existing non-ESPN fallbacks as the last-resort path.
     try:
-        return pipeline.football_data_fixtures()
+        return thesportsdb_current_ere()
     except Exception:
-        return pipeline.sofascore_fixtures()
+        try:
+            return pipeline.football_data_fixtures()
+        except Exception:
+            return pipeline.sofascore_fixtures()
 
 
 pipeline.current_ere = daywise_current_ere
