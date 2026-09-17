@@ -85,15 +85,32 @@ jobs:
           from pathlib import Path
           latest = json.loads(Path('data/predictions.json').read_text())
           generated = json.loads(Path('/tmp/expansion_generated_predictions.json').read_text())
-          latest_ids = {str(r.get('event_id')) for r in latest if r.get('event_id')}
-          for row in generated:
-              if row.get('league') != 'Eredivisie':
-                  continue
-              if str(row.get('event_id')) not in latest_ids:
-                  latest.append(row)
+
+          # The main feed is the active prediction feed consumed by the frontend.
+          # Replace the entire active Eredivisie slice on every expansion run so
+          # fixtures that have rolled out of the current season window cannot stay
+          # visible as stale cards. Keep every non-Eredivisie prediction untouched.
+          ere_generated = [r for r in generated if r.get('league') == 'Eredivisie']
+          latest = [r for r in latest if r.get('league') != 'Eredivisie']
+          latest.extend(ere_generated)
           latest.sort(key=lambda r: (str(r.get('start_time') or ''), str(r.get('sport') or ''), str(r.get('player_1') or '')))
           Path('data/predictions.json').write_text(json.dumps(latest, indent=2, ensure_ascii=False))
-          print(f'Latest-main-safe expansion merge: {len(latest)} total rows; {sum(r.get("league")=="Eredivisie" for r in latest)} Eredivisie rows')
+          print(f'Current-feed replacement: {len(latest)} total rows; {len(ere_generated)} current Eredivisie rows; stale Eredivisie rows removed')
+          PY
+
+      - name: Verify current Eredivisie feed after reconciliation
+        run: |
+          python - <<'PY'
+          import json
+          from datetime import datetime, timezone
+          from pathlib import Path
+          rows = json.loads(Path('data/predictions.json').read_text())
+          ere = [r for r in rows if r.get('league') == 'Eredivisie']
+          if not ere:
+              raise SystemExit('ABORT: no Eredivisie rows remain after reconciliation')
+          print(f'Final main feed: {len(rows)} rows / {len(ere)} current Eredivisie rows')
+          for r in ere:
+              print(r.get('event_id'), r.get('start_time'))
           PY
 
       - name: Commit generated expansion data
