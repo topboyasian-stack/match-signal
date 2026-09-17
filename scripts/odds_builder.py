@@ -4,6 +4,9 @@ Research-only: never places or shares/stakes a wager. The builder selects
 existing Match Signal paper candidates, keeps only fixtures that have not
 started, and calculates model fair odds plus a reference accumulator. Actual
 bookmaker odds are intentionally left for the user to verify manually.
+
+Daily mixed-build trigger marker: football is included whenever qualified;
+tennis fills remaining slots only when it independently passes the gate.
 """
 from __future__ import annotations
 import json, math
