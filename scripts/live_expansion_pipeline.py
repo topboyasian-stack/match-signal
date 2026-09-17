@@ -33,25 +33,61 @@ def dt(v):
 
 
 def football_data_fixtures():
-    """Fallback/current-season Eredivisie fixture source with free odds."""
-    url = "https://www.football-data.co.uk/mmz4281/2627/N1.csv"
-    r = S.get(url, timeout=45)
-    r.raise_for_status()
+    """Fallback/current Eredivisie fixture source with free odds.
+
+    The season result CSV is intentionally not used for upcoming fixtures:
+    Football-Data publishes a separate fixtures feed. This avoids treating a
+    result archive as a future schedule and also avoids the redirect problem
+    seen on the season CSV from the GitHub Actions runner.
+    """
+    urls = (
+        "https://football-data.co.uk/fixtures.csv",
+        "https://www.football-data.co.uk/fixtures.csv",
+        "https://www.football-data.co.uk/matches/resources/fixtures.csv",
+    )
+    last_error = None
+    text = None
+    source_url = None
+    for url in urls:
+        try:
+            r = S.get(url, timeout=45, allow_redirects=False)
+            if r.status_code == 200 and r.text.strip():
+                text = r.text
+                source_url = url
+                break
+            last_error = f"{url}: HTTP {r.status_code}"
+        except Exception as exc:
+            last_error = f"{url}: {exc}"
+    if text is None:
+        raise RuntimeError(f"Football-Data fixtures feed unavailable: {last_error}")
+
     rows = []
-    for x in csv.DictReader(io.StringIO(r.text)):
+    for x in csv.DictReader(io.StringIO(text.lstrip("\ufeff"))):
+        if (x.get("Div") or "").strip().upper() != "N1":
+            continue
         d = dt(x.get("Date"))
         h = (x.get("HomeTeam") or "").strip()
         a = (x.get("AwayTeam") or "").strip()
         if not d or not h or not a:
             continue
+        # The fixture feed is a schedule, so retain only the current/upcoming
+        # window. Use the explicit kick-off time when it is present.
+        time_value = (x.get("Time") or "").strip()
+        if time_value:
+            try:
+                hh, mm = time_value.split(":", 1)
+                d = d.replace(hour=int(hh), minute=int(mm))
+            except Exception:
+                pass
         if d < NOW - timedelta(hours=6) or d > NOW + timedelta(days=10):
             continue
-        # Future rows normally have no final score. Keep them as fixtures.
-        if x.get("FTHG") not in (None, "") or x.get("FTAG") not in (None, ""):
-            continue
+
         def num(k):
-            try: return float(x[k]) if x.get(k) not in (None, "") else None
-            except Exception: return None
+            try:
+                return float(x[k]) if x.get(k) not in (None, "") else None
+            except Exception:
+                return None
+
         odds = {
             "home": num("B365H") or num("AvgH"),
             "draw": num("B365D") or num("AvgD"),
@@ -60,9 +96,11 @@ def football_data_fixtures():
             "under_2_5": num("B365<2.5") or num("Avg<2.5"),
         }
         rows.append({
-            "event_id": f"fd|2627|{d.date()}|{h}|{a}",
-            "date": d.isoformat(), "home": h, "away": a,
-            "markets": {"odds": odds, "source": "football-data.co.uk"},
+            "event_id": f"fd-fixture|N1|{d.isoformat()}|{h}|{a}",
+            "date": d.isoformat(),
+            "home": h,
+            "away": a,
+            "markets": {"odds": odds, "source": "football-data.co.uk", "source_url": source_url},
             "source": "football-data.co.uk",
         })
     return sorted(rows, key=lambda z: z["date"])
@@ -180,10 +218,10 @@ def main():
         "live_trading_approved": False,
         "competitions": {
             "NBA": {"historical_events": len(nba_history), "current_fixtures": len(nba_fixtures), "collection_errors": len(nba_errors), "status": "LIVE_EXPERIMENTAL" if nba_predictions else ("PRESEASON_READY" if NOW < NBA_START else "NO_CURRENT_FIXTURES")},
-            "Eredivisie": {"historical_events": len(ere_history), "current_fixtures": len(ere_fixtures), "published_predictions": len(ere_predictions), "collection_errors": len(ere_errors), "status": "LIVE_EXPERIMENTAL" if ere_predictions else "NO_CURRENT_FIXTURES", "fixture_source": "ESPN primary; Football-Data.co.uk current-season fallback"},
+            "Eredivisie": {"historical_events": len(ere_history), "current_fixtures": len(ere_fixtures), "published_predictions": len(ere_predictions), "collection_errors": len(ere_errors), "status": "LIVE_EXPERIMENTAL" if ere_predictions else "NO_CURRENT_FIXTURES", "fixture_source": "ESPN primary; Football-Data fixtures.csv fallback"},
         },
         "monitoring": {"settlement": "expansion_prediction_history.json", "promotion_rule": "live evidence + calibration + market benchmark; automatic demotion on data failure", "market_data_is_benchmark_only": True},
-        "notes": ["Independent probabilities never consume market probabilities.", "LIVE_EXPERIMENTAL signals are real generated predictions, not guarantees or live-trading approval.", "NBA remains preseason-ready until 2026-10-20, then enters live experimental mode automatically.", "Eredivisie uses current-season fixtures and free current odds when ESPN does not return upcoming fixtures."],
+        "notes": ["Independent probabilities never consume market probabilities.", "LIVE_EXPERIMENTAL signals are real generated predictions, not guarantees or live-trading approval.", "NBA remains preseason-ready until 2026-10-20, then enters live experimental mode automatically.", "Eredivisie uses the current ESPN scoreboard when available and the Football-Data fixtures feed as a resilient current-fixture fallback."],
     }
     (DATA/"expansion_status.json").write_text(json.dumps(status, indent=2), encoding="utf-8")
     print(json.dumps(status, indent=2))
