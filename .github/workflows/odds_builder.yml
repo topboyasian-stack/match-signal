@@ -10,10 +10,15 @@ on:
       - 'expansion-odds-builder.js'
       - '.github/workflows/odds_builder.yml'
   workflow_run:
-    workflows: ["Match Signal Tennis Model V2"]
+    workflows:
+      - "Match Signal Tennis Model V2"
+      - "Match Signal Live Expansion"
+      - "Match Signal Autopilot Refresh"
+      - "Match Signal Post-Pipeline Live Feed Reconcile"
     types: [completed]
   schedule:
-    - cron: '17 */4 * * *'
+    # One automatic build per day at 18:17 UTC / 19:17 Nigeria time.
+    - cron: '17 18 * * *'
   workflow_dispatch:
 
 permissions:
@@ -37,7 +42,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Run manual accumulator builder
+      - name: Run daily mixed accumulator builder
         run: python scripts/odds_builder.py
       - name: Validate accumulator JSON
         run: |
@@ -55,12 +60,15 @@ jobs:
               assert leg.get('sport') in {'football', 'tennis'}
               assert float(leg.get('model_probability', 0)) >= 0.65
               assert float(leg.get('model_fair_odds', 0)) > 1
+          sports = {x.get('sport') for x in data['qualified_legs']}
+          if data.get('candidates_considered', {}).get('football', 0) > 0:
+              assert 'football' in sports or len(data['qualified_legs']) < 3
           if data.get('reference_combined_odds') is not None:
               assert data['reference_combined_odds'] > 1
           print('Accumulator QA:', json.dumps({
               'status': data.get('status'),
               'legs': len(data['qualified_legs']),
-              'sports': sorted({x.get('sport') for x in data['qualified_legs']}),
+              'sports': sorted(sports),
               'candidates': data.get('candidates_considered'),
               'reference_combined_odds': data.get('reference_combined_odds')
           }))
@@ -74,5 +82,5 @@ jobs:
             echo "No accumulator changes."
             exit 0
           fi
-          git commit -m "🤖 Refresh manual accumulator"
+          git commit -m "🤖 Refresh daily mixed accumulator"
           git push origin main
