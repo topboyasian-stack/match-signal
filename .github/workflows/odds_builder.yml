@@ -9,6 +9,9 @@ on:
       - 'scripts/odds_builder.py'
       - 'expansion-odds-builder.js'
       - '.github/workflows/odds_builder.yml'
+  workflow_run:
+    workflows: ["Match Signal Tennis Model V2"]
+    types: [completed]
   schedule:
     - cron: '17 */4 * * *'
   workflow_dispatch:
@@ -22,6 +25,7 @@ concurrency:
 
 jobs:
   build:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
