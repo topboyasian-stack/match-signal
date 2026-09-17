@@ -8,6 +8,7 @@ on:
     branches: [main]
     paths:
       - 'scripts/live_expansion_pipeline.py'
+      - 'scripts/run_live_expansion.py'
       - 'scripts/repair_ere_live.py'
       - 'scripts/eredivisie_source.py'
       - 'scripts/qa_ere_live.py'
@@ -45,7 +46,7 @@ jobs:
           git reset --hard origin/main
 
       - name: Generate live-experimental NBA + Eredivisie signals
-        run: python scripts/live_expansion_pipeline.py
+        run: python scripts/run_live_expansion.py
 
       - name: Repair and publish Eredivisie from resilient current-season sources
         run: python scripts/repair_ere_live.py
