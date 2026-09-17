@@ -8,7 +8,7 @@ on:
       - 'qa/**'
       - '.github/workflows/tennis_pipeline.yml'
   schedule:
-    - cron: '0 */6 * * *'
+    - cron: '7 */4 * * *'
   workflow_dispatch:
 
 permissions:
@@ -16,12 +16,8 @@ permissions:
   pages: write
   id-token: write
 
-concurrency:
-  group: match-signal-pipeline
-  cancel-in-progress: false
-
 env:
-  MATCH_SIGNAL_DEPLOY_REV: "2026-09-14-nba-calibration-tournament"
+  MATCH_SIGNAL_DEPLOY_REV: "2026-09-17-automation-watchdog"
   STAKE_ODDS_API_KEY: ${{ secrets.STAKE_ODDS_API_KEY }}
   ODDSPAPI_API_KEY: ${{ secrets.ODDSPAPI_API_KEY }}
 
@@ -159,9 +155,7 @@ jobs:
           git add data/predictions.json data/prediction_pool.json data/selection_candidates.json data/selection_gate.json data/prediction_history.json data/accuracy.json data/tennis_performance.json data/football_performance.json data/pipeline_status.json data/risk_gate.json data/calibration.json data/football_team_history.json data/basketball_predictions.json data/basketball_history.json data/basketball_accuracy.json data/basketball_provider_cache.json data/behavior_profiles.json data/individual_behavior.json data/behavior_validation.json data/current_performance.json data/v4_paper_ledger.json data/v4_validation.json data/prediction_breakdown.json data/sports_evaluation.json data/nba_history.json data/nba_predictions.json data/ere_divisie_history.json data/ere_divisie_predictions.json data/expansion_status.json data/expansion_validation.json data/expansion_team_form.json data/nba_market_validation.json data/nba_market_matches.json data/nba_model_candidates.json data/nba_calibration_tournament.json qa/report.json
           if git diff --cached --quiet; then
             echo "No generated data or QA changes."
-            echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          git commit -m "🤖 Calibrate NBA candidate probabilities walk-forward"
+          git commit -m "🤖 Refresh scheduled prediction pipeline"
           git push origin main
-          echo "changed=true" >> "$GITHUB_OUTPUT"
