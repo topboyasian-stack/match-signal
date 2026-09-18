@@ -138,12 +138,22 @@ def settle(history):
                 prediction["actual_markets"] = {"over_under": "over" if hs + ass > line else "under", "btts": "yes" if hs > 0 and ass > 0 else "no"}
                 prediction["final_score"] = [int(hs) if hs.is_integer() else hs, int(ass) if ass.is_integer() else ass]
             else:
-                c1, c2 = competitors[0], competitors[1]
+                # Resolve tennis settlement by the corrected public player identities,
+                # never by raw ESPN competitor order.
+                def tennis_name(competitor):
+                    athlete = competitor.get("athlete") or {}
+                    return str(athlete.get("displayName") or competitor.get("displayName") or "").strip().lower()
+                pred_p1 = str(prediction.get("player_1") or "").strip().lower()
+                pred_p2 = str(prediction.get("player_2") or "").strip().lower()
+                c1 = next((c for c in competitors[:2] if tennis_name(c) == pred_p1), competitors[0])
+                c2 = next((c for c in competitors[:2] if tennis_name(c) == pred_p2), competitors[1])
                 lines1 = c1.get("linescores") or []
                 lines2 = c2.get("linescores") or []
                 s1 = sum(float(x.get("value", 0)) for x in lines1)
                 s2 = sum(float(x.get("value", 0)) for x in lines2)
-                actual = "p1" if c1.get("winner") else "p2"
+                winner = next((c for c in competitors[:2] if c.get("winner")), None)
+                winner_name = tennis_name(winner) if winner else ""
+                actual = "p1" if winner_name == pred_p1 else "p2" if winner_name == pred_p2 else ("p1" if c1.get("winner") else "p2")
                 total_games = s1 + s2
                 ou = tennis_total_games_prediction(prediction)
                 line = float(ou.get("line", 22.5))
