@@ -142,16 +142,17 @@ def main():
         for label, tour in ns["TENNIS_LEAGUES"].items():
             try:
                 board = fetch_scoreboard("tennis", tour.lower(), f"{today:%Y%m%d}-{end:%Y%m%d}")
-                source_events = {str(e.get("id")) for e in flatten(board) if str(e.get("id"))}
+                raw_events = [e for e in flatten(board) if str(e.get("id"))]
+                source_events = {str(e.get("id")) for e in raw_events if tennis_fixture_quality(e)[0]}
                 feed_events = {str(r.get("event_id")) for r in rows if r.get("league") == label}
                 if source_events and not feed_events:
-                    source_checks[label] = {"source_events": len(source_events), "feed_events": 0, "status": "MISSING"}
-                    errors.append(f"{label}: source has events but feed has zero rows")
+                    source_checks[label] = {"raw_source_events": len(raw_events), "actionable_source_events": len(source_events), "feed_events": 0, "status": "MISSING"}
+                    errors.append(f"{label}: source has actionable singles but feed has zero rows")
                 elif source_events and not (source_events & feed_events):
-                    source_checks[label] = {"source_events": len(source_events), "feed_events": len(feed_events), "status": "MISSING"}
-                    errors.append(f"{label}: source has upcoming events but feed has no matching event")
+                    source_checks[label] = {"raw_source_events": len(raw_events), "actionable_source_events": len(source_events), "feed_events": len(feed_events), "status": "MISSING"}
+                    errors.append(f"{label}: source has actionable singles but feed has no matching event")
                 else:
-                    source_checks[label] = {"source_events": len(source_events), "feed_events": len(feed_events), "status": "OK"}
+                    source_checks[label] = {"raw_source_events": len(raw_events), "actionable_source_events": len(source_events), "feed_events": len(feed_events), "status": "OK"}
             except Exception as exc:
                 source_checks[label] = {"status": "SOURCE_ERROR", "error": str(exc)}
                 errors.append(f"{label}: source check failed: {exc}")
