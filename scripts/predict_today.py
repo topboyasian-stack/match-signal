@@ -469,7 +469,10 @@ def save_json(path, payload):
 def settle_predictions(history):
     today = datetime.now(timezone.utc).date()
     pending = [p for p in history if not p.get("settled") and p.get("start_time")]
-    dates = sorted({p["start_time"][:10] for p in pending if p["start_time"][:10] < today.isoformat()})[-10:]
+    # Settle finished events from today as well as prior days. The previous
+    # < today guard left same-day finished tennis matches pending until the
+    # following day, which made the Odds Builder show completed matches as LIVE.
+    dates = sorted({p["start_time"][:10] for p in pending if p["start_time"][:10] <= today.isoformat()})[-10:]
     if not dates:
         return history
     boards = {}
@@ -532,7 +535,17 @@ def settle_predictions(history):
                     actual = "p1" if competitors[0].get("winner") else "p2"
                 s1 = score_by_name.get(pred_p1, 0.0)
                 s2 = score_by_name.get(pred_p2, 0.0)
-                prediction["actual_markets"] = {"total_games": s1 + s2, "sets": len(competitors[0].get("linescores", []))}
+                total_games = s1 + s2
+                total_info = prediction.get("analytics", {}).get("total_games", {})
+                line = float(total_info.get("line", 22.5))
+                total_result = "over" if total_games > line else "under"
+                prediction["actual_markets"] = {
+                    "total_games": total_games,
+                    "total_games_line": line,
+                    "total_games_result": total_result,
+                    "total_games_correct": (total_info.get("pick") == total_result),
+                    "sets": len(competitors[0].get("linescores", [])),
+                }
                 prediction["final_score"] = [s1, s2]
             probs = prediction.get("probabilities", {})
             brier = sum((probs.get(k, 0) - (1 if actual == k else 0)) ** 2 for k in probs)
