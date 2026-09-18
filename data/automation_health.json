@@ -1,14 +1,21 @@
 {
-  "updated_at": "2026-09-18T04:35:46.867245+00:00",
+  "updated_at": "2026-09-18T11:06:50.192460+00:00",
   "automation_status": "SELF_HEALING_ENABLED",
   "pipeline_last_update": "2026-09-16T10:55:39.368830+00:00",
-  "pipeline_age_hours": 41.67,
-  "odds_builder_last_update": "2026-09-18T01:20:45.812391+00:00",
-  "odds_builder_age_hours": 3.25,
+  "pipeline_age_hours": 48.19,
+  "odds_builder_last_update": "2026-09-18T06:06:25.048809+00:00",
+  "odds_builder_age_hours": 5.01,
   "thresholds": {
     "pipeline_hours": 4,
     "odds_builder_hours": 8
   },
-  "actions": [],
+  "actions": [
+    {
+      "workflow": "tennis_pipeline.yml",
+      "action": "dispatch",
+      "status": "requested",
+      "detail": "scheduled self-heal"
+    }
+  ],
   "policy": "Watchdog dispatches workflow_dispatch only when the corresponding generated artifact is stale and no run is already active."
 }
