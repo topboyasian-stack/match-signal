@@ -5,7 +5,8 @@ on:
   schedule:
     # Offset from the hour to reduce GitHub Actions schedule-load delays.
     # Changing this cron also re-enables a previously disabled scheduled workflow.
-    - cron: '17,47 * * * *'
+    # TEMPORARY V3 recovery kick; revert to the normal offset schedule after the first successful run.
+    - cron: '25 * * * *'
   workflow_dispatch:
   push:
     branches: [main]
