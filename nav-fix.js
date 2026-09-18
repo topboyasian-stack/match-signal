@@ -5,7 +5,9 @@
     football: './index.html?sport=football',
     tennis: './index.html?sport=tennis',
     basketball: './basketball.html',
-    performance: './performance.html'
+    performance: './performance.html',
+    expansion: './expansion.html',
+    live: './live.html'
   };
 
   function go(route) {
@@ -25,7 +27,11 @@
         if (href.includes('sport=tennis')) return go('tennis');
         if (href.includes('basketball')) return go('basketball');
         if (href.includes('performance')) return go('performance');
-        go('football');
+        if (href.includes('expansion')) return go('expansion');
+        if (href.includes('live')) return go('live');
+        // Preserve any page-specific navigation we do not own.
+        event.preventDefault();
+        window.location.href = href || './index.html?sport=football';
       }, true);
     });
   }
