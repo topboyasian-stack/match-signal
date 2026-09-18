@@ -42,6 +42,7 @@ jobs:
           now = datetime.now(timezone.utc)
           pipeline = load('data/pipeline_status.json')
           odds = load('data/odds_builder.json')
+          expansion = load('data/expansion_status.json')
 
           def age_hours(value):
               if not value:
@@ -54,6 +55,7 @@ jobs:
 
           pipeline_age = age_hours(pipeline.get('updated_at'))
           odds_age = age_hours(odds.get('generated_at'))
+          expansion_age = age_hours(expansion.get('updated_at'))
 
           def active(workflow):
               p = subprocess.run(
@@ -69,6 +71,10 @@ jobs:
                   return False
 
           actions = []
+          if expansion_age > 4 and not active('live-expansion.yml'):
+              r = subprocess.run(['gh', 'workflow', 'run', 'live-expansion.yml', '--ref', 'main'], text=True, capture_output=True)
+              actions.append({'workflow':'live-expansion.yml','action':'dispatch','status':'requested' if r.returncode == 0 else 'failed','detail':(r.stderr.strip() if r.returncode else 'scheduled self-heal')})
+
           if pipeline_age > 4 and not active('tennis_pipeline.yml'):
               r = subprocess.run(['gh', 'workflow', 'run', 'tennis_pipeline.yml', '--ref', 'main'], text=True, capture_output=True)
               actions.append({'workflow':'tennis_pipeline.yml','action':'dispatch','status':'requested' if r.returncode == 0 else 'failed','detail':(r.stderr.strip() if r.returncode else 'scheduled self-heal')})
@@ -84,7 +90,9 @@ jobs:
               'pipeline_age_hours': round(pipeline_age, 2),
               'odds_builder_last_update': odds.get('generated_at'),
               'odds_builder_age_hours': round(odds_age, 2),
-              'thresholds': {'pipeline_hours': 4, 'odds_builder_hours': 8},
+              'expansion_last_update': expansion.get('updated_at'),
+              'expansion_age_hours': round(expansion_age, 2),
+              'thresholds': {'pipeline_hours': 4, 'odds_builder_hours': 8, 'expansion_hours': 4},
               'actions': actions,
               'policy': 'Watchdog dispatches workflow_dispatch only when the corresponding generated artifact is stale and no run is already active.'
           }
