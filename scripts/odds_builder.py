@@ -195,6 +195,7 @@ def main():
     tennis=tennis_candidates(now)
     fresh=[make_leg(x) for x in select_mixed(football,tennis)]
     settled_ids=settled_event_ids()
+    settled_legs=recent_settled_legs(load(HISTORY,[]), now)
     previous=load(OUTPUT,{})
     retained=[]
     if isinstance(previous,dict):
