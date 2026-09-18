@@ -2,7 +2,9 @@ name: Match Signal Automation Watchdog
 
 on:
   schedule:
-    - cron: '7 */2 * * *'
+    # Frequent, off-hour heartbeat so stale live feeds are repaired before the next day.
+    # Changing this cron also re-enables a previously disabled scheduled workflow.
+    - cron: '3,13,23,33,43,53 * * * *'
   workflow_dispatch:
 
 permissions:
