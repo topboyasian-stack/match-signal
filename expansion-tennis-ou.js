@@ -17,7 +17,9 @@
     return isFinite(n) ? n.toFixed(2) : '—';
   }
 
-  function sideName(pick, p1, p2) { var s = String(pick || '').trim().toLowerCase(); if (s === 'p1') return p1; if (s === 'p2') return p2; var m = s.match(/(?:—|-|:)\s*(p1|p2)\s*$/); if (m) return m[1] === 'p1' ? p1 : p2; return pick || '—'; }\n\n  function fmt(v) {
+  function sideName(pick, p1, p2) { var s = String(pick || '').trim().toLowerCase(); if (s === 'p1') return p1; if (s === 'p2') return p2; var m = s.match(/(?:—|-|:)\s*(p1|p2)\s*$/); if (m) return m[1] === 'p1' ? p1 : p2; return pick || '—'; }
+
+  function fmt(v) {
     var d = new Date(v);
     return isNaN(d.getTime()) ? String(v || '—') : d.toLocaleString();
   }
