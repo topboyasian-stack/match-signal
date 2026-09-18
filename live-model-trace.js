@@ -4,7 +4,7 @@ const qs=new URLSearchParams(location.search),eventId=qs.get('event_id');
 const esc=v=>{const d=document.createElement('div');d.textContent=String(v??'');return d.innerHTML};
 const pct=v=>Math.round((Number(v)||0)*1000)/10;
 const leagues={EPL:'eng.1','La Liga':'esp.1',Bundesliga:'ger.1',Serie A:'ita.1',Ligue 1:'fra.1',Champions League:'uefa.champions',MLS:'usa.1',Primeira Liga:'por.1',NBA:'nba',WNBA:'wnba',NCAAM:'mens-college-basketball',NCAAW:'womens-college-basketball',Euroleague:'euroleague',ACB:'acb',BBL:'eng.1',BSL:'tur.1'};
-async function get(u){const r=await fetch(u,{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);return r.json()}
+async function get(u){let target=u;if(String(u).startsWith('https://site.api.espn.com/')){const x=new URL(u);target='./api/espn?path='+encodeURIComponent(x.pathname+x.search);}const r=await fetch(target,{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);return r.json()}
 function totalMarkup(t){if(!t)return '';const exp=t.expected==null?'—':Number(t.expected).toFixed(2),line=t.line==null?'—':Number(t.line).toFixed(1),lean=t.lean||'Unavailable';const over=t.over_prob==null?'':(' · Over '+pct(t.over_prob)+'%');return '<div class="analysis" style="margin-top:10px"><small style="color:#9eb0d4;text-transform:uppercase">Expected O/U</small><br><b>'+esc(t.market)+' '+esc(line)+'</b> · Expected '+esc(exp)+' · <b>'+esc(lean)+'</b>'+over+'<br><span class="notice">'+esc(t.source||'Model total')+'. Live total is paper-only and not a validated betting edge.</span></div>';}
 async function run(){
  try{
