@@ -63,7 +63,7 @@
     }));
   }
   function local(v) { var d=dateOf(v); return d?d.toLocaleString([], {weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'—'; }
-  function timer(v, l) { var c=state(v, l); return '<div class="timer '+c.cls+'" data-start="'+esc(v||'')+'" data-correct="'+(c.cls==='finished-correct'?'1':c.cls==='finished-wrong'?'0':'')+'" data-finished="'+(c.cls.indexOf('finished')===0?'1':'')+'"><span class="timerLabel">'+esc(c.label)+'</span><strong class="timerValue">'+esc(c.text)+'</strong></div>'; }
+  function timer(v, l) { var c=state(v, l); return '<div class="timer '+c.cls+'" data-event-id="'+esc(l&&l.event_id||'')+'" data-start="'+esc(v||'')+'" data-correct="'+(c.cls==='finished-correct'?'1':c.cls==='finished-wrong'?'0':'')+'" data-finished="'+(c.cls.indexOf('finished')===0?'1':'')+'"><span class="timerLabel">'+esc(c.label)+'</span><strong class="timerValue">'+esc(c.text)+'</strong></div>'; }
   function updateTimers() {
     document.querySelectorAll('#oddsBuilder .timer[data-start]').forEach(function(el){ if(el.getAttribute('data-finished')==='1') return; var c=state(el.getAttribute('data-start'), {sport:'tennis', event_id:el.getAttribute('data-event-id')}); el.className='timer '+c.cls; var a=el.querySelector('.timerLabel'),b=el.querySelector('.timerValue'); if(a)a.textContent=c.label; if(b)b.textContent=c.text; });
   }
