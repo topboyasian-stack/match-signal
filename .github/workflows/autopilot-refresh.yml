@@ -2,13 +2,12 @@ name: Match Signal Autopilot Refresh
 
 on:
   schedule:
-    - cron: '*/5 * * * *'
+    - cron: '2,17,32,47 * * * *'
   workflow_dispatch:
   workflow_run:
     workflows:
       - "Match Signal Live Expansion"
       - "Match Signal Post-Pipeline Live Feed Reconcile"
-      - "Deploy Match Signal to Cloudflare Pages"
     types: [completed]
   push:
     branches: [main]
@@ -25,12 +24,12 @@ permissions:
   contents: write
 
 concurrency:
-  group: match-signal-pipeline
-  cancel-in-progress: false
+  group: match-signal-core-refresh
+  cancel-in-progress: true
 
 jobs:
   refresh:
-    if: ${{ github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_sha == '497f3a8f6fd208a2cdbe5c0ba5baedb1ae33c510') }}
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -105,4 +104,18 @@ jobs:
             exit 0
           fi
           git commit -m "🤖 Autopilot refresh current predictions"
-          git push origin main
+          for attempt in 1 2 3; do
+            if git push origin main; then
+              echo "Autopilot publication succeeded on attempt ${attempt}."
+              exit 0
+            fi
+            echo "Concurrent main update detected; refreshing and retrying (attempt ${attempt})."
+            git fetch origin main
+            git rebase origin/main || {
+              git rebase --abort 2>/dev/null || true
+              echo "Rebase conflict; a later scheduled run will safely retry."
+              exit 1
+            }
+            sleep $((attempt * 3))
+          done
+          exit 1
