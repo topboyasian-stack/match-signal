@@ -19,11 +19,8 @@ on:
       - '.github/workflows/cloudflare-pages.yml'
   workflow_run:
     workflows:
-      - "Match Signal Autopilot Refresh"
       - "Match Signal Live Expansion"
-      - "Match Signal Post-Pipeline Live Feed Reconcile"
-      - "Match Signal Saudi Pro League Live Experimental"
-      - "Match Signal Odds Builder"
+      - "Match Signal Autopilot Refresh"
     types: [completed]
   workflow_dispatch:
 
@@ -33,7 +30,7 @@ permissions:
 
 concurrency:
   group: cloudflare-pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   deploy:
