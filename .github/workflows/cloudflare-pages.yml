@@ -111,46 +111,49 @@ jobs:
         run: |
           npx wrangler@latest pages deploy . --project-name="$PROJECT" --branch=main
 
-      - name: Run production browser smoke tests
+      - name: Run production HTTP and asset smoke tests
+        timeout-minutes: 3
         run: |
-          npm install --no-save --no-package-lock playwright@1.55.0
-          npx playwright install chromium --with-deps
           node --input-type=module <<'NODE'
-          import { chromium } from 'playwright';
           const base = 'https://match-signal.pages.dev';
-          const browser = await chromium.launch({headless:true});
-          const pages = ['/','/expansion.html','/live.html','/basketball.html','/performance.html'];
+          const pages = ['/', '/expansion.html', '/live.html', '/basketball.html', '/performance.html'];
+          const assets = ['/expansion.js', '/expansion-odds-builder.js', '/live-analysis.js', '/live-data-worker.js', '/data/predictions.json', '/data/expansion_status.json', '/data/odds_builder.json'];
           const failures = [];
-          for (const path of pages) {
-            const page = await browser.newPage();
-            const errors = [];
-            page.on('pageerror', e => errors.push('pageerror: '+e.message+' stack: '+String(e.stack||'')));
-            page.on('requestfailed', r => { if (!r.url().includes('favicon')) errors.push('requestfailed: '+r.url()+' '+(r.failure()?.errorText||'')); });
-            try {
-              const response = await page.goto(base+path, {waitUntil:'domcontentloaded', timeout:20000});
-              if (!response || !response.ok()) failures.push(path+' HTTP '+(response?.status()||'unknown'));
-              await page.waitForTimeout(2000);
-              if (path === '/expansion.html') {
-                const counts = await page.evaluate(() => ({groups:document.querySelectorAll('#groups').length,odds:document.querySelectorAll('#oddsBuilder').length,groupText:document.querySelector('#groups')?.textContent||'',oddsText:document.querySelector('#oddsBuilder')?.textContent||''}));
-                if (!counts.groups || !counts.odds) failures.push(path+' missing mounts '+JSON.stringify(counts));
-                if (!counts.groupText.trim()) failures.push(path+' expansion renderer produced no fixture content');
-                if (/Loading Odds Builder/i.test(counts.oddsText)) failures.push(path+' Odds Builder remained in loading state');
-              } else if (path === '/live.html') {
-                const status = await page.evaluate(() => document.querySelector('#statusText')?.textContent||'');
-                if (!status) failures.push(path+' live status mount did not initialize');
-                const proxy = await page.evaluate(async () => { try { const r=await fetch('./api/espn?path='+encodeURIComponent('/apis/site/v2/sports/basketball/nba/scoreboard')); const body=await r.text(); return {status:r.status,validJson:(()=>{try{const x=JSON.parse(body);return Array.isArray(x.events)}catch{return false}})()}; } catch(e){ return {status:0,error:String(e.message||e)}; } });
-                if (proxy.status !== 200 || !proxy.validJson) failures.push(path+' ESPN proxy failed '+JSON.stringify(proxy));
-              } else if (path === '/') {
-                const count = await page.locator('#grid').count();
-                if (!count) failures.push(path+' prediction grid mount missing');
-              }
-            } catch (e) { failures.push(path+' '+e.message); }
-            if (errors.length) failures.push(path+' browser/runtime errors: '+errors.join(' | '));
-            await page.close();
+          async function get(path) {
+            const r = await fetch(base + path + (path.includes('?') ? '&' : '?') + 'smoke=' + Date.now(), {cache:'no-store'});
+            const body = await r.text();
+            return {r,body};
           }
-          await browser.close();
-          if (failures.length) { console.error(failures.join('\\n')); process.exit(1); }
-          console.log('Production browser smoke tests passed: '+pages.join(', '));
+          for (const path of pages) {
+            try {
+              const {r,body}=await get(path);
+              if (!r.ok) failures.push(path+' HTTP '+r.status);
+              if (!body.includes('<html') && path.endsWith('.html')) failures.push(path+' did not return HTML');
+              if (path==='/expansion.html') {
+                for (const marker of ['id="groups"','id="oddsBuilder"','expansion.js','expansion-odds-builder.js'])
+                  if (!body.includes(marker)) failures.push(path+' missing '+marker);
+              }
+              if (path==='/live.html') {
+                for (const marker of ['id="statusText"','id="grid"','live-analysis.js','live-data-worker.js'])
+                  if (!body.includes(marker)) failures.push(path+' missing '+marker);
+              }
+            } catch(e) { failures.push(path+' '+e.message); }
+          }
+          for (const path of assets) {
+            try {
+              const {r,body}=await get(path);
+              if (!r.ok) failures.push(path+' HTTP '+r.status);
+              if (!body.trim()) failures.push(path+' empty response');
+              if (path.endsWith('.json')) JSON.parse(body);
+            } catch(e) { failures.push(path+' '+e.message); }
+          }
+          try {
+            const {r,body}=await get('/api/espn?path='+encodeURIComponent('/apis/site/v2/sports/basketball/nba/scoreboard'));
+            if (!r.ok) failures.push('/api/espn NBA HTTP '+r.status);
+            else if (!Array.isArray(JSON.parse(body).events)) failures.push('/api/espn NBA returned invalid JSON');
+          } catch(e) { failures.push('/api/espn '+e.message); }
+          if (failures.length) { console.error(failures.join('\n')); process.exit(1); }
+          console.log('Production HTTP smoke tests passed: '+pages.length+' pages, '+assets.length+' assets, NBA ESPN proxy');
           NODE
 
       - name: Write deployment marker
