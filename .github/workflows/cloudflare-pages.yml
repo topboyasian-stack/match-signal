@@ -16,6 +16,11 @@ on:
       - 'nav-fix.js'
       - 'metrics-fix.js'
       - 'data/**'
+      - 'functions/**'
+      - 'expansion.js'
+      - 'expansion-tennis-ou.js'
+      - 'expansion-odds-builder.js'
+      - 'live-model-trace.js'
       - '.github/workflows/cloudflare-pages.yml'
   workflow_run:
     workflows:
@@ -125,11 +130,13 @@ jobs:
               const response = await page.goto(base+path, {waitUntil:'domcontentloaded', timeout:30000});
               if (!response || !response.ok()) failures.push(path+' HTTP '+(response?.status()||'unknown'));
               if (path === '/expansion.html') {
-                await page.waitForSelector('#groups', {timeout:10000});
-                await page.waitForSelector('#oddsBuilder', {timeout:10000});
+                await page.waitForSelector('#groups', {state:'attached', timeout:10000});
+                await page.waitForSelector('#oddsBuilder', {state:'attached', timeout:10000});
                 await page.waitForTimeout(3500);
-                const text = await page.locator('#oddsBuilder').innerText();
-                if (/Loading Odds Builder/i.test(text)) failures.push(path+' Odds Builder remained in loading state');
+                const groupText = await page.locator('#groups').innerText();
+                const oddsText = await page.locator('#oddsBuilder').innerText();
+                if (!groupText.trim()) failures.push(path+' Expansion renderer produced no fixture content');
+                if (/Loading Odds Builder/i.test(oddsText)) failures.push(path+' Odds Builder remained in loading state');
               } else if (path === '/live.html') {
                 await page.waitForSelector('#grid', {timeout:10000});
                 await page.waitForSelector('#liveCount', {timeout:10000});
