@@ -3,7 +3,9 @@ name: Match Signal Live Expansion
 
 on:
   schedule:
-    - cron: '*/30 * * * *'
+    # Offset from the hour to reduce GitHub Actions schedule-load delays.
+    # Changing this cron also re-enables a previously disabled scheduled workflow.
+    - cron: '17,47 * * * *'
   workflow_dispatch:
   push:
     branches: [main]
@@ -126,4 +128,19 @@ jobs:
             exit 0
           fi
           git commit -m "🤖 Refresh live experimental NBA and Eredivisie signals"
-          git push origin main
+          for attempt in 1 2 3; do
+            if git push origin main; then
+              echo "Live expansion publication succeeded on attempt ${attempt}."
+              exit 0
+            fi
+            echo "Concurrent main update detected; refreshing and retrying publication (attempt ${attempt})."
+            git fetch origin main
+            git rebase origin/main || {
+              git rebase --abort 2>/dev/null || true
+              echo "Rebase conflict; rerunning the expansion workflow is safer than risking a partial publication."
+              exit 1
+            }
+            sleep $((attempt * 3))
+          done
+          echo "ABORT: live expansion could not publish after three synchronized attempts."
+          exit 1
