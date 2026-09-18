@@ -97,6 +97,7 @@ jobs:
             data/ere_divisie_qa.json; do
             cp "$f" "/tmp/$(basename "$f")" 2>/dev/null || true
           done
+          cp data/predictions.json /tmp/expansion_generated_predictions.json
           git fetch origin main
           git reset --hard origin/main
           for f in \
