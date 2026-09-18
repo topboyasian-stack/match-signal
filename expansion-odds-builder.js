@@ -25,7 +25,7 @@
     if (!lineMatch) return null;
     var line = Number(lineMatch[1]);
     if (!isFinite(line)) return null;
-    var side = /\\bover\\b/i.test(pick) ? 'over' : /\\bunder\\b/i.test(pick) ? 'under' : null;
+    var side = /\bover\b/i.test(pick) ? 'over' : /\bunder\b/i.test(pick) ? 'under' : null;
     if (!side) return null;
     var comps = x.event.competitions && x.event.competitions[0] && x.event.competitions[0].competitors;
     if (!Array.isArray(comps) || comps.length < 2) return null;
