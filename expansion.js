@@ -46,10 +46,10 @@
   }
   window.run = function () {
     $('status').textContent = 'Loading all prediction feeds…';
-    Promise.all([get('data/predictions.json'), get('data/ere_divisie_predictions.json')]).then(function (parts) {
-      all = dedupe((Array.isArray(parts[0]) ? parts[0] : []).concat(Array.isArray(parts[1]) ? parts[1] : []));
+    Promise.allSettled([get('data/predictions.json'), get('data/ere_divisie_predictions.json')]).then(function (parts) {
+      var main = parts[0].status === 'fulfilled' && Array.isArray(parts[0].value) ? parts[0].value : []; var ere = parts[1].status === 'fulfilled' && Array.isArray(parts[1].value) ? parts[1].value : []; all = dedupe(main.concat(ere));
       $('fixtures').textContent = all.length; $('football').textContent = all.filter(function (x) { return x.sport === 'football'; }).length; $('tennis').textContent = all.filter(function (x) { return x.sport === 'tennis'; }).length; $('leagues').textContent = new Set(all.map(function (x) { return x.league; }).filter(Boolean)).size;
-      $('status').textContent = all.length + ' detailed predictions loaded'; $('updated').textContent = 'Updated ' + new Date().toLocaleString() + ' · main feed + Eredivisie expansion feed'; filters(); render();
+      $('status').textContent = all.length + ' detailed predictions loaded'; $('updated').textContent = 'Feed checked ' + new Date().toLocaleString() + ' · main: ' + main.length + ' · Eredivisie: ' + ere.length; filters(); render();
     }).catch(function (e) {
       $('status').textContent = 'Expansion data unavailable'; $('updated').innerHTML = '<span style="color:var(--red)">' + esc(e.message) + '</span>'; $('groups').innerHTML = '<div class="empty">' + esc(e.message) + '</div>';
     });
