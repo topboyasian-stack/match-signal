@@ -123,6 +123,11 @@ def recent_settled_legs(history, now):
             continue
         if x.get('sport') != 'tennis':
             continue
+        p1_name = str(x.get('player_1') or '').strip()
+        p2_name = str(x.get('player_2') or '').strip()
+        generic = {'', 'player 1', 'player 2', 'tbd', 'tba', 'unknown', 'unknown player', 'team 1', 'team 2'}
+        if p1_name.lower() in generic or p2_name.lower() in generic or len(p1_name) < 3 or len(p2_name) < 3:
+            continue
         total = (x.get('analytics') or {}).get('total_games') or {}
         ou_pick = total.get('pick')
         if ou_pick not in {'over','under'} or total.get('line') is None:
