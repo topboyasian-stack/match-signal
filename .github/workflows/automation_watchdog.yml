@@ -1,6 +1,10 @@
 name: Match Signal Automation Watchdog
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/automation_watchdog.yml'
   schedule:
     # Frequent, off-hour heartbeat so stale live feeds are repaired before the next day.
     # Changing this cron also re-enables a previously disabled scheduled workflow.
