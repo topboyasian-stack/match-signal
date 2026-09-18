@@ -18,6 +18,7 @@ DATA=ROOT/'data'
 CANDIDATES=DATA/'selection_candidates.json'
 PREDICTIONS=DATA/'predictions.json'
 OUTPUT=DATA/'odds_builder.json'
+HISTORY=DATA/'prediction_history.json'
 MIN_LEGS,MAX_LEGS=3,4
 MIN_PROB=0.65
 
@@ -34,6 +35,12 @@ def upcoming(x, now):
         dt=datetime.fromisoformat(str(raw).replace('Z','+00:00'))
         return dt.astimezone(timezone.utc)>now
     except (TypeError,ValueError):return False
+
+
+def settled_event_ids():
+    raw=load(HISTORY,[])
+    if not isinstance(raw,list):return set()
+    return {str(x.get('event_id')) for x in raw if isinstance(x,dict) and x.get('settled') is True and x.get('event_id')}
 
 
 def fair_odds(p):
@@ -132,7 +139,24 @@ def main():
     now=datetime.now(timezone.utc)
     football=football_candidates(now)
     tennis=tennis_candidates(now)
-    selected=[make_leg(x) for x in select_mixed(football,tennis)]
+    fresh=[make_leg(x) for x in select_mixed(football,tennis)]
+    settled_ids=settled_event_ids()
+    previous=load(OUTPUT,{})
+    retained=[]
+    if isinstance(previous,dict):
+        for leg in previous.get('qualified_legs',[]):
+            if not isinstance(leg,dict) or not leg.get('event_id'):continue
+            if str(leg.get('event_id')) in settled_ids:continue
+            try:started=datetime.fromisoformat(str(leg.get('start_time')).replace('Z','+00:00')).astimezone(timezone.utc)<=now
+            except (TypeError,ValueError):started=False
+            if started:retained.append(leg)
+    selected=[]
+    seen=set()
+    for leg in retained+fresh:
+        eid=str(leg.get('event_id') or '')
+        if not eid or eid in seen:continue
+        selected.append(leg);seen.add(eid)
+        if len(selected)>=MAX_LEGS:break
     sports=sorted({x['sport'] for x in selected})
     if {'football','tennis'} <= set(sports):
         selection_status='MIXED_QUALIFIED_ACCUMULATOR'
@@ -151,6 +175,7 @@ def main():
             'requires_existing_research_gate_for_football':True,
             'requires_paper_probability_threshold_for_tennis':True,
             'upcoming_fixture_only':True,
+            'retain_started_legs_until_settled':True,
             'daily_automated_build':True,
             'mix_qualified_football_when_available':True,
             'football_reserved_slots':1,
@@ -175,7 +200,7 @@ def main():
             'Booking/share-code generation has been removed.',
             'The user manually builds the accumulator on SportyBet or Stake.',
             'Reference combined odds are the product of 1/model-probability and are NOT a quoted bookmaker price.',
-            'Started fixtures are excluded automatically.',
+            'New started fixtures are excluded from fresh selection, but previously qualified legs are retained until explicit settlement.',
             'When qualified football exists, at least one football selection is reserved and up to two may be included.',
             'No accumulator is forced when fewer than three selections pass the existing research threshold.'
         ]
