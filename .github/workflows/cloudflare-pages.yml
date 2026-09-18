@@ -124,7 +124,7 @@ jobs:
           for (const path of pages) {
             const page = await browser.newPage();
             const errors = [];
-            page.on('pageerror', e => errors.push('pageerror: '+e.message));
+            page.on('pageerror', e => errors.push('pageerror: '+e.message+' stack: '+String(e.stack||'')));
             page.on('console', m => { if (m.type() === 'error') errors.push('console: '+m.text()); });
             try {
               const response = await page.goto(base+path, {waitUntil:'domcontentloaded', timeout:30000});
@@ -133,21 +133,37 @@ jobs:
                 await page.waitForSelector('#groups', {state:'attached', timeout:10000});
                 await page.waitForSelector('#oddsBuilder', {state:'attached', timeout:10000});
                 await page.waitForTimeout(3500);
-                const groupText = await page.locator('#groups').innerText();
-                const oddsText = await page.locator('#oddsBuilder').innerText();
+                const groupCount = await page.locator('#groups').count();
+                const oddsCount = await page.locator('#oddsBuilder').count();
+                if (!groupCount) failures.push(path+' missing #groups mount');
+                if (!oddsCount) failures.push(path+' missing #oddsBuilder mount');
+                const groupText = groupCount ? await page.locator('#groups').textContent() : '';
+                const oddsText = oddsCount ? await page.locator('#oddsBuilder').textContent() : '';
                 if (!groupText.trim()) failures.push(path+' Expansion renderer produced no fixture content');
                 if (/Loading Odds Builder/i.test(oddsText)) failures.push(path+' Odds Builder remained in loading state');
               } else if (path === '/live.html') {
                 await page.waitForSelector('#grid', {timeout:10000});
                 await page.waitForSelector('#liveCount', {timeout:10000});
                 await page.waitForTimeout(2500);
-                const status = await page.locator('#statusText').innerText();
+                const status = await page.locator('#statusText').textContent();
                 if (/temporarily unavailable/i.test(status)) failures.push(path+' live status unavailable: '+status);
               } else if (path === '/') {
                 await page.waitForSelector('#grid', {timeout:10000});
                 await page.waitForTimeout(1200);
               }
             } catch (e) { failures.push(path+' '+e.message); }
+            const syntax = await page.evaluate(async () => {
+              const out=[];
+              for (const s of [...document.scripts]) {
+                try {
+                  let body=s.textContent||'';
+                  if (s.src) { const r=await fetch(s.src,{cache:'no-store'}); body=await r.text(); if(!r.ok){out.push({src:s.src,error:'HTTP '+r.status});continue;} }
+                  try { new Function(body); } catch(e) { out.push({src:s.src||'inline',error:String(e.message||e)}); }
+                } catch(e) { out.push({src:s.src||'inline',error:String(e.message||e)}); }
+              }
+              return out;
+            });
+            if (syntax.length) failures.push(path+' script syntax/load diagnostics: '+JSON.stringify(syntax));
             if (errors.length) failures.push(path+' browser errors: '+errors.join(' | '));
             await page.close();
           }
