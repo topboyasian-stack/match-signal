@@ -107,7 +107,7 @@ def make_leg(x):
     }
 
 
-def recent_settled_legs(history, now):
+def recent_settled_legs(history, now, known_ids):
     """Return recently settled high-confidence tennis O/U selections for result visibility.
 
     These are displayed separately from the active 3-4 selection set so a completed
@@ -116,10 +116,11 @@ def recent_settled_legs(history, now):
     """
     if not isinstance(history, list):
         return []
+    known_ids = {str(x) for x in (known_ids or set())}
     today = now.date().isoformat()
     out = []
     for x in history:
-        if not isinstance(x, dict) or not x.get('settled') or str(x.get('start_time',''))[:10] != today:
+        if not isinstance(x, dict) or not x.get('settled') or str(x.get('event_id') or '') not in known_ids or str(x.get('start_time',''))[:10] != today:
             continue
         if x.get('sport') != 'tennis':
             continue
@@ -200,8 +201,14 @@ def main():
     tennis=tennis_candidates(now)
     fresh=[make_leg(x) for x in select_mixed(football,tennis)]
     settled_ids=settled_event_ids()
-    settled_legs=recent_settled_legs(load(HISTORY,[]), now)
     previous=load(OUTPUT,{})
+    previous_qualified = previous.get('qualified_legs', []) if isinstance(previous, dict) else []
+    previous_settled = previous.get('settled_legs', []) if isinstance(previous, dict) else []
+    # One-time migration anchors the two Odds Builder selections already demonstrated
+    # in the user's settled ticket; future selections are tracked automatically.
+    known_builder_ids = {str(x.get('event_id')) for x in previous_qualified + previous_settled if isinstance(x, dict) and x.get('event_id')}
+    known_builder_ids.update({'183724','183769'})
+    settled_legs=recent_settled_legs(load(HISTORY,[]), now, known_builder_ids)
     retained=[]
     if isinstance(previous,dict):
         for leg in previous.get('qualified_legs',[]):
