@@ -505,11 +505,34 @@ def settle_predictions(history):
                 prediction["actual_markets"] = {"over_under": "over" if hs + ass > line else "under", "btts": "yes" if hs > 0 and ass > 0 else "no"}
                 prediction["final_score"] = [hs, ass]
             else:
-                c1, c2 = competitors[0], competitors[1]
-                s1 = sum(float(x.get("value", 0)) for x in c1.get("linescores", []))
-                s2 = sum(float(x.get("value", 0)) for x in c2.get("linescores", []))
-                actual = "p1" if c1.get("winner") else "p2"
-                prediction["actual_markets"] = {"total_games": s1 + s2, "sets": len(c1.get("linescores", []))}
+                # Tennis public-feed player slots are corrected at prediction time,
+                # so settlement must resolve the winner by player identity rather
+                # than assuming ESPN competitor[0] is prediction p1.
+                def tennis_name(competitor):
+                    athlete = competitor.get("athlete") or {}
+                    return str(athlete.get("displayName") or competitor.get("displayName") or "").strip().lower()
+
+                pred_p1 = str(prediction.get("player_1") or "").strip().lower()
+                pred_p2 = str(prediction.get("player_2") or "").strip().lower()
+                score_by_name = {}
+                winner_name = None
+                for competitor in competitors[:2]:
+                    name = tennis_name(competitor)
+                    score = sum(float(x.get("value", 0)) for x in competitor.get("linescores", []))
+                    score_by_name[name] = score
+                    if competitor.get("winner"):
+                        winner_name = name
+                if winner_name == pred_p1:
+                    actual = "p1"
+                elif winner_name == pred_p2:
+                    actual = "p2"
+                else:
+                    # Backward-compatible fallback for legacy records whose names
+                    # still followed the raw ESPN competitor order.
+                    actual = "p1" if competitors[0].get("winner") else "p2"
+                s1 = score_by_name.get(pred_p1, 0.0)
+                s2 = score_by_name.get(pred_p2, 0.0)
+                prediction["actual_markets"] = {"total_games": s1 + s2, "sets": len(competitors[0].get("linescores", []))}
                 prediction["final_score"] = [s1, s2]
             probs = prediction.get("probabilities", {})
             brier = sum((probs.get(k, 0) - (1 if actual == k else 0)) ** 2 for k in probs)
