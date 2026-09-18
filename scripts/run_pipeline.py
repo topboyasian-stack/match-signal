@@ -242,21 +242,24 @@ def enhanced_tennis_prediction(event, tour, rankings, form_map, base_tennis_pred
         1 if market else 0,
     ])
 
+    # ESPN's tennis competitor order is not used as the public player order.
+    # Keep the asymmetric model calculation above exactly as computed, then map
+    # every player-linked output field to the corrected display/player slots.
     return {
         "sport": "tennis", "league": tour, "event_id": str(event.get("id")), "start_time": event.get("date"),
-        "player_1": name1, "player_2": name2, "venue": event.get("venue", {}).get("fullName"),
+        "player_1": name2, "player_2": name1, "venue": event.get("venue", {}).get("fullName"),
         "surface": event.get("surface") or "Unknown", "tournament": event.get("tournament_name") or tour,
         "round": event.get("round", {}).get("displayName"),
-        "rankings": {"p1": rank1, "p2": rank2, "gap": ranking_gap},
-        "form": {"p1": round(form1, 3), "p2": round(form2, 3), "p1_last10": f1.get("record", ""), "p2_last10": f2.get("record", "")},
-        "probabilities": {"p1": round(p1_prob, 4), "p2": round(p2_prob, 4)},
-        "pick": "p1" if p1_prob >= p2_prob else "p2", "confidence": round(max(p1_prob, p2_prob), 4),
+        "rankings": {"p1": rank2, "p2": rank1, "gap": ranking_gap},
+        "form": {"p1": round(form2, 3), "p2": round(form1, 3), "p1_last10": f2.get("record", ""), "p2_last10": f1.get("record", "")},
+        "probabilities": {"p1": round(p2_prob, 4), "p2": round(p1_prob, 4)},
+        "pick": "p1" if p2_prob >= p1_prob else "p2", "confidence": round(max(p1_prob, p2_prob), 4),
         "analytics": {
-            "set_win_prob": {"p1": round(q, 4), "p2": round(1 - q, 4)},
-            "straight_sets": {"p1": round(straight1, 4), "p2": round(straight2, 4)},
+            "set_win_prob": {"p1": round(1 - q, 4), "p2": round(q, 4)},
+            "straight_sets": {"p1": round(straight2, 4), "p2": round(straight1, 4)},
             "three_sets": round(three_sets, 4), "expected_sets": round(expected_sets, 2),
             "total_games": {"line": total_line, "over": round(over_games, 4), "under": round(1 - over_games, 4), "pick": "over" if over_games >= 0.5 else "under"},
-            "games_handicap": {"estimated_margin_p1": round(games_margin, 2), "pick": "p1" if games_margin >= 0 else "p2"},
+            "games_handicap": {"estimated_margin_p1": round(-games_margin, 2), "pick": "p1" if games_margin <= 0 else "p2"},
         },
         "model": source,
         "signal_quality": {"components": signal_components, "max_components": 5, "ranking_gap": ranking_gap, "form_gap": round(form_gap, 3), "market_available": bool(market)},
