@@ -48,15 +48,18 @@
   function refreshLiveStatuses(legs) {
     var ts=(Array.isArray(legs)?legs:[]).filter(function(l){return String(l.sport||'').toLowerCase()==='tennis' && l.event_id;});
     return Promise.all(ts.map(function(l){
-      var url='./api/espn?path='+encodeURIComponent('/apis/site/v2/sports/tennis/'+(String(l.event_id||'').match(/^\d+$/)?'wta':'wta')+'/scoreboard')+'&_='+Date.now();
-      return fetch(url,{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('tennis scoreboard HTTP '+r.status);return r.json();}).then(function(data){
-        var found=null;
-        (data.events||[]).some(function(e){
-          if(String(e.id)===String(l.event_id)){found=e;return true;}
-          return false;
+      var tours=['wta','atp'];
+      function findTour(i){
+        if(i>=tours.length)return Promise.resolve();
+        var url='./api/espn?path='+encodeURIComponent('/apis/site/v2/sports/tennis/'+tours[i]+'/scoreboard')+'&_='+Date.now();
+        return fetch(url,{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('tennis scoreboard HTTP '+r.status);return r.json();}).then(function(data){
+          var found=null;
+          (data.events||[]).some(function(e){if(String(e.id)===String(l.event_id)){found=e;return true;}return false;});
+          if(found){var st=found.status||{},typ=st.type||{};liveStates[String(l.event_id)]={state:typ.state,start_time:found.date||found.competitions?.[0]?.startDate||l.start_time,finished:typ.completed===true||typ.state==='post'};return;}
+          return findTour(i+1);
         });
-        if(found){var st=found.status||{},typ=st.type||{};liveStates[String(l.event_id)]={state:typ.state,start_time:found.date||found.competitions?.[0]?.startDate||l.start_time,finished:typ.completed===true||typ.state==='post'};}
-      }).catch(function(){});
+      }
+      return findTour(0).catch(function(){});
     }));
   }
   function local(v) { var d=dateOf(v); return d?d.toLocaleString([], {weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'—'; }
