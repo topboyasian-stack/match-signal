@@ -101,6 +101,7 @@
   }
   function updateTimers() {
     document.querySelectorAll('#oddsBuilder .timer[data-start]').forEach(function(el){
+      if(el.getAttribute('data-finished')==='1') return;
       var l={sport:el.getAttribute('data-sport')||'',event_id:el.getAttribute('data-event-id')||'',market:el.getAttribute('data-market')||'',pick:el.getAttribute('data-pick')||''};
       var c=state(el.getAttribute('data-start'),l);
       el.className='timer '+c.cls;
