@@ -345,19 +345,24 @@ def tennis_prediction(event, tour, rankings, form_map):
     p1_games = 6.2 * q + 5.4 * (1 - q)
     p2_games = 6.2 * (1 - q) + 5.4 * q
     handicap = p1_games - p2_games
+    # ESPN's tennis competitor order is not a reliable display order for our
+    # public feed. Keep the model calculation above exactly as-is, then swap the
+    # player slots as a presentation/data-mapping correction. Every player-linked
+    # probability, ranking, form and handicap value moves with that player, so the
+    # prediction itself is not recalculated or changed.
     return {
         "sport": "tennis", "league": tour, "event_id": str(event.get("id")), "start_time": event.get("date"),
-        "player_1": name1, "player_2": name2, "venue": event.get("venue", {}).get("fullName"),
+        "player_1": name2, "player_2": name1, "venue": event.get("venue", {}).get("fullName"),
         "surface": event.get("surface") or "Unknown", "tournament": event.get("tournament_name") or tour,
-        "round": event.get("round", {}).get("displayName"), "rankings": {"p1": rank1, "p2": rank2},
-        "form": {"p1": round(f1, 3), "p2": round(f2, 3), "p1_last10": form_map.get(id1, {}).get("record", ""), "p2_last10": form_map.get(id2, {}).get("record", "")},
-        "probabilities": {"p1": round(p1_prob, 4), "p2": round(p2_prob, 4)}, "pick": "p1" if p1_prob >= p2_prob else "p2", "confidence": round(max(p1_prob, p2_prob), 4),
+        "round": event.get("round", {}).get("displayName"), "rankings": {"p1": rank2, "p2": rank1},
+        "form": {"p1": round(f2, 3), "p2": round(f1, 3), "p1_last10": form_map.get(id2, {}).get("record", ""), "p2_last10": form_map.get(id1, {}).get("record", "")},
+        "probabilities": {"p1": round(p2_prob, 4), "p2": round(p1_prob, 4)}, "pick": "p1" if p2_prob >= p1_prob else "p2", "confidence": round(max(p1_prob, p2_prob), 4),
         "analytics": {
-            "set_win_prob": {"p1": round(q, 4), "p2": round(1 - q, 4)},
-            "straight_sets": {"p1": round(straight1, 4), "p2": round(straight2, 4)},
+            "set_win_prob": {"p1": round(1 - q, 4), "p2": round(q, 4)},
+            "straight_sets": {"p1": round(straight2, 4), "p2": round(straight1, 4)},
             "three_sets": round(three_sets, 4), "expected_sets": round(expected_sets, 2), "expected_games": round(expected_total_games, 2),
             "total_games": {"line": total_line, "over": round(over_games, 4), "under": round(1 - over_games, 4), "pick": "over" if over_games >= 0.5 else "under", "base_model_over": round(over_games, 4), "base_model_under": round(1 - over_games, 4), "source": "fixture-specific continuous set/game model"},
-            "games_handicap": {"estimated_margin_p1": round(handicap, 2), "pick": "p1" if handicap >= 0 else "p2"},
+            "games_handicap": {"estimated_margin_p1": round(-handicap, 2), "pick": "p1" if handicap <= 0 else "p2"},
         },
         "model": "ESPN fixture + ATP/WTA ranking + recent form",
     }
