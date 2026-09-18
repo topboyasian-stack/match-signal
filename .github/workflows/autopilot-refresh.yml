@@ -49,8 +49,40 @@ jobs:
       - name: Compile production Python modules
         run: python -m py_compile scripts/predict_today.py scripts/run_pipeline.py scripts/scoped_pipeline.py scripts/production_pipeline.py scripts/autopilot_guard.py
 
+      - name: Preserve independent live experimental league slices
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          feed = Path('data/predictions.json')
+          rows = json.loads(feed.read_text()) if feed.exists() else []
+          preserved = {
+              'Eredivisie': [r for r in rows if r.get('league') == 'Eredivisie'],
+              'Saudi Pro League': [r for r in rows if r.get('league') == 'Saudi Pro League'],
+          }
+          Path('/tmp/preserved_live_leagues.json').write_text(json.dumps(preserved))
+          print({k: len(v) for k, v in preserved.items()})
+          PY
+
       - name: Refresh current football + ATP/WTA predictions transactionally
         run: python scripts/scoped_pipeline.py
+
+      - name: Restore live experimental league slices after core refresh
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          feed = Path('data/predictions.json')
+          rows = json.loads(feed.read_text()) if feed.exists() else []
+          preserved = json.loads(Path('/tmp/preserved_live_leagues.json').read_text())
+          protected = set(preserved)
+          rows = [r for r in rows if r.get('league') not in protected]
+          for league_rows in preserved.values():
+              rows.extend(league_rows)
+          rows.sort(key=lambda r: str(r.get('start_time') or ''))
+          feed.write_text(json.dumps(rows, indent=2, ensure_ascii=False))
+          print('Restored protected live leagues:', {k: len(v) for k, v in preserved.items()})
+          PY
 
       - name: Run autonomous freshness and source coverage guard
         run: python scripts/autopilot_guard.py
