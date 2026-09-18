@@ -8,6 +8,7 @@ on:
     workflows:
       - "Match Signal Live Expansion"
       - "Match Signal Post-Pipeline Live Feed Reconcile"
+      - "Deploy Match Signal to Cloudflare Pages"
     types: [completed]
   push:
     branches: [main]
@@ -29,7 +30,7 @@ concurrency:
 
 jobs:
   refresh:
-    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_sha == '497f3a8f6fd208a2cdbe5c0ba5baedb1ae33c510') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
