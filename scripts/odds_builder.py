@@ -203,10 +203,11 @@ def main():
     settled_ids=settled_event_ids()
     previous=load(OUTPUT,{})
     previous_qualified = previous.get('qualified_legs', []) if isinstance(previous, dict) else []
-    previous_settled = previous.get('settled_legs', []) if isinstance(previous, dict) else []
+    previous_ids = previous.get('builder_event_ids', []) if isinstance(previous, dict) else []
     # One-time migration anchors the two Odds Builder selections already demonstrated
     # in the user's settled ticket; future selections are tracked automatically.
-    known_builder_ids = {str(x.get('event_id')) for x in previous_qualified + previous_settled if isinstance(x, dict) and x.get('event_id')}
+    known_builder_ids = {str(x) for x in previous_ids if x}
+    known_builder_ids.update({str(x.get('event_id')) for x in previous_qualified if isinstance(x, dict) and x.get('event_id')})
     known_builder_ids.update({'183724','183769'})
     settled_legs=recent_settled_legs(load(HISTORY,[]), now, known_builder_ids)
     retained=[]
@@ -258,6 +259,7 @@ def main():
         'candidates_considered':{'football':len(football),'tennis':len(tennis)},
         'qualified_legs':selected,
         'settled_legs':settled_legs,
+        'builder_event_ids':sorted(known_builder_ids),
         'leg_count':len(selected),
         'sports_selected':sports,
         'status':selection_status,
