@@ -61,14 +61,15 @@ jobs:
 
           def active(workflow):
               p = subprocess.run(
-                  ['gh', 'run', 'list', '--workflow', workflow, '--status', 'in_progress', '--json', 'databaseId', '--limit', '5'],
+                  ['gh', 'run', 'list', '--workflow', workflow, '--json', 'databaseId,status', '--limit', '10'],
                   text=True, capture_output=True
               )
               if p.returncode != 0:
                   print(f'WARN unable to inspect {workflow}: {p.stderr.strip()}')
                   return False
               try:
-                  return bool(json.loads(p.stdout))
+                  runs = json.loads(p.stdout)
+                  return any(r.get('status') in {'queued', 'in_progress', 'waiting', 'pending'} for r in runs)
               except Exception:
                   return False
 
