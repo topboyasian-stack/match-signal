@@ -137,6 +137,7 @@ def main():
                 errors.append(f"{label}: source check failed: {exc}")
 
         flatten = ns["flatten_tennis_board"]
+        tennis_fixture_quality = ns["tennis_fixture_quality"]
         today = current.date()
         end = today + timedelta(days=7)
         for label, tour in ns["TENNIS_LEAGUES"].items():
