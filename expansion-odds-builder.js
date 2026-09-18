@@ -48,7 +48,7 @@
   function refreshLiveStatuses(legs) {
     var ts=(Array.isArray(legs)?legs:[]).filter(function(l){return String(l.sport||'').toLowerCase()==='tennis' && l.event_id;});
     return Promise.all(ts.map(function(l){
-      var url='./api/espn?path='+encodeURIComponent('/apis/site/v2/sports/tennis/wta/scoreboard')+'&_='+Date.now();
+      var url='./api/espn?path='+encodeURIComponent('/apis/site/v2/sports/tennis/'+(String(l.event_id||'').match(/^\d+$/)?'wta':'wta')+'/scoreboard')+'&_='+Date.now();
       return fetch(url,{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('tennis scoreboard HTTP '+r.status);return r.json();}).then(function(data){
         var found=null;
         (data.events||[]).some(function(e){
@@ -62,7 +62,7 @@
   function local(v) { var d=dateOf(v); return d?d.toLocaleString([], {weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'—'; }
   function timer(v, l) { var c=state(v, l); return '<div class="timer '+c.cls+'" data-start="'+esc(v||'')+'" data-correct="'+(c.cls==='finished-correct'?'1':c.cls==='finished-wrong'?'0':'')+'" data-finished="'+(c.cls.indexOf('finished')===0?'1':'')+'"><span class="timerLabel">'+esc(c.label)+'</span><strong class="timerValue">'+esc(c.text)+'</strong></div>'; }
   function updateTimers() {
-    document.querySelectorAll('#oddsBuilder .timer[data-start]').forEach(function(el){ if(el.getAttribute('data-finished')==='1') return; var c=state(el.getAttribute('data-start')); el.className='timer '+c.cls; var a=el.querySelector('.timerLabel'),b=el.querySelector('.timerValue'); if(a)a.textContent=c.label; if(b)b.textContent=c.text; });
+    document.querySelectorAll('#oddsBuilder .timer[data-start]').forEach(function(el){ if(el.getAttribute('data-finished')==='1') return; var c=state(el.getAttribute('data-start'), {sport:'tennis', event_id:el.getAttribute('data-event-id')}); el.className='timer '+c.cls; var a=el.querySelector('.timerLabel'),b=el.querySelector('.timerValue'); if(a)a.textContent=c.label; if(b)b.textContent=c.text; });
   }
   function render(data) {
     var target=document.getElementById('oddsBuilder'); if(!target)return;
