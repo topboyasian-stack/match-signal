@@ -25,5 +25,5 @@ function tennis(p,e){const c=e?.competitions?.[0],cs=c?.competitors||[],home=cs.
 window.MatchSignalLiveAnalysis={football,basketball,tennis,clamp};
 function tickVisibleClocks(){document.querySelectorAll('.card').forEach(card=>{const el=card.querySelector('.clock');if(!el||/HALFTIME BREAK/i.test(el.textContent))return;const first=el.firstChild;if(!first||!first.textContent)return;const m=String(first.textContent).match(/(\d+):(\d{2})/);if(!m)return;let sec=Number(m[1])*60+Number(m[2]);const basketball=!![...card.querySelectorAll('.detail small')].find(x=>/period/i.test(x.textContent));sec=Math.max(0,basketball?sec-1:sec+1);first.textContent=Math.floor(sec/60)+':'+String(sec%60).padStart(2,'0');});}
 setInterval(tickVisibleClocks,1000);
-if(!document.getElementById('ms-live-model-trace-loader')){const s=document.createElement('script');s.id='ms-live-model-trace-loader';s.src='./live-model-trace.js?v='+Date.now();s.async=true;document.head.appendChild(s);}
+if(location.pathname.toLowerCase().includes('match-tracker')&&!document.getElementById('ms-live-model-trace-loader')){const s=document.createElement('script');s.id='ms-live-model-trace-loader';s.src='./live-model-trace.js?v='+Date.now();s.async=true;document.head.appendChild(s);}
 })();
