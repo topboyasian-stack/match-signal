@@ -115,16 +115,17 @@
   }
   function render(data) {
     var target=document.getElementById('oddsBuilder'); if(!target)return;
-    var activeLegs=Array.isArray(data.qualified_legs)?data.qualified_legs:[],settledLegs=Array.isArray(data.settled_legs)?data.settled_legs:[],settledIds={},sports=[];
+    var activeLegs=Array.isArray(data.qualified_legs)?data.qualified_legs:[],settledLegs=Array.isArray(data.settled_legs)?data.settled_legs:[],sports=[],settledIds={};
     settledLegs.forEach(function(l){if(l&&l.event_id)settledIds[String(l.event_id)]=true;});
-    var legs=activeLegs.filter(function(l){return !settledIds[String(l&&l.event_id||'')];}),builderLegs=legs.concat(settledLegs);
-    legs.forEach(function(l){var s=String(l.sport||'').toUpperCase();if(s&&sports.indexOf(s)<0)sports.push(s);});
+    var legs=activeLegs.filter(function(l){return !settledIds[String(l&&l.event_id||'')];});
+    var builderLegs=legs.concat(settledLegs);
+    builderLegs.forEach(function(l){var s=String(l.sport||'').toUpperCase();if(s&&sports.indexOf(s)<0)sports.push(s);});
     var cards=builderLegs.map(function(l,i){
-      var settled=effectiveSettlement(l), isSettled=!!(settled&&settled.finished), resultText=settled&&settled.correct===true?'✓ WON':settled&&settled.correct===false?'✕ LOST':'ENDED';
+      var settled=effectiveSettlement(l),isSettled=!!(settled&&settled.finished),resultText=settled&&settled.correct===true?'✓ WON':settled&&settled.correct===false?'✕ LOST':'ENDED';
       return '<article class="card '+(isSettled?'settled-card':'')+'"><div class="meta"><span>Leg '+(i+1)+' · '+esc(String(l.sport||'').toUpperCase())+' · '+esc(l.competition||'—')+'</span><span>'+(isSettled?'<b class="result-badge '+(settled.correct===true?'won':'lost')+'">'+resultText+'</b>':'Fair odds '+esc(l.model_fair_odds==null?'—':l.model_fair_odds))+'</span></div><div class="teams">'+esc(l.match||'—')+'</div><div class="pick">Selection: <b>'+esc(l.pick||'—')+'</b><span class="conf">Model '+pct(l.model_probability)+'</span></div>'+timer(l.start_time,l)+'<div class="startTime">'+(isSettled?'Result confirmed · '+esc(local(l.start_time)):'Start: '+esc(local(l.start_time))+' <span>· your browser time</span>')+'</div><div class="section"><div class="row"><span>Market</span><b>'+esc(l.market||'—')+'</b></div><div class="row"><span>Model fair odds</span><b>'+esc(l.model_fair_odds==null?'—':l.model_fair_odds)+'</b></div><div class="row"><span>Result</span><b class="'+(isSettled?(settled.correct===true?'won-text':'lost-text'):'')+'">'+(isSettled?resultText:'Pending')+'</b></div></div></article>';
     }).join('');
     var status=data.status==='QUALIFIED_ACCUMULATOR'?'READY FOR MANUAL BUILD':(data.status||'—');
-    var settledCards='';
+    var settledCards=settledLegs.map(function(l){
       return '<article class="card settled-card"><div class="meta"><span>SETTLED · '+esc(String(l.sport||'').toUpperCase())+' · '+esc(l.competition||'—')+'</span><span>Result confirmed</span></div><div class="teams">'+esc(l.match||'—')+'</div><div class="pick">Selection: <b>'+esc(l.pick||'—')+'</b><span class="conf">Model '+pct(l.model_probability)+'</span></div>'+timer(l.start_time,l)+'<div class="startTime">Started: '+esc(local(l.start_time))+' <span>· result retained</span></div><div class="section"><div class="row"><span>Market</span><b>'+esc(l.market||'—')+'</b></div><div class="row"><span>Result</span><b>'+esc(l.settlement&&l.settlement.correct===true?'✓ WON':l.settlement&&l.settlement.correct===false?'✕ LOST':'ENDED')+'</b></div></div></article>';
     }).join('');
     var settledPanel='';
