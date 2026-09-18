@@ -107,6 +107,60 @@ def make_leg(x):
     }
 
 
+def recent_settled_legs(history, now):
+    """Return recently settled high-confidence tennis O/U selections for result visibility.
+
+    These are displayed separately from the active 3-4 selection set so a completed
+    leg cannot disappear without a visible WON/LOST result when the daily odds set
+    refreshes. The list is bounded to today's settled model selections.
+    """
+    if not isinstance(history, list):
+        return []
+    today = now.date().isoformat()
+    out = []
+    for x in history:
+        if not isinstance(x, dict) or not x.get('settled') or str(x.get('start_time',''))[:10] != today:
+            continue
+        if x.get('sport') != 'tennis':
+            continue
+        total = (x.get('analytics') or {}).get('total_games') or {}
+        ou_pick = total.get('pick')
+        if ou_pick not in {'over','under'} or total.get('line') is None:
+            continue
+        try:
+            probability = float(total.get(ou_pick, 0) or 0)
+        except (TypeError, ValueError):
+            continue
+        if probability < MIN_PROB:
+            continue
+        actual_markets = x.get('actual_markets') or {}
+        correct = actual_markets.get('total_games_correct')
+        if correct is None:
+            result = actual_markets.get('total_games_result')
+            correct = (result == ou_pick) if result in {'over','under'} else x.get('correct')
+        if not isinstance(correct, bool):
+            continue
+        out.append({
+            'sport': 'tennis',
+            'competition': x.get('league'),
+            'event_id': x.get('event_id'),
+            'start_time': x.get('start_time'),
+            'match': f"{x.get('player_1')} vs {x.get('player_2')}",
+            'market': 'total_games',
+            'pick': f"{x.get('player_1')} vs {x.get('player_2')} — Total Games {ou_pick} {total.get('line')}",
+            'model_probability': round(probability, 6),
+            'model_fair_odds': fair_odds(probability),
+            'source': x.get('model'),
+            'decision': 'PAPER ONLY',
+            'settlement': {'finished': True, 'correct': bool(correct)},
+            'final_score': x.get('final_score'),
+            'actual_markets': actual_markets,
+            'settled_at': x.get('settled_at'),
+        })
+    out.sort(key=lambda x: str(x.get('settled_at') or ''), reverse=True)
+    return out[:4]
+
+
 def select_mixed(football, tennis):
     """Prefer a mixed set when qualified football exists, without forcing it.
 
@@ -190,6 +244,7 @@ def main():
         },
         'candidates_considered':{'football':len(football),'tennis':len(tennis)},
         'qualified_legs':selected,
+        'settled_legs':settled_legs,
         'leg_count':len(selected),
         'sports_selected':sports,
         'status':selection_status,
@@ -202,7 +257,8 @@ def main():
             'Reference combined odds are the product of 1/model-probability and are NOT a quoted bookmaker price.',
             'New started fixtures are excluded from fresh selection, but previously qualified legs are retained until explicit settlement.',
             'When qualified football exists, at least one football selection is reserved and up to two may be included.',
-            'No accumulator is forced when fewer than three selections pass the existing research threshold.'
+            'No accumulator is forced when fewer than three selections pass the existing research threshold.',
+            'Recently settled model selections remain visible separately with their confirmed WON/LOST result; they are not part of the active accumulator.'
         ]
     }
     OUTPUT.write_text(json.dumps(result,indent=2,ensure_ascii=False)+'\n',encoding='utf-8')
