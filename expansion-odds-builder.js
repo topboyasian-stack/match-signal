@@ -1,3 +1,4 @@
+/* Settled result cards: persistent WON/LOST history, never reverted by timer. */
 (function () {
   'use strict';
   function esc(v) { var d = document.createElement('div'); d.textContent = v == null ? '' : String(v); return d.innerHTML; }
