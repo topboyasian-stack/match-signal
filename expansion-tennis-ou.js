@@ -17,7 +17,7 @@
     return isFinite(n) ? n.toFixed(2) : '—';
   }
 
-  function fmt(v) {
+  function sideName(pick, p1, p2) { var s = String(pick || '').trim().toLowerCase(); if (s === 'p1') return p1; if (s === 'p2') return p2; var m = s.match(/(?:—|-|:)\s*(p1|p2)\s*$/); if (m) return m[1] === 'p1' ? p1 : p2; return pick || '—'; }\n\n  function fmt(v) {
     var d = new Date(v);
     return isNaN(d.getTime()) ? String(v || '—') : d.toLocaleString();
   }
@@ -61,7 +61,7 @@
         '<div class="bar"><div class="fill" style="width:' + Math.round((Number(ou.under) || 0) * 100) + '%"></div></div>' +
         (expectedGames != null ? '<div class="row"><span>Expected total games</span><b>' + num(expectedGames) + '</b></div>' : '') +
         '</div>' +
-        '<div class="section sub">Match probability: ' + pct(x.probabilities && x.probabilities.p1) + ' / ' + pct(x.probabilities && x.probabilities.p2) + ' · Games handicap: ' + esc(gh.pick || '—') + '<br>Model: ' + esc(x.model || '—') + ' · Decision: ' + esc(x.decision || 'PAPER ONLY') + '</div>' +
+        '<div class="section sub">Match probability: ' + pct(x.probabilities && x.probabilities.p1) + ' / ' + pct(x.probabilities && x.probabilities.p2) + ' · Games handicap: ' + esc(sideName(gh.pick, x.player_1, x.player_2)) + '<br>Model: ' + esc(x.model || '—') + ' · Decision: ' + esc(x.decision || 'PAPER ONLY') + '</div>' +
         '</article>';
     }).join('');
   }
