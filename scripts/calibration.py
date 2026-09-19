@@ -161,7 +161,7 @@ def calibrate_prediction(prediction, history, now=None):
     }
     prediction["probabilities"] = calibrated
     prediction["confidence"] = round(calibrated_pick, 4)
-    prediction["pick"] = max(calibrated, key=calibrated.get)
+    prediction["pick"] = pick
     prediction["model_version"] = "5.0 historical-calibrated"
     return prediction
 
