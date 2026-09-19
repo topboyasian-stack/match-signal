@@ -95,9 +95,13 @@
       "expected_sets": 2.46,
       "total_games": {
         "line": 22.5,
-        "over": 0.675,
-        "under": 0.325,
-        "pick": "over"
+        "over": 0.571,
+        "under": 0.429,
+        "pick": "over",
+        "raw_over": 0.675,
+        "raw_under": 0.325,
+        "calibrated_over": 0.571,
+        "calibrated_under": 0.429
       },
       "games_handicap": {
         "estimated_margin_p1": -0.23,
@@ -112,7 +116,19 @@
       "form_gap": 0.1,
       "market_available": false
     },
-    "calculated_at": "2026-09-19T21:38:09.506688+00:00"
+    "raw_confidence": 0.675,
+    "calibrated_confidence": 0.571,
+    "calibration": {
+      "market": "tennis:total_games",
+      "method": "recency_weighted_empirical_bayes",
+      "sample_size": 243,
+      "effective_sample": 10.2,
+      "empirical": 0.2653,
+      "raw": 0.675,
+      "bin_center": 0.675
+    },
+    "model_version": "5.0 historical-calibrated",
+    "calculated_at": "2026-09-19T21:49:45.957349+00:00"
   },
   {
     "sport": "football",
@@ -124,12 +140,12 @@
     "venue": "Stade Saputo",
     "surface": "Grass",
     "probabilities": {
-      "p1": 0.3387,
-      "draw": 0.2536,
-      "p2": 0.4077
+      "p1": 0.3632,
+      "draw": 0.272,
+      "p2": 0.3648
     },
     "pick": "p2",
-    "confidence": 0.4077,
+    "confidence": 0.3638,
     "expected_goals": {
       "p1": 1.46,
       "p2": 1.64,
@@ -156,7 +172,31 @@
       "away_cover": 0.4189
     },
     "model": "ESPN market + form + home edge",
-    "calculated_at": "2026-09-19T21:38:09.506688+00:00"
+    "raw_probabilities": {
+      "p1": 0.3387,
+      "draw": 0.2536,
+      "p2": 0.4077
+    },
+    "raw_confidence": 0.4077,
+    "calibrated_probabilities": {
+      "p1": 0.3632,
+      "draw": 0.272,
+      "p2": 0.3648
+    },
+    "calibrated_confidence": 0.3638,
+    "calibration": {
+      "market": "football:1x2",
+      "method": "recency_weighted_empirical_bayes",
+      "sample_size": 118,
+      "effective_sample": 41.22,
+      "empirical": 0.3318,
+      "raw": 0.4077,
+      "bin_center": 0.425,
+      "selection_identity_preserved": true,
+      "selection_floor": 0.3648
+    },
+    "model_version": "5.0 historical-calibrated",
+    "calculated_at": "2026-09-19T21:49:45.957349+00:00"
   },
   {
     "sport": "football",
@@ -168,12 +208,12 @@
     "venue": "Audi Field",
     "surface": "Grass",
     "probabilities": {
-      "p1": 0.3105,
-      "draw": 0.2503,
-      "p2": 0.4392
+      "p1": 0.3355,
+      "draw": 0.2705,
+      "p2": 0.394
     },
     "pick": "p2",
-    "confidence": 0.4392,
+    "confidence": 0.394,
     "expected_goals": {
       "p1": 1.38,
       "p2": 1.68,
@@ -200,7 +240,29 @@
       "away_cover": 0.4462
     },
     "model": "ESPN market + form + home edge",
-    "calculated_at": "2026-09-19T21:38:09.506688+00:00"
+    "raw_probabilities": {
+      "p1": 0.3105,
+      "draw": 0.2503,
+      "p2": 0.4392
+    },
+    "raw_confidence": 0.4392,
+    "calibrated_probabilities": {
+      "p1": 0.3355,
+      "draw": 0.2705,
+      "p2": 0.394
+    },
+    "calibrated_confidence": 0.394,
+    "calibration": {
+      "market": "football:1x2",
+      "method": "recency_weighted_empirical_bayes",
+      "sample_size": 118,
+      "effective_sample": 44.76,
+      "empirical": 0.3637,
+      "raw": 0.4392,
+      "bin_center": 0.425
+    },
+    "model_version": "5.0 historical-calibrated",
+    "calculated_at": "2026-09-19T21:49:45.957349+00:00"
   },
   {
     "sport": "football",
@@ -212,15 +274,15 @@
     "venue": "Gillette Stadium",
     "surface": "Grass",
     "probabilities": {
-      "p1": 0.548,
-      "draw": 0.2176,
-      "p2": 0.2344
+      "p1": 0.4902,
+      "draw": 0.244,
+      "p2": 0.2657
     },
     "pick": "p1",
-    "confidence": 0.548,
+    "confidence": 0.4902,
     "expected_goals": {
-      "p1": 2.24,
-      "p2": 1.46,
+      "p1": 2.26,
+      "p2": 1.43,
       "total": 3.7
     },
     "markets": {
@@ -232,19 +294,41 @@
         "source": "market O/U calibrated"
       },
       "btts": {
-        "yes": 0.6858,
-        "no": 0.3142,
+        "yes": 0.6825,
+        "no": 0.3175,
         "pick": "yes",
         "source": "Poisson xG model"
       }
     },
     "handicap": {
       "line": -0.5,
-      "home_cover": 0.5514,
-      "away_cover": 0.4486
+      "home_cover": 0.562,
+      "away_cover": 0.438
     },
     "model": "ESPN market + form + home edge",
-    "calculated_at": "2026-09-19T21:38:09.506688+00:00"
+    "raw_probabilities": {
+      "p1": 0.5559,
+      "draw": 0.2126,
+      "p2": 0.2315
+    },
+    "raw_confidence": 0.5559,
+    "calibrated_probabilities": {
+      "p1": 0.4902,
+      "draw": 0.244,
+      "p2": 0.2657
+    },
+    "calibrated_confidence": 0.4902,
+    "calibration": {
+      "market": "football:1x2",
+      "method": "recency_weighted_empirical_bayes",
+      "sample_size": 118,
+      "effective_sample": 29.34,
+      "empirical": 0.4231,
+      "raw": 0.5559,
+      "bin_center": 0.575
+    },
+    "model_version": "5.0 historical-calibrated",
+    "calculated_at": "2026-09-19T21:49:45.957349+00:00"
   },
   {
     "sport": "football",
@@ -256,12 +340,12 @@
     "venue": "Levi's Stadium",
     "surface": "Grass",
     "probabilities": {
-      "p1": 0.3227,
-      "draw": 0.2388,
-      "p2": 0.4385
+      "p1": 0.3486,
+      "draw": 0.258,
+      "p2": 0.3934
     },
     "pick": "p2",
-    "confidence": 0.4385,
+    "confidence": 0.3934,
     "expected_goals": {
       "p1": 1.55,
       "p2": 1.84,
@@ -288,7 +372,29 @@
       "away_cover": 0.4469
     },
     "model": "ESPN market + form + home edge",
-    "calculated_at": "2026-09-19T21:38:09.506688+00:00"
+    "raw_probabilities": {
+      "p1": 0.3227,
+      "draw": 0.2388,
+      "p2": 0.4385
+    },
+    "raw_confidence": 0.4385,
+    "calibrated_probabilities": {
+      "p1": 0.3486,
+      "draw": 0.258,
+      "p2": 0.3934
+    },
+    "calibrated_confidence": 0.3934,
+    "calibration": {
+      "market": "football:1x2",
+      "method": "recency_weighted_empirical_bayes",
+      "sample_size": 118,
+      "effective_sample": 44.76,
+      "empirical": 0.3632,
+      "raw": 0.4385,
+      "bin_center": 0.425
+    },
+    "model_version": "5.0 historical-calibrated",
+    "calculated_at": "2026-09-19T21:49:45.957349+00:00"
   },
   {
     "sport": "football",
@@ -300,12 +406,12 @@
     "venue": "Toyota Stadium",
     "surface": "Grass",
     "probabilities": {
-      "p1": 0.5788,
-      "draw": 0.2212,
-      "p2": 0.2
+      "p1": 0.5255,
+      "draw": 0.2492,
+      "p2": 0.2253
     },
     "pick": "p1",
-    "confidence": 0.5788,
+    "confidence": 0.5256,
     "expected_goals": {
       "p1": 2.06,
       "p2": 1.16,
@@ -332,7 +438,29 @@
       "away_cover": 0.4183
     },
     "model": "ESPN market + form + home edge",
-    "calculated_at": "2026-09-19T21:38:09.506688+00:00"
+    "raw_probabilities": {
+      "p1": 0.5788,
+      "draw": 0.2212,
+      "p2": 0.2
+    },
+    "raw_confidence": 0.5788,
+    "calibrated_probabilities": {
+      "p1": 0.5255,
+      "draw": 0.2492,
+      "p2": 0.2253
+    },
+    "calibrated_confidence": 0.5256,
+    "calibration": {
+      "market": "football:1x2",
+      "method": "recency_weighted_empirical_bayes",
+      "sample_size": 118,
+      "effective_sample": 25.09,
+      "empirical": 0.4619,
+      "raw": 0.5788,
+      "bin_center": 0.575
+    },
+    "model_version": "5.0 historical-calibrated",
+    "calculated_at": "2026-09-19T21:49:45.957349+00:00"
   },
   {
     "sport": "football",
@@ -344,12 +472,12 @@
     "venue": "Shell Energy Stadium",
     "surface": "Grass",
     "probabilities": {
-      "p1": 0.4792,
-      "draw": 0.2418,
-      "p2": 0.279
+      "p1": 0.4361,
+      "draw": 0.2618,
+      "p2": 0.3021
     },
     "pick": "p1",
-    "confidence": 0.4792,
+    "confidence": 0.4361,
     "expected_goals": {
       "p1": 1.83,
       "p2": 1.38,
@@ -376,7 +504,29 @@
       "away_cover": 0.5186
     },
     "model": "ESPN market + form + home edge",
-    "calculated_at": "2026-09-19T21:38:09.506688+00:00"
+    "raw_probabilities": {
+      "p1": 0.4792,
+      "draw": 0.2418,
+      "p2": 0.279
+    },
+    "raw_confidence": 0.4792,
+    "calibrated_probabilities": {
+      "p1": 0.4361,
+      "draw": 0.2618,
+      "p2": 0.3021
+    },
+    "calibrated_confidence": 0.4361,
+    "calibration": {
+      "market": "football:1x2",
+      "method": "recency_weighted_empirical_bayes",
+      "sample_size": 118,
+      "effective_sample": 42.22,
+      "empirical": 0.4055,
+      "raw": 0.4792,
+      "bin_center": 0.475
+    },
+    "model_version": "5.0 historical-calibrated",
+    "calculated_at": "2026-09-19T21:49:45.957349+00:00"
   },
   {
     "sport": "football",
@@ -388,39 +538,61 @@
     "venue": "Allianz Field",
     "surface": "Grass",
     "probabilities": {
-      "p1": 0.5633,
-      "draw": 0.2109,
-      "p2": 0.2258
+      "p1": 0.512,
+      "draw": 0.2384,
+      "p2": 0.2496
     },
     "pick": "p1",
-    "confidence": 0.5633,
+    "confidence": 0.512,
     "expected_goals": {
-      "p1": 2.17,
-      "p2": 1.33,
-      "total": 3.5
+      "p1": 2.21,
+      "p2": 1.32,
+      "total": 3.53
     },
     "markets": {
       "over_under": {
         "line": 3.5,
-        "over": 0.4632,
-        "under": 0.5368,
+        "over": 0.4694,
+        "under": 0.5306,
         "pick": "under",
         "source": "market O/U calibrated"
       },
       "btts": {
-        "yes": 0.652,
-        "no": 0.348,
+        "yes": 0.6522,
+        "no": 0.3478,
         "pick": "yes",
         "source": "Poisson xG model"
       }
     },
     "handicap": {
       "line": -0.5,
-      "home_cover": 0.5643,
-      "away_cover": 0.4357
+      "home_cover": 0.5759,
+      "away_cover": 0.4241
     },
     "model": "ESPN market + form + home edge",
-    "calculated_at": "2026-09-19T21:38:09.506688+00:00"
+    "raw_probabilities": {
+      "p1": 0.5691,
+      "draw": 0.2105,
+      "p2": 0.2204
+    },
+    "raw_confidence": 0.5691,
+    "calibrated_probabilities": {
+      "p1": 0.512,
+      "draw": 0.2384,
+      "p2": 0.2496
+    },
+    "calibrated_confidence": 0.512,
+    "calibration": {
+      "market": "football:1x2",
+      "method": "recency_weighted_empirical_bayes",
+      "sample_size": 118,
+      "effective_sample": 26.72,
+      "empirical": 0.4479,
+      "raw": 0.5691,
+      "bin_center": 0.575
+    },
+    "model_version": "5.0 historical-calibrated",
+    "calculated_at": "2026-09-19T21:49:45.957349+00:00"
   },
   {
     "sport": "football",
@@ -432,39 +604,61 @@
     "venue": "Sporting Park",
     "surface": "Grass",
     "probabilities": {
-      "p1": 0.1437,
-      "draw": 0.1853,
-      "p2": 0.671
+      "p1": 0.1506,
+      "draw": 0.2058,
+      "p2": 0.6436
     },
     "pick": "p2",
-    "confidence": 0.671,
+    "confidence": 0.6436,
     "expected_goals": {
-      "p1": 1.11,
-      "p2": 2.46,
-      "total": 3.58
+      "p1": 1.09,
+      "p2": 2.5,
+      "total": 3.6
     },
     "markets": {
       "over_under": {
         "line": 3.5,
-        "over": 0.4797,
-        "under": 0.5203,
+        "over": 0.4843,
+        "under": 0.5157,
         "pick": "under",
         "source": "market O/U calibrated"
       },
       "btts": {
-        "yes": 0.614,
-        "no": 0.386,
+        "yes": 0.6106,
+        "no": 0.3894,
         "pick": "yes",
         "source": "Poisson xG model"
       }
     },
     "handicap": {
       "line": 1.5,
-      "home_cover": 0.5482,
-      "away_cover": 0.4518
+      "home_cover": 0.5359,
+      "away_cover": 0.4641
     },
     "model": "ESPN market + form + home edge",
-    "calculated_at": "2026-09-19T21:38:09.506688+00:00"
+    "raw_probabilities": {
+      "p1": 0.1354,
+      "draw": 0.185,
+      "p2": 0.6796
+    },
+    "raw_confidence": 0.6796,
+    "calibrated_probabilities": {
+      "p1": 0.1506,
+      "draw": 0.2058,
+      "p2": 0.6436
+    },
+    "calibrated_confidence": 0.6436,
+    "calibration": {
+      "market": "football:1x2",
+      "method": "recency_weighted_empirical_bayes",
+      "sample_size": 118,
+      "effective_sample": 12.6,
+      "empirical": 0.5579,
+      "raw": 0.6796,
+      "bin_center": 0.675
+    },
+    "model_version": "5.0 historical-calibrated",
+    "calculated_at": "2026-09-19T21:49:45.957349+00:00"
   },
   {
     "sport": "football",
@@ -476,12 +670,12 @@
     "venue": "Energizer Park",
     "surface": "Grass",
     "probabilities": {
-      "p1": 0.6023,
-      "draw": 0.2095,
-      "p2": 0.1882
+      "p1": 0.5461,
+      "draw": 0.2391,
+      "p2": 0.2148
     },
     "pick": "p1",
-    "confidence": 0.6023,
+    "confidence": 0.5461,
     "expected_goals": {
       "p1": 2.22,
       "p2": 1.17,
@@ -508,7 +702,29 @@
       "away_cover": 0.3898
     },
     "model": "ESPN market + form + home edge",
-    "calculated_at": "2026-09-19T21:38:09.506688+00:00"
+    "raw_probabilities": {
+      "p1": 0.6023,
+      "draw": 0.2095,
+      "p2": 0.1882
+    },
+    "raw_confidence": 0.6023,
+    "calibrated_probabilities": {
+      "p1": 0.5461,
+      "draw": 0.2391,
+      "p2": 0.2148
+    },
+    "calibrated_confidence": 0.5461,
+    "calibration": {
+      "market": "football:1x2",
+      "method": "recency_weighted_empirical_bayes",
+      "sample_size": 118,
+      "effective_sample": 21.86,
+      "empirical": 0.4689,
+      "raw": 0.6023,
+      "bin_center": 0.625
+    },
+    "model_version": "5.0 historical-calibrated",
+    "calculated_at": "2026-09-19T21:49:45.957349+00:00"
   },
   {
     "sport": "football",
@@ -520,15 +736,15 @@
     "venue": "Dick's Sporting Goods Park",
     "surface": "Grass",
     "probabilities": {
-      "p1": 0.5199,
-      "draw": 0.2348,
-      "p2": 0.2453
+      "p1": 0.4717,
+      "draw": 0.2604,
+      "p2": 0.2679
     },
     "pick": "p1",
-    "confidence": 0.5199,
+    "confidence": 0.4717,
     "expected_goals": {
-      "p1": 1.85,
-      "p2": 1.21,
+      "p1": 1.87,
+      "p2": 1.19,
       "total": 3.05
     },
     "markets": {
@@ -540,19 +756,41 @@
         "source": "market O/U calibrated"
       },
       "btts": {
-        "yes": 0.5903,
-        "no": 0.4097,
+        "yes": 0.5872,
+        "no": 0.4128,
         "pick": "yes",
         "source": "Poisson xG model"
       }
     },
     "handicap": {
       "line": -0.5,
-      "home_cover": 0.5239,
-      "away_cover": 0.4761
+      "home_cover": 0.5337,
+      "away_cover": 0.4663
     },
     "model": "ESPN market + form + home edge",
-    "calculated_at": "2026-09-19T21:38:09.506688+00:00"
+    "raw_probabilities": {
+      "p1": 0.5295,
+      "draw": 0.2319,
+      "p2": 0.2386
+    },
+    "raw_confidence": 0.5295,
+    "calibrated_probabilities": {
+      "p1": 0.4717,
+      "draw": 0.2604,
+      "p2": 0.2679
+    },
+    "calibrated_confidence": 0.4717,
+    "calibration": {
+      "market": "football:1x2",
+      "method": "recency_weighted_empirical_bayes",
+      "sample_size": 118,
+      "effective_sample": 34.07,
+      "empirical": 0.4209,
+      "raw": 0.5295,
+      "bin_center": 0.525
+    },
+    "model_version": "5.0 historical-calibrated",
+    "calculated_at": "2026-09-19T21:49:45.957349+00:00"
   },
   {
     "sport": "football",
@@ -564,15 +802,15 @@
     "venue": "GEODIS Park",
     "surface": "Grass",
     "probabilities": {
-      "p1": 0.5566,
-      "draw": 0.226,
-      "p2": 0.2174
+      "p1": 0.5041,
+      "draw": 0.2531,
+      "p2": 0.2428
     },
     "pick": "p1",
-    "confidence": 0.5566,
+    "confidence": 0.5041,
     "expected_goals": {
-      "p1": 2.07,
-      "p2": 1.28,
+      "p1": 2.1,
+      "p2": 1.25,
       "total": 3.35
     },
     "markets": {
@@ -584,19 +822,41 @@
         "source": "market O/U calibrated"
       },
       "btts": {
-        "yes": 0.6305,
-        "no": 0.3695,
+        "yes": 0.6268,
+        "no": 0.3732,
         "pick": "yes",
         "source": "Poisson xG model"
       }
     },
     "handicap": {
       "line": -0.5,
-      "home_cover": 0.5577,
-      "away_cover": 0.4423
+      "home_cover": 0.5679,
+      "away_cover": 0.4321
     },
     "model": "ESPN market + form + home edge",
-    "calculated_at": "2026-09-19T21:38:09.506688+00:00"
+    "raw_probabilities": {
+      "p1": 0.5638,
+      "draw": 0.2226,
+      "p2": 0.2136
+    },
+    "raw_confidence": 0.5638,
+    "calibrated_probabilities": {
+      "p1": 0.5041,
+      "draw": 0.2531,
+      "p2": 0.2428
+    },
+    "calibrated_confidence": 0.5041,
+    "calibration": {
+      "market": "football:1x2",
+      "method": "recency_weighted_empirical_bayes",
+      "sample_size": 118,
+      "effective_sample": 27.67,
+      "empirical": 0.4393,
+      "raw": 0.5638,
+      "bin_center": 0.575
+    },
+    "model_version": "5.0 historical-calibrated",
+    "calculated_at": "2026-09-19T21:49:45.957349+00:00"
   },
   {
     "sport": "football",
@@ -608,12 +868,12 @@
     "venue": "America First Field",
     "surface": "Grass",
     "probabilities": {
-      "p1": 0.2105,
-      "draw": 0.2224,
-      "p2": 0.5671
+      "p1": 0.238,
+      "draw": 0.2514,
+      "p2": 0.5106
     },
     "pick": "p2",
-    "confidence": 0.5671,
+    "confidence": 0.5106,
     "expected_goals": {
       "p1": 1.2,
       "p2": 2.06,
@@ -640,7 +900,29 @@
       "away_cover": 0.5735
     },
     "model": "ESPN market + form + home edge",
-    "calculated_at": "2026-09-19T21:38:09.506688+00:00"
+    "raw_probabilities": {
+      "p1": 0.2105,
+      "draw": 0.2224,
+      "p2": 0.5671
+    },
+    "raw_confidence": 0.5671,
+    "calibrated_probabilities": {
+      "p1": 0.238,
+      "draw": 0.2514,
+      "p2": 0.5106
+    },
+    "calibrated_confidence": 0.5106,
+    "calibration": {
+      "market": "football:1x2",
+      "method": "recency_weighted_empirical_bayes",
+      "sample_size": 118,
+      "effective_sample": 26.9,
+      "empirical": 0.4476,
+      "raw": 0.5671,
+      "bin_center": 0.575
+    },
+    "model_version": "5.0 historical-calibrated",
+    "calculated_at": "2026-09-19T21:49:45.957349+00:00"
   },
   {
     "sport": "football",
@@ -652,12 +934,12 @@
     "venue": "Providence Park",
     "surface": "Grass",
     "probabilities": {
-      "p1": 0.4912,
-      "draw": 0.2332,
-      "p2": 0.2756
+      "p1": 0.449,
+      "draw": 0.2525,
+      "p2": 0.2984
     },
     "pick": "p1",
-    "confidence": 0.4912,
+    "confidence": 0.449,
     "expected_goals": {
       "p1": 1.98,
       "p2": 1.45,
@@ -684,7 +966,29 @@
       "away_cover": 0.5004
     },
     "model": "ESPN market + form + home edge",
-    "calculated_at": "2026-09-19T21:38:09.506688+00:00"
+    "raw_probabilities": {
+      "p1": 0.4912,
+      "draw": 0.2332,
+      "p2": 0.2756
+    },
+    "raw_confidence": 0.4912,
+    "calibrated_probabilities": {
+      "p1": 0.449,
+      "draw": 0.2525,
+      "p2": 0.2984
+    },
+    "calibrated_confidence": 0.449,
+    "calibration": {
+      "market": "football:1x2",
+      "method": "recency_weighted_empirical_bayes",
+      "sample_size": 118,
+      "effective_sample": 40.36,
+      "empirical": 0.4177,
+      "raw": 0.4912,
+      "bin_center": 0.475
+    },
+    "model_version": "5.0 historical-calibrated",
+    "calculated_at": "2026-09-19T21:49:45.957349+00:00"
   },
   {
     "sport": "tennis",
@@ -727,9 +1031,13 @@
       "expected_sets": 2.49,
       "total_games": {
         "line": 22.5,
-        "over": 0.7029,
-        "under": 0.2971,
-        "pick": "over"
+        "over": 0.4756,
+        "under": 0.5244,
+        "pick": "under",
+        "raw_over": 0.7029,
+        "raw_under": 0.2971,
+        "calibrated_over": 0.4756,
+        "calibrated_under": 0.5244
       },
       "games_handicap": {
         "estimated_margin_p1": 0.1,
@@ -744,7 +1052,19 @@
       "form_gap": 0.5,
       "market_available": false
     },
-    "calculated_at": "2026-09-19T21:38:09.506688+00:00"
+    "raw_confidence": 0.7029,
+    "calibrated_confidence": 0.5244,
+    "calibration": {
+      "market": "tennis:total_games",
+      "method": "recency_weighted_empirical_bayes",
+      "sample_size": 243,
+      "effective_sample": 53.14,
+      "empirical": 0.3473,
+      "raw": 0.7029,
+      "bin_center": 0.725
+    },
+    "model_version": "5.0 historical-calibrated",
+    "calculated_at": "2026-09-19T21:49:45.957349+00:00"
   },
   {
     "sport": "tennis",
@@ -787,9 +1107,13 @@
       "expected_sets": 2.49,
       "total_games": {
         "line": 22.5,
-        "over": 0.7029,
-        "under": 0.2971,
-        "pick": "over"
+        "over": 0.4756,
+        "under": 0.5244,
+        "pick": "under",
+        "raw_over": 0.7029,
+        "raw_under": 0.2971,
+        "calibrated_over": 0.4756,
+        "calibrated_under": 0.5244
       },
       "games_handicap": {
         "estimated_margin_p1": -0.1,
@@ -804,7 +1128,19 @@
       "form_gap": 0.5,
       "market_available": false
     },
-    "calculated_at": "2026-09-19T21:38:09.506688+00:00"
+    "raw_confidence": 0.7029,
+    "calibrated_confidence": 0.5244,
+    "calibration": {
+      "market": "tennis:total_games",
+      "method": "recency_weighted_empirical_bayes",
+      "sample_size": 243,
+      "effective_sample": 53.14,
+      "empirical": 0.3473,
+      "raw": 0.7029,
+      "bin_center": 0.725
+    },
+    "model_version": "5.0 historical-calibrated",
+    "calculated_at": "2026-09-19T21:49:45.957349+00:00"
   },
   {
     "sport": "football",
@@ -902,9 +1238,13 @@
       "expected_sets": 2.49,
       "total_games": {
         "line": 22.5,
-        "over": 0.7029,
-        "under": 0.2971,
-        "pick": "over"
+        "over": 0.4756,
+        "under": 0.5244,
+        "pick": "under",
+        "raw_over": 0.7029,
+        "raw_under": 0.2971,
+        "calibrated_over": 0.4756,
+        "calibrated_under": 0.5244
       },
       "games_handicap": {
         "estimated_margin_p1": -0.1,
@@ -919,7 +1259,19 @@
       "form_gap": 0.5,
       "market_available": false
     },
-    "calculated_at": "2026-09-19T21:38:09.506688+00:00"
+    "raw_confidence": 0.7029,
+    "calibrated_confidence": 0.5244,
+    "calibration": {
+      "market": "tennis:total_games",
+      "method": "recency_weighted_empirical_bayes",
+      "sample_size": 243,
+      "effective_sample": 53.14,
+      "empirical": 0.3473,
+      "raw": 0.7029,
+      "bin_center": 0.725
+    },
+    "model_version": "5.0 historical-calibrated",
+    "calculated_at": "2026-09-19T21:49:45.957349+00:00"
   },
   {
     "sport": "tennis",
@@ -962,9 +1314,13 @@
       "expected_sets": 2.5,
       "total_games": {
         "line": 22.5,
-        "over": 0.7054,
-        "under": 0.2946,
-        "pick": "over"
+        "over": 0.4783,
+        "under": 0.5217,
+        "pick": "under",
+        "raw_over": 0.7054,
+        "raw_under": 0.2946,
+        "calibrated_over": 0.4783,
+        "calibrated_under": 0.5217
       },
       "games_handicap": {
         "estimated_margin_p1": 0.07,
@@ -979,7 +1335,19 @@
       "form_gap": 0.375,
       "market_available": false
     },
-    "calculated_at": "2026-09-19T21:38:09.506688+00:00"
+    "raw_confidence": 0.7054,
+    "calibrated_confidence": 0.5217,
+    "calibration": {
+      "market": "tennis:total_games",
+      "method": "recency_weighted_empirical_bayes",
+      "sample_size": 243,
+      "effective_sample": 52.06,
+      "empirical": 0.3475,
+      "raw": 0.7054,
+      "bin_center": 0.725
+    },
+    "model_version": "5.0 historical-calibrated",
+    "calculated_at": "2026-09-19T21:49:45.957349+00:00"
   },
   {
     "sport": "tennis",
@@ -1022,9 +1390,13 @@
       "expected_sets": 2.48,
       "total_games": {
         "line": 22.5,
-        "over": 0.6954,
-        "under": 0.3046,
-        "pick": "over"
+        "over": 0.4676,
+        "under": 0.5324,
+        "pick": "under",
+        "raw_over": 0.6954,
+        "raw_under": 0.3046,
+        "calibrated_over": 0.4676,
+        "calibrated_under": 0.5324
       },
       "games_handicap": {
         "estimated_margin_p1": 0.15,
@@ -1039,7 +1411,19 @@
       "form_gap": 0.75,
       "market_available": false
     },
-    "calculated_at": "2026-09-19T21:38:09.506688+00:00"
+    "raw_confidence": 0.6954,
+    "calibrated_confidence": 0.5324,
+    "calibration": {
+      "market": "tennis:total_games",
+      "method": "recency_weighted_empirical_bayes",
+      "sample_size": 243,
+      "effective_sample": 56.52,
+      "empirical": 0.3467,
+      "raw": 0.6954,
+      "bin_center": 0.675
+    },
+    "model_version": "5.0 historical-calibrated",
+    "calculated_at": "2026-09-19T21:49:45.957349+00:00"
   },
   {
     "sport": "football",
@@ -1192,9 +1576,13 @@
       "expected_sets": 2.49,
       "total_games": {
         "line": 22.5,
-        "over": 0.7029,
-        "under": 0.2971,
-        "pick": "over"
+        "over": 0.4756,
+        "under": 0.5244,
+        "pick": "under",
+        "raw_over": 0.7029,
+        "raw_under": 0.2971,
+        "calibrated_over": 0.4756,
+        "calibrated_under": 0.5244
       },
       "games_handicap": {
         "estimated_margin_p1": -0.1,
@@ -1209,7 +1597,19 @@
       "form_gap": 0.5,
       "market_available": false
     },
-    "calculated_at": "2026-09-19T21:38:09.506688+00:00"
+    "raw_confidence": 0.7029,
+    "calibrated_confidence": 0.5244,
+    "calibration": {
+      "market": "tennis:total_games",
+      "method": "recency_weighted_empirical_bayes",
+      "sample_size": 243,
+      "effective_sample": 53.14,
+      "empirical": 0.3473,
+      "raw": 0.7029,
+      "bin_center": 0.725
+    },
+    "model_version": "5.0 historical-calibrated",
+    "calculated_at": "2026-09-19T21:49:45.957349+00:00"
   },
   {
     "sport": "tennis",
@@ -1252,9 +1652,13 @@
       "expected_sets": 2.49,
       "total_games": {
         "line": 22.5,
-        "over": 0.7029,
-        "under": 0.2971,
-        "pick": "over"
+        "over": 0.4756,
+        "under": 0.5244,
+        "pick": "under",
+        "raw_over": 0.7029,
+        "raw_under": 0.2971,
+        "calibrated_over": 0.4756,
+        "calibrated_under": 0.5244
       },
       "games_handicap": {
         "estimated_margin_p1": 0.1,
@@ -1269,7 +1673,19 @@
       "form_gap": 0.5,
       "market_available": false
     },
-    "calculated_at": "2026-09-19T21:38:09.506688+00:00"
+    "raw_confidence": 0.7029,
+    "calibrated_confidence": 0.5244,
+    "calibration": {
+      "market": "tennis:total_games",
+      "method": "recency_weighted_empirical_bayes",
+      "sample_size": 243,
+      "effective_sample": 53.14,
+      "empirical": 0.3473,
+      "raw": 0.7029,
+      "bin_center": 0.725
+    },
+    "model_version": "5.0 historical-calibrated",
+    "calculated_at": "2026-09-19T21:49:45.957349+00:00"
   },
   {
     "sport": "tennis",
@@ -1312,9 +1728,13 @@
       "expected_sets": 2.49,
       "total_games": {
         "line": 22.5,
-        "over": 0.7029,
-        "under": 0.2971,
-        "pick": "over"
+        "over": 0.4756,
+        "under": 0.5244,
+        "pick": "under",
+        "raw_over": 0.7029,
+        "raw_under": 0.2971,
+        "calibrated_over": 0.4756,
+        "calibrated_under": 0.5244
       },
       "games_handicap": {
         "estimated_margin_p1": 0.1,
@@ -1329,7 +1749,19 @@
       "form_gap": 0.5,
       "market_available": false
     },
-    "calculated_at": "2026-09-19T21:38:09.506688+00:00"
+    "raw_confidence": 0.7029,
+    "calibrated_confidence": 0.5244,
+    "calibration": {
+      "market": "tennis:total_games",
+      "method": "recency_weighted_empirical_bayes",
+      "sample_size": 243,
+      "effective_sample": 53.14,
+      "empirical": 0.3473,
+      "raw": 0.7029,
+      "bin_center": 0.725
+    },
+    "model_version": "5.0 historical-calibrated",
+    "calculated_at": "2026-09-19T21:49:45.957349+00:00"
   },
   {
     "sport": "tennis",
@@ -1372,9 +1804,13 @@
       "expected_sets": 2.5,
       "total_games": {
         "line": 22.5,
-        "over": 0.708,
-        "under": 0.292,
-        "pick": "over"
+        "over": 0.4812,
+        "under": 0.5188,
+        "pick": "under",
+        "raw_over": 0.708,
+        "raw_under": 0.292,
+        "calibrated_over": 0.4812,
+        "calibrated_under": 0.5188
       },
       "games_handicap": {
         "estimated_margin_p1": 0.03,
@@ -1389,7 +1825,19 @@
       "form_gap": 0.0,
       "market_available": false
     },
-    "calculated_at": "2026-09-19T21:38:09.506688+00:00"
+    "raw_confidence": 0.708,
+    "calibrated_confidence": 0.5188,
+    "calibration": {
+      "market": "tennis:total_games",
+      "method": "recency_weighted_empirical_bayes",
+      "sample_size": 243,
+      "effective_sample": 50.96,
+      "empirical": 0.3477,
+      "raw": 0.708,
+      "bin_center": 0.725
+    },
+    "model_version": "5.0 historical-calibrated",
+    "calculated_at": "2026-09-19T21:49:45.957349+00:00"
   },
   {
     "sport": "football",
