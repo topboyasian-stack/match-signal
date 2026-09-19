@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-19T20:37:03.153487+00:00",
+  "generated_at": "2026-09-19T21:34:11.994293+00:00",
   "mode": "PAPER_ONLY",
   "target_legs": "3-4",
   "sports_supported": [
@@ -7,16 +7,19 @@
     "tennis"
   ],
   "selection_policy": {
-    "min_model_probability": 0.65,
+    "min_calibrated_probability": 0.6,
     "requires_existing_research_gate_for_football": true,
-    "requires_paper_probability_threshold_for_tennis": true,
+    "requires_historical_calibration_threshold_for_tennis": true,
     "upcoming_fixture_only": true,
     "retain_started_legs_until_settled": true,
     "daily_automated_build": true,
     "mix_qualified_football_when_available": true,
     "football_reserved_slots": 1,
     "football_max_slots": 2,
-    "public_prediction_feed_unchanged": true
+    "public_prediction_feed_unchanged": true,
+    "historical_calibration_enabled": true,
+    "settled_history_used_for_calibration": true,
+    "raw_probabilities_not_used_for_qualification": true
   },
   "bookmaker_odds": {
     "status": "MANUAL_CONFIRMATION_REQUIRED",
@@ -29,19 +32,6 @@
     "tennis": 10
   },
   "qualified_legs": [
-    {
-      "sport": "tennis",
-      "competition": "WTA",
-      "event_id": "183856",
-      "start_time": "2026-09-19T16:00Z",
-      "match": "Kaitlin Quevedo vs Anna Blinkova",
-      "market": "total_games",
-      "pick": "Kaitlin Quevedo vs Anna Blinkova — Total Games over 22.5",
-      "model_probability": 0.7082,
-      "model_fair_odds": 1.412,
-      "source": "ATP/WTA ranking + recent form",
-      "decision": "PAPER ONLY"
-    },
     {
       "sport": "tennis",
       "competition": "WTA",
@@ -80,9 +70,53 @@
       "model_fair_odds": 1.412,
       "source": "partial ranking + recent form",
       "decision": "PAPER ONLY"
+    },
+    {
+      "sport": "tennis",
+      "competition": "WTA",
+      "event_id": "186105",
+      "start_time": "2026-09-20T11:30Z",
+      "match": "Dalila Spiteri vs Laura Bohner",
+      "market": "total_games",
+      "pick": "Dalila Spiteri vs Laura Bohner — Total Games over 22.5",
+      "model_probability": 0.7054,
+      "model_fair_odds": 1.418,
+      "source": "recent form only",
+      "decision": "PAPER ONLY"
     }
   ],
   "settled_legs": [
+    {
+      "sport": "tennis",
+      "competition": "WTA",
+      "event_id": "183856",
+      "start_time": "2026-09-19T16:05Z",
+      "match": "Kaitlin Quevedo vs Anna Blinkova",
+      "market": "total_games",
+      "pick": "Kaitlin Quevedo vs Anna Blinkova — Total Games over 22.5",
+      "model_probability": 0.7082,
+      "model_fair_odds": 1.412,
+      "source": "ATP/WTA ranking + recent form",
+      "decision": "PAPER ONLY",
+      "settlement": {
+        "finished": true,
+        "correct": true
+      },
+      "final_score": [
+        14.0,
+        14.0
+      ],
+      "actual_markets": {
+        "total_games": 28.0,
+        "total_games_line": 22.5,
+        "total_games_result": "over",
+        "total_games_correct": true,
+        "sets": 3,
+        "sets_won_p1": 1,
+        "sets_won_p2": 2
+      },
+      "settled_at": "2026-09-19T20:50:07.497140+00:00"
+    },
     {
       "sport": "tennis",
       "competition": "WTA",
@@ -193,7 +227,7 @@
     "tennis"
   ],
   "status": "QUALIFIED_ACCUMULATOR",
-  "reference_combined_odds": 3.95,
+  "reference_combined_odds": 3.966,
   "reference_odds_type": "MODEL_FAIR_ODDS_NOT_BOOKMAKER_PRICE",
   "actual_combined_odds": null,
   "notes": [
