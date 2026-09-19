@@ -276,6 +276,8 @@ settle_predictions = ns["settle_predictions"]
 accuracy_summary = ns["accuracy_summary"]
 load_json = ns["load_json"]
 save_json = ns["save_json"]
+calibrate_prediction = ns["calibrate_prediction"]
+calibrate_binary_market = ns["calibrate_binary_market"]
 DATA = ns["DATA"]
 FOOTBALL_LEAGUES = ns["FOOTBALL_LEAGUES"]
 TENNIS_LEAGUES = ns["TENNIS_LEAGUES"]
@@ -366,9 +368,30 @@ def main():
     history = load_json(history_path, [])
     history = settle_predictions(history)
     predictions, errors, qc = fetch_current_predictions()
-    now = datetime.now(timezone.utc).isoformat()
+    calibration_now = datetime.now(timezone.utc)
+
+    # V5 calibration is applied here as well as in predict_today.py because this
+    # production runner intentionally owns the enhanced tennis/football fetcher.
+    # Only settled history is used; current predictions never calibrate themselves.
     for prediction in predictions:
-        prediction["calculated_at"] = now
+        calibrate_prediction(prediction, history, calibration_now)
+        if prediction.get("sport") == "tennis":
+            total = (prediction.get("analytics") or {}).get("total_games") or {}
+            raw_pick = total.get("pick")
+            if raw_pick in {"over", "under"}:
+                raw_total = float(total.get(raw_pick, 0.5))
+                calibrated_total, total_diag = calibrate_binary_market(
+                    prediction, raw_total, history, "tennis:total_games", calibration_now
+                )
+                total["raw_over"] = round(float(total.get("over", 0.5)), 4)
+                total["raw_under"] = round(float(total.get("under", 0.5)), 4)
+                total["calibrated_over"] = round(calibrated_total if raw_pick == "over" else 1.0 - calibrated_total, 4)
+                total["calibrated_under"] = round(1.0 - total["calibrated_over"], 4)
+                total["calibration"] = total_diag
+                total["over"] = total["calibrated_over"]
+                total["under"] = total["calibrated_under"]
+                total["pick"] = "over" if total["over"] >= total["under"] else "under"
+        prediction["calculated_at"] = calibration_now.isoformat()
     existing_ids = {p.get("event_id") for p in history if not p.get("settled")}
     for prediction in predictions:
         if prediction["event_id"] not in existing_ids:
@@ -387,7 +410,7 @@ def main():
         "quality_control": qc,
         "data_source": "ESPN public scoreboards + ESPN ATP/WTA rankings + recent 60-day results",
         "free_server_cost": True,
-        "model_version": "3.2 calibrated tennis signals + fixture QC",
+        "model_version": "5.0 historical-calibrated tennis signals + fixture QC",
     })
     print(f"Predictions: {len(predictions)} | Football: {sum(p.get('sport') == 'football' for p in predictions)} | Tennis: {sum(p.get('sport') == 'tennis' for p in predictions)} | Settled: {summary['settled']} | QC rejected: {qc['rejected_total']} | Low-confidence filtered: {qc['filtered_low_confidence']} | Deduplicated: {qc['deduplicated_matches']}")
     for error in errors:
