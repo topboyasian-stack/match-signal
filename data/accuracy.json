@@ -1,9 +1,16 @@
 {
-  "updated_at": "2026-09-19T04:45:43.668973+00:00",
+  "updated_at": "2026-09-19T06:35:10.652334+00:00",
   "summary": {
-    "settled": 371,
+    "settled": 372,
     "correct": 184,
-    "accuracy": 0.496,
+    "accuracy": 0.4946,
+    "brier_score": 0.5255,
+    "markets": {},
+    "football": {
+      "settled": 103,
+      "correct": 46,
+      "accuracy": 0.4466
+    },
     "tennis": {
       "settled": 269,
       "correct": 138,
@@ -11,116 +18,6 @@
     }
   },
   "recent_settled": [
-    {
-      "sport": "tennis",
-      "league": "WTA",
-      "event_id": "183850",
-      "start_time": "2026-09-16T15:30Z",
-      "player_1": "Claire Liu",
-      "player_2": "Mary Stoiana",
-      "venue": "São Paulo, Brazil",
-      "surface": "Unknown",
-      "tournament": "SP Open",
-      "round": "Round 1",
-      "rankings": {
-        "p1": 96,
-        "p2": 116,
-        "gap": 20.0
-      },
-      "form": {
-        "p1": 0.7,
-        "p2": 0.6,
-        "p1_last10": "WLWLLWWWWW",
-        "p2_last10": "LWWLWWWLWL"
-      },
-      "probabilities": {
-        "p1": 0.5418,
-        "p2": 0.4582
-      },
-      "pick": "p1",
-      "confidence": 0.5418,
-      "analytics": {
-        "set_win_prob": {
-          "p1": 0.5279,
-          "p2": 0.4721
-        },
-        "straight_sets": {
-          "p1": 0.2787,
-          "p2": 0.2229
-        },
-        "three_sets": 0.4984,
-        "expected_sets": 2.5,
-        "total_games": {
-          "line": 22.5,
-          "over": 0.6556,
-          "under": 0.3444,
-          "pick": "over"
-        },
-        "games_handicap": {
-          "estimated_margin_p1": 0.03,
-          "pick": "p1"
-        }
-      },
-      "model": "ATP/WTA ranking + recent form",
-      "signal_quality": {
-        "components": 4,
-        "max_components": 5,
-        "ranking_gap": 20.0,
-        "form_gap": 0.1,
-        "market_available": false,
-        "secondary_analytics_calibrated": true
-      },
-      "calculated_at": "2026-09-16T10:55:39.368830+00:00",
-      "architecture": "independent statistical + market benchmark + calibration + value",
-      "decision": "PAPER ONLY",
-      "behavior_context": {
-        "version": "behavior-profiles-v2",
-        "matched": false,
-        "teams": {},
-        "source": "behavior_profiles.json",
-        "use": "context_only_unvalidated",
-        "probability_adjustment_applied": false
-      },
-      "individual_behavior_context": {
-        "p1": {
-          "sport": "tennis",
-          "name": "Claire Liu",
-          "observations": 0,
-          "provider_identity": false,
-          "note": "Awaiting provider athlete identity/statistics feed"
-        },
-        "p2": {
-          "sport": "tennis",
-          "name": "Mary Stoiana",
-          "observations": 0,
-          "provider_identity": false,
-          "note": "Awaiting provider athlete identity/statistics feed"
-        }
-      },
-      "live_eligible": false,
-      "testing_mode": "paper",
-      "evaluation_eligible": true,
-      "capture_status": "PRE_EVENT",
-      "actual_markets": {
-        "total_games": 21.0,
-        "total_games_line": 22.5,
-        "total_games_result": "under",
-        "total_games_correct": false,
-        "sets": 2,
-        "sets_won_p1": 0,
-        "sets_won_p2": 2
-      },
-      "final_score": [
-        8.0,
-        13.0
-      ],
-      "settled": true,
-      "settled_at": "2026-09-16T19:43:56.765764+00:00",
-      "actual": "p2",
-      "correct": false,
-      "brier": 0.587094,
-      "settlement_source": "ESPN tennis/all scoreboard"
-    },
     {
       "sport": "tennis",
       "league": "WTA",
@@ -4487,6 +4384,63 @@
       "correct": false,
       "brier": 0.887911,
       "settlement_source": "ESPN tennis/all scoreboard"
+    },
+    {
+      "sport": "football",
+      "league": "MLS",
+      "event_id": "761815",
+      "start_time": "2026-09-18T23:30Z",
+      "player_1": "New York City FC",
+      "player_2": "Red Bull New York",
+      "venue": "Yankee Stadium",
+      "surface": "Grass",
+      "probabilities": {
+        "p1": 0.5424,
+        "draw": 0.2242,
+        "p2": 0.2334
+      },
+      "pick": "p1",
+      "confidence": 0.5424,
+      "expected_goals": {
+        "p1": 2.07,
+        "p2": 1.31,
+        "total": 3.38
+      },
+      "markets": {
+        "over_under": {
+          "line": 3.5,
+          "over": 0.4367,
+          "under": 0.5633,
+          "pick": "under",
+          "source": "market O/U calibrated"
+        },
+        "btts": {
+          "yes": 0.6379,
+          "no": 0.3621,
+          "pick": "yes",
+          "source": "Poisson xG model"
+        }
+      },
+      "handicap": {
+        "line": -0.5,
+        "home_cover": 0.5487,
+        "away_cover": 0.4513
+      },
+      "model": "ESPN market + form + home edge",
+      "calculated_at": "2026-09-15T18:45:10.364668+00:00",
+      "actual_markets": {
+        "over_under": "under",
+        "btts": "no"
+      },
+      "final_score": [
+        0,
+        1
+      ],
+      "settled": true,
+      "settled_at": "2026-09-19T06:35:08.629220+00:00",
+      "actual": "p2",
+      "correct": false,
+      "brier": 0.932139
     },
     {
       "sport": "tennis",
