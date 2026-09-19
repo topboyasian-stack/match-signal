@@ -20,7 +20,7 @@ PREDICTIONS=DATA/'predictions.json'
 OUTPUT=DATA/'odds_builder.json'
 HISTORY=DATA/'prediction_history.json'
 MIN_LEGS,MAX_LEGS=3,4
-MIN_PROB=0.65
+MIN_PROB=0.60
 
 
 def load(path,default):
@@ -53,9 +53,9 @@ def football_candidates(now):
     if not isinstance(raw,list):return out
     for x in raw:
         if not isinstance(x,dict) or x.get('candidate_status')!='SELECTED' or x.get('sport')!='football' or not upcoming(x,now):continue
-        probs=x.get('probabilities') or {}
+        probs=x.get('calibrated_probabilities') or x.get('probabilities') or {}
         pick=x.get('pick')
-        try:p=float(probs.get(pick,x.get('confidence',0)) or 0)
+        try:p=float(probs.get(pick,x.get('calibrated_confidence',x.get('confidence',0))) or 0)
         except (TypeError,ValueError):continue
         if p>=MIN_PROB and pick in {'p1','draw','p2'}:
             out.append({**x,'builder_market':'1X2','builder_probability':p,'builder_pick':pick})
@@ -68,13 +68,13 @@ def tennis_candidates(now):
     if not isinstance(raw,list):return out
     for x in raw:
         if not isinstance(x,dict) or x.get('sport')!='tennis' or not upcoming(x,now):continue
-        probs=x.get('probabilities') or {}
+        probs=x.get('calibrated_probabilities') or x.get('probabilities') or {}
         pick=x.get('pick')
-        try:match_prob=float(probs.get(pick,0) or 0) if pick else 0.0
+        try:match_prob=float(probs.get(pick,x.get('calibrated_confidence',0)) or 0) if pick else 0.0
         except (TypeError,ValueError):match_prob=0.0
         total=(x.get('analytics') or {}).get('total_games') or {}
         ou_pick=total.get('pick')
-        try:ou_prob=float(total.get(ou_pick,0) or 0) if ou_pick else 0.0
+        try:ou_prob=float(total.get('calibrated_'+ou_pick,total.get(ou_pick,0)) or 0) if ou_pick else 0.0
         except (TypeError,ValueError):ou_prob=0.0
         if match_prob>=MIN_PROB:
             out.append({**x,'builder_market':'winner','builder_probability':match_prob,'builder_pick':pick})
@@ -134,7 +134,7 @@ def recent_settled_legs(history, now, known_ids):
         if ou_pick not in {'over','under'} or total.get('line') is None:
             continue
         try:
-            probability = float(total.get(ou_pick, 0) or 0)
+            probability = float(total.get('calibrated_'+ou_pick, total.get(ou_pick, 0)) or 0)
         except (TypeError, ValueError):
             continue
         if probability < MIN_PROB:
@@ -239,16 +239,19 @@ def main():
         'target_legs':'3-4',
         'sports_supported':['football','tennis'],
         'selection_policy':{
-            'min_model_probability':MIN_PROB,
+            'min_calibrated_probability':MIN_PROB,
             'requires_existing_research_gate_for_football':True,
-            'requires_paper_probability_threshold_for_tennis':True,
+            'requires_historical_calibration_threshold_for_tennis':True,
             'upcoming_fixture_only':True,
             'retain_started_legs_until_settled':True,
             'daily_automated_build':True,
             'mix_qualified_football_when_available':True,
             'football_reserved_slots':1,
             'football_max_slots':2,
-            'public_prediction_feed_unchanged':True
+            'public_prediction_feed_unchanged':True,
+            'historical_calibration_enabled':True,
+            'settled_history_used_for_calibration':True,
+            'raw_probabilities_not_used_for_qualification':True
         },
         'bookmaker_odds':{
             'status':'MANUAL_CONFIRMATION_REQUIRED',
