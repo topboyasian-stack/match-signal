@@ -17,6 +17,8 @@ SHRINKAGE_PRIOR = 30.0
 BIN_WIDTH = 0.05
 NEIGHBOR_RADIUS = 0.10
 
+# V5 production refresh trigger: calibration changes must regenerate the live feed.
+
 
 def _parse_date(value):
     try:
