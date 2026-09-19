@@ -5,6 +5,8 @@ from pathlib import Path
 
 import requests
 
+from calibration import calibrate_prediction, calibrate_binary_market
+
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
 DATA.mkdir(exist_ok=True)
@@ -588,9 +590,36 @@ def main():
     history = load_json(history_path, [])
     history = settle_predictions(history)
     predictions, errors, qc = fetch_current_predictions()
-    now = datetime.now(timezone.utc).isoformat()
+    calibration_now = datetime.now(timezone.utc)
+
+    # V5: calibrate every new prediction strictly against already-settled
+    # historical records. No current/unsettled prediction is allowed into the
+    # calibration sample, preventing future-result leakage.
     for prediction in predictions:
-        prediction["calculated_at"] = now
+        calibrate_prediction(prediction, history, calibration_now)
+
+        if prediction.get("sport") == "tennis":
+            total = (prediction.get("analytics") or {}).get("total_games") or {}
+            raw_pick = total.get("pick")
+            if raw_pick in {"over", "under"}:
+                raw_total = float(total.get(raw_pick, 0.5))
+                calibrated_total, total_diag = calibrate_binary_market(
+                    prediction,
+                    raw_total,
+                    history,
+                    "tennis:total_games",
+                    calibration_now,
+                )
+                total["raw_over"] = round(float(total.get("over", 0.5)), 4)
+                total["raw_under"] = round(float(total.get("under", 0.5)), 4)
+                total["calibrated_over"] = round(calibrated_total if raw_pick == "over" else 1.0 - calibrated_total, 4)
+                total["calibrated_under"] = round(1.0 - total["calibrated_over"], 4)
+                total["calibration"] = total_diag
+                total["over"] = total["calibrated_over"]
+                total["under"] = total["calibrated_under"]
+                total["pick"] = "over" if total["over"] >= total["under"] else "under"
+
+        prediction["calculated_at"] = calibration_now.isoformat()
     existing_ids = {p.get("event_id") for p in history if not p.get("settled")}
     for prediction in predictions:
         if prediction["event_id"] not in existing_ids:
@@ -600,7 +629,7 @@ def main():
     save_json(DATA / "predictions.json", predictions)
     save_json(history_path, history)
     save_json(accuracy_path, {"updated_at": now, "summary": summary, "recent_settled": [p for p in history if p.get("settled")][-50:]})
-    save_json(DATA / "pipeline_status.json", {"updated_at": now, "prediction_count": len(predictions), "football_count": sum(p.get("sport") == "football" for p in predictions), "tennis_count": sum(p.get("sport") == "tennis" for p in predictions), "errors": errors, "quality_control": qc, "data_source": "ESPN public scoreboards + ESPN ATP/WTA rankings", "free_server_cost": True, "model_version": "3.0 analytical markets"})
+    save_json(DATA / "pipeline_status.json", {"updated_at": now, "prediction_count": len(predictions), "football_count": sum(p.get("sport") == "football" for p in predictions), "tennis_count": sum(p.get("sport") == "tennis" for p in predictions), "errors": errors, "quality_control": qc, "data_source": "ESPN public scoreboards + ESPN ATP/WTA rankings", "free_server_cost": True, "model_version": "5.0 historical-calibrated analytical markets"})
     print(f"Predictions: {len(predictions)} | Football: {sum(p.get('sport') == 'football' for p in predictions)} | Tennis: {sum(p.get('sport') == 'tennis' for p in predictions)} | Settled: {summary['settled']} | QC rejected: {qc['rejected_total']}")
     for error in errors:
         print(" -", error)
