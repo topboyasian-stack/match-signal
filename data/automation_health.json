@@ -1,17 +1,30 @@
 {
-  "updated_at": "2026-09-19T01:16:28.379161+00:00",
+  "updated_at": "2026-09-19T05:59:30.567549+00:00",
   "automation_status": "SELF_HEALING_ENABLED",
-  "pipeline_last_update": "2026-09-18T23:32:40.177418+00:00",
-  "pipeline_age_hours": 1.73,
-  "odds_builder_last_update": "2026-09-18T23:32:54.146009+00:00",
-  "odds_builder_age_hours": 1.73,
-  "expansion_last_update": "2026-09-18T23:17:59.600740+00:00",
-  "expansion_age_hours": 1.97,
+  "pipeline_last_update": "2026-09-19T01:41:11.585978+00:00",
+  "pipeline_age_hours": 4.31,
+  "odds_builder_last_update": "2026-09-19T01:41:24.717550+00:00",
+  "odds_builder_age_hours": 4.3,
+  "expansion_last_update": "2026-09-19T01:35:27.448806+00:00",
+  "expansion_age_hours": 4.4,
   "thresholds": {
     "pipeline_hours": 4,
     "odds_builder_hours": 8,
     "expansion_hours": 4
   },
-  "actions": [],
+  "actions": [
+    {
+      "workflow": "live-expansion.yml",
+      "action": "dispatch",
+      "status": "requested",
+      "detail": "scheduled self-heal"
+    },
+    {
+      "workflow": "tennis_pipeline.yml",
+      "action": "dispatch",
+      "status": "requested",
+      "detail": "scheduled self-heal"
+    }
+  ],
   "policy": "Watchdog dispatches workflow_dispatch only when the corresponding generated artifact is stale and no run is already active."
 }
