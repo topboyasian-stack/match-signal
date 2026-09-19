@@ -170,6 +170,28 @@ def calibrate_prediction(prediction, history, now=None):
     if total:
         calibrated = {key: round(value / total, 4) for key, value in calibrated.items()}
 
+    # Final invariant: the published pick must remain the highest-probability
+    # outcome. Proportional redistribution can otherwise re-invert the pick
+    # when calibration moves it downward.
+    if pick in calibrated:
+        runner_up = max((value for key, value in calibrated.items() if key != pick), default=0.0)
+        if calibrated[pick] <= runner_up:
+            target = min(0.98, runner_up + 0.001)
+            others_total = max(1e-9, 1.0 - calibrated[pick])
+            new_others_total = 1.0 - target
+            for key in list(calibrated):
+                if key == pick:
+                    calibrated[key] = round(target, 4)
+                else:
+                    calibrated[key] = round(
+                        calibrated[key] / others_total * new_others_total, 4
+                    )
+            diagnostics = {
+                **diagnostics,
+                "selection_identity_preserved": True,
+                "selection_floor": round(target, 4),
+            }
+
     prediction["raw_probabilities"] = {key: round(float(value), 4) for key, value in probs.items()}
     prediction["raw_confidence"] = round(raw_pick, 4)
     prediction["calibrated_probabilities"] = calibrated
