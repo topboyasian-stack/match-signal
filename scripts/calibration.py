@@ -138,6 +138,23 @@ def calibrate_prediction(prediction, history, now=None):
     calibrated_pick, diagnostics = calibrate_probability(raw_pick, history, market_key, now)
     calibrated = dict(probs)
 
+    # Calibration must never silently invert the selected outcome. The pick is
+    # a deliberate model decision, so if historical calibration would move it
+    # below another outcome, cap the downward adjustment at the strongest
+    # non-selected raw probability (with a tiny margin for strict ordering).
+    other_raw_max = max(
+        (float(value) for key, value in probs.items() if key != pick),
+        default=0.0,
+    )
+    selection_floor = min(0.98, other_raw_max + 0.001)
+    if calibrated_pick < selection_floor:
+        calibrated_pick = selection_floor
+        diagnostics = {
+            **diagnostics,
+            "selection_identity_preserved": True,
+            "selection_floor": round(selection_floor, 4),
+        }
+
     # Preserve the relative probabilities of the non-selected outcomes while
     # moving the selected outcome to its empirically calibrated confidence.
     remainder_raw = max(1e-9, 1.0 - raw_pick)
