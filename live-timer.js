@@ -79,7 +79,9 @@
   const style=document.createElement('style');
   style.textContent='.live-timer{font-weight:800;letter-spacing:.04em;color:var(--amber);margin-right:auto}.live-timer.live{color:var(--green)}.live-timer.finished{color:var(--muted)}';
   document.head.appendChild(style);
-  new MutationObserver(update).observe(document.body,{childList:true,subtree:true});
+  // Do not observe the whole document: update() changes timer text, which creates
+  // childList mutations and can feed a MutationObserver back into itself forever.
+  // The one-second updater already handles dynamically rendered cards safely.
   refreshData();
   setInterval(update,1000);
   setInterval(refreshData,30000);
