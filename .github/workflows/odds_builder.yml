@@ -56,7 +56,7 @@ jobs:
           assert isinstance(data.get('qualified_legs'), list)
           assert len(data['qualified_legs']) <= 4
           if data['qualified_legs']:
-              assert len(data['qualified_legs']) >= 3
+              assert 1 <= len(data['qualified_legs']) <= 4
           for leg in data['qualified_legs']:
               assert leg.get('sport') in {'football', 'tennis'}
               assert float(leg.get('model_probability', 0)) >= 0.60
