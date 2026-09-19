@@ -21,6 +21,21 @@ FOOTBALL_LEAGUES = {
     "Primeira Liga": "por.1",
 }
 TENNIS_LEAGUES = {"ATP": "atp", "WTA": "wta"}
+
+# Validated schedule corrections for public-feed timestamps that are stale or
+# wrong at the source. Keep these narrow and event-specific; never apply a
+# blanket timezone offset to tennis fixtures.
+TENNIS_START_TIME_OVERRIDES = {
+    # Clara Burel vs Joelle Lilly Sophie Steur — Valencia WTA 125 SF.
+    # ESPN was publishing 15:00Z while multiple current schedule/market feeds
+    # publish 16:10Z on 2026-09-19.
+    "183771": "2026-09-19T16:10:00Z",
+}
+
+
+def tennis_start_time(event):
+    event_id = str(event.get("id") or "")
+    return TENNIS_START_TIME_OVERRIDES.get(event_id) or event.get("date")
 SESSION = requests.Session()
 SESSION.headers.update({"User-Agent": "MatchSignal/3.0 (+https://github.com/topboyasian-stack/match-signal)"})
 
