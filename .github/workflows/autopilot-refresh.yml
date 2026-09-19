@@ -122,20 +122,7 @@ jobs:
             # commits that may have changed the same data files concurrently.
             python scripts/scoped_pipeline.py
 
-            python - <<'PY'
-            import json
-            from pathlib import Path
-            feed = Path('data/predictions.json')
-            rows = json.loads(feed.read_text()) if feed.exists() else []
-            preserved = json.loads(Path('/tmp/preserved_live_leagues.json').read_text())
-            protected = set(preserved)
-            rows = [r for r in rows if r.get('league') not in protected]
-            for league_rows in preserved.values():
-                rows.extend(league_rows)
-            rows.sort(key=lambda r: str(r.get('start_time') or ''))
-            feed.write_text(json.dumps(rows, indent=2, ensure_ascii=False))
-            print('Restored protected live leagues:', {k: len(v) for k, v in preserved.items()})
-            PY
+            python -c "import json; from pathlib import Path; feed=Path('data/predictions.json'); rows=json.loads(feed.read_text()) if feed.exists() else []; preserved=json.loads(Path('/tmp/preserved_live_leagues.json').read_text()); protected=set(preserved); rows=[r for r in rows if r.get('league') not in protected]; [rows.extend(v) for v in preserved.values()]; rows.sort(key=lambda r: str(r.get('start_time') or '')); feed.write_text(json.dumps(rows, indent=2, ensure_ascii=False)); print('Restored protected live leagues:', {k: len(v) for k, v in preserved.items()})"
 
             python scripts/autopilot_guard.py
             git add data/predictions.json data/prediction_history.json data/accuracy.json data/pipeline_status.json data/autopilot_status.json
