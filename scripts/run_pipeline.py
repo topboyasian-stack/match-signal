@@ -274,6 +274,8 @@ base_tennis_prediction = ns["tennis_prediction"]
 football_prediction = ns["football_prediction"]
 settle_predictions = ns["settle_predictions"]
 accuracy_summary = ns["accuracy_summary"]
+calibrate_prediction = ns["calibrate_prediction"]
+calibrate_binary_market = ns["calibrate_binary_market"]
 load_json = ns["load_json"]
 save_json = ns["save_json"]
 DATA = ns["DATA"]
@@ -366,7 +368,35 @@ def main():
     history = load_json(history_path, [])
     history = settle_predictions(history)
     predictions, errors, qc = fetch_current_predictions()
-    now = datetime.now(timezone.utc).isoformat()
+    # V5 historical calibration is applied only after settlement and before
+    # publication. This keeps the current event out of its own calibration fit.
+    calibration_now = datetime.now(timezone.utc)
+    for prediction in predictions:
+        if prediction.get("sport") == "tennis" and (prediction.get("analytics") or {}).get("total_games", {}).get("pick") in {"over", "under"}:
+            total = prediction["analytics"]["total_games"]
+            raw_over = float(total.get("over") or 0.5)
+            raw_under = float(total.get("under") or (1.0 - raw_over))
+            raw_pick = "over" if raw_over >= raw_under else "under"
+            raw_selected = raw_over if raw_pick == "over" else raw_under
+            calibrated_selected, diagnostics = calibrate_binary_market(
+                prediction, raw_selected, history, "tennis:total_games", calibration_now
+            )
+            calibrated_over = calibrated_selected if raw_pick == "over" else 1.0 - calibrated_selected
+            calibrated_under = 1.0 - calibrated_over
+            total["raw_over"] = round(raw_over, 4)
+            total["raw_under"] = round(raw_under, 4)
+            total["calibrated_over"] = round(calibrated_over, 4)
+            total["calibrated_under"] = round(calibrated_under, 4)
+            total["over"] = round(calibrated_over, 4)
+            total["under"] = round(calibrated_under, 4)
+            total["pick"] = "over" if calibrated_over >= calibrated_under else "under"
+            prediction["raw_confidence"] = round(raw_selected, 4)
+            prediction["calibrated_confidence"] = round(max(calibrated_over, calibrated_under), 4)
+            prediction["calibration"] = {"market": "tennis:total_games", **diagnostics}
+            prediction["model_version"] = "5.0 historical-calibrated"
+        else:
+            calibrate_prediction(prediction, history, calibration_now)
+    now = calibration_now.isoformat()
     for prediction in predictions:
         prediction["calculated_at"] = now
     existing_ids = {p.get("event_id") for p in history if not p.get("settled")}
