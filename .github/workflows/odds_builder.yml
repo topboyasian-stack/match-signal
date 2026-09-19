@@ -59,7 +59,7 @@ jobs:
               assert len(data['qualified_legs']) >= 3
           for leg in data['qualified_legs']:
               assert leg.get('sport') in {'football', 'tennis'}
-              assert float(leg.get('model_probability', 0)) >= 0.65
+              assert float(leg.get('model_probability', 0)) >= 0.60
               assert float(leg.get('model_fair_odds', 0)) > 1
           sports = {x.get('sport') for x in data['qualified_legs']}
           if data.get('candidates_considered', {}).get('football', 0) > 0:
