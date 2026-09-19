@@ -71,28 +71,43 @@
       var total=Math.floor(diff/1000),days=Math.floor(total/86400); total%=86400; var h=Math.floor(total/3600); total%=3600; var m=Math.floor(total/60); var s=total%60;
       return {label:'Starts in',text:days?days+'d '+String(h).padStart(2,'0')+'h '+String(m).padStart(2,'0')+'m':String(h).padStart(2,'0')+'h '+String(m).padStart(2,'0')+'m '+String(s).padStart(2,'0')+'s',cls:diff<=900000?'soon':'upcoming'};
     }
-    var e=Math.floor((Date.now()-d.getTime())/1000),eh=Math.floor(e/3600),em=Math.floor((e%3600)/60),es=e%60;
-    return {label:'Live play',text:'LIVE · '+String(eh).padStart(2,'0')+'h '+String(em).padStart(2,'0')+'m '+String(es).padStart(2,'0')+'s',cls:'live'};
+    return {label:'Status check',text:'AWAITING LIVE FEED',cls:'unknown'};
   }
   function refreshLiveStatuses(legs) {
     var ts=(Array.isArray(legs)?legs:[]).filter(function(l){return String(l.sport||'').toLowerCase()==='tennis' && l.event_id;});
     return Promise.all(ts.map(function(l){
       var tours=['wta','atp'];
+      function acceptEvent(found, fallbackStart){
+        if(!found)return false;
+        var st=found.status||{},typ=st.type||{};
+        liveStates[String(l.event_id)]={
+          state:typ.state,
+          start_time:found.date||found.competitions?.[0]?.startDate||fallbackStart||l.start_time,
+          finished:typ.completed===true||typ.state==='post',
+          event:found
+        };
+        return true;
+      }
+      function findSummary(i){
+        if(i>=tours.length)return Promise.resolve(false);
+        var url='./api/espn?path='+encodeURIComponent('/apis/site/v2/sports/tennis/'+tours[i]+'/summary')+'&event='+encodeURIComponent(String(l.event_id))+'&_='+Date.now();
+        return fetch(url,{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('tennis summary HTTP '+r.status);return r.json();}).then(function(data){
+          var found=data.header && data.header.competitions && data.header.competitions[0];
+          if(found && acceptEvent(found, l.start_time))return true;
+          return findSummary(i+1);
+        }).catch(function(){return findSummary(i+1);});
+      }
       function findTour(i){
         if(i>=tours.length)return Promise.resolve();
         var url='./api/espn?path='+encodeURIComponent('/apis/site/v2/sports/tennis/'+tours[i]+'/scoreboard')+'&_='+Date.now();
         return fetch(url,{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('tennis scoreboard HTTP '+r.status);return r.json();}).then(function(data){
           var found=null;
           (data.events||[]).some(function(e){if(String(e.id)===String(l.event_id)){found=e;return true;}return false;});
-          if(found){
-            var st=found.status||{},typ=st.type||{};
-            liveStates[String(l.event_id)]={state:typ.state,start_time:found.date||found.competitions?.[0]?.startDate||l.start_time,finished:typ.completed===true||typ.state==='post',event:found};
-            return;
-          }
+          if(found){ acceptEvent(found, l.start_time); return; }
           return findTour(i+1);
         });
       }
-      return findTour(0).catch(function(){});
+      return findSummary(0).then(function(found){ return found ? true : findTour(0); }).catch(function(){ return findTour(0); });
     }));
   }
   function local(v) { var d=dateOf(v); return d?d.toLocaleString([], {weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'—'; }
@@ -141,7 +156,7 @@
     if(!document.getElementById('odds-builder-result-style')){
       var s=document.createElement('style');s.id='odds-builder-result-style';s.textContent='.timer.finished-correct{border-color:#35d49a;background:#06251a}.timer.finished-correct .timerValue{color:#35d49a}.timer.finished-wrong{border-color:#ff7474;background:#2a0d12}.timer.finished-wrong .timerValue{color:#ff7474}.timer.finished{border-color:#8f98b8}.timer.finished .timerValue{color:#eef1fb}.settled-card{border-color:#35d49a;background:#092018}.settled-card .meta{color:#35d49a}.result-badge{font-weight:900;letter-spacing:.02em}.result-badge.won,.won-text{color:#35d49a}.result-badge.lost,.lost-text{color:#ff7474}';document.head.appendChild(s);
     }
-    load();window.setInterval(load,60000);window.setInterval(updateTimers,1000);
+    load();window.setInterval(load,15000);window.setInterval(updateTimers,1000);
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 }());
