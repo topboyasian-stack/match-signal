@@ -53,7 +53,7 @@ jobs:
           git reset --hard origin/main
 
       - name: Compile production Python modules
-        run: python -m py_compile scripts/predict_today.py scripts/run_pipeline.py scripts/scoped_pipeline.py scripts/production_pipeline.py scripts/autopilot_guard.py
+        run: python -m py_compile scripts/calibration.py scripts/predict_today.py scripts/run_pipeline.py scripts/scoped_pipeline.py scripts/production_pipeline.py scripts/autopilot_guard.py
 
       - name: Preserve independent live experimental league slices
         run: |
