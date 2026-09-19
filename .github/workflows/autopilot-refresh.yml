@@ -110,13 +110,38 @@ jobs:
               echo "Autopilot publication succeeded on attempt ${attempt}."
               exit 0
             fi
-            echo "Concurrent main update detected; refreshing and retrying (attempt ${attempt})."
+
+            echo "Concurrent main update detected; rebuilding the data transaction against latest main (attempt ${attempt})."
             git fetch origin main
-            git rebase origin/main || {
-              git rebase --abort 2>/dev/null || true
-              echo "Rebase conflict; a later scheduled run will safely retry."
-              exit 1
-            }
-            sleep $((attempt * 3))
+            git reset --hard origin/main
+
+            # Re-run the data transaction after syncing to the newest main.
+            # This avoids rebasing generated JSON against settlement/pipeline
+            # commits that may have changed the same data files concurrently.
+            python scripts/scoped_pipeline.py
+
+            python - <<'PY'
+            import json
+            from pathlib import Path
+            feed = Path('data/predictions.json')
+            rows = json.loads(feed.read_text()) if feed.exists() else []
+            preserved = json.loads(Path('/tmp/preserved_live_leagues.json').read_text())
+            protected = set(preserved)
+            rows = [r for r in rows if r.get('league') not in protected]
+            for league_rows in preserved.values():
+                rows.extend(league_rows)
+            rows.sort(key=lambda r: str(r.get('start_time') or ''))
+            feed.write_text(json.dumps(rows, indent=2, ensure_ascii=False))
+            print('Restored protected live leagues:', {k: len(v) for k, v in preserved.items()})
+            PY
+
+            python scripts/autopilot_guard.py
+            git add data/predictions.json data/prediction_history.json data/accuracy.json data/pipeline_status.json data/autopilot_status.json
+            if git diff --cached --quiet; then
+              echo "Autopilot rebuild is already represented on latest main."
+              exit 0
+            fi
+            git commit -m "🤖 Autopilot refresh current predictions"
+            sleep $((attempt * 2))
           done
           exit 1
