@@ -29838,7 +29838,26 @@
     "model": "ESPN fixture + ATP/WTA ranking + recent form",
     "calculated_at": "2026-09-10T09:47:57.725739+00:00",
     "evaluation_eligible": true,
-    "capture_status": "PRE_EVENT"
+    "capture_status": "PRE_EVENT",
+    "actual_markets": {
+      "total_games": 21.0,
+      "total_games_line": 22.5,
+      "total_games_result": "under",
+      "total_games_correct": false,
+      "sets": 2,
+      "sets_won_p1": 0,
+      "sets_won_p2": 2
+    },
+    "final_score": [
+      8.0,
+      13.0
+    ],
+    "settled": true,
+    "settled_at": "2026-09-19T15:57:25.577971+00:00",
+    "actual": "p2",
+    "correct": false,
+    "brier": 0.5,
+    "settlement_source": "ESPN tennis/all scoreboard"
   },
   {
     "sport": "tennis",
@@ -30823,7 +30842,7 @@
     "sport": "tennis",
     "league": "WTA",
     "event_id": "183771",
-    "start_time": "2026-09-19T15:00Z",
+    "start_time": "2026-09-19T15:05Z",
     "player_1": "Clara Burel",
     "player_2": "Joelle Lilly Sophie Steur",
     "venue": "Valencia, Spain",
@@ -30842,11 +30861,11 @@
       "p2_last10": "WWWWW"
     },
     "probabilities": {
-      "p1": 0.5027,
-      "p2": 0.4973
+      "p1": 0.4448,
+      "p2": 0.5552
     },
-    "pick": "p1",
-    "confidence": 0.5027,
+    "pick": "p2",
+    "confidence": 0.5552,
     "analytics": {
       "set_win_prob": {
         "p1": 0.4631,
@@ -30860,54 +30879,26 @@
       "expected_sets": 2.5,
       "total_games": {
         "line": 22.5,
-        "over": 0.6326,
-        "under": 0.3674,
-        "pick": "over",
-        "base_model_over": 0.7066,
-        "base_model_under": 0.2934,
-        "pre_calibration_source": "walk-forward tennis set/game model",
-        "source": "continuous tennis model + walk-forward O/U calibration v4",
-        "calibration_status": "PAPER_RESEARCH",
-        "calibration_features": {
-          "line": 22.5,
-          "three_sets_bin": "mid",
-          "confidence_bin": "low",
-          "tour": "WTA",
-          "empirical_over_rate": 0.3365,
-          "calibration_source": "line+three_sets+confidence+tour",
-          "empirical_weight": 0.2,
-          "prior_model_over": 0.7066,
-          "global_over_rate": 0.3264
-        }
+        "over": 0.7066,
+        "under": 0.2934,
+        "pick": "over"
       },
       "games_handicap": {
         "estimated_margin_p1": -0.06,
         "pick": "p2"
-      },
-      "elo": {
-        "p1": 1500.0,
-        "p2": 1512.0,
-        "p1_win_prob": 0.4827,
-        "weight": 0.25
-      },
-      "walkforward_raw_p1": 0.4543,
-      "walkforward_calibrated_p1": 0.5027
+      }
     },
-    "model": "ESPN + ranking/form base + walk-forward player Elo + current ATP/WTA rank + walk-forward probability calibration",
+    "model": "recent form only",
     "signal_quality": {
       "components": 2,
       "max_components": 5,
       "ranking_gap": null,
       "form_gap": 0.3,
-      "market_available": false,
-      "elo_available": true,
-      "elo_gap": -12.0,
-      "ranking_available": false
+      "market_available": false
     },
-    "calculated_at": "2026-09-19T14:50:22.627702+00:00",
-    "model_version": "2026-09-17-walkforward-calibrated",
-    "evaluation_eligible": true,
-    "capture_status": "PRE_EVENT"
+    "calculated_at": "2026-09-19T15:10:05.927362+00:00",
+    "evaluation_eligible": false,
+    "capture_status": "LATE_CAPTURE"
   },
   {
     "sport": "football",
@@ -32052,125 +32043,5 @@
     },
     "model": "ESPN market + form + home edge",
     "calculated_at": "2026-09-19T11:32:27.875891+00:00"
-  },
-  {
-    "sport": "tennis",
-    "league": "WTA",
-    "event_id": "186097",
-    "start_time": "2026-09-20T09:00Z",
-    "player_1": "Semra Aksu",
-    "player_2": "Ekaterina Yashina",
-    "venue": "Ankara, Türkiye",
-    "surface": "Unknown",
-    "tournament": "Turk Telekom Ankara Open",
-    "round": "Qualifying 1st Round",
-    "rankings": {
-      "p1": null,
-      "p2": null,
-      "gap": null
-    },
-    "form": {
-      "p1": 0.5,
-      "p2": 0.0,
-      "p1_last10": "",
-      "p2_last10": "LLL"
-    },
-    "probabilities": {
-      "p1": 0.592,
-      "p2": 0.408
-    },
-    "pick": "p1",
-    "confidence": 0.592,
-    "analytics": {
-      "set_win_prob": {
-        "p1": 0.5616,
-        "p2": 0.4384
-      },
-      "straight_sets": {
-        "p1": 0.3154,
-        "p2": 0.1922
-      },
-      "three_sets": 0.4924,
-      "expected_sets": 2.49,
-      "total_games": {
-        "line": 22.5,
-        "over": 0.7029,
-        "under": 0.2971,
-        "pick": "over"
-      },
-      "games_handicap": {
-        "estimated_margin_p1": 0.1,
-        "pick": "p1"
-      }
-    },
-    "model": "recent form only",
-    "signal_quality": {
-      "components": 1,
-      "max_components": 5,
-      "ranking_gap": null,
-      "form_gap": 0.5,
-      "market_available": false
-    },
-    "calculated_at": "2026-09-19T15:10:05.927362+00:00"
-  },
-  {
-    "sport": "tennis",
-    "league": "WTA",
-    "event_id": "183728",
-    "start_time": "2026-09-20T13:30Z",
-    "player_1": "Gabriela Knutson",
-    "player_2": "Lisa Pigato",
-    "venue": "Caldas da Rainha, Portugal",
-    "surface": "Unknown",
-    "tournament": "Caldas da Rainha Ladies Open",
-    "round": "Final",
-    "rankings": {
-      "p1": null,
-      "p2": 137,
-      "gap": null
-    },
-    "form": {
-      "p1": 0.8,
-      "p2": 0.8,
-      "p1_last10": "WLWWWLWWWW",
-      "p2_last10": "LWWWW"
-    },
-    "probabilities": {
-      "p1": 0.5311,
-      "p2": 0.4689
-    },
-    "pick": "p1",
-    "confidence": 0.5311,
-    "analytics": {
-      "set_win_prob": {
-        "p1": 0.5208,
-        "p2": 0.4792
-      },
-      "straight_sets": {
-        "p1": 0.2712,
-        "p2": 0.2297
-      },
-      "three_sets": 0.4991,
-      "expected_sets": 2.5,
-      "total_games": {
-        "line": 22.5,
-        "over": 0.708,
-        "under": 0.292,
-        "pick": "over"
-      },
-      "games_handicap": {
-        "estimated_margin_p1": 0.03,
-        "pick": "p1"
-      }
-    },
-    "model": "partial ranking + recent form",
-    "signal_quality": {
-      "components": 3,
-      "max_components": 5,
-      "ranking_gap": null,
-      "form_gap": 0.0,
-      "market_available": false
-    },
-    "calculated_at": "2026-09-19T15:10:05.927362+00:00"
   }
 ]
