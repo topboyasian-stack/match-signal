@@ -24,6 +24,8 @@ on:
 permissions:
   contents: write
 
+# V5 publication retry: rebuild against latest main after concurrent data writers.
+
 concurrency:
   group: match-signal-core-refresh
   cancel-in-progress: true
