@@ -96,7 +96,10 @@ def selected_market_price(x):
         rows=x.get('sportybet_total_games_odds') or []
         for row in rows:
             try:
-                if line is not None and float(row.get('line'))==line and row.get('side')==pick:
+                row_line=float(row.get('line')) if row.get('line') is not None else None
+                # SportyBet specifiers such as total=17.5 are normalized by the
+                # market sync to the numeric line 17.5. Match that exact line.
+                if line is not None and row_line is not None and abs(row_line-line)<1e-9 and row.get('side')==pick:
                     return float(row.get('odds'))
             except (TypeError,ValueError):
                 continue
@@ -331,7 +334,7 @@ def main():
         'reference_combined_odds':round(math.prod(x['model_fair_odds'] for x in selected),3) if selected else None,
         'reference_odds_type':'MODEL_FAIR_ODDS_NOT_BOOKMAKER_PRICE',
         'actual_combined_odds':None,
-        'market_price_combined_odds':round(math.prod(float((x.get('sportybet_market_odds') or {}).get('odds',0) or 0) for x in selected),3) if selected and all((x.get('sportybet_market_odds') or {}).get('odds') for x in selected) else None,
+        'market_price_combined_odds':round(math.prod(float(x.get('bookmaker_odds')) for x in selected),3) if selected and all(x.get('bookmaker_odds') is not None for x in selected) else None,
         'notes':[
             'Booking/share-code generation has been removed.',
             'The user manually builds the accumulator on SportyBet or Stake.',
