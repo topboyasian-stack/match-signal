@@ -3,7 +3,7 @@ import runpy
 import math
 from datetime import datetime, timedelta, timezone
 
-from tennis_total_model import over_probability as v51_total_over_probability
+from tennis_total_model import over_probability as v51_total_over_probability, recommend_total_line
 
 GENERIC_NAMES = {"", "player 1", "player 2", "tbd", "tba", "unknown", "unknown player", "team 1", "team 2"}
 DOUBLES_MARKERS = ("double", "doubles", "mixed", "team")
@@ -228,15 +228,22 @@ def enhanced_tennis_prediction(event, tour, rankings, form_map, base_tennis_pred
             market_line = float(market_line)
     except (IndexError, TypeError, ValueError):
         market_line = None
+    target_context = {"sport":"tennis","league":tour,"player_1":name2,"player_2":name1,"start_time":event.get("date"),"probabilities":{"p1":p2_prob,"p2":p1_prob},"rankings":{"p1":rank2,"p2":rank1},"form":{"p1":form2,"p2":form1}}
     total_line = market_line or 22.5
     legacy_over_games = 1 / (1 + math.exp(-(expected_total_games - total_line) / 1.8))
     v51 = None
     if history:
         try:
-            v51 = v51_total_over_probability({"sport":"tennis","player_1":name2,"player_2":name1,"start_time":event.get("date"),"probabilities":{"p1":p2_prob,"p2":p1_prob},"rankings":{"p1":rank2,"p2":rank1},"form":{"p1":form2,"p2":form1}}, history, total_line)
+            recommended = recommend_total_line(target_context, history, minimum_probability=0.60)
+            if recommended:
+                total_line = float(recommended["recommended_line"])
+                v51 = recommended
+            else:
+                v51 = v51_total_over_probability(target_context, history, total_line)
         except Exception:
             v51 = None
     if v51:
+        selected_side = v51.get("recommended_pick") or v51.get("pick") or ("over" if v51["over"] >= 0.5 else "under")
         over_games = float(v51["over"])
         total_model = v51["model"]
         expected_total_games = float(v51["expected_total"])
@@ -273,7 +280,7 @@ def enhanced_tennis_prediction(event, tour, rankings, form_map, base_tennis_pred
             "set_win_prob": {"p1": round(1 - q, 4), "p2": round(q, 4)},
             "straight_sets": {"p1": round(straight2, 4), "p2": round(straight1, 4)},
             "three_sets": round(three_sets, 4), "expected_sets": round(expected_sets, 2),
-            "total_games": {"line": total_line, "over": round(over_games, 4), "under": round(1 - over_games, 4), "pick": "over" if over_games >= 0.5 else "under", "base_model_over": round(legacy_over_games, 4), "base_model_under": round(1 - legacy_over_games, 4), "source": total_model, "model_version": "5.1", "v51": v51},
+            "total_games": {"line": total_line, "over": round(over_games, 4), "under": round(1 - over_games, 4), "pick": selected_side, "base_model_over": round(legacy_over_games, 4), "base_model_under": round(1 - legacy_over_games, 4), "source": total_model, "model_version": "5.2", "v51": v51, "line_strategy": "tour-specific SportyBet-compatible ladder"},
             "games_handicap": {"estimated_margin_p1": round(-games_margin, 2), "pick": "p1" if games_margin <= 0 else "p2"},
         },
         "model": source,
