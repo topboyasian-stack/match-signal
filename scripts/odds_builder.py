@@ -100,13 +100,21 @@ def make_leg(x):
             'sport':'tennis','competition':x.get('league'),'event_id':x.get('event_id'),
             'start_time':x.get('start_time'),'match':f"{x.get('player_1')} vs {x.get('player_2')}",
             'market':x.get('builder_market'),'pick':pick,'model_probability':round(p,6),
-            'model_fair_odds':reference,'source':x.get('model'),'decision':x.get('decision','PAPER ONLY')
+            'model_fair_odds':reference,
+            'source':x.get('model'),'decision':x.get('decision','PAPER ONLY'),
+            'sportybet_market_odds':x.get('sportybet_market_snapshot') or x.get('sportybet_total_games_odds') or x.get('sportybet_winner_odds'),
+            'market_source':x.get('market_source'),
+            'market_odds_timestamp':x.get('odds_timestamp')
         }
     return {
         'sport':'football','competition':x.get('league'),'event_id':x.get('event_id'),
         'start_time':x.get('start_time'),'match':f"{x.get('home_team')} vs {x.get('away_team')}",
         'market':'1X2','pick':x.get('builder_pick'),'model_probability':round(p,6),
-        'model_fair_odds':reference,'source':x.get('model'),'decision':x.get('decision','PAPER ONLY')
+        'model_fair_odds':reference,
+        'source':x.get('model'),'decision':x.get('decision','PAPER ONLY'),
+        'sportybet_market_odds':x.get('sportybet_market_snapshot') or x.get('sportybet_winner_odds'),
+        'market_source':x.get('market_source'),
+        'market_odds_timestamp':x.get('odds_timestamp')
     }
 
 
@@ -281,6 +289,7 @@ def main():
         'reference_combined_odds':round(math.prod(x['model_fair_odds'] for x in selected),3) if selected else None,
         'reference_odds_type':'MODEL_FAIR_ODDS_NOT_BOOKMAKER_PRICE',
         'actual_combined_odds':None,
+        'market_price_combined_odds':round(math.prod(float((x.get('sportybet_market_odds') or {}).get('odds',0) or 0) for x in selected),3) if selected and all((x.get('sportybet_market_odds') or {}).get('odds') for x in selected) else None,
         'notes':[
             'Booking/share-code generation has been removed.',
             'The user manually builds the accumulator on SportyBet or Stake.',
