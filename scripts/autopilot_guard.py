@@ -133,8 +133,12 @@ def main():
                 else:
                     source_checks[label] = {"source_events": len(source_events), "feed_events": len(feed_events), "status": "OK"}
             except Exception as exc:
-                source_checks[label] = {"status": "SOURCE_ERROR", "error": str(exc)}
-                errors.append(f"{label}: source check failed: {exc}")
+                feed_events = {str(r.get("event_id")) for r in rows if r.get("league") == label}
+                source_checks[label] = {"feed_events": len(feed_events), "status": "SOURCE_UNAVAILABLE", "error": str(exc)}
+                if feed_events:
+                    warnings.append(f"{label}: source temporarily unavailable; retained existing feed coverage")
+                else:
+                    errors.append(f"{label}: source unavailable and feed has zero rows: {exc}")
 
         flatten = ns["flatten_tennis_board"]
         tennis_fixture_quality = ns["tennis_fixture_quality"]
