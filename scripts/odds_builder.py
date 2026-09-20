@@ -86,9 +86,45 @@ def tennis_candidates(now):
     return out
 
 
+def selected_market_price(x):
+    sport=x.get('sport')
+    market=x.get('builder_market')
+    pick=x.get('builder_pick')
+    if market=='total_games':
+        total=x.get('analytics',{}).get('total_games',{}) or {}
+        line=float(total.get('line')) if total.get('line') is not None else None
+        rows=x.get('sportybet_total_games_odds') or []
+        for row in rows:
+            try:
+                if line is not None and float(row.get('line'))==line and row.get('side')==pick:
+                    return float(row.get('odds'))
+            except (TypeError,ValueError):
+                continue
+        return None
+    snap=x.get('sportybet_winner_odds') or {}
+    try:
+        if pick in {'p1','p2'} and snap.get(pick) is not None:
+            return float(snap[pick])
+        if sport=='football' and pick=='draw' and snap.get('draw') is not None:
+            return float(snap['draw'])
+    except (TypeError,ValueError):
+        pass
+    return None
+
+
 def make_leg(x):
     p=float(x['builder_probability'])
     reference=fair_odds(p)
+    bookmaker_odds=selected_market_price(x)
+    market_implied=(1.0/bookmaker_odds) if bookmaker_odds and bookmaker_odds>0 else None
+    edge=(p-market_implied) if market_implied is not None else None
+    odds_age_seconds=None
+    try:
+        stamp=x.get('odds_timestamp')
+        if stamp:
+            odds_age_seconds=max(0,(datetime.now(timezone.utc)-datetime.fromisoformat(str(stamp).replace('Z','+00:00'))).total_seconds())
+    except (TypeError,ValueError):
+        pass
     if x.get('sport')=='tennis':
         if x.get('builder_market')=='total_games':
             total=x.get('analytics',{}).get('total_games',{})
@@ -102,9 +138,12 @@ def make_leg(x):
             'market':x.get('builder_market'),'pick':pick,'model_probability':round(p,6),
             'model_fair_odds':reference,
             'source':x.get('model'),'decision':x.get('decision','PAPER ONLY'),
-            'sportybet_market_odds':x.get('sportybet_market_snapshot') or x.get('sportybet_total_games_odds') or x.get('sportybet_winner_odds'),
+            'bookmaker_odds':round(bookmaker_odds,3) if bookmaker_odds else None,
+            'market_implied_probability':round(market_implied,6) if market_implied is not None else None,
+            'model_edge':round(edge,6) if edge is not None else None,
             'market_source':x.get('market_source'),
-            'market_odds_timestamp':x.get('odds_timestamp')
+            'market_odds_timestamp':x.get('odds_timestamp'),
+            'market_odds_age_seconds':round(odds_age_seconds,1) if odds_age_seconds is not None else None
         }
     return {
         'sport':'football','competition':x.get('league'),'event_id':x.get('event_id'),
@@ -112,9 +151,12 @@ def make_leg(x):
         'market':'1X2','pick':x.get('builder_pick'),'model_probability':round(p,6),
         'model_fair_odds':reference,
         'source':x.get('model'),'decision':x.get('decision','PAPER ONLY'),
-        'sportybet_market_odds':x.get('sportybet_market_snapshot') or x.get('sportybet_winner_odds'),
+        'bookmaker_odds':round(bookmaker_odds,3) if bookmaker_odds else None,
+        'market_implied_probability':round(market_implied,6) if market_implied is not None else None,
+        'model_edge':round(edge,6) if edge is not None else None,
         'market_source':x.get('market_source'),
-        'market_odds_timestamp':x.get('odds_timestamp')
+        'market_odds_timestamp':x.get('odds_timestamp'),
+        'market_odds_age_seconds':round(odds_age_seconds,1) if odds_age_seconds is not None else None
     }
 
 
