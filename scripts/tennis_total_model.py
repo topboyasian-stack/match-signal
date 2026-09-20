@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 
 MIN_HISTORY = 30
 MAX_NEIGHBORS = 60
-WTA_LINES = (16.5, 17.5, 18.5, 19.5, 20.5, 21.5, 22.5)
+WTA_LINES = (17.5, 18.5, 19.5, 20.5, 21.5, 22.5)
 ATP_LINES = (18.5, 19.5, 20.5, 21.5, 22.5, 23.5, 24.5, 25.5)
 HALF_LIFE_DAYS = 45.0
 CONF_SCALE = 0.08
@@ -176,7 +176,9 @@ def recommend_total_line(target, history, minimum_probability=0.60):
         for side in ("over", "under"):
             p = float(result[side])
             if p >= minimum_probability:
-                candidates.append((abs(p - 0.70), -p, line, side, result))
+                # Prefer the safest available bookmaker-compatible side/line.
+                # For WTA this deliberately makes 17.5 available as the floor.
+                candidates.append((-p, line if side == "over" else -line, line, side, result))
     if not candidates:
         return None
     candidates.sort(key=lambda x: (x[0], x[1]))
