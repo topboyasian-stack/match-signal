@@ -42,12 +42,29 @@ def line_from_specifier(spec):
 
 def fetch(sport, page=1):
     params={'sportId':SPORT_IDS[sport],'pageSize':'100','pageNum':str(page),'timeline':'168'}
-    r=requests.get(ENDPOINT,params=params,timeout=30,headers={'Accept':'application/json','User-Agent':'MatchSignal/5.2'})
-    r.raise_for_status()
-    body=r.json()
-    if not isinstance(body,dict):raise RuntimeError('SportyBet proxy returned non-object JSON')
-    if body.get('ok') is False:raise RuntimeError(body.get('error') or 'SportyBet proxy error')
-    return body
+    headers={'Accept':'application/json','Content-Type':'application/json','Current-Country':'NG','Origin':'https://www.sportybet.com','Referer':'https://www.sportybet.com/ng/','User-Agent':'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/152.0.0.0 Safari/537.36'}
+    direct_error=None
+    # GitHub runners may be challenged by SportyBet. curl_cffi first gives the
+    # upstream the same TLS/browser fingerprint shape used by normal browsers.
+    if curl_requests is not None:
+        try:
+            r=curl_requests.get('https://www.sportybet.com/api/ng/factsCenter/pcUpcomingEvents',params=params,headers=headers,timeout=30,impersonate='chrome')
+            if r.status_code==200 and r.text.strip():
+                body=r.json()
+                if isinstance(body,dict) and not body.get('ok'):
+                    return body
+            direct_error=f'HTTP {r.status_code}' if r is not None else 'no response'
+        except Exception as exc:
+            direct_error=str(exc)
+    try:
+        r=requests.get(ENDPOINT,params=params,timeout=30,headers={'Accept':'application/json','User-Agent':'MatchSignal/5.2'})
+        r.raise_for_status()
+        body=r.json()
+        if not isinstance(body,dict):raise RuntimeError('SportyBet proxy returned non-object JSON')
+        if body.get('ok') is False:raise RuntimeError(body.get('error') or 'SportyBet proxy error')
+        return body
+    except Exception as proxy_error:
+        raise RuntimeError(f'direct SportyBet={direct_error}; proxy={proxy_error}')
 
 
 def flatten(body):
