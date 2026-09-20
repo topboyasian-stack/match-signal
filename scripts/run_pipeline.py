@@ -229,6 +229,7 @@ def enhanced_tennis_prediction(event, tour, rankings, form_map, base_tennis_pred
     except (IndexError, TypeError, ValueError):
         market_line = None
     total_line = market_line or 22.5
+    legacy_over_games = 1 / (1 + math.exp(-(expected_total_games - total_line) / 1.8))
     v51 = None
     if history:
         try:
@@ -272,7 +273,7 @@ def enhanced_tennis_prediction(event, tour, rankings, form_map, base_tennis_pred
             "set_win_prob": {"p1": round(1 - q, 4), "p2": round(q, 4)},
             "straight_sets": {"p1": round(straight2, 4), "p2": round(straight1, 4)},
             "three_sets": round(three_sets, 4), "expected_sets": round(expected_sets, 2),
-            "total_games": {"line": total_line, "over": round(over_games, 4), "under": round(1 - over_games, 4), "pick": "over" if over_games >= 0.5 else "under", "source": total_model, "v51": v51},
+            "total_games": {"line": total_line, "over": round(over_games, 4), "under": round(1 - over_games, 4), "pick": "over" if over_games >= 0.5 else "under", "base_model_over": round(legacy_over_games, 4), "base_model_under": round(1 - legacy_over_games, 4), "source": total_model, "model_version": "5.1", "v51": v51},
             "games_handicap": {"estimated_margin_p1": round(-games_margin, 2), "pick": "p1" if games_margin <= 0 else "p2"},
         },
         "model": source,
