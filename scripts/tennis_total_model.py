@@ -202,16 +202,18 @@ def walk_forward_backtest(history, min_train=MIN_HISTORY):
         prior = rows[:index]
         if len(prior) < min_train:
             continue
-        line = float((row.get("analytics") or {}).get("total_games", {}).get("line") or 22.5)
-        actual = 1.0 if sum(float(v) for v in row["final_score"]) > line else 0.0
+        baseline_line = 22.5
+        baseline_actual = 1.0 if sum(float(v) for v in row["final_score"]) > baseline_line else 0.0
         baseline = float((row.get("analytics") or {}).get("total_games", {}).get("over") or 0.5)
-        result = over_probability(row, prior, line)
+        result = recommend_total_line(row, prior, minimum_probability=0.60)
         if not result:
             continue
-        predicted = result["over"]
-        baseline_brier += (baseline - actual) ** 2
+        line = float(result["recommended_line"])
+        actual = 1.0 if sum(float(v) for v in row["final_score"]) > line else 0.0
+        predicted = float(result["over"])
+        baseline_brier += (baseline - baseline_actual) ** 2
         v51_brier += (predicted - actual) ** 2
-        baseline_correct += float((baseline >= 0.5) == bool(actual))
+        baseline_correct += float((baseline >= 0.5) == bool(baseline_actual))
         v51_correct += float((predicted >= 0.5) == bool(actual))
         tested += 1
 
