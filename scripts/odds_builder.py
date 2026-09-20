@@ -76,9 +76,12 @@ def tennis_candidates(now):
         ou_pick=total.get('pick')
         try:ou_prob=float(total.get('calibrated_'+ou_pick,total.get(ou_pick,0)) or 0) if ou_pick else 0.0
         except (TypeError,ValueError):ou_prob=0.0
-        if match_prob>=MIN_PROB:
+        # Winner and Total Games are independent market candidates.
+        # Selection later prevents two correlated markets from the same event
+        # occupying separate accumulator slots.
+        if match_prob>=MIN_PROB and pick in {'p1','p2'}:
             out.append({**x,'builder_market':'winner','builder_probability':match_prob,'builder_pick':pick})
-        elif ou_pick in {'over','under'} and ou_prob>=MIN_PROB and total.get('line') is not None:
+        if ou_pick in {'over','under'} and ou_prob>=MIN_PROB and total.get('line') is not None:
             out.append({**x,'builder_market':'total_games','builder_probability':ou_prob,'builder_pick':ou_pick})
     return out
 
@@ -181,17 +184,26 @@ def select_mixed(football, tennis):
     all_candidates.sort(key=lambda x:float(x.get('builder_probability',0) or 0),reverse=True)
 
     selected=[]
+    selected_events=set()
     if football:
         selected.append(football[0])
+        selected_events.add(str(football[0].get('event_id') or ''))
         if len(football)>1 and MAX_LEGS >= 4:
             selected.append(football[1])
+            selected_events.add(str(football[1].get('event_id') or ''))
 
     for candidate in all_candidates:
         if len(selected)>=MAX_LEGS:
             break
         if candidate in selected:
             continue
+        # Avoid two correlated markets from the same match in one accumulator.
+        eid=str(candidate.get('event_id') or '')
+        if eid and eid in selected_events:
+            continue
         selected.append(candidate)
+        if eid:
+            selected_events.add(eid)
     return selected
 
 
