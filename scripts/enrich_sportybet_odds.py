@@ -9,6 +9,10 @@ import json, os, re
 from datetime import datetime, timezone
 from pathlib import Path
 import requests
+try:
+    from curl_cffi import requests as curl_requests
+except Exception:
+    curl_requests = None
 
 ROOT=Path(__file__).resolve().parents[1]
 DATA=ROOT/'data'
