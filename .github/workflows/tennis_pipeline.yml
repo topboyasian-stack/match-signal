@@ -107,6 +107,35 @@ jobs:
         run: python scripts/settle_same_day.py
       - name: Build isolated football performance ledger
         run: PYTHONPATH=. python scripts/build_football_performance.py
+      - name: Sanitize prediction feed after concurrent refreshes
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('data/predictions.json')
+          raw=p.read_text(encoding='utf-8')
+          try:
+              value=json.loads(raw)
+          except json.JSONDecodeError:
+              dec=json.JSONDecoder()
+              first,end=dec.raw_decode(raw.lstrip())
+              rest=raw.lstrip()[end:].strip()
+              if not rest:
+                  value=first
+              else:
+                  second,_=dec.raw_decode(rest)
+                  if isinstance(first,list) and isinstance(second,list):
+                      merged={str(x.get('event_id')):x for x in first if isinstance(x,dict) and x.get('event_id')}
+                      for x in second:
+                          if isinstance(x,dict) and x.get('event_id'): merged[str(x['event_id'])]=x
+                      value=list(merged.values())
+                  else:
+                      raise
+              p.write_text(json.dumps(value,indent=2,ensure_ascii=False)+'\n',encoding='utf-8')
+              print(f'Sanitized predictions.json: {len(value)} rows')
+          else:
+              print(f'Prediction feed valid JSON: {len(value) if isinstance(value,list) else "object"}')
+          PY
       - name: Refine weak-signal tennis analytics
         run: python scripts/calibrate_tennis_analytics.py
       - name: Build basketball coverage and OddsPapi/Stake market signals
