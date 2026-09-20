@@ -1,4 +1,4 @@
-"""V5.1 tennis Total Games model.
+"""V5.1 tennis Total Games model.\n\nProduction QA uses a chronological walk-forward gate before promotion.
 
 Walk-forward, leakage-safe empirical distribution model. It replaces the old
 single sigmoid over/under transform with a matchup-conditioned distribution
