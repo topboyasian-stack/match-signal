@@ -12,8 +12,9 @@ MIN_TENNIS_CONFIDENCE = 0.52
 
 def athlete_identity(competitor):
     athlete = competitor.get("athlete") or {}
-    athlete_id = str(athlete.get("id") or competitor.get("id") or "")
-    name = (athlete.get("displayName") or competitor.get("displayName") or "").strip()
+    team = competitor.get("team") or {}
+    athlete_id = str(athlete.get("id") or competitor.get("id") or team.get("id") or "")
+    name = (athlete.get("displayName") or competitor.get("displayName") or team.get("displayName") or team.get("shortDisplayName") or "").strip()
     return athlete_id, name
 
 
