@@ -148,17 +148,20 @@ def extract_markets(pred,event):
 def main():
     predictions=load(DATA/'predictions.json',[])
     fetched_at=datetime.now(timezone.utc).isoformat()
-    all_events=[]; errors=[]
+    all_events=[]; errors=[]; diagnostics={'sportybet_samples':{},'prediction_samples':{}}
     for sport in ('football','tennis'):
         try:
             body=fetch(sport)
             events=flatten(body)
             all_events.extend((sport,e) for e in events)
+            diagnostics['sportybet_samples'][sport]=[{'event_id':e.get('eventId'),'home':e.get('homeTeamName'),'away':e.get('awayTeamName'),'start':e.get('estimateStartTime'),'market_count':len(e.get('markets') or [])} for e in events[:10]]
             print(f'SportyBet {sport}: {len(events)} fixtures received')
         except Exception as exc:
             errors.append(f'{sport}:{exc}')
             print(f'SportyBet {sport}: ERROR {exc}')
     matched=0; winner_prices=0; total_prices=0
+    for sport in ('football','tennis'):
+        diagnostics['prediction_samples'][sport]=[{'event_id':p.get('event_id'),'p1':p.get('player_1') or p.get('home_team'),'p2':p.get('player_2') or p.get('away_team'),'start':p.get('start_time')} for p in predictions if p.get('sport')==sport][:10]
     for p in predictions:
         sport=p.get('sport')
         if sport not in SPORT_IDS:continue
@@ -179,7 +182,7 @@ def main():
             if totals:
                 p['sportybet_total_games_odds']=totals
             matched+=1
-    status={'updated_at':fetched_at,'source':'SportyBet NG web API via Cloudflare proxy','endpoint':ENDPOINT,'sports_requested':['football','tennis'],'fixtures_received':len(all_events),'predictions_matched':matched,'winner_price_records':winner_prices,'total_games_price_records':total_prices,'errors':errors,'status':'LIVE_MARKET_SYNC' if matched else 'NO_CURRENT_SPORTYBET_MATCHES'}
+    status={'updated_at':fetched_at,'source':'SportyBet NG web API via Cloudflare proxy','endpoint':ENDPOINT,'sports_requested':['football','tennis'],'fixtures_received':len(all_events),'predictions_matched':matched,'winner_price_records':winner_prices,'total_games_price_records':total_prices,'errors':errors,'status':'LIVE_MARKET_SYNC' if matched else 'NO_CURRENT_SPORTYBET_MATCHES','diagnostics':diagnostics}
     (DATA/'sportybet_odds_snapshot.json').write_text(json.dumps(status,indent=2)+'\\n',encoding='utf-8')
     (DATA/'predictions.json').write_text(json.dumps(predictions,indent=2,ensure_ascii=False)+'\\n',encoding='utf-8')
     print(json.dumps(status,indent=2))
