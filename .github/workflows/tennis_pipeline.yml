@@ -219,4 +219,16 @@ jobs:
             exit 0
           fi
           git commit -m "🤖 Refresh scheduled prediction pipeline"
-          git push origin main
+          for attempt in 1 2 3; do
+            if git push origin main; then
+              exit 0
+            fi
+            echo "Push race detected; rebasing generated commit onto latest main (attempt $attempt)."
+            git fetch origin main
+            git rebase origin/main || {
+              echo "Rebase conflict; aborting to avoid overwriting another workflow's generated data."
+              git rebase --abort || true
+              exit 1
+            }
+          done
+          exit 1
