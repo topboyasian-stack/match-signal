@@ -3,6 +3,8 @@ import runpy
 import math
 from datetime import datetime, timedelta, timezone
 
+from tennis_total_model import over_probability as v51_total_over_probability
+
 GENERIC_NAMES = {"", "player 1", "player 2", "tbd", "tba", "unknown", "unknown player", "team 1", "team 2"}
 DOUBLES_MARKERS = ("double", "doubles", "mixed", "team")
 MIN_TENNIS_CONFIDENCE = 0.52
@@ -158,7 +160,7 @@ def rank_probability(rank1, rank2):
     return 0.5, 0.0
 
 
-def enhanced_tennis_prediction(event, tour, rankings, form_map, base_tennis_prediction, american_to_prob, normalise):
+def enhanced_tennis_prediction(event, tour, rankings, form_map, base_tennis_prediction, american_to_prob, normalise, history=None):
     pair = event.get("competitors", [])[:2]
     if len(pair) != 2:
         return None
@@ -227,7 +229,19 @@ def enhanced_tennis_prediction(event, tour, rankings, form_map, base_tennis_pred
     except (IndexError, TypeError, ValueError):
         market_line = None
     total_line = market_line or 22.5
-    over_games = 1 / (1 + math.exp(-(expected_total_games - total_line) / 1.8))
+    v51 = None
+    if history:
+        try:
+            v51 = v51_total_over_probability({"sport":"tennis","player_1":name2,"player_2":name1,"start_time":event.get("date"),"probabilities":{"p1":p2_prob,"p2":p1_prob},"rankings":{"p1":rank2,"p2":rank1},"form":{"p1":form2,"p2":form1}}, history, total_line)
+        except Exception:
+            v51 = None
+    if v51:
+        over_games = float(v51["over"])
+        total_model = v51["model"]
+        expected_total_games = float(v51["expected_total"])
+    else:
+        over_games = 1 / (1 + math.exp(-(expected_total_games - total_line) / 1.8))
+        total_model = "V3.2 structural fallback"
     games_margin = (6.2 * q + 5.4 * (1 - q)) - (6.2 * (1 - q) + 5.4 * q)
 
     ranking_gap = None
@@ -258,7 +272,7 @@ def enhanced_tennis_prediction(event, tour, rankings, form_map, base_tennis_pred
             "set_win_prob": {"p1": round(1 - q, 4), "p2": round(q, 4)},
             "straight_sets": {"p1": round(straight2, 4), "p2": round(straight1, 4)},
             "three_sets": round(three_sets, 4), "expected_sets": round(expected_sets, 2),
-            "total_games": {"line": total_line, "over": round(over_games, 4), "under": round(1 - over_games, 4), "pick": "over" if over_games >= 0.5 else "under"},
+            "total_games": {"line": total_line, "over": round(over_games, 4), "under": round(1 - over_games, 4), "pick": "over" if over_games >= 0.5 else "under", "source": total_model, "v51": v51},
             "games_handicap": {"estimated_margin_p1": round(-games_margin, 2), "pick": "p1" if games_margin <= 0 else "p2"},
         },
         "model": source,
@@ -285,7 +299,7 @@ amercan_to_prob = ns["american_to_prob"]
 normalise = ns["normalise"]
 
 
-def fetch_current_predictions():
+def fetch_current_predictions(history=None):
     predictions, errors = [], []
     qc = {
         "rejected_total": 0,
@@ -331,7 +345,7 @@ def fetch_current_predictions():
                 if not valid:
                     reject(tour, reason)
                     continue
-                prediction = enhanced_tennis_prediction(event, tour, rankings, form_map, base_tennis_prediction, amercan_to_prob, normalise)
+                prediction = enhanced_tennis_prediction(event, tour, rankings, form_map, base_tennis_prediction, amercan_to_prob, normalise, history=history)
                 if not prediction:
                     reject(tour, "prediction construction failed")
                     continue
@@ -362,12 +376,12 @@ def fetch_current_predictions():
 
 
 def main():
-    print("Match Signal 3.2 — analytical Football + Tennis pipeline with calibrated tennis signals")
+    print("Match Signal V5.1 — analytical Football + Tennis pipeline with calibrated tennis signals")
     history_path = DATA / "prediction_history.json"
     accuracy_path = DATA / "accuracy.json"
     history = load_json(history_path, [])
     history = settle_predictions(history)
-    predictions, errors, qc = fetch_current_predictions()
+    predictions, errors, qc = fetch_current_predictions(history=history)
     # V5 historical calibration is applied only after settlement and before
     # publication. This keeps the current event out of its own calibration fit.
     calibration_now = datetime.now(timezone.utc)
