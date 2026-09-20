@@ -114,6 +114,14 @@ jobs:
           from pathlib import Path
           p=Path('data/predictions.json')
           raw=p.read_text(encoding='utf-8')
+          if not raw.strip():
+              import subprocess
+              restored=subprocess.check_output(['git','show','HEAD:data/predictions.json'],text=True)
+              if not restored.strip():
+                  raise RuntimeError('predictions.json is empty and no committed recovery feed exists')
+              p.write_text(restored,encoding='utf-8')
+              raw=restored
+              print('Recovered empty predictions.json from the checked-out committed feed')
           try:
               value=json.loads(raw)
           except json.JSONDecodeError:
