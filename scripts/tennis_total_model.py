@@ -18,6 +18,8 @@ from datetime import datetime, timezone
 
 MIN_HISTORY = 30
 MAX_NEIGHBORS = 60
+WTA_LINES = (16.5, 17.5, 18.5, 19.5, 20.5, 21.5, 22.5)
+ATP_LINES = (18.5, 19.5, 20.5, 21.5, 22.5, 23.5, 24.5, 25.5)
 HALF_LIFE_DAYS = 45.0
 CONF_SCALE = 0.08
 FORM_SCALE = 0.12
@@ -34,6 +36,10 @@ def _parse_time(value):
         return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
     except (TypeError, ValueError):
         return None
+
+
+def _tour(row):
+    return str(row.get("league") or row.get("tour") or "").upper()
 
 
 def _features(row):
@@ -81,6 +87,8 @@ def _weight(target, row):
     rc, rr, rf = _features(row)
     distance = abs(tc - rc) / CONF_SCALE
     distance += abs(tf - rf) / FORM_SCALE
+    if _tour(target) and _tour(row) and _tour(target) != _tour(row):
+        distance += 2.5
     if tr is not None and rr is not None:
         distance += abs(tr - rr) / RANK_SCALE
     else:
@@ -103,6 +111,8 @@ def predict_total_games(target, history):
     eligible = []
     for row in history or []:
         if not _eligible(row):
+            continue
+        if _tour(target) and _tour(row) and _tour(target) != _tour(row):
             continue
         row_time = _parse_time(row.get("start_time"))
         if target_time and row_time and row_time >= target_time:
@@ -149,6 +159,31 @@ def over_probability(target, history, line):
     result["over"] = round(over, 6)
     result["under"] = round(1.0 - over, 6)
     result["pick"] = "over" if over >= 0.5 else "under"
+    result["tour"] = _tour(target)
+    result["line"] = float(line)
+    return result
+
+
+def recommend_total_line(target, history, minimum_probability=0.60):
+    """Choose a SportyBet-compatible WTA/ATP total line from the empirical distribution."""
+    tour = _tour(target)
+    lines = WTA_LINES if tour == "WTA" else ATP_LINES
+    candidates = []
+    for line in lines:
+        result = over_probability(target, history, line)
+        if not result:
+            continue
+        for side in ("over", "under"):
+            p = float(result[side])
+            if p >= minimum_probability:
+                candidates.append((abs(p - 0.70), -p, line, side, result))
+    if not candidates:
+        return None
+    candidates.sort(key=lambda x: (x[0], x[1]))
+    _, _, line, side, result = candidates[0]
+    result["recommended_line"] = float(line)
+    result["recommended_pick"] = side
+    result["recommended_probability"] = round(float(result[side]), 6)
     return result
 
 
