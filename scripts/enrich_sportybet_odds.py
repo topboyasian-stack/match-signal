@@ -199,7 +199,7 @@ def main():
             matched+=1
     status={'updated_at':fetched_at,'source':'SportyBet NG web API via Cloudflare proxy','endpoint':ENDPOINT,'sports_requested':['football','tennis'],'fixtures_received':len(all_events),'predictions_matched':matched,'winner_price_records':winner_prices,'total_games_price_records':total_prices,'errors':errors,'status':'LIVE_MARKET_SYNC' if matched else 'NO_CURRENT_SPORTYBET_MATCHES','diagnostics':diagnostics}
     (DATA/'sportybet_odds_snapshot.json').write_text(json.dumps(status,indent=2)+'\n',encoding='utf-8')
-    (DATA/'predictions.json').write_text(json.dumps(predictions,indent=2,ensure_ascii=False)+'\\n',encoding='utf-8')
+    (DATA/'predictions.json').write_text(json.dumps(predictions,indent=2,ensure_ascii=False)+'\n',encoding='utf-8')
     print(json.dumps(status,indent=2))
 
 
