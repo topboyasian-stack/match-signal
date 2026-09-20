@@ -19,6 +19,7 @@ DATA=ROOT/'data'
 BASE=os.getenv('MATCH_SIGNAL_PUBLIC_BASE','https://match-signal.pages.dev').rstrip('/')
 ENDPOINT=f'{BASE}/api/sportybet'
 SPORT_IDS={'tennis':'sr:sport:5','football':'sr:sport:1'}
+MARKET_IDS={'tennis':'186,210,202,204,189,203,188,187','football':'1,18,10,14,16,29,45,47'}
 
 
 def load(path, default):
@@ -45,7 +46,7 @@ def line_from_specifier(spec):
 
 
 def fetch(sport, page=1):
-    params={'sportId':SPORT_IDS[sport],'pageSize':'100','pageNum':str(page),'timeline':'168'}
+    params={'sportId':SPORT_IDS[sport],'marketId':MARKET_IDS[sport],'pageSize':'100','pageNum':str(page),'timeline':'168'}
     headers={'Accept':'application/json','Content-Type':'application/json','Current-Country':'NG','Origin':'https://www.sportybet.com','Referer':'https://www.sportybet.com/ng/','User-Agent':'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/152.0.0.0 Safari/537.36'}
     direct_error=None
     # GitHub runners may be challenged by SportyBet. curl_cffi first gives the
