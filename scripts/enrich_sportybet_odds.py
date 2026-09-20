@@ -134,18 +134,23 @@ def extract_markets(pred,event):
     winner=None; totals=[]
     for m in market_rows(event):
         desc=m['desc'].lower()
-        if 'total games' in desc:
+        is_total = 'total games' in desc or (pred.get('sport')=='tennis' and m['id']=='189')
+        if is_total:
             for o in m['outcomes']:
                 ol=person_key(o['name'])
-                side='over' if 'over' in desc+' '+ol else 'under' if 'under' in desc+' '+ol else None
-                if side and m['line'] is not None:totals.append({'line':m['line'],'side':side,'odds':o['odds'],'outcome':o['name'],'market_id':m['id'],'specifier':m['specifier'],'lastOddsChangeTime':m['lastOddsChangeTime']})
-        elif ('winner' in desc or 'match winner' in desc or desc in {'win','1x2'}) and not winner:
+                oid=str(o.get('id') or '')
+                side='over' if ('over' in desc+' '+ol or oid.endswith('/12') or oid in {'12','4'}) else 'under' if ('under' in desc+' '+ol or oid.endswith('/13') or oid in {'13','5'}) else None
+                if side and m['line'] is not None:
+                    totals.append({'line':m['line'],'side':side,'odds':o['odds'],'outcome':o['name'],'market_id':m['id'],'specifier':m['specifier'],'lastOddsChangeTime':m['lastOddsChangeTime']})
+        elif (('winner' in desc or 'match winner' in desc or desc in {'win','1x2'}) or (pred.get('sport')=='tennis' and m['id']=='186')) and not winner:
             mapped={}
             for o in m['outcomes']:
-                ol=norm(o['name'])
-                if ol==p1:mapped['p1']=o['odds']
-                elif ol==p2:mapped['p2']=o['odds']
-            if len(mapped)==2:winner={'p1':mapped['p1'],'p2':mapped['p2'],'market_id':m['id'],'market':m['desc'],'lastOddsChangeTime':m['lastOddsChangeTime']}
+                ol=person_key(o['name'])
+                oid=str(o.get('id') or '')
+                if ol==p1 or (m['id']=='186' and oid in {'4','4.0'}):mapped['p1']=o['odds']
+                elif ol==p2 or (m['id']=='186' and oid in {'5','5.0'}):mapped['p2']=o['odds']
+            if len(mapped)==2:
+                winner={'p1':mapped['p1'],'p2':mapped['p2'],'market_id':m['id'],'market':m['desc'],'lastOddsChangeTime':m['lastOddsChangeTime']}
     return winner,totals
 
 
