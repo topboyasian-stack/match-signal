@@ -1,4 +1,4 @@
-"""Attach current SportyBet NG market prices to Match Signal predictions.
+"""Attach current SportyBet NG market prices to Match Signal predictions.\n\nV5.2 live-sync checkpoint: bookmaker prices remain separate from model fair odds.
 
 Read-only. Uses the production Cloudflare proxy because GitHub-hosted runners can
 be rejected by SportyBet directly. Never substitutes model fair odds for bookmaker
