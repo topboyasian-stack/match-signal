@@ -131,14 +131,19 @@ jobs:
               if not rest:
                   value=first
               else:
-                  second,_=dec.raw_decode(rest)
+                  try:
+                      second,_=dec.raw_decode(rest)
+                  except json.JSONDecodeError:
+                      second=None
                   if isinstance(first,list) and isinstance(second,list):
                       merged={str(x.get('event_id')):x for x in first if isinstance(x,dict) and x.get('event_id')}
                       for x in second:
                           if isinstance(x,dict) and x.get('event_id'): merged[str(x['event_id'])]=x
                       value=list(merged.values())
+                  elif isinstance(first,list):
+                      value=first
                   else:
-                      raise
+                      raise RuntimeError('prediction feed contains an unsupported trailing payload')
               p.write_text(json.dumps(value,indent=2,ensure_ascii=False)+'\n',encoding='utf-8')
               print(f'Sanitized predictions.json: {len(value)} rows')
           else:
