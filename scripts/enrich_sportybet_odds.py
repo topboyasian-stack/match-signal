@@ -151,11 +151,17 @@ def main():
     all_events=[]; errors=[]; diagnostics={'sportybet_samples':{},'prediction_samples':{}}
     for sport in ('football','tennis'):
         try:
-            body=fetch(sport)
-            events=flatten(body)
+            events=[]
+            for page in range(1,6):
+                body=fetch(sport,page=page)
+                batch=flatten(body)
+                events.extend(batch)
+                if len(batch)<100:break
+            dedup={str(e.get('eventId')):e for e in events if e.get('eventId')}
+            events=list(dedup.values())
             all_events.extend((sport,e) for e in events)
             diagnostics['sportybet_samples'][sport]=[{'event_id':e.get('eventId'),'home':e.get('homeTeamName'),'away':e.get('awayTeamName'),'start':e.get('estimateStartTime'),'market_count':len(e.get('markets') or [])} for e in events[:10]]
-            print(f'SportyBet {sport}: {len(events)} fixtures received')
+            print(f'SportyBet {sport}: {len(events)} fixtures received across pages')
         except Exception as exc:
             errors.append(f'{sport}:{exc}')
             print(f'SportyBet {sport}: ERROR {exc}')
