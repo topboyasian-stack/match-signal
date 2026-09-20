@@ -319,10 +319,10 @@ def main():
             'raw_probabilities_not_used_for_qualification':True
         },
         'bookmaker_odds':{
-            'status':'MANUAL_CONFIRMATION_REQUIRED',
-            'sportybet_direct_feed':'BLOCKED_FROM_GITHUB_RUNNER',
+            'status':'LIVE_SPORTYBET_SNAPSHOT',
+            'sportybet_direct_feed':'VIA_CLOUDFLARE_PROXY',
             'stake_direct_feed':'NOT_CONNECTED',
-            'instruction':'Verify each displayed selection and enter the actual current bookmaker odds in your betslip before placing any wager.'
+            'instruction':'SportyBet prices shown below are the latest synchronized snapshot; recheck the displayed price in SportyBet before placing any wager.'
         },
         'candidates_considered':{'football':len(football),'tennis':len(tennis)},
         'qualified_legs':selected,
