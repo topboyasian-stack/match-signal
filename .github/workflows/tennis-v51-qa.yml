@@ -1,0 +1,23 @@
+name: Tennis V5.1 Backtest QA
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/tennis_total_model.py"
+      - "scripts/backtest_tennis_total.py"
+      - "data/prediction_history.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run leakage-safe walk-forward backtest
+        run: python scripts/backtest_tennis_total.py
