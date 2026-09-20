@@ -33,6 +33,10 @@ def norm(s):
     return ' '.join(s.split())
 
 
+def person_key(s):
+    return ' '.join(sorted(norm(s).split()))
+
+
 def number(v):
     try:
         x=float(v)
@@ -106,7 +110,7 @@ def find_event(pred, events):
     if pid:
         for e in events:
             if str(e.get('eventId') or '')==pid:return e,'event_id'
-    pnames={norm(pred.get('player_1')),norm(pred.get('player_2'))}
+    pnames={person_key(pred.get('player_1')),person_key(pred.get('player_2'))}
     if pred.get('sport')=='football':pnames={norm(pred.get('home_team')),norm(pred.get('away_team'))}
     if '' in pnames or len(pnames)!=2:return None,None
     pstart=pred.get('start_time')
@@ -114,7 +118,7 @@ def find_event(pred, events):
     except ValueError:pt=None
     best=None
     for e in events:
-        names={norm(e.get('homeTeamName')),norm(e.get('awayTeamName'))}
+        names={person_key(e.get('homeTeamName')),person_key(e.get('awayTeamName'))} if pred.get('sport')=='tennis' else {norm(e.get('homeTeamName')),norm(e.get('awayTeamName'))}
         if names!=pnames:continue
         est=e.get('estimateStartTime')
         try:et=datetime.fromtimestamp(float(est)/1000,tz=timezone.utc) if est else None
@@ -125,14 +129,14 @@ def find_event(pred, events):
 
 
 def extract_markets(pred,event):
-    p1=norm(pred.get('player_1') or pred.get('home_team'))
-    p2=norm(pred.get('player_2') or pred.get('away_team'))
+    p1=person_key(pred.get('player_1') or pred.get('home_team'))
+    p2=person_key(pred.get('player_2') or pred.get('away_team'))
     winner=None; totals=[]
     for m in market_rows(event):
         desc=m['desc'].lower()
         if 'total games' in desc:
             for o in m['outcomes']:
-                ol=norm(o['name'])
+                ol=person_key(o['name'])
                 side='over' if 'over' in desc+' '+ol else 'under' if 'under' in desc+' '+ol else None
                 if side and m['line'] is not None:totals.append({'line':m['line'],'side':side,'odds':o['odds'],'outcome':o['name'],'market_id':m['id'],'specifier':m['specifier'],'lastOddsChangeTime':m['lastOddsChangeTime']})
         elif ('winner' in desc or 'match winner' in desc or desc in {'win','1x2'}) and not winner:
