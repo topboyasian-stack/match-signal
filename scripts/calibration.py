@@ -207,8 +207,51 @@ def calibrate_prediction(prediction, history, now=None):
     return prediction
 
 
+def calibrate_total_games_probability(prediction, raw_probability, history, now=None):
+    """Calibrate tennis Total Games against the requested line and tour."""
+    now = now or datetime.now(timezone.utc)
+    total = (prediction.get("analytics") or {}).get("total_games") or {}
+    line = float(total.get("line") or 22.5)
+    pick = total.get("pick") or ("over" if float(raw_probability) >= 0.5 else "under")
+    tour = str(prediction.get("league") or "").upper()
+    observations = []
+    for item in history or []:
+        if not isinstance(item, dict) or not item.get("settled") or item.get("sport") != "tennis":
+            continue
+        if tour and str(item.get("league") or "").upper() != tour:
+            continue
+        score = item.get("final_score")
+        if not isinstance(score, list) or len(score) != 2:
+            continue
+        try:
+            actual_total = sum(float(v) for v in score)
+        except (TypeError, ValueError):
+            continue
+        outcome = actual_total > line if pick == "over" else actual_total <= line
+        observations.append((1.0 if outcome else 0.0, _age_weight(item.get("settled_at"), now)))
+    if not observations:
+        return float(raw_probability), {"method":"raw_no_tour_line_history","sample_size":0,"raw":round(float(raw_probability),4),"line":line,"tour":tour}
+    weight_sum = sum(w for _, w in observations)
+    empirical = sum(o*w for o,w in observations) / weight_sum if weight_sum else float(raw_probability)
+    effective_n = min(len(observations), weight_sum)
+    calibrated = (effective_n * empirical + SHRINKAGE_PRIOR * float(raw_probability)) / (effective_n + SHRINKAGE_PRIOR)
+    calibrated = max(0.02, min(0.98, calibrated))
+    return calibrated, {
+        "method":"tour_line_recency_empirical_bayes",
+        "market":f"tennis:total_games:{tour}:{line}",
+        "tour":tour,
+        "line":line,
+        "sample_size":len(observations),
+        "effective_sample":round(effective_n,2),
+        "empirical":round(empirical,4),
+        "raw":round(float(raw_probability),4)
+    }
+
+
 def calibrate_binary_market(prediction, raw_probability, history, market_key, now=None):
     """Calibrate a binary market such as tennis Total Games."""
     now = now or datetime.now(timezone.utc)
+    if market_key == "tennis:total_games":
+        return calibrate_total_games_probability(prediction, raw_probability, history, now)
     calibrated, diagnostics = calibrate_probability(raw_probability, history, market_key, now)
     return calibrated, diagnostics
