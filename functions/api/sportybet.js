@@ -1,5 +1,6 @@
 function headers(){return {'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','Access-Control-Allow-Origin':'*'}}
 const ORIGIN='https://www.sportybet.com';
+const BROWSER_HEADERS={'Accept':'application/json, text/plain, */*','Content-Type':'application/json','Current-Country':'NG','Origin':'https://www.sportybet.com','Referer':'https://www.sportybet.com/ng/','User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/152.0.0.0 Safari/537.36'};
 
 export async function onRequestGet(context){
   const u=new URL(context.request.url);
@@ -11,7 +12,7 @@ export async function onRequestGet(context){
   const params=new URLSearchParams({sportId,marketId,pageSize:String(pageSize),pageNum:String(pageNum),todayGames:'false',timeline:String(timeline),_t:String(Date.now())});
   try{
     const upstream=await fetch(ORIGIN+'/api/ng/factsCenter/pcUpcomingEvents?'+params.toString(),{
-      headers:{Accept:'application/json','Content-Type':'application/json','Current-Country':'NG','User-Agent':'Mozilla/5.0'},
+      headers:BROWSER_HEADERS,
       cache:'no-store',
       signal:AbortSignal.timeout(10000)
     });
