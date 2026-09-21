@@ -6,7 +6,7 @@ const LIVE_API='https://match-signal.pages.dev/api/sportybet-virtual';
 const LIVE_MARKETS='1,18,10,29,11,26,36,14,60100,186,189,202,204,210';
 const SNAPSHOT='./data/virtual_lab_live.json';
 const LIVE_REFRESH_MS=30000;
-const UI_BUILD='20260921-v17';
+const UI_BUILD='20260921-v20';
 const HISTORY='./api/virtual-lab-history';
 const HISTORY_FALLBACK='./data/virtual_lab_history.json';
 const ELIGIBILITY='./data/virtual_lab_eligibility.json';
@@ -347,29 +347,47 @@ function recurrenceEvidence(events,event,line){
   const product=event?.product||'';
   const home=String(event?.home||'').trim().toLowerCase();
   const away=String(event?.away||'').trim().toLowerCase();
-  if(!home&&!away)return {entityN:0,entityOverRate:null,pairN:0,pairOverRate:null};
-  const relevant=(events||[]).filter(e=>{
-    if(!e||e.product!==product||e.total==null||!Number.isFinite(new Date(e.timestamp||0).getTime())||new Date(e.timestamp).getTime()>=cutoff)return false;
-    const eh=String(e.home||'').trim().toLowerCase(), ea=String(e.away||'').trim().toLowerCase();
+  const target=Number(line);
+  if(!home&&!away)return {entityN:0,entityOver:0,entityOverRate:null,entityAvgTotal:null,pairN:0,pairOver:0,pairOverRate:null,pairAvgTotal:null,entityNames:[]};
+  const prior=(events||[]).filter(e=>{
+    const t=new Date(e?.timestamp||0).getTime();
+    if(!e||e.product!==product||e.total==null||!Number.isFinite(t)||t>=cutoff)return false;
+    const eh=String(e.home||'').trim().toLowerCase(),ea=String(e.away||'').trim().toLowerCase();
     return eh===home||eh===away||ea===home||ea===away;
   });
-  const entityDecisive=relevant.filter(e=>e.total!==Number(line));
-  const entityOver=relevant.filter(e=>e.total>Number(line));
-  const entityOverRate=entityDecisive.length?entityOver.length/entityDecisive.length:null;
-  const pairRelevant=(events||[]).filter(e=>{
-    if(!e||e.product!==product||e.total==null||!Number.isFinite(new Date(e.timestamp||0).getTime())||new Date(e.timestamp).getTime()>=cutoff)return false;
-    const eh=String(e.home||'').trim().toLowerCase(), ea=String(e.away||'').trim().toLowerCase();
+  const entityDecisive=prior.filter(e=>e.total!==target);
+  const entityOver=entityDecisive.filter(e=>e.total>target);
+  const entityAvgTotal=prior.length?prior.reduce((s,e)=>s+Number(e.total||0),0)/prior.length:null;
+  const pairRelevant=prior.filter(e=>{
+    const eh=String(e.home||'').trim().toLowerCase(),ea=String(e.away||'').trim().toLowerCase();
     return (eh===home&&ea===away)||(eh===away&&ea===home);
   });
-  const pairDecisive=pairRelevant.filter(e=>e.total!==Number(line));
-  const pairOver=pairRelevant.filter(e=>e.total>Number(line));
+  const pairDecisive=pairRelevant.filter(e=>e.total!==target);
+  const pairOver=pairDecisive.filter(e=>e.total>target);
+  const pairAvgTotal=pairRelevant.length?pairRelevant.reduce((s,e)=>s+Number(e.total||0),0)/pairRelevant.length:null;
   return {
     entityN:entityDecisive.length,
-    entityOverRate:entityOverRate,
+    entityOver:entityOver.length,
+    entityOverRate:entityDecisive.length?entityOver.length/entityDecisive.length:null,
+    entityAvgTotal,
     pairN:pairDecisive.length,
+    pairOver:pairOver.length,
     pairOverRate:pairDecisive.length?pairOver.length/pairDecisive.length:null,
+    pairAvgTotal,
     entityNames:[event.home,event.away].filter(Boolean)
   };
+}
+function participantPrior(events,event,line){
+  const rec=recurrenceEvidence(events,event,line);
+  if(rec.entityN<8)return {prob:null,n:rec.entityN,pairProb:null,pairN:rec.pairN,weight:0,entityProb:null};
+  const entityProb=(rec.entityOver+2)/(rec.entityN+4);
+  let prob=entityProb,pairProb=null;
+  if(rec.pairN>=6){
+    pairProb=(rec.pairOver+2)/(rec.pairN+4);
+    prob=0.75*entityProb+0.25*pairProb;
+  }
+  const weight=Math.min(0.20,Math.max(0.05,(rec.entityN-7)/40));
+  return {prob,n:rec.entityN,pairProb,pairN:rec.pairN,weight,entityProb};
 }
 function blendForEvent(event,priorEvents){
   if(!event||!event.ladder)return null;
@@ -406,8 +424,23 @@ function modelOverForEvent(event,priorEvents,line){
   const market=poissonOver(event.ladder.lambda,line);
   const prior=productPrior(priorEvents,event.product,line,new Date(event.timestamp).getTime());
   const blend=blendForEvent(event,priorEvents);
-  if(!prior.prob||!blend||blend.alpha<=0)return {prob:market,marketProb:market,priorProb:prior.prob,alpha:0,lambda:event.ladder.lambda,n:prior.n};
-  return {prob:clamp01((1-blend.alpha)*market+blend.alpha*prior.prob),marketProb:market,priorProb:prior.prob,alpha:blend.alpha,lambda:event.ladder.lambda,n:prior.n};
+  const base=(prior?.prob&&blend&&blend.alpha>0)?clamp01((1-blend.alpha)*market+blend.alpha*prior.prob):market;
+  const participant=participantPrior(priorEvents,event,line);
+  const prob=participant.prob!=null?clamp01((1-participant.weight)*base+participant.weight*participant.prob):base;
+  return {
+    prob,
+    marketProb:market,
+    priorProb:prior?.prob??null,
+    alpha:blend?.alpha||0,
+    lambda:event.ladder.lambda,
+    n:prior?.n||0,
+    participantProb:participant.prob,
+    participantN:participant.n,
+    participantPairProb:participant.pairProb,
+    participantPairN:participant.pairN,
+    participantWeight:participant.weight,
+    participantEntityProb:participant.entityProb||null
+  };
 }
 function buildModelBacktest(rows){
   const events=historicalOUEvents(rows).sort((a,b)=>new Date(a.timestamp)-new Date(b.timestamp));
@@ -420,7 +453,7 @@ function buildModelBacktest(rows){
       if(!overModel)continue;
       const baseline=String(r.selection||'').toUpperCase().startsWith('U')?1-Number(r.model_prob):Number(r.model_prob);
       const model=String(r.selection||'').toUpperCase().startsWith('U')?1-overModel.prob:overModel.prob;
-      outputs.push(Object.assign({},r,{baselineProb:clamp01(baseline),modelProb:clamp01(model),ladderLambda:overModel.lambda,productPriorProb:overModel.priorProb,blendAlpha:overModel.alpha,modelEventKey:e.key}));
+      outputs.push(Object.assign({},r,{baselineProb:clamp01(baseline),modelProb:clamp01(model),ladderLambda:overModel.lambda,productPriorProb:overModel.priorProb,blendAlpha:overModel.alpha,participantProb:overModel.participantProb,participantN:overModel.participantN,participantWeight:overModel.participantWeight,participantPairN:overModel.participantPairN,modelEventKey:e.key}));
     }
   }
   state.modelRows=outputs;
@@ -442,13 +475,58 @@ function scoreProbabilities(rows){
   const scoreSet=a=>{if(!a.length)return null;const fn=key=>{let b=0,l=0;a.forEach(r=>{const q=clamp01(r[key]),y=r.win?1:0;b+=(y-q)*(y-q);l+=-(y*Math.log(q)+(1-y)*Math.log(1-q));});return {n:a.length,brier:b/a.length,logLoss:l/a.length};};return {baseline:fn('baselineProb'),model:fn('modelProb'),events:new Set(a.map(r=>r.modelEventKey)).size};};
   return {all:{baseline:calc('baselineProb'),model:calc('modelProb')},holdout:scoreSet(holdout),holdoutEvents:holdKeys.size,products:Object.fromEntries(Object.entries(by).map(([p,a])=>[p,scoreSet(a)]))};
 }
+function participantLabRows(events){
+  const groups=new Map();
+  for(const e of (events||[])){
+    if(e.total==null||!e.product)continue;
+    for(const raw of [e.home,e.away]){
+      const name=String(raw||'').trim();
+      if(!name)continue;
+      const key=e.product+'|'+name.toLowerCase();
+      let g=groups.get(key);
+      if(!g){g={product:e.product,participant:name,n:0,lines:{}};groups.set(key,g);}
+      g.n++;
+      for(const line of [1.5,3.5,4.5]){
+        const b=g.lines[line]||(g.lines[line]={n:0,over:0});
+        if(e.total===line)continue;
+        b.n++;
+        if(e.total>line)b.over++;
+      }
+    }
+  }
+  return [...groups.values()].map(g=>{
+    const lineStats={};
+    for(const line of [1.5,3.5,4.5]){
+      const b=g.lines[line]||{n:0,over:0};
+      lineStats[line]={n:b.n,rate:b.n?b.over/b.n:null};
+    }
+    return {...g,lineStats};
+  }).sort((a,b)=>(b.lineStats[1.5].n-a.lineStats[1.5].n)||(b.n-a.n)||a.participant.localeCompare(b.participant)).slice(0,40);
+}
+function renderParticipantLab(){
+  const host=$('participantLab');if(!host)return;
+  const rows=participantLabRows(state.modelEvents||[]);
+  const seen=rows.filter(r=>r.lineStats[1.5].n>0);
+  if(!seen.length){
+    host.innerHTML='<div class="empty">No settled participant recurrence evidence at O/U 1.5 yet. The desk will track it automatically as more events settle.</div>';
+    return;
+  }
+  const qualified=seen.filter(r=>r.lineStats[1.5].n>=8);
+  let html='<p class="muted">This panel tracks recurring team/player identifiers at the exact O/U line. The participant feature does not activate until at least 8 prior decisive observations on the same product and line; smaller samples remain context only.</p>';
+  html+='<table><thead><tr><th>Product</th><th>Participant</th><th>O1.5 n</th><th>O1.5 over rate</th><th>O3.5</th><th>O4.5</th><th>Total prior</th></tr></thead><tbody>';
+  html+=seen.slice(0,30).map(r=>'<tr><td>'+esc(r.product)+'</td><td><strong>'+esc(r.participant)+'</strong></td><td>'+r.lineStats[1.5].n+'</td><td>'+fmtPct(r.lineStats[1.5].rate)+'</td><td>'+r.lineStats[3.5].n+' / '+fmtPct(r.lineStats[3.5].rate)+'</td><td>'+r.lineStats[4.5].n+' / '+fmtPct(r.lineStats[4.5].rate)+'</td><td>'+r.n+'</td></tr>').join('');
+  html+='</tbody></table>';
+  html+='<p class="muted"><strong>Activation-ready participant samples:</strong> '+qualified.length+'. O/U1.5 remains experimental until its own product/line walk-forward evidence clears the model gate.</p>';
+  host.innerHTML=html;
+}
+
 function renderModelLab(){
   const host=$('modelLab');if(!host)return;
   const rows=state.modelRows||[],scores=scoreProbabilities(rows);
   if(!rows.length){host.innerHTML='<div class="empty">Need settled O/U observations with complete pre-event line data. Collect more events before trusting this model.</div>';return;}
   const cell=(v,d=4)=>v==null?'—':Number(v).toFixed(d);
   const delta=(a,b)=>a==null||b==null?'—':(a-b).toFixed(4);
-  let html='<div class="modelGrid"><div><h3>O/U line-ladder model</h3><p class="muted">Fits a Poisson total-goals distribution to the full observed O/U ladder, then blends it with a product-specific historical prior using only earlier settled events. No current-event result is used.</p></div><div><h3>Scoring rules</h3><p class="muted">Brier and log loss are lower-is-better probability losses. The market baseline is the SportyBet de-vig probability; the model must improve on it out-of-sample before becoming eligible.</p></div></div>';
+  let html='<div class="modelGrid"><div><h3>O/U line-ladder model</h3><p class="muted">Fits a Poisson total-goals distribution to the full observed O/U ladder, blends it with a product-specific historical prior, then adds a conservative same-product participant recurrence feature once the exact-line sample is large enough. Every feature uses only events that occurred before the scored event.</p></div><div><h3>Scoring rules</h3><p class="muted">Brier and log loss are lower-is-better probability losses. The market baseline is the SportyBet de-vig probability; the model must improve on it out-of-sample before becoming eligible.</p></div></div>';
   html+='<table><thead><tr><th>Product</th><th>N</th><th>Market Brier</th><th>Model Brier</th><th>Δ Brier</th><th>Market LogLoss</th><th>Model LogLoss</th><th>Δ LogLoss</th></tr></thead><tbody>';
   Object.entries(scores.products).forEach(([p,s])=>{html+='<tr><td>'+esc(p)+'</td><td>'+s.model.n+'</td><td>'+cell(s.baseline.brier)+'</td><td>'+cell(s.model.brier)+'</td><td>'+delta(s.baseline.brier,s.model.brier)+'</td><td>'+cell(s.baseline.logLoss)+'</td><td>'+cell(s.model.logLoss)+'</td><td>'+delta(s.baseline.logLoss,s.model.logLoss)+'</td></tr>';});
   if(scores.all.model)html+='<tr><td><strong>ALL O/U</strong></td><td>'+scores.all.model.n+'</td><td>'+cell(scores.all.baseline.brier)+'</td><td>'+cell(scores.all.model.brier)+'</td><td>'+delta(scores.all.baseline.brier,scores.all.model.brier)+'</td><td>'+cell(scores.all.baseline.logLoss)+'</td><td>'+cell(scores.all.model.logLoss)+'</td><td>'+delta(scores.all.baseline.logLoss,scores.all.model.logLoss)+'</td></tr>';
@@ -592,9 +670,11 @@ function renderPredictionDesk(){
   host.innerHTML=picks.map(function(p,i){
     function row(x,label){
       if(!x)return '<div class="calcRow"><span>'+label+'</span><b>—</b><span>—</span><span>—</span><span>—</span></div>';
-      return '<div class="calcRow"><span>'+label+(x.market.line!=null?' '+x.market.line:'')+(x.experimental?' <em class="experimentalTag">EXPERIMENTAL</em>':'')+'</span><b>'+esc(x.pickCode)+'</b><span>'+fmtPct(x.fairProb)+'</span><span>Fair '+x.fairOdds.toFixed(2)+'</span><span>Book '+x.bookmakerOdds.toFixed(2)+'</span></div>';
+      const modelP=x.calibratedProb!=null?x.calibratedProb:x.fairProb;
+      return '<div class="calcRow"><span>'+label+(x.market.line!=null?' '+x.market.line:'')+(x.experimental?' <em class="experimentalTag">EXPERIMENTAL</em>':'')+'</span><b>'+esc(x.pickCode)+'</b><span>Fair '+fmtPct(x.fairProb)+' · Model '+fmtPct(modelP)+'</span><span>Fair '+x.fairOdds.toFixed(2)+'</span><span>Book '+x.bookmakerOdds.toFixed(2)+'</span></div>';
     }
-    const primaryHtml=p.primary?'<div class="primaryPick"><span>RESEARCH QUALIFIED</span><strong>'+esc(p.primary.pickCode)+'</strong><b>'+fmtPct(p.primary.calibratedProb)+'</b><small>edge '+fmtPct(p.primary.edge)+' · n='+p.primary.calibrationN+'</small></div>':'<div class="primaryPick mutedPrediction"><span>NO QUALIFIED SIGNAL</span><strong>WAIT</strong><b>Market baseline only</b></div>';
+    const watch=p.experimentalOU;
+    const primaryHtml=p.primary?'<div class="primaryPick"><span>RESEARCH QUALIFIED</span><strong>'+esc(p.primary.pickCode)+'</strong><b>'+fmtPct(p.primary.calibratedProb)+'</b><small>edge '+fmtPct(p.primary.edge)+' · n='+p.primary.calibrationN+'</small></div>':watch?'<div class="primaryPick mutedPrediction"><span>O/U 1.5 RESEARCH WATCH</span><strong>'+esc(watch.pickCode)+'</strong><b>'+fmtPct(watch.calibratedProb)+'</b><small>participant n='+(watch.recurrence?watch.recurrence.entityN:0)+' · model is experimental</small></div>':'<div class="primaryPick mutedPrediction"><span>NO QUALIFIED SIGNAL</span><strong>WAIT</strong><b>Market baseline only</b></div>';
     const addLabel=p.primary?'＋ Add qualified pick':'Locked · no qualified signal';
     const activeRec=p.bestOU&&p.bestOU.recurrence;
     const expRec=p.experimentalOU&&p.experimentalOU.recurrence;
@@ -602,7 +682,7 @@ function renderPredictionDesk(){
       'Recurring participant evidence: active-line n='+(activeRec?activeRec.entityN:0)+' · '+(activeRec&&activeRec.entityOverRate!=null?fmtPct(activeRec.entityOverRate):'—')+
       ' · O/U 1.5 n='+(expRec?expRec.entityN:0)+' · '+(expRec&&expRec.entityOverRate!=null?fmtPct(expRec.entityOverRate):'—')+
       ' · exact-pair O1.5 n='+(expRec?expRec.pairN:0):'No prior participant recurrence sample yet.';
-    return '<article class="predictionCard"><div class="predictionHeader"><div><small>'+esc(p.product)+' · '+esc(p.competition)+'</small><h3>'+esc(p.home)+' <span>vs</span> '+esc(p.away)+'</h3></div><time>'+esc(p.start_time?date(p.start_time):'—')+'</time></div>'+primaryHtml+'<div class="calcTable"><div class="calcHead"><span>Market</span><span>Pick</span><span>Probability</span><span>Fair odds</span><span>SportyBet</span></div>'+row(p.bestWinner,'1X2')+row(p.bestOU,'O/U')+row(p.experimentalOU,'O/U 1.5')+'</div><div class="recurrenceNote">'+recurrenceText+'</div><div class="calcNote">Displayed probabilities start from the SportyBet de-vig market baseline. O/U 1.5 is experimental: it is visible for research and recurrence tracking, but it is not promoted to a validated signal from ticket streaks alone.</div><button class="btn builderAdd" data-pick="'+i+'" '+(p.primary?'':'disabled')+'>'+addLabel+'</button></article>';
+    return '<article class="predictionCard"><div class="predictionHeader"><div><small>'+esc(p.product)+' · '+esc(p.competition)+'</small><h3>'+esc(p.home)+' <span>vs</span> '+esc(p.away)+'</h3></div><time>'+esc(p.start_time?date(p.start_time):'—')+'</time></div>'+primaryHtml+'<div class="calcTable"><div class="calcHead"><span>Market</span><span>Pick</span><span>Fair / model probability</span><span>Fair odds</span><span>SportyBet</span></div>'+row(p.bestWinner,'1X2')+row(p.bestOU,'O/U')+row(p.experimentalOU,'O/U 1.5')+'</div><div class="recurrenceNote">'+recurrenceText+'</div><div class="calcNote">Fair probability is the current de-vig SportyBet market baseline. Model probability adds the walk-forward line-ladder/product model and, after enough exact-line history, a conservative recurring-participant feature. O/U 1.5 remains a research watch and is not activated from ticket streaks alone.</div><button class="btn builderAdd" data-pick="'+i+'" '+(p.primary?'':'disabled')+'>'+addLabel+'</button></article>';
   }).join('');
   host.querySelectorAll('.builderAdd').forEach(function(btn){btn.addEventListener('click',function(){const p=picks[Number(btn.dataset.pick)];if(p&&!state.builder.some(function(x){return x.event_id===p.event_id;})){state.builder.push(p);state.builder=state.builder.slice(-4);renderBuilder();}});});
 }
@@ -783,6 +863,7 @@ async function loadHistory(){
       state.modelEvents=historicalOUEvents(state.rows);
       applyFilters(false);
       renderModelLab();
+      renderParticipantLab();
       rebuildPredictionDesk();
       const status=$('historyStatus');if(status)status.textContent='AUTO-COLLECTED · '+arr.length+' settled observations';
       const meta=$('historyMeta');if(meta)meta.textContent='Research filter active · '+state.eligibility.eligible_competitions.length+' eligible leagues · active O/U '+state.eligibility.eligible_ou_lines.join(', ')+' · experimental O/U '+state.eligibility.experimental_ou_lines.join(', ')+' · historical refresh '+new Date().toLocaleString();
