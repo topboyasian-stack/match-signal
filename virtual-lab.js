@@ -546,16 +546,16 @@ function predictionForEvent(e){
     const c=calculateMarket(m);
     if(c){c.marketType='ou';candidates.push(c);}
   });
-  const eligible=candidates.filter(c=>isEligibleOU(c)||isExperimentalOU(c)).sort((a,b)=>{
-    const ae=isExperimentalOU(a)?1:0,be=isExperimentalOU(b)?1:0;
-    return (ae-be)||(b.fairProb-a.fairProb);
-  });
-  if(!eligible.length)return null;
-  const bestOU=enrichCandidate(eligible[0],e);
+  const active=candidates.filter(isEligibleOU).sort((a,b)=>b.fairProb-a.fairProb);
+  const experimental=candidates.filter(isExperimentalOU).sort((a,b)=>b.fairProb-a.fairProb);
+  if(!active.length&&!experimental.length)return null;
+  const bestOU=active.length?enrichCandidate(active[0],e):null;
+  const experimentalOU=experimental.length?enrichCandidate(experimental[0],e):null;
+  const primaryCandidate=bestOU||experimentalOU;
   const out={product:e.product,competition:e.competition||e.tournament||'',event_id:id,
     home:String(e.home||e.participant_1||''),away:String(e.away||e.participant_2||''),
-    start_time:e.start_time||null,primary:qualifiesResearchPick(bestOU)?bestOU:null,
-    bestWinner:null,bestOU,candidates:[bestOU]};
+    start_time:e.start_time||null,primary:primaryCandidate&&qualifiesResearchPick(primaryCandidate)?primaryCandidate:null,
+    bestWinner:null,bestOU,experimentalOU,candidates:[bestOU,experimentalOU].filter(Boolean)};
   state.predictionCache.set(id,out);
   return out;
 }
@@ -596,7 +596,13 @@ function renderPredictionDesk(){
     }
     const primaryHtml=p.primary?'<div class="primaryPick"><span>RESEARCH QUALIFIED</span><strong>'+esc(p.primary.pickCode)+'</strong><b>'+fmtPct(p.primary.calibratedProb)+'</b><small>edge '+fmtPct(p.primary.edge)+' · n='+p.primary.calibrationN+'</small></div>':'<div class="primaryPick mutedPrediction"><span>NO QUALIFIED SIGNAL</span><strong>WAIT</strong><b>Market baseline only</b></div>';
     const addLabel=p.primary?'＋ Add qualified pick':'Locked · no qualified signal';
-    return '<article class="predictionCard"><div class="predictionHeader"><div><small>'+esc(p.product)+' · '+esc(p.competition)+'</small><h3>'+esc(p.home)+' <span>vs</span> '+esc(p.away)+'</h3></div><time>'+esc(p.start_time?date(p.start_time):'—')+'</time></div>'+primaryHtml+'<div class="calcTable"><div class="calcHead"><span>Market</span><span>Pick</span><span>Probability</span><span>Fair odds</span><span>SportyBet</span></div>'+row(p.bestWinner,'1X2')+row(p.bestOU,'O/U')+'</div><div class="recurrenceNote">'+(p.bestOU&&p.bestOU.recurrence?'Recurring participant evidence: '+p.bestOU.recurrence.entityN+' prior involved events · '+(p.bestOU.recurrence.entityOverRate==null?'—':fmtPct(p.bestOU.recurrence.entityOverRate))+' over rate at the displayed line · exact-pair n='+p.bestOU.recurrence.pairN:'No prior participant recurrence sample yet.')+'</div><div class="calcNote">Displayed probabilities start from the SportyBet de-vig market baseline. O/U 1.5 is now shown as an <strong>experimental</strong> line so recurring team/player evidence can be tested without treating three winning tickets as proof. This is not a guarantee.</div><button class="btn builderAdd" data-pick="'+i+'" '+(p.primary?'':'disabled')+'>'+addLabel+'</button></article>';
+    const activeRec=p.bestOU&&p.bestOU.recurrence;
+    const expRec=p.experimentalOU&&p.experimentalOU.recurrence;
+    const recurrenceText=(activeRec||expRec)?
+      'Recurring participant evidence: active-line n='+(activeRec?activeRec.entityN:0)+' · '+(activeRec&&activeRec.entityOverRate!=null?fmtPct(activeRec.entityOverRate):'—')+
+      ' · O/U 1.5 n='+(expRec?expRec.entityN:0)+' · '+(expRec&&expRec.entityOverRate!=null?fmtPct(expRec.entityOverRate):'—')+
+      ' · exact-pair O1.5 n='+(expRec?expRec.pairN:0):'No prior participant recurrence sample yet.';
+    return '<article class="predictionCard"><div class="predictionHeader"><div><small>'+esc(p.product)+' · '+esc(p.competition)+'</small><h3>'+esc(p.home)+' <span>vs</span> '+esc(p.away)+'</h3></div><time>'+esc(p.start_time?date(p.start_time):'—')+'</time></div>'+primaryHtml+'<div class="calcTable"><div class="calcHead"><span>Market</span><span>Pick</span><span>Probability</span><span>Fair odds</span><span>SportyBet</span></div>'+row(p.bestWinner,'1X2')+row(p.bestOU,'O/U')+row(p.experimentalOU,'O/U 1.5')+'</div><div class="recurrenceNote">'+recurrenceText+'</div><div class="calcNote">Displayed probabilities start from the SportyBet de-vig market baseline. O/U 1.5 is experimental: it is visible for research and recurrence tracking, but it is not promoted to a validated signal from ticket streaks alone.</div><button class="btn builderAdd" data-pick="'+i+'" '+(p.primary?'':'disabled')+'>'+addLabel+'</button></article>';
   }).join('');
   host.querySelectorAll('.builderAdd').forEach(function(btn){btn.addEventListener('click',function(){const p=picks[Number(btn.dataset.pick)];if(p&&!state.builder.some(function(x){return x.event_id===p.event_id;})){state.builder.push(p);state.builder=state.builder.slice(-4);renderBuilder();}});});
 }
