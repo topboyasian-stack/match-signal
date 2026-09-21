@@ -42,6 +42,19 @@ jobs:
       - name: Syntax-check collector
         run: python -m py_compile scripts/virtual_lab_collector.py
 
+      - name: Diagnose result proxy route
+        run: |
+          set -e
+          URL="https://match-signal.pages.dev/api/sportybet-virtual-results?source=efootball&pageSize=1&pageNum=1&startTime=$(( $(date +%s%3N) - 86400000 ))&endTime=$(date +%s%3N)"
+          CODE=$(curl -sS -o /tmp/result-proxy-body -D /tmp/result-proxy-headers -w '%{http_code}' "$URL")
+          echo "HTTP $CODE"
+          echo "--- headers ---"
+          cat /tmp/result-proxy-headers
+          echo "--- body (first 1000 bytes) ---"
+          head -c 1000 /tmp/result-proxy-body || true
+          echo
+          test "$CODE" = "200"
+
       - name: Run virtual fixture capture + settlement
         run: python scripts/virtual_lab_collector.py
 
