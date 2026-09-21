@@ -8,6 +8,7 @@ on:
       - 'data/predictions.json'
       - 'scripts/odds_builder.py'
       - 'expansion-odds-builder.js'
+      - 'data/sportybet_odds_snapshot.json'
       - '.github/workflows/odds_builder.yml'
   workflow_run:
     workflows:
@@ -45,13 +46,17 @@ jobs:
           python-version: '3.12'
       - name: Run daily mixed accumulator builder
         run: python scripts/odds_builder.py
-      - name: Validate accumulator JSON
+      - name: Validate V6 market-calibrated accumulator JSON
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
           data = json.loads(Path('data/odds_builder.json').read_text())
           assert data.get('mode') == 'PAPER_ONLY'
+          assert data.get('engine_version') == 'V6.0-MARKET-CALIBRATED'
+          policy = data.get('selection_policy', {})
+          assert policy.get('requires_live_sportybet_price') is True
+          assert float(policy.get('min_model_edge', 0)) >= 0.025
           assert set(data.get('sports_supported', [])) >= {'football', 'tennis'}
           assert isinstance(data.get('qualified_legs'), list)
           assert len(data['qualified_legs']) <= 4
@@ -61,12 +66,15 @@ jobs:
               assert leg.get('sport') in {'football', 'tennis'}
               assert float(leg.get('model_probability', 0)) >= 0.60
               assert float(leg.get('model_fair_odds', 0)) > 1
+              assert leg.get('real_money_eligible') is True
+              assert leg.get('bookmaker_odds') is not None
+              assert float(leg.get('model_edge', 0)) >= 0.025
           sports = {x.get('sport') for x in data['qualified_legs']}
           if data.get('candidates_considered', {}).get('football', 0) > 0:
               assert 'football' in sports or len(data['qualified_legs']) < 3
           if data.get('reference_combined_odds') is not None:
               assert data['reference_combined_odds'] > 1
-          print('Accumulator QA:', json.dumps({
+          print('V6 Accumulator QA:', json.dumps({
               'status': data.get('status'),
               'legs': len(data['qualified_legs']),
               'sports': sorted(sports),
