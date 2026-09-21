@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-21T22:40:08.757389+00:00",
+  "generated_at": "2026-09-21T23:28:06.175Z",
   "mode": "PAPER_RESEARCH_ONLY",
   "policy": {
     "minimum_competition_observations": 12,
@@ -17,20 +17,19 @@
       "handicap",
       "other"
     ],
-    "note": "Collection continues for blocked groups so the gate can be re-evaluated; blocked groups are excluded from research selections. Priority O/U lines are monitored continuously but do not bypass the evidence gate."
+    "note": "Raw league/line gates remain visible for research, but active eligibility now requires strict untouched model validation. O/U1.5 never bypasses this gate."
   },
-  "eligible_competitions": [
-    "Esoccer H2H GG League",
-    "Europa League",
-    "Volta Premier League"
-  ],
+  "eligible_competitions": [],
   "blocked_competitions": [
     "Champions League (Virtual eComp)",
     "Champions League B",
+    "Esoccer H2H GG League",
+    "Europa League",
     "GT Leagues",
     "International (Virtual eComp)",
     "International A 2x6",
     "Serie A",
+    "Volta Premier League",
     "eAdriatic League"
   ],
   "priority_ou_lines": [
@@ -38,16 +37,13 @@
     3.5,
     4.5
   ],
-  "eligible_ou_lines": [
-    3.5,
-    4.5
-  ],
+  "eligible_ou_lines": [],
   "blocked_ou_lines": [
     1.5,
     2.5,
-    3.0,
-    4.0,
-    5.0,
+    3,
+    4,
+    5,
     5.5,
     6.5,
     7.5,
@@ -223,13 +219,13 @@
       "all": {
         "n": 1,
         "wins": 1,
-        "win_rate": 1.0,
+        "win_rate": 1,
         "roi": 0.6499999999999999
       },
       "oos": {
         "n": 1,
         "wins": 1,
-        "win_rate": 1.0,
+        "win_rate": 1,
         "roi": 0.6499999999999999
       },
       "reason": "insufficient sample or weak all/OOS performance"
@@ -239,14 +235,14 @@
       "all": {
         "n": 1,
         "wins": 0,
-        "win_rate": 0.0,
-        "roi": -1.0
+        "win_rate": 0,
+        "roi": -1
       },
       "oos": {
         "n": 1,
         "wins": 0,
-        "win_rate": 0.0,
-        "roi": -1.0
+        "win_rate": 0,
+        "roi": -1
       },
       "reason": "insufficient sample or weak all/OOS performance"
     },
@@ -255,14 +251,14 @@
       "all": {
         "n": 1,
         "wins": 0,
-        "win_rate": 0.0,
-        "roi": -1.0
+        "win_rate": 0,
+        "roi": -1
       },
       "oos": {
         "n": 1,
         "wins": 0,
-        "win_rate": 0.0,
-        "roi": -1.0
+        "win_rate": 0,
+        "roi": -1
       },
       "reason": "insufficient sample or weak all/OOS performance"
     },
@@ -309,7 +305,7 @@
       "oos": {
         "n": 2,
         "wins": 2,
-        "win_rate": 1.0,
+        "win_rate": 1,
         "roi": 0.6
       },
       "reason": "insufficient sample or weak all/OOS performance"
@@ -373,8 +369,8 @@
       "oos": {
         "n": 1,
         "wins": 0,
-        "win_rate": 0.0,
-        "roi": -1.0
+        "win_rate": 0,
+        "roi": -1
       },
       "reason": "insufficient sample or weak all/OOS performance"
     },
@@ -383,14 +379,14 @@
       "all": {
         "n": 2,
         "wins": 0,
-        "win_rate": 0.0,
-        "roi": -1.0
+        "win_rate": 0,
+        "roi": -1
       },
       "oos": {
         "n": 1,
         "wins": 0,
-        "win_rate": 0.0,
-        "roi": -1.0
+        "win_rate": 0,
+        "roi": -1
       },
       "reason": "insufficient sample or weak all/OOS performance"
     },
@@ -399,13 +395,13 @@
       "all": {
         "n": 1,
         "wins": 1,
-        "win_rate": 1.0,
+        "win_rate": 1,
         "roi": 0.75
       },
       "oos": {
         "n": 1,
         "wins": 1,
-        "win_rate": 1.0,
+        "win_rate": 1,
         "roi": 0.75
       },
       "reason": "insufficient sample or weak all/OOS performance"
@@ -415,16 +411,34 @@
       "all": {
         "n": 1,
         "wins": 1,
-        "win_rate": 1.0,
+        "win_rate": 1,
         "roi": 0.75
       },
       "oos": {
         "n": 1,
         "wins": 1,
-        "win_rate": 1.0,
+        "win_rate": 1,
         "roi": 0.75
       },
       "reason": "insufficient sample or weak all/OOS performance"
     }
+  },
+  "raw_eligible_ou_lines": [
+    3.5,
+    4.5
+  ],
+  "model_qualified_ou_lines": [],
+  "raw_eligible_competitions": [
+    "Esoccer H2H GG League",
+    "Europa League",
+    "Volta Premier League"
+  ],
+  "model_qualified_competitions": [],
+  "model_gate": {
+    "minimum_exact_line_history": 8,
+    "minimum_untouched_participant_rows": 20,
+    "minimum_untouched_rows": 30,
+    "pass": false,
+    "reason": "insufficient untouched participant evidence or no dual-loss improvement"
   }
 }
