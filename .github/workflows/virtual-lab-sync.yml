@@ -55,12 +55,13 @@ jobs:
           print("Sources:", d.get('source'))
           PY
 
-      - name: Publish live snapshot
+      - name: Publish live snapshot without overwriting newer data
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          cp data/virtual_lab_live.json /tmp/virtual_lab_live_candidate.json
           git add data/virtual_lab_live.json
           if git diff --cached --quiet; then
             echo "No snapshot change."
@@ -72,8 +73,33 @@ jobs:
               echo "Virtual Lab live snapshot published on attempt ${attempt}."
               exit 0
             fi
+            echo "Concurrent main update detected; comparing snapshot timestamps (attempt ${attempt})."
             git fetch origin main
-            git rebase origin/main || { git rebase --abort 2>/dev/null || true; exit 1; }
+            git reset --hard origin/main
+            python - <<'PY'
+          import json
+          from datetime import datetime, timezone
+          from pathlib import Path
+          cand=json.loads(Path('/tmp/virtual_lab_live_candidate.json').read_text())
+          remote=json.loads(Path('data/virtual_lab_live.json').read_text()) if Path('data/virtual_lab_live.json').exists() else {}
+          def ts(d):
+              try: return datetime.fromisoformat(str(d).replace('Z','+00:00'))
+              except Exception: return datetime.min.replace(tzinfo=timezone.utc)
+          if ts(remote.get('updated_at')) >= ts(cand.get('updated_at')):
+              print('Remote Virtual Lab snapshot is newer or equal; keeping remote snapshot.')
+              raise SystemExit(10)
+          Path('data/virtual_lab_live.json').write_text(Path('/tmp/virtual_lab_live_candidate.json').read_text())
+          print('Candidate snapshot is newer; republishing it on top of latest main.')
+          PY
+            rc=$?
+            if [ "$rc" -eq 10 ]; then
+              exit 0
+            fi
+            if [ "$rc" -ne 0 ]; then
+              exit "$rc"
+            fi
+            git add data/virtual_lab_live.json
+            git commit -m "🤖 Refresh Virtual Lab live feed"
             sleep $((attempt * 2))
           done
           exit 1
