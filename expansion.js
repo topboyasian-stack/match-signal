@@ -7,7 +7,7 @@
   function fmt(v) { var d = new Date(v); return isNaN(d.getTime()) ? String(v || '—') : d.toLocaleString(); }
   function esc(v) { var d = document.createElement('div'); d.textContent = v == null ? '' : String(v); return d.innerHTML; }
   function get(path) {
-    return fetch('./' + path + '?v=' + Date.now(), { cache: 'no-store' }).then(function (r) {
+    return fetch('./' + path, { cache: 'default' }).then(function (r) {
       if (!r.ok) throw new Error(path + ' HTTP ' + r.status);
       return r.json();
     });
@@ -38,7 +38,25 @@
     var grouped = {};
     rows.forEach(function (x) { var k = x.league || x.sport || 'Other'; if (!grouped[k]) grouped[k] = []; grouped[k].push(x); });
     var keys = Object.keys(grouped).sort();
-    $('groups').innerHTML = keys.map(function (k) { return '<div class="group"><h2>' + esc(k) + '</h2><div class="groupMeta">' + grouped[k].length + ' detailed fixture' + (grouped[k].length === 1 ? '' : 's') + '</div><div class="grid">' + grouped[k].map(function (x) { return x.sport === 'tennis' ? tennisCard(x) : footballCard(x); }).join('') + '</div></div>'; }).join('') || '<div class="empty">No fixtures match the selected filters.</div>';
+    var limit = 30;
+    $('groups').innerHTML = keys.map(function (k) {
+      var list = grouped[k], shown = list.slice(0, limit);
+      return '<div class="group"><h2>' + esc(k) + '</h2><div class="groupMeta">' + list.length + ' detailed fixture' + (list.length === 1 ? '' : 's') + (list.length > limit ? ' · showing first ' + limit : '') + '</div><div class="grid">' +
+        shown.map(function (x) { return x.sport === 'tennis' ? tennisCard(x) : footballCard(x); }).join('') +
+        (list.length > limit ? '<button class="btn ms-load-more" data-league="' + esc(k) + '" style="margin-top:12px">Show remaining ' + (list.length-limit) + '</button>' : '') +
+        '</div></div>';
+    }).join('') || '<div class="empty">No fixtures match the selected filters.</div>';
+    Array.from(document.querySelectorAll('.ms-load-more')).forEach(function(btn){
+      btn.onclick=function(){
+        var league=btn.getAttribute('data-league'), target=grouped[league]||[];
+        var grid=btn.parentElement, current=grid.querySelectorAll('.card').length;
+        var next=target.slice(0,current+30);
+        grid.querySelectorAll('.card').forEach(function(el){el.remove();});
+        var cards=next.map(function(x){return x.sport==='tennis'?tennisCard(x):footballCard(x);}).join('');
+        grid.insertAdjacentHTML('afterbegin',cards);
+        if(next.length>=target.length) btn.remove(); else btn.textContent='Show remaining '+(target.length-next.length);
+      };
+    });
   }
   function filters() {
     var leagues = Array.from(new Set(all.map(function (x) { return x.league; }).filter(Boolean))).sort();
@@ -56,5 +74,5 @@
     });
   };
   window.run();
-  window.setInterval(window.run, 60000);
+  window.setInterval(window.run, 120000);
 }());
