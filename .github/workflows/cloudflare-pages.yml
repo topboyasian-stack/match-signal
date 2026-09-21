@@ -28,6 +28,8 @@ on:
       - 'virtual-lab.js'
       - 'virtual-lab.css'
       - 'virtual-lab/**'
+      - 'scripts/virtual_lab_sync.py'
+      - '.github/workflows/virtual-lab-sync.yml'
       - '_redirects'
       - 'VIRTUAL-LAB-*.md'
       - '.github/workflows/cloudflare-pages.yml'
@@ -128,8 +130,8 @@ jobs:
         run: |
           node --input-type=module <<'NODE'
           const base = 'https://match-signal.pages.dev';
-          const pages = ['/', '/expansion.html', '/live.html', '/basketball.html', '/performance.html', '/research.html'];
-          const assets = ['/expansion.js', '/expansion-odds-builder.js', '/live-analysis.js', '/live-data-worker.js', '/virtual-lab.js', '/virtual-lab.css', '/_redirects', '/data/predictions.json', '/data/expansion_status.json', '/data/odds_builder.json'];
+          const pages = ['/', '/expansion.html', '/live.html', '/basketball.html', '/performance.html', '/research.html', '/virtual-lab'];
+          const assets = ['/expansion.js', '/expansion-odds-builder.js', '/live-analysis.js', '/live-data-worker.js', '/virtual-lab.js', '/virtual-lab.css', '/_redirects', '/data/predictions.json', '/data/expansion_status.json', '/data/odds_builder.json', '/data/virtual_lab_live.json'];
           const failures = [];
           async function get(path) {
             const r = await fetch(base + path + (path.includes('?') ? '&' : '?') + 'smoke=' + Date.now(), {cache:'no-store'});
@@ -168,6 +170,31 @@ jobs:
             if (!r.ok) failures.push('/api/espn NBA HTTP '+r.status);
             else if (!Array.isArray(JSON.parse(body).events)) failures.push('/api/espn NBA returned invalid JSON');
           } catch(e) { failures.push('/api/espn '+e.message); }
+          try {
+            const params = new URLSearchParams({
+              sportId:'sr:sport:1',
+              marketId:'1,18,10,29,11,26,36,14,60100,186,189,202,204,210',
+              pageSize:'100',
+              pageNum:'1',
+              todayGames:'false',
+              timeline:'168',
+              _t:String(Date.now())
+            });
+            const {r,body}=await get('/api/sportybet?'+params.toString());
+            if (!r.ok) failures.push('/api/sportybet HTTP '+r.status);
+            const payload=JSON.parse(body);
+            if (payload.bizCode!==10000) failures.push('/api/sportybet bizCode '+payload.bizCode);
+            const tournaments=(payload.data&&payload.data.tournaments)||[];
+            const virtualEvents=tournaments.flatMap(t=>(t.events||[]).map(e=>({
+              tournament:String(t.name||''),
+              category:String(t.categoryName||''),
+              home:String(e.homeTeamName||''),
+              away:String(e.awayTeamName||'')
+            }))).filter(e=>/simulated reality|\bsrl\b|gt sports league|gt leagues|eadriatic|efootball|e soccer|esoccer|virtual football|zoom|turbo/i.test(e.tournament+' '+e.category+' '+e.home+' '+e.away));
+            if (!virtualEvents.length) failures.push('/api/sportybet returned no virtual/eFootball/SRL events');
+            else console.log('Virtual Lab live source passed: '+virtualEvents.length+' matching events');
+          } catch(e) { failures.push('/api/sportybet '+e.message); }
+
           if (failures.length) { console.error(failures.join('\n')); process.exit(1); }
           console.log('Production HTTP smoke tests passed: '+pages.length+' pages, '+assets.length+' assets, NBA ESPN proxy');
           NODE
