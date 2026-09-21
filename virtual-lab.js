@@ -283,23 +283,40 @@ function collectLiveFromBody(body){
 }
 
 async function fetchLiveRemote(){
-  const params=new URLSearchParams({pageSize:'100',pageNum:'1',timeline:'168',sources:'efootball,srl,vfootball'});
-  const r=await fetch(LIVE_API+'?'+params.toString(),{cache:'no-store'});
-  if(!r.ok)throw new Error('Live virtual source HTTP '+r.status);
-  const body=await r.json();
-  if(body?.ok===false)throw new Error(body.error||'Live virtual source returned an error');
-  const events=Array.isArray(body?.events)?body.events:[];
-  return events.map(e=>({
-    product:String(e.product||'other'),
-    competition:String(e.tournament||'Unclassified'),
-    category:String(e.category||''),
-    event_id:String(e.event_id||''),
-    home:String(e.participant_1||''),
-    away:String(e.participant_2||''),
-    start_time:e.start_time_ms!=null?new Date(Number(e.start_time_ms)).toISOString():(e.start_time||null),
-    match_status:e.match_status,
-    markets:Array.isArray(e.markets)?e.markets:[]
-  })).filter(e=>e.event_id);
+  const urls=[
+    './api/sportybet-virtual',
+    LIVE_API
+  ];
+  let lastError=null;
+  for(const base of urls){
+    try{
+      const pages=[];
+      for(let pageNum=1;pageNum<=2;pageNum++){
+        const params=new URLSearchParams({pageSize:'100',pageNum:String(pageNum),timeline:'168',sources:'efootball,srl,vfootball',_t:String(Date.now())});
+        const r=await fetch(base+'?'+params.toString(),{cache:'no-store',headers:{'Accept':'application/json'}});
+        if(!r.ok)throw new Error(base+' HTTP '+r.status);
+        const body=await r.json();
+        if(body?.ok===false)throw new Error(body.error||base+' returned an error');
+        pages.push(body);
+        const batch=Array.isArray(body?.events)?body.events:[];
+        if(batch.length<100)break;
+      }
+      const merged=[];
+      const seen=new Set();
+      for(const body of pages){
+        for(const e of (Array.isArray(body?.events)?body.events:[])){
+          const id=String(e.event_id||e.eventId||'');
+          if(id&&!seen.has(id)){seen.add(id);merged.push(e)}
+        }
+      }
+      if(merged.length){
+        const latestTimestamp=pages.map(p=>p?.updated_at).filter(Boolean).sort().pop()||new Date().toISOString();
+        return {events:merged,updated_at:latestTimestamp,endpoint:base};
+      }
+      lastError=new Error(base+' returned zero virtual/eFootball/SRL events');
+    }catch(e){lastError=e;}
+  }
+  throw lastError||new Error('No live virtual source available');
 }
 async function fetchLiveSnapshot(){
   const r=await fetch(SNAPSHOT,{cache:'no-store'});
@@ -312,24 +329,26 @@ async function loadLive(){
   const button=$('liveRefresh');
   button.disabled=true;
   try{
-    const events=await fetchLiveRemote();
-    if(events.length){
-      state.live=events;
-      state.liveMode='remote';
-      state.liveUpdated=new Date().toISOString();
-      renderLive();
-      return;
-    }
-    throw new Error('SportyBet returned zero virtual/eFootball/SRL events');
+    const live=await fetchLiveRemote();
+    state.live=live.events;
+    state.liveMode='remote';
+    state.liveUpdated=live.updated_at;
+    renderLive();
+    $('liveMeta').textContent='LIVE · '+$('liveMeta').textContent+' · '+live.endpoint;
+    return;
   }catch(remoteError){
     try{
       const snap=await fetchLiveSnapshot();
+      const ageMs=snap.updated_at?Date.now()-new Date(snap.updated_at).getTime():Infinity;
       if(!snap.events.length)throw new Error('snapshot has zero events');
       state.live=snap.events;
       state.liveMode='snapshot';
       state.liveUpdated=snap.updated_at;
       renderLive();
-      $('liveMeta').textContent='Remote live source unavailable · '+$('liveMeta').textContent;
+      const stale=ageMs>120000;
+      $('liveDot').className='liveDot '+(stale?'bad':'wait');
+      $('liveTitle').textContent=stale?'STALE SNAPSHOT — LIVE SOURCE DOWN':'SNAPSHOT FALLBACK';
+      $('liveMeta').textContent=(stale?'Remote source unavailable and snapshot is older than 2 minutes · ':'Remote live source unavailable · ')+$('liveMeta').textContent;
       console.warn('Virtual Lab live source failed; snapshot used:',remoteError);
       return;
     }catch(snapshotError){
