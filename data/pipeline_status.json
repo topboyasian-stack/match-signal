@@ -1,16 +1,16 @@
 {
-  "updated_at": "2026-09-21T01:21:38.980952+00:00",
-  "prediction_count": 40,
-  "football_count": 0,
+  "updated_at": "2026-09-21T04:48:41.660178+00:00",
+  "prediction_count": 41,
+  "football_count": 1,
   "tennis_count": 40,
   "errors": [
     "tennis:ATP:no actionable singles matches in next 7 days"
   ],
   "quality_control": {
-    "rejected_total": 348,
+    "rejected_total": 347,
     "rejected_by_reason": {
-      "missing real player name": 213,
-      "non-singles draw": 135
+      "missing real player name": 211,
+      "non-singles draw": 136
     },
     "rejected_by_tour": {
       "ATP": {
@@ -18,14 +18,20 @@
         "non-singles draw": 30
       },
       "WTA": {
-        "missing real player name": 151,
-        "non-singles draw": 105
+        "non-singles draw": 106,
+        "missing real player name": 149
       }
     },
     "deduplicated_matches": 0,
     "deduplicated_examples": [],
-    "filtered_low_confidence": 34,
+    "filtered_low_confidence": 35,
     "filtered_low_confidence_examples": [
+      {
+        "match": "Kaitlin Quevedo vs Nadia Podoroska",
+        "tour": "WTA",
+        "confidence": 0.5122,
+        "signal_components": 3
+      },
       {
         "match": "Yao Xinxin vs Maya Joint",
         "tour": "WTA",
@@ -139,16 +145,22 @@
         "tour": "WTA",
         "confidence": 0.5,
         "signal_components": 2
-      },
-      {
-        "match": "Katherine Sebov vs Gabriela Knutson",
-        "tour": "WTA",
-        "confidence": 0.5499,
-        "signal_components": 2
       }
     ]
   },
   "data_source": "ESPN public scoreboards + ESPN ATP/WTA rankings + recent 60-day results",
   "free_server_cost": true,
-  "model_version": "3.2 calibrated tennis signals + fixture QC"
+  "model_version": "3.2 calibrated tennis signals + fixture QC",
+  "basketball_count": 0,
+  "basketball_qualified_count": 0,
+  "basketball_settled": 0,
+  "basketball_market_provider": "OddsPapi",
+  "basketball_market_provider_status": "http_429",
+  "basketball_sources": [
+    {
+      "source": "Official BBL schedule",
+      "events": 0,
+      "status": "ok"
+    }
+  ]
 }
