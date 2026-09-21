@@ -6,6 +6,8 @@ const LIVE_API='https://match-signal.pages.dev/api/sportybet-virtual';
 const LIVE_MARKETS='1,18,10,29,11,26,36,14,60100,186,189,202,204,210';
 const SNAPSHOT='./data/virtual_lab_live.json';
 const LIVE_REFRESH_MS=30000;
+const HISTORY='./api/virtual-lab-history';
+const HISTORY_FALLBACK='./data/virtual_lab_history.json';
 const state={rows:[],filtered:[],live:[],liveMode:'none',liveUpdated:null,picks:[],builder:[]};
 
 const $=id=>document.getElementById(id);
@@ -286,7 +288,7 @@ function renderLive(){
     const p=predictionForEvent(e);
     const shown=(e.markets||[]).filter(m=>matchesMarket(m,market)).slice(0,3);
     const chips=shown.flatMap(m=>(m.outcomes||[]).slice(0,4).map(o=>'<span class="liveChip"><span>'+esc(outcomeCode(m,o))+'</span> <b>'+Number(o.odds).toFixed(2)+'</b></span>')).join('');
-    const pick=p?'<div class="predictionBox"><div class="predictionTop"><span class="predictionLabel">PICK</span><span class="predictionType">'+(p.primary.marketType==='ou'?'TOTALS':'MATCH RESULT')+'</span></div><div class="predictionPick">'+esc(p.primary.pickCode)+' <b>'+pct(p.primary.fairProb)+'</b></div><div class="predictionMeta">Book '+p.primary.bookmakerOdds.toFixed(2)+' · Fair '+p.primary.fairOdds.toFixed(2)+'</div></div>':'<div class="predictionBox mutedPrediction"><div class="predictionLabel">PICK</div><div class="predictionPick">NO READABLE PICK</div></div>';
+    const pick=p?'<div class="predictionBox"><div class="predictionTop"><span class="predictionLabel">PICK</span><span class="predictionType">'+(p.primary.marketType==='ou'?'TOTALS':'MATCH RESULT')+'</span></div><div class="predictionPick">'+esc(p.primary.pickCode)+' <b>'+fmtPct(p.primary.fairProb)+'</b></div><div class="predictionMeta">Book '+p.primary.bookmakerOdds.toFixed(2)+' · Fair '+p.primary.fairOdds.toFixed(2)+'</div></div>':'<div class="predictionBox mutedPrediction"><div class="predictionLabel">PICK</div><div class="predictionPick">NO READABLE PICK</div></div>';
     return '<article class="liveCard"><div class="liveTop"><span>'+esc(e.competition||e.product)+'</span><span>'+esc(e.start_time?date(e.start_time):'Time n/a')+'</span></div><div class="liveTeams"><strong>'+esc(e.home||e.participant_1||'Unknown player/team')+'</strong> <span>vs</span> <strong>'+esc(e.away||e.participant_2||'Unknown player/team')+'</strong></div>'+pick+'<div class="liveOdds">'+(chips||'<span class="liveMeta">No readable markets</span>')+'</div></article>';
   }).join('');
   $('liveGrid').innerHTML=list;
@@ -306,7 +308,7 @@ function renderPredictionDesk(){
       if(!x)return '<div class="calcRow"><span>'+label+'</span><b>—</b><span>—</span><span>—</span><span>—</span></div>';
       return '<div class="calcRow"><span>'+label+(x.market.line!=null?' '+x.market.line:'')+'</span><b>'+esc(x.pickCode)+'</b><span>'+pct(x.fairProb)+'</span><span>Fair '+x.fairOdds.toFixed(2)+'</span><span>Book '+x.bookmakerOdds.toFixed(2)+'</span></div>';
     }
-    return '<article class="predictionCard"><div class="predictionHeader"><div><small>'+esc(p.product)+' · '+esc(p.competition)+'</small><h3>'+esc(p.home)+' <span>vs</span> '+esc(p.away)+'</h3></div><time>'+esc(p.start_time?date(p.start_time):'—')+'</time></div><div class="primaryPick"><span>PRIMARY PICK</span><strong>'+esc(p.pickCode)+'</strong><b>'+pct(p.primary.fairProb)+'</b></div><div class="calcTable"><div class="calcHead"><span>Market</span><span>Pick</span><span>Probability</span><span>Fair odds</span><span>SportyBet</span></div>'+row(p.bestWinner,'1X2')+row(p.bestOU,'O/U')+'</div><div class="calcNote">De-vig probability = (1 / outcome odds) ÷ sum of all outcome implied probabilities. This is a live market baseline.</div><button class="btn builderAdd" data-pick="'+i+'">＋ Add to odds builder</button></article>';
+    return '<article class="predictionCard"><div class="predictionHeader"><div><small>'+esc(p.product)+' · '+esc(p.competition)+'</small><h3>'+esc(p.home)+' <span>vs</span> '+esc(p.away)+'</h3></div><time>'+esc(p.start_time?date(p.start_time):'—')+'</time></div><div class="primaryPick"><span>PRIMARY PICK</span><strong>'+esc(p.pickCode)+'</strong><b>'+fmtPct(p.primary.fairProb)+'</b></div><div class="calcTable"><div class="calcHead"><span>Market</span><span>Pick</span><span>Probability</span><span>Fair odds</span><span>SportyBet</span></div>'+row(p.bestWinner,'1X2')+row(p.bestOU,'O/U')+'</div><div class="calcNote">De-vig probability = (1 / outcome odds) ÷ sum of all outcome implied probabilities. This is a live market baseline.</div><button class="btn builderAdd" data-pick="'+i+'">＋ Add to odds builder</button></article>';
   }).join('');
   host.querySelectorAll('.builderAdd').forEach(function(btn){btn.addEventListener('click',function(){const p=picks[Number(btn.dataset.pick)];if(p&&!state.builder.some(function(x){return x.event_id===p.event_id;})){state.builder.push(p);state.builder=state.builder.slice(-4);renderBuilder();}});});
 }
@@ -444,12 +446,30 @@ function rebuildPredictionDesk(){
   renderPredictionDesk();renderBuilder();
 }
 
-function applyFilters(){
+async function loadHistory(){
+  const urls=[HISTORY,HISTORY_FALLBACK];
+  let lastError=null;
+  for(const url of urls){
+    try{
+      const r=await fetch(url+'?t='+Date.now(),{cache:'no-store',headers:{'Accept':'application/json'}});
+      if(!r.ok)throw new Error(url+' HTTP '+r.status);
+      const data=await r.json();
+      const arr=Array.isArray(data)?data:(Array.isArray(data.rows)?data.rows:[]);
+      state.rows=arr.map(normalize);
+      applyFilters(false);
+      const status=$('historyStatus');if(status)status.textContent='AUTO-COLLECTED · '+arr.length+' settled observations';
+      const meta=$('historyMeta');if(meta)meta.textContent='Historical rows are collected automatically from the Virtual Lab paper pipeline. Latest refresh '+new Date().toLocaleString();
+      return;
+    }catch(e){lastError=e;}
+  }
+  const status=$('historyStatus');if(status)status.textContent='HISTORY SOURCE UNAVAILABLE';
+  const meta=$('historyMeta');if(meta)meta.textContent='No automatic history was loaded. '+(lastError?lastError.message:'');
+}
+function applyFilters(rebuildLive=true){
   const product=$('product').value,market=$('market').value;
   state.filtered=state.rows.filter(r=>(product==='all'||r.product===product)&&(market==='all'||r.market===market));
   analyze();
-  renderLive();
-  rebuildPredictionDesk();
+  if(rebuildLive){renderLive();rebuildPredictionDesk();}
 }
 
 function runStrategy(){
@@ -467,7 +487,7 @@ function runStrategy(){
     '</div><p class="muted">This test does not predict hidden RNG state. It asks whether a simple threshold defined before the unseen sample has remained useful out-of-sample. A positive result needs replication on another untouched period.</p>';
 }
 
-$('fileInput').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{state.rows=await parseFile(f);applyFilters()}catch(err){alert('Could not parse dataset: '+err.message)}});
+$('fileInput').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{state.rows=await parseFile(f);applyFilters(true)}catch(err){alert('Could not parse dataset: '+err.message)}});
 $('product').addEventListener('change',applyFilters);
 $('market').addEventListener('change',applyFilters);
 $('split').addEventListener('change',analyze);
@@ -475,9 +495,11 @@ $('runStrategy').addEventListener('click',runStrategy);
 $('liveRefresh').addEventListener('click',loadLive);
 $('autoBuild').addEventListener('click',autoBuild);
 $('clearBuilder').addEventListener('click',function(){state.builder=[];renderBuilder();});
-$('clear').addEventListener('click',()=>{state.rows=[];state.filtered=[];state.builder=[];$('fileInput').value='';analyze();renderBuilder()});
+$('clear').addEventListener('click',()=>{state.rows=[];state.filtered=[];state.builder=[];const hs=$('historyStatus');if(hs)hs.textContent='MANUAL DATASET CLEARED';$('fileInput').value='';analyze();renderBuilder()});
 
 analyze();
+loadHistory();
 loadLive();
 window.setInterval(loadLive,LIVE_REFRESH_MS);
+window.setInterval(loadHistory,120000);
 })();
