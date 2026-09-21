@@ -1,6 +1,10 @@
 name: Match Signal Virtual Lab Collector
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/virtual-lab-collector.yml'
   schedule:
     - cron: '*/5 * * * *'
   workflow_dispatch:
@@ -30,6 +34,12 @@ jobs:
 
       - name: Install dependency
         run: python -m pip install --upgrade requests
+
+      - name: Syntax-check Virtual Lab engine
+        run: node --check virtual-lab.js
+
+      - name: Syntax-check collector
+        run: python -m py_compile scripts/virtual_lab_collector.py
 
       - name: Run virtual fixture capture + settlement
         run: python scripts/virtual_lab_collector.py
