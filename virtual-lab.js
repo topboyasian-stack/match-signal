@@ -6,12 +6,13 @@ const LIVE_API='https://match-signal.pages.dev/api/sportybet-virtual';
 const LIVE_MARKETS='1,18,10,29,11,26,36,14,60100,186,189,202,204,210';
 const SNAPSHOT='./data/virtual_lab_live.json';
 const LIVE_REFRESH_MS=30000;
-const UI_BUILD='20260922-v21';
+const UI_BUILD='20260922-v22';
 const HISTORY='./api/virtual-lab-history';
 const HISTORY_FALLBACK='./data/virtual_lab_history.json';
 const MODEL_EVAL='./data/virtual_lab_model_eval.json';
 const ELIGIBILITY='./data/virtual_lab_eligibility.json';
-const state={rows:[],filtered:[],live:[],liveMode:'none',liveUpdated:null,picks:[],builder:[],historyLoaded:false,modelRows:[],modelEvents:[],modelGate:false,modelHoldout:null,modelEvaluation:null,eligibility:{eligible_competitions:['Esoccer H2H GG League','Europa League','Volta Premier League'],eligible_ou_lines:[3.5,4.5],experimental_ou_lines:[1.5],priority_ou_lines:[1.5,3.5,4.5],eligible_markets:['ou']},predictionCache:new Map()};
+const PARTICIPANT_PROFILES='./data/virtual_lab_participant_profiles.json';
+const state={rows:[],filtered:[],live:[],liveMode:'none',liveUpdated:null,picks:[],builder:[],historyLoaded:false,modelRows:[],modelEvents:[],modelGate:false,modelHoldout:null,modelEvaluation:null,participantProfiles:null,eligibility:{eligible_competitions:['Esoccer H2H GG League','Europa League','Volta Premier League'],eligible_ou_lines:[3.5,4.5],experimental_ou_lines:[1.5],priority_ou_lines:[1.5,3.5,4.5],eligible_markets:['ou']},predictionCache:new Map()};
 
 const $=id=>document.getElementById(id);
 const esc=v=>{const d=document.createElement('div');d.textContent=String(v??'');return d.innerHTML};
@@ -344,51 +345,46 @@ function productPrior(events,product,line,cutoff){
   return {prob:(over+2)/(decisive+4),n:decisive,pushes};
 }
 function recurrenceEvidence(events,event,line){
-  const cutoff=new Date(event?.timestamp||0).getTime();
-  const product=event?.product||'';
-  const home=String(event?.home||'').trim().toLowerCase();
-  const away=String(event?.away||'').trim().toLowerCase();
-  const target=Number(line);
-  if(!home&&!away)return {entityN:0,entityOver:0,entityOverRate:null,entityAvgTotal:null,pairN:0,pairOver:0,pairOverRate:null,pairAvgTotal:null,entityNames:[]};
-  const prior=(events||[]).filter(e=>{
-    const t=new Date(e?.timestamp||0).getTime();
-    if(!e||e.product!==product||e.total==null||!Number.isFinite(t)||t>=cutoff)return false;
-    const eh=String(e.home||'').trim().toLowerCase(),ea=String(e.away||'').trim().toLowerCase();
-    return eh===home||eh===away||ea===home||ea===away;
-  });
-  const entityDecisive=prior.filter(e=>e.total!==target);
-  const entityOver=entityDecisive.filter(e=>e.total>target);
-  const entityAvgTotal=prior.length?prior.reduce((s,e)=>s+Number(e.total||0),0)/prior.length:null;
-  const pairRelevant=prior.filter(e=>{
-    const eh=String(e.home||'').trim().toLowerCase(),ea=String(e.away||'').trim().toLowerCase();
-    return (eh===home&&ea===away)||(eh===away&&ea===home);
-  });
-  const pairDecisive=pairRelevant.filter(e=>e.total!==target);
-  const pairOver=pairDecisive.filter(e=>e.total>target);
-  const pairAvgTotal=pairRelevant.length?pairRelevant.reduce((s,e)=>s+Number(e.total||0),0)/pairRelevant.length:null;
+  const cutoff=new Date(event?.timestamp||0).getTime(),product=event?.product||'',home=String(event?.home||'').trim().toLowerCase(),away=String(event?.away||'').trim().toLowerCase(),target=Number(line);
+  if(!home&&!away)return {entityN:0,totalN:0,entityOver:0,entityOverRate:null,totalOverRate:null,entityAvgTotal:null,pairN:0,pairOver:0,pairOverRate:null,pairAvgTotal:null,entityNames:[]};
+  const prior=(events||[]).filter(e=>{const t=new Date(e?.timestamp||0).getTime();if(!e||e.product!==product||e.total==null||!Number.isFinite(t)||t>=cutoff)return false;const eh=String(e.home||'').trim().toLowerCase(),ea=String(e.away||'').trim().toLowerCase();return eh===home||eh===away||ea===home||ea===away;});
+  const entityDecisive=prior.filter(e=>e.total!==target),entityOver=entityDecisive.filter(e=>e.total>target);
+  const pairRelevant=prior.filter(e=>{const eh=String(e.home||'').trim().toLowerCase(),ea=String(e.away||'').trim().toLowerCase();return (eh===home&&ea===away)||(eh===away&&ea===home);});
+  const pairDecisive=pairRelevant.filter(e=>e.total!==target),pairOver=pairDecisive.filter(e=>e.total>target);
   return {
-    entityN:entityDecisive.length,
-    entityOver:entityOver.length,
+    entityN:entityDecisive.length,totalN:prior.length,entityOver:entityOver.length,
     entityOverRate:entityDecisive.length?entityOver.length/entityDecisive.length:null,
-    entityAvgTotal,
-    pairN:pairDecisive.length,
-    pairOver:pairOver.length,
+    totalOverRate:prior.length?prior.filter(e=>e.total>target).length/prior.length:null,
+    entityAvgTotal:prior.length?prior.reduce((s,e)=>s+Number(e.total||0),0)/prior.length:null,
+    pairN:pairDecisive.length,pairOver:pairOver.length,
     pairOverRate:pairDecisive.length?pairOver.length/pairDecisive.length:null,
-    pairAvgTotal,
+    pairAvgTotal:pairRelevant.length?pairRelevant.reduce((s,e)=>s+Number(e.total||0),0)/pairRelevant.length:null,
     entityNames:[event.home,event.away].filter(Boolean)
   };
 }
 function participantPrior(events,event,line){
   const rec=recurrenceEvidence(events,event,line);
-  if(rec.entityN<8)return {prob:null,n:rec.entityN,pairProb:null,pairN:rec.pairN,weight:0,entityProb:null};
-  const entityProb=(rec.entityOver+2)/(rec.entityN+4);
-  let prob=entityProb,pairProb=null;
+  if(rec.entityN<3)return {prob:null,n:rec.entityN,totalN:rec.totalN,pairProb:null,pairN:rec.pairN,weight:0,entityProb:null};
+  let prob=(rec.entityOver+2)/(rec.entityN+4);
+  let pairProb=null;
+  if(rec.entityN>=8){
+    const exactProb=(rec.entityOver+2)/(rec.entityN+4);
+    prob=exactProb;
+  }
   if(rec.pairN>=6){
     pairProb=(rec.pairOver+2)/(rec.pairN+4);
-    prob=0.75*entityProb+0.25*pairProb;
+    prob=.75*prob+.25*pairProb;
   }
-  const weight=Math.min(0.20,Math.max(0.05,(rec.entityN-7)/40));
-  return {prob,n:rec.entityN,pairProb,pairN:rec.pairN,weight,entityProb};
+  const weight=Math.min(.15,Math.max(.05,(rec.entityN-2)/35));
+  return {prob,n:rec.entityN,totalN:rec.totalN,pairProb,pairN:rec.pairN,weight,entityProb:prob};
+}
+function hotParticipantForEvent(e,line){
+  const profiles=state.participantProfiles?.profiles||[];
+  const names=[e.home||e.participant_1,e.away||e.participant_2].filter(Boolean).map(x=>String(x).trim().toLowerCase());
+  const matches=profiles.filter(p=>p.product===e.product&&names.includes(String(p.participant||'').trim().toLowerCase())&&p.hot&&Number(p.hot.line)===Number(line));
+  if(!matches.length)return null;
+  matches.sort((a,b)=>(b.hot?.strength||0)-(a.hot?.strength||0));
+  return matches[0];
 }
 function blendForEvent(event,priorEvents){
   if(!event||!event.ladder)return null;
@@ -436,10 +432,10 @@ function modelOverForEvent(event,priorEvents,line){
     lambda:event.ladder.lambda,
     n:prior?.n||0,
     participantProb:participant.prob,
-    participantN:participant.n,
+    participantN:participant.n,participantTotalN:participant.totalN,
     participantPairProb:participant.pairProb,
     participantPairN:participant.pairN,
-    participantWeight:participant.weight,
+    participantWeight:participant.weight,participantTotalN:participant.totalN,
     participantEntityProb:participant.entityProb||null
   };
 }
@@ -625,7 +621,8 @@ function enrichCandidate(c,e){
     }
   }
   const recurrence=(c.marketType==='ou')?recurrenceEvidence(state.modelEvents||[],{product:e.product,home:String(e.home||e.participant_1||''),away:String(e.away||e.participant_2||''),timestamp:e.start_time},Number(c.market.line)):null;
-  return Object.assign(c,{calibratedProb:calibrated,calibrationN:cal.n,calibrationSource:source,edge:calibrated-c.bookImplied,modelMeta,recurrence,experimental:isExperimentalOU(c)});
+  const hotParticipant=(c.marketType==='ou')?hotParticipantForEvent(e,Number(c.market.line)):null;
+  return Object.assign(c,{calibratedProb:calibrated,calibrationN:cal.n,calibrationSource:source,edge:calibrated-c.bookImplied,modelMeta,recurrence,hotParticipant,experimental:isExperimentalOU(c)});
 }
 function predictionForEvent(e){
   const id=String(e.event_id||e.eventId||'');
@@ -689,15 +686,17 @@ function renderPredictionDesk(){
       return '<div class="calcRow"><span>'+label+(x.market.line!=null?' '+x.market.line:'')+(x.experimental?' <em class="experimentalTag">EXPERIMENTAL</em>':'')+'</span><b>'+esc(x.pickCode)+'</b><span>Fair '+fmtPct(x.fairProb)+' · Model '+fmtPct(modelP)+'</span><span>Fair '+x.fairOdds.toFixed(2)+'</span><span>Book '+x.bookmakerOdds.toFixed(2)+'</span></div>';
     }
     const watch=p.experimentalOU;
-    const primaryHtml=p.primary?'<div class="primaryPick"><span>RESEARCH QUALIFIED</span><strong>'+esc(p.primary.pickCode)+'</strong><b>'+fmtPct(p.primary.calibratedProb)+'</b><small>edge '+fmtPct(p.primary.edge)+' · n='+p.primary.calibrationN+'</small></div>':watch?'<div class="primaryPick mutedPrediction"><span>O/U 1.5 RESEARCH WATCH</span><strong>'+esc(watch.pickCode)+'</strong><b>'+fmtPct(watch.calibratedProb)+'</b><small>participant n='+(watch.recurrence?watch.recurrence.entityN:0)+' · model is experimental</small></div>':'<div class="primaryPick mutedPrediction"><span>NO QUALIFIED SIGNAL</span><strong>WAIT</strong><b>Market baseline only</b></div>';
+    const hot=p.bestOU&&p.bestOU.hotParticipant?p.bestOU.hotParticipant:(p.experimentalOU&&p.experimentalOU.hotParticipant?p.experimentalOU.hotParticipant:null);
+    const hotBadge=hot?'<em class="hotParticipantTag">🔥 HOT '+esc(hot.hot.direction)+' · '+hot.hot.line+'</em>':'';
+    const primaryHtml=p.primary?'<div class="primaryPick">'+hotBadge+'<span>RESEARCH QUALIFIED</span><strong>'+esc(p.primary.pickCode)+'</strong><b>'+fmtPct(p.primary.calibratedProb)+'</b><small>edge '+fmtPct(p.primary.edge)+' · n='+p.primary.calibrationN+'</small></div>':watch?'<div class="primaryPick mutedPrediction">'+hotBadge+'<span>O/U 1.5 RESEARCH WATCH</span><strong>'+esc(watch.pickCode)+'</strong><b>'+fmtPct(watch.calibratedProb)+'</b><small>participant n='+(watch.recurrence?watch.recurrence.entityN:0)+' · model is experimental</small></div>':'<div class="primaryPick mutedPrediction"><span>NO QUALIFIED SIGNAL</span><strong>WAIT</strong><b>Market baseline only</b></div>';
     const addLabel=p.primary?'＋ Add qualified pick':'Locked · no qualified signal';
     const activeRec=p.bestOU&&p.bestOU.recurrence;
     const expRec=p.experimentalOU&&p.experimentalOU.recurrence;
     const recurrenceText=(activeRec||expRec)?
-      'Recurring participant evidence: active-line n='+(activeRec?activeRec.entityN:0)+' · '+(activeRec&&activeRec.entityOverRate!=null?fmtPct(activeRec.entityOverRate):'—')+
+      'Recurring participant evidence: prior-participant n='+(activeRec?activeRec.entityN:0)+' · total-history n='+(activeRec?activeRec.totalN:0)+' · '+(activeRec&&activeRec.entityOverRate!=null?fmtPct(activeRec.entityOverRate):'—')+
       ' · O/U 1.5 n='+(expRec?expRec.entityN:0)+' · '+(expRec&&expRec.entityOverRate!=null?fmtPct(expRec.entityOverRate):'—')+
       ' · exact-pair O1.5 n='+(expRec?expRec.pairN:0):'No prior participant recurrence sample yet.';
-    return '<article class="predictionCard"><div class="predictionHeader"><div><small>'+esc(p.product)+' · '+esc(p.competition)+'</small><h3>'+esc(p.home)+' <span>vs</span> '+esc(p.away)+'</h3></div><time>'+esc(p.start_time?date(p.start_time):'—')+'</time></div>'+primaryHtml+'<div class="calcTable"><div class="calcHead"><span>Market</span><span>Pick</span><span>Fair / model probability</span><span>Fair odds</span><span>SportyBet</span></div>'+row(p.bestWinner,'1X2')+row(p.bestOU,'O/U')+row(p.experimentalOU,'O/U 1.5')+'</div><div class="recurrenceNote">'+recurrenceText+'</div><div class="calcNote">Fair probability is the current de-vig SportyBet market baseline. Model probability adds the walk-forward line-ladder/product model and, after enough exact-line history, a conservative recurring-participant feature. O/U 1.5 remains a research watch and is not activated from ticket streaks alone.</div><button class="btn builderAdd" data-pick="'+i+'" '+(p.primary?'':'disabled')+'>'+addLabel+'</button></article>';
+    return '<article class="predictionCard"><div class="predictionHeader"><div><small>'+esc(p.product)+' · '+esc(p.competition)+'</small><h3>'+esc(p.home)+' <span>vs</span> '+esc(p.away)+'</h3></div><time>'+esc(p.start_time?date(p.start_time):'—')+'</time></div>'+primaryHtml+'<div class="calcTable"><div class="calcHead"><span>Market</span><span>Pick</span><span>Fair / model probability</span><span>Fair odds</span><span>SportyBet</span></div>'+row(p.bestWinner,'1X2')+row(p.bestOU,'O/U')+row(p.experimentalOU,'O/U 1.5')+'</div><div class="recurrenceNote">'+recurrenceText+'</div><div class="calcNote">Fair probability is the current de-vig SportyBet market baseline. Model probability adds the walk-forward line-ladder/product model and, using prior participant totals across different opponents, with shrinkage; exact-line history is a secondary refinement. O/U 1.5 remains a research watch and is not activated from ticket streaks alone.</div><button class="btn builderAdd" data-pick="'+i+'" '+(p.primary?'':'disabled')+'>'+addLabel+'</button></article>';
   }).join('');
   host.querySelectorAll('.builderAdd').forEach(function(btn){btn.addEventListener('click',function(){const p=picks[Number(btn.dataset.pick)];if(p&&!state.builder.some(function(x){return x.event_id===p.event_id;})){state.builder.push(p);state.builder=state.builder.slice(-4);renderBuilder();}});});
 }
@@ -844,6 +843,15 @@ function rebuildPredictionDesk(){
   state.picks=eligible.slice(0,24).map(predictionForEvent).filter(Boolean);
   renderPredictionDesk();renderBuilder();
 }
+async function loadParticipantProfiles(){
+  try{
+    const r=await fetch(PARTICIPANT_PROFILES+'?t='+Date.now(),{cache:'no-store',headers:{'Accept':'application/json'}});
+    if(!r.ok)throw new Error('participant profiles HTTP '+r.status);
+    state.participantProfiles=await r.json();
+    state.predictionCache.clear();
+    return true;
+  }catch(e){state.participantProfiles=null;console.warn('Virtual Lab participant profiles fallback:',e);return false;}
+}
 async function loadEligibility(){
   try{
     const r=await fetch(ELIGIBILITY+'?t='+Date.now(),{cache:'no-store',headers:{'Accept':'application/json'}});
@@ -889,6 +897,7 @@ async function loadHistory(){
       state.historyLoaded=true;
       state.predictionCache.clear();
       await loadModelEvaluation();
+      await loadParticipantProfiles();
       buildModelBacktest(state.rows);
       state.modelEvents=historicalOUEvents(state.rows);
       applyFilters(false);
