@@ -122,25 +122,21 @@ jobs:
         timeout-minutes: 3
         run: |
           node --input-type=module <<'NODE'
-          const api='https://match-signal.pages.dev/api/sportybet-virtual-virtual';
+          const api='https://match-signal.pages.dev/api/sportybet-virtual';
           const qs=new URLSearchParams({
-            sportId:'sr:sport:1',
-            marketId:'1,18,10,29,11,26,36,14,60100,186,189,202,204,210',
             pageSize:'100',
             pageNum:'1',
-            todayGames:'false',
             timeline:'168',
+            sources:'efootball,srl,vfootball',
             _t:String(Date.now())
           });
           const apiResponse=await fetch(api+'?'+qs.toString(),{cache:'no-store'});
-          if(!apiResponse.ok) throw new Error('Cloudflare live proxy HTTP '+apiResponse.status);
+          if(!apiResponse.ok) throw new Error('Cloudflare virtual proxy HTTP '+apiResponse.status);
           const payload=await apiResponse.json();
-          const tournaments=payload?.data?.tournaments||[];
-          const virtual=tournaments.flatMap(t=>(t.events||[]).map(e=>({t:String(t.name||''),c:String(t.categoryName||''),h:String(e.homeTeamName||''),a:String(e.awayTeamName||'')})))
-            .filter(e=>/simulated reality|\bsrl\b|gt sports league|gt leagues|eadriatic|efootball|e soccer|esoccer|virtual football|zoom|turbo/i.test(e.t+' '+e.c+' '+e.h+' '+e.a));
-          if(payload.bizCode!==10000) throw new Error('Cloudflare live proxy bizCode '+payload.bizCode);
-          if(!virtual.length) throw new Error('Cloudflare live proxy returned no virtual/eFootball/SRL events');
-          console.log('Cloudflare live source OK:',virtual.length,'matching events:',payload.product_counts||{});
+          const virtual=Array.isArray(payload?.events)?payload.events:[];
+          if(payload?.ok!==true) throw new Error('Cloudflare virtual proxy did not return ok=true');
+          if(!virtual.length) throw new Error('Cloudflare virtual proxy returned no virtual/eFootball/SRL events');
+          console.log('Cloudflare live source OK:',virtual.length,'events:',payload.product_counts||{});
           const page=await fetch('https://topboyasian-stack.github.io/match-signal/research.html?smoke='+Date.now(),{cache:'no-store'});
           const body=await page.text();
           if(!page.ok) throw new Error('GitHub Pages Virtual Lab HTTP '+page.status);
