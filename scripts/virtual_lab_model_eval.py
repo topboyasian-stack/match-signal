@@ -17,11 +17,13 @@ OUTPUT=DATA/"virtual_lab_model_eval.json"
 LINES=(1.5,3.5,4.5)
 HOLDOUT_FRACTION=.30
 MIN_EVENT_HISTORY=8
+MIN_PARTICIPANT_TOTAL_HISTORY=3
 MIN_PARTICIPANT_HOLDOUT=20
 MIN_HOLDOUT_ROWS=30
 PRIOR_WEIGHT=.25
 PAIR_WEIGHT=.25
 MAX_PARTICIPANT_WEIGHT=.20
+MAX_TOTAL_PARTICIPANT_WEIGHT=.15
 
 def ts(v):
     try:return datetime.fromisoformat(str(v).replace("Z","+00:00")).timestamp()
@@ -96,23 +98,30 @@ def product_prior(events, product, line, cutoff):
 
 def participant_prior(events,event,line):
     cutoff=ts(event["timestamp"]); product=event["product"]
-    names={event["home"].strip().casefold(),event["away"].strip().casefold()}-{""}
+    names={event["home"].strip().casefold(),event["away"].strip().casefold()}-{""""}
     prior=[e for e in events if e["product"]==product and ts(e["timestamp"])<cutoff and e["total"] is not None]
     entity=[e for e in prior if names & {e["home"].strip().casefold(),e["away"].strip().casefold()}]
-    entity=[e for e in entity if e["total"]!=line]
-    if len(entity)<MIN_EVENT_HISTORY:return None,0,0
-    ep=(sum(e["total"]>line for e in entity)+2)/(len(entity)+4)
+    # Participant recurrence is identity-based, not opponent-based. Use prior actual
+    # totals across all O/U lines to estimate P(total > current line).
+    total_decisive=[e for e in entity if e["total"]!=line]
+    if len(total_decisive)<MIN_PARTICIPANT_TOTAL_HISTORY:return None,0,0
+    total_prob=(sum(e["total"]>line for e in total_decisive)+2)/(len(total_decisive)+4)
+    weight=min(MAX_TOTAL_PARTICIPANT_WEIGHT,max(.05,(len(total_decisive)-2)/35))
+    # If exact-line evidence is mature, blend it in as a secondary refinement.
+    exact=[e for e in total_decisive if any(abs(float(rr.get("line"))-line)<1e-9 for rr in e.get("rows",[]))]
+    exact_prob=None
+    if len(exact)>=MIN_EVENT_HISTORY:
+        exact_prob=(sum(e["total"]>line for e in exact)+2)/(len(exact)+4)
+        total_prob=.65*total_prob+.35*exact_prob
     pair=[]
     a,b=event["home"].strip().casefold(),event["away"].strip().casefold()
     for e in prior:
         eh,ea=e["home"].strip().casefold(),e["away"].strip().casefold()
         if ((eh==a and ea==b) or (eh==b and ea==a)) and e["total"]!=line:pair.append(e)
-    pp=None
     if len(pair)>=6:
         pp=(sum(e["total"]>line for e in pair)+2)/(len(pair)+4)
-        ep=(1-PAIR_WEIGHT)*ep+PAIR_WEIGHT*pp
-    weight=min(MAX_PARTICIPANT_WEIGHT,max(.05,(len(entity)-7)/40))
-    return ep,weight,len(entity)
+        total_prob=(1-PAIR_WEIGHT)*total_prob+PAIR_WEIGHT*pp
+    return total_prob,weight,len(total_decisive)
 
 def probs(events,event,row):
     line=float(row["line"])
@@ -216,6 +225,7 @@ def main():
       "by_competition":table("competition",hold),
       "by_line":line_reports,
       "participant_feature_gate":{
+        "minimum_participant_total_history":MIN_PARTICIPANT_TOTAL_HISTORY,
         "minimum_exact_line_history":MIN_EVENT_HISTORY,
         "minimum_untouched_participant_rows":MIN_PARTICIPANT_HOLDOUT,
         "minimum_untouched_rows":MIN_HOLDOUT_ROWS,
