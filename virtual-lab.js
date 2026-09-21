@@ -707,7 +707,6 @@ async function loadHistory(){
       applyFilters(false);
       renderModelLab();
       rebuildPredictionDesk();
-      renderModelLab();
       const status=$('historyStatus');if(status)status.textContent='AUTO-COLLECTED · '+arr.length+' settled observations';
       const meta=$('historyMeta');if(meta)meta.textContent='Historical rows are collected automatically from the Virtual Lab paper pipeline. Latest refresh '+new Date().toLocaleString();
       return;
