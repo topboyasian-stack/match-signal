@@ -8,6 +8,9 @@ on:
       - 'scripts/virtual_lab_collector.py'
       - 'scripts/virtual_lab_model_eval.py'
       - 'scripts/virtual_lab_participant_profiles.py'
+      - 'scripts/virtual_lab_confirmed_participants.py'
+      - 'confirmed-participant-watch.js'
+      - 'data/virtual_lab_confirmed_participants.json'
       - 'scripts/virtual_lab_eligibility.py'
       - 'virtual-lab.js'
       - 'research.html'
@@ -50,6 +53,8 @@ jobs:
         run: python -m py_compile scripts/virtual_lab_model_eval.py
       - name: Syntax-check participant profile engine
         run: python -m py_compile scripts/virtual_lab_participant_profiles.py
+      - name: Syntax-check confirmed participant tracker
+        run: python -m py_compile scripts/virtual_lab_confirmed_participants.py
       - name: Syntax-check eligibility engine
         run: python -m py_compile scripts/virtual_lab_eligibility.py
 
@@ -80,6 +85,8 @@ jobs:
 
       - name: Build participant performance profiles
         run: python scripts/virtual_lab_participant_profiles.py
+      - name: Track official results for confirmed participants
+        run: python scripts/virtual_lab_confirmed_participants.py
 
       - name: Recalculate league and line eligibility
         run: python scripts/virtual_lab_eligibility.py
@@ -96,6 +103,8 @@ jobs:
               'data/virtual_lab_eligibility.json',
               'data/virtual_lab_model_eval.json',
               'data/virtual_lab_participant_profiles.json',
+              'data/virtual_lab_confirmed_participants.json',
+              'data/virtual_lab_confirmed_participant_results.json',
           ]:
               p = Path(name)
               data = json.loads(p.read_text())
@@ -110,7 +119,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           for attempt in 1 2 3 4; do
-            git add data/virtual_lab_pending.json data/virtual_lab_history.json data/virtual_lab_status.json data/virtual_lab_eligibility.json data/virtual_lab_model_eval.json data/virtual_lab_participant_profiles.json
+            git add data/virtual_lab_pending.json data/virtual_lab_history.json data/virtual_lab_status.json data/virtual_lab_eligibility.json data/virtual_lab_model_eval.json data/virtual_lab_participant_profiles.json data/virtual_lab_confirmed_participant_results.json
 
             if git diff --cached --quiet; then
               echo "Virtual Lab collector produced no data changes."
