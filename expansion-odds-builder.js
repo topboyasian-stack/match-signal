@@ -156,7 +156,7 @@
     if(!document.getElementById('odds-builder-result-style')){
       var s=document.createElement('style');s.id='odds-builder-result-style';s.textContent='.timer.finished-correct{border-color:#35d49a;background:#06251a}.timer.finished-correct .timerValue{color:#35d49a}.timer.finished-wrong{border-color:#ff7474;background:#2a0d12}.timer.finished-wrong .timerValue{color:#ff7474}.timer.finished{border-color:#8f98b8}.timer.finished .timerValue{color:#eef1fb}.settled-card{border-color:#35d49a;background:#092018}.settled-card .meta{color:#35d49a}.result-badge{font-weight:900;letter-spacing:.02em}.result-badge.won,.won-text{color:#35d49a}.result-badge.lost,.lost-text{color:#ff7474}';document.head.appendChild(s);
     }
-    load();window.setInterval(load,15000);window.setInterval(updateTimers,1000);
+    load();window.setInterval(load,60000);window.setInterval(updateTimers,1000);
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 }());
