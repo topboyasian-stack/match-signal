@@ -18,6 +18,7 @@ MIN_COMP_OOS_N=4
 MIN_LINE_N=12
 MIN_LINE_OOS_N=4
 DISCOVERY=.70
+PRIORITY_OU_LINES=[1.5,3.5,4.5]
 
 def settled(rows):
     return [r for r in rows if isinstance(r,dict) and r.get("win") is not None]
@@ -90,10 +91,11 @@ def main():
         "discovery_fraction":DISCOVERY,
         "eligible_markets":["ou"],
         "blocked_markets":["winner","1x2","btts","handicap","other"],
-        "note":"Collection continues for blocked groups so the gate can be re-evaluated; blocked groups are excluded from research selections."
+        "note":"Collection continues for blocked groups so the gate can be re-evaluated; blocked groups are excluded from research selections. Priority O/U lines are monitored continuously but do not bypass the evidence gate."
       },
       "eligible_competitions":sorted(eligible_competitions),
       "blocked_competitions":sorted(blocked_competitions),
+      "priority_ou_lines":PRIORITY_OU_LINES,
       "eligible_ou_lines":sorted(eligible_lines),
       "blocked_ou_lines":sorted(blocked_lines),
       "competitions":comp_report,
