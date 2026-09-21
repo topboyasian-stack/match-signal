@@ -109,11 +109,13 @@ export async function onRequestGet(context){
 
   if(!scopes.length){
     return new Response(JSON.stringify({
-      ok:false,
+      ok:true,
       source,
-      error:'No tournament/category scope was discovered',
-      discovery_errors:discoveryErrors
-    }),{status:502,headers:headers()});
+      fetched_at:new Date().toISOString(),
+      scopes:[],
+      events:[],
+      errors:discoveryErrors.length ? discoveryErrors : ['No active result scope is currently available for this source.']
+    }),{status:200,headers:headers()});
   }
 
   const events=[];
