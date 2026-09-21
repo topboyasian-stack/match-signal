@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-21T20:38:43.273Z",
+  "generated_at": "2026-09-21T22:40:08.757389+00:00",
   "mode": "PAPER_RESEARCH_ONLY",
   "policy": {
     "minimum_competition_observations": 12,
@@ -17,7 +17,7 @@
       "handicap",
       "other"
     ],
-    "note": "O/U 1.5 is tracked as an experimental research line because observed tickets provide an investigation signal, but it is not promoted to the validated active set without independent settled-sample and out-of-sample evidence."
+    "note": "Collection continues for blocked groups so the gate can be re-evaluated; blocked groups are excluded from research selections. Priority O/U lines are monitored continuously but do not bypass the evidence gate."
   },
   "eligible_competitions": [
     "Esoccer H2H GG League",
@@ -33,15 +33,21 @@
     "Serie A",
     "eAdriatic League"
   ],
+  "priority_ou_lines": [
+    1.5,
+    3.5,
+    4.5
+  ],
   "eligible_ou_lines": [
     3.5,
     4.5
   ],
   "blocked_ou_lines": [
+    1.5,
     2.5,
-    3,
-    4,
-    5,
+    3.0,
+    4.0,
+    5.0,
     5.5,
     6.5,
     7.5,
@@ -96,7 +102,7 @@
         "win_rate": 0.6666666666666666,
         "roi": 0.07333333333333332
       },
-      "reason": "passes gate"
+      "reason": "passes league gate"
     },
     "Esoccer H2H GG League": {
       "eligible": true,
@@ -112,7 +118,7 @@
         "win_rate": 0.625,
         "roi": -0.003750000000000031
       },
-      "reason": "passes gate"
+      "reason": "passes league gate"
     },
     "Serie A": {
       "eligible": false,
@@ -144,7 +150,7 @@
         "win_rate": 0.5,
         "roi": -0.03500000000000003
       },
-      "reason": "passes gate"
+      "reason": "passes league gate"
     },
     "Champions League B": {
       "eligible": false,
@@ -212,66 +218,18 @@
     }
   },
   "ou_lines": {
-    "3": {
-      "eligible": false,
-      "all": {
-        "n": 1,
-        "wins": 1,
-        "win_rate": 1,
-        "roi": 0.75
-      },
-      "oos": {
-        "n": 1,
-        "wins": 1,
-        "win_rate": 1,
-        "roi": 0.75
-      },
-      "reason": "insufficient sample or weak all/OOS performance"
-    },
-    "4": {
-      "eligible": false,
-      "all": {
-        "n": 1,
-        "wins": 1,
-        "win_rate": 1,
-        "roi": 0.75
-      },
-      "oos": {
-        "n": 1,
-        "wins": 1,
-        "win_rate": 1,
-        "roi": 0.75
-      },
-      "reason": "insufficient sample or weak all/OOS performance"
-    },
-    "5": {
-      "eligible": false,
-      "all": {
-        "n": 1,
-        "wins": 0,
-        "win_rate": 0,
-        "roi": -1
-      },
-      "oos": {
-        "n": 1,
-        "wins": 0,
-        "win_rate": 0,
-        "roi": -1
-      },
-      "reason": "insufficient sample or weak all/OOS performance"
-    },
     "11.5": {
       "eligible": false,
       "all": {
         "n": 1,
         "wins": 1,
-        "win_rate": 1,
+        "win_rate": 1.0,
         "roi": 0.6499999999999999
       },
       "oos": {
         "n": 1,
         "wins": 1,
-        "win_rate": 1,
+        "win_rate": 1.0,
         "roi": 0.6499999999999999
       },
       "reason": "insufficient sample or weak all/OOS performance"
@@ -281,14 +239,30 @@
       "all": {
         "n": 1,
         "wins": 0,
-        "win_rate": 0,
-        "roi": -1
+        "win_rate": 0.0,
+        "roi": -1.0
       },
       "oos": {
         "n": 1,
         "wins": 0,
-        "win_rate": 0,
-        "roi": -1
+        "win_rate": 0.0,
+        "roi": -1.0
+      },
+      "reason": "insufficient sample or weak all/OOS performance"
+    },
+    "5.0": {
+      "eligible": false,
+      "all": {
+        "n": 1,
+        "wins": 0,
+        "win_rate": 0.0,
+        "roi": -1.0
+      },
+      "oos": {
+        "n": 1,
+        "wins": 0,
+        "win_rate": 0.0,
+        "roi": -1.0
       },
       "reason": "insufficient sample or weak all/OOS performance"
     },
@@ -298,7 +272,7 @@
         "n": 15,
         "wins": 9,
         "win_rate": 0.6,
-        "roi": -0.12133333333333332
+        "roi": -0.12133333333333333
       },
       "oos": {
         "n": 5,
@@ -306,7 +280,7 @@
         "win_rate": 0.8,
         "roi": 0.12799999999999997
       },
-      "reason": "passes gate"
+      "reason": "passes O/U line gate"
     },
     "4.5": {
       "eligible": true,
@@ -322,7 +296,7 @@
         "win_rate": 0.6,
         "roi": 0.044
       },
-      "reason": "passes gate"
+      "reason": "passes O/U line gate"
     },
     "2.5": {
       "eligible": false,
@@ -335,7 +309,7 @@
       "oos": {
         "n": 2,
         "wins": 2,
-        "win_rate": 1,
+        "win_rate": 1.0,
         "roi": 0.6
       },
       "reason": "insufficient sample or weak all/OOS performance"
@@ -362,7 +336,7 @@
         "n": 10,
         "wins": 4,
         "win_rate": 0.4,
-        "roi": -0.32799999999999996
+        "roi": -0.328
       },
       "oos": {
         "n": 3,
@@ -399,8 +373,8 @@
       "oos": {
         "n": 1,
         "wins": 0,
-        "win_rate": 0,
-        "roi": -1
+        "win_rate": 0.0,
+        "roi": -1.0
       },
       "reason": "insufficient sample or weak all/OOS performance"
     },
@@ -409,24 +383,48 @@
       "all": {
         "n": 2,
         "wins": 0,
-        "win_rate": 0,
-        "roi": -1
+        "win_rate": 0.0,
+        "roi": -1.0
       },
       "oos": {
         "n": 1,
         "wins": 0,
-        "win_rate": 0,
-        "roi": -1
+        "win_rate": 0.0,
+        "roi": -1.0
+      },
+      "reason": "insufficient sample or weak all/OOS performance"
+    },
+    "3.0": {
+      "eligible": false,
+      "all": {
+        "n": 1,
+        "wins": 1,
+        "win_rate": 1.0,
+        "roi": 0.75
+      },
+      "oos": {
+        "n": 1,
+        "wins": 1,
+        "win_rate": 1.0,
+        "roi": 0.75
+      },
+      "reason": "insufficient sample or weak all/OOS performance"
+    },
+    "4.0": {
+      "eligible": false,
+      "all": {
+        "n": 1,
+        "wins": 1,
+        "win_rate": 1.0,
+        "roi": 0.75
+      },
+      "oos": {
+        "n": 1,
+        "wins": 1,
+        "win_rate": 1.0,
+        "roi": 0.75
       },
       "reason": "insufficient sample or weak all/OOS performance"
     }
-  },
-  "priority_ou_lines": [
-    1.5,
-    3.5,
-    4.5
-  ],
-  "experimental_ou_lines": [
-    1.5
-  ]
+  }
 }
