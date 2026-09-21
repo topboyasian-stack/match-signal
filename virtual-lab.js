@@ -89,32 +89,74 @@ function analyze(){
   $('seqDelta').textContent=fmtPct(sq&&sq.delta);
   $('fingerprint').className='tableWrap';
   $('fingerprint').innerHTML=productTable(rows);
-  $('fingerprintStatus').textContent=Object.keys(Object.groupBy?Object.groupBy(rows,r=>r.product):rows.reduce((a,r)=>(a[r.product]=1,a),{})).length+' product families';
+  $('fingerprintStatus').textContent=new Set(rows.map(r=>r.product).filter(Boolean)).size+' product families';
   if(sq){
     $('sequence').className='tableWrap';
     $('sequence').innerHTML='<table><thead><tr><th>Observation</th><th>Value</th></tr></thead><tbody>'+
       '<tr><td>Rows used</td><td>'+sq.n+'</td></tr><tr><td>P(win next | previous win)</td><td>'+fmtPct(sq.afterWin)+'</td></tr><tr><td>P(win next | previous loss)</td><td>'+fmtPct(sq.afterLoss)+'</td></tr><tr><td>Conditional delta</td><td>'+fmtPct(sq.delta)+'</td></tr></tbody></table>'+
-      '<p class="muted">A non-zero delta is an investigation trigger, not evidence of a causal or exploitable mechanism.</p>';
+      '<p class="muted">A non-zero delta is only an investigation trigger. It must survive unseen testing before a rule is trusted.</p>';
   }else $('sequence').innerHTML='Need at least 3 settled observations.';
-  $('oosLabel').textContent=(parts.test.length)+' rows';
+  $('oosLabel').textContent=parts.test.length+' rows';
   if(parts.test.length){
     $('oos').className='tableWrap';
     $('oos').innerHTML='<table><thead><tr><th>Metric</th><th>Discovery</th><th>Unseen test</th></tr></thead><tbody>'+
-      '<tr><td>Settled rows</td><td>'+parts.train.filter(r=>typeof r.win==='boolean').length+'</td><td>'+oos.valid+'</td></tr>'+
+      '<tr><td>Settled rows</td><td>'+stats(parts.train).valid+'</td><td>'+oos.valid+'</td></tr>'+
       '<tr><td>Win rate</td><td>'+fmtPct(stats(parts.train).rate)+'</td><td>'+fmtPct(oos.rate)+'</td></tr>'+
       '<tr><td>Paper ROI</td><td>'+fmtPct(stats(parts.train).roi)+'</td><td>'+fmtPct(oos.roi)+'</td></tr></tbody></table>';
   }else $('oos').innerHTML='Need more observations for an out-of-sample test.';
-  const gate=rows.length<100?'INSUFFICIENT DATA':(oos.valid<30?'PAPER WATCH':(oos.rate!=null&&oos.rate>=.80?'RESEARCH THRESHOLD REACHED':'NO VERIFIED SIGNAL'));
+  const candidate=bestCandidate(rows,parts.test);
+  const gate=rows.length<100?'INSUFFICIENT DATA':(oos.valid<30?'PAPER WATCH':(candidate?'RESEARCH THRESHOLD REACHED':'NO VERIFIED SIGNAL'));
   const cls=gate==='RESEARCH THRESHOLD REACHED'?'positive':gate==='PAPER WATCH'?'warning':'negative';
   $('signalGate').className='gate '+cls;
   $('signalGate').innerHTML='<div class="gateTitle">'+gate+'</div><div>'+(
-    gate==='INSUFFICIENT DATA'?'Collect substantially more completed observations before treating any pattern as meaningful.':
-    gate==='PAPER WATCH'?'The dataset is large enough to inspect but the unseen sample is too small for a serious conclusion.':
-    gate==='RESEARCH THRESHOLD REACHED'?'The unseen-test hit rate crossed 80%; verify on a second untouched period before considering the result reproducible.':
-    'Current observations do not support an 80% out-of-sample research threshold.'
+    gate==='INSUFFICIENT DATA'?'Collect more completed observations.':
+    gate==='PAPER WATCH'?'The unseen sample is too small for a serious selection rule.':
+    gate==='RESEARCH THRESHOLD REACHED'?'A candidate crossed the research threshold; read the Research conclusion before acting.':
+    'Current observations do not support an 80% out-of-sample candidate.'
   )+'</div>';
+  updateResearchConclusion(candidate);
 }
-function runStrategy(){
+function updateResearchConclusion(best){
+  const el=$('researchConclusion');
+  if(!best){
+    el.className='conclusion negative';
+    el.innerHTML='<div class="gateTitle">NO SIGNAL</div><p>No candidate currently clears the minimum sample, unseen-test, lower-confidence and positive-ROI gates.</p><p class="muted">Do not choose a game because it is on a streak. Wait for validated evidence.</p>';
+    return;
+  }
+  el.className='conclusion positive';
+  el.innerHTML='<div class="gateTitle">RESEARCH-QUALIFIED</div>'+
+    '<p><strong>Product:</strong> '+esc(best.product)+' · <strong>Market:</strong> '+esc(best.market)+' · <strong>Selection:</strong> '+esc(best.selection)+'</p>'+
+    '<div class="resultGrid">'+statCard('Discovery n',best.train.valid)+statCard('OOS n',best.test.valid)+statCard('OOS win rate',fmtPct(best.test.rate))+statCard('OOS ROI',fmtPct(best.test.roi))+'</div>'+
+    '<p><strong>Instruction:</strong> only use this exact product/market/selection when the live price is at least <strong>'+best.minPrice.toFixed(2)+'</strong> and the market definition matches the research dataset.</p>'+
+    '<p class="muted">This is a paper-research signal, not a guarantee. Replicate it on another untouched period before treating it as reproducible.</p>';
+}
+function bestCandidate(rows,testRows){
+  const groups={};
+  rows.filter(r=>typeof r.win==='boolean'&&r.selection).forEach(r=>{
+    const key=[r.product,r.market,r.selection].join('|');
+    (groups[key]??=[]).push(r);
+  });
+  const candidates=[];
+  for(const [key,trainRows] of Object.entries(groups)){
+    const [product,market,selection]=key.split('|');
+    if(trainRows.length<60)continue;
+    const test=testRows.filter(r=>r.product===product&&r.market===market&&r.selection===selection&&typeof r.win==='boolean'&&r.odds!=null);
+    if(test.length<30)continue;
+    const tr=stats(trainRows),te=stats(test),lower=wilsonLower(te.wins,te.valid);
+    const priced=trainRows.filter(r=>r.odds!=null&&r.odds>=1);
+    const minPrice=priced.length?Math.max(1.01,Math.min(...priced.map(r=>r.odds))):99;
+    if(te.rate==null||te.roi==null||te.rate<.80||lower<.72||te.roi<=0)continue;
+    candidates.push({product,market,selection,train:tr,test:te,lower,minPrice});
+  }
+  candidates.sort((a,b)=>(b.test.roi-a.test.roi)||(b.lower-a.lower));
+  return candidates[0]||null;
+}
+function wilsonLower(successes,n,z=1.96){
+  if(!n)return null;
+  const phat=successes/n,denom=1+z*z/n,centre=phat+z*z/(2*n),spread=z*Math.sqrt((phat*(1-phat)+z*z/(4*n))/n);
+  return (centre-spread)/denom;
+}
+function runStrategy(){function runStrategy(){
   const minOdds=Number($('minOdds').value);
   const rows=state.filtered.filter(r=>typeof r.win==='boolean'&&r.odds!=null&&r.odds>=minOdds).sort((a,b)=>new Date(a.timestamp)-new Date(b.timestamp));
   if(rows.length<30){$('strategyResult').className='strategyResult empty';$('strategyResult').textContent='Not enough priced, settled observations (need at least 30 for this exploratory test).';return}
