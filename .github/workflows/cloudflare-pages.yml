@@ -60,16 +60,16 @@ jobs:
         with:
           ref: main
 
-      - name: Install production frontend fixes
+      - name: Install lightweight navigation fix
         run: |
           python - <<'PY'
           from pathlib import Path
           for path in Path('.').glob('*.html'):
               text=path.read_text(encoding='utf-8')
-              for src in ('./nav-fix.js','./metrics-fix.js','./live-timer.js'):
-                  tag=f'<script src="{src}"></script>'
-                  if tag not in text:
-                      text=text.replace('</body>',tag+'\n</body>',1)
+              src='./nav-fix.js'
+              tag=f'<script src="{src}"></script>'
+              if tag not in text:
+                  text=text.replace('</body>',tag+'\n</body>',1)
               marker='<style id="match-signal-nav-fix">'
               style=marker+'.tabs a,.nav a{pointer-events:auto!important;position:relative;z-index:9999;cursor:pointer!important;touch-action:manipulation}</style>'
               if marker not in text:
