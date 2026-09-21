@@ -1,10 +1,20 @@
+/* Match Signal Virtual Lab — live data + research analysis */
 (function(){
 'use strict';
-const state={rows:[], filtered:[]};
+
+const LIVE_API='https://match-signal.pages.dev/api/sportybet';
+const LIVE_MARKETS='1,18,10,29,11,26,36,14,60100,186,189,202,204,210';
+const SNAPSHOT='./data/virtual_lab_live.json';
+const LIVE_REFRESH_MS=30000;
+const state={rows:[],filtered:[],live:[],liveMode:'none',liveUpdated:null};
+
 const $=id=>document.getElementById(id);
 const esc=v=>{const d=document.createElement('div');d.textContent=String(v??'');return d.innerHTML};
 const num=v=>{const n=Number(String(v??'').replace('%',''));return Number.isFinite(n)?n:null};
 const date=v=>{const d=new Date(v);return isNaN(d.getTime())?String(v||'—'):d.toLocaleString()};
+const fmtPct=v=>v==null?'—':(v*100).toFixed(1)+'%';
+const fmtNum=v=>v==null?'—':Number(v).toFixed(3);
+
 function normalize(r){
   const x={...r};
   x.product=String(x.product||'other').toLowerCase().trim();
@@ -14,23 +24,30 @@ function normalize(r){
   x.result=String(x.result??'').trim().toLowerCase();
   x.selection=String(x.selection??'').trim().toLowerCase();
   if(x.win===''||x.win==null){
-    if(x.selection && x.result) x.win=x.selection===x.result;
+    if(x.selection&&x.result)x.win=x.selection===x.result;
     else x.win=null;
-  } else x.win=String(x.win).toLowerCase()==='true'||String(x.win)==='1';
+  }else x.win=String(x.win).toLowerCase()==='true'||String(x.win)==='1';
   x.model_prob=num(x.model_prob||x.probability);
   return x;
 }
+
 function parseCSV(text){
   const lines=text.replace(/^\uFEFF/,'').split(/\r?\n/).filter(Boolean);
-  if(!lines.length) return [];
+  if(!lines.length)return [];
   const parseLine=line=>{
     const out=[];let cur='',quote=false;
-    for(let i=0;i<line.length;i++){const c=line[i];if(c==='"'){if(quote&&line[i+1]==='"'){cur+='"';i++;}else quote=!quote;}else if(c===','&&!quote){out.push(cur);cur='';}else cur+=c}
+    for(let i=0;i<line.length;i++){
+      const c=line[i];
+      if(c==='"'){if(quote&&line[i+1]==='"'){cur+='"';i++;}else quote=!quote}
+      else if(c===','&&!quote){out.push(cur);cur=''}
+      else cur+=c;
+    }
     out.push(cur);return out;
   };
   const headers=parseLine(lines[0]).map(h=>h.trim());
-  return lines.slice(1).map(line=>{const vals=parseLine(line);const o={};headers.forEach((h,i)=>o[h]=vals[i]??'');return normalize(o)});
+  return lines.slice(1).map(line=>{const vals=parseLine(line),o={};headers.forEach((h,i)=>o[h]=vals[i]??'');return normalize(o)});
 }
+
 async function parseFile(file){
   const text=await file.text();
   if(file.name.toLowerCase().endsWith('.json')){
@@ -40,36 +57,35 @@ async function parseFile(file){
   }
   return parseCSV(text);
 }
-function applyFilters(){
-  const product=$('product').value,market=$('market').value;
-  state.filtered=state.rows.filter(r=>(product==='all'||r.product===product)&&(market==='all'||r.market===market));
-  analyze();
-}
+
 function stats(rows){
   const valid=rows.filter(r=>typeof r.win==='boolean');
   const wins=valid.filter(r=>r.win).length;
-  let roi=null;
   const priced=valid.filter(r=>r.odds&&r.odds>=1);
-  if(priced.length) roi=priced.reduce((s,r)=>s+(r.win?(r.odds-1):-1),0)/priced.length;
+  let roi=null;
+  if(priced.length)roi=priced.reduce((s,r)=>s+(r.win?(r.odds-1):-1),0)/priced.length;
   return {n:rows.length,valid:valid.length,wins,rate:valid.length?wins/valid.length:null,roi};
 }
+
 function split(rows){
   const ordered=[...rows].sort((a,b)=>new Date(a.timestamp)-new Date(b.timestamp));
   const pct=Number($('split').value),cut=Math.floor(ordered.length*pct);
   return {train:ordered.slice(0,cut),test:ordered.slice(cut)};
 }
+
 function seq(rows){
   const v=rows.filter(r=>typeof r.win==='boolean').sort((a,b)=>new Date(a.timestamp)-new Date(b.timestamp));
   if(v.length<3)return null;
-  let prevWin=[],prevLoss=[];
-  for(let i=1;i<v.length;i++){if(v[i-1].win)prevWin.push(v[i].win);else prevLoss.push(v[i].win)}
+  const afterWin=[],afterLoss=[];
+  for(let i=1;i<v.length;i++){(v[i-1].win?afterWin:afterLoss).push(v[i].win)}
   const p=a=>a.length?a.filter(Boolean).length/a.length:null;
-  const a=p(prevWin),b=p(prevLoss);
+  const a=p(afterWin),b=p(afterLoss);
   return {n:v.length,afterWin:a,afterLoss:b,delta:a!=null&&b!=null?a-b:null};
 }
+
 function productTable(rows){
   const groups={};
-  rows.forEach(r=>{(groups[r.product]??=[]).push(r)});
+  rows.forEach(r=>(groups[r.product]??=[]).push(r));
   const data=Object.entries(groups).map(([product,arr])=>({product,all:stats(arr),oos:stats(split(arr).test)}))
     .sort((a,b)=>(b.oos.rate??-1)-(a.oos.rate??-1));
   if(!data.length)return '<div class="empty">No completed win/loss observations in the selected data.</div>';
@@ -77,11 +93,54 @@ function productTable(rows){
     data.map(x=>'<tr><td>'+esc(x.product)+'</td><td>'+x.all.valid+'</td><td>'+fmtPct(x.all.rate)+'</td><td>'+fmtPct(x.oos.rate)+'</td><td>'+fmtPct(x.oos.roi)+'</td></tr>').join('')+
     '</tbody></table>';
 }
-function fmtPct(v){return v==null?'—':(v*100).toFixed(1)+'%'}
-function fmtNum(v){return v==null?'—':Number(v).toFixed(3)}
+
+function wilsonLower(successes,n,z=1.96){
+  if(!n)return null;
+  const phat=successes/n,denom=1+z*z/n,centre=phat+z*z/(2*n),spread=z*Math.sqrt((phat*(1-phat)+z*z/(4*n))/n);
+  return (centre-spread)/denom;
+}
+
+function bestCandidate(rows,testRows){
+  const groups={};
+  rows.filter(r=>typeof r.win==='boolean'&&r.selection).forEach(r=>{
+    const key=[r.product,r.market,r.selection].join('|');
+    (groups[key]??=[]).push(r);
+  });
+  const candidates=[];
+  for(const [key,trainRows] of Object.entries(groups)){
+    const [product,market,selection]=key.split('|');
+    if(trainRows.length<60)continue;
+    const test=testRows.filter(r=>r.product===product&&r.market===market&&r.selection===selection&&typeof r.win==='boolean'&&r.odds!=null);
+    if(test.length<30)continue;
+    const tr=stats(trainRows),te=stats(test),lower=wilsonLower(te.wins,te.valid);
+    const priced=trainRows.filter(r=>r.odds!=null&&r.odds>=1);
+    const minPrice=priced.length?Math.max(1.01,Math.min(...priced.map(r=>r.odds))):99;
+    if(te.rate==null||te.roi==null||te.rate<.80||lower<.72||te.roi<=0)continue;
+    candidates.push({product,market,selection,train:tr,test:te,lower,minPrice});
+  }
+  candidates.sort((a,b)=>(b.test.roi-a.test.roi)||(b.lower-a.lower));
+  return candidates[0]||null;
+}
+
+function statCard(title,value){return '<div class="resultStat"><small>'+esc(title)+'</small><b>'+esc(value)+'</b></div>'}
+
+function updateResearchConclusion(best){
+  const el=$('researchConclusion');
+  if(!best){
+    el.className='conclusion negative';
+    el.innerHTML='<div class="gateTitle">NO SIGNAL</div><p>No candidate currently clears the minimum sample, unseen-test, lower-confidence and positive-ROI gates.</p><p class="muted">Do not choose a game because it is on a streak. Wait for validated evidence.</p>';
+    return;
+  }
+  el.className='conclusion positive';
+  el.innerHTML='<div class="gateTitle">RESEARCH-QUALIFIED</div>'+
+    '<p><strong>Product:</strong> '+esc(best.product)+' · <strong>Market:</strong> '+esc(best.market)+' · <strong>Selection:</strong> '+esc(best.selection)+'</p>'+
+    '<div class="resultGrid">'+statCard('Discovery n',best.train.valid)+statCard('OOS n',best.test.valid)+statCard('OOS win rate',fmtPct(best.test.rate))+statCard('OOS ROI',fmtPct(best.test.roi))+'</div>'+
+    '<p><strong>Instruction:</strong> only use this exact product/market/selection when the live price is at least <strong>'+best.minPrice.toFixed(2)+'</strong> and the market definition matches the research dataset.</p>'+
+    '<p class="muted">This is a paper-research signal, not a guarantee. Replicate it on another untouched period before treating it as reproducible.</p>';
+}
+
 function analyze(){
-  const rows=state.filtered;
-  const s=stats(rows),parts=split(rows),oos=stats(parts.test),sq=seq(rows);
+  const rows=state.filtered,s=stats(rows),parts=split(rows),oos=stats(parts.test),sq=seq(rows);
   $('rounds').textContent=String(s.valid);
   $('winRate').textContent=fmtPct(s.rate);
   $('oosRate').textContent=fmtPct(oos.rate);
@@ -116,59 +175,210 @@ function analyze(){
   )+'</div>';
   updateResearchConclusion(candidate);
 }
-function updateResearchConclusion(best){
-  const el=$('researchConclusion');
-  if(!best){
-    el.className='conclusion negative';
-    el.innerHTML='<div class="gateTitle">NO SIGNAL</div><p>No candidate currently clears the minimum sample, unseen-test, lower-confidence and positive-ROI gates.</p><p class="muted">Do not choose a game because it is on a streak. Wait for validated evidence.</p>';
-    return;
-  }
-  el.className='conclusion positive';
-  el.innerHTML='<div class="gateTitle">RESEARCH-QUALIFIED</div>'+
-    '<p><strong>Product:</strong> '+esc(best.product)+' · <strong>Market:</strong> '+esc(best.market)+' · <strong>Selection:</strong> '+esc(best.selection)+'</p>'+
-    '<div class="resultGrid">'+statCard('Discovery n',best.train.valid)+statCard('OOS n',best.test.valid)+statCard('OOS win rate',fmtPct(best.test.rate))+statCard('OOS ROI',fmtPct(best.test.roi))+'</div>'+
-    '<p><strong>Instruction:</strong> only use this exact product/market/selection when the live price is at least <strong>'+best.minPrice.toFixed(2)+'</strong> and the market definition matches the research dataset.</p>'+
-    '<p class="muted">This is a paper-research signal, not a guarantee. Replicate it on another untouched period before treating it as reproducible.</p>';
+
+function classifyEvent(tournament,category,home,away){
+  const blob=(tournament+' '+category+' '+home+' '+away).toLowerCase();
+  if(blob.includes('eadriatic'))return'efootball_adriatic';
+  if(blob.includes('gt sports league')||blob.includes('gt leagues')||blob.includes('efootball')||blob.includes('e soccer')||blob.includes('esoccer'))return'efootball_gt';
+  if(blob.includes('simulated reality')||/\bsrl\b/i.test(blob))return'srl';
+  if(blob.includes('virtual football'))return'vfootball';
+  if(blob.includes('zoom')||blob.includes('turbo'))return'zoom';
+  if(blob.includes('virtual')||blob.includes('simulated'))return'other';
+  return null;
 }
-function bestCandidate(rows,testRows){
-  const groups={};
-  rows.filter(r=>typeof r.win==='boolean'&&r.selection).forEach(r=>{
-    const key=[r.product,r.market,r.selection].join('|');
-    (groups[key]??=[]).push(r);
+
+function lineFromSpecifier(value){
+  const m=String(value||'').match(/(?:total|line)=([0-9]+(?:\.[0-9]+)?)/i);
+  return m?Number(m[1]):null;
+}
+
+function normalizeLiveEvent(event,tournament,category){
+  const home=String(event.homeTeamName||'');
+  const away=String(event.awayTeamName||'');
+  const product=classifyEvent(tournament,category,home,away);
+  if(!product)return null;
+  const markets=(event.markets||[]).map(m=>{
+    const outcomes=(m.outcomes||[]).map(o=>{
+      const odds=num(o.odds);
+      return odds!=null?{id:String(o.id||''),name:String(o.desc||o.name||''),odds,active:o.isActive!==false}:null;
+    }).filter(Boolean);
+    if(!outcomes.length)return null;
+    return {id:String(m.id||''),name:String(m.desc||m.name||m.title||''),specifier:m.specifier,line:lineFromSpecifier(m.specifier),status:m.status,outcomes,lastOddsChangeTime:m.lastOddsChangeTime};
+  }).filter(Boolean);
+  let start=null;
+  const ms=Number(event.estimateStartTime);
+  if(Number.isFinite(ms)&&ms>0)start=new Date(ms).toISOString();
+  return {product,competition:String(tournament||'Unclassified'),category:String(category||''),event_id:String(event.eventId||''),home,away,start_time:start,match_status:event.matchStatus,markets};
+}
+
+function matchesMarket(market,chosen){
+  if(chosen==='all')return true;
+  const x=(market.name||'').toLowerCase();
+  if(chosen==='1x2'||chosen==='winner')return market.id==='1'||market.id==='186'||x.includes('winner')||x==='win'||x.includes('1x2')||x==='match result';
+  if(chosen==='ou')return market.id==='18'||market.id==='189'||x.includes('total');
+  if(chosen==='btts')return market.id==='29'||x.includes('both teams')||x.includes('btts');
+  if(chosen==='handicap')return market.id==='14'||x.includes('handicap');
+  return true;
+}
+
+function shortOutcome(name){
+  const s=String(name||'').trim();
+  if(/over/i.test(s))return'Over';
+  if(/under/i.test(s))return'Under';
+  if(/^home$/i.test(s))return'1';
+  if(/^draw$/i.test(s))return'X';
+  if(/^away$/i.test(s))return'2';
+  return s.length>24?s.slice(0,22)+'…':s;
+}
+
+function renderLive(){
+  const product=$('product').value,market=$('market').value;
+  const events=state.live.filter(e=>(product==='all'||e.product===product));
+  const now=Date.now();
+  const sorted=[...events].sort((a,b)=>{
+    const aLive=a.start_time&&new Date(a.start_time).getTime()<=now?0:1;
+    const bLive=b.start_time&&new Date(b.start_time).getTime()<=now?0:1;
+    return aLive-bLive||((new Date(a.start_time||0).getTime())-(new Date(b.start_time||0).getTime()));
   });
-  const candidates=[];
-  for(const [key,trainRows] of Object.entries(groups)){
-    const [product,market,selection]=key.split('|');
-    if(trainRows.length<60)continue;
-    const test=testRows.filter(r=>r.product===product&&r.market===market&&r.selection===selection&&typeof r.win==='boolean'&&r.odds!=null);
-    if(test.length<30)continue;
-    const tr=stats(trainRows),te=stats(test),lower=wilsonLower(te.wins,te.valid);
-    const priced=trainRows.filter(r=>r.odds!=null&&r.odds>=1);
-    const minPrice=priced.length?Math.max(1.01,Math.min(...priced.map(r=>r.odds))):99;
-    if(te.rate==null||te.roi==null||te.rate<.80||lower<.72||te.roi<=0)continue;
-    candidates.push({product,market,selection,train:tr,test:te,lower,minPrice});
+  const list=sorted.map(e=>{
+    const markets=e.markets.filter(m=>matchesMarket(m,market)).slice(0,3);
+    const chips=markets.flatMap(m=>m.outcomes.slice(0,4).map(o=>
+      '<span class="liveChip"><span>'+esc(shortOutcome(o.name))+'</span> <b>'+Number(o.odds).toFixed(2)+'</b></span>'
+    )).join('');
+    const line=markets.map(m=>m.line!=null?' '+m.line:'').filter(Boolean)[0]||'';
+    return '<article class="liveCard"><div class="liveTop"><span>'+esc(e.competition||e.product)+'</span><span>'+esc((e.start_time?date(e.start_time):'Time n/a')+line)+'</span></div>'+
+      '<div class="liveTeams">'+esc(e.home)+' <span>vs</span> '+esc(e.away)+'</div>'+
+      '<div class="liveOdds">'+(chips||'<span class="liveMeta">Markets returned without readable odds</span>')+'</div></article>';
+  }).slice(0,30);
+  $('liveGrid').innerHTML=list.join('');
+  $('liveEmpty').hidden=!!list.length;
+  if(state.liveMode==='remote'){
+    $('liveDot').className='liveDot';
+    $('liveTitle').textContent='LIVE SOURCE ONLINE';
+  }else if(state.liveMode==='snapshot'){
+    $('liveDot').className='liveDot wait';
+    $('liveTitle').textContent='SNAPSHOT FALLBACK';
+  }else{
+    $('liveDot').className='liveDot wait';
+    $('liveTitle').textContent='CONNECTING TO LIVE SOURCE…';
   }
-  candidates.sort((a,b)=>(b.test.roi-a.test.roi)||(b.lower-a.lower));
-  return candidates[0]||null;
+  const counts={};
+  state.live.forEach(e=>counts[e.product]=(counts[e.product]||0)+1);
+  const countText=Object.entries(counts).map(([k,v])=>k+': '+v).join(' · ')||'0 virtual events';
+  $('liveMeta').textContent=(state.liveUpdated?'Feed timestamp '+date(state.liveUpdated)+' · ':'')+countText;
 }
-function wilsonLower(successes,n,z=1.96){
-  if(!n)return null;
-  const phat=successes/n,denom=1+z*z/n,centre=phat+z*z/(2*n),spread=z*Math.sqrt((phat*(1-phat)+z*z/(4*n))/n);
-  return (centre-spread)/denom;
+
+function collectLiveFromBody(body){
+  const data=body&&body.data||{};
+  const tournaments=data.tournaments||[];
+  const out=[];
+  tournaments.forEach(t=>{
+    const tn=t.name||'',cn=t.categoryName||'';
+    (t.events||[]).forEach(e=>{
+      const row=normalizeLiveEvent(e,tn,cn);
+      if(row&&row.event_id)out.push(row);
+    });
+  });
+  return out;
 }
+
+async function fetchLiveRemote(){
+  const all=[];
+  for(let page=1;page<=5;page++){
+    const params=new URLSearchParams({
+      sportId:'sr:sport:1',
+      marketId:LIVE_MARKETS,
+      pageSize:'100',
+      pageNum:String(page),
+      todayGames:'false',
+      timeline:'168',
+      _t:String(Date.now())
+    });
+    const r=await fetch(LIVE_API+'?'+params.toString(),{cache:'no-store'});
+    if(!r.ok)throw new Error('Live SportyBet proxy HTTP '+r.status);
+    const body=await r.json();
+    const batch=collectLiveFromBody(body);
+    all.push(...batch);
+    if(batch.length===0&&page>1)break;
+  }
+  const dedup=new Map(all.map(e=>[e.event_id,e]));
+  return [...dedup.values()];
+}
+
+async function fetchLiveSnapshot(){
+  const r=await fetch(SNAPSHOT,{cache:'no-store'});
+  if(!r.ok)throw new Error('Live snapshot HTTP '+r.status);
+  const body=await r.json();
+  return {events:Array.isArray(body.events)?body.events:[],updated_at:body.updated_at||null};
+}
+
+async function loadLive(){
+  const button=$('liveRefresh');
+  button.disabled=true;
+  try{
+    const events=await fetchLiveRemote();
+    if(events.length){
+      state.live=events;
+      state.liveMode='remote';
+      state.liveUpdated=new Date().toISOString();
+      renderLive();
+      return;
+    }
+    throw new Error('SportyBet returned zero virtual/eFootball/SRL events');
+  }catch(remoteError){
+    try{
+      const snap=await fetchLiveSnapshot();
+      if(!snap.events.length)throw new Error('snapshot has zero events');
+      state.live=snap.events;
+      state.liveMode='snapshot';
+      state.liveUpdated=snap.updated_at;
+      renderLive();
+      $('liveMeta').textContent='Remote live source unavailable · '+$('liveMeta').textContent;
+      console.warn('Virtual Lab live source failed; snapshot used:',remoteError);
+      return;
+    }catch(snapshotError){
+      state.live=[];
+      state.liveMode='none';
+      renderLive();
+      $('liveDot').className='liveDot bad';
+      $('liveTitle').textContent='LIVE SOURCE UNAVAILABLE';
+      $('liveMeta').textContent=remoteError.message+' · '+snapshotError.message;
+      console.error('Virtual Lab live feed failed:',remoteError,snapshotError);
+    }
+  }finally{button.disabled=false}
+}
+
+function applyFilters(){
+  const product=$('product').value,market=$('market').value;
+  state.filtered=state.rows.filter(r=>(product==='all'||r.product===product)&&(market==='all'||r.market===market));
+  analyze();
+  renderLive();
+}
+
 function runStrategy(){
   const minOdds=Number($('minOdds').value);
   const rows=state.filtered.filter(r=>typeof r.win==='boolean'&&r.odds!=null&&r.odds>=minOdds).sort((a,b)=>new Date(a.timestamp)-new Date(b.timestamp));
-  if(rows.length<30){$('strategyResult').className='strategyResult empty';$('strategyResult').textContent='Not enough priced, settled observations (need at least 30 for this exploratory test).';return}
+  if(rows.length<30){
+    $('strategyResult').className='strategyResult empty';
+    $('strategyResult').textContent='Not enough priced, settled observations (need at least 30 for this exploratory test).';
+    return;
+  }
   const parts=split(rows),a=stats(parts.train),b=stats(parts.test);
   $('strategyResult').className='strategyResult';
   $('strategyResult').innerHTML='<div class="resultGrid">'+
     statCard('Eligible rows',rows.length)+statCard('Discovery win rate',fmtPct(a.rate))+statCard('OOS win rate',fmtPct(b.rate))+statCard('OOS ROI',fmtPct(b.roi))+
     '</div><p class="muted">This test does not predict hidden RNG state. It asks whether a simple threshold defined before the unseen sample has remained useful out-of-sample. A positive result needs replication on another untouched period.</p>';
 }
-function statCard(title,value){return '<div class="resultStat"><small>'+esc(title)+'</small><b>'+esc(value)+'</b></div>'}
+
 $('fileInput').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{state.rows=await parseFile(f);applyFilters()}catch(err){alert('Could not parse dataset: '+err.message)}});
-$('product').addEventListener('change',applyFilters);$('market').addEventListener('change',applyFilters);$('split').addEventListener('change',analyze);$('runStrategy').addEventListener('click',runStrategy);
+$('product').addEventListener('change',applyFilters);
+$('market').addEventListener('change',applyFilters);
+$('split').addEventListener('change',analyze);
+$('runStrategy').addEventListener('click',runStrategy);
+$('liveRefresh').addEventListener('click',loadLive);
 $('clear').addEventListener('click',()=>{state.rows=[];state.filtered=[];$('fileInput').value='';analyze()});
+
 analyze();
+loadLive();
+window.setInterval(loadLive,LIVE_REFRESH_MS);
 })();
