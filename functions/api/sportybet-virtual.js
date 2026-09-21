@@ -50,35 +50,55 @@ export async function onRequestGet(context){
   const requested=new Set((u.searchParams.get('sources')||'efootball,srl,vfootball').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean));
   const out=[];
   const errors=[];
+  const sourceStatus={};
 
   const pcTargets=[
     ['srl','sr:sport:1'],
     ['efootball','sr:sport:137']
   ];
-  for(const [label,sportId] of pcTargets){
-    if(!requested.has(label)) continue;
+
+  async function collectPc(label,sportId){
+    if(!requested.has(label)) return;
+    const t0=Date.now();
     try{
       const data=await upstream('/api/ng/factsCenter/pcUpcomingEvents',{
         sportId,marketId:'1,18,10,29,11,26,36,14,60100,186,189,202,204,210',
         pageSize,pageNum,todayGames:'false',timeline,_t:Date.now()
       });
+      let n=0;
       for(const t of tournaments(data)){
-        for(const e of (t.events||[])) out.push(normalize(t,e,label,sportId));
+        for(const e of (t.events||[])){
+          out.push(normalize(t,e,label,sportId)); n++;
+        }
       }
-    }catch(e){errors.push(label+': '+String(e.message||e))}
+      sourceStatus[label]={status:n?'LIVE':'EMPTY',events:n,latency_ms:Date.now()-t0};
+    }catch(e){
+      sourceStatus[label]={status:'ERROR',events:0,latency_ms:Date.now()-t0,error:String(e.message||e)};
+      errors.push(label+': '+String(e.message||e));
+    }
   }
 
-  if(requested.has('vfootball')){
+  async function collectVfootball(){
+    if(!requested.has('vfootball')) return;
+    const t0=Date.now();
     try{
       const data=await upstream('/api/ng/factsCenter/wapConfigurableUpcomingEvents',{
-        sportId:'sr:sport:202120001',
-        pageSize,pageNum,todayGames:'false',timeline,_t:Date.now()
+        sportId:'sr:sport:202120001',pageSize,pageNum,todayGames:'false',timeline,_t:Date.now()
       });
+      let n=0;
       for(const t of tournaments(data)){
-        for(const e of (t.events||[])) out.push(normalize(t,e,'vfootball','sr:sport:202120001'));
+        for(const e of (t.events||[])){
+          out.push(normalize(t,e,'vfootball','sr:sport:202120001')); n++;
+        }
       }
-    }catch(e){errors.push('vfootball: '+String(e.message||e))}
+      sourceStatus.vfootball={status:n?'LIVE':'EMPTY',events:n,latency_ms:Date.now()-t0};
+    }catch(e){
+      sourceStatus.vfootball={status:'ERROR',events:0,latency_ms:Date.now()-t0,error:String(e.message||e)};
+      errors.push('vfootball: '+String(e.message||e));
+    }
   }
+
+  await Promise.all([collectPc('srl','sr:sport:1'),collectPc('efootball','sr:sport:137'),collectVfootball()]);
 
   const dedup=new Map();
   for(const row of out) if(row.event_id) dedup.set(row.event_id,row);
@@ -92,7 +112,7 @@ export async function onRequestGet(context){
       key=/eadriatic/.test(blob)?'efootball_adriatic':'efootball_gt';
     }else if(e.source==='vfootball'){
       key='vfootball';
-    }else if(e.source==='srl' && (/simulated reality/.test(blob)||/\bsrl\b/i.test(blob)||/simulated/.test(blob))){
+    }else if(e.source==='srl' && (/simulated reality/.test(blob)||/\\bsrl\\b/i.test(blob)||/simulated/.test(blob))){
       key='srl';
     }else if(/zoom|turbo/i.test(blob)){
       key='zoom';
@@ -105,10 +125,14 @@ export async function onRequestGet(context){
 
   return new Response(JSON.stringify({
     ok:true,
-    status:events.length?'LIVE':'UPSTREAM_EMPTY',
+    status:filtered.length?'LIVE':'UPSTREAM_EMPTY',
     updated_at:new Date().toISOString(),
+    page_size:pageSize,
+    page_num:pageNum,
+    timeline_hours:timeline,
     events_count:filtered.length,
     product_counts:counts,
+    source_status:sourceStatus,
     errors,
     events:filtered
   }),{status:200,headers:headers()});
