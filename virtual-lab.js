@@ -6,6 +6,7 @@ const LIVE_API='https://match-signal.pages.dev/api/sportybet-virtual';
 const LIVE_MARKETS='1,18,10,29,11,26,36,14,60100,186,189,202,204,210';
 const SNAPSHOT='./data/virtual_lab_live.json';
 const LIVE_REFRESH_MS=30000;
+const UI_BUILD='20260921-v11';
 const HISTORY='./api/virtual-lab-history';
 const HISTORY_FALLBACK='./data/virtual_lab_history.json';
 const state={rows:[],filtered:[],live:[],liveMode:'none',liveUpdated:null,picks:[],builder:[]};
@@ -306,7 +307,7 @@ function renderPredictionDesk(){
   host.innerHTML=picks.map(function(p,i){
     function row(x,label){
       if(!x)return '<div class="calcRow"><span>'+label+'</span><b>—</b><span>—</span><span>—</span><span>—</span></div>';
-      return '<div class="calcRow"><span>'+label+(x.market.line!=null?' '+x.market.line:'')+'</span><b>'+esc(x.pickCode)+'</b><span>'+pct(x.fairProb)+'</span><span>Fair '+x.fairOdds.toFixed(2)+'</span><span>Book '+x.bookmakerOdds.toFixed(2)+'</span></div>';
+      return '<div class="calcRow"><span>'+label+(x.market.line!=null?' '+x.market.line:'')+'</span><b>'+esc(x.pickCode)+'</b><span>'+fmtPct(x.fairProb)+'</span><span>Fair '+x.fairOdds.toFixed(2)+'</span><span>Book '+x.bookmakerOdds.toFixed(2)+'</span></div>';
     }
     return '<article class="predictionCard"><div class="predictionHeader"><div><small>'+esc(p.product)+' · '+esc(p.competition)+'</small><h3>'+esc(p.home)+' <span>vs</span> '+esc(p.away)+'</h3></div><time>'+esc(p.start_time?date(p.start_time):'—')+'</time></div><div class="primaryPick"><span>PRIMARY PICK</span><strong>'+esc(p.pickCode)+'</strong><b>'+fmtPct(p.primary.fairProb)+'</b></div><div class="calcTable"><div class="calcHead"><span>Market</span><span>Pick</span><span>Probability</span><span>Fair odds</span><span>SportyBet</span></div>'+row(p.bestWinner,'1X2')+row(p.bestOU,'O/U')+'</div><div class="calcNote">De-vig probability = (1 / outcome odds) ÷ sum of all outcome implied probabilities. This is a live market baseline.</div><button class="btn builderAdd" data-pick="'+i+'">＋ Add to odds builder</button></article>';
   }).join('');
@@ -323,7 +324,7 @@ function renderBuilder(){
   host.innerHTML=state.builder.map(function(p,i){return '<div class="builderRow"><span class="builderPick">'+esc(p.pickCode)+'</span><span>'+esc(p.home+' vs '+p.away)+'</span><b>'+p.primary.bookmakerOdds.toFixed(2)+'</b><button class="btn removeLeg" data-i="'+i+'">×</button></div>';}).join('');
   host.querySelectorAll('.removeLeg').forEach(function(btn){btn.addEventListener('click',function(){state.builder.splice(Number(btn.dataset.i),1);renderBuilder();});});
   const ready=state.builder.length>=2;
-  summary.innerHTML='<span><b>'+state.builder.length+'</b> legs</span><span>Combined odds <b>'+combined.toFixed(2)+'</b></span><span>Baseline hit probability <b>'+pct(baselineHit)+'</b></span><span>Fair combined odds <b>'+fairCombined.toFixed(2)+'</b></span><strong class="'+(ready?'builderReady':'')+'">'+(ready?'READY · PAPER BUILDER':'ADD AT LEAST 2 LEGS')+'</strong>';
+  summary.innerHTML='<span><b>'+state.builder.length+'</b> legs</span><span>Combined odds <b>'+combined.toFixed(2)+'</b></span><span>Baseline hit probability <b>'+fmtPct(baselineHit)+'</b></span><span>Fair combined odds <b>'+fairCombined.toFixed(2)+'</b></span><strong class="'+(ready?'builderReady':'')+'">'+(ready?'READY · PAPER BUILDER':'ADD AT LEAST 2 LEGS')+'</strong>';
 }
 function autoBuild(){
   const candidates=state.picks.slice().sort(function(a,b){return b.primary.fairProb-a.primary.fairProb;});
