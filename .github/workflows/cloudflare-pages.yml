@@ -120,6 +120,7 @@ jobs:
         timeout-minutes: 3
         run: |
           node --input-type=module <<'NODE'
+          import { writeFileSync } from 'node:fs';
           const base = 'https://match-signal.pages.dev';
           const pages = ['/', '/expansion.html', '/live.html', '/basketball.html', '/performance.html', '/research.html', '/virtual-lab'];
           const assets = ['/api/sportybet-virtual','/expansion.js', '/expansion-odds-builder.js', '/live-analysis.js', '/live-data-worker.js', '/virtual-lab.js', '/virtual-lab.css', '/_redirects', '/data/predictions.json', '/data/expansion_status.json', '/data/odds_builder.json', '/data/virtual_lab_live.json'];
@@ -178,7 +179,7 @@ jobs:
             else {
               console.log('Virtual Lab live source passed: '+virtualEvents.length+' events '+JSON.stringify(payload.product_counts||{}));
               if (!payload.updated_at) failures.push('/api/sportybet-virtual missing updated_at');
-              require('fs').writeFileSync('LIVE-PRODUCTION-CHECK.json', JSON.stringify({
+              writeFileSync('LIVE-PRODUCTION-CHECK.json', JSON.stringify({
                 endpoint:'/api/sportybet-virtual',
                 verified_at:new Date().toISOString(),
                 status:payload.status,
