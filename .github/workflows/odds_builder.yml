@@ -11,6 +11,8 @@ on:
       - 'data/sportybet_odds_snapshot.json'
       - 'data/predictions.json'
       - 'scripts/odds_builder.py'
+      - 'scripts/tennis_total_model.py'
+      - 'scripts/tennis_total_research.py'
       - 'expansion-odds-builder.js'
       - 'data/sportybet_odds_snapshot.json'
       - '.github/workflows/odds_builder.yml'
@@ -23,8 +25,8 @@ on:
       - "Match Signal Result Settlement"
     types: [completed]
   schedule:
-    # One automatic build per day at 18:17 UTC / 19:17 Nigeria time.
-    - cron: '17 18 * * *'
+    # Refresh research diagnostics and builder every 15 minutes.
+    - cron: '*/15 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -48,6 +50,18 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Run tennis total challenger research
+        run: python scripts/tennis_total_research.py
+      - name: Validate tennis research artifact
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('data/tennis_total_research.json').read_text())
+          assert d.get('mode') == 'PAPER_RESEARCH_ONLY'
+          assert str(d.get('activation_gate','')).startswith('HOLD')
+          print('Tennis total research holdout:', json.dumps(d.get('holdout',{})))
+          PY
       - name: Run daily mixed accumulator builder
         run: python scripts/odds_builder.py
       - name: Validate V6 market-calibrated accumulator JSON
@@ -57,7 +71,7 @@ jobs:
           from pathlib import Path
           data = json.loads(Path('data/odds_builder.json').read_text())
           assert data.get('mode') == 'PAPER_ONLY'
-          assert data.get('engine_version') == 'V6.0-MARKET-CALIBRATED'
+          assert data.get('engine_version') == 'V6.1-RESEARCH-GATED'
           policy = data.get('selection_policy', {})
           assert policy.get('requires_live_sportybet_price') is True
           assert float(policy.get('min_model_edge', 0)) >= 0.025
@@ -65,7 +79,9 @@ jobs:
           assert isinstance(data.get('qualified_legs'), list)
           assert len(data['qualified_legs']) <= 4
           if data['qualified_legs']:
-              assert 1 <= len(data['qualified_legs']) <= 4
+              assert 3 <= len(data['qualified_legs']) <= 4
+          if data.get('status') == 'UPSTREAM_RESEARCH_GATE_BLOCKED':
+              assert not data['qualified_legs']
           for leg in data['qualified_legs']:
               assert leg.get('sport') in {'football', 'tennis'}
               assert float(leg.get('model_probability', 0)) >= 0.60
@@ -90,10 +106,10 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/odds_builder.json
+          git add data/odds_builder.json data/tennis_total_research.json
           if git diff --cached --quiet; then
             echo "No accumulator changes."
             exit 0
           fi
-          git commit -m "🤖 Refresh daily mixed accumulator"
+          git commit -m "🤖 Refresh research-gated Odds Builder"
           git push origin main
