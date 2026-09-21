@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-21T17:02:04.619437+00:00",
+  "generated_at": "2026-09-21T17:02:17.490Z",
   "engine_version": "V6.1-RESEARCH-GATED",
   "mode": "PAPER_ONLY",
   "target_legs": "3-4",
@@ -18,15 +18,17 @@
     ],
     "selection_reasons": {
       "tournament_not_qualified + selection_not_qualified + confidence_below_0.65": 78,
-      "tournament_not_qualified + selection_not_qualified": 4,
-      "tournament_not_qualified + confidence_below_0.65": 4
+      "tournament_not_qualified + confidence_below_0.65": 5,
+      "tournament_not_qualified + selection_not_qualified": 4
     }
   },
   "candidate_diagnostics": {
     "football_candidates": 0,
-    "tennis_candidates": 42,
+    "tennis_candidates": 37,
     "evaluated": 0,
-    "rejections": {}
+    "rejections": {
+      "UPSTREAM_RESEARCH_GATE_BLOCKED": 37
+    }
   },
   "selection_policy": {
     "min_calibrated_probability": 0.6,
@@ -71,10 +73,10 @@
     "background": "#080D14"
   },
   "notes": [
-    "V6 qualifies on market edge, not probability alone.",
-    "Missing or stale SportyBet prices produce NO_BET/REJECTED.",
-    "Model fair odds never overwrite bookmaker odds.",
-    "Accumulator size is allowed to fall below four and is never padded with weak selections.",
-    "Paper-only until V6 demonstrates stable calibration, edge and closing-line value over a meaningful sample."
+    "Builder is hard-locked by the upstream research/risk gate.",
+    "Tennis currently has no live-eligible research selection.",
+    "No weak prediction is promoted merely to fill 3-4 accumulator slots.",
+    "Fresh SportyBet prices are required before any candidate can be evaluated for market edge.",
+    "Paper-only; no real-money execution."
   ]
 }
