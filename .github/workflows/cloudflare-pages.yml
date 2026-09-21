@@ -33,14 +33,6 @@ on:
       - '_redirects'
       - 'VIRTUAL-LAB-*.md'
       - '.github/workflows/cloudflare-pages.yml'
-  workflow_run:
-    workflows:
-      - "Match Signal Live Expansion"
-      - "Match Signal Autopilot Refresh"
-      - "Match Signal Odds Builder"
-      - "Match Signal Result Settlement"
-      - "Match Signal Live Prediction Pipeline"
-    types: [completed]
   workflow_dispatch:
 
 permissions:
@@ -184,11 +176,68 @@ jobs:
             const virtualEvents=Array.isArray(payload?.events)?payload.events:[];
             if (payload?.ok!==true) failures.push('/api/sportybet-virtual did not return ok=true');
             if (!virtualEvents.length) failures.push('/api/sportybet-virtual returned no virtual/eFootball/SRL events');
-            else console.log('Virtual Lab live source passed: '+virtualEvents.length+' events '+JSON.stringify(payload.product_counts||{}));
+            else {
+              console.log('Virtual Lab live source passed: '+virtualEvents.length+' events '+JSON.stringify(payload.product_counts||{}));
+              if (!payload.updated_at) failures.push('/api/sportybet-virtual missing updated_at');
+            }
           } catch(e) { failures.push('/api/sportybet-virtual '+e.message); }
 
           if (failures.length) { console.error(failures.join('\n')); process.exit(1); }
           console.log('Production HTTP smoke tests passed: '+pages.length+' pages, '+assets.length+' assets, NBA ESPN proxy');
+          NODE
+
+      - name: Browser-verify live production pages
+        timeout-minutes: 8
+        run: |
+          node <<'NODE'
+          const {execSync}=require('node:child_process');
+          execSync('npm init -y >/dev/null 2>&1 && npm install --no-save playwright@1.55.0 >/dev/null 2>&1', {stdio:'inherit', shell:true});
+          execSync('npx playwright install --with-deps chromium >/dev/null 2>&1', {stdio:'inherit', shell:true});
+          const {chromium}=require('playwright');
+          (async()=>{
+            const browser=await chromium.launch({headless:true});
+            const page=await browser.newPage();
+            const failures=[];
+            async function check(path, fn){
+              try{
+                await page.goto('https://match-signal.pages.dev'+path,{waitUntil:'domcontentloaded',timeout:30000});
+                await fn(page);
+                console.log('BROWSER PASS',path);
+              }catch(e){failures.push(path+' :: '+e.message)}
+            }
+            await check('/research.html?browser_smoke=1',async p=>{
+              await p.waitForFunction(()=>document.querySelectorAll('.liveCard').length>0,{timeout:20000});
+              const title=await p.locator('#liveTitle').textContent();
+              if(!/LIVE SOURCE ONLINE/.test(title))throw new Error('Virtual Lab title='+title);
+              const cards=await p.locator('.liveCard').count();
+              if(cards<1)throw new Error('Virtual Lab live cards=0');
+            });
+            await check('/index.html?sport=football&browser_smoke=1',async p=>{
+              await p.waitForFunction(()=>document.querySelector('#count') && document.querySelector('#count').textContent!=='—',{timeout:20000});
+              const n=Number(await p.locator('#count').textContent());
+              if(!(n>0))throw new Error('football prediction count='+n);
+            });
+            await check('/index.html?sport=tennis&browser_smoke=1',async p=>{
+              await p.waitForFunction(()=>document.querySelector('#count') && document.querySelector('#count').textContent!=='—',{timeout:20000});
+              const n=Number(await p.locator('#count').textContent());
+              if(!(n>0))throw new Error('tennis prediction count='+n);
+            });
+            await check('/live.html?browser_smoke=1',async p=>{
+              if(!(await p.locator('body').textContent()).match(/Live|LIVE|Analysis/i))throw new Error('live page content marker missing');
+            });
+            await check('/expansion.html?browser_smoke=1',async p=>{
+              for(const sel of ['#groups','#oddsBuilder']) if(await p.locator(sel).count()===0)throw new Error('missing '+sel);
+            });
+            await check('/basketball.html?browser_smoke=1',async p=>{
+              if((await p.locator('body').textContent()).length<500)throw new Error('basketball page content too small');
+            });
+            await check('/performance.html?browser_smoke=1',async p=>{
+              if((await p.locator('body').textContent()).length<500)throw new Error('performance page content too small');
+            });
+            await browser.close();
+            if(failures.length){console.error(failures.join('\n'));process.exit(1)}
+            console.log('BROWSER PRODUCTION SMOKE PASSED: Virtual Lab live cards + football + tennis + live + expansion + basketball + performance');
+          })();
           NODE
 
       - name: Record Cloudflare production verification
