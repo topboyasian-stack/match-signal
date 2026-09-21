@@ -53,7 +53,7 @@ export async function onRequestGet(context){
 
   const pcTargets=[
     ['srl','sr:sport:1'],
-    ['efootball','sr:sport:97']
+    ['efootball','sr:sport:137']
   ];
   for(const [label,sportId] of pcTargets){
     if(!requested.has(label)) continue;
