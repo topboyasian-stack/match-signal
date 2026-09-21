@@ -567,7 +567,7 @@ def main():
     save_json(HISTORY_PATH,history)
     save_json(STATUS_PATH,{
         "updated_at":now_iso(),
-        "collector_version":"1.4",
+        "collector_version":"1.4.1",
         "upcoming_events":len(events),
         "upcoming_by_product":products,
         "pending_observations":len(pending),
