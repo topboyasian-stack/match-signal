@@ -43,6 +43,26 @@ jobs:
         run: |
           python scripts/virtual_lab_sync.py
 
+      - name: Dispatch GitHub Pages deployment when Virtual Lab changed
+        env:
+          GH_TOKEN: \${{ github.token }}
+        run: |
+          python - <<'PY'
+          import json
+          from datetime import datetime, timezone
+          from pathlib import Path
+          d=json.loads(Path('data/virtual_lab_live.json').read_text())
+          updated=datetime.fromisoformat(str(d.get('updated_at')).replace('Z','+00:00'))
+          age=(datetime.now(timezone.utc)-updated).total_seconds()
+          if d.get('status') != 'LIVE' or int(d.get('events_count',0)) <= 0:
+              raise SystemExit('Live Virtual Lab snapshot is not valid; Pages dispatch blocked.')
+          if age > 480:
+              print(f'No recent Virtual Lab change ({age:.1f}s); Pages dispatch not needed.')
+              raise SystemExit(0)
+          print(f'Live snapshot changed recently ({age:.1f}s old); dispatching GitHub Pages deployment.')
+          PY
+          gh workflow run deploy-pages.yml --ref main
+
       - name: Check freshness and self-heal stale workflows
         env:
           GH_TOKEN: ${{ github.token }}
