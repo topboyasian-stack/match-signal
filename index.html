@@ -20,7 +20,8 @@
 <script>
 (function(){
 'use strict';
-const V6='V6.0-MARKET-CALIBRATED';\nconst state={sport:new URLSearchParams(location.search).get('sport')==='tennis'?'tennis':'football',level:'all',predictions:[],accuracy:null,status:null,expansion:null};
+const V6='V6.0-MARKET-CALIBRATED';
+const state={sport:new URLSearchParams(location.search).get('sport')==='tennis'?'tennis':'football',level:'all',predictions:[],accuracy:null,status:null,expansion:null};
 const $=id=>document.getElementById(id);
 const esc=v=>{const d=document.createElement('div');d.textContent=String(v??'');return d.innerHTML};
 const pct=v=>Math.round((Number(v)||0)*100)+'%';
