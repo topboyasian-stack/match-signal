@@ -12,3 +12,25 @@ body.ms-page:before{content:"";position:fixed;inset:0;pointer-events:none;backgr
 .ms-page .good,.ms-page .positive{color:var(--ms-green)!important}.ms-page .error,.ms-page .negative{color:var(--ms-red)!important}.ms-page .warning{color:var(--ms-amber)!important}.ms-page .footer{color:var(--ms-muted)!important;border-top-color:var(--ms-border)!important}
 .ms-page.ms-home{--ms-accent:#37e7ff;--ms-accent2:#7c6cff}.ms-page.ms-home-tight{--ms-accent:#37e7ff;--ms-accent2:#42e59a}.ms-page.ms-performance{--ms-accent:#ffd166;--ms-accent2:#37e7ff}.ms-page.ms-performance-tight{--ms-accent:#37e7ff;--ms-accent2:#7c6cff}.ms-page.ms-live{--ms-accent:#ff5d73;--ms-accent2:#37e7ff}.ms-page.ms-basketball{--ms-accent:#ff9f43;--ms-accent2:#37e7ff}.ms-page.ms-expansion{--ms-accent:#9b7cff;--ms-accent2:#f472b6}.ms-page.ms-expansion-update{--ms-accent:#42e59a;--ms-accent2:#37e7ff}.ms-page.ms-tracker{--ms-accent:#f472b6;--ms-accent2:#37e7ff}.ms-page.ms-tracker-v2{--ms-accent:#7c6cff;--ms-accent2:#37e7ff}.ms-page.ms-tracker-v3{--ms-accent:#37e7ff;--ms-accent2:#42e59a}.ms-page.ms-control{--ms-accent:#7c6cff;--ms-accent2:#42e59a}.ms-page.ms-control .loginBox{background:linear-gradient(145deg,#0f1824,#080e15)!important;border-color:rgba(124,108,255,.30)!important;box-shadow:0 30px 90px rgba(0,0,0,.52),0 0 60px rgba(124,108,255,.08)!important}.ms-page.ms-control .login{background:radial-gradient(700px 420px at 50% 0%,rgba(124,108,255,.13),transparent 62%),#05070b!important}
 @media(max-width:760px){.ms-page .ms-system-rail{font-size:9px}.ms-page .ms-official-intro{padding:18px}.ms-page .top{padding-bottom:14px!important}}
+
+/* V6.1 readability + layout safety */
+body.ms-page{background:radial-gradient(900px 520px at 8% -12%,color-mix(in srgb,var(--ms-accent) 14%,transparent),transparent 62%),radial-gradient(780px 460px at 96% 2%,color-mix(in srgb,var(--ms-accent2) 10%,transparent),transparent 64%),linear-gradient(180deg,#101821 0%,#0b1118 52%,#0d1720 100%)!important}
+.ms-page .status,.ms-page .panel,.ms-page .metric,.ms-page .card,.ms-page .hero,.ms-page .sport,.ms-page .row{background:linear-gradient(145deg,rgba(23,35,48,.97),rgba(14,24,34,.97))!important}
+.ms-page .ms-official-intro{background:linear-gradient(135deg,rgba(22,35,48,.98),rgba(13,23,33,.97))}
+.ms-page .muted,.ms-page .notice,.ms-page .brand p{color:#a9b8c6!important}
+.ms-page .top{position:relative;z-index:20}
+.ms-page nav{position:relative;z-index:21}
+.ms-page .tabs,.ms-page .nav{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ms-page .tabs .btn,.ms-page .nav .btn,.ms-page nav a{white-space:nowrap}
+.ms-page .panel,.ms-page .card,.ms-page .metric,.ms-page .status{overflow:visible}
+.ms-page .ms-official-intro{z-index:2}
+.ms-page .controls{position:relative;z-index:5}
+.ms-page table{position:relative;z-index:1}
+.ms-page .odds-builder,.ms-page #oddsBuilder,[id*="oddsBuilder"]{scroll-margin-top:90px}
+.ms-page .ms-jump-nav{position:fixed;right:18px;bottom:18px;z-index:9999;display:flex;flex-direction:column;gap:8px}
+.ms-page .ms-jump-nav button{width:44px;height:44px;border-radius:13px;border:1px solid color-mix(in srgb,var(--ms-accent) 42%,rgba(133,161,184,.2));background:rgba(19,31,43,.94);backdrop-filter:blur(12px);color:var(--ms-text);font-size:19px;cursor:pointer;box-shadow:0 12px 30px rgba(0,0,0,.35),0 0 20px color-mix(in srgb,var(--ms-accent) 10%,transparent)}
+.ms-page .ms-jump-nav button:hover{border-color:var(--ms-accent);transform:translateY(-1px)}
+.ms-page .ms-odds-jump{display:inline-flex!important;align-items:center;gap:7px;margin-left:auto!important;color:var(--ms-text)!important;background:linear-gradient(145deg,color-mix(in srgb,var(--ms-accent) 17%,#172334),#0e1824)!important;border:1px solid color-mix(in srgb,var(--ms-accent) 38%,transparent)!important}
+.ms-page .ms-odds-jump strong{color:var(--ms-accent)}
+@media(max-width:900px){.ms-page .top{gap:12px}.ms-page .tabs,.ms-page .nav{width:100%}}
+@media(max-width:600px){.ms-page .ms-jump-nav{right:12px;bottom:12px}.ms-page .ms-jump-nav button{width:40px;height:40px}.ms-page .ms-odds-jump{width:100%;justify-content:center;margin:8px 0 0!important}}
