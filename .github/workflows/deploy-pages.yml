@@ -19,6 +19,8 @@ on:
       - 'data/**'
       - '.github/workflows/deploy-pages.yml'
       - '.github/workflows/tennis_pipeline.yml'
+      - 'scripts/virtual_lab_sync.py'
+      - '.github/workflows/virtual-lab-sync.yml'
   workflow_run:
     workflows:
       - "Match Signal Autopilot Refresh"
@@ -85,6 +87,7 @@ jobs:
           test -s virtual-lab.js
           test -s virtual-lab.css
           test -s data/predictions.json
+          test -s data/virtual_lab_live.json
           python - <<'PY'
           import json
           from pathlib import Path
@@ -98,6 +101,15 @@ jobs:
           PY
           echo "Live page present: $(wc -c < live.html) bytes"
           echo "Prediction feed present: $(wc -c < data/predictions.json) bytes"
+          echo "Virtual Lab live snapshot present: $(wc -c < data/virtual_lab_live.json) bytes"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('data/virtual_lab_live.json').read_text())
+          assert d.get('status') == 'LIVE', f"virtual lab snapshot status={d.get('status')}"
+          assert int(d.get('events_count',0)) > 0, "virtual lab snapshot is empty"
+          print(f"Virtual Lab snapshot: {d.get('events_count')} events / {d.get('product_counts')}")
+          PY
       - name: Upload site artifact
         uses: actions/upload-pages-artifact@v4
         with:
@@ -105,3 +117,33 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: Smoke test live Virtual Lab source and deployed page
+        timeout-minutes: 3
+        run: |
+          node --input-type=module <<'NODE'
+          const api='https://match-signal.pages.dev/api/sportybet';
+          const qs=new URLSearchParams({
+            sportId:'sr:sport:1',
+            marketId:'1,18,10,29,11,26,36,14,60100,186,189,202,204,210',
+            pageSize:'100',
+            pageNum:'1',
+            todayGames:'false',
+            timeline:'168',
+            _t:String(Date.now())
+          });
+          const apiResponse=await fetch(api+'?'+qs.toString(),{cache:'no-store'});
+          if(!apiResponse.ok) throw new Error('Cloudflare live proxy HTTP '+apiResponse.status);
+          const payload=await apiResponse.json();
+          const tournaments=payload?.data?.tournaments||[];
+          const virtual=tournaments.flatMap(t=>(t.events||[]).map(e=>({t:String(t.name||''),c:String(t.categoryName||''),h:String(e.homeTeamName||''),a:String(e.awayTeamName||'')})))
+            .filter(e=>/simulated reality|\bsrl\b|gt sports league|gt leagues|eadriatic|efootball|e soccer|esoccer|virtual football|zoom|turbo/i.test(e.t+' '+e.c+' '+e.h+' '+e.a));
+          if(payload.bizCode!==10000) throw new Error('Cloudflare live proxy bizCode '+payload.bizCode);
+          if(!virtual.length) throw new Error('Cloudflare live proxy returned no virtual/eFootball/SRL events');
+          console.log('Cloudflare live source OK:',virtual.length,'matching events');
+          const page=await fetch('https://topboyasian-stack.github.io/match-signal/research.html?smoke='+Date.now(),{cache:'no-store'});
+          const body=await page.text();
+          if(!page.ok) throw new Error('GitHub Pages Virtual Lab HTTP '+page.status);
+          for(const marker of ['Virtual Lab','liveGrid','LIVE_API']) if(!body.includes(marker)) throw new Error('GitHub Pages research page missing '+marker);
+          console.log('GitHub Pages Virtual Lab page OK');
+          NODE
