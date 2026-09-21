@@ -231,183 +231,104 @@ function shortOutcome(name){
   return s.length>24?s.slice(0,22)+'…':s;
 }
 
+
 function marketLabel(m){
-  const name=String(m?.name||'').trim();
-  const line=m?.line!=null?' '+m.line:'';
+  const name=String(m&&m.name||'').trim();
+  const line=m&&m.line!=null?' '+m.line:'';
   return (name||'Market')+line;
 }
-function outcomePick(m,o){
-  const name=String(o?.name||'').trim();
-  const line=m?.line!=null?String(m.line):'';
-  if(/^over\b/i.test(name))return 'O'+line;
-  if(/^under\b/i.test(name))return 'U'+line;
-  if(/^home$/i.test(name))return '1';
-  if(/^draw$/i.test(name))return 'X';
-  if(/^away$/i.test(name))return '2';
+function outcomeCode(m,o){
+  const name=String(o&&o.name||'').trim(),lower=name.toLowerCase();
+  const line=m&&m.line!=null?String(m.line):'';
+  if(lower.indexOf('over')===0)return 'O'+line;
+  if(lower.indexOf('under')===0)return 'U'+line;
+  if(lower==='home')return '1';
+  if(lower==='draw')return 'X';
+  if(lower==='away')return '2';
   return name;
 }
 function calculateMarket(m){
-  const outs=(m?.outcomes||[]).filter(o=>Number.isFinite(Number(o.odds))&&Number(o.odds)>1);
+  const outs=(m&&m.outcomes||[]).filter(o=>Number(o.odds)>1);
   if(outs.length<2)return null;
-  const inv=outs.map(o=>1/Number(o.odds));
-  const total=inv.reduce((a,b)=>a+b,0);
-  const normalized=outs.map((o,i)=>({...o,fairProb:inv[i]/total}));
-  const pick=normalized.reduce((a,b)=>b.fairProb>a.fairProb?b:a);
-  return {
-    market:m,
-    pick,
-    pickCode:outcomePick(m,pick),
-    fairProb:pick.fairProb,
-    fairOdds:1/pick.fairProb,
-    bookmakerOdds:Number(pick.odds),
-    overround:Math.max(0,total-1)
-  };
+  const total=outs.reduce((sum,o)=>sum+(1/Number(o.odds)),0);
+  const norm=outs.map(o=>Object.assign({},o,{fairProb:(1/Number(o.odds))/total}));
+  const pick=norm.reduce((a,b)=>b.fairProb>a.fairProb?b:a);
+  return {market:m,pick:pick,pickCode:outcomeCode(m,pick),fairProb:pick.fairProb,fairOdds:1/pick.fairProb,bookmakerOdds:Number(pick.odds),overround:Math.max(0,total-1)};
 }
 function predictionForEvent(e){
   const candidates=[];
-  for(const m of (e.markets||[])){
-    const id=String(m.id||'');
-    const name=String(m.name||'');
-    const winner=id==='1'||id==='186'||/1x2|winner|match result/i.test(name);
-    const totals=id==='18'||id==='189'||/over\/?under|total/i.test(name);
-    if(!winner&&!totals)continue;
+  (e.markets||[]).forEach(m=>{
+    const id=String(m.id||''),name=String(m.name||'').toLowerCase();
+    const isWinner=id==='1'||id==='186'||name.indexOf('1x2')>=0||name.indexOf('winner')>=0||name.indexOf('match result')>=0;
+    const isTotals=id==='18'||id==='189'||name.indexOf('over/under')>=0||name.indexOf('total')>=0;
+    if(!isWinner&&!isTotals)return;
     const c=calculateMarket(m);
-    if(c){c.marketType=totals?'ou':'winner';candidates.push(c);}
-  }
-  if(!candidates.length)return null;
-  candidates.sort((a,b)=>b.fairProb-a.fairProb||(a.overround-b.overround));
-  const best=candidates[0];
-  return {
-    product:e.product,
-    event_id:String(e.event_id||''),
-    home:String(e.home||e.participant_1||''),
-    away:String(e.away||e.participant_2||''),
-    competition:String(e.competition||e.tournament||''),
-    start_time:e.start_time||null,
-    marketType:best.marketType,
-    pickCode:best.pickCode,
-    pickName:String(best.pick.name||''),
-    bookmakerOdds:best.bookmakerOdds,
-    fairProb:best.fairProb,
-    fairOdds:best.fairOdds,
-    overround:best.overround,
-    market:best.market,
-    allMarkets:candidates,
-    calculation:'De-vig probability = (1 / odds) / sum(1 / all outcomes)'
-  };
-}
-function upcomingOnly(events){
-  const cutoff=Date.now()-120000;
-  return (events||[]).filter(e=>{
-    if(!e.start_time)return true;
-    const t=new Date(e.start_time).getTime();
-    return Number.isFinite(t)&&t>=cutoff;
+    if(c){c.marketType=isTotals?'ou':'winner';candidates.push(c);}
   });
+  if(!candidates.length)return null;
+  const winner=candidates.filter(x=>x.marketType==='winner').sort((a,b)=>b.fairProb-a.fairProb)[0]||null;
+  const ou=candidates.filter(x=>x.marketType==='ou').sort((a,b)=>b.fairProb-a.fairProb)[0]||null;
+  const primary=candidates.slice().sort((a,b)=>b.fairProb-a.fairProb||a.overround-b.overround)[0];
+  return {product:e.product,competition:e.competition||e.tournament||'',event_id:String(e.event_id||e.eventId||''),home:String(e.home||e.participant_1||''),away:String(e.away||e.participant_2||''),start_time:e.start_time||null,primary:primary,bestWinner:winner,bestOU:ou};
 }
-function rebuildPredictionDesk(){
-  state.picks=upcomingOnly(state.live).map(predictionForEvent).filter(Boolean);
-  const product=$('product')?.value||'all';
-  if(product!=='all')state.picks=state.picks.filter(p=>p.product===product);
-  state.picks.sort((a,b)=>new Date(a.start_time||0)-new Date(b.start_time||0)||b.fairProb-a.fairProb);
-  renderPredictionDesk();
-  renderBuilder();
+function isUpcoming(e){
+  if(!e||!e.start_time)return true;
+  const t=new Date(e.start_time).getTime();
+  return Number.isFinite(t)&&t>=Date.now()-120000;
+}
+function upcomingEventsFrom(events){
+  return (events||[]).filter(isUpcoming).sort((a,b)=>new Date(a.start_time||0).getTime()-new Date(b.start_time||0).getTime());
 }
 function renderLive(){
   const product=$('product').value,market=$('market').value;
-  const events=upcomingOnly(state.live).filter(e=>(product==='all'||e.product===product));
-  const list=events.map(e=>{
-    const shownMarkets=e.markets.filter(m=>matchesMarket(m,market)).slice(0,3);
-    const chips=shownMarkets.flatMap(m=>m.outcomes.slice(0,4).map(o=>
-      '<span class="liveChip"><span>'+esc(outcomePick(m,o))+'</span> <b>'+Number(o.odds).toFixed(2)+'</b></span>'
-    )).join('');
-    const pred=predictionForEvent(e);
-    const predictionHtml=pred?
-      '<div class="predictionBox"><div class="predictionTop"><span class="predictionLabel">PICK</span><span class="predictionType">'+esc(pred.marketType==='ou'?'TOTALS':'MATCH RESULT')+'</span></div><div class="predictionPick">'+esc(pred.pickCode)+' <b>'+esc((pred.fairProb*100).toFixed(1)+'%')+'</b></div><div class="predictionMeta">Book '+Number(pred.bookmakerOdds).toFixed(2)+' · Fair '+Number(pred.fairOdds).toFixed(2)+' · margin '+(pred.overround*100).toFixed(1)+'%</div></div>':
-      '<div class="predictionBox mutedPrediction"><div class="predictionLabel">PICK</div><div class="predictionPick">NO READABLE PICK</div><div class="predictionMeta">No current 1X2 or O/U market.</div></div>';
-    return '<article class="liveCard"><div class="liveTop"><span>'+esc(e.competition||e.product)+'</span><span>'+esc(e.start_time?date(e.start_time):'Time n/a')+'</span></div>'+
-      '<div class="liveTeams"><strong>'+esc(e.home||e.participant_1||'Unknown player/team')+'</strong> <span>vs</span> <strong>'+esc(e.away||e.participant_2||'Unknown player/team')+'</strong></div>'+
-      predictionHtml+
-      '<div class="liveOdds">'+(chips||'<span class="liveMeta">No priced markets returned</span>')+'</div></article>';
-  }).slice(0,30);
-  $('liveGrid').innerHTML=list.join('');
-  $('liveEmpty').hidden=!!list.length;
-  if(state.liveMode==='remote'){
-    $('liveDot').className='liveDot';
-    $('liveTitle').textContent='LIVE SOURCE ONLINE · UPCOMING ONLY';
-  }else if(state.liveMode==='snapshot'){
-    $('liveDot').className='liveDot wait';
-    $('liveTitle').textContent='SNAPSHOT FALLBACK · UPCOMING ONLY';
-  }else{
-    $('liveDot').className='liveDot wait';
-    $('liveTitle').textContent='CONNECTING TO LIVE SOURCE…';
-  }
-  const counts={};
-  events.forEach(e=>counts[e.product]=(counts[e.product]||0)+1);
-  $('liveMeta').textContent=(state.liveUpdated?'Feed timestamp '+date(state.liveUpdated)+' · ':'')+
-    (Object.entries(counts).map(([k,v])=>k+': '+v).join(' · ')||'0 upcoming events');
+  const events=upcomingEventsFrom(state.live).filter(e=>product==='all'||e.product===product);
+  const list=events.slice(0,30).map(e=>{
+    const p=predictionForEvent(e);
+    const shown=(e.markets||[]).filter(m=>matchesMarket(m,market)).slice(0,3);
+    const chips=shown.flatMap(m=>(m.outcomes||[]).slice(0,4).map(o=>'<span class="liveChip"><span>'+esc(outcomeCode(m,o))+'</span> <b>'+Number(o.odds).toFixed(2)+'</b></span>')).join('');
+    const pick=p?'<div class="predictionBox"><div class="predictionTop"><span class="predictionLabel">PICK</span><span class="predictionType">'+(p.primary.marketType==='ou'?'TOTALS':'MATCH RESULT')+'</span></div><div class="predictionPick">'+esc(p.primary.pickCode)+' <b>'+pct(p.primary.fairProb)+'</b></div><div class="predictionMeta">Book '+p.primary.bookmakerOdds.toFixed(2)+' · Fair '+p.primary.fairOdds.toFixed(2)+'</div></div>':'<div class="predictionBox mutedPrediction"><div class="predictionLabel">PICK</div><div class="predictionPick">NO READABLE PICK</div></div>';
+    return '<article class="liveCard"><div class="liveTop"><span>'+esc(e.competition||e.product)+'</span><span>'+esc(e.start_time?date(e.start_time):'Time n/a')+'</span></div><div class="liveTeams"><strong>'+esc(e.home||e.participant_1||'Unknown player/team')+'</strong> <span>vs</span> <strong>'+esc(e.away||e.participant_2||'Unknown player/team')+'</strong></div>'+pick+'<div class="liveOdds">'+(chips||'<span class="liveMeta">No readable markets</span>')+'</div></article>';
+  }).join('');
+  $('liveGrid').innerHTML=list;
+  $('liveEmpty').hidden=!!list;
+  $('liveDot').className='liveDot '+(state.liveMode==='remote'?'':state.liveMode==='snapshot'?'wait':'bad');
+  $('liveTitle').textContent=state.liveMode==='remote'?'LIVE SOURCE ONLINE · UPCOMING ONLY':state.liveMode==='snapshot'?'SNAPSHOT FALLBACK · UPCOMING ONLY':'LIVE SOURCE UNAVAILABLE';
+  const counts={};events.forEach(e=>counts[e.product]=(counts[e.product]||0)+1);
+  $('liveMeta').textContent=(state.liveUpdated?'Feed timestamp '+date(state.liveUpdated)+' · ':'')+(Object.keys(counts).map(k=>k+': '+counts[k]).join(' · ')||'0 upcoming events');
 }
 function renderPredictionDesk(){
-  const host=$('predictionDesk'),count=$('predictionCount');
-  if(!host)return;
+  const host=$('predictionDesk');if(!host)return;
   const picks=state.picks.slice(0,40);
-  if(count)count.textContent=String(picks.length);
-  host.innerHTML=picks.length?picks.map((p,i)=>{
-    const winner=p.allMarkets.find(x=>x.marketType==='winner');
-    const ou=[...p.allMarkets.filter(x=>x.marketType==='ou')].sort((a,b)=>b.fairProb-a.fairProb)[0];
-    const rows=[winner,ou].filter(Boolean).map(x=>
-      '<div class="calcRow"><span>'+esc(x.marketType==='ou'?'O/U '+(x.market.line??'—'):'1X2')+'</span><b>'+esc(x.pickCode)+'</b><span>'+esc((x.fairProb*100).toFixed(1)+'%')+'</span><span>Fair '+esc(x.fairOdds.toFixed(2))+'</span><span>Book '+esc(x.bookmakerOdds.toFixed(2))+'</span></div>'
-    ).join('');
-    return '<article class="predictionCard"><div class="predictionHeader"><div><small>'+esc(p.product)+' · '+esc(p.competition)+'</small><h3>'+esc(p.home)+' <span>vs</span> '+esc(p.away)+'</h3></div><time>'+esc(p.start_time?date(p.start_time):'—')+'</time></div>'+
-      '<div class="primaryPick"><span>PRIMARY PICK</span><strong>'+esc(p.pickCode)+'</strong><b>'+esc((p.fairProb*100).toFixed(1)+'%')+'</b></div>'+
-      '<div class="calcTable"><div class="calcHead"><span>Market</span><span>Pick</span><span>Probability</span><span>Fair odds</span><span>SportyBet</span></div>'+rows+'</div>'+
-      '<div class="calcNote">'+esc(p.calculation)+' · No hidden RNG is inferred; this is the current market-implied baseline.</div>'+
-      '<button class="btn builderAdd" data-i="'+i+'">＋ Add to odds builder</button></article>';
-  }).join(''):'<div class="empty">No upcoming fixture currently has a readable 1X2 or O/U market.</div>';
-  host.querySelectorAll('.builderAdd').forEach(btn=>btn.addEventListener('click',()=>{
-    const p=picks[Number(btn.dataset.i)];
-    if(p&&!state.builder.some(x=>x.event_id===p.event_id)){
-      state.builder.push(p);
-      if(state.builder.length>4)state.builder.shift();
-      renderBuilder();
+  $('predictionCount').textContent=String(picks.length);
+  if(!picks.length){host.innerHTML='<div class="empty">No upcoming fixture currently has a readable 1X2 or O/U market.</div>';return;}
+  host.innerHTML=picks.map(function(p,i){
+    function row(x,label){
+      if(!x)return '<div class="calcRow"><span>'+label+'</span><b>—</b><span>—</span><span>—</span><span>—</span></div>';
+      return '<div class="calcRow"><span>'+label+(x.market.line!=null?' '+x.market.line:'')+'</span><b>'+esc(x.pickCode)+'</b><span>'+pct(x.fairProb)+'</span><span>Fair '+x.fairOdds.toFixed(2)+'</span><span>Book '+x.bookmakerOdds.toFixed(2)+'</span></div>';
     }
-  }));
+    return '<article class="predictionCard"><div class="predictionHeader"><div><small>'+esc(p.product)+' · '+esc(p.competition)+'</small><h3>'+esc(p.home)+' <span>vs</span> '+esc(p.away)+'</h3></div><time>'+esc(p.start_time?date(p.start_time):'—')+'</time></div><div class="primaryPick"><span>PRIMARY PICK</span><strong>'+esc(p.pickCode)+'</strong><b>'+pct(p.primary.fairProb)+'</b></div><div class="calcTable"><div class="calcHead"><span>Market</span><span>Pick</span><span>Probability</span><span>Fair odds</span><span>SportyBet</span></div>'+row(p.bestWinner,'1X2')+row(p.bestOU,'O/U')+'</div><div class="calcNote">De-vig probability = (1 / outcome odds) ÷ sum of all outcome implied probabilities. This is a live market baseline.</div><button class="btn builderAdd" data-pick="'+i+'">＋ Add to odds builder</button></article>';
+  }).join('');
+  host.querySelectorAll('.builderAdd').forEach(function(btn){btn.addEventListener('click',function(){const p=picks[Number(btn.dataset.pick)];if(p&&!state.builder.some(function(x){return x.event_id===p.event_id;})){state.builder.push(p);state.builder=state.builder.slice(-4);renderBuilder();}});});
+}
+function renderBuilder(){
+  const host=$('builderList'),summary=$('builderSummary');if(!host||!summary)return;
+  if(!state.builder.length){host.innerHTML='<div class="empty">Add upcoming predictions to build a 2–4 leg paper slip.</div>';summary.innerHTML='<span>0 legs</span>';return;}
+  const unique=[],seen={};
+  state.builder.forEach(function(p){if(!seen[p.event_id]){seen[p.event_id]=1;unique.push(p);}});state.builder=unique.slice(-4);
+  const combined=state.builder.reduce(function(a,p){return a*p.primary.bookmakerOdds;},1);
+  const fairCombined=state.builder.reduce(function(a,p){return a*p.primary.fairOdds;},1);
+  const baselineHit=state.builder.reduce(function(a,p){return a*p.primary.fairProb;},1);
+  host.innerHTML=state.builder.map(function(p,i){return '<div class="builderRow"><span class="builderPick">'+esc(p.pickCode)+'</span><span>'+esc(p.home+' vs '+p.away)+'</span><b>'+p.primary.bookmakerOdds.toFixed(2)+'</b><button class="btn removeLeg" data-i="'+i+'">×</button></div>';}).join('');
+  host.querySelectorAll('.removeLeg').forEach(function(btn){btn.addEventListener('click',function(){state.builder.splice(Number(btn.dataset.i),1);renderBuilder();});});
+  const ready=state.builder.length>=2;
+  summary.innerHTML='<span><b>'+state.builder.length+'</b> legs</span><span>Combined odds <b>'+combined.toFixed(2)+'</b></span><span>Baseline hit probability <b>'+pct(baselineHit)+'</b></span><span>Fair combined odds <b>'+fairCombined.toFixed(2)+'</b></span><strong class="'+(ready?'builderReady':'')+'">'+(ready?'READY · PAPER BUILDER':'ADD AT LEAST 2 LEGS')+'</strong>';
 }
 function autoBuild(){
-  const candidates=[...state.picks]
-    .filter(p=>p.bookmakerOdds>1&&p.fairProb>0)
-    .sort((a,b)=>b.fairProb-a.fairProb);
-  const chosen=[],events=new Set();
-  for(const p of candidates){
-    if(events.has(p.event_id))continue;
-    chosen.push(p);events.add(p.event_id);
-    if(chosen.length===4)break;
-  }
-  state.builder=chosen;
-  renderBuilder();
-  if($('oddsBuilder'))window.scrollTo({top:$('oddsBuilder').offsetTop-20,behavior:'smooth'});
+  const candidates=state.picks.slice().sort(function(a,b){return b.primary.fairProb-a.primary.fairProb;});
+  const chosen=[],seen={};
+  for(const p of candidates){if(chosen.length>=4||seen[p.event_id])continue;chosen.push(p);seen[p.event_id]=1;}
+  state.builder=chosen;renderBuilder();
 }
-
-function renderBuilder(){
-  const host=$('builderList'),summary=$('builderSummary');
-  if(!host||!summary)return;
-  if(!state.builder.length){
-    host.innerHTML='<div class="empty">Add upcoming predictions to build a 2–4 leg paper slip.</div>';
-    summary.innerHTML='<span>0 legs</span>';
-    return;
-  }
-  const combined=state.builder.reduce((a,p)=>a*p.bookmakerOdds,1);
-  const fairCombined=state.builder.reduce((a,p)=>a*p.fairOdds,1);
-  const hit=state.builder.reduce((a,p)=>a*p.fairProb,1);
-  host.innerHTML=state.builder.map((p,i)=>
-    '<div class="builderRow"><span class="builderPick">'+esc(p.pickCode)+'</span><span>'+esc(p.home+' vs '+p.away)+'</span><b>'+Number(p.bookmakerOdds).toFixed(2)+'</b><button class="btn removeLeg" data-i="'+i+'">×</button></div>'
-  ).join('');
-  host.querySelectorAll('.removeLeg').forEach(btn=>btn.addEventListener('click',()=>{
-    state.builder.splice(Number(btn.dataset.i),1);renderBuilder();
-  }));
-  const ready=state.builder.length>=2&&state.builder.length<=4;
-  summary.innerHTML='<span><b>'+state.builder.length+'</b> legs</span><span>Combined odds <b>'+combined.toFixed(2)+'</b></span><span>Baseline hit probability <b>'+((hit)*100).toFixed(1)+'%</b></span><span>Fair combined odds <b>'+fairCombined.toFixed(2)+'</b></span><strong class="'+(ready?'builderReady':'')+'">'+(ready?'READY · PAPER BUILDER':'ADD '+(state.builder.length<2?'AT LEAST 2 LEGS':'MAX 4 LEGS')+'</strong>';
-}
-
 
 function collectLiveFromBody(body){
   const data=body&&body.data||{};
@@ -480,7 +401,7 @@ async function loadLive(){
   button.disabled=true;
   try{
     const live=await fetchLiveRemote();
-    state.live=live.events;
+    state.live=upcomingEventsFrom(live.events);
     state.liveMode='remote';
     state.liveUpdated=live.updated_at;
     renderLive();
@@ -492,7 +413,8 @@ async function loadLive(){
       const snap=await fetchLiveSnapshot();
       const ageMs=snap.updated_at?Date.now()-new Date(snap.updated_at).getTime():Infinity;
       if(!snap.events.length)throw new Error('snapshot has zero events');
-      state.live=snap.events;
+      state.live=upcomingEventsFrom(snap.events);
+      if(!state.live.length)throw new Error('snapshot has no upcoming events');
       state.liveMode='snapshot';
       state.liveUpdated=snap.updated_at;
       renderLive();
@@ -507,13 +429,19 @@ async function loadLive(){
       state.live=[];
       state.liveMode='none';
       renderLive();
-      rebuildPredictionDesk();
       $('liveDot').className='liveDot bad';
       $('liveTitle').textContent='LIVE SOURCE UNAVAILABLE';
       $('liveMeta').textContent=remoteError.message+' · '+snapshotError.message;
       console.error('Virtual Lab live feed failed:',remoteError,snapshotError);
     }
   }finally{button.disabled=false}
+}
+
+function rebuildPredictionDesk(){
+  state.picks=upcomingEventsFrom(state.live).map(predictionForEvent).filter(Boolean);
+  const product=$('product').value;
+  if(product!=='all')state.picks=state.picks.filter(function(p){return p.product===product;});
+  renderPredictionDesk();renderBuilder();
 }
 
 function applyFilters(){
@@ -545,9 +473,9 @@ $('market').addEventListener('change',applyFilters);
 $('split').addEventListener('change',analyze);
 $('runStrategy').addEventListener('click',runStrategy);
 $('liveRefresh').addEventListener('click',loadLive);
-$('clear').addEventListener('click',()=>{state.rows=[];state.filtered=[];$('fileInput').value='';analyze();state.builder=[];renderBuilder()});
-$('autoBuild')?.addEventListener('click',autoBuild);
-$('clearBuilder')?.addEventListener('click',()=>{state.builder=[];renderBuilder()});
+$('autoBuild').addEventListener('click',autoBuild);
+$('clearBuilder').addEventListener('click',function(){state.builder=[];renderBuilder();});
+$('clear').addEventListener('click',()=>{state.rows=[];state.filtered=[];state.builder=[];$('fileInput').value='';analyze();renderBuilder()});
 
 analyze();
 loadLive();
