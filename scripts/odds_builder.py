@@ -1,12 +1,14 @@
-"""Build a guarded 3-4 selection accumulator for manual betting.
+"""Match Signal V6 market-calibrated value engine.
 
-Research-only: never places or shares/stakes a wager. The builder selects
-existing Match Signal paper candidates, keeps only fixtures that have not
-started, and calculates model fair odds plus a reference accumulator. Actual
-bookmaker odds are intentionally left for the user to verify manually.
+Research/paper-trading only. A candidate is eligible only when:
+- calibrated model probability clears the minimum threshold,
+- a fresh SportyBet price is actually present,
+- bookmaker margin is removed where a complete market is available,
+- model edge clears the V6 threshold,
+- data/price freshness and uncertainty gates pass,
+- correlated selections are not duplicated in the same accumulator.
 
-Daily mixed-build trigger marker: football is included whenever qualified;
-tennis fills remaining slots only when it independently passes the gate.
+No wager is placed and no 3-4 leg target is forced.
 """
 from __future__ import annotations
 import json, math
@@ -14,37 +16,80 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
-DATA=ROOT/'data'
-CANDIDATES=DATA/'selection_candidates.json'
-PREDICTIONS=DATA/'predictions.json'
-OUTPUT=DATA/'odds_builder.json'
-HISTORY=DATA/'prediction_history.json'
-MIN_LEGS,MAX_LEGS=3,4
+DATA=ROOT/"data"
+CANDIDATES=DATA/"selection_candidates.json"
+PREDICTIONS=DATA/"predictions.json"
+OUTPUT=DATA/"odds_builder.json"
+HISTORY=DATA/"prediction_history.json"
+
 MIN_PROB=0.60
+MIN_EDGE=0.025
+MAX_ODDS_AGE_SECONDS=900
+MAX_UNCERTAINTY=0.22
+MIN_DATA_QUALITY=0.70
+MIN_LEGS,MAX_LEGS=2,4
 
 
-def load(path,default):
-    try:return json.loads(path.read_text(encoding='utf-8'))
-    except (FileNotFoundError,json.JSONDecodeError):return default
+def load(path, default):
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError,json.JSONDecodeError):
+        return default
 
 
 def upcoming(x, now):
     try:
-        raw=x.get('start_time')
+        raw=x.get("start_time")
         if not raw:return False
-        dt=datetime.fromisoformat(str(raw).replace('Z','+00:00'))
+        dt=datetime.fromisoformat(str(raw).replace("Z","+00:00"))
         return dt.astimezone(timezone.utc)>now
-    except (TypeError,ValueError):return False
-
-
-def settled_event_ids():
-    raw=load(HISTORY,[])
-    if not isinstance(raw,list):return set()
-    return {str(x.get('event_id')) for x in raw if isinstance(x,dict) and x.get('settled') is True and x.get('event_id')}
+    except (TypeError,ValueError):
+        return False
 
 
 def fair_odds(p):
     return round(1.0/float(p),3) if float(p)>0 else 0.0
+
+
+def prob_value(x, *keys):
+    for key in keys:
+        try:
+            value=x.get(key)
+            if value is not None:return float(value)
+        except (TypeError,ValueError):
+            pass
+    return 0.0
+
+
+def data_quality(x):
+    q=x.get("data_quality")
+    if q is not None:
+        try:return max(0.0,min(1.0,float(q)))
+        except (TypeError,ValueError):pass
+    qobj=x.get("signal_quality") or {}
+    try:
+        components=float(qobj.get("components",0))
+        return min(1.0,components/5.0) if components else 0.75
+    except (TypeError,ValueError):
+        return 0.75
+
+
+def uncertainty(x,p):
+    explicit=x.get("uncertainty")
+    if explicit is not None:
+        try:return max(0.0,min(1.0,float(explicit)))
+        except (TypeError,ValueError):pass
+    # Conservative proxy when the model does not expose a dedicated uncertainty field.
+    return max(0.0,min(1.0,abs(0.5-float(p))*0.35))
+
+
+def odds_age(x):
+    try:
+        stamp=x.get("odds_timestamp")
+        if not stamp:return None
+        return max(0.0,(datetime.now(timezone.utc)-datetime.fromisoformat(str(stamp).replace("Z","+00:00"))).total_seconds())
+    except (TypeError,ValueError):
+        return None
 
 
 def football_candidates(now):
@@ -52,13 +97,13 @@ def football_candidates(now):
     out=[]
     if not isinstance(raw,list):return out
     for x in raw:
-        if not isinstance(x,dict) or x.get('candidate_status')!='SELECTED' or x.get('sport')!='football' or not upcoming(x,now):continue
-        probs=x.get('calibrated_probabilities') or x.get('probabilities') or {}
-        pick=x.get('pick')
-        try:p=float(probs.get(pick,x.get('calibrated_confidence',x.get('confidence',0))) or 0)
+        if not isinstance(x,dict) or x.get("candidate_status")!="SELECTED" or x.get("sport")!="football" or not upcoming(x,now):continue
+        probs=x.get("calibrated_probabilities") or x.get("probabilities") or {}
+        pick=x.get("pick")
+        try:p=float(probs.get(pick,x.get("calibrated_confidence",x.get("confidence",0))) or 0)
         except (TypeError,ValueError):continue
-        if p>=MIN_PROB and pick in {'p1','draw','p2'}:
-            out.append({**x,'builder_market':'1X2','builder_probability':p,'builder_pick':pick})
+        if p>=MIN_PROB and pick in {"p1","draw","p2"}:
+            out.append({**x,"builder_market":"1X2","builder_probability":p,"builder_pick":pick})
     return out
 
 
@@ -67,286 +112,177 @@ def tennis_candidates(now):
     out=[]
     if not isinstance(raw,list):return out
     for x in raw:
-        if not isinstance(x,dict) or x.get('sport')!='tennis' or not upcoming(x,now):continue
-        probs=x.get('calibrated_probabilities') or x.get('probabilities') or {}
-        pick=x.get('pick')
-        try:match_prob=float(probs.get(pick,x.get('calibrated_confidence',0)) or 0) if pick else 0.0
-        except (TypeError,ValueError):match_prob=0.0
-        total=(x.get('analytics') or {}).get('total_games') or {}
-        ou_pick=total.get('pick')
-        try:ou_prob=float(total.get('calibrated_'+ou_pick,total.get(ou_pick,0)) or 0) if ou_pick else 0.0
-        except (TypeError,ValueError):ou_prob=0.0
-        # Winner and Total Games are independent market candidates.
-        # Selection later prevents two correlated markets from the same event
-        # occupying separate accumulator slots.
-        if match_prob>=MIN_PROB and pick in {'p1','p2'}:
-            out.append({**x,'builder_market':'winner','builder_probability':match_prob,'builder_pick':pick})
-        if ou_pick in {'over','under'} and ou_prob>=MIN_PROB and total.get('line') is not None:
-            out.append({**x,'builder_market':'total_games','builder_probability':ou_prob,'builder_pick':ou_pick})
+        if not isinstance(x,dict) or x.get("sport")!="tennis" or not upcoming(x,now):continue
+        probs=x.get("calibrated_probabilities") or x.get("probabilities") or {}
+        pick=x.get("pick")
+        try:wp=float(probs.get(pick,x.get("calibrated_confidence",0)) or 0) if pick else 0.0
+        except (TypeError,ValueError):wp=0.0
+        total=(x.get("analytics") or {}).get("total_games") or {}
+        ou_pick=total.get("pick")
+        try:op=float(total.get("calibrated_"+ou_pick,total.get(ou_pick,0)) or 0) if ou_pick else 0.0
+        except (TypeError,ValueError):op=0.0
+        if wp>=MIN_PROB and pick in {"p1","p2"}:
+            out.append({**x,"builder_market":"winner","builder_probability":wp,"builder_pick":pick})
+        if ou_pick in {"over","under"} and op>=MIN_PROB and total.get("line") is not None:
+            out.append({**x,"builder_market":"total_games","builder_probability":op,"builder_pick":ou_pick})
     return out
 
 
-def selected_market_price(x):
-    sport=x.get('sport')
-    market=x.get('builder_market')
-    pick=x.get('builder_pick')
-    if market=='total_games':
-        total=x.get('analytics',{}).get('total_games',{}) or {}
-        line=float(total.get('line')) if total.get('line') is not None else None
-        rows=x.get('sportybet_total_games_odds') or []
-        for row in rows:
-            try:
-                row_line=float(row.get('line')) if row.get('line') is not None else None
-                # SportyBet specifiers such as total=17.5 are normalized by the
-                # market sync to the numeric line 17.5. Match that exact line.
-                if line is not None and row_line is not None and abs(row_line-line)<1e-9 and row.get('side')==pick:
-                    return float(row.get('odds'))
-            except (TypeError,ValueError):
-                continue
-        return None
-    snap=x.get('sportybet_winner_odds') or {}
-    try:
-        if pick in {'p1','p2'} and snap.get(pick) is not None:
-            return float(snap[pick])
-        if sport=='football' and pick=='draw' and snap.get('draw') is not None:
-            return float(snap['draw'])
-    except (TypeError,ValueError):
-        pass
-    return None
+def market_rows(x):
+    market=x.get("builder_market")
+    if market=="total_games":
+        total=(x.get("analytics") or {}).get("total_games") or {}
+        line=float(total.get("line")) if total.get("line") is not None else None
+        rows=x.get("sportybet_total_games_odds") or []
+        return [r for r in rows if isinstance(r,dict) and line is not None and r.get("line") is not None and abs(float(r.get("line"))-line)<1e-9]
+    snap=x.get("sportybet_winner_odds") or {}
+    if isinstance(snap,dict):
+        return [{"side":k,"odds":v} for k,v in snap.items() if k in {"p1","p2","draw"} and v is not None]
+    return []
+
+
+def selected_price_and_devig(x):
+    rows=market_rows(x)
+    pick=x.get("builder_pick")
+    selected=None
+    inv=[]
+    for row in rows:
+        try:
+            odds=float(row.get("odds"))
+            if odds<=1:continue
+            inv.append((row.get("side"),1.0/odds))
+            if row.get("side")==pick:selected=odds
+        except (TypeError,ValueError):
+            continue
+    if selected is None:return None,None,None,False
+    total=sum(v for _,v in inv)
+    if total<=0:return selected,1.0/selected,None,False
+    devig=next((v/total for side,v in inv if side==pick),None)
+    complete=(len(inv)>=2 if x.get("builder_market")=="total_games" else len(inv)>=2)
+    return selected,1.0/selected,devig,complete
 
 
 def make_leg(x):
-    p=float(x['builder_probability'])
-    reference=fair_odds(p)
-    bookmaker_odds=selected_market_price(x)
-    market_implied=(1.0/bookmaker_odds) if bookmaker_odds and bookmaker_odds>0 else None
-    edge=(p-market_implied) if market_implied is not None else None
-    odds_age_seconds=None
-    try:
-        stamp=x.get('odds_timestamp')
-        if stamp:
-            odds_age_seconds=max(0,(datetime.now(timezone.utc)-datetime.fromisoformat(str(stamp).replace('Z','+00:00'))).total_seconds())
-    except (TypeError,ValueError):
-        pass
-    if x.get('sport')=='tennis':
-        if x.get('builder_market')=='total_games':
-            total=x.get('analytics',{}).get('total_games',{})
+    p=float(x["builder_probability"])
+    bookmaker,implied,devig,complete=selected_price_and_devig(x)
+    age=odds_age(x)
+    quality=data_quality(x)
+    uncert=uncertainty(x,p)
+    market_prob=devig if complete and devig is not None else implied
+    edge=(p-market_prob) if market_prob is not None else None
+    ev=((p*bookmaker)-1.0) if bookmaker is not None else None
+    eligible=(
+        bookmaker is not None and
+        edge is not None and edge>=MIN_EDGE and
+        age is not None and age<=MAX_ODDS_AGE_SECONDS and
+        quality>=MIN_DATA_QUALITY and uncert<=MAX_UNCERTAINTY
+    )
+    if x.get("sport")=="tennis":
+        if x.get("builder_market")=="total_games":
+            total=(x.get("analytics") or {}).get("total_games") or {}
             market=f"Total Games {x.get('builder_pick')} {total.get('line')}"
-            pick=f"{x.get('player_1')} vs {x.get('player_2')} — {market}"
         else:
-            pick=f"{x.get('player_1')} vs {x.get('player_2')} — {x.get('builder_pick')}"
-        return {
-            'sport':'tennis','competition':x.get('league'),'event_id':x.get('event_id'),
-            'start_time':x.get('start_time'),'match':f"{x.get('player_1')} vs {x.get('player_2')}",
-            'market':x.get('builder_market'),'pick':pick,'model_probability':round(p,6),
-            'model_fair_odds':reference,
-            'source':x.get('model'),'decision':x.get('decision','PAPER ONLY'),
-            'bookmaker_odds':round(bookmaker_odds,3) if bookmaker_odds else None,
-            'market_implied_probability':round(market_implied,6) if market_implied is not None else None,
-            'model_edge':round(edge,6) if edge is not None else None,
-            'market_source':x.get('market_source'),
-            'market_odds_timestamp':x.get('odds_timestamp'),
-            'market_odds_age_seconds':round(odds_age_seconds,1) if odds_age_seconds is not None else None
-        }
+            market=f"Winner {x.get('builder_pick')}"
+        match=f"{x.get('player_1')} vs {x.get('player_2')}"
+        pick=f"{match} — {market}"
+    else:
+        match=f"{x.get('home_team')} vs {x.get('away_team')}"
+        pick=x.get("builder_pick")
     return {
-        'sport':'football','competition':x.get('league'),'event_id':x.get('event_id'),
-        'start_time':x.get('start_time'),'match':f"{x.get('home_team')} vs {x.get('away_team')}",
-        'market':'1X2','pick':x.get('builder_pick'),'model_probability':round(p,6),
-        'model_fair_odds':reference,
-        'source':x.get('model'),'decision':x.get('decision','PAPER ONLY'),
-        'bookmaker_odds':round(bookmaker_odds,3) if bookmaker_odds else None,
-        'market_implied_probability':round(market_implied,6) if market_implied is not None else None,
-        'model_edge':round(edge,6) if edge is not None else None,
-        'market_source':x.get('market_source'),
-        'market_odds_timestamp':x.get('odds_timestamp'),
-        'market_odds_age_seconds':round(odds_age_seconds,1) if odds_age_seconds is not None else None
+        "sport":x.get("sport"),"competition":x.get("league"),"event_id":x.get("event_id"),
+        "start_time":x.get("start_time"),"match":match,"market":x.get("builder_market"),
+        "pick":pick,"model_probability":round(p,6),"model_fair_odds":fair_odds(p),
+        "bookmaker_odds":round(bookmaker,3) if bookmaker is not None else None,
+        "market_implied_probability":round(implied,6) if implied is not None else None,
+        "de_vig_probability":round(devig,6) if devig is not None else None,
+        "model_edge":round(edge,6) if edge is not None else None,
+        "expected_value":round(ev,6) if ev is not None else None,
+        "edge_percent":round(edge*100,2) if edge is not None else None,
+        "odds_fresh":bool(age is not None and age<=MAX_ODDS_AGE_SECONDS),
+        "market_odds_age_seconds":round(age,1) if age is not None else None,
+        "data_quality":round(quality,3),"uncertainty":round(uncert,3),
+        "market_complete":complete,"real_money_eligible":eligible,
+        "status":"LIVE_VALUE" if eligible else ("STALE" if age is not None and age>MAX_ODDS_AGE_SECONDS else "REJECTED"),
+        "source":x.get("model"),"market_source":x.get("market_source"),
+        "market_odds_timestamp":x.get("odds_timestamp")
     }
 
 
-def recent_settled_legs(history, now, known_ids):
-    """Return recently settled high-confidence tennis O/U selections for result visibility.
+def select_value(candidates):
+    built=[make_leg(x) for x in candidates]
+    eligible=[x for x in built if x["real_money_eligible"]]
+    eligible.sort(key=lambda x:(x.get("model_edge") or -1,x.get("model_probability") or 0),reverse=True)
+    selected=[];events=set()
+    for leg in eligible:
+        eid=str(leg.get("event_id") or "")
+        if eid and eid in events:continue
+        selected.append(leg)
+        if eid:events.add(eid)
+        if len(selected)>=MAX_LEGS:break
+    return selected,built
 
-    These are displayed separately from the active 3-4 selection set so a completed
-    leg cannot disappear without a visible WON/LOST result when the daily odds set
-    refreshes. The list is bounded to today's settled model selections.
-    """
-    if not isinstance(history, list):
-        return []
-    known_ids = {str(x) for x in (known_ids or set())}
-    today = now.date().isoformat()
-    out = []
+
+def recent_settled(history,now,known):
+    if not isinstance(history,list):return []
+    today=now.date().isoformat();out=[]
     for x in history:
-        if not isinstance(x, dict) or not x.get('settled') or str(x.get('event_id') or '') not in known_ids or str(x.get('start_time',''))[:10] != today:
-            continue
-        if x.get('sport') != 'tennis':
-            continue
-        p1_name = str(x.get('player_1') or '').strip()
-        p2_name = str(x.get('player_2') or '').strip()
-        generic = {'', 'player 1', 'player 2', 'tbd', 'tba', 'unknown', 'unknown player', 'team 1', 'team 2'}
-        if p1_name.lower() in generic or p2_name.lower() in generic or len(p1_name) < 3 or len(p2_name) < 3:
-            continue
-        total = (x.get('analytics') or {}).get('total_games') or {}
-        ou_pick = total.get('pick')
-        if ou_pick not in {'over','under'} or total.get('line') is None:
-            continue
-        try:
-            probability = float(total.get('calibrated_'+ou_pick, total.get(ou_pick, 0)) or 0)
-        except (TypeError, ValueError):
-            continue
-        if probability < MIN_PROB:
-            continue
-        actual_markets = x.get('actual_markets') or {}
-        correct = actual_markets.get('total_games_correct')
+        if not isinstance(x,dict) or not x.get("settled") or str(x.get("event_id") or "") not in known or str(x.get("start_time",""))[:10]!=today or x.get("sport")!="tennis":continue
+        total=(x.get("analytics") or {}).get("total_games") or {}; pick=total.get("pick")
+        if pick not in {"over","under"} or total.get("line") is None:continue
+        try:p=float(total.get("calibrated_"+pick,total.get(pick,0)) or 0)
+        except (TypeError,ValueError):continue
+        if p<MIN_PROB:continue
+        actual=x.get("actual_markets") or {}; correct=actual.get("total_games_correct")
         if correct is None:
-            result = actual_markets.get('total_games_result')
-            correct = (result == ou_pick) if result in {'over','under'} else x.get('correct')
-        if not isinstance(correct, bool):
-            continue
-        out.append({
-            'sport': 'tennis',
-            'competition': x.get('league'),
-            'event_id': x.get('event_id'),
-            'start_time': x.get('start_time'),
-            'match': f"{x.get('player_1')} vs {x.get('player_2')}",
-            'market': 'total_games',
-            'pick': f"{x.get('player_1')} vs {x.get('player_2')} — Total Games {ou_pick} {total.get('line')}",
-            'model_probability': round(probability, 6),
-            'model_fair_odds': fair_odds(probability),
-            'source': x.get('model'),
-            'decision': 'PAPER ONLY',
-            'settlement': {'finished': True, 'correct': bool(correct)},
-            'final_score': x.get('final_score'),
-            'actual_markets': actual_markets,
-            'settled_at': x.get('settled_at'),
-        })
-    out.sort(key=lambda x: str(x.get('settled_at') or ''), reverse=True)
+            result=actual.get("total_games_result");correct=(result==pick) if result in {"over","under"} else x.get("correct")
+        if not isinstance(correct,bool):continue
+        out.append({"sport":"tennis","competition":x.get("league"),"event_id":x.get("event_id"),
+                    "start_time":x.get("start_time"),"match":f"{x.get('player_1')} vs {x.get('player_2')}",
+                    "market":"total_games","pick":f"{x.get('player_1')} vs {x.get('player_2')} — Total Games {pick} {total.get('line')}",
+                    "model_probability":round(p,6),"model_fair_odds":fair_odds(p),
+                    "settlement":{"finished":True,"correct":bool(correct)},"final_score":x.get("final_score"),
+                    "actual_markets":actual,"settled_at":x.get("settled_at")})
+    out.sort(key=lambda x:str(x.get("settled_at") or ""),reverse=True)
     return out[:4]
-
-
-def select_mixed(football, tennis):
-    """Prefer a mixed set when qualified football exists, without forcing it.
-
-    At least one qualified football leg is reserved when available. Up to two
-    football legs can be included; the remaining slots are filled by the
-    strongest eligible candidates across both sports. If no football passes
-    the existing gate, tennis can fill the set normally.
-    """
-    football=sorted(football,key=lambda x:float(x.get('builder_probability',0) or 0),reverse=True)
-    tennis=sorted(tennis,key=lambda x:float(x.get('builder_probability',0) or 0),reverse=True)
-    all_candidates=football+tennis
-    all_candidates.sort(key=lambda x:float(x.get('builder_probability',0) or 0),reverse=True)
-
-    selected=[]
-    selected_events=set()
-    if football:
-        selected.append(football[0])
-        selected_events.add(str(football[0].get('event_id') or ''))
-        if len(football)>1 and MAX_LEGS >= 4:
-            selected.append(football[1])
-            selected_events.add(str(football[1].get('event_id') or ''))
-
-    for candidate in all_candidates:
-        if len(selected)>=MAX_LEGS:
-            break
-        if candidate in selected:
-            continue
-        # Avoid two correlated markets from the same match in one accumulator.
-        eid=str(candidate.get('event_id') or '')
-        if eid and eid in selected_events:
-            continue
-        selected.append(candidate)
-        if eid:
-            selected_events.add(eid)
-    return selected
 
 
 def main():
     now=datetime.now(timezone.utc)
-    football=football_candidates(now)
-    tennis=tennis_candidates(now)
-    fresh=[make_leg(x) for x in select_mixed(football,tennis)]
-    settled_ids=settled_event_ids()
+    football=football_candidates(now); tennis=tennis_candidates(now)
+    selected,built=select_value(football+tennis)
     previous=load(OUTPUT,{})
-    previous_qualified = previous.get('qualified_legs', []) if isinstance(previous, dict) else []
-    previous_ids = previous.get('builder_event_ids', []) if isinstance(previous, dict) else []
-    # One-time migration anchors the two Odds Builder selections already demonstrated
-    # in the user's settled ticket; future selections are tracked automatically.
-    known_builder_ids = {str(x) for x in previous_ids if x}
-    known_builder_ids.update({str(x.get('event_id')) for x in previous_qualified if isinstance(x, dict) and x.get('event_id')})
-    known_builder_ids.update({'183724','183769'})
-    settled_legs=recent_settled_legs(load(HISTORY,[]), now, known_builder_ids)
-    retained=[]
-    if isinstance(previous,dict):
-        for leg in previous.get('qualified_legs',[]):
-            if not isinstance(leg,dict) or not leg.get('event_id'):continue
-            if str(leg.get('event_id')) in settled_ids:continue
-            try:started=datetime.fromisoformat(str(leg.get('start_time')).replace('Z','+00:00')).astimezone(timezone.utc)<=now
-            except (TypeError,ValueError):started=False
-            if started:retained.append(leg)
-    selected=[]
-    seen=set()
-    for leg in retained+fresh:
-        eid=str(leg.get('event_id') or '')
-        if not eid or eid in seen:continue
-        selected.append(leg);seen.add(eid)
-        if len(selected)>=MAX_LEGS:break
-    sports=sorted({x['sport'] for x in selected})
-    if {'football','tennis'} <= set(sports):
-        selection_status='MIXED_QUALIFIED_ACCUMULATOR'
-    elif len(selected)>=MIN_LEGS:
-        selection_status='QUALIFIED_ACCUMULATOR'
-    else:
-        selection_status='NO_3_LEG_QUALIFIED_SET'
-
+    previous_ids={str(x) for x in (previous.get("builder_event_ids",[]) if isinstance(previous,dict) else []) if x}
+    previous_ids.update(str(x.get("event_id")) for x in (previous.get("qualified_legs",[]) if isinstance(previous,dict) else []) if isinstance(x,dict) and x.get("event_id"))
+    known=previous_ids|{"183724","183769"}
+    settled_ids={str(x.get("event_id")) for x in load(HISTORY,[]) if isinstance(x,dict) and x.get("settled") and x.get("event_id")}
+    selected=[x for x in selected if str(x.get("event_id")) not in settled_ids]
+    sports=sorted({x["sport"] for x in selected})
+    status="LIVE_VALUE_SET" if len(selected)>=MIN_LEGS else ("SINGLE_LIVE_VALUE" if selected else "NO_BET")
     result={
-        'generated_at':now.isoformat(),
-        'mode':'PAPER_ONLY',
-        'target_legs':'3-4',
-        'sports_supported':['football','tennis'],
-        'selection_policy':{
-            'min_calibrated_probability':MIN_PROB,
-            'requires_existing_research_gate_for_football':True,
-            'requires_historical_calibration_threshold_for_tennis':True,
-            'upcoming_fixture_only':True,
-            'retain_started_legs_until_settled':True,
-            'daily_automated_build':True,
-            'mix_qualified_football_when_available':True,
-            'football_reserved_slots':1,
-            'football_max_slots':2,
-            'public_prediction_feed_unchanged':True,
-            'historical_calibration_enabled':True,
-            'settled_history_used_for_calibration':True,
-            'raw_probabilities_not_used_for_qualification':True
-        },
-        'bookmaker_odds':{
-            'status':'LIVE_SPORTYBET_SNAPSHOT',
-            'sportybet_direct_feed':'VIA_CLOUDFLARE_PROXY',
-            'stake_direct_feed':'NOT_CONNECTED',
-            'instruction':'SportyBet prices shown below are the latest synchronized snapshot; recheck the displayed price in SportyBet before placing any wager.'
-        },
-        'candidates_considered':{'football':len(football),'tennis':len(tennis)},
-        'qualified_legs':selected,
-        'settled_legs':settled_legs,
-        'builder_event_ids':sorted(known_builder_ids),
-        'leg_count':len(selected),
-        'sports_selected':sports,
-        'status':selection_status,
-        'reference_combined_odds':round(math.prod(x['model_fair_odds'] for x in selected),3) if selected else None,
-        'reference_odds_type':'MODEL_FAIR_ODDS_NOT_BOOKMAKER_PRICE',
-        'actual_combined_odds':None,
-        'market_price_combined_odds':round(math.prod(float(x.get('bookmaker_odds')) for x in selected),3) if selected and all(x.get('bookmaker_odds') is not None for x in selected) else None,
-        'notes':[
-            'Booking/share-code generation has been removed.',
-            'The user manually builds the accumulator on SportyBet or Stake.',
-            'Reference combined odds are the product of 1/model-probability and are NOT a quoted bookmaker price.',
-            'New started fixtures are excluded from fresh selection, but previously qualified legs are retained until explicit settlement.',
-            'When qualified football exists, at least one football selection is reserved and up to two may be included.',
-            'No accumulator is forced when fewer than three selections pass the existing research threshold.',
-            'Recently settled model selections remain visible separately with their confirmed WON/LOST result; they are not part of the active accumulator.'
-        ]
+        "generated_at":now.isoformat(),"engine_version":"V6.0-MARKET-CALIBRATED",
+        "mode":"PAPER_ONLY","target_legs":"2-4","sports_supported":["football","tennis"],
+        "selection_policy":{"min_calibrated_probability":MIN_PROB,"min_model_edge":MIN_EDGE,
+            "max_odds_age_seconds":MAX_ODDS_AGE_SECONDS,"max_uncertainty":MAX_UNCERTAINTY,
+            "min_data_quality":MIN_DATA_QUALITY,"requires_live_sportybet_price":True,
+            "requires_complete_market_for_devig":True,"avoid_same_event_correlation":True,
+            "never_force_accumulator":True,"real_money_execution":False},
+        "bookmaker_odds":{"status":"LIVE_SPORTYBET_SNAPSHOT","sportybet_direct_feed":"VIA_CLOUDFLARE_PROXY",
+            "stake_direct_feed":"NOT_CONNECTED","instruction":"Verify the displayed SportyBet price immediately before any manual wager."},
+        "candidates_considered":{"football":len(football),"tennis":len(tennis),"all_built":len(built)},
+        "qualified_legs":selected,
+        "rejected_candidates":[x for x in built if not x["real_money_eligible"]][:20],
+        "settled_legs":recent_settled(load(HISTORY,[]),now,known),
+        "builder_event_ids":sorted(known),"leg_count":len(selected),"sports_selected":sports,
+        "status":status,
+        "reference_combined_odds":round(math.prod(x["model_fair_odds"] for x in selected),3) if selected else None,
+        "reference_odds_type":"MODEL_FAIR_ODDS_NOT_BOOKMAKER_PRICE",
+        "market_price_combined_odds":round(math.prod(x["bookmaker_odds"] for x in selected),3) if selected and all(x.get("bookmaker_odds") is not None for x in selected) else None,
+        "theme":{"name":"Midnight Graphite / Electric Cyan / Signal Green","accent":"#28D7E8","positive":"#35D07F","background":"#080D14"},
+        "notes":["V6 qualifies on market edge, not probability alone.","Missing or stale SportyBet prices produce NO_BET/REJECTED.","Model fair odds never overwrite bookmaker odds.","Accumulator size is allowed to fall below four and is never padded with weak selections.","Paper-only until V6 demonstrates stable calibration, edge and closing-line value over a meaningful sample."]
     }
-    OUTPUT.write_text(json.dumps(result,indent=2,ensure_ascii=False)+'\n',encoding='utf-8')
+    OUTPUT.write_text(json.dumps(result,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
     print(json.dumps(result,indent=2))
 
 
-if __name__=='__main__':main()
+if __name__=="__main__":
+    main()
