@@ -24,6 +24,7 @@ on:
       - 'expansion-odds-builder.js'
       - 'live-model-trace.js'
       - 'virtual-lab.html'
+      - 'research.html'
       - 'virtual-lab.js'
       - 'virtual-lab.css'
       - 'virtual-lab/**'
@@ -127,7 +128,7 @@ jobs:
         run: |
           node --input-type=module <<'NODE'
           const base = 'https://match-signal.pages.dev';
-          const pages = ['/', '/expansion.html', '/live.html', '/basketball.html', '/performance.html', '/virtual-lab.html', '/virtual-lab', '/virtual-lab/'];
+          const pages = ['/', '/expansion.html', '/live.html', '/basketball.html', '/performance.html', '/research.html'];
           const assets = ['/expansion.js', '/expansion-odds-builder.js', '/live-analysis.js', '/live-data-worker.js', '/virtual-lab.js', '/virtual-lab.css', '/_redirects', '/data/predictions.json', '/data/expansion_status.json', '/data/odds_builder.json'];
           const failures = [];
           async function get(path) {
