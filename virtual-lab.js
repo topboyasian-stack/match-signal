@@ -2,7 +2,7 @@
 (function(){
 'use strict';
 
-const LIVE_API='https://match-signal.pages.dev/api/sportybet';
+const LIVE_API='https://match-signal.pages.dev/api/sportybet-virtual';
 const LIVE_MARKETS='1,18,10,29,11,26,36,14,60100,186,189,202,204,210';
 const SNAPSHOT='./data/virtual_lab_live.json';
 const LIVE_REFRESH_MS=30000;
@@ -283,28 +283,24 @@ function collectLiveFromBody(body){
 }
 
 async function fetchLiveRemote(){
-  const all=[];
-  for(let page=1;page<=5;page++){
-    const params=new URLSearchParams({
-      sportId:'sr:sport:1',
-      marketId:LIVE_MARKETS,
-      pageSize:'100',
-      pageNum:String(page),
-      todayGames:'false',
-      timeline:'168',
-      _t:String(Date.now())
-    });
-    const r=await fetch(LIVE_API+'?'+params.toString(),{cache:'no-store'});
-    if(!r.ok)throw new Error('Live SportyBet proxy HTTP '+r.status);
-    const body=await r.json();
-    const batch=collectLiveFromBody(body);
-    all.push(...batch);
-    if(batch.length===0&&page>1)break;
-  }
-  const dedup=new Map(all.map(e=>[e.event_id,e]));
-  return [...dedup.values()];
+  const params=new URLSearchParams({pageSize:'100',pageNum:'1',timeline:'168',sources:'efootball,srl,vfootball'});
+  const r=await fetch(LIVE_API+'?'+params.toString(),{cache:'no-store'});
+  if(!r.ok)throw new Error('Live virtual source HTTP '+r.status);
+  const body=await r.json();
+  if(body?.ok===false)throw new Error(body.error||'Live virtual source returned an error');
+  const events=Array.isArray(body?.events)?body.events:[];
+  return events.map(e=>({
+    product:String(e.product||'other'),
+    competition:String(e.tournament||'Unclassified'),
+    category:String(e.category||''),
+    event_id:String(e.event_id||''),
+    home:String(e.participant_1||''),
+    away:String(e.participant_2||''),
+    start_time:e.start_time_ms!=null?new Date(Number(e.start_time_ms)).toISOString():(e.start_time||null),
+    match_status:e.match_status,
+    markets:Array.isArray(e.markets)?e.markets:[]
+  })).filter(e=>e.event_id);
 }
-
 async function fetchLiveSnapshot(){
   const r=await fetch(SNAPSHOT,{cache:'no-store'});
   if(!r.ok)throw new Error('Live snapshot HTTP '+r.status);
