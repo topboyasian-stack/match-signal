@@ -342,6 +342,266 @@ def score(event):
     return None
 
 
+# ---------- Public settlement fallbacks ----------
+
+from difflib import SequenceMatcher
+import re
+import unicodedata
+
+FOREBET_URLS = [
+    "https://www.forebet.com/en/esoccer/predictions-for-today",
+    "https://www.forebet.com/en/esoccer/predictions-from-yesterday",
+]
+ESTAVE_BASE = "https://cms6.e-stave.com/Live/Rezultati/Default.aspx"
+
+DATE_RE = re.compile(r"(?P<date>\d{2}[./]\d{2}[./]\d{4})\s+(?P<time>\d{2}:\d{2})")
+FT_RE = re.compile(r"\bFT\b", re.I)
+SCORE_RE = re.compile(r"(?<!\d)(\d{1,2})\s*[-:]\s*(\d{1,2})(?!\d)")
+ESTAVE_SCORE_RE = re.compile(r"\)\s*(\d{1,2})\s*:\s*(\d{1,2})\s*$")
+
+
+def clean_text_lines(html_text):
+    from bs4 import BeautifulSoup
+    soup = BeautifulSoup(html_text, "html.parser")
+    return [
+        re.sub(r"\s+", " ", line).strip()
+        for line in soup.get_text("\n").splitlines()
+        if line.strip()
+    ]
+
+
+def norm_name(value):
+    text = unicodedata.normalize("NFKD", str(value or "")).encode("ascii", "ignore").decode("ascii")
+    text = text.lower().replace("&", " and ")
+    text = re.sub(r"[^a-z0-9]+", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def participant_similarity(target, context):
+    target_n = norm_name(target)
+    context_n = norm_name(context)
+    if not target_n:
+        return 0.0
+    if target_n in context_n:
+        return 1.0
+    target_tokens = set(target_n.split())
+    context_tokens = set(context_n.split())
+    if not target_tokens:
+        return 0.0
+    overlap = len(target_tokens & context_tokens) / len(target_tokens)
+    return max(overlap, SequenceMatcher(None, target_n, context_n).ratio() * 0.65)
+
+
+def parse_score_after_ft(lines, index):
+    for offset in range(1, 22):
+        if index + offset >= len(lines):
+            break
+        line = lines[index + offset]
+        if FT_RE.search(line):
+            for inner in range(1, 6):
+                if index + offset + inner >= len(lines):
+                    break
+                candidate = lines[index + offset + inner]
+                match = SCORE_RE.fullmatch(candidate.strip())
+                if match:
+                    return float(match.group(1)), float(match.group(2))
+    return None
+
+
+def parse_forebet_records(html_text):
+    lines = clean_text_lines(html_text)
+    records = []
+    for i, line in enumerate(lines):
+        match = DATE_RE.search(line)
+        if not match:
+            continue
+        score = parse_score_after_ft(lines, i)
+        if score is None:
+            continue
+        context = " ".join(lines[max(0, i - 7):min(len(lines), i + 3)])
+        if "E12" not in context and "GT Leagues" not in context:
+            continue
+        try:
+            dt = datetime.strptime(
+                f"{match.group('date').replace('.', '/') } {match.group('time')}",
+                "%d/%m/%Y %H:%M",
+            ).replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+        records.append({
+            "source": "Forebet Esoccer public results",
+            "product": "efootball_gt",
+            "timestamp_ms": int(dt.timestamp() * 1000),
+            "context": context,
+            "home_score": score[0],
+            "away_score": score[1],
+        })
+    return records
+
+
+def estave_date_urls(day):
+    date_text = day.strftime("%d.%m.%Y")
+    # Try the common ASP.NET date parameter plus the no-query current page.
+    urls = [
+        ESTAVE_BASE,
+        ESTAVE_BASE + "?d=" + date_text,
+    ]
+    return list(dict.fromkeys(urls))
+
+
+def parse_estave_records(html_text):
+    lines = clean_text_lines(html_text)
+    records = []
+    section = None
+    for i, line in enumerate(lines):
+        lowered = line.lower()
+        if "e-nogomet" in lowered and "eadriatic" in lowered:
+            section = "efootball_adriatic"
+        elif "e-nogomet" in lowered and ("gt sports" in lowered or "gt leagues" in lowered):
+            section = "efootball_gt"
+        elif "e-nogomet" in lowered and ("srl" in lowered or "simulated reality" in lowered):
+            section = "srl"
+
+        match = DATE_RE.search(line)
+        if not match or section is None:
+            continue
+
+        score = None
+        for offset in range(1, 5):
+            if i + offset >= len(lines):
+                break
+            candidate = lines[i + offset]
+            score_match = ESTAVE_SCORE_RE.search(candidate)
+            if score_match:
+                score = (float(score_match.group(1)), float(score_match.group(2)))
+                break
+        if score is None:
+            continue
+        context = " ".join(lines[max(0, i - 5):min(len(lines), i + 4)])
+        try:
+            dt = datetime.strptime(
+                f"{match.group('date').replace('.', '/') } {match.group('time')}",
+                "%d/%m/%Y %H:%M",
+            ).replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+        records.append({
+            "source": "e-stave public results mirror",
+            "product": section,
+            "timestamp_ms": int(dt.timestamp() * 1000),
+            "context": context,
+            "home_score": score[0],
+            "away_score": score[1],
+        })
+    return records
+
+
+def fetch_public_result_records(start_days):
+    records = []
+    errors = []
+    session = requests.Session()
+    session.headers.update({
+        "User-Agent": "Mozilla/5.0 (MatchSignal Virtual Lab research collector)",
+        "Accept": "text/html,application/xhtml+xml",
+    })
+
+    for url in FOREBET_URLS:
+        try:
+            response = session.get(url, timeout=30)
+            response.raise_for_status()
+            records.extend(parse_forebet_records(response.text))
+        except Exception as exc:
+            errors.append(f"Forebet {url}: {exc}")
+
+    # Query e-stave for the pending-event dates plus the previous day.
+    days = set()
+    for value in start_days:
+        try:
+            dt = datetime.fromtimestamp(float(value) / 1000, timezone.utc)
+            days.add(dt.date())
+            days.add((dt - timedelta(days=1)).date())
+        except Exception:
+            continue
+    if not days:
+        days.add(datetime.now(timezone.utc).date())
+
+    fetched_urls = set()
+    for day in sorted(days):
+        for url in estave_date_urls(day):
+            if url in fetched_urls:
+                continue
+            fetched_urls.add(url)
+            try:
+                response = session.get(url, timeout=30)
+                response.raise_for_status()
+                records.extend(parse_estave_records(response.text))
+            except Exception as exc:
+                errors.append(f"e-stave {url}: {exc}")
+
+    # Stable de-duplication of identical observations.
+    seen = set()
+    unique = []
+    for row in records:
+        key = (
+            row["source"],
+            row["product"],
+            row["timestamp_ms"],
+            row["context"],
+            row["home_score"],
+            row["away_score"],
+        )
+        if key not in seen:
+            seen.add(key)
+            unique.append(row)
+    return unique, errors
+
+
+def public_matches_for_item(item, records):
+    product = str(item.get("product") or "")
+    start = num(item.get("start_time_ms"))
+    if start is None:
+        return []
+    candidates = []
+    for row in records:
+        if row.get("product") != product:
+            continue
+        delta = abs(float(row.get("timestamp_ms") or 0) - start)
+        if delta > 90 * 60 * 1000:
+            continue
+        context = str(row.get("context") or "")
+        home_score = participant_similarity(item.get("participant_1"), context)
+        away_score = participant_similarity(item.get("participant_2"), context)
+        if home_score < 0.72 or away_score < 0.72:
+            continue
+        # Exact player-tagged fixture matches receive the strongest score.
+        exact = 2.0 if (
+            norm_name(item.get("participant_1")) in norm_name(context)
+            and norm_name(item.get("participant_2")) in norm_name(context)
+        ) else 0.0
+        candidates.append((
+            exact + home_score + away_score - delta / (90 * 60 * 1000),
+            row,
+        ))
+    candidates.sort(key=lambda x: x[0], reverse=True)
+    return candidates[:5]
+
+
+def resolve_public_score(item, records):
+    matches = public_matches_for_item(item, records)
+    if not matches:
+        return None, None, 0
+    top_score = matches[0][0]
+    top = [row for ranking, row in matches if ranking >= top_score - 0.10]
+    unique_scores = {
+        (float(row["home_score"]), float(row["away_score"]))
+        for row in top
+    }
+    if len(unique_scores) != 1:
+        return None, "public_result_conflict", len(matches)
+    row = top[0]
+    return (row["home_score"], row["away_score"]), row["source"], len(matches)
+
+
 def actual_code(item,final_score):
     home,away=final_score
     if item["market"]=="winner":
@@ -359,99 +619,137 @@ def actual_code(item,final_score):
 
 
 def settle(pending):
-    unresolved=[x for x in pending.values() if not x.get("settled") and x.get("event_id")]
+    unresolved = [x for x in pending.values() if not x.get("settled") and x.get("event_id")]
     if not unresolved:
-        return [],0,[]
-    grouped={}
-    for item in unresolved:
-        source=str(item.get("source") or "")
-        if source not in {"srl","efootball","vfootball"}:
-            if item.get("product")=="srl": source="srl"
-            elif str(item.get("product") or "").startswith("efootball"): source="efootball"
-            elif item.get("product") in {"vfootball","zoom"}: source="vfootball"
-        start=int(num(item.get("start_time_ms")) or (time.time()*1000-86400000))
-        prev=grouped.get(source)
-        grouped[source]=(start,start) if prev is None else (min(prev[0],start),max(prev[1],start))
+        return [], 0, [], {"fallback_settled": 0, "conflicts": 0}
 
-    index={}
-    errors=[]
-    for source,(start,end) in grouped.items():
-        if source not in {"srl","efootball","vfootball"}:
+    grouped = {}
+    for item in unresolved:
+        source = str(item.get("source") or "")
+        if source not in {"srl", "efootball", "vfootball"}:
+            if item.get("product") == "srl":
+                source = "srl"
+            elif str(item.get("product") or "").startswith("efootball"):
+                source = "efootball"
+            elif item.get("product") in {"vfootball", "zoom"}:
+                source = "vfootball"
+        start = int(num(item.get("start_time_ms")) or (time.time() * 1000 - 86400000))
+        previous = grouped.get(source)
+        grouped[source] = (start, start) if previous is None else (min(previous[0], start), max(previous[1], start))
+
+    index = {}
+    errors = []
+
+    for source, (start, end) in grouped.items():
+        if source not in {"srl", "efootball", "vfootball"}:
             continue
-        start_q=start-6*3600000
-        end_q=max(end+6*3600000,int(time.time()*1000))
-        for page_num in range(1,9):
+        start_q = start - 6 * 3600000
+        end_q = max(end + 6 * 3600000, int(time.time() * 1000))
+        for page_num in range(1, 9):
             try:
-                body=proxy_json(RESULT_API,{
-                    "source":source,
-                    "pageSize":100,
-                    "pageNum":page_num,
-                    "startTime":start_q,
-                    "endTime":end_q,
+                body = proxy_json(RESULT_API, {
+                    "source": source,
+                    "pageSize": 100,
+                    "pageNum": page_num,
+                    "startTime": start_q,
+                    "endTime": end_q,
                 })
-                batch=result_events(body)
-                if not batch:
-                    break
+                batch = result_events(body)
                 for event in batch:
-                    event_id=str(event.get("eventId") or event.get("event_id") or "").strip()
+                    event_id = str(event.get("eventId") or event.get("event_id") or "").strip()
                     if event_id:
-                        index[event_id]=event
-                if len(batch)<100:
+                        index[event_id] = event
+                if len(batch) < 100:
                     break
             except Exception as exc:
                 errors.append(f"{source} results page {page_num}: {exc}")
                 break
 
-    history=[]
-    settled_count=0
-    for item in pending.values():
-        if item.get("settled"):
+    public_records, public_errors = fetch_public_result_records(
+        [x.get("start_time_ms") for x in unresolved]
+    )
+    errors.extend(public_errors[-10:])
+
+    history = []
+    settled_count = 0
+    fallback_settled = 0
+    conflicts = 0
+
+    for item in unresolved:
+        primary_event = index.get(str(item.get("event_id")))
+        primary_score = score(primary_event) if primary_event else None
+        public_score, public_source, public_match_count = resolve_public_score(item, public_records)
+
+        if primary_score and public_score and primary_score != public_score:
+            item["settlement_conflict"] = True
+            item["settlement_conflict_sources"] = [
+                "SportyBet NG eventResultList",
+                public_source,
+            ]
+            conflicts += 1
             continue
-        result=index.get(str(item.get("event_id")))
-        if not result:
-            continue
-        final_score=score(result)
+
+        final_score = primary_score or public_score
+        settlement_source = (
+            "SportyBet NG eventResultList via Match Signal proxy"
+            if primary_score
+            else public_source
+        )
         if final_score is None:
+            if public_source == "public_result_conflict":
+                item["settlement_conflict"] = True
+                conflicts += 1
             continue
-        actual=actual_code(item,final_score)
-        win=None if actual=="PUSH" else actual==item.get("selection")
-        settled_at=now_iso()
+
+        actual = actual_code(item, final_score)
+        win = None if actual == "PUSH" else actual == item.get("selection")
+        settled_at = now_iso()
+
         item.update({
-            "settled":True,
-            "settled_at":settled_at,
-            "actual_result":actual,
-            "final_score":[final_score[0],final_score[1]],
-            "win":win,
-            "settlement_source":"SportyBet NG eventResultList via Match Signal proxy",
+            "settled": True,
+            "settled_at": settled_at,
+            "actual_result": actual,
+            "final_score": [final_score[0], final_score[1]],
+            "win": win,
+            "settlement_source": settlement_source,
+            "public_match_candidates": public_match_count,
         })
+        if not primary_score:
+            fallback_settled += 1
+
         history.append({
-            "product":item["product"],
-            "provider":item["provider"],
-            "event_id":item["event_id"],
-            "timestamp":item.get("start_time"),
-            "competition":item["competition"],
-            "participant_1":item["participant_1"],
-            "participant_2":item["participant_2"],
-            "market":item["market"],
-            "market_id":item.get("market_id"),
-            "specifier":item.get("specifier"),
-            "selection":item["selection"],
-            "selection_name":item.get("selection_name"),
-            "odds":item.get("odds"),
-            "model_prob":item.get("model_prob"),
-            "result":actual,
-            "win":win,
-            "line":item.get("line"),
-            "score":f"{int(final_score[0])}:{int(final_score[1])}",
-            "captured_at":item.get("captured_at"),
-            "settled_at":settled_at,
-            "settlement_source":item["settlement_source"],
-            "prediction_source":item.get("prediction_source"),
-            "overround":item.get("overround"),
-            "source":item.get("source"),
+            "product": item["product"],
+            "provider": item["provider"],
+            "event_id": item["event_id"],
+            "timestamp": item.get("start_time"),
+            "competition": item["competition"],
+            "participant_1": item["participant_1"],
+            "participant_2": item["participant_2"],
+            "market": item["market"],
+            "market_id": item.get("market_id"),
+            "specifier": item.get("specifier"),
+            "selection": item["selection"],
+            "selection_name": item.get("selection_name"),
+            "odds": item.get("odds"),
+            "model_prob": item.get("model_prob"),
+            "result": actual,
+            "win": win,
+            "line": item.get("line"),
+            "score": f"{int(final_score[0])}:{int(final_score[1])}",
+            "captured_at": item.get("captured_at"),
+            "settled_at": settled_at,
+            "settlement_source": settlement_source,
+            "prediction_source": item.get("prediction_source"),
+            "overround": item.get("overround"),
+            "source": item.get("source"),
+            "public_match_candidates": public_match_count,
         })
-        settled_count+=1
-    return history,settled_count,errors
+        settled_count += 1
+
+    return history, settled_count, errors, {
+        "fallback_settled": fallback_settled,
+        "conflicts": conflicts,
+    }
 
 
 def main():
@@ -468,7 +766,7 @@ def main():
 
     events,capture_errors=fetch_upcoming()
     added=capture(events,pending)
-    settled_rows,newly_settled,settle_errors=settle(pending)
+    settled_rows,newly_settled,settle_errors,settlement_meta=settle(pending)
     merged_keys={
         (str(x.get("event_id")),str(x.get("market")),str(x.get("line")),str(x.get("selection")))
         for x in history if isinstance(x,dict)
@@ -496,7 +794,7 @@ def main():
     save_json(HISTORY_PATH,history)
     save_json(STATUS_PATH,{
         "updated_at":now_iso(),
-        "collector_version":"1.1",
+        "collector_version":"1.2",
         "upcoming_events":len(events),
         "upcoming_by_product":products,
         "pending_observations":len(pending),
@@ -506,6 +804,8 @@ def main():
         "settled_accuracy":round(wins/len(settled),4) if settled else None,
         "new_observations":added,
         "newly_settled":newly_settled,
+        "fallback_settled":settlement_meta["fallback_settled"],
+        "settlement_conflicts":settlement_meta["conflicts"],
         "result_source":"SportyBet NG eventResultList via Match Signal Cloudflare proxy",
         "prediction_source":"SportyBet live no-vig market baseline",
         "errors":errors[-20:],
