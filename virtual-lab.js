@@ -231,6 +231,42 @@ function shortOutcome(name){
   return s.length>24?s.slice(0,22)+'…':s;
 }
 
+function marketLabel(m){
+  const name=String(m?.name||'').trim();
+  const line=m?.line!=null?' '+m.line:'';
+  return (name||'Market')+line;
+}
+function noVigOutcomes(m){
+  const outs=(m?.outcomes||[]).filter(o=>Number.isFinite(Number(o.odds))&&Number(o.odds)>1);
+  if(outs.length<2)return [];
+  const inv=outs.map(o=>1/Number(o.odds));
+  const total=inv.reduce((a,b)=>a+b,0);
+  return outs.map((o,i)=>({...o,fairProb:inv[i]/total}));
+}
+function predictionForEvent(e,chosenMarket){
+  let markets=(e.markets||[]).filter(m=>matchesMarket(m,chosenMarket));
+  if(chosenMarket==='all'){
+    const preferred=markets.find(m=>m.id==='1'||m.id==='186'||/1x2|winner|match result/i.test(m.name||''))||
+      markets.find(m=>m.id==='18'||m.id==='189'||/total|over\/under/i.test(m.name||''))||markets[0];
+    markets=preferred?[preferred]:[];
+  }
+  let best=null;
+  for(const m of markets){
+    const outcomes=noVigOutcomes(m);
+    if(!outcomes.length)continue;
+    const candidate=outcomes.reduce((a,b)=>b.fairProb>a.fairProb?b:a);
+    if(!best||candidate.fairProb>best.fairProb)best={market:m,outcome:candidate};
+  }
+  if(!best)return null;
+  const p=best.outcome.fairProb;
+  return {
+    market:best.market,
+    selection:best.outcome.name||'Selected side',
+    probabilityText:(p*100).toFixed(1)+'%',
+    marketText:marketLabel(best.market)
+  };
+}
+
 function renderLive(){
   const product=$('product').value,market=$('market').value;
   const events=state.live.filter(e=>(product==='all'||e.product===product));
@@ -241,14 +277,19 @@ function renderLive(){
     return aLive-bLive||((new Date(a.start_time||0).getTime())-(new Date(b.start_time||0).getTime()));
   });
   const list=sorted.map(e=>{
-    const markets=e.markets.filter(m=>matchesMarket(m,market)).slice(0,3);
-    const chips=markets.flatMap(m=>m.outcomes.slice(0,4).map(o=>
+    const shownMarkets=e.markets.filter(m=>matchesMarket(m,market)).slice(0,3);
+    const chips=shownMarkets.flatMap(m=>m.outcomes.slice(0,4).map(o=>
       '<span class="liveChip"><span>'+esc(shortOutcome(o.name))+'</span> <b>'+Number(o.odds).toFixed(2)+'</b></span>'
     )).join('');
-    const line=markets.map(m=>m.line!=null?' '+m.line:'').filter(Boolean)[0]||'';
-    return '<article class="liveCard"><div class="liveTop"><span>'+esc(e.competition||e.product)+'</span><span>'+esc((e.start_time?date(e.start_time):'Time n/a')+line)+'</span></div>'+
-      '<div class="liveTeams">'+esc(e.home)+' <span>vs</span> '+esc(e.away)+'</div>'+
-      '<div class="liveOdds">'+(chips||'<span class="liveMeta">Markets returned without readable odds</span>')+'</div></article>';
+    const pred=predictionForEvent(e,market);
+    const predictionHtml=pred?
+      '<div class="predictionBox"><div class="predictionTop"><span class="predictionLabel">PREDICTION</span><span class="predictionType">Live market baseline</span></div><div class="predictionPick">'+esc(pred.selection)+' <b>'+esc(pred.probabilityText)+'</b></div><div class="predictionMeta">'+esc(pred.marketText)+' · no-vig implied probability · validated research model not yet qualified</div></div>':
+      '<div class="predictionBox mutedPrediction"><div class="predictionLabel">PREDICTION</div><div class="predictionPick">No readable market prediction</div><div class="predictionMeta">SportyBet returned insufficient priced outcomes for a baseline.</div></div>';
+    return '<article class="liveCard"><div class="liveTop"><span>'+esc(e.competition||e.product)+'</span><span>'+esc(e.start_time?date(e.start_time):'Time n/a')+'</span></div>'+
+      '<div class="liveTeams"><strong>'+esc(e.home||'Participant 1')+'</strong> <span>vs</span> <strong>'+esc(e.away||'Participant 2')+'</strong></div>'+
+      predictionHtml+
+      '<div class="liveOdds">'+(chips||'<span class="liveMeta">Markets returned without readable odds</span>')+'</div>'+
+      '<div class="liveCardMeta"><span>Event '+esc(e.event_id||'—')+'</span><span>'+esc(e.match_status||'status unavailable')+'</span></div></article>';
   }).slice(0,30);
   $('liveGrid').innerHTML=list.join('');
   $('liveEmpty').hidden=!!list.length;
