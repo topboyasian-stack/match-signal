@@ -34,3 +34,45 @@ body.ms-page{background:radial-gradient(900px 520px at 8% -12%,color-mix(in srgb
 .ms-page .ms-odds-jump strong{color:var(--ms-accent)}
 @media(max-width:900px){.ms-page .top{gap:12px}.ms-page .tabs,.ms-page .nav{width:100%}}
 @media(max-width:600px){.ms-page .ms-jump-nav{right:12px;bottom:12px}.ms-page .ms-jump-nav button{width:40px;height:40px}.ms-page .ms-odds-jump{width:100%;justify-content:center;margin:8px 0 0!important}}
+
+
+/* V6.2 — system-wide layout containment + action distribution */
+.ms-page .app{width:min(100%,1320px);margin-inline:auto;padding-inline:clamp(14px,2vw,24px);overflow:visible}
+.ms-page .top{display:grid!important;grid-template-columns:minmax(240px,1fr) auto auto;align-items:center;column-gap:18px;row-gap:10px}
+.ms-page .top>.brand{min-width:0}
+.ms-page .top>nav{justify-self:end;min-width:0;display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.ms-page .top>.ms-odds-jump{justify-self:end;min-width:max-content;margin-left:0!important}
+.ms-page .top>nav .btn,.ms-page .top>nav a{flex:0 0 auto}
+.ms-page .brand h1,.ms-page .brand p{overflow-wrap:anywhere}
+.ms-page .panel,.ms-page .card,.ms-page .metric,.ms-page .status,.ms-page .hero,.ms-page .sport,.ms-page .row,.ms-page .ms-official-intro{min-width:0}
+.ms-page .grid,.ms-page .metrics,.ms-page .sports,.ms-page .grid2,.ms-page .heroGrid,.ms-page .analyticsGrid,.ms-page .layout{min-width:0}
+.ms-page .grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,350px),1fr))}
+.ms-page .grid>*{min-width:0}
+.ms-page table{max-width:100%}
+.ms-page th,.ms-page td{overflow-wrap:anywhere}
+.ms-page input,.ms-page select,.ms-page textarea{max-width:100%;min-width:0}
+.ms-page .controls,.ms-page .filters,.ms-page .actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ms-page .controls>* ,.ms-page .filters>* ,.ms-page .actions>*{min-width:0}
+.ms-page .controls input{flex:1 1 220px}
+.ms-page .controls select,.ms-page .filters select{flex:0 1 auto}
+.ms-page .status{flex-wrap:wrap}
+.ms-page .statusLeft{min-width:0;flex:1 1 300px}
+.ms-page .statusLeft>div{min-width:0}
+.ms-page .statusLeft b,.ms-page .statusLeft div{overflow-wrap:anywhere}
+.ms-page .ms-jump-nav{right:max(12px,env(safe-area-inset-right));bottom:max(12px,env(safe-area-inset-bottom))}
+@media(max-width:1100px){
+  .ms-page .top{grid-template-columns:minmax(220px,1fr) auto}
+  .ms-page .top>nav{grid-column:1 / -1;grid-row:2;justify-self:stretch;justify-content:flex-end}
+  .ms-page .top>.ms-odds-jump{grid-column:2;grid-row:1}
+}
+@media(max-width:760px){
+  .ms-page .top{grid-template-columns:1fr}
+  .ms-page .top>nav,.ms-page .top>.ms-odds-jump{grid-column:1;grid-row:auto;justify-self:stretch;justify-content:flex-start}
+  .ms-page .top>.ms-odds-jump{width:100%;justify-content:center}
+  .ms-page .top>nav{justify-content:flex-start}
+  .ms-page .top>nav .btn,.ms-page .top>nav a{flex:1 1 auto;text-align:center}
+}
+@media(max-width:520px){
+  .ms-page .top>nav .btn,.ms-page .top>nav a{flex:1 1 calc(50% - 8px)}
+  .ms-page .status{align-items:flex-start}
+}
