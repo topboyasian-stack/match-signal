@@ -196,12 +196,17 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          python - <<'PY'
+          set -euo pipefail
+          cp LIVE-PRODUCTION-CHECK.json /tmp/live-production-check.json 2>/dev/null || true
+          for attempt in 1 2 3 4 5; do
+            git fetch origin main
+            git reset --hard origin/main
+            python - <<'PY'
           import json, os
           from datetime import datetime, timezone
           from pathlib import Path
           live={}
-          p=Path('LIVE-PRODUCTION-CHECK.json')
+          p=Path('/tmp/live-production-check.json')
           if p.exists():
               live=json.loads(p.read_text())
           Path('DEPLOY-VERIFY-CLOUDFLARE.json').write_text(json.dumps({
@@ -213,8 +218,15 @@ jobs:
             'checks':['core_pages','research_virtual_lab','live_virtual_proxy','virtual_lab_live_snapshot','live_production_data']
           },indent=2)+'\n')
           PY
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add DEPLOY-VERIFY-CLOUDFLARE.json
-          git commit -m "✅ Record Cloudflare production verification"
-          git push origin main
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add DEPLOY-VERIFY-CLOUDFLARE.json
+            git commit -m "✅ Record Cloudflare production verification" || true
+            if git push origin main; then
+              echo "Production verification recorded on attempt ${attempt}."
+              exit 0
+            fi
+            sleep $((attempt * 2))
+          done
+          echo "Could not publish production verification after retries."
+          exit 1
