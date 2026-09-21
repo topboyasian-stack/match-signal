@@ -156,7 +156,7 @@ function wilsonLower(successes,n,z=1.96){
   const phat=successes/n,denom=1+z*z/n,centre=phat+z*z/(2*n),spread=z*Math.sqrt((phat*(1-phat)+z*z/(4*n))/n);
   return (centre-spread)/denom;
 }
-function runStrategy(){function runStrategy(){
+function runStrategy(){
   const minOdds=Number($('minOdds').value);
   const rows=state.filtered.filter(r=>typeof r.win==='boolean'&&r.odds!=null&&r.odds>=minOdds).sort((a,b)=>new Date(a.timestamp)-new Date(b.timestamp));
   if(rows.length<30){$('strategyResult').className='strategyResult empty';$('strategyResult').textContent='Not enough priced, settled observations (need at least 30 for this exploratory test).';return}
