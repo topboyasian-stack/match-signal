@@ -7,7 +7,7 @@
     return h ? `${h}h ${pad(m)}m ${pad(s)}s` : `${m}m ${pad(s)}s`;
   };
   const normalise=v=>String(v||'').toLowerCase().replace(/\s+/g,' ').trim();
-  const state={predictions:[],history:[]};
+  const state={predictions:[]};
   const cache={};
 
   async function loadJson(path){
@@ -23,7 +23,7 @@
     const teams=card.querySelector('.teams');
     if(!teams) return null;
     const text=normalise(teams.textContent);
-    const source=[...state.history,...state.predictions];
+    const source=state.predictions;
     return source.find(p=>{
       const a=normalise(p.player_1),b=normalise(p.player_2);
       return a && b && text.includes(a) && text.includes(b);
@@ -46,8 +46,7 @@
       const badge=ensure(card), p=matchRecord(card);
       if(!badge || !p) return;
       if(p.settled){
-        const score=p.final_score||[];
-        badge.textContent=`FT ${score.length>=2?score[0]+'–'+score[1]:''}`.trim();
+        badge.textContent='FINISHED';
         badge.classList.remove('live');
         badge.classList.add('finished');
         return;
@@ -67,12 +66,8 @@
   }
 
   async function refreshData(){
-    const [predictions,history]=await Promise.all([
-      loadJson('data/predictions.json'),
-      loadJson('data/prediction_history.json')
-    ]);
+    const predictions=await loadJson('data/predictions.json');
     state.predictions=Array.isArray(predictions)?predictions:[];
-    state.history=Array.isArray(history)?history.filter(p=>p.settled):[];
     update();
   }
 
@@ -84,5 +79,5 @@
   // The one-second updater already handles dynamically rendered cards safely.
   refreshData();
   setInterval(update,1000);
-  setInterval(refreshData,30000);
+  setInterval(refreshData,60000);
 })();
