@@ -6,11 +6,11 @@ const LIVE_API='https://match-signal.pages.dev/api/sportybet-virtual';
 const LIVE_MARKETS='1,18,10,29,11,26,36,14,60100,186,189,202,204,210';
 const SNAPSHOT='./data/virtual_lab_live.json';
 const LIVE_REFRESH_MS=30000;
-const UI_BUILD='20260921-v15';
+const UI_BUILD='20260921-v17';
 const HISTORY='./api/virtual-lab-history';
 const HISTORY_FALLBACK='./data/virtual_lab_history.json';
 const ELIGIBILITY='./data/virtual_lab_eligibility.json';
-const state={rows:[],filtered:[],live:[],liveMode:'none',liveUpdated:null,picks:[],builder:[],historyLoaded:false,modelRows:[],modelEvents:[],modelGate:false,modelHoldout:null,eligibility:{eligible_competitions:['Esoccer H2H GG League','Europa League','Volta Premier League'],eligible_ou_lines:[3.5,4.5],eligible_markets:['ou']},predictionCache:new Map()};
+const state={rows:[],filtered:[],live:[],liveMode:'none',liveUpdated:null,picks:[],builder:[],historyLoaded:false,modelRows:[],modelEvents:[],modelGate:false,modelHoldout:null,eligibility:{eligible_competitions:['Esoccer H2H GG League','Europa League','Volta Premier League'],eligible_ou_lines:[3.5,4.5],priority_ou_lines:[1.5,3.5,4.5],eligible_markets:['ou']},predictionCache:new Map()};
 
 const $=id=>document.getElementById(id);
 const esc=v=>{const d=document.createElement('div');d.textContent=String(v??'');return d.innerHTML};
@@ -478,6 +478,7 @@ function qualifiesResearchPick(c){
 function isEligibleResearchEvent(e){
   return (state.eligibility.eligible_competitions||[]).includes(String(e.competition||e.tournament||''));
 }
+function isPriorityOU(c){ return !!(c&&c.marketType==='ou'&&state.eligibility.priority_ou_lines.some(x=>Math.abs(Number(x)-Number(c.market.line))<0.001)); }
 function isEligibleOU(c){
   return !!(c&&c.marketType==='ou'&&state.eligibility.eligible_markets.includes('ou')&&
     state.eligibility.eligible_ou_lines.some(x=>Math.abs(Number(x)-Number(c.market.line))<0.001));
@@ -711,6 +712,7 @@ async function loadEligibility(){
     if(!r.ok)throw new Error('eligibility HTTP '+r.status);
     const d=await r.json();
     if(Array.isArray(d.eligible_competitions))state.eligibility.eligible_competitions=d.eligible_competitions;
+    if(Array.isArray(d.priority_ou_lines))state.eligibility.priority_ou_lines=d.priority_ou_lines.map(Number);
     if(Array.isArray(d.eligible_ou_lines))state.eligibility.eligible_ou_lines=d.eligible_ou_lines.map(Number);
     if(Array.isArray(d.policy?.eligible_markets))state.eligibility.eligible_markets=d.policy.eligible_markets;
     state.predictionCache.clear();
@@ -719,7 +721,7 @@ async function loadEligibility(){
 }
 function renderEligibilityNotice(){
   const host=$('historyMeta');if(!host)return;
-  host.textContent='Research filter active · '+state.eligibility.eligible_competitions.length+' eligible leagues · O/U lines '+state.eligibility.eligible_ou_lines.join(', ')+' · winner/1X2 blocked until its OOS performance recovers.';
+  host.textContent='Research filter active · '+state.eligibility.eligible_competitions.length+' eligible leagues · priority O/U lines '+state.eligibility.priority_ou_lines.join(', ')+' · active '+state.eligibility.eligible_ou_lines.join(', ')+' · O/U 1.5 is monitored until it earns the evidence gate.';
 }
 async function loadHistory(){
   const urls=[HISTORY,HISTORY_FALLBACK];
@@ -739,7 +741,7 @@ async function loadHistory(){
       renderModelLab();
       rebuildPredictionDesk();
       const status=$('historyStatus');if(status)status.textContent='AUTO-COLLECTED · '+arr.length+' settled observations';
-      const meta=$('historyMeta');if(meta)meta.textContent='Research filter active · '+state.eligibility.eligible_competitions.length+' eligible leagues · O/U lines '+state.eligibility.eligible_ou_lines.join(', ')+' · historical refresh '+new Date().toLocaleString();
+      const meta=$('historyMeta');if(meta)meta.textContent='Research filter active · '+state.eligibility.eligible_competitions.length+' eligible leagues · priority O/U lines '+state.eligibility.priority_ou_lines.join(', ')+' · active '+state.eligibility.eligible_ou_lines.join(', ')+' · historical refresh '+new Date().toLocaleString();
       return;
     }catch(e){lastError=e;}
   }
