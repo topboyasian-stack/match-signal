@@ -10,6 +10,7 @@ on:
       - 'basketball.html'
       - 'tennis.html'
       - 'live.html'
+      - 'research.html'
       - 'live-analysis.js'
       - 'live-data-worker.js'
       - 'live-timer.js'
@@ -54,22 +55,22 @@ jobs:
           ref: main
       - name: Setup Pages
         uses: actions/configure-pages@v5
-      - name: Install production frontend fixes
+      - name: Install lightweight navigation fix
         run: |
           python - <<'PY'
           from pathlib import Path
           for path in Path('.').glob('*.html'):
               text=path.read_text(encoding='utf-8')
-              for src in ('./nav-fix.js','./metrics-fix.js','./live-timer.js'):
-                  tag=f'<script src="{src}"></script>'
-                  if tag not in text:
-                      text=text.replace('</body>',tag+'\n</body>',1)
+              src='./nav-fix.js'
+              tag=f'<script src="{src}"></script>'
+              if tag not in text:
+                  text=text.replace('</body>',tag+'\n</body>',1)
               marker='<style id="match-signal-nav-fix">'
               style=marker+'.tabs a,.nav a{pointer-events:auto!important;position:relative;z-index:9999;cursor:pointer!important;touch-action:manipulation}</style>'
               if marker not in text:
                   text=text.replace('</head>',style+'</head>',1)
               path.write_text(text,encoding='utf-8')
-              print(f'Frontend fixes installed: {path}')
+              print(f'Lightweight navigation fix installed: {path}')
           PY
       - name: Verify site entrypoint and data
         run: |
@@ -78,8 +79,11 @@ jobs:
           test -s basketball.html
           test -s performance.html
           test -s live.html
+          test -s research.html
           test -s live-analysis.js
           test -s live-data-worker.js
+          test -s virtual-lab.js
+          test -s virtual-lab.css
           test -s data/predictions.json
           python - <<'PY'
           import json
