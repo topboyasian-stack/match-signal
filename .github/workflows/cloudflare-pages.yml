@@ -119,14 +119,14 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           PROJECT: ${{ steps.project.outputs.project }}
         run: |
-          npx wrangler@latest pages deploy . --project-name="$PROJECT" --branch=main
+          npx wrangler@latest pages deploy . --project-name="$PROJECT"
 
       - name: Run production HTTP and asset smoke tests
         timeout-minutes: 3
         run: |
           node --input-type=module <<'NODE'
           const base = 'https://match-signal.pages.dev';
-          const pages = ['/', '/expansion.html', '/live.html', '/basketball.html', '/performance.html', '/virtual-lab.html', '/virtual-lab'];
+          const pages = ['/', '/expansion.html', '/live.html', '/basketball.html', '/performance.html', '/virtual-lab.html', '/virtual-lab', '/virtual-lab/'];
           const assets = ['/expansion.js', '/expansion-odds-builder.js', '/live-analysis.js', '/live-data-worker.js', '/virtual-lab.js', '/virtual-lab.css', '/_redirects', '/data/predictions.json', '/data/expansion_status.json', '/data/odds_builder.json'];
           const failures = [];
           async function get(path) {
