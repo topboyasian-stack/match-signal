@@ -172,28 +172,20 @@ jobs:
           } catch(e) { failures.push('/api/espn '+e.message); }
           try {
             const params = new URLSearchParams({
-              sportId:'sr:sport:1',
-              marketId:'1,18,10,29,11,26,36,14,60100,186,189,202,204,210',
               pageSize:'100',
               pageNum:'1',
-              todayGames:'false',
               timeline:'168',
+              sources:'efootball,srl,vfootball',
               _t:String(Date.now())
             });
             const {r,body}=await get('/api/sportybet-virtual?'+params.toString());
-            if (!r.ok) failures.push('/api/sportybet HTTP '+r.status);
+            if (!r.ok) failures.push('/api/sportybet-virtual HTTP '+r.status);
             const payload=JSON.parse(body);
-            if (payload.bizCode!==10000) failures.push('/api/sportybet bizCode '+payload.bizCode);
-            const tournaments=(payload.data&&payload.data.tournaments)||[];
-            const virtualEvents=tournaments.flatMap(t=>(t.events||[]).map(e=>({
-              tournament:String(t.name||''),
-              category:String(t.categoryName||''),
-              home:String(e.homeTeamName||''),
-              away:String(e.awayTeamName||'')
-            }))).filter(e=>/simulated reality|\bsrl\b|gt sports league|gt leagues|eadriatic|efootball|e soccer|esoccer|virtual football|zoom|turbo/i.test(e.tournament+' '+e.category+' '+e.home+' '+e.away));
-            if (!virtualEvents.length) failures.push('/api/sportybet returned no virtual/eFootball/SRL events');
-            else console.log('Virtual Lab live source passed: '+virtualEvents.length+' matching events');
-          } catch(e) { failures.push('/api/sportybet '+e.message); }
+            const virtualEvents=Array.isArray(payload?.events)?payload.events:[];
+            if (payload?.ok!==true) failures.push('/api/sportybet-virtual did not return ok=true');
+            if (!virtualEvents.length) failures.push('/api/sportybet-virtual returned no virtual/eFootball/SRL events');
+            else console.log('Virtual Lab live source passed: '+virtualEvents.length+' events '+JSON.stringify(payload.product_counts||{}));
+          } catch(e) { failures.push('/api/sportybet-virtual '+e.message); }
 
           if (failures.length) { console.error(failures.join('\n')); process.exit(1); }
           console.log('Production HTTP smoke tests passed: '+pages.length+' pages, '+assets.length+' assets, NBA ESPN proxy');
