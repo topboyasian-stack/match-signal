@@ -483,6 +483,35 @@ def settle(pending):
     }
 
 
+def participant_fingerprint(history):
+    """Summarize recurring participant/team O/U behavior from settled history."""
+    groups={}
+    for row in history:
+        if not isinstance(row,dict) or row.get("market")!="ou" or row.get("win") is None:
+            continue
+        line=num(row.get("line"))
+        if line is None:
+            continue
+        for raw_name in (row.get("participant_1"),row.get("participant_2")):
+            name=" ".join(str(raw_name or "").split()).strip()
+            if not name:
+                continue
+            key=name.casefold()
+            item=groups.setdefault(key,{"participant":name,"n":0,"wins":0,"lines":{},"products":{}})
+            item["n"]+=1
+            item["wins"]+=1 if row.get("win") else 0
+            bucket=item["lines"].setdefault(str(line),{"n":0,"wins":0})
+            bucket["n"]+=1
+            bucket["wins"]+=1 if row.get("win") else 0
+            product=str(row.get("product") or "other")
+            item["products"][product]=item["products"].get(product,0)+1
+    ranked=[]
+    for item in groups.values():
+        item["win_rate"]=item["wins"]/item["n"] if item["n"] else None
+        ranked.append(item)
+    ranked.sort(key=lambda x:(-x["n"],-(x["win_rate"] or 0),x["participant"].casefold()))
+    return ranked
+
 def main():
     DATA.mkdir(parents=True,exist_ok=True)
     pending_raw=load_json(PENDING_PATH,[])
@@ -520,12 +549,25 @@ def main():
     for event in events:
         products[event["product"]]=products.get(event["product"],0)+1
 
+    participant_rows=participant_fingerprint(history)
+    participant_ou15=[]
+    for item in participant_rows:
+        line=item.get("lines",{}).get("1.5")
+        if line and line.get("n",0)>0:
+            participant_ou15.append({
+                "participant":item["participant"],
+                "n":line["n"],
+                "wins":line["wins"],
+                "win_rate":line["wins"]/line["n"]
+            })
+    participant_ou15.sort(key=lambda x:(-x["n"],-x["win_rate"],x["participant"].casefold()))
+
     errors=capture_errors+settle_errors
     save_json(PENDING_PATH,list(pending.values()))
     save_json(HISTORY_PATH,history)
     save_json(STATUS_PATH,{
         "updated_at":now_iso(),
-        "collector_version":"1.3",
+        "collector_version":"1.4",
         "upcoming_events":len(events),
         "upcoming_by_product":products,
         "pending_observations":len(pending),
@@ -537,6 +579,15 @@ def main():
         "newly_settled":newly_settled,
         "sportybet_settled":settlement_meta["sportybet_settled"],
         "settlement_conflicts":settlement_meta["conflicts"],
+        "participant_fingerprint_count":len(participant_rows),
+        "participant_ou15_leaders":participant_ou15[:25],
+        "participant_model_policy":{
+            "same_product_only":True,
+            "time_safe":True,
+            "minimum_exact_line_observations":8,
+            "maximum_probability_weight":0.25,
+            "note":"Participant history is a model feature only after enough prior settled events; user-reported tickets are not injected into the automatic training dataset."
+        },
         "result_source":"SportyBet NG eventResultList via Match Signal Cloudflare proxy",
         "prediction_source":"SportyBet live no-vig market baseline",
         "errors":errors[-20:],
