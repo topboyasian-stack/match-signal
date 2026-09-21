@@ -41,6 +41,8 @@ jobs:
 
       - name: Syntax-check collector
         run: python -m py_compile scripts/virtual_lab_collector.py
+      - name: Syntax-check model evaluation engine
+        run: python -m py_compile scripts/virtual_lab_model_eval.py
       - name: Syntax-check eligibility engine
         run: python -m py_compile scripts/virtual_lab_eligibility.py
 
@@ -66,6 +68,9 @@ jobs:
       - name: Run virtual fixture capture + settlement
         run: python scripts/virtual_lab_collector.py
 
+      - name: Run strict chronological model evaluation
+        run: python scripts/virtual_lab_model_eval.py
+
       - name: Recalculate league and line eligibility
         run: python scripts/virtual_lab_eligibility.py
 
@@ -79,6 +84,7 @@ jobs:
               'data/virtual_lab_history.json',
               'data/virtual_lab_status.json',
               'data/virtual_lab_eligibility.json',
+              'data/virtual_lab_model_eval.json',
           ]:
               p = Path(name)
               data = json.loads(p.read_text())
@@ -93,7 +99,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           for attempt in 1 2 3 4; do
-            git add data/virtual_lab_pending.json data/virtual_lab_history.json data/virtual_lab_status.json data/virtual_lab_eligibility.json
+            git add data/virtual_lab_pending.json data/virtual_lab_history.json data/virtual_lab_status.json data/virtual_lab_eligibility.json data/virtual_lab_model_eval.json
 
             if git diff --cached --quiet; then
               echo "Virtual Lab collector produced no data changes."
