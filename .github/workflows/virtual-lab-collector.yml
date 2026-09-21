@@ -42,18 +42,24 @@ jobs:
       - name: Syntax-check collector
         run: python -m py_compile scripts/virtual_lab_collector.py
 
-      - name: Confirm deployed result proxy route
+      - name: Probe public result mirrors
         run: |
-          set -e
-          URL="https://match-signal.pages.dev/api/sportybet-virtual-results?source=efootball&pageSize=1&pageNum=1&startTime=$(( $(date +%s%3N) - 86400000 ))&endTime=$(date +%s%3N)"
-          CODE=$(curl -sS -o /tmp/result-proxy-body -D /tmp/result-proxy-headers -w '%{http_code}' "$URL")
-          echo "HTTP $CODE"
-          echo "--- headers ---"
-          cat /tmp/result-proxy-headers
-          echo "--- body (first 1000 bytes) ---"
-          head -c 1000 /tmp/result-proxy-body || true
-          echo
-          test "$CODE" = "200"
+          python - <<'PY'
+          import requests
+          from bs4 import BeautifulSoup
+          urls = {
+              'forebet_today':'https://www.forebet.com/en/esoccer/predictions-for-today',
+              'forebet_yesterday':'https://www.forebet.com/en/esoccer/predictions-from-yesterday',
+              'estave':'https://cms6.e-stave.com/Live/Rezultati/Default.aspx',
+          }
+          for name,url in urls.items():
+              r=requests.get(url,headers={'User-Agent':'Mozilla/5.0'},timeout=30)
+              print(name, r.status_code, len(r.text), r.url)
+              soup=BeautifulSoup(r.text,'html.parser')
+              lines=[x.strip() for x in soup.get_text('\n').splitlines() if x.strip()]
+              hits=[line for line in lines if '21/09/2026' in line or '20/09/2026' in line or 'Eadriatic' in line or 'GT Sports' in line]
+              print('  hits:', hits[:12])
+          PY
 
       - name: Run virtual fixture capture + settlement
         run: python scripts/virtual_lab_collector.py
