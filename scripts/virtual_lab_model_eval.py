@@ -1,0 +1,230 @@
+"""Walk-forward Virtual Lab model evaluation.
+
+Time-safe O/U evaluation only. No user-reported tickets are read.
+Compares SportyBet de-vig baseline, line-ladder Poisson, product prior,
+and the participant-aware model on untouched chronological holdouts.
+"""
+from __future__ import annotations
+import json, math
+from collections import defaultdict
+from datetime import datetime, timezone
+from pathlib import Path
+
+ROOT=Path(__file__).resolve().parents[1]
+DATA=ROOT/"data"
+HISTORY=DATA/"virtual_lab_history.json"
+OUTPUT=DATA/"virtual_lab_model_eval.json"
+LINES=(1.5,3.5,4.5)
+HOLDOUT_FRACTION=.30
+MIN_EVENT_HISTORY=8
+MIN_PARTICIPANT_HOLDOUT=20
+MIN_HOLDOUT_ROWS=30
+PRIOR_WEIGHT=.25
+PAIR_WEIGHT=.25
+MAX_PARTICIPANT_WEIGHT=.20
+
+def ts(v):
+    try:return datetime.fromisoformat(str(v).replace("Z","+00:00")).timestamp()
+    except Exception:return float("inf")
+
+def clamp(p):
+    return max(.0005,min(.9995,float(p)))
+
+def poisson_over(lam,line):
+    lam=max(.05,min(30.,float(lam)))
+    k=math.floor(float(line))
+    pmf=math.exp(-lam); cdf=pmf
+    for i in range(1,k+1):
+        pmf*=lam/i; cdf+=pmf
+    return clamp(1-cdf)
+
+def fit_lambda(points):
+    pts=[p for p in points if p[0] is not None and p[1] is not None]
+    if not pts:return None
+    best=(5.,float("inf"))
+    for i in range(25,2001):
+        lam=i/100
+        loss=sum((poisson_over(lam,line)-prob)**2 for line,prob in pts)/len(pts)
+        if loss<best[1]:best=(lam,loss)
+    return best[0]
+
+def build_events(rows):
+    groups={}
+    for r in rows:
+        if r.get("market")!="ou" or r.get("win") is None or r.get("line") is None:continue
+        eid=str(r.get("event_id") or "")
+        stamp=str(r.get("timestamp") or "")
+        if not eid or not stamp:continue
+        key=eid+"|"+stamp
+        g=groups.setdefault(key,{
+            "key":key,"event_id":eid,"timestamp":stamp,
+            "product":str(r.get("product") or "other"),
+            "competition":str(r.get("competition") or "Unknown"),
+            "home":str(r.get("participant_1") or ""),
+            "away":str(r.get("participant_2") or ""),
+            "rows":[],"total":None
+        })
+        g["rows"].append(r)
+        if g["total"] is None:
+            m=str(r.get("score") or "").replace(" ","").split(":")
+            if len(m)==2:
+                try:g["total"]=float(m[0])+float(m[1])
+                except Exception:pass
+    events=[]
+    for g in groups.values():
+        if g["total"] is None:continue
+        pts=[]
+        for r in g["rows"]:
+            p=r.get("model_prob")
+            if p is None:continue
+            try:p=float(p)
+            except Exception:continue
+            sel=str(r.get("selection") or "").upper()
+            over=p if sel.startswith("O") else 1-p
+            pts.append((float(r["line"]),clamp(over)))
+        lam=fit_lambda(pts)
+        if lam is not None:
+            g["lambda"]=lam; events.append(g)
+    return sorted(events,key=lambda e:ts(e["timestamp"]))
+
+def product_prior(events, product, line, cutoff):
+    eligible=[e for e in events if e["product"]==product and ts(e["timestamp"])<cutoff]
+    decisive=[e for e in eligible if e["total"]!=line]
+    if not decisive:return None
+    over=sum(e["total"]>line for e in decisive)
+    return (over+2)/(len(decisive)+4)
+
+def participant_prior(events,event,line):
+    cutoff=ts(event["timestamp"]); product=event["product"]
+    names={event["home"].strip().casefold(),event["away"].strip().casefold()}-{""}
+    prior=[e for e in events if e["product"]==product and ts(e["timestamp"])<cutoff and e["total"] is not None]
+    entity=[e for e in prior if names & {e["home"].strip().casefold(),e["away"].strip().casefold()}]
+    entity=[e for e in entity if e["total"]!=line]
+    if len(entity)<MIN_EVENT_HISTORY:return None,0,0
+    ep=(sum(e["total"]>line for e in entity)+2)/(len(entity)+4)
+    pair=[]
+    a,b=event["home"].strip().casefold(),event["away"].strip().casefold()
+    for e in prior:
+        eh,ea=e["home"].strip().casefold(),e["away"].strip().casefold()
+        if ((eh==a and ea==b) or (eh==b and ea==a)) and e["total"]!=line:pair.append(e)
+    pp=None
+    if len(pair)>=6:
+        pp=(sum(e["total"]>line for e in pair)+2)/(len(pair)+4)
+        ep=(1-PAIR_WEIGHT)*ep+PAIR_WEIGHT*pp
+    weight=min(MAX_PARTICIPANT_WEIGHT,max(.05,(len(entity)-7)/40))
+    return ep,weight,len(entity)
+
+def probs(events,event,row):
+    line=float(row["line"])
+    market=clamp(float(row["model_prob"]))
+    pois=poisson_over(event["lambda"],line)
+    prior=product_prior(events,event["product"],line,ts(event["timestamp"]))
+    base=pois if prior is None else clamp((1-PRIOR_WEIGHT)*pois+PRIOR_WEIGHT*prior)
+    part,pw,pn=participant_prior(events,event,line)
+    combined=base if part is None else clamp((1-pw)*base+pw*part)
+    return market,pois,base,combined,pn
+
+def metrics(rows,key):
+    if not rows:return None
+    b=sum((r["y"]-r[key])**2 for r in rows)/len(rows)
+    ll=sum(-(r["y"]*math.log(clamp(r[key]))+(1-r["y"])*math.log(1-clamp(r[key]))) for r in rows)/len(rows)
+    hit=sum((r[key]>=.5)==bool(r["y"]) for r in rows)/len(rows)
+    # Reliability: equal-width probability bins, weighted by observations.
+    bins=[]
+    ece=0.
+    for lo in [i/10 for i in range(10)]:
+        bucket=[r for r in rows if lo<=r[key]<(lo+.1 if lo<.9 else 1.0001)]
+        if bucket:
+            mean=sum(r[key] for r in bucket)/len(bucket); obs=sum(r["y"] for r in bucket)/len(bucket)
+            ece+=len(bucket)/len(rows)*abs(mean-obs)
+    return {"n":len(rows),"brier":b,"log_loss":ll,"hit_rate":hit,"ece":ece}
+
+def evaluate(events):
+    outputs=[]
+    for i,event in enumerate(events):
+        prior=events[:i]
+        for row in event["rows"]:
+            if row.get("win") is None or row.get("model_prob") is None:continue
+            market,pois,base,combined,pn=probs(prior,event,row)
+            sel=str(row.get("selection") or "").upper()
+            # Convert all observations to the probability of the selected side.
+            inv=sel.startswith("U")
+            y=1 if bool(row["win"]) else 0
+            outputs.append({
+                "event_key":event["key"],"timestamp":event["timestamp"],
+                "product":event["product"],"competition":event["competition"],
+                "line":float(row["line"]),"participant_active":pn>=MIN_EVENT_HISTORY,
+                "y":y,
+                "market":1-market if inv else market,
+                "poisson":1-pois if inv else pois,
+                "poisson_prior":1-base if inv else base,
+                "participant_model":1-combined if inv else combined,
+                "participant_n":pn
+            })
+    return outputs
+
+def grouped(rows, field):
+    out={}
+    for r in rows:out.setdefault(r[field],[]).append(r)
+    return out
+
+def main():
+    history=json.loads(HISTORY.read_text()) if HISTORY.exists() else []
+    rows=[r for r in history if isinstance(r,dict) and r.get("market")=="ou" and r.get("win") is not None]
+    events=build_events(rows)
+    cut=max(1,int(len(events)*(1-HOLDOUT_FRACTION)))
+    hold_keys={e["key"] for e in events[cut:]}
+    scored=evaluate(events)
+    hold=[r for r in scored if r["event_key"] in hold_keys]
+    participant_hold=[r for r in hold if r["participant_active"]]
+    variants=["market","poisson","poisson_prior","participant_model"]
+    all_metrics={k:metrics(scored,k) for k in variants}
+    hold_metrics={k:metrics(hold,k) for k in variants}
+    part_metrics={k:metrics(participant_hold,k) for k in variants}
+    def table(field, values):
+        out={}
+        for key,subset in grouped(hold,field).items():
+            out[str(key)]={k:metrics(subset,k) for k in variants}
+        return out
+    # Only promote a participant feature when it has a meaningful untouched holdout
+    # and improves both probability losses without materially worsening calibration.
+    ph=hold_metrics.get("participant_model"); mh=hold_metrics.get("market")
+    participant_pass=bool(
+        ph and mh and len(participant_hold)>=MIN_PARTICIPANT_HOLDOUT and len(hold)>=MIN_HOLDOUT_ROWS and
+        ph["brier"]<mh["brier"] and ph["log_loss"]<mh["log_loss"] and ph["ece"]<=mh["ece"]+.02
+    )
+    line_reports={}
+    for line in LINES:
+        subset=[r for r in hold if r["line"]==line]
+        line_reports[str(line)]={"holdout":{k:metrics(subset,k) for k in variants},
+                                 "participant_holdout_n":sum(r["participant_active"] for r in subset)}
+    out={
+      "generated_at":datetime.now(timezone.utc).isoformat(),
+      "method":"strict chronological walk-forward; each scored event only sees earlier settled events",
+      "source_contract":"automatic SportyBet result history only; user-reported tickets excluded",
+      "history_rows":len(history),"ou_rows":len(rows),"events":len(events),
+      "holdout":{"fraction":HOLDOUT_FRACTION,"events":len(events)-cut,"rows":len(hold),"participant_rows":len(participant_hold)},
+      "variants":{
+        "market":"SportyBet de-vig probability",
+        "poisson":"O/U line-ladder Poisson fit",
+        "poisson_prior":"Poisson + same-product historical prior with Beta(2,2) shrinkage",
+        "participant_model":"Poisson + product prior + same-product participant recurrence with exact-pair evidence and shrinkage"
+      },
+      "all":all_metrics,"holdout_metrics":hold_metrics,
+      "participant_holdout_metrics":part_metrics,
+      "by_product":table("product",hold),
+      "by_competition":table("competition",hold),
+      "by_line":line_reports,
+      "participant_feature_gate":{
+        "minimum_exact_line_history":MIN_EVENT_HISTORY,
+        "minimum_untouched_participant_rows":MIN_PARTICIPANT_HOLDOUT,
+        "minimum_untouched_rows":MIN_HOLDOUT_ROWS,
+        "pass":participant_pass,
+        "reason":"passes both Brier and log loss with calibration tolerance" if participant_pass else "insufficient untouched participant evidence or no dual-loss improvement"
+      },
+      "paper_only":True
+    }
+    OUTPUT.write_text(json.dumps(out,indent=2)+"\n")
+    print(json.dumps(out,indent=2))
+
+if __name__=="__main__":main()
