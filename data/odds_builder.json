@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-21T17:02:17.490Z",
+  "generated_at": "2026-09-21T19:17:59.749749+00:00",
   "engine_version": "V6.1-RESEARCH-GATED",
   "mode": "PAPER_ONLY",
   "target_legs": "3-4",
@@ -13,22 +13,20 @@
     "tennis_live_eligible": false,
     "upstream_blocked": true,
     "risk_reasons": [
-      "Brier 0.508 has not beaten baseline 0.5",
+      "Brier 0.5084 has not beaten baseline 0.5",
       "positive-EV testing also requires contemporaneous market odds"
     ],
     "selection_reasons": {
-      "tournament_not_qualified + selection_not_qualified + confidence_below_0.65": 78,
       "tournament_not_qualified + confidence_below_0.65": 5,
+      "tournament_not_qualified + selection_not_qualified + confidence_below_0.65": 77,
       "tournament_not_qualified + selection_not_qualified": 4
     }
   },
   "candidate_diagnostics": {
     "football_candidates": 0,
-    "tennis_candidates": 37,
+    "tennis_candidates": 27,
     "evaluated": 0,
-    "rejections": {
-      "UPSTREAM_RESEARCH_GATE_BLOCKED": 37
-    }
+    "rejections": {}
   },
   "selection_policy": {
     "min_calibrated_probability": 0.6,
@@ -50,7 +48,7 @@
   },
   "candidates_considered": {
     "football": 0,
-    "tennis": 42,
+    "tennis": 27,
     "all_built": 0
   },
   "qualified_legs": [],
@@ -73,10 +71,10 @@
     "background": "#080D14"
   },
   "notes": [
-    "Builder is hard-locked by the upstream research/risk gate.",
-    "Tennis currently has no live-eligible research selection.",
-    "No weak prediction is promoted merely to fill 3-4 accumulator slots.",
-    "Fresh SportyBet prices are required before any candidate can be evaluated for market edge.",
-    "Paper-only; no real-money execution."
+    "V6 qualifies on market edge, not probability alone.",
+    "Missing or stale SportyBet prices produce NO_BET/REJECTED.",
+    "Model fair odds never overwrite bookmaker odds.",
+    "Accumulator size is allowed to fall below four and is never padded with weak selections.",
+    "Paper-only until V6 demonstrates stable calibration, edge and closing-line value over a meaningful sample."
   ]
 }
