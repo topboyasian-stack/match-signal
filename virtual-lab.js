@@ -10,7 +10,7 @@ const UI_BUILD='20260921-v17';
 const HISTORY='./api/virtual-lab-history';
 const HISTORY_FALLBACK='./data/virtual_lab_history.json';
 const ELIGIBILITY='./data/virtual_lab_eligibility.json';
-const state={rows:[],filtered:[],live:[],liveMode:'none',liveUpdated:null,picks:[],builder:[],historyLoaded:false,modelRows:[],modelEvents:[],modelGate:false,modelHoldout:null,eligibility:{eligible_competitions:['Esoccer H2H GG League','Europa League','Volta Premier League'],eligible_ou_lines:[3.5,4.5],priority_ou_lines:[1.5,3.5,4.5],eligible_markets:['ou']},predictionCache:new Map()};
+const state={rows:[],filtered:[],live:[],liveMode:'none',liveUpdated:null,picks:[],builder:[],historyLoaded:false,modelRows:[],modelEvents:[],modelGate:false,modelHoldout:null,eligibility:{eligible_competitions:['Esoccer H2H GG League','Europa League','Volta Premier League'],eligible_ou_lines:[3.5,4.5],experimental_ou_lines:[1.5],priority_ou_lines:[1.5,3.5,4.5],eligible_markets:['ou']},predictionCache:new Map()};
 
 const $=id=>document.getElementById(id);
 const esc=v=>{const d=document.createElement('div');d.textContent=String(v??'');return d.innerHTML};
@@ -313,7 +313,7 @@ function historicalOUEvents(rows){
   rows.filter(r=>r.market==='ou'&&r.event_id&&r.timestamp).forEach(r=>{
     const key=eventKey(r);
     let g=groups.get(key);
-    if(!g){g={key,event_id:r.event_id,timestamp:r.timestamp,product:r.product,rows:[],total:scoreTotal(r)};groups.set(key,g);}
+    if(!g){g={key,event_id:r.event_id,timestamp:r.timestamp,product:r.product,home:String(r.participant_1||r.home||''),away:String(r.participant_2||r.away||''),rows:[],total:scoreTotal(r)};groups.set(key,g);}
     g.rows.push(r);
     if(g.total==null)g.total=scoreTotal(r);
   });
@@ -341,6 +341,35 @@ function productPrior(events,product,line,cutoff){
   if(!decisive)return {prob:null,n:0};
   // Beta(2,2) shrinkage prevents tiny product/line samples from creating extreme probabilities.
   return {prob:(over+2)/(decisive+4),n:decisive,pushes};
+}
+function recurrenceEvidence(events,event,line){
+  const cutoff=new Date(event?.timestamp||0).getTime();
+  const product=event?.product||'';
+  const home=String(event?.home||'').trim().toLowerCase();
+  const away=String(event?.away||'').trim().toLowerCase();
+  if(!home&&!away)return {entityN:0,entityOverRate:null,pairN:0,pairOverRate:null};
+  const relevant=(events||[]).filter(e=>{
+    if(!e||e.product!==product||e.total==null||!Number.isFinite(new Date(e.timestamp||0).getTime())||new Date(e.timestamp).getTime()>=cutoff)return false;
+    const eh=String(e.home||'').trim().toLowerCase(), ea=String(e.away||'').trim().toLowerCase();
+    return eh===home||eh===away||ea===home||ea===away;
+  });
+  const entityDecisive=relevant.filter(e=>e.total!==Number(line));
+  const entityOver=relevant.filter(e=>e.total>Number(line));
+  const entityOverRate=entityDecisive.length?entityOver.length/entityDecisive.length:null;
+  const pairRelevant=(events||[]).filter(e=>{
+    if(!e||e.product!==product||e.total==null||!Number.isFinite(new Date(e.timestamp||0).getTime())||new Date(e.timestamp).getTime()>=cutoff)return false;
+    const eh=String(e.home||'').trim().toLowerCase(), ea=String(e.away||'').trim().toLowerCase();
+    return (eh===home&&ea===away)||(eh===away&&ea===home);
+  });
+  const pairDecisive=pairRelevant.filter(e=>e.total!==Number(line));
+  const pairOver=pairRelevant.filter(e=>e.total>Number(line));
+  return {
+    entityN:entityDecisive.length,
+    entityOverRate:entityOverRate,
+    pairN:pairDecisive.length,
+    pairOverRate:pairDecisive.length?pairOver.length/pairDecisive.length:null,
+    entityNames:[event.home,event.away].filter(Boolean)
+  };
 }
 function blendForEvent(event,priorEvents){
   if(!event||!event.ladder)return null;
@@ -483,10 +512,14 @@ function isEligibleOU(c){
   return !!(c&&c.marketType==='ou'&&state.eligibility.eligible_markets.includes('ou')&&
     state.eligibility.eligible_ou_lines.some(x=>Math.abs(Number(x)-Number(c.market.line))<0.001));
 }
+function isExperimentalOU(c){
+  return !!(c&&c.marketType==='ou'&&state.eligibility.eligible_markets.includes('ou')&&
+    state.eligibility.experimental_ou_lines.some(x=>Math.abs(Number(x)-Number(c.market.line))<0.001));
+}
 function enrichCandidate(c,e){
   const cal=historicalCalibration(e.product,c.marketType,c.pickCode,c.fairProb,e.start_time);
   let calibrated=cal.prob,source=cal.source,modelMeta=null;
-  if(c.marketType==='ou'&&e.start_time&&isEligibleOU(c)){
+  if(c.marketType==='ou'&&e.start_time&&(isEligibleOU(c)||isExperimentalOU(c))){
     const ladder=fitLambdaFromLadder((e.markets||[]).map(m=>marketOverPoint(m)).filter(Boolean));
     if(ladder){
       const priorEvents=state.modelEvents||[];
@@ -498,7 +531,8 @@ function enrichCandidate(c,e){
       }
     }
   }
-  return Object.assign(c,{calibratedProb:calibrated,calibrationN:cal.n,calibrationSource:source,edge:calibrated-c.bookImplied,modelMeta});
+  const recurrence=(c.marketType==='ou')?recurrenceEvidence(state.modelEvents||[],{product:e.product,home:String(e.home||e.participant_1||''),away:String(e.away||e.participant_2||''),timestamp:e.start_time},Number(c.market.line)):null;
+  return Object.assign(c,{calibratedProb:calibrated,calibrationN:cal.n,calibrationSource:source,edge:calibrated-c.bookImplied,modelMeta,recurrence,experimental:isExperimentalOU(c)});
 }
 function predictionForEvent(e){
   const id=String(e.event_id||e.eventId||'');
@@ -512,7 +546,10 @@ function predictionForEvent(e){
     const c=calculateMarket(m);
     if(c){c.marketType='ou';candidates.push(c);}
   });
-  const eligible=candidates.filter(isEligibleOU).sort((a,b)=>b.fairProb-a.fairProb);
+  const eligible=candidates.filter(c=>isEligibleOU(c)||isExperimentalOU(c)).sort((a,b)=>{
+    const ae=isExperimentalOU(a)?1:0,be=isExperimentalOU(b)?1:0;
+    return (ae-be)||(b.fairProb-a.fairProb);
+  });
   if(!eligible.length)return null;
   const bestOU=enrichCandidate(eligible[0],e);
   const out={product:e.product,competition:e.competition||e.tournament||'',event_id:id,
@@ -555,11 +592,11 @@ function renderPredictionDesk(){
   host.innerHTML=picks.map(function(p,i){
     function row(x,label){
       if(!x)return '<div class="calcRow"><span>'+label+'</span><b>—</b><span>—</span><span>—</span><span>—</span></div>';
-      return '<div class="calcRow"><span>'+label+(x.market.line!=null?' '+x.market.line:'')+'</span><b>'+esc(x.pickCode)+'</b><span>'+fmtPct(x.fairProb)+'</span><span>Fair '+x.fairOdds.toFixed(2)+'</span><span>Book '+x.bookmakerOdds.toFixed(2)+'</span></div>';
+      return '<div class="calcRow"><span>'+label+(x.market.line!=null?' '+x.market.line:'')+(x.experimental?' <em class="experimentalTag">EXPERIMENTAL</em>':'')+'</span><b>'+esc(x.pickCode)+'</b><span>'+fmtPct(x.fairProb)+'</span><span>Fair '+x.fairOdds.toFixed(2)+'</span><span>Book '+x.bookmakerOdds.toFixed(2)+'</span></div>';
     }
     const primaryHtml=p.primary?'<div class="primaryPick"><span>RESEARCH QUALIFIED</span><strong>'+esc(p.primary.pickCode)+'</strong><b>'+fmtPct(p.primary.calibratedProb)+'</b><small>edge '+fmtPct(p.primary.edge)+' · n='+p.primary.calibrationN+'</small></div>':'<div class="primaryPick mutedPrediction"><span>NO QUALIFIED SIGNAL</span><strong>WAIT</strong><b>Market baseline only</b></div>';
     const addLabel=p.primary?'＋ Add qualified pick':'Locked · no qualified signal';
-    return '<article class="predictionCard"><div class="predictionHeader"><div><small>'+esc(p.product)+' · '+esc(p.competition)+'</small><h3>'+esc(p.home)+' <span>vs</span> '+esc(p.away)+'</h3></div><time>'+esc(p.start_time?date(p.start_time):'—')+'</time></div>'+primaryHtml+'<div class="calcTable"><div class="calcHead"><span>Market</span><span>Pick</span><span>Probability</span><span>Fair odds</span><span>SportyBet</span></div>'+row(p.bestWinner,'1X2')+row(p.bestOU,'O/U')+'</div><div class="calcNote">Displayed probabilities are the SportyBet de-vig market baseline. A research pick is shown only after historical calibration and edge gates pass. This is not a guarantee.</div><button class="btn builderAdd" data-pick="'+i+'" '+(p.primary?'':'disabled')+'>'+addLabel+'</button></article>';
+    return '<article class="predictionCard"><div class="predictionHeader"><div><small>'+esc(p.product)+' · '+esc(p.competition)+'</small><h3>'+esc(p.home)+' <span>vs</span> '+esc(p.away)+'</h3></div><time>'+esc(p.start_time?date(p.start_time):'—')+'</time></div>'+primaryHtml+'<div class="calcTable"><div class="calcHead"><span>Market</span><span>Pick</span><span>Probability</span><span>Fair odds</span><span>SportyBet</span></div>'+row(p.bestWinner,'1X2')+row(p.bestOU,'O/U')+'</div><div class="recurrenceNote">'+(p.bestOU&&p.bestOU.recurrence?'Recurring participant evidence: '+p.bestOU.recurrence.entityN+' prior involved events · '+(p.bestOU.recurrence.entityOverRate==null?'—':fmtPct(p.bestOU.recurrence.entityOverRate))+' over rate at the displayed line · exact-pair n='+p.bestOU.recurrence.pairN:'No prior participant recurrence sample yet.')+'</div><div class="calcNote">Displayed probabilities start from the SportyBet de-vig market baseline. O/U 1.5 is now shown as an <strong>experimental</strong> line so recurring team/player evidence can be tested without treating three winning tickets as proof. This is not a guarantee.</div><button class="btn builderAdd" data-pick="'+i+'" '+(p.primary?'':'disabled')+'>'+addLabel+'</button></article>';
   }).join('');
   host.querySelectorAll('.builderAdd').forEach(function(btn){btn.addEventListener('click',function(){const p=picks[Number(btn.dataset.pick)];if(p&&!state.builder.some(function(x){return x.event_id===p.event_id;})){state.builder.push(p);state.builder=state.builder.slice(-4);renderBuilder();}});});
 }
@@ -714,6 +751,7 @@ async function loadEligibility(){
     if(Array.isArray(d.eligible_competitions))state.eligibility.eligible_competitions=d.eligible_competitions;
     if(Array.isArray(d.priority_ou_lines))state.eligibility.priority_ou_lines=d.priority_ou_lines.map(Number);
     if(Array.isArray(d.eligible_ou_lines))state.eligibility.eligible_ou_lines=d.eligible_ou_lines.map(Number);
+    if(Array.isArray(d.experimental_ou_lines))state.eligibility.experimental_ou_lines=d.experimental_ou_lines.map(Number);
     if(Array.isArray(d.policy?.eligible_markets))state.eligibility.eligible_markets=d.policy.eligible_markets;
     state.predictionCache.clear();
     renderEligibilityNotice();
@@ -721,7 +759,7 @@ async function loadEligibility(){
 }
 function renderEligibilityNotice(){
   const host=$('historyMeta');if(!host)return;
-  host.textContent='Research filter active · '+state.eligibility.eligible_competitions.length+' eligible leagues · priority O/U lines '+state.eligibility.priority_ou_lines.join(', ')+' · active '+state.eligibility.eligible_ou_lines.join(', ')+' · O/U 1.5 is monitored until it earns the evidence gate.';
+  host.textContent='Research filter active · '+state.eligibility.eligible_competitions.length+' eligible leagues · active O/U '+state.eligibility.eligible_ou_lines.join(', ')+' · experimental O/U '+state.eligibility.experimental_ou_lines.join(', ')+' · recurring participant patterns are tracked separately.';
 }
 async function loadHistory(){
   const urls=[HISTORY,HISTORY_FALLBACK];
@@ -741,7 +779,7 @@ async function loadHistory(){
       renderModelLab();
       rebuildPredictionDesk();
       const status=$('historyStatus');if(status)status.textContent='AUTO-COLLECTED · '+arr.length+' settled observations';
-      const meta=$('historyMeta');if(meta)meta.textContent='Research filter active · '+state.eligibility.eligible_competitions.length+' eligible leagues · priority O/U lines '+state.eligibility.priority_ou_lines.join(', ')+' · active '+state.eligibility.eligible_ou_lines.join(', ')+' · historical refresh '+new Date().toLocaleString();
+      const meta=$('historyMeta');if(meta)meta.textContent='Research filter active · '+state.eligibility.eligible_competitions.length+' eligible leagues · active O/U '+state.eligibility.eligible_ou_lines.join(', ')+' · experimental O/U '+state.eligibility.experimental_ou_lines.join(', ')+' · historical refresh '+new Date().toLocaleString();
       return;
     }catch(e){lastError=e;}
   }
