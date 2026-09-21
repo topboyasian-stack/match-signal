@@ -123,7 +123,7 @@ jobs:
           import { writeFileSync } from 'node:fs';
           const base = 'https://match-signal.pages.dev';
           const pages = ['/', '/expansion.html', '/live.html', '/basketball.html', '/performance.html', '/research.html', '/virtual-lab'];
-          const assets = ['/api/sportybet-virtual','/expansion.js', '/expansion-odds-builder.js', '/live-analysis.js', '/live-data-worker.js', '/virtual-lab.js', '/virtual-lab.css', '/_redirects', '/data/predictions.json', '/data/expansion_status.json', '/data/odds_builder.json', '/data/virtual_lab_live.json'];
+          const assets = ['/api/sportybet-virtual','/expansion.js', '/expansion-odds-builder.js', '/live-analysis.js', '/live-data-worker.js', '/virtual-lab.js', '/virtual-lab.css', '/_redirects', '/data/predictions.json', '/data/expansion_status.json', '/data/odds_builder.json', '/data/virtual_lab_live.json','/data/virtual_lab_model_eval.json','/data/virtual_lab_eligibility.json'];
           const failures = [];
           async function get(path) {
             const r = await fetch(base + path + (path.includes('?') ? '&' : '?') + 'smoke=' + Date.now(), {cache:'no-store'});
@@ -157,6 +157,26 @@ jobs:
               if (path.endsWith('.json')) JSON.parse(body);
             } catch(e) { failures.push(path+' '+e.message); }
           }
+          try {
+            const {r,body}=await get('/data/virtual_lab_model_eval.json');
+            if (!r.ok) failures.push('/data/virtual_lab_model_eval.json HTTP '+r.status);
+            else {
+              const m=JSON.parse(body);
+              if (!m.holdout || !m.participant_feature_gate) failures.push('/data/virtual_lab_model_eval.json missing holdout/gate');
+              else console.log('Virtual Lab model artifact passed: holdout '+(m.holdout.rows||0)+' rows; participant gate '+(m.participant_feature_gate.pass?'PASS':'WAIT'));
+            }
+          } catch(e) { failures.push('/data/virtual_lab_model_eval.json '+e.message); }
+
+          try {
+            const {r,body}=await get('/data/virtual_lab_eligibility.json');
+            if (!r.ok) failures.push('/data/virtual_lab_eligibility.json HTTP '+r.status);
+            else {
+              const e=JSON.parse(body);
+              if (!Array.isArray(e.eligible_ou_lines)) failures.push('/data/virtual_lab_eligibility.json missing eligible_ou_lines');
+              else console.log('Virtual Lab eligibility artifact passed: active lines '+JSON.stringify(e.eligible_ou_lines));
+            }
+          } catch(e) { failures.push('/data/virtual_lab_eligibility.json '+e.message); }
+
           try {
             const {r,body}=await get('/api/espn?path='+encodeURIComponent('/apis/site/v2/sports/basketball/nba/scoreboard'));
             if (!r.ok) failures.push('/api/espn NBA HTTP '+r.status);
