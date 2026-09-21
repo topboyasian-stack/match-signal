@@ -9,7 +9,7 @@ const LIVE_REFRESH_MS=30000;
 const UI_BUILD='20260921-v13';
 const HISTORY='./api/virtual-lab-history';
 const HISTORY_FALLBACK='./data/virtual_lab_history.json';
-const state={rows:[],filtered:[],live:[],liveMode:'none',liveUpdated:null,picks:[],builder:[],historyLoaded:false,modelRows:[],modelEvents:[]};
+const state={rows:[],filtered:[],live:[],liveMode:'none',liveUpdated:null,picks:[],builder:[],historyLoaded:false,modelRows:[],modelEvents:[],modelGate:false,modelHoldout:null};
 
 const $=id=>document.getElementById(id);
 const esc=v=>{const d=document.createElement('div');d.textContent=String(v??'');return d.innerHTML};
@@ -390,7 +390,7 @@ function buildModelBacktest(rows){
       if(!overModel)continue;
       const baseline=String(r.selection||'').toUpperCase().startsWith('U')?1-Number(r.model_prob):Number(r.model_prob);
       const model=String(r.selection||'').toUpperCase().startsWith('U')?1-overModel.prob:overModel.prob;
-      outputs.push(Object.assign({},r,{baselineProb:clamp01(baseline),modelProb:clamp01(model),ladderLambda:overModel.lambda,productPriorProb:overModel.priorProb,blendAlpha:overModel.alpha}));
+      outputs.push(Object.assign({},r,{baselineProb:clamp01(baseline),modelProb:clamp01(model),ladderLambda:overModel.lambda,productPriorProb:overModel.priorProb,blendAlpha:overModel.alpha,modelEventKey:e.key}));
     }
   }
   state.modelRows=outputs;
@@ -406,7 +406,11 @@ function scoreProbabilities(rows){
   };
   const by={};
   valid.forEach(r=>(by[r.product]??=[]).push(r));
-  return {all:{baseline:calc('baselineProb'),model:calc('modelProb')},products:Object.fromEntries(Object.entries(by).map(([p,a])=>{const old=valid;const fn=key=>{let b=0,l=0;a.forEach(r=>{const q=clamp01(r[key]),y=r.win?1:0;b+=(y-q)*(y-q);l+=-(y*Math.log(q)+(1-y)*Math.log(1-q));});return {n:a.length,brier:b/a.length,logLoss:l/a.length};};return [p,{baseline:fn('baselineProb'),model:fn('modelProb')}]}))};
+  const keys=[...new Set(valid.map(r=>r.modelEventKey))];
+  const cut=Math.max(1,Math.floor(keys.length*0.8)),holdKeys=new Set(keys.slice(cut));
+  const holdout=valid.filter(r=>holdKeys.has(r.modelEventKey));
+  const scoreSet=a=>{if(!a.length)return null;const fn=key=>{let b=0,l=0;a.forEach(r=>{const q=clamp01(r[key]),y=r.win?1:0;b+=(y-q)*(y-q);l+=-(y*Math.log(q)+(1-y)*Math.log(1-q));});return {n:a.length,brier:b/a.length,logLoss:l/a.length};};return {baseline:fn('baselineProb'),model:fn('modelProb'),events:new Set(a.map(r=>r.modelEventKey)).size};};
+  return {all:{baseline:calc('baselineProb'),model:calc('modelProb')},holdout:scoreSet(holdout),holdoutEvents:holdKeys.size,products:Object.fromEntries(Object.entries(by).map(([p,a])=>[p,scoreSet(a)]))};
 }
 function renderModelLab(){
   const host=$('modelLab');if(!host)return;
@@ -419,8 +423,13 @@ function renderModelLab(){
   Object.entries(scores.products).forEach(([p,s])=>{html+='<tr><td>'+esc(p)+'</td><td>'+s.model.n+'</td><td>'+cell(s.baseline.brier)+'</td><td>'+cell(s.model.brier)+'</td><td>'+delta(s.baseline.brier,s.model.brier)+'</td><td>'+cell(s.baseline.logLoss)+'</td><td>'+cell(s.model.logLoss)+'</td><td>'+delta(s.baseline.logLoss,s.model.logLoss)+'</td></tr>';});
   if(scores.all.model)html+='<tr><td><strong>ALL O/U</strong></td><td>'+scores.all.model.n+'</td><td>'+cell(scores.all.baseline.brier)+'</td><td>'+cell(scores.all.model.brier)+'</td><td>'+delta(scores.all.baseline.brier,scores.all.model.brier)+'</td><td>'+cell(scores.all.baseline.logLoss)+'</td><td>'+cell(scores.all.model.logLoss)+'</td><td>'+delta(scores.all.baseline.logLoss,scores.all.model.logLoss)+'</td></tr>';
   html+='</tbody></table>';
+  const h=scores.holdout;
+  const holdoutPass=!!(h&&h.n>=20&&h.model.brier<h.baseline.brier&&h.model.logLoss<h.baseline.logLoss);
+  state.modelHoldout=h;
+  state.modelGate=holdoutPass;
   const qualified=Object.entries(scores.products).filter(([p,s])=>s.model.n>=30&&s.model.brier<s.baseline.brier&&s.model.logLoss<s.baseline.logLoss).map(([p])=>p);
-  html+='<p class="muted"><strong>Model gate:</strong> '+(qualified.length?esc(qualified.join(', '))+' currently beats the market on both scoring losses in-sample walk-forward rows. This still requires a fresh untouched validation block before money use.':'NO PRODUCT QUALIFIES YET — the model is research-only.')+'</p>';
+  html+='<p class="muted"><strong>Walk-forward model gate:</strong> '+(holdoutPass?'PASS — the final untouched event block beats the SportyBet baseline on both Brier and log loss.':'NO PASS — the final untouched event block does not beat the SportyBet baseline on both metrics, or has too few observations.')+'</p>';
+  html+='<p class="muted"><strong>Research note:</strong> '+(qualified.length?esc(qualified.join(', '))+' improves the aggregate walk-forward scores, but aggregate improvement is not enough for activation.':'No product currently improves the aggregate walk-forward scores on both metrics.')+' The model remains paper-only until the untouched holdout passes.</p>';
   host.innerHTML=html;
 }
 
@@ -462,7 +471,8 @@ function historicalCalibration(product,marketType,pickCode,rawProb,startTime){
 function qualifiesResearchPick(c){
   if(!c)return false;
   const edge=c.calibratedProb-c.bookImplied;
-  return state.historyLoaded && c.calibrationN>=30 && edge>=0.02;
+  const modelOk=c.marketType==='ou'?state.modelGate:true;
+  return state.historyLoaded && modelOk && c.calibrationN>=30 && edge>=0.02;
 }
 function enrichCandidate(c,e){
   const cal=historicalCalibration(e.product,c.marketType,c.pickCode,c.fairProb,e.start_time);
@@ -695,6 +705,7 @@ async function loadHistory(){
       buildModelBacktest(state.rows);
       state.modelEvents=historicalOUEvents(state.rows);
       applyFilters(false);
+      renderModelLab();
       rebuildPredictionDesk();
       renderModelLab();
       const status=$('historyStatus');if(status)status.textContent='AUTO-COLLECTED · '+arr.length+' settled observations';
