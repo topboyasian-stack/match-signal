@@ -84,23 +84,32 @@ export async function onRequestGet(context){
   for(const row of out) if(row.event_id) dedup.set(row.event_id,row);
   const events=[...dedup.values()];
   const counts={};
+  const filtered=[];
   for(const e of events){
-    const key=/eadriatic/i.test(e.tournament+' '+e.category)?'efootball_adriatic':
-      /gt sports league|gt leagues|efootball|e soccer|esoccer/i.test(e.tournament+' '+e.category+' '+e.participant_1+' '+e.participant_2)?'efootball_gt':
-      /simulated reality|\bsrl\b/i.test(e.tournament+' '+e.category)?'srl':
-      /virtual football/i.test(e.tournament+' '+e.category)?'vfootball':
-      /zoom|turbo|virtual|simulated/i.test(e.tournament+' '+e.category)?'other':null;
-    e.product=key||'other';
-    counts[e.product]=(counts[e.product]||0)+1;
+    const blob=(e.tournament+' '+e.category+' '+e.participant_1+' '+e.participant_2).toLowerCase();
+    let key=null;
+    if(e.source==='efootball'){
+      key=/eadriatic/.test(blob)?'efootball_adriatic':'efootball_gt';
+    }else if(e.source==='vfootball'){
+      key='vfootball';
+    }else if(e.source==='srl' && (/simulated reality/.test(blob)||/\bsrl\b/i.test(blob)||/simulated/.test(blob))){
+      key='srl';
+    }else if(/zoom|turbo/i.test(blob)){
+      key='zoom';
+    }
+    if(!key) continue;
+    e.product=key;
+    filtered.push(e);
+    counts[key]=(counts[key]||0)+1;
   }
 
   return new Response(JSON.stringify({
     ok:true,
     status:events.length?'LIVE':'UPSTREAM_EMPTY',
     updated_at:new Date().toISOString(),
-    events_count:events.length,
+    events_count:filtered.length,
     product_counts:counts,
     errors,
-    events
+    events:filtered
   }),{status:200,headers:headers()});
 }
