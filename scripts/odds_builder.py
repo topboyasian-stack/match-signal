@@ -21,13 +21,15 @@ CANDIDATES=DATA/"selection_candidates.json"
 PREDICTIONS=DATA/"predictions.json"
 OUTPUT=DATA/"odds_builder.json"
 HISTORY=DATA/"prediction_history.json"
+SELECTION_GATE=DATA/"selection_gate.json"
+RISK_GATE=DATA/"risk_gate.json"
 
 MIN_PROB=0.60
 MIN_EDGE=0.025
 MAX_ODDS_AGE_SECONDS=900
 MAX_UNCERTAINTY=0.22
 MIN_DATA_QUALITY=0.70
-MIN_LEGS,MAX_LEGS=2,4
+MIN_LEGS,MAX_LEGS=3,4
 
 
 def load(path, default):
@@ -248,8 +250,19 @@ def recent_settled(history,now,known):
 
 def main():
     now=datetime.now(timezone.utc)
-    football=football_candidates(now); tennis=tennis_candidates(now)
-    selected,built=select_value(football+tennis)
+    gate=load(SELECTION_GATE,{})
+    risk=load(RISK_GATE,{})
+    gate_status=str(gate.get("status") or "")
+    selected_predictions=int(gate.get("selected_predictions") or 0)
+    tennis_risk=(risk.get("gate") or {}).get("tennis") or {}
+    tennis_live_eligible=bool(tennis_risk.get("live_eligible") is True)
+    # The accumulator must never bypass the upstream research/risk gate.
+    # This prevents the builder from turning a losing public prediction feed
+    # into an apparent betting recommendation.
+    upstream_blocked = gate_status not in {"ok","PASS"} or selected_predictions <= 0 or not tennis_live_eligible
+    football=football_candidates(now)
+    tennis=tennis_candidates(now)
+    selected,built=select_value([] if upstream_blocked else (football+tennis))
     previous=load(OUTPUT,{})
     previous_ids={str(x) for x in (previous.get("builder_event_ids",[]) if isinstance(previous,dict) else []) if x}
     previous_ids.update(str(x.get("event_id")) for x in (previous.get("qualified_legs",[]) if isinstance(previous,dict) else []) if isinstance(x,dict) and x.get("event_id"))
@@ -258,9 +271,27 @@ def main():
     selected=[x for x in selected if str(x.get("event_id")) not in settled_ids]
     sports=sorted({x["sport"] for x in selected})
     status="LIVE_VALUE_SET" if len(selected)>=MIN_LEGS else ("SINGLE_LIVE_VALUE" if selected else "NO_BET")
+    rejection_counts={}
+    for leg in built:
+        status=str(leg.get("status") or "REJECTED")
+        rejection_counts[status]=rejection_counts.get(status,0)+1
     result={
-        "generated_at":now.isoformat(),"engine_version":"V6.0-MARKET-CALIBRATED",
-        "mode":"PAPER_ONLY","target_legs":"2-4","sports_supported":["football","tennis"],
+        "generated_at":now.isoformat(),"engine_version":"V6.1-RESEARCH-GATED",
+        "mode":"PAPER_ONLY","target_legs":"3-4","sports_supported":["football","tennis"],
+        "research_gate":{
+            "selection_gate_status":gate_status,
+            "selected_predictions":selected_predictions,
+            "tennis_live_eligible":tennis_live_eligible,
+            "upstream_blocked":upstream_blocked,
+            "risk_reasons":tennis_risk.get("reasons",[]),
+            "selection_reasons":gate.get("rejection_reasons",{})
+        },
+        "candidate_diagnostics":{
+            "football_candidates":len(football),
+            "tennis_candidates":len(tennis),
+            "evaluated":len(built),
+            "rejections":rejection_counts
+        },
         "selection_policy":{"min_calibrated_probability":MIN_PROB,"min_model_edge":MIN_EDGE,
             "max_odds_age_seconds":MAX_ODDS_AGE_SECONDS,"max_uncertainty":MAX_UNCERTAINTY,
             "min_data_quality":MIN_DATA_QUALITY,"requires_live_sportybet_price":True,
@@ -273,7 +304,7 @@ def main():
         "rejected_candidates":[x for x in built if not x["real_money_eligible"]][:20],
         "settled_legs":recent_settled(load(HISTORY,[]),now,known),
         "builder_event_ids":sorted(known),"leg_count":len(selected),"sports_selected":sports,
-        "status":status,
+        "status":("UPSTREAM_RESEARCH_GATE_BLOCKED" if upstream_blocked else status),
         "reference_combined_odds":round(math.prod(x["model_fair_odds"] for x in selected),3) if selected else None,
         "reference_odds_type":"MODEL_FAIR_ODDS_NOT_BOOKMAKER_PRICE",
         "market_price_combined_odds":round(math.prod(x["bookmaker_odds"] for x in selected),3) if selected and all(x.get("bookmaker_odds") is not None for x in selected) else None,
