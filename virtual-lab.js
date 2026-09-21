@@ -236,6 +236,16 @@ function marketLabel(m){
   const line=m?.line!=null?' '+m.line:'';
   return (name||'Market')+line;
 }
+function outcomePick(m,o){
+  const name=String(o?.name||'').trim();
+  const line=m?.line!=null?String(m.line):'';
+  if(/^over\b/i.test(name))return 'O'+line;
+  if(/^under\b/i.test(name))return 'U'+line;
+  if(/^home$/i.test(name))return '1';
+  if(/^draw$/i.test(name))return 'X';
+  if(/^away$/i.test(name))return '2';
+  return name;
+}
 function noVigOutcomes(m){
   const outs=(m?.outcomes||[]).filter(o=>Number.isFinite(Number(o.odds))&&Number(o.odds)>1);
   if(outs.length<2)return [];
@@ -245,24 +255,24 @@ function noVigOutcomes(m){
 }
 function predictionForEvent(e,chosenMarket){
   let markets=(e.markets||[]).filter(m=>matchesMarket(m,chosenMarket));
-  if(chosenMarket==='all'){
-    const preferred=markets.find(m=>m.id==='1'||m.id==='186'||/1x2|winner|match result/i.test(m.name||''))||
-      markets.find(m=>m.id==='18'||m.id==='189'||/total|over\/under/i.test(m.name||''))||markets[0];
-    markets=preferred?[preferred]:[];
-  }
+  if(!markets.length)return null;
+  // For an explicit O/U filter, rank the available O/U lines by the best
+  // de-vig side probability and display the actual line in the pick.
   let best=null;
   for(const m of markets){
     const outcomes=noVigOutcomes(m);
     if(!outcomes.length)continue;
     const candidate=outcomes.reduce((a,b)=>b.fairProb>a.fairProb?b:a);
-    if(!best||candidate.fairProb>best.fairProb)best={market:m,outcome:candidate};
+    if(!best||candidate.fairProb>best.outcome.fairProb){
+      best={market:m,outcome:candidate};
+    }
   }
   if(!best)return null;
-  const p=best.outcome.fairProb;
   return {
     market:best.market,
     selection:best.outcome.name||'Selected side',
-    probabilityText:(p*100).toFixed(1)+'%',
+    pick:outcomePick(best.market,best.outcome),
+    probabilityText:(best.outcome.fairProb*100).toFixed(1)+'%',
     marketText:marketLabel(best.market)
   };
 }
@@ -276,23 +286,27 @@ function renderLive(){
     const bLive=b.start_time&&new Date(b.start_time).getTime()<=now?0:1;
     return aLive-bLive||((new Date(a.start_time||0).getTime())-(new Date(b.start_time||0).getTime()));
   });
+
   const list=sorted.map(e=>{
     const shownMarkets=e.markets.filter(m=>matchesMarket(m,market)).slice(0,3);
     const chips=shownMarkets.flatMap(m=>m.outcomes.slice(0,4).map(o=>
-      '<span class="liveChip"><span>'+esc(shortOutcome(o.name))+'</span> <b>'+Number(o.odds).toFixed(2)+'</b></span>'
+      '<span class="liveChip"><span>'+esc(outcomePick(m,o))+'</span> <b>'+Number(o.odds).toFixed(2)+'</b></span>'
     )).join('');
     const pred=predictionForEvent(e,market);
     const predictionHtml=pred?
-      '<div class="predictionBox"><div class="predictionTop"><span class="predictionLabel">PREDICTION</span><span class="predictionType">Live market baseline</span></div><div class="predictionPick">'+esc(pred.selection)+' <b>'+esc(pred.probabilityText)+'</b></div><div class="predictionMeta">'+esc(pred.marketText)+' · no-vig implied probability · validated research model not yet qualified</div></div>':
-      '<div class="predictionBox mutedPrediction"><div class="predictionLabel">PREDICTION</div><div class="predictionPick">No readable market prediction</div><div class="predictionMeta">SportyBet returned insufficient priced outcomes for a baseline.</div></div>';
+      '<div class="predictionBox"><div class="predictionTop"><span class="predictionLabel">PICK</span><span class="predictionType">Live market baseline</span></div><div class="predictionPick">'+esc(pred.pick)+' <b>'+esc(pred.probabilityText)+'</b></div><div class="predictionMeta">'+esc(pred.marketText)+' · current no-vig implied probability</div></div>':
+      '<div class="predictionBox mutedPrediction"><div class="predictionLabel">PICK</div><div class="predictionPick">NO QUALIFIED PICK</div><div class="predictionMeta">No readable two-sided market was returned for this event.</div></div>';
+
     return '<article class="liveCard"><div class="liveTop"><span>'+esc(e.competition||e.product)+'</span><span>'+esc(e.start_time?date(e.start_time):'Time n/a')+'</span></div>'+
-      '<div class="liveTeams"><strong>'+esc(e.home||'Participant 1')+'</strong> <span>vs</span> <strong>'+esc(e.away||'Participant 2')+'</strong></div>'+
+      '<div class="liveTeams"><strong>'+esc(e.home||e.participant_1||'Unknown player/team')+'</strong> <span>vs</span> <strong>'+esc(e.away||e.participant_2||'Unknown player/team')+'</strong></div>'+
       predictionHtml+
-      '<div class="liveOdds">'+(chips||'<span class="liveMeta">Markets returned without readable odds</span>')+'</div>'+
+      '<div class="liveOdds">'+(chips||'<span class="liveMeta">No priced markets returned</span>')+'</div>'+
       '<div class="liveCardMeta"><span>Event '+esc(e.event_id||'—')+'</span><span>'+esc(e.match_status||'status unavailable')+'</span></div></article>';
   }).slice(0,30);
+
   $('liveGrid').innerHTML=list.join('');
   $('liveEmpty').hidden=!!list.length;
+
   if(state.liveMode==='remote'){
     $('liveDot').className='liveDot';
     $('liveTitle').textContent='LIVE SOURCE ONLINE';
@@ -303,6 +317,7 @@ function renderLive(){
     $('liveDot').className='liveDot wait';
     $('liveTitle').textContent='CONNECTING TO LIVE SOURCE…';
   }
+
   const counts={};
   state.live.forEach(e=>counts[e.product]=(counts[e.product]||0)+1);
   const countText=Object.entries(counts).map(([k,v])=>k+': '+v).join(' · ')||'0 virtual events';
@@ -363,7 +378,16 @@ async function fetchLiveSnapshot(){
   const r=await fetch(SNAPSHOT,{cache:'no-store'});
   if(!r.ok)throw new Error('Live snapshot HTTP '+r.status);
   const body=await r.json();
-  return {events:Array.isArray(body.events)?body.events:[],updated_at:body.updated_at||null};
+  const events=(Array.isArray(body.events)?body.events:[]).map(e=>({
+    ...e,
+    home:String(e.home||e.participant_1||e.homeTeamName||''),
+    away:String(e.away||e.participant_2||e.awayTeamName||''),
+    event_id:String(e.event_id||e.eventId||''),
+    start_time:e.start_time||null,
+    match_status:e.match_status||e.matchStatus||null,
+    markets:Array.isArray(e.markets)?e.markets:[]
+  })).filter(e=>e.event_id);
+  return {events,updated_at:body.updated_at||null};
 }
 
 async function loadLive(){
