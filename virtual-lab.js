@@ -6,11 +6,12 @@ const LIVE_API='https://match-signal.pages.dev/api/sportybet-virtual';
 const LIVE_MARKETS='1,18,10,29,11,26,36,14,60100,186,189,202,204,210';
 const SNAPSHOT='./data/virtual_lab_live.json';
 const LIVE_REFRESH_MS=30000;
-const UI_BUILD='20260921-v20';
+const UI_BUILD='20260922-v21';
 const HISTORY='./api/virtual-lab-history';
 const HISTORY_FALLBACK='./data/virtual_lab_history.json';
+const MODEL_EVAL='./data/virtual_lab_model_eval.json';
 const ELIGIBILITY='./data/virtual_lab_eligibility.json';
-const state={rows:[],filtered:[],live:[],liveMode:'none',liveUpdated:null,picks:[],builder:[],historyLoaded:false,modelRows:[],modelEvents:[],modelGate:false,modelHoldout:null,eligibility:{eligible_competitions:['Esoccer H2H GG League','Europa League','Volta Premier League'],eligible_ou_lines:[3.5,4.5],experimental_ou_lines:[1.5],priority_ou_lines:[1.5,3.5,4.5],eligible_markets:['ou']},predictionCache:new Map()};
+const state={rows:[],filtered:[],live:[],liveMode:'none',liveUpdated:null,picks:[],builder:[],historyLoaded:false,modelRows:[],modelEvents:[],modelGate:false,modelHoldout:null,modelEvaluation:null,eligibility:{eligible_competitions:['Esoccer H2H GG League','Europa League','Volta Premier League'],eligible_ou_lines:[3.5,4.5],experimental_ou_lines:[1.5],priority_ou_lines:[1.5,3.5,4.5],eligible_markets:['ou']},predictionCache:new Map()};
 
 const $=id=>document.getElementById(id);
 const esc=v=>{const d=document.createElement('div');d.textContent=String(v??'');return d.innerHTML};
@@ -520,24 +521,38 @@ function renderParticipantLab(){
   host.innerHTML=html;
 }
 
-function renderModelLab(){
+async function renderModelLab(){
   const host=$('modelLab');if(!host)return;
+  const artifact=state.modelEvaluation;
+  if(artifact){
+    const fmt=v=>v==null?'—':Number(v).toFixed(4);
+    const pct=v=>v==null?'—':(Number(v)*100).toFixed(1)+'%';
+    const row=(name,a,b)=>'<tr><td>'+esc(name)+'</td><td>'+((a&&a.n)||'—')+'</td><td>'+fmt(a&&a.brier)+'</td><td>'+fmt(b&&b.brier)+'</td><td>'+fmt(a&&a.log_loss)+'</td><td>'+fmt(b&&b.log_loss)+'</td><td>'+pct(b&&b.hit_rate)+'</td><td>'+pct(b&&b.ece)+'</td></tr>';
+    const h=artifact.holdout_metrics||{};
+    let html='<div class="modelGrid"><div><h3>Strict walk-forward evaluation</h3><p class="muted">Every event is scored chronologically using only settled events that occurred before it. The final '+pct(artifact.holdout?.fraction)+' event block is untouched during discovery. No user-reported tickets enter the dataset.</p></div><div><h3>Model gate</h3><p class="muted">Lower Brier/log loss are better. Calibration is measured with expected calibration error. Hit rate is the selected-side hit rate at p≥0.50.</p><p><strong>Participant feature:</strong> '+(artifact.participant_feature_gate?.pass?'QUALIFIED ON HOLDOUT':'NOT QUALIFIED YET')+'</p></div></div>';
+    html+='<table><thead><tr><th>Variant</th><th>Holdout N</th><th>Brier</th><th>Δ vs market</th><th>Log loss</th><th>Δ vs market</th><th>Hit rate</th><th>ECE</th></tr></thead><tbody>';
+    const market=h.market||{}; for(const [name,label] of [['market','SportyBet de-vig baseline'],['poisson','Line-ladder Poisson'],['poisson_prior','Poisson + product prior'],['participant_model','Participant-aware model']]){
+      const m=h[name]; const db=m&&market.brier!=null?m.brier-market.brier:null; const dl=m&&market.log_loss!=null?m.log_loss-market.log_loss:null;
+      html+='<tr><td><strong>'+label+'</strong></td><td>'+((m&&m.n)||'—')+'</td><td>'+fmt(m&&m.brier)+'</td><td>'+fmt(db)+'</td><td>'+fmt(m&&m.log_loss)+'</td><td>'+fmt(dl)+'</td><td>'+pct(m&&m.hit_rate)+'</td><td>'+pct(m&&m.ece)+'</td></tr>';
+    }
+    html+='</tbody></table>';
+    html+='<h3>Holdout by O/U line</h3><table><thead><tr><th>Line</th><th>N</th><th>Market Brier</th><th>Participant Brier</th><th>Market Log loss</th><th>Participant Log loss</th><th>Participant hit</th></tr></thead><tbody>';
+    Object.entries(artifact.by_line||{}).forEach(([line,x])=>{const a=x.holdout?.market,b=x.holdout?.participant_model;html+='<tr><td>'+esc(line)+'</td><td>'+((b&&b.n)||'—')+'</td><td>'+fmt(a&&a.brier)+'</td><td>'+fmt(b&&b.brier)+'</td><td>'+fmt(a&&a.log_loss)+'</td><td>'+fmt(b&&b.log_loss)+'</td><td>'+pct(b&&b.hit_rate)+'</td></tr>';});
+    html+='</tbody></table>';
+    html+='<p class="muted"><strong>Untouched participant rows:</strong> '+((artifact.holdout&&artifact.holdout.participant_rows)||0)+' · required '+((artifact.participant_feature_gate&&artifact.participant_feature_gate.minimum_untouched_participant_rows)||0)+'. <strong>Gate:</strong> '+(artifact.participant_feature_gate?.pass?'PASS':'WAIT')+'.</p>';
+    html+='<p class="muted">O/U 1.5 is evaluated separately and remains experimental unless its own untouched evidence clears the same discipline. The Odds Builder never uses the experimental watch as a qualified signal.</p>';
+    host.innerHTML=html;
+    return;
+  }
   const rows=state.modelRows||[],scores=scoreProbabilities(rows);
   if(!rows.length){host.innerHTML='<div class="empty">Need settled O/U observations with complete pre-event line data. Collect more events before trusting this model.</div>';return;}
-  const cell=(v,d=4)=>v==null?'—':Number(v).toFixed(d);
-  const delta=(a,b)=>a==null||b==null?'—':(a-b).toFixed(4);
-  let html='<div class="modelGrid"><div><h3>O/U line-ladder model</h3><p class="muted">Fits a Poisson total-goals distribution to the full observed O/U ladder, blends it with a product-specific historical prior, then adds a conservative same-product participant recurrence feature once the exact-line sample is large enough. Every feature uses only events that occurred before the scored event.</p></div><div><h3>Scoring rules</h3><p class="muted">Brier and log loss are lower-is-better probability losses. The market baseline is the SportyBet de-vig probability; the model must improve on it out-of-sample before becoming eligible.</p></div></div>';
+  const cell=(v,d=4)=>v==null?'—':Number(v).toFixed(d),delta=(a,b)=>a==null||b==null?'—':(a-b).toFixed(4);
+  let html='<div class="modelGrid"><div><h3>O/U line-ladder model</h3><p class="muted">Local fallback scoring is active while the collector-generated strict evaluation artifact is unavailable.</p></div></div>';
   html+='<table><thead><tr><th>Product</th><th>N</th><th>Market Brier</th><th>Model Brier</th><th>Δ Brier</th><th>Market LogLoss</th><th>Model LogLoss</th><th>Δ LogLoss</th></tr></thead><tbody>';
-  Object.entries(scores.products).forEach(([p,s])=>{html+='<tr><td>'+esc(p)+'</td><td>'+s.model.n+'</td><td>'+cell(s.baseline.brier)+'</td><td>'+cell(s.model.brier)+'</td><td>'+delta(s.baseline.brier,s.model.brier)+'</td><td>'+cell(s.baseline.logLoss)+'</td><td>'+cell(s.model.logLoss)+'</td><td>'+delta(s.baseline.logLoss,s.model.logLoss)+'</td></tr>';});
-  if(scores.all.model)html+='<tr><td><strong>ALL O/U</strong></td><td>'+scores.all.model.n+'</td><td>'+cell(scores.all.baseline.brier)+'</td><td>'+cell(scores.all.model.brier)+'</td><td>'+delta(scores.all.baseline.brier,scores.all.model.brier)+'</td><td>'+cell(scores.all.baseline.logLoss)+'</td><td>'+cell(scores.all.model.logLoss)+'</td><td>'+delta(scores.all.baseline.logLoss,scores.all.model.logLoss)+'</td></tr>';
+  Object.entries(scores.products).forEach(([p,x])=>{html+='<tr><td>'+esc(p)+'</td><td>'+x.model.n+'</td><td>'+cell(x.baseline.brier)+'</td><td>'+cell(x.model.brier)+'</td><td>'+delta(x.baseline.brier,x.model.brier)+'</td><td>'+cell(x.baseline.logLoss)+'</td><td>'+cell(x.model.logLoss)+'</td><td>'+delta(x.baseline.logLoss,x.model.logLoss)+'</td></tr>';});
   html+='</tbody></table>';
-  const h=scores.holdout;
-  const holdoutPass=!!(h&&h.n>=20&&h.model.brier<h.baseline.brier&&h.model.logLoss<h.baseline.logLoss);
-  state.modelHoldout=h;
-  state.modelGate=holdoutPass;
-  const qualified=Object.entries(scores.products).filter(([p,s])=>s.model.n>=30&&s.model.brier<s.baseline.brier&&s.model.logLoss<s.baseline.logLoss).map(([p])=>p);
-  html+='<p class="muted"><strong>Walk-forward model gate:</strong> '+(holdoutPass?'PASS — the final untouched event block beats the SportyBet baseline on both Brier and log loss.':'NO PASS — the final untouched event block does not beat the SportyBet baseline on both metrics, or has too few observations.')+'</p>';
-  html+='<p class="muted"><strong>Research note:</strong> '+(qualified.length?esc(qualified.join(', '))+' improves the aggregate walk-forward scores, but aggregate improvement is not enough for activation.':'No product currently improves the aggregate walk-forward scores on both metrics.')+' The model remains paper-only until the untouched holdout passes.</p>';
+  state.modelHoldout=scores.holdout;
+  state.modelGate=!!(scores.holdout&&scores.holdout.n>=20&&scores.holdout.model.brier<scores.holdout.baseline.brier&&scores.holdout.model.logLoss<scores.holdout.baseline.logLoss);
   host.innerHTML=html;
 }
 
@@ -847,6 +862,20 @@ function renderEligibilityNotice(){
   const host=$('historyMeta');if(!host)return;
   host.textContent='Research filter active · '+state.eligibility.eligible_competitions.length+' eligible leagues · active O/U '+state.eligibility.eligible_ou_lines.join(', ')+' · experimental O/U '+state.eligibility.experimental_ou_lines.join(', ')+' · recurring participant patterns are tracked separately.';
 }
+async function loadModelEvaluation(){
+  try{
+    const r=await fetch(MODEL_EVAL+'?t='+Date.now(),{cache:'no-store',headers:{'Accept':'application/json'}});
+    if(!r.ok)throw new Error('model eval HTTP '+r.status);
+    state.modelEvaluation=await r.json();
+    const gate=state.modelEvaluation.participant_feature_gate;
+    state.modelGate=!!(gate&&gate.pass);
+    return true;
+  }catch(e){
+    state.modelEvaluation=null;
+    console.warn('Virtual Lab model evaluation fallback:',e);
+    return false;
+  }
+}
 async function loadHistory(){
   const urls=[HISTORY,HISTORY_FALLBACK];
   let lastError=null;
@@ -859,6 +888,7 @@ async function loadHistory(){
       state.rows=arr.map(normalize);
       state.historyLoaded=true;
       state.predictionCache.clear();
+      await loadModelEvaluation();
       buildModelBacktest(state.rows);
       state.modelEvents=historicalOUEvents(state.rows);
       applyFilters(false);
