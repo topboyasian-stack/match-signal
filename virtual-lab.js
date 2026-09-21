@@ -6,10 +6,11 @@ const LIVE_API='https://match-signal.pages.dev/api/sportybet-virtual';
 const LIVE_MARKETS='1,18,10,29,11,26,36,14,60100,186,189,202,204,210';
 const SNAPSHOT='./data/virtual_lab_live.json';
 const LIVE_REFRESH_MS=30000;
-const UI_BUILD='20260921-v14';
+const UI_BUILD='20260921-v15';
 const HISTORY='./api/virtual-lab-history';
 const HISTORY_FALLBACK='./data/virtual_lab_history.json';
-const state={rows:[],filtered:[],live:[],liveMode:'none',liveUpdated:null,picks:[],builder:[],historyLoaded:false,modelRows:[],modelEvents:[],modelGate:false,modelHoldout:null};
+const ELIGIBILITY='./data/virtual_lab_eligibility.json';
+const state={rows:[],filtered:[],live:[],liveMode:'none',liveUpdated:null,picks:[],builder:[],historyLoaded:false,modelRows:[],modelEvents:[],modelGate:false,modelHoldout:null,eligibility:{eligible_competitions:['Esoccer H2H GG League','Europa League','Volta Premier League'],eligible_ou_lines:[3.5,4.5],eligible_markets:['ou']},predictionCache:new Map()};
 
 const $=id=>document.getElementById(id);
 const esc=v=>{const d=document.createElement('div');d.textContent=String(v??'');return d.innerHTML};
@@ -474,45 +475,51 @@ function qualifiesResearchPick(c){
   const modelOk=c.marketType==='ou'?state.modelGate:true;
   return state.historyLoaded && modelOk && c.calibrationN>=30 && edge>=0.02;
 }
+function isEligibleResearchEvent(e){
+  return (state.eligibility.eligible_competitions||[]).includes(String(e.competition||e.tournament||''));
+}
+function isEligibleOU(c){
+  return !!(c&&c.marketType==='ou'&&state.eligibility.eligible_markets.includes('ou')&&
+    state.eligibility.eligible_ou_lines.some(x=>Math.abs(Number(x)-Number(c.market.line))<0.001));
+}
 function enrichCandidate(c,e){
   const cal=historicalCalibration(e.product,c.marketType,c.pickCode,c.fairProb,e.start_time);
   let calibrated=cal.prob,source=cal.source,modelMeta=null;
-  if(c.marketType==='ou'&&e.start_time){
+  if(c.marketType==='ou'&&e.start_time&&isEligibleOU(c)){
     const ladder=fitLambdaFromLadder((e.markets||[]).map(m=>marketOverPoint(m)).filter(Boolean));
     if(ladder){
-      const hist=state.modelRows||[];
-      const priorEvents=historicalOUEvents(state.rows);
+      const priorEvents=state.modelEvents||[];
       const pseudo={product:e.product,timestamp:e.start_time,ladder,total:null};
       const mm=modelOverForEvent(pseudo,priorEvents,Number(c.market.line));
       if(mm){
-        const overSelected=String(c.pickCode).toUpperCase().startsWith('U')?1-mm.prob:mm.prob;
-        calibrated=overSelected;
-        source='ou-line-ladder-product-model';
-        modelMeta=mm;
+        calibrated=String(c.pickCode).toUpperCase().startsWith('U')?1-mm.prob:mm.prob;
+        source='ou-line-ladder-product-model';modelMeta=mm;
       }
     }
   }
   return Object.assign(c,{calibratedProb:calibrated,calibrationN:cal.n,calibrationSource:source,edge:calibrated-c.bookImplied,modelMeta});
 }
 function predictionForEvent(e){
+  const id=String(e.event_id||e.eventId||'');
+  if(state.predictionCache.has(id))return state.predictionCache.get(id);
+  if(!isEligibleResearchEvent(e))return null;
   const candidates=[];
   (e.markets||[]).forEach(m=>{
-    const id=String(m.id||''),name=String(m.name||'').toLowerCase();
-    const isWinner=id==='1'||id==='186'||name.indexOf('1x2')>=0||name.indexOf('winner')>=0||name.indexOf('match result')>=0;
-    const isTotals=id==='18'||id==='189'||name.indexOf('over/under')>=0||name.indexOf('total')>=0;
-    if(!isWinner&&!isTotals)return;
+    const mid=String(m.id||''),name=String(m.name||'').toLowerCase();
+    const isTotals=mid==='18'||mid==='189'||name.indexOf('over/under')>=0||name.indexOf('total')>=0;
+    if(!isTotals)return;
     const c=calculateMarket(m);
-    if(c){c.marketType=isTotals?'ou':'winner';candidates.push(c);}
+    if(c){c.marketType='ou';candidates.push(c);}
   });
-  if(!candidates.length)return null;
-  const winner=candidates.filter(x=>x.marketType==='winner').sort((a,b)=>b.fairProb-a.fairProb)[0]||null;
-  const ou=candidates.filter(x=>x.marketType==='ou').sort((a,b)=>b.fairProb-a.fairProb)[0]||null;
-  const enriched=candidates.map(c=>enrichCandidate(c,e));
-  enriched.sort((a,b)=>(b.calibratedProb-b.bookImplied)-(a.calibratedProb-a.bookImplied)||b.calibratedProb-a.calibratedProb);
-  const primary=enriched[0]||null;
-  const winnerEnriched=enriched.filter(x=>x.marketType==='winner').sort((a,b)=>b.calibratedProb-a.calibratedProb)[0]||null;
-  const ouEnriched=enriched.filter(x=>x.marketType==='ou').sort((a,b)=>b.calibratedProb-a.calibratedProb)[0]||null;
-  return {product:e.product,competition:e.competition||e.tournament||'',event_id:String(e.event_id||e.eventId||''),home:String(e.home||e.participant_1||''),away:String(e.away||e.participant_2||''),start_time:e.start_time||null,primary:qualifiesResearchPick(primary)?primary:null,bestWinner:winnerEnriched,bestOU:ouEnriched,candidates:enriched};
+  const eligible=candidates.filter(isEligibleOU).sort((a,b)=>b.fairProb-a.fairProb);
+  if(!eligible.length)return null;
+  const bestOU=enrichCandidate(eligible[0],e);
+  const out={product:e.product,competition:e.competition||e.tournament||'',event_id:id,
+    home:String(e.home||e.participant_1||''),away:String(e.away||e.participant_2||''),
+    start_time:e.start_time||null,primary:qualifiesResearchPick(bestOU)?bestOU:null,
+    bestWinner:null,bestOU,candidates:[bestOU]};
+  state.predictionCache.set(id,out);
+  return out;
 }
 function isUpcoming(e){
   if(!e||!e.start_time)return true;
@@ -524,7 +531,7 @@ function upcomingEventsFrom(events){
 }
 function renderLive(){
   const product=$('product').value,market=$('market').value;
-  const events=upcomingEventsFrom(state.live).filter(e=>product==='all'||e.product===product);
+  const events=upcomingEventsFrom(state.live).filter(isEligibleResearchEvent).filter(e=>product==='all'||e.product===product).slice(0,20);
   const list=events.slice(0,30).map(e=>{
     const p=predictionForEvent(e);
     const shown=(e.markets||[]).filter(m=>matchesMarket(m,market)).slice(0,3);
@@ -685,12 +692,27 @@ async function loadLive(){
 }
 
 function rebuildPredictionDesk(){
-  state.picks=upcomingEventsFrom(state.live).map(predictionForEvent).filter(Boolean);
   const product=$('product').value;
-  if(product!=='all')state.picks=state.picks.filter(function(p){return p.product===product;});
+  const eligible=upcomingEventsFrom(state.live).filter(isEligibleResearchEvent).filter(e=>product==='all'||e.product===product);
+  state.picks=eligible.slice(0,24).map(predictionForEvent).filter(Boolean);
   renderPredictionDesk();renderBuilder();
 }
-
+async function loadEligibility(){
+  try{
+    const r=await fetch(ELIGIBILITY+'?t='+Date.now(),{cache:'no-store',headers:{'Accept':'application/json'}});
+    if(!r.ok)throw new Error('eligibility HTTP '+r.status);
+    const d=await r.json();
+    if(Array.isArray(d.eligible_competitions))state.eligibility.eligible_competitions=d.eligible_competitions;
+    if(Array.isArray(d.eligible_ou_lines))state.eligibility.eligible_ou_lines=d.eligible_ou_lines.map(Number);
+    if(Array.isArray(d.policy?.eligible_markets))state.eligibility.eligible_markets=d.policy.eligible_markets;
+    state.predictionCache.clear();
+    renderEligibilityNotice();
+  }catch(e){console.warn('Virtual Lab eligibility fallback:',e);}
+}
+function renderEligibilityNotice(){
+  const host=$('historyMeta');if(!host)return;
+  host.textContent='Research filter active · '+state.eligibility.eligible_competitions.length+' eligible leagues · O/U lines '+state.eligibility.eligible_ou_lines.join(', ')+' · winner/1X2 blocked until its OOS performance recovers.';
+}
 async function loadHistory(){
   const urls=[HISTORY,HISTORY_FALLBACK];
   let lastError=null;
@@ -702,6 +724,7 @@ async function loadHistory(){
       const arr=Array.isArray(data)?data:(Array.isArray(data.rows)?data.rows:[]);
       state.rows=arr.map(normalize);
       state.historyLoaded=true;
+      state.predictionCache.clear();
       buildModelBacktest(state.rows);
       state.modelEvents=historicalOUEvents(state.rows);
       applyFilters(false);
@@ -748,6 +771,7 @@ $('clearBuilder').addEventListener('click',function(){state.builder=[];renderBui
 $('clear').addEventListener('click',()=>{state.rows=[];state.filtered=[];state.builder=[];const hs=$('historyStatus');if(hs)hs.textContent='MANUAL DATASET CLEARED';$('fileInput').value='';analyze();renderBuilder()});
 
 analyze();
+loadEligibility();
 loadHistory();
 loadLive();
 window.setInterval(loadLive,LIVE_REFRESH_MS);
