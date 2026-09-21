@@ -112,8 +112,18 @@ def main():
     rows=sorted(rows.values(),key=lambda x:(x.get("start_time") or "",x.get("product") or "",x.get("event_id") or ""))
     counts={}
     for x in rows:counts[x["product"]]=counts.get(x["product"],0)+1
-    payload={"updated_at":now,"status":"LIVE" if rows else "UPSTREAM_EMPTY","source":[source] if source else [],"endpoint":PROXY,"events_count":len(rows),"product_counts":counts,"events":rows,"errors":errors,"refresh_seconds":30}
+    status="LIVE" if rows else "UPSTREAM_EMPTY"
     out=DATA/"virtual_lab_live.json"
+    previous={}
+    if out.exists():
+        try: previous=json.loads(out.read_text(encoding="utf-8"))
+        except Exception: previous={}
+    candidate={"status":status,"source":[source] if source else [],"endpoint":PROXY,"events_count":len(rows),"product_counts":counts,"events":rows}
+    previous_cmp={k:previous.get(k) for k in candidate}
+    if previous_cmp==candidate and previous:
+        print("Virtual Lab snapshot unchanged; keeping published timestamp.")
+        return
+    payload={"updated_at":now,**candidate,"errors":errors,"refresh_seconds":30}
     out.write_text(json.dumps(payload,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
     print(json.dumps({"status":payload["status"],"events_count":len(rows),"product_counts":counts,"errors":errors},indent=2))
     if not rows:raise SystemExit("ABORT: no live virtual/eFootball/SRL events collected")
