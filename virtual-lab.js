@@ -9,7 +9,7 @@ const LIVE_REFRESH_MS=30000;
 const UI_BUILD='20260921-v11';
 const HISTORY='./api/virtual-lab-history';
 const HISTORY_FALLBACK='./data/virtual_lab_history.json';
-const state={rows:[],filtered:[],live:[],liveMode:'none',liveUpdated:null,picks:[],builder:[]};
+const state={rows:[],filtered:[],live:[],liveMode:'none',liveUpdated:null,picks:[],builder:[],historyLoaded:false};
 
 const $=id=>document.getElementById(id);
 const esc=v=>{const d=document.createElement('div');d.textContent=String(v??'');return d.innerHTML};
@@ -256,7 +256,43 @@ function calculateMarket(m){
   const total=outs.reduce((sum,o)=>sum+(1/Number(o.odds)),0);
   const norm=outs.map(o=>Object.assign({},o,{fairProb:(1/Number(o.odds))/total}));
   const pick=norm.reduce((a,b)=>b.fairProb>a.fairProb?b:a);
-  return {market:m,pick:pick,pickCode:outcomeCode(m,pick),fairProb:pick.fairProb,fairOdds:1/pick.fairProb,bookmakerOdds:Number(pick.odds),overround:Math.max(0,total-1)};
+  return {market:m,pick:pick,pickCode:outcomeCode(m,pick),fairProb:pick.fairProb,fairOdds:1/pick.fairProb,bookmakerOdds:Number(pick.odds),bookImplied:1/Number(pick.odds),overround:Math.max(0,total-1)};
+}
+function historicalCalibration(product,marketType,pickCode,rawProb,startTime){
+  if(!state.historyLoaded||!state.rows.length)return {prob:rawProb,n:0,source:'market'};
+  const cutoff=startTime?new Date(startTime).getTime():Infinity;
+  const exact=state.rows.filter(r=>{
+    if(r.product!==product||r.market!==marketType||r.selection!==String(pickCode).toLowerCase()||typeof r.win!=='boolean')return false;
+    const t=new Date(r.timestamp||0).getTime();
+    return !Number.isFinite(cutoff)||!Number.isFinite(t)||t<cutoff;
+  });
+  const priorN=20;
+  if(exact.length>=20){
+    const wins=exact.filter(r=>r.win).length;
+    return {prob:(wins+rawProb*priorN)/(exact.length+priorN),n:exact.length,source:'exact-selection'};
+  }
+  const bucket=Math.max(0,Math.min(9,Math.floor(rawProb*10)));
+  const broad=state.rows.filter(r=>{
+    if(r.product!==product||r.market!==marketType||typeof r.win!=='boolean'||r.model_prob==null)return false;
+    const t=new Date(r.timestamp||0).getTime();
+    if(Number.isFinite(cutoff)&&Number.isFinite(t)&&t>=cutoff)return false;
+    return Math.max(0,Math.min(9,Math.floor(Number(r.model_prob)*10)))===bucket;
+  });
+  if(broad.length>=30){
+    const wins=broad.filter(r=>r.win).length;
+    const observed=wins/broad.length;
+    return {prob:(wins+rawProb*priorN)/(broad.length+priorN),n:broad.length,source:'probability-bucket'};
+  }
+  return {prob:rawProb,n:Math.max(exact.length,broad.length),source:'market'};
+}
+function qualifiesResearchPick(c){
+  if(!c)return false;
+  const edge=c.calibratedProb-c.bookImplied;
+  return state.historyLoaded && c.calibrationN>=30 && edge>=0.02;
+}
+function enrichCandidate(c,e){
+  const cal=historicalCalibration(e.product,c.marketType,c.pickCode,c.fairProb,e.start_time);
+  return Object.assign(c,{calibratedProb:cal.prob,calibrationN:cal.n,calibrationSource:cal.source,edge:cal.prob-c.bookImplied});
 }
 function predictionForEvent(e){
   const candidates=[];
@@ -271,8 +307,12 @@ function predictionForEvent(e){
   if(!candidates.length)return null;
   const winner=candidates.filter(x=>x.marketType==='winner').sort((a,b)=>b.fairProb-a.fairProb)[0]||null;
   const ou=candidates.filter(x=>x.marketType==='ou').sort((a,b)=>b.fairProb-a.fairProb)[0]||null;
-  const primary=candidates.slice().sort((a,b)=>b.fairProb-a.fairProb||a.overround-b.overround)[0];
-  return {product:e.product,competition:e.competition||e.tournament||'',event_id:String(e.event_id||e.eventId||''),home:String(e.home||e.participant_1||''),away:String(e.away||e.participant_2||''),start_time:e.start_time||null,primary:primary,bestWinner:winner,bestOU:ou};
+  const enriched=candidates.map(c=>enrichCandidate(c,e));
+  enriched.sort((a,b)=>(b.calibratedProb-b.bookImplied)-(a.calibratedProb-a.bookImplied)||b.calibratedProb-a.calibratedProb);
+  const primary=enriched[0]||null;
+  const winnerEnriched=enriched.filter(x=>x.marketType==='winner').sort((a,b)=>b.calibratedProb-a.calibratedProb)[0]||null;
+  const ouEnriched=enriched.filter(x=>x.marketType==='ou').sort((a,b)=>b.calibratedProb-a.calibratedProb)[0]||null;
+  return {product:e.product,competition:e.competition||e.tournament||'',event_id:String(e.event_id||e.eventId||''),home:String(e.home||e.participant_1||''),away:String(e.away||e.participant_2||''),start_time:e.start_time||null,primary:qualifiesResearchPick(primary)?primary:null,bestWinner:winnerEnriched,bestOU:ouEnriched,candidates:enriched};
 }
 function isUpcoming(e){
   if(!e||!e.start_time)return true;
@@ -320,14 +360,14 @@ function renderBuilder(){
   state.builder.forEach(function(p){if(!seen[p.event_id]){seen[p.event_id]=1;unique.push(p);}});state.builder=unique.slice(-4);
   const combined=state.builder.reduce(function(a,p){return a*p.primary.bookmakerOdds;},1);
   const fairCombined=state.builder.reduce(function(a,p){return a*p.primary.fairOdds;},1);
-  const baselineHit=state.builder.reduce(function(a,p){return a*p.primary.fairProb;},1);
+  const baselineHit=state.builder.reduce(function(a,p){return a*(p.primary?p.primary.calibratedProb:0);},1);
   host.innerHTML=state.builder.map(function(p,i){return '<div class="builderRow"><span class="builderPick">'+esc(p.pickCode)+'</span><span>'+esc(p.home+' vs '+p.away)+'</span><b>'+p.primary.bookmakerOdds.toFixed(2)+'</b><button class="btn removeLeg" data-i="'+i+'">×</button></div>';}).join('');
   host.querySelectorAll('.removeLeg').forEach(function(btn){btn.addEventListener('click',function(){state.builder.splice(Number(btn.dataset.i),1);renderBuilder();});});
   const ready=state.builder.length>=2;
   summary.innerHTML='<span><b>'+state.builder.length+'</b> legs</span><span>Combined odds <b>'+combined.toFixed(2)+'</b></span><span>Baseline hit probability <b>'+fmtPct(baselineHit)+'</b></span><span>Fair combined odds <b>'+fairCombined.toFixed(2)+'</b></span><strong class="'+(ready?'builderReady':'')+'">'+(ready?'READY · PAPER BUILDER':'ADD AT LEAST 2 LEGS')+'</strong>';
 }
 function autoBuild(){
-  const candidates=state.picks.slice().sort(function(a,b){return b.primary.fairProb-a.primary.fairProb;});
+  const candidates=state.picks.filter(function(p){return p.primary&&qualifiesResearchPick(p.primary);}).sort(function(a,b){return b.primary.edge-a.primary.edge;});
   const chosen=[],seen={};
   for(const p of candidates){if(chosen.length>=4||seen[p.event_id])continue;chosen.push(p);seen[p.event_id]=1;}
   state.builder=chosen;renderBuilder();
@@ -457,7 +497,9 @@ async function loadHistory(){
       const data=await r.json();
       const arr=Array.isArray(data)?data:(Array.isArray(data.rows)?data.rows:[]);
       state.rows=arr.map(normalize);
+      state.historyLoaded=true;
       applyFilters(false);
+      rebuildPredictionDesk();
       const status=$('historyStatus');if(status)status.textContent='AUTO-COLLECTED · '+arr.length+' settled observations';
       const meta=$('historyMeta');if(meta)meta.textContent='Historical rows are collected automatically from the Virtual Lab paper pipeline. Latest refresh '+new Date().toLocaleString();
       return;
