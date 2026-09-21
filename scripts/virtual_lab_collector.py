@@ -377,7 +377,7 @@ def actual_code(item,final_score):
 def settle(pending):
     unresolved = [x for x in pending.values() if not x.get("settled") and x.get("event_id")]
     if not unresolved:
-        return [], 0, [], {"fallback_settled": 0, "conflicts": 0}
+        return [], 0, [], {"sportybet_settled": 0, "conflicts": 0}
 
     grouped = {}
     for item in unresolved:
@@ -449,9 +449,6 @@ def settle(pending):
             "win": win,
             "settlement_source": settlement_source,
         })
-        if not primary_score:
-            fallback_settled += 1
-
         history.append({
             "product": item["product"],
             "provider": item["provider"],
@@ -477,7 +474,6 @@ def settle(pending):
             "prediction_source": item.get("prediction_source"),
             "overround": item.get("overround"),
             "source": item.get("source"),
-            "public_match_candidates": public_match_count,
         })
         settled_count += 1
 
