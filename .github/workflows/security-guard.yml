@@ -1,0 +1,27 @@
+name: Match Signal Security Guard
+
+on:
+  push:
+    branches: [main, protect/v6-engine-boundary]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  secret-pattern-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan tracked text for common secret patterns
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=$(git ls-files | grep -Ev '(^|/)(node_modules|dist|build)/' || true)
+          if [ -z "$files" ]; then exit 0; fi
+          if git grep -nEI '(^|[^A-Za-z])(sk-[A-Za-z0-9]{20,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16}|xox[baprs]-[A-Za-z0-9-]{20,})([^A-Za-z0-9_]|$)' -- $files; then
+            echo "Potential credential pattern detected in tracked source."
+            exit 1
+          fi
+          echo "No common credential patterns detected."
