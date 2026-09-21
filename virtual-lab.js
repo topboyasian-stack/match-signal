@@ -601,7 +601,7 @@ function enrichCandidate(c,e){
     const ladder=fitLambdaFromLadder((e.markets||[]).map(m=>marketOverPoint(m)).filter(Boolean));
     if(ladder){
       const priorEvents=state.modelEvents||[];
-      const pseudo={product:e.product,timestamp:e.start_time,ladder,total:null};
+      const pseudo={product:e.product,home:String(e.home||e.participant_1||''),away:String(e.away||e.participant_2||''),timestamp:e.start_time,ladder,total:null};
       const mm=modelOverForEvent(pseudo,priorEvents,Number(c.market.line));
       if(mm){
         calibrated=String(c.pickCode).toUpperCase().startsWith('U')?1-mm.prob:mm.prob;
