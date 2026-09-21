@@ -354,14 +354,19 @@ function blendForEvent(event,priorEvents){
     for(const a of candidates){
       let loss=0,n=0;
       for(let i=10;i<earlier.length;i++){
-        const cur=earlier[i],before=earlier.slice(0,i),pprior=productPrior(before,event.product,cur.ladder.points[0].line,new Date(cur.timestamp).getTime());
-        if(!pprior.prob||!cur.ladder)continue;
-        const p=clamp01((1-a)*poissonOver(cur.ladder.lambda,cur.ladder.points[0].line)+a*pprior.prob);
-        const y=cur.total>cur.ladder.points[0].line?1:cur.total<cur.ladder.points[0].line?0:null;
-        if(y==null)continue;
-        loss+=-(y*Math.log(p)+(1-y)*Math.log(1-p));n++;
+        const cur=earlier[i],before=earlier.slice(0,i);
+        for(const rr of cur.rows){
+          if(rr.line==null||typeof rr.win!=='boolean')continue;
+          const pprior=productPrior(before,event.product,Number(rr.line),new Date(cur.timestamp).getTime());
+          if(!pprior.prob||!cur.ladder)continue;
+          const over=poissonOver(cur.ladder.lambda,Number(rr.line));
+          const pOver=clamp01((1-a)*over+a*pprior.prob);
+          const p=String(rr.selection||'').toUpperCase().startsWith('U')?1-pOver:pOver;
+          const y=rr.win?1:0;
+          loss+=-(y*Math.log(p)+(1-y)*Math.log(1-p));n++;
+        }
       }
-      if(n>=10&&loss/n<bestLoss){bestLoss=loss/n;bestN=n;alpha=a;}
+      if(n>=20&&loss/n<bestLoss){bestLoss=loss/n;bestN=n;alpha=a;}
     }
   }else if(earlier.length<20){alpha=0;}
   return {alpha,alphaN:bestN,priorN:prior.n};
@@ -688,6 +693,7 @@ async function loadHistory(){
       state.rows=arr.map(normalize);
       state.historyLoaded=true;
       buildModelBacktest(state.rows);
+      state.modelEvents=historicalOUEvents(state.rows);
       applyFilters(false);
       rebuildPredictionDesk();
       renderModelLab();
