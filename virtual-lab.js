@@ -372,6 +372,21 @@ function renderPredictionDesk(){
     }
   }));
 }
+function autoBuild(){
+  const candidates=[...state.picks]
+    .filter(p=>p.bookmakerOdds>1&&p.fairProb>0)
+    .sort((a,b)=>b.fairProb-a.fairProb);
+  const chosen=[],events=new Set();
+  for(const p of candidates){
+    if(events.has(p.event_id))continue;
+    chosen.push(p);events.add(p.event_id);
+    if(chosen.length===4)break;
+  }
+  state.builder=chosen;
+  renderBuilder();
+  if($('oddsBuilder'))window.scrollTo({top:$('oddsBuilder').offsetTop-20,behavior:'smooth'});
+}
+
 function renderBuilder(){
   const host=$('builderList'),summary=$('builderSummary');
   if(!host||!summary)return;
@@ -530,7 +545,9 @@ $('market').addEventListener('change',applyFilters);
 $('split').addEventListener('change',analyze);
 $('runStrategy').addEventListener('click',runStrategy);
 $('liveRefresh').addEventListener('click',loadLive);
-$('clear').addEventListener('click',()=>{state.rows=[];state.filtered=[];$('fileInput').value='';analyze()});
+$('clear').addEventListener('click',()=>{state.rows=[];state.filtered=[];$('fileInput').value='';analyze();state.builder=[];renderBuilder()});
+$('autoBuild')?.addEventListener('click',autoBuild);
+$('clearBuilder')?.addEventListener('click',()=>{state.builder=[];renderBuilder()});
 
 analyze();
 loadLive();
