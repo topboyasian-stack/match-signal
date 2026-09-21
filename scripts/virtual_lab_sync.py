@@ -74,7 +74,7 @@ def collect_direct():
         base={"pageSize":100,"pageNum":page,"timeline":168,"todayGames":"false","_t":int(datetime.now(tz=timezone.utc).timestamp()*1000)}
         for sport_id,product_hint,url in [
             ("sr:sport:1",None,DIRECT_PC),
-            ("sr:sport:97","efootball_gt",DIRECT_PC),
+            ("sr:sport:137","efootball_gt",DIRECT_PC),
             ("sr:sport:202120001","vfootball",DIRECT_VFL)
         ]:
             p=dict(base);p["sportId"]=sport_id
