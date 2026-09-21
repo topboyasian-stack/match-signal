@@ -249,9 +249,29 @@ def calibrate_total_games_probability(prediction, raw_probability, history, now=
 
 
 def calibrate_binary_market(prediction, raw_probability, history, market_key, now=None):
-    """Calibrate a binary market such as tennis Total Games."""
+    """Calibrate a binary market such as tennis Total Games.
+
+    The V5.1/V5.2 tennis total-games distribution is itself a walk-forward
+    empirical model. The older post-hoc binary calibration layer was allowed to
+    change the selected side after the model had already produced its
+    distribution. The production ledger showed that this could invert good raw
+    O/U decisions. Until a separate untouched calibration holdout proves that
+    post-processing improves Brier/log-loss, preserve the raw distribution
+    probability and report calibration diagnostics without overwriting it.
+    """
     now = now or datetime.now(timezone.utc)
     if market_key == "tennis:total_games":
+        total = (prediction.get("analytics") or {}).get("total_games") or {}
+        source = str(total.get("source") or "")
+        version = str(total.get("model_version") or "")
+        if "V5.1" in source or "V5.2" in source or version in {"5.1","5.2"} or total.get("v51"):
+            return float(raw_probability), {
+                "method": "raw_model_locked_no_posthoc_calibration",
+                "reason": "V5.1/V5.2 O/U distribution is evaluated separately; post-hoc calibration is disabled until an untouched holdout proves it improves Brier and log-loss.",
+                "raw": round(float(raw_probability), 4),
+                "line": float(total.get("line") or 22.5),
+                "tour": str(prediction.get("league") or "").upper(),
+            }
         return calibrate_total_games_probability(prediction, raw_probability, history, now)
     calibrated, diagnostics = calibrate_probability(raw_probability, history, market_key, now)
     return calibrated, diagnostics
