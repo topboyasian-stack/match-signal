@@ -162,6 +162,23 @@ jobs:
             if (!r.ok) failures.push('/api/espn NBA HTTP '+r.status);
             else if (!Array.isArray(JSON.parse(body).events)) failures.push('/api/espn NBA returned invalid JSON');
           } catch(e) { failures.push('/api/espn '+e.message); }
+          for (const source of ['efootball','srl','vfootball']) {
+            try {
+              const p = new URLSearchParams({
+                source,
+                pageSize:'5',
+                pageNum:'1',
+                startTime:String(Date.now()-86400000),
+                endTime:String(Date.now())
+              });
+              const {r,body}=await get('/api/sportybet-virtual-results?'+p.toString());
+              if (!r.ok) failures.push('/api/sportybet-virtual-results '+source+' HTTP '+r.status);
+              const payload=JSON.parse(body);
+              if (payload?.ok!==true) failures.push('/api/sportybet-virtual-results '+source+' returned ok!=true');
+              else console.log('Virtual Lab result proxy passed: '+source+' '+(payload.events?.length||0)+' events '+(payload.scopes?.length||0)+' scopes');
+            } catch(e) { failures.push('/api/sportybet-virtual-results '+source+' '+e.message); }
+          }
+
           try {
             const params = new URLSearchParams({
               pageSize:'100',
