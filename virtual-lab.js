@@ -9,7 +9,7 @@ const LIVE_REFRESH_MS=30000;
 const UI_BUILD='20260921-v12';
 const HISTORY='./api/virtual-lab-history';
 const HISTORY_FALLBACK='./data/virtual_lab_history.json';
-const state={rows:[],filtered:[],live:[],liveMode:'none',liveUpdated:null,picks:[],builder:[],historyLoaded:false};
+const state={rows:[],filtered:[],live:[],liveMode:'none',liveUpdated:null,picks:[],builder:[],historyLoaded:false,modelRows:[],modelEvents:[]};
 
 const $=id=>document.getElementById(id);
 const esc=v=>{const d=document.createElement('div');d.textContent=String(v??'');return d.innerHTML};
@@ -273,6 +273,152 @@ function outcomeCode(m,o){
   if(lower==='away')return '2';
   return name;
 }
+function clamp01(v){return Math.max(0.0005,Math.min(0.9995,Number(v)||0.5));}
+function poissonOver(lambda,line){
+  lambda=Math.max(0.05,Math.min(30,Number(lambda)||5));
+  const k=Math.floor(Number(line));
+  if(!Number.isFinite(k))return null;
+  let pmf=Math.exp(-lambda),cdf=pmf;
+  if(k>=1){
+    for(let i=1;i<=k;i++){pmf*=lambda/i;cdf+=pmf;}
+  }
+  return clamp01(1-cdf);
+}
+function fitLambdaFromLadder(points){
+  const usable=(points||[]).filter(p=>Number.isFinite(p.line)&&Number.isFinite(p.overProb)&&p.line>=0);
+  if(!usable.length)return null;
+  const loss=lambda=>usable.reduce((s,p)=>{const d=poissonOver(lambda,p.line)-p.overProb;return s+d*d;},0)/usable.length;
+  let best={lambda:5,loss:Infinity};
+  for(let l=0.25;l<=20;l+=0.05){const z=loss(l);if(z<best.loss)best={lambda:l,loss:z};}
+  for(let l=Math.max(0.1,best.lambda-0.1);l<=Math.min(25,best.lambda+0.1);l+=0.005){const z=loss(l);if(z<best.loss)best={lambda:l,loss:z};}
+  return {lambda:best.lambda,rmse:Math.sqrt(best.loss),n:usable.length,points:usable};
+}
+function marketOverPoint(m){
+  if(!m||m.line==null)return null;
+  const calc=calculateMarket(m);
+  if(!calc)return null;
+  const over=calc.market.outcomes.find(o=>/^over/i.test(String(o.name||'')));
+  if(!over)return null;
+  const fair=calc.market.outcomes.map(o=>({o,p:(1/Number(o.odds))})).reduce((s,x)=>s+x.p,0);
+  return {line:Number(m.line),overProb:(1/Number(over.odds))/fair};
+}
+function eventKey(r){return String(r.event_id||r.eventId||'')+'|'+String(r.timestamp||'');}
+function scoreTotal(r){
+  const m=String(r.score||'').match(/(\d+)\s*[:\-]\s*(\d+)/);
+  return m?Number(m[1])+Number(m[2]):null;
+}
+function historicalOUEvents(rows){
+  const groups=new Map();
+  rows.filter(r=>r.market==='ou'&&r.event_id&&r.timestamp).forEach(r=>{
+    const key=eventKey(r);
+    let g=groups.get(key);
+    if(!g){g={key,event_id:r.event_id,timestamp:r.timestamp,product:r.product,rows:[],total:scoreTotal(r)};groups.set(key,g);}
+    g.rows.push(r);
+    if(g.total==null)g.total=scoreTotal(r);
+  });
+  return [...groups.values()].map(g=>{
+    const points=[];
+    g.rows.forEach(r=>{
+      if(r.line==null||r.model_prob==null)return;
+      const p=String(r.selection||'').toUpperCase().startsWith('U')?1-Number(r.model_prob):Number(r.model_prob);
+      points.push({line:Number(r.line),overProb:clamp01(p)});
+    });
+    const dedup={};
+    points.forEach(p=>dedup[p.line]=dedup[p.line]==null?p:({line:p.line,overProb:(dedup[p.line].overProb+p.overProb)/2}));
+    const ladder=fitLambdaFromLadder(Object.values(dedup));
+    return Object.assign(g,{ladder});
+  }).filter(g=>g.total!=null&&g.ladder);
+}
+function productPrior(events,product,line,cutoff){
+  const eligible=(events||[]).filter(e=>e.product===product&&e.total!=null&&(!cutoff||new Date(e.timestamp).getTime()<cutoff));
+  const n=eligible.length;
+  if(!n)return {prob:null,n:0};
+  const over=eligible.filter(e=>e.total>line).length;
+  const under=eligible.filter(e=>e.total<line).length;
+  const pushes=n-over-under;
+  const decisive=over+under;
+  if(!decisive)return {prob:null,n:0};
+  // Beta(2,2) shrinkage prevents tiny product/line samples from creating extreme probabilities.
+  return {prob:(over+2)/(decisive+4),n:decisive,pushes};
+}
+function blendForEvent(event,priorEvents){
+  if(!event||!event.ladder)return null;
+  const points=event.ladder.points;
+  const rows=[];
+  const prior=productPrior(priorEvents,event.product,points.length?points[0].line:0,new Date(event.timestamp).getTime());
+  // Product-specific blend weight is selected on earlier events only.
+  const candidates=[0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1];
+  let alpha=0.3,bestLoss=Infinity,bestN=0;
+  const earlier=(priorEvents||[]).filter(e=>e.product===event.product&&e.total!=null&&new Date(e.timestamp).getTime()<new Date(event.timestamp).getTime());
+  if(earlier.length>=20){
+    for(const a of candidates){
+      let loss=0,n=0;
+      for(let i=10;i<earlier.length;i++){
+        const cur=earlier[i],before=earlier.slice(0,i),pprior=productPrior(before,event.product,cur.ladder.points[0].line,new Date(cur.timestamp).getTime());
+        if(!pprior.prob||!cur.ladder)continue;
+        const p=clamp01((1-a)*poissonOver(cur.ladder.lambda,cur.ladder.points[0].line)+a*pprior.prob);
+        const y=cur.total>cur.ladder.points[0].line?1:cur.total<cur.ladder.points[0].line?0:null;
+        if(y==null)continue;
+        loss+=-(y*Math.log(p)+(1-y)*Math.log(1-p));n++;
+      }
+      if(n>=10&&loss/n<bestLoss){bestLoss=loss/n;bestN=n;alpha=a;}
+    }
+  }else if(earlier.length<20){alpha=0;}
+  return {alpha,alphaN:bestN,priorN:prior.n};
+}
+function modelOverForEvent(event,priorEvents,line){
+  if(!event||!event.ladder)return null;
+  const market=poissonOver(event.ladder.lambda,line);
+  const prior=productPrior(priorEvents,event.product,line,new Date(event.timestamp).getTime());
+  const blend=blendForEvent(event,priorEvents);
+  if(!prior.prob||!blend||blend.alpha<=0)return {prob:market,marketProb:market,priorProb:prior.prob,alpha:0,lambda:event.ladder.lambda,n:prior.n};
+  return {prob:clamp01((1-blend.alpha)*market+blend.alpha*prior.prob),marketProb:market,priorProb:prior.prob,alpha:blend.alpha,lambda:event.ladder.lambda,n:prior.n};
+}
+function buildModelBacktest(rows){
+  const events=historicalOUEvents(rows).sort((a,b)=>new Date(a.timestamp)-new Date(b.timestamp));
+  const outputs=[];
+  for(const e of events){
+    const prior=events.filter(x=>x.product===e.product&&new Date(x.timestamp).getTime()<new Date(e.timestamp).getTime());
+    for(const r of e.rows){
+      if(r.line==null||typeof r.win!=='boolean'||r.model_prob==null)continue;
+      const overModel=modelOverForEvent(e,prior,Number(r.line));
+      if(!overModel)continue;
+      const baseline=String(r.selection||'').toUpperCase().startsWith('U')?1-Number(r.model_prob):Number(r.model_prob);
+      const model=String(r.selection||'').toUpperCase().startsWith('U')?1-overModel.prob:overModel.prob;
+      outputs.push(Object.assign({},r,{baselineProb:clamp01(baseline),modelProb:clamp01(model),ladderLambda:overModel.lambda,productPriorProb:overModel.priorProb,blendAlpha:overModel.alpha}));
+    }
+  }
+  state.modelRows=outputs;
+  return outputs;
+}
+function scoreProbabilities(rows){
+  const valid=(rows||[]).filter(r=>typeof r.win==='boolean'&&Number.isFinite(r.baselineProb)&&Number.isFinite(r.modelProb));
+  const calc=key=>{
+    if(!valid.length)return null;
+    let b=0,l=0;
+    valid.forEach(r=>{const p=clamp01(r[key]);const y=r.win?1:0;b+=(y-p)*(y-p);l+=-(y*Math.log(p)+(1-y)*Math.log(1-p));});
+    return {n:valid.length,brier:b/valid.length,logLoss:l/valid.length};
+  };
+  const by={};
+  valid.forEach(r=>(by[r.product]??=[]).push(r));
+  return {all:{baseline:calc('baselineProb'),model:calc('modelProb')},products:Object.fromEntries(Object.entries(by).map(([p,a])=>{const old=valid;const fn=key=>{let b=0,l=0;a.forEach(r=>{const q=clamp01(r[key]),y=r.win?1:0;b+=(y-q)*(y-q);l+=-(y*Math.log(q)+(1-y)*Math.log(1-q));});return {n:a.length,brier:b/a.length,logLoss:l/a.length};};return [p,{baseline:fn('baselineProb'),model:fn('modelProb')}]}))};
+}
+function renderModelLab(){
+  const host=$('modelLab');if(!host)return;
+  const rows=state.modelRows||[],scores=scoreProbabilities(rows);
+  if(!rows.length){host.innerHTML='<div class="empty">Need settled O/U observations with complete pre-event line data. Collect more events before trusting this model.</div>';return;}
+  const cell=(v,d=4)=>v==null?'—':Number(v).toFixed(d);
+  const delta=(a,b)=>a==null||b==null?'—':(a-b).toFixed(4);
+  let html='<div class="modelGrid"><div><h3>O/U line-ladder model</h3><p class="muted">Fits a Poisson total-goals distribution to the full observed O/U ladder, then blends it with a product-specific historical prior using only earlier settled events. No current-event result is used.</p></div><div><h3>Scoring rules</h3><p class="muted">Brier and log loss are lower-is-better probability losses. The market baseline is the SportyBet de-vig probability; the model must improve on it out-of-sample before becoming eligible.</p></div></div>';
+  html+='<table><thead><tr><th>Product</th><th>N</th><th>Market Brier</th><th>Model Brier</th><th>Δ Brier</th><th>Market LogLoss</th><th>Model LogLoss</th><th>Δ LogLoss</th></tr></thead><tbody>';
+  Object.entries(scores.products).forEach(([p,s])=>{html+='<tr><td>'+esc(p)+'</td><td>'+s.model.n+'</td><td>'+cell(s.baseline.brier)+'</td><td>'+cell(s.model.brier)+'</td><td>'+delta(s.baseline.brier,s.model.brier)+'</td><td>'+cell(s.baseline.logLoss)+'</td><td>'+cell(s.model.logLoss)+'</td><td>'+delta(s.baseline.logLoss,s.model.logLoss)+'</td></tr>';});
+  if(scores.all.model)html+='<tr><td><strong>ALL O/U</strong></td><td>'+scores.all.model.n+'</td><td>'+cell(scores.all.baseline.brier)+'</td><td>'+cell(scores.all.model.brier)+'</td><td>'+delta(scores.all.baseline.brier,scores.all.model.brier)+'</td><td>'+cell(scores.all.baseline.logLoss)+'</td><td>'+cell(scores.all.model.logLoss)+'</td><td>'+delta(scores.all.baseline.logLoss,scores.all.model.logLoss)+'</td></tr>';
+  html+='</tbody></table>';
+  const qualified=Object.entries(scores.products).filter(([p,s])=>s.model.n>=30&&s.model.brier<s.baseline.brier&&s.model.logLoss<s.baseline.logLoss).map(([p])=>p);
+  html+='<p class="muted"><strong>Model gate:</strong> '+(qualified.length?esc(qualified.join(', '))+' currently beats the market on both scoring losses in-sample walk-forward rows. This still requires a fresh untouched validation block before money use.':'NO PRODUCT QUALIFIES YET — the model is research-only.')+'</p>';
+  host.innerHTML=html;
+}
+
 function calculateMarket(m){
   const outs=(m&&m.outcomes||[]).filter(o=>Number(o.odds)>1);
   if(outs.length<2)return null;
@@ -315,7 +461,23 @@ function qualifiesResearchPick(c){
 }
 function enrichCandidate(c,e){
   const cal=historicalCalibration(e.product,c.marketType,c.pickCode,c.fairProb,e.start_time);
-  return Object.assign(c,{calibratedProb:cal.prob,calibrationN:cal.n,calibrationSource:cal.source,edge:cal.prob-c.bookImplied});
+  let calibrated=cal.prob,source=cal.source,modelMeta=null;
+  if(c.marketType==='ou'&&e.start_time){
+    const ladder=fitLambdaFromLadder((e.markets||[]).map(m=>marketOverPoint(m)).filter(Boolean));
+    if(ladder){
+      const hist=state.modelRows||[];
+      const priorEvents=historicalOUEvents(state.rows);
+      const pseudo={product:e.product,timestamp:e.start_time,ladder,total:null};
+      const mm=modelOverForEvent(pseudo,priorEvents,Number(c.market.line));
+      if(mm){
+        const overSelected=String(c.pickCode).toUpperCase().startsWith('U')?1-mm.prob:mm.prob;
+        calibrated=overSelected;
+        source='ou-line-ladder-product-model';
+        modelMeta=mm;
+      }
+    }
+  }
+  return Object.assign(c,{calibratedProb:calibrated,calibrationN:cal.n,calibrationSource:source,edge:calibrated-c.bookImplied,modelMeta});
 }
 function predictionForEvent(e){
   const candidates=[];
@@ -525,8 +687,10 @@ async function loadHistory(){
       const arr=Array.isArray(data)?data:(Array.isArray(data.rows)?data.rows:[]);
       state.rows=arr.map(normalize);
       state.historyLoaded=true;
+      buildModelBacktest(state.rows);
       applyFilters(false);
       rebuildPredictionDesk();
+      renderModelLab();
       const status=$('historyStatus');if(status)status.textContent='AUTO-COLLECTED · '+arr.length+' settled observations';
       const meta=$('historyMeta');if(meta)meta.textContent='Historical rows are collected automatically from the Virtual Lab paper pipeline. Latest refresh '+new Date().toLocaleString();
       return;
