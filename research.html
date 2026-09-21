@@ -46,7 +46,30 @@
     </div>
     <div class="liveGrid" id="liveGrid"></div>
     <div id="liveEmpty" class="liveEmpty empty" hidden>No current virtual/eFootball/SRL events were returned. The feed will retry automatically.</div>
-    <div class="liveNote">Match/player names, current SportyBet prices and a live no-vig market-baseline prediction are shown for every readable event. The validated historical research engine remains separate and only qualifies a signal after unseen testing.</div>
+    <div class="liveNote">Upcoming match/player names, current SportyBet prices, normalized probabilities and visible picks are refreshed from the live source every 30 seconds. Historical research remains separate.</div>
+  </section>
+
+  <section class="panel predictionDeskPanel">
+    <div class="panelHead">
+      <h2>Upcoming prediction desk</h2>
+      <span><b id="predictionCount">0</b> upcoming priced fixtures</span>
+    </div>
+    <div class="deskNote">Only upcoming fixtures are shown. Each calculation removes the bookmaker overround from the displayed market to produce a normalized baseline probability and fair odds.</div>
+    <div id="predictionDesk" class="predictionDesk"><div class="empty">Waiting for live upcoming fixtures…</div></div>
+  </section>
+
+  <section class="panel oddsBuilderPanel" id="oddsBuilder">
+    <div class="panelHead">
+      <h2>Odds Builder</h2>
+      <span>2–4 legs · current prices</span>
+    </div>
+    <div class="builderActions">
+      <button id="autoBuild" class="btn primary">⚡ Build top 4</button>
+      <button id="clearBuilder" class="btn">Clear builder</button>
+    </div>
+    <div id="builderList" class="builderList"><div class="empty">Build a paper slip from the upcoming predictions above.</div></div>
+    <div id="builderSummary" class="builderSummary"><span>0 legs</span></div>
+    <div class="builderNote">The builder uses the live SportyBet price attached to each displayed prediction. It does not place a bet or guarantee an outcome.</div>
   </section>
 
   <section class="panel controls">
@@ -124,7 +147,7 @@
   </section>
 
   <section class="panel">
-    <div class="panelHead"><h2>How to use the Lab / what to select</h2><span>Selection workflow</span></div>
+    <div class="panelHead"><h2>How to use the Lab / what to select</h2><span>Prediction → builder</span></div>
     <div class="guideGrid">
       <div><b>1 — Pick the exact product</b><p>Match the bookmaker screen to GT eFootball, eAdriatic, SRL, Virtual Football or Zoom/Turbo. Never mix their statistics.</p></div>
       <div><b>2 — Pick one market</b><p>Use the exact market and line shown by the bookmaker. A signal for 1X2 is not a signal for a different market or total line.</p></div>
