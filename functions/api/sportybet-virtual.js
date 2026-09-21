@@ -127,10 +127,12 @@ export async function onRequestGet(context){
       key=/eadriatic/.test(blob)?'efootball_adriatic':'efootball_gt';
     }else if(e.source==='vfootball'){
       key='vfootball';
-    }else if(e.source==='srl' && (/simulated reality/.test(blob)||/\bsrl\b/i.test(blob)||/simulated/.test(blob))){
+    }else if(e.source==='srl'){
       key='srl';
-    }else if(/zoom|turbo/i.test(blob)){
+    }else if(e.source==='vfootball' && /zoom|turbo/i.test(blob)){
       key='zoom';
+    }else if(e.source==='vfootball'){
+      key='vfootball';
     }
     if(!key) continue;
     e.product=key;
