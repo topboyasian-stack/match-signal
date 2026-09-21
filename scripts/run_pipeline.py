@@ -235,21 +235,27 @@ def enhanced_tennis_prediction(event, tour, rankings, form_map, base_tennis_pred
     v51 = None
     if history:
         try:
-            recommended = recommend_total_line(target_context, history, minimum_probability=0.60)
-            if recommended:
-                total_line = float(recommended["recommended_line"])
-                v51 = recommended
-            else:
+            # Evaluate the exact SportyBet line when one is available. The model
+            # must not cherry-pick a safer line simply because it raises hit rate.
+            if market_line is not None:
                 v51 = v51_total_over_probability(target_context, history, total_line)
+            else:
+                recommended = recommend_total_line(target_context, history, minimum_probability=0.60)
+                if recommended:
+                    total_line = float(recommended["recommended_line"])
+                    v51 = recommended
+                else:
+                    v51 = v51_total_over_probability(target_context, history, total_line)
         except Exception:
             v51 = None
     if v51:
-        selected_side = v51.get("recommended_pick") or v51.get("pick") or ("over" if v51["over"] >= 0.5 else "under")
+        selected_side = v51.get("recommended_pick") or v51.get("pick") or ("over" if float(v51.get("over", 0.5)) >= 0.5 else "under")
         over_games = float(v51["over"])
         total_model = v51["model"]
         expected_total_games = float(v51["expected_total"])
     else:
         over_games = 1 / (1 + math.exp(-(expected_total_games - total_line) / 1.8))
+        selected_side = "over" if over_games >= 0.5 else "under"
         total_model = "V3.2 structural fallback"
     games_margin = (6.2 * q + 5.4 * (1 - q)) - (6.2 * (1 - q) + 5.4 * q)
 
@@ -281,7 +287,7 @@ def enhanced_tennis_prediction(event, tour, rankings, form_map, base_tennis_pred
             "set_win_prob": {"p1": round(1 - q, 4), "p2": round(q, 4)},
             "straight_sets": {"p1": round(straight2, 4), "p2": round(straight1, 4)},
             "three_sets": round(three_sets, 4), "expected_sets": round(expected_sets, 2),
-            "total_games": {"line": total_line, "over": round(over_games, 4), "under": round(1 - over_games, 4), "pick": selected_side, "base_model_over": round(legacy_over_games, 4), "base_model_under": round(1 - legacy_over_games, 4), "source": total_model, "model_version": "5.2", "v51": v51, "line_strategy": "tour-specific SportyBet-compatible ladder"},
+            "total_games": {"line": total_line, "over": round(over_games, 4), "under": round(1 - over_games, 4), "pick": selected_side, "base_model_over": round(legacy_over_games, 4), "base_model_under": round(1 - legacy_over_games, 4), "source": total_model, "model_version": "5.2", "v51": v51, "line_strategy": "exact SportyBet market line when available; ladder fallback only without market line"},
             "games_handicap": {"estimated_margin_p1": round(-games_margin, 2), "pick": "p1" if games_margin <= 0 else "p2"},
         },
         "model": source,
