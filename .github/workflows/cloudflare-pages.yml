@@ -26,6 +26,7 @@ on:
       - 'virtual-lab.html'
       - 'virtual-lab.js'
       - 'virtual-lab.css'
+      - 'virtual-lab/**'
       - '_redirects'
       - 'VIRTUAL-LAB-*.md'
       - '.github/workflows/cloudflare-pages.yml'
@@ -49,7 +50,7 @@ concurrency:
 
 jobs:
   deploy:
-    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
