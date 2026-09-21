@@ -44,7 +44,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   deployments: write
 
 concurrency:
@@ -131,7 +131,7 @@ jobs:
           node --input-type=module <<'NODE'
           const base = 'https://match-signal.pages.dev';
           const pages = ['/', '/expansion.html', '/live.html', '/basketball.html', '/performance.html', '/research.html', '/virtual-lab'];
-          const assets = ['/expansion.js', '/expansion-odds-builder.js', '/live-analysis.js', '/live-data-worker.js', '/virtual-lab.js', '/virtual-lab.css', '/_redirects', '/data/predictions.json', '/data/expansion_status.json', '/data/odds_builder.json', '/data/virtual_lab_live.json'];
+          const assets = ['/api/sportybet-virtual','/expansion.js', '/expansion-odds-builder.js', '/live-analysis.js', '/live-data-worker.js', '/virtual-lab.js', '/virtual-lab.css', '/_redirects', '/data/predictions.json', '/data/expansion_status.json', '/data/odds_builder.json', '/data/virtual_lab_live.json'];
           const failures = [];
           async function get(path) {
             const r = await fetch(base + path + (path.includes('?') ? '&' : '?') + 'smoke=' + Date.now(), {cache:'no-store'});
@@ -180,7 +180,7 @@ jobs:
               timeline:'168',
               _t:String(Date.now())
             });
-            const {r,body}=await get('/api/sportybet?'+params.toString());
+            const {r,body}=await get('/api/sportybet-virtual?'+params.toString());
             if (!r.ok) failures.push('/api/sportybet HTTP '+r.status);
             const payload=JSON.parse(body);
             if (payload.bizCode!==10000) failures.push('/api/sportybet bizCode '+payload.bizCode);
@@ -199,6 +199,24 @@ jobs:
           console.log('Production HTTP smoke tests passed: '+pages.length+' pages, '+assets.length+' assets, NBA ESPN proxy');
           NODE
 
-      - name: Write deployment marker
+      - name: Record Cloudflare production verification
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          echo "Cloudflare Pages deployment completed for commit $GITHUB_SHA"
+          python - <<'PY'
+          import json
+          from datetime import datetime, timezone
+          from pathlib import Path
+          Path('DEPLOY-VERIFY-CLOUDFLARE.json').write_text(json.dumps({
+            'status':'VERIFIED',
+            'provider':'Cloudflare Pages',
+            'source_commit':'$GITHUB_SHA',
+            'verified_at':datetime.now(timezone.utc).isoformat(),
+            'checks':['core_pages','research_virtual_lab','live_virtual_proxy','virtual_lab_live_snapshot']
+          },indent=2)+'\n')
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add DEPLOY-VERIFY-CLOUDFLARE.json
+          git commit -m "✅ Record Cloudflare production verification"
+          git push origin main
