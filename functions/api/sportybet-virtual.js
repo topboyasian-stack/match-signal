@@ -38,7 +38,14 @@ function normalize(t, event, source, sportId){
     participant_2:String(event?.awayTeamName||''),
     start_time_ms:event?.estimateStartTime ?? null,
     match_status:event?.matchStatus ?? null,
-    markets:Array.isArray(event?.markets)?event.markets:[]
+    markets:(Array.isArray(event?.markets)?event.markets:[]).map(m=>({
+      ...m,
+      line:m?.line!=null?Number(m.line):((String(m?.specifier||'').match(/(?:total|line)=([0-9]+(?:\\.[0-9]+)?)/i)||[])[1]!=null?Number((String(m?.specifier||'').match(/(?:total|line)=([0-9]+(?:\\.[0-9]+)?)/i)||[])[1]):null),
+      outcomes:Array.isArray(m?.outcomes)?m.outcomes.map(o=>({
+        ...o,
+        name:String(o?.name||o?.desc||o?.title||'')
+      })):[]
+    }))
   };
 }
 
