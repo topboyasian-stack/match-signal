@@ -609,7 +609,11 @@ async function fetchLiveRemote(){
       const pages=[];
       for(let pageNum=1;pageNum<=2;pageNum++){
         const params=new URLSearchParams({pageSize:'100',pageNum:String(pageNum),timeline:'168',sources:'efootball,srl,vfootball',_t:String(Date.now())});
-        const r=await fetch(base+'?'+params.toString(),{cache:'no-store',headers:{'Accept':'application/json'}});
+        const controller=new AbortController();
+        const timeout=setTimeout(()=>controller.abort(),8000);
+        let r;
+        try{r=await fetch(base+'?'+params.toString(),{cache:'no-store',headers:{'Accept':'application/json'},signal:controller.signal});}
+        finally{clearTimeout(timeout)}
         if(!r.ok)throw new Error(base+' HTTP '+r.status);
         const body=await r.json();
         if(body?.ok===false)throw new Error(body.error||base+' returned an error');
@@ -635,7 +639,8 @@ async function fetchLiveRemote(){
   throw lastError||new Error('No live virtual source available');
 }
 async function fetchLiveSnapshot(){
-  const r=await fetch(SNAPSHOT,{cache:'no-store'});
+  const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),8000);
+  let r;try{r=await fetch(SNAPSHOT,{cache:'no-store',signal:controller.signal});}finally{clearTimeout(timeout)}
   if(!r.ok)throw new Error('Live snapshot HTTP '+r.status);
   const body=await r.json();
   const events=(Array.isArray(body.events)?body.events:[]).map(e=>({
@@ -650,7 +655,10 @@ async function fetchLiveSnapshot(){
   return {events,updated_at:body.updated_at||null};
 }
 
+let liveInFlight=false;
 async function loadLive(){
+  if(liveInFlight)return;
+  liveInFlight=true;
   const button=$('liveRefresh');
   button.disabled=true;
   try{
@@ -688,7 +696,7 @@ async function loadLive(){
       $('liveMeta').textContent=remoteError.message+' · '+snapshotError.message;
       console.error('Virtual Lab live feed failed:',remoteError,snapshotError);
     }
-  }finally{button.disabled=false}
+  }finally{button.disabled=false;liveInFlight=false}
 }
 
 function rebuildPredictionDesk(){
@@ -731,7 +739,7 @@ async function loadHistory(){
       renderModelLab();
       rebuildPredictionDesk();
       const status=$('historyStatus');if(status)status.textContent='AUTO-COLLECTED · '+arr.length+' settled observations';
-      const meta=$('historyMeta');if(meta)meta.textContent='Historical rows are collected automatically from the Virtual Lab paper pipeline. Latest refresh '+new Date().toLocaleString();
+      const meta=$('historyMeta');if(meta)meta.textContent='Research filter active · '+state.eligibility.eligible_competitions.length+' eligible leagues · O/U lines '+state.eligibility.eligible_ou_lines.join(', ')+' · historical refresh '+new Date().toLocaleString();
       return;
     }catch(e){lastError=e;}
   }
