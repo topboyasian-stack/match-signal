@@ -1,17 +1,24 @@
 {
-  "updated_at": "2026-09-21T05:27:37.659815+00:00",
+  "updated_at": "2026-09-21T10:59:08.028652+00:00",
   "automation_status": "SELF_HEALING_ENABLED",
-  "pipeline_last_update": "2026-09-21T05:06:22.104650+00:00",
-  "pipeline_age_hours": 0.35,
-  "odds_builder_last_update": "2026-09-21T05:06:34.651038+00:00",
-  "odds_builder_age_hours": 0.35,
+  "pipeline_last_update": "2026-09-21T10:49:08.851055+00:00",
+  "pipeline_age_hours": 0.17,
+  "odds_builder_last_update": "2026-09-21T10:49:21.947300+00:00",
+  "odds_builder_age_hours": 0.16,
   "expansion_last_update": "2026-09-21T04:49:06.768569+00:00",
-  "expansion_age_hours": 0.64,
+  "expansion_age_hours": 6.17,
   "thresholds": {
     "pipeline_hours": 4,
     "odds_builder_hours": 8,
     "expansion_hours": 4
   },
-  "actions": [],
+  "actions": [
+    {
+      "workflow": "live-expansion.yml",
+      "action": "dispatch",
+      "status": "requested",
+      "detail": "scheduled self-heal"
+    }
+  ],
   "policy": "Watchdog dispatches workflow_dispatch only when the corresponding generated artifact is stale and no run is already active."
 }
