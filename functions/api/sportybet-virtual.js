@@ -107,8 +107,14 @@ export async function onRequestGet(context){
 
   await Promise.all([collectPc('srl','sr:sport:1'),collectPc('efootball','sr:sport:137'),collectVfootball()]);
 
+  const cutoff=Date.now()-(2*60*1000);
   const dedup=new Map();
-  for(const row of out) if(row.event_id) dedup.set(row.event_id,row);
+  for(const row of out){
+    if(!row.event_id)continue;
+    const start=Number(row.start_time_ms||0);
+    if(start>0&&start<cutoff)continue;
+    dedup.set(row.event_id,row);
+  }
   const events=[...dedup.values()];
   const counts={};
   const filtered=[];
@@ -138,6 +144,8 @@ export async function onRequestGet(context){
     page_num:pageNum,
     timeline_hours:timeline,
     events_count:filtered.length,
+    upcoming_events_count:filtered.filter(e=>!e.start_time_ms||Number(e.start_time_ms)>=cutoff).length,
+    server_time:new Date().toISOString(),
     product_counts:counts,
     source_status:sourceStatus,
     errors,
