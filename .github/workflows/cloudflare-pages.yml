@@ -23,6 +23,11 @@ on:
       - 'expansion-tennis-ou.js'
       - 'expansion-odds-builder.js'
       - 'live-model-trace.js'
+      - 'virtual-lab.html'
+      - 'virtual-lab.js'
+      - 'virtual-lab.css'
+      - '_redirects'
+      - 'VIRTUAL-LAB-*.md'
       - '.github/workflows/cloudflare-pages.yml'
   workflow_run:
     workflows:
@@ -121,8 +126,8 @@ jobs:
         run: |
           node --input-type=module <<'NODE'
           const base = 'https://match-signal.pages.dev';
-          const pages = ['/', '/expansion.html', '/live.html', '/basketball.html', '/performance.html'];
-          const assets = ['/expansion.js', '/expansion-odds-builder.js', '/live-analysis.js', '/live-data-worker.js', '/data/predictions.json', '/data/expansion_status.json', '/data/odds_builder.json'];
+          const pages = ['/', '/expansion.html', '/live.html', '/basketball.html', '/performance.html', '/virtual-lab.html', '/virtual-lab'];
+          const assets = ['/expansion.js', '/expansion-odds-builder.js', '/live-analysis.js', '/live-data-worker.js', '/virtual-lab.js', '/virtual-lab.css', '/_redirects', '/data/predictions.json', '/data/expansion_status.json', '/data/odds_builder.json'];
           const failures = [];
           async function get(path) {
             const r = await fetch(base + path + (path.includes('?') ? '&' : '?') + 'smoke=' + Date.now(), {cache:'no-store'});
@@ -140,6 +145,10 @@ jobs:
               }
               if (path==='/live.html') {
                 for (const marker of ['id="statusText"','id="grid"','live-analysis.js','live-data-worker.js'])
+                  if (!body.includes(marker)) failures.push(path+' missing '+marker);
+              }
+              if (path==='/virtual-lab.html' || path==='/virtual-lab') {
+                for (const marker of ['Virtual Lab','virtual-lab.js','How to use the Lab / what to select','Research conclusion'])
                   if (!body.includes(marker)) failures.push(path+' missing '+marker);
               }
             } catch(e) { failures.push(path+' '+e.message); }
