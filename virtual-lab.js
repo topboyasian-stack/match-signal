@@ -70,14 +70,37 @@ function stats(rows){
   return {n:rows.length,valid:valid.length,wins,rate:valid.length?wins/valid.length:null,roi};
 }
 
+function eventCluster(rows){
+  const groups=new Map();
+  rows.filter(r=>typeof r.win==='boolean').forEach(r=>{
+    const id=String(r.event_id||r.eventId||'')||String(r.timestamp||'')+'|'+String(r.product||'');
+    const key=id+'|'+String(r.timestamp||'');
+    const prev=groups.get(key);
+    if(!prev){groups.set(key,r);return;}
+    // Prefer a single winner observation as the event-level representative.
+    if(prev.market!=='winner'&&r.market==='winner')groups.set(key,r);
+  });
+  return [...groups.values()].sort((a,b)=>new Date(a.timestamp)-new Date(b.timestamp));
+}
 function split(rows){
   const ordered=[...rows].sort((a,b)=>new Date(a.timestamp)-new Date(b.timestamp));
-  const pct=Number($('split').value),cut=Math.floor(ordered.length*pct);
-  return {train:ordered.slice(0,cut),test:ordered.slice(cut)};
+  const groups=[];
+  const seen=new Set();
+  ordered.forEach(r=>{
+    const key=String(r.event_id||r.eventId||'')+'|'+String(r.timestamp||'');
+    if(!seen.has(key)){seen.add(key);groups.push(key);}
+  });
+  const pct=Number($('split').value),cut=Math.floor(groups.length*pct);
+  const trainKeys=new Set(groups.slice(0,cut)),train=[],test=[];
+  ordered.forEach(r=>{
+    const key=String(r.event_id||r.eventId||'')+'|'+String(r.timestamp||'');
+    (trainKeys.has(key)?train:test).push(r);
+  });
+  return {train,test,groups:groups.length};
 }
 
 function seq(rows){
-  const v=rows.filter(r=>typeof r.win==='boolean').sort((a,b)=>new Date(a.timestamp)-new Date(b.timestamp));
+  const v=eventCluster(rows);
   if(v.length<3)return null;
   const afterWin=[],afterLoss=[];
   for(let i=1;i<v.length;i++){(v[i-1].win?afterWin:afterLoss).push(v[i].win)}
@@ -155,10 +178,10 @@ function analyze(){
   if(sq){
     $('sequence').className='tableWrap';
     $('sequence').innerHTML='<table><thead><tr><th>Observation</th><th>Value</th></tr></thead><tbody>'+
-      '<tr><td>Rows used</td><td>'+sq.n+'</td></tr><tr><td>P(win next | previous win)</td><td>'+fmtPct(sq.afterWin)+'</td></tr><tr><td>P(win next | previous loss)</td><td>'+fmtPct(sq.afterLoss)+'</td></tr><tr><td>Conditional delta</td><td>'+fmtPct(sq.delta)+'</td></tr></tbody></table>'+
+      '<tr><td>Independent event groups</td><td>'+sq.n+'</td></tr><tr><td>P(win next | previous win)</td><td>'+fmtPct(sq.afterWin)+'</td></tr><tr><td>P(win next | previous loss)</td><td>'+fmtPct(sq.afterLoss)+'</td></tr><tr><td>Conditional delta</td><td>'+fmtPct(sq.delta)+'</td></tr></tbody></table>'+
       '<p class="muted">A non-zero delta is only an investigation trigger. It must survive unseen testing before a rule is trusted.</p>';
   }else $('sequence').innerHTML='Need at least 3 settled observations.';
-  $('oosLabel').textContent=parts.test.length+' rows';
+  $('oosLabel').textContent=parts.test.length+' rows · '+(parts.groups||0)+' event groups';
   if(parts.test.length){
     $('oos').className='tableWrap';
     $('oos').innerHTML='<table><thead><tr><th>Metric</th><th>Discovery</th><th>Unseen test</th></tr></thead><tbody>'+
