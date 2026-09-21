@@ -1,0 +1,81 @@
+name: Match Signal Virtual Lab Collector
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: match-signal-virtual-lab-collector
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 2
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependency
+        run: python -m pip install --upgrade requests
+
+      - name: Run virtual fixture capture + settlement
+        run: python scripts/virtual_lab_collector.py
+
+      - name: Validate collector artifacts
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          for name in [
+              'data/virtual_lab_pending.json',
+              'data/virtual_lab_history.json',
+              'data/virtual_lab_status.json',
+          ]:
+              p = Path(name)
+              data = json.loads(p.read_text())
+              print(name, 'OK', len(data) if isinstance(data, list) else 'object')
+          PY
+
+      - name: Publish collector artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          for attempt in 1 2 3 4; do
+            git add data/virtual_lab_pending.json data/virtual_lab_history.json data/virtual_lab_status.json
+
+            if git diff --cached --quiet; then
+              echo "Virtual Lab collector produced no data changes."
+              exit 0
+            fi
+
+            git commit -m "🤖 Collect and settle Virtual Lab observations"
+
+            if git push origin main; then
+              echo "Virtual Lab collector publication succeeded on attempt $attempt."
+              exit 0
+            fi
+
+            echo "Concurrent main update detected; rebuilding from latest main (attempt $attempt)."
+            git fetch origin main
+            git reset --hard origin/main
+            python scripts/virtual_lab_collector.py
+          done
+
+          echo "Virtual Lab collector could not publish after retries."
+          exit 1
