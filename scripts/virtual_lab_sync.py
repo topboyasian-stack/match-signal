@@ -14,6 +14,7 @@ DIRECT_PC="https://www.sportybet.com/api/ng/factsCenter/pcUpcomingEvents"
 DIRECT_VFL="https://www.sportybet.com/api/ng/factsCenter/wapConfigurableUpcomingEvents"
 HEADERS={"Accept":"application/json, text/plain, */*","Content-Type":"application/json","Current-Country":"NG","Origin":"https://www.sportybet.com","Referer":"https://www.sportybet.com/ng/","User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/152.0.0.0 Safari/537.36"}
 SPORTY_MARKETS="1,18,10,29,11,26,36,14,60100,186,189,202,204,210"
+SYNC_BUILD="2026-09-21-live-refresh-v2"
 
 def request(url, params):
     r=requests.get(url,params=params,headers=HEADERS,timeout=25)
@@ -123,7 +124,7 @@ def main():
     if previous_cmp==candidate and previous:
         print("Virtual Lab snapshot unchanged; keeping published timestamp.")
         return
-    payload={"updated_at":now,**candidate,"errors":errors,"refresh_seconds":30}
+    payload={"updated_at":now,**candidate,"errors":errors,"refresh_seconds":30,"sync_build":SYNC_BUILD}
     out.write_text(json.dumps(payload,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
     print(json.dumps({"status":payload["status"],"events_count":len(rows),"product_counts":counts,"errors":errors},indent=2))
     if not rows:raise SystemExit("ABORT: no live virtual/eFootball/SRL events collected")
