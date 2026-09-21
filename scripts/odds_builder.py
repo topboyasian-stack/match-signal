@@ -273,8 +273,8 @@ def main():
     status="LIVE_VALUE_SET" if len(selected)>=MIN_LEGS else ("SINGLE_LIVE_VALUE" if selected else "NO_BET")
     rejection_counts={}
     for leg in built:
-        status=str(leg.get("status") or "REJECTED")
-        rejection_counts[status]=rejection_counts.get(status,0)+1
+        leg_status=str(leg.get("status") or "REJECTED")
+        rejection_counts[leg_status]=rejection_counts.get(leg_status,0)+1
     result={
         "generated_at":now.isoformat(),"engine_version":"V6.1-RESEARCH-GATED",
         "mode":"PAPER_ONLY","target_legs":"3-4","sports_supported":["football","tennis"],
@@ -304,7 +304,7 @@ def main():
         "rejected_candidates":[x for x in built if not x["real_money_eligible"]][:20],
         "settled_legs":recent_settled(load(HISTORY,[]),now,known),
         "builder_event_ids":sorted(known),"leg_count":len(selected),"sports_selected":sports,
-        "status":("UPSTREAM_RESEARCH_GATE_BLOCKED" if upstream_blocked else status),
+        "status":("UPSTREAM_RESEARCH_GATE_BLOCKED" if upstream_blocked else ("LIVE_VALUE_SET" if len(selected)>=MIN_LEGS else ("SINGLE_LIVE_VALUE" if selected else "NO_BET"))),
         "reference_combined_odds":round(math.prod(x["model_fair_odds"] for x in selected),3) if selected else None,
         "reference_odds_type":"MODEL_FAIR_ODDS_NOT_BOOKMAKER_PRICE",
         "market_price_combined_odds":round(math.prod(x["bookmaker_odds"] for x in selected),3) if selected and all(x.get("bookmaker_odds") is not None for x in selected) else None,
