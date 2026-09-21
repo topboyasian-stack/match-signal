@@ -33,6 +33,8 @@ function normalize(t, event, source, sportId){
     sport_id:sportId,
     tournament:String(t?.name||''),
     category:String(t?.categoryName||''),
+    tournament_id:String(t?.id||t?.tournamentId||''),
+    category_id:String(t?.categoryId||t?.category?.id||''),
     event_id:String(event?.eventId||''),
     participant_1:String(event?.homeTeamName||''),
     participant_2:String(event?.awayTeamName||''),
