@@ -47,7 +47,7 @@ try{
     (d.events||[]).forEach(x=>{
       const p=pdlById.get(String(x.id));
       if(!p)return;
-      const e={id:String(x.id),date:x.date,status:x.status,competitions:[{competitors:[
+      const e={id:String(x.id),date:x.date,status:{...x.status,displayClock:x.displayClock},competitions:[{competitors:[
         {homeAway:'home',team:{displayName:x.home},score:x.home_score},
         {homeAway:'away',team:{displayName:x.away},score:x.away_score}
       ]}]};
