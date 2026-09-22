@@ -70,6 +70,7 @@ jobs:
           preserved = {
               'Eredivisie': [r for r in rows if r.get('league') == 'Eredivisie'],
               'Saudi Pro League': [r for r in rows if r.get('league') == 'Saudi Pro League'],
+              'England Amateur - U21 Professional Development League': [r for r in rows if r.get('league') == 'England Amateur - U21 Professional Development League'],
           }
           Path('/tmp/preserved_live_leagues.json').write_text(json.dumps(preserved))
           print({k: len(v) for k, v in preserved.items()})
