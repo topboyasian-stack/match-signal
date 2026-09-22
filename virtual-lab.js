@@ -5,15 +5,15 @@
 const LIVE_API='https://match-signal.pages.dev/api/sportybet-virtual';
 const LIVE_API_TIMEOUT_MS=12000;
 const LIVE_MARKETS='1,18,10,29,11,26,36,14,60100,186,189,202,204,210';
-const SNAPSHOT='./data/virtual_lab_live.json';
+const SNAPSHOT='/data/virtual_lab_live.json';
 const LIVE_REFRESH_MS=30000;
-const UI_BUILD='20260922-v40';
-const HISTORY='./api/virtual-lab-history';
-const HISTORY_FALLBACK='./data/virtual_lab_history.json';
-const MODEL_EVAL='./data/virtual_lab_model_eval.json';
-const ELIGIBILITY='./data/virtual_lab_eligibility.json';
-const PARTICIPANT_PROFILES='./data/virtual_lab_participant_profiles.json';
-const CONFIRMED_WATCH='./data/virtual_lab_confirmed_participants.json';
+const UI_BUILD='20260922-v41';
+const HISTORY='/api/virtual-lab-history';
+const HISTORY_FALLBACK='/data/virtual_lab_history.json';
+const MODEL_EVAL='/data/virtual_lab_model_eval.json';
+const ELIGIBILITY='/data/virtual_lab_eligibility.json';
+const PARTICIPANT_PROFILES='/data/virtual_lab_participant_profiles.json';
+const CONFIRMED_WATCH='/data/virtual_lab_confirmed_participants.json';
 const state={rows:[],filtered:[],live:[],liveMode:'none',liveUpdated:null,picks:[],builder:[],historyLoaded:false,modelRows:[],modelEvents:[],modelGate:false,modelHoldout:null,modelEvaluation:null,participantProfiles:null,confirmedWatch:null,eligibility:{eligible_competitions:['Esoccer H2H GG League','Europa League','Volta Premier League'],eligible_ou_lines:[3.5,4.5],experimental_ou_lines:[1.5],priority_ou_lines:[1.5,3.5,4.5],eligible_markets:['ou']},predictionCache:new Map()};
 
 const $=id=>document.getElementById(id);
