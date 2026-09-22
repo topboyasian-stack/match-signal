@@ -19,7 +19,7 @@ const ELIGIBILITY='/data/virtual_lab_eligibility.json';
 const PARTICIPANT_PROFILES='/data/virtual_lab_participant_profiles.json';
 const CONFIRMED_WATCH='/data/virtual_lab_participants/efootball_confirmed_watch.json';
 const SUPPORTED_VIRTUAL_PRODUCTS=new Set(['efootball_gt','efootball_adriatic','vfootball','zoom']);
-const state={rows:[],filtered:[],live:[],liveMode:'none',liveUpdated:null,picks:[],builder:[],historyLoaded:false,modelRows:[],modelEvents:[],modelGate:false,modelHoldout:null,modelEvaluation:null,participantProfiles:null,confirmedWatch:null,eligibility:{eligible_competitions:['Esoccer H2H GG League','Europa League','Volta Premier League'],eligible_ou_lines:[3.5,4.5],experimental_ou_lines:[1.5],priority_ou_lines:[1.5,3.5,4.5],eligible_markets:['ou']},predictionCache:new Map()};
+const state={rows:[],filtered:[],live:[],liveMode:'none',liveUpdated:null,picks:[],builder:[],historyLoaded:false,modelRows:[],modelEvents:[],modelGate:false,modelHoldout:null,modelEvaluation:null,participantProfiles:null,confirmedWatch:null,eligibility:{eligible_competitions:['Esoccer H2H GG League','Europa League','Volta Premier League'],raw_eligible_competitions:['Esoccer H2H GG League','Europa League','Volta Premier League'],eligible_ou_lines:[3.5,4.5],raw_eligible_ou_lines:[3.5,4.5],experimental_ou_lines:[1.5],priority_ou_lines:[1.5,3.5,4.5],eligible_markets:['ou']},predictionCache:new Map()};
 
 const $=id=>document.getElementById(id);
 const esc=v=>{const d=document.createElement('div');d.textContent=String(v??'');return d.innerHTML};
@@ -433,13 +433,13 @@ function blendForEvent(event,priorEvents){
   }else if(earlier.length<20){alpha=0;}
   return {alpha,alphaN:bestN,priorN:prior.n};
 }
-function modelOverForEvent(event,priorEvents,line){
+function modelOverForEvent(event,priorEvents,line,useParticipant=true){
   if(!event||!event.ladder)return null;
   const market=poissonOver(event.ladder.lambda,line);
   const prior=productPrior(priorEvents,event.product,line,new Date(event.timestamp).getTime());
   const blend=blendForEvent(event,priorEvents);
   const base=(prior?.prob&&blend&&blend.alpha>0)?clamp01((1-blend.alpha)*market+blend.alpha*prior.prob):market;
-  const participant=participantPrior(priorEvents,event,line);
+  const participant=useParticipant?participantPrior(priorEvents,event,line):{prob:null,n:0,totalN:0,pairProb:null,pairN:0,weight:0,entityProb:null};
   const prob=participant.prob!=null?clamp01((1-participant.weight)*base+participant.weight*participant.prob):base;
   return {
     prob,
@@ -612,10 +612,20 @@ function qualifiesResearchPick(c){
   return state.historyLoaded && modelOk && c.calibrationN>=30 && edge>=0.02;
 }
 function isEligibleResearchEvent(e){
-  return (state.eligibility.eligible_competitions||[]).includes(String(e.competition||e.tournament||''));
+  const name=String(e.competition||e.tournament||'');
+  const raw=state.eligibility.raw_eligible_competitions||state.eligibility.eligible_competitions||[];
+  return raw.includes(name);
+}
+function isPromotedResearchEvent(e){
+  const name=String(e.competition||e.tournament||'');
+  return (state.eligibility.eligible_competitions||[]).includes(name);
 }
 function isPriorityOU(c){ return !!(c&&c.marketType==='ou'&&state.eligibility.priority_ou_lines.some(x=>Math.abs(Number(x)-Number(c.market.line))<0.001)); }
 function isEligibleOU(c){
+  return !!(c&&c.marketType==='ou'&&state.eligibility.eligible_markets.includes('ou')&&
+    (state.eligibility.raw_eligible_ou_lines||state.eligibility.eligible_ou_lines).some(x=>Math.abs(Number(x)-Number(c.market.line))<0.001));
+}
+function isPromotedOU(c){
   return !!(c&&c.marketType==='ou'&&state.eligibility.eligible_markets.includes('ou')&&
     state.eligibility.eligible_ou_lines.some(x=>Math.abs(Number(x)-Number(c.market.line))<0.001));
 }
@@ -631,7 +641,7 @@ function enrichCandidate(c,e){
     if(ladder){
       const priorEvents=state.modelEvents||[];
       const pseudo={product:e.product,participant_1:participantIdentity(e.participant_1||e.home||''),participant_2:participantIdentity(e.participant_2||e.away||''),home:participantIdentity(e.participant_1||e.home||''),away:participantIdentity(e.participant_2||e.away||''),timestamp:e.start_time,ladder,total:null};
-      const mm=modelOverForEvent(pseudo,priorEvents,Number(c.market.line));
+      const mm=modelOverForEvent(pseudo,priorEvents,Number(c.market.line),state.modelGate);
       if(mm){
         calibrated=String(c.pickCode).toUpperCase().startsWith('U')?1-mm.prob:mm.prob;
         source='ou-line-ladder-product-model';modelMeta=mm;
@@ -661,13 +671,19 @@ function predictionForEvent(e){
     const bestOU=active.length?enrichCandidate(active[0],e):null;
     const experimentalOU=experimental.length?enrichCandidate(experimental[0],e):null;
     const primaryCandidate=bestOU||experimentalOU;
-    const out={product:e.product,competition:e.competition||e.tournament||'',event_id:id,
+    const promoted=isPromotedResearchEvent(e)&&(primaryCandidate?isPromotedOU(primaryCandidate):false);
+    const qualified=primaryCandidate&&qualifiesResearchPick(primaryCandidate);
+    const candidate=primaryCandidate&&state.historyLoaded?primaryCandidate:null;
+    const out={
+      product:e.product,competition:e.competition||e.tournament||'',event_id:id,
       home:String(e.home||e.participant_1||''),away:String(e.away||e.participant_2||''),
       participant_1:String(e.participant_1||''),participant_2:String(e.participant_2||''),
-      identity_verified:!!(e.participant_1&&e.participant_2),
-      start_time:e.start_time||null,
-      primary:primaryCandidate&&qualifiesResearchPick(primaryCandidate)?primaryCandidate:null,
-      bestWinner:null,bestOU,experimentalOU,candidates:[bestOU,experimentalOU].filter(Boolean)};
+      identity_verified:!!(e.participant_1&&e.participant_2),start_time:e.start_time||null,
+      primary:qualified?primaryCandidate:null,
+      candidate:candidate,
+      candidate_status:qualified?'QUALIFIED':(promoted?'PROMOTION_PENDING':'EVIDENCE_CANDIDATE'),
+      bestWinner:null,bestOU,experimentalOU,candidates:[bestOU,experimentalOU].filter(Boolean)
+    };
     state.predictionCache.set(id,out);
     return out;
   }catch(err){
@@ -676,7 +692,7 @@ function predictionForEvent(e){
       home:String(e.home||e.participant_1||''),away:String(e.away||e.participant_2||''),
       participant_1:String(e.participant_1||''),participant_2:String(e.participant_2||''),
       identity_verified:!!(e.participant_1&&e.participant_2),start_time:e.start_time||null,
-      primary:null,bestWinner:null,bestOU:null,experimentalOU:null,candidates:[]};
+      primary:null,candidate:null,candidate_status:'CALCULATION_ERROR',bestWinner:null,bestOU:null,experimentalOU:null,candidates:[]};
     state.predictionCache.set(id,safe);
     return safe;
   }
@@ -775,7 +791,12 @@ function renderPredictionDesk(){
     const watch=p.experimentalOU;
     const hot=p.bestOU&&p.bestOU.hotParticipant?p.bestOU.hotParticipant:(p.experimentalOU&&p.experimentalOU.hotParticipant?p.experimentalOU.hotParticipant:null);
     const hotBadge=hot?'<em class="hotParticipantTag">🔥 HOT '+esc(hot.hot.direction)+' · '+hot.hot.line+'</em>':'';
-    const primaryHtml=p.primary?'<div class="primaryPick">'+hotBadge+'<span>RESEARCH QUALIFIED</span><strong>'+esc(p.primary.pickCode)+'</strong><b>'+fmtPct(p.primary.calibratedProb)+'</b><small>edge '+fmtPct(p.primary.edge)+' · n='+p.primary.calibrationN+'</small></div>':watch?'<div class="primaryPick mutedPrediction">'+hotBadge+'<span>O/U 1.5 RESEARCH WATCH</span><strong>'+esc(watch.pickCode)+'</strong><b>'+fmtPct(watch.calibratedProb)+'</b><small>participant n='+(watch.recurrence?watch.recurrence.entityN:0)+' · model is experimental</small></div>':'<div class="primaryPick mutedPrediction"><span>NO QUALIFIED SIGNAL</span><strong>WAIT</strong><b>Market baseline only</b></div>';
+    const primaryHtml=p.primary?
+      '<div class="primaryPick">'+hotBadge+'<span>QUALIFIED RESEARCH SIGNAL</span><strong>'+esc(p.primary.pickCode)+'</strong><b>'+fmtPct(p.primary.calibratedProb)+'</b><small>edge '+fmtPct(p.primary.edge)+' · n='+p.primary.calibrationN+'</small></div>':
+      p.candidate?
+      '<div class="primaryPick candidatePrediction">'+hotBadge+'<span>'+(p.candidate_status==='PROMOTION_PENDING'?'EVIDENCE CANDIDATE · PROMOTION PENDING':'EVIDENCE CANDIDATE')+'</span><strong>'+esc(p.candidate.pickCode||'—')+'</strong><b>'+fmtPct(p.candidate.calibratedProb??p.candidate.fairProb)+'</b><small>book '+(Number.isFinite(Number(p.candidate.bookmakerOdds))?Number(p.candidate.bookmakerOdds).toFixed(2):'—')+' · model '+(p.modelGate?'participant-enhanced':'base evidence')+'</small></div>':
+      watch?'<div class="primaryPick mutedPrediction">'+hotBadge+'<span>O/U 1.5 RESEARCH WATCH</span><strong>'+esc(watch.pickCode)+'</strong><b>'+fmtPct(watch.calibratedProb)+'</b><small>participant n='+(watch.recurrence?watch.recurrence.entityN:0)+' · model is experimental</small></div>':
+      '<div class="primaryPick mutedPrediction"><span>NO EVIDENCE CANDIDATE</span><strong>WAIT</strong><b>Market baseline only</b></div>';
     const addLabel=p.primary?'＋ Add qualified pick':'Locked · no qualified signal';
     const activeRec=p.bestOU&&p.bestOU.recurrence;
     const expRec=p.experimentalOU&&p.experimentalOU.recurrence;
@@ -976,8 +997,12 @@ async function loadEligibility(){
     if(!r.ok)throw new Error('eligibility HTTP '+r.status);
     const d=await r.json();
     if(Array.isArray(d.eligible_competitions))state.eligibility.eligible_competitions=d.eligible_competitions;
+    if(Array.isArray(d.raw_eligible_competitions))state.eligibility.raw_eligible_competitions=d.raw_eligible_competitions;
+    else if(Array.isArray(d.eligible_competitions))state.eligibility.raw_eligible_competitions=d.eligible_competitions;
     if(Array.isArray(d.priority_ou_lines))state.eligibility.priority_ou_lines=d.priority_ou_lines.map(Number);
     if(Array.isArray(d.eligible_ou_lines))state.eligibility.eligible_ou_lines=d.eligible_ou_lines.map(Number);
+    if(Array.isArray(d.raw_eligible_ou_lines))state.eligibility.raw_eligible_ou_lines=d.raw_eligible_ou_lines.map(Number);
+    else if(Array.isArray(d.eligible_ou_lines))state.eligibility.raw_eligible_ou_lines=d.eligible_ou_lines.map(Number);
     if(Array.isArray(d.experimental_ou_lines))state.eligibility.experimental_ou_lines=d.experimental_ou_lines.map(Number);
     if(Array.isArray(d.policy?.eligible_markets))state.eligibility.eligible_markets=d.policy.eligible_markets;
     state.predictionCache.clear();
@@ -986,7 +1011,7 @@ async function loadEligibility(){
 }
 function renderEligibilityNotice(){
   const host=$('historyMeta');if(!host)return;
-  host.textContent='Research filter active · '+state.eligibility.eligible_competitions.length+' eligible leagues · active O/U '+state.eligibility.eligible_ou_lines.join(', ')+' · experimental O/U '+state.eligibility.experimental_ou_lines.join(', ')+' · recurring participant patterns are tracked separately.';
+  host.textContent='Evidence engine active · '+state.eligibility.raw_eligible_competitions.length+' evidence-qualified leagues · candidate O/U '+state.eligibility.raw_eligible_ou_lines.join(', ')+' · promoted O/U '+(state.eligibility.eligible_ou_lines.join(', ')||'none')+' · participant feature '+(state.modelGate?'ACTIVE':'RESEARCH ONLY')+'.';
 }
 async function loadModelEvaluation(){
   try{
