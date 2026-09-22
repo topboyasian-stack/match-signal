@@ -681,9 +681,9 @@ function confirmedWatchParticipantsForEvent(e){
   });
 }
 function isUpcoming(e){
-  if(!e||!e.start_time)return true;
-  const t=new Date(e.start_time).getTime();
-  return Number.isFinite(t)&&t>=Date.now()-120000;
+  // Backend is authoritative for the upcoming/live window. Never apply a second
+  // browser-clock cutoff that can hide valid bookmaker fixtures.
+  return !!e;
 }
 function upcomingEventsFrom(events){
   return (events||[]).filter(isUpcoming).sort((a,b)=>new Date(a.start_time||0).getTime()-new Date(b.start_time||0).getTime());
@@ -702,7 +702,7 @@ function renderLive(){
   $('liveGrid').innerHTML=list;
   $('liveEmpty').hidden=!!list;
   $('liveDot').className='liveDot '+(state.liveMode==='remote'?'':state.liveMode==='snapshot'?'wait':'bad');
-  $('liveTitle').textContent=state.liveMode==='remote'?'LIVE SOURCE ONLINE · UPCOMING ONLY':state.liveMode==='snapshot'?'SNAPSHOT FALLBACK · UPCOMING ONLY':'LIVE SOURCE UNAVAILABLE';
+  $('liveTitle').textContent=state.liveMode==='remote'?'LIVE SOURCE ONLINE · SPORTYBET FIXTURES':state.liveMode==='snapshot'?'SNAPSHOT FALLBACK · SPORTYBET FIXTURES':'LIVE SOURCE UNAVAILABLE';
   const counts={};events.forEach(e=>counts[e.product]=(counts[e.product]||0)+1);
   $('liveMeta').textContent=(state.liveUpdated?'Feed timestamp '+date(state.liveUpdated)+' · ':'')+(Object.keys(counts).map(k=>k+': '+counts[k]).join(' · ')||'0 upcoming events');
 }
@@ -842,7 +842,7 @@ async function loadLive(){
       const stale=ageMs>120000;
       $('liveDot').className='liveDot '+(stale?'bad':'wait');
       $('liveTitle').textContent=stale?'STALE SNAPSHOT — LIVE SOURCE DOWN':'SNAPSHOT FALLBACK';
-      $('liveMeta').textContent=(stale?'Remote source unavailable and snapshot is older than 2 minutes · ':'Remote live source unavailable · ')+$('liveMeta').textContent;
+      $('liveMeta').textContent=(stale?'Remote source unavailable; showing last available snapshot · ':'Remote live source unavailable · ')+$('liveMeta').textContent;
       console.warn('Virtual Lab live source failed; snapshot used:',remoteError);
       return;
     }catch(snapshotError){
