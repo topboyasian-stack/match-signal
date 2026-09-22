@@ -6,7 +6,7 @@ const LIVE_API='https://match-signal.pages.dev/api/sportybet-virtual';
 const LIVE_MARKETS='1,18,10,29,11,26,36,14,60100,186,189,202,204,210';
 const SNAPSHOT='./data/virtual_lab_live.json';
 const LIVE_REFRESH_MS=30000;
-const UI_BUILD='20260922-v22';
+const UI_BUILD='20260922-v26';
 const HISTORY='./api/virtual-lab-history';
 const HISTORY_FALLBACK='./data/virtual_lab_history.json';
 const MODEL_EVAL='./data/virtual_lab_model_eval.json';
@@ -231,10 +231,10 @@ function lineFromSpecifier(value){
 }
 
 function normalizeLiveEvent(event,tournament,category){
-  const home=String(event.homeTeamName||event.home||'');
-  const away=String(event.awayTeamName||event.away||'');
-  const homeParticipant=participantIdentity(event.homeParticipant||event.homePlayer||event.homeCompetitor||home);
-  const awayParticipant=participantIdentity(event.awayParticipant||event.awayPlayer||event.awayCompetitor||away);
+  const home=String(event.team_1||event.homeTeamName||event.home||'');
+  const away=String(event.team_2||event.awayTeamName||event.away||'');
+  const homeParticipant=participantIdentity(event.participant_1||event.homeParticipant||event.homePlayer||event.homeCompetitor||'');
+  const awayParticipant=participantIdentity(event.participant_2||event.awayParticipant||event.awayPlayer||event.awayCompetitor||'');
   const product=classifyEvent(tournament,category,home,away);
   if(!product)return null;
   const markets=(event.markets||[]).map(m=>{
@@ -248,7 +248,7 @@ function normalizeLiveEvent(event,tournament,category){
   let start=null;
   const ms=Number(event.estimateStartTime);
   if(Number.isFinite(ms)&&ms>0)start=new Date(ms).toISOString();
-  return {product,competition:String(tournament||'Unclassified'),category:String(category||''),event_id:String(event.eventId||''),home,away,participant_1:homeParticipant,participant_2:awayParticipant,start_time:start,match_status:event.matchStatus,markets};
+  return {product,competition:String(tournament||'Unclassified'),category:String(category||''),event_id:String(event.eventId||''),home,away,participant_1:homeParticipant,participant_2:awayParticipant,participant_identity_source:event.participant_identity_source||((homeParticipant||awayParticipant)?'event_metadata_or_explicit_name':null),identity_verified:!!(homeParticipant&&awayParticipant),start_time:start,match_status:event.matchStatus,markets};
 }
 
 function matchesMarket(market,chosen){
@@ -695,7 +695,8 @@ function renderLive(){
     const shown=(e.markets||[]).filter(m=>matchesMarket(m,market)).slice(0,3);
     const chips=shown.flatMap(m=>(m.outcomes||[]).slice(0,4).map(o=>'<span class="liveChip"><span>'+esc(outcomeCode(m,o))+'</span> <b>'+Number(o.odds).toFixed(2)+'</b></span>')).join('');
     const pick=p&&p.primary?'<div class="predictionBox"><div class="predictionTop"><span class="predictionLabel">RESEARCH PICK</span><span class="predictionType">'+(p.primary.marketType==='ou'?'TOTALS':'MATCH RESULT')+'</span></div><div class="predictionPick">'+esc(p.primary.pickCode)+' <b>'+fmtPct(p.primary.calibratedProb)+'</b></div><div class="predictionMeta">Book '+p.primary.bookmakerOdds.toFixed(2)+' · Edge '+fmtPct(p.primary.edge)+' · n='+p.primary.calibrationN+'</div></div>':'<div class="predictionBox mutedPrediction"><div class="predictionLabel">NO QUALIFIED SIGNAL</div><div class="predictionPick">MARKET BASELINE ONLY</div><div class="predictionMeta">Needs ≥30 historical calibration observations and ≥2% calibrated edge.</div></div>';
-    return '<article class="liveCard"><div class="liveTop"><span>'+esc(e.competition||e.product)+'</span><span>'+esc(e.start_time?date(e.start_time):'Time n/a')+'</span></div><div class="liveTeams"><strong>'+esc(e.home||e.participant_1||'Unknown player/team')+'</strong> <span>vs</span> <strong>'+esc(e.away||e.participant_2||'Unknown player/team')+'</strong></div>'+pick+'<div class="liveOdds">'+(chips||'<span class="liveMeta">No readable markets</span>')+'</div></article>';
+    const identityLine=(e.participant_1||e.participant_2)?'<div class="participantIdentityLine"><span class="participantIdentityLabel">STABLE PARTICIPANT</span><strong>'+esc(e.participant_1||'UNVERIFIED')+'</strong><span>vs</span><strong>'+esc(e.participant_2||'UNVERIFIED')+'</strong><span class="participantIdentityStatus">'+(e.identity_verified?'✓ VERIFIED':'⚠ IDENTITY UNVERIFIED')+'</span></div>':'<div class="participantIdentityLine participantIdentityUnknown"><span class="participantIdentityLabel">STABLE PARTICIPANT</span><strong>IDENTITY NOT EXPOSED BY LIVE FEED</strong><span class="participantIdentityStatus">⚠ NO GUESSING</span></div>';
+    return '<article class="liveCard"><div class="liveTop"><span>'+esc(e.competition||e.product)+'</span><span>'+esc(e.start_time?date(e.start_time):'Time n/a')+'</span></div><div class="liveTeams"><strong>'+esc(e.home||'Unknown team')+'</strong> <span>vs</span> <strong>'+esc(e.away||'Unknown team')+'</strong>'+identityLine+'</div>'+pick+'<div class="liveOdds">'+(chips||'<span class="liveMeta">No readable markets</span>')+'</div></article>';
   }).join('');
   $('liveGrid').innerHTML=list;
   $('liveEmpty').hidden=!!list;
@@ -813,8 +814,11 @@ async function fetchLiveSnapshot(){
   const body=await r.json();
   const events=(Array.isArray(body.events)?body.events:[]).map(e=>({
     ...e,
-    home:String(e.home||e.participant_1||e.homeTeamName||''),
-    away:String(e.away||e.participant_2||e.awayTeamName||''),
+    home:String(e.home||e.team_1||e.homeTeamName||''),
+    away:String(e.away||e.team_2||e.awayTeamName||''),
+    participant_1:String(e.participant_1||''),
+    participant_2:String(e.participant_2||''),
+    identity_verified:!!(e.participant_1&&e.participant_2),
     event_id:String(e.event_id||e.eventId||''),
     start_time:e.start_time||null,
     match_status:e.match_status||e.matchStatus||null,
