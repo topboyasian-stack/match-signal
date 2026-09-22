@@ -198,7 +198,7 @@ def fetch_upcoming():
                 "pageSize":100,
                 "pageNum":page_num,
                 "timeline":168,
-                "sources":"efootball,srl,vfootball",
+                "sources":"efootball,vfootball",
                 "_t":int(time.time()*1000),
             })
             for raw in body.get("events") or []:
@@ -387,10 +387,8 @@ def settle(pending):
     grouped = {}
     for item in unresolved:
         source = str(item.get("source") or "")
-        if source not in {"srl", "efootball", "vfootball"}:
-            if item.get("product") == "srl":
-                source = "srl"
-            elif str(item.get("product") or "").startswith("efootball"):
+        if source not in {"efootball", "vfootball"}:
+            if str(item.get("product") or "").startswith("efootball"):
                 source = "efootball"
             elif item.get("product") in {"vfootball", "zoom"}:
                 source = "vfootball"
@@ -402,7 +400,7 @@ def settle(pending):
     errors = []
 
     for source, (start, end) in grouped.items():
-        if source not in {"srl", "efootball", "vfootball"}:
+        if source not in {"efootball", "vfootball"}:
             continue
         start_q = start - 6 * 3600000
         end_q = max(end + 6 * 3600000, int(time.time() * 1000))
