@@ -36,9 +36,16 @@ def product_for(t,c,h,a):
 def compact(raw,fallback_product=None):
     t=str(raw.get("tournament") or raw.get("competition") or "")
     c=str(raw.get("category") or "")
-    h=str(raw.get("participant_1") or raw.get("homeTeamName") or "")
-    a=str(raw.get("participant_2") or raw.get("awayTeamName") or "")
-    product=raw.get("product") or product_for(t,c,h,a) or fallback_product
+    team_h=str(raw.get("homeTeamName") or raw.get("team_1") or "")
+    team_a=str(raw.get("awayTeamName") or raw.get("team_2") or "")
+    explicit_h=str(raw.get("participant_1") or raw.get("homeParticipant") or raw.get("homePlayer") or raw.get("homeCompetitor") or "").strip()
+    explicit_a=str(raw.get("participant_2") or raw.get("awayParticipant") or raw.get("awayPlayer") or raw.get("awayCompetitor") or "").strip()
+    def derived(value):
+        m=re.search(r"\\(([^()]+)\\)\\s*$",str(value or ""))
+        return m.group(1).strip() if m else ""
+    h=explicit_h or derived(team_h) or team_h
+    a=explicit_a or derived(team_a) or team_a
+    product=raw.get("product") or product_for(t,c,team_h,team_a) or fallback_product
     if not product:return None
     markets=[]
     for m in raw.get("markets") or []:
