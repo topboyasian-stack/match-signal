@@ -37,7 +37,7 @@ SESSION.headers.update({
 
 PENDING_CAP=12000
 HISTORY_CAP=30000
-COLLECTOR_VERSION="2.0.0"
+COLLECTOR_VERSION="3.0.0-v1"
 SCHEMA_VERSION=1
 SUPPORTED_PRODUCTS={"efootball_gt","efootball_adriatic","vfootball","zoom"}
 
@@ -157,6 +157,8 @@ def normalize_proxy_event(raw):
     participant_1=str(raw.get("participant_1") or "").strip()
     participant_2=str(raw.get("participant_2") or "").strip()
     product=str(raw.get("product") or "").strip()
+    if product not in SUPPORTED_PRODUCTS:
+        return None
     if not event_id or not team_1 or not team_2 or not product:
         return None
     start_ms=num(raw.get("start_time_ms") if raw.get("start_time_ms") is not None else raw.get("estimateStartTime"))
@@ -491,6 +493,8 @@ def settle(pending):
             "participant_1_key": stable_participant_key(item["product"],item.get("participant_1")),
             "participant_2_key": stable_participant_key(item["product"],item.get("participant_2")),
             "trace_source": "sportybet_ng_result_proxy",
+            "trace_id": f"{item[\"event_id\"]}|{item[\"market\"]}|{item.get(\"line\") if item.get(\"line\") is not None else \"\"}|{item[\"selection\"]}",
+            "collector_run_id": os.getenv("GITHUB_RUN_ID") or "local",
         })
         settled_count += 1
 
@@ -526,6 +530,8 @@ def with_trace_metadata(row):
     line="" if row.get("line") is None else str(row.get("line"))
     selection=str(row.get("selection") or "")
     row.setdefault("record_id", f"{event_id}|{market}|{line}|{selection}")
+    row.setdefault("trace_id", row["record_id"])
+    row.setdefault("collector_run_id", os.getenv("GITHUB_RUN_ID") or "local")
     row.setdefault("schema_version", SCHEMA_VERSION)
     row.setdefault("pipeline_version", COLLECTOR_VERSION)
     row.setdefault("participant_1_key", stable_participant_key(product,row.get("participant_1")))
@@ -767,6 +773,8 @@ def main():
         "paper_only":True,
         "walk_forward_model_artifact":"data/virtual_lab_model_eval.json",
         "walk_forward_model_policy":"strict chronological holdout; participant feature cannot activate without untouched dual-loss improvement",
+        "active_product_contract":sorted(SUPPORTED_PRODUCTS),
+        "trace_contract":"Every settled row has deterministic record_id/trace_id plus collector_run_id.",
     })
     print(f"Virtual Lab collector: {len(events)} upcoming events | +{added} observations | +{newly_settled} settled | {len(history)} history rows | {len(pending)} pending")
     for error in errors[-10:]:
