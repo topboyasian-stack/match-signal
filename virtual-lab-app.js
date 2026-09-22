@@ -628,7 +628,10 @@ function qualifiesBaseResearchPick(c,e){
   const edge=Number(c.calibratedProb)-Number(c.bookImplied);
   if(!Number.isFinite(edge)||edge<0.02)return false;
   if(c.marketType==='ou'){
-    return isPromotedResearchEvent(e)&&isPromotedOU(c);
+    // Base-evidence research can use any league/line that has passed the raw
+    // evidence gate. The stricter promoted gate remains separate and is used
+    // only for the participant-enhanced/promotion tier.
+    return isEligibleResearchEvent(e)&&isEligibleOU(c);
   }
   return false;
 }
