@@ -35,6 +35,18 @@ function participantIdentity(value){
   return m&&m[1].trim()?m[1].trim():s;
 }
 function participantIdentityKey(value){return participantIdentity(value).trim().toLowerCase();}
+function deriveParticipant(event,side){
+  const explicit=side===1
+    ? (event?.participant_1||event?.homeParticipant||event?.homePlayer||event?.homeCompetitor||'')
+    : (event?.participant_2||event?.awayParticipant||event?.awayPlayer||event?.awayCompetitor||'');
+  if(String(explicit).trim()) return participantIdentity(explicit);
+  const team=side===1
+    ? (event?.team_1||event?.home||event?.homeTeamName||'')
+    : (event?.team_2||event?.away||event?.awayTeamName||'');
+  const m=String(team||'').match(/\(([^()]+)\)\s*$/);
+  return m&&m[1]?m[1].trim():'';
+}
+
 
 function normalize(r){
   const x={...r};
@@ -238,8 +250,8 @@ function lineFromSpecifier(value){
 function normalizeLiveEvent(event,tournament,category){
   const home=String(event.team_1||event.homeTeamName||event.home||'');
   const away=String(event.team_2||event.awayTeamName||event.away||'');
-  const homeParticipant=participantIdentity(event.participant_1||event.homeParticipant||event.homePlayer||event.homeCompetitor||'');
-  const awayParticipant=participantIdentity(event.participant_2||event.awayParticipant||event.awayPlayer||event.awayCompetitor||'');
+  const homeParticipant=deriveParticipant(event,1);
+  const awayParticipant=deriveParticipant(event,2);
   const product=String(event.product||({'efootball_gt':'efootball_gt','efootball_adriatic':'efootball_adriatic','vfootball':'vfootball','zoom':'zoom'}[String(event.source||'').toLowerCase()]||classifyEvent(tournament,category,home,away)||'')).toLowerCase().trim();
   const eventId=String(event.event_id||event.eventId||'');
   if(!product||!eventId)return null;
@@ -772,7 +784,7 @@ function renderLive(){
       const edge=Number(p?.primary?.edge);
       const calN=Number(p?.primary?.calibrationN);
       const pick=p&&p.primary?'<div class="predictionBox"><div class="predictionTop"><span class="predictionLabel">RESEARCH PICK</span><span class="predictionType">'+(p.primary.marketType==='ou'?'TOTALS':'MATCH RESULT')+'</span></div><div class="predictionPick">'+esc(p.primary.pickCode||'—')+' <b>'+fmtPct(p.primary.calibratedProb)+'</b></div><div class="predictionMeta">Book '+(Number.isFinite(bookmakerOdds)?bookmakerOdds.toFixed(2):'—')+' · Edge '+fmtPct(edge)+' · n='+(Number.isFinite(calN)?calN:0)+'</div></div>':'<div class="predictionBox mutedPrediction"><div class="predictionLabel">NO QUALIFIED SIGNAL</div><div class="predictionPick">MARKET BASELINE ONLY</div><div class="predictionMeta">The fixture is live in the feed, but the research gate has not qualified a signal.</div></div>';
-      const identityLine=(e.participant_1||e.participant_2)?'<div class="participantIdentityLine"><span class="participantIdentityLabel">STABLE PARTICIPANT</span><strong>'+esc(e.participant_1||'UNVERIFIED')+'</strong><span>vs</span><strong>'+esc(e.participant_2||'UNVERIFIED')+'</strong><span class="participantIdentityStatus">'+(e.identity_verified?'✓ VERIFIED':'⚠ IDENTITY UNVERIFIED')+'</span></div>':'<div class="participantIdentityLine participantIdentityUnknown"><span class="participantIdentityLabel">STABLE PARTICIPANT</span><strong>IDENTITY NOT EXPOSED BY LIVE FEED</strong><span class="participantIdentityStatus">⚠ NO GUESSING</span></div>';
+      const identityLine=(e.participant_1||e.participant_2)?'<div class="participantIdentityLine"><span class="participantIdentityLabel">STABLE PARTICIPANT</span><strong>'+esc(e.participant_1||'UNVERIFIED')+'</strong><span>vs</span><strong>'+esc(e.participant_2||'UNVERIFIED')+'</strong><span class="participantIdentityStatus">'+(e.identity_verified?'✓ VERIFIED':'⚠ IDENTITY UNVERIFIED')+'</span></div>':'<div class="participantIdentityLine participantIdentityUnknown"><span class="participantIdentityLabel">STABLE PARTICIPANT</span><strong>IDENTITY NOT DERIVED FROM CURRENT FEED</strong><span class="participantIdentityStatus">⚠ SOURCE DID NOT EXPOSE IT</span></div>';
       cards.push('<article class="liveCard" data-product="'+esc(e.product||'')+'"><div class="liveTop"><span>'+esc(e.competition||e.product||'Virtual')+'</span><span>'+esc(e.start_time?date(e.start_time):'Time n/a')+'</span></div><div class="liveTeams"><strong>'+esc(e.home||'Upcoming fixture')+'</strong> <span>vs</span> <strong>'+esc(e.away||'Upcoming fixture')+'</strong>'+identityLine+'</div>'+pick+'<div class="liveOdds">'+(chips||'<span class="liveMeta">No readable markets</span>')+'</div></article>');
     }catch(err){
       console.warn('Virtual Lab fixture card skipped:',e?.event_id,err);
