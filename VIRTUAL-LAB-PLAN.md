@@ -1,100 +1,92 @@
-# Match Signal Virtual Lab
+# Match Signal Virtual Lab v1
 
 **Public owner:** Diddy  
-**Build:** MS-VIRTUAL-LAB-2026.09.21  
-**Purpose:** Standalone research environment for simulated football/eFootball products.
+**Build:** MS-VIRTUAL-LAB-V1-2026.09.22  
+**Production route:** /virtual-lab/
 
-## Scope
+## Purpose
 
-The lab is intentionally separate from the existing Match Signal football and tennis pages.
+A standalone, read-only research environment for legitimately observed SportyBet NG eFootball and virtual-football products. The lab is separate from the core football/tennis prediction desk.
 
-Initial product families:
+## Active products
 
 1. eFootball — GT Sports League
 2. eFootball — eAdriatic
-3. Simulated Reality League (SRL)
-4. Virtual Football
-5. Zoom / Turbo virtuals
+3. Virtual Football
+4. Zoom / Turbo virtuals
 
-## Research pipeline
+**SRL is excluded from the active collection, prediction and settlement pipeline.**
 
-Observed/public data:
+## Data lifecycle
 
-`event → market → selection → odds → result → settlement`
+`source → raw response → canonical event → participant identity → market snapshot → pending observation → official settlement → append-only archive → cumulative history → participant statistics → walk-forward evaluation → paper-only research signal`
 
-Research stages:
+The UI reads these artifacts. It does not manufacture research state.
 
-1. Collect completed observations.
-2. Normalize product, provider, event, market and timestamps.
-3. Fingerprint each product/provider separately.
-4. Test distributions, repeated participants, scorelines and market behaviour.
-5. Test sequence/dependence features.
-6. Freeze candidate rules on a discovery period.
-7. Evaluate on an untouched out-of-sample period.
-8. Repeat on a second untouched period.
-9. Only a reproducible result can advance to a paper signal.
-10. Never force a daily signal when evidence is absent.
+## Preservation
 
-## 80% target
+Existing history is preserved. The pre-rebuild evidence is retained under:
 
-The 80% figure is a research threshold, not a guarantee.
+`data/virtual_lab_archive/2026-09-22/`
 
-A strategy must cross the threshold **out-of-sample**, with enough observations and replication, before it is treated as a candidate signal. High hit rate without positive expected return is not sufficient.
+Daily settlement records are appended under:
 
-## Product-specific investigation
+`data/virtual_lab_archive/settlements/YYYY-MM-DD.jsonl`
 
-### eFootball GT
-- participant identity and repeat matchup effects
-- participant-specific win/draw/loss frequencies
-- score and total-goal distributions
-- odds movement
-- same-event prices across operators where the underlying event is genuinely identical
+The current participant registry is rebuilt from automatic settled history and archived settlements.
 
-### eAdriatic
-- repeat participant patterns
-- competition/round structure
-- score distributions
-- market-specific behaviour
+## Participant boundaries
 
-### SRL
-- team identity as simulation labels, not real-world match form
-- repeated team pairings
-- league/competition-specific distributions
-- price/result relationship
-- cross-bookmaker event matching
+Stable participant identity is product-scoped.
 
-### Virtual Football
-- season/table structure
-- team/player attributes where legitimately disclosed
-- repeat fixtures
-- short-interval event behaviour
-- result and score distributions
+- eFootball participant identities come from explicit/observed participant metadata, including historically observed parenthetical identifiers.
+- Club/team names are contextual and are never identity keys.
+- Unresolved or truncated identities are not guessed.
+- The confirmed eFootball watch is separate from automatic participant discovery.
+- Tennis participant evidence is preserved separately and is outside the Virtual Lab namespace.
 
-### Zoom / Turbo
-- event cadence
-- competition/product fingerprints
-- market efficiency and outcome distributions
+Confirmed eFootball identities currently include DECIMATOR, EXECUTIONER, AGENT, DUSK, DANTE, BOUNTY, STORM, HAYMAKER and CROWN.
 
-## Safety / integrity boundary
+## Research lines
 
-The lab does not:
-- bypass authentication/security;
-- reverse-engineer or recover secret RNG state;
-- manipulate bookmaker requests;
-- exploit technical faults for unauthorized payouts;
-- automate wagering;
-- claim that an anomaly proves manipulation.
+Priority O/U lines:
+- 1.5 — experimental
+- 3.5
+- 4.5
 
-## Architecture
+O/U 1.5 is tracked because observed evidence may be useful, but it is not promoted by ticket streaks or small samples.
 
-`Standalone Browser UI → local/imported observed dataset → research calculations`
+## Validation
 
-Future optional architecture:
+The lab uses chronological out-of-sample evaluation, model calibration and replication gates. A high raw hit rate is not enough.
 
-`Legitimate public-data collector → normalization store → research engine → paper-only signal API → Virtual Lab UI`
+The model must avoid look-ahead information and must not train on user-reported ticket outcomes.
 
-The collector must use permitted/public data access or a licensed data source. No private credentials or secrets belong in this public repository.
+## Production architecture
 
-## Separation rule
+The public route is:
 
-Do not add Virtual Lab navigation links or shared runtime dependencies to the existing Match Signal pages until the research module is independently validated.
+`https://match-signal.pages.dev/virtual-lab/`
+
+Only one authoritative browser renderer is loaded there:
+
+`virtual-lab-app.js`
+
+Legacy pages remain as compatibility redirects so there is no second production Virtual Lab implementation.
+
+## Debugging contract
+
+Every important settlement row carries:
+- record_id
+- trace_id
+- event_id
+- participant keys
+- schema version
+- pipeline version
+- settlement source
+
+The UI exposes build, feed and history diagnostics. A zero-data condition identifies which pipeline layer returned zero.
+
+## Integrity boundary
+
+The lab does not bypass authentication/security, recover secret RNG state, manipulate bookmaker requests, exploit technical faults, automate wagering, or claim that statistical anomalies prove manipulation.
