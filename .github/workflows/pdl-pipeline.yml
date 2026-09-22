@@ -1,0 +1,89 @@
+name: Match Signal PDL Prediction Feed
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["Match Signal Tennis Model V2","Match Signal Result Settlement","Match Signal Odds Builder"]
+    types: [completed]
+  push:
+    branches: [main]
+    paths:
+      - scripts/pdl_pipeline.py
+      - .github/workflows/pdl-pipeline.yml
+permissions:
+  contents: write
+concurrency:
+  group: match-signal-pdl
+  cancel-in-progress: false
+jobs:
+  pdl:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: python -m pip install --upgrade requests
+      - name: Build PDL predictions
+        run: python scripts/pdl_pipeline.py
+      - name: Preserve generated PDL artifacts
+        run: |
+          cp data/pdl_predictions.json /tmp/pdl_predictions.json
+          cp data/pdl_status.json /tmp/pdl_status.json
+      - name: Rebase generated slice onto latest main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git reset --hard origin/main
+          cp /tmp/pdl_predictions.json data/pdl_predictions.json
+          cp /tmp/pdl_status.json data/pdl_status.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('data/predictions.json')
+          rows=json.loads(p.read_text()) if p.exists() else []
+          pdl=json.loads(Path('data/pdl_predictions.json').read_text())
+          rows=[r for r in rows if r.get('league')!='England Amateur - U21 Professional Development League']
+          rows.extend(pdl)
+          rows.sort(key=lambda r:(str(r.get('start_time') or ''),str(r.get('sport') or ''),str(r.get('player_1') or '')))
+          p.write_text(json.dumps(rows,indent=2,ensure_ascii=False)+'\n')
+          print('PDL publication rows:',len(pdl),'main rows:',len(rows))
+          PY
+      - name: Synchronize SportyBet prices
+        run: python scripts/enrich_sportybet_odds.py
+      - name: Validate PDL publication
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          rows=json.loads(Path('data/predictions.json').read_text())
+          pdl=[r for r in rows if r.get('league')=='England Amateur - U21 Professional Development League']
+          assert all(r.get('sport')=='football' for r in pdl)
+          assert all(r.get('paper_only') is True for r in pdl)
+          assert all(r.get('model_version')=='PDL-1.0-2026.09.22' for r in pdl)
+          print('PDL feed validated:',len(pdl))
+          PY
+      - name: Commit PDL feed
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/pdl_predictions.json data/pdl_status.json data/predictions.json data/sportybet_odds_snapshot.json
+          if git diff --cached --quiet; then echo "No PDL changes."; exit 0; fi
+          git commit -m "🤖 Publish England U21 PDL prediction feed"
+          for attempt in 1 2 3; do
+            if git push origin main; then exit 0; fi
+            git fetch origin main
+            git rebase origin/main || { git rebase --abort 2>/dev/null || true; exit 1; }
+            sleep $((attempt*3))
+          done
+          exit 1
