@@ -162,76 +162,96 @@ def history():
 
 
 
-def upcoming():
+def sportybet_upcoming():
+    params={"sportId":"sr:sport:1","marketId":"1,18,10,14,16,29,45,47","pageSize":"100","pageNum":"1","timeline":"168"}
+    r=S.get(SPORTY,params=params,timeout=30)
+    r.raise_for_status()
+    body=r.json()
     events=[]
-    # Preferred: SportyBet proxy, because the resulting event IDs can later
-    # receive bookmaker-market synchronization. Fall back to SofaScore when
-    # the upstream envelope is unavailable or the exact competition is absent.
-    try:
-        for page in (1,2):
-            params={"sportId":"sr:sport:1","marketId":"1,18,10,14,16,29,45,47","pageSize":"100","pageNum":str(page),"timeline":"168"}
-            r=S.get(SPORTY,params=params,timeout=30);r.raise_for_status();body=r.json()
-            scoped=[]
-            top=body.get("events")
-            if isinstance(top,list):
-                scoped.extend((None,e) for e in top if isinstance(e,dict))
-            data=body.get("data") if isinstance(body.get("data"),dict) else {}
-            if isinstance(data.get("events"),list):
-                scoped.extend((None,e) for e in data["events"] if isinstance(e,dict))
-            if isinstance(data.get("tournaments"),list):
-                for t in data["tournaments"]:
-                    if not isinstance(t,dict): continue
-                    tournament_name=str(t.get("name") or t.get("tournamentName") or "").strip()
-                    if tournament_name and tournament_name!=LEAGUE: continue
-                    for ev in t.get("events") or []:
-                        if isinstance(ev,dict): scoped.append((tournament_name,ev))
-            for tournament_name,e in scoped:
-                event_tournament=str(
-                    e.get("tournamentName") or e.get("tournament_name") or e.get("competition")
-                    or ((e.get("tournament") or {}).get("name") if isinstance(e.get("tournament"),dict) else "")
-                    or tournament_name or ""
-                ).strip()
-                if event_tournament and event_tournament!=LEAGUE: continue
-                raw_start=e.get("estimateStartTime") or e.get("startTimeMs")
-                start=datetime.fromtimestamp(float(raw_start)/1000,tz=timezone.utc)
-                event_id=str(e.get("eventId") or e.get("event_id") or "").strip()
-                h=str(e.get("homeTeamName") or e.get("team_1") or "").strip()
-                a=str(e.get("awayTeamName") or e.get("team_2") or "").strip()
-                if event_id and h and a:
-                    events.append({"event_id":event_id,"start_time":start.isoformat(),"home":h,"away":a,"home_score":None,"away_score":None})
-    except Exception:
-        events=[]
-
-    if not events:
-        try:
-            season=current_season()
-            for page in range(0,4):
-                body=sofascore_json(f"/unique-tournament/{TOURNAMENT_ID}/season/{season}/events/next/{page}")
-                batch=body.get("events") or []
-                for e in batch:
-                    status=e.get("status") or {}
-                    if status.get("type") not in {"notstarted","scheduled","pre"} and status.get("code") not in {0,1}:
-                        continue
-                    ts=e.get("startTimestamp")
-                    home=e.get("homeTeam") or {}
-                    away=e.get("awayTeam") or {}
-                    if not ts or not home.get("name") or not away.get("name"): continue
-                    events.append({
-                        "event_id":f"sofascore|{e.get('id')}",
-                        "start_time":datetime.fromtimestamp(float(ts),tz=timezone.utc).isoformat(),
-                        "home":str(home.get("name")).strip(),
-                        "away":str(away.get("name")).strip(),
-                        "home_score":None,"away_score":None
-                    })
-                if len(batch)<20: break
-        except Exception:
-            pass
-
-    now=datetime.now(timezone.utc)
+    for t in (body.get("data") or {}).get("tournaments") or []:
+        if str(t.get("name") or "").strip()!=LEAGUE:
+            continue
+        for e in t.get("events") or []:
+            try:
+                start=datetime.fromtimestamp(float(e.get("estimateStartTime"))/1000,tz=timezone.utc)
+            except Exception:
+                continue
+            h=str(e.get("homeTeamName") or "").strip()
+            a=str(e.get("awayTeamName") or "").strip()
+            if not h or not a:
+                continue
+            events.append({
+                "event_id":str(e.get("eventId") or ""),
+                "start_time":start.isoformat(),
+                "home":h,
+                "away":a,
+                "home_score":None,
+                "away_score":None,
+                "source":"SportyBet NG via Match Signal Cloudflare proxy",
+            })
     return sorted(
-        {x["event_id"]:x for x in events if x["event_id"] and parse_date(x["start_time"]) and parse_date(x["start_time"])>=now}.values(),
+        {x["event_id"]:x for x in events if x["event_id"]}.values(),
         key=lambda x:x["start_time"]
     )
+
+
+def betstudy_upcoming():
+    response=S.get(RESULTS_URL,timeout=30)
+    response.raise_for_status()
+    soup=BeautifulSoup(response.text,"html.parser")
+    strings=list(soup.stripped_strings)
+    start_idx=next(
+        (i for i,value in enumerate(strings)
+         if "computer prediction" in value.lower()),
+        0,
+    )
+    stop=next(
+        (i for i in range(start_idx+1,len(strings))
+         if "u21 professional development league 2 predictions" in strings[i].lower()),
+        len(strings),
+    )
+    date_re=re.compile(r"^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})\s+(\d{1,2}):(\d{2})$")
+    rows=[]
+    for i in range(start_idx+1,stop):
+        dm=date_re.match(strings[i])
+        if not dm or i==0:
+            continue
+        match_name=strings[i-1].strip()
+        parts=[x.strip() for x in match_name.split(" - ",1)]
+        if len(parts)!=2:
+            continue
+        try:
+            dt=datetime.strptime(strings[i],"%d %B %Y %H:%M").replace(tzinfo=timezone.utc)
+        except Exception:
+            continue
+        rows.append({
+            "event_id":f"betstudy-upcoming|{dt.date()}|{parts[0]}|{parts[1]}",
+            "start_time":dt.isoformat(),
+            "home":parts[0],
+            "away":parts[1],
+            "home_score":None,
+            "away_score":None,
+            "source":"BetStudy PDL computer-prediction fixture feed",
+        })
+    return sorted(
+        {x["event_id"]:x for x in rows}.values(),
+        key=lambda x:x["start_time"]
+    )
+
+
+def upcoming():
+    try:
+        events=sportybet_upcoming()
+        if events:
+            return events, "SportyBet"
+    except Exception:
+        pass
+    events=betstudy_upcoming()
+    if events:
+        return events, "BetStudy"
+    return [], "none"
+
+
 
 def pois(lam,k):return math.exp(-lam)*lam**k/math.factorial(k)
 
@@ -268,10 +288,7 @@ def build(hist,future):
     return out
 
 def main():
-    hist,history_source=history();future=upcoming();pred=build(hist,future);now=datetime.now(timezone.utc).isoformat()
-    fixture_source="SportyBet NG via Match Signal Cloudflare proxy"
-    if pred and all(str(x.get("event_id","")).startswith("sofascore|") for x in future):
-        fixture_source="SofaScore structured PDL fixture fallback"
+    hist,history_source=history();future,fixture_source=upcoming();pred=build(hist,future);now=datetime.now(timezone.utc).isoformat()
     status={"updated_at":now,"competition":LEAGUE,"historical_rows":len(hist),"current_upcoming":len(pred),"historical_source":history_source,"fixture_source":fixture_source,"model":"PDL-1.2-2026.09.22","paper_only":True,"gates":{"model_live_trading_approved":False,"requires_walk_forward_validation":True,"requires_market_benchmark":True}}
     (DATA/"pdl_predictions.json").write_text(json.dumps(pred,indent=2,ensure_ascii=False)+"\n",encoding="utf-8");(DATA/"pdl_status.json").write_text(json.dumps(status,indent=2,ensure_ascii=False)+"\n",encoding="utf-8");print(json.dumps(status,indent=2))
 if __name__=="__main__":main()
