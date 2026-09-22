@@ -6,7 +6,7 @@ const LIVE_API='https://match-signal.pages.dev/api/sportybet-virtual';
 const LIVE_MARKETS='1,18,10,29,11,26,36,14,60100,186,189,202,204,210';
 const SNAPSHOT='./data/virtual_lab_live.json';
 const LIVE_REFRESH_MS=30000;
-const UI_BUILD='20260922-v26';
+const UI_BUILD='20260922-v28';
 const HISTORY='./api/virtual-lab-history';
 const HISTORY_FALLBACK='./data/virtual_lab_history.json';
 const MODEL_EVAL='./data/virtual_lab_model_eval.json';
@@ -236,7 +236,8 @@ function normalizeLiveEvent(event,tournament,category){
   const homeParticipant=participantIdentity(event.participant_1||event.homeParticipant||event.homePlayer||event.homeCompetitor||'');
   const awayParticipant=participantIdentity(event.participant_2||event.awayParticipant||event.awayPlayer||event.awayCompetitor||'');
   const product=classifyEvent(tournament,category,home,away);
-  if(!product)return null;
+  const eventId=String(event.event_id||event.eventId||'');
+  if(!product||!eventId)return null;
   const markets=(event.markets||[]).map(m=>{
     const outcomes=(m.outcomes||[]).map(o=>{
       const odds=num(o.odds);
@@ -246,9 +247,9 @@ function normalizeLiveEvent(event,tournament,category){
     return {id:String(m.id||''),name:String(m.desc||m.name||m.title||''),specifier:m.specifier,line:lineFromSpecifier(m.specifier),status:m.status,outcomes,lastOddsChangeTime:m.lastOddsChangeTime};
   }).filter(Boolean);
   let start=null;
-  const ms=Number(event.estimateStartTime);
+  const ms=Number(event.start_time_ms??event.estimateStartTime);
   if(Number.isFinite(ms)&&ms>0)start=new Date(ms).toISOString();
-  return {product,competition:String(tournament||'Unclassified'),category:String(category||''),event_id:String(event.eventId||''),home,away,participant_1:homeParticipant,participant_2:awayParticipant,participant_identity_source:event.participant_identity_source||((homeParticipant||awayParticipant)?'event_metadata_or_explicit_name':null),identity_verified:!!(homeParticipant&&awayParticipant),start_time:start,match_status:event.matchStatus,markets};
+  return {product,competition:String(tournament||'Unclassified'),category:String(category||''),event_id:eventId,home,away,participant_1:homeParticipant,participant_2:awayParticipant,participant_identity_source:event.participant_identity_source||((homeParticipant||awayParticipant)?'event_metadata_or_explicit_name':null),identity_verified:!!(homeParticipant&&awayParticipant),start_time:start,match_status:event.match_status??event.matchStatus,markets};
 }
 
 function matchesMarket(market,chosen){
