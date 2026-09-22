@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
 FEED = DATA / "predictions.json"
 CORE_LEAGUES = {"EPL", "La Liga", "Bundesliga", "Serie A", "Ligue 1", "Champions League", "MLS", "Primeira Liga"}
-EXPERIMENTAL_LEAGUES = {"Eredivisie", "Saudi Pro League"}
+EXPERIMENTAL_LEAGUES = {"Eredivisie", "Saudi Pro League", "England Amateur - U21 Professional Development League"}
 TENNIS_LEAGUES = {"ATP", "WTA"}
 
 
@@ -99,6 +99,7 @@ def main():
         "tennis_rows": sum(r.get("league") in TENNIS_LEAGUES for r in generated),
         "ere_divisie_rows": sum(r.get("league") == "Eredivisie" for r in generated),
         "saudi_rows": sum(r.get("league") == "Saudi Pro League" for r in generated),
+        "pdl_rows": sum(r.get("league") == "England Amateur - U21 Professional Development League" for r in generated),
         "preserved_rows": len(experimental),
         "transaction_policy": "NO_SPORT_ERASURE_ON_TRANSIENT_SOURCE_FAILURE",
     }
