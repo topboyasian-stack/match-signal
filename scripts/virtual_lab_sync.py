@@ -28,7 +28,6 @@ def product_for(t,c,h,a):
     blob=f"{t} {c} {h} {a}".lower()
     if "eadriatic" in blob: return "efootball_adriatic"
     if "gt sports league" in blob or "gt leagues" in blob or "efootball" in blob or "e soccer" in blob or "esoccer" in blob: return "efootball_gt"
-    if "simulated reality" in blob or re.search(r"\bsrl\b",blob): return "srl"
     if "virtual football" in blob or "vfootball" in blob: return "vfootball"
     if "zoom" in blob or "turbo" in blob: return "zoom"
     if "virtual" in blob or "simulated" in blob: return "other"
