@@ -390,119 +390,127 @@ def actual_code(item,final_score):
 
 
 def settle(pending):
-    unresolved = [x for x in pending.values() if not x.get("settled") and x.get("event_id")]
+    unresolved=[x for x in pending.values() if not x.get("settled") and x.get("event_id")]
     if not unresolved:
-        return [], 0, [], {"sportybet_settled": 0, "conflicts": 0}
+        return [],0,[],{"sportybet_settled":0,"conflicts":0}
 
-    grouped = {}
+    # Keep the exact SportyBet result scope captured with the original fixture.
+    # Discovering scopes only from CURRENT upcoming events is unsafe because a
+    # competition disappears from the upcoming feed as soon as its fixtures finish.
+    groups={}
     for item in unresolved:
-        source = str(item.get("source") or "")
-        if source not in {"efootball", "vfootball"}:
+        source=str(item.get("source") or "")
+        if source not in {"efootball","vfootball"}:
             if str(item.get("product") or "").startswith("efootball"):
-                source = "efootball"
-            elif item.get("product") in {"vfootball", "zoom"}:
-                source = "vfootball"
-        start = int(num(item.get("start_time_ms")) or (time.time() * 1000 - 86400000))
-        previous = grouped.get(source)
-        grouped[source] = (start, start) if previous is None else (min(previous[0], start), max(previous[1], start))
-
-    index = {}
-    errors = []
-
-    for source, (start, end) in grouped.items():
-        if source not in {"efootball", "vfootball"}:
+                source="efootball"
+            elif item.get("product") in {"vfootball","zoom"}:
+                source="vfootball"
+        if source not in {"efootball","vfootball"}:
             continue
-        start_q = start - 6 * 3600000
-        end_q = max(end + 6 * 3600000, int(time.time() * 1000))
-        for page_num in range(1, 9):
+        category_id=str(item.get("category_id") or "")
+        tournament_id=str(item.get("tournament_id") or "")
+        start=int(num(item.get("start_time_ms")) or (time.time()*1000-86400000))
+        key=(source,category_id,tournament_id)
+        prev=groups.get(key)
+        groups[key]=(start,start) if prev is None else (min(prev[0],start),max(prev[1],start))
+
+    index={}
+    errors=[]
+
+    for (source,category_id,tournament_id),(start,end) in groups.items():
+        start_q=start-6*3600000
+        end_q=max(end+6*3600000,int(time.time()*1000))
+        for page_num in range(1,9):
             try:
-                body = proxy_json(RESULT_API, {
-                    "source": source,
-                    "pageSize": 100,
-                    "pageNum": page_num,
-                    "startTime": start_q,
-                    "endTime": end_q,
-                })
-                batch = result_events(body)
+                params={
+                    "source":source,
+                    "pageSize":100,
+                    "pageNum":page_num,
+                    "startTime":start_q,
+                    "endTime":end_q,
+                }
+                # Critical fix: query the exact result scope saved with the
+                # original event whenever it is available. Fall back to proxy
+                # discovery only for legacy rows that lack scope IDs.
+                if category_id and tournament_id:
+                    params["categoryId"]=category_id
+                    params["tournamentId"]=tournament_id
+                body=proxy_json(RESULT_API,params)
+                batch=result_events(body)
                 for event in batch:
-                    event_id = str(event.get("eventId") or event.get("event_id") or "").strip()
+                    event_id=str(event.get("eventId") or event.get("event_id") or "").strip()
                     if event_id:
-                        index[event_id] = event
-                if len(batch) < 100:
+                        index[event_id]=event
+                if len(batch)<100:
                     break
             except Exception as exc:
-                errors.append(f"{source} results page {page_num}: {exc}")
+                errors.append(
+                    f"{source} results scope={category_id}/{tournament_id} "
+                    f"page {page_num}: {exc}"
+                )
                 break
 
-    history = []
-    settled_count = 0
-    conflicts = 0
+    history=[]
+    settled_count=0
+    conflicts=0
 
     for item in unresolved:
-        primary_event = index.get(str(item.get("event_id")))
-        primary_score = score(primary_event) if primary_event else None
-
-        # SportyBet result data is the only authoritative settlement source.
-        # External mirrors are intentionally not used as a fallback.
+        primary_event=index.get(str(item.get("event_id")))
+        primary_score=score(primary_event) if primary_event else None
         if primary_score is None:
             continue
 
-        final_score = primary_score
-        settlement_source = "SportyBet NG eventResultList via Match Signal proxy"
-
-        actual = actual_code(item, final_score)
-        win = None if actual == "PUSH" else actual == item.get("selection")
-        settled_at = now_iso()
+        final_score=primary_score
+        settlement_source="SportyBet NG eventResultList via Match Signal proxy"
+        actual=actual_code(item,final_score)
+        win=None if actual=="PUSH" else actual==item.get("selection")
+        settled_at=now_iso()
 
         item.update({
-            "settled": True,
-            "settled_at": settled_at,
-            "actual_result": actual,
-            "final_score": [final_score[0], final_score[1]],
-            "win": win,
-            "settlement_source": settlement_source,
+            "settled":True,
+            "settled_at":settled_at,
+            "actual_result":actual,
+            "final_score":[final_score[0],final_score[1]],
+            "win":win,
+            "settlement_source":settlement_source,
         })
         history.append({
-            "product": item["product"],
-            "provider": item["provider"],
-            "event_id": item["event_id"],
-            "timestamp": item.get("start_time"),
-            "competition": item["competition"],
-            "participant_1": item["participant_1"],
-            "participant_2": item["participant_2"],
-            "market": item["market"],
-            "market_id": item.get("market_id"),
-            "specifier": item.get("specifier"),
-            "selection": item["selection"],
-            "selection_name": item.get("selection_name"),
-            "odds": item.get("odds"),
-            "model_prob": item.get("model_prob"),
-            "result": actual,
-            "win": win,
-            "line": item.get("line"),
-            "score": f"{int(final_score[0])}:{int(final_score[1])}",
-            "captured_at": item.get("captured_at"),
-            "settled_at": settled_at,
-            "settlement_source": settlement_source,
-            "prediction_source": item.get("prediction_source"),
-            "overround": item.get("overround"),
-            "source": item.get("source"),
-            "record_id": f'{item["event_id"]}|{item["market"]}|{item.get("line") if item.get("line") is not None else ""}|{item["selection"]}',
-            "schema_version": SCHEMA_VERSION,
-            "pipeline_version": COLLECTOR_VERSION,
-            "participant_1_key": stable_participant_key(item["product"],item.get("participant_1")),
-            "participant_2_key": stable_participant_key(item["product"],item.get("participant_2")),
-            "trace_source": "sportybet_ng_result_proxy",
-            "trace_id": f'{item["event_id"]}|{item["market"]}|{item.get("line") if item.get("line") is not None else ""}|{item["selection"]}',
-            "collector_run_id": os.getenv("GITHUB_RUN_ID") or "local",
+            "product":item["product"],
+            "provider":item["provider"],
+            "event_id":item["event_id"],
+            "timestamp":item.get("start_time"),
+            "competition":item["competition"],
+            "participant_1":item["participant_1"],
+            "participant_2":item["participant_2"],
+            "market":item["market"],
+            "market_id":item.get("market_id"),
+            "specifier":item.get("specifier"),
+            "selection":item["selection"],
+            "selection_name":item.get("selection_name"),
+            "odds":item.get("odds"),
+            "model_prob":item.get("model_prob"),
+            "result":actual,
+            "win":win,
+            "line":item.get("line"),
+            "score":f"{int(final_score[0])}:{int(final_score[1])}",
+            "captured_at":item.get("captured_at"),
+            "settled_at":settled_at,
+            "settlement_source":settlement_source,
+            "prediction_source":item.get("prediction_source"),
+            "overround":item.get("overround"),
+            "source":item.get("source"),
+            "record_id":f'{item["event_id"]}|{item["market"]}|{item.get("line") if item.get("line") is not None else ""}|{item["selection"]}',
+            "schema_version":SCHEMA_VERSION,
+            "pipeline_version":COLLECTOR_VERSION,
+            "participant_1_key":stable_participant_key(item["product"],item.get("participant_1")),
+            "participant_2_key":stable_participant_key(item["product"],item.get("participant_2")),
+            "trace_source":"sportybet_ng_result_proxy",
+            "trace_id":f'{item["event_id"]}|{item["market"]}|{item.get("line") if item.get("line") is not None else ""}|{item["selection"]}',
+            "collector_run_id":os.getenv("GITHUB_RUN_ID") or "local",
         })
-        settled_count += 1
+        settled_count+=1
 
-    return history, settled_count, errors, {
-        "sportybet_settled": settled_count,
-        "conflicts": conflicts,
-    }
-
+    return history,settled_count,errors,{"sportybet_settled":settled_count,"conflicts":conflicts}
 
 def stable_participant_identity(product, raw_name):
     name=" ".join(str(raw_name or "").split()).strip()
