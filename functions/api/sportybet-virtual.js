@@ -89,6 +89,27 @@ export async function onRequestGet(context){
     }
   }
 
+  async function collectLive(label,sportId,path,extra={}){
+    if(!requested.has(label)) return;
+    const t0=Date.now();
+    try{
+      const data=await upstream(path,{sportId,pageSize,pageNum,todayGames:'false',timeline,_t:Date.now(),...extra});
+      let n=0;
+      for(const t of tournaments(data)){
+        for(const e of (t.events||[])){
+          const row=normalize(t,e,label+'_live',sportId);
+          row.live=true;
+          row.match_status=e?.matchStatus ?? row.match_status;
+          out.push(row); n++;
+        }
+      }
+      sourceStatus[label+'_live']={status:n?'LIVE':'EMPTY',events:n,latency_ms:Date.now()-t0,endpoint:path};
+    }catch(e){
+      sourceStatus[label+'_live']={status:'ERROR',events:0,latency_ms:Date.now()-t0,error:String(e.message||e),endpoint:path};
+      errors.push(label+'_live: '+String(e.message||e));
+    }
+  }
+
   async function collectVfootball(){
     if(!requested.has('vfootball')) return;
     const t0=Date.now();
@@ -109,14 +130,19 @@ export async function onRequestGet(context){
     }
   }
 
-  await Promise.all([collectPc('efootball','sr:sport:137'),collectVfootball()]);
+  await Promise.all([
+    collectPc('efootball','sr:sport:137'),
+    collectVfootball(),
+    collectLive('vfootball','sr:sport:202120001','/api/ng/factsCenter/wapConfigurableIndexLiveEvents'),
+    collectLive('efootball','sr:sport:137','/api/ng/factsCenter/pcLiveEvents')
+  ]);
 
   const cutoff=Date.now()-(2*60*1000);
   const dedup=new Map();
   for(const row of out){
     if(!row.event_id)continue;
     const start=Number(row.start_time_ms||0);
-    if(start>0&&start<cutoff)continue;
+    if(start>0&&start<cutoff&&!row.live)continue;
     dedup.set(row.event_id,row);
   }
   const events=[...dedup.values()];
@@ -148,7 +174,7 @@ export async function onRequestGet(context){
     page_num:pageNum,
     timeline_hours:timeline,
     events_count:filtered.length,
-    upcoming_events_count:filtered.filter(e=>!e.start_time_ms||Number(e.start_time_ms)>=cutoff).length,
+    upcoming_events_count:filtered.filter(e=>e.live||!e.start_time_ms||Number(e.start_time_ms)>=cutoff).length,
     server_time:new Date().toISOString(),
     product_counts:counts,
     source_status:sourceStatus,
