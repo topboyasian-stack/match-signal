@@ -5,7 +5,7 @@ const WATCH='/data/virtual_lab_participants/efootball_confirmed_watch.json';
 const PRODUCT='efootball_gt';
 let watch=null;
 const norm=v=>String(v||'').trim().toLowerCase();
-const identity=v=>{const s=String(v||'').trim();const m=s.match(/\\(([^()]+)\\)\\s*$/);return m&&m[1].trim()?m[1].trim():s;};
+const identity=v=>{const s=String(v||'').trim();const m=s.match(/\(([^()]+)\)\s*$/);return m&&m[1].trim()?m[1].trim():s;};
 
 async function load(){
   try{
