@@ -8,6 +8,8 @@ on:
     workflows:
       - "Match Signal Live Expansion"
       - "Match Signal Post-Pipeline Live Feed Reconcile"
+      - "Match Signal PDL Prediction Feed"
+      - "Match Signal Live Prediction Pipeline"
     types: [completed]
   push:
     branches: [main]
@@ -29,8 +31,8 @@ permissions:
 # V5 publication retry: rebuild against latest main after concurrent data writers.
 
 concurrency:
-  group: match-signal-core-refresh
-  cancel-in-progress: true
+  group: match-signal-data-publish
+  cancel-in-progress: false
 
 jobs:
   refresh:
