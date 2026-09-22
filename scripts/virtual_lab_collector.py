@@ -574,7 +574,7 @@ def build_participant_registry(history):
             identity=stable_participant_identity(row.get("product"),row.get(side))
             if not identity:
                 continue
-            key=stable_participant_key(row.get("product"),identity)
+            key=stable_participant_key(row.get("product"),row.get(side))
             item=groups.setdefault(key,{
                 "participant_key":key,
                 "participant":identity,
