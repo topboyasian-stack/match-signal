@@ -332,14 +332,14 @@ def fetch_current_predictions(history=None):
         bucket = qc["rejected_by_tour"].setdefault(tour, {})
         bucket[reason] = bucket.get(reason, 0) + 1
 
-    # Football uses an extended 21-day planning window so the production
+    # Football uses an extended 22-day planning window so the production
     # desk can calculate the next scheduled round across international breaks.
     today = datetime.now(timezone.utc).date()
-    football_end = today + timedelta(days=20)
+    football_end = today + timedelta(days=21)
     for label, league in FOOTBALL_LEAGUES.items():
         try:
             seen_events = set()
-            for day_offset in range(21):
+            for day_offset in range(22):
                 date = today + timedelta(days=day_offset)
                 board = fetch_scoreboard("soccer", league, date.strftime("%Y%m%d"))
                 for event in board.get("events", []):
