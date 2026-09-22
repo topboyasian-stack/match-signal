@@ -12,7 +12,8 @@ const HISTORY_FALLBACK='./data/virtual_lab_history.json';
 const MODEL_EVAL='./data/virtual_lab_model_eval.json';
 const ELIGIBILITY='./data/virtual_lab_eligibility.json';
 const PARTICIPANT_PROFILES='./data/virtual_lab_participant_profiles.json';
-const state={rows:[],filtered:[],live:[],liveMode:'none',liveUpdated:null,picks:[],builder:[],historyLoaded:false,modelRows:[],modelEvents:[],modelGate:false,modelHoldout:null,modelEvaluation:null,participantProfiles:null,eligibility:{eligible_competitions:['Esoccer H2H GG League','Europa League','Volta Premier League'],eligible_ou_lines:[3.5,4.5],experimental_ou_lines:[1.5],priority_ou_lines:[1.5,3.5,4.5],eligible_markets:['ou']},predictionCache:new Map()};
+const CONFIRMED_WATCH='./data/virtual_lab_confirmed_participants.json';
+const state={rows:[],filtered:[],live:[],liveMode:'none',liveUpdated:null,picks:[],builder:[],historyLoaded:false,modelRows:[],modelEvents:[],modelGate:false,modelHoldout:null,modelEvaluation:null,participantProfiles:null,confirmedWatch:null,eligibility:{eligible_competitions:['Esoccer H2H GG League','Europa League','Volta Premier League'],eligible_ou_lines:[3.5,4.5],experimental_ou_lines:[1.5],priority_ou_lines:[1.5,3.5,4.5],eligible_markets:['ou']},predictionCache:new Map()};
 
 const $=id=>document.getElementById(id);
 const esc=v=>{const d=document.createElement('div');d.textContent=String(v??'');return d.innerHTML};
@@ -649,6 +650,16 @@ function predictionForEvent(e){
   state.predictionCache.set(id,out);
   return out;
 }
+function isConfirmedWatchedEvent(e){
+  const list=Array.isArray(state.confirmedWatch?.participants)?state.confirmedWatch.participants:[];
+  const names=[String(e?.home||e?.participant_1||'').trim().toLowerCase(),String(e?.away||e?.participant_2||'').trim().toLowerCase()];
+  const product=String(e?.product||'').trim();
+  return list.some(x=>{
+    const p=String(x?.participant||'').trim().toLowerCase();
+    if(!p||!names.includes(p))return false;
+    return !x.product||x.product==='all'||x.product===product;
+  });
+}
 function isUpcoming(e){
   if(!e||!e.start_time)return true;
   const t=new Date(e.start_time).getTime();
@@ -659,7 +670,7 @@ function upcomingEventsFrom(events){
 }
 function renderLive(){
   const product=$('product').value,market=$('market').value;
-  const events=upcomingEventsFrom(state.live).filter(isEligibleResearchEvent).filter(e=>product==='all'||e.product===product).slice(0,20);
+  const events=upcomingEventsFrom(state.live).filter(e=>isEligibleResearchEvent(e)||isConfirmedWatchedEvent(e)).filter(e=>product==='all'||e.product===product).sort((a,b)=>Number(isConfirmedWatchedEvent(b))-Number(isConfirmedWatchedEvent(a))||new Date(a.start_time||0)-new Date(b.start_time||0)).slice(0,30);
   const list=events.slice(0,30).map(e=>{
     const p=predictionForEvent(e);
     const shown=(e.markets||[]).filter(m=>matchesMarket(m,market)).slice(0,3);
@@ -839,9 +850,18 @@ async function loadLive(){
 
 function rebuildPredictionDesk(){
   const product=$('product').value;
-  const eligible=upcomingEventsFrom(state.live).filter(isEligibleResearchEvent).filter(e=>product==='all'||e.product===product);
+  const eligible=upcomingEventsFrom(state.live).filter(e=>isEligibleResearchEvent(e)||isConfirmedWatchedEvent(e)).filter(e=>product==='all'||e.product===product).sort((a,b)=>Number(isConfirmedWatchedEvent(b))-Number(isConfirmedWatchedEvent(a))||new Date(a.start_time||0)-new Date(b.start_time||0);
   state.picks=eligible.slice(0,24).map(predictionForEvent).filter(Boolean);
   renderPredictionDesk();renderBuilder();
+}
+async function loadConfirmedWatch(){
+  try{
+    const r=await fetch(CONFIRMED_WATCH+'?t='+Date.now(),{cache:'no-store',headers:{'Accept':'application/json'}});
+    if(!r.ok)throw new Error('confirmed watch HTTP '+r.status);
+    state.confirmedWatch=await r.json();
+    state.predictionCache.clear();
+    return true;
+  }catch(e){state.confirmedWatch=null;console.warn('Virtual Lab confirmed watch fallback:',e);return false;}
 }
 async function loadParticipantProfiles(){
   try{
@@ -897,6 +917,7 @@ async function loadHistory(){
       state.historyLoaded=true;
       state.predictionCache.clear();
       await loadModelEvaluation();
+      await loadConfirmedWatch();
       await loadParticipantProfiles();
       buildModelBacktest(state.rows);
       state.modelEvents=historicalOUEvents(state.rows);
