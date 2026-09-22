@@ -3,10 +3,11 @@
 'use strict';
 
 const LIVE_API='https://match-signal.pages.dev/api/sportybet-virtual';
+const LIVE_API_TIMEOUT_MS=12000;
 const LIVE_MARKETS='1,18,10,29,11,26,36,14,60100,186,189,202,204,210';
 const SNAPSHOT='./data/virtual_lab_live.json';
 const LIVE_REFRESH_MS=30000;
-const UI_BUILD='20260922-v31';
+const UI_BUILD='20260922-v32';
 const HISTORY='./api/virtual-lab-history';
 const HISTORY_FALLBACK='./data/virtual_lab_history.json';
 const MODEL_EVAL='./data/virtual_lab_model_eval.json';
@@ -769,41 +770,25 @@ function collectLiveFromBody(body){
 }
 
 async function fetchLiveRemote(){
-  const urls=[
-    './api/sportybet-virtual',
-    LIVE_API
-  ];
+  const urls=['./api/sportybet-virtual',LIVE_API];
   let lastError=null;
   for(const base of urls){
     try{
-      const pages=[];
-      for(let pageNum=1;pageNum<=2;pageNum++){
-        const params=new URLSearchParams({pageSize:'100',pageNum:String(pageNum),timeline:'168',sources:'efootball,vfootball',_t:String(Date.now())});
-        const controller=new AbortController();
-        const timeout=setTimeout(()=>controller.abort(),8000);
-        let r;
-        try{r=await fetch(base+'?'+params.toString(),{cache:'no-store',headers:{'Accept':'application/json'},signal:controller.signal});}
-        finally{clearTimeout(timeout)}
-        if(!r.ok)throw new Error(base+' HTTP '+r.status);
-        const body=await r.json();
-        if(body?.ok===false)throw new Error(body.error||base+' returned an error');
-        pages.push(body);
-        const batch=Array.isArray(body?.events)?body.events:[];
-        if(batch.length<100)break;
-      }
-      const merged=[];
-      const seen=new Set();
-      for(const body of pages){
-        for(const e of (Array.isArray(body?.events)?body.events:[])){
-          const id=String(e.event_id||e.eventId||'');
-          if(id&&!seen.has(id)){seen.add(id);merged.push(e)}
-        }
-      }
-      if(merged.length){
-        const latestTimestamp=pages.map(p=>p?.updated_at).filter(Boolean).sort().pop()||new Date().toISOString();
-        return {events:merged,updated_at:latestTimestamp,endpoint:base};
-      }
-      lastError=new Error(base+' returned zero virtual/eFootball events');
+      const params=new URLSearchParams({pageSize:'100',pageNum:'1',timeline:'168',sources:'efootball,vfootball',_t:String(Date.now())});
+      const controller=new AbortController();
+      const timeout=setTimeout(()=>controller.abort(),LIVE_API_TIMEOUT_MS);
+      let r;
+      try{r=await fetch(base+'?'+params.toString(),{cache:'no-store',headers:{Accept:'application/json'},signal:controller.signal});}
+      finally{clearTimeout(timeout);}
+      if(!r.ok)throw new Error(base+' HTTP '+r.status);
+      const body=await r.json();
+      if(body?.ok===false)throw new Error(body.error||base+' returned an error');
+      const raw=Array.isArray(body?.events)?body.events:[];
+      const events=raw.map(e=>normalizeLiveEvent(e,e.tournament||e.competition||'',e.category||'')).filter(Boolean);
+      if(events.length)return {events,updated_at:body.updated_at||new Date().toISOString(),endpoint:base,sourceStatus:body.source_status||{},productCounts:body.product_counts||{}};
+      const status=body?.status||'EMPTY';
+      const detail=body?.errors?.join('; ')||Object.entries(body?.source_status||{}).map(([k,v])=>k+':'+(v?.status||'UNKNOWN')+' '+(v?.events??0)).join(' · ');
+      lastError=new Error(base+' returned '+status+' with 0 normalized events'+(detail?' · '+detail:''));
     }catch(e){lastError=e;}
   }
   throw lastError||new Error('No live virtual source available');
