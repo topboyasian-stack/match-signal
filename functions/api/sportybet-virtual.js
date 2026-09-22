@@ -93,7 +93,10 @@ export async function onRequestGet(context){
     if(!requested.has(label)) return;
     const t0=Date.now();
     try{
-      const data=await upstream(path,{sportId,pageSize,pageNum,todayGames:'false',timeline,_t:Date.now(),...extra});
+      let data=await upstream(path,{sportId,pageSize,pageNum,todayGames:'false',timeline,_t:Date.now(),...extra});
+      if(!tournaments(data).length && label==='vfootball'){
+        data=await upstream(path,{sportId,pageSize,pageNum,todayGames:'true',_t:Date.now(),...extra});
+      }
       let n=0;
       for(const t of tournaments(data)){
         for(const e of (t.events||[])){
@@ -114,9 +117,14 @@ export async function onRequestGet(context){
     if(!requested.has('vfootball')) return;
     const t0=Date.now();
     try{
-      const data=await upstream('/api/ng/factsCenter/wapConfigurableUpcomingEvents',{
+      let data=await upstream('/api/ng/factsCenter/wapConfigurableUpcomingEvents',{
         sportId:'sr:sport:202120001',pageSize,pageNum,todayGames:'false',timeline,_t:Date.now()
       });
+      if(!tournaments(data).length){
+        data=await upstream('/api/ng/factsCenter/wapConfigurableUpcomingEvents',{
+          sportId:'sr:sport:202120001',pageSize,pageNum,todayGames:'true',_t:Date.now()
+        });
+      }
       let n=0;
       for(const t of tournaments(data)){
         for(const e of (t.events||[])){
