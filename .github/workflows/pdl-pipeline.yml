@@ -28,7 +28,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install dependencies
-        run: python -m pip install --upgrade requests pandas lxml html5lib
+        run: python -m pip install --upgrade requests pandas lxml html5lib beautifulsoup4
       - name: Build PDL predictions
         run: python scripts/pdl_pipeline.py
       - name: Preserve generated PDL artifacts
