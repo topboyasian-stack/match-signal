@@ -7,7 +7,7 @@ const LIVE_API_TIMEOUT_MS=12000;
 const LIVE_MARKETS='1,18,10,29,11,26,36,14,60100,186,189,202,204,210';
 const SNAPSHOT='./data/virtual_lab_live.json';
 const LIVE_REFRESH_MS=30000;
-const UI_BUILD='20260922-v34';
+const UI_BUILD='20260922-v37';
 const HISTORY='./api/virtual-lab-history';
 const HISTORY_FALLBACK='./data/virtual_lab_history.json';
 const MODEL_EVAL='./data/virtual_lab_model_eval.json';
@@ -235,7 +235,7 @@ function normalizeLiveEvent(event,tournament,category){
   const away=String(event.team_2||event.awayTeamName||event.away||'');
   const homeParticipant=participantIdentity(event.participant_1||event.homeParticipant||event.homePlayer||event.homeCompetitor||'');
   const awayParticipant=participantIdentity(event.participant_2||event.awayParticipant||event.awayPlayer||event.awayCompetitor||'');
-  const product=String(event.product||classifyEvent(tournament,category,home,away)||'').toLowerCase().trim();
+  const product=String(event.product||({'efootball_gt':'efootball_gt','efootball_adriatic':'efootball_adriatic','vfootball':'vfootball','zoom':'zoom'}[String(event.source||'').toLowerCase()]||classifyEvent(tournament,category,home,away)||'')).toLowerCase().trim();
   const eventId=String(event.event_id||event.eventId||'');
   if(!product||!eventId)return null;
   const markets=(event.markets||[]).map(m=>{
@@ -819,6 +819,8 @@ async function loadLive(){
   liveInFlight=true;
   const button=$('liveRefresh');
   button.disabled=true;
+  $('liveTitle').textContent='Fetching SportyBet fixtures…';
+  $('liveMeta').textContent='Requesting current eFootball / Virtual Football markets';
   try{
     const live=await fetchLiveRemote();
     state.live=upcomingEventsFrom(live.events);
