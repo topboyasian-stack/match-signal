@@ -3,9 +3,6 @@ on:
   schedule:
     - cron: '*/15 * * * *'
   workflow_dispatch:
-  workflow_run:
-    workflows: ["Match Signal Tennis Model V2","Match Signal Result Settlement","Match Signal Odds Builder"]
-    types: [completed]
   push:
     branches: [main]
     paths:
@@ -18,7 +15,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   pdl:
-    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    if: true
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
