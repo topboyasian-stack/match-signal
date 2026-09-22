@@ -16,7 +16,7 @@ import runpy
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
 OUTPUT = DATA / "football_forward_readiness.json"
-PLANNING_DAYS = 7
+PLANNING_DAYS = 21
 
 LEAGUES = [
     "EPL",
@@ -41,6 +41,10 @@ CORE_LEAGUES = {
     "Champions League": "uefa.champions",
     "MLS": "usa.1",
     "Primeira Liga": "por.1",
+}
+
+AUXILIARY_ESPN_LEAGUES = {
+    "Eredivisie": "ned.1",
 }
 
 GENERIC_ERROR = "provider lookup unavailable; status derived from published artifacts"
@@ -192,6 +196,20 @@ def main():
             if historical == 0:
                 ere_history = load("ere_divisie_history.json", [])
                 historical = len(ere_history) if isinstance(ere_history, list) else 0
+
+            # Expansion status can legitimately be zero while a real future
+            # round is already scheduled upstream. Verify it independently.
+            if upcoming == 0:
+                provider_upcoming, provider_errors = espn_upcoming_count(
+                    AUXILIARY_ESPN_LEAGUES[league], now
+                )
+                upcoming = provider_upcoming
+                errors.extend(provider_errors)
+                source = (
+                    "ESPN day-by-day forward fixture scan"
+                    if provider_upcoming
+                    else source
+                )
 
         elif league == "Saudi Pro League":
             status_source = saudi_status if isinstance(saudi_status, dict) else {}
