@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -21,6 +22,8 @@ DATA=ROOT/"data"
 PENDING_PATH=DATA/"virtual_lab_pending.json"
 HISTORY_PATH=DATA/"virtual_lab_history.json"
 STATUS_PATH=DATA/"virtual_lab_status.json"
+PARTICIPANT_REGISTRY_PATH=DATA/"virtual_lab_participants"/"registry.json"
+PARTICIPANT_ARCHIVE_DIR=DATA/"virtual_lab_archive"/"settlements"
 
 BASE="https://match-signal.pages.dev"
 UPCOMING_API=BASE+"/api/sportybet-virtual"
@@ -34,6 +37,9 @@ SESSION.headers.update({
 
 PENDING_CAP=12000
 HISTORY_CAP=30000
+COLLECTOR_VERSION="2.0.0"
+SCHEMA_VERSION=1
+SUPPORTED_PRODUCTS={"efootball_gt","efootball_adriatic","vfootball","zoom"}
 
 
 def now_iso():
@@ -477,6 +483,12 @@ def settle(pending):
             "prediction_source": item.get("prediction_source"),
             "overround": item.get("overround"),
             "source": item.get("source"),
+            "record_id": f'{item["event_id"]}|{item["market"]}|{item.get("line") if item.get("line") is not None else ""}|{item["selection"]}',
+            "schema_version": SCHEMA_VERSION,
+            "pipeline_version": COLLECTOR_VERSION,
+            "participant_1_key": stable_participant_key(item["product"],item.get("participant_1")),
+            "participant_2_key": stable_participant_key(item["product"],item.get("participant_2")),
+            "trace_source": "sportybet_ng_result_proxy",
         })
         settled_count += 1
 
@@ -485,6 +497,119 @@ def settle(pending):
         "conflicts": conflicts,
     }
 
+
+def stable_participant_identity(product, raw_name):
+    name=" ".join(str(raw_name or "").split()).strip()
+    if not name:
+        return None
+    product=str(product or "")
+    if product.startswith("efootball"):
+        import re
+        match=re.search(r"\\(([^()]+)\\)\\s*$",name)
+        return match.group(1).strip() if match else None
+    if product in {"vfootball","zoom"}:
+        return name
+    return None
+
+
+def stable_participant_key(product, raw_name):
+    identity=stable_participant_identity(product, raw_name)
+    return f"{product}|{identity.casefold()}" if identity else None
+
+
+def with_trace_metadata(row):
+    product=str(row.get("product") or "")
+    event_id=str(row.get("event_id") or "")
+    market=str(row.get("market") or "")
+    line="" if row.get("line") is None else str(row.get("line"))
+    selection=str(row.get("selection") or "")
+    row.setdefault("record_id", f"{event_id}|{market}|{line}|{selection}")
+    row.setdefault("schema_version", SCHEMA_VERSION)
+    row.setdefault("pipeline_version", COLLECTOR_VERSION)
+    row.setdefault("participant_1_key", stable_participant_key(product,row.get("participant_1")))
+    row.setdefault("participant_2_key", stable_participant_key(product,row.get("participant_2")))
+    row.setdefault("trace_source", "sportybet_ng_result_proxy")
+    return row
+
+
+def build_participant_registry(history):
+    groups={}
+    for raw_row in history:
+        if not isinstance(raw_row,dict) or raw_row.get("product") not in SUPPORTED_PRODUCTS:
+            continue
+        row=with_trace_metadata(raw_row)
+        for side in ("participant_1","participant_2"):
+            identity=stable_participant_identity(row.get("product"),row.get(side))
+            if not identity:
+                continue
+            key=stable_participant_key(row.get("product"),identity)
+            item=groups.setdefault(key,{
+                "participant_key":key,
+                "participant":identity,
+                "product":row.get("product"),
+                "identity_source":"historical_parenthetical_identity" if str(row.get("product")).startswith("efootball") else "historical_participant_field",
+                "first_seen":None,
+                "last_seen":None,
+                "appearances":0,
+                "settled_appearances":0,
+                "ou_observations":0,
+                "ou_wins":0,
+                "lines":{}
+            })
+            ts=row.get("timestamp") or row.get("settled_at")
+            if ts and (item["first_seen"] is None or ts<item["first_seen"]): item["first_seen"]=ts
+            if ts and (item["last_seen"] is None or ts>item["last_seen"]): item["last_seen"]=ts
+            item["appearances"]+=1
+            item["settled_appearances"]+=1
+            if row.get("market")=="ou" and row.get("win") is not None:
+                item["ou_observations"]+=1
+                if row.get("win") is True: item["ou_wins"]+=1
+                line=row.get("line")
+                if line is not None:
+                    lk=str(line)
+                    bucket=item["lines"].setdefault(lk,{"n":0,"wins":0})
+                    bucket["n"]+=1
+                    if row.get("win") is True: bucket["wins"]+=1
+    participants=sorted(groups.values(), key=lambda x:(x["product"],x["participant"].casefold()))
+    for item in participants:
+        item["ou_win_rate"]=(item["ou_wins"]/item["ou_observations"]) if item["ou_observations"] else None
+        for bucket in item["lines"].values():
+            bucket["win_rate"]=(bucket["wins"]/bucket["n"]) if bucket["n"] else None
+    return {
+        "schema_version":SCHEMA_VERSION,
+        "generated_at":now_iso(),
+        "source_contract":"Automatic settled SportyBet history only; user ticket evidence excluded.",
+        "collector_version":COLLECTOR_VERSION,
+        "participant_count":len(participants),
+        "participants":participants
+    }
+
+
+def append_settlement_archive(rows):
+    if not rows:
+        return 0
+    PARTICIPANT_ARCHIVE_DIR.mkdir(parents=True,exist_ok=True)
+    day=datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    path=PARTICIPANT_ARCHIVE_DIR/f"{day}.jsonl"
+    existing_ids=set()
+    if path.exists():
+        for line in path.read_text(encoding="utf-8").splitlines():
+            try:
+                item=json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(item,dict) and item.get("record_id"):
+                existing_ids.add(item["record_id"])
+    added=0
+    with path.open("a",encoding="utf-8") as handle:
+        for raw in rows:
+            item=with_trace_metadata(dict(raw))
+            if item["record_id"] in existing_ids:
+                continue
+            handle.write(json.dumps(item,ensure_ascii=False,separators=(",",":"))+"\\n")
+            existing_ids.add(item["record_id"])
+            added+=1
+    return added
 
 def participant_fingerprint(history):
     """Summarize recurring participant/team O/U behavior from settled history."""
@@ -499,15 +624,11 @@ def participant_fingerprint(history):
             name=" ".join(str(raw_name or "").split()).strip()
             if not name:
                 continue
-            # eFootball team labels rotate; only an explicit stable participant
-            # identity (parenthetical suffix) may enter the participant fingerprint.
-            if str(row.get("product") or "").startswith("efootball"):
-                import re
-                match=re.search(r"\\(([^()]+)\\)\\s*$",name)
-                if match:
-                    name=match.group(1).strip()
-                elif not row.get("identity_verified"):
-                    continue
+            if str(row.get("product") or "") not in SUPPORTED_PRODUCTS:
+                continue
+            name=stable_participant_identity(row.get("product"),name)
+            if not name:
+                continue
             key=name.casefold()
             item=groups.setdefault(key,{"participant":name,"n":0,"wins":0,"lines":{},"products":{}})
             item["n"]+=1
@@ -530,6 +651,7 @@ def main():
     history=load_json(HISTORY_PATH,[])
     pending_raw=pending_raw if isinstance(pending_raw,list) else []
     history=history if isinstance(history,list) else []
+    history=[with_trace_metadata(x) for x in history if isinstance(x,dict)]
     pending={
         str(item["observation_id"]):item
         for item in pending_raw
@@ -577,9 +699,15 @@ def main():
     errors=capture_errors+settle_errors
     save_json(PENDING_PATH,list(pending.values()))
     save_json(HISTORY_PATH,history)
+    registry=build_participant_registry(history)
+    PARTICIPANT_REGISTRY_PATH.parent.mkdir(parents=True,exist_ok=True)
+    save_json(PARTICIPANT_REGISTRY_PATH,registry)
+    archived_new=append_settlement_archive(settled_rows)
     save_json(STATUS_PATH,{
         "updated_at":now_iso(),
-        "collector_version":"1.5.0",
+        "collector_version":COLLECTOR_VERSION,
+        "schema_version":SCHEMA_VERSION,
+        "build_commit":os.getenv("GITHUB_SHA") or "local",
         "upcoming_events":len(events),
         "upcoming_by_product":products,
         "pending_observations":len(pending),
@@ -589,6 +717,7 @@ def main():
         "settled_accuracy":round(wins/len(settled),4) if settled else None,
         "new_observations":added,
         "newly_settled":newly_settled,
+        "archive_new_records":archived_new,
         "sportybet_settled":settlement_meta["sportybet_settled"],
         "settlement_conflicts":settlement_meta["conflicts"],
         "participant_fingerprint_count":len(participant_rows),
