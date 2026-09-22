@@ -3,7 +3,7 @@
 'use strict';
 const WATCH='./data/virtual_lab_confirmed_participants.json';
 let watch=null;
-const norm=v=>String(v||'').trim().casefold?String(v||'').trim().toLowerCase():String(v||'').trim().toLowerCase();
+const norm=v=>String(v||'').trim().toLowerCase();
 async function load(){
   try{const r=await fetch(WATCH+'?t='+Date.now(),{cache:'no-store'});if(!r.ok)throw new Error('watchlist HTTP '+r.status);watch=await r.json();renderPanel();annotate();setInterval(annotate,5000);}
   catch(e){console.warn('Confirmed participant watch layer:',e);}
