@@ -773,7 +773,7 @@ function collectLiveFromBody(body){
 }
 
 async function fetchLiveRemote(){
-  const urls=['./api/sportybet-virtual',LIVE_API];
+  const urls=['/api/sportybet-virtual',LIVE_API];
   let lastError=null;
   for(const base of urls){
     try{
@@ -892,7 +892,7 @@ async function loadLive(){
 
 function rebuildPredictionDesk(){
   const product=$('product').value;
-  const eligible=upcomingEventsFrom(state.live).filter(e=>isEligibleResearchEvent(e)||isConfirmedWatchedEvent(e)).filter(e=>product==='all'||e.product===product).sort((a,b)=>Number(isConfirmedWatchedEvent(b))-Number(isConfirmedWatchedEvent(a))||new Date(a.start_time||0)-new Date(b.start_time||0);
+  const eligible=upcomingEventsFrom(state.live).filter(e=>isEligibleResearchEvent(e)||isConfirmedWatchedEvent(e)).filter(e=>product==='all'||e.product===product).sort((a,b)=>Number(isConfirmedWatchedEvent(b))-Number(isConfirmedWatchedEvent(a))||new Date(a.start_time||0)-new Date(b.start_time||0));
   state.picks=eligible.slice(0,24).map(predictionForEvent).filter(Boolean);
   renderPredictionDesk();renderBuilder();
 }
