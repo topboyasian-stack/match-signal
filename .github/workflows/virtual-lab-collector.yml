@@ -141,6 +141,10 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
             python scripts/virtual_lab_collector.py
+            python scripts/virtual_lab_model_eval.py
+            python scripts/virtual_lab_participant_profiles.py
+            python scripts/virtual_lab_confirmed_participants.py
+            python scripts/virtual_lab_eligibility.py
           done
 
           echo "Virtual Lab collector could not publish after retries."
