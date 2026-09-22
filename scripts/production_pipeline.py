@@ -18,7 +18,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
 FEED = DATA / "predictions.json"
-CORE_LEAGUES = {"EPL", "La Liga", "Bundesliga", "Serie A", "Ligue 1", "Champions League", "MLS", "Primeira Liga"}
+CORE_LEAGUES = {"EPL", "La Liga", "Bundesliga", "Serie A", "Ligue 1", "Champions League", "MLS", "Primeira Liga", "Eredivisie"}
 EXPERIMENTAL_LEAGUES = {"Eredivisie", "Saudi Pro League", "England Amateur - U21 Professional Development League"}
 TENNIS_LEAGUES = {"ATP", "WTA"}
 
@@ -86,9 +86,16 @@ def main():
             generated.extend(old_tennis)
             print(f"WARNING: ATP/WTA refresh returned zero rows; preserved {len(old_tennis)} active tennis rows")
 
-    experimental = [normalize_experimental(r) for r in preserved if r.get("league") in EXPERIMENTAL_LEAGUES]
+    # Keep newly generated experimental rows, while retaining still-active
+    # rows from the previous publication when the dedicated/auxiliary feed
+    # was temporarily empty. This prevents a transient refresh from erasing
+    # a research competition's live planning window.
+    generated_experimental = [normalize_experimental(r) for r in generated if r.get("league") in EXPERIMENTAL_LEAGUES]
+    preserved_experimental = [normalize_experimental(r) for r in preserved if r.get("league") in EXPERIMENTAL_LEAGUES]
     generated = [r for r in generated if r.get("league") not in EXPERIMENTAL_LEAGUES]
-    generated.extend(experimental)
+    generated.extend(generated_experimental)
+    existing_ids = {str(r.get("event_id") or "") for r in generated if r.get("event_id")}
+    generated.extend(r for r in preserved_experimental if str(r.get("event_id") or "") not in existing_ids)
     generated = merge_unique(generated)
 
     FEED.write_text(json.dumps(generated, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -100,7 +107,7 @@ def main():
         "ere_divisie_rows": sum(r.get("league") == "Eredivisie" for r in generated),
         "saudi_rows": sum(r.get("league") == "Saudi Pro League" for r in generated),
         "pdl_rows": sum(r.get("league") == "England Amateur - U21 Professional Development League" for r in generated),
-        "preserved_rows": len(experimental),
+        "preserved_rows": len([r for r in generated if r.get("league") in EXPERIMENTAL_LEAGUES]),
         "transaction_policy": "NO_SPORT_ERASURE_ON_TRANSIENT_SOURCE_FAILURE",
     }
     print(json.dumps(summary, indent=2))
