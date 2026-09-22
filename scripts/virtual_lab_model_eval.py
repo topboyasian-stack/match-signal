@@ -98,7 +98,7 @@ def product_prior(events, product, line, cutoff):
 
 def participant_prior(events,event,line):
     cutoff=ts(event["timestamp"]); product=event["product"]
-    names={event["home"].strip().casefold(),event["away"].strip().casefold()}-{""""}
+    names={event["home"].strip().casefold(),event["away"].strip().casefold()}-{"""}
     prior=[e for e in events if e["product"]==product and ts(e["timestamp"])<cutoff and e["total"] is not None]
     entity=[e for e in prior if names & {e["home"].strip().casefold(),e["away"].strip().casefold()}]
     # Participant recurrence is identity-based, not opponent-based. Use prior actual
