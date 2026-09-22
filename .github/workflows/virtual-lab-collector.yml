@@ -9,10 +9,11 @@ on:
       - 'scripts/virtual_lab_model_eval.py'
       - 'scripts/virtual_lab_participant_profiles.py'
       - 'scripts/virtual_lab_confirmed_participants.py'
-      - 'confirmed-participant-watch.js'
+      - 'virtual-lab-confirmed-watch.js'
+      - 'data/virtual_lab_participants/efootball_confirmed_watch.json'
       - 'data/virtual_lab_confirmed_participants.json'
       - 'scripts/virtual_lab_eligibility.py'
-      - 'virtual-lab.js'
+      - 'virtual-lab-app.js'
       - 'research.html'
       - 'virtual-lab/**'
       - 'data/virtual_lab_participants/**'
@@ -63,26 +64,7 @@ jobs:
       - name: Syntax-check eligibility engine
         run: python -m py_compile scripts/virtual_lab_eligibility.py
 
-      - name: Probe public result mirrors
-        run: |
-          python - <<'PY'
-          import requests
-          from bs4 import BeautifulSoup
-          urls = {
-              'forebet_today':'https://www.forebet.com/en/esoccer/predictions-for-today',
-              'forebet_yesterday':'https://www.forebet.com/en/esoccer/predictions-from-yesterday',
-              'estave':'https://cms6.e-stave.com/Live/Rezultati/Default.aspx',
-          }
-          for name,url in urls.items():
-              r=requests.get(url,headers={'User-Agent':'Mozilla/5.0'},timeout=30)
-              print(name, r.status_code, len(r.text), r.url)
-              soup=BeautifulSoup(r.text,'html.parser')
-              lines=[x.strip() for x in soup.get_text('\n').splitlines() if x.strip()]
-              hits=[line for line in lines if '21/09/2026' in line or '20/09/2026' in line or 'Eadriatic' in line or 'GT Sports' in line]
-              print('  hits:', hits[:12])
-          PY
-
-      - name: Run virtual fixture capture + settlement
+      - name: Run Virtual Lab v1 capture + settlement
         run: python scripts/virtual_lab_collector.py
 
       - name: Validate product namespace contract
