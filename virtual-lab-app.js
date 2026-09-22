@@ -645,27 +645,41 @@ function enrichCandidate(c,e){
 function predictionForEvent(e){
   const id=String(e.event_id||e.eventId||'');
   if(state.predictionCache.has(id))return state.predictionCache.get(id);
-  if(!isEligibleResearchEvent(e))return null;
-  const candidates=[];
-  (e.markets||[]).forEach(m=>{
-    const mid=String(m.id||''),name=String(m.name||'').toLowerCase();
-    const isTotals=mid==='18'||mid==='189'||name.indexOf('over/under')>=0||name.indexOf('total')>=0;
-    if(!isTotals)return;
-    const c=calculateMarket(m);
-    if(c){c.marketType='ou';candidates.push(c);}
-  });
-  const active=candidates.filter(isEligibleOU).sort((a,b)=>b.fairProb-a.fairProb);
-  const experimental=candidates.filter(isExperimentalOU).sort((a,b)=>b.fairProb-a.fairProb);
-  if(!active.length&&!experimental.length)return null;
-  const bestOU=active.length?enrichCandidate(active[0],e):null;
-  const experimentalOU=experimental.length?enrichCandidate(experimental[0],e):null;
-  const primaryCandidate=bestOU||experimentalOU;
-  const out={product:e.product,competition:e.competition||e.tournament||'',event_id:id,
-    home:String(e.home||e.participant_1||''),away:String(e.away||e.participant_2||''),
-    start_time:e.start_time||null,primary:primaryCandidate&&qualifiesResearchPick(primaryCandidate)?primaryCandidate:null,
-    bestWinner:null,bestOU,experimentalOU,candidates:[bestOU,experimentalOU].filter(Boolean)};
-  state.predictionCache.set(id,out);
-  return out;
+  try{
+    if(!isEligibleResearchEvent(e))return null;
+    const candidates=[];
+    (e.markets||[]).forEach(m=>{
+      const mid=String(m.id||''),name=String(m.name||'').toLowerCase();
+      const isTotals=mid==='18'||mid==='189'||name.indexOf('over/under')>=0||name.indexOf('total')>=0;
+      if(!isTotals)return;
+      const c=calculateMarket(m);
+      if(c){c.marketType='ou';candidates.push(c);}
+    });
+    const active=candidates.filter(isEligibleOU).sort((x,y)=>(y.fairProb||0)-(x.fairProb||0));
+    const experimental=candidates.filter(isExperimentalOU).sort((x,y)=>(y.fairProb||0)-(x.fairProb||0));
+    if(!active.length&&!experimental.length)return null;
+    const bestOU=active.length?enrichCandidate(active[0],e):null;
+    const experimentalOU=experimental.length?enrichCandidate(experimental[0],e):null;
+    const primaryCandidate=bestOU||experimentalOU;
+    const out={product:e.product,competition:e.competition||e.tournament||'',event_id:id,
+      home:String(e.home||e.participant_1||''),away:String(e.away||e.participant_2||''),
+      participant_1:String(e.participant_1||''),participant_2:String(e.participant_2||''),
+      identity_verified:!!(e.participant_1&&e.participant_2),
+      start_time:e.start_time||null,
+      primary:primaryCandidate&&qualifiesResearchPick(primaryCandidate)?primaryCandidate:null,
+      bestWinner:null,bestOU,experimentalOU,candidates:[bestOU,experimentalOU].filter(Boolean)};
+    state.predictionCache.set(id,out);
+    return out;
+  }catch(err){
+    console.warn('Virtual Lab prediction calculation skipped:',id,err);
+    const safe={product:e.product||'',competition:e.competition||e.tournament||'',event_id:id,
+      home:String(e.home||e.participant_1||''),away:String(e.away||e.participant_2||''),
+      participant_1:String(e.participant_1||''),participant_2:String(e.participant_2||''),
+      identity_verified:!!(e.participant_1&&e.participant_2),start_time:e.start_time||null,
+      primary:null,bestWinner:null,bestOU:null,experimentalOU:null,candidates:[]};
+    state.predictionCache.set(id,safe);
+    return safe;
+  }
 }
 function isConfirmedWatchedEvent(e){
   const list=Array.isArray(state.confirmedWatch?.participants)?state.confirmedWatch.participants:[];
@@ -710,25 +724,42 @@ function updateDiagnostics(extra={}){
 }
 
 function renderLive(){
-  const product=$('product').value,market=$('market').value;
-  const sourceCount=state.live.length;
-  const events=upcomingEventsFrom(state.live).filter(e=>SUPPORTED_VIRTUAL_PRODUCTS.has(String(e.product||''))).filter(e=>product==='all'||e.product===product).sort((a,b)=>Number(isConfirmedWatchedEvent(b))-Number(isConfirmedWatchedEvent(a))||new Date(a.start_time||0)-new Date(b.start_time||0)).slice(0,30);
-  const list=events.slice(0,30).map(e=>{
-    // Never let one malformed market/prediction abort the entire live fixture render.
-    let p=null;
-    try{p=predictionForEvent(e);}catch(err){console.warn('Virtual Lab prediction render skipped:',e?.event_id,err);}
-    const shown=(e.markets||[]).filter(m=>matchesMarket(m,market)).slice(0,3);
-    const chips=shown.flatMap(m=>(m.outcomes||[]).slice(0,4).map(o=>'<span class="liveChip"><span>'+esc(outcomeCode(m,o))+'</span> <b>'+Number(o.odds).toFixed(2)+'</b></span>')).join('');
-    const pick=p&&p.primary?'<div class="predictionBox"><div class="predictionTop"><span class="predictionLabel">RESEARCH PICK</span><span class="predictionType">'+(p.primary.marketType==='ou'?'TOTALS':'MATCH RESULT')+'</span></div><div class="predictionPick">'+esc(p.primary.pickCode)+' <b>'+fmtPct(p.primary.calibratedProb)+'</b></div><div class="predictionMeta">Book '+p.primary.bookmakerOdds.toFixed(2)+' · Edge '+fmtPct(p.primary.edge)+' · n='+p.primary.calibrationN+'</div></div>':'<div class="predictionBox mutedPrediction"><div class="predictionLabel">NO QUALIFIED SIGNAL</div><div class="predictionPick">MARKET BASELINE ONLY</div><div class="predictionMeta">Needs ≥30 historical calibration observations and ≥2% calibrated edge.</div></div>';
-    const identityLine=(e.participant_1||e.participant_2)?'<div class="participantIdentityLine"><span class="participantIdentityLabel">STABLE PARTICIPANT</span><strong>'+esc(e.participant_1||'UNVERIFIED')+'</strong><span>vs</span><strong>'+esc(e.participant_2||'UNVERIFIED')+'</strong><span class="participantIdentityStatus">'+(e.identity_verified?'✓ VERIFIED':'⚠ IDENTITY UNVERIFIED')+'</span></div>':'<div class="participantIdentityLine participantIdentityUnknown"><span class="participantIdentityLabel">STABLE PARTICIPANT</span><strong>IDENTITY NOT EXPOSED BY LIVE FEED</strong><span class="participantIdentityStatus">⚠ NO GUESSING</span></div>';
-    return '<article class=\"liveCard\" data-product=\"'+esc(e.product||'')+'\"><div class="liveTop"><span>'+esc(e.competition||e.product)+'</span><span>'+esc(e.start_time?date(e.start_time):'Time n/a')+'</span></div><div class="liveTeams"><strong>'+esc(e.home||'Unknown team')+'</strong> <span>vs</span> <strong>'+esc(e.away||'Unknown team')+'</strong>'+identityLine+'</div>'+pick+'<div class="liveOdds">'+(chips||'<span class="liveMeta">No readable markets</span>')+'</div></article>';
-  }).join('');
-  $('liveGrid').innerHTML=list;
-  $('liveEmpty').hidden=!!list;
-  $('liveDot').className='liveDot '+(state.liveMode==='remote'?'':state.liveMode==='snapshot'?'wait':'bad');
-  $('liveTitle').textContent=state.liveMode==='remote'?'LIVE SOURCE ONLINE · SPORTYBET FIXTURES':state.liveMode==='snapshot'?'SNAPSHOT FALLBACK · SPORTYBET FIXTURES':'LIVE SOURCE UNAVAILABLE';
-  const counts={};events.forEach(e=>counts[e.product]=(counts[e.product]||0)+1);
-  $('liveMeta').textContent=(state.liveUpdated?'Feed timestamp '+date(state.liveUpdated)+' · ':'')+(Object.keys(counts).map(k=>k+': '+counts[k]).join(' · ')||'0 upcoming events');
+  const product=$('product')?.value||'all',market=$('market')?.value||'all';
+  const allEvents=upcomingEventsFrom(state.live)
+    .filter(e=>SUPPORTED_VIRTUAL_PRODUCTS.has(String(e?.product||'')))
+    .filter(e=>product==='all'||e.product===product)
+    .sort((x,y)=>Number(isConfirmedWatchedEvent(y))-Number(isConfirmedWatchedEvent(x))||new Date(x.start_time||0)-new Date(y.start_time||0))
+    .slice(0,30);
+  const cards=[];
+  for(const e of allEvents){
+    try{
+      const p=predictionForEvent(e);
+      const shown=(Array.isArray(e.markets)?e.markets:[]).filter(m=>matchesMarket(m,market)).slice(0,3);
+      const chips=shown.flatMap(m=>(Array.isArray(m.outcomes)?m.outcomes:[]).slice(0,4).map(o=>{
+        const odds=Number(o?.odds);
+        return '<span class="liveChip"><span>'+esc(outcomeCode(m,o))+'</span> <b>'+ (Number.isFinite(odds)?odds.toFixed(2):'—') +'</b></span>';
+      })).join('');
+      const bookmakerOdds=Number(p?.primary?.bookmakerOdds);
+      const edge=Number(p?.primary?.edge);
+      const calN=Number(p?.primary?.calibrationN);
+      const pick=p&&p.primary?'<div class="predictionBox"><div class="predictionTop"><span class="predictionLabel">RESEARCH PICK</span><span class="predictionType">'+(p.primary.marketType==='ou'?'TOTALS':'MATCH RESULT')+'</span></div><div class="predictionPick">'+esc(p.primary.pickCode||'—')+' <b>'+fmtPct(p.primary.calibratedProb)+'</b></div><div class="predictionMeta">Book '+(Number.isFinite(bookmakerOdds)?bookmakerOdds.toFixed(2):'—')+' · Edge '+fmtPct(edge)+' · n='+(Number.isFinite(calN)?calN:0)+'</div></div>':'<div class="predictionBox mutedPrediction"><div class="predictionLabel">NO QUALIFIED SIGNAL</div><div class="predictionPick">MARKET BASELINE ONLY</div><div class="predictionMeta">The fixture is live in the feed, but the research gate has not qualified a signal.</div></div>';
+      const identityLine=(e.participant_1||e.participant_2)?'<div class="participantIdentityLine"><span class="participantIdentityLabel">STABLE PARTICIPANT</span><strong>'+esc(e.participant_1||'UNVERIFIED')+'</strong><span>vs</span><strong>'+esc(e.participant_2||'UNVERIFIED')+'</strong><span class="participantIdentityStatus">'+(e.identity_verified?'✓ VERIFIED':'⚠ IDENTITY UNVERIFIED')+'</span></div>':'<div class="participantIdentityLine participantIdentityUnknown"><span class="participantIdentityLabel">STABLE PARTICIPANT</span><strong>IDENTITY NOT EXPOSED BY LIVE FEED</strong><span class="participantIdentityStatus">⚠ NO GUESSING</span></div>';
+      cards.push('<article class="liveCard" data-product="'+esc(e.product||'')+'"><div class="liveTop"><span>'+esc(e.competition||e.product||'Virtual')+'</span><span>'+esc(e.start_time?date(e.start_time):'Time n/a')+'</span></div><div class="liveTeams"><strong>'+esc(e.home||'Upcoming fixture')+'</strong> <span>vs</span> <strong>'+esc(e.away||'Upcoming fixture')+'</strong>'+identityLine+'</div>'+pick+'<div class="liveOdds">'+(chips||'<span class="liveMeta">No readable markets</span>')+'</div></article>');
+    }catch(err){
+      console.warn('Virtual Lab fixture card skipped:',e?.event_id,err);
+    }
+  }
+  const grid=$('liveGrid'),empty=$('liveEmpty');
+  if(grid)grid.innerHTML=cards.join('');
+  if(empty)empty.hidden=!!cards.length;
+  const dot=$('liveDot');
+  if(dot)dot.className='liveDot '+(state.liveMode==='remote'?'':state.liveMode==='snapshot'?'wait':'bad');
+  const title=$('liveTitle');
+  if(title)title.textContent=state.liveMode==='remote'?'LIVE SOURCE ONLINE · SPORTYBET FIXTURES':state.liveMode==='snapshot'?'SNAPSHOT FALLBACK · SPORTYBET FIXTURES':'LIVE SOURCE UNAVAILABLE';
+  const counts={};allEvents.forEach(e=>counts[e.product]=(counts[e.product]||0)+1);
+  const meta=$('liveMeta');
+  if(meta)meta.textContent=(state.liveUpdated?'Feed timestamp '+date(state.liveUpdated)+' · ':'')+(Object.keys(counts).map(k=>k+': '+counts[k]).join(' · ')||'0 upcoming events')+' · rendered '+cards.length;
+  updateDiagnostics({message:'Live feed renderer is card-isolated: malformed prediction calculations cannot hide the remaining fixtures.'});
 }
 function renderPredictionDesk(){
   const host=$('predictionDesk');if(!host)return;
@@ -739,7 +770,7 @@ function renderPredictionDesk(){
     function row(x,label){
       if(!x)return '<div class="calcRow"><span>'+label+'</span><b>—</b><span>—</span><span>—</span><span>—</span></div>';
       const modelP=x.calibratedProb!=null?x.calibratedProb:x.fairProb;
-      return '<div class="calcRow"><span>'+label+(x.market.line!=null?' '+x.market.line:'')+(x.experimental?' <em class="experimentalTag">EXPERIMENTAL</em>':'')+'</span><b>'+esc(x.pickCode)+'</b><span>Fair '+fmtPct(x.fairProb)+' · Model '+fmtPct(modelP)+'</span><span>Fair '+x.fairOdds.toFixed(2)+'</span><span>Book '+x.bookmakerOdds.toFixed(2)+'</span></div>';
+      const fairOdds=Number(x.fairOdds),bookOdds=Number(x.bookmakerOdds); return '<div class="calcRow"><span>'+label+(x.market.line!=null?' '+x.market.line:'')+(x.experimental?' <em class="experimentalTag">EXPERIMENTAL</em>':'')+'</span><b>'+esc(x.pickCode||'—')+'</b><span>Fair '+fmtPct(x.fairProb)+' · Model '+fmtPct(modelP)+'</span><span>Fair '+(Number.isFinite(fairOdds)?fairOdds.toFixed(2):'—')+'</span><span>Book '+(Number.isFinite(bookOdds)?bookOdds.toFixed(2):'—')+'</span></div>';
     }
     const watch=p.experimentalOU;
     const hot=p.bestOU&&p.bestOU.hotParticipant?p.bestOU.hotParticipant:(p.experimentalOU&&p.experimentalOU.hotParticipant?p.experimentalOU.hotParticipant:null);
@@ -917,7 +948,7 @@ async function loadLive(){
 function rebuildPredictionDesk(){
   const product=$('product').value;
   const eligible=upcomingEventsFrom(state.live).filter(e=>isEligibleResearchEvent(e)||isConfirmedWatchedEvent(e)).filter(e=>product==='all'||e.product===product).sort((a,b)=>Number(isConfirmedWatchedEvent(b))-Number(isConfirmedWatchedEvent(a))||new Date(a.start_time||0)-new Date(b.start_time||0));
-  state.picks=eligible.slice(0,24).map(predictionForEvent).filter(Boolean);
+  state.picks=eligible.slice(0,24).map(e=>{try{return predictionForEvent(e)}catch(err){console.warn('Virtual Lab prediction desk skipped:',e?.event_id,err);return null;}}).filter(Boolean);
   renderPredictionDesk();renderBuilder();
 }
 async function loadConfirmedWatch(){
