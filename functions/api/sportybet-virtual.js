@@ -59,13 +59,12 @@ export async function onRequestGet(context){
   const pageSize=Math.min(Math.max(Number(u.searchParams.get('pageSize')||100),1),100);
   const pageNum=Math.max(Number(u.searchParams.get('pageNum')||1),1);
   const timeline=Math.min(Math.max(Number(u.searchParams.get('timeline')||168),12),720);
-  const requested=new Set((u.searchParams.get('sources')||'efootball,srl,vfootball').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean));
+  const requested=new Set((u.searchParams.get('sources')||'efootball,vfootball').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean));
   const out=[];
   const errors=[];
   const sourceStatus={};
 
   const pcTargets=[
-    ['srl','sr:sport:1'],
     ['efootball','sr:sport:137']
   ];
 
@@ -110,7 +109,7 @@ export async function onRequestGet(context){
     }
   }
 
-  await Promise.all([collectPc('srl','sr:sport:1'),collectPc('efootball','sr:sport:137'),collectVfootball()]);
+  await Promise.all([collectPc('efootball','sr:sport:137'),collectVfootball()]);
 
   const cutoff=Date.now()-(2*60*1000);
   const dedup=new Map();
@@ -130,8 +129,6 @@ export async function onRequestGet(context){
       key=/eadriatic/.test(blob)?'efootball_adriatic':'efootball_gt';
     }else if(e.source==='vfootball'){
       key='vfootball';
-    }else if(e.source==='srl'){
-      key='srl';
     }else if(e.source==='vfootball' && /zoom|turbo/i.test(blob)){
       key='zoom';
     }else if(e.source==='vfootball'){
