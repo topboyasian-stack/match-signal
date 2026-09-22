@@ -6,7 +6,7 @@ const LIVE_API='https://match-signal.pages.dev/api/sportybet-virtual';
 const LIVE_MARKETS='1,18,10,29,11,26,36,14,60100,186,189,202,204,210';
 const SNAPSHOT='./data/virtual_lab_live.json';
 const LIVE_REFRESH_MS=30000;
-const UI_BUILD='20260922-v30';
+const UI_BUILD='20260922-v31';
 const HISTORY='./api/virtual-lab-history';
 const HISTORY_FALLBACK='./data/virtual_lab_history.json';
 const MODEL_EVAL='./data/virtual_lab_model_eval.json';
@@ -689,7 +689,7 @@ function upcomingEventsFrom(events){
 }
 function renderLive(){
   const product=$('product').value,market=$('market').value;
-  const events=upcomingEventsFrom(state.live).filter(e=>isEligibleResearchEvent(e)||isConfirmedWatchedEvent(e)).filter(e=>product==='all'||e.product===product).sort((a,b)=>Number(isConfirmedWatchedEvent(b))-Number(isConfirmedWatchedEvent(a))||new Date(a.start_time||0)-new Date(b.start_time||0)).slice(0,30);
+  const events=upcomingEventsFrom(state.live).filter(e=>['efootball_gt','efootball_adriatic','vfootball','zoom','other'].includes(String(e.product||''))).filter(e=>product==='all'||e.product===product).sort((a,b)=>Number(isConfirmedWatchedEvent(b))-Number(isConfirmedWatchedEvent(a))||new Date(a.start_time||0)-new Date(b.start_time||0)).slice(0,30);
   const list=events.slice(0,30).map(e=>{
     const p=predictionForEvent(e);
     const shown=(e.markets||[]).filter(m=>matchesMarket(m,market)).slice(0,3);
