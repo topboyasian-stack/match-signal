@@ -11,12 +11,11 @@ import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-import requests
+import runpy
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
 OUTPUT = DATA / "football_forward_readiness.json"
-ESPN = "https://site.api.espn.com/apis/site/v2/sports"
 PLANNING_DAYS = 7
 
 LEAGUES = [
@@ -43,12 +42,6 @@ CORE_LEAGUES = {
     "MLS": "usa.1",
     "Primeira Liga": "por.1",
 }
-
-SESSION = requests.Session()
-SESSION.headers.update({
-    "User-Agent": "MatchSignal/forward-readiness/1.0",
-    "Accept": "application/json",
-})
 
 GENERIC_ERROR = "provider lookup unavailable; status derived from published artifacts"
 
@@ -81,14 +74,12 @@ def upcoming_count(rows, now):
     return count
 
 
-def fetch_json(url, params=None):
-    response = SESSION.get(url, params=params, timeout=20)
-    response.raise_for_status()
-    return response.json()
+PREDICT_NS = runpy.run_path(str(ROOT / "scripts" / "predict_today.py"))
+FETCH_SCOREBOARD = PREDICT_NS["fetch_scoreboard"]
 
 
 def espn_upcoming_count(league_code, now):
-    """Count real scheduled ESPN fixtures using one date per scoreboard call."""
+    """Count real scheduled ESPN fixtures using the production ESPN client."""
     today = now.date()
     total = 0
     seen = set()
@@ -97,10 +88,7 @@ def espn_upcoming_count(league_code, now):
     for offset in range(PLANNING_DAYS + 1):
         day = today + timedelta(days=offset)
         try:
-            body = fetch_json(
-                f"{ESPN}/soccer/{league_code}/scoreboard",
-                {"dates": day.strftime("%Y%m%d")},
-            )
+            body = FETCH_SCOREBOARD("soccer", league_code, day.strftime("%Y%m%d"))
             for event in body.get("events", []):
                 event_id = str(event.get("id") or "")
                 if event_id and event_id in seen:
