@@ -45,17 +45,57 @@ def history():
     return sorted({x["event_id"]:x for x in rows}.values(),key=lambda x:x["start_time"])
 
 def upcoming():
-    params={"sportId":"sr:sport:1","marketId":"1,18,10,14,16,29,45,47","pageSize":"100","pageNum":"1","timeline":"168"}
-    r=S.get(SPORTY,params=params,timeout=30);r.raise_for_status();body=r.json()
     events=[]
-    for t in (body.get("data") or {}).get("tournaments") or []:
-        if str(t.get("name") or "").strip()!=LEAGUE:continue
-        for e in t.get("events") or []:
-            try:start=datetime.fromtimestamp(float(e.get("estimateStartTime"))/1000,tz=timezone.utc)
-            except Exception:continue
-            h=str(e.get("homeTeamName") or "").strip();a=str(e.get("awayTeamName") or "").strip()
-            if not h or not a:continue
-            events.append({"event_id":str(e.get("eventId")),"start_time":start.isoformat(),"home":h,"away":a,"home_score":None,"away_score":None})
+    for page in (1,2):
+        params={"sportId":"sr:sport:1","marketId":"1,18,10,14,16,29,45,47","pageSize":"100","pageNum":str(page),"timeline":"168"}
+        r=S.get(SPORTY,params=params,timeout=30);r.raise_for_status();body=r.json()
+
+        # Support both known SportyBet proxy envelopes:
+        # {events:[...]} and {data:{events:[...] / tournaments:[...]}}.
+        scoped=[]
+        top=body.get("events")
+        if isinstance(top,list):
+            scoped.extend((None,e) for e in top if isinstance(e,dict))
+        data=body.get("data") if isinstance(body.get("data"),dict) else {}
+        if isinstance(data.get("events"),list):
+            scoped.extend((None,e) for e in data["events"] if isinstance(e,dict))
+        if isinstance(data.get("tournaments"),list):
+            for t in data["tournaments"]:
+                if not isinstance(t,dict):
+                    continue
+                tournament_name=str(t.get("name") or t.get("tournamentName") or "").strip()
+                if tournament_name and tournament_name!=LEAGUE:
+                    continue
+                for e in t.get("events") or []:
+                    if isinstance(e,dict):
+                        scoped.append((tournament_name,e))
+
+        for tournament_name,e in scoped:
+            event_tournament=str(
+                e.get("tournamentName")
+                or e.get("tournament_name")
+                or e.get("competition")
+                or ((e.get("tournament") or {}).get("name") if isinstance(e.get("tournament"),dict) else "")
+                or tournament_name
+                or ""
+            ).strip()
+            if event_tournament and event_tournament!=LEAGUE:
+                continue
+            try:
+                raw_start=e.get("estimateStartTime")
+                if raw_start is None:
+                    raw_start=e.get("startTimeMs")
+                start=datetime.fromtimestamp(float(raw_start)/1000,tz=timezone.utc)
+            except Exception:
+                continue
+            event_id=str(e.get("eventId") or e.get("event_id") or "").strip()
+            h=str(e.get("homeTeamName") or e.get("team_1") or e.get("homeTeam") or "").strip()
+            a=str(e.get("awayTeamName") or e.get("team_2") or e.get("awayTeam") or "").strip()
+            if not event_id or not h or not a:
+                continue
+            events.append({"event_id":event_id,"start_time":start.isoformat(),"home":h,"away":a,"home_score":None,"away_score":None})
+        if len(top or [])<100 and not data.get("events") and not data.get("tournaments"):
+            break
     return sorted({x["event_id"]:x for x in events if x["event_id"]}.values(),key=lambda x:x["start_time"])
 
 def pois(lam,k):return math.exp(-lam)*lam**k/math.factorial(k)
@@ -89,11 +129,11 @@ def build(hist,future):
         for line in (1.5,2.5,3.5,4.5):
             o=over(total,line);ladder[str(line)]={"line":line,"over":round(o,4),"under":round(1-o,4),"pick":"over" if o>=.5 else "under","fair_over":round(1/max(o,1e-9),2),"fair_under":round(1/max(1-o,1e-9),2)}
         btts=(1-math.exp(-ex_h))*(1-math.exp(-ex_a))
-        out.append({"sport":"football","league":LEAGUE,"event_id":x["event_id"],"start_time":x["start_time"],"player_1":x["home"],"player_2":x["away"],"probabilities":probs,"pick":pick,"confidence":round(max(hp,dp,ap),4),"expected_goals":{"p1":round(ex_h,2),"p2":round(ex_a,2),"total":round(total,2)},"markets":{"over_under":{"line":2.5,"over":ladder["2.5"]["over"],"under":ladder["2.5"]["under"],"pick":ladder["2.5"]["pick"],"source":"PDL time-safe recency-weighted attack/defence + Poisson","ladder":ladder},"btts":{"yes":round(btts,4),"no":round(1-btts,4)}},"fair_odds":{"p1":round(1/max(hp,1e-9),2),"draw":round(1/max(dp,1e-9),2),"p2":round(1/max(ap,1e-9),2)},"model":"PDL time-safe recency-weighted attack/defence + Poisson","model_version":"PDL-1.1-2026.09.22","prediction_status":"research_only","paper_only":True})
+        out.append({"sport":"football","league":LEAGUE,"event_id":x["event_id"],"start_time":x["start_time"],"player_1":x["home"],"player_2":x["away"],"probabilities":probs,"pick":pick,"confidence":round(max(hp,dp,ap),4),"expected_goals":{"p1":round(ex_h,2),"p2":round(ex_a,2),"total":round(total,2)},"markets":{"over_under":{"line":2.5,"over":ladder["2.5"]["over"],"under":ladder["2.5"]["under"],"pick":ladder["2.5"]["pick"],"source":"PDL time-safe recency-weighted attack/defence + Poisson","ladder":ladder},"btts":{"yes":round(btts,4),"no":round(1-btts,4)}},"fair_odds":{"p1":round(1/max(hp,1e-9),2),"draw":round(1/max(dp,1e-9),2),"p2":round(1/max(ap,1e-9),2)},"model":"PDL time-safe recency-weighted attack/defence + Poisson","model_version":"PDL-1.2-2026.09.22","prediction_status":"research_only","paper_only":True})
     return out
 
 def main():
     hist=history();future=upcoming();pred=build(hist,future);now=datetime.now(timezone.utc).isoformat()
-    status={"updated_at":now,"competition":LEAGUE,"historical_rows":len(hist),"current_upcoming":len(pred),"historical_source":RESULTS_URL,"fixture_source":"SportyBet NG via Match Signal Cloudflare proxy","model":"PDL-1.1-2026.09.22","paper_only":True,"gates":{"model_live_trading_approved":False,"requires_walk_forward_validation":True,"requires_market_benchmark":True}}
+    status={"updated_at":now,"competition":LEAGUE,"historical_rows":len(hist),"current_upcoming":len(pred),"historical_source":RESULTS_URL,"fixture_source":"SportyBet NG via Match Signal Cloudflare proxy","model":"PDL-1.2-2026.09.22","paper_only":True,"gates":{"model_live_trading_approved":False,"requires_walk_forward_validation":True,"requires_market_benchmark":True}}
     (DATA/"pdl_predictions.json").write_text(json.dumps(pred,indent=2,ensure_ascii=False)+"\n",encoding="utf-8");(DATA/"pdl_status.json").write_text(json.dumps(status,indent=2,ensure_ascii=False)+"\n",encoding="utf-8");print(json.dumps(status,indent=2))
 if __name__=="__main__":main()
