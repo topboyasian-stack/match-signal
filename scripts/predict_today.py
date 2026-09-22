@@ -21,6 +21,7 @@ FOOTBALL_LEAGUES = {
     "Champions League": "uefa.champions",
     "MLS": "usa.1",
     "Primeira Liga": "por.1",
+    "Eredivisie": "ned.1",
 }
 TENNIS_LEAGUES = {"ATP": "atp", "WTA": "wta"}
 
@@ -428,14 +429,14 @@ def fetch_current_predictions():
         tour_bucket = qc["rejected_by_tour"].setdefault(tour, {})
         tour_bucket[reason] = tour_bucket.get(reason, 0) + 1
 
-    # Football now uses the same forward-planning principle as tennis:
-    # calculate the next 7 days, not only today's scoreboard.
+    # Football uses an extended forward-planning window so the desk can
+    # calculate the next scheduled league round even across international breaks.
     today = datetime.now(timezone.utc).date()
-    football_end = today + timedelta(days=7)
+    football_end = today + timedelta(days=20)
     for label, league in FOOTBALL_LEAGUES.items():
         try:
             seen_events = set()
-            for day_offset in range(8):
+            for day_offset in range(21):
                 date = today + timedelta(days=day_offset)
                 board = fetch_scoreboard("soccer", league, date.strftime("%Y%m%d"))
                 for event in board.get("events", []):
