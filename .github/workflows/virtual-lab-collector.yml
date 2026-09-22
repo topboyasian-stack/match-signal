@@ -14,6 +14,9 @@ on:
       - 'scripts/virtual_lab_eligibility.py'
       - 'virtual-lab.js'
       - 'research.html'
+      - 'virtual-lab/**'
+      - 'data/virtual_lab_participants/**'
+      - 'data/virtual_lab_archive/**'
   schedule:
     - cron: '*/5 * * * *'
   workflow_dispatch:
@@ -105,6 +108,7 @@ jobs:
               'data/virtual_lab_participant_profiles.json',
               'data/virtual_lab_confirmed_participants.json',
               'data/virtual_lab_confirmed_participant_results.json',
+              'data/virtual_lab_participants/registry.json',
           ]:
               p = Path(name)
               data = json.loads(p.read_text())
@@ -119,7 +123,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           for attempt in 1 2 3 4; do
-            git add data/virtual_lab_pending.json data/virtual_lab_history.json data/virtual_lab_status.json data/virtual_lab_eligibility.json data/virtual_lab_model_eval.json data/virtual_lab_participant_profiles.json data/virtual_lab_confirmed_participant_results.json
+            git add data/virtual_lab_pending.json data/virtual_lab_history.json data/virtual_lab_status.json data/virtual_lab_eligibility.json data/virtual_lab_model_eval.json data/virtual_lab_participant_profiles.json data/virtual_lab_confirmed_participant_results.json data/virtual_lab_participants/registry.json data/virtual_lab_archive/settlements
 
             if git diff --cached --quiet; then
               echo "Virtual Lab collector produced no data changes."
