@@ -5,11 +5,10 @@ Upcoming fixtures: Match Signal's SportyBet NG proxy, filtered to the exact
 PDL tournament name. Model fitting is independent of bookmaker prices.
 """
 from __future__ import annotations
-import json, math, re, io
+import json, math, re
 from datetime import datetime, timezone
 from pathlib import Path
 import requests
-import pandas as pd
 
 ROOT=Path(__file__).resolve().parents[1]
 DATA=ROOT/"data"
@@ -27,21 +26,58 @@ def parse_date(v):
             except Exception:pass
     return None
 
+SOFASCORE="https://www.sofascore.com/api/v1"
+TOURNAMENT_ID=13946
+
+def sofascore_json(path):
+    r=S.get(SOFASCORE+path,timeout=30,headers={"User-Agent":"MatchSignal/PDL/1.2"})
+    r.raise_for_status()
+    return r.json()
+
+def current_season():
+    body=sofascore_json(f"/unique-tournament/{TOURNAMENT_ID}/seasons")
+    seasons=body.get("seasons") or []
+    if not seasons:
+        raise RuntimeError("SofaScore returned no PDL seasons")
+    return int(seasons[0]["id"])
+
 def history():
-    html=S.get(RESULTS_URL,timeout=30).text
-    tables=pd.read_html(io.StringIO(html))
+    season=current_season()
     rows=[]
-    for df in tables:
-        cols={str(c).strip().lower() for c in df.columns}
-        if not {"date","home","score","away"}.issubset(cols):continue
-        df.columns=[str(c).strip().lower() for c in df.columns]
-        for _,r in df.iterrows():
-            d=parse_date(r.get("date"))
-            m=re.search(r"(\d+)\s*-\s*(\d+)",str(r.get("score","")))
-            h=str(r.get("home","")).strip();a=str(r.get("away","")).strip()
-            if d and m and h and a:
-                rows.append({"event_id":f"betstudy|{d.date()}|{h}|{a}","start_time":d.isoformat(),"home":h,"away":a,"home_score":float(m.group(1)),"away_score":float(m.group(2))})
-    if not rows:raise RuntimeError("BetStudy PDL results table was not parsed")
+    for page in range(0,10):
+        body=sofascore_json(f"/unique-tournament/{TOURNAMENT_ID}/season/{season}/events/last/{page}")
+        events=body.get("events") or []
+        if not events:
+            break
+        for e in events:
+            status=(e.get("status") or {})
+            if status.get("type") not in {"finished","post"} and status.get("code") not in {100,120}:
+                continue
+            home=e.get("homeTeam") or {}
+            away=e.get("awayTeam") or {}
+            hs=(e.get("homeScore") or {}).get("current")
+            as_=(e.get("awayScore") or {}).get("current")
+            if hs is None:
+                hs=(e.get("homeScore") or {}).get("normaltime")
+            if as_ is None:
+                as_=(e.get("awayScore") or {}).get("normaltime")
+            ts=e.get("startTimestamp")
+            if not ts or hs is None or as_ is None:
+                continue
+            rows.append({
+                "event_id":f"sofascore|{e.get('id')}",
+                "start_time":datetime.fromtimestamp(float(ts),tz=timezone.utc).isoformat(),
+                "home":str(home.get("name") or "").strip(),
+                "away":str(away.get("name") or "").strip(),
+                "home_score":float(hs),
+                "away_score":float(as_),
+                "source":"SofaScore structured PDL season feed",
+            })
+        if len(events)<20:
+            break
+    rows=[x for x in rows if x["home"] and x["away"]]
+    if not rows:
+        raise RuntimeError("SofaScore PDL results returned no finished events")
     return sorted({x["event_id"]:x for x in rows}.values(),key=lambda x:x["start_time"])
 
 def upcoming():
