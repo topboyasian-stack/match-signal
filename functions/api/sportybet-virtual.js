@@ -127,8 +127,6 @@ export async function onRequestGet(context){
     let key=null;
     if(e.source==='efootball'){
       key=/eadriatic/.test(blob)?'efootball_adriatic':'efootball_gt';
-    }else if(e.source==='vfootball'){
-      key='vfootball';
     }else if(e.source==='vfootball' && /zoom|turbo/i.test(blob)){
       key='zoom';
     }else if(e.source==='vfootball'){
@@ -142,6 +140,8 @@ export async function onRequestGet(context){
 
   return new Response(JSON.stringify({
     ok:true,
+    feed_contract:'virtual-lab-v2',
+    excluded_products:['srl'],
     status:filtered.length?'LIVE':'UPSTREAM_EMPTY',
     updated_at:new Date().toISOString(),
     page_size:pageSize,
