@@ -22,8 +22,9 @@ function annotate(){
   document.querySelectorAll('.liveTeams').forEach(el=>{
     const strong=[...el.querySelectorAll('strong')];
     strong.forEach(node=>{
-      const product=el.closest('.liveCard')?.querySelector('.liveTop span')?.textContent||'';
-      const hits=match(node.textContent,'efootball_gt');
+      const card=el.closest('.liveCard');
+      const product=String(card?.dataset?.product||'');
+      const hits=match(node.textContent,product);
       if(!hits.length)return;
       if(!node.parentElement.querySelector('.confirmedWatchTag'))node.insertBefore(badge('🔥 MONITORED'),node);
     });
