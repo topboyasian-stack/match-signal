@@ -125,6 +125,12 @@ export async function onRequestGet(context){
           sportId:'sr:sport:202120001',pageSize,pageNum,todayGames:'true',_t:Date.now()
         });
       }
+      if(!tournaments(data).length){
+        data=await upstream('/api/ng/factsCenter/pcUpcomingEvents',{
+          sportId:'sr:sport:202120001',marketId:'1,18,10,29,11,26,36,14,60100,186,189,202,204,210',
+          pageSize,pageNum,todayGames:'false',timeline,_t:Date.now()
+        });
+      }
       let n=0;
       for(const t of tournaments(data)){
         for(const e of (t.events||[])){
