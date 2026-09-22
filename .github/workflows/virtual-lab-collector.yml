@@ -13,6 +13,7 @@ on:
       - 'data/virtual_lab_participants/efootball_confirmed_watch.json'
       - 'data/virtual_lab_confirmed_participants.json'
       - 'scripts/virtual_lab_eligibility.py'
+      - 'scripts/validate_virtual_lab_v1.py'
       - 'virtual-lab-app.js'
       - 'research.html'
       - 'virtual-lab/**'
@@ -55,6 +56,8 @@ jobs:
 
       - name: Syntax-check collector
         run: python -m py_compile scripts/virtual_lab_collector.py
+      - name: Run Virtual Lab v1 repository contract
+        run: python scripts/validate_virtual_lab_v1.py
       - name: Syntax-check model evaluation engine
         run: python -m py_compile scripts/virtual_lab_model_eval.py
       - name: Syntax-check participant profile engine
