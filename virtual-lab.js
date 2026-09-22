@@ -22,6 +22,14 @@ const date=v=>{const d=new Date(v);return isNaN(d.getTime())?String(v||'—'):d.
 const fmtPct=v=>v==null?'—':(v*100).toFixed(1)+'%';
 const fmtNum=v=>v==null?'—':Number(v).toFixed(3);
 
+function participantIdentity(value){
+  const s=String(value??'').trim();
+  if(!s)return '';
+  const m=s.match(/\\(([^()]+)\\)\\s*$/);
+  return m&&m[1].trim()?m[1].trim():s;
+}
+function participantIdentityKey(value){return participantIdentity(value).trim().toLowerCase();}
+
 function normalize(r){
   const x={...r};
   x.product=String(x.product||'other').toLowerCase().trim();
@@ -223,8 +231,10 @@ function lineFromSpecifier(value){
 }
 
 function normalizeLiveEvent(event,tournament,category){
-  const home=String(event.homeTeamName||'');
-  const away=String(event.awayTeamName||'');
+  const home=String(event.homeTeamName||event.home||'');
+  const away=String(event.awayTeamName||event.away||'');
+  const homeParticipant=participantIdentity(event.homeParticipant||event.homePlayer||event.homeCompetitor||home);
+  const awayParticipant=participantIdentity(event.awayParticipant||event.awayPlayer||event.awayCompetitor||away);
   const product=classifyEvent(tournament,category,home,away);
   if(!product)return null;
   const markets=(event.markets||[]).map(m=>{
@@ -238,7 +248,7 @@ function normalizeLiveEvent(event,tournament,category){
   let start=null;
   const ms=Number(event.estimateStartTime);
   if(Number.isFinite(ms)&&ms>0)start=new Date(ms).toISOString();
-  return {product,competition:String(tournament||'Unclassified'),category:String(category||''),event_id:String(event.eventId||''),home,away,start_time:start,match_status:event.matchStatus,markets};
+  return {product,competition:String(tournament||'Unclassified'),category:String(category||''),event_id:String(event.eventId||''),home,away,participant_1:homeParticipant,participant_2:awayParticipant,start_time:start,match_status:event.matchStatus,markets};
 }
 
 function matchesMarket(market,chosen){
@@ -316,7 +326,7 @@ function historicalOUEvents(rows){
   rows.filter(r=>r.market==='ou'&&r.event_id&&r.timestamp).forEach(r=>{
     const key=eventKey(r);
     let g=groups.get(key);
-    if(!g){g={key,event_id:r.event_id,timestamp:r.timestamp,product:r.product,home:String(r.participant_1||r.home||''),away:String(r.participant_2||r.away||''),rows:[],total:scoreTotal(r)};groups.set(key,g);}
+    if(!g){g={key,event_id:r.event_id,timestamp:r.timestamp,product:r.product,home:participantIdentity(r.participant_1||r.home||''),away:participantIdentity(r.participant_2||r.away||''),rows:[],total:scoreTotal(r)};groups.set(key,g);}
     g.rows.push(r);
     if(g.total==null)g.total=scoreTotal(r);
   });
@@ -346,9 +356,9 @@ function productPrior(events,product,line,cutoff){
   return {prob:(over+2)/(decisive+4),n:decisive,pushes};
 }
 function recurrenceEvidence(events,event,line){
-  const cutoff=new Date(event?.timestamp||0).getTime(),product=event?.product||'',home=String(event?.home||'').trim().toLowerCase(),away=String(event?.away||'').trim().toLowerCase(),target=Number(line);
+  const cutoff=new Date(event?.timestamp||0).getTime(),product=event?.product||'',home=participantIdentityKey(event?.participant_1||event?.home||''),away=participantIdentityKey(event?.participant_2||event?.away||''),target=Number(line);
   if(!home&&!away)return {entityN:0,totalN:0,entityOver:0,entityOverRate:null,totalOverRate:null,entityAvgTotal:null,pairN:0,pairOver:0,pairOverRate:null,pairAvgTotal:null,entityNames:[]};
-  const prior=(events||[]).filter(e=>{const t=new Date(e?.timestamp||0).getTime();if(!e||e.product!==product||e.total==null||!Number.isFinite(t)||t>=cutoff)return false;const eh=String(e.home||'').trim().toLowerCase(),ea=String(e.away||'').trim().toLowerCase();return eh===home||eh===away||ea===home||ea===away;});
+  const prior=(events||[]).filter(e=>{const t=new Date(e?.timestamp||0).getTime();if(!e||e.product!==product||e.total==null||!Number.isFinite(t)||t>=cutoff)return false;const eh=participantIdentityKey(e.participant_1||e.home||''),ea=participantIdentityKey(e.participant_2||e.away||'');return eh===home||eh===away||ea===home||ea===away;});
   const entityDecisive=prior.filter(e=>e.total!==target),entityOver=entityDecisive.filter(e=>e.total>target);
   const pairRelevant=prior.filter(e=>{const eh=String(e.home||'').trim().toLowerCase(),ea=String(e.away||'').trim().toLowerCase();return (eh===home&&ea===away)||(eh===away&&ea===home);});
   const pairDecisive=pairRelevant.filter(e=>e.total!==target),pairOver=pairDecisive.filter(e=>e.total>target);
@@ -360,7 +370,7 @@ function recurrenceEvidence(events,event,line){
     pairN:pairDecisive.length,pairOver:pairOver.length,
     pairOverRate:pairDecisive.length?pairOver.length/pairDecisive.length:null,
     pairAvgTotal:pairRelevant.length?pairRelevant.reduce((s,e)=>s+Number(e.total||0),0)/pairRelevant.length:null,
-    entityNames:[event.home,event.away].filter(Boolean)
+    entityNames:[participantIdentity(event.participant_1||event.home),participantIdentity(event.participant_2||event.away)].filter(Boolean)
   };
 }
 function participantPrior(events,event,line){
@@ -381,7 +391,7 @@ function participantPrior(events,event,line){
 }
 function hotParticipantForEvent(e,line){
   const profiles=state.participantProfiles?.profiles||[];
-  const names=[e.home||e.participant_1,e.away||e.participant_2].filter(Boolean).map(x=>String(x).trim().toLowerCase());
+  const names=[e.participant_1||e.home,e.participant_2||e.away].filter(Boolean).map(participantIdentityKey);
   const matches=profiles.filter(p=>p.product===e.product&&names.includes(String(p.participant||'').trim().toLowerCase())&&p.hot&&Number(p.hot.line)===Number(line));
   if(!matches.length)return null;
   matches.sort((a,b)=>(b.hot?.strength||0)-(a.hot?.strength||0));
@@ -480,9 +490,9 @@ function participantLabRows(events){
     for(const raw of [e.home,e.away]){
       const name=String(raw||'').trim();
       if(!name)continue;
-      const key=e.product+'|'+name.toLowerCase();
+      const key=e.product+'|'+participantIdentityKey(name);
       let g=groups.get(key);
-      if(!g){g={product:e.product,participant:name,n:0,lines:{}};groups.set(key,g);}
+      if(!g){g={product:e.product,participant:participantIdentity(name),n:0,lines:{}};groups.set(key,g);}
       g.n++;
       for(const line of [1.5,3.5,4.5]){
         const b=g.lines[line]||(g.lines[line]={n:0,over:0});
@@ -613,7 +623,7 @@ function enrichCandidate(c,e){
     const ladder=fitLambdaFromLadder((e.markets||[]).map(m=>marketOverPoint(m)).filter(Boolean));
     if(ladder){
       const priorEvents=state.modelEvents||[];
-      const pseudo={product:e.product,home:String(e.home||e.participant_1||''),away:String(e.away||e.participant_2||''),timestamp:e.start_time,ladder,total:null};
+      const pseudo={product:e.product,participant_1:participantIdentity(e.participant_1||e.home||''),participant_2:participantIdentity(e.participant_2||e.away||''),home:participantIdentity(e.participant_1||e.home||''),away:participantIdentity(e.participant_2||e.away||''),timestamp:e.start_time,ladder,total:null};
       const mm=modelOverForEvent(pseudo,priorEvents,Number(c.market.line));
       if(mm){
         calibrated=String(c.pickCode).toUpperCase().startsWith('U')?1-mm.prob:mm.prob;
@@ -621,7 +631,7 @@ function enrichCandidate(c,e){
       }
     }
   }
-  const recurrence=(c.marketType==='ou')?recurrenceEvidence(state.modelEvents||[],{product:e.product,home:String(e.home||e.participant_1||''),away:String(e.away||e.participant_2||''),timestamp:e.start_time},Number(c.market.line)):null;
+  const recurrence=(c.marketType==='ou')?recurrenceEvidence(state.modelEvents||[],{product:e.product,participant_1:participantIdentity(e.participant_1||e.home||''),participant_2:participantIdentity(e.participant_2||e.away||''),home:participantIdentity(e.participant_1||e.home||''),away:participantIdentity(e.participant_2||e.away||''),timestamp:e.start_time},Number(c.market.line)):null;
   const hotParticipant=(c.marketType==='ou')?hotParticipantForEvent(e,Number(c.market.line)):null;
   return Object.assign(c,{calibratedProb:calibrated,calibrationN:cal.n,calibrationSource:source,edge:calibrated-c.bookImplied,modelMeta,recurrence,hotParticipant,experimental:isExperimentalOU(c)});
 }
@@ -652,10 +662,10 @@ function predictionForEvent(e){
 }
 function isConfirmedWatchedEvent(e){
   const list=Array.isArray(state.confirmedWatch?.participants)?state.confirmedWatch.participants:[];
-  const names=[String(e?.home||e?.participant_1||'').trim().toLowerCase(),String(e?.away||e?.participant_2||'').trim().toLowerCase()];
+  const names=[participantIdentityKey(e?.participant_1||e?.home||''),participantIdentityKey(e?.participant_2||e?.away||'')];
   const product=String(e?.product||'').trim();
   return list.some(x=>{
-    const p=String(x?.participant||'').trim().toLowerCase();
+    const p=participantIdentityKey(x?.participant||'');
     if(!p||!names.includes(p))return false;
     return !x.product||x.product==='all'||x.product===product;
   });
@@ -665,7 +675,7 @@ function confirmedWatchParticipantsForEvent(e){
   const names=[String(e?.home||e?.participant_1||'').trim().toLowerCase(),String(e?.away||e?.participant_2||'').trim().toLowerCase()];
   const product=String(e?.product||'').trim();
   return list.filter(x=>{
-    const p=String(x?.participant||'').trim().toLowerCase();
+    const p=participantIdentityKey(x?.participant||'');
     return p&&names.includes(p)&&(!x.product||x.product==='all'||x.product===product);
   });
 }
