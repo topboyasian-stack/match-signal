@@ -734,7 +734,9 @@ def main():
         "result_source":"SportyBet NG eventResultList via Match Signal Cloudflare proxy",
         "prediction_source":"SportyBet live no-vig market baseline",
         "errors":errors[-20:],
-        "paper_only":True,\n        "walk_forward_model_artifact":"data/virtual_lab_model_eval.json",\n        "walk_forward_model_policy":"strict chronological holdout; participant feature cannot activate without untouched dual-loss improvement",
+        "paper_only":True,
+        "walk_forward_model_artifact":"data/virtual_lab_model_eval.json",
+        "walk_forward_model_policy":"strict chronological holdout; participant feature cannot activate without untouched dual-loss improvement",
     })
     print(f"Virtual Lab collector: {len(events)} upcoming events | +{added} observations | +{newly_settled} settled | {len(history)} history rows | {len(pending)} pending")
     for error in errors[-10:]:
