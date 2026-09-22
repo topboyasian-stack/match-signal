@@ -154,8 +154,14 @@ def normalize_proxy_event(raw):
     event_id=str(raw.get("event_id") or raw.get("eventId") or "").strip()
     team_1=str(raw.get("team_1") or raw.get("participant_1") or raw.get("homeTeamName") or "").strip()
     team_2=str(raw.get("team_2") or raw.get("participant_2") or raw.get("awayTeamName") or "").strip()
-    participant_1=str(raw.get("participant_1") or "").strip()
-    participant_2=str(raw.get("participant_2") or "").strip()
+    explicit_1=str(raw.get("participant_1") or raw.get("homeParticipant") or raw.get("homePlayer") or raw.get("homeCompetitor") or "").strip()
+    explicit_2=str(raw.get("participant_2") or raw.get("awayParticipant") or raw.get("awayPlayer") or raw.get("awayCompetitor") or "").strip()
+    def derived(value):
+        import re
+        m=re.search(r"\\(([^()]+)\\)\\s*$",str(value or ""))
+        return m.group(1).strip() if m else ""
+    participant_1=explicit_1 or derived(team_1)
+    participant_2=explicit_2 or derived(team_2)
     product=str(raw.get("product") or "").strip()
     if product not in SUPPORTED_PRODUCTS:
         return None
