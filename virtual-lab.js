@@ -6,7 +6,7 @@ const LIVE_API='https://match-signal.pages.dev/api/sportybet-virtual';
 const LIVE_MARKETS='1,18,10,29,11,26,36,14,60100,186,189,202,204,210';
 const SNAPSHOT='./data/virtual_lab_live.json';
 const LIVE_REFRESH_MS=30000;
-const UI_BUILD='20260922-v28';
+const UI_BUILD='20260922-v29';
 const HISTORY='./api/virtual-lab-history';
 const HISTORY_FALLBACK='./data/virtual_lab_history.json';
 const MODEL_EVAL='./data/virtual_lab_model_eval.json';
@@ -218,7 +218,6 @@ function classifyEvent(tournament,category,home,away){
   const blob=(tournament+' '+category+' '+home+' '+away).toLowerCase();
   if(blob.includes('eadriatic'))return'efootball_adriatic';
   if(blob.includes('gt sports league')||blob.includes('gt leagues')||blob.includes('efootball')||blob.includes('e soccer')||blob.includes('esoccer'))return'efootball_gt';
-  if(blob.includes('simulated reality')||/\bsrl\b/i.test(blob))return'srl';
   if(blob.includes('virtual football'))return'vfootball';
   if(blob.includes('zoom')||blob.includes('turbo'))return'zoom';
   if(blob.includes('virtual')||blob.includes('simulated'))return'other';
@@ -779,7 +778,7 @@ async function fetchLiveRemote(){
     try{
       const pages=[];
       for(let pageNum=1;pageNum<=2;pageNum++){
-        const params=new URLSearchParams({pageSize:'100',pageNum:String(pageNum),timeline:'168',sources:'efootball,srl,vfootball',_t:String(Date.now())});
+        const params=new URLSearchParams({pageSize:'100',pageNum:String(pageNum),timeline:'168',sources:'efootball,vfootball',_t:String(Date.now())});
         const controller=new AbortController();
         const timeout=setTimeout(()=>controller.abort(),8000);
         let r;
@@ -804,7 +803,7 @@ async function fetchLiveRemote(){
         const latestTimestamp=pages.map(p=>p?.updated_at).filter(Boolean).sort().pop()||new Date().toISOString();
         return {events:merged,updated_at:latestTimestamp,endpoint:base};
       }
-      lastError=new Error(base+' returned zero virtual/eFootball/SRL events');
+      lastError=new Error(base+' returned zero virtual/eFootball events');
     }catch(e){lastError=e;}
   }
   throw lastError||new Error('No live virtual source available');
