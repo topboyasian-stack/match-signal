@@ -5,11 +5,11 @@ Upcoming fixtures: Match Signal's SportyBet NG proxy, filtered to the exact
 PDL tournament name. Model fitting is independent of bookmaker prices.
 """
 from __future__ import annotations
-import json, math, re, io
+import json, math, re
 from datetime import datetime, timezone
 from pathlib import Path
 import requests
-import pandas as pd
+from bs4 import BeautifulSoup
 
 ROOT=Path(__file__).resolve().parents[1]
 DATA=ROOT/"data"
@@ -45,34 +45,68 @@ def current_season():
 def betstudy_history():
     response=S.get(RESULTS_URL,timeout=30)
     response.raise_for_status()
-    tables=pd.read_html(io.StringIO(response.text))
+
+    # BetStudy's current results page is card/list markup, not an HTML table.
+    # Parse the visible result sequence directly: date -> home -> score -> away.
+    soup=BeautifulSoup(response.text,"html.parser")
+    strings=list(soup.stripped_strings)
+    stop=next(
+        (i for i,value in enumerate(strings)
+         if "quick stats" in value.lower()),
+        len(strings),
+    )
+    strings=strings[:stop]
+
+    date_re=re.compile(r"^(\d{2}\.\d{2}\.\d{4})(?:\s+.*)?$")
+    score_re=re.compile(r"^(\d+)\s*-\s*(\d+)$")
     rows=[]
-    for df in tables:
-        cols={str(col).strip().lower() for col in df.columns}
-        if not {"date","home","score","away"}.issubset(cols):
+    current_date=None
+
+    for i,value in enumerate(strings):
+        dm=date_re.match(value)
+        if dm:
+            current_date=dm.group(1)
             continue
-        df.columns=[str(col).strip().lower() for col in df.columns]
-        for _, row in df.iterrows():
-            d=parse_date(row.get("date"))
-            m=re.search(r"(\d+)\s*-\s*(\d+)",str(row.get("score","")))
-            h=str(row.get("home","")).strip()
-            a=str(row.get("away","")).strip()
-            if d and m and h and a:
-                rows.append({
-                    "event_id":f"betstudy|{d.date()}|{h}|{a}",
-                    "start_time":d.isoformat(),
-                    "home":h,
-                    "away":a,
-                    "home_score":float(m.group(1)),
-                    "away_score":float(m.group(2)),
-                    "source":"BetStudy current-season PDL results",
-                })
+
+        sm=score_re.match(value)
+        if not sm or not current_date:
+            continue
+
+        # The visible result card sequence places the home team immediately
+        # before the score and the away team immediately after it.
+        before=strings[i-1].strip() if i else ""
+        after=strings[i+1].strip() if i+1<len(strings) else ""
+        if not before or not after:
+            continue
+
+        # Skip UI/control text that can occur around the result list.
+        blocked={"HOME","AWAY","ODDS","PREDICTIONS","RESULTS","SHOW MORE"}
+        if before.upper() in blocked or after.upper() in blocked:
+            continue
+
+        d=parse_date(current_date)
+        if not d:
+            continue
+
+        rows.append({
+            "event_id":f"betstudy|{d.date()}|{before}|{after}",
+            "start_time":d.isoformat(),
+            "home":before,
+            "away":after,
+            "home_score":float(sm.group(1)),
+            "away_score":float(sm.group(2)),
+            "source":"BetStudy current-season PDL results",
+        })
+
+    rows=[x for x in rows if x["home"] and x["away"]]
     if not rows:
-        raise RuntimeError("BetStudy PDL results table was not parsed")
+        raise RuntimeError("BetStudy PDL result cards were not parsed")
     return sorted(
         {x["event_id"]:x for x in rows}.values(),
         key=lambda x:x["start_time"]
     )
+
+
 
 
 def sofascore_history():
