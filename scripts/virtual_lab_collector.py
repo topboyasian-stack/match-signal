@@ -534,9 +534,39 @@ def with_trace_metadata(row):
     return row
 
 
+def load_archived_settlements():
+    rows=[]
+    if not PARTICIPANT_ARCHIVE_DIR.exists():
+        return rows
+    for path in sorted(PARTICIPANT_ARCHIVE_DIR.glob('*.jsonl')):
+        try:
+            for line in path.read_text(encoding='utf-8').splitlines():
+                if not line.strip():
+                    continue
+                try:
+                    item=json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(item,dict):
+                    rows.append(item)
+        except OSError:
+            continue
+    return rows
+
+
 def build_participant_registry(history):
     groups={}
-    for raw_row in history:
+    combined=[]
+    seen=set()
+    for raw_row in list(load_archived_settlements())+list(history):
+        if not isinstance(raw_row,dict):
+            continue
+        record_id=str(raw_row.get('record_id') or (str(raw_row.get('event_id',''))+'|'+str(raw_row.get('market',''))+'|'+str(raw_row.get('line',''))+'|'+str(raw_row.get('selection',''))))
+        if record_id in seen:
+            continue
+        seen.add(record_id)
+        combined.append(raw_row)
+    for raw_row in combined:
         if not isinstance(raw_row,dict) or raw_row.get("product") not in SUPPORTED_PRODUCTS:
             continue
         row=with_trace_metadata(raw_row)
