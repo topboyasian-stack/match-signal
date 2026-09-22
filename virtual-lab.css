@@ -32,3 +32,6 @@
 
 /* Performance: defer off-screen research panels so the browser does not render the entire long lab at once. */
 .panel:not(.livePanel):not(.predictionDeskPanel), .metrics, footer { content-visibility:auto; contain-intrinsic-size:420px; }
+
+/* Participant recurrence desk: force the dynamic research surface to remain dark and visible. */
+#participantLabPanel{content-visibility:visible;contain-intrinsic-size:auto}#participantLab{display:block;min-height:120px;color:var(--text)}#participantLab table{width:100%;border-collapse:collapse;background:#091019;border:1px solid var(--border);border-radius:12px;overflow:hidden}#participantLab th,#participantLab td{background:#091019;color:var(--text);padding:9px 8px;border-bottom:1px solid rgba(38,56,74,.65);font-size:11px;text-align:left}#participantLab th{color:var(--muted);background:#0a1119;font-size:9px;text-transform:uppercase;letter-spacing:.06em}#participantLab td strong{color:var(--cyan)}#participantLab .participantDeskIntro{padding:12px;border:1px solid rgba(55,231,255,.18);border-radius:11px;background:rgba(55,231,255,.04);margin-bottom:10px}#participantLab .participantDeskEmpty{padding:16px;border:1px dashed var(--border);border-radius:12px;background:#091019;color:var(--muted);min-height:100px;display:grid;place-items:center;text-align:center}
