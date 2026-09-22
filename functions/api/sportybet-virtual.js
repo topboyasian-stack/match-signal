@@ -41,7 +41,7 @@ function normalize(t, event, source, sportId){
     participant_1:String(event?.homeParticipant||event?.homePlayer||event?.homeCompetitor||'').trim(),
     participant_2:String(event?.awayParticipant||event?.awayPlayer||event?.awayCompetitor||'').trim(),
     participant_identity_source:(event?.homeParticipant||event?.awayParticipant||event?.homePlayer||event?.awayPlayer||event?.homeCompetitor||event?.awayCompetitor)?'sportybet_explicit_event_metadata':null,
-    start_time_ms:event?.estimateStartTime ?? null,
+    start_time_ms:(()=>{const raw=Number(event?.estimateStartTime);if(!Number.isFinite(raw)||raw<=0)return null;return raw<100000000000?raw*1000:raw})(),
     match_status:event?.matchStatus ?? null,
     markets:(Array.isArray(event?.markets)?event.markets:[]).map(m=>({
       ...m,
