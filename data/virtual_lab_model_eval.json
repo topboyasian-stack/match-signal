@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-09-21T23:48:43.575Z",
-  "method": "strict chronological walk-forward; participant recurrence is keyed to participant identity and prior actual totals, not opponent",
+  "generated_at": "2026-09-22T10:16:54.994669+00:00",
+  "method": "strict chronological walk-forward; each scored event only sees earlier settled events",
   "source_contract": "automatic SportyBet result history only; user-reported tickets excluded",
   "history_rows": 110,
   "ou_rows": 72,
@@ -9,102 +9,322 @@
     "fraction": 0.3,
     "events": 11,
     "rows": 26,
-    "participant_rows": 4
+    "participant_rows": 0
   },
   "variants": {
     "market": "SportyBet de-vig probability",
     "poisson": "O/U line-ladder Poisson fit",
-    "poisson_prior": "Poisson + same-product historical prior",
-    "participant_model": "Poisson + product prior + same-product participant recurrence across prior totals; pair evidence secondary"
+    "poisson_prior": "Poisson + same-product historical prior with Beta(2,2) shrinkage",
+    "participant_model": "Poisson + product prior + same-product participant recurrence with exact-pair evidence and shrinkage"
   },
   "all": {
     "market": {
       "n": 72,
-      "brier": 0.2517129935500052,
+      "brier": 0.25171299355000515,
       "log_loss": 0.6989811006173843,
       "hit_rate": 0.6111111111111112,
-      "ece": 0.14248863961918648
+      "ece": 0.14248863961918642
     },
     "poisson": {
       "n": 72,
       "brier": 0.23809530336562768,
       "log_loss": 0.6668651222583974,
       "hit_rate": 0.5416666666666666,
-      "ece": 0.07382697190059818
+      "ece": 0.07382697190059832
     },
     "poisson_prior": {
       "n": 72,
-      "brier": 0.24537289870593812,
-      "log_loss": 0.6832125467521123,
-      "hit_rate": 0.5833333333333334,
-      "ece": 0.07116246134030285
+      "brier": 0.24433879410814974,
+      "log_loss": 0.6810014030194628,
+      "hit_rate": 0.5555555555555556,
+      "ece": 0.03226505006230553
     },
     "participant_model": {
       "n": 72,
-      "brier": 0.24545879732551912,
-      "log_loss": 0.6833992480546152,
-      "hit_rate": 0.5833333333333334,
-      "ece": 0.07110858426306721
+      "brier": 0.2444265693492135,
+      "log_loss": 0.6811908611771628,
+      "hit_rate": 0.5694444444444444,
+      "ece": 0.02994423714392651
     }
   },
   "holdout_metrics": {
     "market": {
       "n": 26,
-      "brier": 0.2056124801634729,
-      "log_loss": 0.6040801762882569,
+      "brier": 0.20561248016347292,
+      "log_loss": 0.604080176288257,
       "hit_rate": 0.8461538461538461,
       "ece": 0.3067016783791678
     },
     "poisson": {
       "n": 26,
       "brier": 0.24938984803376163,
-      "log_loss": 0.6909047462502844,
+      "log_loss": 0.6909047462502845,
       "hit_rate": 0.5384615384615384,
-      "ece": 0.12876016586130395
+      "ece": 0.128760165861304
     },
     "poisson_prior": {
       "n": 26,
-      "brier": 0.2486646157364454,
-      "log_loss": 0.6906868190477586,
-      "hit_rate": 0.6153846153846154,
-      "ece": 0.15948110873530708
+      "brier": 0.24910699200760816,
+      "log_loss": 0.6914957719836955,
+      "hit_rate": 0.5384615384615384,
+      "ece": 0.15901521535127128
     },
     "participant_model": {
       "n": 26,
-      "brier": 0.2489024888368235,
-      "log_loss": 0.6912038380393052,
-      "hit_rate": 0.6153846153846154,
-      "ece": 0.15903803931913882
+      "brier": 0.24935006190593864,
+      "log_loss": 0.6920204253434801,
+      "hit_rate": 0.5769230769230769,
+      "ece": 0.15858430331795006
     }
   },
   "participant_holdout_metrics": {
-    "market": {
-      "n": 4,
-      "brier": 0.19229359805694346,
-      "log_loss": 0.5740112574625558,
-      "hit_rate": 0.75,
-      "ece": 0.43047739821933373
+    "market": null,
+    "poisson": null,
+    "poisson_prior": null,
+    "participant_model": null
+  },
+  "by_product": {
+    "efootball_gt": {
+      "market": {
+        "n": 26,
+        "brier": 0.20561248016347292,
+        "log_loss": 0.604080176288257,
+        "hit_rate": 0.8461538461538461,
+        "ece": 0.3067016783791678
+      },
+      "poisson": {
+        "n": 26,
+        "brier": 0.24938984803376163,
+        "log_loss": 0.6909047462502845,
+        "hit_rate": 0.5384615384615384,
+        "ece": 0.128760165861304
+      },
+      "poisson_prior": {
+        "n": 26,
+        "brier": 0.24910699200760816,
+        "log_loss": 0.6914957719836955,
+        "hit_rate": 0.5384615384615384,
+        "ece": 0.15901521535127128
+      },
+      "participant_model": {
+        "n": 26,
+        "brier": 0.24935006190593864,
+        "log_loss": 0.6920204253434801,
+        "hit_rate": 0.5769230769230769,
+        "ece": 0.15858430331795006
+      }
+    }
+  },
+  "by_competition": {
+    "Esoccer H2H GG League": {
+      "market": {
+        "n": 6,
+        "brier": 0.2807759537184025,
+        "log_loss": 0.7605636380100432,
+        "hit_rate": 0.5,
+        "ece": 0.4998128677947625
+      },
+      "poisson": {
+        "n": 6,
+        "brier": 0.24574260454703023,
+        "log_loss": 0.6813855127437364,
+        "hit_rate": 0.6666666666666666,
+        "ece": 0.30498839706536235
+      },
+      "poisson_prior": {
+        "n": 6,
+        "brier": 0.2589263502973736,
+        "log_loss": 0.7139687048648709,
+        "hit_rate": 0.5,
+        "ece": 0.2690550222000743
+      },
+      "participant_model": {
+        "n": 6,
+        "brier": 0.2589263502973736,
+        "log_loss": 0.7139687048648709,
+        "hit_rate": 0.5,
+        "ece": 0.2690550222000743
+      }
     },
-    "poisson": {
-      "n": 4,
-      "brier": 0.24925547863181038,
-      "log_loss": 0.693028021865909,
-      "hit_rate": 0.75,
-      "ece": 0.3131971662354466
+    "International A 2x6": {
+      "market": {
+        "n": 2,
+        "brier": 0.18379788984464313,
+        "log_loss": 0.5595400360982958,
+        "hit_rate": 1.0,
+        "ece": 0.427965367965368
+      },
+      "poisson": {
+        "n": 2,
+        "brier": 0.22998535227997718,
+        "log_loss": 0.6522442283796527,
+        "hit_rate": 0.5,
+        "ece": 0.06927592938785843
+      },
+      "poisson_prior": {
+        "n": 2,
+        "brier": 0.29387649772266256,
+        "log_loss": 0.7824647343989591,
+        "hit_rate": 0.5,
+        "ece": 0.538595716374603
+      },
+      "participant_model": {
+        "n": 2,
+        "brier": 0.29387649772266256,
+        "log_loss": 0.7824647343989591,
+        "hit_rate": 0.5,
+        "ece": 0.538595716374603
+      }
     },
-    "poisson_prior": {
-      "n": 4,
-      "brier": 0.24333944802589563,
-      "log_loss": 0.6794742172868139,
-      "hit_rate": 0.5,
-      "ece": 0.30759902410187223
+    "Europa League": {
+      "market": {
+        "n": 4,
+        "brier": 0.17145369942963337,
+        "log_loss": 0.5332495767754913,
+        "hit_rate": 1.0,
+        "ece": 0.4114375127646538
+      },
+      "poisson": {
+        "n": 4,
+        "brier": 0.2662767523914144,
+        "log_loss": 0.7263641039204277,
+        "hit_rate": 0.5,
+        "ece": 0.08812908760159949
+      },
+      "poisson_prior": {
+        "n": 4,
+        "brier": 0.25729839575497365,
+        "log_loss": 0.7078171884126641,
+        "hit_rate": 0.5,
+        "ece": 0.06609681570119963
+      },
+      "participant_model": {
+        "n": 4,
+        "brier": 0.25729839575497365,
+        "log_loss": 0.7078171884126641,
+        "hit_rate": 0.5,
+        "ece": 0.06609681570119963
+      }
     },
-    "participant_model": {
-      "n": 4,
-      "brier": 0.24488562317835327,
-      "log_loss": 0.6828348407318658,
-      "hit_rate": 0.5,
-      "ece": 0.3047190728967787
+    "Volta Premier League": {
+      "market": {
+        "n": 4,
+        "brier": 0.19229359805694346,
+        "log_loss": 0.5740112574625558,
+        "hit_rate": 0.75,
+        "ece": 0.43047739821933373
+      },
+      "poisson": {
+        "n": 4,
+        "brier": 0.24925547863181036,
+        "log_loss": 0.693028021865909,
+        "hit_rate": 0.75,
+        "ece": 0.3131971662354466
+      },
+      "poisson_prior": {
+        "n": 4,
+        "brier": 0.24310299019768433,
+        "log_loss": 0.6791057993995774,
+        "hit_rate": 0.5,
+        "ece": 0.30601856433175734
+      },
+      "participant_model": {
+        "n": 4,
+        "brier": 0.2446829445368326,
+        "log_loss": 0.6825160462381771,
+        "hit_rate": 0.75,
+        "ece": 0.3032176361151695
+      }
+    },
+    "Champions League (Virtual eComp)": {
+      "market": {
+        "n": 3,
+        "brier": 0.18181923482349946,
+        "log_loss": 0.5548619897399385,
+        "hit_rate": 1.0,
+        "ece": 0.42431942462342875
+      },
+      "poisson": {
+        "n": 3,
+        "brier": 0.23020137975487212,
+        "log_loss": 0.6498686844331212,
+        "hit_rate": 0.3333333333333333,
+        "ece": 0.4688237306663702
+      },
+      "poisson_prior": {
+        "n": 3,
+        "brier": 0.18657811318284692,
+        "log_loss": 0.5606456405934986,
+        "hit_rate": 1.0,
+        "ece": 0.42270190293804927
+      },
+      "participant_model": {
+        "n": 3,
+        "brier": 0.18657811318284692,
+        "log_loss": 0.5606456405934986,
+        "hit_rate": 1.0,
+        "ece": 0.42270190293804927
+      }
+    },
+    "Champions League B": {
+      "market": {
+        "n": 4,
+        "brier": 0.18423612595902283,
+        "log_loss": 0.5605937387223138,
+        "hit_rate": 1.0,
+        "ece": 0.42883071553228624
+      },
+      "poisson": {
+        "n": 4,
+        "brier": 0.2744572081477413,
+        "log_loss": 0.7433091941066452,
+        "hit_rate": 0.5,
+        "ece": 0.2233735592216245
+      },
+      "poisson_prior": {
+        "n": 4,
+        "brier": 0.2858849694734814,
+        "log_loss": 0.7666703381405054,
+        "hit_rate": 0.5,
+        "ece": 0.23400236395224638
+      },
+      "participant_model": {
+        "n": 4,
+        "brier": 0.2858849694734814,
+        "log_loss": 0.7666703381405054,
+        "hit_rate": 0.5,
+        "ece": 0.23400236395224638
+      }
+    },
+    "International (Virtual eComp)": {
+      "market": {
+        "n": 3,
+        "brier": 0.18542719466589921,
+        "log_loss": 0.5625394740588574,
+        "hit_rate": 1.0,
+        "ece": 0.42909886013334286
+      },
+      "poisson": {
+        "n": 3,
+        "brier": 0.2330492736957287,
+        "log_loss": 0.6567701788047947,
+        "hit_rate": 0.3333333333333333,
+        "ece": 0.4743323477933633
+      },
+      "poisson_prior": {
+        "n": 3,
+        "brier": 0.21019697790504888,
+        "log_loss": 0.6112793826658186,
+        "hit_rate": 0.3333333333333333,
+        "ece": 0.4531114920278181
+      },
+      "participant_model": {
+        "n": 3,
+        "brier": 0.21019697790504888,
+        "log_loss": 0.6112793826658186,
+        "hit_rate": 0.3333333333333333,
+        "ece": 0.4531114920278181
+      }
     }
   },
   "by_line": {
@@ -126,17 +346,17 @@
         },
         "poisson_prior": {
           "n": 2,
-          "brier": 0.3084508804311883,
-          "log_loss": 0.823407576728823,
+          "brier": 0.30718108028960533,
+          "log_loss": 0.8199164436268939,
           "hit_rate": 0.5,
-          "ece": 0.4764053652381235
+          "ece": 0.47557110494891325
         },
         "participant_model": {
           "n": 2,
-          "brier": 0.3084508804311883,
-          "log_loss": 0.823407576728823,
+          "brier": 0.30718108028960533,
+          "log_loss": 0.8199164436268939,
           "hit_rate": 0.5,
-          "ece": 0.4764053652381235
+          "ece": 0.47557110494891325
         }
       },
       "participant_holdout_n": 0
@@ -146,7 +366,7 @@
         "market": {
           "n": 6,
           "brier": 0.20821415448442604,
-          "log_loss": 0.6143979823670929,
+          "log_loss": 0.614397982367093,
           "hit_rate": 0.8333333333333334,
           "ece": 0.43554648844580524
         },
@@ -159,20 +379,20 @@
         },
         "poisson_prior": {
           "n": 6,
-          "brier": 0.18799164571720864,
-          "log_loss": 0.5653154535930597,
+          "brier": 0.18860589180910733,
+          "log_loss": 0.5666431939940154,
           "hit_rate": 0.8333333333333334,
-          "ece": 0.21763244686505656
+          "ece": 0.21847890103812356
         },
         "participant_model": {
           "n": 6,
-          "brier": 0.18929853393383292,
-          "log_loss": 0.5681597217283675,
+          "brier": 0.18990503461089434,
+          "log_loss": 0.5694599655579603,
           "hit_rate": 0.8333333333333334,
-          "ece": 0.21945932041974364
+          "ece": 0.2202794335966421
         }
       },
-      "participant_holdout_n": 1
+      "participant_holdout_n": 0
     },
     "4.5": {
       "holdout": {
@@ -186,26 +406,26 @@
         "poisson": {
           "n": 5,
           "brier": 0.24660729413832372,
-          "log_loss": 0.6863269426038728,
+          "log_loss": 0.6863269426038727,
           "hit_rate": 0.6,
           "ece": 0.05653564072030903
         },
         "poisson_prior": {
           "n": 5,
-          "brier": 0.23124507947025158,
-          "log_loss": 0.6553614827163681,
-          "hit_rate": 0.6,
-          "ece": 0.07320976256530225
+          "brier": 0.23336416372417138,
+          "log_loss": 0.6596479772921958,
+          "hit_rate": 0.4,
+          "ece": 0.12869546448025523
         },
         "participant_model": {
           "n": 5,
-          "brier": 0.2315348132280318,
-          "log_loss": 0.6559552288227783,
+          "brier": 0.2336902153291088,
+          "log_loss": 0.6603144179990801,
           "hit_rate": 0.6,
-          "ece": 0.07359870826286215
+          "ece": 0.07245191506282356
         }
       },
-      "participant_holdout_n": 2
+      "participant_holdout_n": 0
     }
   },
   "participant_feature_gate": {

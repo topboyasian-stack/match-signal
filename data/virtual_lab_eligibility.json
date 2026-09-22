@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-21T23:28:06.175Z",
+  "generated_at": "2026-09-22T10:16:55.098998+00:00",
   "mode": "PAPER_RESEARCH_ONLY",
   "policy": {
     "minimum_competition_observations": 12,
@@ -17,7 +17,7 @@
       "handicap",
       "other"
     ],
-    "note": "Raw league/line gates remain visible for research, but active eligibility now requires strict untouched model validation. O/U1.5 never bypasses this gate."
+    "model_gate": "Raw league/line evidence must also pass strict untouched walk-forward model validation before becoming active. Participant recurrence is never activated from user tickets."
   },
   "eligible_competitions": [],
   "blocked_competitions": [
@@ -32,18 +32,31 @@
     "Volta Premier League",
     "eAdriatic League"
   ],
+  "raw_eligible_competitions": [
+    "Esoccer H2H GG League",
+    "Europa League",
+    "Volta Premier League"
+  ],
+  "model_qualified_competitions": [],
   "priority_ou_lines": [
     1.5,
     3.5,
     4.5
   ],
   "eligible_ou_lines": [],
+  "raw_eligible_ou_lines": [
+    3.5,
+    4.5
+  ],
+  "model_qualified_ou_lines": [],
   "blocked_ou_lines": [
     1.5,
     2.5,
-    3,
-    4,
-    5,
+    3.0,
+    3.5,
+    4.0,
+    4.5,
+    5.0,
     5.5,
     6.5,
     7.5,
@@ -53,7 +66,7 @@
   ],
   "competitions": {
     "International A 2x6": {
-      "eligible": false,
+      "raw_eligible": false,
       "all": {
         "n": 6,
         "wins": 2,
@@ -65,11 +78,10 @@
         "wins": 1,
         "win_rate": 0.5,
         "roi": -0.22499999999999998
-      },
-      "reason": "insufficient sample or weak all/OOS performance"
+      }
     },
     "eAdriatic League": {
-      "eligible": false,
+      "raw_eligible": false,
       "all": {
         "n": 9,
         "wins": 2,
@@ -81,11 +93,10 @@
         "wins": 1,
         "win_rate": 0.3333333333333333,
         "roi": -0.44
-      },
-      "reason": "insufficient sample or weak all/OOS performance"
+      }
     },
     "Volta Premier League": {
-      "eligible": true,
+      "raw_eligible": true,
       "all": {
         "n": 18,
         "wins": 10,
@@ -97,11 +108,10 @@
         "wins": 4,
         "win_rate": 0.6666666666666666,
         "roi": 0.07333333333333332
-      },
-      "reason": "passes league gate"
+      }
     },
     "Esoccer H2H GG League": {
-      "eligible": true,
+      "raw_eligible": true,
       "all": {
         "n": 24,
         "wins": 15,
@@ -113,11 +123,10 @@
         "wins": 5,
         "win_rate": 0.625,
         "roi": -0.003750000000000031
-      },
-      "reason": "passes league gate"
+      }
     },
     "Serie A": {
-      "eligible": false,
+      "raw_eligible": false,
       "all": {
         "n": 12,
         "wins": 5,
@@ -129,11 +138,10 @@
         "wins": 1,
         "win_rate": 0.25,
         "roi": -0.595
-      },
-      "reason": "insufficient sample or weak all/OOS performance"
+      }
     },
     "Europa League": {
-      "eligible": true,
+      "raw_eligible": true,
       "all": {
         "n": 12,
         "wins": 7,
@@ -145,11 +153,10 @@
         "wins": 2,
         "win_rate": 0.5,
         "roi": -0.03500000000000003
-      },
-      "reason": "passes league gate"
+      }
     },
     "Champions League B": {
-      "eligible": false,
+      "raw_eligible": false,
       "all": {
         "n": 12,
         "wins": 5,
@@ -161,11 +168,10 @@
         "wins": 1,
         "win_rate": 0.25,
         "roi": -0.575
-      },
-      "reason": "insufficient sample or weak all/OOS performance"
+      }
     },
     "GT Leagues": {
-      "eligible": false,
+      "raw_eligible": false,
       "all": {
         "n": 8,
         "wins": 3,
@@ -177,11 +183,10 @@
         "wins": 2,
         "win_rate": 0.6666666666666666,
         "roi": 0.11000000000000003
-      },
-      "reason": "insufficient sample or weak all/OOS performance"
+      }
     },
     "Champions League (Virtual eComp)": {
-      "eligible": false,
+      "raw_eligible": false,
       "all": {
         "n": 4,
         "wins": 2,
@@ -193,11 +198,10 @@
         "wins": 1,
         "win_rate": 0.5,
         "roi": -0.265
-      },
-      "reason": "insufficient sample or weak all/OOS performance"
+      }
     },
     "International (Virtual eComp)": {
-      "eligible": false,
+      "raw_eligible": false,
       "all": {
         "n": 4,
         "wins": 2,
@@ -209,61 +213,57 @@
         "wins": 1,
         "win_rate": 0.5,
         "roi": -0.25
-      },
-      "reason": "insufficient sample or weak all/OOS performance"
+      }
     }
   },
   "ou_lines": {
     "11.5": {
-      "eligible": false,
+      "raw_eligible": false,
       "all": {
         "n": 1,
         "wins": 1,
-        "win_rate": 1,
+        "win_rate": 1.0,
         "roi": 0.6499999999999999
       },
       "oos": {
         "n": 1,
         "wins": 1,
-        "win_rate": 1,
+        "win_rate": 1.0,
         "roi": 0.6499999999999999
-      },
-      "reason": "insufficient sample or weak all/OOS performance"
+      }
     },
     "12.5": {
-      "eligible": false,
+      "raw_eligible": false,
       "all": {
         "n": 1,
         "wins": 0,
-        "win_rate": 0,
-        "roi": -1
+        "win_rate": 0.0,
+        "roi": -1.0
       },
       "oos": {
         "n": 1,
         "wins": 0,
-        "win_rate": 0,
-        "roi": -1
-      },
-      "reason": "insufficient sample or weak all/OOS performance"
+        "win_rate": 0.0,
+        "roi": -1.0
+      }
     },
     "5.0": {
-      "eligible": false,
+      "raw_eligible": false,
       "all": {
         "n": 1,
         "wins": 0,
-        "win_rate": 0,
-        "roi": -1
+        "win_rate": 0.0,
+        "roi": -1.0
       },
       "oos": {
         "n": 1,
         "wins": 0,
-        "win_rate": 0,
-        "roi": -1
-      },
-      "reason": "insufficient sample or weak all/OOS performance"
+        "win_rate": 0.0,
+        "roi": -1.0
+      }
     },
     "3.5": {
-      "eligible": true,
+      "raw_eligible": true,
       "all": {
         "n": 15,
         "wins": 9,
@@ -275,11 +275,10 @@
         "wins": 4,
         "win_rate": 0.8,
         "roi": 0.12799999999999997
-      },
-      "reason": "passes O/U line gate"
+      }
     },
     "4.5": {
-      "eligible": true,
+      "raw_eligible": true,
       "all": {
         "n": 16,
         "wins": 10,
@@ -291,11 +290,10 @@
         "wins": 3,
         "win_rate": 0.6,
         "roi": 0.044
-      },
-      "reason": "passes O/U line gate"
+      }
     },
     "2.5": {
-      "eligible": false,
+      "raw_eligible": false,
       "all": {
         "n": 6,
         "wins": 3,
@@ -305,13 +303,12 @@
       "oos": {
         "n": 2,
         "wins": 2,
-        "win_rate": 1,
+        "win_rate": 1.0,
         "roi": 0.6
-      },
-      "reason": "insufficient sample or weak all/OOS performance"
+      }
     },
     "5.5": {
-      "eligible": false,
+      "raw_eligible": false,
       "all": {
         "n": 8,
         "wins": 5,
@@ -323,11 +320,10 @@
         "wins": 1,
         "win_rate": 0.3333333333333333,
         "roi": -0.4166666666666667
-      },
-      "reason": "insufficient sample or weak all/OOS performance"
+      }
     },
     "6.5": {
-      "eligible": false,
+      "raw_eligible": false,
       "all": {
         "n": 10,
         "wins": 4,
@@ -339,11 +335,10 @@
         "wins": 2,
         "win_rate": 0.6666666666666666,
         "roi": 0.10999999999999995
-      },
-      "reason": "insufficient sample or weak all/OOS performance"
+      }
     },
     "7.5": {
-      "eligible": false,
+      "raw_eligible": false,
       "all": {
         "n": 7,
         "wins": 5,
@@ -355,11 +350,10 @@
         "wins": 2,
         "win_rate": 0.6666666666666666,
         "roi": 0.05666666666666672
-      },
-      "reason": "insufficient sample or weak all/OOS performance"
+      }
     },
     "1.5": {
-      "eligible": false,
+      "raw_eligible": false,
       "all": {
         "n": 3,
         "wins": 2,
@@ -369,76 +363,63 @@
       "oos": {
         "n": 1,
         "wins": 0,
-        "win_rate": 0,
-        "roi": -1
-      },
-      "reason": "insufficient sample or weak all/OOS performance"
+        "win_rate": 0.0,
+        "roi": -1.0
+      }
     },
     "8.5": {
-      "eligible": false,
+      "raw_eligible": false,
       "all": {
         "n": 2,
         "wins": 0,
-        "win_rate": 0,
-        "roi": -1
+        "win_rate": 0.0,
+        "roi": -1.0
       },
       "oos": {
         "n": 1,
         "wins": 0,
-        "win_rate": 0,
-        "roi": -1
-      },
-      "reason": "insufficient sample or weak all/OOS performance"
+        "win_rate": 0.0,
+        "roi": -1.0
+      }
     },
     "3.0": {
-      "eligible": false,
+      "raw_eligible": false,
       "all": {
         "n": 1,
         "wins": 1,
-        "win_rate": 1,
+        "win_rate": 1.0,
         "roi": 0.75
       },
       "oos": {
         "n": 1,
         "wins": 1,
-        "win_rate": 1,
+        "win_rate": 1.0,
         "roi": 0.75
-      },
-      "reason": "insufficient sample or weak all/OOS performance"
+      }
     },
     "4.0": {
-      "eligible": false,
+      "raw_eligible": false,
       "all": {
         "n": 1,
         "wins": 1,
-        "win_rate": 1,
+        "win_rate": 1.0,
         "roi": 0.75
       },
       "oos": {
         "n": 1,
         "wins": 1,
-        "win_rate": 1,
+        "win_rate": 1.0,
         "roi": 0.75
-      },
-      "reason": "insufficient sample or weak all/OOS performance"
+      }
     }
   },
-  "raw_eligible_ou_lines": [
-    3.5,
-    4.5
-  ],
-  "model_qualified_ou_lines": [],
-  "raw_eligible_competitions": [
-    "Esoccer H2H GG League",
-    "Europa League",
-    "Volta Premier League"
-  ],
-  "model_qualified_competitions": [],
   "model_gate": {
+    "minimum_participant_total_history": 3,
     "minimum_exact_line_history": 8,
     "minimum_untouched_participant_rows": 20,
     "minimum_untouched_rows": 30,
     "pass": false,
     "reason": "insufficient untouched participant evidence or no dual-loss improvement"
-  }
+  },
+  "paper_only": true
 }

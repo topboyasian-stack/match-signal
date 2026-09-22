@@ -1,57 +1,61 @@
 {
-  "updated_at": "2026-09-21T22:40:08.688974+00:00",
-  "collector_version": "1.5.0",
-  "upcoming_events": 127,
+  "updated_at": "2026-09-22T10:16:54.679782+00:00",
+  "collector_version": "2.0.0",
+  "schema_version": 1,
+  "build_commit": "fc0e435b380112ff6de1b8a02878733ec289e2d2",
+  "upcoming_events": 400,
   "upcoming_by_product": {
-    "efootball_gt": 115,
-    "efootball_adriatic": 12
+    "efootball_gt": 186,
+    "efootball_adriatic": 14,
+    "vfootball": 200
   },
-  "pending_observations": 3493,
+  "pending_observations": 5599,
   "settled_observations": 110,
   "settled_decisions": 109,
   "settled_wins": 53,
   "settled_accuracy": 0.4862,
-  "new_observations": 198,
+  "new_observations": 2106,
   "newly_settled": 0,
+  "archive_new_records": 0,
   "sportybet_settled": 0,
   "settlement_conflicts": 0,
   "participant_fingerprint_count": 52,
   "participant_ou15_leaders": [
     {
-      "participant": "Aston Villa (MJ)",
+      "participant": "COSMOS",
       "n": 1,
       "wins": 1,
-      "win_rate": 1
+      "win_rate": 1.0
     },
     {
-      "participant": "England (COSMOS)",
+      "participant": "DEZZY",
       "n": 1,
       "wins": 1,
-      "win_rate": 1
+      "win_rate": 1.0
     },
     {
-      "participant": "Spain (PLUTO)",
+      "participant": "MJ",
       "n": 1,
       "wins": 1,
-      "win_rate": 1
+      "win_rate": 1.0
     },
     {
-      "participant": "Spurs (DEZZY)",
+      "participant": "PLUTO",
       "n": 1,
       "wins": 1,
-      "win_rate": 1
+      "win_rate": 1.0
     },
     {
-      "participant": "Arsenal (ZT)",
+      "participant": "DART",
       "n": 1,
       "wins": 0,
-      "win_rate": 0
+      "win_rate": 0.0
     },
     {
-      "participant": "Newcastle UTD (DART)",
+      "participant": "ZT",
       "n": 1,
       "wins": 0,
-      "win_rate": 0
+      "win_rate": 0.0
     }
   ],
   "participant_model_policy": {
@@ -65,16 +69,6 @@
   "prediction_source": "SportyBet live no-vig market baseline",
   "errors": [],
   "paper_only": true,
-  "walk_forward_model": {
-    "artifact": "data/virtual_lab_model_eval.json",
-    "generated_at": "2026-09-21T23:27:58.449Z",
-    "holdout_events": 11,
-    "holdout_rows": 26,
-    "participant_holdout_rows": 0,
-    "participant_feature_pass": false
-  },
-  "removed_products": [
-    "srl"
-  ],
-  "source_contract": "SportyBet NG virtual/eFootball research feed; SRL is permanently excluded from ingestion, collection, prediction, settlement, and UI."
+  "walk_forward_model_artifact": "data/virtual_lab_model_eval.json",
+  "walk_forward_model_policy": "strict chronological holdout; participant feature cannot activate without untouched dual-loss improvement"
 }
