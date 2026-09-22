@@ -1,31 +1,56 @@
-# Virtual Lab Data Dictionary
+# Virtual Lab v1 Data Dictionary
 
-One row represents one settled market observation.
+The durable research record is an observed, settled market row. Product boundaries are enforced before rows enter the registry/model pipeline.
 
 | Field | Required | Meaning |
 |---|---|---|
-| product | yes | efootball_gt, efootball_adriatic, srl, vfootball, zoom, other |
-| provider | yes | Simulation/provider label when known |
-| event_id | yes | Stable event identifier |
-| timestamp | yes | Event or observation timestamp |
-| competition | recommended | Competition/league |
-| participant_1 | recommended | First displayed participant |
-| participant_2 | recommended | Second displayed participant |
-| market | yes | 1x2, winner, ou, btts, handicap, other |
-| selection | yes | The tested selection |
-| odds | recommended | Decimal market price at observation |
-| result | yes | Settled outcome normalized to same label vocabulary as selection |
-| win | derived | selection == result when both are known |
-| score | recommended | Final simulated score |
-| model_prob | optional | Probability emitted by a research model |
-| bookmaker | optional | Operator/source of the observed market |
-| observed_at | optional | Timestamp at which the price/result was captured |
+| product | yes | efootball_gt, efootball_adriatic, vfootball, zoom, or other explicitly supported research product |
+| provider | yes | Source/provider label |
+| event_id | yes | Stable source event identifier |
+| timestamp | yes | Event start/observation time |
+| competition | recommended | League/competition label |
+| participant_1 | recommended | First participant as observed |
+| participant_2 | recommended | Second participant as observed |
+| participant_1_key | derived | Product-scoped stable participant identity |
+| participant_2_key | derived | Product-scoped stable participant identity |
+| market | yes | winner, ou, btts, handicap, other |
+| market_id | recommended | Source market identifier |
+| specifier | optional | Source market specifier |
+| line | optional | Numeric O/U line |
+| selection | yes | Normalized tested selection |
+| odds | recommended | Observed bookmaker price |
+| result | yes | Normalized settled result |
+| win | derived | Whether selection matched the settled result |
+| score | recommended | Final observed score |
+| model_prob | optional | Probability produced before settlement |
+| captured_at | yes | Time the price/event was captured |
+| settled_at | recommended | Time official settlement was recorded |
+| settlement_source | yes | Authoritative result source |
+| record_id | yes | Deterministic row identity |
+| trace_id | yes | Trace identifier linking the row through the pipeline |
+| schema_version | yes | Data schema version |
+| pipeline_version | yes | Collector/model pipeline version |
 
-## Data quality rules
+## Identity rules
 
-- Never mix two providers without retaining the provider field.
-- Never overwrite raw observed odds with model fair odds.
-- Preserve bookmaker observation time separately from event time.
-- Keep event IDs stable.
-- Mark missing/ambiguous settlements instead of guessing.
-- Do not infer real-world team form as though it were simulation state.
+For eFootball, the stable participant is the explicit participant identifier observed inside the event metadata or historically observed parenthetical identity. The real-world club/team label is contextual and may rotate.
+
+For Virtual Football and Zoom, the source participant field is product-scoped; it is never compared across products.
+
+A missing or truncated identity is unresolved rather than guessed.
+
+## Preservation rules
+
+Raw observed evidence is never replaced with model fair odds.
+
+User-reported ticket outcomes are retained as external evidence only and never injected into automatic training labels.
+
+Settled evidence is appended to the daily archive and reflected into the cumulative history/registry.
+
+## Model rules
+
+Use chronological training/validation/test splits.
+
+Do not allow post-event information into a pre-event feature.
+
+O/U 1.5 is experimental until its own untouched evidence meets the same research discipline as the other lines.
