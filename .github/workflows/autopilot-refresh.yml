@@ -94,6 +94,9 @@ jobs:
           print('Restored protected live leagues:', {k: len(v) for k, v in preserved.items()})
           PY
 
+      - name: Build football forward-planning readiness
+        run: python scripts/football_forward_readiness.py
+
       - name: Run autonomous freshness and source coverage guard
         run: python scripts/autopilot_guard.py
 
@@ -102,7 +105,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/predictions.json data/prediction_history.json data/accuracy.json data/pipeline_status.json data/autopilot_status.json
+          git add data/predictions.json data/prediction_history.json data/accuracy.json data/pipeline_status.json data/autopilot_status.json data/football_forward_readiness.json data/football_forward_readiness.json
           if git diff --cached --quiet; then
             echo "Autopilot checked the feed; no data changes were required."
             exit 0
