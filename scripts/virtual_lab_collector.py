@@ -501,6 +501,15 @@ def participant_fingerprint(history):
             name=" ".join(str(raw_name or "").split()).strip()
             if not name:
                 continue
+            # eFootball team labels rotate; only an explicit stable participant
+            # identity (parenthetical suffix) may enter the participant fingerprint.
+            if str(row.get("product") or "").startswith("efootball"):
+                import re
+                match=re.search(r"\\(([^()]+)\\)\\s*$",name)
+                if match:
+                    name=match.group(1).strip()
+                elif not row.get("identity_verified"):
+                    continue
             key=name.casefold()
             item=groups.setdefault(key,{"participant":name,"n":0,"wins":0,"lines":{},"products":{}})
             item["n"]+=1
