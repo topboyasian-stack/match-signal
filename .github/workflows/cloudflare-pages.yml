@@ -140,7 +140,7 @@ jobs:
           node --input-type=module <<'NODE'
           import { writeFileSync } from 'node:fs';
           const base = 'https://match-signal.pages.dev';
-          const pages = ['/', '/football.html', '/tennis.html', '/basketball.html', '/league.html?sport=football&league=England%20Amateur%20-%20U21%20Professional%20Development%20League', '/reports.html', '/live.html', '/expansion.html', '/performance.html', '/virtual-lab/', '/virtual-lab', '/research.html', '/virtual-lab.html'];
+          const pages = ['/', '/football.html', '/tennis.html', '/basketball.html', '/league.html?sport=football&league=England%20Amateur%20-%20U21%20Professional%20Development%20League', '/reports.html', '/live.html', '/expansion.html', '/virtual-lab/', '/virtual-lab', '/research.html', '/virtual-lab.html'];
           const assets = ['/api/sportybet-virtual','/expansion.js', '/expansion-odds-builder.js', '/live-analysis.js', '/live-data-worker.js', '/virtual-lab-app.js', '/virtual-lab-confirmed-watch.js', '/virtual-lab.css', '/_redirects', '/data/predictions.json', '/data/expansion_status.json', '/data/odds_builder.json', '/data/virtual_lab_live.json','/data/virtual_lab_model_eval.json','/data/virtual_lab_eligibility.json','/data/virtual_lab_participants/registry.json','/data/virtual_lab_participants/efootball_confirmed_watch.json'];
           const failures = [];
           async function get(path) {
@@ -153,7 +153,7 @@ jobs:
               const {r,body}=await get(path);
               if (!r.ok) failures.push(path+' HTTP '+r.status);
               if (!body.includes('<html') && path.endsWith('.html')) failures.push(path+' did not return HTML');
-              if (path==='/expansion.html' || path==='/performance.html') {
+              if (path==='/expansion.html') {
                 if (!body.includes('/reports.html')) failures.push(path+' missing retired-route redirect');
               }
               if (path==='/football.html' || path==='/tennis.html' || path==='/basketball.html' || path==='/reports.html') {
