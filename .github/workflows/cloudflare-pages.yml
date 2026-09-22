@@ -135,6 +135,15 @@ jobs:
             const body = await r.text();
             return {r,body};
           }
+          // Canonical route assertions: root is the only public desk entrypoint.
+          for (const legacyPath of ['/index.html','/index-tight','/index-tight.html']) {
+            try {
+              const rr=await fetch(base+legacyPath,{redirect:'manual',cache:'no-store'});
+              const location=rr.headers.get('location')||'';
+              if (rr.status!==301 || !location.endsWith('/')) failures.push(legacyPath+' did not canonicalize to /');
+            } catch(e) { failures.push(legacyPath+' '+e.message); }
+          }
+
           for (const path of pages) {
             try {
               const {r,body}=await get(path);
