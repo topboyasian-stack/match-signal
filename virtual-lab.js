@@ -7,7 +7,7 @@ const LIVE_API_TIMEOUT_MS=12000;
 const LIVE_MARKETS='1,18,10,29,11,26,36,14,60100,186,189,202,204,210';
 const SNAPSHOT='./data/virtual_lab_live.json';
 const LIVE_REFRESH_MS=30000;
-const UI_BUILD='20260922-v32';
+const UI_BUILD='20260922-v33';
 const HISTORY='./api/virtual-lab-history';
 const HISTORY_FALLBACK='./data/virtual_lab_history.json';
 const MODEL_EVAL='./data/virtual_lab_model_eval.json';
@@ -851,7 +851,7 @@ async function loadLive(){
       renderLive();
       $('liveDot').className='liveDot bad';
       $('liveTitle').textContent='LIVE SOURCE UNAVAILABLE';
-      $('liveMeta').textContent=remoteError.message+' · '+snapshotError.message;
+      $('liveMeta').textContent='LIVE FEED ERROR · '+remoteError.message+' · SNAPSHOT · '+snapshotError.message;
       console.error('Virtual Lab live feed failed:',remoteError,snapshotError);
     }
   }finally{button.disabled=false;liveInFlight=false}
