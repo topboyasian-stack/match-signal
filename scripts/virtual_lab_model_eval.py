@@ -29,6 +29,20 @@ def ts(v):
     try:return datetime.fromisoformat(str(v).replace("Z","+00:00")).timestamp()
     except Exception:return float("inf")
 
+
+def stable_participant_identity(product, value):
+    import re
+    s=" ".join(str(value or "").split()).strip()
+    if not s:
+        return ""
+    product=str(product or "")
+    if product.startswith("efootball"):
+        m=re.search(r"\(([^()]+)\)\s*$",s)
+        return m.group(1).strip() if m and m.group(1).strip() else ""
+    if product in {"vfootball","zoom"}:
+        return s
+    return ""
+
 def clamp(p):
     return max(.0005,min(.9995,float(p)))
 
@@ -98,9 +112,9 @@ def product_prior(events, product, line, cutoff):
 
 def participant_prior(events,event,line):
     cutoff=ts(event["timestamp"]); product=event["product"]
-    names={event["home"].strip().casefold(),event["away"].strip().casefold()}
+    names={stable_participant_identity(product,event["home"]).casefold(),stable_participant_identity(product,event["away"]).casefold()}-{"")}
     prior=[e for e in events if e["product"]==product and ts(e["timestamp"])<cutoff and e["total"] is not None]
-    entity=[e for e in prior if names & {e["home"].strip().casefold(),e["away"].strip().casefold()}]
+    entity=[e for e in prior if names & {stable_participant_identity(product,e["home"]).casefold(),stable_participant_identity(product,e["away"]).casefold()}]
     # Participant recurrence is identity-based, not opponent-based. Use prior actual
     # totals across all O/U lines to estimate P(total > current line).
     total_decisive=[e for e in entity if e["total"]!=line]
@@ -114,9 +128,9 @@ def participant_prior(events,event,line):
         exact_prob=(sum(e["total"]>line for e in exact)+2)/(len(exact)+4)
         total_prob=.65*total_prob+.35*exact_prob
     pair=[]
-    a,b=event["home"].strip().casefold(),event["away"].strip().casefold()
+    a,b=stable_participant_identity(product,event["home"]).casefold(),stable_participant_identity(product,event["away"]).casefold()
     for e in prior:
-        eh,ea=e["home"].strip().casefold(),e["away"].strip().casefold()
+        eh,ea=stable_participant_identity(product,e["home"]).casefold(),stable_participant_identity(product,e["away"]).casefold()
         if ((eh==a and ea==b) or (eh==b and ea==a)) and e["total"]!=line:pair.append(e)
     if len(pair)>=6:
         pp=(sum(e["total"]>line for e in pair)+2)/(len(pair)+4)
