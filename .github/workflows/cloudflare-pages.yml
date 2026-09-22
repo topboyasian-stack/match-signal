@@ -24,7 +24,8 @@ on:
       - 'live-model-trace.js'
       - 'virtual-lab.html'
       - 'research.html'
-      - 'virtual-lab.js'
+      - 'virtual-lab-app.js'
+      - 'virtual-lab-confirmed-watch.js'
       - 'virtual-lab.css'
       - 'virtual-lab/**'
       - 'data/virtual_lab_history.json'
@@ -134,8 +135,8 @@ jobs:
           node --input-type=module <<'NODE'
           import { writeFileSync } from 'node:fs';
           const base = 'https://match-signal.pages.dev';
-          const pages = ['/', '/expansion.html', '/live.html', '/basketball.html', '/performance.html', '/virtual-lab/', '/research.html'];
-          const assets = ['/api/sportybet-virtual','/expansion.js', '/expansion-odds-builder.js', '/live-analysis.js', '/live-data-worker.js', '/virtual-lab.js', '/virtual-lab.css', '/_redirects', '/data/predictions.json', '/data/expansion_status.json', '/data/odds_builder.json', '/data/virtual_lab_live.json','/data/virtual_lab_model_eval.json','/data/virtual_lab_eligibility.json','/data/virtual_lab_participants/registry.json','/confirmed-participant-watch.js'];
+          const pages = ['/', '/expansion.html', '/live.html', '/basketball.html', '/performance.html', '/virtual-lab/', '/virtual-lab', '/research.html', '/virtual-lab.html'];
+          const assets = ['/api/sportybet-virtual','/expansion.js', '/expansion-odds-builder.js', '/live-analysis.js', '/live-data-worker.js', '/virtual-lab-app.js', '/virtual-lab-confirmed-watch.js', '/virtual-lab.css', '/_redirects', '/data/predictions.json', '/data/expansion_status.json', '/data/odds_builder.json', '/data/virtual_lab_live.json','/data/virtual_lab_model_eval.json','/data/virtual_lab_eligibility.json','/data/virtual_lab_participants/registry.json','/data/virtual_lab_participants/efootball_confirmed_watch.json'];
           const failures = [];
           async function get(path) {
             const r = await fetch(base + path + (path.includes('?') ? '&' : '?') + 'smoke=' + Date.now(), {cache:'no-store'});
@@ -155,9 +156,13 @@ jobs:
                 for (const marker of ['id="statusText"','id="grid"','live-analysis.js','live-data-worker.js'])
                   if (!body.includes(marker)) failures.push(path+' missing '+marker);
               }
-              if (path==='/research.html' || path==='/virtual-lab.html' || path==='/virtual-lab/' || path==='/virtual-lab') {
-                for (const marker of ['Virtual Lab','virtual-lab.js','predictionDesk','oddsBuilder','How to use the Lab / what to select','Research conclusion'])
+              if (path==='/virtual-lab/' || path==='/virtual-lab') {
+                for (const marker of ['Virtual Lab','virtual-lab-app.js','predictionDesk','oddsBuilder','How to use the Lab / what to select','Research conclusion','/virtual-lab/'])
                   if (!body.includes(marker)) failures.push(path+' missing '+marker);
+              }
+              if (path==='/research.html' || path==='/virtual-lab.html') {
+                if (!body.includes('/virtual-lab/')) failures.push(path+' missing standalone redirect');
+                if (body.includes('virtual-lab.js?v=')) failures.push(path+' still contains retired renderer reference');
               }
             } catch(e) { failures.push(path+' '+e.message); }
           }
@@ -224,7 +229,7 @@ jobs:
             const payload=JSON.parse(body);
             const virtualEvents=Array.isArray(payload?.events)?payload.events:[];
             if (payload?.ok!==true) failures.push('/api/sportybet-virtual did not return ok=true');
-            if (!virtualEvents.length) failures.push('/api/sportybet-virtual returned no virtual/eFootball/SRL events');
+            if (!virtualEvents.length) failures.push('/api/sportybet-virtual returned no eFootball/virtual events');
             const cutoff = Date.now() - 120000;
             const stale = virtualEvents.filter(e => e.start_time_ms && Number(e.start_time_ms) < cutoff);
             if (stale.length) failures.push('/api/sportybet-virtual returned '+stale.length+' stale fixtures');
