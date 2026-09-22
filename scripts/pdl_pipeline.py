@@ -9,6 +9,7 @@ import json, math, re
 from datetime import datetime, timezone
 from pathlib import Path
 import requests
+import pandas as pd
 
 ROOT=Path(__file__).resolve().parents[1]
 DATA=ROOT/"data"
@@ -41,7 +42,40 @@ def current_season():
         raise RuntimeError("SofaScore returned no PDL seasons")
     return int(seasons[0]["id"])
 
-def history():
+def betstudy_history():
+    response=S.get(RESULTS_URL,timeout=30)
+    response.raise_for_status()
+    tables=pd.read_html(response.text)
+    rows=[]
+    for df in tables:
+        cols={str(col).strip().lower() for col in df.columns}
+        if not {"date","home","score","away"}.issubset(cols):
+            continue
+        df.columns=[str(col).strip().lower() for col in df.columns]
+        for _, row in df.iterrows():
+            d=parse_date(row.get("date"))
+            m=re.search(r"(\d+)\s*-\s*(\d+)",str(row.get("score","")))
+            h=str(row.get("home","")).strip()
+            a=str(row.get("away","")).strip()
+            if d and m and h and a:
+                rows.append({
+                    "event_id":f"betstudy|{d.date()}|{h}|{a}",
+                    "start_time":d.isoformat(),
+                    "home":h,
+                    "away":a,
+                    "home_score":float(m.group(1)),
+                    "away_score":float(m.group(2)),
+                    "source":"BetStudy current-season PDL results",
+                })
+    if not rows:
+        raise RuntimeError("BetStudy PDL results table was not parsed")
+    return sorted(
+        {x["event_id"]:x for x in rows}.values(),
+        key=lambda x:x["start_time"]
+    )
+
+
+def sofascore_history():
     season=current_season()
     rows=[]
     for page in range(0,10):
@@ -78,7 +112,21 @@ def history():
     rows=[x for x in rows if x["home"] and x["away"]]
     if not rows:
         raise RuntimeError("SofaScore PDL results returned no finished events")
-    return sorted({x["event_id"]:x for x in rows}.values(),key=lambda x:x["start_time"])
+    return sorted(
+        {x["event_id"]:x for x in rows}.values(),
+        key=lambda x:x["start_time"]
+    )
+
+
+def history():
+    try:
+        return betstudy_history(), "BetStudy"
+    except Exception as primary_error:
+        hist=sofascore_history()
+        return hist, "SofaScore fallback"
+
+
+
 
 def upcoming():
     events=[]
@@ -186,7 +234,10 @@ def build(hist,future):
     return out
 
 def main():
-    hist=history();future=upcoming();pred=build(hist,future);now=datetime.now(timezone.utc).isoformat()
-    status={"updated_at":now,"competition":LEAGUE,"historical_rows":len(hist),"current_upcoming":len(pred),"historical_source":RESULTS_URL,"fixture_source":"SportyBet NG via Match Signal Cloudflare proxy","model":"PDL-1.2-2026.09.22","paper_only":True,"gates":{"model_live_trading_approved":False,"requires_walk_forward_validation":True,"requires_market_benchmark":True}}
+    hist,history_source=history();future=upcoming();pred=build(hist,future);now=datetime.now(timezone.utc).isoformat()
+    fixture_source="SportyBet NG via Match Signal Cloudflare proxy"
+    if pred and all(str(x.get("event_id","")).startswith("sofascore|") for x in future):
+        fixture_source="SofaScore structured PDL fixture fallback"
+    status={"updated_at":now,"competition":LEAGUE,"historical_rows":len(hist),"current_upcoming":len(pred),"historical_source":history_source,"fixture_source":fixture_source,"model":"PDL-1.2-2026.09.22","paper_only":True,"gates":{"model_live_trading_approved":False,"requires_walk_forward_validation":True,"requires_market_benchmark":True}}
     (DATA/"pdl_predictions.json").write_text(json.dumps(pred,indent=2,ensure_ascii=False)+"\n",encoding="utf-8");(DATA/"pdl_status.json").write_text(json.dumps(status,indent=2,ensure_ascii=False)+"\n",encoding="utf-8");print(json.dumps(status,indent=2))
 if __name__=="__main__":main()
