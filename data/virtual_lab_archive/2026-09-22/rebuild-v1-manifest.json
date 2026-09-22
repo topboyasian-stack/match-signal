@@ -1,0 +1,43 @@
+{
+  "schema_version": 2,
+  "archive_id": "VL-ARCHIVE-2026-09-22-PRE-REBUILD",
+  "rebuild_id": "VL-V1-2026-09-22",
+  "source_baseline_commit": "f182573dc3f00010e084f55164a4aacb652d813e",
+  "rebuild_branch": "virtual-lab-rebuild-2026-09-22",
+  "production_route": "/virtual-lab/",
+  "authoritative_renderer": "virtual-lab-app.js",
+  "watch_renderer": "virtual-lab-confirmed-watch.js",
+  "active_products": ["efootball_gt","efootball_adriatic","vfootball","zoom"],
+  "excluded_products": ["srl"],
+  "separate_domains": ["tennis"],
+  "preserved_paths": [
+    "data/virtual_lab_history.json",
+    "data/virtual_lab_pending.json",
+    "data/virtual_lab_live.json",
+    "data/virtual_lab_participant_profiles.json",
+    "data/virtual_lab_model_eval.json",
+    "data/virtual_lab_eligibility.json",
+    "data/virtual_lab_user_ticket_evidence.json",
+    "data/virtual_lab_confirmed_participant_results.json",
+    "data/virtual_lab_archive/2026-09-22/participant-watch-original.json",
+    "data/virtual_lab_archive/2026-09-22/settled-history-baseline.json",
+    "data/virtual_lab_archive/settlements"
+  ],
+  "product_partition_rules": {
+    "confirmed_efootball_watch": "data/virtual_lab_participants/efootball_confirmed_watch.json",
+    "tennis_archive": "data/virtual_lab_participants/tennis_archive.json",
+    "automatic_registry": "data/virtual_lab_participants/registry.json",
+    "efootball_registry": "data/virtual_lab_participants/efootball_registry.json"
+  },
+  "migration_rules": {
+    "user_ticket_evidence": "preserve as external evidence; exclude from automatic training",
+    "tennis_participants": "preserve in tennis archive; never display or train inside Virtual Lab",
+    "efootball_confirmed_watch": "retain exactly nine confirmed identities; product must be efootball_gt",
+    "unresolved_identities": "retain as unresolved evidence; never infer a truncated suffix",
+    "settled_history": "retain; append new official settlements rather than replacing evidence"
+  },
+  "trace_contract": {
+    "required_row_fields": ["record_id","trace_id","event_id","participant_1_key","participant_2_key","schema_version","pipeline_version","settlement_source"],
+    "ui_diagnostics": ["build","route","live_mode","live_events","settled_rows","participants","model_gate"]
+  }
+}
