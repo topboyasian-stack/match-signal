@@ -192,16 +192,20 @@ def calibrate_prediction(prediction, history, now=None):
                 "selection_floor": round(target, 4),
             }
 
+    # Publish confidence from the final probability vector, after all
+    # redistribution and rounding. This keeps the integrity guard invariant
+    # exact even when calibrated probabilities move or re-normalize slightly.
+    final_confidence = max(float(value) for value in calibrated.values()) if calibrated else calibrated_pick
     prediction["raw_probabilities"] = {key: round(float(value), 4) for key, value in probs.items()}
     prediction["raw_confidence"] = round(raw_pick, 4)
     prediction["calibrated_probabilities"] = calibrated
-    prediction["calibrated_confidence"] = round(calibrated_pick, 4)
+    prediction["calibrated_confidence"] = round(final_confidence, 4)
     prediction["calibration"] = {
         "market": market_key,
         **diagnostics,
     }
     prediction["probabilities"] = calibrated
-    prediction["confidence"] = round(calibrated_pick, 4)
+    prediction["confidence"] = round(final_confidence, 4)
     prediction["pick"] = pick
     prediction["model_version"] = "5.0 historical-calibrated"
     return prediction
