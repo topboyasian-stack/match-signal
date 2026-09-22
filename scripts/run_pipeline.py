@@ -338,13 +338,21 @@ def fetch_current_predictions(history=None):
     football_end = today + timedelta(days=7)
     for label, league in FOOTBALL_LEAGUES.items():
         try:
-            board = fetch_scoreboard("soccer", league, f"{today:%Y%m%d}-{football_end:%Y%m%d}")
-            for event in board.get("events", []):
-                if event.get("status", {}).get("type", {}).get("completed"):
-                    continue
-                prediction = football_prediction(event, label)
-                if prediction:
-                    predictions.append(prediction)
+            seen_events = set()
+            for day_offset in range(8):
+                date = today + timedelta(days=day_offset)
+                board = fetch_scoreboard("soccer", league, date.strftime("%Y%m%d"))
+                for event in board.get("events", []):
+                    event_id = str(event.get("id") or "")
+                    if event_id and event_id in seen_events:
+                        continue
+                    if event_id:
+                        seen_events.add(event_id)
+                    if event.get("status", {}).get("type", {}).get("completed"):
+                        continue
+                    prediction = football_prediction(event, label)
+                    if prediction:
+                        predictions.append(prediction)
         except Exception as exc:
             errors.append(f"football:{label}:{exc}")
 
