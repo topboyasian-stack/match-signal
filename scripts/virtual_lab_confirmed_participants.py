@@ -10,6 +10,31 @@ DATA=ROOT/"data"
 WATCH=DATA/"virtual_lab_confirmed_participants.json"
 HISTORY=DATA/"virtual_lab_history.json"
 OUT=DATA/"virtual_lab_confirmed_participant_results.json"
+
+def participant_identity(value):
+    import re
+    s=str(value or '').strip()
+    m=re.search(r'\\(([^()]+)\\)\\s*
+def main():
+    watch=json.loads(WATCH.read_text()) if WATCH.exists() else {"participants":[]}
+    hist=json.loads(HISTORY.read_text()) if HISTORY.exists() else []
+    profiles=[]
+    for w in watch.get("participants",[]):
+        name=participant_identity(w.get("participant",""))
+        product=str(w.get("product","")).strip()
+        rows=[r for r in hist if isinstance(r,dict) and r.get("market")=="ou" and str(r.get("product",""))==product and name in {participant_identity(r.get("participant_1","")),participant_identity(r.get("participant_2",""))} and r.get("win") is not None]
+        profiles.append({"participant":name,"product":product,"official_settled_rows":len(rows),
+                         "wins":sum(bool(r.get("win")) for r in rows),
+                         "losses":sum(not bool(r.get("win")) for r in rows),
+                         "rate":(sum(bool(r.get("win")) for r in rows)/len(rows)) if rows else None})
+    OUT.write_text(json.dumps({"generated_at":datetime.now(timezone.utc).isoformat(),
+      "source_contract":"automatic SportyBet history only; user-reported ticket outcomes excluded",
+      "profiles":profiles},indent=2)+"\n")
+    print(json.dumps({"tracked":len(profiles),"matched":sum(p["official_settled_rows"]>0 for p in profiles),
+      "rows":sum(p["official_settled_rows"] for p in profiles)},indent=2))
+if __name__=="__main__": main()
+, s)
+    return m.group(1).strip() if m and m.group(1).strip() else s
 def main():
     watch=json.loads(WATCH.read_text()) if WATCH.exists() else {"participants":[]}
     hist=json.loads(HISTORY.read_text()) if HISTORY.exists() else []
