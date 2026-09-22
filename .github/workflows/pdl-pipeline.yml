@@ -66,7 +66,7 @@ jobs:
           pdl=[r for r in rows if r.get('league')=='England Amateur - U21 Professional Development League']
           assert all(r.get('sport')=='football' for r in pdl)
           assert all(r.get('paper_only') is True for r in pdl)
-          assert all(r.get('model_version')=='PDL-1.1-2026.09.22' for r in pdl)
+          assert all(r.get('model_version')=='PDL-1.2-2026.09.22' for r in pdl)
           print('PDL feed validated:',len(pdl))
           PY
       - name: Commit PDL feed
