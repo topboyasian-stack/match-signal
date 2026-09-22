@@ -119,19 +119,35 @@ def main():
         fetch_scoreboard = ns["fetch_scoreboard"]
         football_leagues = ns["FOOTBALL_LEAGUES"]
         source_checks = {}
+        today = current.date()
         for label, league in football_leagues.items():
             try:
-                board = fetch_scoreboard("soccer", league)
-                source_events = {str(e.get("id")) for e in board.get("events", []) if not e.get("status", {}).get("type", {}).get("completed")}
-                feed_events = {str(r.get("event_id")) for r in rows if r.get("league") == label}
+                source_events = set()
+                for offset in range(8):
+                    day = today + timedelta(days=offset)
+                    board = fetch_scoreboard("soccer", league, day.strftime("%Y%m%d"))
+                    for event in board.get("events", []):
+                        status = (event.get("status") or {}).get("type") or {}
+                        if not status.get("completed"):
+                            source_events.add(str(event.get("id")))
+                feed_events = {
+                    str(r.get("event_id"))
+                    for r in rows
+                    if r.get("sport") == "football" and r.get("league") == label
+                }
                 if source_events and not (source_events & feed_events):
-                    source_checks[label] = {"source_events": len(source_events), "feed_events": len(feed_events), "status": "MISSING"}
+                    source_checks[label] = {
+                        "source_events": len(source_events),
+                        "feed_events": len(feed_events),
+                        "status": "MISSING",
+                    }
                     errors.append(f"{label}: source has upcoming events but feed has no matching event")
-                elif source_events and not feed_events:
-                    source_checks[label] = {"source_events": len(source_events), "feed_events": 0, "status": "MISSING"}
-                    errors.append(f"{label}: source has events but feed has zero rows")
                 else:
-                    source_checks[label] = {"source_events": len(source_events), "feed_events": len(feed_events), "status": "OK"}
+                    source_checks[label] = {
+                        "source_events": len(source_events),
+                        "feed_events": len(feed_events),
+                        "status": "OK",
+                    }
             except Exception as exc:
                 source_checks[label] = {"status": "SOURCE_ERROR", "error": str(exc)}
                 errors.append(f"{label}: source check failed: {exc}")
