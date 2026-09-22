@@ -20,8 +20,8 @@ MIN_PROFILE_N=3
 def participant_identity(value: str) -> str:
     import re
     s=str(value or '').strip()
-    m=re.search(r'\\(([^()]+)\\)\\s*
-
+    m=re.search(r'\(([^()]+)\)\s*$',s)
+    return m.group(1).strip() if m and m.group(1).strip() else s
 def t(v):
     try:return datetime.fromisoformat(str(v).replace("Z","+00:00")).timestamp()
     except Exception:return float("inf")
