@@ -918,6 +918,7 @@ async function loadHistory(){
       state.predictionCache.clear();
       await loadModelEvaluation();
       await loadConfirmedWatch();
+      renderLive();
       await loadParticipantProfiles();
       buildModelBacktest(state.rows);
       state.modelEvents=historicalOUEvents(state.rows);
