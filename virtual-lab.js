@@ -969,7 +969,7 @@ $('clear').addEventListener('click',()=>{state.rows=[];state.filtered=[];state.b
 analyze();
 loadEligibility();
 loadHistory();
-loadLive();
+loadConfirmedWatch().then(()=>loadLive());
 window.setInterval(loadLive,LIVE_REFRESH_MS);
 window.setInterval(loadHistory,120000);
 })();
