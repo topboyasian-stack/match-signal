@@ -1,23 +1,36 @@
 {
-  "status": "PENDING_DEPLOY_VERIFICATION",
+  "status": "VERIFIED",
   "provider": "Cloudflare Pages",
-  "source_commit": "f244c3849dfb468b6390cc61d9910aad5199ab8f",
-  "verified_at": null,
+  "source_commit": "5eb2da6eac2820afee2ec85cfe8cd417e0f69580",
+  "verified_at": "2026-09-22T00:57:23.676900+00:00",
   "live_virtual_feed": {
     "endpoint": "/api/sportybet-virtual",
-    "status": "PENDING",
-    "reason": "Production verification must be rerun after the live-feed adapter fix; source now normalizes proxy events before rendering and the UI renders supported live products independently of research eligibility."
+    "verified_at": "2026-09-22T00:57:23.195Z",
+    "status": "LIVE",
+    "events_count": 100,
+    "product_counts": {
+      "efootball_gt": 86,
+      "efootball_adriatic": 14
+    },
+    "source_status": {
+      "vfootball": {
+        "status": "EMPTY",
+        "events": 0,
+        "latency_ms": 513
+      },
+      "efootball": {
+        "status": "LIVE",
+        "events": 100,
+        "latency_ms": 1395
+      }
+    },
+    "errors": []
   },
   "checks": [
+    "core_pages",
     "research_virtual_lab",
     "live_virtual_proxy",
     "virtual_lab_live_snapshot",
     "live_production_data"
-  ],
-  "notes": [
-    "SRL is removed from ingestion, collection, prediction, settlement, and UI.",
-    "Live proxy eFootball source remains sr:sport:137; sr:sport:202120001 is the Virtual Football source.",
-    "Do not treat sr:sport:137 as SRL; it is the eFootball source.",
-    "Production must be verified against the deployed Cloudflare commit before declaring the feed fixed."
   ]
 }
