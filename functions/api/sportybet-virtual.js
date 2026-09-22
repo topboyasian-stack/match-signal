@@ -36,8 +36,11 @@ function normalize(t, event, source, sportId){
     tournament_id:String(t?.id||t?.tournamentId||''),
     category_id:String(t?.categoryId||t?.category?.id||''),
     event_id:String(event?.eventId||''),
-    participant_1:String(event?.homeTeamName||''),
-    participant_2:String(event?.awayTeamName||''),
+    team_1:String(event?.homeTeamName||''),
+    team_2:String(event?.awayTeamName||''),
+    participant_1:String(event?.homeParticipant||event?.homePlayer||event?.homeCompetitor||'').trim(),
+    participant_2:String(event?.awayParticipant||event?.awayPlayer||event?.awayCompetitor||'').trim(),
+    participant_identity_source:(event?.homeParticipant||event?.awayParticipant||event?.homePlayer||event?.awayPlayer||event?.homeCompetitor||event?.awayCompetitor)?'sportybet_explicit_event_metadata':null,
     start_time_ms:event?.estimateStartTime ?? null,
     match_status:event?.matchStatus ?? null,
     markets:(Array.isArray(event?.markets)?event.markets:[]).map(m=>({
@@ -121,7 +124,7 @@ export async function onRequestGet(context){
   const counts={};
   const filtered=[];
   for(const e of events){
-    const blob=(e.tournament+' '+e.category+' '+e.participant_1+' '+e.participant_2).toLowerCase();
+    const blob=(e.tournament+' '+e.category+' '+e.team_1+' '+e.team_2+' '+e.participant_1+' '+e.participant_2).toLowerCase();
     let key=null;
     if(e.source==='efootball'){
       key=/eadriatic/.test(blob)?'efootball_adriatic':'efootball_gt';
