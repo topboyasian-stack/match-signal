@@ -56,8 +56,6 @@ jobs:
 
       - name: Syntax-check collector
         run: python -m py_compile scripts/virtual_lab_collector.py
-      - name: Run Virtual Lab v1 repository contract
-        run: python scripts/validate_virtual_lab_v1.py
       - name: Syntax-check model evaluation engine
         run: python -m py_compile scripts/virtual_lab_model_eval.py
       - name: Syntax-check participant profile engine
@@ -69,6 +67,9 @@ jobs:
 
       - name: Run Virtual Lab v1 capture + settlement
         run: python scripts/virtual_lab_collector.py
+
+      - name: Run Virtual Lab v1 repository contract
+        run: python scripts/validate_virtual_lab_v1.py
 
       - name: Validate product namespace contract
         run: |
