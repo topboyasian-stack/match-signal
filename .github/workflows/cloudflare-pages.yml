@@ -93,6 +93,8 @@ jobs:
           test -s live-analysis.js
           test -s live-data-worker.js
           test -s data/predictions.json
+          test -s virtual-lab-app.js
+          test -s virtual-lab-confirmed-watch.js
           python - <<'PY'
           import json
           from pathlib import Path
@@ -102,6 +104,9 @@ jobs:
           assert any(r.get('sport')=='tennis' for r in rows), 'no tennis rows'
           print(f'Prediction rows: {len(rows)}')
           PY
+          python scripts/validate_virtual_lab_v1.py
+          node --check virtual-lab-app.js
+          node --check virtual-lab-confirmed-watch.js
 
       - name: Resolve Cloudflare Pages project
         id: project
