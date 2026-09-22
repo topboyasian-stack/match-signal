@@ -160,6 +160,8 @@ def normalize_proxy_event(raw):
     if not event_id or not team_1 or not team_2 or not product:
         return None
     start_ms=num(raw.get("start_time_ms") if raw.get("start_time_ms") is not None else raw.get("estimateStartTime"))
+    if start_ms is not None and 0 < start_ms < 100000000000:
+        start_ms*=1000
     if start_ms is not None and start_ms < time.time()*1000-120000:
         return None
     start_time=(datetime.fromtimestamp(start_ms/1000,timezone.utc).isoformat() if start_ms is not None else None)
@@ -505,7 +507,7 @@ def stable_participant_identity(product, raw_name):
     product=str(product or "")
     if product.startswith("efootball"):
         import re
-        match=re.search(r"\\(([^()]+)\\)\\s*$",name)
+        match=re.search(r"\(([^()]+)\)\s*$",name)
         return match.group(1).strip() if match else None
     if product in {"vfootball","zoom"}:
         return name
@@ -606,7 +608,7 @@ def append_settlement_archive(rows):
             item=with_trace_metadata(dict(raw))
             if item["record_id"] in existing_ids:
                 continue
-            handle.write(json.dumps(item,ensure_ascii=False,separators=(",",":"))+"\\n")
+            handle.write(json.dumps(item,ensure_ascii=False,separators=(",",":"))+"\n")
             existing_ids.add(item["record_id"])
             added+=1
     return added
@@ -629,14 +631,14 @@ def participant_fingerprint(history):
             name=stable_participant_identity(row.get("product"),name)
             if not name:
                 continue
-            key=name.casefold()
+            product=str(row.get("product") or "other")
+            key=product+"|"+name.casefold()
             item=groups.setdefault(key,{"participant":name,"n":0,"wins":0,"lines":{},"products":{}})
             item["n"]+=1
             item["wins"]+=1 if row.get("win") else 0
             bucket=item["lines"].setdefault(str(line),{"n":0,"wins":0})
             bucket["n"]+=1
             bucket["wins"]+=1 if row.get("win") else 0
-            product=str(row.get("product") or "other")
             item["products"][product]=item["products"].get(product,0)+1
     ranked=[]
     for item in groups.values():
