@@ -1,105 +1,25 @@
 {
-  "version": 3,
+  "schema_version": 3,
   "generated_at": "2026-09-22",
-  "source_contract": "Product-scoped monitored participant identities for the standalone Virtual Lab. User-confirmed eFootball identities only; original ticket outcomes are excluded from model training.",
-  "product_scope": [
-    "efootball_gt",
-    "efootball_adriatic",
-    "vfootball",
-    "zoom"
-  ],
-  "matching": "Stable participant identity only. eFootball club/team labels are contextual metadata and may rotate; they are never identity keys.",
+  "source_contract": "Generated from the product-scoped confirmed eFootball watch namespace. User ticket outcomes are external evidence and are not automatic training labels.",
+  "watch_namespace": "data/virtual_lab_participants/efootball_confirmed_watch.json",
+  "product_scope": ["efootball_gt"],
+  "matching": "Exact eFootball participant identity only. Club/team labels are contextual metadata and never identity keys.",
   "participants": [
-    {
-      "participant": "DECIMATOR",
-      "product": "efootball_gt",
-      "market": "ou",
-      "confirmed_context": "user_confirmed_winning_ou1_5_ticket",
-      "team_context": "Spain"
-    },
-    {
-      "participant": "EXECUTIONER",
-      "product": "efootball_gt",
-      "market": "ou",
-      "confirmed_context": "user_confirmed_winning_ou1_5_ticket",
-      "team_context": "France"
-    },
-    {
-      "participant": "AGENT",
-      "product": "efootball_gt",
-      "market": "ou",
-      "confirmed_context": "user_confirmed_winning_ou1_5_ticket",
-      "team_context": "Manchester City"
-    },
-    {
-      "participant": "DUSK",
-      "product": "efootball_gt",
-      "market": "ou",
-      "confirmed_context": "user_confirmed_winning_ou1_5_ticket",
-      "team_context": "England"
-    },
-    {
-      "participant": "DANTE",
-      "product": "efootball_gt",
-      "market": "ou",
-      "confirmed_context": "user_confirmed_winning_ou1_5_ticket",
-      "team_context": "Portugal"
-    },
-    {
-      "participant": "BOUNTY",
-      "product": "efootball_gt",
-      "market": "ou",
-      "confirmed_context": "user_confirmed_winning_ou1_5_ticket",
-      "team_context": "Newcastle UTD"
-    },
-    {
-      "participant": "STORM",
-      "product": "efootball_gt",
-      "market": "ou",
-      "confirmed_context": "user_confirmed_winning_ou1_5_ticket",
-      "team_context": "Arsenal"
-    },
-    {
-      "participant": "HAYMAKER",
-      "product": "efootball_gt",
-      "market": "ou",
-      "confirmed_context": "user_confirmed_winning_ou1_5_ticket",
-      "team_context": "Liverpool"
-    },
-    {
-      "participant": "CROWN",
-      "product": "efootball_gt",
-      "market": "ou",
-      "confirmed_context": "user_confirmed_winning_ou1_5_ticket",
-      "team_context": "Barcelona"
-    }
-  ],
-  "excluded_from_virtual_lab": [
-    {
-      "participant": "Andrea Lazaro Garcia",
-      "product": "tennis",
-      "reason": "Main Match Signal tennis domain; preserved separately."
-    },
-    {
-      "participant": "Joelle Lilly Sophie Steur",
-      "product": "tennis",
-      "reason": "Main Match Signal tennis domain; preserved separately."
-    },
-    {
-      "participant": "Jeline Vandromme",
-      "product": "tennis",
-      "reason": "Main Match Signal tennis domain; preserved separately."
-    },
-    {
-      "participant": "Francisca Jorge",
-      "product": "tennis",
-      "reason": "Main Match Signal tennis domain; preserved separately."
-    }
+    {"participant":"DECIMATOR","product":"efootball_gt","market":"ou","confirmed_context":"user_confirmed_winning_ou1_5_ticket","team_context":"Spain"},
+    {"participant":"EXECUTIONER","product":"efootball_gt","market":"ou","confirmed_context":"user_confirmed_winning_ou1_5_ticket","team_context":"France"},
+    {"participant":"AGENT","product":"efootball_gt","market":"ou","confirmed_context":"user_confirmed_winning_ou1_5_ticket","team_context":"Manchester City"},
+    {"participant":"DUSK","product":"efootball_gt","market":"ou","confirmed_context":"user_confirmed_winning_ou1_5_ticket","team_context":"England"},
+    {"participant":"DANTE","product":"efootball_gt","market":"ou","confirmed_context":"user_confirmed_winning_ou1_5_ticket","team_context":"Portugal"},
+    {"participant":"BOUNTY","product":"efootball_gt","market":"ou","confirmed_context":"user_confirmed_winning_ou1_5_ticket","team_context":"Newcastle UTD"},
+    {"participant":"STORM","product":"efootball_gt","market":"ou","confirmed_context":"user_confirmed_winning_ou1_5_ticket","team_context":"Arsenal"},
+    {"participant":"HAYMAKER","product":"efootball_gt","market":"ou","confirmed_context":"user_confirmed_winning_ou1_5_ticket","team_context":"Liverpool"},
+    {"participant":"CROWN","product":"efootball_gt","market":"ou","confirmed_context":"user_confirmed_winning_ou1_5_ticket","team_context":"Barcelona"}
   ],
   "unresolved_participants": [
     {
       "participant": "Real Madrid (CAS…)",
-      "reason": "Truncated confirmed ticket identity; exact suffix must be recovered before any identity linkage."
+      "reason": "Truncated identifier preserved as unresolved evidence; exact suffix is not inferred."
     }
   ]
 }
