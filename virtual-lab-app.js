@@ -703,7 +703,7 @@ function updateDiagnostics(extra={}){
     '<div><small>Live events</small><b>'+liveCount+'</b></div>'+ 
     '<div><small>Settled rows</small><b>'+historyCount+'</b></div>'+ 
     '<div><small>Participants</small><b>'+participantCount+'</b></div>'+ 
-    '<div><small>Model gate</small><b>'+esc(state.modelGate?'PASS':'WAIT')+'</b></div>'+\
+    '<div><small>Model gate</small><b>'+esc(state.modelGate?'PASS':'WAIT')+'</b></div>'+
     '<div><small>Route</small><b>'+esc(PRODUCTION_ROUTE)+'</b></div>'+
     '</div>'+
     '<p class="muted">'+esc(extra.message||'Canonical pipeline: SportyBet → normalization → identity → observation → settlement → history → model.')+'</p>';
