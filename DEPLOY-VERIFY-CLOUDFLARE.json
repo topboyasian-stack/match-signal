@@ -1,11 +1,11 @@
 {
   "status": "VERIFIED",
   "provider": "Cloudflare Pages",
-  "source_commit": "39b48b6078af406046c295c87a0ef656133acf0e",
-  "verified_at": "2026-09-22T01:14:05.179973+00:00",
+  "source_commit": "b05cff6137da45456eecad1cda44948a646fb022",
+  "verified_at": "2026-09-22T08:24:04.856596+00:00",
   "live_virtual_feed": {
     "endpoint": "/api/sportybet-virtual",
-    "verified_at": "2026-09-22T01:14:04.897Z",
+    "verified_at": "2026-09-22T08:24:04.520Z",
     "status": "LIVE",
     "events_count": 100,
     "product_counts": {
@@ -13,18 +13,33 @@
       "efootball_adriatic": 14
     },
     "source_status": {
+      "efootball_live": {
+        "status": "ERROR",
+        "events": 0,
+        "latency_ms": 114,
+        "error": "/api/ng/factsCenter/pcLiveEvents HTTP 404 {\"bizCode\":19001,\"innerMsg\":\"Resource not found\",\"message\":\"Resource not found\",\"data\":{}}",
+        "endpoint": "/api/ng/factsCenter/pcLiveEvents"
+      },
       "vfootball": {
         "status": "EMPTY",
         "events": 0,
-        "latency_ms": 417
+        "latency_ms": 335
+      },
+      "vfootball_live": {
+        "status": "EMPTY",
+        "events": 0,
+        "latency_ms": 525,
+        "endpoint": "/api/ng/factsCenter/wapConfigurableIndexLiveEvents"
       },
       "efootball": {
         "status": "LIVE",
         "events": 100,
-        "latency_ms": 1092
+        "latency_ms": 1521
       }
     },
-    "errors": []
+    "errors": [
+      "efootball_live: /api/ng/factsCenter/pcLiveEvents HTTP 404 {\"bizCode\":19001,\"innerMsg\":\"Resource not found\",\"message\":\"Resource not found\",\"data\":{}}"
+    ]
   },
   "checks": [
     "core_pages",
