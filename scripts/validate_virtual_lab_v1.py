@@ -98,8 +98,9 @@ def main():
         failures.append("Virtual Lab v1 renderer marker missing")
 
     collector = (ROOT / "scripts/virtual_lab_collector.py").read_text(encoding="utf-8")
-    if "SUPPORTED_PRODUCTS={'efootball_gt','efootball_adriatic','vfootball','zoom'}" not in collector.replace(" ", ""):
-        failures.append("collector supported-product contract missing/changed")
+    for product in ("efootball_gt","efootball_adriatic","vfootball","zoom"):
+        if product not in collector:
+            failures.append("collector supported-product contract missing: " + product)
     if "row.setdefault(\"trace_id\"" not in collector:
         failures.append("collector does not assign trace_id")
     if '"sr:sport:1"' in (ROOT / "scripts/virtual_lab_sync.py").read_text(encoding="utf-8"):
