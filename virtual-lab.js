@@ -660,6 +660,15 @@ function isConfirmedWatchedEvent(e){
     return !x.product||x.product==='all'||x.product===product;
   });
 }
+function confirmedWatchParticipantsForEvent(e){
+  const list=Array.isArray(state.confirmedWatch?.participants)?state.confirmedWatch.participants:[];
+  const names=[String(e?.home||e?.participant_1||'').trim().toLowerCase(),String(e?.away||e?.participant_2||'').trim().toLowerCase()];
+  const product=String(e?.product||'').trim();
+  return list.filter(x=>{
+    const p=String(x?.participant||'').trim().toLowerCase();
+    return p&&names.includes(p)&&(!x.product||x.product==='all'||x.product===product);
+  });
+}
 function isUpcoming(e){
   if(!e||!e.start_time)return true;
   const t=new Date(e.start_time).getTime();
