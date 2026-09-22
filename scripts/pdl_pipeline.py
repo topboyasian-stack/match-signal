@@ -82,57 +82,74 @@ def history():
 
 def upcoming():
     events=[]
-    for page in (1,2):
-        params={"sportId":"sr:sport:1","marketId":"1,18,10,14,16,29,45,47","pageSize":"100","pageNum":str(page),"timeline":"168"}
-        r=S.get(SPORTY,params=params,timeout=30);r.raise_for_status();body=r.json()
-
-        # Support both known SportyBet proxy envelopes:
-        # {events:[...]} and {data:{events:[...] / tournaments:[...]}}.
-        scoped=[]
-        top=body.get("events")
-        if isinstance(top,list):
-            scoped.extend((None,e) for e in top if isinstance(e,dict))
-        data=body.get("data") if isinstance(body.get("data"),dict) else {}
-        if isinstance(data.get("events"),list):
-            scoped.extend((None,e) for e in data["events"] if isinstance(e,dict))
-        if isinstance(data.get("tournaments"),list):
-            for t in data["tournaments"]:
-                if not isinstance(t,dict):
-                    continue
-                tournament_name=str(t.get("name") or t.get("tournamentName") or "").strip()
-                if tournament_name and tournament_name!=LEAGUE:
-                    continue
-                for e in t.get("events") or []:
-                    if isinstance(e,dict):
-                        scoped.append((tournament_name,e))
-
-        for tournament_name,e in scoped:
-            event_tournament=str(
-                e.get("tournamentName")
-                or e.get("tournament_name")
-                or e.get("competition")
-                or ((e.get("tournament") or {}).get("name") if isinstance(e.get("tournament"),dict) else "")
-                or tournament_name
-                or ""
-            ).strip()
-            if event_tournament and event_tournament!=LEAGUE:
-                continue
-            try:
-                raw_start=e.get("estimateStartTime")
-                if raw_start is None:
-                    raw_start=e.get("startTimeMs")
+    # Preferred: SportyBet proxy, because the resulting event IDs can later
+    # receive bookmaker-market synchronization. Fall back to SofaScore when
+    # the upstream envelope is unavailable or the exact competition is absent.
+    try:
+        for page in (1,2):
+            params={"sportId":"sr:sport:1","marketId":"1,18,10,14,16,29,45,47","pageSize":"100","pageNum":str(page),"timeline":"168"}
+            r=S.get(SPORTY,params=params,timeout=30);r.raise_for_status();body=r.json()
+            scoped=[]
+            top=body.get("events")
+            if isinstance(top,list):
+                scoped.extend((None,e) for e in top if isinstance(e,dict))
+            data=body.get("data") if isinstance(body.get("data"),dict) else {}
+            if isinstance(data.get("events"),list):
+                scoped.extend((None,e) for e in data["events"] if isinstance(e,dict))
+            if isinstance(data.get("tournaments"),list):
+                for t in data["tournaments"]:
+                    if not isinstance(t,dict): continue
+                    tournament_name=str(t.get("name") or t.get("tournamentName") or "").strip()
+                    if tournament_name and tournament_name!=LEAGUE: continue
+                    for ev in t.get("events") or []:
+                        if isinstance(ev,dict): scoped.append((tournament_name,ev))
+            for tournament_name,e in scoped:
+                event_tournament=str(
+                    e.get("tournamentName") or e.get("tournament_name") or e.get("competition")
+                    or ((e.get("tournament") or {}).get("name") if isinstance(e.get("tournament"),dict) else "")
+                    or tournament_name or ""
+                ).strip()
+                if event_tournament and event_tournament!=LEAGUE: continue
+                raw_start=e.get("estimateStartTime") or e.get("startTimeMs")
                 start=datetime.fromtimestamp(float(raw_start)/1000,tz=timezone.utc)
-            except Exception:
-                continue
-            event_id=str(e.get("eventId") or e.get("event_id") or "").strip()
-            h=str(e.get("homeTeamName") or e.get("team_1") or e.get("homeTeam") or "").strip()
-            a=str(e.get("awayTeamName") or e.get("team_2") or e.get("awayTeam") or "").strip()
-            if not event_id or not h or not a:
-                continue
-            events.append({"event_id":event_id,"start_time":start.isoformat(),"home":h,"away":a,"home_score":None,"away_score":None})
-        if len(top or [])<100 and not data.get("events") and not data.get("tournaments"):
-            break
-    return sorted({x["event_id"]:x for x in events if x["event_id"]}.values(),key=lambda x:x["start_time"])
+                event_id=str(e.get("eventId") or e.get("event_id") or "").strip()
+                h=str(e.get("homeTeamName") or e.get("team_1") or "").strip()
+                a=str(e.get("awayTeamName") or e.get("team_2") or "").strip()
+                if event_id and h and a:
+                    events.append({"event_id":event_id,"start_time":start.isoformat(),"home":h,"away":a,"home_score":None,"away_score":None})
+    except Exception:
+        events=[]
+
+    if not events:
+        try:
+            season=current_season()
+            for page in range(0,4):
+                body=sofascore_json(f"/unique-tournament/{TOURNAMENT_ID}/season/{season}/events/next/{page}")
+                batch=body.get("events") or []
+                for e in batch:
+                    status=e.get("status") or {}
+                    if status.get("type") not in {"notstarted","scheduled","pre"} and status.get("code") not in {0,1}:
+                        continue
+                    ts=e.get("startTimestamp")
+                    home=e.get("homeTeam") or {}
+                    away=e.get("awayTeam") or {}
+                    if not ts or not home.get("name") or not away.get("name"): continue
+                    events.append({
+                        "event_id":f"sofascore|{e.get('id')}",
+                        "start_time":datetime.fromtimestamp(float(ts),tz=timezone.utc).isoformat(),
+                        "home":str(home.get("name")).strip(),
+                        "away":str(away.get("name")).strip(),
+                        "home_score":None,"away_score":None
+                    })
+                if len(batch)<20: break
+        except Exception:
+            pass
+
+    now=datetime.now(timezone.utc)
+    return sorted(
+        {x["event_id"]:x for x in events if x["event_id"] and parse_date(x["start_time"]) and parse_date(x["start_time"])>=now}.values(),
+        key=lambda x:x["start_time"]
+    )
 
 def pois(lam,k):return math.exp(-lam)*lam**k/math.factorial(k)
 
