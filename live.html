@@ -12,7 +12,7 @@
 </head>
 <body class="ms-page ms-live">
 <div class="app">
-<header class="top"><div class="brand"><div class="mark" aria-label="Match Signal logo"><svg viewBox="0 0 48 48" width="34" height="34" fill="none" aria-hidden="true"><path d="M9 28.5a15 15 0 0 1 30 0" stroke="#37E7FF" stroke-width="2.8" stroke-linecap="round"/><path d="M14 29a10 10 0 0 1 20 0M19 29a5 5 0 0 1 10 0" stroke="#42E59A" stroke-width="2.4" stroke-linecap="round"/><path d="M24 29l9-11" stroke="#EDF6FB" stroke-width="3" stroke-linecap="round"/><circle cx="24" cy="29" r="3.2" fill="#37E7FF"/><path d="M8 35h32" stroke="#7C6CFF" stroke-width="1.8" stroke-linecap="round"/></svg></div><div><h1>Match Signal — Live Games</h1><p>Games automatically move here after their live status is confirmed</p></div></div><nav class="tabs"><a class="btn" href="./index.html?sport=football">⚽ Predictions</a><a class="btn active" href="./live.html">🔴 Live</a><a class="btn" href="./basketball.html">🏀 Basketball</a><a class="btn" href="./performance.html">📊 Performance</a></nav></header><section class="ms-official-intro"><div class="eyebrow">LIVE DESK · PROVIDER STATE</div><h2>Live games, live context</h2><p>Only provider-confirmed in-progress events enter the live desk. Finished events are removed and the system remains paper-only.</p></section>
+<header class="top"><div class="brand"><div class="mark" aria-label="Match Signal logo"><svg viewBox="0 0 48 48" width="34" height="34" fill="none" aria-hidden="true"><path d="M9 28.5a15 15 0 0 1 30 0" stroke="#37E7FF" stroke-width="2.8" stroke-linecap="round"/><path d="M14 29a10 10 0 0 1 20 0M19 29a5 5 0 0 1 10 0" stroke="#42E59A" stroke-width="2.4" stroke-linecap="round"/><path d="M24 29l9-11" stroke="#EDF6FB" stroke-width="3" stroke-linecap="round"/><circle cx="24" cy="29" r="3.2" fill="#37E7FF"/><path d="M8 35h32" stroke="#7C6CFF" stroke-width="1.8" stroke-linecap="round"/></svg></div><div><h1>Match Signal — Live Games</h1><p>Games automatically move here after their live status is confirmed</p></div></div><nav class="tabs"><a class="btn" href="./index.html?sport=football">⚽ Predictions</a><a class="btn active" href="./live.html">🔴 Live</a><a class="btn" href="./basketball.html">🏀 Basketball</a><a class="btn" href="./reports.html">📊 Reports</a></nav></header><section class="ms-official-intro"><div class="eyebrow">LIVE DESK · PROVIDER STATE</div><h2>Live games, live context</h2><p>Only provider-confirmed in-progress events enter the live desk. Finished events are removed and the system remains paper-only.</p></section>
 <section class="status"><div class="statusLeft"><span id="dot" class="dot livePulse"></span><div><b id="statusText">Checking live event status…</b><div id="updated" style="color:var(--muted)">Loading current fixtures and live scores</div></div></div><button id="refresh" class="btn">↻ Refresh</button></section>
 <section class="metrics"><div class="metric"><small>Live now</small><strong id="liveCount">0</strong></div><div class="metric"><small>Football</small><strong id="footballCount">0</strong></div><div class="metric"><small>Tennis</small><strong id="tennisCount">0</strong></div><div class="metric"><small>Basketball</small><strong id="basketballCount">0</strong></div></section>
 <section class="panel"><h2>Live desk</h2><div class="notice">Only events confirmed as <b>in progress</b> are shown. Finished games are removed automatically. Match Signal remains <b>paper-only</b>; this page is for live analysis, not live betting.</div></section>
@@ -38,6 +38,23 @@ await Promise.allSettled(tennisTours.map(async tour=>{try{const d=await espn('ht
 // Basketball is included when a matching prediction can be confirmed by a current ESPN scoreboard.
 const basketballLeagues=[...new Set(state.predictions.filter(p=>p.sport==='basketball'&&p.league).map(p=>String(p.league).toLowerCase().replace(/\s+/g,'.')))];
 await Promise.allSettled(basketballLeagues.map(async slug=>{try{const d=await espn('https://site.api.espn.com/apis/site/v2/sports/basketball/'+slug+'/scoreboard');(d.events||[]).forEach(e=>{const p=byId.get(String(e.id));if(p&&statusIsLive(e.status)){found.set(String(e.id),{p,e})}})}catch(e){}}));
+// PDL uses the dedicated SofaScore live adapter because ESPN does not publish the competition in the core football league map.
+try{
+  const pdlRows=state.predictions.filter(p=>p.sport==='football'&&p.league==='England Amateur - U21 Professional Development League');
+  if(pdlRows.length){
+    const d=await getJson('./api/pdl-live');
+    const pdlById=new Map(pdlRows.map(p=>[String(p.event_id),p]));
+    (d.events||[]).forEach(x=>{
+      const p=pdlById.get(String(x.id));
+      if(!p)return;
+      const e={id:String(x.id),date:x.date,status:{...x.status,displayClock:x.displayClock},competitions:[{competitors:[
+        {homeAway:'home',team:{displayName:x.home},score:x.home_score},
+        {homeAway:'away',team:{displayName:x.away},score:x.away_score}
+      ]}]};
+      if(statusIsLive(e.status))found.set(String(x.id),{p,e});
+    });
+  }
+}catch(e){}
 // Keep the last known live event briefly when a provider call drops out.
 const confirmed=[...found.values()];
 const confirmedIds=new Set(confirmed.map(x=>String(x.p.event_id)));
