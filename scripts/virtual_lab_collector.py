@@ -146,10 +146,12 @@ def normalized_market(raw):
 
 def normalize_proxy_event(raw):
     event_id=str(raw.get("event_id") or raw.get("eventId") or "").strip()
-    home=str(raw.get("participant_1") or raw.get("homeTeamName") or "").strip()
-    away=str(raw.get("participant_2") or raw.get("awayTeamName") or "").strip()
+    team_1=str(raw.get("team_1") or raw.get("participant_1") or raw.get("homeTeamName") or "").strip()
+    team_2=str(raw.get("team_2") or raw.get("participant_2") or raw.get("awayTeamName") or "").strip()
+    participant_1=str(raw.get("participant_1") or "").strip()
+    participant_2=str(raw.get("participant_2") or "").strip()
     product=str(raw.get("product") or "").strip()
-    if not event_id or not home or not away or not product:
+    if not event_id or not team_1 or not team_2 or not product:
         return None
     start_ms=num(raw.get("start_time_ms") if raw.get("start_time_ms") is not None else raw.get("estimateStartTime"))
     if start_ms is not None and start_ms < time.time()*1000-120000:
@@ -173,8 +175,11 @@ def normalize_proxy_event(raw):
         "category":str(raw.get("category") or ""),
         "tournament_id":str(raw.get("tournament_id") or ""),
         "category_id":str(raw.get("category_id") or ""),
-        "participant_1":home,
-        "participant_2":away,
+        "team_1":team_1,
+        "team_2":team_2,
+        "participant_1":participant_1,
+        "participant_2":participant_2,
+        "identity_verified":bool(participant_1 and participant_2),
         "start_time_ms":int(start_ms) if start_ms is not None else None,
         "start_time":start_time,
         "match_status":raw.get("match_status") or raw.get("matchStatus"),
