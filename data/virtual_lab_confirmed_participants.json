@@ -1,8 +1,14 @@
 {
-  "version": 2,
+  "version": 3,
   "generated_at": "2026-09-22",
-  "source_contract": "User-confirmed monitored participant identities only; original ticket outcomes are excluded from model training.",
-  "matching": "Stable participant identity only for recurrence/watch matching. eFootball club/team labels are contextual metadata and may rotate; they are never identity keys.",
+  "source_contract": "Product-scoped monitored participant identities for the standalone Virtual Lab. User-confirmed eFootball identities only; original ticket outcomes are excluded from model training.",
+  "product_scope": [
+    "efootball_gt",
+    "efootball_adriatic",
+    "vfootball",
+    "zoom"
+  ],
+  "matching": "Stable participant identity only. eFootball club/team labels are contextual metadata and may rotate; they are never identity keys.",
   "participants": [
     {
       "participant": "DECIMATOR",
@@ -66,36 +72,34 @@
       "market": "ou",
       "confirmed_context": "user_confirmed_winning_ou1_5_ticket",
       "team_context": "Barcelona"
-    },
+    }
+  ],
+  "excluded_from_virtual_lab": [
     {
       "participant": "Andrea Lazaro Garcia",
       "product": "tennis",
-      "market": "ou",
-      "confirmed_context": "user_confirmed_winning_tennis_ticket"
+      "reason": "Main Match Signal tennis domain; preserved separately."
     },
     {
       "participant": "Joelle Lilly Sophie Steur",
       "product": "tennis",
-      "market": "ou",
-      "confirmed_context": "user_confirmed_winning_tennis_ticket"
+      "reason": "Main Match Signal tennis domain; preserved separately."
     },
     {
       "participant": "Jeline Vandromme",
       "product": "tennis",
-      "market": "ou",
-      "confirmed_context": "user_confirmed_winning_tennis_ticket"
+      "reason": "Main Match Signal tennis domain; preserved separately."
     },
     {
       "participant": "Francisca Jorge",
       "product": "tennis",
-      "market": "ou",
-      "confirmed_context": "user_confirmed_winning_tennis_ticket"
+      "reason": "Main Match Signal tennis domain; preserved separately."
     }
   ],
   "unresolved_participants": [
     {
       "participant": "Real Madrid (CAS…)",
-      "reason": "The confirmed ticket record available to the project contains a truncated identifier; omitted until the exact suffix is recovered."
+      "reason": "Truncated confirmed ticket identity; exact suffix must be recovered before any identity linkage."
     }
   ]
 }

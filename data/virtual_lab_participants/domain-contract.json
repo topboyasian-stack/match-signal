@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "contract_id": "VL-DOMAIN-2026-09-22",
+  "purpose": "Hard product/sport boundary for the standalone Virtual Lab.",
+  "allowed_products": [
+    "efootball_gt",
+    "efootball_adriatic",
+    "vfootball",
+    "zoom"
+  ],
+  "excluded_from_virtual_lab": [
+    "tennis",
+    "basketball",
+    "football_core",
+    "srl"
+  ],
+  "identity_rules": [
+    "Stable participant identity is the primary recurrence key.",
+    "Club/team labels are contextual metadata and never identity keys.",
+    "A participant cannot cross product domains without explicit source evidence.",
+    "Unknown or truncated identities remain unresolved."
+  ],
+  "evidence_rules": [
+    "User-supplied tickets remain external evidence and are excluded from automatic model training.",
+    "Automatically collected SportyBet result history is the training/evaluation source.",
+    "Historical observations are append-only research evidence."
+  ],
+  "trace_fields": [
+    "record_id",
+    "event_id",
+    "participant_key",
+    "product",
+    "source",
+    "observed_at",
+    "settled_at",
+    "pipeline_version",
+    "schema_version",
+    "build_commit"
+  ]
+}

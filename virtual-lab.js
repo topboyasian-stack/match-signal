@@ -5,15 +5,16 @@
 const LIVE_API='https://match-signal.pages.dev/api/sportybet-virtual';
 const LIVE_API_TIMEOUT_MS=12000;
 const LIVE_MARKETS='1,18,10,29,11,26,36,14,60100,186,189,202,204,210';
-const SNAPSHOT='./data/virtual_lab_live.json';
+const SNAPSHOT='/data/virtual_lab_live.json';
 const LIVE_REFRESH_MS=30000;
-const UI_BUILD='20260922-v40';
-const HISTORY='./api/virtual-lab-history';
-const HISTORY_FALLBACK='./data/virtual_lab_history.json';
-const MODEL_EVAL='./data/virtual_lab_model_eval.json';
-const ELIGIBILITY='./data/virtual_lab_eligibility.json';
-const PARTICIPANT_PROFILES='./data/virtual_lab_participant_profiles.json';
-const CONFIRMED_WATCH='./data/virtual_lab_confirmed_participants.json';
+const UI_BUILD='20260922-v41';
+const HISTORY='/api/virtual-lab-history';
+const HISTORY_FALLBACK='/data/virtual_lab_history.json';
+const MODEL_EVAL='/data/virtual_lab_model_eval.json';
+const ELIGIBILITY='/data/virtual_lab_eligibility.json';
+const PARTICIPANT_PROFILES='/data/virtual_lab_participant_profiles.json';
+const CONFIRMED_WATCH='/data/virtual_lab_confirmed_participants.json';
+const SUPPORTED_VIRTUAL_PRODUCTS=new Set(['efootball_gt','efootball_adriatic','vfootball','zoom']);
 const state={rows:[],filtered:[],live:[],liveMode:'none',liveUpdated:null,picks:[],builder:[],historyLoaded:false,modelRows:[],modelEvents:[],modelGate:false,modelHoldout:null,modelEvaluation:null,participantProfiles:null,confirmedWatch:null,eligibility:{eligible_competitions:['Esoccer H2H GG League','Europa League','Volta Premier League'],eligible_ou_lines:[3.5,4.5],experimental_ou_lines:[1.5],priority_ou_lines:[1.5,3.5,4.5],eligible_markets:['ou']},predictionCache:new Map()};
 
 const $=id=>document.getElementById(id);
@@ -487,7 +488,7 @@ function scoreProbabilities(rows){
 function participantLabRows(events){
   const groups=new Map();
   for(const e of (events||[])){
-    if(e.total==null||!e.product)continue;
+    if(e.total==null||!SUPPORTED_VIRTUAL_PRODUCTS.has(String(e.product||'')))continue;
     for(const raw of [e.home,e.away]){
       const name=String(raw||'').trim();
       if(!name)continue;
@@ -686,11 +687,11 @@ function isUpcoming(e){
   return !!e;
 }
 function upcomingEventsFrom(events){
-  return (events||[]).filter(isUpcoming).sort((a,b)=>new Date(a.start_time||0).getTime()-new Date(b.start_time||0).getTime());
+  return (events||[]).filter(e=>SUPPORTED_VIRTUAL_PRODUCTS.has(String(e?.product||''))).filter(isUpcoming).sort((a,b)=>new Date(a.start_time||0).getTime()-new Date(b.start_time||0).getTime());
 }
 function renderLive(){
   const product=$('product').value,market=$('market').value;
-  const events=upcomingEventsFrom(state.live).filter(e=>['efootball_gt','efootball_adriatic','vfootball','zoom','other'].includes(String(e.product||''))).filter(e=>product==='all'||e.product===product).sort((a,b)=>Number(isConfirmedWatchedEvent(b))-Number(isConfirmedWatchedEvent(a))||new Date(a.start_time||0)-new Date(b.start_time||0)).slice(0,30);
+  const events=upcomingEventsFrom(state.live).filter(e=>SUPPORTED_VIRTUAL_PRODUCTS.has(String(e.product||''))).filter(e=>product==='all'||e.product===product).sort((a,b)=>Number(isConfirmedWatchedEvent(b))-Number(isConfirmedWatchedEvent(a))||new Date(a.start_time||0)-new Date(b.start_time||0)).slice(0,30);
   const list=events.slice(0,30).map(e=>{
     // Never let one malformed market/prediction abort the entire live fixture render.
     let p=null;
@@ -699,7 +700,7 @@ function renderLive(){
     const chips=shown.flatMap(m=>(m.outcomes||[]).slice(0,4).map(o=>'<span class="liveChip"><span>'+esc(outcomeCode(m,o))+'</span> <b>'+Number(o.odds).toFixed(2)+'</b></span>')).join('');
     const pick=p&&p.primary?'<div class="predictionBox"><div class="predictionTop"><span class="predictionLabel">RESEARCH PICK</span><span class="predictionType">'+(p.primary.marketType==='ou'?'TOTALS':'MATCH RESULT')+'</span></div><div class="predictionPick">'+esc(p.primary.pickCode)+' <b>'+fmtPct(p.primary.calibratedProb)+'</b></div><div class="predictionMeta">Book '+p.primary.bookmakerOdds.toFixed(2)+' · Edge '+fmtPct(p.primary.edge)+' · n='+p.primary.calibrationN+'</div></div>':'<div class="predictionBox mutedPrediction"><div class="predictionLabel">NO QUALIFIED SIGNAL</div><div class="predictionPick">MARKET BASELINE ONLY</div><div class="predictionMeta">Needs ≥30 historical calibration observations and ≥2% calibrated edge.</div></div>';
     const identityLine=(e.participant_1||e.participant_2)?'<div class="participantIdentityLine"><span class="participantIdentityLabel">STABLE PARTICIPANT</span><strong>'+esc(e.participant_1||'UNVERIFIED')+'</strong><span>vs</span><strong>'+esc(e.participant_2||'UNVERIFIED')+'</strong><span class="participantIdentityStatus">'+(e.identity_verified?'✓ VERIFIED':'⚠ IDENTITY UNVERIFIED')+'</span></div>':'<div class="participantIdentityLine participantIdentityUnknown"><span class="participantIdentityLabel">STABLE PARTICIPANT</span><strong>IDENTITY NOT EXPOSED BY LIVE FEED</strong><span class="participantIdentityStatus">⚠ NO GUESSING</span></div>';
-    return '<article class="liveCard"><div class="liveTop"><span>'+esc(e.competition||e.product)+'</span><span>'+esc(e.start_time?date(e.start_time):'Time n/a')+'</span></div><div class="liveTeams"><strong>'+esc(e.home||'Unknown team')+'</strong> <span>vs</span> <strong>'+esc(e.away||'Unknown team')+'</strong>'+identityLine+'</div>'+pick+'<div class="liveOdds">'+(chips||'<span class="liveMeta">No readable markets</span>')+'</div></article>';
+    return '<article class=\"liveCard\" data-product=\"'+esc(e.product||'')+'\"><div class="liveTop"><span>'+esc(e.competition||e.product)+'</span><span>'+esc(e.start_time?date(e.start_time):'Time n/a')+'</span></div><div class="liveTeams"><strong>'+esc(e.home||'Unknown team')+'</strong> <span>vs</span> <strong>'+esc(e.away||'Unknown team')+'</strong>'+identityLine+'</div>'+pick+'<div class="liveOdds">'+(chips||'<span class="liveMeta">No readable markets</span>')+'</div></article>';
   }).join('');
   $('liveGrid').innerHTML=list;
   $('liveEmpty').hidden=!!list;

@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "archive_id": "VL-ARCHIVE-2026-09-22-PRE-REBUILD",
+  "frozen_commit": "83b484a9a93d83f16a369049a4be36770235d661",
+  "frozen_branch": "archive/virtual-lab-pre-rebuild-2026-09-22",
+  "rebuild_branch": "rebuild/virtual-lab-v1-2026-09-22",
+  "preserved_paths": [
+    "data/virtual_lab_history.json",
+    "data/virtual_lab_pending.json",
+    "data/virtual_lab_live.json",
+    "data/virtual_lab_participant_profiles.json",
+    "data/virtual_lab_model_eval.json",
+    "data/virtual_lab_eligibility.json",
+    "data/virtual_lab_user_ticket_evidence.json",
+    "data/virtual_lab_confirmed_participants.json"
+  ],
+  "migration_rules": {
+    "user_ticket_evidence": "preserve as external evidence; exclude from automatic model training",
+    "tennis_participants": "preserve, but move to tennis archive namespace; never display in Virtual Lab eFootball desk",
+    "efootball_participants": "remain in Virtual Lab participant watch namespace",
+    "unresolved_identities": "never infer or invent missing suffixes"
+  }
+}

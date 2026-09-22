@@ -11,6 +11,7 @@ on:
       - 'tennis.html'
       - 'live.html'
       - 'research.html'
+      - 'virtual-lab/**'
       - 'live-analysis.js'
       - 'live-data-worker.js'
       - 'live-timer.js'
@@ -128,7 +129,7 @@ jobs:
             pageSize:'100',
             pageNum:'1',
             timeline:'168',
-            sources:'efootball,srl,vfootball',
+            sources:'efootball,vfootball',
             _t:String(Date.now())
           });
           const apiResponse=await fetch(api+'?'+qs.toString(),{cache:'no-store'});
@@ -138,10 +139,10 @@ jobs:
           if(payload?.ok!==true) throw new Error('Cloudflare virtual proxy did not return ok=true');
           if(!virtual.length) throw new Error('Cloudflare virtual proxy returned no virtual/eFootball/SRL events');
           console.log('Cloudflare live source OK:',virtual.length,'events:',payload.product_counts||{});
-          const page=await fetch('https://topboyasian-stack.github.io/match-signal/research.html?smoke='+Date.now(),{cache:'no-store'});
+          const page=await fetch('https://topboyasian-stack.github.io/match-signal/virtual-lab/?smoke='+Date.now(),{cache:'no-store'});
           const body=await page.text();
           if(!page.ok) throw new Error('GitHub Pages Virtual Lab HTTP '+page.status);
-          for(const marker of ['Virtual Lab','liveGrid','LIVE_API']) if(!body.includes(marker)) throw new Error('GitHub Pages research page missing '+marker);
+          for(const marker of ['Virtual Lab','liveGrid','virtual-lab.js','predictionDesk']) if(!body.includes(marker)) throw new Error('GitHub Pages research page missing '+marker);
           console.log('GitHub Pages Virtual Lab page OK');
           NODE
 

@@ -122,8 +122,8 @@ jobs:
           node --input-type=module <<'NODE'
           import { writeFileSync } from 'node:fs';
           const base = 'https://match-signal.pages.dev';
-          const pages = ['/', '/expansion.html', '/live.html', '/basketball.html', '/performance.html', '/research.html', '/virtual-lab'];
-          const assets = ['/api/sportybet-virtual','/expansion.js', '/expansion-odds-builder.js', '/live-analysis.js', '/live-data-worker.js', '/virtual-lab.js', '/virtual-lab.css', '/_redirects', '/data/predictions.json', '/data/expansion_status.json', '/data/odds_builder.json', '/data/virtual_lab_live.json','/data/virtual_lab_model_eval.json','/data/virtual_lab_eligibility.json'];
+          const pages = ['/', '/expansion.html', '/live.html', '/basketball.html', '/performance.html', '/virtual-lab/', '/research.html'];
+          const assets = ['/api/sportybet-virtual','/expansion.js', '/expansion-odds-builder.js', '/live-analysis.js', '/live-data-worker.js', '/virtual-lab.js', '/virtual-lab.css', '/_redirects', '/data/predictions.json', '/data/expansion_status.json', '/data/odds_builder.json', '/data/virtual_lab_live.json','/data/virtual_lab_model_eval.json','/data/virtual_lab_eligibility.json','/data/virtual_lab_participants/registry.json','/confirmed-participant-watch.js'];
           const failures = [];
           async function get(path) {
             const r = await fetch(base + path + (path.includes('?') ? '&' : '?') + 'smoke=' + Date.now(), {cache:'no-store'});
@@ -143,7 +143,7 @@ jobs:
                 for (const marker of ['id="statusText"','id="grid"','live-analysis.js','live-data-worker.js'])
                   if (!body.includes(marker)) failures.push(path+' missing '+marker);
               }
-              if (path==='/research.html' || path==='/virtual-lab.html' || path==='/virtual-lab') {
+              if (path==='/research.html' || path==='/virtual-lab.html' || path==='/virtual-lab/' || path==='/virtual-lab') {
                 for (const marker of ['Virtual Lab','virtual-lab.js','predictionDesk','oddsBuilder','How to use the Lab / what to select','Research conclusion'])
                   if (!body.includes(marker)) failures.push(path+' missing '+marker);
               }
@@ -182,7 +182,7 @@ jobs:
             if (!r.ok) failures.push('/api/espn NBA HTTP '+r.status);
             else if (!Array.isArray(JSON.parse(body).events)) failures.push('/api/espn NBA returned invalid JSON');
           } catch(e) { failures.push('/api/espn '+e.message); }
-          for (const source of ['efootball','srl','vfootball']) {
+          for (const source of ['efootball','vfootball']) {
             try {
               const p = new URLSearchParams({
                 source,
@@ -204,7 +204,7 @@ jobs:
               pageSize:'100',
               pageNum:'1',
               timeline:'168',
-              sources:'efootball,srl,vfootball',
+              sources:'efootball,vfootball',
               _t:String(Date.now())
             });
             const {r,body}=await get('/api/sportybet-virtual?'+params.toString());
