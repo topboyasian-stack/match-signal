@@ -8,6 +8,7 @@ const LIVE_API=location.origin+'/api/sportybet-virtual';
 const LIVE_API_TIMEOUT_MS=12000;
 const LIVE_MARKETS='1,18,10,29,11,26,36,14,60100,186,189,202,204,210';
 const BUILD_ID='VL-V1-20260922';
+const PRODUCTION_ROUTE='/virtual-lab/';
 const SNAPSHOT='/data/virtual_lab_live.json';
 const LIVE_REFRESH_MS=30000;
 const UI_BUILD='VL-V1-20260922';
@@ -702,7 +703,8 @@ function updateDiagnostics(extra={}){
     '<div><small>Live events</small><b>'+liveCount+'</b></div>'+ 
     '<div><small>Settled rows</small><b>'+historyCount+'</b></div>'+ 
     '<div><small>Participants</small><b>'+participantCount+'</b></div>'+ 
-    '<div><small>Model gate</small><b>'+esc(state.modelGate?'PASS':'WAIT')+'</b></div>'+
+    '<div><small>Model gate</small><b>'+esc(state.modelGate?'PASS':'WAIT')+'</b></div>'+\
+    '<div><small>Route</small><b>'+esc(PRODUCTION_ROUTE)+'</b></div>'+
     '</div>'+
     '<p class="muted">'+esc(extra.message||'Canonical pipeline: SportyBet → normalization → identity → observation → settlement → history → model.')+'</p>';
 }
@@ -1032,6 +1034,7 @@ $('clearBuilder').addEventListener('click',function(){state.builder=[];renderBui
 $('clear').addEventListener('click',()=>{state.rows=[];state.filtered=[];state.builder=[];const hs=$('historyStatus');if(hs)hs.textContent='MANUAL DATASET CLEARED';$('fileInput').value='';analyze();renderBuilder()});
 
 analyze();
+updateDiagnostics({message:'Virtual Lab v1 initialized. Production route: '+PRODUCTION_ROUTE});
 loadEligibility();
 loadHistory();
 loadConfirmedWatch().then(()=>loadLive());
