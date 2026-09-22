@@ -493,7 +493,7 @@ def settle(pending):
             "participant_1_key": stable_participant_key(item["product"],item.get("participant_1")),
             "participant_2_key": stable_participant_key(item["product"],item.get("participant_2")),
             "trace_source": "sportybet_ng_result_proxy",
-            "trace_id": f"{item[\"event_id\"]}|{item[\"market\"]}|{item.get(\"line\") if item.get(\"line\") is not None else \"\"}|{item[\"selection\"]}",
+            "trace_id": f'{item["event_id"]}|{item["market"]}|{item.get("line") if item.get("line") is not None else ""}|{item["selection"]}',
             "collector_run_id": os.getenv("GITHUB_RUN_ID") or "local",
         })
         settled_count += 1
