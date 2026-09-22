@@ -125,6 +125,6 @@ def main():
     payload={"updated_at":now,**candidate,"errors":errors,"refresh_seconds":30,"sync_build":SYNC_BUILD}
     out.write_text(json.dumps(payload,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
     print(json.dumps({"status":payload["status"],"events_count":len(rows),"product_counts":counts,"errors":errors},indent=2))
-    if not rows:raise SystemExit("ABORT: no live virtual/eFootball/SRL events collected")
+    if not rows:raise SystemExit("ABORT: no live eFootball/virtual events collected")
 
 if __name__=="__main__":main()
