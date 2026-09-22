@@ -20,7 +20,6 @@ on:
       - 'live-analysis.js'
       - 'live-data-worker.js'
       - 'live-timer.js'
-      - 'nav-fix.js'
       - 'metrics-fix.js'
       - 'functions/**'
       - 'expansion.js'
@@ -70,23 +69,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: main
-
-      - name: Install lightweight navigation fix
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          for path in Path('.').glob('*.html'):
-              text=path.read_text(encoding='utf-8')
-              src='./nav-fix.js'
-              tag=f'<script src="{src}"></script>'
-              if tag not in text:
-                  text=text.replace('</body>',tag+'\n</body>',1)
-              marker='<style id="match-signal-nav-fix">'
-              style=marker+'.tabs a,.nav a{pointer-events:auto!important;position:relative;z-index:9999;cursor:pointer!important;touch-action:manipulation}</style>'
-              if marker not in text:
-                  text=text.replace('</head>',style+'</head>',1)
-              path.write_text(text,encoding='utf-8')
-          PY
 
       - name: Verify production artifact
         run: |
@@ -156,6 +138,8 @@ jobs:
           for (const path of pages) {
             try {
               const {r,body}=await get(path);
+              if ((path==='/' || path==='/index.html') && (body.includes('index-tight') || body.includes('nav-fix.js') || body.includes('⌂ Home'))) failures.push(path+' contains retired root/navigation behavior');
+              if (path==='/live.html' && (body.includes('nav-fix.js') || body.includes('?sport=football'))) failures.push(path+' contains retired navigation behavior');
               if (!r.ok) failures.push(path+' HTTP '+r.status);
               if (!body.includes('<html') && path.endsWith('.html')) failures.push(path+' did not return HTML');
               if (path==='/expansion.html') {
