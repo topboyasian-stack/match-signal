@@ -31,7 +31,7 @@ const fmtNum=v=>v==null?'—':Number(v).toFixed(3);
 function participantIdentity(value){
   const s=String(value??'').trim();
   if(!s)return '';
-  const m=s.match(/\\(([^()]+)\\)\\s*$/);
+  const m=s.match(/\(([^()]+)\)\s*$/);
   return m&&m[1].trim()?m[1].trim():s;
 }
 function participantIdentityKey(value){return participantIdentity(value).trim().toLowerCase();}
