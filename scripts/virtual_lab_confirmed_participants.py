@@ -9,10 +9,10 @@ import re
 
 ROOT=Path(__file__).resolve().parents[1]
 DATA=ROOT/"data"
-WATCH=DATA/"virtual_lab_confirmed_participants.json"
+WATCH=DATA/"virtual_lab_participants"/"efootball_confirmed_watch.json"
 HISTORY=DATA/"virtual_lab_history.json"
 OUT=DATA/"virtual_lab_confirmed_participant_results.json"
-SUPPORTED_PRODUCTS={"efootball_gt","efootball_adriatic","vfootball","zoom"}
+SUPPORTED_PRODUCTS={"efootball_gt"}
 
 def participant_identity(value: str) -> str:
     s=" ".join(str(value or "").split()).strip()
@@ -48,6 +48,7 @@ def main():
         "generated_at":datetime.now(timezone.utc).isoformat(),
         "source_contract":"automatic SportyBet history only; user-reported ticket outcomes excluded",
         "product_scope":sorted(SUPPORTED_PRODUCTS),
+        "watch_namespace":"data/virtual_lab_participants/efootball_confirmed_watch.json",
         "profiles":profiles
     },indent=2)+"\n")
     print(json.dumps({
