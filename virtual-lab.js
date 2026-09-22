@@ -7,7 +7,7 @@ const LIVE_API_TIMEOUT_MS=12000;
 const LIVE_MARKETS='1,18,10,29,11,26,36,14,60100,186,189,202,204,210';
 const SNAPSHOT='./data/virtual_lab_live.json';
 const LIVE_REFRESH_MS=30000;
-const UI_BUILD='20260922-v37';
+const UI_BUILD='20260922-v38';
 const HISTORY='./api/virtual-lab-history';
 const HISTORY_FALLBACK='./data/virtual_lab_history.json';
 const MODEL_EVAL='./data/virtual_lab_model_eval.json';
@@ -692,7 +692,9 @@ function renderLive(){
   const product=$('product').value,market=$('market').value;
   const events=upcomingEventsFrom(state.live).filter(e=>['efootball_gt','efootball_adriatic','vfootball','zoom','other'].includes(String(e.product||''))).filter(e=>product==='all'||e.product===product).sort((a,b)=>Number(isConfirmedWatchedEvent(b))-Number(isConfirmedWatchedEvent(a))||new Date(a.start_time||0)-new Date(b.start_time||0)).slice(0,30);
   const list=events.slice(0,30).map(e=>{
-    const p=predictionForEvent(e);
+    // Never let one malformed market/prediction abort the entire live fixture render.
+    let p=null;
+    try{p=predictionForEvent(e);}catch(err){console.warn('Virtual Lab prediction render skipped:',e?.event_id,err);}
     const shown=(e.markets||[]).filter(m=>matchesMarket(m,market)).slice(0,3);
     const chips=shown.flatMap(m=>(m.outcomes||[]).slice(0,4).map(o=>'<span class="liveChip"><span>'+esc(outcomeCode(m,o))+'</span> <b>'+Number(o.odds).toFixed(2)+'</b></span>')).join('');
     const pick=p&&p.primary?'<div class="predictionBox"><div class="predictionTop"><span class="predictionLabel">RESEARCH PICK</span><span class="predictionType">'+(p.primary.marketType==='ou'?'TOTALS':'MATCH RESULT')+'</span></div><div class="predictionPick">'+esc(p.primary.pickCode)+' <b>'+fmtPct(p.primary.calibratedProb)+'</b></div><div class="predictionMeta">Book '+p.primary.bookmakerOdds.toFixed(2)+' · Edge '+fmtPct(p.primary.edge)+' · n='+p.primary.calibrationN+'</div></div>':'<div class="predictionBox mutedPrediction"><div class="predictionLabel">NO QUALIFIED SIGNAL</div><div class="predictionPick">MARKET BASELINE ONLY</div><div class="predictionMeta">Needs ≥30 historical calibration observations and ≥2% calibrated edge.</div></div>';
@@ -784,8 +786,36 @@ async function fetchLiveRemote(){
       const body=await r.json();
       if(body?.ok===false)throw new Error(body.error||base+' returned an error');
       const raw=Array.isArray(body?.events)?body.events:[];
-      const events=raw.map(e=>normalizeLiveEvent(e,e.tournament||e.competition||'',e.category||'')).filter(Boolean);
-      if(events.length)return {events,updated_at:body.updated_at||new Date().toISOString(),endpoint:base,sourceStatus:body.source_status||{},productCounts:body.product_counts||{}};
+      // Cloudflare proxy responses are already normalized. Keep a tolerant direct path
+      // so a single field-shape change cannot turn a known non-empty feed into zero cards.
+      const events=raw.map(e=>{
+        try{
+          const normalized=normalizeLiveEvent(e,e.tournament||e.competition||'',e.category||'');
+          if(normalized)return normalized;
+          const product=String(e.product||'').toLowerCase().trim();
+          const eventId=String(e.event_id||e.eventId||'');
+          if(!product||!eventId)return null;
+          return {
+            product,
+            competition:String(e.tournament||e.competition||'Unclassified'),
+            category:String(e.category||''),
+            event_id:eventId,
+            home:String(e.team_1||e.homeTeamName||e.home||''),
+            away:String(e.team_2||e.awayTeamName||e.away||''),
+            participant_1:String(e.participant_1||''),
+            participant_2:String(e.participant_2||''),
+            participant_identity_source:e.participant_identity_source||null,
+            identity_verified:!!(e.participant_1&&e.participant_2),
+            start_time:(Number(e.start_time_ms)>0?new Date(Number(e.start_time_ms)).toISOString():(e.start_time||null)),
+            match_status:e.match_status??e.matchStatus??null,
+            markets:Array.isArray(e.markets)?e.markets:[]
+          };
+        }catch(err){
+          console.warn('Virtual Lab live normalization skipped:',e?.event_id||e?.eventId,err);
+          return null;
+        }
+      }).filter(Boolean);
+      if(events.length)return {events,updated_at:body.updated_at||new Date().toISOString(),endpoint:base,sourceStatus:body.source_status||{},productCounts:body.product_counts||{},rawCount:raw.length};
       const status=body?.status||'EMPTY';
       const detail=body?.errors?.join('; ')||Object.entries(body?.source_status||{}).map(([k,v])=>k+':'+(v?.status||'UNKNOWN')+' '+(v?.events??0)).join(' · ');
       lastError=new Error(base+' returned '+status+' with 0 normalized events'+(detail?' · '+detail:''));
@@ -828,7 +858,7 @@ async function loadLive(){
     state.liveUpdated=live.updated_at;
     renderLive();
     rebuildPredictionDesk();
-    $('liveMeta').textContent='LIVE · '+$('liveMeta').textContent+' · '+live.endpoint;
+    $('liveMeta').textContent='LIVE · '+$('liveMeta').textContent+' · '+live.endpoint+(live.rawCount!=null?' · '+live.rawCount+' raw / '+live.events.length+' normalized':'');
     return;
   }catch(remoteError){
     try{
