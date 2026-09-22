@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Collect live SportyBet NG virtual/eFootball/SRL events for Match Signal."""
+"""Collect live SportyBet NG eFootball/virtual events for Match Signal."""
 from __future__ import annotations
 import json, os, re
 from datetime import datetime, timezone
@@ -14,7 +14,7 @@ DIRECT_PC="https://www.sportybet.com/api/ng/factsCenter/pcUpcomingEvents"
 DIRECT_VFL="https://www.sportybet.com/api/ng/factsCenter/wapConfigurableUpcomingEvents"
 HEADERS={"Accept":"application/json, text/plain, */*","Content-Type":"application/json","Current-Country":"NG","Origin":"https://www.sportybet.com","Referer":"https://www.sportybet.com/ng/","User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/152.0.0.0 Safari/537.36"}
 SPORTY_MARKETS="1,18,10,29,11,26,36,14,60100,186,189,202,204,210"
-SYNC_BUILD="2026-09-21-live-refresh-v2"
+SYNC_BUILD="2026-09-22-vl-v1"
 
 def request(url, params):
     r=requests.get(url,params=params,headers=HEADERS,timeout=25)
@@ -62,7 +62,7 @@ def compact(raw,fallback_product=None):
 def collect_proxy():
     events=[]
     for page in range(1,6):
-        p={"pageSize":100,"pageNum":page,"timeline":168,"sources":"efootball,srl,vfootball","_t":int(datetime.now(tz=timezone.utc).timestamp()*1000)}
+        p={"pageSize":100,"pageNum":page,"timeline":168,"sources":"efootball,vfootball","_t":int(datetime.now(tz=timezone.utc).timestamp()*1000)}
         body=request(PROXY,p)
         batch=body.get("events") or []
         events.extend(batch)
@@ -74,7 +74,6 @@ def collect_direct():
     for page in range(1,6):
         base={"pageSize":100,"pageNum":page,"timeline":168,"todayGames":"false","_t":int(datetime.now(tz=timezone.utc).timestamp()*1000)}
         for sport_id,product_hint,url in [
-            ("sr:sport:1",None,DIRECT_PC),
             ("sr:sport:137","efootball_gt",DIRECT_PC),
             ("sr:sport:202120001","vfootball",DIRECT_VFL)
         ]:
@@ -108,7 +107,7 @@ def main():
     rows={}
     for item in raw:
         row=compact(item)
-        if row and row["event_id"] and row["product"] in {"efootball_gt","efootball_adriatic","srl","vfootball","zoom","other"}:
+        if row and row["event_id"] and row["product"] in {"efootball_gt","efootball_adriatic","vfootball","zoom","other"}:
             rows[row["event_id"]]=row
     rows=sorted(rows.values(),key=lambda x:(x.get("start_time") or "",x.get("product") or "",x.get("event_id") or ""))
     counts={}
