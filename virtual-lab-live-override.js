@@ -47,9 +47,9 @@
   }
   function render(body){
     const raw=Array.isArray(body&&body.events)?body.events:[];
-    const now=Date.now();
+    // Backend already applies the authoritative upcoming/live window. Do not re-filter here.
     const events=raw.map(e=>Object.assign({},e,{_start:startMs(e),_product:product(e)}))
-      .filter(e=>e._start==null||e._start>=now-120000)
+      
       .sort((a,b)=>(a._start||0)-(b._start||0))
       .slice(0,30);
 
