@@ -6,7 +6,7 @@ const LIVE_API='https://match-signal.pages.dev/api/sportybet-virtual';
 const LIVE_MARKETS='1,18,10,29,11,26,36,14,60100,186,189,202,204,210';
 const SNAPSHOT='./data/virtual_lab_live.json';
 const LIVE_REFRESH_MS=30000;
-const UI_BUILD='20260922-v29';
+const UI_BUILD='20260922-v30';
 const HISTORY='./api/virtual-lab-history';
 const HISTORY_FALLBACK='./data/virtual_lab_history.json';
 const MODEL_EVAL='./data/virtual_lab_model_eval.json';
@@ -234,7 +234,7 @@ function normalizeLiveEvent(event,tournament,category){
   const away=String(event.team_2||event.awayTeamName||event.away||'');
   const homeParticipant=participantIdentity(event.participant_1||event.homeParticipant||event.homePlayer||event.homeCompetitor||'');
   const awayParticipant=participantIdentity(event.participant_2||event.awayParticipant||event.awayPlayer||event.awayCompetitor||'');
-  const product=classifyEvent(tournament,category,home,away);
+  const product=String(event.product||classifyEvent(tournament,category,home,away)||'').toLowerCase().trim();
   const eventId=String(event.event_id||event.eventId||'');
   if(!product||!eventId)return null;
   const markets=(event.markets||[]).map(m=>{
@@ -243,7 +243,7 @@ function normalizeLiveEvent(event,tournament,category){
       return odds!=null?{id:String(o.id||''),name:String(o.desc||o.name||''),odds,active:o.isActive!==false}:null;
     }).filter(Boolean);
     if(!outcomes.length)return null;
-    return {id:String(m.id||''),name:String(m.desc||m.name||m.title||''),specifier:m.specifier,line:lineFromSpecifier(m.specifier),status:m.status,outcomes,lastOddsChangeTime:m.lastOddsChangeTime};
+    return {id:String(m.id||''),name:String(m.desc||m.name||m.title||''),specifier:m.specifier,line:m.line!=null?Number(m.line):lineFromSpecifier(m.specifier),status:m.status,outcomes,lastOddsChangeTime:m.lastOddsChangeTime};
   }).filter(Boolean);
   let start=null;
   const ms=Number(event.start_time_ms??event.estimateStartTime);
