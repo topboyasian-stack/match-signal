@@ -19,6 +19,7 @@ on:
       - 'scripts/scoped_pipeline.py'
       - 'scripts/production_pipeline.py'
       - 'scripts/autopilot_guard.py'
+      - 'scripts/football_forward_readiness.py'
       - 'live.html'
       - '.github/workflows/autopilot-refresh.yml'
 
@@ -57,7 +58,7 @@ jobs:
           git reset --hard origin/main
 
       - name: Compile production Python modules
-        run: python -m py_compile scripts/calibration.py scripts/tennis_total_model.py scripts/predict_today.py scripts/run_pipeline.py scripts/scoped_pipeline.py scripts/production_pipeline.py scripts/autopilot_guard.py
+        run: python -m py_compile scripts/calibration.py scripts/tennis_total_model.py scripts/predict_today.py scripts/run_pipeline.py scripts/scoped_pipeline.py scripts/production_pipeline.py scripts/autopilot_guard.py scripts/football_forward_readiness.py
 
       - name: Preserve independent live experimental league slices
         run: |
@@ -105,7 +106,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/predictions.json data/prediction_history.json data/accuracy.json data/pipeline_status.json data/autopilot_status.json data/football_forward_readiness.json data/football_forward_readiness.json
+          git add data/predictions.json data/prediction_history.json data/accuracy.json data/pipeline_status.json data/autopilot_status.json data/football_forward_readiness.json
           if git diff --cached --quiet; then
             echo "Autopilot checked the feed; no data changes were required."
             exit 0
@@ -129,7 +130,7 @@ jobs:
             python -c "import json; from pathlib import Path; feed=Path('data/predictions.json'); rows=json.loads(feed.read_text()) if feed.exists() else []; preserved=json.loads(Path('/tmp/preserved_live_leagues.json').read_text()); protected=set(preserved); rows=[r for r in rows if r.get('league') not in protected]; [rows.extend(v) for v in preserved.values()]; rows.sort(key=lambda r: str(r.get('start_time') or '')); feed.write_text(json.dumps(rows, indent=2, ensure_ascii=False)); print('Restored protected live leagues:', {k: len(v) for k, v in preserved.items()})"
 
             python scripts/autopilot_guard.py
-            git add data/predictions.json data/prediction_history.json data/accuracy.json data/pipeline_status.json data/autopilot_status.json
+            git add data/predictions.json data/prediction_history.json data/accuracy.json data/pipeline_status.json data/autopilot_status.json data/football_forward_readiness.json
             if git diff --cached --quiet; then
               echo "Autopilot rebuild is already represented on latest main."
               exit 0
