@@ -4,13 +4,14 @@
 const WATCH='./data/virtual_lab_confirmed_participants.json';
 let watch=null;
 const norm=v=>String(v||'').trim().toLowerCase();
+const identity=v=>{const s=String(v||'').trim();const m=s.match(/\\(([^()]+)\\)\\s*$/);return m&&m[1].trim()?m[1].trim():s};
 async function load(){
   try{const r=await fetch(WATCH+'?t='+Date.now(),{cache:'no-store'});if(!r.ok)throw new Error('watchlist HTTP '+r.status);watch=await r.json();renderPanel();annotate();setInterval(annotate,5000);}
   catch(e){console.warn('Confirmed participant watch layer:',e);}
 }
 function match(name,product){
-  const n=norm(name);
-  return (watch?.participants||[]).filter(x=>norm(x.participant)===n && (!x.product||x.product===product||x.product==='all'));
+  const n=norm(identity(name));
+  return (watch?.participants||[]).filter(x=>norm(identity(x.participant))===n && (!x.product||x.product===product||x.product==='all'));
 }
 function badge(text,cls){
   const s=document.createElement('span');s.className='confirmedWatchTag '+(cls||'');s.textContent=text;return s;
@@ -28,7 +29,7 @@ function annotate(){
   });
   document.querySelectorAll('.predictionDesk .predictionCard').forEach(card=>{
     const text=card.textContent||'';
-    const hits=(watch.participants||[]).filter(x=>text.includes(x.participant));
+    const hits=(watch.participants||[]).filter(x=>text.split(/\\s+vs\\s+/i).map(identity).map(norm).includes(norm(identity(x.participant))));
     if(hits.length&&!card.querySelector('.confirmedWatchTag'))card.prepend(badge('🔥 MONITORED','deskWatch'));
   });
 }
