@@ -428,9 +428,13 @@ def fetch_current_predictions():
         tour_bucket = qc["rejected_by_tour"].setdefault(tour, {})
         tour_bucket[reason] = tour_bucket.get(reason, 0) + 1
 
+    # Football now uses the same forward-planning principle as tennis:
+    # calculate the next 7 days, not only today's scoreboard.
+    today = datetime.now(timezone.utc).date()
+    football_end = today + timedelta(days=7)
     for label, league in FOOTBALL_LEAGUES.items():
         try:
-            board = fetch_scoreboard("soccer", league)
+            board = fetch_scoreboard("soccer", league, f"{today:%Y%m%d}-{football_end:%Y%m%d}")
             for event in board.get("events", []):
                 if event.get("status", {}).get("type", {}).get("completed"):
                     continue
@@ -439,7 +443,6 @@ def fetch_current_predictions():
                     predictions.append(prediction)
         except Exception as exc:
             errors.append(f"football:{label}:{exc}")
-    today = datetime.now(timezone.utc).date()
     tennis_end = today + timedelta(days=7)
     form_start = today - timedelta(days=60)
     for tour in TENNIS_LEAGUES:
