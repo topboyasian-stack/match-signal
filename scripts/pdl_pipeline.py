@@ -5,7 +5,7 @@ Upcoming fixtures: Match Signal's SportyBet NG proxy, filtered to the exact
 PDL tournament name. Model fitting is independent of bookmaker prices.
 """
 from __future__ import annotations
-import json, math, re
+import json, math, re, io
 from datetime import datetime, timezone
 from pathlib import Path
 import requests
@@ -29,7 +29,7 @@ def parse_date(v):
 
 def history():
     html=S.get(RESULTS_URL,timeout=30).text
-    tables=pd.read_html(html)
+    tables=pd.read_html(io.StringIO(html))
     rows=[]
     for df in tables:
         cols={str(c).strip().lower() for c in df.columns}
