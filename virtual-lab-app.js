@@ -611,6 +611,15 @@ function qualifiesResearchPick(c){
   const modelOk=c.marketType==='ou'?state.modelGate:true;
   return state.historyLoaded && modelOk && c.calibrationN>=30 && edge>=0.02;
 }
+function qualifiesBaseResearchPick(c,e){
+  if(!c||!e||!state.historyLoaded)return false;
+  const edge=Number(c.calibratedProb)-Number(c.bookImplied);
+  if(!Number.isFinite(edge)||edge<0.02)return false;
+  if(c.marketType==='ou'){
+    return isPromotedResearchEvent(e)&&isPromotedOU(c);
+  }
+  return false;
+}
 function isEligibleResearchEvent(e){
   const name=String(e.competition||e.tournament||'');
   const raw=state.eligibility.raw_eligible_competitions||state.eligibility.eligible_competitions||[];
@@ -671,9 +680,11 @@ function predictionForEvent(e){
     const bestOU=active.length?enrichCandidate(active[0],e):null;
     const experimentalOU=experimental.length?enrichCandidate(experimental[0],e):null;
     const primaryCandidate=bestOU||experimentalOU;
-    const promoted=isPromotedResearchEvent(e)&&(primaryCandidate?isPromotedOU(primaryCandidate):false);
-    const qualified=primaryCandidate&&qualifiesResearchPick(primaryCandidate);
+    const participantQualified=primaryCandidate&&qualifiesResearchPick(primaryCandidate);
+    const baseQualified=primaryCandidate&&qualifiesBaseResearchPick(primaryCandidate,e);
+    const qualified=!!(participantQualified||baseQualified);
     const candidate=primaryCandidate&&state.historyLoaded?primaryCandidate:null;
+    const status=participantQualified?'QUALIFIED_PARTICIPANT_ENHANCED':(baseQualified?'QUALIFIED_BASE_EVIDENCE':(isPromotedResearchEvent(e)?'PROMOTION_PENDING':'EVIDENCE_CANDIDATE'));
     const out={
       product:e.product,competition:e.competition||e.tournament||'',event_id:id,
       home:String(e.home||e.participant_1||''),away:String(e.away||e.participant_2||''),
@@ -681,7 +692,8 @@ function predictionForEvent(e){
       identity_verified:!!(e.participant_1&&e.participant_2),start_time:e.start_time||null,
       primary:qualified?primaryCandidate:null,
       candidate:candidate,
-      candidate_status:qualified?'QUALIFIED':(promoted?'PROMOTION_PENDING':'EVIDENCE_CANDIDATE'),
+      candidate_status:status,
+      model_tier:participantQualified?'participant-enhanced':'base-evidence',
       bestWinner:null,bestOU,experimentalOU,candidates:[bestOU,experimentalOU].filter(Boolean)
     };
     state.predictionCache.set(id,out);
@@ -692,7 +704,8 @@ function predictionForEvent(e){
       home:String(e.home||e.participant_1||''),away:String(e.away||e.participant_2||''),
       participant_1:String(e.participant_1||''),participant_2:String(e.participant_2||''),
       identity_verified:!!(e.participant_1&&e.participant_2),start_time:e.start_time||null,
-      primary:null,candidate:null,candidate_status:'CALCULATION_ERROR',bestWinner:null,bestOU:null,experimentalOU:null,candidates:[]};
+      primary:null,candidate:null,candidate_status:'CALCULATION_ERROR',model_tier:'none',
+      bestWinner:null,bestOU:null,experimentalOU:null,candidates:[]};
     state.predictionCache.set(id,safe);
     return safe;
   }
@@ -792,12 +805,12 @@ function renderPredictionDesk(){
     const hot=p.bestOU&&p.bestOU.hotParticipant?p.bestOU.hotParticipant:(p.experimentalOU&&p.experimentalOU.hotParticipant?p.experimentalOU.hotParticipant:null);
     const hotBadge=hot?'<em class="hotParticipantTag">🔥 HOT '+esc(hot.hot.direction)+' · '+hot.hot.line+'</em>':'';
     const primaryHtml=p.primary?
-      '<div class="primaryPick">'+hotBadge+'<span>QUALIFIED RESEARCH SIGNAL</span><strong>'+esc(p.primary.pickCode)+'</strong><b>'+fmtPct(p.primary.calibratedProb)+'</b><small>edge '+fmtPct(p.primary.edge)+' · n='+p.primary.calibrationN+'</small></div>':
+      '<div class="primaryPick">'+hotBadge+'<span>'+(p.model_tier==='participant-enhanced'?'QUALIFIED · PARTICIPANT ENHANCED':'QUALIFIED · BASE EVIDENCE')+'</span><strong>'+esc(p.primary.pickCode)+'</strong><b>'+fmtPct(p.primary.calibratedProb)+'</b><small>edge '+fmtPct(p.primary.edge)+' · n='+p.primary.calibrationN+'</small></div>':
       p.candidate?
       '<div class="primaryPick candidatePrediction">'+hotBadge+'<span>'+(p.candidate_status==='PROMOTION_PENDING'?'EVIDENCE CANDIDATE · PROMOTION PENDING':'EVIDENCE CANDIDATE')+'</span><strong>'+esc(p.candidate.pickCode||'—')+'</strong><b>'+fmtPct(p.candidate.calibratedProb??p.candidate.fairProb)+'</b><small>book '+(Number.isFinite(Number(p.candidate.bookmakerOdds))?Number(p.candidate.bookmakerOdds).toFixed(2):'—')+' · model '+(state.modelGate?'participant-enhanced':'base evidence')+'</small></div>':
       watch?'<div class="primaryPick mutedPrediction">'+hotBadge+'<span>O/U 1.5 RESEARCH WATCH</span><strong>'+esc(watch.pickCode)+'</strong><b>'+fmtPct(watch.calibratedProb)+'</b><small>participant n='+(watch.recurrence?watch.recurrence.entityN:0)+' · model is experimental</small></div>':
       '<div class="primaryPick mutedPrediction"><span>NO EVIDENCE CANDIDATE</span><strong>WAIT</strong><b>Market baseline only</b></div>';
-    const addLabel=p.primary?'＋ Add qualified pick':'Locked · no qualified signal';
+    const addLabel=p.primary?'＋ Add qualified paper pick':'Locked · evidence not yet promoted';
     const activeRec=p.bestOU&&p.bestOU.recurrence;
     const expRec=p.experimentalOU&&p.experimentalOU.recurrence;
     const recurrenceText=(activeRec||expRec)?
@@ -805,7 +818,7 @@ function renderPredictionDesk(){
       ' · O/U 1.5 n='+(expRec?expRec.entityN:0)+' · '+(expRec&&expRec.entityOverRate!=null?fmtPct(expRec.entityOverRate):'—')+
       ' · exact-pair O1.5 n='+(expRec?expRec.pairN:0):'No prior participant recurrence sample yet.';
     const identityHtml=(p.participant_1||p.participant_2)?'<div class="participantIdentityLine"><span class="participantIdentityLabel">STABLE PARTICIPANT</span><strong>'+esc(p.participant_1||'UNVERIFIED')+'</strong><span>vs</span><strong>'+esc(p.participant_2||'UNVERIFIED')+'</strong><span class="participantIdentityStatus">'+(p.identity_verified?'✓ VERIFIED':'⚠ IDENTITY UNVERIFIED')+'</span></div>':'<div class="participantIdentityLine participantIdentityUnknown"><span class="participantIdentityLabel">STABLE PARTICIPANT</span><strong>IDENTITY NOT EXPOSED BY LIVE FEED</strong><span class="participantIdentityStatus">⚠ NO GUESSING</span></div>';
-    return '<article class="predictionCard"><div class="predictionHeader"><div><small>'+esc(p.product)+' · '+esc(p.competition)+'</small><h3>'+esc(p.home)+' <span>vs</span> '+esc(p.away)+'</h3>'+identityHtml+'</div><time>'+esc(p.start_time?date(p.start_time):'—')+'</time></div>'+primaryHtml+'<div class="calcTable"><div class="calcHead"><span>Market</span><span>Pick</span><span>Fair / model probability</span><span>Fair odds</span><span>SportyBet</span></div>'+row(p.bestWinner,'1X2')+row(p.bestOU,'O/U')+row(p.experimentalOU,'O/U 1.5')+'</div><div class="recurrenceNote">'+recurrenceText+'</div><div class="calcNote">Fair probability is the current de-vig SportyBet market baseline. Model probability uses the walk-forward line-ladder/product evidence model. The participant recurrence overlay is only activated after its untouched validation gate passes; until then, participant evidence remains research-only. O/U 1.5 remains a research watch and is not activated from ticket streaks alone.</div><button class="btn builderAdd" data-pick="'+i+'" '+(p.primary?'':'disabled')+'>'+addLabel+'</button></article>';
+    return '<article class="predictionCard"><div class="predictionHeader"><div><small>'+esc(p.product)+' · '+esc(p.competition)+'</small><h3>'+esc(p.home)+' <span>vs</span> '+esc(p.away)+'</h3>'+identityHtml+'</div><time>'+esc(p.start_time?date(p.start_time):'—')+'</time></div>'+primaryHtml+'<div class="calcTable"><div class="calcHead"><span>Market</span><span>Pick</span><span>Fair / model probability</span><span>Fair odds</span><span>SportyBet</span></div>'+row(p.bestWinner,'1X2')+row(p.bestOU,'O/U')+row(p.experimentalOU,'O/U 1.5')+'</div><div class="recurrenceNote">'+recurrenceText+'</div><div class="calcNote">Fair probability is the current de-vig SportyBet market baseline. Model probability uses the walk-forward line-ladder/product evidence model. The participant recurrence overlay is only activated after its untouched validation gate passes; until then, participant evidence remains research-only. Base-evidence picks use the validated line/competition evidence and the walk-forward Poisson/product model. O/U 1.5 remains a research watch and is not activated from ticket streaks alone.</div><button class="btn builderAdd" data-pick="'+i+'" '+(p.primary?'':'disabled')+'>'+addLabel+'</button></article>';
   }).join('');
   host.querySelectorAll('.builderAdd').forEach(function(btn){btn.addEventListener('click',function(){const p=picks[Number(btn.dataset.pick)];if(p&&!state.builder.some(function(x){return x.event_id===p.event_id;})){state.builder.push(p);state.builder=state.builder.slice(-4);renderBuilder();}});});
 }
