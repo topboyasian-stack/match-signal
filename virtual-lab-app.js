@@ -880,6 +880,19 @@ function displayableLiveEventsFrom(events){
     .filter(isDisplayableLiveEvent)
     .sort((a,b)=>Number(isConfirmedWatchedEvent(b))-Number(isConfirmedWatchedEvent(a))||(eventStartMs(a)||Infinity)-(eventStartMs(b)||Infinity));
 }
+function updateLabPulse(){
+  const live=$('pulseLive'),future=$('pulseFuture'),pred=$('pulsePredictions'),acc=$('pulseAccuracy'),model=$('pulseModel');
+  const displayable=displayableLiveEventsFrom(state.live);
+  const research=upcomingEventsFrom(state.live).filter(e=>isEligibleResearchEvent(e)||isConfirmedWatchedEvent(e));
+  if(live)live.textContent=String(displayable.length);
+  if(future)future.textContent=String(research.length);
+  if(pred)pred.textContent=String(state.picks.length);
+  const settled=(state.rows||[]).filter(r=>typeof r.win==='boolean');
+  const wins=settled.filter(r=>r.win).length;
+  if(acc)acc.textContent=settled.length?fmtPct(wins/settled.length):'—';
+  if(model)model.textContent=state.modelGate?'PARTICIPANT ACTIVE':'POISSON + EVIDENCE';
+}
+
 function updateDiagnostics(extra={}){
   const el=$('labDiagnostics');if(!el)return;
   const liveCount=state.live.length, historyCount=state.rows.length, participantCount=(state.participantProfiles?.participant_count ?? state.participantProfiles?.profiles?.length ?? 0);
@@ -929,7 +942,7 @@ function renderLive(){
   const counts={};allEvents.forEach(e=>counts[e.product]=(counts[e.product]||0)+1);
   const meta=$('liveMeta');
   if(meta)meta.textContent=(state.liveUpdated?'Feed timestamp '+date(state.liveUpdated)+' · ':'')+(Object.keys(counts).map(k=>k+': '+counts[k]).join(' · ')||'0 upcoming events')+' · rendered '+cards.length;
-  updateDiagnostics({message:'Live feed renderer is card-isolated: malformed prediction calculations cannot hide the remaining fixtures.'});
+  updateLabPulse(); updateDiagnostics({message:'Live feed renderer is card-isolated: malformed prediction calculations cannot hide the remaining fixtures.'});
 }
 function renderPredictionDesk(){
   const host=$('predictionDesk');if(!host)return;
@@ -1177,6 +1190,7 @@ function rebuildPredictionDesk(){
   state.picks=eligible.slice(0,24).map(e=>{try{return predictionForEvent(e)}catch(err){console.warn('Virtual Lab prediction desk skipped:',e?.event_id,err);return null;}}).filter(Boolean);
   renderPredictionDesk();
   renderBuilder();
+  updateLabPulse();
   const diagnostics=$('predictionDiagnostics');
   if(diagnostics){
     const researchLeagueCount=upcoming.filter(e=>isEligibleResearchEvent(e)||isConfirmedWatchedEvent(e)).length;
@@ -1320,6 +1334,7 @@ function runStrategy(){
     '</div><p class="muted">This test does not predict hidden RNG state. It asks whether a simple threshold defined before the unseen sample has remained useful out-of-sample. A positive result needs replication on another untouched period.</p>';
 }
 
+document.querySelectorAll('.labJump [data-jump]').forEach(function(btn){btn.addEventListener('click',function(){const target=document.querySelector(btn.dataset.jump);if(target)target.scrollIntoView({behavior:'smooth',block:'start'});});});
 $('fileInput').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{state.rows=await parseFile(f);applyFilters(true)}catch(err){alert('Could not parse dataset: '+err.message)}});
 $('product').addEventListener('change',applyFilters);
 $('market').addEventListener('change',applyFilters);
