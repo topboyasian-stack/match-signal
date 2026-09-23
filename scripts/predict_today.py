@@ -1,5 +1,9 @@
 import json
 import math
+import os
+import re
+import unicodedata
+from difflib import SequenceMatcher
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -66,6 +70,493 @@ def american_to_prob(odds):
         return -odds / (-odds + 100)
     except (TypeError, ValueError):
         return None
+
+
+
+SPORTYBET_ORIGIN = os.getenv("MATCH_SIGNAL_SPORTYBET_BASE", "https://www.sportybet.com").rstrip("/")
+SPORTYBET_PROXY = os.getenv("MATCH_SIGNAL_SPORTYBET_PROXY", "https://match-signal.pages.dev/api/sportybet").rstrip("/")
+SPORTYBET_HEADERS = {
+    "Accept": "application/json, text/plain, */*",
+    "Content-Type": "application/json",
+    "Current-Country": "NG",
+    "Origin": "https://www.sportybet.com",
+    "Referer": "https://www.sportybet.com/ng/",
+    "User-Agent": "MatchSignal/3.0 SportyBet-Market-Layer (+https://github.com/topboyasian-stack/match-signal)",
+}
+SPORTYBET_MARKETS = {
+    "football": "1,18,10,29,11,14,26,36,60100,186,189,202,204,210",
+    "tennis": "186,189,202,204,210",
+}
+
+
+def _sportybet_get(params):
+    endpoints = [
+        (SPORTYBET_ORIGIN + "/api/ng/factsCenter/pcUpcomingEvents", SPORTYBET_HEADERS),
+    ]
+    if SPORTYBET_PROXY and SPORTYBET_PROXY != SPORTYBET_ORIGIN:
+        endpoints.append((SPORTYBET_PROXY, {"Accept": "application/json"}))
+    last_error = None
+    for url, headers in endpoints:
+        try:
+            response = SESSION.get(
+                url,
+                params=params,
+                headers=headers,
+                timeout=20,
+            )
+            response.raise_for_status()
+            body = response.json()
+            if body.get("bizCode") is not None and body.get("bizCode") != 10000:
+                raise RuntimeError(f"SportyBet bizCode {body.get('bizCode')}")
+            if body.get("ok") is False:
+                raise RuntimeError(body.get("error") or "SportyBet proxy returned ok=false")
+            return body
+        except Exception as exc:
+            last_error = exc
+    raise RuntimeError(str(last_error or "SportyBet request failed"))
+
+
+def fetch_sportybet_events(sport_id, market_ids, timeline=720, max_pages=20):
+    events = []
+    seen = set()
+    total_num = None
+    for page_num in range(1, max_pages + 1):
+        body = _sportybet_get({
+            "sportId": sport_id,
+            "marketId": market_ids,
+            "pageSize": 100,
+            "pageNum": page_num,
+            "todayGames": "false",
+            "timeline": timeline,
+            "_t": int(datetime.now(timezone.utc).timestamp() * 1000),
+        })
+        data = body.get("data") or {}
+        if total_num is None:
+            raw_total = data.get("totalNum") or data.get("totalEvents") or body.get("total_events")
+            try:
+                total_num = int(raw_total) if raw_total is not None else None
+            except (TypeError, ValueError):
+                total_num = None
+        page_events = []
+        for tournament in data.get("tournaments") or []:
+            tournament_name = str(tournament.get("name") or "")
+            category_name = str(tournament.get("categoryName") or "")
+            for event in tournament.get("events") or []:
+                event_id = str(event.get("eventId") or "")
+                if not event_id or event_id in seen:
+                    continue
+                seen.add(event_id)
+                page_events.append({
+                    "event_id": event_id,
+                    "tournament": tournament_name,
+                    "category": category_name,
+                    "home": str(event.get("homeTeamName") or ""),
+                    "away": str(event.get("awayTeamName") or ""),
+                    "start_time_ms": _sportybet_time_ms(event.get("estimateStartTime")),
+                    "markets": event.get("markets") or [],
+                })
+        if not page_events:
+            break
+        events.extend(page_events)
+        if total_num is not None and len(events) >= total_num:
+            break
+        if len(page_events) < 100:
+            break
+    return events
+
+
+def _sportybet_time_ms(value):
+    try:
+        n = float(value)
+        if n <= 0:
+            return None
+        return int(n * 1000 if n < 100000000000 else n)
+    except (TypeError, ValueError):
+        return None
+
+
+def _market_line(market):
+    raw = market.get("line")
+    try:
+        if raw is not None and str(raw) != "":
+            return float(raw)
+    except (TypeError, ValueError):
+        pass
+    match = re.search(r"(?:total|line)=([0-9]+(?:\.[0-9]+)?)", str(market.get("specifier") or ""), re.I)
+    return float(match.group(1)) if match else None
+
+
+def _sportybet_fair_market(market):
+    usable = []
+    for outcome in market.get("outcomes") or []:
+        try:
+            odds = float(outcome.get("odds"))
+        except (TypeError, ValueError):
+            continue
+        if odds <= 1 or outcome.get("isActive") is False:
+            continue
+        inv = 1.0 / odds
+        usable.append({
+            "id": str(outcome.get("id") or ""),
+            "name": str(outcome.get("desc") or outcome.get("name") or outcome.get("title") or ""),
+            "book_odds": odds,
+            "implied": inv,
+        })
+    if len(usable) < 2:
+        return None
+    denom = sum(x["implied"] for x in usable)
+    for item in usable:
+        item["fair_prob"] = item["implied"] / denom
+        item["fair_odds"] = 1.0 / item["fair_prob"]
+    return {
+        "id": str(market.get("id") or ""),
+        "name": str(market.get("desc") or market.get("name") or market.get("title") or ""),
+        "line": _market_line(market),
+        "overround": max(0.0, denom - 1.0),
+        "outcomes": usable,
+    }
+
+
+def _sportybet_market_snapshot(event, sport):
+    winner_ids = {"1", "186"} if sport == "football" else {"186"}
+    total_ids = {"18", "189"}
+    winner = None
+    totals = []
+    all_markets = []
+    for market in event.get("markets") or []:
+        fair = _sportybet_fair_market(market)
+        if not fair:
+            continue
+        mid = fair["id"]
+        label = fair["name"].lower()
+        all_markets.append({
+            "id": mid,
+            "name": fair["name"],
+            "line": fair["line"],
+            "overround": round(fair["overround"], 6),
+            "outcomes": fair["outcomes"],
+        })
+        if mid in winner_ids or "winner" in label or "1x2" in label or label in {"win", "match result"}:
+            if winner is None:
+                winner = fair
+        if mid in total_ids or "total" in label or "over/under" in label:
+            names = {x["name"].lower(): x for x in fair["outcomes"]}
+            over = next((x for x in fair["outcomes"] if x["name"].lower().startswith("over")), None)
+            under = next((x for x in fair["outcomes"] if x["name"].lower().startswith("under")), None)
+            if over and under:
+                totals.append({
+                    "line": fair["line"],
+                    "over": over["book_odds"],
+                    "under": under["book_odds"],
+                    "over_fair_prob": over["fair_prob"],
+                    "under_fair_prob": under["fair_prob"],
+                    "over_fair_odds": over["fair_odds"],
+                    "under_fair_odds": under["fair_odds"],
+                    "overround": fair["overround"],
+                    "market_id": mid,
+                })
+    if winner:
+        by_name = {x["name"].lower(): x for x in winner["outcomes"]}
+        def _find_winner(*patterns):
+            for x in winner["outcomes"]:
+                low = x["name"].lower()
+                if any(low == p or low.startswith(p) for p in patterns):
+                    return x
+            return None
+        home = _find_winner("home", "1")
+        draw = _find_winner("draw", "x")
+        away = _find_winner("away", "2")
+        winner_summary = {
+            "p1_book": home["book_odds"] if home else None,
+            "draw_book": draw["book_odds"] if draw else None,
+            "p2_book": away["book_odds"] if away else None,
+            "p1_fair_prob": home["fair_prob"] if home else None,
+            "draw_fair_prob": draw["fair_prob"] if draw else None,
+            "p2_fair_prob": away["fair_prob"] if away else None,
+            "p1_fair_odds": home["fair_odds"] if home else None,
+            "draw_fair_odds": draw["fair_odds"] if draw else None,
+            "p2_fair_odds": away["fair_odds"] if away else None,
+            "market_id": winner["id"],
+            "overround": winner["overround"],
+            "raw_outcomes": winner["outcomes"],
+        }
+        if sport == "tennis":
+            pair = winner["outcomes"][:2]
+            if pair:
+                winner_summary["p1_book"] = pair[0]["book_odds"]
+                winner_summary["p2_book"] = pair[-1]["book_odds"]
+                winner_summary["p1_fair_prob"] = pair[0]["fair_prob"]
+                winner_summary["p2_fair_prob"] = pair[-1]["fair_prob"]
+                winner_summary["p1_fair_odds"] = pair[0]["fair_odds"]
+                winner_summary["p2_fair_odds"] = pair[-1]["fair_odds"]
+                winner_summary["draw_book"] = None
+                winner_summary["draw_fair_prob"] = None
+                winner_summary["draw_fair_odds"] = None
+    else:
+        winner_summary = None
+    return {
+        "provider": "SportyBet NG",
+        "event_id": event["event_id"],
+        "tournament": event["tournament"],
+        "category": event["category"],
+        "start_time": (
+            datetime.fromtimestamp(event["start_time_ms"] / 1000, tz=timezone.utc).isoformat()
+            if event.get("start_time_ms") else None
+        ),
+        "winner": winner_summary,
+        "totals": sorted(totals, key=lambda x: (x["line"] is None, x["line"] or 999)),
+        "market_count": len(all_markets),
+        "markets": all_markets,
+        "fetched_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def _market_name_key(value):
+    text = unicodedata.normalize("NFKD", str(value or ""))
+    text = "".join(ch for ch in text if not unicodedata.combining(ch)).lower()
+    text = text.replace("&", " and ")
+    text = re.sub(r"[^a-z0-9]+", " ", text)
+    stop = {"fc", "afc", "sc", "cf", "club", "the"}
+    return " ".join(token for token in text.split() if token not in stop)
+
+
+def _name_similarity(left, right):
+    a = _market_name_key(left)
+    b = _market_name_key(right)
+    if not a or not b:
+        return 0.0
+    if a == b:
+        return 1.0
+    ratio = SequenceMatcher(None, a, b).ratio()
+    at = set(a.split())
+    bt = set(b.split())
+    overlap = len(at & bt) / max(1, len(at | bt))
+    return max(ratio, 0.75 * overlap + 0.25 * ratio)
+
+
+def _pair_match_score(pred, event):
+    p1 = pred.get("player_1") or ""
+    p2 = pred.get("player_2") or ""
+    e1 = event.get("home") or ""
+    e2 = event.get("away") or ""
+    direct = (_name_similarity(p1, e1) + _name_similarity(p2, e2)) / 2
+    reverse = (_name_similarity(p1, e2) + _name_similarity(p2, e1)) / 2
+    name_score = max(direct, reverse)
+    start_a = _parse_dt(pred.get("start_time"))
+    start_b = _parse_dt(
+        datetime.fromtimestamp(event["start_time_ms"] / 1000, tz=timezone.utc).isoformat()
+        if event.get("start_time_ms") else None
+    )
+    if start_a and start_b:
+        hours = abs((start_a - start_b).total_seconds()) / 3600.0
+        time_score = max(0.0, 1.0 - min(hours, 48.0) / 48.0)
+    else:
+        time_score = 0.35
+    return 0.82 * name_score + 0.18 * time_score, direct, reverse
+
+
+def _parse_dt(value):
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _find_sportybet_match(pred, events):
+    ranked = []
+    for event in events:
+        score, direct, reverse = _pair_match_score(pred, event)
+        ranked.append((score, direct, reverse, event))
+    ranked.sort(key=lambda x: x[0], reverse=True)
+    if not ranked:
+        return None, None
+    score, direct, reverse, event = ranked[0]
+    # Exact or near-exact names can safely tolerate larger scheduling differences;
+    # fuzzy matches still require stronger name agreement.
+    threshold = 0.78 if max(direct, reverse) >= 0.94 else 0.86
+    if score < threshold:
+        return None, None
+    side_map = "direct" if direct >= reverse else "reverse"
+    return event, {
+        "score": round(score, 4),
+        "method": side_map,
+        "name_direct": round(direct, 4),
+        "name_reverse": round(reverse, 4),
+    }
+
+
+def _pick_sporty_total(snapshot, prediction):
+    totals = snapshot.get("totals") or []
+    if not totals:
+        return None
+    existing = None
+    if prediction.get("sport") == "football":
+        existing = ((prediction.get("markets") or {}).get("over_under") or {}).get("line")
+    else:
+        existing = ((prediction.get("analytics") or {}).get("total_games") or {}).get("line")
+    try:
+        target = float(existing) if existing is not None else None
+    except (TypeError, ValueError):
+        target = None
+    usable = [x for x in totals if x.get("line") is not None]
+    if target is None:
+        return usable[0] if usable else totals[0]
+    return min(usable or totals, key=lambda x: abs(float(x.get("line") or 0) - target))
+
+
+def attach_sportybet_market_layer(predictions):
+    """
+    Add a current SportyBet NG market snapshot without replacing the independent
+    Match Signal model. This is a market-baseline/enrichment layer only.
+    """
+    stats = {
+        "provider": "SportyBet NG",
+        "fetched_at": datetime.now(timezone.utc).isoformat(),
+        "football_events": 0,
+        "tennis_events": 0,
+        "matched": 0,
+        "unmatched": 0,
+        "match_errors": [],
+        "fetch_errors": [],
+    }
+    batches = {}
+    for sport, sport_id in (("football", "sr:sport:1"), ("tennis", "sr:sport:5")):
+        try:
+            events = fetch_sportybet_events(sport_id, SPORTYBET_MARKETS[sport])
+            batches[sport] = events
+            stats[f"{sport}_events"] = len(events)
+        except Exception as exc:
+            batches[sport] = []
+            stats["fetch_errors"].append(f"{sport}: {exc}")
+
+    fetched_at = stats["fetched_at"]
+    for prediction in predictions:
+        sport = prediction.get("sport")
+        events = batches.get(sport) or []
+        if not events:
+            prediction["sportybet_market"] = {
+                "available": False,
+                "provider": "SportyBet NG",
+                "reason": "market feed unavailable for this pipeline run",
+                "fetched_at": fetched_at,
+            }
+            prediction["market_insights"] = {"provider": "SportyBet NG", "available": False}
+            stats["unmatched"] += 1
+            continue
+        try:
+            event, match = _find_sportybet_match(prediction, events)
+            if not event:
+                prediction["sportybet_market"] = {
+                    "available": False,
+                    "provider": "SportyBet NG",
+                    "reason": "no sufficiently confident fixture match",
+                    "fetched_at": fetched_at,
+                }
+                prediction["market_insights"] = {"provider": "SportyBet NG", "available": False}
+                stats["unmatched"] += 1
+                continue
+            snapshot = _sportybet_market_snapshot(event, sport)
+            snapshot["available"] = True
+            snapshot["match"] = match
+            prediction["sportybet_market"] = snapshot
+            prediction["sportybet_winner_odds"] = {}
+            winner = snapshot.get("winner") or {}
+            if winner:
+                p1_book = winner.get("p1_book")
+                p2_book = winner.get("p2_book")
+                draw_book = winner.get("draw_book")
+                if match["method"] == "reverse":
+                    p1_book, p2_book = p2_book, p1_book
+                    p1_fair = winner.get("p2_fair_prob")
+                    p2_fair = winner.get("p1_fair_prob")
+                    p1_fair_odds = winner.get("p2_fair_odds")
+                    p2_fair_odds = winner.get("p1_fair_odds")
+                else:
+                    p1_fair = winner.get("p1_fair_prob")
+                    p2_fair = winner.get("p2_fair_prob")
+                    p1_fair_odds = winner.get("p1_fair_odds")
+                    p2_fair_odds = winner.get("p2_fair_odds")
+                prediction["sportybet_winner_odds"] = {
+                    "p1": round(p1_book, 3) if p1_book else None,
+                    "draw": round(draw_book, 3) if draw_book else None,
+                    "p2": round(p2_book, 3) if p2_book else None,
+                    "fair_p1": round(p1_fair, 6) if p1_fair is not None else None,
+                    "fair_draw": round(winner.get("draw_fair_prob"), 6) if winner.get("draw_fair_prob") is not None else None,
+                    "fair_p2": round(p2_fair, 6) if p2_fair is not None else None,
+                    "fair_odds_p1": round(p1_fair_odds, 3) if p1_fair_odds else None,
+                    "fair_odds_draw": round(winner.get("draw_fair_odds"), 3) if winner.get("draw_fair_odds") else None,
+                    "fair_odds_p2": round(p2_fair_odds, 3) if p2_fair_odds else None,
+                    "market_id": winner.get("market_id"),
+                    "overround": round(float(winner.get("overround") or 0), 6),
+                }
+            model_probs = prediction.get("probabilities") or {}
+            market_winner = prediction.get("sportybet_winner_odds") or {}
+            pick = prediction.get("pick")
+            model_pick_prob = model_probs.get(pick)
+            if pick == "p1":
+                fair_prob = market_winner.get("fair_p1")
+            elif pick == "p2":
+                fair_prob = market_winner.get("fair_p2")
+            else:
+                fair_prob = market_winner.get("fair_draw")
+            total = _pick_sporty_total(snapshot, prediction)
+            total_insight = None
+            if total:
+                total_pick = "over" if ((prediction.get("markets") or {}).get("over_under") or {}).get("pick") == "over" else "under"
+                if sport == "tennis":
+                    total_pick = ((prediction.get("analytics") or {}).get("total_games") or {}).get("pick") or total_pick
+                model_total_prob = (
+                    ((prediction.get("markets") or {}).get("over_under") or {}).get("over")
+                    if total_pick == "over" and sport == "football"
+                    else ((prediction.get("markets") or {}).get("over_under") or {}).get("under")
+                    if sport == "football"
+                    else ((prediction.get("analytics") or {}).get("total_games") or {}).get("over")
+                    if total_pick == "over"
+                    else ((prediction.get("analytics") or {}).get("total_games") or {}).get("under")
+                )
+                market_fair_prob = total.get("over_fair_prob") if total_pick == "over" else total.get("under_fair_prob")
+                total_insight = {
+                    "line": total.get("line"),
+                    "pick": total_pick,
+                    "book_odds": total.get("over") if total_pick == "over" else total.get("under"),
+                    "fair_prob": market_fair_prob,
+                    "fair_odds": total.get("over_fair_odds") if total_pick == "over" else total.get("under_fair_odds"),
+                    "model_prob": model_total_prob,
+                    "model_edge_vs_market": round(float(model_total_prob) - float(market_fair_prob), 6)
+                    if model_total_prob is not None and market_fair_prob is not None else None,
+                    "overround": total.get("overround"),
+                    "market_id": total.get("market_id"),
+                }
+            prediction["sportybet_total_market"] = total_insight
+            prediction["market_insights"] = {
+                "provider": "SportyBet NG",
+                "available": True,
+                "matched_event_id": snapshot.get("event_id"),
+                "match_score": match.get("score"),
+                "winner_model_edge_vs_market": (
+                    round(float(model_pick_prob) - float(fair_prob), 6)
+                    if model_pick_prob is not None and fair_prob is not None else None
+                ),
+                "winner_model_pick": pick,
+                "winner_market_fair_prob": fair_prob,
+                "total": total_insight,
+                "snapshot_at": snapshot.get("fetched_at"),
+            }
+            stats["matched"] += 1
+        except Exception as exc:
+            prediction["sportybet_market"] = {
+                "available": False,
+                "provider": "SportyBet NG",
+                "reason": f"market enrichment error: {exc}",
+                "fetched_at": fetched_at,
+            }
+            prediction["market_insights"] = {"provider": "SportyBet NG", "available": False, "error": str(exc)}
+            stats["match_errors"].append(f"{prediction.get('sport')}:{prediction.get('event_id')}: {exc}")
+            stats["unmatched"] += 1
+    stats["coverage"] = round(stats["matched"] / max(1, len(predictions)), 4)
+    return stats
 
 
 def form_score(form):
@@ -602,6 +1093,7 @@ def main():
     history = load_json(history_path, [])
     history = settle_predictions(history)
     predictions, errors, qc = fetch_current_predictions()
+    sportybet_market_status = attach_sportybet_market_layer(predictions)
     calibration_now = datetime.now(timezone.utc)
 
     # V5: calibrate every new prediction strictly against already-settled
@@ -641,7 +1133,20 @@ def main():
     save_json(DATA / "predictions.json", predictions)
     save_json(history_path, history)
     save_json(accuracy_path, {"updated_at": now, "summary": summary, "recent_settled": [p for p in history if p.get("settled")][-50:]})
-    save_json(DATA / "pipeline_status.json", {"updated_at": now, "prediction_count": len(predictions), "football_count": sum(p.get("sport") == "football" for p in predictions), "tennis_count": sum(p.get("sport") == "tennis" for p in predictions), "errors": errors, "quality_control": qc, "data_source": "ESPN public scoreboards + ESPN ATP/WTA rankings", "free_server_cost": True, "model_version": "5.0 historical-calibrated analytical markets"})
+    if sportybet_market_status.get("fetch_errors"):
+        errors.extend("sportybet:" + str(x) for x in sportybet_market_status["fetch_errors"])
+    save_json(DATA / "pipeline_status.json", {
+        "updated_at": now,
+        "prediction_count": len(predictions),
+        "football_count": sum(p.get("sport") == "football" for p in predictions),
+        "tennis_count": sum(p.get("sport") == "tennis" for p in predictions),
+        "errors": errors,
+        "quality_control": qc,
+        "market_data": sportybet_market_status,
+        "data_source": "ESPN public scoreboards + ESPN ATP/WTA rankings + recent 60-day results + SportyBet NG live market layer",
+        "free_server_cost": True,
+        "model_version": "5.0 historical-calibrated analytical markets + SportyBet market baseline",
+    })
     print(f"Predictions: {len(predictions)} | Football: {sum(p.get('sport') == 'football' for p in predictions)} | Tennis: {sum(p.get('sport') == 'tennis' for p in predictions)} | Settled: {summary['settled']} | QC rejected: {qc['rejected_total']}")
     for error in errors:
         print(" -", error)
