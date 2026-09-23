@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-23T22:53:42.319627+00:00",
+  "generated_at": "2026-09-23T23:11:50.460194+00:00",
   "mode": "PAPER_RESEARCH_ONLY",
   "policy": {
     "minimum_competition_observations": 12,
@@ -60,6 +60,7 @@
     "Esoccer H2H GG League",
     "Europa League",
     "Portugal Primera",
+    "Volta Club World Cup",
     "Volta FA Cup",
     "Volta International A",
     "Volta Premier League",
@@ -497,18 +498,18 @@
       }
     },
     "Volta Club World Cup": {
-      "raw_eligible": false,
+      "raw_eligible": true,
       "all": {
-        "n": 12,
-        "wins": 6,
-        "win_rate": 0.5,
-        "roi": -0.19083333333333333
+        "n": 18,
+        "wins": 11,
+        "win_rate": 0.6111111111111112,
+        "roi": -0.010555555555555552
       },
       "oos": {
-        "n": 4,
-        "wins": 2,
-        "win_rate": 0.5,
-        "roi": -0.20750000000000002
+        "n": 6,
+        "wins": 5,
+        "win_rate": 0.8333333333333334,
+        "roi": 0.3500000000000001
       }
     },
     "Club World Cup": {
@@ -621,31 +622,31 @@
     "3.5": {
       "raw_eligible": false,
       "all": {
-        "n": 392,
-        "wins": 274,
-        "win_rate": 0.6989795918367347,
-        "roi": -0.08114795918367347
+        "n": 393,
+        "wins": 275,
+        "win_rate": 0.6997455470737913,
+        "roi": -0.07959287531806616
       },
       "oos": {
         "n": 118,
         "wins": 74,
         "win_rate": 0.6271186440677966,
-        "roi": -0.15254237288135594
+        "roi": -0.1498305084745763
       }
     },
     "4.5": {
       "raw_eligible": false,
       "all": {
-        "n": 455,
-        "wins": 338,
-        "win_rate": 0.7428571428571429,
-        "roi": -0.0921538461538461
+        "n": 457,
+        "wins": 340,
+        "win_rate": 0.7439824945295405,
+        "roi": -0.0892997811816192
       },
       "oos": {
-        "n": 137,
-        "wins": 87,
-        "win_rate": 0.635036496350365,
-        "roi": -0.19459854014598538
+        "n": 138,
+        "wins": 88,
+        "win_rate": 0.6376811594202898,
+        "roi": -0.18579710144927536
       }
     },
     "2.5": {
@@ -666,16 +667,16 @@
     "5.5": {
       "raw_eligible": false,
       "all": {
-        "n": 407,
-        "wins": 342,
-        "win_rate": 0.8402948402948403,
-        "roi": -0.028206388206388204
+        "n": 408,
+        "wins": 343,
+        "win_rate": 0.8406862745098039,
+        "roi": -0.026666666666666665
       },
       "oos": {
         "n": 123,
-        "wins": 100,
-        "win_rate": 0.8130081300813008,
-        "roi": -0.0386991869918699
+        "wins": 101,
+        "win_rate": 0.8211382113821138,
+        "roi": -0.025691056910569082
       }
     },
     "6.5": {
@@ -836,6 +837,30 @@
     "minimum_untouched_rows": 30,
     "pass": false,
     "reason": "insufficient untouched participant evidence or no dual-loss improvement"
+  },
+  "adaptive_model_policy": {
+    "base_gate": "best validated core model vs SportyBet market",
+    "candidate_variants": [
+      "poisson_prior",
+      "poisson"
+    ],
+    "participant_feature_independent": true,
+    "participant_feature_gate": {
+      "minimum_participant_total_history": 3,
+      "minimum_exact_line_history": 8,
+      "minimum_untouched_participant_rows": 20,
+      "minimum_untouched_rows": 30,
+      "pass": false,
+      "reason": "insufficient untouched participant evidence or no dual-loss improvement"
+    },
+    "qualified_lines": [
+      3.5,
+      4.5
+    ],
+    "qualified_competitions": [
+      "Virtual",
+      "Volta Champions League A"
+    ]
   },
   "paper_only": true
 }
