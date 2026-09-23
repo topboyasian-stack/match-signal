@@ -453,19 +453,56 @@ function blendForEvent(event,priorEvents){
   }else if(earlier.length<20){alpha=0;}
   return {alpha,alphaN:bestN,priorN:prior.n};
 }
+
+function selectEvidenceVariant(product,line){
+  const ev=state.modelEvaluation;
+  if(!ev)return 'poisson';
+  const key=Math.abs(Number(line)-1.5)<0.001?'1.5':Math.abs(Number(line)-3.5)<0.001?'3.5':Math.abs(Number(line)-4.5)<0.001?'4.5':String(Number(line));
+  const lm=ev.by_line?.[key]?.holdout||null;
+  const pm=ev.by_product?.[product]||null;
+  const choices=[];
+  if(lm){
+    const p=lm.poisson||{},q=lm.poisson_prior||{};
+    if(Number(p.n||0)>=40&&Number(q.n||0)>=40&&Number.isFinite(p.hit_rate)&&Number.isFinite(q.hit_rate)){
+      choices.push({variant:q.hit_rate-p.hit_rate>=0.005?'poisson_prior':'poisson',delta:q.hit_rate-p.hit_rate});
+    }
+  }
+  if(pm){
+    const p=pm.poisson||{},q=pm.poisson_prior||{};
+    if(Number(p.n||0)>=200&&Number(q.n||0)>=200&&Number.isFinite(p.hit_rate)&&Number.isFinite(q.hit_rate)){
+      choices.push({variant:q.hit_rate-p.hit_rate>=0.01?'poisson_prior':'poisson',delta:q.hit_rate-p.hit_rate});
+    }
+  }
+  return choices.some(x=>x.variant==='poisson_prior')?'poisson_prior':'poisson';
+}
+function fastPriorAlpha(product,line,priorN){
+  const variant=selectEvidenceVariant(product,line);
+  if(variant!=='poisson_prior')return 0;
+  const n=Math.max(0,Number(priorN)||0);
+  return n>=80?0.24:n>=40?0.20:n>=20?0.16:0.10;
+}
+
 function modelOverForEvent(event,priorEvents,line,useParticipant=true){
   if(!event||!event.ladder)return null;
   const market=poissonOver(event.ladder.lambda,line);
   const prior=productPrior(priorEvents,event.product,line,new Date(event.timestamp).getTime());
   const blend=blendForEvent(event,priorEvents);
-  const base=(prior?.prob&&blend&&blend.alpha>0)?clamp01((1-blend.alpha)*market+blend.alpha*prior.prob):market;
-  const participant=useParticipant?participantPrior(priorEvents,event,line):{prob:null,n:0,totalN:0,pairProb:null,pairN:0,weight:0,entityProb:null};
+  const selectedVariant=selectEvidenceVariant(event.product,line);
+  let alpha=blend?.alpha||0;
+  if(event._livePrediction){
+    alpha=fastPriorAlpha(event.product,line,prior?.n||0);
+  }else if(selectedVariant==='poisson' && alpha>0){
+    alpha=0;
+  }
+  const base=(prior?.prob&&alpha>0)?clamp01((1-alpha)*market+alpha*prior.prob):market;
+  const participant=useParticipant&&state.modelGate?participantPrior(priorEvents,event,line):{prob:null,n:0,totalN:0,pairProb:null,pairN:0,weight:0,entityProb:null};
   const prob=participant.prob!=null?clamp01((1-participant.weight)*base+participant.weight*participant.prob):base;
   return {
     prob,
     marketProb:market,
     priorProb:prior?.prob??null,
-    alpha:blend?.alpha||0,
+    alpha,
+    variant:selectedVariant,
     lambda:event.ladder.lambda,
     n:prior?.n||0,
     participantProb:participant.prob,
