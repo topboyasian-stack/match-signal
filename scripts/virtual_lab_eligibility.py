@@ -26,10 +26,24 @@ def eligible_line(rows):
     return (a["n"]>=MIN_LINE_N and b["n"]>=MIN_LINE_OOS_N and a["win_rate"]>=.58 and b["win_rate"]>=.55 and b["roi"]>=-.02),a,b
 
 def model_pass(x):
+    """Validate the core O/U model without requiring participant enhancement."""
     if not x:return False
-    m=x.get("market"); p=x.get("participant_model")
-    if not m or not p:return False
-    return p.get("n",0)>=30 and p.get("brier",9)<m.get("brier",0) and p.get("log_loss",9)<m.get("log_loss",0) and p.get("ece",9)<=m.get("ece",9)+.02
+    market=x.get("market") or {}
+    candidates=[]
+    for name in ("poisson_prior","poisson"):
+        m=x.get(name) or {}
+        if m.get("n",0)>=30 and all(k in m for k in ("brier","log_loss","ece")):
+            if (not candidates or
+                (m.get("brier",9),m.get("log_loss",9)) <
+                (candidates[0][1].get("brier",9),candidates[0][1].get("log_loss",9))):
+                candidates=[(name,m)]
+    if not candidates or not market:return False
+    _,best=candidates[0]
+    return (
+        best.get("brier",9)<market.get("brier",0) and
+        best.get("log_loss",9)<market.get("log_loss",0) and
+        best.get("ece",9)<=market.get("ece",9)+.02
+    )
 
 def main():
     history=json.loads(HISTORY.read_text()) if HISTORY.exists() else []
@@ -58,6 +72,14 @@ def main():
     model_comps=[str(k) for k,v in by_comp.items() if model_pass(v)]
     eligible_lines=sorted(set(raw_lines)&set(model_lines))
     eligible_comps=sorted(set(raw_comp)&set(model_comps))
+    adaptive_policy={
+        "base_gate":"best validated core model vs SportyBet market",
+        "candidate_variants":["poisson_prior","poisson"],
+        "participant_feature_independent":True,
+        "participant_feature_gate":model.get("participant_feature_gate",{}),
+        "qualified_lines":sorted(model_lines),
+        "qualified_competitions":sorted(model_comps)
+    }
     out={
       "generated_at":datetime.now(timezone.utc).isoformat(),
       "mode":"PAPER_RESEARCH_ONLY",
@@ -79,6 +101,7 @@ def main():
       "blocked_ou_lines":sorted(set(blocked_lines)|set(raw_lines)-set(eligible_lines)),
       "competitions":comp_report,"ou_lines":line_report,
       "model_gate":model.get("participant_feature_gate",{"pass":False,"reason":"model artifact unavailable"}),
+      "adaptive_model_policy":adaptive_policy,
       "paper_only":True
     }
     OUTPUT.write_text(json.dumps(out,indent=2)+"\n"); print(json.dumps(out,indent=2))
