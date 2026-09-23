@@ -302,6 +302,7 @@ tennis_rankings = ns["tennis_rankings"]
 base_tennis_prediction = ns["tennis_prediction"]
 football_prediction = ns["football_prediction"]
 settle_predictions = ns["settle_predictions"]
+attach_sportybet_market_layer = ns["attach_sportybet_market_layer"]
 accuracy_summary = ns["accuracy_summary"]
 calibrate_prediction = ns["calibrate_prediction"]
 calibrate_binary_market = ns["calibrate_binary_market"]
@@ -408,6 +409,7 @@ def main():
     history = load_json(history_path, [])
     history = settle_predictions(history)
     predictions, errors, qc = fetch_current_predictions(history=history)
+    sportybet_market_status = attach_sportybet_market_layer(predictions)
     # V5 historical calibration is applied only after settlement and before
     # publication. This keeps the current event out of its own calibration fit.
     calibration_now = datetime.now(timezone.utc)
@@ -455,9 +457,10 @@ def main():
         "tennis_count": sum(p.get("sport") == "tennis" for p in predictions),
         "errors": errors,
         "quality_control": qc,
-        "data_source": "ESPN public scoreboards + ESPN ATP/WTA rankings + recent 60-day results",
+        "market_data": sportybet_market_status,
+        "data_source": "ESPN public scoreboards + ESPN ATP/WTA rankings + recent 60-day results + SportyBet NG live market layer",
         "free_server_cost": True,
-        "model_version": "3.2 calibrated tennis signals + fixture QC",
+        "model_version": "3.2 calibrated tennis signals + fixture QC + SportyBet market baseline",
     })
     print(f"Predictions: {len(predictions)} | Football: {sum(p.get('sport') == 'football' for p in predictions)} | Tennis: {sum(p.get('sport') == 'tennis' for p in predictions)} | Settled: {summary['settled']} | QC rejected: {qc['rejected_total']} | Low-confidence filtered: {qc['filtered_low_confidence']} | Deduplicated: {qc['deduplicated_matches']}")
     for error in errors:
