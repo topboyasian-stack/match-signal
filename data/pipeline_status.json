@@ -1,14 +1,14 @@
 {
-  "updated_at": "2026-09-23T01:30:27.540260+00:00",
+  "updated_at": "2026-09-23T04:39:53.278642+00:00",
   "prediction_count": 171,
   "football_count": 132,
   "tennis_count": 39,
   "errors": [],
   "quality_control": {
-    "rejected_total": 704,
+    "rejected_total": 703,
     "rejected_by_reason": {
       "missing real player name": 483,
-      "non-singles draw": 221
+      "non-singles draw": 220
     },
     "rejected_by_tour": {
       "ATP": {
@@ -17,12 +17,12 @@
       },
       "WTA": {
         "missing real player name": 256,
-        "non-singles draw": 130
+        "non-singles draw": 129
       }
     },
     "deduplicated_matches": 0,
     "deduplicated_examples": [],
-    "filtered_low_confidence": 25,
+    "filtered_low_confidence": 24,
     "filtered_low_confidence_examples": [
       {
         "match": "Lloyd Harris vs Alexis Galarneau",
@@ -77,12 +77,6 @@
         "tour": "WTA",
         "confidence": 0.5093,
         "signal_components": 2
-      },
-      {
-        "match": "Kamilla Rakhimova vs Katie Volynets",
-        "tour": "WTA",
-        "confidence": 0.5011,
-        "signal_components": 4
       },
       {
         "match": "Dayeon Back vs Maya Joint",
@@ -143,10 +137,39 @@
         "tour": "WTA",
         "confidence": 0.5153,
         "signal_components": 2
+      },
+      {
+        "match": "Weronika Falkowska vs Polina Iatcenko",
+        "tour": "WTA",
+        "confidence": 0.5,
+        "signal_components": 2
       }
     ]
   },
-  "data_source": "ESPN public scoreboards + ESPN ATP/WTA rankings + recent 60-day results",
+  "market_data": {
+    "provider": "SportyBet NG",
+    "fetched_at": "2026-09-23T04:39:02.654187+00:00",
+    "football_events": 1185,
+    "tennis_events": 447,
+    "matched": 129,
+    "unmatched": 42,
+    "match_errors": [],
+    "fetch_errors": [],
+    "coverage": 0.7544
+  },
+  "data_source": "ESPN public scoreboards + ESPN ATP/WTA rankings + recent 60-day results + SportyBet NG live market layer",
   "free_server_cost": true,
-  "model_version": "3.2 calibrated tennis signals + fixture QC"
+  "model_version": "3.2 calibrated tennis signals + fixture QC + SportyBet market baseline",
+  "basketball_count": 0,
+  "basketball_qualified_count": 0,
+  "basketball_settled": 0,
+  "basketball_market_provider": "OddsPapi",
+  "basketball_market_provider_status": "http_429",
+  "basketball_sources": [
+    {
+      "source": "Official BBL schedule",
+      "events": 0,
+      "status": "ok"
+    }
+  ]
 }
