@@ -26,6 +26,29 @@
     </div>
   </header>
 
+  <section class="labPulse">
+    <div class="pulseMain">
+      <div class="pulseLabel">LAB PULSE</div>
+      <div class="pulseTitle">SportyBet feed → model → evidence</div>
+      <div class="pulseSub">A live product view of what is being observed, calculated and currently eligible for research.</div>
+    </div>
+    <div class="pulseStats">
+      <div class="pulseStat"><small>Live / fresh</small><b id="pulseLive">—</b></div>
+      <div class="pulseStat"><small>Research / watch</small><b id="pulseFuture">—</b></div>
+      <div class="pulseStat"><small>Desk cards</small><b id="pulsePredictions">—</b></div>
+      <div class="pulseStat"><small>Settled accuracy</small><b id="pulseAccuracy">—</b></div>
+      <div class="pulseStat"><small>Model regime</small><b id="pulseModel">—</b></div>
+    </div>
+  </section>
+
+  <nav class="labJump" aria-label="Virtual Lab sections">
+    <button data-jump="#predictionDeskPanel">Predictions</button>
+    <button data-jump="#oddsBuilder">Builder</button>
+    <button data-jump="#participantLabPanel">Evidence</button>
+    <button data-jump="#modelLabPanel">Model</button>
+    <button data-jump="#labDiagnosticsPanel">Health</button>
+  </nav>
+
   <section class="notice">
     <strong>Research boundary</strong>
     <span>This lab analyzes legitimately observed/publicly available results and published market information. It does not bypass RNGs, bookmaker security, private endpoints, or account controls.</span>
@@ -51,7 +74,7 @@
     <div class="liveNote">Live feed mode shows supported upcoming eFootball/virtual products; the prediction desk separately applies the validated research-league and O/U-line filters. Excluded products are not collected, predicted, or settled.</div>
   </section>
 
-  <section class="panel predictionDeskPanel">
+  <section class="panel predictionDeskPanel" id="predictionDeskPanel">
     <div class="panelHead">
       <h2>Upcoming prediction desk</h2>
       <span><b id="predictionCount">0</b> upcoming priced fixtures <button id="predictionRefresh" class="btn">↻ Refresh predictions</button></span>
