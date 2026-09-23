@@ -46,3 +46,44 @@
 .participantIdentityUnknown strong,.participantIdentityUnknown .participantIdentityStatus{color:#fbbf24}
 
 .labDiagnostics{padding:12px 0 0}.diagGrid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}.diagGrid>div{padding:10px;border:1px solid var(--border);border-radius:10px;background:rgba(5,11,18,.65)}.diagGrid small{display:block;color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:.06em}.diagGrid b{display:block;margin-top:3px;font-size:13px;overflow-wrap:anywhere}.labDiagnostics .muted{margin:10px 0 0}@media(max-width:900px){.diagGrid{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:560px){.diagGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* 2026 Command Center visual layer */
+body{background:
+ radial-gradient(850px 520px at 8% -10%,rgba(55,231,255,.16),transparent 62%),
+ radial-gradient(900px 540px at 96% -12%,rgba(136,120,255,.14),transparent 64%),
+ linear-gradient(180deg,#060a10 0%,#05080d 45%,#071019 100%);
+ position:relative}
+body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.22;background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.02) 1px,transparent 1px);background-size:42px 42px;mask-image:linear-gradient(to bottom,black,transparent 88%);z-index:0}
+.shell,.labJump{position:relative;z-index:1}
+.hero{padding:18px 0 24px;position:relative}
+.hero:after{content:"";position:absolute;right:0;top:10px;width:180px;height:180px;border-radius:50%;border:1px solid rgba(55,231,255,.16);box-shadow:0 0 0 26px rgba(55,231,255,.025),0 0 0 54px rgba(136,120,255,.02);pointer-events:none}
+.hero h1{text-shadow:0 0 30px rgba(55,231,255,.12)}
+.notice{backdrop-filter:blur(8px);box-shadow:0 18px 40px rgba(0,0,0,.16)}
+.labPulse{display:grid;grid-template-columns:minmax(250px,1.1fr) minmax(0,2fr);gap:12px;margin:0 0 14px;padding:14px;border:1px solid rgba(55,231,255,.2);border-radius:18px;background:linear-gradient(145deg,rgba(12,25,38,.94),rgba(7,13,21,.98));box-shadow:0 20px 55px rgba(0,0,0,.22);overflow:hidden;position:relative}
+.labPulse:after{content:"";position:absolute;inset:auto -15% -55% 20%;height:120px;background:radial-gradient(circle,rgba(55,231,255,.12),transparent 68%);pointer-events:none}
+.pulseMain{padding:4px 4px 4px 6px}
+.pulseLabel{font-size:9px;letter-spacing:.16em;color:var(--cyan);font-weight:900}
+.pulseTitle{font-size:18px;font-weight:900;letter-spacing:-.03em;margin-top:5px}
+.pulseSub{font-size:10px;color:var(--muted);margin-top:5px;max-width:480px}
+.pulseStats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px}
+.pulseStat{padding:10px;border:1px solid rgba(142,162,181,.16);border-radius:12px;background:rgba(3,9,15,.65)}
+.pulseStat small{display:block;font-size:8px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.pulseStat b{display:block;margin-top:4px;font-size:16px;letter-spacing:-.02em}
+.labJump{display:flex;gap:7px;flex-wrap:wrap;margin:0 0 14px;position:sticky;top:8px;z-index:20;pointer-events:none}
+.labJump button{pointer-events:auto;border:1px solid rgba(55,231,255,.16);background:rgba(8,16,24,.88);backdrop-filter:blur(10px);color:#bfd0dc;border-radius:999px;padding:7px 11px;font-size:9px;font-weight:900;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;box-shadow:0 8px 20px rgba(0,0,0,.18)}
+.labJump button:hover{color:#fff;border-color:rgba(55,231,255,.45);background:rgba(55,231,255,.1)}
+.livePanel,.predictionDeskPanel,.oddsBuilderPanel{box-shadow:0 24px 60px rgba(0,0,0,.28)}
+.livePanel,.predictionDeskPanel{border-color:rgba(55,231,255,.18)}
+.oddsBuilderPanel{border-color:rgba(136,120,255,.18)}
+.liveCard,.predictionCard{position:relative;overflow:hidden}
+.liveCard:before,.predictionCard:before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:linear-gradient(180deg,var(--cyan),transparent 75%);opacity:.75}
+.predictionCard:hover,.liveCard:hover{transform:translateY(-1px);border-color:rgba(55,231,255,.34);box-shadow:0 18px 42px rgba(0,0,0,.2)}
+.predictionCard,.liveCard{transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease}
+.predictionHeader time{padding:4px 7px;border:1px solid rgba(142,162,181,.16);border-radius:999px;background:rgba(4,10,16,.55)}
+.primaryPick{background:linear-gradient(90deg,rgba(66,229,154,.08),rgba(55,231,255,.03))}
+.calcHead{position:sticky;top:0;z-index:2}
+.builderActions .btn.primary{box-shadow:0 0 0 1px rgba(55,231,255,.08),0 10px 25px rgba(55,231,255,.08)}
+.controls{position:relative}
+.controls:before{content:"FILTERS";position:absolute;left:16px;top:-9px;padding:0 6px;background:var(--bg);color:var(--cyan);font-size:8px;letter-spacing:.12em;font-weight:900}
+@media(max-width:980px){.labPulse{grid-template-columns:1fr}.pulseStats{grid-template-columns:repeat(5,minmax(105px,1fr));overflow:auto}.pulseStat{min-width:105px}}
+@media(max-width:620px){.pulseStats{grid-template-columns:repeat(2,minmax(0,1fr));overflow:visible}.labPulse{padding:12px}.hero:after{display:none}.labJump{top:4px}.labJump button{padding:6px 9px;font-size:8px}}
