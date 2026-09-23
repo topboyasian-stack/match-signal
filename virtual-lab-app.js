@@ -1008,7 +1008,10 @@ function liveStateFingerprint(events){
   })).sort((a,b)=>a.id.localeCompare(b.id)));
 }
 function publishLiveEvents(events,mode,updatedAt){
-  const next=upcomingEventsFrom(events);
+  // Keep the live feed broad enough to show current eFootball/eAdriatic,
+  // Virtual Football and Zoom records. The prediction desk applies the
+  // stricter future-only filter separately.
+  const next=displayableLiveEventsFrom(events);
   const fingerprint=liveStateFingerprint(next);
   const changed=fingerprint!==liveFingerprint;
   state.live=next;
