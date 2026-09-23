@@ -1016,13 +1016,16 @@ async function loadLive(silent=false){
       console.warn('Virtual Lab live source failed; snapshot used:',remoteError);
       return;
     }catch(snapshotError){
-      state.live=[];
-      state.liveMode='none';
-      renderLive();
-      $('liveDot').className='liveDot bad';
-      $('liveTitle').textContent='LIVE SOURCE UNAVAILABLE';
-      $('liveMeta').textContent='LIVE FEED ERROR · '+remoteError.message+' · SNAPSHOT · '+snapshotError.message;
-      updateDiagnostics({message:'Feed layer failed. History and participant archives remain independent and are preserved.'});
+      liveFailureCount+=1;
+      const hadLastGoodFeed=state.live.length>0;
+      state.liveMode=hadLastGoodFeed?'stale':'none';
+      if(!hadLastGoodFeed)renderLive();
+      updateLiveFailureStatus(
+        'Temporary feed failure #'+liveFailureCount+
+        ' · '+remoteError.message+' · SNAPSHOT · '+snapshotError.message+
+        (hadLastGoodFeed?' · keeping the last valid fixture set':' · no prior fixture set available')
+      );
+      updateDiagnostics({message:'Temporary live-feed failure handled without clearing an existing prediction desk.'});
       console.error('Virtual Lab live feed failed:',remoteError,snapshotError);
     }
   }finally{button.disabled=false;liveInFlight=false}
@@ -1153,8 +1156,9 @@ $('clear').addEventListener('click',()=>{state.rows=[];state.filtered=[];state.b
 analyze();
 updateDiagnostics({message:'Virtual Lab v1 initialized. Production route: '+PRODUCTION_ROUTE});
 loadEligibility();
-loadHistory();
-loadConfirmedWatch().then(()=>loadLive(false));
+loadConfirmedWatch()
+  .then(()=>loadLive(false))
+  .finally(()=>window.setTimeout(()=>loadHistory(),250));
 window.setInterval(()=>loadLive(true),LIVE_REFRESH_MS);
-window.setInterval(loadHistory,300000);
+window.setInterval(loadHistory,600000);
 })();
