@@ -680,7 +680,7 @@ function predictionForEvent(e){
   const id=String(e.event_id||e.eventId||'');
   if(state.predictionCache.has(id))return state.predictionCache.get(id);
   try{
-    const researchEligible=isEligibleResearchEvent(e);
+    if(!isEligibleResearchEvent(e))return null;
     const candidates=[];
     (e.markets||[]).forEach(m=>{
       const mid=String(m.id||''),name=String(m.name||'').toLowerCase();
@@ -691,20 +691,12 @@ function predictionForEvent(e){
     });
     const active=candidates.filter(isEligibleOU).sort((x,y)=>(y.fairProb||0)-(x.fairProb||0));
     const experimental=candidates.filter(isExperimentalOU).sort((x,y)=>(y.fairProb||0)-(x.fairProb||0));
-    const marketCandidates=candidates.slice().sort((a,b)=>(b.fairProb||0)-(a.fairProb||0));
-    if(!marketCandidates.length)return null;
-    const bestOU=researchEligible&&active.length?enrichCandidate(active[0],e):null;
-    const experimentalOU=researchEligible&&experimental.length?enrichCandidate(experimental[0],e):null;
-    const primaryCandidate=bestOU||experimentalOU||marketCandidates[0];
-    if(primaryCandidate&&!bestOU&&!experimentalOU){
-      primaryCandidate.unqualified=true;
-      primaryCandidate.calibratedProb=primaryCandidate.fairProb;
-      primaryCandidate.calibrationN=0;
-      primaryCandidate.edge=0;
-      primaryCandidate.calibrationSource='market-baseline-only';
-    }
-    const participantQualified=researchEligible&&primaryCandidate&&qualifiesResearchPick(primaryCandidate);
-    const baseQualified=researchEligible&&primaryCandidate&&qualifiesBaseResearchPick(primaryCandidate,e);
+    if(!active.length&&!experimental.length)return null;
+    const bestOU=active.length?enrichCandidate(active[0],e):null;
+    const experimentalOU=experimental.length?enrichCandidate(experimental[0],e):null;
+    const primaryCandidate=bestOU||experimentalOU;
+    const participantQualified=primaryCandidate&&qualifiesResearchPick(primaryCandidate);
+    const baseQualified=primaryCandidate&&qualifiesBaseResearchPick(primaryCandidate,e);
     const qualified=!!(participantQualified||baseQualified);
     const candidate=primaryCandidate&&state.historyLoaded?primaryCandidate:null;
     const status=participantQualified?'QUALIFIED_PARTICIPANT_ENHANCED':(baseQualified?'QUALIFIED_BASE_EVIDENCE':(isPromotedResearchEvent(e)?'PROMOTION_PENDING':'EVIDENCE_CANDIDATE'));
@@ -716,7 +708,7 @@ function predictionForEvent(e){
       primary:qualified?primaryCandidate:null,
       candidate:candidate,
       candidate_status:status,
-      model_tier:participantQualified?'participant-enhanced':(researchEligible?'base-evidence':'market-baseline'),
+      model_tier:participantQualified?'participant-enhanced':'base-evidence',
       bestWinner:null,bestOU,experimentalOU,candidates:[bestOU,experimentalOU].filter(Boolean)
     };
     state.predictionCache.set(id,out);
@@ -1041,11 +1033,8 @@ async function loadLive(silent=false){
 
 function rebuildPredictionDesk(){
   const product=$('product').value;
-  // Visibility is separate from research qualification. Every supported
-  // upcoming fixture with a readable market can appear on the desk; only
-  // evidence-qualified markets can become a research signal or builder leg.
   const eligible=upcomingEventsFrom(state.live)
-    .filter(e=>isConfirmedWatchedEvent(e)||SUPPORTED_VIRTUAL_PRODUCTS.has(String(e?.product||'')))
+    .filter(e=>isEligibleResearchEvent(e)||isConfirmedWatchedEvent(e))
     .filter(e=>product==='all'||e.product===product)
     .sort((a,b)=>Number(isConfirmedWatchedEvent(b))-Number(isConfirmedWatchedEvent(a))||new Date(a.start_time||0)-new Date(b.start_time||0));
   state.picks=eligible.slice(0,24).map(e=>{try{return predictionForEvent(e)}catch(err){console.warn('Virtual Lab prediction desk skipped:',e?.event_id,err);return null;}}).filter(Boolean);
@@ -1086,6 +1075,7 @@ async function loadEligibility(){
     if(Array.isArray(d.policy?.eligible_markets))state.eligibility.eligible_markets=d.policy.eligible_markets;
     state.predictionCache.clear();
     renderEligibilityNotice();
+    if(state.live.length)rebuildPredictionDesk();
   }catch(e){console.warn('Virtual Lab eligibility fallback:',e);}
 }
 function renderEligibilityNotice(){
