@@ -171,17 +171,26 @@ export async function onRequestGet(context){
     if(start>0&&start<cutoff&&!row.live)continue;
     dedup.set(row.event_id,row);
   }
-  const events=[...dedup.values()];
+  const nowMs=Date.now();
+  const events=[...dedup.values()].filter(e=>{
+    if(e.live)return true;
+    const start=Number(e.start_time_ms||0);
+    // Upcoming non-live records must have a real timestamp and still be
+    // current. This prevents stale/partial upstream records from reaching
+    // the Lab and being mistaken for predictions.
+    return start>0&&start>=nowMs-60000;
+  });
   const counts={};
   const filtered=[];
   for(const e of events){
     const blob=(e.tournament+' '+e.category+' '+e.team_1+' '+e.team_2+' '+e.participant_1+' '+e.participant_2).toLowerCase();
     let key=null;
-    if(e.source==='efootball'){
+    const sourceBase=String(e.source||'').replace(/_live$/,'');
+    if(sourceBase==='efootball'){
       key=/eadriatic/.test(blob)?'efootball_adriatic':'efootball_gt';
-    }else if(e.source==='vfootball' && /zoom|turbo/i.test(blob)){
+    }else if(sourceBase==='vfootball' && /zoom|turbo/i.test(blob)){
       key='zoom';
-    }else if(e.source==='vfootball'){
+    }else if(sourceBase==='vfootball'){
       key='vfootball';
     }
     if(!key) continue;
