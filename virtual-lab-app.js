@@ -809,7 +809,14 @@ function renderPredictionDesk(){
   const host=$('predictionDesk');if(!host)return;
   const picks=state.picks.slice(0,40);
   $('predictionCount').textContent=String(picks.length);
-  if(!picks.length){host.innerHTML='<div class="empty">No upcoming fixture currently has a readable 1X2 or O/U market.</div>';return;}
+  if(!picks.length){
+    const liveCount=state.live.length;
+    const eligibleCount=upcomingEventsFrom(state.live).filter(e=>isEligibleResearchEvent(e)||isConfirmedWatchedEvent(e)).length;
+    host.innerHTML=liveCount
+      ? '<div class="empty">LIVE FEED CONNECTED · '+liveCount+' upcoming fixtures loaded, but none currently match the research desk filter.'+(eligibleCount?' '+eligibleCount+' match the research-league filter but have no supported O/U prediction line right now.':' Research-eligible upcoming predictions will appear when a supported O/U market is available.')+'</div>'
+      : '<div class="empty">No live virtual fixtures are currently loaded.</div>';
+    return;
+  }
   host.innerHTML=picks.map(function(p,i){
     function row(x,label){
       if(!x)return '<div class="calcRow"><span>'+label+'</span><b>—</b><span>—</span><span>—</span><span>—</span></div>';
