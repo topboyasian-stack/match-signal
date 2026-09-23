@@ -1017,6 +1017,7 @@ function publishLiveEvents(events,mode,updatedAt){
   liveFailureCount=mode==='remote'?0:liveFailureCount;
   if(changed){
     liveFingerprint=fingerprint;
+    state.predictionCache.clear();
     renderLive();
     rebuildPredictionDesk();
   }
