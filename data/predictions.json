@@ -38364,6 +38364,114 @@
   },
   {
     "sport": "football",
+    "league": "Saudi Pro League",
+    "event_id": "401900907",
+    "start_time": "2026-10-09T18:00Z",
+    "player_1": "Al Nassr",
+    "player_2": "Al Diriyah",
+    "venue": "Al-Awwal Park",
+    "surface": "Grass",
+    "probabilities": {
+      "p1": 0.3765,
+      "draw": 0.3026,
+      "p2": 0.3209
+    },
+    "pick": "p1",
+    "confidence": 0.3765,
+    "expected_goals": {
+      "p1": 1.45,
+      "p2": 1.15,
+      "total": 2.6
+    },
+    "markets": {
+      "over_under": {
+        "line": 2.5,
+        "over": 0.4689,
+        "under": 0.5311,
+        "pick": "under",
+        "source": "modeled prior"
+      },
+      "btts": {
+        "yes": 0.453,
+        "no": 0.547,
+        "pick": "no",
+        "source": "Poisson xG model"
+      }
+    },
+    "handicap": {
+      "line": null,
+      "home_cover": null,
+      "away_cover": null
+    },
+    "model": "independent venue-aware recency-weighted team-strength + Poisson/Dixon-Coles",
+    "mode": "LIVE_EXPERIMENTAL",
+    "paper_only": true,
+    "live_experimental": true,
+    "live_trading_approved": false,
+    "competition_source": "ESPN public soccer scoreboard",
+    "competition_id": "ksa.1",
+    "experimental_context": {
+      "team_tier_p1": "Level A",
+      "team_tier_p2": null,
+      "tier_source": "Saudi Pro League 2026-27 scheduling classification",
+      "notes": "Tier metadata is contextual only; it does not override the base model probabilities."
+    },
+    "prediction_status": "live_experimental",
+    "independent_probabilities": {
+      "p1": 0.439822,
+      "draw": 0.260388,
+      "p2": 0.29979
+    },
+    "calibrated_probabilities": {
+      "p1": 0.3765,
+      "draw": 0.3026,
+      "p2": 0.3209
+    },
+    "architecture": "independent statistical + market benchmark + calibration + value",
+    "model_version": "4.4-venue-aware-dixon-coles",
+    "calibration_version": "4.3",
+    "live_eligible": false,
+    "testing_mode": "paper",
+    "market_probabilities": null,
+    "market_odds": null,
+    "market_source": null,
+    "edge": null,
+    "value": {
+      "expected_value": null,
+      "odds": null,
+      "market_implied": null
+    },
+    "decision": "PAPER ONLY",
+    "decision_reason": "no_contemporaneous_market_data",
+    "independent_diagnostics": {
+      "sample_home": 0.0,
+      "sample_away": 0.0,
+      "effective_sample": 0.0,
+      "history_sufficient": false,
+      "history_source": "ESPN completed scoreboards + settled paper ledger",
+      "recency_half_life_days": 120,
+      "venue_aware": true,
+      "dixon_coles": true,
+      "dixon_coles_rho": -0.0,
+      "home_attack": 1.0,
+      "home_defence": 1.0,
+      "away_attack": 1.0,
+      "away_defence": 1.0,
+      "league_home_xg": 1.45,
+      "league_away_xg": 1.15,
+      "market_available": false
+    },
+    "behavior_context": {
+      "version": "behavior-profiles-v2",
+      "matched": false,
+      "teams": {},
+      "source": "behavior_profiles.json",
+      "use": "context_only_unvalidated",
+      "probability_adjustment_applied": false
+    }
+  },
+  {
+    "sport": "football",
     "league": "Eredivisie",
     "event_id": "401875592",
     "start_time": "2026-10-09T18:00Z",
@@ -39217,114 +39325,6 @@
       "dixon_coles_rho": -0.0,
       "home_attack": 0.9747,
       "home_defence": 0.9777,
-      "away_attack": 1.0,
-      "away_defence": 1.0,
-      "league_home_xg": 1.45,
-      "league_away_xg": 1.15,
-      "market_available": false
-    },
-    "behavior_context": {
-      "version": "behavior-profiles-v2",
-      "matched": false,
-      "teams": {},
-      "source": "behavior_profiles.json",
-      "use": "context_only_unvalidated",
-      "probability_adjustment_applied": false
-    }
-  },
-  {
-    "sport": "football",
-    "league": "Saudi Pro League",
-    "event_id": "401900907",
-    "start_time": "2026-10-09T18:00Z",
-    "player_1": "Al Nassr",
-    "player_2": "Al Diriyah",
-    "venue": "Al-Awwal Park",
-    "surface": "Grass",
-    "probabilities": {
-      "p1": 0.3765,
-      "draw": 0.3026,
-      "p2": 0.3209
-    },
-    "pick": "p1",
-    "confidence": 0.3765,
-    "expected_goals": {
-      "p1": 1.45,
-      "p2": 1.15,
-      "total": 2.6
-    },
-    "markets": {
-      "over_under": {
-        "line": 2.5,
-        "over": 0.4689,
-        "under": 0.5311,
-        "pick": "under",
-        "source": "modeled prior"
-      },
-      "btts": {
-        "yes": 0.453,
-        "no": 0.547,
-        "pick": "no",
-        "source": "Poisson xG model"
-      }
-    },
-    "handicap": {
-      "line": null,
-      "home_cover": null,
-      "away_cover": null
-    },
-    "model": "independent venue-aware recency-weighted team-strength + Poisson/Dixon-Coles",
-    "mode": "LIVE_EXPERIMENTAL",
-    "paper_only": true,
-    "live_experimental": true,
-    "live_trading_approved": false,
-    "competition_source": "ESPN public soccer scoreboard",
-    "competition_id": "ksa.1",
-    "experimental_context": {
-      "team_tier_p1": "Level A",
-      "team_tier_p2": null,
-      "tier_source": "Saudi Pro League 2026-27 scheduling classification",
-      "notes": "Tier metadata is contextual only; it does not override the base model probabilities."
-    },
-    "prediction_status": "live_experimental",
-    "independent_probabilities": {
-      "p1": 0.439822,
-      "draw": 0.260388,
-      "p2": 0.29979
-    },
-    "calibrated_probabilities": {
-      "p1": 0.3765,
-      "draw": 0.3026,
-      "p2": 0.3209
-    },
-    "architecture": "independent statistical + market benchmark + calibration + value",
-    "model_version": "4.4-venue-aware-dixon-coles",
-    "calibration_version": "4.3",
-    "live_eligible": false,
-    "testing_mode": "paper",
-    "market_probabilities": null,
-    "market_odds": null,
-    "market_source": null,
-    "edge": null,
-    "value": {
-      "expected_value": null,
-      "odds": null,
-      "market_implied": null
-    },
-    "decision": "PAPER ONLY",
-    "decision_reason": "no_contemporaneous_market_data",
-    "independent_diagnostics": {
-      "sample_home": 0.0,
-      "sample_away": 0.0,
-      "effective_sample": 0.0,
-      "history_sufficient": false,
-      "history_source": "ESPN completed scoreboards + settled paper ledger",
-      "recency_half_life_days": 120,
-      "venue_aware": true,
-      "dixon_coles": true,
-      "dixon_coles_rho": -0.0,
-      "home_attack": 1.0,
-      "home_defence": 1.0,
       "away_attack": 1.0,
       "away_defence": 1.0,
       "league_home_xg": 1.45,
@@ -60937,6 +60937,114 @@
   },
   {
     "sport": "football",
+    "league": "Saudi Pro League",
+    "event_id": "401900909",
+    "start_time": "2026-10-10T18:00Z",
+    "player_1": "Al Hilal",
+    "player_2": "Al Ittihad",
+    "venue": "Kingdom Arena",
+    "surface": "Grass",
+    "probabilities": {
+      "p1": 0.3765,
+      "draw": 0.3026,
+      "p2": 0.3209
+    },
+    "pick": "p1",
+    "confidence": 0.3765,
+    "expected_goals": {
+      "p1": 1.45,
+      "p2": 1.15,
+      "total": 2.6
+    },
+    "markets": {
+      "over_under": {
+        "line": 2.5,
+        "over": 0.4689,
+        "under": 0.5311,
+        "pick": "under",
+        "source": "modeled prior"
+      },
+      "btts": {
+        "yes": 0.4832,
+        "no": 0.5168,
+        "pick": "no",
+        "source": "Poisson xG model"
+      }
+    },
+    "handicap": {
+      "line": null,
+      "home_cover": null,
+      "away_cover": null
+    },
+    "model": "independent venue-aware recency-weighted team-strength + Poisson/Dixon-Coles",
+    "mode": "LIVE_EXPERIMENTAL",
+    "paper_only": true,
+    "live_experimental": true,
+    "live_trading_approved": false,
+    "competition_source": "ESPN public soccer scoreboard",
+    "competition_id": "ksa.1",
+    "experimental_context": {
+      "team_tier_p1": "Level A",
+      "team_tier_p2": "Level A",
+      "tier_source": "Saudi Pro League 2026-27 scheduling classification",
+      "notes": "Tier metadata is contextual only; it does not override the base model probabilities."
+    },
+    "prediction_status": "live_experimental",
+    "independent_probabilities": {
+      "p1": 0.439822,
+      "draw": 0.260388,
+      "p2": 0.29979
+    },
+    "calibrated_probabilities": {
+      "p1": 0.3765,
+      "draw": 0.3026,
+      "p2": 0.3209
+    },
+    "architecture": "independent statistical + market benchmark + calibration + value",
+    "model_version": "4.4-venue-aware-dixon-coles",
+    "calibration_version": "4.3",
+    "live_eligible": false,
+    "testing_mode": "paper",
+    "market_probabilities": null,
+    "market_odds": null,
+    "market_source": null,
+    "edge": null,
+    "value": {
+      "expected_value": null,
+      "odds": null,
+      "market_implied": null
+    },
+    "decision": "PAPER ONLY",
+    "decision_reason": "no_contemporaneous_market_data",
+    "independent_diagnostics": {
+      "sample_home": 0.0,
+      "sample_away": 0.0,
+      "effective_sample": 0.0,
+      "history_sufficient": false,
+      "history_source": "ESPN completed scoreboards + settled paper ledger",
+      "recency_half_life_days": 120,
+      "venue_aware": true,
+      "dixon_coles": true,
+      "dixon_coles_rho": -0.0,
+      "home_attack": 1.0,
+      "home_defence": 1.0,
+      "away_attack": 1.0,
+      "away_defence": 1.0,
+      "league_home_xg": 1.45,
+      "league_away_xg": 1.15,
+      "market_available": false
+    },
+    "behavior_context": {
+      "version": "behavior-profiles-v2",
+      "matched": false,
+      "teams": {},
+      "source": "behavior_profiles.json",
+      "use": "context_only_unvalidated",
+      "probability_adjustment_applied": false
+    }
+  },
+  {
+    "sport": "football",
     "league": "Eredivisie",
     "event_id": "401875588",
     "start_time": "2026-10-10T18:00Z",
@@ -61020,114 +61128,6 @@
       "p2": 0.29979
     },
     "architecture": "independent statistical + market benchmark + calibration + value",
-    "calibration_version": "4.3",
-    "live_eligible": false,
-    "testing_mode": "paper",
-    "market_probabilities": null,
-    "market_odds": null,
-    "market_source": null,
-    "edge": null,
-    "value": {
-      "expected_value": null,
-      "odds": null,
-      "market_implied": null
-    },
-    "decision": "PAPER ONLY",
-    "decision_reason": "no_contemporaneous_market_data",
-    "independent_diagnostics": {
-      "sample_home": 0.0,
-      "sample_away": 0.0,
-      "effective_sample": 0.0,
-      "history_sufficient": false,
-      "history_source": "ESPN completed scoreboards + settled paper ledger",
-      "recency_half_life_days": 120,
-      "venue_aware": true,
-      "dixon_coles": true,
-      "dixon_coles_rho": -0.0,
-      "home_attack": 1.0,
-      "home_defence": 1.0,
-      "away_attack": 1.0,
-      "away_defence": 1.0,
-      "league_home_xg": 1.45,
-      "league_away_xg": 1.15,
-      "market_available": false
-    },
-    "behavior_context": {
-      "version": "behavior-profiles-v2",
-      "matched": false,
-      "teams": {},
-      "source": "behavior_profiles.json",
-      "use": "context_only_unvalidated",
-      "probability_adjustment_applied": false
-    }
-  },
-  {
-    "sport": "football",
-    "league": "Saudi Pro League",
-    "event_id": "401900909",
-    "start_time": "2026-10-10T18:00Z",
-    "player_1": "Al Hilal",
-    "player_2": "Al Ittihad",
-    "venue": "Kingdom Arena",
-    "surface": "Grass",
-    "probabilities": {
-      "p1": 0.3765,
-      "draw": 0.3026,
-      "p2": 0.3209
-    },
-    "pick": "p1",
-    "confidence": 0.3765,
-    "expected_goals": {
-      "p1": 1.45,
-      "p2": 1.15,
-      "total": 2.6
-    },
-    "markets": {
-      "over_under": {
-        "line": 2.5,
-        "over": 0.4689,
-        "under": 0.5311,
-        "pick": "under",
-        "source": "modeled prior"
-      },
-      "btts": {
-        "yes": 0.4832,
-        "no": 0.5168,
-        "pick": "no",
-        "source": "Poisson xG model"
-      }
-    },
-    "handicap": {
-      "line": null,
-      "home_cover": null,
-      "away_cover": null
-    },
-    "model": "independent venue-aware recency-weighted team-strength + Poisson/Dixon-Coles",
-    "mode": "LIVE_EXPERIMENTAL",
-    "paper_only": true,
-    "live_experimental": true,
-    "live_trading_approved": false,
-    "competition_source": "ESPN public soccer scoreboard",
-    "competition_id": "ksa.1",
-    "experimental_context": {
-      "team_tier_p1": "Level A",
-      "team_tier_p2": "Level A",
-      "tier_source": "Saudi Pro League 2026-27 scheduling classification",
-      "notes": "Tier metadata is contextual only; it does not override the base model probabilities."
-    },
-    "prediction_status": "live_experimental",
-    "independent_probabilities": {
-      "p1": 0.439822,
-      "draw": 0.260388,
-      "p2": 0.29979
-    },
-    "calibrated_probabilities": {
-      "p1": 0.3765,
-      "draw": 0.3026,
-      "p2": 0.3209
-    },
-    "architecture": "independent statistical + market benchmark + calibration + value",
-    "model_version": "4.4-venue-aware-dixon-coles",
     "calibration_version": "4.3",
     "live_eligible": false,
     "testing_mode": "paper",
@@ -65997,6 +65997,132 @@
   },
   {
     "sport": "football",
+    "league": "Eredivisie",
+    "event_id": "401875589",
+    "start_time": "2026-10-10T19:00Z",
+    "player_1": "Ajax Amsterdam",
+    "player_2": "NEC Nijmegen",
+    "venue": "Johan Cruijff Arena",
+    "surface": "Grass",
+    "probabilities": {
+      "p1": 0.3765,
+      "draw": 0.3026,
+      "p2": 0.3209
+    },
+    "pick": "p1",
+    "confidence": 0.3765,
+    "expected_goals": {
+      "p1": 1.45,
+      "p2": 1.15,
+      "total": 2.6
+    },
+    "markets": {
+      "over_under": {
+        "line": 3.5,
+        "over": 0.5231,
+        "under": 0.4769,
+        "pick": "over",
+        "source": "market O/U calibrated"
+      },
+      "btts": {
+        "yes": 0.582,
+        "no": 0.418,
+        "pick": "yes",
+        "source": "Poisson xG model"
+      }
+    },
+    "handicap": {
+      "line": -1.5,
+      "home_cover": 0.5559,
+      "away_cover": 0.4441
+    },
+    "model": "independent venue-aware recency-weighted team-strength + Poisson/Dixon-Coles",
+    "sportybet_market": {
+      "available": false,
+      "provider": "SportyBet NG",
+      "reason": "no sufficiently confident fixture match",
+      "fetched_at": "2026-09-23T13:35:59.766676+00:00"
+    },
+    "market_insights": {
+      "provider": "SportyBet NG",
+      "available": false
+    },
+    "raw_probabilities": {
+      "p1": 0.759,
+      "draw": 0.1497,
+      "p2": 0.0913
+    },
+    "raw_confidence": 0.759,
+    "calibrated_probabilities": {
+      "p1": 0.3765,
+      "draw": 0.3026,
+      "p2": 0.3209
+    },
+    "calibrated_confidence": 0.7323,
+    "calibration": {
+      "market": "football:1x2",
+      "method": "recency_weighted_empirical_bayes",
+      "sample_size": 169,
+      "effective_sample": 10.8,
+      "empirical": 0.6581,
+      "raw": 0.759,
+      "bin_center": 0.775
+    },
+    "model_version": "4.4-venue-aware-dixon-coles",
+    "calculated_at": "2026-09-23T13:36:52.813646+00:00",
+    "paper_only": true,
+    "live_experimental": true,
+    "live_trading_approved": false,
+    "prediction_status": "live_experimental",
+    "independent_probabilities": {
+      "p1": 0.439822,
+      "draw": 0.260388,
+      "p2": 0.29979
+    },
+    "architecture": "independent statistical + market benchmark + calibration + value",
+    "calibration_version": "4.3",
+    "live_eligible": false,
+    "testing_mode": "paper",
+    "market_probabilities": null,
+    "market_odds": null,
+    "market_source": null,
+    "edge": null,
+    "value": {
+      "expected_value": null,
+      "odds": null,
+      "market_implied": null
+    },
+    "decision": "PAPER ONLY",
+    "decision_reason": "no_contemporaneous_market_data",
+    "independent_diagnostics": {
+      "sample_home": 0.0,
+      "sample_away": 0.0,
+      "effective_sample": 0.0,
+      "history_sufficient": false,
+      "history_source": "ESPN completed scoreboards + settled paper ledger",
+      "recency_half_life_days": 120,
+      "venue_aware": true,
+      "dixon_coles": true,
+      "dixon_coles_rho": -0.0,
+      "home_attack": 1.0,
+      "home_defence": 1.0,
+      "away_attack": 1.0,
+      "away_defence": 1.0,
+      "league_home_xg": 1.45,
+      "league_away_xg": 1.15,
+      "market_available": false
+    },
+    "behavior_context": {
+      "version": "behavior-profiles-v2",
+      "matched": false,
+      "teams": {},
+      "source": "behavior_profiles.json",
+      "use": "context_only_unvalidated",
+      "probability_adjustment_applied": false
+    }
+  },
+  {
+    "sport": "football",
     "league": "La Liga",
     "event_id": "401882848",
     "start_time": "2026-10-10T19:00Z",
@@ -67024,132 +67150,6 @@
     },
     "model_version": "5.0 historical-calibrated",
     "calculated_at": "2026-09-23T16:36:35.124965+00:00"
-  },
-  {
-    "sport": "football",
-    "league": "Eredivisie",
-    "event_id": "401875589",
-    "start_time": "2026-10-10T19:00Z",
-    "player_1": "Ajax Amsterdam",
-    "player_2": "NEC Nijmegen",
-    "venue": "Johan Cruijff Arena",
-    "surface": "Grass",
-    "probabilities": {
-      "p1": 0.3765,
-      "draw": 0.3026,
-      "p2": 0.3209
-    },
-    "pick": "p1",
-    "confidence": 0.3765,
-    "expected_goals": {
-      "p1": 1.45,
-      "p2": 1.15,
-      "total": 2.6
-    },
-    "markets": {
-      "over_under": {
-        "line": 3.5,
-        "over": 0.5231,
-        "under": 0.4769,
-        "pick": "over",
-        "source": "market O/U calibrated"
-      },
-      "btts": {
-        "yes": 0.582,
-        "no": 0.418,
-        "pick": "yes",
-        "source": "Poisson xG model"
-      }
-    },
-    "handicap": {
-      "line": -1.5,
-      "home_cover": 0.5559,
-      "away_cover": 0.4441
-    },
-    "model": "independent venue-aware recency-weighted team-strength + Poisson/Dixon-Coles",
-    "sportybet_market": {
-      "available": false,
-      "provider": "SportyBet NG",
-      "reason": "no sufficiently confident fixture match",
-      "fetched_at": "2026-09-23T13:35:59.766676+00:00"
-    },
-    "market_insights": {
-      "provider": "SportyBet NG",
-      "available": false
-    },
-    "raw_probabilities": {
-      "p1": 0.759,
-      "draw": 0.1497,
-      "p2": 0.0913
-    },
-    "raw_confidence": 0.759,
-    "calibrated_probabilities": {
-      "p1": 0.3765,
-      "draw": 0.3026,
-      "p2": 0.3209
-    },
-    "calibrated_confidence": 0.7323,
-    "calibration": {
-      "market": "football:1x2",
-      "method": "recency_weighted_empirical_bayes",
-      "sample_size": 169,
-      "effective_sample": 10.8,
-      "empirical": 0.6581,
-      "raw": 0.759,
-      "bin_center": 0.775
-    },
-    "model_version": "4.4-venue-aware-dixon-coles",
-    "calculated_at": "2026-09-23T13:36:52.813646+00:00",
-    "paper_only": true,
-    "live_experimental": true,
-    "live_trading_approved": false,
-    "prediction_status": "live_experimental",
-    "independent_probabilities": {
-      "p1": 0.439822,
-      "draw": 0.260388,
-      "p2": 0.29979
-    },
-    "architecture": "independent statistical + market benchmark + calibration + value",
-    "calibration_version": "4.3",
-    "live_eligible": false,
-    "testing_mode": "paper",
-    "market_probabilities": null,
-    "market_odds": null,
-    "market_source": null,
-    "edge": null,
-    "value": {
-      "expected_value": null,
-      "odds": null,
-      "market_implied": null
-    },
-    "decision": "PAPER ONLY",
-    "decision_reason": "no_contemporaneous_market_data",
-    "independent_diagnostics": {
-      "sample_home": 0.0,
-      "sample_away": 0.0,
-      "effective_sample": 0.0,
-      "history_sufficient": false,
-      "history_source": "ESPN completed scoreboards + settled paper ledger",
-      "recency_half_life_days": 120,
-      "venue_aware": true,
-      "dixon_coles": true,
-      "dixon_coles_rho": -0.0,
-      "home_attack": 1.0,
-      "home_defence": 1.0,
-      "away_attack": 1.0,
-      "away_defence": 1.0,
-      "league_home_xg": 1.45,
-      "league_away_xg": 1.15,
-      "market_available": false
-    },
-    "behavior_context": {
-      "version": "behavior-profiles-v2",
-      "matched": false,
-      "teams": {},
-      "source": "behavior_profiles.json",
-      "use": "context_only_unvalidated",
-      "probability_adjustment_applied": false
-    }
   },
   {
     "sport": "football",
