@@ -87,3 +87,30 @@ body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.22;ba
 .controls:before{content:"FILTERS";position:absolute;left:16px;top:-9px;padding:0 6px;background:var(--bg);color:var(--cyan);font-size:8px;letter-spacing:.12em;font-weight:900}
 @media(max-width:980px){.labPulse{grid-template-columns:1fr}.pulseStats{grid-template-columns:repeat(5,minmax(105px,1fr));overflow:auto}.pulseStat{min-width:105px}}
 @media(max-width:620px){.pulseStats{grid-template-columns:repeat(2,minmax(0,1fr));overflow:visible}.labPulse{padding:12px}.hero:after{display:none}.labJump{top:4px}.labJump button{padding:6px 9px;font-size:8px}}
+
+.nearQualifiedPanel{border-color:rgba(255,209,102,.18);box-shadow:0 22px 56px rgba(0,0,0,.24)}
+.radarIntro{margin:-2px 0 12px;color:var(--muted);font-size:10px;line-height:1.45;max-width:900px}
+.nearQualifiedRadar{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.radarCard{position:relative;padding:13px;border:1px solid rgba(255,209,102,.16);border-radius:13px;background:linear-gradient(145deg,#111a24,#0a1017);overflow:hidden}
+.radarCard:before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:linear-gradient(180deg,var(--amber),transparent 75%);opacity:.75}
+.radarTop{display:flex;justify-content:space-between;gap:10px;color:var(--muted);font-size:9px}
+.radarTop span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.radarTop time{white-space:nowrap}
+.radarMatch{display:flex;align-items:center;gap:7px;margin-top:8px;font-size:13px}
+.radarMatch span{color:var(--muted);font-size:10px}
+.radarMarket{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center;margin-top:9px;padding:8px;border:1px solid var(--border);border-radius:9px;background:#07101a;font-size:10px}
+.radarMarket b{text-align:center;color:var(--green);font-size:13px}
+.radarMarket span:last-child{text-align:right;color:var(--muted)}
+.radarMetrics{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}
+.radarMetrics>div{padding:7px;border:1px solid rgba(142,162,181,.14);border-radius:8px;background:rgba(3,9,15,.55)}
+.radarMetrics small{display:block;color:var(--muted);font-size:8px;text-transform:uppercase;letter-spacing:.06em}
+.radarMetrics b{display:block;margin-top:3px;font-size:11px}
+.radarStatus{display:grid;gap:3px;margin-top:8px;padding:8px 9px;border-radius:9px;background:rgba(255,209,102,.05);border:1px solid rgba(255,209,102,.14)}
+.radarStatus.radarReady{background:rgba(66,229,154,.045);border-color:rgba(66,229,154,.16)}
+.radarStatus span{font-size:8px;letter-spacing:.08em;text-transform:uppercase;font-weight:900;color:var(--amber)}
+.radarStatus.radarReady span{color:var(--green)}
+.radarStatus small{font-size:9px;color:var(--muted);line-height:1.35}
+.radarEmpty{min-height:90px;padding:17px;border:1px dashed rgba(255,209,102,.18);border-radius:12px;background:rgba(255,209,102,.025);display:grid;place-items:center;text-align:center;color:var(--muted)}
+.radarEmpty strong{display:block;color:#dbe6ef;font-size:12px}
+.radarEmpty span{display:block;margin-top:3px;font-size:9px}
+@media(max-width:760px){.nearQualifiedRadar{grid-template-columns:1fr}.radarMetrics{grid-template-columns:repeat(2,1fr)}.radarMarket{grid-template-columns:1fr auto 1fr}}
