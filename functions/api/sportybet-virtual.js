@@ -178,7 +178,7 @@ export async function onRequestGet(context){
     // Upcoming non-live records must have a real timestamp and still be
     // current. This prevents stale/partial upstream records from reaching
     // the Lab and being mistaken for predictions.
-    return start>0&&start>=nowMs-60000;
+    return start>0&&start>=nowMs-(30*60*1000);
   });
   const counts={};
   const filtered=[];
@@ -209,7 +209,7 @@ export async function onRequestGet(context){
     page_num:pageNum,
     timeline_hours:timeline,
     events_count:filtered.length,
-    upcoming_events_count:filtered.filter(e=>e.live||!e.start_time_ms||Number(e.start_time_ms)>=cutoff).length,
+    upcoming_events_count:filtered.filter(e=>e.live||(!e.live&&Number(e.start_time_ms||0)>=Date.now()-(30*60*1000))).length,
     server_time:new Date().toISOString(),
     product_counts:counts,
     source_status:sourceStatus,
