@@ -266,7 +266,7 @@ function normalizeLiveEvent(event,tournament,category){
   let start=null;
   const ms=Number(event.start_time_ms??event.estimateStartTime);
   if(Number.isFinite(ms)&&ms>0)start=new Date(ms).toISOString();
-  return {product,competition:String(tournament||'Unclassified'),category:String(category||''),event_id:eventId,home,away,participant_1:homeParticipant,participant_2:awayParticipant,participant_identity_source:event.participant_identity_source||((homeParticipant||awayParticipant)?'event_metadata_or_explicit_name':null),identity_verified:!!(homeParticipant&&awayParticipant),start_time:start,match_status:event.match_status??event.matchStatus,markets};
+  return {product,competition:String(tournament||'Unclassified'),category:String(category||''),event_id:eventId,home,away,participant_1:homeParticipant,participant_2:awayParticipant,participant_identity_source:event.participant_identity_source||((homeParticipant||awayParticipant)?'event_metadata_or_explicit_name':null),identity_verified:!!(homeParticipant&&awayParticipant),start_time:start,match_status:event.match_status??event.matchStatus,live:!!event.live||/(^|[\\s_-])(live|started|inprogress|in-progress|playing)([\\s_-]|$)/i.test(String(event.match_status??event.matchStatus??'')),markets};
 }
 
 function matchesMarket(market,chosen){
@@ -417,6 +417,14 @@ function hotParticipantForEvent(e,line){
 }
 function blendForEvent(event,priorEvents){
   if(!event||!event.ladder)return null;
+  // Live/future cards must remain responsive. The generated walk-forward
+  // artifact already validates the line-ladder model; do not run the
+  // O(n^3) historical alpha search in the browser for every live card.
+  if(event._livePrediction){
+    const firstLine=event.ladder.points?.length?Number(event.ladder.points[0].line):0;
+    const prior=productPrior(priorEvents,event.product,firstLine,new Date(event.timestamp).getTime());
+    return {alpha:0,alphaN:0,priorN:prior.n||0};
+  }
   const points=event.ladder.points;
   const rows=[];
   const prior=productPrior(priorEvents,event.product,points.length?points[0].line:0,new Date(event.timestamp).getTime());
@@ -671,7 +679,7 @@ function enrichCandidate(c,e){
     const ladder=fitLambdaFromLadder((e.markets||[]).map(m=>marketOverPoint(m)).filter(Boolean));
     if(ladder){
       const priorEvents=state.modelEvents||[];
-      const pseudo={product:e.product,participant_1:participantIdentity(e.participant_1||e.home||''),participant_2:participantIdentity(e.participant_2||e.away||''),home:participantIdentity(e.participant_1||e.home||''),away:participantIdentity(e.participant_2||e.away||''),timestamp:e.start_time,ladder,total:null};
+      const pseudo={product:e.product,participant_1:participantIdentity(e.participant_1||e.home||''),participant_2:participantIdentity(e.participant_2||e.away||''),home:participantIdentity(e.participant_1||e.home||''),away:participantIdentity(e.participant_2||e.away||''),timestamp:e.start_time,ladder,total:null,_livePrediction:true};
       const mm=modelOverForEvent(pseudo,priorEvents,Number(c.market.line),state.modelGate);
       if(mm){
         calibrated=String(c.pickCode).toUpperCase().startsWith('U')?1-mm.prob:mm.prob;
@@ -751,13 +759,38 @@ function confirmedWatchParticipantsForEvent(e){
     return p&&names.includes(p)&&(!x.product||x.product==='all'||x.product===product);
   });
 }
+function eventStatusIsLive(e){
+  const s=String(e?.match_status||e?.matchStatus||'').toLowerCase();
+  return !!e?.live||/(^|[\\s_-])(live|started|inprogress|in-progress|playing)([\\s_-]|$)/.test(s);
+}
+function eventStartMs(e){
+  const t=new Date(e?.start_time||0).getTime();
+  return Number.isFinite(t)&&t>0?t:null;
+}
 function isUpcoming(e){
-  // Backend is authoritative for the upcoming/live window. Never apply a second
-  // browser-clock cutoff that can hide valid bookmaker fixtures.
-  return !!e;
+  const t=eventStartMs(e);
+  if(!t)return false;
+  if(eventStatusIsLive(e))return false;
+  // Small clock-skew tolerance only. A past fixture must never enter the
+  // prediction desk simply because the upstream feed returned it.
+  return t>=Date.now()-60000;
+}
+function isDisplayableLiveEvent(e){
+  if(!e)return false;
+  if(eventStatusIsLive(e))return true;
+  return isUpcoming(e);
 }
 function upcomingEventsFrom(events){
-  return (events||[]).filter(e=>SUPPORTED_VIRTUAL_PRODUCTS.has(String(e?.product||''))).filter(isUpcoming).sort((a,b)=>new Date(a.start_time||0).getTime()-new Date(b.start_time||0).getTime());
+  return (events||[])
+    .filter(e=>SUPPORTED_VIRTUAL_PRODUCTS.has(String(e?.product||'')))
+    .filter(isUpcoming)
+    .sort((a,b)=>(eventStartMs(a)||Infinity)-(eventStartMs(b)||Infinity));
+}
+function displayableLiveEventsFrom(events){
+  return (events||[])
+    .filter(e=>SUPPORTED_VIRTUAL_PRODUCTS.has(String(e?.product||'')))
+    .filter(isDisplayableLiveEvent)
+    .sort((a,b)=>Number(isConfirmedWatchedEvent(b))-Number(isConfirmedWatchedEvent(a))||(eventStartMs(a)||Infinity)-(eventStartMs(b)||Infinity));
 }
 function updateDiagnostics(extra={}){
   const el=$('labDiagnostics');if(!el)return;
@@ -776,10 +809,8 @@ function updateDiagnostics(extra={}){
 
 function renderLive(){
   const product=$('product')?.value||'all',market=$('market')?.value||'all';
-  const allEvents=upcomingEventsFrom(state.live)
-    .filter(e=>SUPPORTED_VIRTUAL_PRODUCTS.has(String(e?.product||'')))
+  const allEvents=displayableLiveEventsFrom(state.live)
     .filter(e=>product==='all'||e.product===product)
-    .sort((x,y)=>Number(isConfirmedWatchedEvent(y))-Number(isConfirmedWatchedEvent(x))||new Date(x.start_time||0)-new Date(y.start_time||0))
     .slice(0,30);
   const cards=[];
   for(const e of allEvents){
@@ -1061,22 +1092,25 @@ function rebuildPredictionDesk(){
       const mid=String(m.id||''),name=String(m.name||'').toLowerCase();
       return (mid==='18'||mid==='189'||name.includes('over/under')||name.includes('total')) && calculateMarket(m);
     })).length;
-    diagnostics.textContent='Live '+upcoming.length+' · research/watch league '+researchLeagueCount+' · readable O/U '+readableOUCount+' · displayed '+state.picks.length;
+    const displayCount=displayableLiveEventsFrom(state.live).length;
+    const staleCount=state.live.filter(e=>SUPPORTED_VIRTUAL_PRODUCTS.has(String(e?.product||''))&&!isDisplayableLiveEvent(e)).length;
+    diagnostics.textContent='Live '+displayCount+' · stale dropped '+staleCount+' · research/watch league '+researchLeagueCount+' · readable O/U '+readableOUCount+' · displayed '+state.picks.length;
   }
 }
 async function refreshPredictionDesk(){
   const button=$('predictionRefresh');
   if(button){button.disabled=true;button.textContent='↻ Refreshing predictions…';}
   const diagnostics=$('predictionDiagnostics');
-  if(diagnostics)diagnostics.textContent='Refreshing SportyBet feed, research eligibility, and current prediction state…';
+  if(diagnostics)diagnostics.textContent='Refreshing SportyBet feed and prediction state…';
   try{
     state.predictionCache.clear();
     await loadEligibility();
     await loadLive(false);
-    if(state.historyLoaded) await loadHistory();
-    else await loadHistory();
-    state.predictionCache.clear();
-    rebuildPredictionDesk();
+    if(!state.historyLoaded) await loadHistory();
+    else {
+      state.predictionCache.clear();
+      rebuildPredictionDesk();
+    }
     if(diagnostics)diagnostics.textContent += ' Done.';
   }catch(e){
     console.error('Virtual Lab prediction refresh failed:',e);
