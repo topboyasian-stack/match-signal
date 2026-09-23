@@ -635,10 +635,17 @@ function qualifiesBaseResearchPick(c,e){
   }
   return false;
 }
+function competitionKey(value){
+  return String(value??'')
+    .normalize('NFKD')
+    .replace(/[\\u0300-\\u036f]/g,'')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g,'');
+}
 function isEligibleResearchEvent(e){
-  const name=String(e.competition||e.tournament||'');
+  const name=competitionKey(e.competition||e.tournament||'');
   const raw=state.eligibility.raw_eligible_competitions||state.eligibility.eligible_competitions||[];
-  return raw.includes(name);
+  return raw.some(x=>competitionKey(x)===name);
 }
 function isPromotedResearchEvent(e){
   const name=String(e.competition||e.tournament||'');
@@ -1040,12 +1047,43 @@ async function loadLive(silent=false){
 
 function rebuildPredictionDesk(){
   const product=$('product').value;
-  const eligible=upcomingEventsFrom(state.live)
+  const upcoming=upcomingEventsFrom(state.live).filter(e=>product==='all'||e.product===product);
+  const eligible=upcoming
     .filter(e=>isEligibleResearchEvent(e)||isConfirmedWatchedEvent(e))
-    .filter(e=>product==='all'||e.product===product)
     .sort((a,b)=>Number(isConfirmedWatchedEvent(b))-Number(isConfirmedWatchedEvent(a))||new Date(a.start_time||0)-new Date(b.start_time||0));
   state.picks=eligible.slice(0,24).map(e=>{try{return predictionForEvent(e)}catch(err){console.warn('Virtual Lab prediction desk skipped:',e?.event_id,err);return null;}}).filter(Boolean);
-  renderPredictionDesk();renderBuilder();
+  renderPredictionDesk();
+  renderBuilder();
+  const diagnostics=$('predictionDiagnostics');
+  if(diagnostics){
+    const researchLeagueCount=upcoming.filter(e=>isEligibleResearchEvent(e)||isConfirmedWatchedEvent(e)).length;
+    const readableOUCount=upcoming.filter(e=>(e.markets||[]).some(m=>{
+      const mid=String(m.id||''),name=String(m.name||'').toLowerCase();
+      return (mid==='18'||mid==='189'||name.includes('over/under')||name.includes('total')) && calculateMarket(m);
+    })).length;
+    diagnostics.textContent='Live '+upcoming.length+' · research/watch league '+researchLeagueCount+' · readable O/U '+readableOUCount+' · displayed '+state.picks.length;
+  }
+}
+async function refreshPredictionDesk(){
+  const button=$('predictionRefresh');
+  if(button){button.disabled=true;button.textContent='↻ Refreshing predictions…';}
+  const diagnostics=$('predictionDiagnostics');
+  if(diagnostics)diagnostics.textContent='Refreshing SportyBet feed, research eligibility, and current prediction state…';
+  try{
+    state.predictionCache.clear();
+    await loadEligibility();
+    await loadLive(false);
+    if(state.historyLoaded) await loadHistory();
+    else await loadHistory();
+    state.predictionCache.clear();
+    rebuildPredictionDesk();
+    if(diagnostics)diagnostics.textContent += ' Done.';
+  }catch(e){
+    console.error('Virtual Lab prediction refresh failed:',e);
+    if(diagnostics)diagnostics.textContent='Prediction refresh failed · '+String(e.message||e);
+  }finally{
+    if(button){button.disabled=false;button.textContent='↻ Refresh predictions';}
+  }
 }
 async function loadConfirmedWatch(){
   try{
@@ -1160,6 +1198,7 @@ $('market').addEventListener('change',applyFilters);
 $('split').addEventListener('change',analyze);
 $('runStrategy').addEventListener('click',runStrategy);
 $('liveRefresh').addEventListener('click',loadLive);
+$('predictionRefresh').addEventListener('click',refreshPredictionDesk);
 $('autoBuild').addEventListener('click',autoBuild);
 $('clearBuilder').addEventListener('click',function(){state.builder=[];renderBuilder();});
 $('clear').addEventListener('click',()=>{state.rows=[];state.filtered=[];state.builder=[];const hs=$('historyStatus');if(hs)hs.textContent='MANUAL DATASET CLEARED';$('fileInput').value='';analyze();renderBuilder()});
