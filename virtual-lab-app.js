@@ -470,7 +470,7 @@ function selectEvidenceVariant(product,line){
   if(pm){
     const p=pm.poisson||{},q=pm.poisson_prior||{};
     if(Number(p.n||0)>=200&&Number(q.n||0)>=200&&Number.isFinite(p.hit_rate)&&Number.isFinite(q.hit_rate)){
-      choices.push({variant:q.hit_rate-p.hit_rate>=0.01?'poisson_prior':'poisson',delta:q.hit_rate-p.hit_rate});
+      choices.push({variant:q.hit_rate-p.hit_rate>=0.005?'poisson_prior':'poisson',delta:q.hit_rate-p.hit_rate});
     }
   }
   return choices.some(x=>x.variant==='poisson_prior')?'poisson_prior':'poisson';
