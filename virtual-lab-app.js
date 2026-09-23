@@ -19,7 +19,7 @@ const ELIGIBILITY='/data/virtual_lab_eligibility.json';
 const PARTICIPANT_PROFILES='/data/virtual_lab_participant_profiles.json';
 const CONFIRMED_WATCH='/data/virtual_lab_participants/efootball_confirmed_watch.json';
 const SUPPORTED_VIRTUAL_PRODUCTS=new Set(['efootball_gt','efootball_adriatic','vfootball','zoom']);
-const state={rows:[],filtered:[],live:[],liveMode:'none',liveUpdated:null,picks:[],builder:[],historyLoaded:false,modelRows:[],modelEvents:[],modelGate:false,modelHoldout:null,modelEvaluation:null,participantProfiles:null,confirmedWatch:null,eligibility:{eligible_competitions:['Virtual'],raw_eligible_competitions:['Esoccer H2H GG League','Europa League','FA Cup','International (Virtual eComp)','La Liga (Virtual eComp)','Premier League 2x6','Virtual','Volta Premier League'],eligible_ou_lines:[],raw_eligible_ou_lines:[0.5,1.5,2.5,7.5],experimental_ou_lines:[1.5],priority_ou_lines:[1.5,3.5,4.5],eligible_markets:['ou']},predictionCache:new Map()};
+const state={rows:[],filtered:[],live:[],liveMode:'none',liveUpdated:null,picks:[],builder:[],historyLoaded:false,modelRows:[],modelEvents:[],modelGate:false,modelHoldout:null,modelEvaluation:null,participantProfiles:null,confirmedWatch:null,eligibility:{eligible_competitions:['Virtual'],raw_eligible_competitions:['Esoccer H2H GG League','Europa League','FA Cup','International (Virtual eComp)','La Liga (Virtual eComp)','Premier League 2x6','Virtual','Volta Premier League'],eligible_ou_lines:[],raw_eligible_ou_lines:[0.5,1.5,2.5,7.5],experimental_ou_lines:[1.5],priority_ou_lines:[1.5,3.5,4.5],eligible_markets:['ou']},predictionCache:new Map(),modelCalibration:{}};
 
 const $=id=>document.getElementById(id);
 const esc=v=>{const d=document.createElement('div');d.textContent=String(v??'');return d.innerHTML};
@@ -494,7 +494,9 @@ function modelOverForEvent(event,priorEvents,line,useParticipant=true){
   }else if(selectedVariant==='poisson' && alpha>0){
     alpha=0;
   }
-  const base=(prior?.prob&&alpha>0)?clamp01((1-alpha)*market+alpha*prior.prob):market;
+  const rawBase=(prior?.prob&&alpha>0)?clamp01((1-alpha)*market+alpha*prior.prob):market;
+  const recentCal=recentModelCalibration(event.product,line,rawBase);
+  const base=recentCal.prob;
   const participant=useParticipant&&state.modelGate?participantPrior(priorEvents,event,line):{prob:null,n:0,totalN:0,pairProb:null,pairN:0,weight:0,entityProb:null};
   const prob=participant.prob!=null?clamp01((1-participant.weight)*base+participant.weight*participant.prob):base;
   return {
@@ -503,6 +505,7 @@ function modelOverForEvent(event,priorEvents,line,useParticipant=true){
     priorProb:prior?.prob??null,
     alpha,
     variant:selectedVariant,
+    recentCalibration:recentCal,
     lambda:event.ladder.lambda,
     n:prior?.n||0,
     participantProb:participant.prob,
@@ -546,6 +549,54 @@ function scoreProbabilities(rows){
   const scoreSet=a=>{if(!a.length)return null;const fn=key=>{let b=0,l=0;a.forEach(r=>{const q=clamp01(r[key]),y=r.win?1:0;b+=(y-q)*(y-q);l+=-(y*Math.log(q)+(1-y)*Math.log(1-q));});return {n:a.length,brier:b/a.length,logLoss:l/a.length};};return {baseline:fn('baselineProb'),model:fn('modelProb'),events:new Set(a.map(r=>r.modelEventKey)).size};};
   return {all:{baseline:calc('baselineProb'),model:calc('modelProb')},holdout:scoreSet(holdout),holdoutEvents:holdKeys.size,products:Object.fromEntries(Object.entries(by).map(([p,a])=>[p,scoreSet(a)]))};
 }
+function buildRecentModelCalibration(events){
+  const buckets=new Map();
+  const ordered=(events||[]).filter(e=>e&&e.total!=null&&e.ladder).slice().sort((a,b)=>new Date(a.timestamp)-new Date(b.timestamp));
+  for(const e of ordered){
+    for(const r of (e.rows||[])){
+      if(r.line==null||typeof r.win!=='boolean')continue;
+      const line=Number(r.line);
+      const overP=poissonOver(e.ladder.lambda,line);
+      const selected=String(r.selection||'').toUpperCase().startsWith('U')?1-overP:overP;
+      const bucket=Math.max(0,Math.min(9,Math.floor(selected*10)));
+      const key=e.product+'|'+line+'|'+bucket;
+      let g=buckets.get(key);
+      if(!g){g={n:0,wins:0};buckets.set(key,g);}
+      g.n++;g.wins+=r.win?1:0;
+      // Keep only a recent rolling window per bucket.
+    }
+  }
+  // Rebuild with a bounded recency window so old regimes do not dominate.
+  const recent=new Map();
+  for(const e of ordered.slice(-180)){
+    for(const r of (e.rows||[])){
+      if(r.line==null||typeof r.win!=='boolean')continue;
+      const line=Number(r.line),overP=poissonOver(e.ladder.lambda,line);
+      const selected=String(r.selection||'').toUpperCase().startsWith('U')?1-overP:overP;
+      const bucket=Math.max(0,Math.min(9,Math.floor(selected*10)));
+      const key=e.product+'|'+line+'|'+bucket;
+      let g=recent.get(key);
+      if(!g){g={n:0,wins:0};recent.set(key,g);}
+      g.n++;g.wins+=r.win?1:0;
+    }
+  }
+  state.modelCalibration=Object.fromEntries([...recent.entries()].map(([k,g])=>[k,{
+    n:g.n,
+    observed:(g.wins+4)/(g.n+8)
+  }]));
+}
+function recentModelCalibration(product,line,prob){
+  const p=clamp01(prob);
+  const bucket=Math.max(0,Math.min(9,Math.floor(p*10)));
+  const key=product+'|'+Number(line)+'|'+bucket;
+  const g=state.modelCalibration?.[key];
+  if(!g||Number(g.n||0)<20)return {prob:p,n:0,weight:0};
+  const n=Number(g.n),weight=n>=80?0.22:n>=40?0.18:0.12;
+  const observed=Number(g.observed);
+  const adjusted=clamp01(p+(observed-p)*weight);
+  return {prob:adjusted,n,weight};
+}
+
 function participantLabRows(events){
   const groups=new Map();
   for(const e of (events||[])){
@@ -1149,6 +1200,7 @@ async function refreshPredictionDesk(){
     await loadLive(false);
     if(!state.historyLoaded) await loadHistory();
     else {
+      buildRecentModelCalibration(state.modelEvents||[]);
       state.predictionCache.clear();
       rebuildPredictionDesk();
     }
@@ -1232,6 +1284,7 @@ async function loadHistory(){
       if(!state.confirmedWatch) await loadConfirmedWatch();
       if(!state.participantProfiles) await loadParticipantProfiles();
       state.modelEvents=historicalOUEvents(state.rows);
+      buildRecentModelCalibration(state.modelEvents);
       if(!state.modelEvaluation) buildModelBacktest(state.rows);
       applyFilters(false);
       renderModelLab();
