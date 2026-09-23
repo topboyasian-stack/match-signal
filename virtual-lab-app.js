@@ -946,39 +946,73 @@ async function fetchLiveSnapshot(){
 }
 
 let liveInFlight=false;
-async function loadLive(){
+let liveFingerprint='';
+let liveFailureCount=0;
+function liveStateFingerprint(events){
+  return JSON.stringify((events||[]).map(e=>({
+    id:String(e.event_id||e.eventId||''),
+    product:e.product||'',
+    start:e.start_time||null,
+    status:e.match_status||null,
+    markets:(e.markets||[]).map(m=>({
+      id:String(m.id||''),
+      specifier:m.specifier||'',
+      line:m.line??null,
+      outcomes:(m.outcomes||[]).map(o=>[String(o.id||''),String(o.name||o.desc||''),Number(o.odds)||null,o.active!==false])
+    }))
+  })).sort((a,b)=>a.id.localeCompare(b.id)));
+}
+function publishLiveEvents(events,mode,updatedAt){
+  const next=upcomingEventsFrom(events);
+  const fingerprint=liveStateFingerprint(next);
+  const changed=fingerprint!==liveFingerprint;
+  state.live=next;
+  state.liveMode=mode;
+  state.liveUpdated=updatedAt||state.liveUpdated;
+  liveFailureCount=mode==='remote'?0:liveFailureCount;
+  if(changed){
+    liveFingerprint=fingerprint;
+    renderLive();
+    rebuildPredictionDesk();
+  }
+  return changed;
+}
+function updateLiveFailureStatus(message){
+  const dot=$('liveDot');
+  const title=$('liveTitle');
+  const meta=$('liveMeta');
+  if(dot)dot.className='liveDot '+(state.live.length?'wait':'bad');
+  if(title)title.textContent=state.live.length?'STALE LIVE FEED · SHOWING LAST GOOD DATA':'LIVE SOURCE UNAVAILABLE';
+  if(meta)meta.textContent=message;
+}
+async function loadLive(silent=false){
   if(liveInFlight)return;
   liveInFlight=true;
   const button=$('liveRefresh');
   button.disabled=true;
-  $('liveTitle').textContent='Fetching SportyBet fixtures…';
-  $('liveMeta').textContent='Requesting current eFootball / Virtual Football markets';
+  if(!silent){
+    $('liveTitle').textContent='Fetching SportyBet fixtures…';
+    $('liveMeta').textContent='Requesting current eFootball / Virtual Football markets';
+  }
   try{
     const live=await fetchLiveRemote();
-    state.live=upcomingEventsFrom(live.events);
-    state.liveMode='remote';
-    state.liveUpdated=live.updated_at;
-    renderLive();
-    rebuildPredictionDesk();
-    $('liveMeta').textContent='LIVE · '+$('liveMeta').textContent+' · '+live.endpoint+(live.rawCount!=null?' · '+live.rawCount+' raw / '+live.events.length+' normalized':'');
-    updateDiagnostics({message:'Live feed connected. Backend is authoritative for the upcoming/live time window; browser applies no second clock cutoff.'});
+    const changed=publishLiveEvents(live.events,'remote',live.updated_at);
+    const meta=$('liveMeta');
+    if(meta)meta.textContent='LIVE · '+(state.liveUpdated?'Feed timestamp '+date(state.liveUpdated)+' · ':'')+(live.endpoint||'SportyBet proxy')+(live.rawCount!=null?' · '+live.rawCount+' raw / '+live.events.length+' normalized':'')+(changed?'':' · unchanged');
+    const title=$('liveTitle');if(title&&!silent)title.textContent='LIVE SOURCE ONLINE · SPORTYBET FIXTURES';
+    updateDiagnostics({message:changed?'Live feed connected and changed.':'Live feed refreshed with no fixture/price changes; existing prediction cards were retained.'});
     return;
   }catch(remoteError){
     try{
       const snap=await fetchLiveSnapshot();
       const ageMs=snap.updated_at?Date.now()-new Date(snap.updated_at).getTime():Infinity;
       if(!snap.events.length)throw new Error('snapshot has zero events');
-      state.live=upcomingEventsFrom(snap.events);
-      if(!state.live.length)throw new Error('snapshot has no upcoming events');
-      state.liveMode='snapshot';
-      state.liveUpdated=snap.updated_at;
-      renderLive();
-      rebuildPredictionDesk();
+      const changed=publishLiveEvents(snap.events,'snapshot',snap.updated_at);
       const stale=ageMs>120000;
       $('liveDot').className='liveDot '+(stale?'bad':'wait');
-      $('liveTitle').textContent=stale?'STALE SNAPSHOT — LIVE SOURCE DOWN':'SNAPSHOT FALLBACK';
-      $('liveMeta').textContent=(stale?'Remote source unavailable; showing last available snapshot · ':'Remote live source unavailable · ')+$('liveMeta').textContent;
-      updateDiagnostics({message:stale?'Snapshot fallback is older than the allowed freshness window.':'Remote feed unavailable; displaying the latest valid snapshot.'});
+      $('liveTitle').textContent=stale?'STALE SNAPSHOT — SHOWING LAST GOOD DATA':'SNAPSHOT FALLBACK';
+      $('liveMeta').textContent=(stale?'Remote source unavailable; showing last available snapshot · ':'Remote live source unavailable · ')+(state.liveUpdated?'Feed timestamp '+date(state.liveUpdated)+' · ':'')+(changed?'updated':'unchanged');
+      updateDiagnostics({message:stale?'Remote feed unavailable. Last valid snapshot retained instead of clearing the desk.':'Remote feed unavailable; latest valid snapshot retained.'});
       console.warn('Virtual Lab live source failed; snapshot used:',remoteError);
       return;
     }catch(snapshotError){
@@ -1068,11 +1102,10 @@ async function loadHistory(){
       state.historyLoaded=true;
       state.predictionCache.clear();
       await loadModelEvaluation();
-      await loadConfirmedWatch();
-      renderLive();
-      await loadParticipantProfiles();
-      buildModelBacktest(state.rows);
+      if(!state.confirmedWatch) await loadConfirmedWatch();
+      if(!state.participantProfiles) await loadParticipantProfiles();
       state.modelEvents=historicalOUEvents(state.rows);
+      if(!state.modelEvaluation) buildModelBacktest(state.rows);
       applyFilters(false);
       renderModelLab();
       renderParticipantLab();
@@ -1121,7 +1154,7 @@ analyze();
 updateDiagnostics({message:'Virtual Lab v1 initialized. Production route: '+PRODUCTION_ROUTE});
 loadEligibility();
 loadHistory();
-loadConfirmedWatch().then(()=>loadLive());
-window.setInterval(loadLive,LIVE_REFRESH_MS);
-window.setInterval(loadHistory,120000);
+loadConfirmedWatch().then(()=>loadLive(false));
+window.setInterval(()=>loadLive(true),LIVE_REFRESH_MS);
+window.setInterval(loadHistory,300000);
 })();
