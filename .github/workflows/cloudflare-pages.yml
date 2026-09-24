@@ -16,6 +16,12 @@ on:
       - 'performance.html'
       - 'basketball.html'
       - 'tennis.html'
+      - 'darts.html'
+      - 'darts-app.js'
+      - 'darts.css'
+      - 'table-tennis.html'
+      - 'table-tennis-app.js'
+      - 'table-tennis.css'
       - 'live.html'
       - 'live-analysis.js'
       - 'live-data-worker.js'
@@ -40,6 +46,9 @@ on:
       - 'data/virtual_lab_confirmed_participants.json'
       - 'data/virtual_lab_confirmed_participant_results.json'
       - 'data/virtual_lab_participants/**'
+      - 'data/darts_*.json'
+      - 'data/table_tennis_*.json'
+      - 'PRECISION-SPORTS-UPGRADE.md'
       - '_redirects'
       - 'VIRTUAL-LAB-*.md'
       - 'functions/api/virtual-lab-history.js'
@@ -75,6 +84,8 @@ jobs:
           test -s index.html
           test -s expansion.html
           test -s basketball.html
+          test -s darts.html
+          test -s table-tennis.html
           test -s performance.html
           test -s live.html
           test -s live-analysis.js
@@ -94,6 +105,9 @@ jobs:
           python scripts/validate_virtual_lab_v1.py
           node --check virtual-lab-app.js
           node --check virtual-lab-confirmed-watch.js
+          node --check darts-app.js
+          node --check table-tennis-app.js
+          python -m py_compile scripts/darts_pipeline.py scripts/table_tennis_pipeline.py
 
       - name: Resolve Cloudflare Pages project
         id: project
@@ -127,8 +141,8 @@ jobs:
           node --input-type=module <<'NODE'
           import { writeFileSync } from 'node:fs';
           const base = 'https://match-signal.pages.dev';
-          const pages = ['/', '/football.html', '/tennis.html', '/basketball.html', '/league.html?sport=football&league=England%20Amateur%20-%20U21%20Professional%20Development%20League', '/reports.html', '/live.html', '/expansion.html', '/virtual-lab/', '/virtual-lab', '/research.html', '/virtual-lab.html'];
-          const assets = ['/api/sportybet-virtual','/expansion.js', '/expansion-odds-builder.js', '/live-analysis.js', '/live-data-worker.js', '/virtual-lab-app.js', '/virtual-lab-confirmed-watch.js', '/virtual-lab.css', '/_redirects', '/data/predictions.json', '/data/expansion_status.json', '/data/odds_builder.json', '/data/virtual_lab_live.json','/data/virtual_lab_model_eval.json','/data/virtual_lab_eligibility.json','/data/virtual_lab_participants/registry.json','/data/virtual_lab_participants/efootball_confirmed_watch.json'];
+          const pages = ['/', '/football.html', '/tennis.html', '/basketball.html', '/darts.html', '/table-tennis.html', '/league.html?sport=football&league=England%20Amateur%20-%20U21%20Professional%20Development%20League', '/reports.html', '/live.html', '/expansion.html', '/virtual-lab/', '/virtual-lab', '/research.html', '/virtual-lab.html'];
+          const assets = ['/api/sportybet-virtual','/api/sportybet-darts','/api/sportybet-table-tennis','/expansion.js', '/expansion-odds-builder.js', '/live-analysis.js', '/live-data-worker.js', '/virtual-lab-app.js', '/virtual-lab-confirmed-watch.js', '/virtual-lab.css', '/_redirects', '/data/predictions.json', '/data/expansion_status.json', '/data/odds_builder.json', '/data/virtual_lab_live.json','/data/virtual_lab_model_eval.json','/data/virtual_lab_eligibility.json','/data/virtual_lab_participants/registry.json','/data/virtual_lab_participants/efootball_confirmed_watch.json'];
           const failures = [];
           async function get(path) {
             const r = await fetch(base + path + (path.includes('?') ? '&' : '?') + 'smoke=' + Date.now(), {cache:'no-store'});
@@ -182,7 +196,14 @@ jobs:
               if (path.endsWith('.json')) JSON.parse(body);
             } catch(e) { failures.push(path+' '+e.message); }
           }
-          try {
+          for (const path of ['/data/darts_model.json','/data/darts_status.json','/data/darts_upcoming.json','/data/darts_candidates.json','/data/table_tennis_model.json','/data/table_tennis_status.json','/data/table_tennis_upcoming.json','/data/table_tennis_candidates.json']) {
+            try {
+              const {r,body}=await get(path);
+              if (!r.ok) failures.push(path+' HTTP '+r.status);
+              if (path.endsWith('.json')) JSON.parse(body);
+            } catch(e) { failures.push(path+' '+e.message); }
+          }
+                    try {
             const {r,body}=await get('/data/virtual_lab_model_eval.json');
             if (!r.ok) failures.push('/data/virtual_lab_model_eval.json HTTP '+r.status);
             else {
