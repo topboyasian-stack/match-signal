@@ -306,7 +306,7 @@ def main():
       "by_product_selection":nested_table("product","selection",hold),
       "efootball_gt_diagnostics":{
         "competition":nested_table("competition","line",[r for r in hold if r["product"]=="efootball_gt"]),
-        "line":{k:metrics([r for r in hold if r["product"]=="efootball_gt" and r["line"]==float(k)],k2) for k in variants for _ in []},
+        "line":{str(line):{variant:metrics([r for r in hold if r["product"]=="efootball_gt" and r["line"]==line],variant) for variant in variants} for line in LINES},
         "selection":nested_table("selection","line",[r for r in hold if r["product"]=="efootball_gt"])
       },
       "participant_feature_gate":{
