@@ -1557,10 +1557,10 @@ async function loadHistory(){
       state.historyLoaded=true;
       state.predictionCache.clear();
       await loadModelEvaluation();
-      if(!state.confirmedWatch) await loadConfirmedWatch();
-      if(!state.participantProfiles) await loadParticipantProfiles();
-      if(!state.participantH2H) await loadParticipantH2H();
-      if(!state.externalH2H) await loadExternalH2H();
+      await loadConfirmedWatch();
+      await loadParticipantProfiles();
+      await loadParticipantH2H();
+      await loadExternalH2H();
       state._participantProfileIndex=null;state._participantH2HIndex=null;
       state.modelEvents=historicalOUEvents(state.rows);
       buildRecentModelCalibration(state.modelEvents);
