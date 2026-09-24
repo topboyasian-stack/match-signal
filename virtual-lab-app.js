@@ -7,11 +7,11 @@ window.__MATCH_SIGNAL_VIRTUAL_LAB_APP__='VL-V1';
 const LIVE_API=location.origin+'/api/sportybet-virtual';
 const LIVE_API_TIMEOUT_MS=12000;
 const LIVE_MARKETS='1,18,10,29,11,26,36,14,60100,186,189,202,204,210';
-const BUILD_ID='VL-V1-20260922';
+const BUILD_ID='VL-V1-20260924-EFDIST';
 const PRODUCTION_ROUTE='/virtual-lab/';
 const SNAPSHOT='/data/virtual_lab_live.json';
 const LIVE_REFRESH_MS=30000;
-const UI_BUILD='VL-V1-20260922';
+const UI_BUILD='VL-V1-20260924-EFDIST';
 const HISTORY='/api/virtual-lab-history';
 const HISTORY_FALLBACK='/data/virtual_lab_history.json';
 const MODEL_EVAL='/data/virtual_lab_model_eval.json';
@@ -373,6 +373,34 @@ function productPrior(events,product,line,cutoff){
   // Beta(2,2) shrinkage prevents tiny product/line samples from creating extreme probabilities.
   return {prob:(over+2)/(decisive+4),n:decisive,pushes};
 }
+function efootballShapeProb(events,event,line,poissonProb){
+  const product=String(event?.product||'');
+  if(!product.startsWith('efootball_'))return {prob:clamp01(poissonProb),n:0,weight:0};
+  const cutoff=new Date(event?.timestamp||0).getTime();
+  if(!Number.isFinite(cutoff))return {prob:clamp01(poissonProb),n:0,weight:0};
+  const prior=(events||[]).filter(e=>{
+    const t=new Date(e?.timestamp||0).getTime();
+    return e&&e.product===product&&e.total!=null&&Number.isFinite(t)&&t<cutoff;
+  }).sort((a,b)=>new Date(a.timestamp)-new Date(b.timestamp)).slice(-300);
+  if(prior.length<20)return {prob:clamp01(poissonProb),n:0,weight:0};
+  let over=0,under=0;
+  const target=Number(line);
+  for(let age=0;age<prior.length;age++){
+    const e=prior[prior.length-1-age];
+    const total=Number(e.total);
+    if(!Number.isFinite(total)||total===target)continue;
+    const w=Math.exp(-age/60);
+    if(total>target)over+=w;
+    else under+=w;
+  }
+  const decisive=over+under;
+  if(!(decisive>0))return {prob:clamp01(poissonProb),n:0,weight:0};
+  const empirical=(over+2)/(decisive+4);
+  const confidence=Math.max(0,Math.min(1,(decisive-20)/(60-20)));
+  const weight=.15+.30*confidence;
+  return {prob:clamp01((1-weight)*poissonProb+weight*empirical),n:decisive,weight};
+}
+
 function recurrenceEvidence(events,event,line){
   const cutoff=new Date(event?.timestamp||0).getTime(),product=event?.product||'',home=participantIdentityKey(event?.participant_1||event?.home||''),away=participantIdentityKey(event?.participant_2||event?.away||''),target=Number(line);
   if(!home&&!away)return {entityN:0,totalN:0,entityOver:0,entityOverRate:null,totalOverRate:null,entityAvgTotal:null,pairN:0,pairOver:0,pairOverRate:null,pairAvgTotal:null,entityNames:[]};
@@ -460,20 +488,25 @@ function selectEvidenceVariant(product,line){
   const key=Math.abs(Number(line)-1.5)<0.001?'1.5':Math.abs(Number(line)-3.5)<0.001?'3.5':Math.abs(Number(line)-4.5)<0.001?'4.5':String(Number(line));
   const lm=ev.by_line?.[key]?.holdout||null;
   const pm=ev.by_product?.[product]||null;
-  const choices=[];
+  const candidates=[{variant:'poisson',priority:0}];
+  const consider=(variant,p,q,minN)=>{
+    if(!p||!q)return;
+    if(Number(p.n||0)<minN||Number(q.n||0)<minN)return;
+    if(!Number.isFinite(p.brier)||!Number.isFinite(q.brier)||!Number.isFinite(p.log_loss)||!Number.isFinite(q.log_loss))return;
+    const improves=p.brier-q.brier>=0.001&&p.log_loss-q.log_loss>=0.001;
+    const calibrated=!Number.isFinite(p.ece)||!Number.isFinite(q.ece)||q.ece<=p.ece+.01;
+    if(improves&&calibrated)candidates.push({variant,priority:variant==='efootball_shape'?2:1});
+  };
   if(lm){
-    const p=lm.poisson||{},q=lm.poisson_prior||{};
-    if(Number(p.n||0)>=40&&Number(q.n||0)>=40&&Number.isFinite(p.hit_rate)&&Number.isFinite(q.hit_rate)){
-      choices.push({variant:q.hit_rate-p.hit_rate>=0.005?'poisson_prior':'poisson',delta:q.hit_rate-p.hit_rate});
-    }
+    consider('poisson_prior',lm.poisson,lm.poisson_prior,40);
+    if(String(product).startsWith('efootball_'))consider('efootball_shape',lm.poisson,lm.efootball_shape,40);
   }
   if(pm){
-    const p=pm.poisson||{},q=pm.poisson_prior||{};
-    if(Number(p.n||0)>=200&&Number(q.n||0)>=200&&Number.isFinite(p.hit_rate)&&Number.isFinite(q.hit_rate)){
-      choices.push({variant:q.hit_rate-p.hit_rate>=0.005?'poisson_prior':'poisson',delta:q.hit_rate-p.hit_rate});
-    }
+    consider('poisson_prior',pm.poisson,pm.poisson_prior,100);
+    if(String(product).startsWith('efootball_'))consider('efootball_shape',pm.poisson,pm.efootball_shape,100);
   }
-  return choices.some(x=>x.variant==='poisson_prior')?'poisson_prior':'poisson';
+  candidates.sort((a,b)=>b.priority-a.priority);
+  return candidates[0].variant;
 }
 function fastPriorAlpha(product,line,priorN){
   const variant=selectEvidenceVariant(product,line);
@@ -494,7 +527,14 @@ function modelOverForEvent(event,priorEvents,line,useParticipant=true){
   }else if(selectedVariant==='poisson' && alpha>0){
     alpha=0;
   }
-  const rawBase=(prior?.prob&&alpha>0)?clamp01((1-alpha)*market+alpha*prior.prob):market;
+  const shape=efootballShapeProb(priorEvents,event,line,market);
+  let rawBase=market;
+  if(selectedVariant==='efootball_shape'&&shape.n>0){
+    rawBase=shape.prob;
+    alpha=0;
+  }else{
+    rawBase=(prior?.prob&&alpha>0)?clamp01((1-alpha)*market+alpha*prior.prob):market;
+  }
   const recentCal=recentModelCalibration(event.product,line,rawBase);
   const base=recentCal.prob;
   const participant=useParticipant&&state.modelGate?participantPrior(priorEvents,event,line):{prob:null,n:0,totalN:0,pairProb:null,pairN:0,weight:0,entityProb:null};
@@ -503,6 +543,9 @@ function modelOverForEvent(event,priorEvents,line,useParticipant=true){
     prob,
     marketProb:market,
     priorProb:prior?.prob??null,
+    efootballShapeProb:shape.prob,
+    efootballShapeN:shape.n,
+    efootballShapeWeight:shape.weight,
     alpha,
     variant:selectedVariant,
     recentCalibration:recentCal,
