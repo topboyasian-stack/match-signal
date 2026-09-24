@@ -767,10 +767,10 @@ function qualifiesBaseResearchPick(c,e){
   const edge=Number(c.calibratedProb)-Number(c.bookImplied);
   if(!Number.isFinite(edge)||edge<0.02)return false;
   if(c.marketType==='ou'){
-    // Base-evidence research can use any league/line that has passed the raw
-    // evidence gate. The stricter promoted gate remains separate and is used
-    // only for the participant-enhanced/promotion tier.
-    return isEligibleResearchEvent(e)&&isEligibleOU(c);
+    // Primary predictions must use the intersection of raw evidence and the
+    // strict walk-forward model gate. Raw candidates remain visible separately
+    // as research/model-gate candidates and continue to feed future evidence.
+    return isModelQualifiedResearchEvent(e)&&isModelQualifiedOU(c);
   }
   return false;
 }
@@ -787,8 +787,14 @@ function isEligibleResearchEvent(e){
   return raw.some(x=>competitionKey(x)===name);
 }
 function isPromotedResearchEvent(e){
-  const name=String(e.competition||e.tournament||'');
-  return (state.eligibility.eligible_competitions||[]).includes(name);
+  const name=competitionKey(e.competition||e.tournament||'');
+  return (state.eligibility.eligible_competitions||[]).some(x=>competitionKey(x)===name);
+}
+function isModelQualifiedResearchEvent(e){
+  const name=competitionKey(e.competition||e.tournament||'');
+  const active=state.eligibility.eligible_competitions||[];
+  const model=state.eligibility.model_qualified_competitions||[];
+  return active.some(x=>competitionKey(x)===name) && model.some(x=>competitionKey(x)===name);
 }
 function isPriorityOU(c){ return !!(c&&c.marketType==='ou'&&state.eligibility.priority_ou_lines.some(x=>Math.abs(Number(x)-Number(c.market.line))<0.001)); }
 function isEligibleOU(c){
@@ -798,6 +804,11 @@ function isEligibleOU(c){
 function isPromotedOU(c){
   return !!(c&&c.marketType==='ou'&&state.eligibility.eligible_markets.includes('ou')&&
     state.eligibility.eligible_ou_lines.some(x=>Math.abs(Number(x)-Number(c.market.line))<0.001));
+}
+function isModelQualifiedOU(c){
+  return !!(c&&c.marketType==='ou'&&
+    (state.eligibility.eligible_ou_lines||[]).some(x=>Math.abs(Number(x)-Number(c.market.line))<0.001) &&
+    (state.eligibility.model_qualified_ou_lines||[]).some(x=>Math.abs(Number(x)-Number(c.market.line))<0.001));
 }
 function isExperimentalOU(c){
   return !!(c&&c.marketType==='ou'&&state.eligibility.eligible_markets.includes('ou')&&
@@ -845,7 +856,7 @@ function predictionForEvent(e){
     const baseQualified=primaryCandidate&&qualifiesBaseResearchPick(primaryCandidate,e);
     const qualified=!!(participantQualified||baseQualified);
     const candidate=primaryCandidate&&state.historyLoaded?primaryCandidate:null;
-    const status=participantQualified?'QUALIFIED_PARTICIPANT_ENHANCED':(baseQualified?'QUALIFIED_BASE_EVIDENCE':(isPromotedResearchEvent(e)?'PROMOTION_PENDING':'EVIDENCE_CANDIDATE'));
+    const status=participantQualified?'QUALIFIED_PARTICIPANT_ENHANCED':(baseQualified?'QUALIFIED_BASE_EVIDENCE':(isPromotedResearchEvent(e)?'PROMOTION_PENDING':(isEligibleResearchEvent(e)?'MODEL_GATE_PENDING':'EVIDENCE_CANDIDATE')));
     const out={
       product:e.product,competition:e.competition||e.tournament||'',event_id:id,
       home:String(e.home||e.participant_1||''),away:String(e.away||e.participant_2||''),
@@ -1087,7 +1098,10 @@ function renderPredictionDesk(){
     const primaryHtml=p.primary?
       '<div class="primaryPick">'+hotBadge+'<span>'+(p.model_tier==='participant-enhanced'?'QUALIFIED · PARTICIPANT ENHANCED':'QUALIFIED · BASE EVIDENCE')+'</span><strong>'+esc(p.primary.pickCode)+'</strong><b>'+fmtPct(p.primary.calibratedProb)+'</b><small>edge '+fmtPct(p.primary.edge)+' · n='+p.primary.calibrationN+'</small></div>':
       p.candidate?
-      '<div class="primaryPick candidatePrediction">'+hotBadge+'<span>'+(p.candidate_status==='PROMOTION_PENDING'?'EVIDENCE CANDIDATE · PROMOTION PENDING':'EVIDENCE CANDIDATE')+'</span><strong>'+esc(p.candidate.pickCode||'—')+'</strong><b>'+fmtPct(p.candidate.calibratedProb??p.candidate.fairProb)+'</b><small>book '+(Number.isFinite(Number(p.candidate.bookmakerOdds))?Number(p.candidate.bookmakerOdds).toFixed(2):'—')+' · model '+(state.modelGate?'participant-enhanced':'base evidence')+'</small></div>':
+      '<div class="primaryPick candidatePrediction">'+hotBadge+'<span>'+
+        (p.candidate_status==='PROMOTION_PENDING'?'EVIDENCE CANDIDATE · PROMOTION PENDING':
+         p.candidate_status==='MODEL_GATE_PENDING'?'RESEARCH CANDIDATE · MODEL GATE PENDING':'EVIDENCE CANDIDATE')+
+        '</span><strong>'+esc(p.candidate.pickCode||'—')+'</strong><b>'+fmtPct(p.candidate.calibratedProb??p.candidate.fairProb)+'</b><small>book '+(Number.isFinite(Number(p.candidate.bookmakerOdds))?Number(p.candidate.bookmakerOdds).toFixed(2):'—')+' · model '+(state.modelGate?'participant-enhanced':'core evidence')+'</small></div>':
       watch?'<div class="primaryPick mutedPrediction">'+hotBadge+'<span>O/U 1.5 RESEARCH WATCH</span><strong>'+esc(watch.pickCode)+'</strong><b>'+fmtPct(watch.calibratedProb)+'</b><small>participant n='+(watch.recurrence?watch.recurrence.entityN:0)+' · model is experimental</small></div>':
       '<div class="primaryPick mutedPrediction"><span>NO EVIDENCE CANDIDATE</span><strong>WAIT</strong><b>Market baseline only</b></div>';
     const addLabel=p.primary?'＋ Add qualified paper pick':'Locked · evidence not yet promoted';
