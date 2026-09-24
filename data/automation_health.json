@@ -1,19 +1,19 @@
 {
-  "updated_at": "2026-09-24T05:31:42.595662+00:00",
+  "updated_at": "2026-09-24T10:27:18.283557+00:00",
   "automation_status": "SELF_HEALING_ENABLED",
-  "pipeline_last_update": "2026-09-24T04:44:00.974456+00:00",
-  "pipeline_age_hours": 0.79,
-  "odds_builder_last_update": "2026-09-24T05:17:23.315894+00:00",
-  "odds_builder_age_hours": 0.24,
+  "pipeline_last_update": "2026-09-24T06:05:07.389321+00:00",
+  "pipeline_age_hours": 4.37,
+  "odds_builder_last_update": "2026-09-24T10:08:59.825977+00:00",
+  "odds_builder_age_hours": 0.31,
   "expansion_last_update": "2026-09-24T04:41:05.711975+00:00",
-  "expansion_age_hours": 0.84,
-  "virtual_lab_last_update": "2026-09-24T05:31:38.953386+00:00",
+  "expansion_age_hours": 5.77,
+  "virtual_lab_last_update": "2026-09-24T10:27:08.102864+00:00",
   "virtual_lab_age_hours": 0.0,
-  "virtual_lab_events": 256,
+  "virtual_lab_events": 621,
   "virtual_lab_products": {
-    "efootball_gt": 203,
-    "efootball_adriatic": 14,
-    "vfootball": 39
+    "efootball_adriatic": 16,
+    "efootball_gt": 172,
+    "vfootball": 433
   },
   "thresholds": {
     "pipeline_hours": 4,
@@ -21,6 +21,19 @@
     "expansion_hours": 4,
     "virtual_lab_hours": 1
   },
-  "actions": [],
+  "actions": [
+    {
+      "workflow": "live-expansion.yml",
+      "action": "dispatch",
+      "status": "requested",
+      "detail": "scheduled self-heal"
+    },
+    {
+      "workflow": "tennis_pipeline.yml",
+      "action": "dispatch",
+      "status": "requested",
+      "detail": "scheduled self-heal"
+    }
+  ],
   "policy": "Watchdog dispatches workflow_dispatch only when the corresponding generated artifact is stale and no run is already active."
 }
