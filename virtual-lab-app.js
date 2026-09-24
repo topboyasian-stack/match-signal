@@ -43,7 +43,7 @@ function participantProfileKey(product,value){
 }
 function participantEvidenceForEvent(e,line){
   const product=String(e?.product||'');
-  const p1=participantIdentity(e?.participant_1||e?.home||''),p2=participantIdentity(e?.participant_2||e?.away'||'');
+  const p1=participantIdentity(e?.participant_1||e?.home||''),p2=participantIdentity(e?.participant_2||e?.away||'');
   const k1=participantProfileKey(product,p1),k2=participantProfileKey(product,p2);
   const profiles=Array.isArray(state.participantProfiles?.profiles)?state.participantProfiles.profiles:[];
   if(!state._participantProfileIndex)state._participantProfileIndex=new Map(profiles.map(p=>[String(p.participant_key||''),p]));
