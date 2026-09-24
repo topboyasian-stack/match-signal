@@ -53,10 +53,13 @@ function participantEvidenceForEvent(e,line){
     state._participantH2HIndex=new Map(pairs.map(x=>{
       const key=String(x.pair_key||'');
       const parts=key.split('|');
-      return [parts.length>=3?parts.slice(0,3).sort((a,b)=>a.localeCompare(b)).join('|'):key,x];
+      const productKey=parts[0]||'';
+      const names=parts.slice(1).map(v=>String(v||'').trim().toLowerCase()).sort();
+      return [productKey+'|'+names.join('|'),x];
     }));
   }
-  const pairKey=k1&&k2?[k1,k2].sort((a,b)=>a.localeCompare(b)).join('|'):'';
+  const pairNames=[participantIdentityKey(p1),participantIdentityKey(p2)].filter(Boolean).sort();
+  const pairKey=product+'|'+pairNames.join('|');
   const h2h=pairKey?state._participantH2HIndex.get(pairKey)||null:null;
   const snapshots=Array.isArray(state.externalH2H?.snapshots)?state.externalH2H.snapshots:[];
   const external=snapshots.find(x=>String(x.event_id||'')===String(e?.event_id||''))||null;
@@ -67,6 +70,27 @@ function participantEvidenceForEvent(e,line){
     externalStatus:String(state.externalH2H?.status||'UNKNOWN'),
     externalFetched:Number(state.externalH2H?.fetched_pairs||0)
   };
+}
+function artifactParticipantPrior(event,line){
+  const evidence=participantEvidenceForEvent(event,line);
+  const profiles=[evidence.profile1,evidence.profile2].filter(Boolean);
+  const target=String(Number(line));
+  const rates=[];
+  profiles.forEach(p=>{
+    const s=p?.lines?.[target];
+    if(s&&Number(s.n)>0&&Number.isFinite(Number(s.over_rate)))rates.push({n:Number(s.n),rate:Number(s.over_rate)});
+  });
+  let n=rates.reduce((s,x)=>s+x.n,0);
+  if(!rates.length&&(!evidence.h2h?.lines?.[target]?.n))return {prob:null,n:0,totalN:0,pairN:0,weight:0,entityProb:null,source:'no-artifact-evidence'};
+  let prob=rates.length?(rates.reduce((s,x)=>s+x.rate*x.n,0)+2)/(n+4):null;
+  const h=evidence.h2h?.lines?.[target];
+  if(h&&Number(h.n)>0){
+    const hp=(Number(h.over)+2)/(Number(h.n)+4);
+    prob=prob==null?hp:(.75*prob+.25*hp);
+    n=Math.max(n,Number(h.n));
+  }
+  const weight=Math.min(.15,Math.max(.05,(n-2)/35));
+  return {prob,n,totalN:n,pairN:Number(evidence.h2h?.matches||0),weight,entityProb:prob,source:evidence.h2h?'stored-profile+h2h':'stored-profile'};
 }
 function deriveParticipant(event,side){
   const explicit=side===1
@@ -570,7 +594,7 @@ function modelOverForEvent(event,priorEvents,line,useParticipant=true){
   }
   const recentCal=recentModelCalibration(event.product,line,rawBase);
   const base=recentCal.prob;
-  const participant=useParticipant&&state.modelGate?participantPrior(priorEvents,event,line):{prob:null,n:0,totalN:0,pairProb:null,pairN:0,weight:0,entityProb:null};
+  const participant=useParticipant&&state.modelGate?(event._livePrediction?artifactParticipantPrior(event,line):participantPrior(priorEvents,event,line)):{prob:null,n:0,totalN:0,pairProb:null,pairN:0,weight:0,entityProb:null};
   const prob=participant.prob!=null?clamp01((1-participant.weight)*base+participant.weight*participant.prob):base;
   return {
     prob,
