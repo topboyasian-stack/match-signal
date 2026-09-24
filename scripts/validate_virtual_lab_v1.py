@@ -76,9 +76,12 @@ def main():
         failures.append("tennis identities leaked into eFootball watch: " + ", ".join(leaked))
 
     page = (ROOT / "virtual-lab/index.html").read_text(encoding="utf-8")
-    for marker in ("virtual-lab-app.js", "virtual-lab-confirmed-watch.js", "VL-V1-20260922", "/virtual-lab/"):
+    for marker in ("virtual-lab-app.js", "virtual-lab-confirmed-watch.js", "/virtual-lab/"):
         if marker not in page:
             failures.append("Virtual Lab page missing marker: " + marker)
+    build_markers = ("VL-V1-20260924-EFDIST", "VL-V1-20260922")
+    if not any(marker in page for marker in build_markers):
+        failures.append("Virtual Lab page missing build marker: " + " or ".join(build_markers))
     for legacy in ("virtual-lab-live-override.js", "confirmed-participant-watch.js?v=", "virtual-lab-live-v4.js"):
         if legacy in page:
             failures.append("Virtual Lab page still references legacy renderer: " + legacy)
