@@ -781,14 +781,19 @@ function competitionKey(value){
     .toLowerCase()
     .replace(/[^a-z0-9]+/g,'');
 }
+function scopedEligibility(mapKey,product,fallback){
+  const map=state.eligibility?.[mapKey];
+  if(map&&Object.prototype.hasOwnProperty.call(map,String(product||"")))return Array.isArray(map[String(product||"")])?map[String(product||"")]:[];
+  return fallback||[];
+}
 function isEligibleResearchEvent(e){
   const name=competitionKey(e.competition||e.tournament||'');
-  const raw=state.eligibility.raw_eligible_competitions||state.eligibility.eligible_competitions||[];
+  const raw=scopedEligibility("raw_eligible_competitions_by_product",e.product,state.eligibility.raw_eligible_competitions||state.eligibility.eligible_competitions||[]);
   return raw.some(x=>competitionKey(x)===name);
 }
 function isPromotedResearchEvent(e){
   const name=competitionKey(e.competition||e.tournament||'');
-  return (state.eligibility.eligible_competitions||[]).some(x=>competitionKey(x)===name);
+  const active=scopedEligibility("eligible_competitions_by_product",e.product,state.eligibility.eligible_competitions||[]);\n  return active.some(x=>competitionKey(x)===name);
 }
 function isModelQualifiedResearchEvent(e){
   const name=competitionKey(e.competition||e.tournament||'');
@@ -799,11 +804,11 @@ function isModelQualifiedResearchEvent(e){
 function isPriorityOU(c){ return !!(c&&c.marketType==='ou'&&state.eligibility.priority_ou_lines.some(x=>Math.abs(Number(x)-Number(c.market.line))<0.001)); }
 function isEligibleOU(c){
   return !!(c&&c.marketType==='ou'&&state.eligibility.eligible_markets.includes('ou')&&
-    (state.eligibility.raw_eligible_ou_lines||state.eligibility.eligible_ou_lines).some(x=>Math.abs(Number(x)-Number(c.market.line))<0.001));
+    scopedEligibility("raw_eligible_ou_lines_by_product",c?.eventProduct||c?.product,state.eligibility.raw_eligible_ou_lines||state.eligibility.eligible_ou_lines).some(x=>Math.abs(Number(x)-Number(c.market.line))<0.001));
 }
 function isPromotedOU(c){
   return !!(c&&c.marketType==='ou'&&state.eligibility.eligible_markets.includes('ou')&&
-    state.eligibility.eligible_ou_lines.some(x=>Math.abs(Number(x)-Number(c.market.line))<0.001));
+    scopedEligibility("eligible_ou_lines_by_product",c?.eventProduct||c?.product,state.eligibility.eligible_ou_lines).some(x=>Math.abs(Number(x)-Number(c.market.line))<0.001));
 }
 function isModelQualifiedOU(c){
   return !!(c&&c.marketType==='ou'&&
@@ -831,7 +836,7 @@ function enrichCandidate(c,e){
   }
   const recurrence=(c.marketType==='ou')?recurrenceEvidence(state.modelEvents||[],{product:e.product,participant_1:participantIdentity(e.participant_1||e.home||''),participant_2:participantIdentity(e.participant_2||e.away||''),home:participantIdentity(e.participant_1||e.home||''),away:participantIdentity(e.participant_2||e.away||''),timestamp:e.start_time},Number(c.market.line)):null;
   const hotParticipant=(c.marketType==='ou')?hotParticipantForEvent(e,Number(c.market.line)):null;
-  return Object.assign(c,{calibratedProb:calibrated,calibrationN:cal.n,calibrationSource:source,edge:calibrated-c.bookImplied,modelMeta,recurrence,hotParticipant,experimental:isExperimentalOU(c)});
+  return Object.assign(c,{eventProduct:e.product,calibratedProb:calibrated,calibrationN:cal.n,calibrationSource:source,edge:calibrated-c.bookImplied,modelMeta,recurrence,hotParticipant,experimental:isExperimentalOU(c)});
 }
 function predictionForEvent(e){
   const id=String(e.event_id||e.eventId||'');
