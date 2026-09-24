@@ -793,7 +793,8 @@ function isEligibleResearchEvent(e){
 }
 function isPromotedResearchEvent(e){
   const name=competitionKey(e.competition||e.tournament||'');
-  const active=scopedEligibility("eligible_competitions_by_product",e.product,state.eligibility.eligible_competitions||[]);\n  return active.some(x=>competitionKey(x)===name);
+  const active=scopedEligibility("eligible_competitions_by_product",e.product,state.eligibility.eligible_competitions||[]);
+  return active.some(x=>competitionKey(x)===name);
 }
 function isModelQualifiedResearchEvent(e){
   const name=competitionKey(e.competition||e.tournament||'');
