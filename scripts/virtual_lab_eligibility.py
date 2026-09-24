@@ -72,6 +72,42 @@ def main():
     model_comps=[str(k) for k,v in by_comp.items() if model_pass(v)]
     eligible_lines=sorted(set(raw_lines)&set(model_lines))
     eligible_comps=sorted(set(raw_comp)&set(model_comps))
+
+    # Product-scoped promotion is mandatory for the Virtual Lab. The legacy
+    # top-level gates remain published for compatibility, but a vfootball
+    # result must never qualify an eFootball competition/line (or vice versa).
+    by_product_comp=model.get("by_product_competition",{})
+    by_product_line=model.get("by_product_line",{})
+    eligible_competitions_by_product={}
+    model_qualified_competitions_by_product={}
+    eligible_ou_lines_by_product={}
+    model_qualified_ou_lines_by_product={}
+    raw_eligible_competitions_by_product={}
+    raw_eligible_ou_lines_by_product={}
+    for product in sorted({str(r.get("product") or "other") for r in rows}):
+        product_rows=[r for r in rows if str(r.get("product") or "other")==product]
+        pcomps={}
+        plines={}
+        for r in product_rows:
+            pcomps.setdefault(str(r.get("competition") or "Unknown"),[]).append(r)
+            if r.get("market")=="ou" and r.get("line") is not None:
+                plines.setdefault(str(float(r["line"])),[]).append(r)
+        raw_pc=[]
+        for comp,items in pcomps.items():
+            ok,_,_=eligible_comp(items)
+            if ok: raw_pc.append(comp)
+        raw_pl=[]
+        for line,items in plines.items():
+            ok,_,_=eligible_line(items)
+            if ok: raw_pl.append(float(line))
+        pmodel_comps=[str(k) for k,v in (by_product_comp.get(product,{}) or {}).items() if model_pass(v)]
+        pmodel_lines=[float(k) for k,v in (by_product_line.get(product,{}) or {}).items() if model_pass(v)]
+        raw_eligible_competitions_by_product[product]=sorted(raw_pc)
+        raw_eligible_ou_lines_by_product[product]=sorted(raw_pl)
+        model_qualified_competitions_by_product[product]=sorted(pmodel_comps)
+        model_qualified_ou_lines_by_product[product]=sorted(pmodel_lines)
+        eligible_competitions_by_product[product]=sorted(set(raw_pc)&set(pmodel_comps))
+        eligible_ou_lines_by_product[product]=sorted(set(raw_pl)&set(pmodel_lines))
     adaptive_policy={
         "base_gate":"best validated product-aware core model vs SportyBet market",
         "candidate_variants":["efootball_shape","poisson_prior","poisson"],
@@ -94,8 +130,14 @@ def main():
       "blocked_competitions":sorted(set(comps)-set(eligible_comps)),
       "raw_eligible_competitions":sorted(raw_comp),
       "model_qualified_competitions":sorted(model_comps),
+      "eligible_competitions_by_product":eligible_competitions_by_product,
+      "raw_eligible_competitions_by_product":raw_eligible_competitions_by_product,
+      "model_qualified_competitions_by_product":model_qualified_competitions_by_product,
       "priority_ou_lines":PRIORITY_OU_LINES,
       "eligible_ou_lines":eligible_lines,
+      "eligible_ou_lines_by_product":eligible_ou_lines_by_product,
+      "raw_eligible_ou_lines_by_product":raw_eligible_ou_lines_by_product,
+      "model_qualified_ou_lines_by_product":model_qualified_ou_lines_by_product,
       "raw_eligible_ou_lines":sorted(raw_lines),
       "model_qualified_ou_lines":sorted(model_lines),
       "blocked_ou_lines":sorted(set(blocked_lines)|set(raw_lines)-set(eligible_lines)),
