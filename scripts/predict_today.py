@@ -26,6 +26,7 @@ FOOTBALL_LEAGUES = {
     "MLS": "usa.1",
     "Primeira Liga": "por.1",
     "Eredivisie": "ned.1",
+    "Saudi Pro League": "ksa.1",
 }
 TENNIS_LEAGUES = {"ATP": "atp", "WTA": "wta"}
 
