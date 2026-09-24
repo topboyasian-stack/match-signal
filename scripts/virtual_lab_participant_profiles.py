@@ -285,8 +285,8 @@ def build_h2h(events):
         rows.sort(key=lambda x: timestamp(x[0]["timestamp"]))
         observed = rows[0]
         observed_names = sorted({
-            participant_identity(product, observed[1]),
-            participant_identity(product, observed[2]),
+            str(observed[1] or "").strip(),
+            str(observed[2] or "").strip(),
         }, key=lambda value: value.casefold())
         a = observed_names[0] if observed_names else ""
         b = observed_names[1] if len(observed_names) > 1 else ""
