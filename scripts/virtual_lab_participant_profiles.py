@@ -283,8 +283,13 @@ def build_h2h(events):
     output = []
     for (product, key_a, key_b), rows in pairs.items():
         rows.sort(key=lambda x: timestamp(x[0]["timestamp"]))
-        a = key_a.split("|", 1)[1]
-        b = key_b.split("|", 1)[1]
+        observed = rows[0]
+        observed_names = sorted({
+            participant_identity(product, observed[1]),
+            participant_identity(product, observed[2]),
+        }, key=lambda value: value.casefold())
+        a = observed_names[0] if observed_names else ""
+        b = observed_names[1] if len(observed_names) > 1 else ""
         wins_a = wins_b = draws = btts = 0
         goals_a = goals_b = 0.0
         recent = []
