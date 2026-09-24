@@ -226,6 +226,7 @@ def evaluate(events):
             outputs.append({
                 "event_key":event["key"],"timestamp":event["timestamp"],
                 "product":event["product"],"competition":event["competition"],
+                "selection":str(row.get("selection") or "").lower(),
                 "line":float(row["line"]),"participant_active":pn>=MIN_EVENT_HISTORY,
                 "y":y,
                 "market":1-market if inv else market,
