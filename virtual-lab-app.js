@@ -83,6 +83,9 @@ function artifactParticipantPrior(event,line){
   let n=rates.reduce((s,x)=>s+x.n,0);
   if(!rates.length&&(!evidence.h2h?.lines?.[target]?.n))return {prob:null,n:0,totalN:0,pairN:0,weight:0,entityProb:null,source:'no-artifact-evidence'};
   let prob=rates.length?(rates.reduce((s,x)=>s+x.rate*x.n,0)+2)/(n+4):null;
+  const pairMatches=Number(evidence.h2h?.matches||0);
+  const minimumHistory=Math.max(n,pairMatches);
+  if(minimumHistory<3)return {prob:null,n:minimumHistory,totalN:minimumHistory,pairN:pairMatches,weight:0,entityProb:null,source:'insufficient-artifact-history'};
   const h=evidence.h2h?.lines?.[target];
   if(h&&Number(h.n)>0){
     const hp=(Number(h.over)+2)/(Number(h.n)+4);
