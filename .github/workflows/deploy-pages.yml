@@ -9,6 +9,12 @@ on:
       - 'performance.html'
       - 'basketball.html'
       - 'tennis.html'
+      - 'darts.html'
+      - 'darts-app.js'
+      - 'darts.css'
+      - 'table-tennis.html'
+      - 'table-tennis-app.js'
+      - 'table-tennis.css'
       - 'live.html'
       - 'research.html'
       - 'virtual-lab/**'
@@ -63,6 +69,8 @@ jobs:
           test -s index.html
           test -s expansion.html
           test -s basketball.html
+          test -s darts.html
+          test -s table-tennis.html
           test -s performance.html
           test -s live.html
           test -s research.html
@@ -72,6 +80,7 @@ jobs:
           test -s virtual-lab.css
           test -s data/predictions.json
           test -s data/virtual_lab_live.json
+          python -m py_compile scripts/darts_pipeline.py scripts/table_tennis_pipeline.py
           python - <<'PY'
           import json
           from pathlib import Path
@@ -106,6 +115,21 @@ jobs:
         timeout-minutes: 3
         run: |
           node --input-type=module <<'NODE'
+          for (const [page,markers] of [
+            ['/darts.html',['Darts-X','darts-app.js']],
+            ['/table-tennis.html',['Table Tennis-X','table-tennis-app.js']]
+          ]) {
+            const p=await fetch('https://match-signal.pages.dev'+page+'?smoke='+Date.now(),{cache:'no-store'});
+            const b=await p.text();
+            if(!p.ok) throw new Error('Cloudflare '+page+' HTTP '+p.status);
+            for(const m of markers) if(!b.includes(m)) throw new Error('Cloudflare '+page+' missing '+m);
+          }
+          for (const apiPath of ['/api/sportybet-darts','/api/sportybet-table-tennis']) {
+            const p=await fetch('https://match-signal.pages.dev'+apiPath+'?pageSize=5&pageNum=1&timeline=24&_t='+Date.now(),{cache:'no-store'});
+            if(!p.ok) throw new Error('Cloudflare '+apiPath+' HTTP '+p.status);
+            const body=await p.json();
+            if(body?.ok!==true) throw new Error(apiPath+' returned ok!=true');
+          }
           const api='https://match-signal.pages.dev/api/sportybet-virtual';
           const qs=new URLSearchParams({
             pageSize:'100',
