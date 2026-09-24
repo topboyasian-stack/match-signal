@@ -20,6 +20,7 @@ MODEL=DATA/"darts_model.json"
 CANDIDATES=DATA/"darts_candidates.json"
 STATUS=DATA/"darts_status.json"
 
+SPORTYBET_PROXY="https://match-signal.pages.dev/api/sportybet-darts"
 SPORTYBET="https://www.sportybet.com/api/ng/factsCenter/pcUpcomingEvents"
 SPORTYBET_HEADERS={"Accept":"application/json, text/plain, */*","Content-Type":"application/json","Current-Country":"NG","Origin":"https://www.sportybet.com","Referer":"https://www.sportybet.com/ng/","User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/152.0.0.0 Safari/537.36"}
 TSDB="https://www.thesportsdb.com/api/v1/json/123/eventsday.php"
@@ -52,28 +53,36 @@ def wilson_lower(w,n,z=1.645):
     return (p+z*z/(2*n)-z*math.sqrt(p*(1-p)/n+z*z/(4*n*n)))/den
 
 def fetch_sportybet():
-    r=requests.get(SPORTYBET,params={"sportId":"sr:sport:22","pageSize":100,"pageNum":1,"todayGames":"false","timeline":168,"_t":int(time.time()*1000)},headers=SPORTYBET_HEADERS,timeout=25)
-    r.raise_for_status(); body=r.json()
-    rows=[]
-    for t in (body.get("data",{}).get("tournaments") or []):
-        for e in (t.get("events") or []):
-            p1=str(e.get("homeTeamName") or e.get("homePlayerName") or e.get("homeParticipant") or e.get("homePlayer") or "").strip()
-            p2=str(e.get("awayTeamName") or e.get("awayPlayerName") or e.get("awayParticipant") or e.get("awayPlayer") or "").strip()
-            if not p1 or not p2 or not e.get("eventId"):continue
-            start=e.get("estimateStartTime")
-            try:
-                start=int(float(start)); start=start*1000 if start<100000000000 else start
-            except (TypeError,ValueError):start=None
-            markets=[]
-            for m in (e.get("markets") or []):
-                outs=[]
-                for o in (m.get("outcomes") or []):
-                    try:od=float(o.get("odds"))
-                    except (TypeError,ValueError):continue
-                    if od>1:outs.append({"id":str(o.get("id") or ""),"name":str(o.get("name") or o.get("desc") or "").strip(),"odds":od})
-                if outs:markets.append({"id":str(m.get("id") or ""),"name":str(m.get("name") or m.get("desc") or "").strip(),"outcomes":outs})
-            rows.append({"event_id":str(e["eventId"]),"competition":str(t.get("name") or ""),"category":str(t.get("categoryName") or ""),"start_time_ms":start,"player_1":p1,"player_2":p2,"markets":markets})
-    return rows
+    errors=[]
+    urls=[SPORTYBET_PROXY]
+    # Direct SportyBet access from hosted CI can be protected or return non-JSON.
+    # The isolated Cloudflare provider boundary is therefore authoritative.
+    for url in urls:
+        try:
+            params={"pageSize":100,"pageNum":1,"timeline":168,"_t":int(time.time()*1000)}
+            if "sportybet-" in url:
+                params={}
+            r=requests.get(url,params=params,headers={"Accept":"application/json","User-Agent":"MatchSignal-Darts-X/1.0"},timeout=25)
+            r.raise_for_status()
+            body=r.json()
+            rows=[]
+            for e in (body.get("events") or []):
+                p1=str(e.get("participant_1") or "").strip()
+                p2=str(e.get("participant_2") or "").strip()
+                if not p1 or not p2 or not e.get("event_id"):continue
+                markets=[]
+                for m in (e.get("markets") or []):
+                    outs=[]
+                    for o in (m.get("outcomes") or []):
+                        try:od=float(o.get("odds"))
+                        except (TypeError,ValueError):continue
+                        if od>1:outs.append({"id":str(o.get("id") or ""),"name":str(o.get("name") or o.get("desc") or "").strip(),"odds":od})
+                    if outs:markets.append({"id":str(m.get("id") or ""),"name":str(m.get("name") or m.get("desc") or "").strip(),"outcomes":outs})
+                rows.append({"event_id":str(e["event_id"]),"competition":str(e.get("competition") or ""),"category":str(e.get("category") or ""),"start_time_ms":e.get("start_time_ms"),"player_1":p1,"player_2":p2,"markets":markets})
+            return rows,errors
+        except Exception as exc:
+            errors.append(f"SportyBet provider boundary: {exc}")
+    return [],errors
 
 def winner_market(row):
     ms=[m for m in row.get("markets",[]) if len(m.get("outcomes",[]))>=2]
@@ -169,7 +178,7 @@ def main():
     promoted=bool(gate_row["accuracy"] is not None and gate_row["n"]>=MIN_GATE_N and gate_row["accuracy"]>BENCHMARK and (gate_row.get("wilson_lower_90") or 0)>=0.75)
     model={"version":"DARTS-X-1.0","generated_at":datetime.now(timezone.utc).isoformat(),"scope":"Darts pre-match winner only","history_events":len(history),"source_results":"TheSportsDB public event results","source_odds":"SportyBet NG current odds","frozen_vfootball_benchmark":BENCHMARK,"variants":variants,"selected_variant":selected,"precision_gate":{"minimum_n":MIN_GATE_N,"selected":gate_row,"beats_vfootball":bool(gate_row.get("accuracy") is not None and gate_row["accuracy"]>BENCHMARK),"promoted":promoted},"mode":"PAPER_ONLY"}
     save(MODEL,model)
-    upcoming=fetch_sportybet()
+    upcoming,odds_errors=fetch_sportybet()
     ratings={}
     for row,p,actual in build_variant(history,selected):
         a,b=norm(row["player_1"]),norm(row["player_2"])
@@ -192,7 +201,7 @@ def main():
         if row["qualified"]:candidates.append(row)
     save(UPCOMING,enriched)
     save(CANDIDATES,{"generated_at":datetime.now(timezone.utc).isoformat(),"sport":"darts","mode":"PAPER_ONLY","candidates":candidates,"gate":model["precision_gate"]})
-    save(STATUS,{"updated_at":datetime.now(timezone.utc).isoformat(),"sport":"darts","sport_id":"sr:sport:22","history_events":len(history),"upcoming_events":len(enriched),"candidate_count":len(candidates),"model_status":"PROMOTED" if promoted else ("TESTING" if history else "COLLECTING"),"source_results":"TheSportsDB public event results","source_odds":"SportyBet NG","source_errors":source_errors})
+    save(STATUS,{"updated_at":datetime.now(timezone.utc).isoformat(),"sport":"darts","sport_id":"sr:sport:22","history_events":len(history),"upcoming_events":len(enriched),"candidate_count":len(candidates),"model_status":"PROMOTED" if promoted else ("TESTING" if history else "COLLECTING"),"source_results":"TheSportsDB public event results","source_odds":"SportyBet NG","source_errors":source_errors+odds_errors})
     print(json.dumps({"sport":"darts","history":len(history),"upcoming":len(enriched),"selected_variant":selected,"holdout":chosen["holdout"],"precision_gate":model["precision_gate"],"candidates":len(candidates)},indent=2))
 
 if __name__=="__main__":main()
