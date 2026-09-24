@@ -24,6 +24,11 @@ PRIOR_WEIGHT=.25
 PAIR_WEIGHT=.25
 MAX_PARTICIPANT_WEIGHT=.20
 MAX_TOTAL_PARTICIPANT_WEIGHT=.15
+EFOOTBALL_PRODUCTS={"efootball_gt","efootball_adriatic"}
+EFOOTBALL_SHAPE_MIN_HISTORY=20
+EFOOTBALL_SHAPE_FULL_HISTORY=60
+EFOOTBALL_SHAPE_DECAY=60.0
+EFOOTBALL_SHAPE_MAX_EVENTS=300
 
 def ts(v):
     try:return datetime.fromisoformat(str(v).replace("Z","+00:00")).timestamp()
@@ -110,6 +115,49 @@ def product_prior(events, product, line, cutoff):
     over=sum(e["total"]>line for e in decisive)
     return (over+2)/(len(decisive)+4)
 
+def efootball_shape_prob(events,event,line,poisson_prob):
+    """Product-specific full-distribution O/U estimate for eFootball.
+
+    Uses the settled total-goal distribution across earlier same-product events,
+    with bounded recency weighting and Beta(2,2) shrinkage, then blends it with
+    the event's line-ladder Poisson probability. The feature is time-safe: the
+    current event is never included.
+    """
+    product=str(event.get("product") or "")
+    if product not in EFOOTBALL_PRODUCTS:
+        return poisson_prob,0.0,0.0
+    cutoff=ts(event.get("timestamp"))
+    prior=[e for e in events
+           if e.get("product")==product and e.get("total") is not None
+           and ts(e.get("timestamp"))<cutoff]
+    if len(prior)<EFOOTBALL_SHAPE_MIN_HISTORY:
+        return poisson_prob,0.0,0.0
+    prior=prior[-EFOOTBALL_SHAPE_MAX_EVENTS:]
+    weighted_over=0.0
+    weighted_under=0.0
+    used=0
+    for age,e in enumerate(reversed(prior)):
+        total=e.get("total")
+        if total is None or total==line:
+            continue
+        w=math.exp(-age/EFOOTBALL_SHAPE_DECAY)
+        if total>line:
+            weighted_over+=w
+        else:
+            weighted_under+=w
+        used+=1
+    decisive_weight=weighted_over+weighted_under
+    if decisive_weight<=0:
+        return poisson_prob,0.0,0.0
+    empirical=(weighted_over+2)/(decisive_weight+4)
+    confidence=max(0.0,min(1.0,
+        (decisive_weight-EFOOTBALL_SHAPE_MIN_HISTORY) /
+        (EFOOTBALL_SHAPE_FULL_HISTORY-EFOOTBALL_SHAPE_MIN_HISTORY)
+    ))
+    shape_weight=.15+.30*confidence
+    shape_prob=clamp((1-shape_weight)*poisson_prob+shape_weight*empirical)
+    return shape_prob,decisive_weight,shape_weight
+
 def participant_prior(events,event,line):
     cutoff=ts(event["timestamp"]); product=event["product"]
     names={stable_participant_identity(product,event["home"]).casefold(),stable_participant_identity(product,event["away"]).casefold()}-{""}
@@ -143,9 +191,11 @@ def probs(events,event,row):
     pois=poisson_over(event["lambda"],line)
     prior=product_prior(events,event["product"],line,ts(event["timestamp"]))
     base=pois if prior is None else clamp((1-PRIOR_WEIGHT)*pois+PRIOR_WEIGHT*prior)
+    shape_prob,shape_n,shape_weight=efootball_shape_prob(events,event,line,pois)
+    core=shape_prob if event["product"] in EFOOTBALL_PRODUCTS and shape_n>0 else base
     part,pw,pn=participant_prior(events,event,line)
-    combined=base if part is None else clamp((1-pw)*base+pw*part)
-    return market,pois,base,combined,pn
+    combined=core if part is None else clamp((1-pw)*core+pw*part)
+    return market,pois,base,core,combined,pn,shape_prob,shape_n,shape_weight
 
 def metrics(rows,key):
     if not rows:return None
@@ -168,7 +218,7 @@ def evaluate(events):
         prior=events[:i]
         for row in event["rows"]:
             if row.get("win") is None or row.get("model_prob") is None:continue
-            market,pois,base,combined,pn=probs(prior,event,row)
+            market,pois,base,core,combined,pn,shape_prob,shape_n,shape_weight=probs(prior,event,row)
             sel=str(row.get("selection") or "").upper()
             # Convert all observations to the probability of the selected side.
             inv=sel.startswith("U")
@@ -181,8 +231,11 @@ def evaluate(events):
                 "market":1-market if inv else market,
                 "poisson":1-pois if inv else pois,
                 "poisson_prior":1-base if inv else base,
+                "efootball_shape":1-shape_prob if inv else shape_prob,
                 "participant_model":1-combined if inv else combined,
-                "participant_n":pn
+                "participant_n":pn,
+                "efootball_shape_n":shape_n,
+                "efootball_shape_weight":shape_weight
             })
     return outputs
 
@@ -200,7 +253,7 @@ def main():
     scored=evaluate(events)
     hold=[r for r in scored if r["event_key"] in hold_keys]
     participant_hold=[r for r in hold if r["participant_active"]]
-    variants=["market","poisson","poisson_prior","participant_model"]
+    variants=["market","poisson","poisson_prior","efootball_shape","participant_model"]
     all_metrics={k:metrics(scored,k) for k in variants}
     hold_metrics={k:metrics(hold,k) for k in variants}
     part_metrics={k:metrics(participant_hold,k) for k in variants}
