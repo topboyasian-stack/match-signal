@@ -65,6 +65,9 @@ def fetch_sportybet():
             r=requests.get(url,params=params,headers={"Accept":"application/json","User-Agent":"MatchSignal-Darts-X/1.0"},timeout=25)
             r.raise_for_status()
             body=r.json()
+            if body.get('status') not in {'LIVE','EMPTY'}:
+                errors.append(str(body.get('error') or body.get('status') or 'SportyBet provider unavailable'))
+                return [],errors
             rows=[]
             for e in (body.get("events") or []):
                 p1=str(e.get("participant_1") or "").strip()
