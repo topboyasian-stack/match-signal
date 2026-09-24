@@ -45,6 +45,7 @@ CORE_LEAGUES = {
 
 AUXILIARY_ESPN_LEAGUES = {
     "Eredivisie": "ned.1",
+    "Saudi Pro League": "ksa.1",
 }
 
 GENERIC_ERROR = "provider lookup unavailable; status derived from published artifacts"
@@ -144,7 +145,6 @@ def main():
     pdl_status = load("pdl_status.json", {})
     pdl_predictions = load("pdl_predictions.json", [])
     expansion_status = load("expansion_status.json", {})
-    saudi_status = load("saudi_pro_league_status.json", {})
 
     expansion_comps = (
         expansion_status.get("competitions")
@@ -212,18 +212,22 @@ def main():
                 )
 
         elif league == "Saudi Pro League":
-            status_source = saudi_status if isinstance(saudi_status, dict) else {}
-            historical = sum(
-                1
-                for row in history
-                if row.get("sport") == "football"
-                and row.get("league") == league
-                and row.get("settled")
+            # Saudi is a first-class ESPN-backed football league in the
+            # authoritative pipeline. Do not use the legacy 60-day status
+            # artifact as a substitute for the current forward fixture scan.
+            historical = historical_count(history, performance, league)
+            provider_upcoming, provider_errors = espn_upcoming_count(
+                CORE_LEAGUES[league], now
             )
-            upstream = int(status_source.get("current_fixtures") or 0)
-            if upcoming == 0 and upstream > 0:
-                upcoming = upstream
-                source = "Saudi Pro League status feed"
+            upcoming = max(published_upcoming, provider_upcoming)
+            errors.extend(provider_errors)
+            source = (
+                "published prediction artifact + ESPN day-by-day forward fixture scan"
+                if published_upcoming and provider_upcoming
+                else "ESPN day-by-day forward fixture scan"
+                if provider_upcoming
+                else "published prediction artifact"
+            )
 
         else:
             pdl_current = len(pdl_predictions) if isinstance(pdl_predictions, list) else 0
