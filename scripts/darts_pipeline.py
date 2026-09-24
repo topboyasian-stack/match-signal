@@ -208,3 +208,5 @@ def main():
     print(json.dumps({"sport":"darts","history":len(history),"upcoming":len(enriched),"selected_variant":selected,"holdout":chosen["holdout"],"precision_gate":model["precision_gate"],"candidates":len(candidates)},indent=2))
 
 if __name__=="__main__":main()
+
+# DARTS-X-PROVIDER-RETEST 2026-09-24
