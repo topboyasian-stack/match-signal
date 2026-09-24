@@ -1110,6 +1110,34 @@ function builderEligiblePick(p){
   const c=p.primary;
   return Number.isFinite(Number(c.bookmakerOdds))&&Number(c.bookmakerOdds)>1&&Number.isFinite(Number(c.calibratedProb))&&Number(c.calibratedProb)>0;
 }
+function syncBuilderCTA(){
+  const candidates=state.picks.filter(builderEligiblePick);
+  const count=candidates.length;
+  const deskCount=state.picks.length;
+  const top=Math.min(count,4);
+  const header=$('buildFromPredictions');
+  const build=$('autoBuild');
+  const status=$('builderSourceStatus');
+  if(header){
+    header.disabled=count===0;
+    header.textContent=count
+      ? '⚡ Build '+top+' qualified pick'+(top===1?'':'s')
+      : '⚡ Waiting for qualified picks';
+    header.title=count
+      ? count+' qualified prediction'+(count===1?' is':'s are')+' ready for the Odds Builder.'
+      : 'The prediction desk currently has no Builder-ready qualified picks.';
+  }
+  if(build){
+    build.disabled=count===0;
+    build.textContent=count
+      ? '⚡ Build top '+top
+      : '⚡ No qualified picks yet';
+  }
+  if(status){
+    status.textContent='Builder-ready: '+count+' · Desk cards: '+deskCount;
+    status.title='Only QUALIFIED_BASE_EVIDENCE or QUALIFIED_PARTICIPANT_ENHANCED cards can enter the Builder.';
+  }
+}
 function renderBuilder(){
   const host=$('builderList'),summary=$('builderSummary');if(!host||!summary)return;
   if(!state.builder.length){host.innerHTML='<div class="empty">Add qualified upcoming predictions to build a 2–4 leg paper slip.</div>';summary.innerHTML='<span>0 legs</span>';return;}
@@ -1129,7 +1157,7 @@ function autoBuild(){
   const candidates=state.picks.filter(builderEligiblePick).sort(function(a,b){return (Number(b.primary.edge)||0)-(Number(a.primary.edge)||0);});
   const chosen=[],seen={};
   for(const p of candidates){if(chosen.length>=4||seen[p.event_id])continue;chosen.push(p);seen[p.event_id]=1;}
-  state.builder=chosen;renderBuilder();
+  state.builder=chosen;renderBuilder();syncBuilderCTA();
 }
 
 function collectLiveFromBody(body){
@@ -1317,6 +1345,7 @@ function rebuildPredictionDesk(){
   state.picks=eligible.slice(0,24).map(e=>{try{return predictionForEvent(e)}catch(err){console.warn('Virtual Lab prediction desk skipped:',e?.event_id,err);return null;}}).filter(Boolean);
   renderPredictionDesk();
   renderBuilder();
+  syncBuilderCTA();
   updateLabPulse();
   const diagnostics=$('predictionDiagnostics');
   if(diagnostics){
@@ -1472,8 +1501,13 @@ $('split').addEventListener('change',analyze);
 $('runStrategy').addEventListener('click',runStrategy);
 $('liveRefresh').addEventListener('click',loadLive);
 $('predictionRefresh').addEventListener('click',refreshPredictionDesk);
+$('buildFromPredictions').addEventListener('click',function(){
+  autoBuild();
+  const target=$('oddsBuilder');
+  if(target)target.scrollIntoView({behavior:'smooth',block:'start'});
+});
 $('autoBuild').addEventListener('click',autoBuild);
-$('clearBuilder').addEventListener('click',function(){state.builder=[];renderBuilder();});
+$('clearBuilder').addEventListener('click',function(){state.builder=[];renderBuilder();syncBuilderCTA();});
 $('clear').addEventListener('click',()=>{state.rows=[];state.filtered=[];state.builder=[];const hs=$('historyStatus');if(hs)hs.textContent='MANUAL DATASET CLEARED';$('fileInput').value='';analyze();renderBuilder()});
 
 analyze();
