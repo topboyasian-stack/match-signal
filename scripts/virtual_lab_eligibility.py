@@ -30,7 +30,7 @@ def model_pass(x):
     if not x:return False
     market=x.get("market") or {}
     candidates=[]
-    for name in ("poisson_prior","poisson"):
+    for name in ("efootball_shape","poisson_prior","poisson"):
         m=x.get(name) or {}
         if m.get("n",0)>=30 and all(k in m for k in ("brier","log_loss","ece")):
             if (not candidates or
@@ -73,8 +73,8 @@ def main():
     eligible_lines=sorted(set(raw_lines)&set(model_lines))
     eligible_comps=sorted(set(raw_comp)&set(model_comps))
     adaptive_policy={
-        "base_gate":"best validated core model vs SportyBet market",
-        "candidate_variants":["poisson_prior","poisson"],
+        "base_gate":"best validated product-aware core model vs SportyBet market",
+        "candidate_variants":["efootball_shape","poisson_prior","poisson"],
         "participant_feature_independent":True,
         "participant_feature_gate":model.get("participant_feature_gate",{}),
         "qualified_lines":sorted(model_lines),
