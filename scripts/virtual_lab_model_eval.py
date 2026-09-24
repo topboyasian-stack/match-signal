@@ -262,6 +262,16 @@ def main():
         for key,subset in grouped(hold,field).items():
             out[str(key)]={k:metrics(subset,k) for k in variants}
         return out
+
+    def nested_table(primary_field, secondary_field, source_rows):
+        """Diagnostic matrix used to isolate product-specific degradation without changing gates."""
+        out={}
+        for primary, subset in grouped(source_rows, primary_field).items():
+            bucket={}
+            for secondary, rows2 in grouped(subset, secondary_field).items():
+                bucket[str(secondary)]={k:metrics(rows2,k) for k in variants}
+            out[str(primary)]=bucket
+        return out
     # Only promote a participant feature when it has a meaningful untouched holdout
     # and improves both probability losses without materially worsening calibration.
     ph=hold_metrics.get("participant_model"); mh=hold_metrics.get("market")
@@ -291,6 +301,14 @@ def main():
       "by_product":table("product",hold),
       "by_competition":table("competition",hold),
       "by_line":line_reports,
+      "by_product_competition":nested_table("product","competition",hold),
+      "by_product_line":nested_table("product","line",hold),
+      "by_product_selection":nested_table("product","selection",hold),
+      "efootball_gt_diagnostics":{
+        "competition":nested_table("competition","line",[r for r in hold if r["product"]=="efootball_gt"]),
+        "line":{k:metrics([r for r in hold if r["product"]=="efootball_gt" and r["line"]==float(k)],k2) for k in variants for _ in []},
+        "selection":nested_table("selection","line",[r for r in hold if r["product"]=="efootball_gt"])
+      },
       "participant_feature_gate":{
         "minimum_participant_total_history":MIN_PARTICIPANT_TOTAL_HISTORY,
         "minimum_exact_line_history":MIN_EVENT_HISTORY,
