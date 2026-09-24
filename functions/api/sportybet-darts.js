@@ -1,14 +1,31 @@
 function headers(){return {'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','Access-Control-Allow-Origin':'*','Access-Control-Allow-Methods':'GET,OPTIONS'}}
 const ORIGIN='https://www.sportybet.com';
 const BROWSER_HEADERS={'Accept':'application/json, text/plain, */*','Content-Type':'application/json','Current-Country':'NG','Origin':'https://www.sportybet.com','Referer':'https://www.sportybet.com/ng/','User-Agent':'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/152.0.0.0 Safari/537.36'};
-async function upstream(params){
-  const u=new URL(ORIGIN+'/api/ng/factsCenter/pcUpcomingEvents');
+async function upstream(path,params){
+  const u=new URL(ORIGIN+path);
   for(const [k,v] of Object.entries(params))u.searchParams.set(k,String(v));
   const r=await fetch(u.toString(),{headers:BROWSER_HEADERS,cache:'no-store',signal:AbortSignal.timeout(10000)});
   const body=await r.text();
-  if(!r.ok)throw new Error('SPORTYBET_UPSTREAM_HTTP_'+r.status);
+  if(!r.ok)throw new Error(path+' HTTP '+r.status+' '+body.slice(0,180));
+  if(!body.trim())throw new Error(path+' empty response');
   return JSON.parse(body);
 }
+async function fetchSportFeed(params){
+  const attempts=[
+    ['/api/ng/factsCenter/pcUpcomingEvents',{...params,marketId:'1,10,14,18,29,186,189,202,204,210'}],
+    ['/api/ng/factsCenter/wapConfigurableUpcomingEvents',params]
+  ];
+  const errors=[];
+  for(const [path,p] of attempts){
+    try{
+      const data=await upstream(path,p);
+      const tournaments=Array.isArray(data?.data?.tournaments)?data.data.tournaments:[];
+      return {data,tournaments};
+    }catch(e){errors.push(String(e?.message||e));}
+  }
+  throw new Error(errors.join(' | '));
+}
+
 function nameOf(v){return String(v?.name||v?.desc||v?.title||'').trim()}
 function normalizeEvent(t,e){
   const p1=String(e?.homeTeamName||e?.homePlayerName||e?.homeParticipant||e?.homePlayer||e?.homeCompetitor||'').trim();
@@ -30,14 +47,14 @@ export async function onRequestGet(context){
   const pageNum=Math.max(Number(u.searchParams.get('pageNum')||1),1);
   const timeline=Math.min(Math.max(Number(u.searchParams.get('timeline')||168),12),720);
   try{
-    const data=await upstream({sportId:'sr:sport:22',pageSize,pageNum,todayGames:'false',timeline,_t:Date.now()});
+    const feed=await fetchSportFeed({sportId:'sr:sport:22',pageSize,pageNum,todayGames:'false',timeline,_t:Date.now()});
     const events=[];
-    for(const t of (data?.data?.tournaments||[]))for(const e of (t?.events||[])){
+    for(const t of feed.tournaments)for(const e of (t?.events||[])){
       const row=normalizeEvent(t,e);
       if(row.event_id&&row.participant_1&&row.participant_2)events.push(row);
     }
     return new Response(JSON.stringify({ok:true,status:events.length?'LIVE':'EMPTY',updated_at:new Date().toISOString(),events_count:events.length,events}),{headers:headers()});
   }catch(e){
-    return new Response(JSON.stringify({ok:false,status:'UPSTREAM_ERROR',error:String(e?.message||e)}),{status:502,headers:headers()});
+    return new Response(JSON.stringify({ok:true,status:'UPSTREAM_UNAVAILABLE',updated_at:new Date().toISOString(),events_count:0,events:[],error:String(e?.message||e),provider:'SportyBet NG',sport_id:'sr:sport:22'}),{status:200,headers:headers()});
   }
 }
