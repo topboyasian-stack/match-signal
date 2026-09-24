@@ -1103,13 +1103,20 @@ function renderPredictionDesk(){
   renderNearQualifiedRadar();
   host.querySelectorAll('.builderAdd').forEach(function(btn){btn.addEventListener('click',function(){const p=picks[Number(btn.dataset.pick)];if(p&&!state.builder.some(function(x){return x.event_id===p.event_id;})){state.builder.push(p);state.builder=state.builder.slice(-4);renderBuilder();}});});
 }
+function builderEligiblePick(p){
+  if(!p||!p.primary)return false;
+  const status=String(p.candidate_status||'');
+  if(status!=='QUALIFIED_BASE_EVIDENCE'&&status!=='QUALIFIED_PARTICIPANT_ENHANCED')return false;
+  const c=p.primary;
+  return Number.isFinite(Number(c.bookmakerOdds))&&Number(c.bookmakerOdds)>1&&Number.isFinite(Number(c.calibratedProb))&&Number(c.calibratedProb)>0;
+}
 function renderBuilder(){
   const host=$('builderList'),summary=$('builderSummary');if(!host||!summary)return;
-  if(!state.builder.length){host.innerHTML='<div class="empty">Add upcoming predictions to build a 2–4 leg paper slip.</div>';summary.innerHTML='<span>0 legs</span>';return;}
+  if(!state.builder.length){host.innerHTML='<div class="empty">Add qualified upcoming predictions to build a 2–4 leg paper slip.</div>';summary.innerHTML='<span>0 legs</span>';return;}
   const unique=[],seen={};
   state.builder.forEach(function(p){if(!seen[p.event_id]){seen[p.event_id]=1;unique.push(p);}});state.builder=unique.slice(-4);
-  state.builder=state.builder.filter(function(p){return p&&p.primary&&qualifiesResearchPick(p.primary);}).slice(-4);
-  if(!state.builder.length){host.innerHTML='<div class="empty">No qualified research picks are currently eligible for the paper builder.</div>';summary.innerHTML='<span>0 legs · builder locked until a validated signal exists</span>';return;}
+  state.builder=state.builder.filter(builderEligiblePick).slice(-4);
+  if(!state.builder.length){host.innerHTML='<div class="empty">No qualified base-evidence or participant-enhanced picks are currently available for the paper builder.</div>';summary.innerHTML='<span>0 legs · waiting for qualified predictions</span>';return;}
   const combined=state.builder.reduce(function(a,p){return a*p.primary.bookmakerOdds;},1);
   const fairCombined=state.builder.reduce(function(a,p){return a*p.primary.fairOdds;},1);
   const baselineHit=state.builder.reduce(function(a,p){return a*p.primary.calibratedProb;},1);
@@ -1119,7 +1126,7 @@ function renderBuilder(){
   summary.innerHTML='<span><b>'+state.builder.length+'</b> legs</span><span>Combined odds <b>'+combined.toFixed(2)+'</b></span><span>Baseline hit probability <b>'+fmtPct(baselineHit)+'</b></span><span>Fair combined odds <b>'+fairCombined.toFixed(2)+'</b></span><strong class="'+(ready?'builderReady':'')+'">'+(ready?'READY · PAPER BUILDER':'ADD AT LEAST 2 LEGS')+'</strong>';
 }
 function autoBuild(){
-  const candidates=state.picks.filter(function(p){return p.primary&&qualifiesResearchPick(p.primary);}).sort(function(a,b){return b.primary.edge-a.primary.edge;});
+  const candidates=state.picks.filter(builderEligiblePick).sort(function(a,b){return (Number(b.primary.edge)||0)-(Number(a.primary.edge)||0);});
   const chosen=[],seen={};
   for(const p of candidates){if(chosen.length>=4||seen[p.event_id])continue;chosen.push(p);seen[p.event_id]=1;}
   state.builder=chosen;renderBuilder();
