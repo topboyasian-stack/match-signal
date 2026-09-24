@@ -797,8 +797,8 @@ function isPromotedResearchEvent(e){
 }
 function isModelQualifiedResearchEvent(e){
   const name=competitionKey(e.competition||e.tournament||'');
-  const active=state.eligibility.eligible_competitions||[];
-  const model=state.eligibility.model_qualified_competitions||[];
+  const active=scopedEligibility("eligible_competitions_by_product",e.product,state.eligibility.eligible_competitions||[]);
+  const model=scopedEligibility("model_qualified_competitions_by_product",e.product,state.eligibility.model_qualified_competitions||[]);
   return active.some(x=>competitionKey(x)===name) && model.some(x=>competitionKey(x)===name);
 }
 function isPriorityOU(c){ return !!(c&&c.marketType==='ou'&&state.eligibility.priority_ou_lines.some(x=>Math.abs(Number(x)-Number(c.market.line))<0.001)); }
@@ -812,8 +812,8 @@ function isPromotedOU(c){
 }
 function isModelQualifiedOU(c){
   return !!(c&&c.marketType==='ou'&&
-    (state.eligibility.eligible_ou_lines||[]).some(x=>Math.abs(Number(x)-Number(c.market.line))<0.001) &&
-    (state.eligibility.model_qualified_ou_lines||[]).some(x=>Math.abs(Number(x)-Number(c.market.line))<0.001));
+    scopedEligibility("eligible_ou_lines_by_product",c?.eventProduct||c?.product,state.eligibility.eligible_ou_lines).some(x=>Math.abs(Number(x)-Number(c.market.line))<0.001) &&
+    scopedEligibility("model_qualified_ou_lines_by_product",c?.eventProduct||c?.product,state.eligibility.model_qualified_ou_lines||[]).some(x=>Math.abs(Number(x)-Number(c.market.line))<0.001));
 }
 function isExperimentalOU(c){
   return !!(c&&c.marketType==='ou'&&state.eligibility.eligible_markets.includes('ou')&&
@@ -849,7 +849,7 @@ function predictionForEvent(e){
       const isTotals=mid==='18'||mid==='189'||name.indexOf('over/under')>=0||name.indexOf('total')>=0;
       if(!isTotals)return;
       const c=calculateMarket(m);
-      if(c){c.marketType='ou';candidates.push(c);}
+      if(c){c.marketType='ou';c.eventProduct=e.product;candidates.push(c);}
     });
     const active=candidates.filter(isEligibleOU).sort((x,y)=>(y.fairProb||0)-(x.fairProb||0));
     const experimental=candidates.filter(isExperimentalOU).sort((x,y)=>(y.fairProb||0)-(x.fairProb||0));
