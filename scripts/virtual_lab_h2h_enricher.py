@@ -316,7 +316,8 @@ def parse_h2h_page(html, requested_p1, requested_p2):
     h2h_o25_over, h2h_o25_under = find_section_percent(text, "Over/Under H2H - Gols")
     fh_o25_over, fh_o25_under = find_section_percent(text, "Over/Under H2H - Gols 1º Tempo")
 
-    recent = parse_recent_results(lines)
+    h2h_start = next((i for i, line in enumerate(lines) if "Histórico H2H" in line), None)
+    recent = parse_recent_results(lines[h2h_start + 1:] if h2h_start is not None else [])
 
     updated_text = None
     m = re.search(r"Atualizado em\s+([^\.]+)\.", text, re.I)
@@ -485,8 +486,8 @@ def run():
                 "participant_1_key": f'{event["product"]}|{normalize_name(p1)}',
                 "participant_2_key": f'{event["product"]}|{normalize_name(p2)}',
                 "provider_participant_ids": {
-                    "a": item["link"]["provider_id_a"],
-                    "b": item["link"]["provider_id_b"],
+                    "a": item["link"]["provider_id_a"] if normalize_name(item["link"]["slug_a"]) == normalize_name(p1) else item["link"]["provider_id_b"],
+                    "b": item["link"]["provider_id_b"] if normalize_name(item["link"]["slug_a"]) == normalize_name(p1) else item["link"]["provider_id_a"],
                 },
                 "cold_start_enrichment": bool(item["cold_start"]),
                 "h2h": parsed,
