@@ -50,13 +50,19 @@ jobs:
       - name: Settle completed football and tennis fixtures
         run: python scripts/settle_same_day.py
 
+      - name: Recompute current performance snapshot
+        run: PYTHONPATH=. python scripts/current_performance.py
+
+      - name: Verify append-only performance ledger
+        run: PYTHONPATH=. python scripts/verify_performance_ledger.py
+
       - name: Commit newly settled results
         id: commit-results
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/prediction_history.json data/accuracy.json data/tennis_performance.json
+          git add data/prediction_history.json data/accuracy.json data/tennis_performance.json data/current_performance.json
           if git diff --cached --quiet; then
             echo "No newly settled results."
             echo "changed=false" >> "$GITHUB_OUTPUT"
