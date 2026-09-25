@@ -127,12 +127,12 @@ def settle_row(row, competition):
 
 
 def tennis_performance(rows):
-    eligible = [x for x in rows if str(x.get("sport")).lower() == "tennis" and x.get("evaluation_eligible") is True and x.get("settled")]
+    eligible = [x for x in rows if str(x.get("sport")).lower() == "tennis" and x.get("settled")]
     ou_rows = [x for x in eligible if ((x.get("actual_markets") or {}).get("total_games_result")) in {"over", "under", "push"}]
     ou_decisions = [x for x in ou_rows if ((x.get("analytics") or {}).get("total_games") or {}).get("pick") in {"over", "under"} and ((x.get("actual_markets") or {}).get("total_games_result")) != "push"]
     correct = sum(bool(x.get("correct")) for x in eligible)
     ou_correct = sum(bool((x.get("actual_markets") or {}).get("total_games_correct")) for x in ou_decisions)
-    return {"updated_at": datetime.now(timezone.utc).isoformat(), "settled_tennis_matches": len(eligible), "match_wins": correct, "match_accuracy": round(correct / len(eligible), 4) if eligible else 0.0, "ou_settled": len(ou_rows), "ou_decisions": len(ou_decisions), "ou_correct": ou_correct, "ou_accuracy": round(ou_correct / len(ou_decisions), 4) if ou_decisions else 0.0, "by_tour": {tour: {"settled": sum(x.get("league") == tour for x in eligible), "correct": sum(bool(x.get("correct")) for x in eligible if x.get("league") == tour), "ou_decisions": sum(x.get("league") == tour for x in ou_decisions), "ou_correct": sum(bool((x.get("actual_markets") or {}).get("total_games_correct")) for x in ou_decisions if x.get("league") == tour)} for tour in ("ATP", "WTA")}, "late_captures_excluded": sum(bool(x.get("capture_status") == "LATE_CAPTURE" and x.get("settled")) for x in rows), "status": "PAPER_RESEARCH_ONLY"}
+    return {"updated_at": datetime.now(timezone.utc).isoformat(), "settled_tennis_matches": len(eligible), "match_wins": correct, "match_accuracy": round(correct / len(eligible), 4) if eligible else 0.0, "ou_settled": len(ou_rows), "ou_decisions": len(ou_decisions), "ou_correct": ou_correct, "ou_accuracy": round(ou_correct / len(ou_decisions), 4) if ou_decisions else 0.0, "by_tour": {tour: {"settled": sum(x.get("league") == tour for x in eligible), "correct": sum(bool(x.get("correct")) for x in eligible if x.get("league") == tour), "ou_decisions": sum(x.get("league") == tour for x in ou_decisions), "ou_correct": sum(bool((x.get("actual_markets") or {}).get("total_games_correct")) for x in ou_decisions if x.get("league") == tour)} for tour in ("ATP", "WTA")}, "late_captures_observed": sum(bool(x.get("capture_status") == "LATE_CAPTURE" and x.get("settled")) for x in rows), "status": "PAPER_RESEARCH_ONLY"}
 
 
 def main():
