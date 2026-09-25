@@ -1237,8 +1237,22 @@ function builderEligiblePick(p){
   const c=p.primary;
   return Number.isFinite(Number(c.bookmakerOdds))&&Number(c.bookmakerOdds)>1&&Number.isFinite(Number(c.calibratedProb))&&Number(c.calibratedProb)>0;
 }
+function builderSourceCandidates(){
+  const product=$('product')?.value||'all';
+  const upcoming=upcomingEventsFrom(state.live).filter(e=>product==='all'||e.product===product);
+  const selected=[];
+  for(const e of upcoming){
+    if(!(isEligibleResearchEvent(e)||isConfirmedWatchedEvent(e)))continue;
+    try{
+      const p=predictionForEvent(e);
+      if(p&&builderEligiblePick(p))selected.push(p);
+    }catch(err){console.warn('Virtual Lab builder candidate skipped:',e?.event_id,err);}
+  }
+  const seen=new Set();
+  return selected.filter(p=>{if(seen.has(p.event_id))return false;seen.add(p.event_id);return true;});
+}
 function syncBuilderCTA(){
-  const candidates=state.picks.filter(builderEligiblePick);
+  const candidates=builderSourceCandidates();
   const count=candidates.length;
   const deskCount=state.picks.length;
   const top=Math.min(count,4);
@@ -1281,7 +1295,9 @@ function renderBuilder(){
   summary.innerHTML='<span><b>'+state.builder.length+'</b> legs</span><span>Combined odds <b>'+combined.toFixed(2)+'</b></span><span>Baseline hit probability <b>'+fmtPct(baselineHit)+'</b></span><span>Fair combined odds <b>'+fairCombined.toFixed(2)+'</b></span><strong class="'+(ready?'builderReady':'')+'">'+(ready?'READY · PAPER BUILDER':'ADD AT LEAST 2 LEGS')+'</strong>';
 }
 function autoBuild(){
-  const candidates=state.picks.filter(builderEligiblePick).sort(function(a,b){return (Number(b.primary.edge)||0)-(Number(a.primary.edge)||0);});
+  // Build from the full current eligible feed, not only the visible desk quota.
+  // This keeps the Builder functional without weakening any qualification gate.
+  const candidates=builderSourceCandidates().sort(function(a,b){return (Number(b.primary.edge)||0)-(Number(a.primary.edge)||0);});
   const chosen=[],seen={};
   for(const p of candidates){if(chosen.length>=4||seen[p.event_id])continue;chosen.push(p);seen[p.event_id]=1;}
   state.builder=chosen;renderBuilder();syncBuilderCTA();
