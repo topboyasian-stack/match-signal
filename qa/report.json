@@ -1,7 +1,7 @@
 {
   "generated_at": "2026-09-25T10:29:23.060408+00:00",
-  "status": "PASS",
-  "qa_score": 90,
+  "status": "FAIL",
+  "qa_score": 0,
   "live_trading_approved": false,
   "testing_mode": "PAPER_ONLY",
   "empirical_metrics": {
@@ -82,7 +82,7 @@
         {
           "range": "0.70-0.80",
           "n": 2,
-          "accuracy": 0.0,
+          "accuracy": 0,
           "mean_confidence": 0.7332
         },
         {
@@ -114,7 +114,18 @@
     "football_tennis": 216,
     "basketball": 0
   },
-  "issues": [],
+  "issues": [
+    {
+      "severity": "critical",
+      "code": "PERFORMANCE_LEDGER_DIVERGENCE",
+      "message": "Derived accuracy artifacts are not on one settlement snapshot."
+    },
+    {
+      "severity": "critical",
+      "code": "NON_APPEND_ONLY_TENNIS_SETTLEMENT",
+      "message": "A settlement refresh reduced the tennis performance denominator; historical predictions must be append-only."
+    }
+  ],
   "warnings": [
     "No accepted events for unknown"
   ],
@@ -125,5 +136,15 @@
     "placeholder_names_checked": true,
     "basketball_source_coverage_checked": true,
     "empirical_risk_gate_checked": true
+  },
+  "integrity_gate": {
+    "status": "BLOCKED",
+    "observed": {
+      "accuracy_settled": 583,
+      "accuracy_tennis_settled": 413,
+      "current_performance_settled": 574,
+      "current_performance_tennis": 404,
+      "tennis_performance_settled": 404
+    }
   }
 }
