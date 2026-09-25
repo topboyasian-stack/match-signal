@@ -900,6 +900,20 @@ function enrichCandidate(c,e){
   const participantEvidence=participantEvidenceForEvent(e,Number(c.market?.line));
   return Object.assign(c,{eventProduct:e.product,calibratedProb:calibrated,calibrationN:cal.n,calibrationSource:source,edge:calibrated-c.bookImplied,modelMeta,recurrence,hotParticipant,experimental:isExperimentalOU(c),participantEvidence});
 }
+function calculateMarketSides(m){
+  const outs=(m&&m.outcomes||[]).filter(o=>Number(o.odds)>1&&o.active!==false);
+  if(outs.length<2)return [];
+  const total=outs.reduce((sum,o)=>sum+(1/Number(o.odds)),0);
+  return outs.map(o=>{
+    const fairProb=(1/Number(o.odds))/total;
+    return {
+      market:m,pick:o,pickCode:outcomeCode(m,o),
+      fairProb,fairOdds:1/fairProb,
+      bookmakerOdds:Number(o.odds),bookImplied:1/Number(o.odds),
+      overround:Math.max(0,total-1)
+    };
+  });
+}
 function predictionForEvent(e){
   const id=String(e.event_id||e.eventId||'');
   if(state.predictionCache.has(id))return state.predictionCache.get(id);
@@ -910,30 +924,54 @@ function predictionForEvent(e){
       const mid=String(m.id||''),name=String(m.name||'').toLowerCase();
       const isTotals=mid==='18'||mid==='189'||name.indexOf('over/under')>=0||name.indexOf('total')>=0;
       if(!isTotals)return;
-      const c=calculateMarket(m);
-      if(c){c.marketType='ou';c.eventProduct=e.product;candidates.push(c);}
+      calculateMarketSides(m).forEach(c=>{
+        c.marketType='ou';c.eventProduct=e.product;candidates.push(c);
+      });
     });
-    const active=candidates.filter(isEligibleOU).sort((x,y)=>(y.fairProb||0)-(x.fairProb||0));
-    const experimental=candidates.filter(isExperimentalOU).sort((x,y)=>(y.fairProb||0)-(x.fairProb||0));
+    const active=candidates.filter(isEligibleOU);
+    const experimental=candidates.filter(isExperimentalOU);
     if(!active.length&&!experimental.length)return null;
-    const bestOU=active.length?enrichCandidate(active[0],e):null;
-    const experimentalOU=experimental.length?enrichCandidate(experimental[0],e):null;
-    const primaryCandidate=bestOU||experimentalOU;
-    const participantQualified=primaryCandidate&&qualifiesResearchPick(primaryCandidate);
-    const baseQualified=primaryCandidate&&qualifiesBaseResearchPick(primaryCandidate,e);
-    const qualified=!!(participantQualified||baseQualified);
-    const candidate=primaryCandidate&&state.historyLoaded?primaryCandidate:null;
-    const status=participantQualified?'QUALIFIED_PARTICIPANT_ENHANCED':(baseQualified?'QUALIFIED_BASE_EVIDENCE':(isPromotedResearchEvent(e)?'PROMOTION_PENDING':(isEligibleResearchEvent(e)?'MODEL_GATE_PENDING':'EVIDENCE_CANDIDATE')));
+
+    const enrichedActive=active.map(c=>enrichCandidate(c,e)).filter(Boolean);
+    const enrichedExperimental=experimental.map(c=>enrichCandidate(c,e)).filter(Boolean);
+    const allCandidates=[...enrichedActive,...enrichedExperimental];
+
+    // Direction is selected by validated model edge, not by whichever side
+    // happens to have the largest raw market probability. This prevents the
+    // desk from repeatedly defaulting to Under when the evidence does not
+    // support that direction.
+    const sideRank=(a,b)=>(Number(b.edge)||-Infinity)-(Number(a.edge)||-Infinity)||
+      (Number(b.calibratedProb)||0)-(Number(a.calibratedProb)||0);
+    const bestOU=enrichedActive.slice().sort(sideRank)[0]||null;
+    const experimentalOU=enrichedExperimental.slice().sort(sideRank)[0]||null;
+
+    const qualifiedCandidates=allCandidates.filter(c=>{
+      return qualifiesResearchPick(c)||qualifiesBaseResearchPick(c,e);
+    }).sort(sideRank);
+    const primaryCandidate=qualifiedCandidates[0]||null;
+    const participantQualified=!!(primaryCandidate&&qualifiesResearchPick(primaryCandidate));
+    const baseQualified=!!(primaryCandidate&&qualifiesBaseResearchPick(primaryCandidate,e));
+    const qualified=!!primaryCandidate;
+
+    // A non-qualified side remains visible only as evidence/watch context;
+    // it is never treated as a pick and can never enter the Builder.
+    const candidatePool=enrichedActive.length?enrichedActive:enrichedExperimental;
+    const candidate=candidatePool.slice().sort(sideRank)[0]||null;
+    const status=participantQualified?'QUALIFIED_PARTICIPANT_ENHANCED':
+      (baseQualified?'QUALIFIED_BASE_EVIDENCE':
+      (isPromotedResearchEvent(e)?'PROMOTION_PENDING':
+      (isEligibleResearchEvent(e)?'MODEL_GATE_PENDING':'EVIDENCE_CANDIDATE')));
+
     const out={
       product:e.product,competition:e.competition||e.tournament||'',event_id:id,
       home:String(e.home||e.participant_1||''),away:String(e.away||e.participant_2||''),
       participant_1:String(e.participant_1||''),participant_2:String(e.participant_2||''),
       identity_verified:!!(e.participant_1&&e.participant_2),start_time:e.start_time||null,
       primary:qualified?primaryCandidate:null,
-      candidate:candidate,
+      candidate:candidate&&state.historyLoaded?candidate:null,
       candidate_status:status,
       model_tier:participantQualified?'participant-enhanced':'base-evidence',
-      bestWinner:null,bestOU,experimentalOU,candidates:[bestOU,experimentalOU].filter(Boolean)
+      bestWinner:null,bestOU,experimentalOU,candidates:allCandidates
     };
     state.predictionCache.set(id,out);
     return out;
