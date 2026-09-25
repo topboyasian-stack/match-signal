@@ -59,12 +59,18 @@ jobs:
           print(f'Tennis archive rows: {len(archive)} | settled: {len(settled)} | eligible settled: {len(eligible)}')
           PY
 
+      - name: Recompute current performance snapshot
+        run: PYTHONPATH=. python scripts/current_performance.py
+
+      - name: Verify append-only performance ledger
+        run: PYTHONPATH=. python scripts/verify_performance_ledger.py
+
       - name: Commit recovered tennis history and settlement
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/tennis_prediction_archive.json data/prediction_history.json data/accuracy.json data/tennis_performance.json
+          git add data/tennis_prediction_archive.json data/prediction_history.json data/accuracy.json data/tennis_performance.json data/current_performance.json
           if git diff --cached --quiet; then
             echo "No tennis history changes."
             exit 0
