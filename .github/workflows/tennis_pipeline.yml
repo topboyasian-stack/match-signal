@@ -211,6 +211,8 @@ jobs:
       - name: Generate prediction-type, confidence, league and model breakdown
         continue-on-error: true
         run: PYTHONPATH=. python scripts/prediction_breakdown.py
+      - name: Verify append-only performance ledger
+        run: PYTHONPATH=. python scripts/verify_performance_ledger.py
       - name: Commit generated data and QA report
         id: commit-data
         shell: bash
