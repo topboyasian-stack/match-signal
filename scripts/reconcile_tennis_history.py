@@ -43,12 +43,15 @@ def classify(row):
     now = datetime.now(timezone.utc)
     if start < now - timedelta(days=LOOKBACK_DAYS) or start > now:
         return None
+    row = dict(row)
+    # Eligibility is immutable once captured; preserve prior classification.
+    if "evaluation_eligible" in row and "capture_status" in row:
+        return row
     try:
         calc = datetime.fromisoformat(str(row.get("calculated_at", "")).replace("Z", "+00:00"))
         eligible = calc < start
     except Exception:
         eligible = False
-    row = dict(row)
     row["evaluation_eligible"] = bool(eligible)
     row["capture_status"] = "PRE_EVENT" if eligible else "LATE_CAPTURE"
     return row
