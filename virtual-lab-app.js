@@ -1462,9 +1462,40 @@ function rebuildPredictionDesk(){
   const product=$('product').value;
   const upcoming=upcomingEventsFrom(state.live).filter(e=>product==='all'||e.product===product);
   const eligible=upcoming
-    .filter(e=>isEligibleResearchEvent(e)||isConfirmedWatchedEvent(e))
-    .sort((a,b)=>Number(isConfirmedWatchedEvent(b))-Number(isConfirmedWatchedEvent(a))||new Date(a.start_time||0)-new Date(b.start_time||0));
-  state.picks=eligible.slice(0,24).map(e=>{try{return predictionForEvent(e)}catch(err){console.warn('Virtual Lab prediction desk skipped:',e?.event_id,err);return null;}}).filter(Boolean);
+    .filter(e=>isEligibleResearchEvent(e)||isConfirmedWatchedEvent(e));
+
+  // Product-isolated quotas prevent a high-volume Virtual Football feed from
+  // crowding eFootball/eAdriatic out of the desk. Each supported product gets
+  // its own visible research lane; no product is allowed to consume another
+  // product's card budget.
+  const productOrder=['efootball_gt','efootball_adriatic','vfootball','zoom'];
+  const grouped=new Map(productOrder.map(p=>[p,[]]));
+  for(const e of eligible){
+    const p=String(e.product||'');
+    if(!grouped.has(p))grouped.set(p,[]);
+    grouped.get(p).push(e);
+  }
+  const selected=[];
+  const perProduct=product==='all'?12:40;
+  for(const p of productOrder){
+    const rows=(grouped.get(p)||[]).sort((a,b)=>
+      Number(isConfirmedWatchedEvent(b))-Number(isConfirmedWatchedEvent(a))||
+      (eventStartMs(a)||Infinity)-(eventStartMs(b)||Infinity)
+    );
+    selected.push(...rows.slice(0,perProduct));
+  }
+  // Preserve any supported product not yet in the fixed order without letting
+  // it exceed the same per-product quota.
+  for(const [p,rows] of grouped){
+    if(productOrder.includes(p))continue;
+    selected.push(...rows.sort((a,b)=>(eventStartMs(a)||Infinity)-(eventStartMs(b)||Infinity)).slice(0,perProduct));
+  }
+
+  state.picks=selected.map(e=>{
+    try{return predictionForEvent(e);}
+    catch(err){console.warn('Virtual Lab prediction desk skipped:',e?.event_id,err);return null;}
+  }).filter(Boolean);
+
   renderPredictionDesk();
   renderBuilder();
   syncBuilderCTA();
@@ -1479,7 +1510,11 @@ function rebuildPredictionDesk(){
     const displayCount=displayableLiveEventsFrom(state.live).length;
     const staleCount=state.live.filter(e=>SUPPORTED_VIRTUAL_PRODUCTS.has(String(e?.product||''))&&!isDisplayableLiveEvent(e)).length;
     const radarCount=$('nearQualifiedCount')?.textContent||'0';
-    diagnostics.textContent='Live '+displayCount+' · stale dropped '+staleCount+' · research/watch league '+researchLeagueCount+' · readable O/U '+readableOUCount+' · displayed '+state.picks.length+' · radar '+radarCount;
+    const counts={};
+    state.picks.forEach(p=>counts[p.product]=(counts[p.product]||0)+1);
+    diagnostics.textContent='Live '+displayCount+' · stale dropped '+staleCount+
+      ' · research/watch league '+researchLeagueCount+' · readable O/U '+readableOUCount+
+      ' · displayed '+state.picks.length+' · '+Object.entries(counts).map(([k,v])=>k+': '+v).join(' · ')+' · radar '+radarCount;
   }
 }
 async function refreshPredictionDesk(){
