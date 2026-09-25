@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-09-25T10:29:23.060408+00:00",
-  "status": "FAIL",
-  "qa_score": 0,
+  "generated_at": "2026-09-25T12:27:25.760210+00:00",
+  "status": "PASS",
+  "qa_score": 90,
   "live_trading_approved": false,
   "testing_mode": "PAPER_ONLY",
   "empirical_metrics": {
@@ -50,22 +50,22 @@
       ]
     },
     "tennis": {
-      "settled": 404,
-      "accuracy": 0.4728,
-      "brier": 0.5117,
+      "settled": 413,
+      "accuracy": 0.477,
+      "brier": 0.5124,
       "baseline_brier": 0.5,
       "bins": [
         {
           "range": "0.50-0.55",
-          "n": 245,
-          "accuracy": 0.4531,
-          "mean_confidence": 0.5097
+          "n": 248,
+          "accuracy": 0.4556,
+          "mean_confidence": 0.51
         },
         {
           "range": "0.55-0.60",
-          "n": 107,
-          "accuracy": 0.5327,
-          "mean_confidence": 0.5754
+          "n": 109,
+          "accuracy": 0.5321,
+          "mean_confidence": 0.5757
         },
         {
           "range": "0.60-0.65",
@@ -75,15 +75,15 @@
         },
         {
           "range": "0.65-0.70",
-          "n": 8,
-          "accuracy": 0.5,
-          "mean_confidence": 0.6723
+          "n": 11,
+          "accuracy": 0.5455,
+          "mean_confidence": 0.6776
         },
         {
           "range": "0.70-0.80",
-          "n": 2,
-          "accuracy": 0,
-          "mean_confidence": 0.7332
+          "n": 3,
+          "accuracy": 0.3333,
+          "mean_confidence": 0.7371
         },
         {
           "range": "0.80-1.00",
@@ -101,31 +101,20 @@
       "bins": []
     },
     "tennis_verified": {
-      "settled": 404,
-      "accuracy": 0.4728,
-      "ou_decisions": 355,
-      "ou_accuracy": 0.4056,
+      "settled": 413,
+      "accuracy": 0.477,
+      "ou_decisions": 364,
+      "ou_accuracy": 0.4093,
       "status": "PAPER_RESEARCH_ONLY",
       "model_v2_walkforward_accuracy": 0.4375,
       "model_v2_training_records": 129
     }
   },
   "prediction_counts": {
-    "football_tennis": 216,
+    "football_tennis": 214,
     "basketball": 0
   },
-  "issues": [
-    {
-      "severity": "critical",
-      "code": "PERFORMANCE_LEDGER_DIVERGENCE",
-      "message": "Derived accuracy artifacts are not on one settlement snapshot."
-    },
-    {
-      "severity": "critical",
-      "code": "NON_APPEND_ONLY_TENNIS_SETTLEMENT",
-      "message": "A settlement refresh reduced the tennis performance denominator; historical predictions must be append-only."
-    }
-  ],
+  "issues": [],
   "warnings": [
     "No accepted events for unknown"
   ],
@@ -136,15 +125,5 @@
     "placeholder_names_checked": true,
     "basketball_source_coverage_checked": true,
     "empirical_risk_gate_checked": true
-  },
-  "integrity_gate": {
-    "status": "BLOCKED",
-    "observed": {
-      "accuracy_settled": 583,
-      "accuracy_tennis_settled": 413,
-      "current_performance_settled": 574,
-      "current_performance_tennis": 404,
-      "tennis_performance_settled": 404
-    }
   }
 }
