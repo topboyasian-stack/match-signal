@@ -29,8 +29,15 @@ def check(rows,label):
     return issues
 
 def main():
-    fb=load('predictions.json',[]); bb=load('basketball_predictions.json',[]); status=load('pipeline_status.json',{}); risk=load('risk_gate.json',{}); tennis_perf=load('tennis_performance.json',{}); v2=load('tennis_model_v2.json',{})
+    fb=load('predictions.json',[]); bb=load('basketball_predictions.json',[]); status=load('pipeline_status.json',{}); risk=load('risk_gate.json',{}); tennis_perf=load('tennis_performance.json',{}); v2=load('tennis_model_v2.json',{}); accuracy=load('accuracy.json',{}); current=load('current_performance.json',{}); history=load('prediction_history.json',[])
     issues=check(fb,'football/tennis')+check(bb,'basketball')
+    settled=[p for p in history if isinstance(p,dict) and p.get('settled') and p.get('correct') is not None]
+    tennis_settled=[p for p in settled if str(p.get('sport') or '').lower()=='tennis']
+    if accuracy.get('summary',{}).get('settled') != len(settled): issues.append('performance ledger: accuracy settled count diverges')
+    if current.get('overall',{}).get('settled') != len(settled): issues.append('performance ledger: current performance count diverges')
+    if tennis_perf.get('settled_tennis_matches') != len(tennis_settled): issues.append('performance ledger: tennis performance count diverges')
+    keys=[(p.get('sport'),p.get('league'),p.get('event_id')) for p in settled]
+    if len(keys)!=len(set(keys)): issues.append('performance ledger: duplicate settled prediction key')
     sources=status.get('basketball_sources') or []
     warnings=[f"No accepted events for {s.get('competition','unknown')}" for s in sources if s.get('events',0)==0]
     empirical=risk.get('metrics',{})
@@ -45,7 +52,7 @@ def main():
     }
     live_approved=any(v.get('live_eligible') for v in (risk.get('gate') or {}).values())
     score=max(0,100-min(60,len(issues)*5)-min(20,len(warnings)*10))
-    report={'generated_at':datetime.now(timezone.utc).isoformat(),'status':'PASS' if not issues else 'FAIL','qa_score':score,'live_trading_approved':bool(live_approved),'testing_mode':risk.get('mode','PAPER_ONLY'),'empirical_metrics':empirical,'prediction_counts':{'football_tennis':len(fb),'basketball':len(bb)},'issues':issues[:100],'warnings':warnings,'checks':{'probabilities_valid':not any('invalid probabilities' in x for x in issues),'confidence_valid':not any('invalid confidence' in x for x in issues),'duplicates_checked':True,'placeholder_names_checked':True,'basketball_source_coverage_checked':True,'empirical_risk_gate_checked':bool(risk)}}
+    report={'generated_at':datetime.now(timezone.utc).isoformat(),'status':'PASS' if not issues else 'FAIL','qa_score':score,'live_trading_approved':bool(live_approved),'testing_mode':risk.get('mode','PAPER_ONLY'),'empirical_metrics':empirical,'prediction_counts':{'football_tennis':len(fb),'basketball':len(bb)},'issues':issues[:100],'warnings':warnings,'checks':{'probabilities_valid':not any('invalid probabilities' in x for x in issues),'confidence_valid':not any('invalid confidence' in x for x in issues),'duplicates_checked':True,'placeholder_names_checked':True,'basketball_source_coverage_checked':True,'empirical_risk_gate_checked':bool(risk),'performance_ledger_checked':True}}
     OUT.write_text(json.dumps(report,indent=2,ensure_ascii=False),encoding='utf-8'); print(json.dumps(report,indent=2))
     if issues: raise SystemExit(1)
 if __name__=='__main__':main()
