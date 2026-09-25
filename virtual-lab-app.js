@@ -968,10 +968,15 @@ function predictionForEvent(e){
       participant_1:String(e.participant_1||''),participant_2:String(e.participant_2||''),
       identity_verified:!!(e.participant_1&&e.participant_2),start_time:e.start_time||null,
       primary:qualified?primaryCandidate:null,
-      candidate:candidate&&state.historyLoaded?candidate:null,
+      // Never surface an unqualified Under/Over direction as the desk pick.
+      // The desk may show the fixture, but direction stays WAIT until a
+      // validated side clears the evidence gates.
+      candidate:qualified&&candidate&&state.historyLoaded?candidate:null,
       candidate_status:status,
       model_tier:participantQualified?'participant-enhanced':'base-evidence',
-      bestWinner:null,bestOU,experimentalOU,candidates:allCandidates
+      bestWinner:null,bestOU:qualified?primaryCandidate:null,
+      experimentalOU:qualified&&primaryCandidate.experimental?primaryCandidate:null,
+      candidates:allCandidates
     };
     state.predictionCache.set(id,out);
     return out;
