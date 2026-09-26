@@ -531,7 +531,7 @@ def stable_participant_identity(product, raw_name):
     if product.startswith("efootball"):
         import re
         match=re.search(r"\(([^()]+)\)\s*$",name)
-        return match.group(1).strip() if match else None
+        return match.group(1).strip() if match else name
     if product in {"vfootball","zoom"}:
         return name
     return None
