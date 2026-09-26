@@ -80,10 +80,14 @@ jobs:
           test -s virtual-lab.css
           test -s data/predictions.json
           test -s data/virtual_lab_live.json
+          test -s data/virtual_lab_participant_lifecycle.json
           python -m py_compile scripts/darts_pipeline.py scripts/table_tennis_pipeline.py
           python - <<'PY'
           import json
           from pathlib import Path
+          lifecycle=json.loads(Path('data/virtual_lab_participant_lifecycle.json').read_text())
+          assert lifecycle.get('discovery_mode')=='feed_driven', 'participant lifecycle is not feed-driven'
+          assert int(lifecycle.get('active_count',0))+int(lifecycle.get('live_count',0))+int(lifecycle.get('upcoming_count',0))>0, 'participant lifecycle has no active identities'
           rows=json.loads(Path('data/predictions.json').read_text())
           assert isinstance(rows,list) and rows, 'prediction feed is empty'
           leagues=sorted({str(r.get('league')) for r in rows if r.get('league')})
