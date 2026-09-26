@@ -177,21 +177,6 @@ jobs:
       - name: Build basketball coverage and OddsPapi/Stake market signals
         continue-on-error: true
         run: PYTHONPATH=. python scripts/basketball_oddspapi_runner.py
-      - name: Build NBA + Eredivisie expansion research datasets
-        continue-on-error: true
-        run: PYTHONPATH=. python scripts/expansion_pipeline.py
-      - name: Benchmark NBA model against public closing moneyline market
-        continue-on-error: true
-        run: PYTHONPATH=. python scripts/nba_market_validation.py
-      - name: Tournament market-blind NBA model candidates
-        continue-on-error: true
-        run: PYTHONPATH=. python scripts/nba_model_candidates.py
-      - name: Walk-forward calibrate the best NBA Elo candidate and test value thresholds
-        continue-on-error: true
-        run: PYTHONPATH=. python scripts/nba_calibration_tournament.py
-      - name: Deep walk-forward validate NBA + Eredivisie and build recent-form snapshots
-        continue-on-error: true
-        run: PYTHONPATH=. python scripts/expansion_validation.py
       - name: Build current empirical performance snapshot from previous settled predictions
         continue-on-error: true
         run: PYTHONPATH=. python scripts/current_performance.py
@@ -257,7 +242,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/predictions.json data/prediction_pool.json data/selection_candidates.json data/selection_gate.json data/prediction_history.json data/accuracy.json data/tennis_performance.json data/football_performance.json data/pipeline_status.json data/risk_gate.json data/calibration.json data/football_team_history.json data/basketball_predictions.json data/basketball_history.json data/basketball_accuracy.json data/basketball_provider_cache.json data/behavior_profiles.json data/individual_behavior.json data/behavior_validation.json data/current_performance.json data/v4_paper_ledger.json data/v4_validation.json data/prediction_breakdown.json data/sports_evaluation.json data/nba_history.json data/nba_predictions.json data/ere_divisie_history.json data/ere_divisie_predictions.json data/expansion_status.json data/expansion_validation.json data/expansion_team_form.json data/nba_market_validation.json data/nba_market_matches.json data/nba_model_candidates.json data/nba_calibration_tournament.json data/sportybet_odds_snapshot.json qa/report.json
+          git add data/predictions.json data/prediction_pool.json data/selection_candidates.json data/selection_gate.json data/prediction_history.json data/accuracy.json data/tennis_performance.json data/football_performance.json data/pipeline_status.json data/risk_gate.json data/calibration.json data/football_team_history.json data/basketball_predictions.json data/basketball_history.json data/basketball_accuracy.json data/basketball_provider_cache.json data/behavior_profiles.json data/individual_behavior.json data/behavior_validation.json data/current_performance.json data/v4_paper_ledger.json data/v4_validation.json data/prediction_breakdown.json data/sports_evaluation.json data/sportybet_odds_snapshot.json qa/report.json
           if git diff --cached --quiet; then
             echo "No generated data or QA changes."
             exit 0
