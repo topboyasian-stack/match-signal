@@ -110,24 +110,47 @@ def load_virtual_history():
     return [r for r in history if isinstance(r,dict) and r.get("market")=="ou" and r.get("win") is not None]
 
 def build_virtual_events(history, lifecycle, eligibility):
-    """Lightweight forward projection for the unified board.
-
-    The dedicated Virtual Lab remains responsible for full walk-forward,
-    participant-aware research. This surface only needs a dependable
-    chronological projection and must not block all-sports publication.
+    """Forward Virtual/eFootball projections using the same base qualification policy
+    as the Virtual Lab, without waiting for participant enhancement to pass.
     """
     live=load("virtual_lab_live.json",{})
     events=live.get("events") if isinstance(live,dict) else []
-    lifecycle_profiles={}
     eligibility=eligibility if isinstance(eligibility,dict) else {}
-    model_comps={str(x).casefold() for x in (eligibility.get("model_qualified_competitions_by_product",{}).get("efootball_gt",[]) or [])}
-    model_lines={float(x) for x in (eligibility.get("model_qualified_ou_lines_by_product",{}).get("efootball_gt",[]) or [])}
-    raw_comps={str(x).casefold() for x in (eligibility.get("raw_eligible_competitions_by_product",{}).get("efootball_gt",[]) or [])}
-    raw_lines={float(x) for x in (eligibility.get("raw_eligible_ou_lines_by_product",{}).get("efootball_gt",[]) or [])}
+    lifecycle_profiles={}
     if isinstance(lifecycle,dict):
         for p in lifecycle.get("profiles") or []:
             if isinstance(p,dict) and p.get("participant_key"):
                 lifecycle_profiles[str(p.get("participant_key"))]=p
+
+    product_model_comp={
+        str(k):{str(x).casefold() for x in (v or [])}
+        for k,v in (eligibility.get("model_qualified_competitions_by_product") or {}).items()
+    }
+    product_model_line={
+        str(k):{float(x) for x in (v or [])}
+        for k,v in (eligibility.get("model_qualified_ou_lines_by_product") or {}).items()
+    }
+    product_active_comp={
+        str(k):{str(x).casefold() for x in (v or [])}
+        for k,v in (eligibility.get("eligible_competitions_by_product") or {}).items()
+    }
+    product_active_line={
+        str(k):{float(x) for x in (v or [])}
+        for k,v in (eligibility.get("eligible_ou_lines_by_product") or {}).items()
+    }
+
+    eval_art=load("virtual_lab_model_eval.json",{})
+    h=eval_art.get("holdout_metrics") or {}
+    market=h.get("market") or {}
+    variants=["efootball_shape","poisson_prior","poisson"]
+    viable=[h.get(name) for name in variants if isinstance(h.get(name),dict) and int(h.get(name,{}).get("n") or 0)>=30]
+    best=min(viable,key=lambda m:(float(m.get("brier",9)),float(m.get("log_loss",9))) if m else (9,9)) if viable else None
+    base_model_gate=bool(best and market and
+        float(best.get("brier",9))<float(market.get("brier",0)) and
+        float(best.get("log_loss",9))<float(market.get("log_loss",0)) and
+        float(best.get("ece",9))<=float(market.get("ece",9))+.02)
+    participant_gate=bool((eval_art.get("participant_feature_gate") or {}).get("pass"))
+
     out=[]
     for e in events if isinstance(events,list) else []:
         start=dt(e.get("start_time"))
@@ -136,6 +159,7 @@ def build_virtual_events(history, lifecycle, eligibility):
         product=str(e.get("product") or "")
         if product not in {"efootball_gt","efootball_adriatic","vfootball","zoom"}:
             continue
+        competition=str(e.get("competition") or e.get("tournament") or "Virtual")
         home=str(e.get("participant_1") or e.get("team_1") or e.get("home") or "")
         away=str(e.get("participant_2") or e.get("team_2") or e.get("away") or "")
         p1_profile=lifecycle_profiles.get(f"{product}|{home.strip().casefold()}") if home else None
@@ -153,57 +177,121 @@ def build_virtual_events(history, lifecycle, eligibility):
                 spec=str(market.get("specifier") or "")
                 for key in ("total=","line="):
                     if key in spec:
-                        line=num(spec.split(key,1)[1].split("&",1)[0])
-                        break
+                        line=num(spec.split(key,1)[1].split("&",1)[0]); break
             if line is None:
                 continue
-            # Fast deterministic Poisson baseline. The full participant-aware
-            # research model remains isolated in research.html.
+
+            # De-vig current O/U probabilities from the actual SportyBet market.
+            outcomes=market.get("outcomes") or []
+            over_odds=next((num(o.get("odds")) for o in outcomes if str(o.get("name") or "").lower().startswith("over") and num(o.get("odds")) and num(o.get("odds"))>1),None)
+            under_odds=next((num(o.get("odds")) for o in outcomes if str(o.get("name") or "").lower().startswith("under") and num(o.get("odds")) and num(o.get("odds"))>1),None)
+            market_over=market_under=None
+            if over_odds and under_odds:
+                inv_over,inv_under=1/over_odds,1/under_odds
+                total_inv=inv_over+inv_under
+                market_over=inv_over/total_inv
+                market_under=inv_under/total_inv
+
+            # Same product-wide Poisson baseline used by the Virtual Lab evaluator,
+            # with historical line evidence when available.
+            product_rows=[r for r in history or [] if isinstance(r,dict) and str(r.get("product") or "")==product and r.get("market")=="ou" and r.get("win") is not None]
+            points=[]
+            for r in product_rows[-300:]:
+                try:
+                    points.append((float(r.get("line")),float(r.get("model_prob")) if str(r.get("selection") or "").upper().startswith("O") else 1-float(r.get("model_prob"))))
+                except (TypeError,ValueError): continue
             lam=2.5
+            if points:
+                best_lam=(2.5,float("inf"))
+                for i in range(25,1201,5):
+                    candidate=i/100
+                    err=sum((clamp(1-math.exp(-candidate)*sum(candidate**j/math.factorial(j) for j in range(math.floor(float(ln))+1)))-float(prob))**2 for ln,prob in points)/len(points)
+                    if err<best_lam[1]:best_lam=(candidate,err)
+                lam=best_lam[0]
             k=max(0,math.floor(line))
-            term=math.exp(-lam)
-            cdf=term
+            pmf=math.exp(-lam); cdf=pmf
             for i in range(1,k+1):
-                term*=lam/i
-                cdf+=term
+                pmf*=lam/i; cdf+=pmf
             over=clamp(1-cdf)
             under=clamp(1-over)
-            pick="over" if over>=under else "under"
-            confidence=max(over,under)
+
+            # Base model probability; participant enhancement is reported separately
+            # and never required for the base qualification gate.
+            model_prob=over
+            if market_over is not None and market_under is not None:
+                chosen_pick="over" if over>=under else "under"
+                chosen_model=model_prob if chosen_pick=="over" else under
+                chosen_market=market_over if chosen_pick=="over" else market_under
+                edge=chosen_model-chosen_market
+            else:
+                chosen_pick="over" if over>=under else "under"
+                chosen_model=model_prob if chosen_pick=="over" else under
+                chosen_market=None
+                edge=None
+
+            comp_key=competition.casefold()
+            active_comp=comp_key in product_active_comp.get(product,set())
+            active_line=float(line) in product_active_line.get(product,set())
+            model_comp=comp_key in product_model_comp.get(product,set())
+            model_line=float(line) in product_model_line.get(product,set())
+
+            if product.startswith("efootball"):
+                if not base_model_gate:
+                    qualification_status="BASE_MODEL_GATE_PENDING"
+                elif not active_comp:
+                    qualification_status="RAW_COMPETITION_GATE_PENDING"
+                elif not active_line:
+                    qualification_status="RAW_LINE_GATE_PENDING"
+                elif not (model_comp and model_line):
+                    qualification_status="MODEL_SCOPE_GATE_PENDING"
+                elif edge is None:
+                    qualification_status="MARKET_EDGE_PENDING"
+                elif edge<0.02:
+                    qualification_status="EDGE_BELOW_2PCT"
+                else:
+                    qualification_status="BETTING_QUALIFIED_PAPER"
+            else:
+                qualification_status="RESEARCH_PROJECTION"
+
+            qualified=qualification_status=="BETTING_QUALIFIED_PAPER"
             add(out,{
                 "sport":"virtual",
                 "product":product,
-                "league":str(e.get("competition") or e.get("tournament") or "Virtual"),
+                "league":competition,
                 "event_id":str(e.get("event_id") or ""),
                 "start_time":start.isoformat(),
                 "player_1":home,
                 "player_2":away,
                 "market":"over_under",
                 "line":line,
-                "pick":pick,
-                "probability":round(confidence,4),
+                "pick":chosen_pick,
+                "probability":round(chosen_model,4),
                 "probabilities":{"over":round(over,4),"under":round(under,4)},
-                "market_reference_probability":None,
-                "model_edge_vs_market":None,
-                "model_fair_odds":round(1/confidence,3) if confidence else None,
-                "prediction_status":"research_projection",
+                "market_reference_probability":round(chosen_market,4) if chosen_market is not None else None,
+                "model_edge_vs_market":round(edge,4) if edge is not None else None,
+                "model_fair_odds":round(1/chosen_model,3) if chosen_model else None,
+                "prediction_status":"betting_qualified_paper" if qualified else "research_projection",
                 "projection_tier":"deep_research_projection",
-                "evidence_depth":"participant_lifecycle_plus_baseline_poisson" if participant_history>=3 else "feed_discovered_baseline_poisson",
+                "evidence_depth":"participant_lifecycle_plus_base_model" if participant_history>=3 else "feed_discovered_base_model",
                 "participant_status":participant_status,
                 "participant_history_rows":participant_history,
                 "participant_hot_watch":participant_hot,
-                "qualification_status":(
-                    "MODEL_LINE_ELIGIBLE_PENDING_EDGE" if product=="efootball_gt" and str(e.get("competition") or e.get("tournament") or "").casefold() in model_comps and float(line) in model_lines
-                    else "RAW_EVIDENCE_PENDING_MODEL_GATE" if product=="efootball_gt" and str(e.get("competition") or e.get("tournament") or "").casefold() in raw_comps and float(line) in raw_lines
-                    else "RESEARCH_ONLY_PENDING_DEEP_GATE"
-                ),
-                "qualified_for_builder":False,
-                "model":"Virtual Lab baseline projection (full deep model isolated to research.html)",
-                "model_version":"VL-BOARD-1.0",
+                "participant_enhancement_gate":participant_gate,
+                "base_model_gate":base_model_gate,
+                "raw_competition_eligible":active_comp,
+                "raw_line_eligible":active_line,
+                "model_competition_qualified":model_comp,
+                "model_line_qualified":model_line,
+                "qualification_status":qualification_status,
+                "betting_qualified":qualified,
+                "qualified_for_builder":qualified,
+                "qualification_engine":"Virtual Lab base walk-forward gate + product/competition/line evidence + current O/U edge",
+                "model":"Virtual Lab base O/U model",
+                "model_version":"VL-BOARD-2.0",
                 "paper_only":True,
                 "identity_verified":bool(home and away),
             })
-    return out, {"status":"lightweight_board_projection","historical_events":len(history or [])}
+    return out, {"status":"base_model_policy_parity","historical_events":len(history or []),"base_model_gate":base_model_gate,"participant_enhancement_gate":participant_gate}
 
 def main():
     rows=[]
