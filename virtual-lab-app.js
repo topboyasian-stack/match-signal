@@ -1061,12 +1061,12 @@ function displayableLiveEventsFrom(events){
   return (events||[])
     .filter(e=>SUPPORTED_VIRTUAL_PRODUCTS.has(String(e?.product||'')))
     .filter(isDisplayableLiveEvent)
-    .sort((a,b)=>Number(isConfirmedWatchedEvent(b))-Number(isConfirmedWatchedEvent(a))||(eventStartMs(a)||Infinity)-(eventStartMs(b)||Infinity));
+    .sort((a,b)=>(eventStartMs(a)||Infinity)-(eventStartMs(b)||Infinity));
 }
 function updateLabPulse(){
   const live=$('pulseLive'),future=$('pulseFuture'),pred=$('pulsePredictions'),acc=$('pulseAccuracy'),model=$('pulseModel');
   const displayable=displayableLiveEventsFrom(state.live);
-  const research=upcomingEventsFrom(state.live).filter(e=>isEligibleResearchEvent(e)||isConfirmedWatchedEvent(e));
+  const research=upcomingEventsFrom(state.live);
   if(live)live.textContent=String(displayable.length);
   if(future)future.textContent=String(research.length);
   if(pred)pred.textContent=String(state.picks.length);
@@ -1263,7 +1263,7 @@ function builderSourceCandidates(){
   const upcoming=upcomingEventsFrom(state.live).filter(e=>product==='all'||e.product===product);
   const selected=[];
   for(const e of upcoming){
-    if(!(isEligibleResearchEvent(e)||isConfirmedWatchedEvent(e)))continue;
+    if(!isResearchDeskEvent(e))continue;
     try{
       const p=predictionForEvent(e);
       if(p&&builderEligiblePick(p))selected.push(p);
@@ -1521,7 +1521,6 @@ function rebuildPredictionDesk(){
   const perProduct=product==='all'?12:40;
   for(const p of productOrder){
     const rows=(grouped.get(p)||[]).sort((a,b)=>
-      Number(isConfirmedWatchedEvent(b))-Number(isConfirmedWatchedEvent(a))||
       (eventStartMs(a)||Infinity)-(eventStartMs(b)||Infinity)
     );
     selected.push(...rows.slice(0,perProduct));
@@ -1544,7 +1543,7 @@ function rebuildPredictionDesk(){
   updateLabPulse();
   const diagnostics=$('predictionDiagnostics');
   if(diagnostics){
-    const researchLeagueCount=upcoming.filter(e=>isEligibleResearchEvent(e)||isConfirmedWatchedEvent(e)).length;
+    const researchLeagueCount=upcoming.length;
     const readableOUCount=upcoming.filter(e=>(e.markets||[]).some(m=>{
       const mid=String(m.id||''),name=String(m.name||'').toLowerCase();
       return (mid==='18'||mid==='189'||name.includes('over/under')||name.includes('total')) && calculateMarket(m);
