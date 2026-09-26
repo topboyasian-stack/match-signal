@@ -30,11 +30,13 @@ function probabilityValue(x){
 function unifiedRow(x){
   const p=probabilityValue(x);
   const when=DT(x.start_time);
-  const status=x.prediction_status||(
-    x.projection_tier==="deep_model"?"DEEP MODEL":
-    x.projection_tier==="deep_research_projection"?"DEEP RESEARCH":
-    x.projection_tier==="research_model"?"RESEARCH":
-    x.projection_tier==="testing_projection"?"TESTING":"BASELINE");
+  const status=x.candidate_status==="BETTING_QUALIFIED_PAPER"?"BETTING QUALIFIED · PAPER":
+    x.candidate_status==="RESEARCH_CANDIDATE"?"RESEARCH CANDIDATE":
+    x.prediction_status||(
+      x.projection_tier==="deep_model"?"DEEP MODEL":
+      x.projection_tier==="deep_research_projection"?"DEEP RESEARCH":
+      x.projection_tier==="research_model"?"RESEARCH":
+      x.projection_tier==="testing_projection"?"TESTING":"BASELINE");
   const qualification=x.betting_qualified?"BETTING-QUALIFIED":"PAPER · NOT QUALIFIED";
   const tier=evidenceLabel(x);
   const odds=Number.isFinite(Number(x.model_fair_odds))?Number(x.model_fair_odds).toFixed(2):"—";
