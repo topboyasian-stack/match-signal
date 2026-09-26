@@ -221,7 +221,7 @@ def main():
         core_stale=(core_generated_at is None or core_generated_at<NOW-timedelta(hours=4))
     except Exception:
         core_stale=True
-    if core_stale or len(core_source)<10:
+    if len(core_source)<10:
         try:
             from predict_today import fetch_current_predictions
             live_predictions, live_errors, _qc = fetch_current_predictions()
