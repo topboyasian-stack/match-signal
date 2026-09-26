@@ -38,6 +38,23 @@ table=load("table_tennis_status.json",{})
 unified=load("unified_upcoming.json",{})
 qa=load("qa/report.json",{})
 selection=load("selection_gate.json",{})
+predictions_file=DATA/"predictions.json"
+accuracy_file=DATA/"accuracy.json"
+prediction_rows=[]
+predictions_valid=False
+accuracy_valid=False
+try:
+    raw=predictions_file.read_text(encoding="utf-8").strip()
+    prediction_rows=json.loads(raw) if raw else []
+    predictions_valid=isinstance(prediction_rows,list) and len(prediction_rows)>0
+except Exception:
+    prediction_rows=[]
+try:
+    raw=accuracy_file.read_text(encoding="utf-8").strip()
+    accuracy_valid=bool(json.loads(raw)) if raw else False
+except Exception:
+    accuracy_valid=False
+
 
 checks=[]
 def freshness(name,payload,field,threshold):
@@ -80,6 +97,17 @@ for product in ("efootball_gt","efootball_adriatic","vfootball"):
 sel=int(selection.get("selected_predictions") or 0)
 if prediction_count>0 and sel==0:
     checks.append(issue("SELECTION_GATE_EMPTY","warning","Current prediction feed exists but the selected-candidate layer returned zero selections"))
+
+if not predictions_valid:
+    checks.append(issue("PREDICTION_FEED_EMPTY_OR_INVALID","critical",f"data/predictions.json is empty/invalid ({len(prediction_rows)} rows)"))
+if not accuracy_valid:
+    checks.append(issue("ACCURACY_ARTIFACT_EMPTY_OR_INVALID","critical","data/accuracy.json is empty or invalid"))
+pipeline_age_check=age_hours(pipeline.get("updated_at"))
+if pipeline_age_check>4:
+    checks.append(issue("PIPELINE_STALE","critical",f"pipeline_status age {pipeline_age_check:.2f}h exceeds 4h"))
+unified_age_check=age_hours(unified.get("generated_at"))
+if unified_age_check>2:
+    checks.append(issue("UNIFIED_BOARD_STALE","warning",f"unified board age {unified_age_check:.2f}h exceeds 2h"))
 
 qa_status=str(qa.get("status") or qa.get("overall") or "")
 if qa_status and qa_status.upper() in {"FAIL","FAILED"}:
