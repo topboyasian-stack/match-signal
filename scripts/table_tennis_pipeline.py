@@ -32,6 +32,7 @@ SPORTYBET_LIVE_PATHS=[
     "/api/ng/factsCenter/pcLiveEvents",
     "/api/ng/factsCenter/wapConfigurableIndexLiveEvents",
 ]
+SOFASCORE_PROXY="https://match-signal.pages.dev/api/table-tennis-results"
 SOFASCORE_HOSTS=[
     "https://api.sofascore.com/api/v1/sport/table-tennis/scheduled-events",
     "https://www.sofascore.com/api/v1/sport/table-tennis/scheduled-events",
@@ -157,13 +158,29 @@ def fetch_results(days=HISTORY_DAYS):
     for i in range(min(days,14),-1,-1):
         day=today-timedelta(days=i)
         payload=None;last_error=None
-        for base in SOFASCORE_HOSTS:
-            try:
-                r=session.get(f"{base}/{day.isoformat()}",
-                    headers={"Accept":"application/json, text/plain, */*","Referer":"https://www.sofascore.com/table-tennis"},
-                    timeout=20)
-                r.raise_for_status();payload=r.json();break
-            except Exception as exc:last_error=exc
+        try:
+            r=session.get(
+                SOFASCORE_PROXY,
+                params={"date":day.isoformat(),"_t":int(time.time()*1000)},
+                headers={"Accept":"application/json","User-Agent":"MatchSignal-Table-Tennis-X/1.2"},
+                timeout=20
+            )
+            r.raise_for_status()
+            wrapped=r.json()
+            if wrapped.get("ok") and isinstance(wrapped.get("events"),list):
+                payload=wrapped
+            else:
+                raise RuntimeError("; ".join(wrapped.get("errors") or ["Cloudflare Sofascore proxy unavailable"]))
+        except Exception as exc:
+            last_error=exc
+        if payload is None:
+            for base in SOFASCORE_HOSTS:
+                try:
+                    r=session.get(f"{base}/{day.isoformat()}",
+                        headers={"Accept":"application/json, text/plain, */*","Referer":"https://www.sofascore.com/table-tennis"},
+                        timeout=20)
+                    r.raise_for_status();payload=r.json();break
+                except Exception as exc:last_error=exc
         if payload is None:
             schedule_errors+=1
             last_error=last_error or RuntimeError("Sofascore dated feed unavailable")
