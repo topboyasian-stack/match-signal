@@ -43,6 +43,13 @@ def american_to_decimal(odds):
     return None
 
 def value_trial(row):
+    """Enroll a paper value trial when odds are frozen and the prediction is valid.
+
+    Enrollment is deliberately broader than the final value-selection hurdle.
+    This creates a precommitted out-of-sample trial population rather than a
+    circular sample containing only bets that already passed the target edge/EV.
+    Live approval still requires >=30 trials and realized ROI >0.
+    """
     if not row.get('settled') or row.get('actual') not in {'p1','p2','draw'}:
         return None
     pick=str(row.get('pick') or '')
@@ -50,43 +57,45 @@ def value_trial(row):
         return None
     insights=row.get('market_insights') or {}
     winner_odds=row.get('sportybet_winner_odds') or {}
-    edge=insights.get('winner_model_edge_vs_market')
     snapshot_at=insights.get('snapshot_at') or (row.get('sportybet_market_snapshot') or {}).get('fetched_at')
     odds_map={'p1':winner_odds.get('p1'),'p2':winner_odds.get('p2'),'draw':winner_odds.get('draw')}
-    if not isinstance(edge,(int,float)):
-        edge=row.get('edge')
-    legacy_ev=(row.get('value') or {}).get('expected_value')
-    legacy_odds=row.get('market_odds')
-    if isinstance(legacy_odds,list) and len(legacy_odds)>=3 and odds_map.get(pick) is None:
-        odds_map={'p1':legacy_odds[0],'draw':legacy_odds[1],'p2':legacy_odds[2]}
     book=odds_map.get(pick)
     model_prob=(row.get('probabilities') or {}).get(pick)
-    dec=None
     try:
-        dec=float(book)
-        if dec<=1.0: dec=None
+        dec=float(book) if book is not None else None
+        if dec is not None and dec<=1.0: dec=None
     except (TypeError,ValueError):
         dec=None
-    if isinstance(model_prob,(int,float)) and dec is not None:
-        ev=float(model_prob)*dec-1.0
-        book_edge=float(model_prob)-(1.0/dec)
-    else:
-        ev=float(legacy_ev) if isinstance(legacy_ev,(int,float)) else None
-        book_edge=float(edge) if isinstance(edge,(int,float)) else None
-    value_edge=float(edge) if isinstance(edge,(int,float)) else book_edge
-    if value_edge is None or ev is None:
+    try:
+        prob=float(model_prob) if model_prob is not None else None
+    except (TypeError,ValueError):
+        prob=None
+    try:
+        conf=float(row.get('confidence'))
+    except (TypeError,ValueError):
+        conf=None
+
+    # Precommitted paper-trial enrollment: valid probability, contemporaneous
+    # frozen odds, and at least moderate model confidence. This is NOT a live
+    # approval threshold and does not assert positive value.
+    if not snapshot_at or dec is None or prob is None or prob<=0 or prob>=1:
         return None
-    if float(value_edge)<0.035 or float(ev)<0.05:
+    if conf is None or conf < 0.55:
         return None
-    if not snapshot_at or book is None or dec is None:
-        return None
-    roi=(dec-1.0) if row.get('actual')==pick else -1.0
+
+    implied=1.0/dec
+    book_edge=prob-implied
+    expected_value=prob*dec-1.0
+    realized_roi=(dec-1.0) if row.get('actual')==pick else -1.0
     return {
-        'event_id':row.get('event_id'),'sport':row.get('sport'),'league':row.get('league'),'pick':pick,
-        'roi':roi,'won':row.get('actual')==pick,'edge':round(float(value_edge),6),
-        'book_edge':round(float(book_edge),6),'expected_value':round(float(ev),6),
+        'event_id':row.get('event_id'),'sport':row.get('sport'),'league':row.get('league'),
+        'pick':pick,'roi':realized_roi,'won':row.get('actual')==pick,
+        'model_probability':round(prob,6),'confidence':round(conf,6),
+        'edge':round(book_edge,6),'expected_value':round(expected_value,6),
         'frozen_odds':float(book),'frozen_odds_at':snapshot_at,
-        'source':'SportyBet NG frozen winner snapshot'
+        'source':'SportyBet NG frozen winner snapshot',
+        'trial_enrollment':'precommitted_confidence_0.55_plus_frozen_odds',
+        'approval_hurdle':'30_trials_and_positive_realized_roi'
     }
 
 def value_testing(rows,sport):
