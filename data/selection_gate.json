@@ -1,19 +1,21 @@
 {
   "status": "ok",
   "mode": "PAPER_ONLY",
-  "input_predictions": 243,
-  "selected_predictions": 0,
-  "filtered_predictions": 243,
-  "selection_rate": 0.0,
+  "input_predictions": 231,
+  "selected_predictions": 2,
+  "paper_betting_qualified": 2,
+  "research_candidates": 4,
+  "filtered_predictions": 227,
+  "selection_rate": 0.0087,
   "rejection_reasons": {
-    "tournament_not_qualified + selection_not_qualified + confidence_below_0.65": 208,
-    "tournament_not_qualified + selection_not_qualified": 4,
-    "tournament_not_qualified + confidence_below_0.65": 13,
-    "confidence_below_0.65": 18
+    "confidence_below_0.65 + no_current_value_signal": 191,
+    "confidence_below_0.65": 36,
+    "no_current_value_signal": 2
   },
+  "evidence_validated_count": 31,
   "public_feed_preserved": true,
   "tennis_confidence_threshold": 0.65,
   "tennis_threshold_source": "walkforward_precision_gate",
   "selected_artifact": "data/selection_candidates.json",
-  "policy": "Selection is an analysis layer; it never deletes raw/current predictions from the public feed."
+  "policy": "Tournament/selection history is an evidence tier, not a hard prerequisite. Betting-qualified PAPER selections require current model confidence plus an independent current value signal. Live-money approval remains a separate risk gate."
 }
