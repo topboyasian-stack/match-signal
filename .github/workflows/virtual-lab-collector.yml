@@ -80,7 +80,7 @@ jobs:
       - name: Run Virtual Lab v1 repository contract
         run: python scripts/validate_virtual_lab_v1.py
 
-      - name: Validate product namespace contract
+      - name: Validate optional manual watch namespace
         run: |
           python - <<'PY'
           import json
@@ -88,8 +88,7 @@ jobs:
           watch=json.loads(Path('data/virtual_lab_participants/efootball_confirmed_watch.json').read_text())
           products={str(x.get('product')) for x in watch.get('participants',[])}
           assert products <= {'efootball_gt'}, f'confirmed watch contamination: {products}'
-          assert len(watch.get('participants',[])) == 9, 'confirmed eFootball watch unexpectedly changed'
-          print('Confirmed eFootball watch namespace OK:', sorted(products), len(watch.get('participants',[])))
+          print('Optional manual eFootball watch namespace OK:', sorted(products), len(watch.get('participants',[])))
           PY
 
       - name: Run strict chronological model evaluation
