@@ -160,7 +160,7 @@ export async function onRequestGet(context){
     collectPc('efootball','sr:sport:137'),
     collectVfootball(),
     collectLive('vfootball','sr:sport:202120001','/api/ng/factsCenter/wapConfigurableIndexLiveEvents'),
-    collectLive('efootball','sr:sport:137','/api/ng/factsCenter/pcLiveEvents')
+    collectLive('efootball','sr:sport:137','/api/ng/factsCenter/wapConfigurableIndexLiveEvents')
   ]);
 
   const cutoff=Date.now()-(2*60*1000);
