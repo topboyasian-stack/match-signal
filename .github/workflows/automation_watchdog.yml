@@ -120,9 +120,9 @@ jobs:
               r = subprocess.run(['gh', 'workflow', 'run', 'table-tennis-x.yml', '--ref', 'main'], text=True, capture_output=True)
               actions.append({'workflow':'table-tennis-x.yml','action':'dispatch','status':'requested' if r.returncode == 0 else 'failed','detail':(r.stderr.strip() if r.returncode else 'Table Tennis-X self-heal')})
 
-          if unified_age > 2 and not active('autopilot-refresh.yml'):
-              r = subprocess.run(['gh', 'workflow', 'run', 'autopilot-refresh.yml', '--ref', 'main'], text=True, capture_output=True)
-              actions.append({'workflow':'autopilot-refresh.yml','action':'dispatch','status':'requested' if r.returncode == 0 else 'failed','detail':(r.stderr.strip() if r.returncode else 'Unified board self-heal')})
+          if unified_age > 2 and not active('unified-upcoming.yml'):
+              r = subprocess.run(['gh', 'workflow', 'run', 'unified-upcoming.yml', '--ref', 'main'], text=True, capture_output=True)
+              actions.append({'workflow':'unified-upcoming.yml','action':'dispatch','status':'requested' if r.returncode == 0 else 'failed','detail':(r.stderr.strip() if r.returncode else 'Unified board self-heal')})
 
           if odds_age > 8 and not active('odds_builder.yml'):
               r = subprocess.run(['gh', 'workflow', 'run', 'odds_builder.yml', '--ref', 'main'], text=True, capture_output=True)
