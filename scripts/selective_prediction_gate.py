@@ -77,8 +77,9 @@ def main():
     def explicit_value_signal(row):
         # Football model_upgrade.py already performs the canonical independent
         # edge + EV test (>=3.5% edge and >=5% EV). Do not duplicate or loosen it.
-        if row.get("decision") == "PAPER ONLY" and row.get("decision_reason") == "value_detected_but_live_gate_closed":
-            return True, "football_model_value_layer"
+        # Legacy decision flags are not sufficient by themselves. Current
+        # qualification must be backed by the finalized contemporaneous market
+        # snapshot and the unchanged edge/EV thresholds below.
         # SportyBet-enriched winner/total signals provide the same market-
         # independent edge comparison for Tennis and other feed rows.
         insights = row.get("market_insights") or {}
