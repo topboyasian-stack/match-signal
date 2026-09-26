@@ -1,13 +1,16 @@
 name: Match Signal Automation Watchdog
 # Watchdog activation: scheduled self-healing heartbeat for production feeds.
-# Virtual Lab live-feed classification refresh.\n# Immediate heartbeat repair path enabled for sync/audit changes.
+# Virtual Lab live-feed classification refresh.
+# Immediate heartbeat repair path enabled for sync/audit changes.
 # Fresh-heartbeat remediation verified after sync payload fix.
 
 on:
   push:
     branches: [main]
     paths:
-      - '.github/workflows/automation_watchdog.yml'\n      - 'scripts/system_health_audit.py'\n      - 'scripts/virtual_lab_sync.py'
+      - '.github/workflows/automation_watchdog.yml'
+      - 'scripts/system_health_audit.py'
+      - 'scripts/virtual_lab_sync.py'
   schedule:
     # Frequent, off-hour heartbeat so stale live feeds are repaired before the next day.
     # Changing this cron also re-enables a previously disabled scheduled workflow.
@@ -159,7 +162,8 @@ jobs:
               'actions': actions,
               'policy': 'Watchdog proactively self-heals stale engines and force-restarts the actual core Live Prediction Pipeline; health publication is retried across concurrent data writers.'
           }
-          Path('data/automation_health.json').write_text(json.dumps(health, indent=2) + '\n')
+          Path('data/automation_health.json').write_text(json.dumps(health, indent=2) + '
+')
           print(json.dumps(health, indent=2))
           PY
 
