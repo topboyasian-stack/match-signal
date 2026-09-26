@@ -146,20 +146,35 @@ jobs:
               'virtual_lab_products': virtual.get('product_counts', {}),
               'thresholds': {'pipeline_hours': 4, 'odds_builder_hours': 8, 'expansion_hours': 4, 'virtual_lab_hours': 1, 'darts_hours': 2, 'table_tennis_hours': 2, 'unified_upcoming_hours': 2},
               'actions': actions,
-              'policy': 'Watchdog dispatches workflow_dispatch only when the corresponding generated artifact is stale and no run is already active.'
+              'policy': 'Watchdog proactively self-heals stale engines and force-replaces a hung core publisher; health publication is retried across concurrent data writers.'
           }
           Path('data/automation_health.json').write_text(json.dumps(health, indent=2) + '\n')
           print(json.dumps(health, indent=2))
           PY
 
       - name: Commit automation health record
+        shell: bash
         run: |
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/automation_health.json data/virtual_lab_live.json
-          if git diff --cached --quiet; then
-            echo "No automation health change."
-            exit 0
-          fi
-          git commit -m "🤖 Update automation watchdog health"
-          git push origin main
+          cp data/automation_health.json /tmp/automation_health.json
+          for attempt in 1 2 3 4 5; do
+            git fetch origin main
+            git reset --hard origin/main
+            cp /tmp/automation_health.json data/automation_health.json
+            git add data/automation_health.json
+            if git diff --cached --quiet; then
+              echo "No automation health change."
+              exit 0
+            fi
+            git commit -m "🤖 Update automation watchdog health"
+            if git push origin main; then
+              echo "Automation health publication succeeded."
+              exit 0
+            fi
+            echo "Concurrent main update detected; retrying watchdog health publication."
+            sleep $((attempt * 2))
+          done
+          echo "Automation health publication failed after five retries." >&2
+          exit 1
