@@ -70,7 +70,7 @@ for args in [
     ("core_prediction_pipeline",pipeline,"updated_at",4),
     ("odds_builder",odds,"generated_at",8),
     ("expansion",expansion,"updated_at",4),
-    ("virtual_lab",virtual_live,"updated_at",1),
+    # The collector heartbeat is the canonical freshness signal for Virtual Lab.\n    # virtual_lab_live.json is a large live snapshot and may be intentionally omitted from Git publication.\n    ("virtual_lab",virtual,"updated_at",1),
     ("darts_x",darts,"updated_at",2),
     ("table_tennis_x",table,"updated_at",2),
     ("unified_upcoming",unified,"generated_at",2),
