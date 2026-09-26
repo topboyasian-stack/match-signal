@@ -162,8 +162,10 @@ def normalize_proxy_event(raw):
         import re
         m=re.search(r"\\(([^()]+)\\)\\s*$",str(value or ""))
         return m.group(1).strip() if m else ""
-    participant_1=explicit_1 or derived(team_1)
-    participant_2=explicit_2 or derived(team_2)
+    participant_1_source="explicit" if explicit_1 else ("parenthetical" if derived(team_1) else "provider_label")
+    participant_2_source="explicit" if explicit_2 else ("parenthetical" if derived(team_2) else "provider_label")
+    participant_1=explicit_1 or derived(team_1) or team_1
+    participant_2=explicit_2 or derived(team_2) or team_2
     product=str(raw.get("product") or "").strip()
     if product not in SUPPORTED_PRODUCTS:
         return None
@@ -206,7 +208,9 @@ def normalize_proxy_event(raw):
         "team_2":team_2,
         "participant_1":participant_1,
         "participant_2":participant_2,
-        "identity_verified":bool(participant_1 and participant_2),
+        "identity_verified":bool(explicit_1 and explicit_2),
+        "identity_source_1":participant_1_source,
+        "identity_source_2":participant_2_source,
         "start_time_ms":int(start_ms) if start_ms is not None else None,
         "start_time":start_time,
         "match_status":raw.get("match_status") or raw.get("matchStatus"),
