@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: match-signal-pipeline
+  group: match-signal-expansion-reconcile
   cancel-in-progress: false
 
 jobs:
@@ -38,41 +38,35 @@ jobs:
       - name: QA the repaired Eredivisie feed
         run: python scripts/qa_ere_live.py
 
-      - name: Assert main feed contains current Eredivisie predictions
+      - name: Assert isolated Eredivisie feed
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
-          main_feed = json.loads(Path('data/predictions.json').read_text())
-          ere = [p for p in main_feed if p.get('league') == 'Eredivisie']
-          if not ere:
-              raise SystemExit('ABORT: post-pipeline main prediction feed has no Eredivisie rows')
-          print(f'Post-pipeline reconciliation passed: {len(ere)} Eredivisie rows in main feed')
+          data=json.loads(Path('data/ere_divisie_predictions.json').read_text())
+          if not data:
+              raise SystemExit('ABORT: isolated Eredivisie feed is empty')
+          print(f'Isolated Eredivisie reconciliation: {len(data)} rows')
           PY
 
-      - name: Commit reconciled live feed
+      - name: Commit isolated expansion feed
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/predictions.json data/ere_divisie_history.json data/ere_divisie_predictions.json data/expansion_status.json data/ere_divisie_qa.json
-          if git diff --cached --quiet; then
-            echo "No reconciliation changes."
-            exit 0
-          fi
-          git commit -m "🤖 Reconcile live experimental feed after core pipeline"
+          git add data/ere_divisie_history.json data/ere_divisie_predictions.json data/expansion_status.json data/ere_divisie_qa.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "🤖 Reconcile isolated live experimental Eredivisie feed"
           for attempt in 1 2 3 4 5; do
             git fetch origin main
-            if git rebase origin/main; then
-              if git push origin main; then
-                echo "Reconciliation published successfully on attempt ${attempt}."
-                exit 0
-              fi
-            fi
-            git rebase --abort 2>/dev/null || true
-            echo "Concurrent main update detected; retrying publication (attempt ${attempt})."
-            sleep $((attempt * 3))
+            git reset --hard origin/main
+            python scripts/repair_ere_live.py
+            python scripts/qa_ere_live.py
+            git add data/ere_divisie_history.json data/ere_divisie_predictions.json data/expansion_status.json data/ere_divisie_qa.json
+            if git diff --cached --quiet; then exit 0; fi
+            git commit -m "🤖 Reconcile isolated live experimental Eredivisie feed"
+            if git push origin main; then exit 0; fi
+            sleep $((attempt * 2))
           done
-          echo "ABORT: could not publish reconciled live feed after five synchronized attempts."
           exit 1
