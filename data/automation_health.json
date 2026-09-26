@@ -1,21 +1,21 @@
 {
-  "updated_at": "2026-09-26T16:25:51.612694+00:00",
+  "updated_at": "2026-09-26T16:28:02.881831+00:00",
   "automation_status": "SELF_HEALING_ENABLED",
   "pipeline_last_update": "2026-09-25T12:26:12.573616+00:00",
-  "pipeline_age_hours": 27.99,
+  "pipeline_age_hours": 28.03,
   "odds_builder_last_update": "2026-09-26T15:54:06.730373+00:00",
-  "odds_builder_age_hours": 0.53,
+  "odds_builder_age_hours": 0.57,
   "expansion_last_update": "2026-09-26T14:27:55.071098+00:00",
-  "expansion_age_hours": 1.97,
-  "virtual_lab_last_update": "2026-09-26T16:25:40.975146+00:00",
+  "expansion_age_hours": 2.0,
+  "virtual_lab_last_update": "2026-09-26T16:27:52.084251+00:00",
   "virtual_lab_age_hours": 0.0,
-  "darts_age_hours": 0.44,
-  "table_tennis_age_hours": 0.06,
+  "darts_age_hours": 0.48,
+  "table_tennis_age_hours": 0.1,
   "unified_upcoming_age_hours": 999.0,
-  "virtual_lab_events": 764,
+  "virtual_lab_events": 749,
   "virtual_lab_products": {
-    "efootball_gt": 294,
-    "vfootball": 462,
+    "efootball_gt": 289,
+    "vfootball": 452,
     "efootball_adriatic": 8
   },
   "thresholds": {
@@ -29,11 +29,11 @@
   },
   "actions": [
     {
-      "workflow": "autopilot-refresh.yml",
+      "workflow": "tennis_pipeline.yml",
       "action": "force_dispatch",
       "status": "requested",
-      "detail": "core prediction forced self-heal after 27.99h stale"
+      "detail": "core prediction pipeline forced self-heal after 28.03h stale"
     }
   ],
-  "policy": "Watchdog proactively self-heals stale engines and force-replaces a hung core publisher; health publication is retried across concurrent data writers."
+  "policy": "Watchdog proactively self-heals stale engines and force-restarts the actual core Live Prediction Pipeline; health publication is retried across concurrent data writers."
 }
