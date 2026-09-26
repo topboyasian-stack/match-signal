@@ -195,7 +195,8 @@ def build_tennis_performance(settled):
         "ou_decisions": len(ou_decisions),
         "ou_correct": ou_correct,
         "ou_accuracy": round(ou_correct / len(ou_decisions), 4) if ou_decisions else 0.0,
-        "three_set_rate": round(sum(float(((p.get("analytics") or {}).get("three_sets")) or 0) for p in rows) / len(rows), 4) if rows else 0.0,\n        "late_captures_observed": sum(bool(p.get("capture_status") == "LATE_CAPTURE") for p in rows),
+        "three_set_rate": round(sum(float(((p.get("analytics") or {}).get("three_sets")) or 0) for p in rows) / len(rows), 4) if rows else 0.0,
+        "late_captures_observed": sum(bool(p.get("capture_status") == "LATE_CAPTURE") for p in rows),
         "by_tour": {
             tour: {
                 "settled": sum(p.get("league") == tour for p in rows),
