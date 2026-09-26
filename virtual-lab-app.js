@@ -16,12 +16,12 @@ const HISTORY='/api/virtual-lab-history';
 const HISTORY_FALLBACK='/data/virtual_lab_history.json';
 const MODEL_EVAL='/data/virtual_lab_model_eval.json';
 const ELIGIBILITY='/data/virtual_lab_eligibility.json';
-const PARTICIPANT_PROFILES='/data/virtual_lab_participant_profiles.json';
+const PARTICIPANT_PROFILES='/data/virtual_lab_participant_lifecycle.json';
 const PARTICIPANT_H2H='/data/virtual_lab_participant_h2h.json';
 const EXTERNAL_H2H='/data/virtual_lab_external_h2h.json';
 const CONFIRMED_WATCH='/data/virtual_lab_participants/efootball_confirmed_watch.json';
 const SUPPORTED_VIRTUAL_PRODUCTS=new Set(['efootball_gt','efootball_adriatic','vfootball','zoom']);
-const state={rows:[],filtered:[],live:[],liveMode:'none',liveUpdated:null,picks:[],builder:[],historyLoaded:false,modelRows:[],modelEvents:[],modelGate:false,modelHoldout:null,modelEvaluation:null,participantProfiles:null,participantH2H:null,externalH2H:null,confirmedWatch:null,eligibility:{eligible_competitions:['Virtual'],raw_eligible_competitions:['Esoccer H2H GG League','Europa League','FA Cup','International (Virtual eComp)','La Liga (Virtual eComp)','Premier League 2x6','Virtual','Volta Premier League'],eligible_ou_lines:[],raw_eligible_ou_lines:[0.5,1.5,2.5,7.5],experimental_ou_lines:[1.5],priority_ou_lines:[1.5,3.5,4.5],model_qualified_competitions:['Virtual','Volta Champions League A'],model_qualified_ou_lines:[3.5,4.5],eligible_markets:['ou']},predictionCache:new Map(),modelCalibration:{}};
+const state={rows:[],filtered:[],live:[],liveMode:'none',liveUpdated:null,picks:[],builder:[],historyLoaded:false,modelRows:[],modelEvents:[],modelGate:false,modelHoldout:null,modelEvaluation:null,participantProfiles:null,participantH2H:null,externalH2H:null,confirmedWatch:null,participantLifecycle:null,eligibility:{eligible_competitions:['Virtual'],raw_eligible_competitions:['Esoccer H2H GG League','Europa League','FA Cup','International (Virtual eComp)','La Liga (Virtual eComp)','Premier League 2x6','Virtual','Volta Premier League'],eligible_ou_lines:[],raw_eligible_ou_lines:[0.5,1.5,2.5,7.5],experimental_ou_lines:[1.5],priority_ou_lines:[1.5,3.5,4.5],model_qualified_competitions:['Virtual','Volta Champions League A'],model_qualified_ou_lines:[3.5,4.5],eligible_markets:['ou']},predictionCache:new Map(),modelCalibration:{}};
 
 const $=id=>document.getElementById(id);
 const esc=v=>{const d=document.createElement('div');d.textContent=String(v??'');return d.innerHTML};
@@ -496,9 +496,9 @@ function participantPrior(events,event,line){
   return {prob,n:rec.entityN,totalN:rec.totalN,pairProb,pairN:rec.pairN,weight,entityProb:prob};
 }
 function hotParticipantForEvent(e,line){
-  const profiles=state.participantProfiles?.profiles||[];
+  const profiles=(state.participantLifecycle?.profiles||state.participantProfiles?.profiles||[]);
   const names=[e.participant_1||e.home,e.participant_2||e.away].filter(Boolean).map(participantIdentityKey);
-  const matches=profiles.filter(p=>p.product===e.product&&names.includes(String(p.participant||'').trim().toLowerCase())&&p.hot&&Number(p.hot.line)===Number(line));
+  const matches=profiles.filter(p=>p.product===e.product&&p.active_now!==false&&names.includes(String(p.participant||'').trim().toLowerCase())&&p.hot&&Number(p.hot.line)===Number(line));
   if(!matches.length)return null;
   matches.sort((a,b)=>(b.hot?.strength||0)-(a.hot?.strength||0));
   return matches[0];
@@ -1616,6 +1616,8 @@ async function loadParticipantProfiles(){
     const r=await fetch(PARTICIPANT_PROFILES+'?t='+Date.now(),{cache:'no-store',headers:{'Accept':'application/json'}});
     if(!r.ok)throw new Error('participant profiles HTTP '+r.status);
     state.participantProfiles=await r.json();
+    state.participantLifecycle=state.participantProfiles;
+    state._participantProfileIndex=null;
     state.predictionCache.clear();
     return true;
   }catch(e){state.participantProfiles=null;console.warn('Virtual Lab participant profiles fallback:',e);return false;}
