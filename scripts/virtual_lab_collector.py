@@ -643,7 +643,16 @@ def build_participant_registry(history):
 
 
 def build_participant_lifecycle(history, current_events, previous_state):
-    """Build a feed-driven participant lifecycle from current feed + settled history."""
+    """Build a feed-driven participant lifecycle from current feed + the full settled archive."""
+    combined=[]
+    seen=set()
+    for raw_row in list(load_archived_settlements())+list(history):
+        if not isinstance(raw_row,dict): continue
+        rid=str(raw_row.get("record_id") or f'{raw_row.get("event_id","")}|{raw_row.get("market","")}|{raw_row.get("line","")}|{raw_row.get("selection","")}')
+        if rid in seen: continue
+        seen.add(rid)
+        combined.append(with_trace_metadata(dict(raw_row)))
+    history=combined
     previous_profiles={}
     if isinstance(previous_state,dict):
         for p in previous_state.get("profiles") or []:
