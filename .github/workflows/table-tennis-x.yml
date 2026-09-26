@@ -44,7 +44,7 @@ jobs:
           python - <<'PY'
           import json
           from pathlib import Path
-          for name in ['table_tennis_history.json','table_tennis_upcoming.json','table_tennis_model.json','table_tennis_candidates.json','table_tennis_status.json']:
+          for name in ['table_tennis_history.json','table_tennis_pending.json','table_tennis_upcoming.json','table_tennis_model.json','table_tennis_candidates.json','table_tennis_status.json']:
               p=Path('data')/name
               assert p.exists() and p.stat().st_size, name+' missing'
               json.loads(p.read_text())
@@ -55,7 +55,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/table_tennis_history.json data/table_tennis_upcoming.json data/table_tennis_model.json data/table_tennis_candidates.json data/table_tennis_status.json
+          git add data/table_tennis_history.json data/table_tennis_pending.json data/table_tennis_upcoming.json data/table_tennis_model.json data/table_tennis_candidates.json data/table_tennis_status.json
           if git diff --cached --quiet; then echo "No Table Tennis-X changes."; exit 0; fi
           git commit -m "🏓 Refresh Table Tennis-X research engine"
           for attempt in 1 2 3; do
