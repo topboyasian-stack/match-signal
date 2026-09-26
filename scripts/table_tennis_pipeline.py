@@ -15,6 +15,7 @@ import requests
 ROOT=Path(__file__).resolve().parents[1]
 DATA=ROOT/"data"
 HISTORY=DATA/"table_tennis_history.json"
+PENDING=DATA/"table_tennis_pending.json"
 UPCOMING=DATA/"table_tennis_upcoming.json"
 MODEL=DATA/"table_tennis_model.json"
 CANDIDATES=DATA/"table_tennis_candidates.json"
@@ -24,6 +25,12 @@ SPORTYBET_PROXY="https://match-signal.pages.dev/api/sportybet-table-tennis"
 SPORTYBET="https://www.sportybet.com/api/ng/factsCenter/pcUpcomingEvents"
 SPORTYBET_HEADERS={"Accept":"application/json, text/plain, */*","Content-Type":"application/json","Current-Country":"NG","Origin":"https://www.sportybet.com","Referer":"https://www.sportybet.com/ng/","User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/152.0.0.0 Safari/537.36"}
 TSDB="https://www.thesportsdb.com/api/v1/json/123/eventsday.php"
+SPORTYBET_ORIGIN="https://www.sportybet.com"
+SPORTYBET_HEADERS={"Accept":"application/json, text/plain, */*","Content-Type":"application/json","Current-Country":"NG","Origin":"https://www.sportybet.com","Referer":"https://www.sportybet.com/ng/","User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/152.0.0.0 Safari/537.36"}
+SPORTYBET_LIVE_PATHS=[
+    "/api/ng/factsCenter/pcLiveEvents",
+    "/api/ng/factsCenter/wapConfigurableIndexLiveEvents",
+]
 SOFASCORE_HOSTS=[
     "https://api.sofascore.com/api/v1/sport/table-tennis/scheduled-events",
     "https://www.sofascore.com/api/v1/sport/table-tennis/scheduled-events",
@@ -208,6 +215,113 @@ def fetch_results(days=HISTORY_DAYS):
     dedup={x["event_id"]:x for x in out}
     return sorted(dedup.values(),key=lambda x:ts(x["timestamp"])),errors
 
+
+def _deep_numbers(obj, parent_key=""):
+    """Collect likely score-like numeric fields from an arbitrary provider object."""
+    found=[]
+    if isinstance(obj,dict):
+        for k,v in obj.items():
+            key=str(k).lower()
+            if isinstance(v,(int,float)) and not isinstance(v,bool):
+                if any(token in key for token in ("score","home","away","current")):
+                    found.append((key,float(v)))
+            elif isinstance(v,(dict,list)):
+                found.extend(_deep_numbers(v,key))
+    elif isinstance(obj,list):
+        for v in obj:found.extend(_deep_numbers(v,parent_key))
+    return found
+
+def extract_score(event):
+    """Best-effort score extraction; returns None unless two plausible scores exist."""
+    direct_pairs=[
+        ("homeScore","awayScore"),("home_score","away_score"),
+        ("homeScoreCurrent","awayScoreCurrent"),("homeTeamScore","awayTeamScore"),
+        ("score1","score2"),("score_1","score_2")
+    ]
+    for a,b in direct_pairs:
+        va,vb=event.get(a),event.get(b)
+        if va is not None and vb is not None:
+            try:return int(float(va)),int(float(vb))
+            except (TypeError,ValueError):pass
+    score=event.get("score")
+    if isinstance(score,dict):
+        for a,b in [("home","away"),("current","current")]:
+            va,vb=score.get(a),score.get(b)
+            if isinstance(va,(dict,list)):continue
+            if va is not None and vb is not None:
+                try:return int(float(va)),int(float(vb))
+                except (TypeError,ValueError):pass
+    # Some feeds encode scores as [home,away] or nested team score objects.
+    if isinstance(score,list) and len(score)>=2:
+        try:return int(float(score[0])),int(float(score[1]))
+        except (TypeError,ValueError):pass
+    nums=_deep_numbers(event)
+    home_vals=[v for k,v in nums if "home" in k]
+    away_vals=[v for k,v in nums if "away" in k]
+    if home_vals and away_vals:
+        try:return int(home_vals[-1]),int(away_vals[-1])
+        except (TypeError,ValueError):pass
+    return None
+
+def provider_status(event):
+    text=" ".join(str(event.get(k) or "") for k in ("matchStatus","match_status","status","statusName","state")).lower()
+    return text
+
+def collect_sportybet_live_results():
+    """Capture live/completed Table Tennis observations from SportyBet."""
+    observations=[]; pending=load(PENDING,[])
+    if not isinstance(pending,list):pending=[]
+    errors=[]
+    now_ms=int(time.time()*1000)
+    for path in SPORTYBET_LIVE_PATHS:
+        try:
+            url=SPORTYBET_ORIGIN+path
+            r=requests.get(url,params={
+                "sportId":"sr:sport:20","pageSize":100,"pageNum":1,
+                "todayGames":"false","timeline":168,"_t":now_ms
+            },headers=SPORTYBET_HEADERS,timeout=25)
+            r.raise_for_status()
+            body=r.json()
+            tournaments=((body.get("data") or {}).get("tournaments") or [])
+            for t in tournaments:
+                for e in (t.get("events") or []):
+                    event_id=str(e.get("eventId") or e.get("event_id") or "")
+                    p1=str(e.get("homeTeamName") or e.get("homePlayerName") or e.get("homeParticipant") or e.get("homePlayer") or "").strip()
+                    p2=str(e.get("awayTeamName") or e.get("awayPlayerName") or e.get("awayParticipant") or e.get("awayPlayer") or "").strip()
+                    if not event_id or not p1 or not p2:continue
+                    score=extract_score(e)
+                    status=provider_status(e)
+                    stamp=Number(e.get("estimateStartTime") or 0) if isinstance(e,dict) else 0
+                    start_iso=datetime.fromtimestamp(stamp/1000 if stamp>1e11 else stamp,tz=timezone.utc).isoformat() if stamp else ""
+                    row={
+                        "event_id":event_id,
+                        "source":"SportyBet NG live result capture",
+                        "timestamp":start_iso or datetime.now(timezone.utc).isoformat(),
+                        "competition":str(t.get("name") or ""),
+                        "player_1":p1,"player_2":p2,
+                        "score_1":score[0] if score else None,
+                        "score_2":score[1] if score else None,
+                        "provider_status":status,
+                        "captured_at":datetime.now(timezone.utc).isoformat()
+                    }
+                    # Keep the newest score observation for each event.
+                    existing=next((x for x in pending if str(x.get("event_id"))==event_id),None)
+                    if existing:
+                        existing.update(row)
+                    else:
+                        pending.append(row)
+                    final_hint=any(token in status for token in ("finished","ended","complete","completed","settled","closed","after"))
+                    if score and final_hint and score[0]!=score[1]:
+                        observations.append({k:row[k] for k in ("event_id","source","timestamp","competition","player_1","player_2","score_1","score_2")})
+            break
+        except Exception as exc:
+            errors.append(f"SportyBet {path}: {exc}")
+    # Deduplicate pending rows and trim very old rows only after they have had
+    # an explicit final-state observation; unmatched live rows remain pending.
+    by_id={str(x.get("event_id")):x for x in pending if isinstance(x,dict) and x.get("event_id")}
+    save(PENDING,sorted(by_id.values(),key=lambda x:ts(x.get("timestamp"))))
+    return observations,errors
+
 def build_variant(records,variant):
     ratings={}; forms=defaultdict(lambda:deque(maxlen=RECENT)); margins=defaultdict(lambda:deque(maxlen=RECENT)); h2h=defaultdict(lambda:[0,0])
     scored=[]
@@ -253,11 +367,16 @@ def precision_bands(items):
 def main():
     history=load(HISTORY,[])
     if not isinstance(history,list):history=[]
+    # Historical public backfill remains optional; SportyBet live settlement is
+    # the primary append-only source for competitions it exposes.
     fresh,source_errors=fetch_results()
+    live_rows,live_errors=collect_sportybet_live_results()
+    existing={str(x.get("event_id")):x for x in history if isinstance(x,dict) and x.get("event_id")}
+    for x in live_rows:existing[str(x["event_id"])]=x
+    history=sorted(existing.values(),key=lambda x:ts(x.get("timestamp")))
     merged={str(x.get("event_id")):x for x in history if isinstance(x,dict) and x.get("event_id")}
     for x in fresh:merged[str(x["event_id"])]=x
     history=sorted(merged.values(),key=lambda x:ts(x.get("timestamp")))
-    save(HISTORY,history)
     variants={}
     for v in ("elo","elo_form","elo_form_h2h","elo_form_margin"):
         scored=build_variant(history,v)
@@ -270,7 +389,6 @@ def main():
     gate_row=max(qualifying,key=lambda b:(b["accuracy"],b["wilson_lower_90"] or 0)) if qualifying else {"threshold":0.75,"n":0,"accuracy":None,"wilson_lower_90":None}
     promoted=bool(gate_row["accuracy"] is not None and gate_row["n"]>=MIN_GATE_N and gate_row["accuracy"]>BENCHMARK and (gate_row.get("wilson_lower_90") or 0)>=0.75)
     model={"version":"TABLE-TENNIS-X-1.0","generated_at":datetime.now(timezone.utc).isoformat(),"scope":"Table Tennis pre-match winner only","history_events":len(history),"source_results":"Sofascore completed table-tennis results; TheSportsDB fallback","source_odds":"SportyBet NG current odds","frozen_vfootball_benchmark":BENCHMARK,"variants":variants,"selected_variant":selected,"precision_gate":{"minimum_n":MIN_GATE_N,"selected":gate_row,"beats_vfootball":bool(gate_row.get("accuracy") is not None and gate_row["accuracy"]>BENCHMARK),"promoted":promoted},"mode":"PAPER_ONLY"}
-    save(MODEL,model)
     upcoming,odds_errors=fetch_sportybet()
     ratings={}
     for row,p,actual in build_variant(history,selected):
@@ -292,10 +410,14 @@ def main():
         row={**e,"model_variant":selected,"model_prob_p1":round(pa,6),"pick":pick,"confidence":round(prob,6),"book_odds":book,"fair_odds":round(1/prob,3),"edge":round(edge,6) if edge is not None else None,"promotion_gate":promoted,"qualified":bool(promoted and prob>=threshold and edge is not None and edge>=0.015)}
         enriched.append(row)
         if row["qualified"]:candidates.append(row)
+    print(json.dumps({"sport":"table_tennis","history":len(history),"upcoming":len(enriched),"selected_variant":selected,"holdout":chosen["holdout"],"precision_gate":model["precision_gate"],"candidates":len(candidates)},indent=2))
+
+    save(HISTORY,history)
+    save(MODEL,model)
     save(UPCOMING,enriched)
     save(CANDIDATES,{"generated_at":datetime.now(timezone.utc).isoformat(),"sport":"table_tennis","mode":"PAPER_ONLY","candidates":candidates,"gate":model["precision_gate"]})
-    save(STATUS,{"updated_at":datetime.now(timezone.utc).isoformat(),"sport":"table_tennis","sport_id":"sr:sport:20","history_events":len(history),"upcoming_events":len(enriched),"candidate_count":len(candidates),"model_status":"PROMOTED" if promoted else ("TESTING" if history else "COLLECTING"),"source_results":"Sofascore completed table-tennis results; TheSportsDB fallback","source_odds":"SportyBet NG","source_errors":source_errors+odds_errors})
-    print(json.dumps({"sport":"table_tennis","history":len(history),"upcoming":len(enriched),"selected_variant":selected,"holdout":chosen["holdout"],"precision_gate":model["precision_gate"],"candidates":len(candidates)},indent=2))
+    save(STATUS,{"updated_at":datetime.now(timezone.utc).isoformat(),"sport":"table_tennis","sport_id":"sr:sport:20","history_events":len(history),"upcoming_events":len(enriched),"candidate_count":len(candidates),"model_status":"PROMOTED" if promoted else ("TESTING" if history else "COLLECTING"),"source_results":"SportyBet NG live result capture; public historical fallback","source_odds":"SportyBet NG","source_errors":source_errors+live_errors+odds_errors})
+    print(json.dumps({"sport":"table_tennis","history":len(history),"upcoming":len(enriched),"selected_variant":selected,"holdout":chosen["holdout"],"precision_gate":model["precision_gate"],"candidates":len(candidates),"live_captures":len(live_rows)},indent=2))
 
 if __name__=="__main__":main()
 
