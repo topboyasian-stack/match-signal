@@ -172,7 +172,9 @@ def normalize_proxy_event(raw):
     start_ms=num(raw.get("start_time_ms") if raw.get("start_time_ms") is not None else raw.get("estimateStartTime"))
     if start_ms is not None and 0 < start_ms < 100000000000:
         start_ms*=1000
-    if start_ms is not None and start_ms < time.time()*1000-120000:
+    status_text=str(raw.get("match_status") or raw.get("matchStatus") or "").lower()
+    is_live=bool(raw.get("live")) or bool(raw.get("isLive")) or bool(re.search(r"(live|started|inprogress|playing|1st|2nd|period|set)",status_text))
+    if start_ms is not None and start_ms < time.time()*1000-120000 and not is_live:
         return None
     start_time=(datetime.fromtimestamp(start_ms/1000,timezone.utc).isoformat() if start_ms is not None else None)
     markets=[]
@@ -201,6 +203,7 @@ def normalize_proxy_event(raw):
         "start_time_ms":int(start_ms) if start_ms is not None else None,
         "start_time":start_time,
         "match_status":raw.get("match_status") or raw.get("matchStatus"),
+        "live":is_live,
         "markets":markets,
         "captured_at":now_iso(),
     }
@@ -804,7 +807,10 @@ def build_participant_lifecycle(history, current_events, previous_state):
         profile={
             "participant_key":key,"product":product,"participant":identity,
             "status":status,"active_now":status in {"LIVE","UPCOMING"},
-            "rediscovered":bool(cur and not previous.get("active_now")),
+            "current_feed_visible":bool(cur),
+            "newly_discovered":bool(cur and not previous),
+            "rediscovered":bool(cur and previous and not previous.get("active_now")),
+            "stopped_appearing":bool(previous and previous.get("active_now") and not cur),
             "first_seen_at":previous.get("first_seen_at") or (settled_events[0]["timestamp"] if settled_events else cur.get("last_current_seen")),
             "last_seen_at":cur.get("last_current_seen") or previous.get("last_seen_at") or last_settled,
             "last_upcoming_at":last_upcoming,"last_live_at":last_live,"last_settled_at":last_settled,
@@ -853,6 +859,9 @@ def build_participant_lifecycle(history, current_events, previous_state):
         "upcoming_count":sum(1 for p in profiles if p["status"]=="UPCOMING"),
         "dormant_count":sum(1 for p in profiles if p["status"]=="DORMANT"),
         "hot_watch_count":sum(1 for p in profiles if p["monitor_grade"]=="HOT_WATCH"),
+        "newly_discovered_count":sum(1 for p in profiles if p.get("newly_discovered")),
+        "rediscovered_count":sum(1 for p in profiles if p.get("rediscovered")),
+        "stopped_appearing_count":sum(1 for p in profiles if p.get("stopped_appearing")),
         "profiles":profiles,
     }
 
@@ -1002,6 +1011,9 @@ def main():
         "participant_lifecycle_upcoming":lifecycle["upcoming_count"],
         "participant_lifecycle_dormant":lifecycle["dormant_count"],
         "participant_lifecycle_hot_watch":lifecycle["hot_watch_count"],
+        "participant_lifecycle_newly_discovered":lifecycle["newly_discovered_count"],
+        "participant_lifecycle_rediscovered":lifecycle["rediscovered_count"],
+        "participant_lifecycle_stopped_appearing":lifecycle["stopped_appearing_count"],
         "participant_ou15_leaders":participant_ou15[:25],
         "participant_model_policy":{
             "same_product_only":True,
