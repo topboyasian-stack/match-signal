@@ -17,9 +17,10 @@ concurrency:
 
 jobs:
   reconcile:
-    # Reconcile even when the broader pipeline fails later (for example on an
-    # unrelated NBA research step). Tennis settlement is an independent ledger.
-    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion != 'cancelled' }}
+    # Scheduled/manual runs remain available for reconciliation. When triggered
+    # by the core pipeline, only a successful core publication may launch this
+    # writer; never let a failed/cancelled core snapshot become authoritative.
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -65,29 +66,47 @@ jobs:
       - name: Verify append-only performance ledger
         run: PYTHONPATH=. python scripts/verify_performance_ledger.py
 
-      - name: Commit recovered tennis history and settlement
+      - name: Prepare isolated tennis publication snapshot
         shell: bash
         run: |
+          set -euo pipefail
+          rm -rf /tmp/tennis-publish
+          mkdir -p /tmp/tennis-publish
+          cp data/tennis_prediction_archive.json data/prediction_history.json data/accuracy.json data/tennis_performance.json data/current_performance.json /tmp/tennis-publish/
+
+      - name: Publish only authorized tennis ledger files on latest main
+        shell: bash
+        run: |
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/tennis_prediction_archive.json data/prediction_history.json data/accuracy.json data/tennis_performance.json data/current_performance.json
-          if git diff --cached --quiet; then
-            echo "No tennis history changes."
-            exit 0
-          fi
-          git commit -m "🎾 Persist and settle historical tennis predictions"
           for attempt in 1 2 3 4 5; do
             git fetch origin main
-            if git rebase origin/main; then
-              if git push origin main; then
-                echo "Tennis history push succeeded on attempt $attempt"
-                exit 0
-              fi
-            else
-              git rebase --abort || true
-              git reset --soft origin/main
-              git add data/tennis_prediction_archive.json data/prediction_history.json data/accuracy.json data/tennis_performance.json
-              git commit -m "🎾 Persist and settle historical tennis predictions" || true
+            git reset --hard origin/main
+
+            python scripts/reconcile_tennis_history.py
+            PYTHONPATH=scripts python scripts/settle_tennis_history.py
+            PYTHONPATH=. python scripts/current_performance.py
+            PYTHONPATH=. python scripts/verify_performance_ledger.py
+
+            git add data/tennis_prediction_archive.json data/prediction_history.json data/accuracy.json data/tennis_performance.json data/current_performance.json
+            if git diff --cached --quiet; then
+              echo "No tennis history changes."
+              exit 0
+            fi
+
+            extra=$(git diff --cached --name-only | grep -vE '^(data/tennis_prediction_archive\.json|data/prediction_history\.json|data/accuracy\.json|data/tennis_performance\.json|data/current_performance\.json)$' || true)
+            if [ -n "$extra" ]; then
+              echo "ABORT: tennis reconciler staged unauthorized files:"
+              echo "$extra"
+              git reset
+              exit 1
+            fi
+
+            git commit -m "🎾 Persist and settle historical tennis predictions"
+            if git push origin main; then
+              echo "Tennis history push succeeded on attempt $attempt"
+              exit 0
             fi
             sleep $((attempt * 2))
           done
