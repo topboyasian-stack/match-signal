@@ -45,6 +45,24 @@ def row_to_event(row):
 
 
 def valid_market(row):
+    sporty = row.get("sportybet_winner_odds") or {}
+    sporty_odds = [sporty.get("p1"), sporty.get("draw"), sporty.get("p2")]
+    if all(o is not None for o in sporty_odds):
+        try:
+            values = [1.0/float(o) for o in sporty_odds]
+            total = sum(values)
+            if total > 0 and all(v > 0 for v in values):
+                probs = [v/total for v in values]
+                return {
+                    "p1": probs[0],
+                    "draw": probs[1],
+                    "p2": probs[2],
+                    "odds": sporty_odds,
+                    "source": "SportyBet NG de-vig current market"
+                }
+        except (TypeError, ValueError, ZeroDivisionError):
+            pass
+
     probs = row.get("market_probabilities")
     odds = row.get("market_odds")
     if not isinstance(probs, dict) or not isinstance(odds, list) or len(odds) != 3:
@@ -55,7 +73,7 @@ def valid_market(row):
             return None
         if any(o is None for o in odds):
             return None
-        return {"p1": values[0], "draw": values[1], "p2": values[2], "odds": odds}
+        return {"p1": values[0], "draw": values[1], "p2": values[2], "odds": odds, "source": row.get("market_source")}
     except (TypeError, ValueError, KeyError):
         return None
 
@@ -118,7 +136,7 @@ def main():
             if market:
                 row["market_probabilities"] = {"p1": round(market["p1"], 4), "draw": round(market["draw"], 4), "p2": round(market["p2"], 4)}
                 row["market_odds"] = market["odds"]
-                row["market_source"] = row.get("market_source") or "stored contemporaneous market"
+                row["market_source"] = market.get("source") or row.get("market_source") or "stored contemporaneous market"
                 pick_idx = calibrated.index(max(calibrated))
                 edge, ev = edge_and_ev(calibrated[pick_idx], market["odds"][pick_idx])
                 row["edge"] = edge
