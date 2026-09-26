@@ -846,6 +846,15 @@ function scopedEligibility(mapKey,product,fallback){
   if(map&&Object.prototype.hasOwnProperty.call(map,String(product||"")))return Array.isArray(map[String(product||"")])?map[String(product||"")]:[];
   return fallback||[];
 }
+function isResearchDeskEvent(e){
+  if(!e||!SUPPORTED_VIRTUAL_PRODUCTS.has(String(e.product||'')))return false;
+  const name=competitionKey(e.competition||e.tournament||'');
+  const raw=scopedEligibility("raw_eligible_competitions_by_product",e.product,state.eligibility.raw_eligible_competitions||state.eligibility.eligible_competitions||[]);
+  const model=scopedEligibility("model_qualified_competitions_by_product",e.product,state.eligibility.model_qualified_competitions||[]);
+  return isConfirmedWatchedEvent(e)||
+    raw.some(x=>competitionKey(x)===name)||
+    model.some(x=>competitionKey(x)===name);
+}
 function isEligibleResearchEvent(e){
   const name=competitionKey(e.competition||e.tournament||'');
   const raw=scopedEligibility("raw_eligible_competitions_by_product",e.product,state.eligibility.raw_eligible_competitions||state.eligibility.eligible_competitions||[]);
@@ -918,7 +927,7 @@ function predictionForEvent(e){
   const id=String(e.event_id||e.eventId||'');
   if(state.predictionCache.has(id))return state.predictionCache.get(id);
   try{
-    if(!isEligibleResearchEvent(e))return null;
+    if(!isResearchDeskEvent(e))return null;
     const candidates=[];
     (e.markets||[]).forEach(m=>{
       const mid=String(m.id||''),name=String(m.name||'').toLowerCase();
@@ -957,10 +966,14 @@ function predictionForEvent(e){
     // it is never treated as a pick and can never enter the Builder.
     const candidatePool=enrichedActive.length?enrichedActive:enrichedExperimental;
     const candidate=candidatePool.slice().sort(sideRank)[0]||null;
+    const eventName=competitionKey(e.competition||e.tournament||'');
+    const eventRaw=scopedEligibility("raw_eligible_competitions_by_product",e.product,state.eligibility.raw_eligible_competitions||[]).some(x=>competitionKey(x)===eventName);
+    const eventModel=scopedEligibility("model_qualified_competitions_by_product",e.product,state.eligibility.model_qualified_competitions||[]).some(x=>competitionKey(x)===eventName);
     const status=participantQualified?'QUALIFIED_PARTICIPANT_ENHANCED':
       (baseQualified?'QUALIFIED_BASE_EVIDENCE':
-      (isPromotedResearchEvent(e)?'PROMOTION_PENDING':
-      (isEligibleResearchEvent(e)?'MODEL_GATE_PENDING':'EVIDENCE_CANDIDATE')));
+      (eventRaw&&!eventModel?'RAW_EVIDENCE · MODEL_GATE_PENDING':
+      (eventModel&&!eventRaw?'MODEL_EVIDENCE · RAW_GATE_PENDING':
+      (isPromotedResearchEvent(e)?'PROMOTION_PENDING':'EVIDENCE_CANDIDATE'))));
 
     const out={
       product:e.product,competition:e.competition||e.tournament||'',event_id:id,
@@ -971,7 +984,7 @@ function predictionForEvent(e){
       // Never surface an unqualified Under/Over direction as the desk pick.
       // The desk may show the fixture, but direction stays WAIT until a
       // validated side clears the evidence gates.
-      candidate:qualified&&candidate&&state.historyLoaded?candidate:null,
+      candidate:candidate&&state.historyLoaded?candidate:null,
       candidate_status:status,
       model_tier:participantQualified?'participant-enhanced':'base-evidence',
       bestWinner:null,bestOU:qualified?primaryCandidate:null,
@@ -1119,7 +1132,7 @@ function renderNearQualifiedRadar(){
   const upcoming=upcomingEventsFrom(state.live).filter(e=>product==='all'||e.product===product);
   const candidates=[];
   for(const e of upcoming){
-    const leagueRaw=isEligibleResearchEvent(e)||isConfirmedWatchedEvent(e);
+    const leagueRaw=isResearchDeskEvent(e);
     if(!leagueRaw)continue;
     const markets=(e.markets||[]).map(calculateMarket).filter(Boolean).filter(c=>{
       const mid=String(c.market?.id||''),name=String(c.market?.name||c.market?.desc||'').toLowerCase();
@@ -1210,6 +1223,8 @@ function renderPredictionDesk(){
       p.candidate?
       '<div class="primaryPick candidatePrediction">'+hotBadge+'<span>'+
         (p.candidate_status==='PROMOTION_PENDING'?'EVIDENCE CANDIDATE · PROMOTION PENDING':
+         p.candidate_status==='RAW_EVIDENCE · MODEL_GATE_PENDING'?'RESEARCH CANDIDATE · MODEL GATE PENDING':
+         p.candidate_status==='MODEL_EVIDENCE · RAW_GATE_PENDING'?'RESEARCH CANDIDATE · RAW EVIDENCE PENDING':
          p.candidate_status==='MODEL_GATE_PENDING'?'RESEARCH CANDIDATE · MODEL GATE PENDING':'EVIDENCE CANDIDATE')+
         '</span><strong>'+esc(p.candidate.pickCode||'—')+'</strong><b>'+fmtPct(p.candidate.calibratedProb??p.candidate.fairProb)+'</b><small>book '+(Number.isFinite(Number(p.candidate.bookmakerOdds))?Number(p.candidate.bookmakerOdds).toFixed(2):'—')+' · model '+(state.modelGate?'participant-enhanced':'core evidence')+'</small></div>':
       watch?'<div class="primaryPick mutedPrediction">'+hotBadge+'<span>O/U 1.5 RESEARCH WATCH</span><strong>'+esc(watch.pickCode)+'</strong><b>'+fmtPct(watch.calibratedProb)+'</b><small>participant n='+(watch.recurrence?watch.recurrence.entityN:0)+' · model is experimental</small></div>':
@@ -1483,7 +1498,7 @@ function rebuildPredictionDesk(){
   const product=$('product').value;
   const upcoming=upcomingEventsFrom(state.live).filter(e=>product==='all'||e.product===product);
   const eligible=upcoming
-    .filter(e=>isEligibleResearchEvent(e)||isConfirmedWatchedEvent(e));
+    .filter(isResearchDeskEvent);
 
   // Product-isolated quotas prevent a high-volume Virtual Football feed from
   // crowding eFootball/eAdriatic out of the desk. Each supported product gets
