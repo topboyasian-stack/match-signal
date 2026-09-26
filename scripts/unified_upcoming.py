@@ -166,29 +166,26 @@ def build_virtual_events(history):
                 "away":str(e.get("participant_2") or e.get("team_2") or e.get("away") or ""),
                 "lambda":lam,
             }
-            row={"line":line,"model_prob":0.5,"selection":"over"}
-            try:
-                market_p,pois,base,core,combined,pn,shape_prob,shape_n,shape_weight=probs(
-                    prior,event,row
-                )
-            except Exception:
-                # Deep historical fallback when the evaluator cannot build a feature.
-                k=math.floor(line)
-                p=math.exp(-lam);cdf=p
-                for i in range(1,k+1):
-                    p*=lam/i;cdf+=p
-                pois=clamp(1-cdf);market_p=0.5;base=core=combined=pois;pn=0;shape_n=0;shape_weight=0
-            pick="over" if combined>=0.5 else "under"
-            confidence=max(combined,1-combined)
-            # Evidence depth is independent of publication eligibility.
-            if pn>=8 and shape_n>=20:
-                depth="participant_plus_product"
-            elif shape_n>=20:
-                depth="product_shape"
-            elif len(prior)>=8:
-                depth="product_poisson"
-            else:
-                depth="cross_product_baseline"
+            # The unified board is an availability/projection surface.
+            # Keep the Virtual Lab's full evaluation engine in research.html;
+            # use a deterministic Poisson baseline here so the all-sports board
+            # cannot hang on expensive per-market feature reconstruction.
+            k=max(0,math.floor(line))
+            p=math.exp(-lam)
+            cdf=p
+            for i in range(1,k+1):
+                p*=lam/i
+                cdf+=p
+            over_p=clamp(1-cdf)
+            under_p=clamp(1-over_p)
+            combined=over_p
+            market_p=0.5
+            pn=0
+            shape_n=0
+            shape_weight=0
+            pick="over" if over_p>=under_p else "under"
+            confidence=max(over_p,under_p)
+            depth="product_poisson" if len(prior)>=8 else "cross_product_baseline"
             add(out,{
                 "sport":"virtual",
                 "product":product,
