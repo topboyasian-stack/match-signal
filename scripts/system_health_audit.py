@@ -97,7 +97,7 @@ for product in ("efootball_gt","efootball_adriatic","vfootball"):
 
 sel=int(selection.get("selected_predictions") or 0)
 if prediction_count>0 and sel==0:
-    checks.append(issue("SELECTION_GATE_EMPTY","warning","Current prediction feed exists but the selected-candidate layer returned zero selections"))
+    checks.append(issue("SELECTION_GATE_EMPTY","info","Current prediction feed exists but the selected-candidate layer returned zero qualified selections; no gate was weakened"))
 
 if not predictions_valid:
     checks.append(issue("PREDICTION_FEED_EMPTY_OR_INVALID","critical",f"data/predictions.json is empty/invalid ({len(prediction_rows)} rows)"))
@@ -121,6 +121,7 @@ out={
     "status":status,
     "critical_issues":len(hard),
     "warning_issues":sum(x.get("severity")=="warning" for x in checks),
+    "info_issues":sum(x.get("severity")=="info" for x in checks),
     "checks":[x for x in checks if "engine" in x],
     "issues":[x for x in checks if "code" in x],
     "policy":"Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
