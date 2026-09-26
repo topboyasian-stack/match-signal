@@ -219,7 +219,7 @@ async function renderUnifiedBoard(){
     const draw=()=>{
       const now=new Date(), today=now.toISOString().slice(0,10);
       const tomorrow=new Date(now.getTime()+86400000).toISOString().slice(0,10);
-      const horizon=Number(date?.value||7);
+      const horizon=Number(date?.value||7); const horizonEnd=new Date(now.getTime()+horizon*86400000);
       const q=String(search?.value||"").trim().toLowerCase();
       const filteredRows=all.filter(x=>{
         if(sport?.value && sport.value!=="all" && x.sport!==sport.value)return false;
