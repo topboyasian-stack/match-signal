@@ -1,32 +1,36 @@
 {
-  "updated_at": "2026-09-26T16:30:30.203829+00:00",
-  "paper_only": true,
+  "updated_at": "2026-09-26T14:27:55.071098+00:00",
+  "release_mode": "LIVE_EXPERIMENTAL",
   "live_trading_approved": false,
   "competitions": {
     "NBA": {
       "historical_events": 0,
       "current_fixtures": 0,
       "collection_errors": 2,
-      "status": "research",
-      "source": "ESPN primary; llimllib/nba_data parquet; DataHub/FiveThirtyEight NBA Elo CSV fallback"
+      "status": "PRESEASON_READY"
     },
     "Eredivisie": {
-      "historical_events": 70,
-      "current_fixtures": 0,
+      "historical_events": 133,
+      "current_fixtures": 1,
+      "published_predictions": 1,
       "collection_errors": 0,
-      "status": "research"
+      "status": "LIVE_EXPERIMENTAL",
+      "fixture_source": "FixtureDownload JSON primary; openfootball current-season fallback",
+      "history_source": "openfootball current season + retained Match Signal history"
     }
   },
-  "release_gate": {
-    "minimum_walk_forward_settled": 100,
-    "requires_market_benchmark": true,
-    "requires_calibration": true,
-    "requires_positive_out_of_sample_evidence": true
+  "monitoring": {
+    "settlement": "expansion_prediction_history.json",
+    "promotion_rule": "live evidence + calibration + market benchmark; automatic demotion on data failure",
+    "market_data_is_benchmark_only": true
   },
   "notes": [
     "Independent probabilities never consume market probabilities.",
-    "Expansion outputs remain research-only until walk-forward validation passes.",
-    "Historical fallback sources are source-tagged and retained for auditability.",
-    "NBA fallback order: ESPN, verified team-box parquet, then stable DataHub/FiveThirtyEight NBA Elo CSV. The Elo dataset is updated periodically and may end before the current season, so its coverage date is retained in the source URL."
-  ]
+    "LIVE_EXPERIMENTAL signals are real generated predictions, not guarantees or live-trading approval.",
+    "NBA remains preseason-ready until 2026-10-20, then enters live experimental mode automatically.",
+    "Eredivisie uses ESPN when available, Football-Data's current fixture feed as the first fallback, and SofaScore's daily schedule as the second fallback.",
+    "Eredivisie repair source added after free Football-Data endpoint rate limiting; no market odds are fabricated when unavailable."
+  ],
+  "main_prediction_feed_merged": true,
+  "main_prediction_feed_count": 205
 }
