@@ -151,6 +151,44 @@ def build_virtual_events(history, lifecycle, eligibility):
         float(best.get("ece",9))<=float(market.get("ece",9))+.02)
     participant_gate=bool((eval_art.get("participant_feature_gate") or {}).get("pass"))
 
+    # Fit one stable lambda per product from the latest settled history.
+    # Never recompute the grid separately for every fixture/market.
+    product_points={}
+    product_lambdas={}
+    for r in history or []:
+        if not isinstance(r,dict) or r.get("market")!="ou" or r.get("win") is None:
+            continue
+        product=str(r.get("product") or "")
+        try:
+            line_value=float(r.get("line"))
+            prob_value=float(r.get("model_prob"))
+        except (TypeError,ValueError):
+            continue
+        if not product:
+            continue
+        selected_prob=prob_value if str(r.get("selection") or "").upper().startswith("O") else 1-prob_value
+        product_points.setdefault(product,[]).append((line_value,selected_prob))
+    for product,points in product_points.items():
+        if not points:
+            continue
+        best_lam=(2.5,float("inf"))
+        for i in range(25,1201,5):
+            candidate=i/100
+            err=0.0
+            for ln,prob in points:
+                k=max(0,math.floor(float(ln)))
+                pmf=math.exp(-candidate)
+                cdf=pmf
+                for j in range(1,k+1):
+                    pmf*=candidate/j
+                    cdf+=pmf
+                pred=clamp(1-cdf)
+                err+=(pred-float(prob))**2
+            err/=len(points)
+            if err<best_lam[1]:
+                best_lam=(candidate,err)
+        product_lambdas[product]=best_lam[0]
+
     out=[]
     for e in events if isinstance(events,list) else []:
         start=dt(e.get("start_time"))
@@ -192,22 +230,8 @@ def build_virtual_events(history, lifecycle, eligibility):
                 market_over=inv_over/total_inv
                 market_under=inv_under/total_inv
 
-            # Same product-wide Poisson baseline used by the Virtual Lab evaluator,
-            # with historical line evidence when available.
-            product_rows=[r for r in history or [] if isinstance(r,dict) and str(r.get("product") or "")==product and r.get("market")=="ou" and r.get("win") is not None]
-            points=[]
-            for r in product_rows[-300:]:
-                try:
-                    points.append((float(r.get("line")),float(r.get("model_prob")) if str(r.get("selection") or "").upper().startswith("O") else 1-float(r.get("model_prob"))))
-                except (TypeError,ValueError): continue
-            lam=2.5
-            if points:
-                best_lam=(2.5,float("inf"))
-                for i in range(25,1201,5):
-                    candidate=i/100
-                    err=sum((clamp(1-math.exp(-candidate)*sum(candidate**j/math.factorial(j) for j in range(math.floor(float(ln))+1)))-float(prob))**2 for ln,prob in points)/len(points)
-                    if err<best_lam[1]:best_lam=(candidate,err)
-                lam=best_lam[0]
+            # Same product-wide Poisson baseline used by the Virtual Lab evaluator.
+            lam=float(product_lambdas.get(product,2.5))
             k=max(0,math.floor(line))
             pmf=math.exp(-lam); cdf=pmf
             for i in range(1,k+1):
