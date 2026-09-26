@@ -217,7 +217,7 @@ def main():
             # artifact as a substitute for the current forward fixture scan.
             historical = historical_count(history, performance, league)
             provider_upcoming, provider_errors = espn_upcoming_count(
-                CORE_LEAGUES[league], now
+                AUXILIARY_ESPN_LEAGUES[league], now
             )
             upcoming = max(published_upcoming, provider_upcoming)
             errors.extend(provider_errors)
