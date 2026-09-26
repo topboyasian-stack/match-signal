@@ -60,7 +60,7 @@ def finalize(row):
         if market_probs:
             model_probs=[number(probs.get("p1")),number(probs.get("draw")),number(probs.get("p2"))] if row.get("sport")=="football" else [number(probs.get("p1")),number(probs.get("p2"))]
             if all(x is not None for x in model_probs):
-                idx={"p1":0,"draw":1,"p2":2}[model_pick]
+                idx={"p1":0,"draw":1,"p2":2}[model_pick] if row.get("sport")=="football" else {"p1":0,"p2":1}[model_pick]
                 mp=market_probs[idx]
                 bp=ordered[idx]
                 fair=1/model_probs[idx] if model_probs[idx]>0 else None
