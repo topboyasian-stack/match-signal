@@ -32,7 +32,7 @@ def participant_identity(product: str, value: str) -> str:
     product = str(product or "")
     if product.startswith("efootball"):
         match = re.search(r"\(([^()]+)\)\s*$", s)
-        return match.group(1).strip() if match and match.group(1).strip() else ""
+        return match.group(1).strip() if match and match.group(1).strip() else s
     if product in {"vfootball", "zoom"}:
         return s
     return ""
