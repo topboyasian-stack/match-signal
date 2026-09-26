@@ -50,8 +50,60 @@ async function renderUnifiedBoard(){
   const root=Q('#unifiedBoard');
   if(!root)return;
   try{
-    const payload=await get('./data/unified_upcoming.json');
-    const all=Array.isArray(payload?.events)?payload.events:[];
+    let payload={events:[],generated_at:null};
+    try{
+      payload=await get('./data/unified_upcoming.json');
+    }catch(_){
+      payload={events:[],generated_at:null};
+    }
+    let all=Array.isArray(payload?.events)?payload.events:[];
+    if(!all.length){
+      const sources=[
+        './data/predictions.json',
+        './data/pdl_predictions.json',
+        './data/darts_upcoming.json',
+        './data/table_tennis_upcoming.json',
+        './data/basketball_predictions.json',
+        './data/ere_divisie_predictions.json',
+        './data/saudi_pro_league_predictions.json',
+        './data/nba_predictions.json'
+      ];
+      const chunks=await Promise.all(sources.map(async url=>{
+        try{
+          const data=await get(url);
+          return Array.isArray(data)?data:[];
+        }catch(_){return [];}
+      }));
+      const normalize=(row,source)=>{
+        const x={...row};
+        if(!x.start_time && x.start_time_ms){
+          const d=new Date(Number(x.start_time_ms));
+          if(!Number.isNaN(d.getTime()))x.start_time=d.toISOString();
+        }
+        x.sport=x.sport||source;
+        x.league=x.league||x.competition||x.tournament||'Unclassified';
+        x.player_1=x.player_1||x.home||x.team_1||'Participant 1';
+        x.player_2=x.player_2||x.away||x.team_2||'Participant 2';
+        x.projection_tier=x.projection_tier||(
+          source==='darts'||source==='table_tennis'?'testing_projection':'deep_model'
+        );
+        x.prediction_status=x.prediction_status||(
+          x.qualified?'qualified_candidate':
+          x.projection_tier==='deep_model'?'deep_model':'research_projection'
+        );
+        x.evidence_depth=x.evidence_depth||(
+          x.qualified?'validated_gate':
+          x.projection_tier==='deep_model'?'published_core_model':'baseline_plus_current_feed'
+        );
+        x.probability=x.probability??x.confidence??null;
+        x.model_fair_odds=x.model_fair_odds??x.fair_odds??null;
+        x.model_edge_vs_market=x.model_edge_vs_market??x.edge??null;
+        return x;
+      };
+      const labels=['football_tennis','football','darts','table_tennis','basketball','football','football','basketball'];
+      all=chunks.flatMap((rows,i)=>rows.map(r=>normalize(r,labels[i]))).filter(x=>x.start_time);
+      payload.generated_at=new Date().toISOString();
+    }
     const sport=Q('#upSport'), date=Q('#upDate'), search=Q('#upSearch');
     const setOptions=(el,vals)=>{if(!el||el.dataset.ready)return;el.innerHTML=vals.map(v=>'<option value="'+E(v.value)+'">'+E(v.label)+'</option>').join('');el.dataset.ready="1";};
     setOptions(sport,[{value:"all",label:"All sports"},{value:"football",label:"⚽ Football"},{value:"tennis",label:"🎾 Tennis"},{value:"basketball",label:"🏀 Basketball"},{value:"darts",label:"🏹 Darts"},{value:"table_tennis",label:"🏓 Table Tennis"},{value:"virtual",label:"🧪 Virtual / eFootball"}]);
