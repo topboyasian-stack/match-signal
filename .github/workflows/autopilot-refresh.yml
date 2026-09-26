@@ -60,7 +60,7 @@ jobs:
           git reset --hard origin/main
 
       - name: Compile production Python modules
-        run: python -m py_compile scripts/calibration.py scripts/tennis_total_model.py scripts/predict_today.py scripts/run_pipeline.py scripts/scoped_pipeline.py scripts/production_pipeline.py scripts/autopilot_guard.py scripts/football_forward_readiness.py
+        run: python -m py_compile scripts/calibration.py scripts/tennis_total_model.py scripts/predict_today.py scripts/run_pipeline.py scripts/scoped_pipeline.py scripts/production_pipeline.py scripts/autopilot_guard.py scripts/football_forward_readiness.py scripts/unified_upcoming.py scripts/system_health_audit.py
 
       - name: Preserve independent live experimental league slices
         run: |
@@ -101,6 +101,12 @@ jobs:
       - name: Build football forward-planning readiness
         run: python scripts/football_forward_readiness.py
 
+      - name: Build unified all-sports upcoming/prediction board
+        run: python scripts/unified_upcoming.py
+
+      - name: Run whole-system health audit
+        run: python scripts/system_health_audit.py
+
       - name: Run autonomous freshness and source coverage guard
         run: python scripts/autopilot_guard.py
 
@@ -109,7 +115,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/predictions.json data/prediction_history.json data/accuracy.json data/pipeline_status.json data/autopilot_status.json data/football_forward_readiness.json
+          git add data/predictions.json data/prediction_history.json data/accuracy.json data/pipeline_status.json data/autopilot_status.json data/football_forward_readiness.json data/unified_upcoming.json data/system_health.json
           if git diff --cached --quiet; then
             echo "Autopilot checked the feed; no data changes were required."
             exit 0
