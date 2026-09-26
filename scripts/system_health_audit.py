@@ -33,6 +33,7 @@ pipeline=load("pipeline_status.json",{})
 odds=load("odds_builder.json",{})
 expansion=load("expansion_status.json",{})
 virtual=load("virtual_lab_status.json",{})
+virtual_live=load("virtual_lab_live.json",{})
 darts=load("darts_status.json",{})
 table=load("table_tennis_status.json",{})
 unified=load("unified_upcoming.json",{})
@@ -69,7 +70,7 @@ for args in [
     ("core_prediction_pipeline",pipeline,"updated_at",4),
     ("odds_builder",odds,"generated_at",8),
     ("expansion",expansion,"updated_at",4),
-    ("virtual_lab",virtual,"updated_at",1),
+    ("virtual_lab",virtual_live,"updated_at",1),
     ("darts_x",darts,"updated_at",2),
     ("table_tennis_x",table,"updated_at",2),
     ("unified_upcoming",unified,"generated_at",2),
