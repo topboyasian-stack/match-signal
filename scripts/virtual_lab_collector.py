@@ -169,7 +169,14 @@ def normalize_proxy_event(raw):
         return None
     if not event_id or not team_1 or not team_2 or not product:
         return None
-    start_ms=num(raw.get("start_time_ms") if raw.get("start_time_ms") is not None else raw.get("estimateStartTime"))
+    start_raw=raw.get("start_time_ms") if raw.get("start_time_ms") is not None else raw.get("estimateStartTime")
+    start_ms=num(start_raw)
+    if start_ms is None and raw.get("start_time"):
+        try:
+            parsed=datetime.fromisoformat(str(raw.get("start_time")).replace("Z","+00:00"))
+            start_ms=parsed.timestamp()*1000
+        except Exception:
+            start_ms=None
     if start_ms is not None and 0 < start_ms < 100000000000:
         start_ms*=1000
     status_text=str(raw.get("match_status") or raw.get("matchStatus") or "").lower()
