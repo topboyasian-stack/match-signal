@@ -60,7 +60,8 @@ def add(rows, row):
     if not eid:return
     rows.append(row)
 
-def core_rows(rows, source_rows):
+def core_rows(rows, source_rows, selection_map=None):
+    selection_map=selection_map or {}
     for r in source_rows if isinstance(source_rows,list) else []:
         sport=str(r.get("sport") or "").lower()
         if sport not in {"football","tennis","basketball"}:continue
@@ -69,6 +70,13 @@ def core_rows(rows, source_rows):
         x["projection_tier"]="deep_model"
         x["evidence_depth"]="published_model_plus_enrichment"
         x["paper_only"]=True
+        key=(str(x.get("event_id") or ""),str(x.get("pick") or ""))
+        selected=selection_map.get(key) or selection_map.get((str(x.get("event_id") or ""), ""))
+        if isinstance(selected,dict):
+            x["candidate_status"]=selected.get("candidate_status","BETTING_QUALIFIED_PAPER")
+            x["qualification_status"]="BETTING_QUALIFIED_PAPER"
+            x["live_eligible"]=False
+            x["qualification_basis"]=selected.get("qualification_basis")
         add(rows,x)
 
 def pdl_rows(rows, source_rows):
@@ -201,7 +209,12 @@ def main():
     rows=[]
     lifecycle=load("virtual_lab_participant_lifecycle.json",{})
     core_source=load("predictions.json",[])
-    core_rows(rows,core_source)
+    selected_rows=load("selection_candidates.json",[])
+    selection_map={}
+    for s in selected_rows if isinstance(selected_rows,list) else []:
+        selection_map[(str(s.get("event_id") or ""),str(s.get("pick") or ""))]=s
+        selection_map.setdefault((str(s.get("event_id") or "")),s)
+    core_rows(rows,core_source,selection_map)
 
     # Independent live refresh fallback: if the committed core feed is stale or
     # unexpectedly empty, rebuild current Football/Tennis projections directly
@@ -235,7 +248,7 @@ def main():
     pdl_rows(rows,load("pdl_predictions.json",[]))
     isolated_rows(rows,load("darts_upcoming.json",[]),"darts","DARTS-X-1.0")
     isolated_rows(rows,load("table_tennis_upcoming.json",[]),"table_tennis","TABLE-TENNIS-X-1.0")
-    core_rows(rows,load("basketball_predictions.json",[]))
+    core_rows(rows,load("basketball_predictions.json",[]),selection_map)
     virtual, virtual_meta=build_virtual_events(load_virtual_history(), lifecycle, load("virtual_lab_eligibility.json",{}))
     rows.extend(virtual)
 
