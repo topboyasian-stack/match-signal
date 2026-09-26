@@ -105,6 +105,24 @@ jobs:
       - name: Recalculate league and line eligibility
         run: python scripts/virtual_lab_eligibility.py
 
+      - name: Assert feed-driven participant discovery is alive
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          status=json.loads(Path('data/virtual_lab_status.json').read_text())
+          lifecycle=json.loads(Path('data/virtual_lab_participant_lifecycle.json').read_text())
+          current=int(status.get('upcoming_events') or 0)
+          active=int(lifecycle.get('active_count') or 0)+int(lifecycle.get('live_count') or 0)+int(lifecycle.get('upcoming_count') or 0)
+          print('Current virtual fixtures:', current)
+          print('Active/live/upcoming participant identities:', active)
+          print('Lifecycle discovery mode:', lifecycle.get('discovery_mode'))
+          if current>0 and active<=0:
+              raise SystemExit('ABORT: live virtual feed has fixtures but participant lifecycle discovered zero active identities')
+          if lifecycle.get('discovery_mode') != 'feed_driven':
+              raise SystemExit('ABORT: participant lifecycle is not feed-driven')
+          PY
+
       - name: Validate collector artifacts
         run: |
           python - <<'PY'
