@@ -1,0 +1,64 @@
+{
+  "generated_at": "2026-09-26T17:12:48.881403+00:00",
+  "status": "FAIL",
+  "critical_issues": 1,
+  "warning_issues": 1,
+  "checks": [
+    {
+      "engine": "core_prediction_pipeline",
+      "status": "PASS",
+      "age_hours": 0.56,
+      "threshold_hours": 4
+    },
+    {
+      "engine": "odds_builder",
+      "status": "PASS",
+      "age_hours": 0.1,
+      "threshold_hours": 8
+    },
+    {
+      "engine": "expansion",
+      "status": "PASS",
+      "age_hours": 0.11,
+      "threshold_hours": 4
+    },
+    {
+      "engine": "virtual_lab",
+      "status": "STALE",
+      "age_hours": 1.16,
+      "threshold_hours": 1
+    },
+    {
+      "engine": "darts_x",
+      "status": "PASS",
+      "age_hours": 1.23,
+      "threshold_hours": 2
+    },
+    {
+      "engine": "table_tennis_x",
+      "status": "PASS",
+      "age_hours": 0.43,
+      "threshold_hours": 2
+    },
+    {
+      "engine": "unified_upcoming",
+      "status": "PASS",
+      "age_hours": 0.0,
+      "threshold_hours": 2
+    }
+  ],
+  "issues": [
+    {
+      "code": "STALE_VIRTUAL_LAB",
+      "severity": "critical",
+      "detail": "updated_at age 1.16h exceeds 1h"
+    },
+    {
+      "code": "SELECTION_GATE_EMPTY",
+      "severity": "warning",
+      "detail": "Current prediction feed exists but the selected-candidate layer returned zero selections"
+    }
+  ],
+  "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
+  "paper_only": true
+}
