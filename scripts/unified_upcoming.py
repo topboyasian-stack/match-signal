@@ -102,115 +102,76 @@ def load_virtual_history():
     return [r for r in history if isinstance(r,dict) and r.get("market")=="ou" and r.get("win") is not None]
 
 def build_virtual_events(history):
-    try:
-        from virtual_lab_model_eval import fit_lambda, build_events, probs
-    except Exception:
-        return [], {"status":"MODEL_IMPORT_ERROR","reason":"virtual_lab_model_eval unavailable"}
+    """Lightweight forward projection for the unified board.
 
-    historical=build_events(history)
-    historical=sorted(historical,key=lambda x: str(x.get("timestamp") or ""))
-    grouped_by_product=defaultdict(list)
-    for e in historical: grouped_by_product[str(e.get("product") or "other")].append(e)
-
-    global_points=[]
-    for e in historical:
-        for rr in e.get("rows") or []:
-            p=num(rr.get("model_prob")); line=num(rr.get("line"))
-            if p is None or line is None:continue
-            sel=str(rr.get("selection") or "").upper()
-            global_points.append((line, p if sel.startswith("O") else 1-p))
-    global_lambda=fit_lambda(global_points) if global_points else 2.5
-
+    The dedicated Virtual Lab remains responsible for full walk-forward,
+    participant-aware research. This surface only needs a dependable
+    chronological projection and must not block all-sports publication.
+    """
     live=load("virtual_lab_live.json",{})
     events=live.get("events") if isinstance(live,dict) else []
     out=[]
     for e in events if isinstance(events,list) else []:
         start=dt(e.get("start_time"))
-        if not start or start<NOW-timedelta(minutes=30) or start>HORIZON:continue
+        if not start or start<NOW-timedelta(minutes=30) or start>HORIZON:
+            continue
         product=str(e.get("product") or "")
-        if product not in {"efootball_gt","efootball_adriatic","vfootball","zoom"}:continue
+        if product not in {"efootball_gt","efootball_adriatic","vfootball","zoom"}:
+            continue
+        home=str(e.get("participant_1") or e.get("team_1") or e.get("home") or "")
+        away=str(e.get("participant_2") or e.get("team_2") or e.get("away") or "")
         for market in e.get("markets") or []:
-            mid=str(market.get("id") or "")
             name=str(market.get("name") or "").lower()
-            if mid not in {"18","189"} and "total" not in name and "over/under" not in name:continue
+            mid=str(market.get("id") or "")
+            if mid not in {"18","189"} and "total" not in name and "over/under" not in name:
+                continue
             line=num(market.get("line"))
             if line is None:
                 spec=str(market.get("specifier") or "")
                 for key in ("total=","line="):
                     if key in spec:
-                        line=num(spec.split(key,1)[1].split("&",1)[0]); break
-            if line is None:continue
-            outs=market.get("outcomes") or []
-            over=next((o for o in outs if str(o.get("name") or "").lower().startswith("over")),None)
-            under=next((o for o in outs if str(o.get("name") or "").lower().startswith("under")),None)
-            if not over or not under:continue
-
-            prior=grouped_by_product.get(product) or historical
-            points=[]
-            for pe in prior[-300:]:
-                for rr in pe.get("rows") or []:
-                    p=num(rr.get("model_prob")); ln=num(rr.get("line"))
-                    if p is None or ln is None:continue
-                    sel=str(rr.get("selection") or "").upper()
-                    points.append((ln,p if sel.startswith("O") else 1-p))
-            lam=fit_lambda(points) if len(points)>=8 else global_lambda
-            if lam is None:lam=2.5
-
-            event={
-                "key":f"live|{e.get('event_id')}|{line}",
-                "event_id":str(e.get("event_id")),
-                "timestamp":start.isoformat(),
-                "product":product,
-                "competition":str(e.get("competition") or e.get("tournament") or "Virtual"),
-                "home":str(e.get("participant_1") or e.get("team_1") or e.get("home") or ""),
-                "away":str(e.get("participant_2") or e.get("team_2") or e.get("away") or ""),
-                "lambda":lam,
-            }
-            # The unified board is an availability/projection surface.
-            # Keep the Virtual Lab's full evaluation engine in research.html;
-            # use a deterministic Poisson baseline here so the all-sports board
-            # cannot hang on expensive per-market feature reconstruction.
+                        line=num(spec.split(key,1)[1].split("&",1)[0])
+                        break
+            if line is None:
+                continue
+            # Fast deterministic Poisson baseline. The full participant-aware
+            # research model remains isolated in research.html.
+            lam=2.5
             k=max(0,math.floor(line))
-            p=math.exp(-lam)
-            cdf=p
+            term=math.exp(-lam)
+            cdf=term
             for i in range(1,k+1):
-                p*=lam/i
-                cdf+=p
-            over_p=clamp(1-cdf)
-            under_p=clamp(1-over_p)
-            combined=over_p
-            market_p=0.5
-            pn=0
-            shape_n=0
-            shape_weight=0
-            pick="over" if over_p>=under_p else "under"
-            confidence=max(over_p,under_p)
-            depth="product_poisson" if len(prior)>=8 else "cross_product_baseline"
+                term*=lam/i
+                cdf+=term
+            over=clamp(1-cdf)
+            under=clamp(1-over)
+            pick="over" if over>=under else "under"
+            confidence=max(over,under)
             add(out,{
                 "sport":"virtual",
                 "product":product,
-                "league":event["competition"],
-                "event_id":str(e.get("event_id")),
+                "league":str(e.get("competition") or e.get("tournament") or "Virtual"),
+                "event_id":str(e.get("event_id") or ""),
                 "start_time":start.isoformat(),
-                "player_1":event["home"],
-                "player_2":event["away"],
+                "player_1":home,
+                "player_2":away,
                 "market":"over_under",
                 "line":line,
                 "pick":pick,
                 "probability":round(confidence,4),
-                "probabilities":{"over":round(combined,4),"under":round(1-combined,4)},
-                "market_reference_probability":round(market_p,4),
-                "model_edge_vs_market":round((combined-market_p) if pick=="over" else ((1-combined)-(1-market_p)),4),
+                "probabilities":{"over":round(over,4),"under":round(under,4)},
+                "market_reference_probability":None,
+                "model_edge_vs_market":None,
                 "model_fair_odds":round(1/confidence,3) if confidence else None,
                 "prediction_status":"research_projection",
                 "projection_tier":"deep_research_projection",
-                "evidence_depth":depth,
-                "model":"Virtual Lab chronological Poisson/product/shape/participant model",
-                "model_version":"VL-3.0-WF",
+                "evidence_depth":"baseline_poisson_on_current_market_line",
+                "model":"Virtual Lab baseline projection (full deep model isolated to research.html)",
+                "model_version":"VL-BOARD-1.0",
                 "paper_only":True,
-                "identity_verified":bool(event["home"] and event["away"]),
+                "identity_verified":bool(home and away),
             })
-    return out, {"status":"ok","historical_events":len(historical)}
+    return out, {"status":"lightweight_board_projection","historical_events":len(history or [])}
 
 def main():
     rows=[]
