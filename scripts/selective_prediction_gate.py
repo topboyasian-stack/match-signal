@@ -75,29 +75,48 @@ def main():
     evidence_validated_count = 0
 
     def explicit_value_signal(row):
-        # Football model_upgrade.py already performs the canonical independent
-        # edge + EV test (>=3.5% edge and >=5% EV). Do not duplicate or loosen it.
-        # Legacy decision flags are not sufficient by themselves. Current
-        # qualification must be backed by the finalized contemporaneous market
-        # snapshot and the unchanged edge/EV thresholds below.
-        # SportyBet-enriched winner/total signals provide the same market-
-        # independent edge comparison for Tennis and other feed rows.
+        # Current contemporaneous market data is authoritative. A stale legacy
+        # row.edge/value field must never qualify a newer market snapshot.
         insights = row.get("market_insights") or {}
-        winner_edge = insights.get("winner_model_edge_vs_market")
-        if isinstance(winner_edge, (int, float)) and float(winner_edge) >= 0.035:
-            return True, "sportybet_winner_edge"
-        total = row.get("sportybet_total_market") or (insights.get("total") if isinstance(insights, dict) else None) or {}
-        total_edge = total.get("model_edge_vs_market") if isinstance(total, dict) else None
-        total_ev = total.get("expected_value") if isinstance(total, dict) else None
-        if isinstance(total_edge, (int, float)) and float(total_edge) >= 0.035 and isinstance(total_ev, (int, float)) and float(total_ev) >= 0.05:
-            return True, "sportybet_total_edge_ev"
+        snapshot_at = insights.get("snapshot_at")
+        if snapshot_at:
+            winner_edge = insights.get("winner_model_edge_vs_market")
+            winner_ev = insights.get("winner_expected_value")
+            if (
+                isinstance(winner_edge, (int, float))
+                and float(winner_edge) >= 0.035
+                and isinstance(winner_ev, (int, float))
+                and float(winner_ev) >= 0.05
+            ):
+                return True, "current_sportybet_winner_edge_ev"
+            total = insights.get("total") if isinstance(insights, dict) else None
+            total_edge = total.get("model_edge_vs_market") if isinstance(total, dict) else None
+            total_ev = total.get("expected_value") if isinstance(total, dict) else None
+            if (
+                isinstance(total_edge, (int, float))
+                and float(total_edge) >= 0.035
+                and isinstance(total_ev, (int, float))
+                and float(total_ev) >= 0.05
+            ):
+                return True, "current_sportybet_total_edge_ev"
+            return False, None
+
+        # Only a row with its own explicit frozen snapshot may use the legacy
+        # edge/value fallback.
         row_edge = row.get("edge")
         row_value = row.get("value") or {}
         row_ev = row_value.get("expected_value") if isinstance(row_value, dict) else None
         snapshot = row.get("sportybet_market_snapshot") or {}
-        if isinstance(row_edge, (int, float)) and float(row_edge) >= 0.035 and isinstance(row_ev, (int, float)) and float(row_ev) >= 0.05 and snapshot.get("fetched_at"):
-            return True, "sportybet_winner_edge_ev"
+        if (
+            isinstance(row_edge, (int, float))
+            and float(row_edge) >= 0.035
+            and isinstance(row_ev, (int, float))
+            and float(row_ev) >= 0.05
+            and snapshot.get("fetched_at")
+        ):
+            return True, "frozen_market_edge_ev"
         return False, None
+
 
     for original in predictions:
         row = dict(original)
