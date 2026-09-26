@@ -24,6 +24,9 @@ SPORTYBET_PROXY="https://match-signal.pages.dev/api/sportybet-darts"
 SPORTYBET="https://www.sportybet.com/api/ng/factsCenter/pcUpcomingEvents"
 SPORTYBET_HEADERS={"Accept":"application/json, text/plain, */*","Content-Type":"application/json","Current-Country":"NG","Origin":"https://www.sportybet.com","Referer":"https://www.sportybet.com/ng/","User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/152.0.0.0 Safari/537.36"}
 TSDB="https://www.thesportsdb.com/api/v1/json/123/eventsday.php"
+TSDB_BASE="https://www.thesportsdb.com/api/v1/json/123"
+PDC_LEAGUE_ID="4554"
+PDC_SEASON="2026"
 BENCHMARK=0.80325064
 HISTORY_DAYS=21
 K=28.0
@@ -35,7 +38,11 @@ def load(path,default):
     except (FileNotFoundError,json.JSONDecodeError):return default
 def save(path,obj):path.write_text(json.dumps(obj,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
 def norm(s):
-    return " ".join("".join(c for c in str(s or "").lower().strip() if c not in "[]").replace("-"," ").split())
+    text=" ".join("".join(c for c in str(s or "").lower().strip() if c not in "[]").replace("-"," ").split())
+    if "," in text:
+        left,right=[x.strip() for x in text.split(",",1)]
+        if left and right:text=f"{right} {left}"
+    return " ".join(text.split())
 def ts(v):
     try:
         x=str(v or "").replace("Z","+00:00")
@@ -94,27 +101,95 @@ def winner_market(row):
     return ms[0] if ms else None
 
 def fetch_results(days=HISTORY_DAYS):
-    out=[]; errors=[]
-    now=datetime.now(timezone.utc).date()
-    session=requests.Session(); session.headers.update({"User-Agent":"MatchSignal-Darts-X/1.0","Accept":"application/json"})
-    for i in range(days,0,-1):
-        day=now-timedelta(days=i)
+    """Collect completed PDC match results from TheSportsDB event result pages.
+
+    The previous eventsday?s=Darts route returned no usable history in CI.
+    PDC has a dedicated league (4554) with a 2026 season schedule whose event
+    pages contain match-by-match result descriptions. We use those records and
+    keep the old day endpoint only as a fallback.
+    """
+    out=[]; errors=[]; session=requests.Session()
+    session.headers.update({"User-Agent":"MatchSignal-Darts-X/1.1","Accept":"application/json"})
+
+    def get_json(path,params):
+        r=session.get(TSDB_BASE+"/"+path,params=params,timeout=20)
+        r.raise_for_status()
+        return r.json()
+
+    def parse_lines(blob,event_id,event_date,event_name):
+        rows=[]
+        if not blob:return rows
+        text_blob=str(blob).replace("\r","")
+        pat=re.compile(r"^\s*(?:\d+\s+)?(.+?)\s+(\d+)\s*[-v]\s*(\d+)\s+(.+?)\s*$",re.I)
+        for raw in text_blob.split("\n"):
+            line=re.sub(r"<[^>]+>"," ",raw).strip()
+            line=re.sub(r"^[-•*]\s*","",line)
+            m=pat.match(line)
+            if not m:continue
+            a=m.group(1).strip(" .:-"); b=m.group(4).strip(" .:-")
+            s1,s2=int(m.group(2)),int(m.group(3))
+            if not a or not b or a.lower() in {"home","away"} or b.lower() in {"home","away"}:continue
+            if "world cup" in event_name.lower():continue
+            if s1==s2:continue
+            eid=hashlib.sha1(f"pdc|{event_id}|{a}|{b}|{s1}|{s2}".encode()).hexdigest()[:20]
+            stamp=str(event_date or "")+"T00:00:00+00:00"
+            rows.append({"event_id":eid,"source":"TheSportsDB PDC event result","timestamp":iso(stamp) or str(event_date or ""),"competition":event_name,"player_1":a,"player_2":b,"score_1":s1,"score_2":s2})
+        return rows
+
+    try:
+        payload=get_json("eventsseason.php",{"id":PDC_LEAGUE_ID,"s":PDC_SEASON})
+        events=payload.get("events") or []
+        now=time.time()
+        past=[]
+        for e in events:
+            stamp=ts(e.get("strTimestamp") or e.get("dateEvent") or "")
+            if stamp and stamp<=now:past.append(e)
+        past.sort(key=lambda e:ts(e.get("strTimestamp") or e.get("dateEvent") or ""),reverse=True)
+        targets=past[:12]
+        if len(targets)<6:
+            fallback=get_json("eventspastleague.php",{"id":PDC_LEAGUE_ID})
+            extra=fallback.get("events") or []
+            seen={str(e.get("idEvent")) for e in targets}
+            for e in extra:
+                if str(e.get("idEvent")) not in seen:
+                    targets.append(e);seen.add(str(e.get("idEvent")))
+                if len(targets)>=12:break
+
+        for e in targets:
+            event_id=str(e.get("idEvent") or "")
+            if not event_id:continue
+            try:
+                detail=get_json("lookupevent.php",{"id":event_id})
+                ev=(detail.get("events") or [{}])[0]
+                desc=ev.get("strDescription") or ev.get("strResult") or ""
+                out.extend(parse_lines(desc,event_id,ev.get("dateEvent") or e.get("dateEvent"),ev.get("strEvent") or e.get("strEvent") or "PDC Darts"))
+            except Exception as exc:
+                errors.append(f"event {event_id}: {exc}")
+            time.sleep(0.20)
+    except Exception as exc:
+        errors.append(f"PDC season collector: {exc}")
+
+    if not out:
         try:
-            r=session.get(TSDB,params={"d":day.isoformat(),"s":"Darts"},timeout=20)
-            r.raise_for_status(); payload=r.json()
-            for e in payload.get("events") or []:
-                a=str(e.get("strHomeTeam") or e.get("strPlayer1") or "").strip()
-                b=str(e.get("strAwayTeam") or e.get("strPlayer2") or "").strip()
-                if not a or not b:continue
-                ha=e.get("intHomeScore"); hb=e.get("intAwayScore")
-                try:ha=int(float(ha)); hb=int(float(hb))
-                except (TypeError,ValueError):continue
-                stamp=e.get("strTimestamp") or e.get("dateEvent") or ""
-                if not stamp:stamp=day.isoformat()+"T00:00:00Z"
-                eid=str(e.get("idEvent") or hashlib.sha1(f"darts|{day}|{a}|{b}|{ha}|{hb}".encode()).hexdigest()[:16])
-                out.append({"event_id":eid,"source":"TheSportsDB","timestamp":iso(stamp) or day.isoformat()+"T00:00:00+00:00","competition":str(e.get("strLeague") or ""),"player_1":a,"player_2":b,"score_1":ha,"score_2":hb})
-        except Exception as exc:errors.append(f"{day.isoformat()}: {exc}")
-        time.sleep(0.20)
+            now=datetime.now(timezone.utc).date()
+            for i in range(min(days,7),0,-1):
+                day=now-timedelta(days=i)
+                try:
+                    r=session.get(TSDB,params={"d":day.isoformat(),"l":PDC_LEAGUE_ID},timeout=20)
+                    r.raise_for_status();payload=r.json()
+                    for e in payload.get("events") or []:
+                        event_id=str(e.get("idEvent") or "")
+                        if not event_id:continue
+                        detail=get_json("lookupevent.php",{"id":event_id})
+                        ev=(detail.get("events") or [{}])[0]
+                        desc=ev.get("strDescription") or ev.get("strResult") or ""
+                        out.extend(parse_lines(desc,event_id,day.isoformat(),ev.get("strEvent") or "PDC Darts"))
+                        time.sleep(0.20)
+                except Exception as exc:
+                    errors.append(f"{day.isoformat()}: {exc}")
+        except Exception as exc:
+            errors.append(f"PDC fallback: {exc}")
+
     dedup={x["event_id"]:x for x in out}
     return sorted(dedup.values(),key=lambda x:ts(x["timestamp"])),errors
 
@@ -179,7 +254,7 @@ def main():
     qualifying=[b for b in chosen["bands"] if b["n"]>=MIN_GATE_N and b["accuracy"] is not None]
     gate_row=max(qualifying,key=lambda b:(b["accuracy"],b["wilson_lower_90"] or 0)) if qualifying else {"threshold":0.75,"n":0,"accuracy":None,"wilson_lower_90":None}
     promoted=bool(gate_row["accuracy"] is not None and gate_row["n"]>=MIN_GATE_N and gate_row["accuracy"]>BENCHMARK and (gate_row.get("wilson_lower_90") or 0)>=0.75)
-    model={"version":"DARTS-X-1.0","generated_at":datetime.now(timezone.utc).isoformat(),"scope":"Darts pre-match winner only","history_events":len(history),"source_results":"TheSportsDB public event results","source_odds":"SportyBet NG current odds","frozen_vfootball_benchmark":BENCHMARK,"variants":variants,"selected_variant":selected,"precision_gate":{"minimum_n":MIN_GATE_N,"selected":gate_row,"beats_vfootball":bool(gate_row.get("accuracy") is not None and gate_row["accuracy"]>BENCHMARK),"promoted":promoted},"mode":"PAPER_ONLY"}
+    model={"version":"DARTS-X-1.0","generated_at":datetime.now(timezone.utc).isoformat(),"scope":"Darts pre-match winner only","history_events":len(history),"source_results":"TheSportsDB PDC Darts event results","source_odds":"SportyBet NG current odds","frozen_vfootball_benchmark":BENCHMARK,"variants":variants,"selected_variant":selected,"precision_gate":{"minimum_n":MIN_GATE_N,"selected":gate_row,"beats_vfootball":bool(gate_row.get("accuracy") is not None and gate_row["accuracy"]>BENCHMARK),"promoted":promoted},"mode":"PAPER_ONLY"}
     save(MODEL,model)
     upcoming,odds_errors=fetch_sportybet()
     ratings={}
