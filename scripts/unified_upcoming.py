@@ -232,7 +232,7 @@ def main():
     if len(core_source)<10:
         try:
             from predict_today import fetch_current_predictions
-            live_predictions, live_errors, _qc = fetch_current_predictions()
+            live_predictions, live_errors, _qc = fetch_current_predictions(include_watch=True)
             existing_ids={str(r.get("event_id") or "") for r in rows}
             for r in live_predictions:
                 if str(r.get("event_id") or "") in existing_ids:continue
@@ -270,11 +270,16 @@ def main():
     for r in rows:
         eid=str(r.get("event_id") or "")
         if not eid:continue
-        # Prefer the deepest available projection for a duplicate event.
-        rank={"deep_model":5,"deep_research_projection":4,"research_model":3,"testing_projection":2,"baseline":1}
-        prev=by_id.get(eid)
+        # Preserve distinct markets/lines for the same fixture (e.g. O/U 1.5,
+        # 2.5 and 3.5) while still collapsing duplicate copies of one projection.
+        market=str(r.get("market") or "winner")
+        line=r.get("line")
+        pick=str(r.get("pick") or "")
+        key=f"{eid}|{market}|{line}|{pick}"
+        rank={"deep_model":5,"deep_research_projection":4,"research_model":3,"baseline_plus_enrichment":2,"testing_projection":2,"baseline":1}
+        prev=by_id.get(key)
         if prev is None or rank.get(str(r.get("projection_tier")),0)>rank.get(str(prev.get("projection_tier")),0):
-            by_id[eid]=r
+            by_id[key]=r
     final=sorted(by_id.values(),key=lambda x:(str(x.get("start_time") or ""),str(x.get("sport") or "")))
     dates=defaultdict(int);sports=defaultdict(int)
     for r in final:
