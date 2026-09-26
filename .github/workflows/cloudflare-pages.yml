@@ -288,6 +288,7 @@ jobs:
             const payload=JSON.parse(body);
             const virtualEvents=Array.isArray(payload?.events)?payload.events:[];
             if (payload?.ok!==true) failures.push('/api/sportybet-virtual did not return ok=true');
+            for (const [name,status] of Object.entries(payload?.source_status||{})) { if (status?.status==='ERROR') failures.push('/api/sportybet-virtual source '+name+' returned ERROR: '+(status.error||'unknown')); }
             if (!virtualEvents.length) failures.push('/api/sportybet-virtual returned no eFootball/virtual events');
             const cutoff = Date.now() - 120000;
             const stale = virtualEvents.filter(e => e.start_time_ms && Number(e.start_time_ms) < cutoff);
