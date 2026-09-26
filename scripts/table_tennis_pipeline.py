@@ -24,6 +24,7 @@ SPORTYBET_PROXY="https://match-signal.pages.dev/api/sportybet-table-tennis"
 SPORTYBET="https://www.sportybet.com/api/ng/factsCenter/pcUpcomingEvents"
 SPORTYBET_HEADERS={"Accept":"application/json, text/plain, */*","Content-Type":"application/json","Current-Country":"NG","Origin":"https://www.sportybet.com","Referer":"https://www.sportybet.com/ng/","User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/152.0.0.0 Safari/537.36"}
 TSDB="https://www.thesportsdb.com/api/v1/json/123/eventsday.php"
+SOFASCORE="https://www.sofascore.com/api/v1/sport/table-tennis/scheduled-events"
 BENCHMARK=0.80325064
 HISTORY_DAYS=21
 K=28.0
@@ -94,27 +95,87 @@ def winner_market(row):
     return ms[0] if ms else None
 
 def fetch_results(days=HISTORY_DAYS):
+    """Collect completed table-tennis results from a public live-score feed.
+
+    TheSportsDB's generic Table Tennis day filter has produced zero historical
+    rows for the competitions carried by SportyBet (including TT Cup/Elite
+    Series). Sofascore exposes dated table-tennis schedules with completed
+    scores, so it is used as the primary public result source with TheSportsDB
+    retained as a fallback.
+    """
     out=[]; errors=[]
-    now=datetime.now(timezone.utc).date()
-    session=requests.Session(); session.headers.update({"User-Agent":"MatchSignal-Table Tennis-X/1.0","Accept":"application/json"})
-    for i in range(days,0,-1):
-        day=now-timedelta(days=i)
+    session=requests.Session()
+    session.headers.update({"User-Agent":"MatchSignal-Table-Tennis-X/1.1","Accept":"application/json"})
+
+    def append_sofascore_event(e):
+        if not isinstance(e,dict):return
+        status=e.get("status") or {}
+        stype=str(status.get("type") or "").lower()
+        if stype not in {"finished","ended","after"}:return
+        home=e.get("homeTeam") or e.get("homePlayer") or {}
+        away=e.get("awayTeam") or e.get("awayPlayer") or {}
+        a=str(home.get("name") or home.get("shortName") or "").strip()
+        b=str(away.get("name") or away.get("shortName") or "").strip()
+        if not a or not b or "/" in a or "/" in b:return
+        hs=e.get("homeScore") or {}; ascore=e.get("awayScore") or {}
+        s1=hs.get("current"); s2=ascore.get("current")
+        try:s1=int(s1);s2=int(s2)
+        except (TypeError,ValueError):return
+        if s1==s2:return
+        stamp=datetime.fromtimestamp(float(e.get("startTimestamp") or 0),tz=timezone.utc).isoformat() if e.get("startTimestamp") else ""
+        tournament=(e.get("tournament") or {})
+        unique=(e.get("uniqueTournament") or {})
+        competition=str(tournament.get("name") or unique.get("name") or "").strip()
+        event_id=str(e.get("id") or "")
+        if not event_id:return
+        out.append({
+            "event_id":"sofa:"+event_id,
+            "source":"Sofascore table tennis results",
+            "timestamp":stamp or datetime.now(timezone.utc).isoformat(),
+            "competition":competition,
+            "player_1":a,
+            "player_2":b,
+            "score_1":s1,
+            "score_2":s2
+        })
+
+    today=datetime.now(timezone.utc).date()
+    for i in range(min(days,14),-1,-1):
+        day=today-timedelta(days=i)
         try:
-            r=session.get(TSDB,params={"d":day.isoformat(),"s":"Table Tennis"},timeout=20)
-            r.raise_for_status(); payload=r.json()
-            for e in payload.get("events") or []:
-                a=str(e.get("strHomeTeam") or e.get("strPlayer1") or "").strip()
-                b=str(e.get("strAwayTeam") or e.get("strPlayer2") or "").strip()
-                if not a or not b:continue
-                ha=e.get("intHomeScore"); hb=e.get("intAwayScore")
-                try:ha=int(float(ha)); hb=int(float(hb))
-                except (TypeError,ValueError):continue
-                stamp=e.get("strTimestamp") or e.get("dateEvent") or ""
-                if not stamp:stamp=day.isoformat()+"T00:00:00Z"
-                eid=str(e.get("idEvent") or hashlib.sha1(f"table_tennis|{day}|{a}|{b}|{ha}|{hb}".encode()).hexdigest()[:16])
-                out.append({"event_id":eid,"source":"TheSportsDB","timestamp":iso(stamp) or day.isoformat()+"T00:00:00+00:00","competition":str(e.get("strLeague") or ""),"player_1":a,"player_2":b,"score_1":ha,"score_2":hb})
-        except Exception as exc:errors.append(f"{day.isoformat()}: {exc}")
-        time.sleep(0.20)
+            url=f"{SOFASCORE}/{day.isoformat()}"
+            r=session.get(url,timeout=20)
+            r.raise_for_status()
+            payload=r.json()
+            events=payload.get("events") or []
+            for e in events:append_sofascore_event(e)
+        except Exception as exc:
+            errors.append(f"Sofascore {day.isoformat()}: {exc}")
+        time.sleep(0.15)
+
+    # Fallback: retain the previous TheSportsDB collector for any historical
+    # rows it can provide, but never replace successful Sofascore history with
+    # an empty response.
+    if not out:
+        now=datetime.now(timezone.utc).date()
+        for i in range(min(days,7),0,-1):
+            day=now-timedelta(days=i)
+            try:
+                r=session.get(TSDB,params={"d":day.isoformat(),"s":"Table Tennis"},timeout=20)
+                r.raise_for_status();payload=r.json()
+                for e in payload.get("events") or []:
+                    a=str(e.get("strHomeTeam") or e.get("strPlayer1") or "").strip()
+                    b=str(e.get("strAwayTeam") or e.get("strPlayer2") or "").strip()
+                    if not a or not b or "/" in a or "/" in b:continue
+                    try:ha=int(float(e.get("intHomeScore")));hb=int(float(e.get("intAwayScore")))
+                    except (TypeError,ValueError):continue
+                    if ha==hb:continue
+                    stamp=e.get("strTimestamp") or e.get("dateEvent") or day.isoformat()+"T00:00:00Z"
+                    eid=str(e.get("idEvent") or hashlib.sha1(f"table_tennis|{day}|{a}|{b}|{ha}|{hb}".encode()).hexdigest()[:16])
+                    out.append({"event_id":eid,"source":"TheSportsDB","timestamp":iso(stamp) or day.isoformat()+"T00:00:00+00:00","competition":str(e.get("strLeague") or ""),"player_1":a,"player_2":b,"score_1":ha,"score_2":hb})
+            except Exception as exc:errors.append(f"TheSportsDB {day.isoformat()}: {exc}")
+            time.sleep(0.20)
+
     dedup={x["event_id"]:x for x in out}
     return sorted(dedup.values(),key=lambda x:ts(x["timestamp"])),errors
 
@@ -179,7 +240,7 @@ def main():
     qualifying=[b for b in chosen["bands"] if b["n"]>=MIN_GATE_N and b["accuracy"] is not None]
     gate_row=max(qualifying,key=lambda b:(b["accuracy"],b["wilson_lower_90"] or 0)) if qualifying else {"threshold":0.75,"n":0,"accuracy":None,"wilson_lower_90":None}
     promoted=bool(gate_row["accuracy"] is not None and gate_row["n"]>=MIN_GATE_N and gate_row["accuracy"]>BENCHMARK and (gate_row.get("wilson_lower_90") or 0)>=0.75)
-    model={"version":"TABLE-TENNIS-X-1.0","generated_at":datetime.now(timezone.utc).isoformat(),"scope":"Table Tennis pre-match winner only","history_events":len(history),"source_results":"TheSportsDB public event results","source_odds":"SportyBet NG current odds","frozen_vfootball_benchmark":BENCHMARK,"variants":variants,"selected_variant":selected,"precision_gate":{"minimum_n":MIN_GATE_N,"selected":gate_row,"beats_vfootball":bool(gate_row.get("accuracy") is not None and gate_row["accuracy"]>BENCHMARK),"promoted":promoted},"mode":"PAPER_ONLY"}
+    model={"version":"TABLE-TENNIS-X-1.0","generated_at":datetime.now(timezone.utc).isoformat(),"scope":"Table Tennis pre-match winner only","history_events":len(history),"source_results":"Sofascore completed table-tennis results; TheSportsDB fallback","source_odds":"SportyBet NG current odds","frozen_vfootball_benchmark":BENCHMARK,"variants":variants,"selected_variant":selected,"precision_gate":{"minimum_n":MIN_GATE_N,"selected":gate_row,"beats_vfootball":bool(gate_row.get("accuracy") is not None and gate_row["accuracy"]>BENCHMARK),"promoted":promoted},"mode":"PAPER_ONLY"}
     save(MODEL,model)
     upcoming,odds_errors=fetch_sportybet()
     ratings={}
