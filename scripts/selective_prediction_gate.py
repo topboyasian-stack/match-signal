@@ -68,8 +68,29 @@ def main():
     tennis_min_confidence, tennis_threshold_source = tennis_threshold()
 
     selected = []
+    research_candidates = []
     rejected = 0
     reasons = {}
+    paper_value_count = 0
+    evidence_validated_count = 0
+
+    def explicit_value_signal(row):
+        # Football model_upgrade.py already performs the canonical independent
+        # edge + EV test (>=3.5% edge and >=5% EV). Do not duplicate or loosen it.
+        if row.get("decision") == "PAPER ONLY" and row.get("decision_reason") == "value_detected_but_live_gate_closed":
+            return True, "football_model_value_layer"
+        # SportyBet-enriched winner/total signals provide the same market-
+        # independent edge comparison for Tennis and other feed rows.
+        insights = row.get("market_insights") or {}
+        winner_edge = insights.get("winner_model_edge_vs_market")
+        if isinstance(winner_edge, (int, float)) and float(winner_edge) >= 0.035:
+            return True, "sportybet_winner_edge"
+        total = row.get("sportybet_total_market") or (insights.get("total") if isinstance(insights, dict) else None) or {}
+        total_edge = total.get("model_edge_vs_market") if isinstance(total, dict) else None
+        if isinstance(total_edge, (int, float)) and float(total_edge) >= 0.035:
+            return True, "sportybet_total_edge"
+        return False, None
+
     for original in predictions:
         row = dict(original)
         sport = str(row.get("sport") or "").lower()
@@ -77,32 +98,72 @@ def main():
         pick = selection(row)
         conf = row.get("confidence")
         threshold = tennis_min_confidence if sport == "tennis" else DEFAULT_MIN_CONFIDENCE
+        qualified_tour_flag = tour in qualified_tour.get(sport, set())
+        qualified_selection_flag = (tour, pick) in qualified_pairs.get(sport, set())
+        confidence_ok = isinstance(conf, (int, float)) and float(conf) >= threshold
+        value_ok, value_source = explicit_value_signal(row)
+
+        # Evidence tier: historical tournament/selection track record increases
+        # confidence in a candidate but does not make it a prerequisite.
+        if qualified_selection_flag:
+            evidence_tier = "VALIDATED_SEGMENT"
+            evidence_validated_count += 1
+        elif qualified_tour_flag:
+            evidence_tier = "VALIDATED_TOURNAMENT"
+            evidence_validated_count += 1
+        else:
+            evidence_tier = "GLOBAL_MODEL_ONLY"
+
         reasons_list = []
-        if tour not in qualified_tour.get(sport, set()):
-            reasons_list.append("tournament_not_qualified")
-        if (tour, pick) not in qualified_pairs.get(sport, set()):
-            reasons_list.append("selection_not_qualified")
-        if not isinstance(conf, (int, float)) or float(conf) < threshold:
+        if not confidence_ok:
             reasons_list.append(f"confidence_below_{threshold:.2f}")
 
-        row["candidate_status"] = "SELECTED" if not reasons_list else "RESEARCH_FILTERED"
+        if confidence_ok:
+            research_candidates.append(row)
+
+        if confidence_ok and value_ok:
+            row["candidate_status"] = "BETTING_QUALIFIED_PAPER"
+            row["live_eligible"] = False
+            row["qualification_basis"] = {
+                "confidence_ok": True,
+                "value_ok": True,
+                "value_source": value_source,
+                "evidence_tier": evidence_tier,
+                "tournament_gate_non_blocking": True,
+                "selection_gate_non_blocking": True,
+            }
+            selected.append(row)
+            paper_value_count += 1
+        else:
+            row["candidate_status"] = "RESEARCH_CANDIDATE" if confidence_ok else "RESEARCH_FILTERED"
+            row["live_eligible"] = False
+            row["qualification_basis"] = {
+                "confidence_ok": confidence_ok,
+                "value_ok": value_ok,
+                "value_source": value_source,
+                "evidence_tier": evidence_tier,
+                "tournament_gate_non_blocking": True,
+                "selection_gate_non_blocking": True,
+                "not_selected_reasons": reasons_list + ([] if value_ok else ["no_current_value_signal"]),
+            }
+            rejected += 0 if confidence_ok else 1
+            if not confidence_ok or not value_ok:
+                key = " + ".join(reasons_list + ([] if value_ok else ["no_current_value_signal"]))
+                reasons[key] = reasons.get(key, 0) + 1
+
         row["selection_gate"] = {
-            "status": "passed" if not reasons_list else "filtered",
+            "status": "passed" if row["candidate_status"] == "BETTING_QUALIFIED_PAPER" else ("research" if confidence_ok else "filtered"),
             "sport": sport,
             "tournament": tour,
             "selection": pick,
             "confidence_threshold": threshold,
             "threshold_source": tennis_threshold_source if sport == "tennis" else "default",
             "mode": "PAPER_ONLY",
-            "reasons": reasons_list,
+            "evidence_tier": evidence_tier,
+            "tournament_gate_non_blocking": True,
+            "selection_gate_non_blocking": True,
+            "reasons": reasons_list + ([] if value_ok else ["no_current_value_signal"]),
         }
-        row["live_eligible"] = False
-        if not reasons_list:
-            selected.append(row)
-        else:
-            rejected += 1
-            reason = " + ".join(reasons_list)
-            reasons[reason] = reasons.get(reason, 0) + 1
 
     PREDICTIONS.write_text(json.dumps(predictions, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     SELECTED.write_text(json.dumps(selected, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
@@ -112,14 +173,17 @@ def main():
         "mode": "PAPER_ONLY",
         "input_predictions": len(predictions),
         "selected_predictions": len(selected),
+        "paper_betting_qualified": paper_value_count,
+        "research_candidates": len(research_candidates),
         "filtered_predictions": rejected,
         "selection_rate": round(len(selected) / len(predictions), 4) if predictions else 0.0,
         "rejection_reasons": reasons,
+        "evidence_validated_count": evidence_validated_count,
         "public_feed_preserved": True,
         "tennis_confidence_threshold": tennis_min_confidence,
         "tennis_threshold_source": tennis_threshold_source,
         "selected_artifact": "data/selection_candidates.json",
-        "policy": "Selection is an analysis layer; it never deletes raw/current predictions from the public feed.",
+        "policy": "Tournament/selection history is an evidence tier, not a hard prerequisite. Betting-qualified PAPER selections require current model confidence plus an independent current value signal. Live-money approval remains a separate risk gate.",
     }
     (DATA / "selection_gate.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(json.dumps(summary, indent=2))
