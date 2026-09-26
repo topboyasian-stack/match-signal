@@ -35,6 +35,7 @@ function unifiedRow(x){
     x.projection_tier==="deep_research_projection"?"DEEP RESEARCH":
     x.projection_tier==="research_model"?"RESEARCH":
     x.projection_tier==="testing_projection"?"TESTING":"BASELINE");
+  const qualification=x.betting_qualified?"BETTING-QUALIFIED":"PAPER · NOT QUALIFIED";
   const tier=evidenceLabel(x);
   const odds=Number.isFinite(Number(x.model_fair_odds))?Number(x.model_fair_odds).toFixed(2):"—";
   const edge=Number.isFinite(Number(x.model_edge_vs_market))?((Number(x.model_edge_vs_market)>=0?"+":"")+(Number(x.model_edge_vs_market)*100).toFixed(1)+"%"):"—";
@@ -43,7 +44,7 @@ function unifiedRow(x){
     '<div class="ms-up-event"><div class="ms-up-meta"><span class="ms-sport-pill">'+sportIcon(x.sport)+' '+E(x.sport==="table_tennis"?"Table Tennis":(x.sport||"Sport"))+'</span><span>'+E(x.league||x.competition||"Unclassified")+'</span></div>'+
     '<div class="ms-up-match">'+E(x.player_1||x.home||"Participant 1")+' <span>vs</span> '+E(x.player_2||x.away||"Participant 2")+'</div>'+
     '<div class="ms-up-details"><span>'+E(marketLabel(x))+'</span><span>Probability <b>'+ (p==null?"—":P(p))+'</b></span><span>Fair <b>'+E(odds)+'</b></span><span>Edge <b>'+E(edge)+'</b></span></div></div>'+
-    '<div class="ms-up-status"><span class="ms-up-status-badge '+(status.includes("DEEP")||status.includes("QUALIFIED")?"deep":status==="TESTING"?"testing":"research")+'">'+E(status)+'</span><small>'+E(tier)+'</small></div>'+
+    '<div class="ms-up-status"><span class="ms-up-status-badge '+(status.includes("DEEP")||status.includes("QUALIFIED")?"deep":status==="TESTING"?"testing":"research")+'">'+E(status)+'</span><span class="ms-up-qual '+(x.betting_qualified?"qualified":"paper")+'">'+E(qualification)+'</span><small>'+E(tier)+'</small></div>'+
   '</article>';
 }
 async function renderUnifiedBoard(){
@@ -51,6 +52,16 @@ async function renderUnifiedBoard(){
   if(!root)return;
   try{
     let payload={events:[],generated_at:null};
+    let selectedRows=[];
+    let riskGate=null;
+    try{
+      const [sel,rg]=await Promise.all([
+        get('./data/selection_candidates.json'),
+        get('./data/risk_gate.json')
+      ]);
+      selectedRows=Array.isArray(sel)?sel:[];
+      riskGate=rg;
+    }catch(_){}
     try{
       payload=await get('./data/unified_upcoming.json');
     }catch(_){
@@ -104,6 +115,24 @@ async function renderUnifiedBoard(){
       all=chunks.flatMap((rows,i)=>rows.map(r=>normalize(r,labels[i]))).filter(x=>x.start_time);
       payload.generated_at=new Date().toISOString();
     }
+    const selectedKeys=new Set(selectedRows.map(x=>{
+      const event=String(x?.event_id||x?.id||"");
+      const pick=String(x?.pick||x?.selection||"");
+      const line=x?.line==null?"":String(x.line);
+      return event+"|"+pick+"|"+line;
+    }));
+    const annotate=(x)=>{
+      const event=String(x?.event_id||"");
+      const pick=String(x?.pick||x?.selection||"");
+      const line=x?.line==null?"":String(x.line);
+      const exact=event+"|"+pick+"|"+line;
+      const broad=event+"|"+pick+"|";
+      x.betting_qualified=selectedKeys.has(exact)||selectedKeys.has(broad)||x.qualification_status==="qualified";
+      x.paper_only=true;
+      x.live_money_eligible=Boolean(riskGate?.gate?.[String(x?.sport||"").toLowerCase()]?.live_eligible);
+      return x;
+    };
+    all=all.map(annotate);
     const sport=Q('#upSport'), date=Q('#upDate'), search=Q('#upSearch');
     const setOptions=(el,vals)=>{if(!el||el.dataset.ready)return;el.innerHTML=vals.map(v=>'<option value="'+E(v.value)+'">'+E(v.label)+'</option>').join('');el.dataset.ready="1";};
     setOptions(sport,[{value:"all",label:"All sports"},{value:"football",label:"⚽ Football"},{value:"tennis",label:"🎾 Tennis"},{value:"basketball",label:"🏀 Basketball"},{value:"darts",label:"🏹 Darts"},{value:"table_tennis",label:"🏓 Table Tennis"},{value:"virtual",label:"🧪 Virtual / eFootball"}]);
@@ -133,7 +162,9 @@ async function renderUnifiedBoard(){
         const label=new Date(day+"T00:00:00Z").toLocaleDateString([], {weekday:"long",month:"short",day:"numeric"});
         return '<section class="ms-up-day"><div class="ms-up-day-head"><h3>'+E(label)+'</h3><span>'+rows.length+' fixtures</span></div>'+rows.map(unifiedRow).join("")+'</section>';
       }).join(""):'<div class="ms-empty">No future fixtures match these filters. The engines remain active and the board will refresh with the next generated window.</div>';
+      const qualified=filtered.filter(x=>x.betting_qualified).length;
       Q('#upCount').textContent=filtered.length;
+      const qEl=Q('#upQualified'); if(qEl)qEl.textContent=qualified;
       Q('#upLast').textContent=payload.generated_at?DT(payload.generated_at):"—";
     };
     if(!root.dataset.bound){
