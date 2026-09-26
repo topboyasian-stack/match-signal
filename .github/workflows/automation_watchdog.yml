@@ -42,6 +42,7 @@ jobs:
       - name: Refresh Virtual Lab live snapshot
         run: |
           python scripts/virtual_lab_sync.py
+          cp data/virtual_lab_live.json /tmp/virtual_lab_live_candidate.json
 
       - name: Check freshness and self-heal stale workflows
         env:
@@ -61,6 +62,7 @@ jobs:
 
           now = datetime.now(timezone.utc)
           virtual = load('data/virtual_lab_live.json')
+          virtual_status = load('data/virtual_lab_status.json')
           pipeline = load('data/pipeline_status.json')
           odds = load('data/odds_builder.json')
           expansion = load('data/expansion_status.json')
@@ -81,6 +83,7 @@ jobs:
           odds_age = age_hours(odds.get('generated_at'))
           expansion_age = age_hours(expansion.get('updated_at'))
           virtual_age = age_hours(virtual.get('updated_at'))
+          virtual_status_age = age_hours(virtual_status.get('updated_at'))
           darts_age = age_hours(darts.get('updated_at'))
           table_tennis_age = age_hours(table_tennis.get('updated_at'))
           unified_age = age_hours(unified.get('generated_at'))
@@ -100,6 +103,10 @@ jobs:
                   return False
 
           actions = []
+          if virtual_status_age > 1 and not active('virtual-lab-collector.yml'):
+              r = subprocess.run(['gh', 'workflow', 'run', 'virtual-lab-collector.yml', '--ref', 'main'], text=True, capture_output=True)
+              actions.append({'workflow':'virtual-lab-collector.yml','action':'dispatch','status':'requested' if r.returncode == 0 else 'failed','detail':(r.stderr.strip() if r.returncode else 'Virtual Lab research-ledger self-heal')})
+
           if expansion_age > 4 and not active('live-expansion.yml'):
               r = subprocess.run(['gh', 'workflow', 'run', 'live-expansion.yml', '--ref', 'main'], text=True, capture_output=True)
               actions.append({'workflow':'live-expansion.yml','action':'dispatch','status':'requested' if r.returncode == 0 else 'failed','detail':(r.stderr.strip() if r.returncode else 'scheduled self-heal')})
@@ -139,12 +146,13 @@ jobs:
               'expansion_age_hours': round(expansion_age, 2),
               'virtual_lab_last_update': virtual.get('updated_at'),
               'virtual_lab_age_hours': round(virtual_age, 2),
+              'virtual_lab_status_age_hours': round(virtual_status_age, 2),
               'darts_age_hours': round(darts_age, 2),
               'table_tennis_age_hours': round(table_tennis_age, 2),
               'unified_upcoming_age_hours': round(unified_age, 2),
               'virtual_lab_events': virtual.get('events_count', 0),
               'virtual_lab_products': virtual.get('product_counts', {}),
-              'thresholds': {'pipeline_hours': 4, 'odds_builder_hours': 8, 'expansion_hours': 4, 'virtual_lab_hours': 1, 'darts_hours': 2, 'table_tennis_hours': 2, 'unified_upcoming_hours': 2},
+              'thresholds': {'pipeline_hours': 4, 'odds_builder_hours': 8, 'expansion_hours': 4, 'virtual_lab_hours': 1, 'virtual_lab_status_hours': 1, 'darts_hours': 2, 'table_tennis_hours': 2, 'unified_upcoming_hours': 2},
               'actions': actions,
               'policy': 'Watchdog proactively self-heals stale engines and force-restarts the actual core Live Prediction Pipeline; health publication is retried across concurrent data writers.'
           }
@@ -163,7 +171,10 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
             cp /tmp/automation_health.json data/automation_health.json
-            git add data/automation_health.json
+            if [ -f /tmp/virtual_lab_live_candidate.json ]; then
+              cp /tmp/virtual_lab_live_candidate.json data/virtual_lab_live.json
+            fi
+            git add data/automation_health.json data/virtual_lab_live.json
             if git diff --cached --quiet; then
               echo "No automation health change."
               exit 0
