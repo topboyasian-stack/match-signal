@@ -84,6 +84,14 @@ def isolated_rows(rows, source_rows, sport, engine):
         x=dict(r)
         x["sport"]=sport
         x["source_engine"]=engine
+        if not x.get("start_time") and x.get("start_time_ms"):
+            try:
+                x["start_time"]=datetime.fromtimestamp(float(x["start_time_ms"])/1000,tz=timezone.utc).isoformat()
+            except Exception:
+                pass
+        x["player_1"]=x.get("player_1") or x.get("home") or ""
+        x["player_2"]=x.get("player_2") or x.get("away") or ""
+        x["probability"]=num(x.get("confidence")) or num(x.get("model_prob_p1"))
         x["projection_tier"]="research_model" if x.get("qualified") else "testing_projection"
         x["evidence_depth"]="historical_walk_forward" if (x.get("promotion_gate") or x.get("qualified")) else "baseline_plus_current_feed"
         x["paper_only"]=True
