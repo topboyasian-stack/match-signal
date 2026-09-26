@@ -14,14 +14,10 @@ on:
   push:
     branches: [main]
     paths:
-      - 'scripts/predict_today.py'
-      - 'scripts/calibration.py'
-      - 'scripts/tennis_total_model.py'
-      - 'scripts/run_pipeline.py'
-      - 'scripts/scoped_pipeline.py'
-      - 'scripts/production_pipeline.py'
       - 'scripts/autopilot_guard.py'
       - 'scripts/football_forward_readiness.py'
+      - 'scripts/unified_upcoming.py'
+      - 'scripts/system_health_audit.py'
       - 'live.html'
       - '.github/workflows/autopilot-refresh.yml'
 
@@ -60,44 +56,8 @@ jobs:
           git fetch origin main
           git reset --hard origin/main
 
-      - name: Compile production Python modules
-        run: python -m py_compile scripts/calibration.py scripts/tennis_total_model.py scripts/predict_today.py scripts/run_pipeline.py scripts/scoped_pipeline.py scripts/production_pipeline.py scripts/autopilot_guard.py scripts/football_forward_readiness.py scripts/unified_upcoming.py scripts/system_health_audit.py
-
-      - name: Preserve independent live experimental league slices
-        run: |
-          python - <<'PY'
-          import json
-          from pathlib import Path
-          feed = Path('data/predictions.json')
-          rows = json.loads(feed.read_text()) if feed.exists() else []
-          preserved = {
-              'Eredivisie': [r for r in rows if r.get('league') == 'Eredivisie'],
-              'Saudi Pro League': [r for r in rows if r.get('league') == 'Saudi Pro League'],
-              'England Amateur - U21 Professional Development League': [r for r in rows if r.get('league') == 'England Amateur - U21 Professional Development League'],
-          }
-          Path('/tmp/preserved_live_leagues.json').write_text(json.dumps(preserved))
-          print({k: len(v) for k, v in preserved.items()})
-          PY
-
-      - name: Refresh current football + ATP/WTA predictions transactionally
-        run: python scripts/scoped_pipeline.py
-
-      - name: Restore live experimental league slices after core refresh
-        run: |
-          python - <<'PY'
-          import json
-          from pathlib import Path
-          feed = Path('data/predictions.json')
-          rows = json.loads(feed.read_text()) if feed.exists() else []
-          preserved = json.loads(Path('/tmp/preserved_live_leagues.json').read_text())
-          protected = set(preserved)
-          rows = [r for r in rows if r.get('league') not in protected]
-          for league_rows in preserved.values():
-              rows.extend(league_rows)
-          rows.sort(key=lambda r: str(r.get('start_time') or ''))
-          feed.write_text(json.dumps(rows, indent=2, ensure_ascii=False))
-          print('Restored protected live leagues:', {k: len(v) for k, v in preserved.items()})
-          PY
+      - name: Compile derived/health modules
+        run: python -m py_compile scripts/autopilot_guard.py scripts/football_forward_readiness.py scripts/unified_upcoming.py scripts/system_health_audit.py
 
       - name: Build football forward-planning readiness
         run: python scripts/football_forward_readiness.py
@@ -111,42 +71,35 @@ jobs:
       - name: Run autonomous freshness and source coverage guard
         run: python scripts/autopilot_guard.py
 
-      - name: Publish refreshed production data
+      - name: Publish derived readiness, unified board and health
         shell: bash
         run: |
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/predictions.json data/prediction_history.json data/accuracy.json data/pipeline_status.json data/autopilot_status.json data/football_forward_readiness.json data/unified_upcoming.json data/system_health.json
+          git add data/autopilot_status.json data/football_forward_readiness.json data/unified_upcoming.json data/system_health.json
           if git diff --cached --quiet; then
-            echo "Autopilot checked the feed; no data changes were required."
+            echo "Autopilot derived layer already current."
             exit 0
           fi
-          git commit -m "🤖 Autopilot refresh current predictions"
+          git commit -m "🤖 Refresh derived readiness and health layer"
           for attempt in 1 2 3; do
             if git push origin main; then
-              echo "Autopilot publication succeeded on attempt ${attempt}."
+              echo "Derived layer publication succeeded."
               exit 0
             fi
-
-            echo "Concurrent main update detected; rebuilding the data transaction against latest main (attempt ${attempt})."
             git fetch origin main
             git reset --hard origin/main
-
-            # Re-run the data transaction after syncing to the newest main.
-            # This avoids rebasing generated JSON against settlement/pipeline
-            # commits that may have changed the same data files concurrently.
-            python scripts/scoped_pipeline.py
-
-            python -c "import json; from pathlib import Path; feed=Path('data/predictions.json'); rows=json.loads(feed.read_text()) if feed.exists() else []; preserved=json.loads(Path('/tmp/preserved_live_leagues.json').read_text()); protected=set(preserved); rows=[r for r in rows if r.get('league') not in protected]; [rows.extend(v) for v in preserved.values()]; rows.sort(key=lambda r: str(r.get('start_time') or '')); feed.write_text(json.dumps(rows, indent=2, ensure_ascii=False)); print('Restored protected live leagues:', {k: len(v) for k, v in preserved.items()})"
-
             python scripts/football_forward_readiness.py
+            python scripts/unified_upcoming.py
+            python scripts/system_health_audit.py
             python scripts/autopilot_guard.py
-            git add data/predictions.json data/prediction_history.json data/accuracy.json data/pipeline_status.json data/autopilot_status.json data/football_forward_readiness.json
+            git add data/autopilot_status.json data/football_forward_readiness.json data/unified_upcoming.json data/system_health.json
             if git diff --cached --quiet; then
-              echo "Autopilot rebuild is already represented on latest main."
+              echo "Latest main already contains the derived layer."
               exit 0
             fi
-            git commit -m "🤖 Autopilot refresh current predictions"
+            git commit -m "🤖 Refresh derived readiness and health layer"
             sleep $((attempt * 2))
           done
           exit 1
