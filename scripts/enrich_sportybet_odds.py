@@ -132,14 +132,14 @@ def find_event(pred, events):
             overlap=len(sa&sb)/max(1,len(sa|sb))
             return max(overlap,SequenceMatcher(None,a,b).ratio())
         if pred.get('sport')=='football':
-            if similarity(names[0],pnames[0])<0.82 or similarity(names[1],pnames[1])<0.82:continue
+            if similarity(names[0],pnames[0])<0.78 or similarity(names[1],pnames[1])<0.78:continue
         elif names!=pnames:
-            if similarity(names[0],pnames[0])<0.86 or similarity(names[1],pnames[1])<0.86:continue
+            if similarity(names[0],pnames[0])<0.84 or similarity(names[1],pnames[1])<0.84:continue
         est=e.get('estimateStartTime')
         try:et=datetime.fromtimestamp(float(est)/1000,tz=timezone.utc) if est else None
         except (TypeError,ValueError):et=None
         delta=abs((et-pt).total_seconds()) if et and pt else 0
-        if delta<=36*3600 and (best is None or delta<best[0]):best=(delta,e)
+        if delta<=72*3600 and (best is None or delta<best[0]):best=(delta,e)
     return (best[1],'name_time') if best else (None,None)
 
 
@@ -176,7 +176,7 @@ def main():
     for sport in ('football','tennis'):
         try:
             events=[]
-            for page in range(1,6):
+            for page in range(1,11):
                 body=fetch(sport,page=page)
                 batch=flatten(body)
                 events.extend(batch)
@@ -212,7 +212,7 @@ def main():
             if totals:
                 p['sportybet_total_games_odds']=totals
             matched+=1
-    status={'updated_at':fetched_at,'source':'SportyBet NG web API via Cloudflare proxy','endpoint':ENDPOINT,'sports_requested':['football','tennis'],'fixtures_received':len(all_events),'predictions_matched':matched,'winner_price_records':winner_prices,'total_games_price_records':total_prices,'errors':errors,'status':'LIVE_MARKET_SYNC' if matched else 'NO_CURRENT_SPORTYBET_MATCHES','diagnostics':diagnostics}
+    status={'updated_at':fetched_at,'source':'SportyBet NG web API via Cloudflare proxy','endpoint':ENDPOINT,'sports_requested':['football','tennis'],'fixtures_received':len(all_events),'predictions_seen':sum(1 for p in predictions if p.get('sport') in SPORT_IDS),'predictions_matched':matched,'winner_price_records':winner_prices,'total_games_price_records':total_prices,'errors':errors,'status':'LIVE_MARKET_SYNC' if matched else 'NO_CURRENT_SPORTYBET_MATCHES','diagnostics':diagnostics}
     (DATA/'sportybet_odds_snapshot.json').write_text(json.dumps(status,indent=2)+'\n',encoding='utf-8')
     (DATA/'predictions.json').write_text(json.dumps(predictions,indent=2,ensure_ascii=False)+'\n',encoding='utf-8')
     print(json.dumps(status,indent=2))
