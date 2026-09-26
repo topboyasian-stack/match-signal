@@ -213,6 +213,25 @@ jobs:
         run: PYTHONPATH=. python scripts/prediction_breakdown.py
       - name: Verify append-only performance ledger
         run: PYTHONPATH=. python scripts/verify_performance_ledger.py
+
+      - name: Assert prediction feed is publishable
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          path = Path('data/predictions.json')
+          raw = path.read_text(encoding='utf-8').strip()
+          if not raw:
+              raise SystemExit('ABORT: predictions.json is empty after generation')
+          data = json.loads(raw)
+          if not isinstance(data, list) or len(data) < 10:
+              raise SystemExit(f'ABORT: predictions.json contains {len(data) if isinstance(data,list) else "non-list"} rows')
+          status = json.loads(Path('data/pipeline_status.json').read_text(encoding='utf-8'))
+          reported = int(status.get('prediction_count') or 0)
+          if reported and len(data) < min(reported, 10):
+              raise SystemExit(f'ABORT: feed rows {len(data)} inconsistent with pipeline prediction_count {reported}')
+          print(f'Publishable prediction feed verified: {len(data)} rows; reported count={reported}')
+          PY
       - name: Commit generated data and QA report
         id: commit-data
         shell: bash
