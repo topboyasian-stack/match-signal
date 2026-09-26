@@ -6,6 +6,7 @@ prices: if SportyBet data is unavailable, the bookmaker fields remain absent.
 """
 from __future__ import annotations
 import json, os, re
+from difflib import SequenceMatcher
 from datetime import datetime, timezone
 from pathlib import Path
 import requests
@@ -30,7 +31,8 @@ def load(path, default):
 def norm(s):
     s=str(s or '').lower()
     s=re.sub(r'[^a-z0-9]+',' ',s)
-    return ' '.join(s.split())
+    tokens=[t for t in s.split() if t not in {'fc','cf','sc','afc','ac','club','the'}]
+    return ' '.join(tokens)
 
 
 def person_key(s):
@@ -110,21 +112,34 @@ def find_event(pred, events):
     if pid:
         for e in events:
             if str(e.get('eventId') or '')==pid:return e,'event_id'
-    pnames={person_key(pred.get('player_1')),person_key(pred.get('player_2'))}
-    if pred.get('sport')=='football':pnames={norm(pred.get('home_team')),norm(pred.get('away_team'))}
-    if '' in pnames or len(pnames)!=2:return None,None
+    if pred.get('sport')=='football':
+        home_name=pred.get('home_team') or pred.get('player_1')
+        away_name=pred.get('away_team') or pred.get('player_2')
+        pnames=(norm(home_name),norm(away_name))
+        if not pnames[0] or not pnames[1]:return None,None
+    else:
+        pnames=(person_key(pred.get('player_1')),person_key(pred.get('player_2')))
+        if not pnames[0] or not pnames[1]:return None,None
     pstart=pred.get('start_time')
     try:pt=datetime.fromisoformat(str(pstart).replace('Z','+00:00')).astimezone(timezone.utc) if pstart else None
     except ValueError:pt=None
     best=None
     for e in events:
-        names={person_key(e.get('homeTeamName')),person_key(e.get('awayTeamName'))} if pred.get('sport')=='tennis' else {norm(e.get('homeTeamName')),norm(e.get('awayTeamName'))}
-        if names!=pnames:continue
+        names=(person_key(e.get('homeTeamName')),person_key(e.get('awayTeamName'))) if pred.get('sport')=='tennis' else (norm(e.get('homeTeamName')),norm(e.get('awayTeamName')))
+        def similarity(a,b):
+            if a==b:return 1.0
+            sa=set(a.split()); sb=set(b.split())
+            overlap=len(sa&sb)/max(1,len(sa|sb))
+            return max(overlap,SequenceMatcher(None,a,b).ratio())
+        if pred.get('sport')=='football':
+            if similarity(names[0],pnames[0])<0.82 or similarity(names[1],pnames[1])<0.82:continue
+        elif names!=pnames:
+            if similarity(names[0],pnames[0])<0.86 or similarity(names[1],pnames[1])<0.86:continue
         est=e.get('estimateStartTime')
         try:et=datetime.fromtimestamp(float(est)/1000,tz=timezone.utc) if est else None
         except (TypeError,ValueError):et=None
         delta=abs((et-pt).total_seconds()) if et and pt else 0
-        if delta<=18*3600 and (best is None or delta<best[0]):best=(delta,e)
+        if delta<=36*3600 and (best is None or delta<best[0]):best=(delta,e)
     return (best[1],'name_time') if best else (None,None)
 
 
