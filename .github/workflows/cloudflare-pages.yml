@@ -104,6 +104,7 @@ jobs:
           test -s data/predictions.json
           test -s virtual-lab-app.js
           test -s virtual-lab-confirmed-watch.js
+      test -s data/virtual_lab_participant_lifecycle.json
           python - <<'PY'
           import json
           from pathlib import Path
@@ -153,7 +154,7 @@ jobs:
           import { writeFileSync } from 'node:fs';
           const base = 'https://match-signal.pages.dev';
           const pages = ['/', '/football.html', '/tennis.html', '/basketball.html', '/darts.html', '/table-tennis.html', '/league.html?sport=football&league=England%20Amateur%20-%20U21%20Professional%20Development%20League', '/reports.html', '/live.html', '/expansion.html', '/virtual-lab/', '/virtual-lab', '/research.html', '/virtual-lab.html'];
-          const assets = ['/api/sportybet-virtual','/api/sportybet-darts','/api/sportybet-table-tennis','/expansion.js', '/expansion-odds-builder.js', '/live-analysis.js', '/live-data-worker.js', '/virtual-lab-app.js', '/virtual-lab-confirmed-watch.js', '/virtual-lab.css', '/_redirects', '/data/predictions.json', '/data/expansion_status.json', '/data/odds_builder.json', '/data/virtual_lab_live.json','/data/virtual_lab_model_eval.json','/data/virtual_lab_eligibility.json','/data/virtual_lab_participants/registry.json','/data/virtual_lab_participants/efootball_confirmed_watch.json'];
+          const assets = ['/api/sportybet-virtual','/api/sportybet-darts','/api/sportybet-table-tennis','/expansion.js', '/expansion-odds-builder.js', '/live-analysis.js', '/live-data-worker.js', '/virtual-lab-app.js', '/virtual-lab-confirmed-watch.js', '/virtual-lab.css', '/_redirects', '/data/predictions.json', '/data/expansion_status.json', '/data/odds_builder.json', '/data/virtual_lab_live.json','/data/virtual_lab_model_eval.json','/data/virtual_lab_eligibility.json','/data/virtual_lab_participants/registry.json','/data/virtual_lab_participant_lifecycle.json','/data/virtual_lab_participants/efootball_confirmed_watch.json'];
           const failures = [];
           async function get(path) {
             const r = await fetch(base + path + (path.includes('?') ? '&' : '?') + 'smoke=' + Date.now(), {cache:'no-store'});
@@ -215,6 +216,18 @@ jobs:
             } catch(e) { failures.push(path+' '+e.message); }
           }
                     try {
+            const {r,body}=await get('/data/virtual_lab_participant_lifecycle.json');
+            if (!r.ok) failures.push('/data/virtual_lab_participant_lifecycle.json HTTP '+r.status);
+            else {
+              const p=JSON.parse(body);
+              if (p.discovery_mode!=='feed_driven') failures.push('/data/virtual_lab_participant_lifecycle.json discovery_mode is not feed_driven');
+              if (!Number(p.participant_count)) failures.push('/data/virtual_lab_participant_lifecycle.json has no participants');
+              else if (Number(p.active_count||0)+Number(p.live_count||0)+Number(p.upcoming_count||0) < 1) failures.push('/data/virtual_lab_participant_lifecycle.json has no active/live/upcoming participants');
+              else console.log('Virtual Lab participant lifecycle passed: '+p.participant_count+' participants / '+(Number(p.active_count||0)+Number(p.live_count||0)+Number(p.upcoming_count||0))+' active');
+            }
+          } catch(e) { failures.push('/data/virtual_lab_participant_lifecycle.json '+e.message); }
+
+          try {
             const {r,body}=await get('/data/virtual_lab_model_eval.json');
             if (!r.ok) failures.push('/data/virtual_lab_model_eval.json HTTP '+r.status);
             else {
