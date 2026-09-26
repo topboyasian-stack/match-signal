@@ -214,11 +214,10 @@ def fetch_results(days=HISTORY_DAYS):
     # Table Tennis entirely, while named leagues may still expose completed
     # event rows with final scores.
     if not out:
-        league_terms=["TT Cup","TT Elite Series","Table Tennis","Tibhar"]
         league_ids=set()
-        for term in league_terms:
+        for sport_name in ("Table Tennis","table tennis"):
             try:
-                r=session.get(f"{TSDB_BASE}/searchleague.php",params={"l":term},timeout=20)
+                r=session.get(f"{TSDB_BASE}/search_all_leagues.php",params={"s":sport_name},timeout=20)
                 r.raise_for_status()
                 leagues=(r.json().get("leagues") or [])
                 for league in leagues:
@@ -228,7 +227,7 @@ def fetch_results(days=HISTORY_DAYS):
                         lid=str(league.get("idLeague") or "")
                         if lid:league_ids.add(lid)
             except Exception as exc:
-                errors.append(f"TheSportsDB league search {term}: {exc}")
+                errors.append(f"TheSportsDB table-tennis league list {sport_name}: {exc}")
         for lid in sorted(league_ids):
             try:
                 r=session.get(f"{TSDB_BASE}/eventspastleague.php",params={"id":lid},timeout=20)
