@@ -11,6 +11,7 @@ on:
   schedule:
     - cron: '11,31,51 * * * *'
   workflow_dispatch:
+  # Touch-triggered self-check: this workflow must be runnable immediately after remediation.
 permissions:
   contents: write
 concurrency:
