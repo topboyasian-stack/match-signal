@@ -81,6 +81,9 @@ jobs:
       - name: Run Virtual Lab v1 repository contract
         run: python scripts/validate_virtual_lab_v1.py
 
+      - name: Recompute system health after Virtual Lab refresh
+        run: python scripts/system_health_audit.py
+
       - name: Validate optional manual watch namespace
         run: |
           python - <<'PY'
@@ -156,7 +159,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           for attempt in 1 2 3 4; do
-            git add data/virtual_lab_pending.json data/virtual_lab_history.json data/virtual_lab_status.json data/virtual_lab_eligibility.json data/virtual_lab_model_eval.json data/virtual_lab_participant_profiles.json data/virtual_lab_participant_h2h.json data/virtual_lab_external_h2h.json data/virtual_lab_confirmed_participant_results.json data/virtual_lab_participants/registry.json data/virtual_lab_participant_lifecycle.json data/virtual_lab_archive/settlements
+            git add data/virtual_lab_pending.json data/virtual_lab_history.json data/virtual_lab_status.json data/virtual_lab_eligibility.json data/virtual_lab_model_eval.json data/virtual_lab_participant_profiles.json data/virtual_lab_participant_h2h.json data/virtual_lab_external_h2h.json data/virtual_lab_confirmed_participant_results.json data/virtual_lab_participants/registry.json data/virtual_lab_participant_lifecycle.json data/virtual_lab_archive/settlements data/system_health.json
 
             if git diff --cached --quiet; then
               echo "Virtual Lab collector produced no data changes."
