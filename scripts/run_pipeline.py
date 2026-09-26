@@ -315,7 +315,7 @@ amercan_to_prob = ns["american_to_prob"]
 normalise = ns["normalise"]
 
 
-def fetch_current_predictions(history=None):
+def fetch_current_predictions(history=None, include_watch=False):
     predictions, errors = [], []
     qc = {
         "rejected_total": 0,
@@ -389,7 +389,20 @@ def fetch_current_predictions(history=None):
                             "confidence": round(confidence, 4),
                             "signal_components": quality,
                         })
+                    if include_watch:
+                        prediction["prediction_status"] = "watch_projection"
+                        prediction["projection_tier"] = "baseline_plus_enrichment"
+                        prediction["evidence_depth"] = "ranking_form_market_or_recent_form"
+                        prediction["qualification_status"] = "not_qualified"
+                        prediction["paper_only"] = True
+                        predictions.append(prediction)
+                        accepted += 1
                     continue
+                prediction.setdefault("prediction_status", "qualified_candidate")
+                prediction.setdefault("projection_tier", "deep_model")
+                prediction.setdefault("evidence_depth", "ranking_form_market_recent_form")
+                prediction.setdefault("qualification_status", "candidate")
+                prediction["paper_only"] = True
                 predictions.append(prediction)
                 accepted += 1
             if accepted == 0:
