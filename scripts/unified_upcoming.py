@@ -209,7 +209,38 @@ def build_virtual_events(history):
 
 def main():
     rows=[]
-    core_rows(rows,load("predictions.json",[]))
+    core_source=load("predictions.json",[])
+    core_rows(rows,core_source)
+
+    # Independent live refresh fallback: if the committed core feed is stale or
+    # unexpectedly empty, rebuild current Football/Tennis projections directly
+    # from the public schedule/model engine for the unified board. This does not
+    # replace the canonical production artifact; it keeps the forward desk alive.
+    try:
+        core_generated_at=dt(load("pipeline_status.json",{}).get("updated_at"))
+        core_stale=(core_generated_at is None or core_generated_at<NOW-timedelta(hours=4))
+    except Exception:
+        core_stale=True
+    if core_stale or len(core_source)<10:
+        try:
+            from predict_today import fetch_current_predictions
+            live_predictions, live_errors, _qc = fetch_current_predictions()
+            existing_ids={str(r.get("event_id") or "") for r in rows}
+            for r in live_predictions:
+                if str(r.get("event_id") or "") in existing_ids:continue
+                x=dict(r)
+                x["source_engine"]="unified_live_refresh"
+                x["projection_tier"]="deep_model"
+                x["evidence_depth"]="fresh_public_schedule_plus_model"
+                x["paper_only"]=True
+                add(rows,x)
+                existing_ids.add(str(x.get("event_id") or ""))
+            live_meta={"attempted":True,"rows":len(live_predictions),"errors":live_errors}
+        except Exception as exc:
+            live_meta={"attempted":True,"rows":0,"errors":[str(exc)]}
+    else:
+        live_meta={"attempted":False,"rows":0,"errors":[]}
+
     pdl_rows(rows,load("pdl_predictions.json",[]))
     isolated_rows(rows,load("darts_upcoming.json",[]),"darts","DARTS-X-1.0")
     isolated_rows(rows,load("table_tennis_upcoming.json",[]),"table_tennis","TABLE-TENNIS-X-1.0")
@@ -252,7 +283,7 @@ def main():
             "market_rule":"Market prices are reference/enrichment data, never displayed as independent model probabilities.",
             "real_money":False,
         },
-        "summary":{"events":len(final),"sports":dict(sorted(sports.items())),"dates":dict(sorted(dates.items())),"virtual_model":virtual_meta},
+        "summary":{"events":len(final),"sports":dict(sorted(sports.items())),"dates":dict(sorted(dates.items())),"virtual_model":virtual_meta,"live_core_refresh":live_meta},
         "events":final,
     }
     OUTPUT.write_text(json.dumps(result,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
