@@ -227,7 +227,7 @@ async function renderUnifiedBoard(){
         if(date?.value==="today" && day!==today)return false;
         if(date?.value==="tomorrow" && day!==tomorrow)return false;
         if(date?.value==="3"){
-          const d=dt(x.start_time); if(!d||d>new Date(now.getTime()+3*86400000))return false;
+          const d=new Date(x.start_time); if(Number.isNaN(d.getTime())||d>new Date(now.getTime()+3*86400000))return false;
         }
         if(q){
           const hay=[x.sport,x.league,x.competition,x.player_1,x.player_2,x.home,x.away,x.pick,x.selection,marketLabel(x)].join(" ").toLowerCase();
