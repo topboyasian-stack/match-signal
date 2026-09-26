@@ -62,6 +62,9 @@ jobs:
         run: python -m py_compile scripts/virtual_lab_collector.py
       - name: Syntax-check model evaluation engine
         run: python -m py_compile scripts/virtual_lab_model_eval.py
+      - name: Syntax-check participant lifecycle collector
+        run: python -m py_compile scripts/virtual_lab_collector.py
+
       - name: Syntax-check participant profile engine
         run: python -m py_compile scripts/virtual_lab_participant_profiles.py
       - name: Syntax-check confirmed participant tracker
@@ -120,6 +123,7 @@ jobs:
               'data/virtual_lab_confirmed_participants.json',
               'data/virtual_lab_confirmed_participant_results.json',
               'data/virtual_lab_participants/registry.json',
+              'data/virtual_lab_participant_lifecycle.json',
           ]:
               p = Path(name)
               data = json.loads(p.read_text())
@@ -134,7 +138,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           for attempt in 1 2 3 4; do
-            git add data/virtual_lab_pending.json data/virtual_lab_history.json data/virtual_lab_status.json data/virtual_lab_eligibility.json data/virtual_lab_model_eval.json data/virtual_lab_participant_profiles.json data/virtual_lab_participant_h2h.json data/virtual_lab_external_h2h.json data/virtual_lab_confirmed_participant_results.json data/virtual_lab_participants/registry.json data/virtual_lab_archive/settlements
+            git add data/virtual_lab_pending.json data/virtual_lab_history.json data/virtual_lab_status.json data/virtual_lab_eligibility.json data/virtual_lab_model_eval.json data/virtual_lab_participant_profiles.json data/virtual_lab_participant_h2h.json data/virtual_lab_external_h2h.json data/virtual_lab_confirmed_participant_results.json data/virtual_lab_participants/registry.json data/virtual_lab_participant_lifecycle.json data/virtual_lab_archive/settlements
 
             if git diff --cached --quiet; then
               echo "Virtual Lab collector produced no data changes."
