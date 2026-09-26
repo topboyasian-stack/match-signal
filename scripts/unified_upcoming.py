@@ -260,6 +260,26 @@ def build_virtual_events(history, lifecycle, eligibility):
         float(best.get("ece",9))<=float(market.get("ece",9))+.02)
     participant_gate=bool((eval_art.get("participant_feature_gate") or {}).get("pass"))
 
+    # Validated product-bootstrap lane for new eFootball competition names.
+    # This preserves the existing model/line/odds/edge gates while removing the
+    # brittle requirement that every newly appearing competition already have
+    # its own promoted-history record.
+    product_bootstrap_gate={}
+    for product,metrics in (eval_art.get("by_product") or {}).items():
+        if not str(product).startswith("efootball_") or not isinstance(metrics,dict):
+            continue
+        market_m=metrics.get("market") or {}
+        viable_m=[]
+        for variant_name in ("poisson","poisson_prior","efootball_shape"):
+            m=metrics.get(variant_name)
+            if not isinstance(m,dict): continue
+            if int(m.get("n") or 0)<300: continue
+            if float(m.get("brier",9))>=float(market_m.get("brier",0)): continue
+            if float(m.get("log_loss",9))>=float(market_m.get("log_loss",0)): continue
+            if float(m.get("ece",9))>float(market_m.get("ece",9))+.02: continue
+            viable_m.append(variant_name)
+        product_bootstrap_gate[str(product)]=bool(viable_m)
+
     # Fit one stable lambda per product from the latest settled history.
     # Never recompute the grid separately for every fixture/market.
     product_points={}
@@ -371,22 +391,24 @@ def build_virtual_events(history, lifecycle, eligibility):
             if product.startswith("efootball"):
                 if not base_model_gate:
                     qualification_status="BASE_MODEL_GATE_PENDING"
-                elif not active_comp:
-                    qualification_status="RAW_COMPETITION_GATE_PENDING"
-                elif not active_line:
-                    qualification_status="RAW_LINE_GATE_PENDING"
-                elif not (model_comp and model_line):
-                    qualification_status="MODEL_SCOPE_GATE_PENDING"
+                elif not model_line:
+                    qualification_status="MODEL_LINE_SCOPE_GATE_PENDING"
                 elif edge is None:
                     qualification_status="MARKET_EDGE_PENDING"
                 elif edge<0.02:
                     qualification_status="EDGE_BELOW_2PCT"
-                else:
+                elif active_comp and model_comp:
                     qualification_status="BETTING_QUALIFIED_PAPER"
+                elif product_bootstrap_gate.get(product,False):
+                    qualification_status="BETTING_QUALIFIED_PAPER_BOOTSTRAP"
+                elif not active_comp:
+                    qualification_status="RAW_COMPETITION_GATE_PENDING"
+                else:
+                    qualification_status="MODEL_SCOPE_GATE_PENDING"
             else:
                 qualification_status="RESEARCH_PROJECTION"
 
-            qualified=qualification_status=="BETTING_QUALIFIED_PAPER"
+            qualified=qualification_status in {"BETTING_QUALIFIED_PAPER","BETTING_QUALIFIED_PAPER_BOOTSTRAP"}
             add(out,{
                 "sport":"virtual",
                 "product":product,
@@ -417,6 +439,7 @@ def build_virtual_events(history, lifecycle, eligibility):
                 "participant_history_rows":participant_history,
                 "participant_hot_watch":participant_hot,
                 "participant_enhancement_gate":participant_gate,
+                "product_bootstrap_gate":product_bootstrap_gate.get(product,False),
                 "base_model_gate":base_model_gate,
                 "raw_competition_eligible":active_comp,
                 "raw_line_eligible":active_line,
@@ -425,7 +448,7 @@ def build_virtual_events(history, lifecycle, eligibility):
                 "qualification_status":qualification_status,
                 "betting_qualified":qualified,
                 "qualified_for_builder":qualified,
-                "qualification_engine":"Virtual Lab base walk-forward gate + product/competition/line evidence + current O/U edge",
+                "qualification_engine":"Virtual Lab base walk-forward gate + qualified line + current SportyBet edge + competition evidence OR validated product-bootstrap evidence",
                 "model":"Virtual Lab base O/U model",
                 "model_version":"VL-BOARD-2.0",
                 "paper_only":True,
