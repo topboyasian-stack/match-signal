@@ -28,6 +28,10 @@ SOFASCORE_HOSTS=[
     "https://api.sofascore.com/api/v1/sport/table-tennis/scheduled-events",
     "https://www.sofascore.com/api/v1/sport/table-tennis/scheduled-events",
 ]
+SOFASCORE_LAST_HOSTS=[
+    "https://api.sofascore.com/api/v1/sport/table-tennis/events/last",
+    "https://www.sofascore.com/api/v1/sport/table-tennis/events/last",
+]
 BENCHMARK=0.80325064
 HISTORY_DAYS=21
 K=28.0
@@ -98,17 +102,15 @@ def winner_market(row):
     return ms[0] if ms else None
 
 def fetch_results(days=HISTORY_DAYS):
-    """Collect completed table-tennis results from a public live-score feed.
+    """Collect completed table-tennis results from public Sofascore feeds.
 
-    TheSportsDB's generic Table Tennis day filter has produced zero historical
-    rows for the competitions carried by SportyBet (including TT Cup/Elite
-    Series). Sofascore exposes dated table-tennis schedules with completed
-    scores, so it is used as the primary public result source with TheSportsDB
-    retained as a fallback.
+    Primary path: dated schedules. Secondary path: paginated recent-event feed,
+    which is useful when the dated route is blocked by a CDN rule. TheSportsDB
+    remains a final fallback.
     """
     out=[]; errors=[]
     session=requests.Session()
-    session.headers.update({"User-Agent":"MatchSignal-Table-Tennis-X/1.1","Accept":"application/json"})
+    session.headers.update({"User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/152.0.0.0 Safari/537.36","Accept":"application/json, text/plain, */*"})
 
     def append_sofascore_event(e):
         if not isinstance(e,dict):return
@@ -143,38 +145,46 @@ def fetch_results(days=HISTORY_DAYS):
         })
 
     today=datetime.now(timezone.utc).date()
+    schedule_errors=0
     for i in range(min(days,14),-1,-1):
         day=today-timedelta(days=i)
-        try:
-            payload=None
-            last_error=None
-            for base in SOFASCORE_HOSTS:
+        payload=None;last_error=None
+        for base in SOFASCORE_HOSTS:
+            try:
+                r=session.get(f"{base}/{day.isoformat()}",
+                    headers={"Accept":"application/json, text/plain, */*","Referer":"https://www.sofascore.com/table-tennis"},
+                    timeout=20)
+                r.raise_for_status();payload=r.json();break
+            except Exception as exc:last_error=exc
+        if payload is None:
+            schedule_errors+=1
+            last_error=last_error or RuntimeError("Sofascore dated feed unavailable")
+        else:
+            for e in payload.get("events") or []:append_sofascore_event(e)
+        if payload is None and last_error:errors.append(f"Sofascore dated {day.isoformat()}: {last_error}")
+        time.sleep(0.10)
+
+    # When every dated endpoint is blocked, try recent-event pages. Each page
+    # carries completed events from the live public index and is independent of
+    # the calendar route.
+    if not out and schedule_errors:
+        for page in range(0,12):
+            payload=None;last_error=None
+            for base in SOFASCORE_LAST_HOSTS:
                 try:
-                    r=session.get(
-                        f"{base}/{day.isoformat()}",
-                        headers={
-                            "Accept":"application/json, text/plain, */*",
-                            "Referer":"https://www.sofascore.com/table-tennis",
-                            "User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/152.0.0.0 Safari/537.36",
-                        },
-                        timeout=20
-                    )
-                    r.raise_for_status()
-                    payload=r.json()
-                    break
-                except Exception as exc:
-                    last_error=exc
+                    r=session.get(f"{base}/{page}",
+                        headers={"Accept":"application/json, text/plain, */*","Referer":"https://www.sofascore.com/table-tennis"},
+                        timeout=20)
+                    r.raise_for_status();payload=r.json();break
+                except Exception as exc:last_error=exc
             if payload is None:
-                raise last_error or RuntimeError("Sofascore returned no payload")
+                if last_error:errors.append(f"Sofascore recent page {page}: {last_error}")
+                continue
             events=payload.get("events") or []
             for e in events:append_sofascore_event(e)
-        except Exception as exc:
-            errors.append(f"Sofascore {day.isoformat()}: {exc}")
-        time.sleep(0.15)
+            if not events:break
+            time.sleep(0.10)
 
-    # Fallback: retain the previous TheSportsDB collector for any historical
-    # rows it can provide, but never replace successful Sofascore history with
-    # an empty response.
     if not out:
         now=datetime.now(timezone.utc).date()
         for i in range(min(days,7),0,-1):
@@ -193,7 +203,7 @@ def fetch_results(days=HISTORY_DAYS):
                     eid=str(e.get("idEvent") or hashlib.sha1(f"table_tennis|{day}|{a}|{b}|{ha}|{hb}".encode()).hexdigest()[:16])
                     out.append({"event_id":eid,"source":"TheSportsDB","timestamp":iso(stamp) or day.isoformat()+"T00:00:00+00:00","competition":str(e.get("strLeague") or ""),"player_1":a,"player_2":b,"score_1":ha,"score_2":hb})
             except Exception as exc:errors.append(f"TheSportsDB {day.isoformat()}: {exc}")
-            time.sleep(0.20)
+            time.sleep(0.15)
 
     dedup={x["event_id"]:x for x in out}
     return sorted(dedup.values(),key=lambda x:ts(x["timestamp"])),errors
