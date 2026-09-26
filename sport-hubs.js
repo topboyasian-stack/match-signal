@@ -81,25 +81,45 @@ function unifiedMarketLine(x){
     '<span class="ms-market-q '+(x.betting_qualified?"qualified":"paper")+'">'+E(q)+'</span>'+
   '</div>';
 }
+function primaryPrediction(rows){
+  const rank=x=>{
+    const q=x.betting_qualified||x.qualification_status==="BETTING_QUALIFIED_PAPER"||x.qualification_status==="BETTING_QUALIFIED_PAPER_BOOTSTRAP";
+    const tier=String(x.projection_tier||"");
+    const p=Number(probabilityValue(x));
+    const edge=Number(x.model_edge_vs_market);
+    return [
+      q?100:0,
+      tier.includes("deep")?30:tier.includes("research")?20:10,
+      Number.isFinite(edge)?Math.max(-10,Math.min(20,edge*100)):0,
+      Number.isFinite(p)?p*10:0,
+      bookmakerOdds(x)!=null?1:0
+    ];
+  };
+  return [...rows].sort((a,b)=>{
+    const ra=rank(a),rb=rank(b);
+    for(let i=0;i<ra.length;i++)if(ra[i]!==rb[i])return rb[i]-ra[i];
+    return String(a.market||"").localeCompare(String(b.market||""));
+  })[0]||null;
+}
 function unifiedRow(group){
   const rows=group.rows;
-  const first=rows[0];
-  const when=DT(first.start_time);
-  const anyQualified=rows.some(x=>x.betting_qualified);
-  const anyLive=rows.some(x=>String(x.event_state||"").toUpperCase()==="LIVE");
-  const allBookmaker=rows.some(x=>bookmakerOdds(x)!=null);
-  const statuses=[...new Set(rows.map(x=>x.prediction_status||x.qualification_status).filter(Boolean))];
-  const tier=evidenceLabel(first);
-  const status=anyQualified?"BETTING QUALIFIED · PAPER":
-    (anyLive?"LIVE RESEARCH":
-    (String(first.projection_tier||"").includes("deep")?"DEEP MODEL":"RESEARCH PROJECTION"));
+  const x=primaryPrediction(rows);
+  if(!x)return "";
+  const when=DT(x.start_time);
+  const qualified=Boolean(x.betting_qualified);
+  const live=String(x.event_state||"").toUpperCase()==="LIVE";
+  const book=bookmakerOdds(x);
+  const status=qualified?"BETTING QUALIFIED · PAPER":
+    (live?"LIVE RESEARCH":
+    (String(x.projection_tier||"").includes("deep")?"DEEP MODEL":"RESEARCH PROJECTION"));
+  const q=x.betting_qualified?"BETTING-QUALIFIED":(x.qualification_status||"PAPER · NOT QUALIFIED");
   return '<article class="ms-up-row ms-fixture-card">'+
-    '<div class="ms-up-time"><b>'+E(when)+'</b><span>'+E(String(first.start_time||"").slice(0,10))+'</span></div>'+
-    '<div class="ms-up-event"><div class="ms-up-meta"><span class="ms-sport-pill">'+sportIcon(first.sport)+' '+E(first.sport==="table_tennis"?"Table Tennis":(first.sport||"Sport"))+'</span><span>'+E(first.league||first.competition||"Unclassified")+'</span><span class="ms-fixture-market-count">'+rows.length+' predictions</span></div>'+
-    '<div class="ms-up-match">'+E(first.player_1||first.home||"Participant 1")+' <span>vs</span> '+E(first.player_2||first.away||"Participant 2")+'</div>'+
-    '<div class="ms-market-stack">'+rows.map(unifiedMarketLine).join("")+'</div>'+
-    '<div class="ms-fixture-foot"><span>'+E(statuses.join(" · ")||"Projection active")+'</span><span>'+E(allBookmaker?"SportyBet quotes attached":"SportyBet quotes not matched")+'</span></div></div>'+
-    '<div class="ms-up-status"><span class="ms-up-status-badge '+(anyQualified?"deep":anyLive?"testing":"research")+'">'+E(status)+'</span><span class="ms-up-qual '+(anyQualified?"qualified":"paper")+'">'+E(anyQualified?"BETTING-QUALIFIED":"PAPER · NOT QUALIFIED")+'</span><small>'+E(tier)+'</small></div>'+
+    '<div class="ms-up-time"><b>'+E(when)+'</b><span>'+E(String(x.start_time||"").slice(0,10))+'</span></div>'+
+    '<div class="ms-up-event"><div class="ms-up-meta"><span class="ms-sport-pill">'+sportIcon(x.sport)+' '+E(x.sport==="table_tennis"?"Table Tennis":(x.sport||"Sport"))+'</span><span>'+E(x.league||x.competition||"Unclassified")+'</span><span class="ms-fixture-market-count">1 prediction</span></div>'+
+    '<div class="ms-up-match">'+E(x.player_1||x.home||"Participant 1")+' <span>vs</span> '+E(x.player_2||x.away||"Participant 2")+'</div>'+
+    '<div class="ms-market-stack">'+unifiedMarketLine(x)+'</div>'+
+    '<div class="ms-fixture-foot"><span>'+E(q)+'</span><span>'+E(book!=null?"SportyBet quote matched to this prediction":"SportyBet quote not matched")+'</span></div></div>'+
+    '<div class="ms-up-status"><span class="ms-up-status-badge '+(qualified?"deep":live?"testing":"research")+'">'+E(status)+'</span><span class="ms-up-qual '+(qualified?"qualified":"paper")+'">'+E(qualified?"BETTING-QUALIFIED":"PAPER · NOT QUALIFIED")+'</span><small>'+E(evidenceLabel(x))+'</small></div>'+
   '</article>';
 }
 async function renderUnifiedBoard(){
