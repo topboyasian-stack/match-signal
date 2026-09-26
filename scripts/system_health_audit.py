@@ -129,8 +129,7 @@ out={
     "policy":"Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
     "paper_only":True,
 }
-(DATA/"system_health.json").write_text(json.dumps(out,indent=2,ensure_ascii=False)+"
-",encoding="utf-8")
+(DATA/"system_health.json").write_text(json.dumps(out,indent=2,ensure_ascii=False)+"\\n",encoding="utf-8")
 print(json.dumps(out,indent=2))
 if status=="FAIL":
     print("CRITICAL health state recorded; watchdog self-healing remains responsible for remediation.")
