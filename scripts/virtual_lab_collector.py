@@ -23,6 +23,7 @@ PENDING_PATH=DATA/"virtual_lab_pending.json"
 HISTORY_PATH=DATA/"virtual_lab_history.json"
 STATUS_PATH=DATA/"virtual_lab_status.json"
 PARTICIPANT_REGISTRY_PATH=DATA/"virtual_lab_participants"/"registry.json"
+PARTICIPANT_LIFECYCLE_PATH=DATA/"virtual_lab_participant_lifecycle.json"
 PARTICIPANT_ARCHIVE_DIR=DATA/"virtual_lab_archive"/"settlements"
 
 BASE="https://match-signal.pages.dev"
@@ -637,6 +638,224 @@ def build_participant_registry(history):
     }
 
 
+def build_participant_lifecycle(history, current_events, previous_state):
+    """Build a feed-driven participant lifecycle from current feed + settled history."""
+    previous_profiles={}
+    if isinstance(previous_state,dict):
+        for p in previous_state.get("profiles") or []:
+            if isinstance(p,dict) and p.get("participant_key"):
+                previous_profiles[str(p["participant_key"])]=p
+
+    event_map={}
+    for row in history:
+        if not isinstance(row,dict) or row.get("win") is None:
+            continue
+        product=str(row.get("product") or "")
+        if product not in SUPPORTED_PRODUCTS:
+            continue
+        event_id=str(row.get("event_id") or "")
+        stamp=str(row.get("timestamp") or "")
+        if not event_id or not stamp:
+            continue
+        score_text=str(row.get("score") or "")
+        m=re.search(r"(\d+(?:\.\d+)?)\s*[:\-]\s*(\d+(?:\.\d+)?)",score_text)
+        if not m:
+            continue
+        home=float(m.group(1)); away=float(m.group(2))
+        key=f"{product}|{event_id}|{stamp}"
+        event_map.setdefault(key,{
+            "product":product,"event_id":event_id,"timestamp":stamp,
+            "competition":str(row.get("competition") or ""),
+            "participant_1":str(row.get("participant_1") or ""),
+            "participant_2":str(row.get("participant_2") or ""),
+            "score_home":home,"score_away":away,
+        })
+
+    current_by_key={}
+    now=datetime.now(timezone.utc)
+    for event in current_events if isinstance(current_events,list) else []:
+        if not isinstance(event,dict):
+            continue
+        product=str(event.get("product") or "")
+        if product not in SUPPORTED_PRODUCTS:
+            continue
+        start_ms=num(event.get("start_time_ms"))
+        if start_ms is None:
+            continue
+        if start_ms<100000000000:
+            start_ms*=1000
+        start=datetime.fromtimestamp(start_ms/1000,timezone.utc)
+        status_text=str(event.get("match_status") or "").lower()
+        is_live=bool(event.get("live")) or bool(re.search(r"(live|started|inprogress|playing)",status_text))
+        for side in (1,2):
+            raw=str(event.get("participant_1" if side==1 else "participant_2") or "")
+            identity=stable_participant_identity(product,raw)
+            if not identity:
+                continue
+            key=stable_participant_key(product,raw)
+            item=current_by_key.setdefault(key,{
+                "participant_key":key,"participant":identity,"product":product,
+                "today_upcoming":0,"today_live":0,"today_fixtures":[],"current_fixture_ids":[],
+                "last_current_seen":None,"last_current_live":None,
+            })
+            if is_live:
+                item["today_live"]+=1
+            else:
+                item["today_upcoming"]+=1
+            item["current_fixture_ids"].append(str(event.get("event_id") or ""))
+            item["today_fixtures"].append({
+                "event_id":str(event.get("event_id") or ""),
+                "start_time":start.isoformat(),
+                "competition":str(event.get("competition") or ""),
+                "opponent":str(event.get("participant_2" if side==1 else "participant_1") or ""),
+                "live":is_live,
+            })
+            stamp=start.isoformat()
+            if item["last_current_seen"] is None or stamp>item["last_current_seen"]:
+                item["last_current_seen"]=stamp
+            if is_live and (item["last_current_live"] is None or stamp>item["last_current_live"]):
+                item["last_current_live"]=stamp
+
+    history_groups={}
+    for ev in event_map.values():
+        for side in (1,2):
+            raw=ev["participant_1"] if side==1 else ev["participant_2"]
+            identity=stable_participant_identity(ev["product"],raw)
+            if not identity:
+                continue
+            key=stable_participant_key(ev["product"],raw)
+            gf=ev["score_home"] if side==1 else ev["score_away"]
+            ga=ev["score_away"] if side==1 else ev["score_home"]
+            history_groups.setdefault(key,[]).append({
+                "timestamp":ev["timestamp"],
+                "event_id":ev["event_id"],
+                "competition":ev["competition"],
+                "goals_for":gf,"goals_against":ga,
+                "total":gf+ga,
+                "opponent":stable_participant_identity(ev["product"],ev["participant_2"] if side==1 else ev["participant_1"]) or (ev["participant_2"] if side==1 else ev["participant_1"]),
+            })
+
+    profiles=[]
+    all_keys=set(previous_profiles)|set(history_groups)|set(current_by_key)
+    for key in all_keys:
+        previous=previous_profiles.get(key,{})
+        product=key.split("|",1)[0] if "|" in key else ""
+        cur=current_by_key.get(key,{})
+        identity=cur.get("participant") or previous.get("participant")
+        if not identity and history_groups.get(key):
+            raw=(history_groups[key][0].get("opponent") or "")
+            identity=previous.get("participant") or raw
+        if not identity:
+            continue
+        settled_events=sorted(history_groups.get(key,[]),key=lambda x:str(x["timestamp"]))
+        n=len(settled_events)
+        wins=sum(1 for x in settled_events if x["goals_for"]>x["goals_against"])
+        draws=sum(1 for x in settled_events if x["goals_for"]==x["goals_against"])
+        losses=n-wins-draws
+        recent=settled_events[-10:]
+        style={}
+        for line in (1.5,3.5,4.5):
+            decisive=[x for x in settled_events if x["total"]!=line]
+            recent_dec=[x for x in recent if x["total"]!=line]
+            over=sum(x["total"]>line for x in decisive)
+            rover=sum(x["total"]>line for x in recent_dec)
+            style[str(line)]={
+                "n":len(decisive),"over":over,"under":len(decisive)-over,
+                "over_rate":over/len(decisive) if decisive else None,
+                "recent_n":len(recent_dec),
+                "recent_over_rate":rover/len(recent_dec) if recent_dec else None,
+            }
+
+        monitor=[]
+        for line in (1.5,3.5,4.5):
+            s=style[str(line)]
+            if s["n"]<8 or s["over_rate"] is None:
+                continue
+            shrunk=(s["over"]+2)/(s["n"]+4)
+            recent_rate=s["recent_over_rate"]
+            for direction,p in (("OVER",shrunk),("UNDER",1-shrunk)):
+                directional=max(p,1-p)
+                edge=directional-0.5
+                recency_boost=0
+                if recent_rate is not None:
+                    recency_value=recent_rate if direction=="OVER" else 1-recent_rate
+                    recency_boost=max(0,recency_value-0.5)
+                strength=edge*0.7+recency_boost*0.3
+                if strength>=0.10:
+                    monitor.append({"line":line,"direction":direction,"strength":round(strength,4),"n":s["n"],"smoothed_rate":round(p,4),"recent_rate":recent_rate})
+        monitor.sort(key=lambda x:(-x["strength"],-x["n"],x["line"]))
+        grade="INSUFFICIENT"
+        if monitor:
+            grade="HOT_WATCH" if monitor[0]["strength"]>=0.18 and monitor[0]["n"]>=12 else "WATCH"
+
+        last_settled=settled_events[-1]["timestamp"] if settled_events else previous.get("last_settled_at")
+        last_upcoming=cur.get("last_current_seen") or previous.get("last_upcoming_at")
+        last_live=cur.get("last_current_live") or previous.get("last_live_at")
+        if cur.get("today_live",0):
+            status="LIVE"
+        elif cur.get("today_upcoming",0):
+            status="UPCOMING"
+        elif last_settled:
+            status="DORMANT"
+        else:
+            status="DISCOVERED"
+
+        profile={
+            "participant_key":key,"product":product,"participant":identity,
+            "status":status,"active_now":status in {"LIVE","UPCOMING"},
+            "rediscovered":bool(cur and not previous.get("active_now")),
+            "first_seen_at":previous.get("first_seen_at") or (settled_events[0]["timestamp"] if settled_events else cur.get("last_current_seen")),
+            "last_seen_at":cur.get("last_current_seen") or previous.get("last_seen_at") or last_settled,
+            "last_upcoming_at":last_upcoming,"last_live_at":last_live,"last_settled_at":last_settled,
+            "lifetime_feed_appearances":int(previous.get("lifetime_feed_appearances") or 0)+int(cur.get("today_upcoming",0)+cur.get("today_live",0)),
+            "today_upcoming":int(cur.get("today_upcoming",0)),
+            "today_live":int(cur.get("today_live",0)),
+            "settled_matches":n,"wins":wins,"draws":draws,"losses":losses,
+            "win_rate":wins/n if n else None,
+            "avg_goals_for":sum(x["goals_for"] for x in settled_events)/n if n else None,
+            "avg_goals_against":sum(x["goals_against"] for x in settled_events)/n if n else None,
+            "avg_total_goals":sum(x["total"] for x in settled_events)/n if n else None,
+            "recent_form":recent[::-1],"last10":recent[::-1],
+            "style":style,"monitor_candidates":monitor[:10],
+            "monitor_grade":grade,
+            "current_fixtures":cur.get("today_fixtures",[]),
+            "current_fixture_ids":cur.get("current_fixture_ids",[]),
+            "source_mode":"daily_live_feed_plus_settled_history",
+        }
+        if last_upcoming:
+            try:
+                lu=datetime.fromisoformat(str(last_upcoming).replace("Z","+00:00"))
+                profile["days_since_current_feed"]=max(0,round((now-lu).total_seconds()/86400,2))
+            except Exception:
+                profile["days_since_current_feed"]=None
+        else:
+            profile["days_since_current_feed"]=None
+        profile["lines"]={k:{
+            "n":v["n"],"over":v["over"],"over_rate":v["over_rate"],
+            "recent_n":v["recent_n"],"recent_over_rate":v["recent_over_rate"]
+        } for k,v in style.items()}
+        top=monitor[0] if monitor else None
+        profile["hot"]={"line":top["line"],"direction":top["direction"],"strength":top["strength"],"basis_n":top["n"]} if top else None
+        profiles.append(profile)
+
+    profiles.sort(key=lambda x:(0 if x["active_now"] else 1,0 if x["monitor_grade"]=="HOT_WATCH" else 1,-(x["settled_matches"] or 0),str(x["participant"]).casefold()))
+    return {
+        "schema_version":1,
+        "generated_at":now_iso(),
+        "source_contract":"Daily SportyBet upcoming/live feed + automatic settled history; no fixed participant roster.",
+        "product_scope":sorted(SUPPORTED_PRODUCTS),
+        "discovery_mode":"feed_driven",
+        "retirement_rule":"Absence from current future/live feed makes a participant DORMANT; history is retained for learning and reappearance reactivates the same identity key.",
+        "participant_count":len(profiles),
+        "active_count":sum(1 for p in profiles if p["active_now"]),
+        "live_count":sum(1 for p in profiles if p["status"]=="LIVE"),
+        "upcoming_count":sum(1 for p in profiles if p["status"]=="UPCOMING"),
+        "dormant_count":sum(1 for p in profiles if p["status"]=="DORMANT"),
+        "hot_watch_count":sum(1 for p in profiles if p["monitor_grade"]=="HOT_WATCH"),
+        "profiles":profiles,
+    }
+
+
 def append_settlement_archive(rows):
     if not rows:
         return 0
@@ -754,6 +973,9 @@ def main():
     registry=build_participant_registry(history)
     PARTICIPANT_REGISTRY_PATH.parent.mkdir(parents=True,exist_ok=True)
     save_json(PARTICIPANT_REGISTRY_PATH,registry)
+    previous_lifecycle=load_json(PARTICIPANT_LIFECYCLE_PATH,{})
+    lifecycle=build_participant_lifecycle(history,events,previous_lifecycle)
+    save_json(PARTICIPANT_LIFECYCLE_PATH,lifecycle)
     archived_new=append_settlement_archive(settled_rows)
     save_json(STATUS_PATH,{
         "updated_at":now_iso(),
@@ -773,6 +995,12 @@ def main():
         "sportybet_settled":settlement_meta["sportybet_settled"],
         "settlement_conflicts":settlement_meta["conflicts"],
         "participant_fingerprint_count":len(participant_rows),
+        "participant_lifecycle_count":lifecycle["participant_count"],
+        "participant_lifecycle_active":lifecycle["active_count"],
+        "participant_lifecycle_live":lifecycle["live_count"],
+        "participant_lifecycle_upcoming":lifecycle["upcoming_count"],
+        "participant_lifecycle_dormant":lifecycle["dormant_count"],
+        "participant_lifecycle_hot_watch":lifecycle["hot_watch_count"],
         "participant_ou15_leaders":participant_ou15[:25],
         "participant_model_policy":{
             "same_product_only":True,
