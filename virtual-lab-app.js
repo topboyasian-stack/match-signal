@@ -21,7 +21,7 @@ const PARTICIPANT_H2H='/data/virtual_lab_participant_h2h.json';
 const EXTERNAL_H2H='/data/virtual_lab_external_h2h.json';
 const CONFIRMED_WATCH='/data/virtual_lab_participants/efootball_confirmed_watch.json';
 const SUPPORTED_VIRTUAL_PRODUCTS=new Set(['efootball_gt','efootball_adriatic','vfootball','zoom']);
-const state={rows:[],filtered:[],live:[],liveMode:'none',liveUpdated:null,picks:[],builder:[],historyLoaded:false,modelRows:[],modelEvents:[],modelGate:false,modelHoldout:null,modelEvaluation:null,participantProfiles:null,participantH2H:null,externalH2H:null,confirmedWatch:null,participantLifecycle:null,eligibility:{eligible_competitions:['Virtual'],raw_eligible_competitions:['Esoccer H2H GG League','Europa League','FA Cup','International (Virtual eComp)','La Liga (Virtual eComp)','Premier League 2x6','Virtual','Volta Premier League'],eligible_ou_lines:[],raw_eligible_ou_lines:[0.5,1.5,2.5,7.5],experimental_ou_lines:[1.5],priority_ou_lines:[1.5,3.5,4.5],model_qualified_competitions:['Virtual','Volta Champions League A'],model_qualified_ou_lines:[3.5,4.5],eligible_markets:['ou']},predictionCache:new Map(),modelCalibration:{}};
+const state={rows:[],filtered:[],live:[],liveMode:'none',liveUpdated:null,picks:[],builder:[],historyLoaded:false,modelRows:[],modelEvents:[],modelGate:false,participantModelGate:false,baseModelGate:false,modelHoldout:null,modelEvaluation:null,participantProfiles:null,participantH2H:null,externalH2H:null,confirmedWatch:null,participantLifecycle:null,eligibility:{eligible_competitions:['Virtual'],raw_eligible_competitions:['Esoccer H2H GG League','Europa League','FA Cup','International (Virtual eComp)','La Liga (Virtual eComp)','Premier League 2x6','Virtual','Volta Premier League'],eligible_ou_lines:[],raw_eligible_ou_lines:[0.5,1.5,2.5,7.5],experimental_ou_lines:[1.5],priority_ou_lines:[1.5,3.5,4.5],model_qualified_competitions:['Virtual','Volta Champions League A'],model_qualified_ou_lines:[3.5,4.5],eligible_markets:['ou']},predictionCache:new Map(),modelCalibration:{}};
 
 const $=id=>document.getElementById(id);
 const esc=v=>{const d=document.createElement('div');d.textContent=String(v??'');return d.innerHTML};
@@ -597,7 +597,7 @@ function modelOverForEvent(event,priorEvents,line,useParticipant=true){
   }
   const recentCal=recentModelCalibration(event.product,line,rawBase);
   const base=recentCal.prob;
-  const participant=useParticipant&&state.modelGate?(event._livePrediction?artifactParticipantPrior(event,line):participantPrior(priorEvents,event,line)):{prob:null,n:0,totalN:0,pairProb:null,pairN:0,weight:0,entityProb:null};
+  const participant=useParticipant&&state.participantModelGate?(event._livePrediction?artifactParticipantPrior(event,line):participantPrior(priorEvents,event,line)):{prob:null,n:0,totalN:0,pairProb:null,pairN:0,weight:0,entityProb:null};
   const prob=participant.prob!=null?clamp01((1-participant.weight)*base+participant.weight*participant.prob):base;
   return {
     prob,
@@ -754,7 +754,7 @@ async function renderModelLab(){
     const pct=v=>v==null?'—':(Number(v)*100).toFixed(1)+'%';
     const row=(name,a,b)=>'<tr><td>'+esc(name)+'</td><td>'+((a&&a.n)||'—')+'</td><td>'+fmt(a&&a.brier)+'</td><td>'+fmt(b&&b.brier)+'</td><td>'+fmt(a&&a.log_loss)+'</td><td>'+fmt(b&&b.log_loss)+'</td><td>'+pct(b&&b.hit_rate)+'</td><td>'+pct(b&&b.ece)+'</td></tr>';
     const h=artifact.holdout_metrics||{};
-    let html='<div class="modelGrid"><div><h3>Strict walk-forward evaluation</h3><p class="muted">Every event is scored chronologically using only settled events that occurred before it. The final '+pct(artifact.holdout?.fraction)+' event block is untouched during discovery. No user-reported tickets enter the dataset.</p></div><div><h3>Model gate</h3><p class="muted">Lower Brier/log loss are better. Calibration is measured with expected calibration error. Hit rate is the selected-side hit rate at p≥0.50.</p><p><strong>Participant feature:</strong> '+(artifact.participant_feature_gate?.pass?'QUALIFIED ON HOLDOUT':'NOT QUALIFIED YET')+'</p></div></div>';
+    let html='<div class="modelGrid"><div><h3>Strict walk-forward evaluation</h3><p class="muted">Every event is scored chronologically using only settled events that occurred before it. The final '+pct(artifact.holdout?.fraction)+' event block is untouched during discovery. No user-reported tickets enter the dataset.</p></div><div><h3>Model gate</h3><p class="muted">Lower Brier/log loss are better. Calibration is measured with expected calibration error. Hit rate is the selected-side hit rate at p≥0.50.</p><p><strong>Base model:</strong> '+(state.baseModelGate?'QUALIFIED ON HOLDOUT':'NOT QUALIFIED')+' · <strong>Participant enhancement:</strong> '+(state.participantModelGate?'QUALIFIED ON HOLDOUT':'RESEARCH ONLY')+'</p></div></div>';
     html+='<table><thead><tr><th>Variant</th><th>Holdout N</th><th>Brier</th><th>Δ vs market</th><th>Log loss</th><th>Δ vs market</th><th>Hit rate</th><th>ECE</th></tr></thead><tbody>';
     const market=h.market||{}; for(const [name,label] of [['market','SportyBet de-vig baseline'],['poisson','Line-ladder Poisson'],['poisson_prior','Poisson + product prior'],['efootball_shape','eFootball full-distribution model'],['participant_model','Participant-aware model']]){
       const m=h[name]; const db=m&&market.brier!=null?m.brier-market.brier:null; const dl=m&&market.log_loss!=null?m.log_loss-market.log_loss:null;
@@ -777,7 +777,7 @@ async function renderModelLab(){
   Object.entries(scores.products).forEach(([p,x])=>{html+='<tr><td>'+esc(p)+'</td><td>'+x.model.n+'</td><td>'+cell(x.baseline.brier)+'</td><td>'+cell(x.model.brier)+'</td><td>'+delta(x.baseline.brier,x.model.brier)+'</td><td>'+cell(x.baseline.logLoss)+'</td><td>'+cell(x.model.logLoss)+'</td><td>'+delta(x.baseline.logLoss,x.model.logLoss)+'</td></tr>';});
   html+='</tbody></table>';
   state.modelHoldout=scores.holdout;
-  state.modelGate=!!(scores.holdout&&scores.holdout.n>=20&&scores.holdout.model.brier<scores.holdout.baseline.brier&&scores.holdout.model.logLoss<scores.holdout.baseline.logLoss);
+  state.baseModelGate=!!(scores.holdout&&scores.holdout.n>=20&&scores.holdout.model.brier<scores.holdout.baseline.brier&&scores.holdout.model.logLoss<scores.holdout.baseline.logLoss); state.participantModelGate=false; state.modelGate=state.baseModelGate;
   host.innerHTML=html;
 }
 
@@ -1073,7 +1073,7 @@ function updateLabPulse(){
   const settled=(state.rows||[]).filter(r=>typeof r.win==='boolean');
   const wins=settled.filter(r=>r.win).length;
   if(acc)acc.textContent=settled.length?fmtPct(wins/settled.length):'—';
-  if(model)model.textContent=state.modelGate?'PARTICIPANT ACTIVE':'POISSON + EVIDENCE';
+  if(model)model.textContent=state.participantModelGate?'PARTICIPANT ACTIVE':(state.baseModelGate?'BASE MODEL ACTIVE':'MODEL WAIT');
 }
 
 function updateDiagnostics(extra={}){
@@ -1085,7 +1085,7 @@ function updateDiagnostics(extra={}){
     '<div><small>Live events</small><b>'+liveCount+'</b></div>'+ 
     '<div><small>Settled rows</small><b>'+historyCount+'</b></div>'+ 
     '<div><small>Participants</small><b>'+participantCount+'</b></div>'+ 
-    '<div><small>Model gate</small><b>'+esc(state.modelGate?'PASS':'WAIT')+'</b></div>'+
+    '<div><small>Base model gate</small><b>'+esc(state.baseModelGate?'PASS':'WAIT')+'</b></div><div><small>Participant enhancement</small><b>'+esc(state.participantModelGate?'PASS':'RESEARCH')+'</b></div>'+
     '<div><small>Route</small><b>'+esc(PRODUCTION_ROUTE)+'</b></div>'+
     '</div>'+
     '<p class="muted">'+esc(extra.message||'Canonical pipeline: SportyBet → normalization → identity → observation → settlement → history → model.')+'</p>';
@@ -1651,8 +1651,20 @@ async function loadModelEvaluation(){
     const r=await fetch(MODEL_EVAL+'?t='+Date.now(),{cache:'no-store',headers:{'Accept':'application/json'}});
     if(!r.ok)throw new Error('model eval HTTP '+r.status);
     state.modelEvaluation=await r.json();
-    const gate=state.modelEvaluation.participant_feature_gate;
-    state.modelGate=!!(gate&&gate.pass);
+    const artifact=state.modelEvaluation||{};
+    const h=artifact.holdout_metrics||{};
+    const market=h.market;
+    const variants=['efootball_shape','poisson_prior','poisson'];
+    const viable=variants.map(name=>({name,m:h[name]})).filter(x=>x.m&&Number(x.m.n||0)>=30&&Number.isFinite(Number(x.m.brier))&&Number.isFinite(Number(x.m.log_loss))&&Number.isFinite(Number(x.m.ece)));
+    const best=viable.slice().sort((a,b)=>(Number(a.m.brier)-Number(b.m.brier))||(Number(a.m.log_loss)-Number(b.m.log_loss)))[0]?.m||null;
+    state.baseModelGate=!!(market&&best&&
+      Number(best.brier)<Number(market.brier)&&
+      Number(best.log_loss)<Number(market.log_loss)&&
+      Number(best.ece)<=Number(market.ece)+0.02&&
+      Number(best.n)>=30);
+    const gate=artifact.participant_feature_gate;
+    state.participantModelGate=!!(gate&&gate.pass);
+    state.modelGate=state.baseModelGate;
     return true;
   }catch(e){
     state.modelEvaluation=null;
