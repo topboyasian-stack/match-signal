@@ -101,7 +101,7 @@ def load_virtual_history():
     history=load("virtual_lab_history.json",[])
     return [r for r in history if isinstance(r,dict) and r.get("market")=="ou" and r.get("win") is not None]
 
-def build_virtual_events(history):
+def build_virtual_events(history, lifecycle):
     """Lightweight forward projection for the unified board.
 
     The dedicated Virtual Lab remains responsible for full walk-forward,
@@ -110,6 +110,11 @@ def build_virtual_events(history):
     """
     live=load("virtual_lab_live.json",{})
     events=live.get("events") if isinstance(live,dict) else []
+    lifecycle_profiles={}
+    if isinstance(lifecycle,dict):
+        for p in lifecycle.get("profiles") or []:
+            if isinstance(p,dict) and p.get("participant_key"):
+                lifecycle_profiles[str(p.get("participant_key"))]=p
     out=[]
     for e in events if isinstance(events,list) else []:
         start=dt(e.get("start_time"))
@@ -120,6 +125,11 @@ def build_virtual_events(history):
             continue
         home=str(e.get("participant_1") or e.get("team_1") or e.get("home") or "")
         away=str(e.get("participant_2") or e.get("team_2") or e.get("away") or "")
+        p1_profile=lifecycle_profiles.get(f"{product}|{home.strip().casefold()}") if home else None
+        p2_profile=lifecycle_profiles.get(f"{product}|{away.strip().casefold()}") if away else None
+        participant_history=max(int((p1_profile or {}).get("settled_matches") or 0),int((p2_profile or {}).get("settled_matches") or 0))
+        participant_hot=any((p or {}).get("monitor_grade")=="HOT_WATCH" for p in (p1_profile,p2_profile) if isinstance(p,dict))
+        participant_status="PARTICIPANT_HOT_WATCH" if participant_hot else ("PARTICIPANT_TRACKED" if participant_history>=3 else "PARTICIPANT_NEW")
         for market in e.get("markets") or []:
             name=str(market.get("name") or "").lower()
             mid=str(market.get("id") or "")
@@ -165,7 +175,12 @@ def build_virtual_events(history):
                 "model_fair_odds":round(1/confidence,3) if confidence else None,
                 "prediction_status":"research_projection",
                 "projection_tier":"deep_research_projection",
-                "evidence_depth":"baseline_poisson_on_current_market_line",
+                "evidence_depth":"participant_lifecycle_plus_baseline_poisson" if participant_history>=3 else "feed_discovered_baseline_poisson",
+                "participant_status":participant_status,
+                "participant_history_rows":participant_history,
+                "participant_hot_watch":participant_hot,
+                "qualification_status":"research_only_pending_deep_gate",
+                "qualified_for_builder":False,
                 "model":"Virtual Lab baseline projection (full deep model isolated to research.html)",
                 "model_version":"VL-BOARD-1.0",
                 "paper_only":True,
@@ -175,6 +190,7 @@ def build_virtual_events(history):
 
 def main():
     rows=[]
+    lifecycle=load("virtual_lab_participant_lifecycle.json",{})
     core_source=load("predictions.json",[])
     core_rows(rows,core_source)
 
@@ -211,7 +227,7 @@ def main():
     isolated_rows(rows,load("darts_upcoming.json",[]),"darts","DARTS-X-1.0")
     isolated_rows(rows,load("table_tennis_upcoming.json",[]),"table_tennis","TABLE-TENNIS-X-1.0")
     core_rows(rows,load("basketball_predictions.json",[]))
-    virtual, virtual_meta=build_virtual_events(load_virtual_history())
+    virtual, virtual_meta=build_virtual_events(load_virtual_history(), lifecycle)
     rows.extend(virtual)
 
     # Fallback/augmentation: some expansion artifacts are generated separately
