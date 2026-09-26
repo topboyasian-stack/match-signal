@@ -101,7 +101,7 @@ def load_virtual_history():
     history=load("virtual_lab_history.json",[])
     return [r for r in history if isinstance(r,dict) and r.get("market")=="ou" and r.get("win") is not None]
 
-def build_virtual_events(history, lifecycle):
+def build_virtual_events(history, lifecycle, eligibility):
     """Lightweight forward projection for the unified board.
 
     The dedicated Virtual Lab remains responsible for full walk-forward,
@@ -111,6 +111,11 @@ def build_virtual_events(history, lifecycle):
     live=load("virtual_lab_live.json",{})
     events=live.get("events") if isinstance(live,dict) else []
     lifecycle_profiles={}
+    eligibility=eligibility if isinstance(eligibility,dict) else {}
+    model_comps={str(x).casefold() for x in (eligibility.get("model_qualified_competitions_by_product",{}).get("efootball_gt",[]) or [])}
+    model_lines={float(x) for x in (eligibility.get("model_qualified_ou_lines_by_product",{}).get("efootball_gt",[]) or [])}
+    raw_comps={str(x).casefold() for x in (eligibility.get("raw_eligible_competitions_by_product",{}).get("efootball_gt",[]) or [])}
+    raw_lines={float(x) for x in (eligibility.get("raw_eligible_ou_lines_by_product",{}).get("efootball_gt",[]) or [])}
     if isinstance(lifecycle,dict):
         for p in lifecycle.get("profiles") or []:
             if isinstance(p,dict) and p.get("participant_key"):
@@ -179,7 +184,11 @@ def build_virtual_events(history, lifecycle):
                 "participant_status":participant_status,
                 "participant_history_rows":participant_history,
                 "participant_hot_watch":participant_hot,
-                "qualification_status":"research_only_pending_deep_gate",
+                "qualification_status":(
+                    "MODEL_LINE_ELIGIBLE_PENDING_EDGE" if product=="efootball_gt" and str(e.get("competition") or e.get("tournament") or "").casefold() in model_comps and float(line) in model_lines
+                    else "RAW_EVIDENCE_PENDING_MODEL_GATE" if product=="efootball_gt" and str(e.get("competition") or e.get("tournament") or "").casefold() in raw_comps and float(line) in raw_lines
+                    else "RESEARCH_ONLY_PENDING_DEEP_GATE"
+                ),
                 "qualified_for_builder":False,
                 "model":"Virtual Lab baseline projection (full deep model isolated to research.html)",
                 "model_version":"VL-BOARD-1.0",
@@ -227,7 +236,7 @@ def main():
     isolated_rows(rows,load("darts_upcoming.json",[]),"darts","DARTS-X-1.0")
     isolated_rows(rows,load("table_tennis_upcoming.json",[]),"table_tennis","TABLE-TENNIS-X-1.0")
     core_rows(rows,load("basketball_predictions.json",[]))
-    virtual, virtual_meta=build_virtual_events(load_virtual_history(), lifecycle)
+    virtual, virtual_meta=build_virtual_events(load_virtual_history(), lifecycle, load("virtual_lab_eligibility.json",{}))
     rows.extend(virtual)
 
     # Fallback/augmentation: some expansion artifacts are generated separately
