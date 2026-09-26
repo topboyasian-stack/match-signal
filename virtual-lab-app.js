@@ -848,12 +848,13 @@ function scopedEligibility(mapKey,product,fallback){
 }
 function isResearchDeskEvent(e){
   if(!e||!SUPPORTED_VIRTUAL_PRODUCTS.has(String(e.product||'')))return false;
-  const name=competitionKey(e.competition||e.tournament||'');
-  const raw=scopedEligibility("raw_eligible_competitions_by_product",e.product,state.eligibility.raw_eligible_competitions||state.eligibility.eligible_competitions||[]);
-  const model=scopedEligibility("model_qualified_competitions_by_product",e.product,state.eligibility.model_qualified_competitions||[]);
-  return isConfirmedWatchedEvent(e)||
-    raw.some(x=>competitionKey(x)===name)||
-    model.some(x=>competitionKey(x)===name);
+  // Visibility is market/source driven, not promotion driven. Any current
+  // future event with a readable O/U market can enter the research desk.
+  // Evidence depth determines status/qualification later.
+  return Array.isArray(e.markets)&&e.markets.some(function(m){
+    const mid=String(m?.id||''),name=String(m?.name||'').toLowerCase();
+    return mid==='18'||mid==='189'||name.includes('total')||name.includes('over/under');
+  });
 }
 function isEligibleResearchEvent(e){
   const name=competitionKey(e.competition||e.tournament||'');
