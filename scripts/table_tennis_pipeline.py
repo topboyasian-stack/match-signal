@@ -25,6 +25,7 @@ SPORTYBET_PROXY="https://match-signal.pages.dev/api/sportybet-table-tennis"
 SPORTYBET="https://www.sportybet.com/api/ng/factsCenter/pcUpcomingEvents"
 SPORTYBET_HEADERS={"Accept":"application/json, text/plain, */*","Content-Type":"application/json","Current-Country":"NG","Origin":"https://www.sportybet.com","Referer":"https://www.sportybet.com/ng/","User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/152.0.0.0 Safari/537.36"}
 TSDB="https://www.thesportsdb.com/api/v1/json/123/eventsday.php"
+TSDB_BASE="https://www.thesportsdb.com/api/v1/json/123"
 SPORTYBET_ORIGIN="https://www.sportybet.com"
 SPORTYBET_HEADERS={"Accept":"application/json, text/plain, */*","Content-Type":"application/json","Current-Country":"NG","Origin":"https://www.sportybet.com","Referer":"https://www.sportybet.com/ng/","User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/152.0.0.0 Safari/537.36"}
 SPORTYBET_LIVE_PATHS=[
