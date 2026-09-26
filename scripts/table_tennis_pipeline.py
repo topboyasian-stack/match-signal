@@ -192,6 +192,47 @@ def fetch_results(days=HISTORY_DAYS):
             if not events:break
             time.sleep(0.10)
 
+    # TheSportsDB league-specific fallback. The generic day filter can miss
+    # Table Tennis entirely, while named leagues may still expose completed
+    # event rows with final scores.
+    if not out:
+        league_terms=["TT Cup","TT Elite Series","Table Tennis","Tibhar"]
+        league_ids=set()
+        for term in league_terms:
+            try:
+                r=session.get(f"{TSDB_BASE}/searchleague.php",params={"l":term},timeout=20)
+                r.raise_for_status()
+                leagues=(r.json().get("leagues") or [])
+                for league in leagues:
+                    sport=str(league.get("strSport") or "").lower()
+                    name=str(league.get("strLeague") or "").lower()
+                    if "table tennis" in sport or "table tennis" in name or "tt " in name:
+                        lid=str(league.get("idLeague") or "")
+                        if lid:league_ids.add(lid)
+            except Exception as exc:
+                errors.append(f"TheSportsDB league search {term}: {exc}")
+        for lid in sorted(league_ids):
+            try:
+                r=session.get(f"{TSDB_BASE}/eventspastleague.php",params={"id":lid},timeout=20)
+                r.raise_for_status()
+                events=r.json().get("events") or []
+                for e in events:
+                    a=str(e.get("strHomeTeam") or e.get("strPlayer1") or "").strip()
+                    b=str(e.get("strAwayTeam") or e.get("strPlayer2") or "").strip()
+                    if not a or not b or "/" in a or "/" in b:continue
+                    try:ha=int(float(e.get("intHomeScore")));hb=int(float(e.get("intAwayScore")))
+                    except (TypeError,ValueError):continue
+                    if ha==hb:continue
+                    stamp=e.get("strTimestamp") or e.get("dateEvent") or ""
+                    eid=str(e.get("idEvent") or hashlib.sha1(f"table_tennis|{lid}|{a}|{b}|{ha}|{hb}".encode()).hexdigest()[:16])
+                    out.append({
+                        "event_id":eid,"source":"TheSportsDB named Table Tennis league",
+                        "timestamp":iso(stamp) or datetime.now(timezone.utc).isoformat(),
+                        "competition":str(e.get("strLeague") or ""),
+                        "player_1":a,"player_2":b,"score_1":ha,"score_2":hb
+                    })
+            except Exception as exc:
+                errors.append(f"TheSportsDB league {lid}: {exc}")
     if not out:
         now=datetime.now(timezone.utc).date()
         for i in range(min(days,7),0,-1):
@@ -388,7 +429,7 @@ def main():
     qualifying=[b for b in chosen["bands"] if b["n"]>=MIN_GATE_N and b["accuracy"] is not None]
     gate_row=max(qualifying,key=lambda b:(b["accuracy"],b["wilson_lower_90"] or 0)) if qualifying else {"threshold":0.75,"n":0,"accuracy":None,"wilson_lower_90":None}
     promoted=bool(gate_row["accuracy"] is not None and gate_row["n"]>=MIN_GATE_N and gate_row["accuracy"]>BENCHMARK and (gate_row.get("wilson_lower_90") or 0)>=0.75)
-    model={"version":"TABLE-TENNIS-X-1.0","generated_at":datetime.now(timezone.utc).isoformat(),"scope":"Table Tennis pre-match winner only","history_events":len(history),"source_results":"SportyBet NG live result capture; public historical fallback","source_odds":"SportyBet NG current odds","frozen_vfootball_benchmark":BENCHMARK,"variants":variants,"selected_variant":selected,"precision_gate":{"minimum_n":MIN_GATE_N,"selected":gate_row,"beats_vfootball":bool(gate_row.get("accuracy") is not None and gate_row["accuracy"]>BENCHMARK),"promoted":promoted},"mode":"PAPER_ONLY"}
+    model={"version":"TABLE-TENNIS-X-1.0","generated_at":datetime.now(timezone.utc).isoformat(),"scope":"Table Tennis pre-match winner only","history_events":len(history),"source_results":"SportyBet NG live result capture; TheSportsDB named Table Tennis leagues","source_odds":"SportyBet NG current odds","frozen_vfootball_benchmark":BENCHMARK,"variants":variants,"selected_variant":selected,"precision_gate":{"minimum_n":MIN_GATE_N,"selected":gate_row,"beats_vfootball":bool(gate_row.get("accuracy") is not None and gate_row["accuracy"]>BENCHMARK),"promoted":promoted},"mode":"PAPER_ONLY"}
     upcoming,odds_errors=fetch_sportybet()
     ratings={}
     for row,p,actual in build_variant(history,selected):
