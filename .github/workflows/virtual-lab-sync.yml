@@ -41,6 +41,9 @@ jobs:
           MATCH_SIGNAL_PUBLIC_BASE: https://match-signal.pages.dev
         run: python scripts/virtual_lab_sync.py
 
+      - name: Recalculate whole-system health from fresh live snapshot
+        run: python scripts/system_health_audit.py
+
       - name: Validate collected feed
         run: |
           python - <<'PY'
@@ -62,7 +65,8 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           cp data/virtual_lab_live.json /tmp/virtual_lab_live_candidate.json
-          git add data/virtual_lab_live.json
+          cp data/system_health.json /tmp/system_health_candidate.json
+          git add data/virtual_lab_live.json data/system_health.json
           if git diff --cached --quiet; then
             echo "No snapshot change."
             exit 0
@@ -76,6 +80,7 @@ jobs:
             echo "Concurrent main update detected; comparing snapshot timestamps (attempt ${attempt})."
             git fetch origin main
             git reset --hard origin/main
+            cp /tmp/system_health_candidate.json data/system_health.json
             python - <<'PY'
           import json
           from datetime import datetime, timezone
@@ -98,7 +103,7 @@ jobs:
             if [ "$rc" -ne 0 ]; then
               exit "$rc"
             fi
-            git add data/virtual_lab_live.json
+            git add data/virtual_lab_live.json data/system_health.json
             git commit -m "🤖 Refresh Virtual Lab live feed"
             sleep $((attempt * 2))
           done
