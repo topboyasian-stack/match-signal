@@ -7,6 +7,9 @@ import json, math
 from datetime import datetime, timezone
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]; DATA=ROOT/'data'
+MIN_SETTLED=100
+MIN_VALUE_TRIALS=30
+MIN_VALUE_ROI=0.0
 
 def load(name, default):
     try: return json.loads((DATA/name).read_text(encoding='utf-8'))
@@ -29,14 +32,71 @@ def evaluate(rows,sport):
         if z: bins.append({'range':f'{lo:.2f}-{min(hi,1):.2f}','n':len(z),'accuracy':round(sum(p.get('pick')==p.get('actual') for p in z)/len(z),4),'mean_confidence':round(sum(float(p.get('confidence') or 0) for p in z)/len(z),4)})
     return {'settled':len(r),'accuracy':round(acc,4),'brier':round(sum(bs)/len(bs),4) if bs else None,'baseline_brier':baseline,'bins':bins}
 
+
+def american_to_decimal(odds):
+    try:
+        x=float(odds)
+        if x>0:return 1+x/100
+        if x<0:return 1+100/abs(x)
+    except (TypeError,ValueError,ZeroDivisionError):
+        return None
+    return None
+
+def value_trial(row):
+    if not row.get('settled') or row.get('actual') not in {'p1','p2','draw'}:
+        return None
+    edge=row.get('edge')
+    ev=(row.get('value') or {}).get('expected_value')
+    odds=row.get('market_odds')
+    pick=str(row.get('pick') or '')
+    if not isinstance(edge,(int,float)) or not isinstance(ev,(int,float)):
+        return None
+    if float(edge)<0.035 or float(ev)<0.05:
+        return None
+    if pick not in {'p1','draw','p2'} or not isinstance(odds,list) or len(odds)!=3:
+        return None
+    dec=american_to_decimal(odds[{'p1':0,'draw':1,'p2':2}[pick]])
+    if dec is None:return None
+    roi=(dec-1.0) if row.get('actual')==pick else -1.0
+    return {'roi':roi,'won':row.get('actual')==pick,'edge':float(edge),'expected_value':float(ev)}
+
+def value_testing(rows,sport):
+    trials=[x for r in rows if str(r.get('sport','')).lower()==sport for x in [value_trial(r)] if x]
+    if not trials:
+        return {'trials':0,'wins':0,'roi_units':0.0,'roi':None,'status':'NO_VALUE_TRIALS'}
+    units=sum(x['roi'] for x in trials)
+    roi=units/len(trials)
+    return {'trials':len(trials),'wins':sum(bool(x['won']) for x in trials),'roi_units':round(units,6),'roi':round(roi,6),'status':'PASS' if len(trials)>=MIN_VALUE_TRIALS and roi>MIN_VALUE_ROI else 'INSUFFICIENT_OR_NONPOSITIVE'}
+
 def main():
     history=load('prediction_history.json',[])+load('basketball_history.json',[])
     metrics={s:evaluate(history,s) for s in ('football','tennis','basketball')}
     gate={}
     for sport,m in metrics.items():
-        enough=m['settled']>=100
+        enough=m['settled']>=MIN_SETTLED
         better=m['brier'] is not None and m['brier']<m['baseline_brier']
-        gate[sport]={'live_eligible':False,'paper_only':True,'reasons':([f"need >=100 settled picks (have {m['settled']})"] if not enough else [])+([f"Brier {m['brier']} has not beaten baseline {m['baseline_brier']}"] if m['brier'] is not None and not better else [])+['positive-EV testing also requires contemporaneous market odds']}
+        value=value_testing(history,sport)
+        reasons=[]
+        if not enough:
+            reasons.append(f"need >={MIN_SETTLED} settled picks (have {m['settled']})")
+        if m['brier'] is not None and not better:
+            reasons.append(f"Brier {m['brier']} has not beaten baseline {m['baseline_brier']}")
+        if value['trials']<MIN_VALUE_TRIALS:
+            reasons.append(f"need >={MIN_VALUE_TRIALS} settled value trials with frozen odds/value evidence (have {value['trials']})")
+        elif value['roi'] is None or value['roi']<=MIN_VALUE_ROI:
+            reasons.append(f"value-test realized ROI {value['roi']} is not > {MIN_VALUE_ROI}")
+        model_risk_approval_passed=bool(
+            enough and better and value['trials']>=MIN_VALUE_TRIALS and
+            value['roi'] is not None and value['roi']>MIN_VALUE_ROI
+        )
+        gate[sport]={
+            'live_eligible':False,
+            'model_risk_approval_passed':model_risk_approval_passed,
+            'live_trading_enabled':False,
+            'paper_only':True,
+            'value_testing':value,
+            'reasons':reasons,
+        }
     for name in ('predictions.json','basketball_predictions.json'):
         path=DATA/name; rows=load(name,[])
         for p in rows:
