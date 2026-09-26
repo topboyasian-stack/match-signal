@@ -24,7 +24,10 @@ SPORTYBET_PROXY="https://match-signal.pages.dev/api/sportybet-table-tennis"
 SPORTYBET="https://www.sportybet.com/api/ng/factsCenter/pcUpcomingEvents"
 SPORTYBET_HEADERS={"Accept":"application/json, text/plain, */*","Content-Type":"application/json","Current-Country":"NG","Origin":"https://www.sportybet.com","Referer":"https://www.sportybet.com/ng/","User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/152.0.0.0 Safari/537.36"}
 TSDB="https://www.thesportsdb.com/api/v1/json/123/eventsday.php"
-SOFASCORE="https://www.sofascore.com/api/v1/sport/table-tennis/scheduled-events"
+SOFASCORE_HOSTS=[
+    "https://api.sofascore.com/api/v1/sport/table-tennis/scheduled-events",
+    "https://www.sofascore.com/api/v1/sport/table-tennis/scheduled-events",
+]
 BENCHMARK=0.80325064
 HISTORY_DAYS=21
 K=28.0
@@ -143,10 +146,26 @@ def fetch_results(days=HISTORY_DAYS):
     for i in range(min(days,14),-1,-1):
         day=today-timedelta(days=i)
         try:
-            url=f"{SOFASCORE}/{day.isoformat()}"
-            r=session.get(url,timeout=20)
-            r.raise_for_status()
-            payload=r.json()
+            payload=None
+            last_error=None
+            for base in SOFASCORE_HOSTS:
+                try:
+                    r=session.get(
+                        f"{base}/{day.isoformat()}",
+                        headers={
+                            "Accept":"application/json, text/plain, */*",
+                            "Referer":"https://www.sofascore.com/table-tennis",
+                            "User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/152.0.0.0 Safari/537.36",
+                        },
+                        timeout=20
+                    )
+                    r.raise_for_status()
+                    payload=r.json()
+                    break
+                except Exception as exc:
+                    last_error=exc
+            if payload is None:
+                raise last_error or RuntimeError("Sofascore returned no payload")
             events=payload.get("events") or []
             for e in events:append_sofascore_event(e)
         except Exception as exc:
@@ -265,7 +284,7 @@ def main():
         if row["qualified"]:candidates.append(row)
     save(UPCOMING,enriched)
     save(CANDIDATES,{"generated_at":datetime.now(timezone.utc).isoformat(),"sport":"table_tennis","mode":"PAPER_ONLY","candidates":candidates,"gate":model["precision_gate"]})
-    save(STATUS,{"updated_at":datetime.now(timezone.utc).isoformat(),"sport":"table_tennis","sport_id":"sr:sport:20","history_events":len(history),"upcoming_events":len(enriched),"candidate_count":len(candidates),"model_status":"PROMOTED" if promoted else ("TESTING" if history else "COLLECTING"),"source_results":"TheSportsDB public event results","source_odds":"SportyBet NG","source_errors":source_errors+odds_errors})
+    save(STATUS,{"updated_at":datetime.now(timezone.utc).isoformat(),"sport":"table_tennis","sport_id":"sr:sport:20","history_events":len(history),"upcoming_events":len(enriched),"candidate_count":len(candidates),"model_status":"PROMOTED" if promoted else ("TESTING" if history else "COLLECTING"),"source_results":"Sofascore completed table-tennis results; TheSportsDB fallback","source_odds":"SportyBet NG","source_errors":source_errors+odds_errors})
     print(json.dumps({"sport":"table_tennis","history":len(history),"upcoming":len(enriched),"selected_variant":selected,"holdout":chosen["holdout"],"precision_gate":model["precision_gate"],"candidates":len(candidates)},indent=2))
 
 if __name__=="__main__":main()
