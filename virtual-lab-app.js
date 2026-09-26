@@ -939,11 +939,15 @@ function predictionForEvent(e){
     });
     const active=candidates.filter(isEligibleOU);
     const experimental=candidates.filter(isExperimentalOU);
-    if(!active.length&&!experimental.length)return null;
+    // Keep the fixture visible whenever SportyBet exposes a readable O/U
+    // market. Qualification still requires an eligible/model-qualified line;
+    // unsupported lines become evidence-only context rather than picks.
+    if(!candidates.length)return null;
 
+    const unsupported=candidates.filter(c=>!isEligibleOU(c)&&!isExperimentalOU(c));
     const enrichedActive=active.map(c=>enrichCandidate(c,e)).filter(Boolean);
     const enrichedExperimental=experimental.map(c=>enrichCandidate(c,e)).filter(Boolean);
-    const allCandidates=[...enrichedActive,...enrichedExperimental];
+    const allCandidates=[...enrichedActive,...enrichedExperimental,...unsupported];
 
     // Direction is selected by validated model edge, not by whichever side
     // happens to have the largest raw market probability. This prevents the
@@ -971,9 +975,10 @@ function predictionForEvent(e){
     const eventModel=scopedEligibility("model_qualified_competitions_by_product",e.product,state.eligibility.model_qualified_competitions||[]).some(x=>competitionKey(x)===eventName);
     const status=participantQualified?'QUALIFIED_PARTICIPANT_ENHANCED':
       (baseQualified?'QUALIFIED_BASE_EVIDENCE':
+      (!active.length&&!experimental.length?'LINE_GATE_PENDING':
       (eventRaw&&!eventModel?'RAW_EVIDENCE · MODEL_GATE_PENDING':
       (eventModel&&!eventRaw?'MODEL_EVIDENCE · RAW_GATE_PENDING':
-      (isPromotedResearchEvent(e)?'PROMOTION_PENDING':'EVIDENCE_CANDIDATE'))));
+      (isPromotedResearchEvent(e)?'PROMOTION_PENDING':'EVIDENCE_CANDIDATE')))));
 
     const out={
       product:e.product,competition:e.competition||e.tournament||'',event_id:id,
