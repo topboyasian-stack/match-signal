@@ -6,7 +6,7 @@ public historical results. No private feeds, RNG manipulation or cross-sport
 model state is used.
 """
 from __future__ import annotations
-import json, math, time, hashlib
+import json, math, time, hashlib, re
 from collections import defaultdict, deque
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
