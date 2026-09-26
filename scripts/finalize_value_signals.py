@@ -120,7 +120,10 @@ def finalize(row):
     return row
 
 predictions=load("predictions.json",[])
+history=load("prediction_history.json",[])
+history_by_event={str(r.get("event_id")):r for r in history if isinstance(r,dict) and r.get("event_id") and not r.get("settled")}
 updated=0
+history_synced=0
 winner_value=0
 total_value=0
 for row in predictions:
@@ -129,10 +132,35 @@ for row in predictions:
     mi=row.get("market_insights") or {}
     if mi.get("winner_value_signal"):winner_value+=1
     if (mi.get("total") or {}).get("value_signal"):total_value+=1
+
+    # Freeze the same contemporaneous market evidence onto the unsettled history
+    # record. This is the audit trail later consumed by model_guard.value_trial().
+    # We never modify settled rows and never invent historical prices.
+    eid=str(row.get("event_id") or "")
+    archived=history_by_event.get(eid)
+    if archived is not None:
+        for key in (
+            "sportybet_winner_odds",
+            "sportybet_total_games_odds",
+            "sportybet_market_snapshot",
+            "odds_timestamp",
+            "market_insights",
+        ):
+            if key in row:
+                archived[key]=row.get(key)
+        archived["value_evidence_frozen_at"]=(
+            (row.get("market_insights") or {}).get("snapshot_at")
+            or row.get("odds_timestamp")
+            or datetime.now(timezone.utc).isoformat()
+        )
+        history_synced+=1
+
 (DATA/"predictions.json").write_text(json.dumps(predictions,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
+(DATA/"prediction_history.json").write_text(json.dumps(history,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
 (DATA/"value_signal_status.json").write_text(json.dumps({
     "updated_at":datetime.now(timezone.utc).isoformat(),
     "predictions_processed":updated,
+    "history_records_synced":history_synced,
     "winner_value_signals":winner_value,
     "total_value_signals":total_value,
     "paper_only":True,
