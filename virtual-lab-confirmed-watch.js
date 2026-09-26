@@ -33,7 +33,7 @@ function annotate(){
     if(product!==PRODUCT)return;
     teams.querySelectorAll('strong').forEach(node=>{
       if(!match(node.textContent).length)return;
-      if(!node.parentElement.querySelector('.confirmedWatchTag'))node.insertBefore(badge('🔥 MONITORED'),node);
+      if(!node.parentElement.querySelector('.confirmedWatchTag'))node.insertBefore(badge('🔥 MANUAL WATCH'),node);
     });
   });
   document.querySelectorAll('.predictionDesk .predictionCard').forEach(card=>{
@@ -47,11 +47,11 @@ function renderPanel(){
   const host=document.getElementById('participantLab');if(!host)return;
   const existing=document.getElementById('confirmedWatchPanel');if(existing)existing.remove();
   const panel=document.createElement('div');panel.id='confirmedWatchPanel';panel.className='confirmedWatchPanel';
-  const title=document.createElement('div');title.innerHTML='<strong>🔥 Confirmed eFootball participants</strong><span>GT Sports League watch · exact identities only</span>';panel.appendChild(title);
+  const title=document.createElement('div');title.innerHTML='<strong>🔥 Manual eFootball annotations</strong><span>Optional GT Sports League annotations</span>';panel.appendChild(title);
   const ul=document.createElement('div');ul.className='confirmedWatchList';
   (watch.participants||[]).forEach(x=>{const item=document.createElement('span');item.className='confirmedWatchItem';item.textContent=x.participant;ul.appendChild(item);});
   panel.appendChild(ul);
-  const note=document.createElement('p');note.className='muted';note.textContent='These identities are a separate user-confirmed watch namespace. Automatic participant discovery is collected independently from settled SportyBet history. Tennis identities are not part of this desk.';
+  const note=document.createElement('p');note.className='muted';note.textContent='These are optional manual annotations only. They do not define participant discovery, prediction eligibility, Builder access, or the automatic participant lifecycle. Automatic discovery comes from the current SportyBet live/upcoming feed plus settled results.';
   panel.appendChild(note);
   host.parentNode.insertBefore(panel,host);
 }
