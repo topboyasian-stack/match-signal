@@ -26,6 +26,7 @@ on:
       - 'scripts/behavior_validation.py'
       - 'scripts/v4_validation.py'
       - 'scripts/selective_prediction_gate.py'
+      - 'scripts/finalize_value_signals.py'
       - 'scripts/prediction_breakdown.py'
       - 'scripts/verify_performance_ledger.py'
       - 'qa/**'
@@ -186,6 +187,8 @@ jobs:
       - name: Apply independent statistical model, market benchmark and value layer
         continue-on-error: true
         run: PYTHONPATH=. python scripts/model_upgrade.py
+      - name: Finalize current SportyBet model edge and EV signals
+        run: python scripts/finalize_value_signals.py
       - name: Build reusable team and player behavior profiles
         continue-on-error: true
         run: PYTHONPATH=. python scripts/build_behavior_profiles.py
