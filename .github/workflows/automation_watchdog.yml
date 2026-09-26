@@ -104,9 +104,13 @@ jobs:
               r = subprocess.run(['gh', 'workflow', 'run', 'live-expansion.yml', '--ref', 'main'], text=True, capture_output=True)
               actions.append({'workflow':'live-expansion.yml','action':'dispatch','status':'requested' if r.returncode == 0 else 'failed','detail':(r.stderr.strip() if r.returncode else 'scheduled self-heal')})
 
-          if pipeline_age > 4 and not active('autopilot-refresh.yml'):
+          # A core run that has left the publication artifact stale for half a
+          # day is treated as hung, even when GitHub reports the workflow as
+          # queued/in-progress. Autopilot uses cancel-in-progress so the fresh
+          # run can replace the stuck publisher.
+          if pipeline_age > 12 or (pipeline_age > 4 and not active('autopilot-refresh.yml')):
               r = subprocess.run(['gh', 'workflow', 'run', 'autopilot-refresh.yml', '--ref', 'main'], text=True, capture_output=True)
-              actions.append({'workflow':'autopilot-refresh.yml','action':'dispatch','status':'requested' if r.returncode == 0 else 'failed','detail':(r.stderr.strip() if r.returncode else 'core prediction self-heal')})
+              actions.append({'workflow':'autopilot-refresh.yml','action':'force_dispatch' if pipeline_age > 12 else 'dispatch','status':'requested' if r.returncode == 0 else 'failed','detail':(r.stderr.strip() if r.returncode else ('core prediction forced self-heal after '+str(round(pipeline_age,2))+'h stale' if pipeline_age > 12 else 'core prediction self-heal'))})
 
           if darts_age > 2 and not active('darts-x.yml'):
               r = subprocess.run(['gh', 'workflow', 'run', 'darts-x.yml', '--ref', 'main'], text=True, capture_output=True)
