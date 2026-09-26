@@ -1,16 +1,12 @@
 name: Match Signal Automation Watchdog
 # Watchdog activation: scheduled self-healing heartbeat for production feeds.
 # Virtual Lab live-feed classification refresh.
-# Immediate heartbeat repair path enabled for sync/audit changes.
-# Fresh-heartbeat remediation verified after sync payload fix.
 
 on:
   push:
     branches: [main]
     paths:
       - '.github/workflows/automation_watchdog.yml'
-      - 'scripts/system_health_audit.py'
-      - 'scripts/virtual_lab_sync.py'
   schedule:
     # Frequent, off-hour heartbeat so stale live feeds are repaired before the next day.
     # Changing this cron also re-enables a previously disabled scheduled workflow.
@@ -47,8 +43,6 @@ jobs:
         run: |
           python scripts/virtual_lab_sync.py
           cp data/virtual_lab_live.json /tmp/virtual_lab_live_candidate.json
-          python scripts/system_health_audit.py
-          cp data/system_health.json /tmp/system_health_candidate.json
 
       - name: Check freshness and self-heal stale workflows
         env:
@@ -162,8 +156,7 @@ jobs:
               'actions': actions,
               'policy': 'Watchdog proactively self-heals stale engines and force-restarts the actual core Live Prediction Pipeline; health publication is retried across concurrent data writers.'
           }
-          Path('data/automation_health.json').write_text(json.dumps(health, indent=2) + '
-')
+          Path('data/automation_health.json').write_text(json.dumps(health, indent=2) + '\n')
           print(json.dumps(health, indent=2))
           PY
 
@@ -181,10 +174,7 @@ jobs:
             if [ -f /tmp/virtual_lab_live_candidate.json ]; then
               cp /tmp/virtual_lab_live_candidate.json data/virtual_lab_live.json
             fi
-            if [ -f /tmp/system_health_candidate.json ]; then
-              cp /tmp/system_health_candidate.json data/system_health.json
-            fi
-            git add data/automation_health.json data/virtual_lab_live.json data/system_health.json
+            git add data/automation_health.json data/virtual_lab_live.json
             if git diff --cached --quiet; then
               echo "No automation health change."
               exit 0
