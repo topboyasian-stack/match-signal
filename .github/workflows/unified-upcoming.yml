@@ -1,0 +1,80 @@
+name: Match Signal Unified Upcoming Board
+
+on:
+  schedule:
+    - cron: '4,14,24,34,44,54 * * * *'
+  workflow_run:
+    workflows:
+      - "Match Signal Autopilot Refresh"
+      - "Match Signal Live Prediction Pipeline"
+      - "Match Signal Darts-X Research Engine"
+      - "Match Signal Table Tennis-X Research Engine"
+      - "Match Signal Result Settlement"
+    types: [completed]
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/unified_upcoming.py'
+      - 'scripts/system_health_audit.py'
+      - 'index.html'
+      - 'upcoming.html'
+      - 'sport-hubs.js'
+      - '.github/workflows/unified-upcoming.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: match-signal-unified-upcoming
+  cancel-in-progress: true
+
+jobs:
+  unified:
+    if: \${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 2
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install runtime dependency
+        run: python -m pip install --upgrade requests
+      - name: Sync latest main
+        run: |
+          git fetch origin main
+          git reset --hard origin/main
+      - name: Compile unified engines
+        run: python -m py_compile scripts/unified_upcoming.py scripts/system_health_audit.py scripts/predict_today.py
+      - name: Build unified upcoming board
+        run: python scripts/unified_upcoming.py
+      - name: Audit complete system
+        run: python scripts/system_health_audit.py
+      - name: Publish unified board and health
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/unified_upcoming.json data/system_health.json
+          if git diff --cached --quiet; then
+            echo "Unified board already current."
+            exit 0
+          fi
+          git commit -m "🤖 Refresh unified upcoming board"
+          for attempt in 1 2 3; do
+            if git push origin main; then exit 0; fi
+            git fetch origin main
+            git reset --hard origin/main
+            python scripts/unified_upcoming.py
+            python scripts/system_health_audit.py
+            git add data/unified_upcoming.json data/system_health.json
+            if git diff --cached --quiet; then exit 0; fi
+            git commit -m "🤖 Refresh unified upcoming board"
+          done
+          exit 1
