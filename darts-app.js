@@ -16,7 +16,15 @@ async function load(){
   const rows=Array.isArray(upcoming)?upcoming:[]; const cand=Array.isArray(candidates.candidates)?candidates.candidates:[];
   $("feedMeta").textContent="Collector update "+(status.updated_at||"—")+" · "+rows.length+" SportyBet fixtures · qualified candidates "+cand.length;
   const byId=new Map(cand.map(x=>[String(x.event_id),x]));
-  $("cards").innerHTML=rows.length?rows.slice(0,50).map(x=>{const c=byId.get(String(x.event_id))||x;const promoted=!!c.qualified;return '<article class="card"><div class="cardTop"><span>'+String(x.competition||"").replace(/</g,"&lt;")+'</span><span>'+new Date(Number(x.start_time_ms||0)).toLocaleString()+'</span></div><div class="match">'+String(x.player_1||"").replace(/</g,"&lt;")+' <span class="muted">vs</span> '+String(x.player_2||"").replace(/</g,"&lt;")+'</div><div class="pick">'+(promoted?'<b>QUALIFIED · '+String(c.pick||"").toUpperCase()+'</b> · '+pct(c.confidence):'NO QUALIFIED SIGNAL')+'<br><span class="muted">book '+money(c.book_odds)+' · fair '+money(c.fair_odds)+' · edge '+pct(c.edge)+'</span></div><div class="stats"><div class="stat"><small>Model p1</small><b>'+pct(c.model_prob_p1)+'</b></div><div class="stat"><small>Threshold</small><b>'+String(sel.threshold??"—")+'</b></div><div class="stat"><small>Status</small><b>'+(promoted?"PROMOTED":"WATCH")+'</b></div></div></article>'}).join(""):'<div class="gate">No current SportyBet fixtures were collected. The engine will retry on its next scheduled run.</div>';
+  const testing=status.model_status==="TESTING" && Number(status.history_events||0)>0;
+  const collecting=Number(status.history_events||0)===0;
+  $("cards").innerHTML=rows.length?rows.slice(0,50).map(x=>{const c=byId.get(String(x.event_id))||x;const promoted=!!c.qualified;
+    const label=promoted?'<b>QUALIFIED · '+String(c.pick||"").toUpperCase()+'</b> · '+pct(c.confidence):
+      (testing?'<b>TESTING MODEL · '+String(c.pick||"").toUpperCase()+'</b> · '+pct(c.confidence):
+      (collecting?'<b>COLLECTING HISTORY</b>':'NO QUALIFIED SIGNAL'));
+    const statusLabel=promoted?"PROMOTED":(testing?"TESTING":(collecting?"COLLECTING":"WATCH"));
+    return '<article class="card"><div class="cardTop"><span>'+String(x.competition||"").replace(/</g,"&lt;")+'</span><span>'+new Date(Number(x.start_time_ms||0)).toLocaleString()+'</span></div><div class="match">'+String(x.player_1||"").replace(/</g,"&lt;")+' <span class="muted">vs</span> '+String(x.player_2||"").replace(/</g,"&lt;")+'</div><div class="pick">'+label+'<br><span class="muted">book '+money(c.book_odds)+' · fair '+money(c.fair_odds)+' · edge '+pct(c.edge)+'</span></div><div class="stats"><div class="stat"><small>Model p1</small><b>'+pct(c.model_prob_p1)+'</b></div><div class="stat"><small>Threshold</small><b>'+String(sel.threshold??"—")+'</b></div><div class="stat"><small>Status</small><b>'+statusLabel+'</b></div></div></article>'
+  }).join(""):'<div class="gate">No current SportyBet fixtures were collected. The engine will retry on its next scheduled run.</div>';
 }
 async function refresh(){
   $("refresh").disabled=true;$("refresh").textContent="Checking…";
