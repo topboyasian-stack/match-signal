@@ -45,28 +45,57 @@ def american_to_decimal(odds):
 def value_trial(row):
     if not row.get('settled') or row.get('actual') not in {'p1','p2','draw'}:
         return None
-    edge=row.get('edge')
-    ev=(row.get('value') or {}).get('expected_value')
-    odds=row.get('market_odds')
     pick=str(row.get('pick') or '')
-    if not isinstance(edge,(int,float)) or not isinstance(ev,(int,float)):
+    if pick not in {'p1','p2','draw'}:
         return None
-    if float(edge)<0.035 or float(ev)<0.05:
+    insights=row.get('market_insights') or {}
+    winner_odds=row.get('sportybet_winner_odds') or {}
+    edge=insights.get('winner_model_edge_vs_market')
+    snapshot_at=insights.get('snapshot_at') or (row.get('sportybet_market_snapshot') or {}).get('fetched_at')
+    odds_map={'p1':winner_odds.get('p1'),'p2':winner_odds.get('p2'),'draw':winner_odds.get('draw')}
+    if not isinstance(edge,(int,float)):
+        edge=row.get('edge')
+    legacy_ev=(row.get('value') or {}).get('expected_value')
+    legacy_odds=row.get('market_odds')
+    if isinstance(legacy_odds,list) and len(legacy_odds)>=3 and odds_map.get(pick) is None:
+        odds_map={'p1':legacy_odds[0],'draw':legacy_odds[1],'p2':legacy_odds[2]}
+    book=odds_map.get(pick)
+    model_prob=(row.get('probabilities') or {}).get(pick)
+    dec=None
+    try:
+        dec=float(book)
+        if dec<=1.0: dec=None
+    except (TypeError,ValueError):
+        dec=None
+    if isinstance(model_prob,(int,float)) and dec is not None:
+        ev=float(model_prob)*dec-1.0
+        book_edge=float(model_prob)-(1.0/dec)
+    else:
+        ev=float(legacy_ev) if isinstance(legacy_ev,(int,float)) else None
+        book_edge=float(edge) if isinstance(edge,(int,float)) else None
+    value_edge=float(edge) if isinstance(edge,(int,float)) else book_edge
+    if value_edge is None or ev is None:
         return None
-    if pick not in {'p1','draw','p2'} or not isinstance(odds,list) or len(odds)!=3:
+    if float(value_edge)<0.035 or float(ev)<0.05:
         return None
-    dec=american_to_decimal(odds[{'p1':0,'draw':1,'p2':2}[pick]])
-    if dec is None:return None
+    if not snapshot_at or book is None or dec is None:
+        return None
     roi=(dec-1.0) if row.get('actual')==pick else -1.0
-    return {'roi':roi,'won':row.get('actual')==pick,'edge':float(edge),'expected_value':float(ev)}
+    return {
+        'event_id':row.get('event_id'),'sport':row.get('sport'),'league':row.get('league'),'pick':pick,
+        'roi':roi,'won':row.get('actual')==pick,'edge':round(float(value_edge),6),
+        'book_edge':round(float(book_edge),6),'expected_value':round(float(ev),6),
+        'frozen_odds':float(book),'frozen_odds_at':snapshot_at,
+        'source':'SportyBet NG frozen winner snapshot'
+    }
 
 def value_testing(rows,sport):
     trials=[x for r in rows if str(r.get('sport','')).lower()==sport for x in [value_trial(r)] if x]
     if not trials:
-        return {'trials':0,'wins':0,'roi_units':0.0,'roi':None,'status':'NO_VALUE_TRIALS'}
+        return {'trials':0,'wins':0,'roi_units':0.0,'roi':None,'status':'NO_VALUE_TRIALS','required_trials':MIN_VALUE_TRIALS}
     units=sum(x['roi'] for x in trials)
     roi=units/len(trials)
-    return {'trials':len(trials),'wins':sum(bool(x['won']) for x in trials),'roi_units':round(units,6),'roi':round(roi,6),'status':'PASS' if len(trials)>=MIN_VALUE_TRIALS and roi>MIN_VALUE_ROI else 'INSUFFICIENT_OR_NONPOSITIVE'}
+    return {'trials':len(trials),'wins':sum(bool(x['won']) for x in trials),'roi_units':round(units,6),'roi':round(roi,6),'status':'PASS' if len(trials)>=MIN_VALUE_TRIALS and roi>MIN_VALUE_ROI else 'INSUFFICIENT_OR_NONPOSITIVE','required_trials':MIN_VALUE_TRIALS,'latest_frozen_snapshot':max((x.get('frozen_odds_at') or '' for x in trials),default=None)}
 
 def main():
     history=load('prediction_history.json',[])+load('basketball_history.json',[])
@@ -103,6 +132,8 @@ def main():
             g=gate.get(str(p.get('sport','')).lower(),{'live_eligible':False})
             p['live_eligible']=bool(g['live_eligible']); p['testing_mode']='paper'
         path.write_text(json.dumps(rows,indent=2,ensure_ascii=False),encoding='utf-8')
+    trial_ledger=[x for r in history for x in [value_trial(r)] if x]
+    (DATA/'value_trial_ledger.json').write_text(json.dumps({'generated_at':datetime.now(timezone.utc).isoformat(),'mode':'PAPER_ONLY','policy':'Frozen SportyBet value evidence; never modifies settled outcomes or model probabilities.','trials':trial_ledger},indent=2,ensure_ascii=False),encoding='utf-8')
     out={'generated_at':datetime.now(timezone.utc).isoformat(),'mode':'PAPER_ONLY','metrics':metrics,'gate':gate}
     (DATA/'risk_gate.json').write_text(json.dumps(out,indent=2,ensure_ascii=False),encoding='utf-8')
     print(json.dumps(out,indent=2))
