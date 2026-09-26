@@ -16,6 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
 HISTORY = DATA / "virtual_lab_history.json"
+ARCHIVE_DIR = DATA / "virtual_lab_archive" / "settlements"
 OUTPUT = DATA / "virtual_lab_participant_profiles.json"
 H2H_OUTPUT = DATA / "virtual_lab_participant_h2h.json"
 
@@ -365,10 +366,36 @@ def build_h2h(events):
     return output
 
 
+def load_settled_history():
+    rows=[]
+    if HISTORY.exists():
+        try:
+            raw=json.loads(HISTORY.read_text(encoding="utf-8"))
+            if isinstance(raw,list):
+                rows.extend(raw)
+        except Exception:
+            pass
+    if ARCHIVE_DIR.exists():
+        for path in sorted(ARCHIVE_DIR.glob("*.jsonl")):
+            try:
+                for line in path.read_text(encoding="utf-8").splitlines():
+                    if not line.strip(): continue
+                    try:
+                        row=json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    if isinstance(row,dict): rows.append(row)
+            except OSError:
+                continue
+    seen=set(); out=[]
+    for row in rows:
+        rid=str(row.get("record_id") or f'{row.get("event_id","")}|{row.get("market","")}|{row.get("line","")}|{row.get("selection","")}')
+        if rid in seen: continue
+        seen.add(rid); out.append(row)
+    return out
+
 def main():
-    history = json.loads(HISTORY.read_text(encoding="utf-8")) if HISTORY.exists() else []
-    if not isinstance(history, list):
-        history = []
+    history = load_settled_history()
     events = event_groups(history)
     profiles = build_participant_profiles(events)
     h2h = build_h2h(events)
