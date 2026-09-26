@@ -21,6 +21,7 @@ from __future__ import annotations
 import json, math
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
+import re
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -52,12 +53,88 @@ def num(v):
 def clamp(p):
     return max(.0005,min(.9995,float(p)))
 
+def norm_name(v):
+    return re.sub(r"[^a-z0-9]+"," ",str(v or "").lower()).strip()
+
+def row_date(row):
+    value=row.get("start_time") or row.get("timestamp") or row.get("date")
+    d=dt(value)
+    return d.date().isoformat() if d else ""
+
+def match_key(row):
+    sport=str(row.get("sport") or row.get("product") or "").lower()
+    if sport=="virtual":
+        sport=str(row.get("product") or sport).lower()
+    p1=norm_name(row.get("player_1") or row.get("participant_1") or row.get("home") or row.get("team_1"))
+    p2=norm_name(row.get("player_2") or row.get("participant_2") or row.get("away") or row.get("team_2"))
+    day=row_date(row)
+    if not p1 or not p2 or not day:
+        return None
+    pair="|".join(sorted((p1,p2)))
+    return f"{sport}|{day}|{pair}"
+
+def explicit_live(row):
+    text=" ".join(str(row.get(k) or "") for k in ("match_status","matchStatus","status","state")).lower()
+    return bool(row.get("live") or row.get("isLive") or re.search(r"(live|started|inprogress|playing|period|set)",text))
+
+def explicit_terminal(row):
+    if row.get("settled") is True or row.get("completed") is True or row.get("finished") is True or row.get("ended") is True:
+        return True
+    text=" ".join(str(row.get(k) or "") for k in ("match_status","matchStatus","status","state")).lower()
+    return bool(re.search(r"(finished|ended|completed|settled|closed|full.?time)$",text))
+
+def settlement_index():
+    event_ids=set()
+    keys=set()
+
+    def ingest(items, require_settled=True):
+        for item in items if isinstance(items,list) else []:
+            if not isinstance(item,dict):
+                continue
+            if require_settled and item.get("settled") is not True and item.get("win") is None:
+                continue
+            eid=str(item.get("event_id") or "").strip()
+            if eid:
+                event_ids.add(eid)
+            key=match_key(item)
+            if key:
+                keys.add(key)
+
+    ingest(load("prediction_history.json",[]),True)
+    ingest(load("expansion_prediction_history.json",[]),True)
+    ingest(load("virtual_lab_history.json",[]),True)
+    # Darts/Table Tennis history rows are result-only ledgers, so every row is terminal.
+    ingest(load("darts_history.json",[]),False)
+    ingest(load("table_tennis_history.json",[]),False)
+    return event_ids,keys
+
+SETTLED_EVENT_IDS, SETTLED_MATCH_KEYS = settlement_index()
+
 def add(rows, row):
     if not isinstance(row,dict):return
     start=dt(row.get("start_time"))
-    if not start or start<NOW-timedelta(minutes=30) or start>HORIZON:return
+    if not start or start>HORIZON:return
     eid=str(row.get("event_id") or "")
     if not eid:return
+
+    # Terminal result state wins over every other display rule.
+    if explicit_terminal(row) or eid in SETTLED_EVENT_IDS or match_key(row) in SETTLED_MATCH_KEYS:
+        return
+
+    nowish=NOW-timedelta(minutes=30)
+    if start < nowish and not explicit_live(row):
+        # A kickoff already passed but settlement has not arrived yet. Keep it
+        # only briefly as a pending-settlement/live queue item; once the
+        # settlement ledger receives the result, it disappears automatically.
+        age_hours=(NOW-start).total_seconds()/3600
+        if age_hours>6:
+            return
+        row.setdefault("event_state","PENDING_SETTLEMENT")
+    elif explicit_live(row):
+        row.setdefault("event_state","LIVE")
+    else:
+        row.setdefault("event_state","UPCOMING")
+    row["settlement_tracked"]=bool(eid in SETTLED_EVENT_IDS or match_key(row) in SETTLED_MATCH_KEYS)
     rows.append(row)
 
 def core_rows(rows, source_rows, selection_map=None):
@@ -393,18 +470,21 @@ def main():
     for r in final:
         dates[str(r.get("start_time") or "")[:10]]+=1
         sports[str(r.get("sport") or "unknown")]+=1
+    pending_settlement=sum(1 for r in final if r.get("event_state")=="PENDING_SETTLEMENT")
+    live_count=sum(1 for r in final if r.get("event_state")=="LIVE")
     result={
         "generated_at":NOW.isoformat(),
         "horizon_days":7,
         "mode":"PAPER_ONLY",
         "policy":{
-            "visibility":"Every current future fixture with a readable source/model path is visible.",
+            "visibility":"Every current future fixture with a readable source/model path is visible; terminal/settled fixtures are removed from this board.",
             "confidence":"Evidence depth changes confidence/status; it does not erase the fixture.",
+            "settlement":"Completed events disappear from Upcoming through the settlement/result ledgers; their outcomes remain in permanent history and feed the next model/lifecycle cycle.",
             "ranking":"Deep model > deep research projection > research model > testing projection.",
             "market_rule":"Market prices are reference/enrichment data, never displayed as independent model probabilities.",
             "real_money":False,
         },
-        "summary":{"events":len(final),"sports":dict(sorted(sports.items())),"dates":dict(sorted(dates.items())),"virtual_model":virtual_meta,"live_core_refresh":live_meta},
+        "summary":{"events":len(final),"sports":dict(sorted(sports.items())),"dates":dict(sorted(dates.items())),"live":live_count,"pending_settlement":pending_settlement,"settled_hidden":len(SETTLED_EVENT_IDS),"virtual_model":virtual_meta,"live_core_refresh":live_meta},
         "events":final,
     }
     OUTPUT.write_text(json.dumps(result,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
