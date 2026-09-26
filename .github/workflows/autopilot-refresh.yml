@@ -31,7 +31,8 @@ permissions:
 # V5 publication retry: rebuild against latest main after concurrent data writers.
 
 concurrency:
-  group: match-signal-data-publish
+  # Autopilot may publish derived artifacts, but it must never cancel the core prediction publisher.
+  group: match-signal-autopilot-publish
   cancel-in-progress: true
 
 jobs:
