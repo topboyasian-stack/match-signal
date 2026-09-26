@@ -64,6 +64,9 @@ jobs:
           pipeline = load('data/pipeline_status.json')
           odds = load('data/odds_builder.json')
           expansion = load('data/expansion_status.json')
+          darts = load('data/darts_status.json')
+          table_tennis = load('data/table_tennis_status.json')
+          unified = load('data/unified_upcoming.json')
 
           def age_hours(value):
               if not value:
@@ -78,6 +81,9 @@ jobs:
           odds_age = age_hours(odds.get('generated_at'))
           expansion_age = age_hours(expansion.get('updated_at'))
           virtual_age = age_hours(virtual.get('updated_at'))
+          darts_age = age_hours(darts.get('updated_at'))
+          table_tennis_age = age_hours(table_tennis.get('updated_at'))
+          unified_age = age_hours(unified.get('generated_at'))
 
           def active(workflow):
               p = subprocess.run(
@@ -98,9 +104,21 @@ jobs:
               r = subprocess.run(['gh', 'workflow', 'run', 'live-expansion.yml', '--ref', 'main'], text=True, capture_output=True)
               actions.append({'workflow':'live-expansion.yml','action':'dispatch','status':'requested' if r.returncode == 0 else 'failed','detail':(r.stderr.strip() if r.returncode else 'scheduled self-heal')})
 
-          if pipeline_age > 4 and not active('tennis_pipeline.yml'):
-              r = subprocess.run(['gh', 'workflow', 'run', 'tennis_pipeline.yml', '--ref', 'main'], text=True, capture_output=True)
-              actions.append({'workflow':'tennis_pipeline.yml','action':'dispatch','status':'requested' if r.returncode == 0 else 'failed','detail':(r.stderr.strip() if r.returncode else 'scheduled self-heal')})
+          if pipeline_age > 4 and not active('autopilot-refresh.yml'):
+              r = subprocess.run(['gh', 'workflow', 'run', 'autopilot-refresh.yml', '--ref', 'main'], text=True, capture_output=True)
+              actions.append({'workflow':'autopilot-refresh.yml','action':'dispatch','status':'requested' if r.returncode == 0 else 'failed','detail':(r.stderr.strip() if r.returncode else 'core prediction self-heal')})
+
+          if darts_age > 2 and not active('darts-x.yml'):
+              r = subprocess.run(['gh', 'workflow', 'run', 'darts-x.yml', '--ref', 'main'], text=True, capture_output=True)
+              actions.append({'workflow':'darts-x.yml','action':'dispatch','status':'requested' if r.returncode == 0 else 'failed','detail':(r.stderr.strip() if r.returncode else 'Darts-X self-heal')})
+
+          if table_tennis_age > 2 and not active('table-tennis-x.yml'):
+              r = subprocess.run(['gh', 'workflow', 'run', 'table-tennis-x.yml', '--ref', 'main'], text=True, capture_output=True)
+              actions.append({'workflow':'table-tennis-x.yml','action':'dispatch','status':'requested' if r.returncode == 0 else 'failed','detail':(r.stderr.strip() if r.returncode else 'Table Tennis-X self-heal')})
+
+          if unified_age > 2 and not active('autopilot-refresh.yml'):
+              r = subprocess.run(['gh', 'workflow', 'run', 'autopilot-refresh.yml', '--ref', 'main'], text=True, capture_output=True)
+              actions.append({'workflow':'autopilot-refresh.yml','action':'dispatch','status':'requested' if r.returncode == 0 else 'failed','detail':(r.stderr.strip() if r.returncode else 'Unified board self-heal')})
 
           if odds_age > 8 and not active('odds_builder.yml'):
               r = subprocess.run(['gh', 'workflow', 'run', 'odds_builder.yml', '--ref', 'main'], text=True, capture_output=True)
@@ -117,9 +135,12 @@ jobs:
               'expansion_age_hours': round(expansion_age, 2),
               'virtual_lab_last_update': virtual.get('updated_at'),
               'virtual_lab_age_hours': round(virtual_age, 2),
+              'darts_age_hours': round(darts_age, 2),
+              'table_tennis_age_hours': round(table_tennis_age, 2),
+              'unified_upcoming_age_hours': round(unified_age, 2),
               'virtual_lab_events': virtual.get('events_count', 0),
               'virtual_lab_products': virtual.get('product_counts', {}),
-              'thresholds': {'pipeline_hours': 4, 'odds_builder_hours': 8, 'expansion_hours': 4, 'virtual_lab_hours': 1},
+              'thresholds': {'pipeline_hours': 4, 'odds_builder_hours': 8, 'expansion_hours': 4, 'virtual_lab_hours': 1, 'darts_hours': 2, 'table_tennis_hours': 2, 'unified_upcoming_hours': 2},
               'actions': actions,
               'policy': 'Watchdog dispatches workflow_dispatch only when the corresponding generated artifact is stale and no run is already active.'
           }
