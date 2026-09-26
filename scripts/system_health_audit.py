@@ -70,7 +70,9 @@ for args in [
     ("core_prediction_pipeline",pipeline,"updated_at",4),
     ("odds_builder",odds,"generated_at",8),
     ("expansion",expansion,"updated_at",4),
-    # The collector heartbeat is the canonical freshness signal for Virtual Lab.\n    # virtual_lab_live.json is a large live snapshot and may be intentionally omitted from Git publication.\n    ("virtual_lab",virtual,"updated_at",1),
+    # The collector heartbeat is the canonical freshness signal for Virtual Lab.
+    # virtual_lab_live.json is a large live snapshot and may be intentionally omitted from Git publication.
+    ("virtual_lab",virtual,"updated_at",1),
     ("darts_x",darts,"updated_at",2),
     ("table_tennis_x",table,"updated_at",2),
     ("unified_upcoming",unified,"generated_at",2),
@@ -127,7 +129,8 @@ out={
     "policy":"Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
     "paper_only":True,
 }
-(DATA/"system_health.json").write_text(json.dumps(out,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
+(DATA/"system_health.json").write_text(json.dumps(out,indent=2,ensure_ascii=False)+"
+",encoding="utf-8")
 print(json.dumps(out,indent=2))
 if status=="FAIL":
     print("CRITICAL health state recorded; watchdog self-healing remains responsible for remediation.")
