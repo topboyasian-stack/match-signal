@@ -125,6 +125,7 @@ def main():
         try: previous=json.loads(out.read_text(encoding="utf-8"))
         except Exception: previous={}
     candidate={"status":status,"source":[source] if source else [],"endpoint":PROXY,"events_count":len(rows),"product_counts":counts,"events":rows}
+    payload={"updated_at":now,**candidate,"errors":errors,"refresh_seconds":30,"sync_build":SYNC_BUILD}
     # A successful poll is itself a fresh observation even when the upstream fixture set is unchanged.
     # Never preserve an old timestamp merely because the payload is identical; the watchdog uses this
     # timestamp to distinguish a healthy unchanged feed from a dead collector.
