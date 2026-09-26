@@ -291,7 +291,7 @@ def collect_sportybet_live_results():
                     if not event_id or not p1 or not p2:continue
                     score=extract_score(e)
                     status=provider_status(e)
-                    stamp=Number(e.get("estimateStartTime") or 0) if isinstance(e,dict) else 0
+                    stamp=float(e.get("estimateStartTime") or 0) if isinstance(e,dict) else 0.0
                     start_iso=datetime.fromtimestamp(stamp/1000 if stamp>1e11 else stamp,tz=timezone.utc).isoformat() if stamp else ""
                     row={
                         "event_id":event_id,
@@ -388,7 +388,7 @@ def main():
     qualifying=[b for b in chosen["bands"] if b["n"]>=MIN_GATE_N and b["accuracy"] is not None]
     gate_row=max(qualifying,key=lambda b:(b["accuracy"],b["wilson_lower_90"] or 0)) if qualifying else {"threshold":0.75,"n":0,"accuracy":None,"wilson_lower_90":None}
     promoted=bool(gate_row["accuracy"] is not None and gate_row["n"]>=MIN_GATE_N and gate_row["accuracy"]>BENCHMARK and (gate_row.get("wilson_lower_90") or 0)>=0.75)
-    model={"version":"TABLE-TENNIS-X-1.0","generated_at":datetime.now(timezone.utc).isoformat(),"scope":"Table Tennis pre-match winner only","history_events":len(history),"source_results":"Sofascore completed table-tennis results; TheSportsDB fallback","source_odds":"SportyBet NG current odds","frozen_vfootball_benchmark":BENCHMARK,"variants":variants,"selected_variant":selected,"precision_gate":{"minimum_n":MIN_GATE_N,"selected":gate_row,"beats_vfootball":bool(gate_row.get("accuracy") is not None and gate_row["accuracy"]>BENCHMARK),"promoted":promoted},"mode":"PAPER_ONLY"}
+    model={"version":"TABLE-TENNIS-X-1.0","generated_at":datetime.now(timezone.utc).isoformat(),"scope":"Table Tennis pre-match winner only","history_events":len(history),"source_results":"SportyBet NG live result capture; public historical fallback","source_odds":"SportyBet NG current odds","frozen_vfootball_benchmark":BENCHMARK,"variants":variants,"selected_variant":selected,"precision_gate":{"minimum_n":MIN_GATE_N,"selected":gate_row,"beats_vfootball":bool(gate_row.get("accuracy") is not None and gate_row["accuracy"]>BENCHMARK),"promoted":promoted},"mode":"PAPER_ONLY"}
     upcoming,odds_errors=fetch_sportybet()
     ratings={}
     for row,p,actual in build_variant(history,selected):
