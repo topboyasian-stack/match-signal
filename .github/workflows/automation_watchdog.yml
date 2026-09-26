@@ -43,6 +43,8 @@ jobs:
         run: |
           python scripts/virtual_lab_sync.py
           cp data/virtual_lab_live.json /tmp/virtual_lab_live_candidate.json
+          python scripts/system_health_audit.py
+          cp data/system_health.json /tmp/system_health_candidate.json
 
       - name: Check freshness and self-heal stale workflows
         env:
@@ -174,7 +176,10 @@ jobs:
             if [ -f /tmp/virtual_lab_live_candidate.json ]; then
               cp /tmp/virtual_lab_live_candidate.json data/virtual_lab_live.json
             fi
-            git add data/automation_health.json data/virtual_lab_live.json
+            if [ -f /tmp/system_health_candidate.json ]; then
+              cp /tmp/system_health_candidate.json data/system_health.json
+            fi
+            git add data/automation_health.json data/virtual_lab_live.json data/system_health.json
             if git diff --cached --quiet; then
               echo "No automation health change."
               exit 0
