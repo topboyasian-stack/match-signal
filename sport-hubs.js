@@ -129,9 +129,13 @@ async function renderUnifiedBoard(){
       const line=x?.line==null?"":String(x.line);
       const exact=event+"|"+pick+"|"+line;
       const broad=event+"|"+pick+"|";
-      x.betting_qualified=selectedKeys.has(exact)||selectedKeys.has(broad)||x.qualification_status==="qualified";
+      x.betting_qualified=Boolean(x.betting_qualified)||Boolean(x.qualified_for_builder)||
+        selectedKeys.has(exact)||selectedKeys.has(broad)||
+        x.qualification_status==="qualified"||
+        x.qualification_status==="BETTING_QUALIFIED_PAPER";
       x.paper_only=true;
-      x.live_money_eligible=Boolean(riskGate?.gate?.[String(x?.sport||"").toLowerCase()]?.live_eligible);
+      x.live_money_eligible=Boolean(x.live_money_eligible) ||
+        Boolean(riskGate?.gate?.[String(x?.sport||"").toLowerCase()]?.live_eligible);
       return x;
     };
     all=all.map(annotate);
