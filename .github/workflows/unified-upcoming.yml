@@ -1,6 +1,14 @@
 name: Match Signal Unified Upcoming Board
 
 on:
+  workflow_run:
+    workflows:
+      - "Match Signal Live Prediction Pipeline"
+      - "Match Signal Darts-X Research Engine"
+      - "Match Signal Table Tennis-X Research Engine"
+      - "Match Signal Tennis History Reconciliation"
+      - "Match Signal Result Settlement"
+    types: [completed]
   schedule:
     - cron: '4,14,24,34,44,54 * * * *'
   push:
