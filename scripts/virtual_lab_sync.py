@@ -125,11 +125,7 @@ def main():
         try: previous=json.loads(out.read_text(encoding="utf-8"))
         except Exception: previous={}
     candidate={"status":status,"source":[source] if source else [],"endpoint":PROXY,"events_count":len(rows),"product_counts":counts,"events":rows}
-    previous_cmp={k:previous.get(k) for k in candidate}
-    if previous_cmp==candidate and previous:
-        print("Virtual Lab snapshot unchanged; keeping published timestamp.")
-        return
-    payload={"updated_at":now,**candidate,"errors":errors,"refresh_seconds":30,"sync_build":SYNC_BUILD}
+    # A successful poll is itself a fresh observation even when the upstream fixture set is unchanged.\n    # Never preserve an old timestamp merely because the payload is identical; the watchdog uses this\n    # timestamp to distinguish a healthy unchanged feed from a dead collector.\n    payload={"updated_at":now,**candidate,"errors":errors,"refresh_seconds":30,"sync_build":SYNC_BUILD}
     out.write_text(json.dumps(payload,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
     print(json.dumps({"status":payload["status"],"events_count":len(rows),"product_counts":counts,"errors":errors},indent=2))
     if not rows:raise SystemExit("ABORT: no live eFootball/virtual events collected")
