@@ -87,8 +87,15 @@ def main():
             return True, "sportybet_winner_edge"
         total = row.get("sportybet_total_market") or (insights.get("total") if isinstance(insights, dict) else None) or {}
         total_edge = total.get("model_edge_vs_market") if isinstance(total, dict) else None
-        if isinstance(total_edge, (int, float)) and float(total_edge) >= 0.035:
-            return True, "sportybet_total_edge"
+        total_ev = total.get("expected_value") if isinstance(total, dict) else None
+        if isinstance(total_edge, (int, float)) and float(total_edge) >= 0.035 and isinstance(total_ev, (int, float)) and float(total_ev) >= 0.05:
+            return True, "sportybet_total_edge_ev"
+        row_edge = row.get("edge")
+        row_value = row.get("value") or {}
+        row_ev = row_value.get("expected_value") if isinstance(row_value, dict) else None
+        snapshot = row.get("sportybet_market_snapshot") or {}
+        if isinstance(row_edge, (int, float)) and float(row_edge) >= 0.035 and isinstance(row_ev, (int, float)) and float(row_ev) >= 0.05 and snapshot.get("fetched_at"):
+            return True, "sportybet_winner_edge_ev"
         return False, None
 
     for original in predictions:
