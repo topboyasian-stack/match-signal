@@ -27,26 +27,79 @@ function probabilityValue(x){
   if(x.pick&&Number.isFinite(Number(pr[x.pick])))return Number(pr[x.pick]);
   return null;
 }
-function unifiedRow(x){
+function rowFixtureKey(x){
+  const norm=s=>String(s||"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+  const sport=String(x.sport||"").toLowerCase();
+  const date=String(x.start_time||"").slice(0,10);
+  const p1=norm(x.player_1||x.home),p2=norm(x.player_2||x.away);
+  return String(x.event_id||"")+"|"+sport+"|"+date+"|"+[p1,p2].sort().join("|");
+}
+function fixtureGroups(rows){
+  const map=new Map();
+  for(const row of rows){
+    const key=rowFixtureKey(row);
+    if(!map.has(key))map.set(key,{key,rows:[]});
+    const g=map.get(key);
+    const m=String(row.market||"winner");
+    const line=row.line==null?"":String(row.line);
+    const pick=String(row.pick||row.selection||"");
+    const dedupe=m+"|"+line+"|"+pick;
+    if(!g.rows.some(x=>(String(x.market||"winner")+"|"+(x.line==null?"":String(x.line))+"|"+String(x.pick||x.selection||""))===dedupe)){
+      g.rows.push(row);
+    }
+  }
+  return [...map.values()].map(g=>{
+    g.rows.sort((a,b)=>{
+      const la=Number.isFinite(Number(a.line))?Number(a.line):999;
+      const lb=Number.isFinite(Number(b.line))?Number(b.line):999;
+      return la-lb;
+    });
+    return g;
+  }).sort((a,b)=>new Date(a.rows[0].start_time)-new Date(b.rows[0].start_time));
+}
+function bookmakerOdds(x){
+  const v=Number(x.bookmaker_odds??x.sportybet_odds??x.book_odds);
+  return Number.isFinite(v)&&v>1?v:null;
+}
+function unifiedMarketLine(x){
   const p=probabilityValue(x);
-  const when=DT(x.start_time);
-  const status=x.candidate_status==="BETTING_QUALIFIED_PAPER"?"BETTING QUALIFIED · PAPER":
-    x.candidate_status==="RESEARCH_CANDIDATE"?"RESEARCH CANDIDATE":
-    x.prediction_status||(
-      x.projection_tier==="deep_model"?"DEEP MODEL":
-      x.projection_tier==="deep_research_projection"?"DEEP RESEARCH":
-      x.projection_tier==="research_model"?"RESEARCH":
-      x.projection_tier==="testing_projection"?"TESTING":"BASELINE");
-  const qualification=x.betting_qualified?"BETTING-QUALIFIED":"PAPER · NOT QUALIFIED";
-  const tier=evidenceLabel(x);
-  const odds=Number.isFinite(Number(x.model_fair_odds))?Number(x.model_fair_odds).toFixed(2):"—";
-  const edge=Number.isFinite(Number(x.model_edge_vs_market))?((Number(x.model_edge_vs_market)>=0?"+":"")+(Number(x.model_edge_vs_market)*100).toFixed(1)+"%"):"—";
-  return '<article class="ms-up-row">'+
-    '<div class="ms-up-time"><b>'+E(when)+'</b><span>'+E(String(x.start_time||"").slice(0,10))+'</span></div>'+
-    '<div class="ms-up-event"><div class="ms-up-meta"><span class="ms-sport-pill">'+sportIcon(x.sport)+' '+E(x.sport==="table_tennis"?"Table Tennis":(x.sport||"Sport"))+'</span><span>'+E(x.league||x.competition||"Unclassified")+'</span></div>'+
-    '<div class="ms-up-match">'+E(x.player_1||x.home||"Participant 1")+' <span>vs</span> '+E(x.player_2||x.away||"Participant 2")+'</div>'+
-    '<div class="ms-up-details"><span>'+E(marketLabel(x))+'</span><span>Probability <b>'+ (p==null?"—":P(p))+'</b></span><span>Fair <b>'+E(odds)+'</b></span><span>Edge <b>'+E(edge)+'</b></span></div></div>'+
-    '<div class="ms-up-status"><span class="ms-up-status-badge '+(status.includes("DEEP")||status.includes("QUALIFIED")?"deep":status==="TESTING"?"testing":"research")+'">'+E(status)+'</span><span class="ms-up-qual '+(x.betting_qualified?"qualified":"paper")+'">'+E(qualification)+'</span><small>'+E(tier)+'</small></div>'+
+  const fair=Number(x.model_fair_odds);
+  const book=bookmakerOdds(x);
+  const edge=Number(x.model_edge_vs_market);
+  const pick=String(x.pick||x.selection||"").toUpperCase();
+  const market=x.market==="over_under"?("O/U "+pick+" "+(x.line??"")):marketLabel(x);
+  const sportLabel=book!=null?("SportyBet LIVE @ "+book.toFixed(2)):"SportyBet —";
+  const fairLabel=Number.isFinite(fair)?fair.toFixed(2):"—";
+  const edgeLabel=Number.isFinite(edge)?((edge>=0?"+":"")+(edge*100).toFixed(1)+"%"):"—";
+  const q=x.betting_qualified?"QUALIFIED":(x.qualification_status||"PAPER");
+  return '<div class="ms-market-row">'+
+    '<span class="ms-market-name">'+E(market)+'</span>'+
+    '<span>Model <b>'+(p==null?"—":P(p))+'</b></span>'+
+    '<span>Fair <b>'+E(fairLabel)+'</b></span>'+
+    '<span class="'+(book!=null?"ms-book-live":"ms-book-missing")+'">'+E(sportLabel)+'</span>'+
+    '<span>Edge <b>'+E(edgeLabel)+'</b></span>'+
+    '<span class="ms-market-q '+(x.betting_qualified?"qualified":"paper")+'">'+E(q)+'</span>'+
+  '</div>';
+}
+function unifiedRow(group){
+  const rows=group.rows;
+  const first=rows[0];
+  const when=DT(first.start_time);
+  const anyQualified=rows.some(x=>x.betting_qualified);
+  const anyLive=rows.some(x=>String(x.event_state||"").toUpperCase()==="LIVE");
+  const allBookmaker=rows.some(x=>bookmakerOdds(x)!=null);
+  const statuses=[...new Set(rows.map(x=>x.prediction_status||x.qualification_status).filter(Boolean))];
+  const tier=evidenceLabel(first);
+  const status=anyQualified?"BETTING QUALIFIED · PAPER":
+    (anyLive?"LIVE RESEARCH":
+    (String(first.projection_tier||"").includes("deep")?"DEEP MODEL":"RESEARCH PROJECTION"));
+  return '<article class="ms-up-row ms-fixture-card">'+
+    '<div class="ms-up-time"><b>'+E(when)+'</b><span>'+E(String(first.start_time||"").slice(0,10))+'</span></div>'+
+    '<div class="ms-up-event"><div class="ms-up-meta"><span class="ms-sport-pill">'+sportIcon(first.sport)+' '+E(first.sport==="table_tennis"?"Table Tennis":(first.sport||"Sport"))+'</span><span>'+E(first.league||first.competition||"Unclassified")+'</span><span class="ms-fixture-market-count">'+rows.length+' predictions</span></div>'+
+    '<div class="ms-up-match">'+E(first.player_1||first.home||"Participant 1")+' <span>vs</span> '+E(first.player_2||first.away||"Participant 2")+'</div>'+
+    '<div class="ms-market-stack">'+rows.map(unifiedMarketLine).join("")+'</div>'+
+    '<div class="ms-fixture-foot"><span>'+E(statuses.join(" · ")||"Projection active")+'</span><span>'+E(allBookmaker?"SportyBet quotes attached":"SportyBet quotes not matched")+'</span></div></div>'+
+    '<div class="ms-up-status"><span class="ms-up-status-badge '+(anyQualified?"deep":anyLive?"testing":"research")+'">'+E(status)+'</span><span class="ms-up-qual '+(anyQualified?"qualified":"paper")+'">'+E(anyQualified?"BETTING-QUALIFIED":"PAPER · NOT QUALIFIED")+'</span><small>'+E(tier)+'</small></div>'+
   '</article>';
 }
 async function renderUnifiedBoard(){
@@ -148,7 +201,7 @@ async function renderUnifiedBoard(){
       const tomorrow=new Date(now.getTime()+86400000).toISOString().slice(0,10);
       const horizon=Number(date?.value||7);
       const q=String(search?.value||"").trim().toLowerCase();
-      const filtered=all.filter(x=>{
+      const filteredRows=all.filter(x=>{
         if(sport?.value && sport.value!=="all" && x.sport!==sport.value)return false;
         const day=String(x.start_time||"").slice(0,10);
         if(date?.value==="today" && day!==today)return false;
@@ -157,19 +210,20 @@ async function renderUnifiedBoard(){
           const d=dt(x.start_time); if(!d||d>new Date(now.getTime()+3*86400000))return false;
         }
         if(q){
-          const hay=[x.sport,x.league,x.competition,x.player_1,x.player_2,x.home,x.away,x.pick,marketLabel(x)].join(" ").toLowerCase();
+          const hay=[x.sport,x.league,x.competition,x.player_1,x.player_2,x.home,x.away,x.pick,x.selection,marketLabel(x)].join(" ").toLowerCase();
           if(!hay.includes(q))return false;
         }
         return true;
-      }).sort((a,b)=>new Date(a.start_time)-new Date(b.start_time));
+      });
+      const groups=fixtureGroups(filteredRows);
       const byDay=new Map();
-      for(const row of filtered){const day=String(row.start_time).slice(0,10);if(!byDay.has(day))byDay.set(day,[]);byDay.get(day).push(row);}
-      root.innerHTML=filtered.length?[...byDay.entries()].map(([day,rows])=>{
+      for(const group of groups){const day=String(group.rows[0].start_time).slice(0,10);if(!byDay.has(day))byDay.set(day,[]);byDay.get(day).push(group);}
+      root.innerHTML=groups.length?[...byDay.entries()].map(([day,groupsForDay])=>{
         const label=new Date(day+"T00:00:00Z").toLocaleDateString([], {weekday:"long",month:"short",day:"numeric"});
-        return '<section class="ms-up-day"><div class="ms-up-day-head"><h3>'+E(label)+'</h3><span>'+rows.length+' fixtures</span></div>'+rows.map(unifiedRow).join("")+'</section>';
+        return '<section class="ms-up-day"><div class="ms-up-day-head"><h3>'+E(label)+'</h3><span>'+groupsForDay.length+' fixtures</span></div>'+groupsForDay.map(unifiedRow).join("")+'</section>';
       }).join(""):'<div class="ms-empty">No future fixtures match these filters. The engines remain active and the board will refresh with the next generated window.</div>';
-      const qualified=filtered.filter(x=>x.betting_qualified).length;
-      Q('#upCount').textContent=filtered.length;
+      const qualified=filteredRows.filter(x=>x.betting_qualified).length;
+      Q('#upCount').textContent=groups.length;
       const qEl=Q('#upQualified'); if(qEl)qEl.textContent=qualified;
       Q('#upLast').textContent=payload.generated_at?DT(payload.generated_at):"—";
     };
