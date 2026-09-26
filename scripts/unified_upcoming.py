@@ -53,6 +53,36 @@ def num(v):
 def clamp(p):
     return max(.0005,min(.9995,float(p)))
 
+def apply_bookmaker_fields(x):
+    """Normalize current SportyBet quotes onto a unified prediction row."""
+    winner=x.get("sportybet_winner_odds")
+    totals=x.get("sportybet_total_games_odds") or []
+    pick=str(x.get("pick") or "").lower()
+    line=num(x.get("line"))
+    quote=None
+    if isinstance(winner,dict):
+        side={"p1":"p1","p2":"p2","draw":"draw"}.get(pick)
+        if side and num(winner.get(side)) is not None:
+            quote=num(winner.get(side))
+            x["sportybet_odds_market"]="winner"
+    if quote is None and isinstance(totals,list):
+        for item in totals:
+            if not isinstance(item,dict): continue
+            il=num(item.get("line"))
+            side=str(item.get("side") or "").lower()
+            if line is not None and il is not None and abs(il-line)<0.001 and side==pick and num(item.get("odds")) is not None:
+                quote=num(item.get("odds"))
+                x["sportybet_odds_market"]="total"
+                x["sportybet_odds_line"]=il
+                break
+    if quote is not None:
+        x["bookmaker_odds"]=quote
+        x["sportybet_odds"]=quote
+        x["bookmaker_available"]=True
+        x["bookmaker_source"]="SportyBet NG"
+        x["market_odds_timestamp"]=x.get("odds_timestamp")
+    return x
+
 def norm_name(v):
     return re.sub(r"[^a-z0-9]+"," ",str(v or "").lower()).strip()
 
@@ -147,6 +177,7 @@ def core_rows(rows, source_rows, selection_map=None):
         x["projection_tier"]="deep_model"
         x["evidence_depth"]="published_model_plus_enrichment"
         x["paper_only"]=True
+        x=apply_bookmaker_fields(x)
         key=(str(x.get("event_id") or ""),str(x.get("pick") or ""))
         selected=selection_map.get(key) or selection_map.get((str(x.get("event_id") or ""), ""))
         if isinstance(selected,dict):
@@ -180,6 +211,7 @@ def isolated_rows(rows, source_rows, sport, engine):
         x["projection_tier"]="research_model" if x.get("qualified") else "testing_projection"
         x["evidence_depth"]="historical_walk_forward" if (x.get("promotion_gate") or x.get("qualified")) else "baseline_plus_current_feed"
         x["paper_only"]=True
+        x=apply_bookmaker_fields(x)
         add(rows,x)
 
 def load_virtual_history():
@@ -371,6 +403,13 @@ def build_virtual_events(history, lifecycle, eligibility):
                 "market_reference_probability":round(chosen_market,4) if chosen_market is not None else None,
                 "model_edge_vs_market":round(edge,4) if edge is not None else None,
                 "model_fair_odds":round(1/chosen_model,3) if chosen_model else None,
+                "bookmaker_odds":(over_odds if chosen_pick=="over" else under_odds) if (over_odds or under_odds) else None,
+                "sportybet_odds":(over_odds if chosen_pick=="over" else under_odds) if (over_odds or under_odds) else None,
+                "sportybet_over_odds":over_odds,
+                "sportybet_under_odds":under_odds,
+                "bookmaker_available":bool(over_odds and under_odds),
+                "bookmaker_source":"SportyBet NG" if (over_odds or under_odds) else None,
+                "market_odds_timestamp":e.get("captured_at") or live.get("updated_at"),
                 "prediction_status":"betting_qualified_paper" if qualified else "research_projection",
                 "projection_tier":"deep_research_projection",
                 "evidence_depth":"participant_lifecycle_plus_base_model" if participant_history>=3 else "feed_discovered_base_model",
