@@ -311,6 +311,21 @@ jobs:
             }
           } catch(e) { failures.push('/api/sportybet-virtual '+e.message); }
 
+          try {
+            const {r,body}=await get('/data/odds_builder.json');
+            if (!r.ok) failures.push('/data/odds_builder.json HTTP '+r.status);
+            else {
+              const b=JSON.parse(body);
+              const legs=Array.isArray(b?.qualified_legs)?b.qualified_legs:[];
+              const combined=Number(b?.market_price_combined_odds||0);
+              if (b?.mode!=='PAPER_ONLY') failures.push('/data/odds_builder.json is not PAPER_ONLY');
+              if (b?.status!=='LIVE_VALUE_SET') failures.push('/data/odds_builder.json status is '+b?.status);
+              if (!legs.length) failures.push('/data/odds_builder.json has no qualified paper legs');
+              if (!(combined>=4)) failures.push('/data/odds_builder.json combined odds below 4.00: '+combined);
+              else console.log('Paper Odds Builder production ticket passed: '+legs.length+' legs / combined odds '+combined);
+            }
+          } catch(e) { failures.push('/data/odds_builder.json '+e.message); }
+
           if (failures.length) { console.error(failures.join('\n')); process.exit(1); }
           console.log('Production HTTP smoke tests passed: '+pages.length+' pages, '+assets.length+' assets, NBA ESPN proxy');
           NODE
