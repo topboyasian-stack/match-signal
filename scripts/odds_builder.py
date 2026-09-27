@@ -339,6 +339,9 @@ def virtual_candidates(now):
                   "current_feed_events":0,"model_templates":len(templates),
                   "current_market_candidates":0,"reasons":{}}
     diagnostics["current_feed_events"]=len(current_events) if isinstance(current_events,list) else 0
+    diagnostics["model_template_keys"]=[list(k) for k in sorted(templates.keys())]
+    diagnostics["current_product_counts"]={}
+    diagnostics["current_market_line_counts"]={}
 
     for event in current_events if isinstance(current_events,list) else []:
         if not isinstance(event,dict): continue
@@ -351,6 +354,7 @@ def virtual_candidates(now):
         if not upcoming({"start_time":event_start},now): continue
         diagnostics["seen"]+=1
         product=str(event.get("product") or "")
+        diagnostics["current_product_counts"][product]=diagnostics["current_product_counts"].get(product,0)+1
         markets=event.get("markets") or []
         if not isinstance(markets,list): continue
 
@@ -372,6 +376,8 @@ def virtual_candidates(now):
                 elif name.startswith("under"): prices["under"]=odds
             if "over" not in prices or "under" not in prices: continue
             diagnostics["current_market_candidates"]+=2
+            lk=f"{product}|{float(line):g}"
+            diagnostics["current_market_line_counts"][lk]=diagnostics["current_market_line_counts"].get(lk,0)+1
 
             for pick in ("over","under"):
                 template=templates.get(template_key(product,line,pick))
