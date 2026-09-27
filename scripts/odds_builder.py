@@ -349,7 +349,7 @@ def main():
     upstream_blocked = gate_status not in {"ok","PASS"} or selected_predictions <= 0 or not tennis_live_eligible
     football=football_candidates(now)
     tennis=tennis_candidates(now)
-    virtual=virtual_candidates(now)
+    virtual,virtual_diag=virtual_candidates(now)
     core_pool=[] if upstream_blocked else (football+tennis)
     selected,built,combined=select_value(core_pool+virtual)
     previous=load(OUTPUT,{})
@@ -380,6 +380,7 @@ def main():
             "football_candidates":len(football),
             "tennis_candidates":len(tennis),
             "virtual_candidates":len(virtual),
+            "virtual_gate_diagnostics":virtual_diag,
             "evaluated":len(built),
             "rejections":rejection_counts
         },
