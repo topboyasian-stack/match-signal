@@ -163,7 +163,7 @@ def refresh_virtual_quotes(rows):
                 if not isinstance(e,dict): continue
                 if len(live_samples)<3: live_samples.append({"keys":sorted(e.keys()),"event_id":e.get("event_id"),"match":e.get("match"),"name":e.get("name"),"player_1":e.get("player_1"),"player_2":e.get("player_2")})
                 if e.get("event_id"): live_by_id[str(e["event_id"])]=e
-                key=_norm_fixture(e.get("match") or e.get("name"))
+                key=_norm_fixture(e.get("match") or e.get("name") or f"{e.get('participant_1') or e.get('team_1') or ''} vs {e.get('participant_2') or e.get('team_2') or ''}")
                 if key: live_by_match[key]=e
             if len(events)<100: break
         except Exception:
@@ -174,7 +174,7 @@ def refresh_virtual_quotes(rows):
     join_diag={"live_events":len(live_by_id),"live_match_keys":len(live_by_match),"matched_by_id":0,"matched_by_match":0,"unmatched":0,"samples":live_samples}
     for x in rows:
         y=dict(x)
-        key=_norm_fixture(x.get("match") or f"{x.get('player_1','')} vs {x.get('player_2','')}")
+        key=_norm_fixture(x.get("match") or f"{x.get('player_1') or x.get('participant_1') or x.get('team_1') or ''} vs {x.get('player_2') or x.get('participant_2') or x.get('team_2') or ''}")
         e=live_by_id.get(str(x.get("event_id")))
         if isinstance(e,dict): join_diag["matched_by_id"]+=1
         else:
@@ -387,19 +387,41 @@ def make_leg(x):
     }
 
 
+def _participants(leg):
+    """Return normalized participant identities for correlation control."""
+    import re
+    vals=[]
+    for key in ("participant_1","participant_2","player_1","player_2","team_1","team_2"):
+        v=leg.get(key)
+        if v: vals.append(v)
+    if not vals:
+        match=str(leg.get("match") or "")
+        vals=[p.strip() for p in re.split(r"\\s+vs\\s+",match,flags=re.I) if p.strip()]
+    out=[]
+    for v in vals:
+        s=re.sub(r"[^a-z0-9]+"," ",str(v).lower()).strip()
+        if s and s not in out: out.append(s)
+    return out
+
 def select_value(candidates):
     built=[make_leg(x) for x in candidates]
     eligible=[x for x in built if x["builder_eligible"]]
-    eligible.sort(key=lambda x:(x.get("model_probability") or 0,x.get("model_edge") or -1,x.get("bookmaker_odds") or 0),reverse=True)
-    selected=[];events=set();combined=1.0
+    eligible.sort(key=lambda x:(x.get("model_edge") or -1,x.get("model_probability") or 0,x.get("bookmaker_odds") or 0),reverse=True)
+    selected=[];events=set();participants=set();combined=1.0
+    skipped_participant=0
     for leg in eligible:
         eid=str(leg.get("event_id") or "")
         if eid and eid in events:continue
+        pids=_participants(leg)
+        if any(pid in participants for pid in pids):
+            skipped_participant+=1
+            continue
         selected.append(leg)
         if eid:events.add(eid)
+        participants.update(pids)
         combined*=float(leg.get("bookmaker_odds") or 1)
         if combined>=MIN_COMBINED_ODDS or len(selected)>=MAX_LEGS:break
-    return selected,built,combined
+    return selected,built,combined,{"participant_correlation_skips":skipped_participant,"unique_participants":len(participants)}
 
 
 def recent_settled(history,now,known):
@@ -442,7 +464,7 @@ def main():
     tennis=tennis_candidates(now)
     virtual,virtual_diag=virtual_candidates(now)
     core_pool=[] if upstream_blocked else (football+tennis)
-    selected,built,combined=select_value(core_pool+virtual)
+    selected,built,combined,selection_diag=select_value(core_pool+virtual)
     previous=load(OUTPUT,{})
     previous_ids={str(x) for x in (previous.get("builder_event_ids",[]) if isinstance(previous,dict) else []) if x}
     previous_ids.update(str(x.get("event_id")) for x in (previous.get("qualified_legs",[]) if isinstance(previous,dict) else []) if isinstance(x,dict) and x.get("event_id"))
@@ -473,7 +495,7 @@ def main():
             "virtual_candidates":len(virtual),
             "virtual_gate_diagnostics":virtual_diag,
             "evaluated":len(built),
-            "rejections":rejection_counts
+            "rejections":rejection_counts,"selection_diversity":selection_diag
         },
         "selection_policy":{"min_calibrated_probability":MIN_PROB,"virtual_min_probability":VIRTUAL_MIN_PROB,"virtual_builder_lines":"all current O/U lines with exact-side evidence; no forced line list","minimum_combined_odds":MIN_COMBINED_ODDS,"min_model_edge":MIN_EDGE,
             "max_odds_age_seconds":MAX_ODDS_AGE_SECONDS,"max_uncertainty":MAX_UNCERTAINTY,
