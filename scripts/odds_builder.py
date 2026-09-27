@@ -148,6 +148,7 @@ def refresh_virtual_quotes(rows):
         return rows
     live_by_id={}
     live_by_match={}
+    live_samples=[]
     fetched_at=datetime.now(timezone.utc).isoformat()
     headers={"Accept":"application/json","Current-Country":"NG","User-Agent":"Match-Signal-Paper-Builder/6.1"}
     for page in range(1,4):
@@ -160,6 +161,7 @@ def refresh_virtual_quotes(rows):
             if not isinstance(events,list): break
             for e in events:
                 if not isinstance(e,dict): continue
+                if len(live_samples)<3: live_samples.append({"keys":sorted(e.keys()),"event_id":e.get("event_id"),"match":e.get("match"),"name":e.get("name"),"player_1":e.get("player_1"),"player_2":e.get("player_2")})
                 if e.get("event_id"): live_by_id[str(e["event_id"])]=e
                 key=_norm_fixture(e.get("match") or e.get("name"))
                 if key: live_by_match[key]=e
@@ -169,10 +171,16 @@ def refresh_virtual_quotes(rows):
     if not live_by_id and not live_by_match:
         return rows
     out=[]
+    join_diag={"live_events":len(live_by_id),"live_match_keys":len(live_by_match),"matched_by_id":0,"matched_by_match":0,"unmatched":0,"samples":live_samples}
     for x in rows:
         y=dict(x)
         key=_norm_fixture(x.get("match") or f"{x.get('player_1','')} vs {x.get('player_2','')}")
-        e=live_by_id.get(str(x.get("event_id"))) or live_by_match.get(key)
+        e=live_by_id.get(str(x.get("event_id")))
+        if isinstance(e,dict): join_diag["matched_by_id"]+=1
+        else:
+            e=live_by_match.get(key)
+            if isinstance(e,dict): join_diag["matched_by_match"]+=1
+            else: join_diag["unmatched"]+=1
         if isinstance(e,dict):
             line=x.get("line")
             over=under=None
@@ -205,7 +213,7 @@ def refresh_virtual_quotes(rows):
                 y["market_odds_timestamp"]=fetched_at
                 y["sportybet_identity_match"]=str(e.get("event_id"))==str(x.get("event_id")) or _norm_fixture(e.get("match") or e.get("name"))==key
         out.append(y)
-    return out
+    return out,join_diag
 
 def virtual_recent_gate(product,line,pick):
     """Evidence gate for Virtual/eFootball candidates.
@@ -247,7 +255,7 @@ def virtual_recent_gate(product,line,pick):
 def virtual_candidates(now):
     board=load(DATA/"unified_upcoming.json",{})
     rows=board.get("events") if isinstance(board,dict) else []
-    rows=refresh_virtual_quotes(rows)
+    rows,quote_diag=refresh_virtual_quotes(rows)
     live=load(DATA/"virtual_lab_live.json",{})
     live_events=live.get("events") if isinstance(live,dict) else []
     live_ts={str(e.get("event_id")): (e.get("timestamp") or e.get("captured_at")) for e in live_events if isinstance(e,dict) and e.get("event_id")}
@@ -286,6 +294,7 @@ def virtual_candidates(now):
            # Fall back to the snapshot heartbeat only when the event timestamp is absent.
            "market_odds_timestamp":x.get("market_odds_timestamp") or live_ts.get(str(x.get("event_id"))) or live_updated}
         out.append(y)
+    diagnostics["quote_join"]=quote_diag
     return out,diagnostics
 
 def market_rows(x):
