@@ -31,7 +31,7 @@ MAX_UNCERTAINTY=0.22
 MIN_DATA_QUALITY=0.70
 MIN_LEGS,MAX_LEGS=1,20
 MIN_COMBINED_ODDS=4.0
-VIRTUAL_MIN_PROB=0.70
+VIRTUAL_MIN_PROB=0.65
 
 
 def load(path, default):
@@ -154,7 +154,7 @@ def virtual_recent_gate(product,line):
     hit=wins/len(same)
     # Product-wide eFootball GT recently ran below the model's historical
     # holdout; line-level evidence therefore must independently support the leg.
-    threshold=0.70 if product=="efootball_gt" else 0.75
+    threshold=0.65 if product=="efootball_gt" else 0.75
     return hit>=threshold,{"n":len(same),"wins":wins,"hit_rate":round(hit,4),"threshold":threshold}
 
 def virtual_candidates(now):
