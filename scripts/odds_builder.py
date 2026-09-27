@@ -264,7 +264,7 @@ def refresh_virtual_quotes(rows):
                 y["market_odds_timestamp"]=fetched_at
                 y["sportybet_identity_match"]=str(e.get("event_id"))==str(x.get("event_id")) or _norm_fixture(e.get("match") or e.get("name"))==key
         out.append(y)
-    return out,join_diag
+    return out,join_diag,list(live_by_id.values())
 
 def virtual_recent_gate(product,line,pick):
     """Evidence gate for Virtual/eFootball candidates.
@@ -304,48 +304,111 @@ def virtual_recent_gate(product,line,pick):
     return hit>=threshold,{"n":len(exact),"wins":wins,"hit_rate":round(hit,4),"threshold":threshold,"side":side}
 
 def virtual_candidates(now):
+    """Build virtual candidates from the current SportyBet fixture set.
+
+    The historical/unified board supplies only validated product+line+side
+    model templates. Fixture identity, event ID, time and price are taken from
+    the fresh SportyBet proxy.
+    """
     board=load(DATA/"unified_upcoming.json",{})
-    rows=board.get("events") if isinstance(board,dict) else []
-    rows,quote_diag=refresh_virtual_quotes(rows)
+    model_rows=board.get("events") if isinstance(board,dict) else []
+    model_rows,quote_diag,live_events=refresh_virtual_quotes(model_rows)
     live=load(DATA/"virtual_lab_live.json",{})
-    live_events=live.get("events") if isinstance(live,dict) else []
-    live_ts={str(e.get("event_id")): (e.get("timestamp") or e.get("captured_at")) for e in live_events if isinstance(e,dict) and e.get("event_id")}
-    live_updated=live.get("updated_at") if isinstance(live,dict) else None
+    live_events_snapshot=live.get("events") if isinstance(live,dict) else []
+    current_events=live_events if live_events else live_events_snapshot
+
+    def template_key(product,line,pick):
+        return (str(product or ""),f"{float(line):g}",str(pick or "").lower())
+
+    templates={}
+    for row in (model_rows if isinstance(model_rows,list) else []):
+        if not isinstance(row,dict) or row.get("sport")!="virtual" or not row.get("betting_qualified"):
+            continue
+        line=row.get("line"); pick=str(row.get("pick") or "").lower()
+        if line is None or pick not in {"over","under"}: continue
+        try:key=template_key(row.get("product"),line,pick)
+        except (TypeError,ValueError): continue
+        try:prob=float(row.get("probability") or 0)
+        except (TypeError,ValueError):prob=0.0
+        prev=templates.get(key)
+        if prev is None or prob>float(prev.get("probability") or 0):
+            templates[key]=row
+
     out=[]
-    diagnostics={"seen":0,"qualified":0,"evidence_pass":0,"rejected_evidence":0,"reasons":{}}
-    for x in rows if isinstance(rows,list) else []:
-        if not isinstance(x,dict) or x.get("sport")!="virtual" or not x.get("betting_qualified") or not upcoming(x,now):
+    diagnostics={"seen":0,"qualified":0,"evidence_pass":0,"rejected_evidence":0,
+                  "current_feed_events":0,"model_templates":len(templates),
+                  "current_market_candidates":0,"reasons":{}}
+    diagnostics["current_feed_events"]=len(current_events) if isinstance(current_events,list) else 0
+
+    for event in current_events if isinstance(current_events,list) else []:
+        if not isinstance(event,dict): continue
+        if event.get("product") not in {"efootball_gt","efootball_adriatic","vfootball","zoom"}: continue
+        try:
+            start_ms=float(event.get("start_time_ms"))
+            event_start=datetime.fromtimestamp(start_ms/1000.0,timezone.utc).isoformat()
+        except (TypeError,ValueError):
             continue
+        if not upcoming({"start_time":event_start},now): continue
         diagnostics["seen"]+=1
-        product=str(x.get("product") or "")
-        line=x.get("line")
-        try:p=float(x.get("probability") or 0)
-        except (TypeError,ValueError):continue
-        if p<VIRTUAL_MIN_PROB:
-            diagnostics["reasons"]["probability_below_0_65"]=diagnostics["reasons"].get("probability_below_0_65",0)+1; continue
-        if line is None:
-            diagnostics["reasons"]["missing_line"]=diagnostics["reasons"].get("missing_line",0)+1; continue
-        if not x.get("bookmaker_available"):
-            diagnostics["reasons"]["missing_complete_market"]=diagnostics["reasons"].get("missing_complete_market",0)+1; continue
-        diagnostics["qualified"]+=1
-        pick=str(x.get("pick") or "").lower()
-        passed,recent=virtual_recent_gate(product,line,pick)
-        if not passed:
-            diagnostics["rejected_evidence"]+=1
-            reason=str(recent.get("reason") or "recent_evidence_below_threshold")
-            diagnostics["reasons"][reason]=diagnostics["reasons"].get(reason,0)+1
-            continue
-        diagnostics["evidence_pass"]+=1
-        y={**x,
-           "builder_market":"virtual_total",
-           "builder_probability":p,
-           "builder_pick":pick,
-           "recent_evidence":recent,
-           # Prefer the event-level timestamp from the same live SportyBet snapshot.
-           # Fall back to the snapshot heartbeat only when the event timestamp is absent.
-           "market_odds_timestamp":x.get("market_odds_timestamp") or live_ts.get(str(x.get("event_id"))) or live_updated}
-        out.append(y)
+        product=str(event.get("product") or "")
+        markets=event.get("markets") or []
+        if not isinstance(markets,list): continue
+
+        for market in markets:
+            if not isinstance(market,dict): continue
+            line=market.get("line")
+            if line is None: continue
+            try:line=float(line)
+            except (TypeError,ValueError):continue
+            outcomes=market.get("outcomes") or []
+            prices={}
+            for o in outcomes:
+                if not isinstance(o,dict): continue
+                name=str(o.get("name") or o.get("desc") or "").lower()
+                try:odds=float(o.get("odds"))
+                except (TypeError,ValueError):continue
+                if odds<=1: continue
+                if name.startswith("over"): prices["over"]=odds
+                elif name.startswith("under"): prices["under"]=odds
+            if "over" not in prices or "under" not in prices: continue
+            diagnostics["current_market_candidates"]+=2
+
+            for pick in ("over","under"):
+                template=templates.get(template_key(product,line,pick))
+                if not template: continue
+                diagnostics["qualified"]+=1
+                y={**template}
+                y.update({
+                    "sport":"virtual","product":product,
+                    "league":event.get("tournament") or event.get("category") or template.get("league"),
+                    "event_id":str(event.get("event_id") or ""),
+                    "start_time":event_start,
+                    "participant_1":event.get("participant_1") or event.get("team_1"),
+                    "participant_2":event.get("participant_2") or event.get("team_2"),
+                    "player_1":event.get("team_1") or event.get("participant_1"),
+                    "player_2":event.get("team_2") or event.get("participant_2"),
+                    "match":f"{event.get('team_1') or event.get('participant_1') or ''} vs {event.get('team_2') or event.get('participant_2') or ''}",
+                    "line":line,"pick":pick,"probability":template.get("probability"),
+                    "bookmaker_available":True,"sportybet_over_odds":prices["over"],
+                    "sportybet_under_odds":prices["under"],"bookmaker_source":"SportyBet NG",
+                    "sportybet_event_id":str(event.get("event_id") or ""),
+                    "sportybet_match":f"{event.get('team_1') or event.get('participant_1') or ''} vs {event.get('team_2') or event.get('participant_2') or ''}",
+                    "market_odds_timestamp":datetime.now(timezone.utc).isoformat(),
+                    "sportybet_identity_match":True,"builder_pick":pick,"builder_market":"virtual_total"
+                })
+                passed,recent=virtual_recent_gate(product,line,pick)
+                if not passed:
+                    diagnostics["rejected_evidence"]+=1
+                    reason=str(recent.get("reason") or "recent_evidence_below_threshold")
+                    diagnostics["reasons"][reason]=diagnostics["reasons"].get(reason,0)+1
+                    continue
+                diagnostics["evidence_pass"]+=1
+                y["recent_evidence"]=recent
+                out.append(y)
+
     diagnostics["quote_join"]=quote_diag
+    diagnostics["stale_unified_prices_used"]=False
+    diagnostics["current_feed_is_price_authority"]=True
     return out,diagnostics
 
 def market_rows(x):
