@@ -119,4 +119,7 @@ jobs:
             exit 0
           fi
           git commit -m "🤖 Refresh research-gated Odds Builder"
+          # Cloudflare verification may commit while this build is running.
+          # Rebase once on the latest main so the generated artifact is not lost.
+          git pull --rebase origin main
           git push origin main
