@@ -68,6 +68,10 @@ def main():
         except Exception:model={}
     by_line=model.get("by_line",{})
     by_comp=model.get("by_competition",{})
+    # Model validation is line-adaptive: every observed settled line can earn
+    # scope only when raw evidence and untouched walk-forward validation pass.
+    # A line absent from settled history is never promoted merely because the
+    # live SportyBet feed currently advertises it.
     model_lines=[float(k) for k,v in by_line.items() if model_pass(v.get("holdout",{}))]
     model_comps=[str(k) for k,v in by_comp.items() if model_pass(v)]
     eligible_lines=sorted(set(raw_lines)&set(model_lines))
@@ -114,7 +118,8 @@ def main():
         "participant_feature_independent":True,
         "participant_feature_gate":model.get("participant_feature_gate",{}),
         "qualified_lines":sorted(model_lines),
-        "qualified_competitions":sorted(model_comps)
+        "qualified_competitions":sorted(model_comps),
+        "line_scope_mode":"observed_settled_history_intersection_with_model_validation"
     }
     out={
       "generated_at":datetime.now(timezone.utc).isoformat(),
