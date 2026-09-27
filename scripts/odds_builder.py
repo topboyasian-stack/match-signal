@@ -361,7 +361,7 @@ def make_leg(x):
         "status":"LIVE_VALUE" if eligible else ("STALE" if age is not None and age>MAX_ODDS_AGE_SECONDS else "REJECTED"),
         "source":x.get("model"),"market_source":x.get("market_source") or x.get("bookmaker_source"),
         "recent_evidence":x.get("recent_evidence"),
-        "market_odds_timestamp":x.get("odds_timestamp")
+        "market_odds_timestamp":x.get("odds_timestamp") or x.get("market_odds_timestamp")
     }
 
 
