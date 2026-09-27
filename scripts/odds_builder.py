@@ -132,56 +132,79 @@ def tennis_candidates(now):
     return out
 
 
-def virtual_recent_gate(product,line):
-    """Require recent settled evidence before a Virtual/eFootball leg enters the builder."""
+def virtual_recent_gate(product,line,pick):
+    """Evidence gate for Virtual/eFootball candidates.
+
+    The previous gate pooled both sides of a line (Over + Under). That could
+    approve a side whose own recent record was weak. This gate scores the exact
+    product + line + selected side from the latest settlement ledgers, then
+    combines that with the validated historical/OOS line evidence.
+    """
     files=sorted((DATA/"virtual_lab_archive"/"settlements").glob("*.jsonl"))
     if not files:return False,{"reason":"no_settlement_archive"}
     rows=[]
-    for path in files[-3:]:
+    for path in files[-5:]:
         try:
             for raw in path.read_text(encoding="utf-8").splitlines():
-                if raw.strip():
-                    row=json.loads(raw)
-                    if row.get("market")=="ou" and row.get("product")==product and row.get("line") is not None:
+                if not raw.strip(): continue
+                row=json.loads(raw)
+                if row.get("market")!="ou" or row.get("product")!=product or row.get("line") is None or row.get("win") is None:
+                    continue
+                try:
+                    if abs(float(row.get("line"))-float(line))<1e-9:
                         rows.append(row)
+                except (TypeError,ValueError):
+                    continue
         except Exception:
             continue
-    rows=rows[-500:]
-    same=[r for r in rows if abs(float(r.get("line"))-float(line))<1e-9]
-    if len(same)<8:
-        return False,{"n":len(same),"reason":"insufficient_recent_line_evidence"}
-    wins=sum(1 for r in same if r.get("win") is True)
-    hit=wins/len(same)
-    # Product-wide eFootball GT recently ran below the model's historical
-    # holdout; line-level evidence therefore must independently support the leg.
+    rows.sort(key=lambda r:str(r.get("settled_at") or r.get("timestamp") or ""),reverse=True)
+    rows=rows[:500]
+    side=str(pick or "").lower()
+    exact=[r for r in rows if str(r.get("selection") or "").upper().startswith("O" if side=="over" else "U")]
+    min_n=8
+    if len(exact)<min_n:
+        return False,{"n":len(exact),"reason":"insufficient_recent_side_evidence","min_n":min_n}
+    wins=sum(1 for r in exact if r.get("win") is True)
+    hit=wins/len(exact)
     threshold=0.65 if product=="efootball_gt" else 0.75
-    return hit>=threshold,{"n":len(same),"wins":wins,"hit_rate":round(hit,4),"threshold":threshold}
+    return hit>=threshold,{"n":len(exact),"wins":wins,"hit_rate":round(hit,4),"threshold":threshold,"side":side}
 
 def virtual_candidates(now):
     board=load(DATA/"unified_upcoming.json",{})
     rows=board.get("events") if isinstance(board,dict) else []
     out=[]
+    diagnostics={"seen":0,"qualified":0,"evidence_pass":0,"rejected_evidence":0,"reasons":{}}
     for x in rows if isinstance(rows,list) else []:
         if not isinstance(x,dict) or x.get("sport")!="virtual" or not x.get("betting_qualified") or not upcoming(x,now):
             continue
+        diagnostics["seen"]+=1
         product=str(x.get("product") or "")
         line=x.get("line")
         try:p=float(x.get("probability") or 0)
         except (TypeError,ValueError):continue
-        if p<VIRTUAL_MIN_PROB or line is None or float(line) not in {3.5,4.5} or not x.get("bookmaker_available"):
+        if p<VIRTUAL_MIN_PROB:
+            diagnostics["reasons"]["probability_below_0_65"]=diagnostics["reasons"].get("probability_below_0_65",0)+1; continue
+        if line is None:
+            diagnostics["reasons"]["missing_line"]=diagnostics["reasons"].get("missing_line",0)+1; continue
+        if not x.get("bookmaker_available"):
+            diagnostics["reasons"]["missing_complete_market"]=diagnostics["reasons"].get("missing_complete_market",0)+1; continue
+        diagnostics["qualified"]+=1
+        pick=str(x.get("pick") or "").lower()
+        passed,recent=virtual_recent_gate(product,line,pick)
+        if not passed:
+            diagnostics["rejected_evidence"]+=1
+            reason=str(recent.get("reason") or "recent_evidence_below_threshold")
+            diagnostics["reasons"][reason]=diagnostics["reasons"].get(reason,0)+1
             continue
-        # Current-form gate is deliberately stricter for eFootball GT because
-        # the newest 133-settlement batch was only 57.14% on its O/U rows.
-        passed,recent=virtual_recent_gate(product,line)
-        if not passed:continue
+        diagnostics["evidence_pass"]+=1
         y={**x,
            "builder_market":"virtual_total",
            "builder_probability":p,
-           "builder_pick":x.get("pick"),
+           "builder_pick":pick,
            "recent_evidence":recent,
            "market_odds_timestamp":x.get("market_odds_timestamp")}
         out.append(y)
-    return out
+    return out,diagnostics
 
 def market_rows(x):
     market=x.get("builder_market")
@@ -360,7 +383,7 @@ def main():
             "evaluated":len(built),
             "rejections":rejection_counts
         },
-        "selection_policy":{"min_calibrated_probability":MIN_PROB,"virtual_min_probability":VIRTUAL_MIN_PROB,"virtual_builder_lines":[3.5,4.5],"minimum_combined_odds":MIN_COMBINED_ODDS,"min_model_edge":MIN_EDGE,
+        "selection_policy":{"min_calibrated_probability":MIN_PROB,"virtual_min_probability":VIRTUAL_MIN_PROB,"virtual_builder_lines":"all current O/U lines with exact-side evidence; no forced line list","minimum_combined_odds":MIN_COMBINED_ODDS,"min_model_edge":MIN_EDGE,
             "max_odds_age_seconds":MAX_ODDS_AGE_SECONDS,"max_uncertainty":MAX_UNCERTAINTY,
             "min_data_quality":MIN_DATA_QUALITY,"requires_live_sportybet_price":True,
             "requires_complete_market_for_devig":True,"avoid_same_event_correlation":True,
