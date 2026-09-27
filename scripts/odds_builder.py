@@ -176,6 +176,12 @@ def refresh_virtual_quotes(rows):
     join_diag={"live_events":len(live_by_id),"live_match_keys":len(live_by_match),"matched_by_id":0,"matched_by_match":0,"unmatched":0,"samples":live_samples}
     for x in rows:
         y=dict(x)
+        # Never carry a price from unified_upcoming into the Builder. A virtual
+        # leg is priced only when this exact current SportyBet event AND exact
+        # requested O/U line are found in the fresh proxy snapshot.
+        for stale_key in ("sportybet_over_odds","sportybet_under_odds","bookmaker_available","bookmaker_source","sportybet_event_id","sportybet_match","market_odds_timestamp","sportybet_identity_match"):
+            y.pop(stale_key,None)
+        y["bookmaker_available"]=False
         key=_norm_fixture(x.get("match") or f"{x.get('player_1') or x.get('participant_1') or x.get('team_1') or ''} vs {x.get('player_2') or x.get('participant_2') or x.get('team_2') or ''}")
         e=live_by_id.get(str(x.get("event_id")))
         if isinstance(e,dict): join_diag["matched_by_id"]+=1
