@@ -169,7 +169,7 @@ def refresh_virtual_quotes(rows):
         except Exception:
             break
     if not live_by_id and not live_by_match:
-        return rows,{"live_events":0,"live_match_keys":0,"matched_by_id":0,"matched_by_match":0,"unmatched":len(rows),"samples":live_samples}
+        return rows,{"live_events":0,"live_match_keys":0,"matched_by_id":0,"matched_by_match":0,"unmatched":len(rows),"samples":live_samples,"market_samples":[(e.get("markets") or [])[:3] for e in live_samples if isinstance(e,dict)]}
     out=[]
     join_diag={"live_events":len(live_by_id),"live_match_keys":len(live_by_match),"matched_by_id":0,"matched_by_match":0,"unmatched":0,"samples":live_samples}
     for x in rows:
