@@ -75,25 +75,28 @@ jobs:
           policy = data.get('selection_policy', {})
           assert policy.get('requires_live_sportybet_price') is True
           assert float(policy.get('min_model_edge', 0)) >= 0.025
-          assert set(data.get('sports_supported', [])) >= {'football', 'tennis'}
+          assert set(data.get('sports_supported', [])) >= {'football', 'tennis', 'virtual'}
           assert isinstance(data.get('qualified_legs'), list)
-          assert len(data['qualified_legs']) <= 4
+          assert len(data['qualified_legs']) <= 20
           if data['qualified_legs']:
-              assert 3 <= len(data['qualified_legs']) <= 4
+              assert float(data.get('market_price_combined_odds', 0)) >= 4.0
           if data.get('status') == 'UPSTREAM_RESEARCH_GATE_BLOCKED':
               assert not data['qualified_legs']
           for leg in data['qualified_legs']:
-              assert leg.get('sport') in {'football', 'tennis'}
-              assert float(leg.get('model_probability', 0)) >= 0.60
+              assert leg.get('sport') in {'football', 'tennis', 'virtual'}
+              assert float(leg.get('model_probability', 0)) >= (0.65 if leg.get('sport') == 'virtual' else 0.60)
               assert float(leg.get('model_fair_odds', 0)) > 1
-              assert leg.get('real_money_eligible') is True
+              assert leg.get('real_money_eligible') is False
+              assert leg.get('paper_only') is True
               assert leg.get('bookmaker_odds') is not None
               assert float(leg.get('model_edge', 0)) >= 0.025
           sports = {x.get('sport') for x in data['qualified_legs']}
           if data.get('candidates_considered', {}).get('football', 0) > 0:
               assert 'football' in sports or len(data['qualified_legs']) < 3
-          if data.get('reference_combined_odds') is not None:
-              assert data['reference_combined_odds'] > 1
+          if data.get('market_price_combined_odds') is not None:
+              assert data['market_price_combined_odds'] > 1
+          if data.get('status') == 'BELOW_4_TARGET_AVAILABLE':
+              assert data.get('best_available_legs')
           print('V6 Accumulator QA:', json.dumps({
               'status': data.get('status'),
               'legs': len(data['qualified_legs']),
