@@ -335,7 +335,7 @@ jobs:
           Path('DEPLOY-VERIFY-CLOUDFLARE.json').write_text(json.dumps({
             'status':'VERIFIED',
             'provider':'Cloudflare Pages',
-            'source_commit':os.environ.get('GITHUB_SHA'),
+            'source_commit':__import__('subprocess').check_output(['git','rev-parse','HEAD'],text=True).strip(),
             'verified_at':datetime.now(timezone.utc).isoformat(),
             'live_virtual_feed':live,
             'checks':['core_pages','research_virtual_lab','live_virtual_proxy','virtual_lab_live_snapshot','live_production_data']
