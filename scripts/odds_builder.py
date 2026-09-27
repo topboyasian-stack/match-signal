@@ -172,6 +172,10 @@ def virtual_recent_gate(product,line,pick):
 def virtual_candidates(now):
     board=load(DATA/"unified_upcoming.json",{})
     rows=board.get("events") if isinstance(board,dict) else []
+    live=load(DATA/"virtual_lab_live.json",{})
+    live_events=live.get("events") if isinstance(live,dict) else []
+    live_ts={str(e.get("event_id")): (e.get("timestamp") or e.get("captured_at")) for e in live_events if isinstance(e,dict) and e.get("event_id")}
+    live_updated=live.get("updated_at") if isinstance(live,dict) else None
     out=[]
     diagnostics={"seen":0,"qualified":0,"evidence_pass":0,"rejected_evidence":0,"reasons":{}}
     for x in rows if isinstance(rows,list) else []:
@@ -202,7 +206,9 @@ def virtual_candidates(now):
            "builder_probability":p,
            "builder_pick":pick,
            "recent_evidence":recent,
-           "market_odds_timestamp":x.get("market_odds_timestamp")}
+           # Prefer the event-level timestamp from the same live SportyBet snapshot.
+           # Fall back to the snapshot heartbeat only when the event timestamp is absent.
+           "market_odds_timestamp":x.get("market_odds_timestamp") or live_ts.get(str(x.get("event_id"))) or live_updated}
         out.append(y)
     return out,diagnostics
 
