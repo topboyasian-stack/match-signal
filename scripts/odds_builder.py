@@ -168,7 +168,7 @@ def virtual_candidates(now):
         line=x.get("line")
         try:p=float(x.get("probability") or 0)
         except (TypeError,ValueError):continue
-        if p<VIRTUAL_MIN_PROB or line is None or not x.get("bookmaker_available"):
+        if p<VIRTUAL_MIN_PROB or line is None or float(line) not in {3.5,4.5} or not x.get("bookmaker_available"):
             continue
         # Current-form gate is deliberately stricter for eFootball GT because
         # the newest 133-settlement batch was only 57.14% on its O/U rows.
@@ -360,7 +360,7 @@ def main():
             "evaluated":len(built),
             "rejections":rejection_counts
         },
-        "selection_policy":{"min_calibrated_probability":MIN_PROB,"virtual_min_probability":VIRTUAL_MIN_PROB,"minimum_combined_odds":MIN_COMBINED_ODDS,"min_model_edge":MIN_EDGE,
+        "selection_policy":{"min_calibrated_probability":MIN_PROB,"virtual_min_probability":VIRTUAL_MIN_PROB,"virtual_builder_lines":[3.5,4.5],"minimum_combined_odds":MIN_COMBINED_ODDS,"min_model_edge":MIN_EDGE,
             "max_odds_age_seconds":MAX_ODDS_AGE_SECONDS,"max_uncertainty":MAX_UNCERTAINTY,
             "min_data_quality":MIN_DATA_QUALITY,"requires_live_sportybet_price":True,
             "requires_complete_market_for_devig":True,"avoid_same_event_correlation":True,
