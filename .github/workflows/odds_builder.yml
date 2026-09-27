@@ -121,5 +121,12 @@ jobs:
           git commit -m "🤖 Refresh research-gated Odds Builder"
           # Cloudflare verification may commit while this build is running.
           # Rebase once on the latest main so the generated artifact is not lost.
-          git pull --rebase origin main
+          if ! git pull --rebase origin main; then
+            echo "Rebase conflict detected; generated builder artifacts win over concurrent refresh artifacts."
+            git rebase --abort || true
+            git fetch origin main
+            git reset --soft origin/main
+            git add data/odds_builder.json data/tennis_total_research.json
+            git commit -m "🤖 Refresh research-gated Odds Builder"
+          fi
           git push origin main
