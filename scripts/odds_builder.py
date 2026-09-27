@@ -32,6 +32,8 @@ MIN_DATA_QUALITY=0.70
 MIN_LEGS,MAX_LEGS=1,20
 MIN_COMBINED_ODDS=4.0
 VIRTUAL_MIN_PROB=0.65
+PARTICIPANT_HISTORY_MIN_N=3
+PARTICIPANT_HISTORY_MAX_BONUS=0.035
 
 
 def load(path, default):
@@ -336,6 +338,87 @@ def selected_price_and_devig(x):
     return selected,1.0/selected,devig,complete
 
 
+def _participant_identity(value):
+    """Extract the stable virtual participant identity from a feed label.
+
+    Virtual fixtures commonly arrive as Team (participant). The parenthetical
+    identity is the durable entity; plain labels are normalized as-is.
+    """
+    import re
+    s=str(value or "").strip()
+    m=re.search(r"\\(([^()]*)\\)\\s*$",s)
+    if m and m.group(1).strip():
+        s=m.group(1).strip()
+    s=re.sub(r"[^a-z0-9]+"," ",s.lower()).strip()
+    return s
+
+
+def participant_history_profiles():
+    """Load the latest automatic participant O/U profiles.
+
+    These profiles are generated only from settled SportyBet O/U history.
+    Because the builder runs on upcoming fixtures, the settled profile snapshot
+    is strictly prior to the candidate event time and is used only as a
+    conservative ranking feature, never as a replacement for model probability.
+    """
+    profile_path=DATA/"virtual_lab_participant_profiles.json"
+    raw=load(profile_path,{})
+    profiles=raw.get("profiles") if isinstance(raw,dict) else []
+    return profiles if isinstance(profiles,list) else []
+
+
+def participant_history_signal(x):
+    """Return conservative exact-line O/U history for both participants.
+
+    A Bayesian prior keeps tiny samples near 50%. Recent exact-line history is
+    blended with the full exact-line record when available. This feature can
+    rank already-qualified legs but cannot make a rejected leg eligible.
+    """
+    if x.get("sport")!="virtual":
+        return {"available":False,"score":0.5,"participants":[]}
+    product=str(x.get("product") or "")
+    line=x.get("line")
+    pick=str(x.get("builder_pick") or "").lower()
+    try:line_key=f"{float(line):g}"
+    except (TypeError,ValueError):
+        return {"available":False,"score":0.5,"participants":[]}
+    names=[x.get("participant_1") or x.get("player_1") or x.get("team_1"),
+           x.get("participant_2") or x.get("player_2") or x.get("team_2")]
+    profiles=participant_history_profiles()
+    by_key={str(p.get("participant_key")):p for p in profiles if isinstance(p,dict)}
+    details=[]
+    for raw_name in names:
+        identity=_participant_identity(raw_name)
+        key=f"{product}|{identity}" if identity else ""
+        profile=by_key.get(key)
+        line_data=(profile or {}).get("lines",{}).get(line_key) if profile else None
+        if not isinstance(line_data,dict):
+            details.append({"participant":identity,"n":0,"recent_n":0,"score":0.5,"available":False})
+            continue
+        try:n=int(line_data.get("n") or 0)
+        except (TypeError,ValueError):n=0
+        try:over=int(line_data.get("over") or 0)
+        except (TypeError,ValueError):over=0
+        try:rn=int(line_data.get("recent_n") or 0)
+        except (TypeError,ValueError):rn=0
+        try:ro=float(line_data.get("recent_over_rate")) if rn else None
+        except (TypeError,ValueError):ro=None
+        full_wins=over if pick=="over" else max(0,n-over)
+        full=(full_wins+2.0)/(n+4.0) if n else 0.5
+        recent_wins=(ro*rn) if pick=="over" and ro is not None else ((1.0-ro)*rn if ro is not None else 0.0)
+        recent=(recent_wins+2.0)/(rn+4.0) if rn else full
+        if rn>=PARTICIPANT_HISTORY_MIN_N and n>=PARTICIPANT_HISTORY_MIN_N:
+            score=0.65*recent+0.35*full
+        elif n>=PARTICIPANT_HISTORY_MIN_N:
+            score=full
+        else:
+            score=0.5
+        details.append({"participant":identity,"n":n,"recent_n":rn,"full_score":round(full,4),"recent_score":round(recent,4),"score":round(score,4),"available":n>=PARTICIPANT_HISTORY_MIN_N})
+    available=[d for d in details if d["available"]]
+    score=sum(d["score"] for d in available)/len(available) if available else 0.5
+    return {"available":bool(available),"score":round(score,4),"participants":details,"line":line_key,"side":pick}
+
+
 def make_leg(x):
     p=float(x["builder_probability"])
     bookmaker,implied,devig,complete=selected_price_and_devig(x)
@@ -366,6 +449,11 @@ def make_leg(x):
     else:
         match=f"{x.get('home_team')} vs {x.get('away_team')}"
         pick=x.get("builder_pick")
+    participant_history=participant_history_signal(x)
+    # History is deliberately capped: it can break ties / reorder qualified
+    # legs, but it cannot overwhelm the calibrated model edge or bookmaker edge.
+    history_bonus=(participant_history.get("score",0.5)-0.5)*PARTICIPANT_HISTORY_MAX_BONUS*2.0
+    selection_score=(edge if edge is not None else -1.0)+history_bonus
     return {
         "sport":x.get("sport"),"competition":x.get("league"),"event_id":x.get("event_id"),
         "start_time":x.get("start_time"),"match":match,"market":x.get("builder_market"),
@@ -375,6 +463,9 @@ def make_leg(x):
         "de_vig_probability":round(devig,6) if devig is not None else None,
         "model_edge":round(edge,6) if edge is not None else None,
         "expected_value":round(ev,6) if ev is not None else None,
+        "participant_history":participant_history,
+        "participant_history_bonus":round(history_bonus,6),
+        "selection_score":round(selection_score,6),
         "edge_percent":round(edge*100,2) if edge is not None else None,
         "odds_fresh":bool(age is not None and age<=MAX_ODDS_AGE_SECONDS),
         "market_odds_age_seconds":round(age,1) if age is not None else None,
@@ -406,7 +497,7 @@ def _participants(leg):
 def select_value(candidates):
     built=[make_leg(x) for x in candidates]
     eligible=[x for x in built if x["builder_eligible"]]
-    eligible.sort(key=lambda x:(x.get("model_edge") or -1,x.get("model_probability") or 0,x.get("bookmaker_odds") or 0),reverse=True)
+    eligible.sort(key=lambda x:(x.get("selection_score") or -1,x.get("model_edge") or -1,x.get("model_probability") or 0,x.get("bookmaker_odds") or 0),reverse=True)
     selected=[];events=set();participants=set();combined=1.0
     skipped_participant=0
     for leg in eligible:
@@ -495,12 +586,20 @@ def main():
             "virtual_candidates":len(virtual),
             "virtual_gate_diagnostics":virtual_diag,
             "evaluated":len(built),
-            "rejections":rejection_counts,"selection_diversity":selection_diag
+            "rejections":rejection_counts,"selection_diversity":selection_diag,
+            "participant_history_weighting":{
+                "enabled":True,
+                "min_n":PARTICIPANT_HISTORY_MIN_N,
+                "max_bonus":PARTICIPANT_HISTORY_MAX_BONUS,
+                "role":"ranking_only_after_all_existing_eligibility_gates",
+                "source":"data/virtual_lab_participant_profiles.json"
+            }
         },
         "selection_policy":{"min_calibrated_probability":MIN_PROB,"virtual_min_probability":VIRTUAL_MIN_PROB,"virtual_builder_lines":"all current O/U lines with exact-side evidence; no forced line list","minimum_combined_odds":MIN_COMBINED_ODDS,"min_model_edge":MIN_EDGE,
             "max_odds_age_seconds":MAX_ODDS_AGE_SECONDS,"max_uncertainty":MAX_UNCERTAINTY,
             "min_data_quality":MIN_DATA_QUALITY,"requires_live_sportybet_price":True,
             "requires_complete_market_for_devig":True,"avoid_same_event_correlation":True,
+            "participant_history_weighting":"qualified-leg ranking only; conservative exact-line settled O/U history; no eligibility bypass",
             "never_force_accumulator":True,"real_money_execution":False},
         "bookmaker_odds":{"status":"LIVE_SPORTYBET_SNAPSHOT","sportybet_direct_feed":"VIA_CLOUDFLARE_PROXY",
             "stake_direct_feed":"NOT_CONNECTED","instruction":"Verify the displayed SportyBet price immediately before any manual wager."},
