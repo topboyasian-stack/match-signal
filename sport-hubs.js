@@ -108,18 +108,22 @@ function unifiedRow(group){
   const when=DT(x.start_time);
   const qualified=Boolean(x.betting_qualified);
   const live=String(x.event_state||"").toUpperCase()==="LIVE";
+  const settled=String(x.event_state||"").toUpperCase()==="SETTLED";
   const book=bookmakerOdds(x);
-  const status=qualified?"BETTING QUALIFIED · PAPER":
+  const result=String(x.settlement_result||"").toUpperCase();
+  const won=settled && (x.settlement_result===x.pick || result==="WIN" || result==="WON" || x.win===true);
+  const status=settled?(won?"SETTLED · ✓ WIN":"SETTLED · ✕ LOSS"):
+    (qualified?"BETTING QUALIFIED · PAPER":
     (live?"LIVE RESEARCH":
-    (String(x.projection_tier||"").includes("deep")?"DEEP MODEL":"RESEARCH PROJECTION"));
-  const q=x.betting_qualified?"BETTING-QUALIFIED":(x.qualification_status||"PAPER · NOT QUALIFIED");
+    (String(x.projection_tier||"").includes("deep")?"DEEP MODEL":"RESEARCH PROJECTION")));
+  const q=settled?(won?"SETTLED · ✓":"SETTLED · ✕"):(x.betting_qualified?"BETTING-QUALIFIED":(x.qualification_status||"PAPER · NOT QUALIFIED"));
   return '<article class="ms-up-row ms-fixture-card">'+
     '<div class="ms-up-time"><b>'+E(when)+'</b><span>'+E(String(x.start_time||"").slice(0,10))+'</span></div>'+
     '<div class="ms-up-event"><div class="ms-up-meta"><span class="ms-sport-pill">'+sportIcon(x.sport)+' '+E(x.sport==="table_tennis"?"Table Tennis":(x.sport||"Sport"))+'</span><span>'+E(x.league||x.competition||"Unclassified")+'</span><span class="ms-fixture-market-count">1 prediction</span></div>'+
     '<div class="ms-up-match">'+E(x.player_1||x.home||"Participant 1")+' <span>vs</span> '+E(x.player_2||x.away||"Participant 2")+'</div>'+
     '<div class="ms-market-stack">'+unifiedMarketLine(x)+'</div>'+
-    '<div class="ms-fixture-foot"><span>'+E(q)+'</span><span>'+E(book!=null?"SportyBet quote matched to this prediction":"SportyBet quote not matched")+'</span></div></div>'+
-    '<div class="ms-up-status"><span class="ms-up-status-badge '+(qualified?"deep":live?"testing":"research")+'">'+E(status)+'</span><span class="ms-up-qual '+(qualified?"qualified":"paper")+'">'+E(qualified?"BETTING-QUALIFIED":"PAPER · NOT QUALIFIED")+'</span><small>'+E(evidenceLabel(x))+'</small></div>'+
+    '<div class="ms-fixture-foot"><span class="'+(settled?(won?"ms-settled-win":"ms-settled-loss"):"")+'">'+E(q)+'</span><span>'+E(settled?("Result "+(x.final_score||x.settlement_result||"recorded")):(book!=null?"SportyBet quote matched to this prediction":"SportyBet quote not matched"))+'</span></div></div>'+
+    '<div class="ms-up-status"><span class="ms-up-status-badge '+(settled?(won?"deep":"research"):(qualified?"deep":live?"testing":"research"))+'">'+E(status)+'</span><span class="ms-up-qual '+(qualified?"qualified":"paper")+'">'+E(qualified?"BETTING-QUALIFIED":"PAPER · NOT QUALIFIED")+'</span><small>'+E(evidenceLabel(x))+'</small></div>'+
   '</article>';
 }
 async function renderUnifiedBoard(){
