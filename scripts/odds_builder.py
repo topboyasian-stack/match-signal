@@ -132,14 +132,22 @@ def tennis_candidates(now):
     return out
 
 
+def _norm_fixture(v):
+    import re
+    s=str(v or "").lower().replace("vs"," ")
+    return re.sub(r"[^a-z0-9]+"," ",s).strip()
+
 def refresh_virtual_quotes(rows):
-    """Refresh read-only SportyBet virtual quotes before applying the freshness gate.
-    The unified board can lag the live snapshot; the builder must not treat an old
-    quote as current merely because its event remains upcoming.
+    """Join unified fixtures to the current read-only SportyBet snapshot.
+
+    Event ID is preferred. When IDs differ between pipeline snapshots, fall
+    back to exact normalized participant identity. Never join by market ID
+    alone, because one event can expose several O/U ladders.
     """
     if not isinstance(rows,list) or not rows:
         return rows
     live_by_id={}
+    live_by_match={}
     fetched_at=datetime.now(timezone.utc).isoformat()
     headers={"Accept":"application/json","Current-Country":"NG","User-Agent":"Match-Signal-Paper-Builder/6.1"}
     for page in range(1,4):
@@ -151,19 +159,22 @@ def refresh_virtual_quotes(rows):
             events=payload.get("events") if isinstance(payload,dict) else []
             if not isinstance(events,list): break
             for e in events:
-                if isinstance(e,dict) and e.get("event_id"):
-                    live_by_id[str(e["event_id"])]=e
+                if not isinstance(e,dict): continue
+                if e.get("event_id"): live_by_id[str(e["event_id"])]=e
+                key=_norm_fixture(e.get("match") or e.get("name"))
+                if key: live_by_match[key]=e
             if len(events)<100: break
         except Exception:
             break
-    if not live_by_id:
+    if not live_by_id and not live_by_match:
         return rows
     out=[]
     for x in rows:
         y=dict(x)
-        e=live_by_id.get(str(y.get("event_id")))
+        key=_norm_fixture(x.get("match") or f"{x.get('player_1','')} vs {x.get('player_2','')}")
+        e=live_by_id.get(str(x.get("event_id"))) or live_by_match.get(key)
         if isinstance(e,dict):
-            line=y.get("line")
+            line=x.get("line")
             over=under=None
             for m in e.get("markets") or []:
                 if not isinstance(m,dict): continue
@@ -172,9 +183,6 @@ def refresh_virtual_quotes(rows):
                     same_line=line is not None and ml is not None and abs(float(ml)-float(line))<1e-9
                 except (TypeError,ValueError):
                     same_line=False
-                # Never fall back to a market ID when the requested line is known.
-                # IDs can contain multiple/current O-U ladders; accepting an ID-only
-                # match was the source of fixture/price mismatches.
                 if not same_line:
                     continue
                 for o in m.get("outcomes") or []:
@@ -195,9 +203,9 @@ def refresh_virtual_quotes(rows):
                 y["sportybet_event_id"]=str(e.get("event_id"))
                 y["sportybet_match"]=e.get("match") or e.get("name")
                 y["market_odds_timestamp"]=fetched_at
+                y["sportybet_identity_match"]=str(e.get("event_id"))==str(x.get("event_id")) or _norm_fixture(e.get("match") or e.get("name"))==key
         out.append(y)
     return out
-
 
 def virtual_recent_gate(product,line,pick):
     """Evidence gate for Virtual/eFootball candidates.
