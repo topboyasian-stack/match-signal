@@ -1,44 +1,44 @@
 {
-  "generated_at": "2026-09-27T08:06:25.729903+00:00",
+  "generated_at": "2026-09-27T08:53:45.183529+00:00",
   "status": "FAIL",
-  "critical_issues": 1,
+  "critical_issues": 2,
   "warning_issues": 0,
   "info_issues": 0,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
       "status": "PASS",
-      "age_hours": 2.89,
+      "age_hours": 3.68,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.01,
+      "age_hours": 0.15,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 0.02,
+      "age_hours": 0.81,
       "threshold_hours": 4
     },
     {
       "engine": "virtual_lab",
-      "status": "PASS",
-      "age_hours": 0.88,
+      "status": "STALE",
+      "age_hours": 1.67,
       "threshold_hours": 1
     },
     {
       "engine": "darts_x",
       "status": "PASS",
-      "age_hours": 0.01,
+      "age_hours": 0.79,
       "threshold_hours": 2
     },
     {
       "engine": "table_tennis_x",
       "status": "STALE",
-      "age_hours": 2.43,
+      "age_hours": 3.22,
       "threshold_hours": 2
     },
     {
@@ -50,9 +50,14 @@
   ],
   "issues": [
     {
+      "code": "STALE_VIRTUAL_LAB",
+      "severity": "critical",
+      "detail": "updated_at age 1.67h exceeds 1h"
+    },
+    {
       "code": "STALE_TABLE_TENNIS_X",
       "severity": "critical",
-      "detail": "updated_at age 2.43h exceeds 2h"
+      "detail": "updated_at age 3.22h exceeds 2h"
     }
   ],
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
