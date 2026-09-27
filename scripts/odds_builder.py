@@ -412,3 +412,5 @@ def main():
 
 if __name__=="__main__":
     main()
+
+# Refresh marker: exact-side virtual evidence gate is active.
