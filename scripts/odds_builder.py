@@ -139,6 +139,27 @@ def _norm_fixture(v):
     s=str(v or "").lower().replace("vs"," ")
     return re.sub(r"[^a-z0-9]+"," ",s).strip()
 
+
+def _live_participant_identity(value):
+    import re
+    s=str(value or "").strip()
+    m=re.search(r"\\(([^()]*)\\)\\s*$",s)
+    if m and m.group(1).strip(): s=m.group(1).strip()
+    return re.sub(r"[^a-z0-9]+"," ",s.lower()).strip()
+
+
+def _participant_pair_key(row):
+    product=str(row.get("product") or "")
+    vals=[]
+    for key in ("participant_1","participant_2","player_1","player_2","team_1","team_2"):
+        v=row.get(key)
+        if v:
+            ident=_live_participant_identity(v)
+            if ident and ident not in vals: vals.append(ident)
+    if len(vals)<2:
+        return ""
+    return product+"|"+"|".join(sorted(vals[:2]))
+
 def refresh_virtual_quotes(rows):
     """Join unified fixtures to the current read-only SportyBet snapshot.
 
@@ -150,6 +171,7 @@ def refresh_virtual_quotes(rows):
         return rows,{"live_events":0,"live_match_keys":0,"matched_by_id":0,"matched_by_match":0,"unmatched":0,"samples":[]}
     live_by_id={}
     live_by_match={}
+    live_by_pair={}
     live_samples=[]
     fetched_at=datetime.now(timezone.utc).isoformat()
     headers={"Accept":"application/json","Current-Country":"NG","User-Agent":"Match-Signal-Paper-Builder/6.1"}
@@ -167,13 +189,15 @@ def refresh_virtual_quotes(rows):
                 if e.get("event_id"): live_by_id[str(e["event_id"])]=e
                 key=_norm_fixture(e.get("match") or e.get("name") or f"{e.get('participant_1') or e.get('team_1') or ''} vs {e.get('participant_2') or e.get('team_2') or ''}")
                 if key: live_by_match[key]=e
+                pair_key=_participant_pair_key(e)
+                if pair_key: live_by_pair.setdefault(pair_key,[]).append(e)
             if len(events)<100: break
         except Exception:
             break
     if not live_by_id and not live_by_match:
-        return rows,{"live_events":0,"live_match_keys":0,"matched_by_id":0,"matched_by_match":0,"unmatched":len(rows),"samples":live_samples,"market_samples":[(e.get("markets") or [])[:3] for e in live_samples if isinstance(e,dict)]}
+        return rows,{"live_events":0,"live_match_keys":0,"live_pair_keys":0,"matched_by_id":0,"matched_by_match":0,"matched_by_participant_time":0,"unmatched":len(rows),"samples":live_samples,"market_samples":[(e.get("markets") or [])[:3] for e in live_samples if isinstance(e,dict)]}
     out=[]
-    join_diag={"live_events":len(live_by_id),"live_match_keys":len(live_by_match),"matched_by_id":0,"matched_by_match":0,"unmatched":0,"samples":live_samples}
+    join_diag={"live_events":len(live_by_id),"live_match_keys":len(live_by_match),"live_pair_keys":len(live_by_pair),"matched_by_id":0,"matched_by_match":0,"matched_by_participant_time":0,"unmatched":0,"samples":live_samples}
     for x in rows:
         y=dict(x)
         # Never carry a price from unified_upcoming into the Builder. A virtual
@@ -188,7 +212,26 @@ def refresh_virtual_quotes(rows):
         else:
             e=live_by_match.get(key)
             if isinstance(e,dict): join_diag["matched_by_match"]+=1
-            else: join_diag["unmatched"]+=1
+            else:
+                pair_key=_participant_pair_key(x)
+                options=live_by_pair.get(pair_key,[])
+                if options:
+                    try:
+                        target_dt=datetime.fromisoformat(str(x.get("start_time") or "").replace("Z","+00:00"))
+                        target_ts=target_dt.timestamp()
+                        ranked=[]
+                        for opt in options:
+                            raw_ms=opt.get("start_time_ms")
+                            if raw_ms is None: continue
+                            diff=abs(float(raw_ms)/1000.0-target_ts)
+                            if diff<=1800: ranked.append((diff,opt))
+                        if ranked:
+                            ranked.sort(key=lambda z:z[0]); e=ranked[0][1]
+                            join_diag["matched_by_participant_time"]+=1
+                        else: e=None
+                    except (TypeError,ValueError):
+                        e=None
+                if not isinstance(e,dict): join_diag["unmatched"]+=1
         if isinstance(e,dict):
             line=x.get("line")
             over=under=None
