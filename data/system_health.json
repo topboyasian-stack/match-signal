@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-09-27T15:07:36.492975+00:00",
-  "status": "HEALTHY",
-  "critical_issues": 0,
+  "generated_at": "2026-09-27T15:07:46.000997+00:00",
+  "status": "FAIL",
+  "critical_issues": 1,
   "warning_issues": 0,
   "info_issues": 1,
   "checks": [
@@ -37,7 +37,7 @@
     },
     {
       "engine": "table_tennis_x",
-      "status": "PASS",
+      "status": "STALE",
       "age_hours": 2.0,
       "threshold_hours": 2
     },
@@ -49,6 +49,11 @@
     }
   ],
   "issues": [
+    {
+      "code": "STALE_TABLE_TENNIS_X",
+      "severity": "critical",
+      "detail": "updated_at age 2.00h exceeds 2h"
+    },
     {
       "code": "SELECTION_GATE_EMPTY",
       "severity": "info",
