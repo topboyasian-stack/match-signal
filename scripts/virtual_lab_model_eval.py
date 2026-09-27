@@ -14,7 +14,7 @@ ROOT=Path(__file__).resolve().parents[1]
 DATA=ROOT/"data"
 HISTORY=DATA/"virtual_lab_history.json"
 OUTPUT=DATA/"virtual_lab_model_eval.json"
-LINES=(1.5,3.5,4.5)
+DEFAULT_LINES=(1.5,3.5,4.5)
 HOLDOUT_FRACTION=.30
 MIN_EVENT_HISTORY=8
 MIN_PARTICIPANT_TOTAL_HISTORY=3
@@ -248,6 +248,12 @@ def grouped(rows, field):
 def main():
     history=json.loads(HISTORY.read_text()) if HISTORY.exists() else []
     rows=[r for r in history if isinstance(r,dict) and r.get("market")=="ou" and r.get("win") is not None]
+    # Evaluate every settled O/U line with enough observations instead of a
+    # hard-coded half-line subset. This lets the model validate the actual
+    # SportyBet ladder (including integer lines) without inventing probabilities
+    # for lines that have never been observed.
+    observed_lines=sorted({float(r.get("line")) for r in rows if r.get("line") is not None})
+    evaluation_lines=tuple(observed_lines) if observed_lines else DEFAULT_LINES
     events=build_events(rows)
     cut=max(1,int(len(events)*(1-HOLDOUT_FRACTION)))
     hold_keys={e["key"] for e in events[cut:]}
@@ -281,7 +287,7 @@ def main():
         ph["brier"]<mh["brier"] and ph["log_loss"]<mh["log_loss"] and ph["ece"]<=mh["ece"]+.02
     )
     line_reports={}
-    for line in LINES:
+    for line in evaluation_lines:
         subset=[r for r in hold if r["line"]==line]
         line_reports[str(line)]={"holdout":{k:metrics(subset,k) for k in variants},
                                  "participant_holdout_n":sum(r["participant_active"] for r in subset)}
@@ -289,7 +295,7 @@ def main():
       "generated_at":datetime.now(timezone.utc).isoformat(),
       "method":"strict chronological walk-forward; each scored event only sees earlier settled events",
       "source_contract":"automatic SportyBet result history only; user-reported tickets excluded",
-      "history_rows":len(history),"ou_rows":len(rows),"events":len(events),
+      "history_rows":len(history),"ou_rows":len(rows),"events":len(events),"evaluation_lines":list(evaluation_lines),
       "holdout":{"fraction":HOLDOUT_FRACTION,"events":len(events)-cut,"rows":len(hold),"participant_rows":len(participant_hold)},
       "variants":{
         "market":"SportyBet de-vig probability",
@@ -318,6 +324,7 @@ def main():
         "pass":participant_pass,
         "reason":"passes both Brier and log loss with calibration tolerance" if participant_pass else "insufficient untouched participant evidence or no dual-loss improvement"
       },
+      "line_scope_policy":{"mode":"observed_history_lines","default_lines":list(DEFAULT_LINES),"current_feed_lines_are_not_promoted_without_settled_history":True},
       "paper_only":True
     }
     OUTPUT.write_text(json.dumps(out,indent=2)+"\n")
