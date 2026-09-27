@@ -265,7 +265,7 @@ def make_leg(x):
         "odds_fresh":bool(age is not None and age<=MAX_ODDS_AGE_SECONDS),
         "market_odds_age_seconds":round(age,1) if age is not None else None,
         "data_quality":round(quality,3),"uncertainty":round(uncert,3),
-        "market_complete":complete,"real_money_eligible":eligible,
+        "market_complete":complete,"builder_eligible":eligible,"real_money_eligible":False,"paper_only":True,
         "status":"LIVE_VALUE" if eligible else ("STALE" if age is not None and age>MAX_ODDS_AGE_SECONDS else "REJECTED"),
         "source":x.get("model"),"market_source":x.get("market_source") or x.get("bookmaker_source"),
         "recent_evidence":x.get("recent_evidence"),
@@ -275,7 +275,7 @@ def make_leg(x):
 
 def select_value(candidates):
     built=[make_leg(x) for x in candidates]
-    eligible=[x for x in built if x["real_money_eligible"]]
+    eligible=[x for x in built if x["builder_eligible"]]
     eligible.sort(key=lambda x:(x.get("model_probability") or 0,x.get("model_edge") or -1,x.get("bookmaker_odds") or 0),reverse=True)
     selected=[];events=set();combined=1.0
     for leg in eligible:
@@ -344,7 +344,7 @@ def main():
         rejection_counts[leg_status]=rejection_counts.get(leg_status,0)+1
     result={
         "generated_at":now.isoformat(),"engine_version":"V6.1-RESEARCH-GATED",
-        "mode":"PAPER_ONLY","target_legs":"3-4","sports_supported":["football","tennis","virtual"],
+        "mode":"PAPER_ONLY","target_legs":"variable until combined odds >= 4.00","sports_supported":["football","tennis","virtual"],
         "research_gate":{
             "selection_gate_status":gate_status,
             "selected_predictions":selected_predictions,
