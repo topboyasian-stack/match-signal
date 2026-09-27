@@ -104,6 +104,12 @@ def main():
     raw=[];source="";errors=[]
     try:
         raw,source=collect_proxy()
+        # A successful HTTP response with zero fixtures is not a healthy live
+        # snapshot. Use the direct SportyBet endpoint as the same fallback path
+        # used by the collector rather than publishing an empty live artifact.
+        if not raw:
+            errors.append("proxy: returned zero events; attempting direct fallback")
+            raw,source=collect_direct()
     except Exception as exc:
         errors.append("proxy: "+str(exc))
         try:
