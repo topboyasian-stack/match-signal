@@ -29,7 +29,9 @@ MIN_EDGE=0.025
 MAX_ODDS_AGE_SECONDS=900
 MAX_UNCERTAINTY=0.22
 MIN_DATA_QUALITY=0.70
-MIN_LEGS,MAX_LEGS=3,4
+MIN_LEGS,MAX_LEGS=1,20
+MIN_COMBINED_ODDS=4.0
+VIRTUAL_MIN_PROB=0.70
 
 
 def load(path, default):
@@ -87,7 +89,7 @@ def uncertainty(x,p):
 
 def odds_age(x):
     try:
-        stamp=x.get("odds_timestamp")
+        stamp=x.get("odds_timestamp") or x.get("market_odds_timestamp")
         if not stamp:return None
         return max(0.0,(datetime.now(timezone.utc)-datetime.fromisoformat(str(stamp).replace("Z","+00:00"))).total_seconds())
     except (TypeError,ValueError):
@@ -129,6 +131,57 @@ def tennis_candidates(now):
             out.append({**x,"builder_market":"total_games","builder_probability":op,"builder_pick":ou_pick})
     return out
 
+
+def virtual_recent_gate(product,line):
+    """Require recent settled evidence before a Virtual/eFootball leg enters the builder."""
+    files=sorted((DATA/"virtual_lab_archive"/"settlements").glob("*.jsonl"))
+    if not files:return False,{"reason":"no_settlement_archive"}
+    rows=[]
+    for path in files[-3:]:
+        try:
+            for raw in path.read_text(encoding="utf-8").splitlines():
+                if raw.strip():
+                    row=json.loads(raw)
+                    if row.get("market")=="ou" and row.get("product")==product and row.get("line") is not None:
+                        rows.append(row)
+        except Exception:
+            continue
+    rows=rows[-500:]
+    same=[r for r in rows if abs(float(r.get("line"))-float(line))<1e-9]
+    if len(same)<8:
+        return False,{"n":len(same),"reason":"insufficient_recent_line_evidence"}
+    wins=sum(1 for r in same if r.get("win") is True)
+    hit=wins/len(same)
+    # Product-wide eFootball GT recently ran below the model's historical
+    # holdout; line-level evidence therefore must independently support the leg.
+    threshold=0.70 if product=="efootball_gt" else 0.75
+    return hit>=threshold,{"n":len(same),"wins":wins,"hit_rate":round(hit,4),"threshold":threshold}
+
+def virtual_candidates(now):
+    board=load(DATA/"unified_upcoming.json",{})
+    rows=board.get("events") if isinstance(board,dict) else []
+    out=[]
+    for x in rows if isinstance(rows,list) else []:
+        if not isinstance(x,dict) or x.get("sport")!="virtual" or not x.get("betting_qualified") or not upcoming(x,now):
+            continue
+        product=str(x.get("product") or "")
+        line=x.get("line")
+        try:p=float(x.get("probability") or 0)
+        except (TypeError,ValueError):continue
+        if p<VIRTUAL_MIN_PROB or line is None or not x.get("bookmaker_available"):
+            continue
+        # Current-form gate is deliberately stricter for eFootball GT because
+        # the newest 133-settlement batch was only 57.14% on its O/U rows.
+        passed,recent=virtual_recent_gate(product,line)
+        if not passed:continue
+        y={**x,
+           "builder_market":"virtual_total",
+           "builder_probability":p,
+           "builder_pick":x.get("pick"),
+           "recent_evidence":recent,
+           "market_odds_timestamp":x.get("market_odds_timestamp")}
+        out.append(y)
+    return out
 
 def market_rows(x):
     market=x.get("builder_market")
@@ -187,6 +240,10 @@ def make_leg(x):
             market=f"Winner {x.get('builder_pick')}"
         match=f"{x.get('player_1')} vs {x.get('player_2')}"
         pick=f"{match} — {market}"
+    elif x.get("sport")=="virtual":
+        market=f"O/U {x.get('builder_pick')} {x.get('line')}"
+        match=f"{x.get('player_1')} vs {x.get('player_2')}"
+        pick=f"{match} — {market}"
     else:
         match=f"{x.get('home_team')} vs {x.get('away_team')}"
         pick=x.get("builder_pick")
@@ -213,15 +270,16 @@ def make_leg(x):
 def select_value(candidates):
     built=[make_leg(x) for x in candidates]
     eligible=[x for x in built if x["real_money_eligible"]]
-    eligible.sort(key=lambda x:(x.get("model_edge") or -1,x.get("model_probability") or 0),reverse=True)
-    selected=[];events=set()
+    eligible.sort(key=lambda x:(x.get("model_probability") or 0,x.get("model_edge") or -1,x.get("bookmaker_odds") or 0),reverse=True)
+    selected=[];events=set();combined=1.0
     for leg in eligible:
         eid=str(leg.get("event_id") or "")
         if eid and eid in events:continue
         selected.append(leg)
         if eid:events.add(eid)
-        if len(selected)>=MAX_LEGS:break
-    return selected,built
+        combined*=float(leg.get("bookmaker_odds") or 1)
+        if combined>=MIN_COMBINED_ODDS or len(selected)>=MAX_LEGS:break
+    return selected,built,combined
 
 
 def recent_settled(history,now,known):
@@ -262,7 +320,9 @@ def main():
     upstream_blocked = gate_status not in {"ok","PASS"} or selected_predictions <= 0 or not tennis_live_eligible
     football=football_candidates(now)
     tennis=tennis_candidates(now)
-    selected,built=select_value([] if upstream_blocked else (football+tennis))
+    virtual=virtual_candidates(now)
+    core_pool=[] if upstream_blocked else (football+tennis)
+    selected,built,combined=select_value(core_pool+virtual)
     previous=load(OUTPUT,{})
     previous_ids={str(x) for x in (previous.get("builder_event_ids",[]) if isinstance(previous,dict) else []) if x}
     previous_ids.update(str(x.get("event_id")) for x in (previous.get("qualified_legs",[]) if isinstance(previous,dict) else []) if isinstance(x,dict) and x.get("event_id"))
@@ -270,14 +330,15 @@ def main():
     settled_ids={str(x.get("event_id")) for x in load(HISTORY,[]) if isinstance(x,dict) and x.get("settled") and x.get("event_id")}
     selected=[x for x in selected if str(x.get("event_id")) not in settled_ids]
     sports=sorted({x["sport"] for x in selected})
-    status="LIVE_VALUE_SET" if len(selected)>=MIN_LEGS else ("SINGLE_LIVE_VALUE" if selected else "NO_BET")
+    target_met=combined>=MIN_COMBINED_ODDS and bool(selected)
+    status="LIVE_VALUE_SET" if target_met else ("BELOW_4_TARGET_AVAILABLE" if selected else "NO_BET")
     rejection_counts={}
     for leg in built:
         leg_status=str(leg.get("status") or "REJECTED")
         rejection_counts[leg_status]=rejection_counts.get(leg_status,0)+1
     result={
         "generated_at":now.isoformat(),"engine_version":"V6.1-RESEARCH-GATED",
-        "mode":"PAPER_ONLY","target_legs":"3-4","sports_supported":["football","tennis"],
+        "mode":"PAPER_ONLY","target_legs":"3-4","sports_supported":["football","tennis","virtual"],
         "research_gate":{
             "selection_gate_status":gate_status,
             "selected_predictions":selected_predictions,
@@ -289,25 +350,29 @@ def main():
         "candidate_diagnostics":{
             "football_candidates":len(football),
             "tennis_candidates":len(tennis),
+            "virtual_candidates":len(virtual),
             "evaluated":len(built),
             "rejections":rejection_counts
         },
-        "selection_policy":{"min_calibrated_probability":MIN_PROB,"min_model_edge":MIN_EDGE,
+        "selection_policy":{"min_calibrated_probability":MIN_PROB,"virtual_min_probability":VIRTUAL_MIN_PROB,"minimum_combined_odds":MIN_COMBINED_ODDS,"min_model_edge":MIN_EDGE,
             "max_odds_age_seconds":MAX_ODDS_AGE_SECONDS,"max_uncertainty":MAX_UNCERTAINTY,
             "min_data_quality":MIN_DATA_QUALITY,"requires_live_sportybet_price":True,
             "requires_complete_market_for_devig":True,"avoid_same_event_correlation":True,
             "never_force_accumulator":True,"real_money_execution":False},
         "bookmaker_odds":{"status":"LIVE_SPORTYBET_SNAPSHOT","sportybet_direct_feed":"VIA_CLOUDFLARE_PROXY",
             "stake_direct_feed":"NOT_CONNECTED","instruction":"Verify the displayed SportyBet price immediately before any manual wager."},
-        "candidates_considered":{"football":len(football),"tennis":len(tennis),"all_built":len(built)},
-        "qualified_legs":selected,
+        "candidates_considered":{"football":len(football),"tennis":len(tennis),"virtual":len(virtual),"all_built":len(built)},
+        "qualified_legs":selected if target_met else [],
+        "best_available_legs":selected,
+        "combined_odds_selected":round(combined,3) if selected else None,
+        "naive_independence_hit_proxy":round(math.prod(float(x.get("model_probability") or 0) for x in selected),6) if selected else None,
         "rejected_candidates":[x for x in built if not x["real_money_eligible"]][:20],
         "settled_legs":recent_settled(load(HISTORY,[]),now,known),
         "builder_event_ids":sorted(known),"leg_count":len(selected),"sports_selected":sports,
-        "status":("UPSTREAM_RESEARCH_GATE_BLOCKED" if upstream_blocked else ("LIVE_VALUE_SET" if len(selected)>=MIN_LEGS else ("SINGLE_LIVE_VALUE" if selected else "NO_BET"))),
+        "status":("UPSTREAM_RESEARCH_GATE_BLOCKED" if upstream_blocked and not virtual else ("LIVE_VALUE_SET" if target_met else ("BELOW_4_TARGET_AVAILABLE" if selected else "NO_BET"))),
         "reference_combined_odds":round(math.prod(x["model_fair_odds"] for x in selected),3) if selected else None,
         "reference_odds_type":"MODEL_FAIR_ODDS_NOT_BOOKMAKER_PRICE",
-        "market_price_combined_odds":round(math.prod(x["bookmaker_odds"] for x in selected),3) if selected and all(x.get("bookmaker_odds") is not None for x in selected) else None,
+        "market_price_combined_odds":round(combined,3) if selected else None,
         "theme":{"name":"Midnight Graphite / Electric Cyan / Signal Green","accent":"#28D7E8","positive":"#35D07F","background":"#080D14"},
         "notes":["V6 qualifies on market edge, not probability alone.","Missing or stale SportyBet prices produce NO_BET/REJECTED.","Model fair odds never overwrite bookmaker odds.","Accumulator size is allowed to fall below four and is never padded with weak selections.","Paper-only until V6 demonstrates stable calibration, edge and closing-line value over a meaningful sample."]
     }
