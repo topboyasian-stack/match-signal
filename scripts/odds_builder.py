@@ -185,6 +185,11 @@ def virtual_candidates(now):
 
 def market_rows(x):
     market=x.get("builder_market")
+    if market=="virtual_total":
+        return [
+            {"side":"over","odds":x.get("sportybet_over_odds")},
+            {"side":"under","odds":x.get("sportybet_under_odds")}
+        ]
     if market=="total_games":
         total=(x.get("analytics") or {}).get("total_games") or {}
         line=float(total.get("line")) if total.get("line") is not None else None
@@ -262,7 +267,8 @@ def make_leg(x):
         "data_quality":round(quality,3),"uncertainty":round(uncert,3),
         "market_complete":complete,"real_money_eligible":eligible,
         "status":"LIVE_VALUE" if eligible else ("STALE" if age is not None and age>MAX_ODDS_AGE_SECONDS else "REJECTED"),
-        "source":x.get("model"),"market_source":x.get("market_source"),
+        "source":x.get("model"),"market_source":x.get("market_source") or x.get("bookmaker_source"),
+        "recent_evidence":x.get("recent_evidence"),
         "market_odds_timestamp":x.get("odds_timestamp")
     }
 
