@@ -191,7 +191,9 @@ def refresh_virtual_quotes(rows):
             if under is not None: y["sportybet_under_odds"]=under
             if over is not None or under is not None:
                 y["bookmaker_available"]=bool(over and under)
-                y["bookmaker_source"]="SportyBet NG"\n                y["sportybet_event_id"]=str(e.get("event_id"))\n                y["sportybet_match"]=e.get("match") or e.get("name")
+                y["bookmaker_source"]="SportyBet NG"
+                y["sportybet_event_id"]=str(e.get("event_id"))
+                y["sportybet_match"]=e.get("match") or e.get("name")
                 y["market_odds_timestamp"]=fetched_at
         out.append(y)
     return out
