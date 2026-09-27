@@ -323,10 +323,22 @@ jobs:
               const legs=Array.isArray(b?.qualified_legs)?b.qualified_legs:[];
               const combined=Number(b?.market_price_combined_odds||0);
               if (b?.mode!=='PAPER_ONLY') failures.push('/data/odds_builder.json is not PAPER_ONLY');
-              if (b?.status!=='LIVE_VALUE_SET') failures.push('/data/odds_builder.json status is '+b?.status);
-              if (!legs.length) failures.push('/data/odds_builder.json has no qualified paper legs');
-              if (!(combined>=4)) failures.push('/data/odds_builder.json combined odds below 4.00: '+combined);
-              else console.log('Paper Odds Builder production ticket passed: '+legs.length+' legs / combined odds '+combined);
+              const allowedStatuses=new Set(['LIVE_VALUE_SET','BELOW_4_TARGET_AVAILABLE','NO_BET','UPSTREAM_RESEARCH_GATE_BLOCKED']);
+              if (!allowedStatuses.has(b?.status)) failures.push('/data/odds_builder.json status is '+b?.status);
+              if (b?.status==='LIVE_VALUE_SET') {
+                if (!legs.length) failures.push('/data/odds_builder.json LIVE_VALUE_SET has no qualified paper legs');
+                if (!(combined>=4)) failures.push('/data/odds_builder.json LIVE_VALUE_SET combined odds below 4.00: '+combined);
+              } else if (b?.status==='BELOW_4_TARGET_AVAILABLE') {
+                if (!Array.isArray(b?.best_available_legs) || !b.best_available_legs.length) failures.push('/data/odds_builder.json BELOW_4_TARGET_AVAILABLE has no best_available_legs');
+                if (!(combined>1 && combined<4)) failures.push('/data/odds_builder.json BELOW_4_TARGET_AVAILABLE has invalid combined odds: '+combined);
+              } else {
+                if (legs.length) failures.push('/data/odds_builder.json '+b?.status+' unexpectedly contains qualified legs');
+                console.log('Paper Odds Builder production state: '+b?.status+' (no weak/stale ticket was forced)');
+              }
+              for (const leg of legs) {
+                if (leg?.odds_fresh!==true) failures.push('/data/odds_builder.json qualified leg has stale odds');
+                if (!leg?.market_source || !String(leg.market_source).includes('SportyBet')) failures.push('/data/odds_builder.json qualified leg is not sourced from SportyBet');
+              }
             }
           } catch(e) { failures.push('/data/odds_builder.json '+e.message); }
 
