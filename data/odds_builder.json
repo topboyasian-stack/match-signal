@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-27T23:27:47.136154+00:00",
+  "generated_at": "2026-09-27T23:37:18.660629+00:00",
   "engine_version": "V6.1-RESEARCH-GATED",
   "mode": "PAPER_ONLY",
   "target_legs": "variable until combined odds >= 4.00",
@@ -26,21 +26,21 @@
   "candidate_diagnostics": {
     "football_candidates": 0,
     "tennis_candidates": 24,
-    "virtual_candidates": 27,
+    "virtual_candidates": 26,
     "virtual_gate_diagnostics": {
-      "seen": 303,
-      "qualified": 303,
-      "evidence_pass": 27,
-      "rejected_evidence": 276,
+      "seen": 295,
+      "qualified": 295,
+      "evidence_pass": 26,
+      "rejected_evidence": 269,
       "reasons": {
-        "recent_evidence_below_threshold": 276
+        "recent_evidence_below_threshold": 269
       },
       "quote_join": {
-        "live_events": 588,
-        "live_match_keys": 515,
-        "matched_by_id": 3706,
-        "matched_by_match": 50,
-        "unmatched": 1661,
+        "live_events": 592,
+        "live_match_keys": 520,
+        "matched_by_id": 3686,
+        "matched_by_match": 40,
+        "unmatched": 1691,
         "samples": [
           {
             "keys": [
@@ -62,7 +62,7 @@
               "tournament",
               "tournament_id"
             ],
-            "event_id": "sr:match:75066744",
+            "event_id": "sr:match:75066756",
             "match": null,
             "name": null,
             "player_1": null,
@@ -88,7 +88,7 @@
               "tournament",
               "tournament_id"
             ],
-            "event_id": "sr:match:75067026",
+            "event_id": "sr:match:75067058",
             "match": null,
             "name": null,
             "player_1": null,
@@ -114,7 +114,7 @@
               "tournament",
               "tournament_id"
             ],
-            "event_id": "sr:match:75067664",
+            "event_id": "sr:match:75067868",
             "match": null,
             "name": null,
             "player_1": null,
@@ -123,13 +123,20 @@
         ]
       }
     },
-    "evaluated": 27,
+    "evaluated": 26,
     "rejections": {
-      "LIVE_VALUE": 27
+      "STALE": 26
     },
     "selection_diversity": {
       "participant_correlation_skips": 0,
-      "unique_participants": 2
+      "unique_participants": 0
+    },
+    "participant_history_weighting": {
+      "enabled": true,
+      "min_n": 3,
+      "max_bonus": 0.035,
+      "role": "ranking_only_after_all_existing_eligibility_gates",
+      "source": "data/virtual_lab_participant_profiles.json"
     }
   },
   "selection_policy": {
@@ -144,6 +151,7 @@
     "requires_live_sportybet_price": true,
     "requires_complete_market_for_devig": true,
     "avoid_same_event_correlation": true,
+    "participant_history_weighting": "qualified-leg ranking only; conservative exact-line settled O/U history; no eligibility bypass",
     "never_force_accumulator": true,
     "real_money_execution": false
   },
@@ -156,196 +164,14 @@
   "candidates_considered": {
     "football": 0,
     "tennis": 24,
-    "virtual": 27,
-    "all_built": 27
+    "virtual": 26,
+    "all_built": 26
   },
-  "qualified_legs": [
-    {
-      "sport": "virtual",
-      "competition": "Volta World Cup C",
-      "event_id": "sr:match:BAaDim51zdwironDRRBMkMA",
-      "start_time": "2026-09-28T04:36:00+00:00",
-      "match": "Denmark (vladl3n) vs USA (alosdvxl)",
-      "market": "virtual_total",
-      "pick": "Denmark (vladl3n) vs USA (alosdvxl) — O/U under 7.5",
-      "model_probability": 0.7906,
-      "model_fair_odds": 1.265,
-      "bookmaker_odds": 2.35,
-      "market_implied_probability": 0.425532,
-      "de_vig_probability": 0.39433,
-      "model_edge": 0.39627,
-      "expected_value": 0.85791,
-      "edge_percent": 39.63,
-      "odds_fresh": true,
-      "market_odds_age_seconds": 383.3,
-      "data_quality": 0.75,
-      "uncertainty": 0.102,
-      "market_complete": true,
-      "builder_eligible": true,
-      "real_money_eligible": false,
-      "paper_only": true,
-      "status": "LIVE_VALUE",
-      "source": "Virtual Lab base O/U model",
-      "market_source": "SportyBet NG",
-      "recent_evidence": {
-        "n": 127,
-        "wins": 84,
-        "hit_rate": 0.6614,
-        "threshold": 0.65,
-        "side": "under"
-      },
-      "market_odds_timestamp": "2026-09-27T23:21:56.396911+00:00"
-    },
-    {
-      "sport": "virtual",
-      "competition": "Premier League 2x6",
-      "event_id": "sr:match:BAaDjLcmCdd-7LXhG01t54g",
-      "start_time": "2026-09-28T04:00:00+00:00",
-      "match": "Arsenal (TikitakaMaster) vs Man City (Frantsuz)",
-      "market": "virtual_total",
-      "pick": "Arsenal (TikitakaMaster) vs Man City (Frantsuz) — O/U under 7.5",
-      "model_probability": 0.7906,
-      "model_fair_odds": 1.265,
-      "bookmaker_odds": 2.3,
-      "market_implied_probability": 0.434783,
-      "de_vig_probability": 0.402597,
-      "model_edge": 0.388003,
-      "expected_value": 0.81838,
-      "edge_percent": 38.8,
-      "odds_fresh": true,
-      "market_odds_age_seconds": 383.3,
-      "data_quality": 0.75,
-      "uncertainty": 0.102,
-      "market_complete": true,
-      "builder_eligible": true,
-      "real_money_eligible": false,
-      "paper_only": true,
-      "status": "LIVE_VALUE",
-      "source": "Virtual Lab base O/U model",
-      "market_source": "SportyBet NG",
-      "recent_evidence": {
-        "n": 127,
-        "wins": 84,
-        "hit_rate": 0.6614,
-        "threshold": 0.65,
-        "side": "under"
-      },
-      "market_odds_timestamp": "2026-09-27T23:21:56.378557+00:00"
-    }
-  ],
-  "best_available_legs": [
-    {
-      "sport": "virtual",
-      "competition": "Volta World Cup C",
-      "event_id": "sr:match:BAaDim51zdwironDRRBMkMA",
-      "start_time": "2026-09-28T04:36:00+00:00",
-      "match": "Denmark (vladl3n) vs USA (alosdvxl)",
-      "market": "virtual_total",
-      "pick": "Denmark (vladl3n) vs USA (alosdvxl) — O/U under 7.5",
-      "model_probability": 0.7906,
-      "model_fair_odds": 1.265,
-      "bookmaker_odds": 2.35,
-      "market_implied_probability": 0.425532,
-      "de_vig_probability": 0.39433,
-      "model_edge": 0.39627,
-      "expected_value": 0.85791,
-      "edge_percent": 39.63,
-      "odds_fresh": true,
-      "market_odds_age_seconds": 383.3,
-      "data_quality": 0.75,
-      "uncertainty": 0.102,
-      "market_complete": true,
-      "builder_eligible": true,
-      "real_money_eligible": false,
-      "paper_only": true,
-      "status": "LIVE_VALUE",
-      "source": "Virtual Lab base O/U model",
-      "market_source": "SportyBet NG",
-      "recent_evidence": {
-        "n": 127,
-        "wins": 84,
-        "hit_rate": 0.6614,
-        "threshold": 0.65,
-        "side": "under"
-      },
-      "market_odds_timestamp": "2026-09-27T23:21:56.396911+00:00"
-    },
-    {
-      "sport": "virtual",
-      "competition": "Premier League 2x6",
-      "event_id": "sr:match:BAaDjLcmCdd-7LXhG01t54g",
-      "start_time": "2026-09-28T04:00:00+00:00",
-      "match": "Arsenal (TikitakaMaster) vs Man City (Frantsuz)",
-      "market": "virtual_total",
-      "pick": "Arsenal (TikitakaMaster) vs Man City (Frantsuz) — O/U under 7.5",
-      "model_probability": 0.7906,
-      "model_fair_odds": 1.265,
-      "bookmaker_odds": 2.3,
-      "market_implied_probability": 0.434783,
-      "de_vig_probability": 0.402597,
-      "model_edge": 0.388003,
-      "expected_value": 0.81838,
-      "edge_percent": 38.8,
-      "odds_fresh": true,
-      "market_odds_age_seconds": 383.3,
-      "data_quality": 0.75,
-      "uncertainty": 0.102,
-      "market_complete": true,
-      "builder_eligible": true,
-      "real_money_eligible": false,
-      "paper_only": true,
-      "status": "LIVE_VALUE",
-      "source": "Virtual Lab base O/U model",
-      "market_source": "SportyBet NG",
-      "recent_evidence": {
-        "n": 127,
-        "wins": 84,
-        "hit_rate": 0.6614,
-        "threshold": 0.65,
-        "side": "under"
-      },
-      "market_odds_timestamp": "2026-09-27T23:21:56.378557+00:00"
-    }
-  ],
-  "combined_odds_selected": 5.405,
-  "naive_independence_hit_proxy": 0.625048,
+  "qualified_legs": [],
+  "best_available_legs": [],
+  "combined_odds_selected": null,
+  "naive_independence_hit_proxy": null,
   "rejected_candidates": [
-    {
-      "sport": "virtual",
-      "competition": "Serie A",
-      "event_id": "sr:match:BAaDgdj3BcQ2av5LekElpOw",
-      "start_time": "2026-09-27T23:29:00+00:00",
-      "match": "Bologna (Grellz) vs Napoli (ssstasonn)",
-      "market": "virtual_total",
-      "pick": "Bologna (Grellz) vs Napoli (ssstasonn) — O/U under 7.5",
-      "model_probability": 0.7906,
-      "model_fair_odds": 1.265,
-      "bookmaker_odds": 1.53,
-      "market_implied_probability": 0.653595,
-      "de_vig_probability": 0.60567,
-      "model_edge": 0.18493,
-      "expected_value": 0.209618,
-      "edge_percent": 18.49,
-      "odds_fresh": true,
-      "market_odds_age_seconds": 383.3,
-      "data_quality": 0.75,
-      "uncertainty": 0.102,
-      "market_complete": true,
-      "builder_eligible": true,
-      "real_money_eligible": false,
-      "paper_only": true,
-      "status": "LIVE_VALUE",
-      "source": "Virtual Lab base O/U model",
-      "market_source": "SportyBet NG",
-      "recent_evidence": {
-        "n": 127,
-        "wins": 84,
-        "hit_rate": 0.6614,
-        "threshold": 0.65,
-        "side": "under"
-      },
-      "market_odds_timestamp": "2026-09-27T23:21:56.396722+00:00"
-    },
     {
       "sport": "virtual",
       "competition": "Premier League",
@@ -361,16 +187,40 @@
       "de_vig_probability": 0.629723,
       "model_edge": 0.160877,
       "expected_value": 0.162182,
+      "participant_history": {
+        "available": false,
+        "score": 0.5,
+        "participants": [
+          {
+            "participant": "chelsea taz",
+            "n": 0,
+            "recent_n": 0,
+            "score": 0.5,
+            "available": false
+          },
+          {
+            "participant": "liverpool totti",
+            "n": 0,
+            "recent_n": 0,
+            "score": 0.5,
+            "available": false
+          }
+        ],
+        "line": "7.5",
+        "side": "under"
+      },
+      "participant_history_bonus": 0.0,
+      "selection_score": 0.160877,
       "edge_percent": 16.09,
-      "odds_fresh": true,
-      "market_odds_age_seconds": 383.3,
+      "odds_fresh": false,
+      "market_odds_age_seconds": 953.3,
       "data_quality": 0.75,
       "uncertainty": 0.102,
       "market_complete": true,
-      "builder_eligible": true,
+      "builder_eligible": false,
       "real_money_eligible": false,
       "paper_only": true,
-      "status": "LIVE_VALUE",
+      "status": "STALE",
       "source": "Virtual Lab base O/U model",
       "market_source": "SportyBet NG",
       "recent_evidence": {
@@ -397,16 +247,40 @@
       "de_vig_probability": 0.589005,
       "model_edge": 0.201595,
       "expected_value": 0.241242,
+      "participant_history": {
+        "available": false,
+        "score": 0.5,
+        "participants": [
+          {
+            "participant": "roma aveaaaaa",
+            "n": 0,
+            "recent_n": 0,
+            "score": 0.5,
+            "available": false
+          },
+          {
+            "participant": "bologna grellz",
+            "n": 0,
+            "recent_n": 0,
+            "score": 0.5,
+            "available": false
+          }
+        ],
+        "line": "7.5",
+        "side": "under"
+      },
+      "participant_history_bonus": 0.0,
+      "selection_score": 0.201595,
       "edge_percent": 20.16,
-      "odds_fresh": true,
-      "market_odds_age_seconds": 383.3,
+      "odds_fresh": false,
+      "market_odds_age_seconds": 953.3,
       "data_quality": 0.75,
       "uncertainty": 0.102,
       "market_complete": true,
-      "builder_eligible": true,
+      "builder_eligible": false,
       "real_money_eligible": false,
       "paper_only": true,
-      "status": "LIVE_VALUE",
+      "status": "STALE",
       "source": "Virtual Lab base O/U model",
       "market_source": "SportyBet NG",
       "recent_evidence": {
@@ -433,16 +307,40 @@
       "de_vig_probability": 0.546667,
       "model_edge": 0.243933,
       "expected_value": 0.34402,
+      "participant_history": {
+        "available": false,
+        "score": 0.5,
+        "participants": [
+          {
+            "participant": "mexico haiko",
+            "n": 0,
+            "recent_n": 0,
+            "score": 0.5,
+            "available": false
+          },
+          {
+            "participant": "denmark vladl3n",
+            "n": 0,
+            "recent_n": 0,
+            "score": 0.5,
+            "available": false
+          }
+        ],
+        "line": "7.5",
+        "side": "under"
+      },
+      "participant_history_bonus": 0.0,
+      "selection_score": 0.243933,
       "edge_percent": 24.39,
-      "odds_fresh": true,
-      "market_odds_age_seconds": 383.3,
+      "odds_fresh": false,
+      "market_odds_age_seconds": 953.3,
       "data_quality": 0.75,
       "uncertainty": 0.102,
       "market_complete": true,
-      "builder_eligible": true,
+      "builder_eligible": false,
       "real_money_eligible": false,
       "paper_only": true,
-      "status": "LIVE_VALUE",
+      "status": "STALE",
       "source": "Virtual Lab base O/U model",
       "market_source": "SportyBet NG",
       "recent_evidence": {
@@ -469,16 +367,40 @@
       "de_vig_probability": 0.527027,
       "model_edge": 0.263573,
       "expected_value": 0.38355,
+      "participant_history": {
+        "available": false,
+        "score": 0.5,
+        "participants": [
+          {
+            "participant": "usa alosdvxl",
+            "n": 0,
+            "recent_n": 0,
+            "score": 0.5,
+            "available": false
+          },
+          {
+            "participant": "ghana mers",
+            "n": 0,
+            "recent_n": 0,
+            "score": 0.5,
+            "available": false
+          }
+        ],
+        "line": "7.5",
+        "side": "under"
+      },
+      "participant_history_bonus": 0.0,
+      "selection_score": 0.263573,
       "edge_percent": 26.36,
-      "odds_fresh": true,
-      "market_odds_age_seconds": 383.3,
+      "odds_fresh": false,
+      "market_odds_age_seconds": 953.3,
       "data_quality": 0.75,
       "uncertainty": 0.102,
       "market_complete": true,
-      "builder_eligible": true,
+      "builder_eligible": false,
       "real_money_eligible": false,
       "paper_only": true,
-      "status": "LIVE_VALUE",
+      "status": "STALE",
       "source": "Virtual Lab base O/U model",
       "market_source": "SportyBet NG",
       "recent_evidence": {
@@ -505,16 +427,40 @@
       "de_vig_probability": 0.402597,
       "model_edge": 0.388003,
       "expected_value": 0.81838,
+      "participant_history": {
+        "available": false,
+        "score": 0.5,
+        "participants": [
+          {
+            "participant": "arsenal tikitakamaster",
+            "n": 0,
+            "recent_n": 0,
+            "score": 0.5,
+            "available": false
+          },
+          {
+            "participant": "man city frantsuz",
+            "n": 0,
+            "recent_n": 0,
+            "score": 0.5,
+            "available": false
+          }
+        ],
+        "line": "7.5",
+        "side": "under"
+      },
+      "participant_history_bonus": 0.0,
+      "selection_score": 0.388003,
       "edge_percent": 38.8,
-      "odds_fresh": true,
-      "market_odds_age_seconds": 383.3,
+      "odds_fresh": false,
+      "market_odds_age_seconds": 953.3,
       "data_quality": 0.75,
       "uncertainty": 0.102,
       "market_complete": true,
-      "builder_eligible": true,
+      "builder_eligible": false,
       "real_money_eligible": false,
       "paper_only": true,
-      "status": "LIVE_VALUE",
+      "status": "STALE",
       "source": "Virtual Lab base O/U model",
       "market_source": "SportyBet NG",
       "recent_evidence": {
@@ -541,16 +487,40 @@
       "de_vig_probability": 0.44,
       "model_edge": 0.3506,
       "expected_value": 0.66026,
+      "participant_history": {
+        "available": false,
+        "score": 0.5,
+        "participants": [
+          {
+            "participant": "tottenham flamez",
+            "n": 0,
+            "recent_n": 0,
+            "score": 0.5,
+            "available": false
+          },
+          {
+            "participant": "liverpool why",
+            "n": 0,
+            "recent_n": 0,
+            "score": 0.5,
+            "available": false
+          }
+        ],
+        "line": "7.5",
+        "side": "under"
+      },
+      "participant_history_bonus": 0.0,
+      "selection_score": 0.3506,
       "edge_percent": 35.06,
-      "odds_fresh": true,
-      "market_odds_age_seconds": 383.3,
+      "odds_fresh": false,
+      "market_odds_age_seconds": 953.3,
       "data_quality": 0.75,
       "uncertainty": 0.102,
       "market_complete": true,
-      "builder_eligible": true,
+      "builder_eligible": false,
       "real_money_eligible": false,
       "paper_only": true,
-      "status": "LIVE_VALUE",
+      "status": "STALE",
       "source": "Virtual Lab base O/U model",
       "market_source": "SportyBet NG",
       "recent_evidence": {
@@ -577,16 +547,40 @@
       "de_vig_probability": 0.615385,
       "model_edge": 0.354815,
       "expected_value": 0.4553,
+      "participant_history": {
+        "available": false,
+        "score": 0.5,
+        "participants": [
+          {
+            "participant": "denmark vladl3n",
+            "n": 0,
+            "recent_n": 0,
+            "score": 0.5,
+            "available": false
+          },
+          {
+            "participant": "sweden dan dragonio",
+            "n": 0,
+            "recent_n": 0,
+            "score": 0.5,
+            "available": false
+          }
+        ],
+        "line": "10.5",
+        "side": "under"
+      },
+      "participant_history_bonus": 0.0,
+      "selection_score": 0.354815,
       "edge_percent": 35.48,
-      "odds_fresh": true,
-      "market_odds_age_seconds": 383.3,
+      "odds_fresh": false,
+      "market_odds_age_seconds": 953.3,
       "data_quality": 0.75,
       "uncertainty": 0.165,
       "market_complete": true,
-      "builder_eligible": true,
+      "builder_eligible": false,
       "real_money_eligible": false,
       "paper_only": true,
-      "status": "LIVE_VALUE",
+      "status": "STALE",
       "source": "Virtual Lab base O/U model",
       "market_source": "SportyBet NG",
       "recent_evidence": {
@@ -613,16 +607,40 @@
       "de_vig_probability": 0.410995,
       "model_edge": 0.379605,
       "expected_value": 0.77885,
+      "participant_history": {
+        "available": false,
+        "score": 0.5,
+        "participants": [
+          {
+            "participant": "sweden dan dragonio",
+            "n": 0,
+            "recent_n": 0,
+            "score": 0.5,
+            "available": false
+          },
+          {
+            "participant": "ghana mers",
+            "n": 0,
+            "recent_n": 0,
+            "score": 0.5,
+            "available": false
+          }
+        ],
+        "line": "7.5",
+        "side": "under"
+      },
+      "participant_history_bonus": 0.0,
+      "selection_score": 0.379605,
       "edge_percent": 37.96,
-      "odds_fresh": true,
-      "market_odds_age_seconds": 383.3,
+      "odds_fresh": false,
+      "market_odds_age_seconds": 953.3,
       "data_quality": 0.75,
       "uncertainty": 0.102,
       "market_complete": true,
-      "builder_eligible": true,
+      "builder_eligible": false,
       "real_money_eligible": false,
       "paper_only": true,
-      "status": "LIVE_VALUE",
+      "status": "STALE",
       "source": "Virtual Lab base O/U model",
       "market_source": "SportyBet NG",
       "recent_evidence": {
@@ -649,16 +667,40 @@
       "de_vig_probability": 0.429708,
       "model_edge": 0.360892,
       "expected_value": 0.69979,
+      "participant_history": {
+        "available": false,
+        "score": 0.5,
+        "participants": [
+          {
+            "participant": "mexico haiko",
+            "n": 0,
+            "recent_n": 0,
+            "score": 0.5,
+            "available": false
+          },
+          {
+            "participant": "usa alosdvxl",
+            "n": 0,
+            "recent_n": 0,
+            "score": 0.5,
+            "available": false
+          }
+        ],
+        "line": "7.5",
+        "side": "under"
+      },
+      "participant_history_bonus": 0.0,
+      "selection_score": 0.360892,
       "edge_percent": 36.09,
-      "odds_fresh": true,
-      "market_odds_age_seconds": 383.3,
+      "odds_fresh": false,
+      "market_odds_age_seconds": 953.3,
       "data_quality": 0.75,
       "uncertainty": 0.102,
       "market_complete": true,
-      "builder_eligible": true,
+      "builder_eligible": false,
       "real_money_eligible": false,
       "paper_only": true,
-      "status": "LIVE_VALUE",
+      "status": "STALE",
       "source": "Virtual Lab base O/U model",
       "market_source": "SportyBet NG",
       "recent_evidence": {
@@ -685,16 +727,40 @@
       "de_vig_probability": 0.491892,
       "model_edge": 0.298708,
       "expected_value": 0.486328,
+      "participant_history": {
+        "available": false,
+        "score": 0.5,
+        "participants": [
+          {
+            "participant": "liverpool why",
+            "n": 0,
+            "recent_n": 0,
+            "score": 0.5,
+            "available": false
+          },
+          {
+            "participant": "arsenal tikitakamaster",
+            "n": 0,
+            "recent_n": 0,
+            "score": 0.5,
+            "available": false
+          }
+        ],
+        "line": "7.5",
+        "side": "under"
+      },
+      "participant_history_bonus": 0.0,
+      "selection_score": 0.298708,
       "edge_percent": 29.87,
-      "odds_fresh": true,
-      "market_odds_age_seconds": 383.3,
+      "odds_fresh": false,
+      "market_odds_age_seconds": 953.4,
       "data_quality": 0.75,
       "uncertainty": 0.102,
       "market_complete": true,
-      "builder_eligible": true,
+      "builder_eligible": false,
       "real_money_eligible": false,
       "paper_only": true,
-      "status": "LIVE_VALUE",
+      "status": "STALE",
       "source": "Virtual Lab base O/U model",
       "market_source": "SportyBet NG",
       "recent_evidence": {
@@ -721,16 +787,40 @@
       "de_vig_probability": 0.6375,
       "model_edge": 0.3327,
       "expected_value": 0.40679,
+      "participant_history": {
+        "available": false,
+        "score": 0.5,
+        "participants": [
+          {
+            "participant": "usa alosdvxl",
+            "n": 0,
+            "recent_n": 0,
+            "score": 0.5,
+            "available": false
+          },
+          {
+            "participant": "sweden dan dragonio",
+            "n": 0,
+            "recent_n": 0,
+            "score": 0.5,
+            "available": false
+          }
+        ],
+        "line": "10.5",
+        "side": "under"
+      },
+      "participant_history_bonus": 0.0,
+      "selection_score": 0.3327,
       "edge_percent": 33.27,
-      "odds_fresh": true,
-      "market_odds_age_seconds": 383.3,
+      "odds_fresh": false,
+      "market_odds_age_seconds": 953.3,
       "data_quality": 0.75,
       "uncertainty": 0.165,
       "market_complete": true,
-      "builder_eligible": true,
+      "builder_eligible": false,
       "real_money_eligible": false,
       "paper_only": true,
-      "status": "LIVE_VALUE",
+      "status": "STALE",
       "source": "Virtual Lab base O/U model",
       "market_source": "SportyBet NG",
       "recent_evidence": {
@@ -757,16 +847,40 @@
       "de_vig_probability": 0.615385,
       "model_edge": 0.175215,
       "expected_value": 0.1859,
+      "participant_history": {
+        "available": false,
+        "score": 0.5,
+        "participants": [
+          {
+            "participant": "ghana mers",
+            "n": 0,
+            "recent_n": 0,
+            "score": 0.5,
+            "available": false
+          },
+          {
+            "participant": "denmark vladl3n",
+            "n": 0,
+            "recent_n": 0,
+            "score": 0.5,
+            "available": false
+          }
+        ],
+        "line": "7.5",
+        "side": "under"
+      },
+      "participant_history_bonus": 0.0,
+      "selection_score": 0.175215,
       "edge_percent": 17.52,
-      "odds_fresh": true,
-      "market_odds_age_seconds": 383.3,
+      "odds_fresh": false,
+      "market_odds_age_seconds": 953.4,
       "data_quality": 0.75,
       "uncertainty": 0.102,
       "market_complete": true,
-      "builder_eligible": true,
+      "builder_eligible": false,
       "real_money_eligible": false,
       "paper_only": true,
-      "status": "LIVE_VALUE",
+      "status": "STALE",
       "source": "Virtual Lab base O/U model",
       "market_source": "SportyBet NG",
       "recent_evidence": {
@@ -793,16 +907,40 @@
       "de_vig_probability": 0.39433,
       "model_edge": 0.39627,
       "expected_value": 0.85791,
+      "participant_history": {
+        "available": false,
+        "score": 0.5,
+        "participants": [
+          {
+            "participant": "denmark vladl3n",
+            "n": 0,
+            "recent_n": 0,
+            "score": 0.5,
+            "available": false
+          },
+          {
+            "participant": "usa alosdvxl",
+            "n": 0,
+            "recent_n": 0,
+            "score": 0.5,
+            "available": false
+          }
+        ],
+        "line": "7.5",
+        "side": "under"
+      },
+      "participant_history_bonus": 0.0,
+      "selection_score": 0.39627,
       "edge_percent": 39.63,
-      "odds_fresh": true,
-      "market_odds_age_seconds": 383.3,
+      "odds_fresh": false,
+      "market_odds_age_seconds": 953.4,
       "data_quality": 0.75,
       "uncertainty": 0.102,
       "market_complete": true,
-      "builder_eligible": true,
+      "builder_eligible": false,
       "real_money_eligible": false,
       "paper_only": true,
-      "status": "LIVE_VALUE",
+      "status": "STALE",
       "source": "Virtual Lab base O/U model",
       "market_source": "SportyBet NG",
       "recent_evidence": {
@@ -829,16 +967,40 @@
       "de_vig_probability": 0.429708,
       "model_edge": 0.360892,
       "expected_value": 0.69979,
+      "participant_history": {
+        "available": false,
+        "score": 0.5,
+        "participants": [
+          {
+            "participant": "sweden dan dragonio",
+            "n": 0,
+            "recent_n": 0,
+            "score": 0.5,
+            "available": false
+          },
+          {
+            "participant": "mexico haiko",
+            "n": 0,
+            "recent_n": 0,
+            "score": 0.5,
+            "available": false
+          }
+        ],
+        "line": "7.5",
+        "side": "under"
+      },
+      "participant_history_bonus": 0.0,
+      "selection_score": 0.360892,
       "edge_percent": 36.09,
-      "odds_fresh": true,
-      "market_odds_age_seconds": 383.3,
+      "odds_fresh": false,
+      "market_odds_age_seconds": 953.4,
       "data_quality": 0.75,
       "uncertainty": 0.102,
       "market_complete": true,
-      "builder_eligible": true,
+      "builder_eligible": false,
       "real_money_eligible": false,
       "paper_only": true,
-      "status": "LIVE_VALUE",
+      "status": "STALE",
       "source": "Virtual Lab base O/U model",
       "market_source": "SportyBet NG",
       "recent_evidence": {
@@ -865,16 +1027,40 @@
       "de_vig_probability": 0.421053,
       "model_edge": 0.369547,
       "expected_value": 0.73932,
+      "participant_history": {
+        "available": false,
+        "score": 0.5,
+        "participants": [
+          {
+            "participant": "chelsea v1nniepuh",
+            "n": 0,
+            "recent_n": 0,
+            "score": 0.5,
+            "available": false
+          },
+          {
+            "participant": "liverpool why",
+            "n": 0,
+            "recent_n": 0,
+            "score": 0.5,
+            "available": false
+          }
+        ],
+        "line": "7.5",
+        "side": "under"
+      },
+      "participant_history_bonus": 0.0,
+      "selection_score": 0.369547,
       "edge_percent": 36.95,
-      "odds_fresh": true,
-      "market_odds_age_seconds": 383.3,
+      "odds_fresh": false,
+      "market_odds_age_seconds": 953.4,
       "data_quality": 0.75,
       "uncertainty": 0.102,
       "market_complete": true,
-      "builder_eligible": true,
+      "builder_eligible": false,
       "real_money_eligible": false,
       "paper_only": true,
-      "status": "LIVE_VALUE",
+      "status": "STALE",
       "source": "Virtual Lab base O/U model",
       "market_source": "SportyBet NG",
       "recent_evidence": {
@@ -901,16 +1087,40 @@
       "de_vig_probability": 0.546667,
       "model_edge": 0.243933,
       "expected_value": 0.34402,
+      "participant_history": {
+        "available": false,
+        "score": 0.5,
+        "participants": [
+          {
+            "participant": "arsenal tikitakamaster",
+            "n": 0,
+            "recent_n": 0,
+            "score": 0.5,
+            "available": false
+          },
+          {
+            "participant": "tottenham flamez",
+            "n": 0,
+            "recent_n": 0,
+            "score": 0.5,
+            "available": false
+          }
+        ],
+        "line": "7.5",
+        "side": "under"
+      },
+      "participant_history_bonus": 0.0,
+      "selection_score": 0.243933,
       "edge_percent": 24.39,
-      "odds_fresh": true,
-      "market_odds_age_seconds": 383.3,
+      "odds_fresh": false,
+      "market_odds_age_seconds": 953.4,
       "data_quality": 0.75,
       "uncertainty": 0.102,
       "market_complete": true,
-      "builder_eligible": true,
+      "builder_eligible": false,
       "real_money_eligible": false,
       "paper_only": true,
-      "status": "LIVE_VALUE",
+      "status": "STALE",
       "source": "Virtual Lab base O/U model",
       "market_source": "SportyBet NG",
       "recent_evidence": {
@@ -937,16 +1147,40 @@
       "de_vig_probability": 0.44,
       "model_edge": 0.3506,
       "expected_value": 0.66026,
+      "participant_history": {
+        "available": false,
+        "score": 0.5,
+        "participants": [
+          {
+            "participant": "liverpool why",
+            "n": 0,
+            "recent_n": 0,
+            "score": 0.5,
+            "available": false
+          },
+          {
+            "participant": "man city frantsuz",
+            "n": 0,
+            "recent_n": 0,
+            "score": 0.5,
+            "available": false
+          }
+        ],
+        "line": "7.5",
+        "side": "under"
+      },
+      "participant_history_bonus": 0.0,
+      "selection_score": 0.3506,
       "edge_percent": 35.06,
-      "odds_fresh": true,
-      "market_odds_age_seconds": 383.3,
+      "odds_fresh": false,
+      "market_odds_age_seconds": 953.4,
       "data_quality": 0.75,
       "uncertainty": 0.102,
       "market_complete": true,
-      "builder_eligible": true,
+      "builder_eligible": false,
       "real_money_eligible": false,
       "paper_only": true,
-      "status": "LIVE_VALUE",
+      "status": "STALE",
       "source": "Virtual Lab base O/U model",
       "market_source": "SportyBet NG",
       "recent_evidence": {
@@ -973,16 +1207,40 @@
       "de_vig_probability": 0.578947,
       "model_edge": 0.211653,
       "expected_value": 0.26496,
+      "participant_history": {
+        "available": false,
+        "score": 0.5,
+        "participants": [
+          {
+            "participant": "france a1ose",
+            "n": 0,
+            "recent_n": 0,
+            "score": 0.5,
+            "available": false
+          },
+          {
+            "participant": "argentina wboy",
+            "n": 0,
+            "recent_n": 0,
+            "score": 0.5,
+            "available": false
+          }
+        ],
+        "line": "7.5",
+        "side": "under"
+      },
+      "participant_history_bonus": 0.0,
+      "selection_score": 0.211653,
       "edge_percent": 21.17,
-      "odds_fresh": true,
-      "market_odds_age_seconds": 383.3,
+      "odds_fresh": false,
+      "market_odds_age_seconds": 953.4,
       "data_quality": 0.75,
       "uncertainty": 0.102,
       "market_complete": true,
-      "builder_eligible": true,
+      "builder_eligible": false,
       "real_money_eligible": false,
       "paper_only": true,
-      "status": "LIVE_VALUE",
+      "status": "STALE",
       "source": "Virtual Lab base O/U model",
       "market_source": "SportyBet NG",
       "recent_evidence": {
@@ -1009,16 +1267,40 @@
       "de_vig_probability": 0.410995,
       "model_edge": 0.379605,
       "expected_value": 0.77885,
+      "participant_history": {
+        "available": false,
+        "score": 0.5,
+        "participants": [
+          {
+            "participant": "man city frantsuz",
+            "n": 0,
+            "recent_n": 0,
+            "score": 0.5,
+            "available": false
+          },
+          {
+            "participant": "tottenham flamez",
+            "n": 0,
+            "recent_n": 0,
+            "score": 0.5,
+            "available": false
+          }
+        ],
+        "line": "7.5",
+        "side": "under"
+      },
+      "participant_history_bonus": 0.0,
+      "selection_score": 0.379605,
       "edge_percent": 37.96,
-      "odds_fresh": true,
-      "market_odds_age_seconds": 383.3,
+      "odds_fresh": false,
+      "market_odds_age_seconds": 953.4,
       "data_quality": 0.75,
       "uncertainty": 0.102,
       "market_complete": true,
-      "builder_eligible": true,
+      "builder_eligible": false,
       "real_money_eligible": false,
       "paper_only": true,
-      "status": "LIVE_VALUE",
+      "status": "STALE",
       "source": "Virtual Lab base O/U model",
       "market_source": "SportyBet NG",
       "recent_evidence": {
@@ -1029,6 +1311,66 @@
         "side": "under"
       },
       "market_odds_timestamp": "2026-09-27T23:21:56.378661+00:00"
+    },
+    {
+      "sport": "virtual",
+      "competition": "World Cup A",
+      "event_id": "sr:match:BAaDjMAi5fAaY3YL7u|ByhQ",
+      "start_time": "2026-09-28T05:21:00+00:00",
+      "match": "Argentina (Wboy) vs Spain (mko1919)",
+      "market": "virtual_total",
+      "pick": "Argentina (Wboy) vs Spain (mko1919) — O/U under 7.5",
+      "model_probability": 0.7906,
+      "model_fair_odds": 1.265,
+      "bookmaker_odds": 1.7,
+      "market_implied_probability": 0.588235,
+      "de_vig_probability": 0.546667,
+      "model_edge": 0.243933,
+      "expected_value": 0.34402,
+      "participant_history": {
+        "available": false,
+        "score": 0.5,
+        "participants": [
+          {
+            "participant": "argentina wboy",
+            "n": 0,
+            "recent_n": 0,
+            "score": 0.5,
+            "available": false
+          },
+          {
+            "participant": "spain mko1919",
+            "n": 0,
+            "recent_n": 0,
+            "score": 0.5,
+            "available": false
+          }
+        ],
+        "line": "7.5",
+        "side": "under"
+      },
+      "participant_history_bonus": 0.0,
+      "selection_score": 0.243933,
+      "edge_percent": 24.39,
+      "odds_fresh": false,
+      "market_odds_age_seconds": 953.4,
+      "data_quality": 0.75,
+      "uncertainty": 0.102,
+      "market_complete": true,
+      "builder_eligible": false,
+      "real_money_eligible": false,
+      "paper_only": true,
+      "status": "STALE",
+      "source": "Virtual Lab base O/U model",
+      "market_source": "SportyBet NG",
+      "recent_evidence": {
+        "n": 127,
+        "wins": 84,
+        "hit_rate": 0.6614,
+        "threshold": 0.65,
+        "side": "under"
+      },
+      "market_odds_timestamp": "2026-09-27T23:21:56.378334+00:00"
     }
   ],
   "settled_legs": [],
@@ -1042,18 +1384,18 @@
     "sr:match:BAaDgd4McfC-vLHQ9jl4c1w",
     "sr:match:BAaDgd5OweHu8dzqRvMOrwA",
     "sr:match:BAaDgd8nscayyuwEIW7cFrg",
+    "sr:match:BAaDim51zdwironDRRBMkMA",
     "sr:match:BAaDim5|kd8uio88yryrcQg",
     "sr:match:BAaDim6Xrei2e1nK1RvT5cQ",
+    "sr:match:BAaDjLcmCdd-7LXhG01t54g",
     "sr:match:D251270926"
   ],
-  "leg_count": 2,
-  "sports_selected": [
-    "virtual"
-  ],
-  "status": "LIVE_VALUE_SET",
-  "reference_combined_odds": 1.6,
+  "leg_count": 0,
+  "sports_selected": [],
+  "status": "NO_BET",
+  "reference_combined_odds": null,
   "reference_odds_type": "MODEL_FAIR_ODDS_NOT_BOOKMAKER_PRICE",
-  "market_price_combined_odds": 5.405,
+  "market_price_combined_odds": null,
   "theme": {
     "name": "Midnight Graphite / Electric Cyan / Signal Green",
     "accent": "#28D7E8",
