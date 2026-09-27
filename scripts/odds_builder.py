@@ -172,7 +172,10 @@ def refresh_virtual_quotes(rows):
                     same_line=line is not None and ml is not None and abs(float(ml)-float(line))<1e-9
                 except (TypeError,ValueError):
                     same_line=False
-                if not same_line and str(m.get("id") or "") not in {"18","189"}:
+                # Never fall back to a market ID when the requested line is known.
+                # IDs can contain multiple/current O-U ladders; accepting an ID-only
+                # match was the source of fixture/price mismatches.
+                if not same_line:
                     continue
                 for o in m.get("outcomes") or []:
                     if not isinstance(o,dict): continue
@@ -188,7 +191,7 @@ def refresh_virtual_quotes(rows):
             if under is not None: y["sportybet_under_odds"]=under
             if over is not None or under is not None:
                 y["bookmaker_available"]=bool(over and under)
-                y["bookmaker_source"]="SportyBet NG"
+                y["bookmaker_source"]="SportyBet NG"\n                y["sportybet_event_id"]=str(e.get("event_id"))\n                y["sportybet_match"]=e.get("match") or e.get("name")
                 y["market_odds_timestamp"]=fetched_at
         out.append(y)
     return out
