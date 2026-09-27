@@ -11,7 +11,7 @@ Research/paper-trading only. A candidate is eligible only when:
 No wager is placed and no 3-4 leg target is forced.
 """
 from __future__ import annotations
-import json, math
+import json, math, urllib.parse, urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -132,6 +132,68 @@ def tennis_candidates(now):
     return out
 
 
+def refresh_virtual_quotes(rows):
+    """Refresh read-only SportyBet virtual quotes before applying the freshness gate.
+    The unified board can lag the live snapshot; the builder must not treat an old
+    quote as current merely because its event remains upcoming.
+    """
+    if not isinstance(rows,list) or not rows:
+        return rows
+    live_by_id={}
+    fetched_at=datetime.now(timezone.utc).isoformat()
+    headers={"Accept":"application/json","Current-Country":"NG","User-Agent":"Match-Signal-Paper-Builder/6.1"}
+    for page in range(1,4):
+        try:
+            qs=urllib.parse.urlencode({"pageSize":100,"pageNum":page,"timeline":168,"sources":"efootball,vfootball","_t":int(datetime.now(timezone.utc).timestamp()*1000)})
+            req=urllib.request.Request("https://match-signal.pages.dev/api/sportybet-virtual?"+qs,headers=headers)
+            with urllib.request.urlopen(req,timeout=20) as resp:
+                payload=json.loads(resp.read().decode("utf-8"))
+            events=payload.get("events") if isinstance(payload,dict) else []
+            if not isinstance(events,list): break
+            for e in events:
+                if isinstance(e,dict) and e.get("event_id"):
+                    live_by_id[str(e["event_id"])]=e
+            if len(events)<100: break
+        except Exception:
+            break
+    if not live_by_id:
+        return rows
+    out=[]
+    for x in rows:
+        y=dict(x)
+        e=live_by_id.get(str(y.get("event_id")))
+        if isinstance(e,dict):
+            line=y.get("line")
+            over=under=None
+            for m in e.get("markets") or []:
+                if not isinstance(m,dict): continue
+                ml=m.get("line")
+                try:
+                    same_line=line is not None and ml is not None and abs(float(ml)-float(line))<1e-9
+                except (TypeError,ValueError):
+                    same_line=False
+                if not same_line and str(m.get("id") or "") not in {"18","189"}:
+                    continue
+                for o in m.get("outcomes") or []:
+                    if not isinstance(o,dict): continue
+                    name=str(o.get("name") or "").lower()
+                    try: odds=float(o.get("odds"))
+                    except (TypeError,ValueError): continue
+                    if odds<=1: continue
+                    if name.startswith("over"): over=odds
+                    elif name.startswith("under"): under=odds
+                if over is not None or under is not None:
+                    break
+            if over is not None: y["sportybet_over_odds"]=over
+            if under is not None: y["sportybet_under_odds"]=under
+            if over is not None or under is not None:
+                y["bookmaker_available"]=bool(over and under)
+                y["bookmaker_source"]="SportyBet NG"
+                y["market_odds_timestamp"]=fetched_at
+        out.append(y)
+    return out
+
+
 def virtual_recent_gate(product,line,pick):
     """Evidence gate for Virtual/eFootball candidates.
 
@@ -172,6 +234,7 @@ def virtual_recent_gate(product,line,pick):
 def virtual_candidates(now):
     board=load(DATA/"unified_upcoming.json",{})
     rows=board.get("events") if isinstance(board,dict) else []
+    rows=refresh_virtual_quotes(rows)
     live=load(DATA/"virtual_lab_live.json",{})
     live_events=live.get("events") if isinstance(live,dict) else []
     live_ts={str(e.get("event_id")): (e.get("timestamp") or e.get("captured_at")) for e in live_events if isinstance(e,dict) and e.get("event_id")}
