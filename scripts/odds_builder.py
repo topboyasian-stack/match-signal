@@ -346,7 +346,7 @@ def _participant_identity(value):
     """
     import re
     s=str(value or "").strip()
-    m=re.search(r"\\(([^()]*)\\)\\s*$",s)
+    m=re.search(r"\(([^()]*)\)\s*$",s)
     if m and m.group(1).strip():
         s=m.group(1).strip()
     s=re.sub(r"[^a-z0-9]+"," ",s.lower()).strip()
