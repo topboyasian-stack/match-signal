@@ -425,6 +425,8 @@ def build_virtual_events(history, lifecycle, eligibility):
                     qualification_status="MARKET_EDGE_PENDING"
                 elif edge<0.02:
                     qualification_status="EDGE_BELOW_2PCT"
+                elif chosen_model<0.65:
+                    qualification_status="MODEL_PROBABILITY_BELOW_0_65"
                 elif active_comp and model_comp:
                     qualification_status="BETTING_QUALIFIED_PAPER"
                 elif product_bootstrap_gate.get(product,False):
