@@ -145,7 +145,7 @@ def refresh_virtual_quotes(rows):
     alone, because one event can expose several O/U ladders.
     """
     if not isinstance(rows,list) or not rows:
-        return rows
+        return rows,{"live_events":0,"live_match_keys":0,"matched_by_id":0,"matched_by_match":0,"unmatched":0,"samples":[]}
     live_by_id={}
     live_by_match={}
     live_samples=[]
@@ -169,7 +169,7 @@ def refresh_virtual_quotes(rows):
         except Exception:
             break
     if not live_by_id and not live_by_match:
-        return rows
+        return rows,{"live_events":0,"live_match_keys":0,"matched_by_id":0,"matched_by_match":0,"unmatched":len(rows),"samples":live_samples}
     out=[]
     join_diag={"live_events":len(live_by_id),"live_match_keys":len(live_by_match),"matched_by_id":0,"matched_by_match":0,"unmatched":0,"samples":live_samples}
     for x in rows:
