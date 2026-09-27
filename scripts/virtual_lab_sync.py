@@ -141,3 +141,5 @@ def main():
     if not rows:raise SystemExit("ABORT: no live eFootball/virtual events collected")
 
 if __name__=="__main__":main()
+
+# Live-refresh marker: keep scheduled feed and builder timestamps traceable.
