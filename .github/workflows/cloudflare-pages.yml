@@ -97,6 +97,10 @@ jobs:
         with:
           ref: main
 
+      - name: Capture deployment source commit
+        id: source
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
       - name: Verify production artifact
         run: |
           test -s index.html
@@ -333,6 +337,7 @@ jobs:
       - name: Record Cloudflare production verification
         env:
           GH_TOKEN: ${{ github.token }}
+          DEPLOY_SOURCE_COMMIT: ${{ github.sha }}
         run: |
           set -euo pipefail
           cp LIVE-PRODUCTION-CHECK.json /tmp/live-production-check.json 2>/dev/null || true
@@ -350,7 +355,7 @@ jobs:
           Path('DEPLOY-VERIFY-CLOUDFLARE.json').write_text(json.dumps({
             'status':'VERIFIED',
             'provider':'Cloudflare Pages',
-            'source_commit':__import__('subprocess').check_output(['git','rev-parse','HEAD'],text=True).strip(),
+            'source_commit':os.environ['DEPLOY_SOURCE_COMMIT'],
             'verified_at':datetime.now(timezone.utc).isoformat(),
             'live_virtual_feed':live,
             'checks':['core_pages','research_virtual_lab','live_virtual_proxy','virtual_lab_live_snapshot','live_production_data']
