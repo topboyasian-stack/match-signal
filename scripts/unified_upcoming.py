@@ -461,7 +461,7 @@ def build_virtual_events(history, lifecycle, eligibility):
                 "sportybet_under_odds":under_odds,
                 "bookmaker_available":bool(over_odds and under_odds),
                 "bookmaker_source":"SportyBet NG" if (over_odds or under_odds) else None,
-                "market_odds_timestamp":e.get("captured_at") or live.get("updated_at"),
+                "market_odds_timestamp":e.get("timestamp") or e.get("captured_at") or live.get("updated_at"),
                 "prediction_status":"betting_qualified_paper" if qualified else "research_projection",
                 "projection_tier":"deep_research_projection",
                 "evidence_depth":"participant_lifecycle_plus_base_model" if participant_history>=3 else "feed_discovered_base_model",
