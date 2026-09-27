@@ -116,6 +116,7 @@ def explicit_terminal(row):
 def settlement_index():
     event_ids=set()
     keys=set()
+    details={}
 
     def ingest(items, require_settled=True):
         for item in items if isinstance(items,list) else []:
@@ -136,9 +137,16 @@ def settlement_index():
     # Darts/Table Tennis history rows are result-only ledgers, so every row is terminal.
     ingest(load("darts_history.json",[]),False)
     ingest(load("table_tennis_history.json",[]),False)
-    return event_ids,keys
+    return event_ids,keys,details
 
-SETTLED_EVENT_IDS, SETTLED_MATCH_KEYS = settlement_index()
+SETTLED_EVENT_IDS, SETTLED_MATCH_KEYS, SETTLED_DETAILS = settlement_index()
+
+def settled_record(row):
+    eid=str(row.get("event_id") or "")
+    market=str(row.get("market") or "winner")
+    line="" if row.get("line") is None else str(row.get("line"))
+    pick=str(row.get("pick") or row.get("selection") or "")
+    return SETTLED_DETAILS.get(f"{eid}|{market}|{line}|{pick}")
 
 def add(rows, row):
     if not isinstance(row,dict):return
@@ -147,9 +155,29 @@ def add(rows, row):
     eid=str(row.get("event_id") or "")
     if not eid:return
 
-    # Terminal result state wins over every other display rule.
-    if explicit_terminal(row) or eid in SETTLED_EVENT_IDS or match_key(row) in SETTLED_MATCH_KEYS:
-        return
+    # Terminal result state wins over every other display rule. For Virtual/
+    # eFootball, retain an exact settled prediction match for the recent
+    # settlement window so Upcoming can show the original selection with its
+    # result instead of silently deleting it.
+    terminal=explicit_terminal(row) or eid in SETTLED_EVENT_IDS or match_key(row) in SETTLED_MATCH_KEYS
+    if terminal:
+        sr=settled_record(row) if str(row.get("sport") or "")=="virtual" else None
+        if sr and sr.get("settled_at"):
+            try:
+                age=(NOW-dt(sr.get("settled_at"))).total_seconds()
+            except Exception:
+                age=999999
+            if age<=48*3600:
+                row["event_state"]="SETTLED"
+                row["settled"]=True
+                row["settlement_result"]=sr.get("result") or sr.get("actual_result")
+                row["final_score"]=sr.get("score") or sr.get("final_score")
+                row["settled_at"]=sr.get("settled_at")
+                row["prediction_trace_id"]=sr.get("trace_id") or sr.get("record_id")
+            else:
+                return
+        else:
+            return
 
     nowish=NOW-timedelta(minutes=30)
     if start < nowish and not explicit_live(row):
