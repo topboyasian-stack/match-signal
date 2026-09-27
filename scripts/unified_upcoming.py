@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Build the unified Match Signal upcoming/prediction board.
 
+Fresh Virtual snapshot synchronization is a publication dependency.
+
 Every supported engine contributes its forward window to one chronological
 surface. Existing evidence controls confidence/status, but it does not decide
 whether an event is visible.
