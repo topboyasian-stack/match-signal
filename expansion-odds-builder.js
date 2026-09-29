@@ -128,7 +128,39 @@
       if(b)b.textContent=c.text;
     });
   }
-  function render(data) {
+  function ticketTrackHtml(tracker) {
+    var tickets=tracker&&Array.isArray(tracker.tickets)?tracker.tickets:[];
+    var summary=tracker&&tracker.summary?tracker.summary:{};
+    function esc2(v){return esc(v);}
+    function ticketStatus(t){
+      if(t.status==='WON') return '<b class="ticket-status won">✓ WON</b>';
+      if(t.status==='LOST') return '<b class="ticket-status lost">✕ LOST</b>';
+      return '<b class="ticket-status pending">ONGOING</b>';
+    }
+    function ticketRows(t){
+      var lc=t.leg_counts||{};
+      var bits=[];
+      if(Number(lc.won||0)) bits.push(lc.won+' won');
+      if(Number(lc.lost||0)) bits.push(lc.lost+' lost');
+      if(Number(lc.void||0)) bits.push(lc.void+' void');
+      if(Number(lc.pending||0)) bits.push(lc.pending+' pending');
+      return bits.join(' · ')||'—';
+    }
+    var cards=tickets.slice(0,10).map(function(t){
+      var activeLoss=t.status==='LOST' && Number((t.leg_counts||{}).pending||0)>0;
+      return '<div class="ticket-row '+(t.status==='LOST'?'ticket-lost':t.status==='WON'?'ticket-won':'ticket-pending')+'">'+
+        '<div class="ticket-main"><span class="ticket-id">'+esc2(t.ticket_id||'—')+'</span><strong>'+(t.batch_id?esc2(t.batch_id)+' · ':'')+ticketStatus(t)+'</strong>'+
+        '<small>'+esc2(t.leg_count||((t.legs||[]).length))+' legs · '+esc2(t.combined_odds==null?'—':Number(t.combined_odds).toFixed(3))+'x · rating '+esc2(t.combined_model_rating==null?'—':Number(t.combined_model_rating).toFixed(1)+'/100')+'</small></div>'+
+        '<div class="ticket-progress">'+esc2(ticketRows(t))+(activeLoss?' · loss confirmed while other legs remain pending':'')+'</div>'+
+        '</div>';
+    }).join('');
+    if(!cards) cards='<div class="empty">No generated paper tickets have been tracked yet.</div>';
+    return '<section class="ticket-track"><div class="ticket-track-head"><div><b>Paper Ticket Track</b><div class="sub">Each generated batch is tracked independently. A single losing leg changes an ongoing ticket to LOST immediately; remaining legs continue settling for the record.</div></div>'+
+      '<div class="ticket-track-stats"><span>Ongoing <b>'+esc2(summary.pending||0)+'</b></span><span>Won <b>'+esc2(summary.won||0)+'</b></span><span>Lost <b>'+esc2(summary.lost||0)+'</b></span></div></div>'+
+      '<div class="ticket-list">'+cards+'</div></section>';
+  }
+
+  function render(data, tracker) {
     var target=document.getElementById('oddsBuilder'); if(!target)return;
     var batches=Array.isArray(data.batches)?data.batches:[];
     var settledLegs=Array.isArray(data.settled_legs)?data.settled_legs:[];
@@ -214,20 +246,28 @@
       gateNote='<div class="section"><b>Research gate active</b><div class="sub">Only fresh SportyBet prices, calibrated edge and evidence gates can produce a batch.</div></div>';
     }
 
+    var ticketTrack=ticketTrackHtml(tracker);
     target.innerHTML='<div class="metrics"><div class="metric"><small>Active batches</small><strong>'+batchCount+'/6</strong></div><div class="metric"><small>Sports</small><strong>'+esc(sports.length?sports.join(' + '):'—')+'</strong></div><div class="metric"><small>Top combined model rating</small><strong>'+esc(topRating==null?'—':topRating.toFixed(1)+'/100')+'</strong></div><div class="metric"><small>Top combined SportyBet odds</small><strong>'+esc(top&&top.combined_odds!=null?Number(top.combined_odds).toFixed(3):'—')+'</strong></div></div><div class="panel"><b>Ranked 4.00+ Paper Research Batches</b><div class="sub">Separate batches are kept disjoint by event. Higher combined model rating means a stronger naive joint model-probability proxy; it is not a guarantee.</div><div class="batch-list">'+(cards||'<div class="empty">No qualified 4.00+ batches are currently available.</div>')+'</div><div class="section"><div class="row"><span>Bookmaker feed</span><b>Fresh SportyBet snapshot · paper only</b></div><div class="row"><span>Top batch joint-model probability proxy</span><b>'+esc(topJoint==null?'—':pct(topJoint))+'</b></div><div class="row"><span>Candidate pool</span><b>'+esc(virtualCount)+'</b></div></div>'+gateNote+'</div>';
     updateTimers();
+    var host=document.createElement('div');
+    host.innerHTML=ticketTrack;
+    target.appendChild(host.firstElementChild);
   }
   function load(){
     var target=document.getElementById('oddsBuilder');if(!target)return;
     target.innerHTML='<div class="empty">Loading Odds Builder data…</div>';
-    fetch('./data/odds_builder.json?v=20260918-odds-builder-live-'+Date.now(),{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('odds_builder.json HTTP '+r.status);return r.json();}).then(function(data){
+    Promise.all([
+      fetch('./data/odds_builder.json?v=20260929-odds-builder-'+Date.now(),{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('odds_builder.json HTTP '+r.status);return r.json();}),
+      fetch('./data/odds_ticket_tracker.json?v=20260929-ticket-track-'+Date.now(),{cache:'no-store'}).then(function(r){if(!r.ok)return {tickets:[],summary:{}};return r.json();})
+    ]).then(function(results){
+      var data=results[0],tracker=results[1];
       var legs=Array.isArray(data.qualified_legs)?data.qualified_legs:[];
-      return refreshLiveStatuses(legs).then(function(){render(data);});
+      return refreshLiveStatuses(legs).then(function(){render(data,tracker);});
     }).catch(function(e){target.innerHTML='<div class="empty">Accumulator data unavailable: '+esc(e.message)+'</div>';});
   }
   function boot(){
     if(!document.getElementById('odds-builder-result-style')){
-      var s=document.createElement('style');s.id='odds-builder-result-style';s.textContent='.batch-list{display:grid;gap:14px}.batch-card{border:1px solid rgba(255,255,255,.1);border-radius:16px;background:#0c121c;overflow:hidden}.batch-summary{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:18px 20px;cursor:pointer;list-style:none}.batch-summary::-webkit-details-marker{display:none}.batch-kicker{display:block;font-size:11px;letter-spacing:.12em;text-transform:uppercase;opacity:.7;margin-bottom:4px}.batch-summary strong{display:block;font-size:16px}.batch-summary small{display:block;opacity:.72;margin-top:5px}.batch-odds{font-size:22px;font-weight:900;white-space:nowrap}.batch-metrics{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;padding:0 20px 14px}.batch-metrics>div{padding:10px 12px;border-radius:10px;background:rgba(255,255,255,.035)}.batch-metrics span{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.08em;opacity:.65}.batch-metrics b{display:block;margin-top:4px;font-size:15px}.batch-card>.sub{padding:0 20px 14px}.batch-card>.grid{padding:0 20px 20px}@media(max-width:900px){.batch-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}};\'.timer.finished-correct{border-color:#35d49a;background:#06251a}.timer.finished-correct .timerValue{color:#35d49a}.timer.finished-wrong{border-color:#ff7474;background:#2a0d12}.timer.finished-wrong .timerValue{color:#ff7474}.timer.finished{border-color:#8f98b8}.timer.finished .timerValue{color:#eef1fb}.settled-card{border-color:#35d49a;background:#092018}.settled-card .meta{color:#35d49a}.result-badge{font-weight:900;letter-spacing:.02em}.result-badge.won,.won-text{color:#35d49a}.result-badge.lost,.lost-text{color:#ff7474}';;document.head.appendChild(s);
+      var s=document.createElement('style');s.id='odds-builder-result-style';s.textContent='.batch-list{display:grid;gap:14px}.batch-card{border:1px solid rgba(255,255,255,.1);border-radius:16px;background:#0c121c;overflow:hidden}.batch-summary{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:18px 20px;cursor:pointer;list-style:none}.batch-summary::-webkit-details-marker{display:none}.batch-kicker{display:block;font-size:11px;letter-spacing:.12em;text-transform:uppercase;opacity:.7;margin-bottom:4px}.batch-summary strong{display:block;font-size:16px}.batch-summary small{display:block;opacity:.72;margin-top:5px}.batch-odds{font-size:22px;font-weight:900;white-space:nowrap}.batch-metrics{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;padding:0 20px 14px}.batch-metrics>div{padding:10px 12px;border-radius:10px;background:rgba(255,255,255,.035)}.batch-metrics span{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.08em;opacity:.65}.batch-metrics b{display:block;margin-top:4px;font-size:15px}.batch-card>.sub{padding:0 20px 14px}.batch-card>.grid{padding:0 20px 20px}@media(max-width:900px){.batch-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}};\'.timer.finished-correct{border-color:#35d49a;background:#06251a}.timer.finished-correct .timerValue{color:#35d49a}.timer.finished-wrong{border-color:#ff7474;background:#2a0d12}.timer.finished-wrong .timerValue{color:#ff7474}.timer.finished{border-color:#8f98b8}.timer.finished .timerValue{color:#eef1fb}.ticket-track{margin-top:18px;padding:18px;border:1px solid rgba(255,255,255,.1);border-radius:16px;background:#0c121c}.ticket-track-head{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}.ticket-track-stats{display:flex;gap:8px;flex-wrap:wrap}.ticket-track-stats span{padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.04);font-size:11px}.ticket-list{display:grid;gap:8px;margin-top:14px}.ticket-row{display:flex;justify-content:space-between;gap:16px;align-items:center;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.025)}.ticket-row.ticket-lost{border-color:rgba(255,116,116,.38)}.ticket-row.ticket-won{border-color:rgba(53,208,127,.38)}.ticket-main strong{display:block;margin-top:3px}.ticket-main small,.ticket-progress{font-size:11px;opacity:.72}.ticket-id{font-size:10px;letter-spacing:.08em;opacity:.65}.ticket-status.won,.ticket-row.ticket-won .ticket-progress{color:#35d49a}.ticket-status.lost,.ticket-row.ticket-lost .ticket-progress{color:#ff7474}.ticket-status.pending{color:#f3c76b}.ticket-progress{text-align:right}.settled-card{border-color:#35d49a;background:#092018}.settled-card .meta{color:#35d49a}.result-badge{font-weight:900;letter-spacing:.02em}.result-badge.won,.won-text{color:#35d49a}.result-badge.lost,.lost-text{color:#ff7474}';;document.head.appendChild(s);
     }
     load();window.setInterval(load,60000);window.setInterval(updateTimers,1000);
   }
