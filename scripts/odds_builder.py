@@ -267,42 +267,65 @@ def refresh_virtual_quotes(rows):
         out.append(y)
     return out,join_diag,list(live_by_id.values())
 
-def virtual_recent_gate(product,line,pick):
-    """Evidence gate for Virtual/eFootball candidates.
+_VIRTUAL_RECENT_GATE_CACHE=None
 
-    The previous gate pooled both sides of a line (Over + Under). That could
-    approve a side whose own recent record was weak. This gate scores the exact
-    product + line + selected side from the latest settlement ledgers, then
-    combines that with the validated historical/OOS line evidence.
-    """
+
+def _load_recent_virtual_evidence():
+    global _VIRTUAL_RECENT_GATE_CACHE
+    if _VIRTUAL_RECENT_GATE_CACHE is not None:
+        return _VIRTUAL_RECENT_GATE_CACHE
     files=sorted((DATA/"virtual_lab_archive"/"settlements").glob("*.jsonl"))
-    if not files:return False,{"reason":"no_settlement_archive"}
     rows=[]
     for path in files[-5:]:
         try:
             for raw in path.read_text(encoding="utf-8").splitlines():
-                if not raw.strip(): continue
+                if not raw.strip():
+                    continue
                 row=json.loads(raw)
-                if row.get("market")!="ou" or row.get("product")!=product or row.get("line") is None or row.get("win") is None:
+                if row.get("market")!="ou" or row.get("product") not in {"efootball_gt","efootball_adriatic","vfootball","zoom"}:
                     continue
-                try:
-                    if abs(float(row.get("line"))-float(line))<1e-9:
-                        rows.append(row)
-                except (TypeError,ValueError):
+                if row.get("line") is None or row.get("win") is None:
                     continue
+                rows.append(row)
         except Exception:
             continue
     rows.sort(key=lambda r:str(r.get("settled_at") or r.get("timestamp") or ""),reverse=True)
-    rows=rows[:500]
-    side=str(pick or "").lower()
-    exact=[r for r in rows if str(r.get("selection") or "").upper().startswith("O" if side=="over" else "U")]
+    rows=rows[:2500]
+    index={}
+    for row in rows:
+        try:
+            line=float(row.get("line"))
+        except (TypeError,ValueError):
+            continue
+        side="over" if str(row.get("selection") or "").upper().startswith("O") else "under" if str(row.get("selection") or "").upper().startswith("U") else None
+        if side is None:
+            continue
+        key=(str(row.get("product") or ""),f"{line:g}",side)
+        index.setdefault(key,[]).append(row)
+    _VIRTUAL_RECENT_GATE_CACHE=index
+    return index
+
+
+def virtual_recent_gate(product,line,pick):
+    """Exact product + line + selected-side recent evidence gate.
+
+    The settlement files are loaded once per Builder run and indexed by
+    product/line/side, preserving the existing threshold while avoiding
+    repeated disk parsing for every live candidate.
+    """
+    index=_load_recent_virtual_evidence()
+    try:
+        key=(str(product or ""),f"{float(line):g}",str(pick or "").lower())
+    except (TypeError,ValueError):
+        return False,{"reason":"invalid_line"}
+    exact=index.get(key,[])
     min_n=8
     if len(exact)<min_n:
         return False,{"n":len(exact),"reason":"insufficient_recent_side_evidence","min_n":min_n}
     wins=sum(1 for r in exact if r.get("win") is True)
     hit=wins/len(exact)
     threshold=0.65 if product=="efootball_gt" else 0.75
-    return hit>=threshold,{"n":len(exact),"wins":wins,"hit_rate":round(hit,4),"threshold":threshold,"side":side}
+    return hit>=threshold,{"n":len(exact),"wins":wins,"hit_rate":round(hit,4),"threshold":threshold,"side":str(pick or "").lower()}
 
 def virtual_candidates(now):
     """Build Virtual candidates from the freshest exact SportyBet O/U snapshot.
