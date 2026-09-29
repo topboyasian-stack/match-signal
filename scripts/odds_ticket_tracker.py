@@ -214,6 +214,9 @@ def ticket_status(legs):
 def refresh_ticket(ticket, rows, now):
     changed = False
     for leg in ticket.get("legs") or []:
+        if leg.get("status") not in {"PENDING", "WON", "LOST", "VOID"}:
+            leg["status"] = "PENDING"
+            changed = True
         settlement = settle_leg(leg, rows)
         if settlement:
             for key in ("status", "correct", "settled_at", "result", "final_score"):
@@ -246,7 +249,7 @@ def make_ticket(batch, now):
     legs = []
     for leg in batch.get("legs") or []:
         copied = dict(leg)
-        copied.setdefault("status", "PENDING")
+        copied["status"] = "PENDING"
         copied.setdefault("correct", None)
         copied.setdefault("settled_at", None)
         copied.setdefault("result", None)
