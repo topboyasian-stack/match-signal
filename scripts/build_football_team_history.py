@@ -15,6 +15,10 @@ FOOTBALL_LEAGUES = {
 }
 
 SESSION = requests.Session()
+SESSION.headers.update({
+    "User-Agent": "MatchSignal/3.0 (+https://github.com/topboyasian-stack/match-signal)",
+    "Accept": "application/json, text/plain, */*",
+})
 
 
 def main():
@@ -80,9 +84,9 @@ def main():
     if not history:
         if prior_history:
             history = prior_history
-            errors.append("all active team-history sources returned zero rows; preserved prior non-empty artifact")
+            errors.append("active team-history sources returned zero rows; preserved prior non-empty artifact")
         else:
-            raise RuntimeError("active football team-history sources returned zero rows and no prior evidence exists")
+            errors.append("active team-history sources returned zero rows; independent history is unavailable for this run")
     (DATA / "football_team_history.json").write_text(
         json.dumps(history, indent=2, ensure_ascii=False), encoding="utf-8"
     )
