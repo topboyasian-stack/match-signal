@@ -302,6 +302,67 @@ jobs:
           } catch(e) { failures.push('/api/sportybet-booking OPTIONS '+e.message); }
 
           try {
+            const dataResp = await fetch(base + '/data/odds_builder.json?bookingSmoke=' + Date.now(), {cache:'no-store'});
+            if (!dataResp.ok) throw new Error('odds_builder.json HTTP '+dataResp.status);
+            const data = await dataResp.json();
+            const now = Date.now();
+            const candidates = (Array.isArray(data?.batches)?data.batches:[])
+              .filter(b => Array.isArray(b?.legs) && b.legs.length > 0 && b.legs.length <= 20)
+              .filter(b => b.legs.every(l => {
+                const t = Date.parse(l?.start_time || '');
+                return Number.isFinite(t) && t > now + 120000;
+              }));
+            let smoke = {
+              verified_at: new Date().toISOString(),
+              status: 'NOT_RUN',
+              http_status: null,
+              ok: false,
+              batch_id: null,
+              selection_count: 0,
+              booking_code_available: false,
+              error: null,
+              message: null
+            };
+            if (!candidates.length) {
+              smoke.status = 'NO_FUTURE_BATCH';
+              console.log('SportyBet booking POST smoke test skipped: no fully future batch in production artifact');
+            } else {
+              let last = null;
+              for (const batch of candidates.slice(0,3)) {
+                const rr = await fetch(base + '/api/sportybet-booking', {
+                  method: 'POST',
+                  headers: {'Content-Type':'application/json','Accept':'application/json'},
+                  body: JSON.stringify({batch_id: String(batch.batch_id)}),
+                  cache: 'no-store'
+                });
+                const raw = await rr.text();
+                let payload = null;
+                try { payload = raw ? JSON.parse(raw) : null; } catch {}
+                last = {rr,raw,payload,batch};
+                if (payload && rr.ok && payload.ok === true && payload.booking_code) break;
+              }
+              const rr = last.rr, raw = last.raw, payload = last.payload, batch = last.batch;
+              smoke.status = payload?.ok === true ? 'PASS' : 'FAIL';
+              smoke.http_status = rr.status;
+              smoke.ok = Boolean(rr.ok && payload?.ok === true);
+              smoke.batch_id = String(batch.batch_id || '');
+              smoke.selection_count = Number(payload?.selection_count || batch.legs?.length || 0);
+              smoke.booking_code_available = Boolean(payload?.booking_code);
+              smoke.error = payload?.error || null;
+              smoke.message = payload?.message || (!payload ? 'Non-JSON response' : null);
+              if (!payload) smoke.raw_prefix = String(raw||'').replace(/\s+/g,' ').slice(0,240);
+              if (payload?.validation) smoke.validation = payload.validation.slice(0,5);
+              if (!smoke.ok) failures.push('/api/sportybet-booking POST smoke failed: HTTP '+rr.status+' '+(smoke.error||smoke.message||'unknown'));
+              else console.log('SportyBet booking POST smoke passed: '+smoke.selection_count+' selections; booking code returned');
+            }
+            writeFileSync('BOOKING-PRODUCTION-CHECK.json', JSON.stringify(smoke,null,2)+'\n');
+          } catch(e) {
+            const smoke={verified_at:new Date().toISOString(),status:'ERROR',http_status:null,ok:false,batch_id:null,selection_count:0,booking_code_available:false,error:String(e.message||e)};
+            writeFileSync('BOOKING-PRODUCTION-CHECK.json', JSON.stringify(smoke,null,2)+'\n');
+            failures.push('/api/sportybet-booking POST smoke '+String(e.message||e));
+          }
+
+          try {
             const params = new URLSearchParams({
               pageSize:'100',
               pageNum:'1',
@@ -392,6 +453,7 @@ jobs:
         run: |
           set -euo pipefail
           cp LIVE-PRODUCTION-CHECK.json /tmp/live-production-check.json 2>/dev/null || true
+          cp BOOKING-PRODUCTION-CHECK.json /tmp/booking-production-check.json 2>/dev/null || true
           for attempt in 1 2 3 4 5; do
             git fetch origin main
             git reset --hard origin/main
@@ -400,16 +462,21 @@ jobs:
           from datetime import datetime, timezone
           from pathlib import Path
           live={}
+          booking={}
           p=Path('/tmp/live-production-check.json')
           if p.exists():
               live=json.loads(p.read_text())
+          b=Path('/tmp/booking-production-check.json')
+          if b.exists():
+              booking=json.loads(b.read_text())
           Path('DEPLOY-VERIFY-CLOUDFLARE.json').write_text(json.dumps({
             'status':'VERIFIED',
             'provider':'Cloudflare Pages',
             'source_commit':os.environ['DEPLOY_SOURCE_COMMIT'],
             'verified_at':datetime.now(timezone.utc).isoformat(),
             'live_virtual_feed':live,
-            'checks':['core_pages','research_virtual_lab','live_virtual_proxy','virtual_lab_live_snapshot','live_production_data']
+            'booking_api':booking,
+            'checks':['core_pages','research_virtual_lab','live_virtual_proxy','virtual_lab_live_snapshot','live_production_data','booking_api_post']
           },indent=2)+'\n')
           PY
             git config user.name "github-actions[bot]"
