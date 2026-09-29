@@ -1,0 +1,95 @@
+name: Match Signal Odds Ticket Tracker
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_run:
+    workflows:
+      - "Match Signal Odds Builder"
+      - "Match Signal Result Settlement"
+      - "Match Signal Virtual Lab Collector"
+    types: [completed]
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/odds_ticket_tracker.py'
+      - 'data/odds_builder.json'
+      - '.github/workflows/odds-ticket-tracker.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: match-signal-odds-ticket-tracker
+  cancel-in-progress: true
+
+jobs:
+  track:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 2
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run ticket tracker
+        run: python scripts/odds_ticket_tracker.py
+
+      - name: Validate ticket tracker
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('data/odds_ticket_tracker.json').read_text())
+          assert d.get('mode') == 'PAPER_ONLY'
+          assert isinstance(d.get('tickets'), list)
+          summary=d.get('summary') or {}
+          for key in ('tracked_tickets','pending','won','lost','legs_won','legs_lost','legs_pending'):
+              assert int(summary.get(key,0)) >= 0
+          for ticket in d['tickets']:
+              assert ticket.get('paper_only') is True
+              assert ticket.get('real_money_execution') is False
+              assert ticket.get('status') in {'PENDING','LOST','WON'}
+              assert isinstance(ticket.get('legs'), list)
+              statuses={str(x.get('status') or 'PENDING') for x in ticket['legs']}
+              if 'LOST' in statuses:
+                  assert ticket.get('status') == 'LOST'
+          print('Ticket tracker OK:', json.dumps(summary))
+          PY
+
+      - name: Publish ticket tracker
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/odds_ticket_tracker.json
+          if git diff --cached --quiet; then
+            echo "No ticket tracking changes."
+            exit 0
+          fi
+          git commit -m "🤖 Update paper ticket settlement tracker"
+          for attempt in 1 2 3; do
+            if git push origin main; then
+              echo "Ticket tracker published on attempt ${attempt}."
+              exit 0
+            fi
+            git fetch origin main
+            git reset --hard origin/main
+            python scripts/odds_ticket_tracker.py
+            git add data/odds_ticket_tracker.json
+            if git diff --cached --quiet; then
+              exit 0
+            fi
+            git commit -m "🤖 Update paper ticket settlement tracker"
+          done
+          exit 1
