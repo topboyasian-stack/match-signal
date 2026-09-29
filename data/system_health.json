@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-29T14:42:17.401213+00:00",
+  "generated_at": "2026-09-29T14:43:07.477855+00:00",
   "status": "HEALTHY",
   "critical_issues": 0,
   "warning_issues": 0,
@@ -8,19 +8,19 @@
     {
       "engine": "core_prediction_pipeline",
       "status": "PASS",
-      "age_hours": 0.13,
+      "age_hours": 0.14,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.04,
+      "age_hours": 0.05,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 3.13,
+      "age_hours": 3.14,
       "threshold_hours": 4
     },
     {
@@ -32,7 +32,7 @@
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 0.72,
+      "age_hours": 0.74,
       "threshold_hours": 0.5,
       "heartbeat_source": "unified_live_refresh"
     },
@@ -55,15 +55,11 @@
       }
     },
     {
-      "engine": "virtual_lab_research_collector",
+      "engine": "tennis_desk",
       "status": "INFO",
-      "age_hours": 5.7,
-      "threshold_hours": 2
-    },
-    {
-      "engine": "tennis_feed",
-      "status": "INFO",
-      "reason": "No actionable ATP singles matches in the current forward window; no feed failure detected"
+      "detail": "Core pipeline is holding tennis back for lack of actionable singles matches, while the desk itself still has active ATP/WTA rows.",
+      "autopilot_atp": 2,
+      "autopilot_wta": 0
     }
   ],
   "issues": [
@@ -75,4 +71,4 @@
   ],
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
   "paper_only": true
-}\n
+}
