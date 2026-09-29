@@ -239,9 +239,6 @@ def refresh_ticket(ticket, rows, now):
     if ticket.get("leg_counts") != counts:
         ticket["leg_counts"] = counts
         changed = True
-    if ticket.get("last_evaluated_at") != now:
-        ticket["last_evaluated_at"] = now
-        # Timestamp is operational metadata; do not count it as a file change.
     return changed
 
 
@@ -311,8 +308,6 @@ def main():
             if t.get("batch_id") != batch.get("batch_id"):
                 t["batch_id"] = batch.get("batch_id")
                 changed = True
-            if t.get("last_seen_at") != now:
-                t["last_seen_at"] = now
             continue
         ticket = make_ticket(batch, now)
         tickets.append(ticket)
