@@ -1,38 +1,38 @@
 {
-  "generated_at": "2026-09-29T18:07:15.201971+00:00",
-  "status": "HEALTHY",
+  "generated_at": "2026-09-29T19:15:08.512583+00:00",
+  "status": "DEGRADED",
   "critical_issues": 0,
-  "warning_issues": 0,
+  "warning_issues": 1,
   "info_issues": 1,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
       "status": "PASS",
-      "age_hours": 0.06,
+      "age_hours": 1.19,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.02,
+      "age_hours": 0.03,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 0.03,
+      "age_hours": 1.16,
       "threshold_hours": 4
     },
     {
       "engine": "unified_upcoming",
       "status": "PASS",
-      "age_hours": 0.0,
+      "age_hours": 1.14,
       "threshold_hours": 2
     },
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 3.18,
+      "age_hours": 0.0,
       "threshold_hours": 0.5,
       "heartbeat_source": "unified_live_refresh"
     },
@@ -53,16 +53,14 @@
           "provider": "not_active"
         }
       }
-    },
-    {
-      "engine": "tennis_desk",
-      "status": "INFO",
-      "detail": "Core pipeline is holding tennis back for lack of actionable singles matches, while the desk itself still has active ATP/WTA rows.",
-      "autopilot_atp": 2,
-      "autopilot_wta": 0
     }
   ],
   "issues": [
+    {
+      "code": "TENNIS_FEED_EMPTY",
+      "severity": "warning",
+      "detail": "No current tennis predictions are published"
+    },
     {
       "code": "SELECTION_GATE_EMPTY",
       "severity": "info",
