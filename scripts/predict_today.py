@@ -16,19 +16,16 @@ DATA = ROOT / "data"
 DATA.mkdir(exist_ok=True)
 
 ESPN = "https://site.api.espn.com/apis/site/v2/sports"
+# Active core production scope. Retired or evidence-incomplete lanes remain
+# available through their preserved research artifacts, but are no longer
+# regenerated into the canonical prediction feed.
 FOOTBALL_LEAGUES = {
-    "EPL": "eng.1",
     "La Liga": "esp.1",
     "Bundesliga": "ger.1",
-    "Serie A": "ita.1",
     "Ligue 1": "fra.1",
     "Champions League": "uefa.champions",
-    "MLS": "usa.1",
-    "Primeira Liga": "por.1",
-    "Eredivisie": "ned.1",
-    "Saudi Pro League": "ksa.1",
 }
-TENNIS_LEAGUES = {"ATP": "atp", "WTA": "wta"}
+TENNIS_LEAGUES = {"ATP": "atp"}
 
 # Validated schedule corrections for public-feed timestamps that are stale or
 # wrong at the source. Keep these narrow and event-specific; never apply a
