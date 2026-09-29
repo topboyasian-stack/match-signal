@@ -175,26 +175,39 @@ def refresh_virtual_quotes(rows):
     live_by_pair={}
     live_samples=[]
     fetched_at=datetime.now(timezone.utc).isoformat()
-    headers={"Accept":"application/json","Current-Country":"NG","User-Agent":"Match-Signal-Paper-Builder/6.1"}
-    for page in range(1,4):
+    # Use the same bounded collector as the Virtual Lab live pipeline so the
+    # Builder refreshes the SportyBet catalogue immediately before qualification.
+    # The collector covers multiple pages/sources and stamps every compacted row
+    # with the current observation time. This prevents the Builder from trusting
+    # an otherwise healthy but old Unified Upcoming artifact.
+    try:
+        from virtual_lab_sync import collect_proxy, collect_direct, compact
         try:
-            qs=urllib.parse.urlencode({"pageSize":100,"pageNum":page,"timeline":168,"sources":"efootball,vfootball","_t":int(datetime.now(timezone.utc).timestamp()*1000)})
-            req=urllib.request.Request("https://match-signal.pages.dev/api/sportybet-virtual?"+qs,headers=headers)
-            with urllib.request.urlopen(req,timeout=20) as resp:
-                payload=json.loads(resp.read().decode("utf-8"))
-            events=payload.get("events") if isinstance(payload,dict) else []
-            if not isinstance(events,list): break
-            for e in events:
-                if not isinstance(e,dict): continue
-                if len(live_samples)<3: live_samples.append({"keys":sorted(e.keys()),"event_id":e.get("event_id"),"match":e.get("match"),"name":e.get("name"),"player_1":e.get("player_1"),"player_2":e.get("player_2")})
-                if e.get("event_id"): live_by_id[str(e["event_id"])]=e
-                key=_norm_fixture(e.get("match") or e.get("name") or f"{e.get('participant_1') or e.get('team_1') or ''} vs {e.get('participant_2') or e.get('team_2') or ''}")
-                if key: live_by_match[key]=e
-                pair_key=_participant_pair_key(e)
-                if pair_key: live_by_pair.setdefault(pair_key,[]).append(e)
-            if len(events)<100: break
-        except Exception:
-            break
+            raw_events, live_source = collect_proxy()
+        except Exception as proxy_error:
+            raw_events, live_source = collect_direct()
+            live_source = live_source + "_fallback"
+        for raw in raw_events if isinstance(raw_events,list) else []:
+            event = compact(raw)
+            if not isinstance(event,dict) or not event.get("event_id"):
+                continue
+            product = str(event.get("product") or "")
+            if product not in {"efootball_gt","efootball_adriatic","vfootball","zoom","other"}:
+                continue
+            event["price_snapshot_source"]="fresh_live_sportybet_collector"
+            event["market_odds_timestamp"]=event.get("timestamp") or fetched_at
+            live_by_id[str(event["event_id"])]=event
+            key=_norm_fixture(event.get("match") or event.get("name") or f"{event.get('participant_1') or event.get('team_1') or ''} vs {event.get('participant_2') or event.get('team_2') or ''}")
+            if key: live_by_match[key]=event
+            pair_key=_participant_pair_key(event)
+            if pair_key: live_by_pair.setdefault(pair_key,[]).append(event)
+            if len(live_samples)<3:
+                live_samples.append({"event_id":event.get("event_id"),"match":event.get("match"),"participant_1":event.get("participant_1"),"participant_2":event.get("participant_2"),"source":live_source})
+    except Exception as exc:
+        # Keep the failure diagnosable. We intentionally do not reuse old prices
+        # here; an unavailable refresh must fail closed rather than make a stale
+        # quote look fresh.
+        live_samples.append({"refresh_error":str(exc)[:240]})
     if not live_by_id and not live_by_match:
         return rows,{"live_events":0,"live_match_keys":0,"live_pair_keys":0,"matched_by_id":0,"matched_by_match":0,"matched_by_participant_time":0,"unmatched":len(rows),"samples":live_samples,"market_samples":[(e.get("markets") or [])[:3] for e in live_samples if isinstance(e,dict)]}
     out=[]
@@ -341,18 +354,7 @@ def virtual_candidates(now):
     # Use that fresh exact-line snapshot as the price authority here; a second
     # network call can expose a different virtual ladder and can also stall the
     # Builder without adding evidence.
-    refreshed_rows=list(model_rows) if isinstance(model_rows,list) else []
-    quote_diag={
-        "live_events":len(refreshed_rows),
-        "live_match_keys":len(refreshed_rows),
-        "live_pair_keys":len(refreshed_rows),
-        "matched_by_id":len(refreshed_rows),
-        "matched_by_match":0,
-        "matched_by_participant_time":0,
-        "unmatched":0,
-        "samples":[],
-        "source":"fresh_unified_sportybet_snapshot"
-    }
+    refreshed_rows, quote_diag = refresh_virtual_quotes(model_rows if isinstance(model_rows,list) else [])
 
     def row_key(row):
         try:
@@ -453,6 +455,14 @@ def virtual_candidates(now):
     diagnostics["current_product_counts"]={}
     diagnostics["current_market_line_counts"]={}
     diagnostics["price_snapshot_sources"]={}
+    diagnostics["live_quote_refresh"]={
+        "source":quote_diag.get("source") if isinstance(quote_diag,dict) else None,
+        "live_events":quote_diag.get("live_events",0) if isinstance(quote_diag,dict) else 0,
+        "matched_by_id":quote_diag.get("matched_by_id",0) if isinstance(quote_diag,dict) else 0,
+        "matched_by_match":quote_diag.get("matched_by_match",0) if isinstance(quote_diag,dict) else 0,
+        "matched_by_participant_time":quote_diag.get("matched_by_participant_time",0) if isinstance(quote_diag,dict) else 0,
+        "unmatched":quote_diag.get("unmatched",0) if isinstance(quote_diag,dict) else 0
+    }
 
     for event in merged:
         if not isinstance(event,dict):
@@ -531,7 +541,7 @@ def virtual_candidates(now):
     diagnostics["quote_join"]=quote_diag
     diagnostics["stale_unified_prices_used"]=False
     diagnostics["current_feed_is_price_authority"]=True
-    diagnostics["price_authority"]="fresh SportyBet snapshot on Unified Upcoming Board; direct exact-event refresh overrides when an exact line matches"
+    diagnostics["price_authority"]="fresh SportyBet snapshot collected in-process immediately before Builder qualification"
     return out,diagnostics
 
 def market_rows(x):
