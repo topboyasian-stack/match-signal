@@ -711,6 +711,7 @@ def make_leg(x):
         "participant_history":participant_history,
         "participant_history_bonus":round(history_bonus,6),
         "selection_score":round(selection_score,6),
+        "product":x.get("product"),
         "edge_percent":round(edge*100,2) if edge is not None else None,
         "odds_fresh":bool(age is not None and age<=MAX_ODDS_AGE_SECONDS),
         "market_odds_age_seconds":round(age,1) if age is not None else None,
@@ -772,7 +773,14 @@ def build_value_batches(candidates):
     the current strongest validated research lane.
     """
     built=[make_leg(x) for x in candidates]
-    remaining=[x for x in built if x.get("builder_eligible")]
+    eligible_all=[x for x in built if x.get("builder_eligible")]
+    # vFootball is the primary research lane. Use it exclusively while there
+    # are enough qualified legs to form the requested batch set; only fall back
+    # to other Virtual products when vFootball cannot supply another batch.
+    vfootball_pool=[x for x in eligible_all if str(x.get("product") or "")=="vfootball"]
+    other_pool=[x for x in eligible_all if str(x.get("product") or "")!="vfootball"]
+    remaining=vfootball_pool if len(vfootball_pool)>=2 else eligible_all
+    fallback_pool=other_pool
     batches=[]
     used_events=set()
     used_leg_keys=set()
@@ -832,6 +840,12 @@ def build_value_batches(candidates):
                 if combined>=MIN_COMBINED_ODDS or len(batch)>=MAX_LEGS:
                     break
         if not batch or combined<MIN_COMBINED_ODDS:
+            # Exhaust the primary vFootball lane before opening other Virtual
+            # products. This preserves the intended research priority.
+            if remaining is vfootball_pool and fallback_pool:
+                remaining=fallback_pool
+                fallback_pool=[]
+                continue
             break
 
         metrics=_batch_metrics(batch)
@@ -850,6 +864,7 @@ def build_value_batches(candidates):
             "avg_model_probability":metrics["avg_model_probability"],
             "avg_model_edge_percent":metrics["avg_model_edge_percent"],
             "products":products,
+            "primary_lane": "vfootball" if any(str(x.get("product") or "")=="vfootball" for x in batch) else "fallback_virtual",
             "paper_only":True,
             "real_money_execution":False,
             "correlation_policy":"same-event prevented; participant reuse used only as fallback if strict disjoint construction cannot reach 4.00+"
@@ -864,6 +879,7 @@ def build_value_batches(candidates):
     batches.sort(key=lambda b:(b.get("combined_model_rating",0),b.get("avg_model_edge_percent",0),b.get("combined_odds",0)),reverse=True)
     for i,b in enumerate(batches,1):
         b["rank"]=i
+        b["batch_id"]=f"BATCH-{i:02d}"
         b["rank_pending"]=False
         b["label"]=f"BATCH-{i:02d} · Combined Model Rating {float(b.get('combined_model_rating') or 0):.1f}/100"
     return batches,built,{
