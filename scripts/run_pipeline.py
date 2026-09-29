@@ -319,7 +319,7 @@ normalise = ns["normalise"]
 def fallback_football_events_for_date(league, date):
     if league != "esp.1":
         return []
-    url = f"https://www.sofascore.com/api/v1/sport/football/scheduled-events/{date:%Y-%m-%d}"
+    url = f"https://api.sofascore.com/api/v1/sport/football/scheduled-events/{date:%Y-%m-%d}"
     response = requests.get(
         url,
         headers={"User-Agent": "MatchSignal/3.0 (+https://github.com/topboyasian-stack/match-signal)"},
