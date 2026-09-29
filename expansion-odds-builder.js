@@ -15,6 +15,112 @@
     return null;
   }
   var liveStates = {};
+  var bookingMemory = {};
+
+  function bookingFingerprint(batch) {
+    var legs=Array.isArray(batch&&batch.legs)?batch.legs:[];
+    return legs.map(function(l){
+      return [String(l.event_id||''),String(l.market||''),l.line==null?'':String(l.line),String(l.pick||'')].join('|');
+    }).join('||');
+  }
+  function bookingHash(value) {
+    var s=String(value||''),h=2166136261;
+    for(var i=0;i<s.length;i++){h^=s.charCodeAt(i);h+=((h<<1)+(h<<4)+(h<<7)+(h<<8)+(h<<24));}
+    return ('00000000'+(h>>>0).toString(16)).slice(-8);
+  }
+  function bookingKey(batch) {
+    return 'match-signal:sportybet-booking:'+String(batch&&batch.batch_id||'')+':'+bookingHash(bookingFingerprint(batch));
+  }
+  function readBookingState(batch) {
+    var key=bookingKey(batch);
+    if(bookingMemory[key])return bookingMemory[key];
+    try {
+      var raw=localStorage.getItem(key);
+      if(raw){
+        var parsed=JSON.parse(raw);
+        if(parsed&&typeof parsed==='object'){bookingMemory[key]=parsed;return parsed;}
+      }
+    } catch(e) {}
+    return null;
+  }
+  function writeBookingState(batch,state) {
+    var key=bookingKey(batch),value=state||{};
+    bookingMemory[key]=value;
+    try{localStorage.setItem(key,JSON.stringify(value));}catch(e){}
+    return value;
+  }
+  function bookingStillValid(state) {
+    if(!state||!state.booking_code)return false;
+    var expiry=state.expires_at?dateOf(state.expires_at):null;
+    if(expiry)return expiry.getTime()>Date.now()+15000;
+    var created=state.generated_at?dateOf(state.generated_at):null;
+    return !!created && (created.getTime()+10*60*1000)>Date.now();
+  }
+  function bookingPanelHtml(batch) {
+    var state=readBookingState(batch);
+    var status=state&&state.error?'error':(state&&state.booking_code&&bookingStillValid(state)?'ready':'loading');
+    var code=state&&state.booking_code?state.booking_code:'';
+    var expiry=state&&state.expires_at?dateOf(state.expires_at):null;
+    var text=state&&state.error?String(state.error):(status==='ready'?'Copy the code, open SportyBet, and confirm the live slip before placing it.':'Preparing a live SportyBet booking code from the current ticket selections…');
+    var id=esc(String(batch&&batch.batch_id||'').replace(/[^A-Za-z0-9_-]/g,''));
+    return '<div class="booking-panel" data-booking-panel="'+id+'">'+
+      '<div class="booking-panel-head"><div><b>SportyBet Booking Code</b><div class="sub">Prepared from this exact Builder ticket. Match Signal only creates the betslip/share code; it does not stake or place the wager.</div></div>'+
+      '<span class="booking-status '+status+'">'+(status==='ready'?'READY':status==='error'?'REFRESH NEEDED':'PREPARING')+'</span></div>'+
+      '<div class="booking-code-wrap"><code class="booking-code" data-booking-code>'+esc(code||'Waiting…')+'</code>'+
+      '<div class="booking-actions"><button type="button" class="booking-btn primary" data-booking-copy="'+id+'" '+(code?'':'disabled')+'>Copy code</button>'+
+      '<a class="booking-btn link '+(code?'':'disabled')+'" data-booking-open="'+id+'" href="'+(state&&state.share_url?esc(state.share_url):'#')+'" target="_blank" rel="noopener" '+(code?'':'aria-disabled="true" tabindex="-1"':'')+'>Open SportyBet</a>'+
+      '<button type="button" class="booking-btn" data-booking-refresh="'+id+'">Refresh code</button></div></div>'+
+      '<div class="booking-message">'+esc(text)+(expiry?' · Valid until '+esc(local(expiry.toISOString())):'')+'</div></div>';
+  }
+  function findBatchById(batchId) {
+    var batches=window.__matchSignalOddsBuilderBatches||[];
+    for(var i=0;i<batches.length;i++)if(String(batches[i]&&batches[i].batch_id||'')===String(batchId||''))return batches[i];
+    return null;
+  }
+  function updateBookingPanel(batch,state) {
+    var id=String(batch&&batch.batch_id||'').replace(/[^A-Za-z0-9_-]/g,'');
+    var panel=document.querySelector('[data-booking-panel="'+id+'"]');
+    if(!panel)return;
+    var live=state||readBookingState(batch)||{},ready=!!(live.booking_code&&bookingStillValid(live)),error=!!live.error;
+    var statusEl=panel.querySelector('.booking-status'),codeEl=panel.querySelector('[data-booking-code]'),msgEl=panel.querySelector('.booking-message'),copy=panel.querySelector('[data-booking-copy]'),open=panel.querySelector('[data-booking-open]');
+    if(statusEl){statusEl.className='booking-status '+(error?'error':ready?'ready':'loading');statusEl.textContent=ready?'READY':error?'REFRESH NEEDED':'PREPARING';}
+    if(codeEl)codeEl.textContent=ready?live.booking_code:(error?'Unavailable':'Preparing…');
+    if(copy)copy.disabled=!ready;
+    if(open){
+      open.classList.toggle('disabled',!ready);open.setAttribute('aria-disabled',ready?'false':'true');
+      if(ready){open.removeAttribute('tabindex');open.href=live.share_url||('https://www.sportybet.com/ng/?c=ng&shareCode='+encodeURIComponent(live.booking_code));}
+      else{open.href='#';open.setAttribute('tabindex','-1');}
+    }
+    if(msgEl){
+      var msg=live.error||(ready?'Copy the code, open SportyBet, and confirm the live slip before placing it.':'Preparing a live SportyBet booking code from the current ticket…');
+      var ex=live.expires_at?dateOf(live.expires_at):null;if(ex)msg+=' · Valid until '+local(ex.toISOString());
+      msgEl.textContent=msg;
+    }
+  }
+  function delay(ms){return new Promise(function(resolve){setTimeout(resolve,ms);});}
+  function requestBookingCode(batch,force) {
+    if(!batch||!batch.batch_id)return Promise.resolve();
+    var current=readBookingState(batch);
+    if(!force&&current&&bookingStillValid(current)){updateBookingPanel(batch,current);return Promise.resolve(current);}
+    var loading={booking_code:'',generated_at:new Date().toISOString(),error:''};
+    writeBookingState(batch,loading);updateBookingPanel(batch,loading);
+    return fetch('./api/sportybet-booking',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({batch_id:batch.batch_id}),cache:'no-store'})
+      .then(function(r){return r.json().catch(function(){return {ok:false,error:'Invalid booking response'};}).then(function(payload){
+        if(!r.ok||!payload.ok)throw new Error(String(payload&&payload.message||payload&&payload.error||('HTTP '+r.status)));
+        var ready={booking_code:String(payload.booking_code||''),share_url:String(payload.share_url||''),expires_at:payload.expires_at||null,generated_at:new Date().toISOString(),selection_count:Number(payload.selection_count||0)};
+        writeBookingState(batch,ready);updateBookingPanel(batch,ready);return ready;
+      });})
+      .catch(function(err){
+        var failed={booking_code:'',generated_at:new Date().toISOString(),error:String(err&&err.message||err)};
+        writeBookingState(batch,failed);updateBookingPanel(batch,failed);return failed;
+      });
+  }
+  function ensureBookingCodes(batches) {
+    var list=Array.isArray(batches)?batches:[];window.__matchSignalOddsBuilderBatches=list;
+    var chain=Promise.resolve();
+    list.forEach(function(batch){chain=chain.then(function(){return requestBookingCode(batch,false);}).then(function(){return delay(300);});});
+    return chain;
+  }
   function liveSettlement(l) {
     if (!l || !l.event_id) return null;
     var x = liveStates[String(l.event_id)];
@@ -163,6 +269,7 @@
   function render(data, tracker) {
     var target=document.getElementById('oddsBuilder'); if(!target)return;
     var batches=Array.isArray(data.batches)?data.batches:[];
+    window.__matchSignalOddsBuilderBatches=batches;
     var settledLegs=Array.isArray(data.settled_legs)?data.settled_legs:[];
     var sports=[], batchCount=batches.length;
     batches.forEach(function(b){
@@ -207,6 +314,7 @@
       var laneText=b.primary_lane==='vfootball'?'vFootball priority lane':'fallback virtual lane';
       var batchNum=String(idx+1).padStart(2,'0');
       var body=legs.map(function(l,i){return legCard(l,i,idx);}).join('');
+      var bookingPanel=bookingPanelHtml(b);
       return [
         '<details class="batch-card" '+(idx===0?'open':'')+'>',
         '<summary class="batch-summary">',
@@ -223,6 +331,7 @@
         '<div><span>Combined SportyBet odds</span><b>'+esc(oddsText)+'</b></div>',
         '</div>',
         '<div class="sub">The joint probability is an independence proxy, not a guarantee of the whole ticket winning. Prices shown are the current SportyBet snapshot used by the Builder.</div>',
+        bookingPanel,
         '<div class="grid" style="margin-top:14px">'+(body||'<div class="empty">No legs in this batch.</div>')+'</div>',
         '</details>'
       ].join('');
@@ -262,12 +371,27 @@
     ]).then(function(results){
       var data=results[0],tracker=results[1];
       var legs=Array.isArray(data.qualified_legs)?data.qualified_legs:[];
-      return refreshLiveStatuses(legs).then(function(){render(data,tracker);});
+      return refreshLiveStatuses(legs).then(function(){render(data,tracker);}).then(function(){return ensureBookingCodes(Array.isArray(data.batches)?data.batches:[]);});
     }).catch(function(e){target.innerHTML='<div class="empty">Accumulator data unavailable: '+esc(e.message)+'</div>';});
   }
   function boot(){
     if(!document.getElementById('odds-builder-result-style')){
-      var s=document.createElement('style');s.id='odds-builder-result-style';s.textContent='.batch-list{display:grid;gap:14px}.batch-card{border:1px solid rgba(255,255,255,.1);border-radius:16px;background:#0c121c;overflow:hidden}.batch-summary{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:18px 20px;cursor:pointer;list-style:none}.batch-summary::-webkit-details-marker{display:none}.batch-kicker{display:block;font-size:11px;letter-spacing:.12em;text-transform:uppercase;opacity:.7;margin-bottom:4px}.batch-summary strong{display:block;font-size:16px}.batch-summary small{display:block;opacity:.72;margin-top:5px}.batch-odds{font-size:22px;font-weight:900;white-space:nowrap}.batch-metrics{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;padding:0 20px 14px}.batch-metrics>div{padding:10px 12px;border-radius:10px;background:rgba(255,255,255,.035)}.batch-metrics span{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.08em;opacity:.65}.batch-metrics b{display:block;margin-top:4px;font-size:15px}.batch-card>.sub{padding:0 20px 14px}.batch-card>.grid{padding:0 20px 20px}@media(max-width:900px){.batch-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}};\'.timer.finished-correct{border-color:#35d49a;background:#06251a}.timer.finished-correct .timerValue{color:#35d49a}.timer.finished-wrong{border-color:#ff7474;background:#2a0d12}.timer.finished-wrong .timerValue{color:#ff7474}.timer.finished{border-color:#8f98b8}.timer.finished .timerValue{color:#eef1fb}.ticket-track{margin-top:18px;padding:18px;border:1px solid rgba(255,255,255,.1);border-radius:16px;background:#0c121c}.ticket-track-head{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}.ticket-track-stats{display:flex;gap:8px;flex-wrap:wrap}.ticket-track-stats span{padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.04);font-size:11px}.ticket-list{display:grid;gap:8px;margin-top:14px}.ticket-row{display:flex;justify-content:space-between;gap:16px;align-items:center;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.025)}.ticket-row.ticket-lost{border-color:rgba(255,116,116,.38)}.ticket-row.ticket-won{border-color:rgba(53,208,127,.38)}.ticket-main strong{display:block;margin-top:3px}.ticket-main small,.ticket-progress{font-size:11px;opacity:.72}.ticket-id{font-size:10px;letter-spacing:.08em;opacity:.65}.ticket-status.won,.ticket-row.ticket-won .ticket-progress{color:#35d49a}.ticket-status.lost,.ticket-row.ticket-lost .ticket-progress{color:#ff7474}.ticket-status.pending{color:#f3c76b}.ticket-progress{text-align:right}.settled-card{border-color:#35d49a;background:#092018}.settled-card .meta{color:#35d49a}.result-badge{font-weight:900;letter-spacing:.02em}.result-badge.won,.won-text{color:#35d49a}.result-badge.lost,.lost-text{color:#ff7474}';;document.head.appendChild(s);
+      var s=document.createElement('style');s.id='odds-builder-result-style';s.textContent='.batch-list{display:grid;gap:14px}.batch-card{border:1px solid rgba(255,255,255,.1);border-radius:16px;background:#0c121c;overflow:hidden}.batch-summary{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:18px 20px;cursor:pointer;list-style:none}.batch-summary::-webkit-details-marker{display:none}.batch-kicker{display:block;font-size:11px;letter-spacing:.12em;text-transform:uppercase;opacity:.7;margin-bottom:4px}.batch-summary strong{display:block;font-size:16px}.batch-summary small{display:block;opacity:.72;margin-top:5px}.batch-odds{font-size:22px;font-weight:900;white-space:nowrap}.batch-metrics{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;padding:0 20px 14px}.batch-metrics>div{padding:10px 12px;border-radius:10px;background:rgba(255,255,255,.035)}.batch-metrics span{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.08em;opacity:.65}.batch-metrics b{display:block;margin-top:4px;font-size:15px}.batch-card>.sub{padding:0 20px 14px}.batch-card>.grid{padding:0 20px 20px}@media(max-width:900px){.batch-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}};\'.timer.finished-correct{border-color:#35d49a;background:#06251a}.timer.finished-correct .timerValue{color:#35d49a}.timer.finished-wrong{border-color:#ff7474;background:#2a0d12}.timer.finished-wrong .timerValue{color:#ff7474}.timer.finished{border-color:#8f98b8}.timer.finished .timerValue{color:#eef1fb}.ticket-track{margin-top:18px;padding:18px;border:1px solid rgba(255,255,255,.1);border-radius:16px;background:#0c121c}.ticket-track-head{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}.ticket-track-stats{display:flex;gap:8px;flex-wrap:wrap}.ticket-track-stats span{padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.04);font-size:11px}.ticket-list{display:grid;gap:8px;margin-top:14px}.ticket-row{display:flex;justify-content:space-between;gap:16px;align-items:center;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.025)}.ticket-row.ticket-lost{border-color:rgba(255,116,116,.38)}.ticket-row.ticket-won{border-color:rgba(53,208,127,.38)}.ticket-main strong{display:block;margin-top:3px}.ticket-main small,.ticket-progress{font-size:11px;opacity:.72}.ticket-id{font-size:10px;letter-spacing:.08em;opacity:.65}.ticket-status.won,.ticket-row.ticket-won .ticket-progress{color:#35d49a}.ticket-status.lost,.ticket-row.ticket-lost .ticket-progress{color:#ff7474}.ticket-status.pending{color:#f3c76b}.ticket-progress{text-align:right}.settled-card{border-color:#35d49a;background:#092018}.settled-card .meta{color:#35d49a}.result-badge{font-weight:900;letter-spacing:.02em}.result-badge.won,.won-text{color:#35d49a}.result-badge.lost,.lost-text{color:#ff7474}.booking-panel{margin:16px 20px 0;padding:14px 16px;border:1px solid rgba(255,255,255,.1);border-radius:14px;background:rgba(255,255,255,.025)}.booking-panel-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}.booking-panel-head b{font-size:13px}.booking-status{font-size:10px;font-weight:900;letter-spacing:.08em;white-space:nowrap;padding:6px 8px;border-radius:999px}.booking-status.ready{color:#35d49a;background:rgba(53,212,154,.1)}.booking-status.error{color:#ff7474;background:rgba(255,116,116,.1)}.booking-status.loading{color:#f3c76b;background:rgba(243,199,107,.1)}.booking-code-wrap{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px}.booking-code{display:block;min-width:170px;padding:11px 13px;border-radius:10px;background:#070b11;border:1px solid rgba(255,255,255,.08);font-size:18px;font-weight:900;letter-spacing:.12em}.booking-actions{display:flex;gap:8px;flex-wrap:wrap}.booking-btn{border:1px solid rgba(255,255,255,.12);border-radius:9px;background:rgba(255,255,255,.05);color:inherit;padding:9px 11px;font:inherit;font-size:11px;font-weight:800;cursor:pointer;text-decoration:none}.booking-btn.primary{background:#eef1fb;color:#071018}.booking-btn:disabled,.booking-btn.disabled{opacity:.4;pointer-events:none;cursor:not-allowed}.booking-message{margin-top:8px;font-size:10px;opacity:.7}@media(max-width:700px){.booking-panel-head{flex-direction:column}.booking-code{width:100%;min-width:0;text-align:center}.booking-actions{width:100%}.booking-btn{flex:1;text-align:center}}';;document.head.appendChild(s);
+    }
+    if(!window.__matchSignalBookingHandlers){
+      window.__matchSignalBookingHandlers=true;
+      document.addEventListener('click',function(e){
+        var copy=e.target.closest&&e.target.closest('[data-booking-copy]');
+        if(copy){
+          var batch=findBatchById(copy.getAttribute('data-booking-copy')),state=batch?readBookingState(batch):null;
+          if(state&&state.booking_code&&navigator.clipboard){
+            navigator.clipboard.writeText(state.booking_code).then(function(){var old=copy.textContent;copy.textContent='Copied';setTimeout(function(){copy.textContent=old;},1200);}).catch(function(){});
+          }
+          return;
+        }
+        var refresh=e.target.closest&&e.target.closest('[data-booking-refresh]');
+        if(refresh){var b=findBatchById(refresh.getAttribute('data-booking-refresh'));if(b)requestBookingCode(b,true);}
+      });
     }
     load();window.setInterval(load,60000);window.setInterval(updateTimers,1000);
   }
