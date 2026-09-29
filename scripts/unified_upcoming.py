@@ -397,6 +397,7 @@ def build_virtual_events(history, lifecycle, eligibility):
             # efootball_adriatic/zoom remain preserved in the research collector
             # but are retired from forward prediction generation until they earn
             # settled walk-forward evidence.
+            continue
         competition=str(e.get("competition") or e.get("tournament") or "Virtual")
         home=str(e.get("participant_1") or e.get("team_1") or e.get("home") or "")
         away=str(e.get("participant_2") or e.get("team_2") or e.get("away") or "")
