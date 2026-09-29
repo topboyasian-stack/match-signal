@@ -4,8 +4,6 @@ on:
   workflow_run:
     workflows:
       - "Match Signal Live Prediction Pipeline"
-      - "Match Signal Darts-X Research Engine"
-      - "Match Signal Table Tennis-X Research Engine"
       - "Match Signal Tennis History Reconciliation"
       - "Match Signal Result Settlement"
       - "Match Signal Virtual Lab Collector"
@@ -18,6 +16,7 @@ on:
     branches: [main]
     paths:
       - 'scripts/unified_upcoming.py'
+      - 'scripts/unified_upcoming_cleanup.py'
       - 'scripts/system_health_audit.py'
       - 'data/virtual_lab_participant_lifecycle.json'
       - 'index.html'
@@ -55,9 +54,11 @@ jobs:
           git fetch origin main
           git reset --hard origin/main
       - name: Compile unified engines
-        run: python -m py_compile scripts/unified_upcoming.py scripts/system_health_audit.py scripts/predict_today.py
+        run: python -m py_compile scripts/unified_upcoming.py scripts/unified_upcoming_cleanup.py scripts/system_health_audit.py scripts/predict_today.py
       - name: Build unified upcoming board
         run: python scripts/unified_upcoming.py
+      - name: Remove retired sports from the user-facing board
+        run: python scripts/unified_upcoming_cleanup.py
       - name: Audit complete system
         run: python scripts/system_health_audit.py
       - name: Publish unified board and health
@@ -76,6 +77,7 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
             python scripts/unified_upcoming.py
+            python scripts/unified_upcoming_cleanup.py
             python scripts/system_health_audit.py
             git add data/unified_upcoming.json data/system_health.json
             if git diff --cached --quiet; then exit 0; fi
