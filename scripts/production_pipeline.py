@@ -18,9 +18,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
 FEED = DATA / "predictions.json"
-CORE_LEAGUES = {"EPL", "La Liga", "Bundesliga", "Serie A", "Ligue 1", "Champions League", "MLS", "Primeira Liga", "Eredivisie"}
-EXPERIMENTAL_LEAGUES = {"Eredivisie", "Saudi Pro League", "England Amateur - U21 Professional Development League"}
-TENNIS_LEAGUES = {"ATP", "WTA"}
+CORE_LEAGUES = {"La Liga", "Bundesliga", "Ligue 1", "Champions League"}
+EXPERIMENTAL_LEAGUES = {"Eredivisie", "England Amateur - U21 Professional Development League"}
+TENNIS_LEAGUES = {"ATP"}
+RETIRED_LEAGUES = {"EPL", "MLS", "Primeira Liga", "Serie A", "Saudi Pro League"}
+RETIRED_TENNIS = {"WTA"}
 
 
 def load_rows():
@@ -65,7 +67,12 @@ def merge_unique(rows):
 def main():
     before = load_rows()
     now = datetime.now(timezone.utc)
-    preserved = [r for r in before if valid_active(r, now)]
+    preserved = [
+        r for r in before
+        if valid_active(r, now)
+        and str(r.get("league") or "") not in RETIRED_LEAGUES
+        and not (str(r.get("sport") or "").lower() == "tennis" and str(r.get("league") or "") in RETIRED_TENNIS)
+    ]
 
     print("Production transaction: running canonical Football + ATP/WTA engine")
     runpy.run_path(str(ROOT / "scripts" / "run_pipeline.py"), run_name="__main__")
@@ -100,15 +107,20 @@ def main():
 
     FEED.write_text(json.dumps(generated, indent=2, ensure_ascii=False), encoding="utf-8")
 
+    generated = [
+        r for r in generated
+        if str(r.get("league") or "") not in RETIRED_LEAGUES
+        and not (str(r.get("sport") or "").lower() == "tennis" and str(r.get("league") or "") in RETIRED_TENNIS)
+    ]
     summary = {
         "final_rows": len(generated),
         "core_football_rows": sum(r.get("league") in CORE_LEAGUES for r in generated),
         "tennis_rows": sum(r.get("league") in TENNIS_LEAGUES for r in generated),
         "ere_divisie_rows": sum(r.get("league") == "Eredivisie" for r in generated),
-        "saudi_rows": sum(r.get("league") == "Saudi Pro League" for r in generated),
+        "saudi_rows": 0,
         "pdl_rows": sum(r.get("league") == "England Amateur - U21 Professional Development League" for r in generated),
-        "preserved_rows": len([r for r in generated if r.get("league") in EXPERIMENTAL_LEAGUES]),
-        "transaction_policy": "NO_SPORT_ERASURE_ON_TRANSIENT_SOURCE_FAILURE",
+        "retired_rows_removed": len([r for r in before if r.get("league") in RETIRED_LEAGUES or (str(r.get("sport") or "").lower()=="tennis" and r.get("league") in RETIRED_TENNIS)]),
+        "transaction_policy": "NO_SPORT_ERASURE_ON_TRANSIENT_SOURCE_FAILURE; EXPLICIT_RETIRED_SCOPE",
     }
     print(json.dumps(summary, indent=2))
     if summary["core_football_rows"] == 0:
