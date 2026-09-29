@@ -27,11 +27,15 @@ function lineFromMarket(market) {
 }
 
 function normalizeEvent(event, tournament) {
+  const rawStart = Number(event?.estimateStartTime || 0);
+  const estimateStartTime = Number.isFinite(rawStart) && rawStart > 0
+    ? (rawStart < 100000000000 ? rawStart * 1000 : rawStart)
+    : 0;
   return {
     eventId: String(event?.eventId || ''),
     homeTeamName: String(event?.homeTeamName || ''),
     awayTeamName: String(event?.awayTeamName || ''),
-    estimateStartTime: Number(event?.estimateStartTime || 0),
+    estimateStartTime,
     matchStatus: String(event?.matchStatus || 'Not start'),
     tournament: String(tournament?.name || ''),
     markets: Array.isArray(event?.markets) ? event.markets : []
@@ -189,8 +193,10 @@ function pickVirtualSide(leg) {
 function isOpenEvent(event) {
   const start = Number(event?.estimateStartTime || 0);
   const status = String(event?.matchStatus || '').toLowerCase();
+  const closed = /live|running|playing|in.?play|started|finish|ended|final|completed|settled|closed/.test(status);
+  if (closed) return false;
   if (start && start <= Date.now()) return false;
-  return !status || /not start|not started|scheduled|prematch/.test(status);
+  return !status || /not start|not started|scheduled|prematch|waiting/.test(status);
 }
 
 function lineFromLeg(leg) {
@@ -388,10 +394,11 @@ async function handlePost(context) {
         ok: false,
         error: 'NO_AVAILABLE_SELECTIONS',
         batch_id: batchId,
-        message: 'All selections in this Builder batch are now unavailable, suspended, started, or no longer mappable on SportyBet.',
+        message: 'No Builder selections could be mapped to a currently open SportyBet event/market.',
         initial_selection_count: legs.length,
         selection_count: 0,
         excluded_count: preExcluded.length,
+        unavailable_count: preExcluded.length,
         validation
       }, 409);
     }
