@@ -479,6 +479,25 @@ def build_virtual_events(history, lifecycle, eligibility):
                     qualification_status="RAW_COMPETITION_GATE_PENDING"
                 else:
                     qualification_status="MODEL_SCOPE_GATE_PENDING"
+            elif product=="vfootball":
+                # vFootball has its own large untouched O/U evidence base and
+                # should be eligible for the Builder on the same validated
+                # product+competition+line+price gates rather than being
+                # permanently left as a research-only projection.
+                if not base_model_gate:
+                    qualification_status="BASE_MODEL_GATE_PENDING"
+                elif not active_line or not model_line:
+                    qualification_status="MODEL_LINE_SCOPE_GATE_PENDING"
+                elif edge is None:
+                    qualification_status="MARKET_EDGE_PENDING"
+                elif edge<0.02:
+                    qualification_status="EDGE_BELOW_2PCT"
+                elif chosen_model<0.65:
+                    qualification_status="MODEL_PROBABILITY_BELOW_0_65"
+                elif active_comp and model_comp:
+                    qualification_status="BETTING_QUALIFIED_PAPER"
+                else:
+                    qualification_status="MODEL_SCOPE_GATE_PENDING"
             else:
                 qualification_status="RESEARCH_PROJECTION"
 
