@@ -63,12 +63,15 @@
     var expiry=state&&state.expires_at?dateOf(state.expires_at):null;
     var text=state&&state.error?String(state.error):(status==='ready'?'Copy the code, open SportyBet, and confirm the live slip before placing it.':'Preparing a live SportyBet booking code from the current ticket selections…');
     var id=esc(String(batch&&batch.batch_id||'').replace(/[^A-Za-z0-9_-]/g,''));
+    var share=state&&state.share_url?String(state.share_url):'#';
+    var openClass=code?'':' disabled';
+    var openAttrs=code?'':' aria-disabled="true" tabindex="-1"';
     return '<div class="booking-panel" data-booking-panel="'+id+'">'+
       '<div class="booking-panel-head"><div><b>SportyBet Booking Code</b><div class="sub">Prepared from this exact Builder ticket. Match Signal only creates the betslip/share code; it does not stake or place the wager.</div></div>'+
       '<span class="booking-status '+status+'">'+(status==='ready'?'READY':status==='error'?'REFRESH NEEDED':'PREPARING')+'</span></div>'+
       '<div class="booking-code-wrap"><code class="booking-code" data-booking-code>'+esc(code||'Waiting…')+'</code>'+
       '<div class="booking-actions"><button type="button" class="booking-btn primary" data-booking-copy="'+id+'" '+(code?'':'disabled')+'>Copy code</button>'+
-      '<a class="booking-btn link '+(code?'':'disabled')+'" data-booking-open="'+id+'" href="'+(state&&state.share_url?esc(state.share_url):'#')+'" target="_blank" rel="noopener" '+(code?'':'aria-disabled="true" tabindex="-1"':'')+'>Open SportyBet</a>'+
+      '<a class="booking-btn link'+openClass+'" data-booking-open="'+id+'" href="'+esc(share)+'" target="_blank" rel="noopener"'+openAttrs+'>Open SportyBet</a>'+
       '<button type="button" class="booking-btn" data-booking-refresh="'+id+'">Refresh code</button></div></div>'+
       '<div class="booking-message">'+esc(text)+(expiry?' · Valid until '+esc(local(expiry.toISOString())):'')+'</div></div>';
   }
