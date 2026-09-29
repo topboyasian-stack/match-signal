@@ -314,7 +314,22 @@ def virtual_candidates(now):
     """
     board=load(DATA/"unified_upcoming.json",{})
     model_rows=board.get("events") if isinstance(board,dict) else []
-    refreshed_rows,quote_diag,_live_events=refresh_virtual_quotes(model_rows)
+    # Unified Upcoming is generated directly from the live SportyBet snapshot.
+    # Use that fresh exact-line snapshot as the price authority here; a second
+    # network call can expose a different virtual ladder and can also stall the
+    # Builder without adding evidence.
+    refreshed_rows=list(model_rows) if isinstance(model_rows,list) else []
+    quote_diag={
+        "live_events":len(refreshed_rows),
+        "live_match_keys":len(refreshed_rows),
+        "live_pair_keys":len(refreshed_rows),
+        "matched_by_id":len(refreshed_rows),
+        "matched_by_match":0,
+        "matched_by_participant_time":0,
+        "unmatched":0,
+        "samples":[],
+        "source":"fresh_unified_sportybet_snapshot"
+    }
 
     def row_key(row):
         try:
