@@ -161,7 +161,12 @@ def add(rows, row):
     # eFootball, retain an exact settled prediction match for the recent
     # settlement window so Upcoming can show the original selection with its
     # result instead of silently deleting it.
-    terminal=explicit_terminal(row) or eid in SETTLED_EVENT_IDS or match_key(row) in SETTLED_MATCH_KEYS
+    # Historical Virtual/eFootball event IDs can recur across sessions. Never hide a
+    # genuinely future fixture merely because its ID appeared in an older settlement
+    # ledger. Event-id/match-key settlement is only authoritative once kickoff has
+    # passed; explicit terminal provider state still wins immediately.
+    started_or_due = bool(start and start <= NOW)
+    terminal=explicit_terminal(row) or (started_or_due and (eid in SETTLED_EVENT_IDS or match_key(row) in SETTLED_MATCH_KEYS))
     if terminal:
         sr=settled_record(row) if str(row.get("sport") or "")=="virtual" else None
         if sr and sr.get("settled_at"):
@@ -254,6 +259,40 @@ def build_virtual_events(history, lifecycle, eligibility):
     """
     live=load("virtual_lab_live.json",{})
     events=live.get("events") if isinstance(live,dict) else []
+
+    # The Virtual/eFootball desk is active around the clock. Do not make the
+    # upcoming board wait for the separate 5-minute sync artifact when that
+    # artifact is stale or has temporarily lost eFootball rows. Refresh the same
+    # public SportyBet virtual connector in-process as a bounded fallback.
+    live_refresh_meta={"attempted":False,"refreshed":False,"reason":"fresh_artifact"}
+    try:
+        live_updated=dt(live.get("updated_at")) if isinstance(live,dict) else None
+        product_counts=live.get("product_counts") if isinstance(live,dict) else {}
+        needs_refresh=(live_updated is None or live_updated < NOW-timedelta(minutes=7)
+                       or int((product_counts or {}).get("efootball_gt") or 0)==0)
+        if needs_refresh:
+            from virtual_lab_sync import collect_proxy, collect_direct, compact
+            live_refresh_meta={"attempted":True,"refreshed":False,"reason":"stale_or_missing_efootball"}
+            try:
+                raw,source=collect_proxy()
+            except Exception:
+                raw,source=collect_direct()
+            refreshed=[]
+            for item in raw:
+                row=compact(item)
+                if row and row.get("event_id") and row.get("product") in {"efootball_gt","efootball_adriatic","vfootball","zoom","other"}:
+                    refreshed.append(row)
+            if refreshed:
+                refreshed.sort(key=lambda x:(x.get("start_time") or "",x.get("product") or "",x.get("event_id") or ""))
+                events=refreshed
+                counts={}
+                for row in refreshed:
+                    p=str(row.get("product") or "")
+                    counts[p]=counts.get(p,0)+1
+                live={"status":"LIVE","source":[source],"events_count":len(refreshed),"product_counts":counts,"events":refreshed,"updated_at":NOW.isoformat()}
+                live_refresh_meta={"attempted":True,"refreshed":True,"reason":"stale_or_missing_efootball","events":len(refreshed),"product_counts":counts}
+    except Exception as exc:
+        live_refresh_meta={"attempted":True,"refreshed":False,"reason":"refresh_failed","error":str(exc)}
     eligibility=eligibility if isinstance(eligibility,dict) else {}
     lifecycle_profiles={}
     if isinstance(lifecycle,dict):
@@ -486,7 +525,7 @@ def build_virtual_events(history, lifecycle, eligibility):
                 "paper_only":True,
                 "identity_verified":bool(home and away),
             })
-    return out, {"status":"base_model_policy_parity","historical_events":len(history or []),"base_model_gate":base_model_gate,"participant_enhancement_gate":participant_gate}
+    return out, {"status":"base_model_policy_parity","historical_events":len(history or []),"base_model_gate":base_model_gate,"participant_enhancement_gate":participant_gate,"live_refresh":live_refresh_meta}
 
 def main():
     rows=[]
