@@ -1,64 +1,66 @@
 {
-  "generated_at": "2026-09-29T13:59:26.250384+00:00",
-  "status": "FAIL",
-  "critical_issues": 2,
+  "generated_at": "2026-09-29T14:22:37.181077+00:00",
+  "status": "HEALTHY",
+  "critical_issues": 0,
   "warning_issues": 0,
   "info_issues": 1,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
       "status": "PASS",
-      "age_hours": 3.35,
+      "age_hours": 3.74,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.85,
+      "age_hours": 0.38,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 2.41,
+      "age_hours": 2.8,
       "threshold_hours": 4
     },
     {
-      "engine": "virtual_lab",
-      "status": "STALE",
-      "age_hours": 4.98,
-      "threshold_hours": 1
-    },
-    {
-      "engine": "darts_x",
-      "status": "STALE",
-      "age_hours": 2.37,
-      "threshold_hours": 2
-    },
-    {
-      "engine": "table_tennis_x",
+      "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 1.14,
-      "threshold_hours": 2
+      "age_hours": 0.4,
+      "threshold_hours": 0.5
     },
     {
       "engine": "unified_upcoming",
       "status": "PASS",
       "age_hours": 0.0,
       "threshold_hours": 2
+    },
+    {
+      "engine": "retired_engines",
+      "status": "INFO",
+      "lanes": {
+        "darts_x": {
+          "status": "RETIRED",
+          "artifact_at": "2026-09-29T11:36:59.150255+00:00"
+        },
+        "table_tennis_x": {
+          "status": "RETIRED",
+          "artifact_at": "2026-09-29T12:51:17.724293+00:00"
+        },
+        "basketball": {
+          "status": "RETIRED",
+          "provider": "http_429"
+        }
+      }
+    },
+    {
+      "engine": "virtual_lab_research_collector",
+      "status": "INFO",
+      "age_hours": 5.37,
+      "threshold_hours": 2
     }
   ],
   "issues": [
-    {
-      "code": "STALE_VIRTUAL_LAB",
-      "severity": "critical",
-      "detail": "updated_at age 4.98h exceeds 1h"
-    },
-    {
-      "code": "STALE_DARTS_X",
-      "severity": "critical",
-      "detail": "updated_at age 2.37h exceeds 2h"
-    },
     {
       "code": "SELECTION_GATE_EMPTY",
       "severity": "info",
