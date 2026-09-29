@@ -114,7 +114,13 @@ football_count=int(pipeline.get("football_count") or 0)
 tennis_count=int(pipeline.get("tennis_count") or 0)
 if prediction_count<=0:checks.append(issue("CORE_PREDICTIONS_EMPTY","critical","data/pipeline_status.json reports zero current predictions"))
 if football_count<=0:checks.append(issue("FOOTBALL_FEED_EMPTY","critical","No current football predictions are published"))
-if tennis_count<=0:checks.append(issue("TENNIS_FEED_EMPTY","warning","No current tennis predictions are published"))
+
+tennis_errors=[str(x) for x in (pipeline.get("errors") or []) if str(x).lower().startswith("tennis:")]
+tennis_no_actionable=bool(tennis_errors) and all("no actionable singles matches" in x.lower() for x in tennis_errors)
+if tennis_count<=0 and not tennis_no_actionable:
+    checks.append(issue("TENNIS_FEED_EMPTY","warning","No current tennis predictions are published"))
+elif tennis_count<=0 and tennis_no_actionable:
+    checks.append({"engine":"tennis_feed","status":"INFO","reason":"No actionable ATP singles matches in the current forward window; no feed failure detected"})
 
 virtual_products=virtual_live.get("product_counts") or {}
 for product in ("efootball_gt","vfootball"):
