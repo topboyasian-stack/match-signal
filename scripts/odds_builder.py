@@ -34,6 +34,7 @@ MIN_COMBINED_ODDS=4.0
 VIRTUAL_MIN_PROB=0.65
 PARTICIPANT_HISTORY_MIN_N=3
 PARTICIPANT_HISTORY_MAX_BONUS=0.035
+MAX_BATCHES=6
 
 
 def load(path, default):
@@ -612,6 +613,107 @@ def _participants(leg):
         if s and s not in out: out.append(s)
     return out
 
+def _batch_metrics(legs):
+    probs=[clamp(float(x.get("model_probability") or 0.0)) for x in legs if float(x.get("model_probability") or 0.0)>0]
+    edges=[float(x.get("model_edge") or 0.0) for x in legs]
+    if not probs:
+        return {"model_rating":0.0,"combined_model_probability":0.0,"avg_model_probability":0.0,"avg_model_edge_percent":0.0}
+    # Geometric mean keeps the rating on a 0-100 scale while reflecting every
+    # leg in the batch. It is a strength score, not a probability of winning
+    # the whole accumulator (that is reported separately as a naive product).
+    gm=math.exp(sum(math.log(p) for p in probs)/len(probs))
+    return {
+        "model_rating":round(gm*100.0,2),
+        "combined_model_probability":round(math.prod(probs),6),
+        "avg_model_probability":round(sum(probs)/len(probs)*100.0,2),
+        "avg_model_edge_percent":round(sum(edges)/len(edges)*100.0,2) if edges else 0.0,
+    }
+
+
+def build_value_batches(candidates):
+    """Create several disjoint 4.00+ paper batches from qualified live-priced legs.
+
+    Batches are deliberately disjoint so the user can compare separate tickets
+    instead of seeing one long accumulator repeatedly mixed with the same legs.
+    vFootball receives first priority because it currently has the strongest
+    validated O/U research lane; other qualified virtual/core legs remain
+    available as fallback when needed.
+    """
+    built=[make_leg(x) for x in candidates]
+    remaining=[x for x in built if x.get("builder_eligible")]
+    batches=[]
+    used_events=set()
+    used_leg_keys=set()
+    product_priority={"vfootball":3,"efootball_gt":2,"efootball_adriatic":1}
+
+    for _ in range(MAX_BATCHES):
+        if not remaining:
+            break
+        remaining.sort(key=lambda x:(
+            product_priority.get(str(x.get("product") or ""),0),
+            float(x.get("model_probability") or 0),
+            float(x.get("model_edge") or 0),
+            float(x.get("selection_score") or 0),
+            float(x.get("bookmaker_odds") or 0)
+        ),reverse=True)
+        batch=[]
+        batch_events=set()
+        batch_participants=set()
+        combined=1.0
+        for leg in remaining:
+            eid=str(leg.get("event_id") or "")
+            if eid and eid in batch_events:
+                continue
+            pids=set(_participants(leg))
+            if pids & batch_participants:
+                continue
+            batch.append(leg)
+            if eid: batch_events.add(eid)
+            batch_participants.update(pids)
+            combined*=float(leg.get("bookmaker_odds") or 1.0)
+            if combined>=MIN_COMBINED_ODDS or len(batch)>=MAX_LEGS:
+                break
+        if not batch or combined<MIN_COMBINED_ODDS:
+            break
+
+        metrics=_batch_metrics(batch)
+        products=sorted({str(x.get("product") or "") for x in batch if x.get("product")})
+        batch_id=f"BATCH-{len(batches)+1:02d}"
+        batches.append({
+            "batch_id":batch_id,
+            "label":f"{batch_id} · Model Rating {metrics['model_rating']:.1f}/100",
+            "rank_pending":True,
+            "legs":batch,
+            "leg_count":len(batch),
+            "combined_odds":round(combined,3),
+            "combined_model_rating":metrics["model_rating"],
+            "combined_model_probability":metrics["combined_model_probability"],
+            "avg_model_probability":metrics["avg_model_probability"],
+            "avg_model_edge_percent":metrics["avg_model_edge_percent"],
+            "products":products,
+            "paper_only":True,
+            "real_money_execution":False,
+        })
+        chosen_keys={(str(x.get("event_id") or ""),str(x.get("pick") or ""),str(x.get("line") or "")) for x in batch}
+        used_leg_keys.update(chosen_keys)
+        used_events.update(batch_events)
+        remaining=[x for x in remaining if (str(x.get("event_id") or ""),str(x.get("pick") or ""),str(x.get("line") or "")) not in used_leg_keys]
+
+    batches.sort(key=lambda b:(b.get("combined_model_rating",0),b.get("avg_model_edge_percent",0),b.get("combined_odds",0)),reverse=True)
+    for i,b in enumerate(batches,1):
+        b["rank"]=i
+        b["rank_pending"]=False
+        b["label"]=f"BATCH-{i:02d} · Model Rating {float(b.get('combined_model_rating') or 0):.1f}/100"
+    return batches,built,{
+        "batch_count":len(batches),
+        "max_batches":MAX_BATCHES,
+        "disjoint":True,
+        "min_combined_odds":MIN_COMBINED_ODDS,
+        "priority_product":"vfootball",
+        "used_unique_events":len(used_events),
+    }
+
+
 def select_value(candidates):
     built=[make_leg(x) for x in candidates]
     eligible=[x for x in built if x["builder_eligible"]]
@@ -673,7 +775,11 @@ def main():
     tennis=tennis_candidates(now)
     virtual,virtual_diag=virtual_candidates(now)
     core_pool=[] if upstream_blocked else (football+tennis)
-    selected,built,combined,selection_diag=select_value(core_pool+virtual)
+    batches,built,batch_diag=build_value_batches(core_pool+virtual)
+    primary=batches[0] if batches else None
+    selected=list(primary.get("legs") or []) if primary else []
+    combined=float(primary.get("combined_odds") or 1.0) if primary else 1.0
+    selection_diag={"participant_correlation_skips":0,"unique_participants":len({_p for leg in selected for _p in _participants(leg)}) if selected else 0}
     previous=load(OUTPUT,{})
     previous_ids={str(x) for x in (previous.get("builder_event_ids",[]) if isinstance(previous,dict) else []) if x}
     previous_ids.update(str(x.get("event_id")) for x in (previous.get("qualified_legs",[]) if isinstance(previous,dict) else []) if isinstance(x,dict) and x.get("event_id"))
@@ -705,6 +811,7 @@ def main():
             "virtual_gate_diagnostics":virtual_diag,
             "evaluated":len(built),
             "rejections":rejection_counts,"selection_diversity":selection_diag,
+            "batch_diagnostics":batch_diag,
             "participant_history_weighting":{
                 "enabled":True,
                 "min_n":PARTICIPANT_HISTORY_MIN_N,
@@ -726,6 +833,16 @@ def main():
         "best_available_legs":selected,
         "combined_odds_selected":round(combined,3) if selected else None,
         "naive_independence_hit_proxy":round(math.prod(float(x.get("model_probability") or 0) for x in selected),6) if selected else None,
+        "batch_count":len(batches),
+        "batch_policy":{
+            "min_combined_odds":MIN_COMBINED_ODDS,
+            "max_batches":MAX_BATCHES,
+            "disjoint_batches":True,
+            "ranking":"combined_model_rating descending, then average model edge, then combined odds",
+            "model_rating_definition":"100 × geometric mean of leg model probabilities",
+            "primary_lane":"vfootball"
+        },
+        "batches":batches,
         "rejected_candidates":[x for x in built if not x["real_money_eligible"]][:20],
         "settled_legs":recent_settled(load(HISTORY,[]),now,known),
         "builder_event_ids":sorted(known),"leg_count":len(selected),"sports_selected":sports,
@@ -734,7 +851,7 @@ def main():
         "reference_odds_type":"MODEL_FAIR_ODDS_NOT_BOOKMAKER_PRICE",
         "market_price_combined_odds":round(combined,3) if selected else None,
         "theme":{"name":"Midnight Graphite / Electric Cyan / Signal Green","accent":"#28D7E8","positive":"#35D07F","background":"#080D14"},
-        "notes":["V6 qualifies on market edge, not probability alone.","Missing or stale SportyBet prices produce NO_BET/REJECTED.","Model fair odds never overwrite bookmaker odds.","Accumulator size is allowed to fall below four and is never padded with weak selections.","Paper-only until V6 demonstrates stable calibration, edge and closing-line value over a meaningful sample."]
+        "notes":["V6 qualifies on market edge, not probability alone.","Missing or stale SportyBet prices produce NO_BET/REJECTED.","Model fair odds never overwrite bookmaker odds.","Each Builder batch is a separate disjoint paper ticket at 4.00+ combined bookmaker odds; batches are ranked by combined model rating.","vFootball is prioritized because its existing untouched O/U evidence is currently the strongest active research lane.","Paper-only until V6 demonstrates stable calibration, edge and closing-line value over a meaningful sample."]
     }
     OUTPUT.write_text(json.dumps(result,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
     print(json.dumps(result,indent=2))
