@@ -571,8 +571,8 @@ def main():
         live_meta={"attempted":False,"rows":0,"errors":[]}
 
     pdl_rows(rows,load("pdl_predictions.json",[]))
-    isolated_rows(rows,load("darts_upcoming.json",[]),"darts","DARTS-X-1.0")
-    isolated_rows(rows,load("table_tennis_upcoming.json",[]),"table_tennis","TABLE-TENNIS-X-1.0")
+    # Darts-X and Table Tennis-X are retired from the active desk. Their
+    # historical artifacts remain preserved, but no new rows enter Upcoming.
     core_rows(rows,load("basketball_predictions.json",[]),selection_map)
     virtual, virtual_meta=build_virtual_events(load_virtual_history(), lifecycle, load("virtual_lab_eligibility.json",{}))
     rows.extend(virtual)
@@ -601,7 +601,12 @@ def main():
         prev=by_id.get(key)
         if prev is None or rank.get(str(r.get("projection_tier")),0)>rank.get(str(prev.get("projection_tier")),0):
             by_id[key]=r
-    final=sorted(by_id.values(),key=lambda x:(str(x.get("start_time") or ""),str(x.get("sport") or "")))
+    retired_sports={"darts","table_tennis","basketball"}
+    retired_leagues={"EPL","MLS","Primeira Liga","Serie A","Saudi Pro League","WTA"}
+    final=[r for r in by_id.values()
+           if str(r.get("sport") or "").lower() not in retired_sports
+           and str(r.get("league") or "") not in retired_leagues]
+    final=sorted(final,key=lambda x:(str(x.get("start_time") or ""),str(x.get("sport") or "")))
     dates=defaultdict(int);sports=defaultdict(int)
     for r in final:
         dates[str(r.get("start_time") or "")[:10]]+=1
