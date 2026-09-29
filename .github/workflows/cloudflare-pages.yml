@@ -136,6 +136,8 @@ jobs:
           node --check virtual-lab-app.js
           node --check virtual-lab-confirmed-watch.js
           node --check expansion-odds-builder.js
+          node --check functions/api/sportybet-booking.js
+          node --check functions/api/sportybet-virtual.js
           node --check darts-app.js
           node --check table-tennis-app.js
           python -m py_compile scripts/darts_pipeline.py scripts/table_tennis_pipeline.py
@@ -313,6 +315,7 @@ jobs:
             const virtualEvents=Array.isArray(payload?.events)?payload.events:[];
             if (payload?.ok!==true) failures.push('/api/sportybet-virtual did not return ok=true');
             for (const [name,status] of Object.entries(payload?.source_status||{})) { if (status?.status==='ERROR') failures.push('/api/sportybet-virtual source '+name+' returned ERROR: '+(status.error||'unknown')); }
+            if (virtualEvents.length && !virtualEvents.every(e => Object.prototype.hasOwnProperty.call(e,'score'))) failures.push('/api/sportybet-virtual normalized events are missing score field');
             if (!virtualEvents.length) failures.push('/api/sportybet-virtual returned no eFootball/virtual events');
             const cutoff = Date.now() - 120000;
             const stale = virtualEvents.filter(e => e.start_time_ms && Number(e.start_time_ms) < cutoff);
@@ -362,6 +365,7 @@ jobs:
               if (!allowedStatuses.has(b?.status)) failures.push('/data/odds_builder.json status is '+b?.status);
               if (b?.status==='LIVE_VALUE_SET') {
                 if (!legs.length) failures.push('/data/odds_builder.json LIVE_VALUE_SET has no qualified paper legs');
+                if (!Array.isArray(b?.batches) || !b.batches.length) failures.push('/data/odds_builder.json LIVE_VALUE_SET has no batches');
                 if (!(combined>=4)) failures.push('/data/odds_builder.json LIVE_VALUE_SET combined odds below 4.00: '+combined);
               } else if (b?.status==='BELOW_4_TARGET_AVAILABLE') {
                 if (!Array.isArray(b?.best_available_legs) || !b.best_available_legs.length) failures.push('/data/odds_builder.json BELOW_4_TARGET_AVAILABLE has no best_available_legs');
