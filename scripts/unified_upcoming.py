@@ -578,7 +578,7 @@ def main():
 
     # Fallback/augmentation: some expansion artifacts are generated separately
     # from the core feed. Merge them without duplicating event IDs.
-    for name in ("ere_divisie_predictions.json","saudi_pro_league_predictions.json","nba_predictions.json"):
+    for name in ("ere_divisie_predictions.json",):
         for r in load(name,[]) if isinstance(load(name,[]),list) else []:
             x=dict(r);x.setdefault("source_engine",name.replace("_predictions.json",""))
             x.setdefault("projection_tier","research_model")
