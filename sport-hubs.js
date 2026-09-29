@@ -152,8 +152,7 @@ async function renderUnifiedBoard(){
         './data/predictions.json',
         './data/pdl_predictions.json',
         './data/ere_divisie_predictions.json',
-        './data/saudi_pro_league_predictions.json',
-        './data/nba_predictions.json'
+        './data/ere_divisie_predictions.json'
       ];
       const chunks=await Promise.all(sources.map(async url=>{
         try{
