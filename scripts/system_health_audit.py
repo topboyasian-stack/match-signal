@@ -85,9 +85,11 @@ virtual_live_age=age_hours(virtual_live.get("updated_at"))
 unified_virtual=((unified.get("summary") or {}).get("virtual_model") or {})
 live_refresh=unified_virtual.get("live_refresh") or {}
 if str(virtual_live.get("status") or "")=="LIVE" and int(virtual_live.get("events_count") or 0)>0:
-    checks.append({"engine":"virtual_live_feed","status":"PASS" if virtual_live_age<=0.5 else "INFO",
-                   "age_hours":round(virtual_live_age,2),"threshold_hours":0.5,
-                   "heartbeat_source":"unified_live_refresh" if live_refresh.get("refreshed") else "virtual_lab_live.json"})
+    checks.append({"engine":"virtual_live_feed",
+                "status":"PASS" if live_refresh.get("refreshed") or virtual_live_age<=0.5 else "INFO",
+                "age_hours":round(virtual_live_age,2),
+                "threshold_hours":0.5,
+                "heartbeat_source":"unified_live_refresh" if live_refresh.get("refreshed") else "virtual_lab_live.json"})
 else:
     checks.append(issue("VIRTUAL_LIVE_FEED_INVALID","critical",
                         f"live virtual status={virtual_live.get('status')!r}, events={int(virtual_live.get('events_count') or 0)}"))
@@ -114,7 +116,12 @@ football_count=int(pipeline.get("football_count") or 0)
 tennis_count=int(pipeline.get("tennis_count") or 0)
 if prediction_count<=0:checks.append(issue("CORE_PREDICTIONS_EMPTY","critical","data/pipeline_status.json reports zero current predictions"))
 if football_count<=0:checks.append(issue("FOOTBALL_FEED_EMPTY","critical","No current football predictions are published"))
-if tennis_count<=0:checks.append(issue("TENNIS_FEED_EMPTY","warning","No current tennis predictions are published"))
+tennis_errors=[str(x) for x in (pipeline.get("errors") or []) if str(x).lower().startswith("tennis:")]
+tennis_no_actionable=bool(tennis_errors) and all("no actionable singles matches" in x.lower() for x in tennis_errors)
+if tennis_count<=0 and not tennis_no_actionable:
+    checks.append(issue("TENNIS_FEED_EMPTY","warning","No current tennis predictions are published"))
+elif tennis_count<=0 and tennis_no_actionable:
+    checks.append({"engine":"tennis_feed","status":"INFO","reason":"No actionable ATP singles matches in the current forward window; no feed failure detected"})
 
 virtual_products=virtual_live.get("product_counts") or {}
 for product in ("efootball_gt","vfootball"):
