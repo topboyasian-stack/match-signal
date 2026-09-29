@@ -239,8 +239,29 @@ def refresh_ticket(ticket, rows, now):
         "void": sum(str(x.get("status")) == "VOID" for x in ticket.get("legs") or []),
         "pending": sum(str(x.get("status") or "PENDING") == "PENDING" for x in ticket.get("legs") or []),
     }
+    settled_times = [
+        str(x.get("settled_at"))
+        for x in ticket.get("legs") or []
+        if x.get("settled_at")
+    ]
+    values = sorted(settled_times)
+    latest_settled = values[-1] if values else None
+    settled_count = counts["won"] + counts["lost"] + counts["void"]
     if ticket.get("leg_counts") != counts:
         ticket["leg_counts"] = counts
+        changed = True
+    if ticket.get("settled_leg_count") != settled_count:
+        ticket["settled_leg_count"] = settled_count
+        changed = True
+    if ticket.get("pending_leg_count") != counts["pending"]:
+        ticket["pending_leg_count"] = counts["pending"]
+        changed = True
+    if ticket.get("last_settled_at") != latest_settled:
+        ticket["last_settled_at"] = latest_settled
+        changed = True
+    if ticket.get("version", 1) < 2:
+        ticket["version"] = 2
+        ticket["snapshot_fingerprint"] = ticket.get("snapshot_fingerprint") or ticket_id_from_batch(ticket)[2:]
         changed = True
     return changed
 
@@ -256,17 +277,24 @@ def make_ticket(batch, now):
         copied.setdefault("final_score", None)
         legs.append(copied)
 
+    fingerprint = fingerprint_batch(batch)
     return {
+        "version": 2,
         "ticket_id": ticket_id_from_batch(batch),
+        "snapshot_fingerprint": fingerprint,
         "batch_id": batch.get("batch_id"),
         "created_at": now,
         "last_seen_at": now,
+        "last_settled_at": None,
         "status": "PENDING",
         "combined_odds": batch.get("combined_odds"),
         "combined_model_rating": batch.get("combined_model_rating"),
         "combined_model_probability": batch.get("combined_model_probability"),
         "products": batch.get("products") or [],
+        "primary_lane": batch.get("primary_lane"),
         "leg_count": len(legs),
+        "settled_leg_count": 0,
+        "pending_leg_count": len(legs),
         "legs": legs,
         "leg_counts": {"won": 0, "lost": 0, "void": 0, "pending": len(legs)},
         "paper_only": True,
@@ -284,6 +312,7 @@ def summary(tickets):
         "legs_won": sum(x.get("leg_counts", {}).get("won", 0) for x in tickets),
         "legs_lost": sum(x.get("leg_counts", {}).get("lost", 0) for x in tickets),
         "legs_pending": sum(x.get("leg_counts", {}).get("pending", 0) for x in tickets),
+        "settled_tickets": sum(x.get("status") in {"WON", "LOST"} for x in tickets),
     }
 
 
@@ -333,7 +362,7 @@ def main():
         changed = True
 
     output = {
-        "version": 1,
+        "version": 2,
         "updated_at": now if changed or not TRACKER.exists() else existing.get("updated_at"),
         "mode": "PAPER_ONLY",
         "summary": summary(tickets),
