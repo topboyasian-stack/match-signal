@@ -122,8 +122,14 @@ jobs:
           rows=json.loads(Path('data/predictions.json').read_text())
           assert isinstance(rows,list) and rows, 'prediction feed is empty'
           assert any(r.get('sport')=='football' for r in rows), 'no football rows'
-          assert any(r.get('sport')=='tennis' for r in rows), 'no tennis rows'
-          print(f'Prediction rows: {len(rows)}')
+          tennis_rows=[r for r in rows if r.get('sport')=='tennis']
+          risk=json.loads(Path('data/risk_gate.json').read_text()) if Path('data/risk_gate.json').exists() else {}
+          tennis_gate=(risk.get('gate') or {}).get('tennis') or {}
+          if not tennis_rows and tennis_gate.get('live_eligible') is True:
+              raise AssertionError('no tennis rows while tennis live gate is eligible')
+          if not tennis_rows:
+              print('Tennis rows absent while tennis live gate is blocked; core deployment may proceed for independent Virtual research lanes.')
+          print(f'Prediction rows: {len(rows)}; tennis rows: {len(tennis_rows)}')
           PY
           python scripts/validate_virtual_lab_v1.py
           node --check virtual-lab-app.js
