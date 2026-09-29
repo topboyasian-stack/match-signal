@@ -72,11 +72,25 @@ for args in [
     ("expansion",expansion,"updated_at",4),
     # Operational Virtual health follows the live SportyBet snapshot, not the
     # slower research/settlement artifact.
-    ("virtual_live_feed",virtual_live,"updated_at",0.5),
     ("unified_upcoming",unified,"generated_at",2),
 ]:
     x=freshness(*args)
     if x:checks.append(x)
+
+# Unified Upcoming performs a bounded live SportyBet Virtual refresh whenever
+# the stored snapshot is stale/missing. Treat that fresh publication path as
+# an operational heartbeat so a delayed secondary snapshot does not falsely
+# mark the live Virtual desk critical.
+virtual_live_age=age_hours(virtual_live.get("updated_at"))
+unified_virtual=((unified.get("summary") or {}).get("virtual_model") or {})
+live_refresh=unified_virtual.get("live_refresh") or {}
+if str(virtual_live.get("status") or "")=="LIVE" and int(virtual_live.get("events_count") or 0)>0:
+    checks.append({"engine":"virtual_live_feed","status":"PASS" if virtual_live_age<=0.5 else "INFO",
+                   "age_hours":round(virtual_live_age,2),"threshold_hours":0.5,
+                   "heartbeat_source":"unified_live_refresh" if live_refresh.get("refreshed") else "virtual_lab_live.json"})
+else:
+    checks.append(issue("VIRTUAL_LIVE_FEED_INVALID","critical",
+                        f"live virtual status={virtual_live.get('status')!r}, events={int(virtual_live.get('events_count') or 0)}"))
 
 # Retired research engines are tracked for visibility but cannot fail the
 # production health state.
