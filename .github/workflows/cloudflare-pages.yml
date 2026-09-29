@@ -128,6 +128,7 @@ jobs:
           python scripts/validate_virtual_lab_v1.py
           node --check virtual-lab-app.js
           node --check virtual-lab-confirmed-watch.js
+          node --check expansion-odds-builder.js
           node --check darts-app.js
           node --check table-tennis-app.js
           python -m py_compile scripts/darts_pipeline.py scripts/table_tennis_pipeline.py
@@ -280,6 +281,16 @@ jobs:
               else console.log('Virtual Lab result proxy passed: '+source+' '+(payload.events?.length||0)+' events '+(payload.scopes?.length||0)+' scopes');
             } catch(e) { failures.push('/api/sportybet-virtual-results '+source+' '+e.message); }
           }
+
+          try {
+            const r = await fetch(base + '/api/sportybet-booking', {
+              method: 'OPTIONS',
+              headers: { 'Origin': base, 'Access-Control-Request-Method': 'POST' },
+              cache: 'no-store'
+            });
+            if (r.status !== 204) failures.push('/api/sportybet-booking OPTIONS HTTP '+r.status);
+            else console.log('SportyBet booking-code API route passed OPTIONS smoke test');
+          } catch(e) { failures.push('/api/sportybet-booking OPTIONS '+e.message); }
 
           try {
             const params = new URLSearchParams({
