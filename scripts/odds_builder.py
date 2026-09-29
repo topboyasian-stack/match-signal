@@ -757,7 +757,7 @@ def build_value_batches(candidates):
 
     def efficiency(leg):
         try:
-            p=clamp(float(leg.get("model_probability") or 0.0))
+            p=max(0.0005,min(0.9995,float(leg.get("model_probability") or 0.0)))
             odds=float(leg.get("bookmaker_odds") or 1.0)
             if odds<=1.0:
                 return 999.0
