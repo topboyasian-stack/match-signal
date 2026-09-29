@@ -289,7 +289,7 @@ def refresh_virtual_quotes(rows):
                 y["market_odds_timestamp"]=fetched_at
                 y["sportybet_identity_match"]=str(e.get("event_id"))==str(x.get("event_id")) or _norm_fixture(e.get("match") or e.get("name"))==key
         out.append(y)
-    return out,join_diag,list(live_by_id.values())
+    return out,join_diag
 
 _VIRTUAL_RECENT_GATE_CACHE=None
 
