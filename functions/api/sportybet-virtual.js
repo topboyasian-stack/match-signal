@@ -31,6 +31,39 @@ function participantFromName(value){
   const m=text.match(/\\(([^()]+)\\)\\s*$/);
   return m&&m[1]?m[1].trim():'';
 }
+
+function scoreValue(value){
+  if(value==null) return null;
+  if(typeof value==='number' && Number.isFinite(value)) return value;
+  if(typeof value==='string' && value.trim()!=='' && Number.isFinite(Number(value))) return Number(value);
+  if(typeof value==='object'){
+    for(const key of ['display','value','score','current','points','games']){
+      if(value[key]!=null){
+        const n=scoreValue(value[key]);
+        if(n!=null) return n;
+      }
+    }
+  }
+  return null;
+}
+
+function extractScore(event){
+  const homeCandidates=[
+    event?.homeScore,event?.home_score,event?.scoreHome,event?.homeTeamScore,
+    event?.home?.score,event?.home?.currentScore,event?.scores?.home,event?.score?.home,
+    event?.score?.homeScore,event?.homeTeam?.score,event?.competitors?.[0]?.score
+  ];
+  const awayCandidates=[
+    event?.awayScore,event?.away_score,event?.scoreAway,event?.awayTeamScore,
+    event?.away?.score,event?.away?.currentScore,event?.scores?.away,event?.score?.away,
+    event?.score?.awayScore,event?.awayTeam?.score,event?.competitors?.[1]?.score
+  ];
+  let home=null,away=null;
+  for(const value of homeCandidates){home=scoreValue(value);if(home!=null)break;}
+  for(const value of awayCandidates){away=scoreValue(value);if(away!=null)break;}
+  if(home==null && away==null) return null;
+  return {home,away,text:(home!=null&&away!=null)?String(home)+' - '+String(away):null};
+}
 function normalize(t, event, source, sportId){
   const team1=String(event?.homeTeamName||'').trim();
   const team2=String(event?.awayTeamName||'').trim();
@@ -55,6 +88,8 @@ function normalize(t, event, source, sportId){
     participant_identity_source:identitySource,
     start_time_ms:(()=>{const raw=Number(event?.estimateStartTime);if(!Number.isFinite(raw)||raw<=0)return null;return raw<100000000000?raw*1000:raw})(),
     match_status:event?.matchStatus ?? null,
+    live:Boolean(event?.live||event?.isLive||false),
+    score:extractScore(event),
     markets:(Array.isArray(event?.markets)?event.markets:[]).map(m=>({
       ...m,
       line:m?.line!=null?Number(m.line):((String(m?.specifier||'').match(/(?:total|line)=([0-9]+(?:\\.[0-9]+)?)/i)||[])[1]!=null?Number((String(m?.specifier||'').match(/(?:total|line)=([0-9]+(?:\\.[0-9]+)?)/i)||[])[1]):null),
