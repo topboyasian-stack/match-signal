@@ -60,12 +60,13 @@ async function upstream(path, params) {
   return payload;
 }
 
-async function collectEvents({ sportId, marketId, timeline = 168, pageSize = 100, maxPages = 8, primaryPath = '/api/ng/factsCenter/pcUpcomingEvents', fallbackPath = null, fallbackParams = {} }, targetIds) {
+async function collectEvents({ sportId, marketId, timeline = 168, pageSize = 100, maxPages = 5, primaryPath = '/api/ng/factsCenter/pcUpcomingEvents', fallbackPath = null, fallbackParams = {} }, targetIds) {
   const found = new Map();
+  const matchedTargets = new Set();
   let page = 1;
   let usedFallback = false;
 
-  while (page <= maxPages) {
+  while (page <= maxPages && matchedTargets.size < targetIds.size) {
     let data;
     try {
       const path = usedFallback && fallbackPath ? fallbackPath : primaryPath;
@@ -96,6 +97,7 @@ async function collectEvents({ sportId, marketId, timeline = 168, pageSize = 100
         const normalized = normalizeEvent(event, tournament);
         if (normalized.eventId) {
           found.set(normalized.eventId, normalized);
+          if (targetIds.has(normalized.eventId)) matchedTargets.add(normalized.eventId);
         }
         count++;
       }
