@@ -717,7 +717,7 @@ def _participants(leg):
     return out
 
 def _batch_metrics(legs):
-    probs=[clamp(float(x.get("model_probability") or 0.0)) for x in legs if float(x.get("model_probability") or 0.0)>0]
+    probs=[max(0.0005,min(0.9995,float(x.get("model_probability") or 0.0))) for x in legs if float(x.get("model_probability") or 0.0)>0]
     edges=[float(x.get("model_edge") or 0.0) for x in legs]
     if not probs:
         return {
