@@ -670,11 +670,12 @@ def make_leg(x):
     else:
         match=f"{x.get('home_team')} vs {x.get('away_team')}"
         pick=x.get("builder_pick")
-    participant_history=participant_history_signal(x)
-    # History is deliberately capped: it can break ties / reorder qualified
-    # legs, but it cannot overwhelm the calibrated model edge or bookmaker edge.
-    history_bonus=(participant_history.get("score",0.5)-0.5)*PARTICIPANT_HISTORY_MAX_BONUS*2.0
-    selection_score=(edge if edge is not None else -1.0)+history_bonus
+    # Participant history is an informational ranking feature only. The batch
+    # assembler now ranks by whole-ticket model probability and edge, so avoid
+    # loading/scoring the profile artifact for every candidate leg.
+    participant_history={"available":False,"score":0.5,"participants":[]}
+    history_bonus=0.0
+    selection_score=(edge if edge is not None else -1.0)
     return {
         "sport":x.get("sport"),"competition":x.get("league"),"event_id":x.get("event_id"),
         "start_time":x.get("start_time"),"match":match,"market":x.get("builder_market"),
