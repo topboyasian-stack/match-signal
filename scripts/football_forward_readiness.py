@@ -18,35 +18,15 @@ DATA = ROOT / "data"
 OUTPUT = DATA / "football_forward_readiness.json"
 PLANNING_DAYS = 21
 
-LEAGUES = [
-    "EPL",
-    "La Liga",
-    "Bundesliga",
-    "Serie A",
-    "Ligue 1",
-    "Champions League",
-    "MLS",
-    "Primeira Liga",
-    "Eredivisie",
-    "Saudi Pro League",
-    "England Amateur - U21 Professional Development League",
-]
-
-CORE_LEAGUES = {
-    "EPL": "eng.1",
+ACTIVE_CORE_LEAGUES = {
     "La Liga": "esp.1",
     "Bundesliga": "ger.1",
-    "Serie A": "ita.1",
     "Ligue 1": "fra.1",
     "Champions League": "uefa.champions",
-    "MLS": "usa.1",
-    "Primeira Liga": "por.1",
 }
-
-AUXILIARY_ESPN_LEAGUES = {
-    "Eredivisie": "ned.1",
-    "Saudi Pro League": "ksa.1",
-}
+LEAGUES = list(ACTIVE_CORE_LEAGUES) + ["Eredivisie", "England Amateur - U21 Professional Development League"]
+CORE_LEAGUES = ACTIVE_CORE_LEAGUES
+AUXILIARY_ESPN_LEAGUES = {"Eredivisie": "ned.1"}
 
 GENERIC_ERROR = "provider lookup unavailable; status derived from published artifacts"
 
@@ -210,24 +190,6 @@ def main():
                     if provider_upcoming
                     else source
                 )
-
-        elif league == "Saudi Pro League":
-            # Saudi is a first-class ESPN-backed football league in the
-            # authoritative pipeline. Do not use the legacy 60-day status
-            # artifact as a substitute for the current forward fixture scan.
-            historical = historical_count(history, performance, league)
-            provider_upcoming, provider_errors = espn_upcoming_count(
-                AUXILIARY_ESPN_LEAGUES[league], now
-            )
-            upcoming = max(published_upcoming, provider_upcoming)
-            errors.extend(provider_errors)
-            source = (
-                "published prediction artifact + ESPN day-by-day forward fixture scan"
-                if published_upcoming and provider_upcoming
-                else "ESPN day-by-day forward fixture scan"
-                if provider_upcoming
-                else "published prediction artifact"
-            )
 
         else:
             pdl_current = len(pdl_predictions) if isinstance(pdl_predictions, list) else 0
