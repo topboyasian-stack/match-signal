@@ -154,6 +154,7 @@
   function bookingPanelHtml(batch) {
     var state=readBookingState(batch);
     var eligibility=bookingEligibility(batch);
+    var blocked=false;
     
     var status=state&&state.error?'error':(state&&state.booking_code&&bookingStillValid(state)?(state.partial?'partial':'ready'):'loading');
     var code=state&&state.booking_code?state.booking_code:'';
