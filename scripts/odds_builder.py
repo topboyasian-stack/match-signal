@@ -566,6 +566,7 @@ def _participant_identity(value):
 
 
 _PARTICIPANT_PROFILES_CACHE=None
+_PARTICIPANT_PROFILE_INDEX_CACHE=None
 
 
 def participant_history_profiles():
@@ -601,8 +602,11 @@ def participant_history_signal(x):
         return {"available":False,"score":0.5,"participants":[]}
     names=[x.get("participant_1") or x.get("player_1") or x.get("team_1"),
            x.get("participant_2") or x.get("player_2") or x.get("team_2")]
+    global _PARTICIPANT_PROFILE_INDEX_CACHE
     profiles=participant_history_profiles()
-    by_key={str(p.get("participant_key")):p for p in profiles if isinstance(p,dict)}
+    if _PARTICIPANT_PROFILE_INDEX_CACHE is None:
+        _PARTICIPANT_PROFILE_INDEX_CACHE={str(p.get("participant_key")):p for p in profiles if isinstance(p,dict)}
+    by_key=_PARTICIPANT_PROFILE_INDEX_CACHE
     details=[]
     for raw_name in names:
         identity=_participant_identity(raw_name)
