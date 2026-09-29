@@ -72,7 +72,7 @@ for args in [
     ("expansion",expansion,"updated_at",4),
     # Operational Virtual health follows the live SportyBet snapshot, not the
     # slower research/settlement artifact.
-    ("virtual_live_feed",virtual_live,"updated_at",0.25),
+    ("virtual_live_feed",virtual_live,"updated_at",0.5),
     ("unified_upcoming",unified,"generated_at",2),
 ]:
     x=freshness(*args)
