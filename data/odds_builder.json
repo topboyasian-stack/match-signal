@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-29T15:09:30.789311+00:00",
+  "generated_at": "2026-09-29T15:12:53.911757+00:00",
   "engine_version": "V6.1-RESEARCH-GATED",
   "mode": "PAPER_ONLY",
   "target_legs": "variable until combined odds >= 4.00",
@@ -27,13 +27,13 @@
     "tennis_candidates": 0,
     "virtual_candidates": 0,
     "virtual_gate_diagnostics": {
-      "seen": 466,
+      "seen": 470,
       "qualified": 0,
       "evidence_pass": 0,
       "rejected_evidence": 0,
-      "current_feed_events": 466,
+      "current_feed_events": 470,
       "model_templates": 8,
-      "current_market_candidates": 4572,
+      "current_market_candidates": 4574,
       "reasons": {},
       "model_template_keys": [
         [
@@ -78,23 +78,21 @@
         ]
       ],
       "current_product_counts": {
-        "efootball_gt": 157,
+        "efootball_gt": 161,
         "efootball_adriatic": 9,
         "vfootball": 300
       },
       "current_market_line_counts": {
-        "efootball_gt|4": 62,
-        "efootball_gt|3": 87,
-        "efootball_gt|5": 47,
+        "efootball_gt|4": 66,
+        "efootball_gt|3": 91,
+        "efootball_gt|5": 48,
         "efootball_gt|6": 34,
         "efootball_gt|7": 19,
         "efootball_adriatic|5": 6,
         "efootball_adriatic|6": 4,
         "efootball_adriatic|4": 2,
-        "efootball_gt|10": 7,
-        "efootball_gt|11": 4,
-        "efootball_gt|2": 65,
-        "efootball_gt|1": 26,
+        "efootball_gt|2": 66,
+        "efootball_gt|1": 27,
         "efootball_gt|8": 3,
         "vfootball|0": 300,
         "vfootball|1": 300,
@@ -102,20 +100,22 @@
         "vfootball|3": 300,
         "vfootball|4": 300,
         "vfootball|5": 289,
-        "vfootball|6": 111,
-        "vfootball|7": 13,
-        "efootball_gt|9": 5,
+        "vfootball|6": 105,
+        "vfootball|7": 11,
+        "efootball_gt|9": 6,
+        "efootball_gt|10": 6,
+        "efootball_gt|11": 2,
         "efootball_gt|12": 1,
         "efootball_gt|0": 1
       },
       "quote_join": {
-        "live_events": 466,
-        "live_match_keys": 466,
-        "live_pair_keys": 457,
-        "matched_by_id": 3353,
+        "live_events": 470,
+        "live_match_keys": 470,
+        "live_pair_keys": 461,
+        "matched_by_id": 3349,
         "matched_by_match": 0,
         "matched_by_participant_time": 0,
-        "unmatched": 1536,
+        "unmatched": 1540,
         "samples": [
           {
             "keys": [
@@ -206,6 +206,14 @@
       "participant_correlation_skips": 0,
       "unique_participants": 0
     },
+    "batch_diagnostics": {
+      "batch_count": 0,
+      "max_batches": 6,
+      "disjoint": true,
+      "min_combined_odds": 4.0,
+      "priority_product": "vfootball",
+      "used_unique_events": 0
+    },
     "participant_history_weighting": {
       "enabled": true,
       "min_n": 3,
@@ -246,6 +254,16 @@
   "best_available_legs": [],
   "combined_odds_selected": null,
   "naive_independence_hit_proxy": null,
+  "batch_count": 0,
+  "batch_policy": {
+    "min_combined_odds": 4.0,
+    "max_batches": 6,
+    "disjoint_batches": true,
+    "ranking": "combined_model_rating descending, then average model edge, then combined odds",
+    "model_rating_definition": "100 × geometric mean of leg model probabilities",
+    "primary_lane": "vfootball"
+  },
+  "batches": [],
   "rejected_candidates": [],
   "settled_legs": [],
   "builder_event_ids": [
@@ -280,7 +298,8 @@
     "V6 qualifies on market edge, not probability alone.",
     "Missing or stale SportyBet prices produce NO_BET/REJECTED.",
     "Model fair odds never overwrite bookmaker odds.",
-    "Accumulator size is allowed to fall below four and is never padded with weak selections.",
+    "Each Builder batch is a separate disjoint paper ticket at 4.00+ combined bookmaker odds; batches are ranked by combined model rating.",
+    "vFootball is prioritized because its existing untouched O/U evidence is currently the strongest active research lane.",
     "Paper-only until V6 demonstrates stable calibration, edge and closing-line value over a meaningful sample."
   ]
 }
