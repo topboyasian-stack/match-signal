@@ -8,14 +8,10 @@ ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
 ESPN = "https://site.api.espn.com/apis/site/v2/sports/soccer"
 FOOTBALL_LEAGUES = {
-    "EPL": "eng.1",
     "La Liga": "esp.1",
     "Bundesliga": "ger.1",
-    "Serie A": "ita.1",
     "Ligue 1": "fra.1",
     "Champions League": "uefa.champions",
-    "MLS": "usa.1",
-    "Primeira Liga": "por.1",
 }
 
 SESSION = requests.Session()
@@ -27,6 +23,13 @@ def main():
     date_range = f"{start:%Y%m%d}-{today:%Y%m%d}"
     history = []
     errors = []
+    prior_path = DATA / "football_team_history.json"
+    try:
+        prior_history = json.loads(prior_path.read_text(encoding="utf-8"))
+        if not isinstance(prior_history, list):
+            prior_history = []
+    except Exception:
+        prior_history = []
 
     for league, slug in FOOTBALL_LEAGUES.items():
         try:
@@ -71,6 +74,15 @@ def main():
             errors.append(f"{league}:{str(exc)[:180]}")
 
     history.sort(key=lambda row: row.get("start_time") or "")
+    # Never silently replace a non-empty research history with an empty file.
+    # A total provider failure must fail closed so the model layer cannot lose
+    # its independent team-history evidence.
+    if not history:
+        if prior_history:
+            history = prior_history
+            errors.append("all active team-history sources returned zero rows; preserved prior non-empty artifact")
+        else:
+            raise RuntimeError("active football team-history sources returned zero rows and no prior evidence exists")
     (DATA / "football_team_history.json").write_text(
         json.dumps(history, indent=2, ensure_ascii=False), encoding="utf-8"
     )
