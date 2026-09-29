@@ -1,26 +1,26 @@
 {
-  "generated_at": "2026-09-29T15:26:47.944709+00:00",
-  "status": "HEALTHY",
-  "critical_issues": 0,
+  "generated_at": "2026-09-29T15:49:00.306114+00:00",
+  "status": "FAIL",
+  "critical_issues": 1,
   "warning_issues": 0,
   "info_issues": 1,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
       "status": "PASS",
-      "age_hours": 0.87,
+      "age_hours": 1.24,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.11,
+      "age_hours": 0.04,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
-      "status": "PASS",
-      "age_hours": 3.87,
+      "status": "STALE",
+      "age_hours": 4.24,
       "threshold_hours": 4
     },
     {
@@ -32,7 +32,7 @@
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 0.51,
+      "age_hours": 0.88,
       "threshold_hours": 0.5,
       "heartbeat_source": "unified_live_refresh"
     },
@@ -63,6 +63,11 @@
     }
   ],
   "issues": [
+    {
+      "code": "STALE_EXPANSION",
+      "severity": "critical",
+      "detail": "updated_at age 4.24h exceeds 4h"
+    },
     {
       "code": "SELECTION_GATE_EMPTY",
       "severity": "info",
