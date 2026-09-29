@@ -861,3 +861,4 @@ if __name__=="__main__":
     main()
 
 # Refresh marker: exact-side virtual evidence gate is active.
+# Batch marker: vFootball-priority disjoint 4.00+ research batches.
