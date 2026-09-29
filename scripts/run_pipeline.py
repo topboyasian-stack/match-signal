@@ -1,6 +1,7 @@
 """Authoritative Match Signal pipeline runner with production tennis QC and model v3.2."""
 import runpy
 import math
+import requests
 from datetime import datetime, timedelta, timezone
 
 from tennis_total_model import over_probability as v51_total_over_probability, recommend_total_line
@@ -315,6 +316,46 @@ amercan_to_prob = ns["american_to_prob"]
 normalise = ns["normalise"]
 
 
+def fallback_football_events_for_date(league, date):
+    if league != "esp.1":
+        return []
+    url = f"https://www.sofascore.com/api/v1/sport/football/scheduled-events/{date:%Y-%m-%d}"
+    response = requests.get(
+        url,
+        headers={"User-Agent": "MatchSignal/3.0 (+https://github.com/topboyasian-stack/match-signal)"},
+        timeout=30,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    events = []
+    for item in payload.get("events", []):
+        tournament = item.get("tournament") or {}
+        unique = tournament.get("uniqueTournament") or {}
+        if unique.get("id") != 8 and str(unique.get("slug") or "").lower() != "laliga":
+            continue
+        status = (item.get("status") or {}).get("type")
+        if status in {"finished", "canceled", "postponed"}:
+            continue
+        timestamp = item.get("startTimestamp")
+        home = (item.get("homeTeam") or {}).get("name")
+        away = (item.get("awayTeam") or {}).get("name")
+        event_id = item.get("id")
+        if not timestamp or not home or not away or not event_id:
+            continue
+        start = datetime.fromtimestamp(float(timestamp), tz=timezone.utc)
+        events.append({
+            "id": f"sofa|{event_id}",
+            "date": start.isoformat(),
+            "competitions": [{
+                "competitors": [
+                    {"homeAway": "home", "team": {"displayName": home}},
+                    {"homeAway": "away", "team": {"displayName": away}},
+                ]
+            }],
+        })
+    return events
+
+
 def fetch_current_predictions(history=None, include_watch=False):
     predictions, errors = [], []
     qc = {
@@ -325,6 +366,7 @@ def fetch_current_predictions(history=None, include_watch=False):
         "deduplicated_examples": [],
         "filtered_low_confidence": 0,
         "filtered_low_confidence_examples": [],
+        "fallback_by_league": {},
     }
 
     def reject(tour, reason):
@@ -344,8 +386,16 @@ def fetch_current_predictions(history=None, include_watch=False):
             try:
                 board = fetch_scoreboard("soccer", league, date.strftime("%Y%m%d"))
             except Exception as exc:
-                errors.append(f"football:{label}:{date.isoformat()}:{exc}")
-                continue
+                if league == "esp.1":
+                    try:
+                        board = {"events": fallback_football_events_for_date(league, date)}
+                        qc["fallback_by_league"][label] = qc["fallback_by_league"].get(label, 0) + 1
+                    except Exception as fallback_exc:
+                        errors.append(f"football:{label}:{date.isoformat()}:{exc}; fallback:{fallback_exc}")
+                        continue
+                else:
+                    errors.append(f"football:{label}:{date.isoformat()}:{exc}")
+                    continue
             for event in board.get("events", []):
                 event_id = str(event.get("id") or "")
                 if event_id and event_id in seen_events:
