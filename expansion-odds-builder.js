@@ -241,32 +241,87 @@
     var tickets=tracker&&Array.isArray(tracker.tickets)?tracker.tickets:[];
     var summary=tracker&&tracker.summary?tracker.summary:{};
     function esc2(v){return esc(v);}
-    function ticketStatus(t){
-      if(t.status==='WON') return '<b class="ticket-status won">✓ WON</b>';
-      if(t.status==='LOST') return '<b class="ticket-status lost">✕ LOST</b>';
-      return '<b class="ticket-status pending">ONGOING</b>';
+    function n(v,d){var x=Number(v);return isFinite(x)?x:d;}
+    function ticketLabel(t){
+      if(t.status==='WON') return '<span class="ticket-status won">✓ WON</span>';
+      if(t.status==='LOST') return '<span class="ticket-status lost">✕ LOST</span>';
+      return '<span class="ticket-status pending">ONGOING</span>';
     }
-    function ticketRows(t){
-      var lc=t.leg_counts||{};
-      var bits=[];
-      if(Number(lc.won||0)) bits.push(lc.won+' won');
-      if(Number(lc.lost||0)) bits.push(lc.lost+' lost');
-      if(Number(lc.void||0)) bits.push(lc.void+' void');
-      if(Number(lc.pending||0)) bits.push(lc.pending+' pending');
-      return bits.join(' · ')||'—';
+    function legStatus(leg){
+      var s=String(leg&&leg.status||'PENDING').toUpperCase();
+      if(s==='WON') return '<span class="ticket-leg-state won">WON</span>';
+      if(s==='LOST') return '<span class="ticket-leg-state lost">LOST</span>';
+      if(s==='VOID') return '<span class="ticket-leg-state void">VOID</span>';
+      return '<span class="ticket-leg-state pending">PENDING</span>';
     }
-    var cards=tickets.slice(0,10).map(function(t){
-      var activeLoss=t.status==='LOST' && Number((t.leg_counts||{}).pending||0)>0;
-      return '<div class="ticket-row '+(t.status==='LOST'?'ticket-lost':t.status==='WON'?'ticket-won':'ticket-pending')+'">'+
-        '<div class="ticket-main"><span class="ticket-id">'+esc2(t.ticket_id||'—')+'</span><strong>'+(t.batch_id?esc2(t.batch_id)+' · ':'')+ticketStatus(t)+'</strong>'+
-        '<small>'+esc2(t.leg_count||((t.legs||[]).length))+' legs · '+esc2(t.combined_odds==null?'—':Number(t.combined_odds).toFixed(3))+'x · rating '+esc2(t.combined_model_rating==null?'—':Number(t.combined_model_rating).toFixed(1)+'/100')+'</small></div>'+
-        '<div class="ticket-progress">'+esc2(ticketRows(t))+(activeLoss?' · loss confirmed while other legs remain pending':'')+'</div>'+
+    function ticketLegs(t){
+      var legs=Array.isArray(t.legs)?t.legs:[];
+      return legs.map(function(leg,i){
+        var status=String(leg.status||'PENDING').toUpperCase();
+        var cls=status==='WON'?'won':status==='LOST'?'lost':status==='VOID'?'void':'pending';
+        var result=leg.result||((status==='WON'||status==='LOST')?status:'Waiting for settlement');
+        var settledAt=leg.settled_at?local(leg.settled_at):'';
+        return '<div class="ticket-leg '+cls+'">'+
+          '<div class="ticket-leg-index">LEG '+(i+1)+'</div>'+
+          '<div class="ticket-leg-core"><strong>'+esc2(leg.match||'Unknown fixture')+'</strong><span>'+esc2(leg.pick||'—')+'</span><small>'+esc2(String(leg.market||'SportyBet market'))+(leg.bookmaker_odds!=null?' · SportyBet '+esc2(leg.bookmaker_odds):'')+'</small></div>'+
+          '<div class="ticket-leg-result">'+legStatus(leg)+'<small>'+esc2(result)+(settledAt?' · '+esc2(settledAt):'')+'</small></div>'+
         '</div>';
+      }).join('');
+    }
+    var tracked=Number(summary.tracked_tickets||tickets.length);
+    var ongoing=Number(summary.pending||0),won=Number(summary.won||0),lost=Number(summary.lost||0);
+    var cards=tickets.slice(0,20).map(function(t,idx){
+      var lc=t.leg_counts||{}, total=Number(t.leg_count||((t.legs||[]).length))||0;
+      var settled=Number(t.settled_leg_count!=null?t.settled_leg_count:(Number(lc.won||0)+Number(lc.lost||0)+Number(lc.void||0)));
+      var pending=Number(t.pending_leg_count!=null?t.pending_leg_count:(lc.pending||0));
+      var pctDone=total?Math.max(0,Math.min(100,(settled/total)*100)):0;
+      var lostAndPending=t.status==='LOST'&&pending>0;
+      var products=(Array.isArray(t.products)?t.products:[]).map(function(x){return String(x||'').toUpperCase();}).filter(Boolean).join(' · ')||'VIRTUAL';
+      var created=t.created_at?local(t.created_at):'Unknown';
+      var lastSettled=t.last_settled_at?local(t.last_settled_at):'No legs settled yet';
+      var headline=(t.batch_id?esc2(t.batch_id)+' · ':'')+ticketLabel(t);
+      return '<details class="ticket-card '+(t.status==='LOST'?'ticket-lost':t.status==='WON'?'ticket-won':'ticket-pending')+'" '+(idx===0?'open':'')+'>'+
+        '<summary class="ticket-card-summary">'+
+          '<div class="ticket-card-title"><span class="ticket-kicker">PAPER TICKET · '+esc2(t.ticket_id||'—')+'</span><strong>'+headline+'</strong><small>'+esc2(products)+' · Created '+esc2(created)+'</small></div>'+
+          '<div class="ticket-card-odds"><strong>'+esc2(t.combined_odds==null?'—':Number(t.combined_odds).toFixed(3))+'x</strong><span>'+esc2(t.leg_count||total)+' legs</span></div>'+
+        '</summary>'+
+        '<div class="ticket-card-body">'+
+          '<div class="ticket-card-metrics">'+
+            '<div><small>Model rating</small><b>'+esc2(t.combined_model_rating==null?'—':Number(t.combined_model_rating).toFixed(1)+'/100')+'</b></div>'+
+            '<div><small>Joint proxy</small><b>'+esc2(t.combined_model_probability==null?'—':pct(t.combined_model_probability))+'</b></div>'+
+            '<div><small>Settled</small><b>'+esc2(settled)+' / '+esc2(total)+'</b></div>'+
+            '<div><small>Pending</small><b>'+esc2(pending)+'</b></div>'+
+          '</div>'+
+          '<div class="ticket-progress-wrap">'+
+            '<div class="ticket-progress-head"><span>Settlement progress</span><b>'+esc2(Math.round(pctDone))+'%</b></div>'+
+            '<div class="ticket-progress-track"><i style="width:'+pctDone.toFixed(1)+'%"></i></div>'+
+            '<div class="ticket-progress-legend"><span><b class="won-text">'+esc2(lc.won||0)+'</b> won</span><span><b class="lost-text">'+esc2(lc.lost||0)+'</b> lost</span><span><b>'+esc2(lc.void||0)+'</b> void</span><span><b>'+esc2(pending)+'</b> pending</span></div>'+
+          '</div>'+
+          '<div class="ticket-state-callout '+(t.status==='LOST'?'lost':t.status==='WON'?'won':'pending')+'">'+
+            '<strong>'+headline+'</strong>'+
+            '<span>'+(lostAndPending?'A loss has already settled this accumulator. Remaining legs continue to settle for the historical record.':t.status==='WON'?'Every leg is settled without a loss.':t.status==='LOST'?'The accumulator is settled as lost.':'Ticket is still awaiting final settlement.')+'</span>'+
+          '</div>'+
+          '<div class="ticket-meta-grid">'+
+            '<div><small>Created</small><b>'+esc2(created)+'</b></div>'+
+            '<div><small>Last settlement update</small><b>'+esc2(lastSettled)+'</b></div>'+
+            '<div><small>Lane</small><b>'+esc2(products)+'</b></div>'+
+            '<div><small>Mode</small><b>PAPER ONLY</b></div>'+
+          '</div>'+
+          '<div class="ticket-leg-list">'+ticketLegs(t)+'</div>'+
+        '</div>'+
+      '</details>';
     }).join('');
     if(!cards) cards='<div class="empty">No generated paper tickets have been tracked yet.</div>';
-    return '<section class="ticket-track"><div class="ticket-track-head"><div><b>Paper Ticket Track</b><div class="sub">Each generated batch is tracked independently. A single losing leg changes an ongoing ticket to LOST immediately; remaining legs continue settling for the record.</div></div>'+
-      '<div class="ticket-track-stats"><span>Ongoing <b>'+esc2(summary.pending||0)+'</b></span><span>Won <b>'+esc2(summary.won||0)+'</b></span><span>Lost <b>'+esc2(summary.lost||0)+'</b></span></div></div>'+
-      '<div class="ticket-list">'+cards+'</div></section>';
+    return '<section class="ticket-track">'+
+      '<div class="ticket-track-head"><div><span class="ticket-track-kicker">PAPER LEDGER</span><b>Paper Ticket Track</b><div class="sub">Every generated accumulator is preserved as its own immutable paper-ticket snapshot. Ticket status and leg settlement are tracked independently.</div></div>'+
+      '<div class="ticket-track-stats">'+
+        '<span><small>Tracked</small><b>'+esc2(tracked)+'</b></span>'+
+        '<span class="ongoing"><small>Ongoing</small><b>'+esc2(ongoing)+'</b></span>'+
+        '<span class="won"><small>Won</small><b>'+esc2(won)+'</b></span>'+
+        '<span class="lost"><small>Lost</small><b>'+esc2(lost)+'</b></span>'+
+      '</div></div>'+
+      '<div class="ticket-list">'+cards+'</div>'+
+    '</section>';
   }
 
   function render(data, tracker) {
