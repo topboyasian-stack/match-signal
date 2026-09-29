@@ -1,54 +1,59 @@
 {
-  "generated_at": "2026-09-29T00:24:30.298200+00:00",
+  "generated_at": "2026-09-29T01:19:00.591785+00:00",
   "status": "FAIL",
-  "critical_issues": 2,
+  "critical_issues": 3,
   "warning_issues": 1,
   "info_issues": 0,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
       "status": "PASS",
-      "age_hours": 0.06,
+      "age_hours": 0.97,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.01,
+      "age_hours": 0.9,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 0.04,
+      "age_hours": 0.94,
       "threshold_hours": 4
     },
     {
       "engine": "virtual_lab",
-      "status": "PASS",
-      "age_hours": 0.89,
+      "status": "STALE",
+      "age_hours": 1.8,
       "threshold_hours": 1
     },
     {
       "engine": "darts_x",
       "status": "PASS",
-      "age_hours": 0.43,
+      "age_hours": 1.34,
       "threshold_hours": 2
     },
     {
       "engine": "table_tennis_x",
       "status": "PASS",
-      "age_hours": 0.01,
+      "age_hours": 0.91,
       "threshold_hours": 2
     },
     {
       "engine": "unified_upcoming",
       "status": "PASS",
-      "age_hours": 0.0,
+      "age_hours": 0.91,
       "threshold_hours": 2
     }
   ],
   "issues": [
+    {
+      "code": "STALE_VIRTUAL_LAB",
+      "severity": "critical",
+      "detail": "updated_at age 1.80h exceeds 1h"
+    },
     {
       "code": "CORE_PREDICTIONS_EMPTY",
       "severity": "critical",
