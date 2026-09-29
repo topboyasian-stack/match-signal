@@ -441,7 +441,7 @@
 .batch-summary strong{display:block;font-size:14px;line-height:1.25}
 .batch-summary small{display:block;margin-top:5px;color:var(--ms-muted);font-size:9px}
 .batch-odds{font-size:24px;font-weight:950;color:var(--ms-cyan);white-space:nowrap}
-.batch-odds:after{content:' COMBINED';display:block;color:var(--ms-muted);font-size:7px;letter-spacing:.1em;text-align:right}
+.batch-odds:after{content:\" COMBINED\";display:block;color:var(--ms-muted);font-size:7px;letter-spacing:.1em;text-align:right}
 .batch-metrics{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;padding:0 15px 12px}
 .batch-metrics>div{padding:9px 10px;border:1px solid rgba(255,255,255,.06);border-radius:10px;background:rgba(255,255,255,.025)}
 .batch-metrics span{display:block;color:var(--ms-muted);font-size:8px;text-transform:uppercase;letter-spacing:.08em}
