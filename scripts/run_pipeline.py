@@ -317,8 +317,67 @@ normalise = ns["normalise"]
 
 
 def fallback_football_events_for_date(league, date):
+    """Use resilient public fixture sources when ESPN blocks the runner."""
     if league != "esp.1":
         return []
+
+    # First fallback: football-data.co.uk publishes a free current-season
+    # fixtures CSV and is already used elsewhere in Match Signal.
+    csv_urls = (
+        "https://football-data.co.uk/fixtures.csv",
+        "https://www.football-data.co.uk/fixtures.csv",
+    )
+    for url in csv_urls:
+        try:
+            response = requests.get(
+                url,
+                headers={"User-Agent": "MatchSignal/3.0 (+https://github.com/topboyasian-stack/match-signal)"},
+                timeout=30,
+            )
+            response.raise_for_status()
+            import csv, io
+            rows = []
+            for row in csv.DictReader(io.StringIO(response.text.lstrip("\ufeff"))):
+                if str(row.get("Div") or "").strip().upper() != "SP1":
+                    continue
+                raw_date = str(row.get("Date") or "").strip()
+                if not raw_date:
+                    continue
+                try:
+                    d = datetime.strptime(raw_date, "%d/%m/%Y").replace(tzinfo=timezone.utc)
+                except ValueError:
+                    try:
+                        d = datetime.strptime(raw_date, "%d/%m/%y").replace(tzinfo=timezone.utc)
+                    except ValueError:
+                        continue
+                if (row.get("Time") or "").strip():
+                    try:
+                        hh, mm = str(row["Time"]).strip().split(":", 1)
+                        d=d.replace(hour=int(hh), minute=int(mm))
+                    except Exception:
+                        pass
+                if d.date() != date:
+                    continue
+                home=str(row.get("HomeTeam") or "").strip()
+                away=str(row.get("AwayTeam") or "").strip()
+                if not home or not away:
+                    continue
+                rows.append({
+                    "id": f"football-data|SP1|{d.isoformat()}|{home}|{away}",
+                    "date": d.isoformat(),
+                    "competitions": [{
+                        "competitors": [
+                            {"homeAway": "home", "team": {"displayName": home}},
+                            {"homeAway": "away", "team": {"displayName": away}},
+                        ]
+                    }],
+                })
+            if rows:
+                return rows
+        except Exception:
+            continue
+
+    # Second fallback: SofaScore daily schedule.
     url = f"https://api.sofascore.com/api/v1/sport/football/scheduled-events/{date:%Y-%m-%d}"
     response = requests.get(
         url,
@@ -342,10 +401,10 @@ def fallback_football_events_for_date(league, date):
         event_id = item.get("id")
         if not timestamp or not home or not away or not event_id:
             continue
-        start = datetime.fromtimestamp(float(timestamp), tz=timezone.utc)
+        start_time = datetime.fromtimestamp(float(timestamp), tz=timezone.utc)
         events.append({
             "id": f"sofa|{event_id}",
-            "date": start.isoformat(),
+            "date": start_time.isoformat(),
             "competitions": [{
                 "competitors": [
                     {"homeAway": "home", "team": {"displayName": home}},
@@ -354,7 +413,6 @@ def fallback_football_events_for_date(league, date):
             }],
         })
     return events
-
 
 def fetch_current_predictions(history=None, include_watch=False):
     predictions, errors = [], []
