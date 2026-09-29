@@ -144,8 +144,15 @@ function isOpenEvent(event) {
   return !status || /not start|not started|scheduled|prematch/.test(status);
 }
 
+function lineFromLeg(leg) {
+  if (leg?.line != null && Number.isFinite(Number(leg.line))) return Number(leg.line);
+  const pick = String(leg?.pick || '');
+  const match = pick.match(/(?:over|under)\s+([0-9]+(?:\.[0-9]+)?)/i);
+  return match ? Number(match[1]) : null;
+}
+
 function findVirtualSelection(leg, event) {
-  const requestedLine = Number(leg?.line);
+  const requestedLine = lineFromLeg(leg);
   const side = pickVirtualSide(leg);
   if (!Number.isFinite(requestedLine) || !side) {
     return { error: 'Could not map the Builder O/U selection to an exact line and side.' };
@@ -327,11 +334,17 @@ export async function onRequestPost(context) {
     }
 
     if (validation.some(item => item.ok !== true)) {
+      const startedCount = validation.filter(item => /started|closed pre-match booking/i.test(String(item?.reason || ''))).length;
+      const unavailableCount = validation.length - startedCount - validation.filter(item => item.ok === true).length;
       return json({
         ok: false,
-        error: 'VALIDATION_FAILED',
+        error: startedCount ? 'BATCH_HAS_STARTED_LEGS' : 'VALIDATION_FAILED',
         batch_id: batchId,
-        message: 'The ticket changed on SportyBet, so no partial booking code was created.',
+        message: startedCount
+          ? 'This batch contains ' + startedCount + ' selection(s) that have already started or closed on SportyBet; one booking code cannot be created for the full batch.'
+          : 'The ticket changed on SportyBet, so no partial booking code was created.',
+        started_count: startedCount,
+        unavailable_count: Math.max(0, unavailableCount),
         validation
       }, 409);
     }
