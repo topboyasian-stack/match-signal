@@ -303,17 +303,17 @@ async function handlePost(context) {
       const eventId = String(leg?.event_id || '');
       const event = found.get(eventId);
       if (!event) {
-        validation.push({ event_id: eventId, ok: false, reason: 'Event is no longer present in SportyBet current catalogue.' });
+        validation.push({ event_id: eventId, ok: false, excluded: true, reason: 'Event is no longer present in SportyBet current catalogue.' });
         continue;
       }
       if (!isOpenEvent(event)) {
-        validation.push({ event_id: eventId, ok: false, reason: 'Event has started or SportyBet has closed pre-match booking.' });
+        validation.push({ event_id: eventId, ok: false, excluded: true, reason: 'Event has started or SportyBet has closed pre-match booking.' });
         continue;
       }
 
       const selection = await buildSelection(leg, event);
       if (selection?.error || !selection?.marketId || !selection?.outcomeId) {
-        validation.push({ event_id: eventId, ok: false, reason: selection?.error || 'Selection could not be mapped to a live SportyBet market.' });
+        validation.push({ event_id: eventId, ok: false, excluded: true, reason: selection?.error || 'Selection could not be mapped to a live SportyBet market.' });
         continue;
       }
 
@@ -329,18 +329,29 @@ async function handlePost(context) {
       });
     }
 
-    if (validation.some(item => item.ok !== true)) {
-      const startedCount = validation.filter(item => /started|closed pre-match booking/i.test(String(item?.reason || ''))).length;
-      const unavailableCount = validation.length - startedCount - validation.filter(item => item.ok === true).length;
+    const preExcluded = validation.filter(item => item.ok !== true);
+    if (!selections.length) {
       return json({
         ok: false,
-        error: startedCount ? 'BATCH_HAS_STARTED_LEGS' : 'VALIDATION_FAILED',
+        error: 'NO_AVAILABLE_SELECTIONS',
         batch_id: batchId,
-        message: startedCount
-          ? 'This batch contains ' + startedCount + ' selection(s) that have already started or closed on SportyBet; one booking code cannot be created for the full batch.'
-          : 'The ticket changed on SportyBet, so no partial booking code was created.',
-        started_count: startedCount,
-        unavailable_count: Math.max(0, unavailableCount),
+        message: 'All selections in this Builder batch are now unavailable, suspended, started, or no longer mappable on SportyBet.',
+        initial_selection_count: legs.length,
+        selection_count: 0,
+        excluded_count: preExcluded.length,
+        validation
+      }, 409);
+    }
+
+    if (selections.length < 3) {
+      return json({
+        ok: false,
+        error: 'TOO_FEW_AVAILABLE_SELECTIONS',
+        batch_id: batchId,
+        message: 'Only ' + selections.length + ' selection(s) remain available. SportyBet requires more than two valid selections for this type of booking.',
+        initial_selection_count: legs.length,
+        selection_count: selections.length,
+        excluded_count: preExcluded.length,
         validation
       }, 409);
     }
@@ -380,23 +391,32 @@ async function handlePost(context) {
 
     const data = share?.data;
     const shareCode = String(data?.shareCode || '').trim().toUpperCase();
+    const unavailable = Array.isArray(data?.unavailableOutcomes) ? data.unavailableOutcomes : [];
+    const acceptedOutcomes = Array.isArray(data?.outcomes) ? data.outcomes : [];
     if (!shareCode) {
       return json({
         ok: false,
         error: 'NO_BOOKING_CODE',
-        message: 'SportyBet did not return a booking code. Refresh the ticket and try again.'
+        message: unavailable.length
+          ? 'SportyBet removed unavailable selections, but no booking code was returned for the remaining selections. Refresh the ticket and try again.'
+          : 'SportyBet did not return a booking code. Refresh the ticket and try again.',
+        initial_selection_count: legs.length,
+        requested_selection_count: selections.length,
+        unavailable_count: unavailable.length,
+        excluded_count: preExcluded.length + unavailable.length,
+        validation
       }, 502);
     }
 
-    const unavailable = Array.isArray(data?.unavailableOutcomes) ? data.unavailableOutcomes : [];
-    if (unavailable.length) {
-      return json({
-        ok: false,
-        error: 'PARTIAL_BOOKING_REJECTED',
-        message: 'SportyBet could not preserve every Builder selection, so the partial code was not accepted.',
-        unavailable_count: unavailable.length
-      }, 409);
-    }
+    const acceptedCount = acceptedOutcomes.length || Math.max(0, selections.length - unavailable.length);
+    const partial = preExcluded.length > 0 || unavailable.length > 0 || acceptedCount < legs.length;
+    const combinedOddsSource = acceptedOutcomes.length ? acceptedOutcomes : selections;
+    const combinedOdds = combinedOddsSource.length
+      ? combinedOddsSource.reduce((product, item) => {
+          const odds = Number(item?.odds);
+          return Number.isFinite(odds) && odds > 0 ? product * odds : product;
+        }, 1)
+      : null;
 
     const deadline = Number(data?.deadline || 0);
     return json({
@@ -406,9 +426,18 @@ async function handlePost(context) {
       booking_code: shareCode,
       share_url: String(data?.shareURL || ('https://www.sportybet.com/ng/?c=ng&shareCode=' + encodeURIComponent(shareCode))),
       expires_at: Number.isFinite(deadline) && deadline > 0 ? new Date(deadline).toISOString() : null,
-      selection_count: selections.length,
+      initial_selection_count: legs.length,
+      requested_selection_count: selections.length,
+      selection_count: acceptedCount,
+      excluded_count: Math.max(0, legs.length - acceptedCount),
+      unavailable_count: unavailable.length,
+      pre_excluded_count: preExcluded.length,
+      partial,
+      combined_odds: Number.isFinite(combinedOdds) ? Number(combinedOdds.toFixed(4)) : null,
       selections: validation,
-      note: 'This creates a SportyBet betslip reservation/share code only. No wager, stake, payment, or account action is performed by Match Signal.'
+      note: partial
+        ? 'SportyBet changed one or more selections. The booking code contains only the selections still available at booking time; its combined odds may be lower than the original Builder batch.'
+        : 'This creates a SportyBet betslip reservation/share code only. No wager, stake, payment, or account action is performed by Match Signal.'
     });
   } catch (error) {
     return json({
