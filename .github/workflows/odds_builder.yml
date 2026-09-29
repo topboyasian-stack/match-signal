@@ -101,12 +101,33 @@ jobs:
               assert data['market_price_combined_odds'] > 1
           if data.get('status') == 'BELOW_4_TARGET_AVAILABLE':
               assert data.get('best_available_legs')
+          batches = data.get('batches', [])
+          assert isinstance(batches, list)
+          assert int(data.get('batch_count', len(batches))) == len(batches)
+          seen_batch_ids = set()
+          seen_event_ids = set()
+          for batch in batches:
+              assert batch.get('batch_id') not in seen_batch_ids
+              seen_batch_ids.add(batch.get('batch_id'))
+              assert float(batch.get('combined_odds', 0)) >= 4.0
+              assert batch.get('paper_only') is True
+              assert batch.get('real_money_execution') is False
+              assert float(batch.get('combined_model_rating', 0)) >= 0
+              leg_ids = [str(x.get('event_id')) for x in batch.get('legs', [])]
+              assert len(leg_ids) == len(set(leg_ids)), 'duplicate event inside batch'
+              assert not (seen_event_ids & set(leg_ids)), 'batches must be disjoint'
+              seen_event_ids.update(leg_ids)
+          if batches:
+              ratings = [float(x.get('combined_model_rating', 0)) for x in batches]
+              assert ratings == sorted(ratings, reverse=True)
           print('V6 Accumulator QA:', json.dumps({
               'status': data.get('status'),
               'legs': len(data['qualified_legs']),
               'sports': sorted(sports),
               'candidates': data.get('candidates_considered'),
-              'reference_combined_odds': data.get('reference_combined_odds')
+              'reference_combined_odds': data.get('reference_combined_odds'),
+              'batches': data.get('batch_count', 0),
+              'top_model_rating': (data.get('batches') or [{}])[0].get('combined_model_rating') if data.get('batches') else None
           }))
           PY
       - name: Commit generated accumulator artifact
