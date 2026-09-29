@@ -60,15 +60,16 @@ async function upstream(path, params) {
   return payload;
 }
 
-async function collectEvents({ sportId, marketId, timeline = 168, pageSize = 100, maxPages = 8, fallbackPath = null, fallbackParams = {} }, targetIds) {
+async function collectEvents({ sportId, marketId, timeline = 168, pageSize = 100, maxPages = 5, primaryPath = '/api/ng/factsCenter/pcUpcomingEvents', fallbackPath = null, fallbackParams = {} }, targetIds) {
   const found = new Map();
+  const matchedTargets = new Set();
   let page = 1;
   let usedFallback = false;
 
-  while (page <= maxPages && found.size < targetIds.size) {
+  while (page <= maxPages && matchedTargets.size < targetIds.size) {
     let data;
     try {
-      const path = usedFallback && fallbackPath ? fallbackPath : '/api/ng/factsCenter/pcUpcomingEvents';
+      const path = usedFallback && fallbackPath ? fallbackPath : primaryPath;
       const params = {
         sportId,
         marketId,
@@ -94,8 +95,9 @@ async function collectEvents({ sportId, marketId, timeline = 168, pageSize = 100
     for (const tournament of tournaments) {
       for (const event of Array.isArray(tournament?.events) ? tournament.events : []) {
         const normalized = normalizeEvent(event, tournament);
-        if (targetIds.has(normalized.eventId)) {
+        if (normalized.eventId) {
           found.set(normalized.eventId, normalized);
+          if (targetIds.has(normalized.eventId)) matchedTargets.add(normalized.eventId);
         }
         count++;
       }
@@ -105,6 +107,53 @@ async function collectEvents({ sportId, marketId, timeline = 168, pageSize = 100
     page++;
   }
   return found;
+}
+
+function normalizeFixture(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .replace(/\s*vs\s*/g, ' vs ')
+    .trim();
+}
+
+function resolveCurrentEvent(leg, found) {
+  const direct = found.get(String(leg?.event_id || ''));
+  if (direct) return { event: direct, matched_by: 'event_id' };
+
+  const targetMatch = normalizeFixture(
+    leg?.match ||
+    leg?.fixture ||
+    String(leg?.pick || '').split('—')[0]
+  );
+  if (!targetMatch) return { event: null, matched_by: 'none' };
+
+  const targetStart = Date.parse(String(leg?.start_time || ''));
+  let best = null;
+  let bestDiff = Infinity;
+
+  for (const event of found.values()) {
+    const candidateMatch = normalizeFixture(
+      String(event?.homeTeamName || '') + ' vs ' + String(event?.awayTeamName || '')
+    );
+    if (!candidateMatch || candidateMatch !== targetMatch) continue;
+
+    const candidateStart = Number(event?.estimateStartTime || 0);
+    if (!candidateStart) {
+      if (!best) best = event;
+      continue;
+    }
+
+    const diff = Number.isFinite(targetStart)
+      ? Math.abs(candidateStart - targetStart)
+      : 0;
+    if (diff <= 30 * 60 * 1000 && diff < bestDiff) {
+      best = event;
+      bestDiff = diff;
+    }
+  }
+
+  return { event: best, matched_by: best ? 'fixture_time' : 'none' };
 }
 
 function productForLeg(leg) {
@@ -268,7 +317,8 @@ async function handlePost(context) {
       const events = await collectEvents({
         sportId: 'sr:sport:202120001',
         marketId: '1,18,10,29,11,26,36,14,60100,186,189,202,204,210',
-        fallbackPath: '/api/ng/factsCenter/wapConfigurableUpcomingEvents'
+        primaryPath: '/api/ng/factsCenter/wapConfigurableUpcomingEvents',
+        fallbackPath: '/api/ng/factsCenter/pcUpcomingEvents'
       }, virtualIds);
       for (const [id, event] of events) found.set(id, event);
     }
@@ -301,7 +351,8 @@ async function handlePost(context) {
     const validation = [];
     for (const leg of legs) {
       const eventId = String(leg?.event_id || '');
-      const event = found.get(eventId);
+      const resolved = resolveCurrentEvent(leg, found);
+      const event = resolved.event;
       if (!event) {
         validation.push({ event_id: eventId, ok: false, excluded: true, reason: 'Event is no longer present in SportyBet current catalogue.' });
         continue;
@@ -321,6 +372,8 @@ async function handlePost(context) {
       validation.push({
         event_id: eventId,
         ok: true,
+        resolved_by: resolved.matched_by,
+        resolved_event_id: event.eventId,
         market_id: selection.marketId,
         outcome_id: selection.outcomeId,
         specifier: selection.specifier,

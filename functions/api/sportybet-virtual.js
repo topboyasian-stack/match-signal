@@ -224,18 +224,29 @@ export async function onRequestGet(context){
   const dedup=new Map();
   for(const row of out){
     if(!row.event_id)continue;
+    const status=String(row.match_status||'').toLowerCase();
+    const inferredLive=row.live===true || /live|running|playing|in.?play|started|1st half|2nd half|half time/.test(status);
+    if(inferredLive) row.live=true;
     const start=Number(row.start_time_ms||0);
-    if(start>0&&start<cutoff&&!row.live)continue;
-    dedup.set(row.event_id,row);
+    const finished=/finish|ended|final|completed|settled|closed/.test(status);
+    if(start>0&&start<cutoff&&!row.live){
+      const recentlyStarted=start>=Date.now()-(4*60*60*1000)&&start<=Date.now()&&!finished;
+      if(!recentlyStarted)continue;
+    }
+    const previous=dedup.get(row.event_id);
+    // Live records must always win over the corresponding upcoming snapshot.
+    if(!previous || row.live===true || previous.live!==true) dedup.set(row.event_id,row);
   }
   const nowMs=Date.now();
   const events=[...dedup.values()].filter(e=>{
     if(e.live)return true;
     const start=Number(e.start_time_ms||0);
-    // Upcoming non-live records must have a real timestamp and still be
-    // current. This prevents stale/partial upstream records from reaching
-    // the Lab and being mistaken for predictions.
-    return start>0&&start>=nowMs-(30*60*1000);
+    const status=String(e.match_status||'').toLowerCase();
+    const finished=/finish|ended|final|completed|settled|closed/.test(status);
+    if(!start||finished)return false;
+    // Keep near-start and recently-started records visible even when SportyBet
+    // has not exposed a live flag yet, so the UI can show STARTED / awaiting feed.
+    return start>=nowMs-(4*60*60*1000);
   });
   const counts={};
   const filtered=[];
