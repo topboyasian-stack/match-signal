@@ -34,17 +34,27 @@
     });
     if(!Object.keys(targets).length||virtualLiveBusy)return Promise.resolve();
     virtualLiveBusy=true;
-    return fetch('./api/sportybet-virtual?sources=efootball,vfootball&pageSize=100&pageNum=1&timeline=24&_='+Date.now(),{cache:'no-store'})
-      .then(function(r){if(!r.ok)throw new Error('virtual live HTTP '+r.status);return r.json();})
-      .then(function(data){
+    var pages=[1,2,3,4,5];
+    return Promise.all(pages.map(function(pageNum){
+      return fetch('./api/sportybet-virtual?sources=efootball,vfootball&pageSize=100&pageNum='+pageNum+'&timeline=24&_='+Date.now(),{cache:'no-store'})
+        .then(function(r){if(!r.ok)throw new Error('virtual live HTTP '+r.status);return r.json();})
+        .catch(function(){return {events:[]};});
+    })).then(function(results){
+      results.forEach(function(data){
         var events=Array.isArray(data&&data.events)?data.events:[];
         events.forEach(function(e){
           var id=String(e&&e.event_id||'');if(!targets[id])return;
           var startMs=Number(e&&e.start_time_ms||0);if(startMs>0&&startMs<100000000000)startMs*=1000;
-          var type=virtualStatusType(e&&e.match_status,e&&e.live===true);
-          virtualLiveStates[id]={type:type,live:(e&&e.live===true)||type==='live',finished:type==='finished',status:String(e&&e.match_status||''),start_time:startMs||null,score:e&&e.score||null};
+          var status=String(e&&e.match_status||'');
+          var statusLower=status.toLowerCase();
+          var live=(e&&e.live===true)||/live|running|playing|in.?play|started|1st half|2nd half|half time/.test(statusLower);
+          var finished=/finish|ended|final|completed|settled|closed/.test(statusLower);
+          var candidate={type:finished?'finished':live?'live':'upcoming',live:live,finished:finished,status:status,start_time:startMs||null,score:e&&e.score||null};
+          var previous=virtualLiveStates[id];
+          if(!previous||candidate.live||candidate.finished||!previous.live)virtualLiveStates[id]=candidate;
         });
-      }).catch(function(){}).finally(function(){virtualLiveBusy=false;});
+      });
+    }).catch(function(){}).finally(function(){virtualLiveBusy=false;});
   }
 
   function formatElapsed(startMs){
@@ -82,6 +92,8 @@
         text='STARTS IN · '+formatCountdown(startMs);detail='Scheduled '+local(startRaw);el.classList.add('is-upcoming');
       }else if(state){
         text='STARTED · AWAITING LIVE FEED';detail=state.status||'Waiting for live score update';el.classList.add('is-waiting');
+      }else if(startMs&&startMs<=Date.now()){
+        text='STARTED · AWAITING LIVE FEED';detail='Kickoff passed; waiting for the live score feed';el.classList.add('is-waiting');
       }else{
         text='STARTING / LIVE FEED CHECK';detail=startMs?'Scheduled '+local(startRaw):'Start time unavailable';el.classList.add('is-waiting');
       }
