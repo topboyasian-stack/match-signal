@@ -1,44 +1,44 @@
 {
-  "generated_at": "2026-09-29T05:53:57.250250+00:00",
+  "generated_at": "2026-09-29T06:10:59.895291+00:00",
   "status": "FAIL",
-  "critical_issues": 6,
+  "critical_issues": 5,
   "warning_issues": 1,
   "info_issues": 0,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
       "status": "STALE",
-      "age_hours": 5.55,
+      "age_hours": 5.83,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.21,
+      "age_hours": 0.28,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 0.23,
+      "age_hours": 0.52,
       "threshold_hours": 4
     },
     {
       "engine": "virtual_lab",
       "status": "STALE",
-      "age_hours": 3.22,
+      "age_hours": 3.51,
       "threshold_hours": 1
     },
     {
       "engine": "darts_x",
       "status": "PASS",
-      "age_hours": 0.22,
+      "age_hours": 0.5,
       "threshold_hours": 2
     },
     {
       "engine": "table_tennis_x",
-      "status": "STALE",
-      "age_hours": 5.5,
+      "status": "PASS",
+      "age_hours": 0.01,
       "threshold_hours": 2
     },
     {
@@ -52,17 +52,12 @@
     {
       "code": "STALE_CORE_PREDICTION_PIPELINE",
       "severity": "critical",
-      "detail": "updated_at age 5.55h exceeds 4h"
+      "detail": "updated_at age 5.83h exceeds 4h"
     },
     {
       "code": "STALE_VIRTUAL_LAB",
       "severity": "critical",
-      "detail": "updated_at age 3.22h exceeds 1h"
-    },
-    {
-      "code": "STALE_TABLE_TENNIS_X",
-      "severity": "critical",
-      "detail": "updated_at age 5.50h exceeds 2h"
+      "detail": "updated_at age 3.51h exceeds 1h"
     },
     {
       "code": "CORE_PREDICTIONS_EMPTY",
@@ -82,7 +77,7 @@
     {
       "code": "PIPELINE_STALE",
       "severity": "critical",
-      "detail": "pipeline_status age 5.55h exceeds 4h"
+      "detail": "pipeline_status age 5.83h exceeds 4h"
     }
   ],
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
