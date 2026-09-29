@@ -151,7 +151,6 @@ async function renderUnifiedBoard(){
       const sources=[
         './data/predictions.json',
         './data/pdl_predictions.json',
-        './data/ere_divisie_predictions.json',
         './data/ere_divisie_predictions.json'
       ];
       const chunks=await Promise.all(sources.map(async url=>{
@@ -186,7 +185,7 @@ async function renderUnifiedBoard(){
         x.model_edge_vs_market=x.model_edge_vs_market??x.edge??null;
         return x;
       };
-      const labels=['football_tennis','football','football','football','football'];
+      const labels=['football_tennis','football','football'];
       all=chunks.flatMap((rows,i)=>rows.map(r=>normalize(r,labels[i]))).filter(x=>x.start_time);
       payload.generated_at=new Date().toISOString();
     }
