@@ -195,11 +195,19 @@
     var loading={booking_code:'',generated_at:new Date().toISOString(),error:''};
     writeBookingState(batch,loading);updateBookingPanel(batch,loading);
     return fetch('./api/sportybet-booking',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({batch_id:batch.batch_id}),cache:'no-store'})
-      .then(function(r){return r.json().catch(function(){return {ok:false,error:'Invalid booking response'};}).then(function(payload){
-        if(!r.ok||!payload.ok)throw new Error(String(payload&&payload.message||payload&&payload.error||('HTTP '+r.status)));
-        var ready={booking_code:String(payload.booking_code||''),share_url:String(payload.share_url||''),expires_at:payload.expires_at||null,generated_at:new Date().toISOString(),selection_count:Number(payload.selection_count||0)};
-        writeBookingState(batch,ready);updateBookingPanel(batch,ready);return ready;
-      });})
+      .then(function(r){
+        return r.text().then(function(text){
+          var payload=null;
+          try{payload=text?JSON.parse(text):null;}catch(_){}
+          if(!payload){
+            var raw=String(text||'').replace(/\s+/g,' ').slice(0,180);
+            throw new Error('Booking API HTTP '+r.status+' returned a non-JSON response'+(raw?' · '+raw:''));
+          }
+          if(!r.ok||!payload.ok)throw new Error(String(payload&&payload.message||payload&&payload.error||('HTTP '+r.status)));
+          var ready={booking_code:String(payload.booking_code||''),share_url:String(payload.share_url||''),expires_at:payload.expires_at||null,generated_at:new Date().toISOString(),selection_count:Number(payload.selection_count||0)};
+          writeBookingState(batch,ready);updateBookingPanel(batch,ready);return ready;
+        });
+      })
       .catch(function(err){
         var failed={booking_code:'',generated_at:new Date().toISOString(),error:String(err&&err.message||err)};
         writeBookingState(batch,failed);updateBookingPanel(batch,failed);return failed;
