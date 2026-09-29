@@ -1,26 +1,26 @@
 {
-  "generated_at": "2026-09-29T21:24:12.874394+00:00",
-  "status": "DEGRADED",
-  "critical_issues": 0,
+  "generated_at": "2026-09-29T22:25:33.211926+00:00",
+  "status": "FAIL",
+  "critical_issues": 2,
   "warning_issues": 1,
   "info_issues": 1,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
-      "status": "PASS",
-      "age_hours": 3.34,
+      "status": "STALE",
+      "age_hours": 4.36,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.06,
+      "age_hours": 1.02,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 0.01,
+      "age_hours": 1.03,
       "threshold_hours": 4
     },
     {
@@ -32,7 +32,7 @@
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 1.47,
+      "age_hours": 2.49,
       "threshold_hours": 0.5,
       "heartbeat_source": "unified_live_refresh"
     },
@@ -57,6 +57,11 @@
   ],
   "issues": [
     {
+      "code": "STALE_CORE_PREDICTION_PIPELINE",
+      "severity": "critical",
+      "detail": "updated_at age 4.36h exceeds 4h"
+    },
+    {
       "code": "TENNIS_FEED_EMPTY",
       "severity": "warning",
       "detail": "No current tennis predictions are published"
@@ -65,6 +70,11 @@
       "code": "SELECTION_GATE_EMPTY",
       "severity": "info",
       "detail": "Current prediction feed exists but the selected-candidate layer returned zero qualified selections; no gate was weakened"
+    },
+    {
+      "code": "PIPELINE_STALE",
+      "severity": "critical",
+      "detail": "pipeline_status age 4.36h exceeds 4h"
     }
   ],
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
