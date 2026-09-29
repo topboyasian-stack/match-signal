@@ -47,6 +47,26 @@ function scoreValue(value){
   return null;
 }
 
+function deepScore(root,side,depth=0){
+  if(root==null||depth>3||typeof root!=='object') return null;
+  const keys=Object.keys(root);
+  for(const key of keys){
+    const normalized=String(key).replace(/[^a-z0-9]/gi,'').toLowerCase();
+    if((normalized.includes(side+'score')||normalized.includes('score'+side))||(side==='home'&&normalized==='hscore')||(side==='away'&&normalized==='ascore')){
+      const n=scoreValue(root[key]);
+      if(n!=null) return n;
+    }
+  }
+  for(const key of keys){
+    const value=root[key];
+    if(value&&typeof value==='object'){
+      const nested=deepScore(value,side,depth+1);
+      if(nested!=null) return nested;
+    }
+  }
+  return null;
+}
+
 function extractScore(event){
   const homeCandidates=[
     event?.homeScore,event?.home_score,event?.scoreHome,event?.homeTeamScore,
@@ -61,6 +81,8 @@ function extractScore(event){
   let home=null,away=null;
   for(const value of homeCandidates){home=scoreValue(value);if(home!=null)break;}
   for(const value of awayCandidates){away=scoreValue(value);if(away!=null)break;}
+  if(home==null) home=deepScore(event,'home');
+  if(away==null) away=deepScore(event,'away');
   if(home==null && away==null) return null;
   return {home,away,text:(home!=null&&away!=null)?String(home)+' - '+String(away):null};
 }
