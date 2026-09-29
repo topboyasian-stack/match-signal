@@ -565,18 +565,23 @@ def _participant_identity(value):
     return s
 
 
-def participant_history_profiles():
-    """Load the latest automatic participant O/U profiles.
+_PARTICIPANT_PROFILES_CACHE=None
 
-    These profiles are generated only from settled SportyBet O/U history.
-    Because the builder runs on upcoming fixtures, the settled profile snapshot
-    is strictly prior to the candidate event time and is used only as a
-    conservative ranking feature, never as a replacement for model probability.
+
+def participant_history_profiles():
+    """Load participant O/U profiles once per Builder run.
+
+    The profiles are generated only from settled SportyBet history and are used
+    strictly as a ranking feature after all eligibility gates. Caching avoids
+    repeatedly parsing the same artifact for every candidate leg.
     """
-    profile_path=DATA/"virtual_lab_participant_profiles.json"
-    raw=load(profile_path,{})
-    profiles=raw.get("profiles") if isinstance(raw,dict) else []
-    return profiles if isinstance(profiles,list) else []
+    global _PARTICIPANT_PROFILES_CACHE
+    if _PARTICIPANT_PROFILES_CACHE is None:
+        profile_path=DATA/"virtual_lab_participant_profiles.json"
+        raw=load(profile_path,{})
+        profiles=raw.get("profiles") if isinstance(raw,dict) else []
+        _PARTICIPANT_PROFILES_CACHE=profiles if isinstance(profiles,list) else []
+    return _PARTICIPANT_PROFILES_CACHE
 
 
 def participant_history_signal(x):
