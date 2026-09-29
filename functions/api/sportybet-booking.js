@@ -234,11 +234,7 @@ async function buildSelection(leg, event) {
   return { error: 'No verified SportyBet booking mapper exists for product "' + product + '".' };
 }
 
-export async function onRequestOptions() {
-  return new Response(null, { status: 204, headers: JSON_HEADERS });
-}
-
-export async function onRequestPost(context) {
+async function handlePost(context) {
   try {
     const body = await context.request.json();
     const batchId = String(body?.batch_id || '').trim();
@@ -421,4 +417,14 @@ export async function onRequestPost(context) {
       message: String(error?.message || error).slice(0, 500)
     }, 502);
   }
+}
+
+export async function onRequest(context) {
+  if (context.request.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: JSON_HEADERS });
+  }
+  if (context.request.method !== 'POST') {
+    return json({ ok: false, error: 'METHOD_NOT_ALLOWED', message: 'Use POST to prepare a SportyBet booking code.' }, 405);
+  }
+  return handlePost(context);
 }
