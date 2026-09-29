@@ -144,8 +144,15 @@ function isOpenEvent(event) {
   return !status || /not start|not started|scheduled|prematch/.test(status);
 }
 
+function lineFromLeg(leg) {
+  if (leg?.line != null && Number.isFinite(Number(leg.line))) return Number(leg.line);
+  const pick = String(leg?.pick || '');
+  const match = pick.match(/(?:over|under)\s+([0-9]+(?:\.[0-9]+)?)/i);
+  return match ? Number(match[1]) : null;
+}
+
 function findVirtualSelection(leg, event) {
-  const requestedLine = Number(leg?.line);
+  const requestedLine = lineFromLeg(leg);
   const side = pickVirtualSide(leg);
   if (!Number.isFinite(requestedLine) || !side) {
     return { error: 'Could not map the Builder O/U selection to an exact line and side.' };
