@@ -715,27 +715,33 @@ def _batch_metrics(legs):
     probs=[clamp(float(x.get("model_probability") or 0.0)) for x in legs if float(x.get("model_probability") or 0.0)>0]
     edges=[float(x.get("model_edge") or 0.0) for x in legs]
     if not probs:
-        return {"model_rating":0.0,"combined_model_probability":0.0,"avg_model_probability":0.0,"avg_model_edge_percent":0.0}
-    # Geometric mean keeps the rating on a 0-100 scale while reflecting every
-    # leg in the batch. It is a strength score, not a probability of winning
-    # the whole accumulator (that is reported separately as a naive product).
-    gm=math.exp(sum(math.log(p) for p in probs)/len(probs))
+        return {
+            "model_rating":0.0,
+            "combined_model_probability":0.0,
+            "leg_strength_rating":0.0,
+            "avg_model_probability":0.0,
+            "avg_model_edge_percent":0.0
+        }
+    combined=math.prod(probs)
+    geometric=math.exp(sum(math.log(p) for p in probs)/len(probs))
     return {
-        "model_rating":round(gm*100.0,2),
-        "combined_model_probability":round(math.prod(probs),6),
+        # Headline rating is the whole-ticket naive joint model probability,
+        # expressed on a 0-100 scale. It is a transparent proxy, not a guarantee.
+        "model_rating":round(combined*100.0,2),
+        "combined_model_probability":round(combined,6),
+        "leg_strength_rating":round(geometric*100.0,2),
         "avg_model_probability":round(sum(probs)/len(probs)*100.0,2),
         "avg_model_edge_percent":round(sum(edges)/len(edges)*100.0,2) if edges else 0.0,
     }
 
 
 def build_value_batches(candidates):
-    """Create several disjoint 4.00+ paper batches from qualified live-priced legs.
+    """Create several disjoint 4.00+ paper batches using odds efficiency.
 
-    Batches are deliberately disjoint so the user can compare separate tickets
-    instead of seeing one long accumulator repeatedly mixed with the same legs.
-    vFootball receives first priority because it currently has the strongest
-    validated O/U research lane; other qualified virtual/core legs remain
-    available as fallback when needed.
+    The objective is not to minimize the number of legs. It is to find batches
+    whose product of model probabilities is as strong as possible while the
+    actual SportyBet combined odds clear 4.00. vFootball receives priority as
+    the current strongest validated research lane.
     """
     built=[make_leg(x) for x in candidates]
     remaining=[x for x in built if x.get("builder_eligible")]
@@ -744,16 +750,26 @@ def build_value_batches(candidates):
     used_leg_keys=set()
     product_priority={"vfootball":3,"efootball_gt":2,"efootball_adriatic":1}
 
+    def efficiency(leg):
+        try:
+            p=clamp(float(leg.get("model_probability") or 0.0))
+            odds=float(leg.get("bookmaker_odds") or 1.0)
+            if odds<=1.0:
+                return 999.0
+            return -math.log(p)/math.log(odds)
+        except (TypeError,ValueError,ZeroDivisionError):
+            return 999.0
+
     for _ in range(MAX_BATCHES):
         if not remaining:
             break
         remaining.sort(key=lambda x:(
-            product_priority.get(str(x.get("product") or ""),0),
-            float(x.get("model_probability") or 0),
-            float(x.get("model_edge") or 0),
-            float(x.get("selection_score") or 0),
-            float(x.get("bookmaker_odds") or 0)
-        ),reverse=True)
+            efficiency(x),
+            -product_priority.get(str(x.get("product") or ""),0),
+            -float(x.get("model_edge") or 0),
+            -float(x.get("model_probability") or 0),
+            -float(x.get("bookmaker_odds") or 0)
+        ))
         batch=[]
         batch_events=set()
         batch_participants=set()
@@ -766,11 +782,27 @@ def build_value_batches(candidates):
             if pids & batch_participants:
                 continue
             batch.append(leg)
-            if eid: batch_events.add(eid)
+            if eid:
+                batch_events.add(eid)
             batch_participants.update(pids)
             combined*=float(leg.get("bookmaker_odds") or 1.0)
             if combined>=MIN_COMBINED_ODDS or len(batch)>=MAX_LEGS:
                 break
+        if not batch or combined<MIN_COMBINED_ODDS:
+            # If participant-correlation prevents a 4.00+ batch, retry using
+            # event uniqueness only. This still prevents same-event market
+            # duplication while avoiding an accidental empty Builder.
+            batch=[];batch_events=set();batch_participants=set();combined=1.0
+            for leg in remaining:
+                eid=str(leg.get("event_id") or "")
+                if eid and eid in batch_events:
+                    continue
+                batch.append(leg)
+                if eid:
+                    batch_events.add(eid)
+                combined*=float(leg.get("bookmaker_odds") or 1.0)
+                if combined>=MIN_COMBINED_ODDS or len(batch)>=MAX_LEGS:
+                    break
         if not batch or combined<MIN_COMBINED_ODDS:
             break
 
@@ -779,18 +811,20 @@ def build_value_batches(candidates):
         batch_id=f"BATCH-{len(batches)+1:02d}"
         batches.append({
             "batch_id":batch_id,
-            "label":f"{batch_id} · Model Rating {metrics['model_rating']:.1f}/100",
+            "label":f"{batch_id} · Combined Model Rating {metrics['model_rating']:.1f}/100",
             "rank_pending":True,
             "legs":batch,
             "leg_count":len(batch),
             "combined_odds":round(combined,3),
             "combined_model_rating":metrics["model_rating"],
             "combined_model_probability":metrics["combined_model_probability"],
+            "leg_strength_rating":metrics["leg_strength_rating"],
             "avg_model_probability":metrics["avg_model_probability"],
             "avg_model_edge_percent":metrics["avg_model_edge_percent"],
             "products":products,
             "paper_only":True,
             "real_money_execution":False,
+            "correlation_policy":"same-event prevented; participant reuse used only as fallback if strict disjoint construction cannot reach 4.00+"
         })
         chosen_keys={(str(x.get("event_id") or ""),str(x.get("pick") or ""),str(x.get("line") or "")) for x in batch}
         used_leg_keys.update(chosen_keys)
@@ -801,7 +835,7 @@ def build_value_batches(candidates):
     for i,b in enumerate(batches,1):
         b["rank"]=i
         b["rank_pending"]=False
-        b["label"]=f"BATCH-{i:02d} · Model Rating {float(b.get('combined_model_rating') or 0):.1f}/100"
+        b["label"]=f"BATCH-{i:02d} · Combined Model Rating {float(b.get('combined_model_rating') or 0):.1f}/100"
     return batches,built,{
         "batch_count":len(batches),
         "max_batches":MAX_BATCHES,
@@ -809,6 +843,7 @@ def build_value_batches(candidates):
         "min_combined_odds":MIN_COMBINED_ODDS,
         "priority_product":"vfootball",
         "used_unique_events":len(used_events),
+        "ranking_metric":"naive joint model probability; leg-strength rating reported separately",
     }
 
 
@@ -937,7 +972,8 @@ def main():
             "max_batches":MAX_BATCHES,
             "disjoint_batches":True,
             "ranking":"combined_model_rating descending, then average model edge, then combined odds",
-            "model_rating_definition":"100 × geometric mean of leg model probabilities",
+            "model_rating_definition":"100 × product of leg model probabilities (naive joint proxy)",
+            "leg_strength_definition":"100 × geometric mean of leg model probabilities",
             "primary_lane":"vfootball"
         },
         "batches":batches,
