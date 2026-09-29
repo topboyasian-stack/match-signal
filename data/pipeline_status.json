@@ -1,105 +1,35 @@
 {
-  "updated_at": "2026-09-29T10:38:27.697389+00:00",
-  "prediction_count": 237,
-  "football_count": 225,
-  "tennis_count": 12,
-  "errors": [],
+  "updated_at": "2026-09-29T14:24:12.930584+00:00",
+  "prediction_count": 83,
+  "football_count": 83,
+  "tennis_count": 0,
+  "errors": [
+    "football:La Liga:2026-09-29:403 Client Error: Forbidden for url: https://site.api.espn.com/apis/site/v2/sports/soccer/esp.1/scoreboard?dates=20260929",
+    "football:La Liga:2026-09-30:403 Client Error: Forbidden for url: https://site.api.espn.com/apis/site/v2/sports/soccer/esp.1/scoreboard?dates=20260930",
+    "football:La Liga:2026-10-01:403 Client Error: Forbidden for url: https://site.api.espn.com/apis/site/v2/sports/soccer/esp.1/scoreboard?dates=20261001",
+    "tennis:ATP:no actionable singles matches in next 7 days"
+  ],
   "quality_control": {
-    "rejected_total": 157,
-    "rejected_by_reason": {
-      "missing real player name": 100,
-      "non-singles draw": 57
-    },
-    "rejected_by_tour": {
-      "WTA": {
-        "missing real player name": 100,
-        "non-singles draw": 57
-      }
-    },
+    "rejected_total": 0,
+    "rejected_by_reason": {},
+    "rejected_by_tour": {},
     "deduplicated_matches": 0,
     "deduplicated_examples": [],
-    "filtered_low_confidence": 9,
-    "filtered_low_confidence_examples": [
-      {
-        "match": "Jessica Bouzas Maneiro vs Tian Fangran",
-        "tour": "WTA",
-        "confidence": 0.5074,
-        "signal_components": 3
-      },
-      {
-        "match": "Alexandra Shubladze vs Lu Jia-Jing",
-        "tour": "WTA",
-        "confidence": 0.5123,
-        "signal_components": 2
-      },
-      {
-        "match": "Wei Sijia vs Fiona Ferro",
-        "tour": "WTA",
-        "confidence": 0.5015,
-        "signal_components": 3
-      },
-      {
-        "match": "Alevtina Ibragimova vs Kyoka Okamura",
-        "tour": "WTA",
-        "confidence": 0.5184,
-        "signal_components": 2
-      },
-      {
-        "match": "Anastasia Tikhonova vs Simona Waltert",
-        "tour": "WTA",
-        "confidence": 0.5074,
-        "signal_components": 3
-      },
-      {
-        "match": "Lucia Bronzetti vs Lois Boisson",
-        "tour": "WTA",
-        "confidence": 0.5148,
-        "signal_components": 3
-      },
-      {
-        "match": "Ksenia Efremova vs Martyna Kubka",
-        "tour": "WTA",
-        "confidence": 0.5,
-        "signal_components": 1
-      },
-      {
-        "match": "Carole Monnet vs Cagla Buyukakcay",
-        "tour": "WTA",
-        "confidence": 0.5102,
-        "signal_components": 2
-      },
-      {
-        "match": "Fiona Crawley vs Elena Pridankina",
-        "tour": "WTA",
-        "confidence": 0.5394,
-        "signal_components": 2
-      }
-    ]
+    "filtered_low_confidence": 0,
+    "filtered_low_confidence_examples": []
   },
   "market_data": {
     "provider": "SportyBet NG",
-    "fetched_at": "2026-09-29T10:37:37.058749+00:00",
-    "football_events": 1156,
-    "tennis_events": 348,
-    "matched": 129,
-    "unmatched": 108,
+    "fetched_at": "2026-09-29T14:23:32.835242+00:00",
+    "football_events": 1273,
+    "tennis_events": 371,
+    "matched": 63,
+    "unmatched": 20,
     "match_errors": [],
     "fetch_errors": [],
-    "coverage": 0.5443
+    "coverage": 0.759
   },
   "data_source": "ESPN public scoreboards + ESPN ATP/WTA rankings + recent 60-day results + SportyBet NG live market layer",
   "free_server_cost": true,
-  "model_version": "3.2 calibrated tennis signals + fixture QC + SportyBet market baseline",
-  "basketball_count": 0,
-  "basketball_qualified_count": 0,
-  "basketball_settled": 0,
-  "basketball_market_provider": "OddsPapi",
-  "basketball_market_provider_status": "http_429",
-  "basketball_sources": [
-    {
-      "source": "Official BBL schedule",
-      "events": 0,
-      "status": "ok"
-    }
-  ]
+  "model_version": "3.2 calibrated tennis signals + fixture QC + SportyBet market baseline"
 }
