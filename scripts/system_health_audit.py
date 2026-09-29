@@ -70,15 +70,30 @@ for args in [
     ("core_prediction_pipeline",pipeline,"updated_at",4),
     ("odds_builder",odds,"generated_at",8),
     ("expansion",expansion,"updated_at",4),
-    # The collector heartbeat is the canonical freshness signal for Virtual Lab.
-    # virtual_lab_live.json is a large live snapshot and may be intentionally omitted from Git publication.
-    ("virtual_lab",virtual,"updated_at",1),
-    ("darts_x",darts,"updated_at",2),
-    ("table_tennis_x",table,"updated_at",2),
+    # Operational Virtual health follows the live SportyBet snapshot, not the
+    # slower research/settlement artifact.
+    ("virtual_live_feed",virtual_live,"updated_at",0.25),
     ("unified_upcoming",unified,"generated_at",2),
 ]:
     x=freshness(*args)
     if x:checks.append(x)
+
+# Retired research engines are tracked for visibility but cannot fail the
+# production health state.
+retired = {
+    "darts_x": {"status": "RETIRED", "artifact_at": darts.get("updated_at")},
+    "table_tennis_x": {"status": "RETIRED", "artifact_at": table.get("updated_at")},
+    "basketball": {"status": "RETIRED", "provider": (pipeline.get("basketball_market_provider_status") or "not_active")},
+}
+checks.append({"engine":"retired_engines","status":"INFO","lanes":retired})
+
+live_status=str(virtual_live.get("status") or "")
+live_events=int(virtual_live.get("events_count") or 0)
+if live_status != "LIVE" or live_events <= 0:
+    checks.append(issue("VIRTUAL_LIVE_FEED_INVALID","critical",f"live virtual status={live_status!r}, events={live_events}"))
+collector_age=age_hours(virtual.get("updated_at"))
+if collector_age > 2:
+    checks.append({"engine":"virtual_lab_research_collector","status":"INFO","age_hours":round(collector_age,2),"threshold_hours":2})
 
 prediction_count=int(pipeline.get("prediction_count") or 0)
 football_count=int(pipeline.get("football_count") or 0)
@@ -87,15 +102,10 @@ if prediction_count<=0:checks.append(issue("CORE_PREDICTIONS_EMPTY","critical","
 if football_count<=0:checks.append(issue("FOOTBALL_FEED_EMPTY","critical","No current football predictions are published"))
 if tennis_count<=0:checks.append(issue("TENNIS_FEED_EMPTY","warning","No current tennis predictions are published"))
 
-if int(darts.get("upcoming_events") or 0)<=0:
-    checks.append(issue("DARTS_NO_FORWARD_FIXTURES","warning","Darts-X has no forward fixtures"))
-if int(table.get("upcoming_events") or 0)<=0:
-    checks.append(issue("TABLE_TENNIS_NO_FORWARD_FIXTURES","warning","Table Tennis-X has no forward fixtures"))
-
-virtual_products=virtual.get("upcoming_by_product") or {}
-for product in ("efootball_gt","efootball_adriatic","vfootball"):
+virtual_products=virtual_live.get("product_counts") or {}
+for product in ("efootball_gt","vfootball"):
     if int(virtual_products.get(product) or 0)<=0:
-        checks.append(issue("VIRTUAL_PRODUCT_EMPTY","warning",f"{product} has no upcoming events in the latest collector snapshot"))
+        checks.append(issue("VIRTUAL_PRODUCT_EMPTY","warning",f"{product} has no upcoming events in the latest live snapshot"))
 
 sel=int(selection.get("selected_predictions") or 0)
 if prediction_count>0 and sel==0:
