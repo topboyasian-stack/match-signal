@@ -130,22 +130,68 @@
   }
   function render(data) {
     var target=document.getElementById('oddsBuilder'); if(!target)return;
-    var activeLegs=Array.isArray(data.qualified_legs)?data.qualified_legs:[],settledLegs=Array.isArray(data.settled_legs)?data.settled_legs:[],sports=[],settledIds={};
-    settledLegs.forEach(function(l){if(l&&l.event_id)settledIds[String(l.event_id)]=true;});
-    var legs=activeLegs.filter(function(l){return !settledIds[String(l&&l.event_id||'')];});
-    var builderLegs=legs.concat(settledLegs);
-    builderLegs.forEach(function(l){var s=String(l.sport||'').toUpperCase();if(s&&sports.indexOf(s)<0)sports.push(s);});
-    var cards=builderLegs.map(function(l,i){
-      var settled=effectiveSettlement(l),isSettled=!!(settled&&settled.finished),resultText=settled&&settled.correct===true?'✓ WON':settled&&settled.correct===false?'✕ LOST':'ENDED';
-      return '<article class="card '+(isSettled?'settled-card':'')+'"><div class="meta"><span>Leg '+(i+1)+' · '+esc(String(l.sport||'').toUpperCase())+' · '+esc(l.competition||'—')+'</span><span>'+(isSettled?'<b class="result-badge '+(settled.correct===true?'won':'lost')+'">'+resultText+'</b>':'Fair odds '+esc(l.model_fair_odds==null?'—':l.model_fair_odds))+'</span></div><div class="teams">'+esc(l.match||'—')+'</div><div class="pick">Selection: <b>'+esc(l.pick||'—')+'</b><span class="conf">Model '+pct(l.model_probability)+'</span></div>'+timer(l.start_time,l)+'<div class="startTime">'+(isSettled?'Result confirmed · '+esc(local(l.start_time)):'Start: '+esc(local(l.start_time))+' <span>· your browser time</span>')+'</div><div class="section"><div class="row"><span>Market</span><b>'+esc(l.market||'—')+'</b></div><div class="row"><span>Model probability</span><b>'+pct(l.model_probability)+'</b></div><div class="row"><span>Model fair odds</span><b>'+esc(l.model_fair_odds==null?'—':l.model_fair_odds)+'</b></div><div class="row"><span>SportyBet price</span><b>'+esc(l.bookmaker_odds==null?'—':l.bookmaker_odds)+'</b></div><div class="row"><span>Model edge vs market</span><b>'+esc(l.model_edge==null?'—':pct(l.model_edge))+'</b></div><div class="row"><span>Result</span><b class="'+(isSettled?(settled.correct===true?'won-text':'lost-text'):'')+'">'+(isSettled?resultText:'Pending')+'</b></div></div></article>';
-    }).join('');
-    var gate=data.research_gate||{};
-    var status=data.status==='LIVE_VALUE_SET'?'RESEARCH-QUALIFIED 4.00+ PAPER SET':data.status==='BELOW_4_TARGET_AVAILABLE'?'BEST AVAILABLE SET BELOW 4.00':data.status==='SINGLE_LIVE_VALUE'?'BELOW TARGET — NOT FORCED':data.status==='UPSTREAM_RESEARCH_GATE_BLOCKED'?'LOCKED — UPSTREAM TENNIS RESEARCH GATE':(data.status||'—');
-    var gateNote=gate.upstream_blocked
-      ? '<div class="section warning"><b>Builder locked by research evidence</b><div class="sub">Tennis is not currently live-eligible. The upstream selection/risk gate has produced no qualified predictions, so this builder will not manufacture a 3–4 leg slip from weak predictions.</div><div class="row"><span>Selected upstream predictions</span><b>'+esc(gate.selected_predictions==null?'—':gate.selected_predictions)+'</b></div><div class="row"><span>Tennis live eligibility</span><b>'+esc(gate.tennis_live_eligible?'YES':'NO')+'</b></div></div>'
-      : '<div class="section"><b>Research gate passed</b><div class="sub">Only fresh SportyBet prices, complete markets, calibrated edge and uncertainty/data-quality gates can produce a leg.</div></div>';
-    var settledPanel='';
-    target.innerHTML='<div class="metrics"><div class="metric"><small>Active legs</small><strong>'+legs.length+'/20</strong></div><div class="metric"><small>Sports</small><strong>'+esc(sports.length?sports.join(' + '):'—')+'</strong></div><div class="metric"><small>Status</small><strong>'+esc(status)+'</strong></div><div class="metric"><small>Combined SportyBet odds</small><strong>'+esc(data.market_price_combined_odds==null?'—':data.market_price_combined_odds)+'</strong></div></div><div class="panel"><b>Evidence-Gated 4.00+ Paper Accumulator · Variable Legs</b><div class="sub">Research-qualified selections only. Confirm current bookmaker prices yourself before placing an accumulator.</div><div class="grid" style="margin-top:14px">'+(cards||'<div class="empty">No qualified selections currently available. The builder is intentionally locked rather than filling the slip with weak predictions.</div>')+'</div><div class="section"><div class="row"><span>Bookmaker feed</span><b>Manual confirmation required</b></div><div class="row"><span>Combined SportyBet odds</span><b>'+esc(data.market_price_combined_odds==null?'—':data.market_price_combined_odds)+'</b></div></div>'+gateNote+'</div>'+settledPanel;
+    var batches=Array.isArray(data.batches)?data.batches:[];
+    var settledLegs=Array.isArray(data.settled_legs)?data.settled_legs:[];
+    var sports=[], batchCount=batches.length;
+    batches.forEach(function(b){
+      (Array.isArray(b.products)?b.products:[]).forEach(function(p){
+        var s=String(p||'').toUpperCase();
+        if(s&&sports.indexOf(s)<0)sports.push(s);
+      });
+      (Array.isArray(b.legs)?b.legs:[]).forEach(function(l){
+        var s=String(l.product||l.sport||'').toUpperCase();
+        if(s&&sports.indexOf(s)<0)sports.push(s);
+      });
+    });
+    var top=batches.length?batches[0]:null;
+    var topRating=top&&top.combined_model_rating!=null?Number(top.combined_model_rating):null;
+    var topJoint=top&&top.combined_model_probability!=null?Number(top.combined_model_probability):null;
+    var status=data.status==='LIVE_VALUE_SET'
+      ? batchCount+' RESEARCH BATCH'+(batchCount===1?'':'ES')+' · 4.00+'
+      : data.status==='BELOW_4_TARGET_AVAILABLE'
+        ? 'BEST AVAILABLE SET BELOW 4.00'
+        : data.status==='UPSTREAM_RESEARCH_GATE_BLOCKED'
+          ? 'NO QUALIFIED BATCHES'
+          : (data.status||'—');
+
+    function legCard(l,i,batchIndex){
+      var settled=effectiveSettlement(l),isSettled=!!(settled&&settled.finished);
+      var resultText=settled&&settled.correct===true?'✓ WON':settled&&settled.correct===false?'✕ LOST':'ENDED';
+      var product=String(l.product||l.sport||'virtual').toUpperCase();
+      return '<article class="card '+(isSettled?'settled-card':'')+'"><div class="meta"><span>Leg '+(i+1)+' · '+esc(product)+' · '+esc(l.competition||'—')+'</span><span>'+(isSettled?'<b class="result-badge '+(settled.correct===true?'won':'lost')+'">'+resultText+'</b>':'SportyBet '+esc(l.bookmaker_odds==null?'—':l.bookmaker_odds))+'</span></div><div class="teams">'+esc(l.match||'—')+'</div><div class="pick">Selection: <b>'+esc(l.pick||'—')+'</b><span class="conf">Model '+pct(l.model_probability)+'</span></div>'+timer(l.start_time,l)+'<div class="startTime">'+(isSettled?'Result confirmed · '+esc(local(l.start_time)):'Start: '+esc(local(l.start_time))+' <span>· your browser time</span>')+'</div><div class="section"><div class="row"><span>Market</span><b>'+esc(l.market||'—')+'</b></div><div class="row"><span>Model probability</span><b>'+pct(l.model_probability)+'</b></div><div class="row"><span>Model fair odds</span><b>'+esc(l.model_fair_odds==null?'—':l.model_fair_odds)+'</b></div><div class="row"><span>SportyBet price</span><b>'+esc(l.bookmaker_odds==null?'—':l.bookmaker_odds)+'</b></div><div class="row"><span>Model edge vs market</span><b>'+esc(l.model_edge==null?'—':pct(l.model_edge))+'</b></div><div class="row"><span>Market price age</span><b>'+esc(l.market_odds_age_seconds==null?'—':Math.round(Number(l.market_odds_age_seconds))+'s')+'</b></div><div class="row"><span>Result</span><b class="'+(isSettled?(settled.correct===true?'won-text':'lost-text'):'')+'">'+(isSettled?resultText:'Pending')+'</b></div></div></article>';
+    }
+
+    function batchCard(b,idx){
+      var legs=Array.isArray(b.legs)?b.legs:[];
+      var joint=b.combined_model_probability==null?'—':pct(b.combined_model_probability);
+      var strength=b.leg_strength_rating==null?'—':Number(b.leg_strength_rating).toFixed(1)+'/100';
+      var rating=b.combined_model_rating==null?'—':Number(b.combined_model_rating).toFixed(1)+'/100';
+      var avgEdge=b.avg_model_edge_percent==null?'—':Number(b.avg_model_edge_percent).toFixed(1)+'%';
+      var products=(Array.isArray(b.products)?b.products:[]).map(function(x){return String(x||'').toUpperCase();}).filter(Boolean).join(' + ') || 'VIRTUAL';
+      var summary=(b.label||('BATCH-'+String(idx+1).padStart(2,'0')))+' · '+esc(products);
+      var body=legs.map(function(l,i){return legCard(l,i,idx);}).join('');
+      return '<details class="batch-card" '+(idx===0?'open':'')+'><summary class="batch-summary"><div><span class="batch-kicker">Batch '+String(idx+1).padStart(2,'0')+'</span><strong>'+esc(products)+' · Combined Model Rating '+esc(rating)+'</strong><small>'+esc((b.leg_count||legs.length)+' legs · '+(b.avg_model_edge_percent==null?'—':Number(b.avg_model_edge_percent).toFixed(1)+'% avg edge')+' · '+(b.primary_lane==='vfootball'?'vFootball priority lane':'fallback virtual lane')+'</small></div><div class="batch-odds">'+esc(b.combined_odds==null?'—':Number(b.combined_odds).toFixed(3))+'x</div></summary><div class="batch-metrics"><div><span>Combined model rating</span><b>'+esc(rating)+'</b></div><div><span>Naive joint model probability</span><b>'+esc(joint)+'</b></div><div><span>Leg-strength rating</span><b>'+esc(strength)+'</b></div><div><span>Average model edge</span><b>'+esc(avgEdge)+'</b></div><div><span>Combined SportyBet odds</span><b>'+esc(b.combined_odds==null?'—':Number(b.combined_odds).toFixed(3))+'</b></div></div><div class="sub">The joint probability is an independence proxy, not a guarantee of the whole ticket winning. Prices shown are the current SportyBet snapshot used by the Builder.</div><div class="grid" style="margin-top:14px">'+(body||'<div class="empty">No legs in this batch.</div>')+'</div></details>';
+    }
+
+    var cards=batches.map(batchCard).join('');
+    if(!batches.length){
+      var fallback=Array.isArray(data.qualified_legs)?data.qualified_legs:[];
+      cards=fallback.map(function(l,i){return legCard(l,i,0);}).join('');
+    }
+
+    var gate=data.research_gate||{}, virtualCount=Number((data.candidates_considered||{}).virtual||0);
+    var gateNote;
+    if(batches.length){
+      gateNote='<div class="section"><b>Research batch gate active</b><div class="sub">The Builder evaluates Virtual lanes independently of the core tennis gate. vFootball is the primary lane because its existing untouched O/U evidence is currently the strongest active research lane.</div><div class="row"><span>Qualified Virtual candidates</span><b>'+esc(virtualCount)+'</b></div><div class="row"><span>SportyBet price authority</span><b>Fresh Unified Snapshot</b></div></div>';
+    } else if(virtualCount>0){
+      gateNote='<div class="section warning"><b>Virtual lane evaluated, but no 4.00+ batch survived all gates</b><div class="sub">No weak selections are added just to reach 4.00.</div><div class="row"><span>Virtual candidates</span><b>'+esc(virtualCount)+'</b></div></div>';
+    } else if(gate.upstream_blocked){
+      gateNote='<div class="section warning"><b>No current batch available</b><div class="sub">The core prediction gate is separate from Virtual and was not allowed to manufacture a slip.</div></div>';
+    } else {
+      gateNote='<div class="section"><b>Research gate active</b><div class="sub">Only fresh SportyBet prices, calibrated edge and evidence gates can produce a batch.</div></div>';
+    }
+
+    target.innerHTML='<div class="metrics"><div class="metric"><small>Active batches</small><strong>'+batchCount+'/6</strong></div><div class="metric"><small>Sports</small><strong>'+esc(sports.length?sports.join(' + '):'—')+'</strong></div><div class="metric"><small>Top combined model rating</small><strong>'+esc(topRating==null?'—':topRating.toFixed(1)+'/100')+'</strong></div><div class="metric"><small>Top combined SportyBet odds</small><strong>'+esc(top&&top.combined_odds!=null?Number(top.combined_odds).toFixed(3):'—')+'</strong></div></div><div class="panel"><b>Ranked 4.00+ Paper Research Batches</b><div class="sub">Separate batches are kept disjoint by event. Higher combined model rating means a stronger naive joint model-probability proxy; it is not a guarantee.</div><div class="batch-list">'+(cards||'<div class="empty">No qualified 4.00+ batches are currently available.</div>')+'</div><div class="section"><div class="row"><span>Bookmaker feed</span><b>Fresh SportyBet snapshot · paper only</b></div><div class="row"><span>Top batch joint-model probability proxy</span><b>'+esc(topJoint==null?'—':pct(topJoint))+'</b></div><div class="row"><span>Candidate pool</span><b>'+esc(virtualCount)+'</b></div></div>'+gateNote+'</div>';
     updateTimers();
   }
   function load(){
@@ -158,7 +204,7 @@
   }
   function boot(){
     if(!document.getElementById('odds-builder-result-style')){
-      var s=document.createElement('style');s.id='odds-builder-result-style';s.textContent='.timer.finished-correct{border-color:#35d49a;background:#06251a}.timer.finished-correct .timerValue{color:#35d49a}.timer.finished-wrong{border-color:#ff7474;background:#2a0d12}.timer.finished-wrong .timerValue{color:#ff7474}.timer.finished{border-color:#8f98b8}.timer.finished .timerValue{color:#eef1fb}.settled-card{border-color:#35d49a;background:#092018}.settled-card .meta{color:#35d49a}.result-badge{font-weight:900;letter-spacing:.02em}.result-badge.won,.won-text{color:#35d49a}.result-badge.lost,.lost-text{color:#ff7474}';document.head.appendChild(s);
+      var s=document.createElement('style');s.id='odds-builder-result-style';s.textContent=.batch-list{display:grid;gap:14px}.batch-card{border:1px solid rgba(255,255,255,.1);border-radius:16px;background:#0c121c;overflow:hidden}.batch-summary{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:18px 20px;cursor:pointer;list-style:none}.batch-summary::-webkit-details-marker{display:none}.batch-kicker{display:block;font-size:11px;letter-spacing:.12em;text-transform:uppercase;opacity:.7;margin-bottom:4px}.batch-summary strong{display:block;font-size:16px}.batch-summary small{display:block;opacity:.72;margin-top:5px}.batch-odds{font-size:22px;font-weight:900;white-space:nowrap}.batch-metrics{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;padding:0 20px 14px}.batch-metrics>div{padding:10px 12px;border-radius:10px;background:rgba(255,255,255,.035)}.batch-metrics span{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.08em;opacity:.65}.batch-metrics b{display:block;margin-top:4px;font-size:15px}.batch-card>.sub{padding:0 20px 14px}.batch-card>.grid{padding:0 20px 20px}@media(max-width:900px){.batch-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}};'.timer.finished-correct{border-color:#35d49a;background:#06251a}.timer.finished-correct .timerValue{color:#35d49a}.timer.finished-wrong{border-color:#ff7474;background:#2a0d12}.timer.finished-wrong .timerValue{color:#ff7474}.timer.finished{border-color:#8f98b8}.timer.finished .timerValue{color:#eef1fb}.settled-card{border-color:#35d49a;background:#092018}.settled-card .meta{color:#35d49a}.result-badge{font-weight:900;letter-spacing:.02em}.result-badge.won,.won-text{color:#35d49a}.result-badge.lost,.lost-text{color:#ff7474}';document.head.appendChild(s);
     }
     load();window.setInterval(load,60000);window.setInterval(updateTimers,1000);
   }
