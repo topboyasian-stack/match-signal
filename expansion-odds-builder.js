@@ -167,10 +167,33 @@
       var strength=b.leg_strength_rating==null?'—':Number(b.leg_strength_rating).toFixed(1)+'/100';
       var rating=b.combined_model_rating==null?'—':Number(b.combined_model_rating).toFixed(1)+'/100';
       var avgEdge=b.avg_model_edge_percent==null?'—':Number(b.avg_model_edge_percent).toFixed(1)+'%';
-      var products=(Array.isArray(b.products)?b.products:[]).map(function(x){return String(x||'').toUpperCase();}).filter(Boolean).join(' + ') || 'VIRTUAL';
-      var summary=(b.label||('BATCH-'+String(idx+1).padStart(2,'0')))+' · '+esc(products);
+      var oddsText=b.combined_odds==null?'—':Number(b.combined_odds).toFixed(3);
+      var products=(Array.isArray(b.products)?b.products:[])
+        .map(function(x){return String(x||'').toUpperCase();})
+        .filter(Boolean)
+        .join(' + ') || 'VIRTUAL';
+      var laneText=b.primary_lane==='vfootball'?'vFootball priority lane':'fallback virtual lane';
+      var batchNum=String(idx+1).padStart(2,'0');
       var body=legs.map(function(l,i){return legCard(l,i,idx);}).join('');
-      return '<details class="batch-card" '+(idx===0?'open':'')+'><summary class="batch-summary"><div><span class="batch-kicker">Batch '+String(idx+1).padStart(2,'0')+'</span><strong>'+esc(products)+' · Combined Model Rating '+esc(rating)+'</strong><small>'+esc((b.leg_count||legs.length)+' legs · '+(b.avg_model_edge_percent==null?'—':Number(b.avg_model_edge_percent).toFixed(1)+'% avg edge')+' · '+(b.primary_lane==='vfootball'?'vFootball priority lane':'fallback virtual lane')+'</small></div><div class="batch-odds">'+esc(b.combined_odds==null?'—':Number(b.combined_odds).toFixed(3))+'x</div></summary><div class="batch-metrics"><div><span>Combined model rating</span><b>'+esc(rating)+'</b></div><div><span>Naive joint model probability</span><b>'+esc(joint)+'</b></div><div><span>Leg-strength rating</span><b>'+esc(strength)+'</b></div><div><span>Average model edge</span><b>'+esc(avgEdge)+'</b></div><div><span>Combined SportyBet odds</span><b>'+esc(b.combined_odds==null?'—':Number(b.combined_odds).toFixed(3))+'</b></div></div><div class="sub">The joint probability is an independence proxy, not a guarantee of the whole ticket winning. Prices shown are the current SportyBet snapshot used by the Builder.</div><div class="grid" style="margin-top:14px">'+(body||'<div class="empty">No legs in this batch.</div>')+'</div></details>';
+      return [
+        '<details class="batch-card" '+(idx===0?'open':'')+'>',
+        '<summary class="batch-summary">',
+        '<div><span class="batch-kicker">Batch '+batchNum+'</span>',
+        '<strong>'+esc(products)+' · Combined Model Rating '+esc(rating)+'</strong>',
+        '<small>'+esc(String(b.leg_count||legs.length)+' legs · '+avgEdge+' avg edge · '+laneText)+'</small></div>',
+        '<div class="batch-odds">'+esc(oddsText)+'x</div>',
+        '</summary>',
+        '<div class="batch-metrics">',
+        '<div><span>Combined model rating</span><b>'+esc(rating)+'</b></div>',
+        '<div><span>Naive joint model probability</span><b>'+esc(joint)+'</b></div>',
+        '<div><span>Leg-strength rating</span><b>'+esc(strength)+'</b></div>',
+        '<div><span>Average model edge</span><b>'+esc(avgEdge)+'</b></div>',
+        '<div><span>Combined SportyBet odds</span><b>'+esc(oddsText)+'</b></div>',
+        '</div>',
+        '<div class="sub">The joint probability is an independence proxy, not a guarantee of the whole ticket winning. Prices shown are the current SportyBet snapshot used by the Builder.</div>',
+        '<div class="grid" style="margin-top:14px">'+(body||'<div class="empty">No legs in this batch.</div>')+'</div>',
+        '</details>'
+      ].join('');
     }
 
     var cards=batches.map(batchCard).join('');
