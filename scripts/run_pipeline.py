@@ -338,24 +338,25 @@ def fetch_current_predictions(history=None, include_watch=False):
     today = datetime.now(timezone.utc).date()
     football_end = today + timedelta(days=21)
     for label, league in FOOTBALL_LEAGUES.items():
-        try:
-            seen_events = set()
-            for day_offset in range(22):
-                date = today + timedelta(days=day_offset)
+        seen_events = set()
+        for day_offset in range(22):
+            date = today + timedelta(days=day_offset)
+            try:
                 board = fetch_scoreboard("soccer", league, date.strftime("%Y%m%d"))
-                for event in board.get("events", []):
-                    event_id = str(event.get("id") or "")
-                    if event_id and event_id in seen_events:
-                        continue
-                    if event_id:
-                        seen_events.add(event_id)
-                    if event.get("status", {}).get("type", {}).get("completed"):
-                        continue
-                    prediction = football_prediction(event, label)
-                    if prediction:
-                        predictions.append(prediction)
-        except Exception as exc:
-            errors.append(f"football:{label}:{exc}")
+            except Exception as exc:
+                errors.append(f"football:{label}:{date.isoformat()}:{exc}")
+                continue
+            for event in board.get("events", []):
+                event_id = str(event.get("id") or "")
+                if event_id and event_id in seen_events:
+                    continue
+                if event_id:
+                    seen_events.add(event_id)
+                if event.get("status", {}).get("type", {}).get("completed"):
+                    continue
+                prediction = football_prediction(event, label)
+                if prediction:
+                    predictions.append(prediction)
 
     tennis_end = today + timedelta(days=7)
     form_start = today - timedelta(days=60)
