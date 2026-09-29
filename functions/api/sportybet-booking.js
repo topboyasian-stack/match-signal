@@ -334,11 +334,17 @@ export async function onRequestPost(context) {
     }
 
     if (validation.some(item => item.ok !== true)) {
+      const startedCount = validation.filter(item => /started|closed pre-match booking/i.test(String(item?.reason || ''))).length;
+      const unavailableCount = validation.length - startedCount - validation.filter(item => item.ok === true).length;
       return json({
         ok: false,
-        error: 'VALIDATION_FAILED',
+        error: startedCount ? 'BATCH_HAS_STARTED_LEGS' : 'VALIDATION_FAILED',
         batch_id: batchId,
-        message: 'The ticket changed on SportyBet, so no partial booking code was created.',
+        message: startedCount
+          ? 'This batch contains ' + startedCount + ' selection(s) that have already started or closed on SportyBet; one booking code cannot be created for the full batch.'
+          : 'The ticket changed on SportyBet, so no partial booking code was created.',
+        started_count: startedCount,
+        unavailable_count: Math.max(0, unavailableCount),
         validation
       }, 409);
     }
