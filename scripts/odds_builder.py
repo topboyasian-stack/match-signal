@@ -395,7 +395,7 @@ def virtual_candidates(now):
                     "player_1":event.get("team_1") or event.get("participant_1"),
                     "player_2":event.get("team_2") or event.get("participant_2"),
                     "match":f"{event.get('team_1') or event.get('participant_1') or ''} vs {event.get('team_2') or event.get('participant_2') or ''}",
-                    "line":line,"pick":pick,"probability":template.get("probability"),
+                    "line":line,"pick":pick,"probability":template.get("probability"),"builder_probability":template.get("probability"),
                     "bookmaker_available":True,"sportybet_over_odds":prices["over"],
                     "sportybet_under_odds":prices["under"],"bookmaker_source":"SportyBet NG",
                     "sportybet_event_id":str(event.get("event_id") or ""),
