@@ -55,11 +55,15 @@ jobs:
           summary=d.get('summary') or {}
           for key in ('tracked_tickets','pending','won','lost','legs_won','legs_lost','legs_pending'):
               assert int(summary.get(key,0)) >= 0
+          assert int(d.get('version',0)) >= 2
           for ticket in d['tickets']:
               assert ticket.get('paper_only') is True
               assert ticket.get('real_money_execution') is False
               assert ticket.get('status') in {'PENDING','LOST','WON'}
+              assert ticket.get('ticket_id')
+              assert ticket.get('snapshot_fingerprint')
               assert isinstance(ticket.get('legs'), list)
+              assert int(ticket.get('leg_count',len(ticket['legs']))) == len(ticket['legs'])
               statuses={str(x.get('status') or 'PENDING') for x in ticket['legs']}
               if 'LOST' in statuses:
                   assert ticket.get('status') == 'LOST'
