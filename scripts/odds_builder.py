@@ -305,117 +305,195 @@ def virtual_recent_gate(product,line,pick):
     return hit>=threshold,{"n":len(exact),"wins":wins,"hit_rate":round(hit,4),"threshold":threshold,"side":side}
 
 def virtual_candidates(now):
-    """Build virtual candidates from the current SportyBet fixture set.
+    """Build Virtual candidates from the freshest exact SportyBet O/U snapshot.
 
-    The historical/unified board supplies only validated product+line+side
-    model templates. Fixture identity, event ID, time and price are taken from
-    the fresh SportyBet proxy.
+    The Unified Upcoming Board is itself generated from the live SportyBet feed and
+    preserves the exact observed O/U ladder. A bounded direct refresh can update a
+    matching event/line, but it must not replace a fresh validated half-line with
+    a different representation from another endpoint.
     """
     board=load(DATA/"unified_upcoming.json",{})
     model_rows=board.get("events") if isinstance(board,dict) else []
-    model_rows,quote_diag,live_events=refresh_virtual_quotes(model_rows)
-    live=load(DATA/"virtual_lab_live.json",{})
-    live_events_snapshot=live.get("events") if isinstance(live,dict) else []
-    current_events=live_events if live_events else live_events_snapshot
+    refreshed_rows,quote_diag,_live_events=refresh_virtual_quotes(model_rows)
+
+    def row_key(row):
+        try:
+            return (
+                str(row.get("product") or ""),
+                str(row.get("event_id") or ""),
+                f"{float(row.get('line')):g}" if row.get("line") is not None else "",
+            )
+        except (TypeError,ValueError):
+            return (str(row.get("product") or ""),str(row.get("event_id") or ""),"")
+    
+    original_map={}
+    for row in model_rows if isinstance(model_rows,list) else []:
+        if not isinstance(row,dict):
+            continue
+        original_map[row_key(row)]=row
+
+    merged=[]
+    for row in refreshed_rows if isinstance(refreshed_rows,list) else []:
+        x=dict(row)
+        original=original_map.get(row_key(row))
+        if isinstance(original,dict):
+            # The direct endpoint may expose a different line ladder for the same
+            # recurring fixture. Preserve a fresh exact SportyBet quote from the
+            # Unified Board when the direct refresh does not contain that exact line.
+            if not x.get("sportybet_over_odds") or not x.get("sportybet_under_odds"):
+                age=odds_age(original)
+                if (
+                    age is not None and age<=MAX_ODDS_AGE_SECONDS
+                    and str(original.get("bookmaker_source") or "")=="SportyBet NG"
+                    and original.get("sportybet_over_odds") is not None
+                    and original.get("sportybet_under_odds") is not None
+                ):
+                    for key in (
+                        "bookmaker_available","bookmaker_source","sportybet_over_odds",
+                        "sportybet_under_odds","bookmaker_odds","sportybet_odds",
+                        "market_odds_timestamp","sportybet_event_id","sportybet_match"
+                    ):
+                        if key in original:
+                            x[key]=original.get(key)
+                    x["price_snapshot_source"]="fresh_unified_sportybet_snapshot"
+            else:
+                x["price_snapshot_source"]="fresh_direct_sportybet_match"
+        merged.append(x)
+
+    # The refreshed list can be smaller than the board when its endpoint uses a
+    # narrower current ladder. Add fresh board rows that have exact SportyBet
+    # quotes and were not returned by the direct refresh.
+    seen={row_key(x) for x in merged}
+    for original in model_rows if isinstance(model_rows,list) else []:
+        if not isinstance(original,dict):
+            continue
+        key=row_key(original)
+        if key in seen:
+            continue
+        age=odds_age(original)
+        if (
+            age is not None and age<=MAX_ODDS_AGE_SECONDS
+            and str(original.get("bookmaker_source") or "")=="SportyBet NG"
+            and original.get("sportybet_over_odds") is not None
+            and original.get("sportybet_under_odds") is not None
+        ):
+            x=dict(original)
+            x["price_snapshot_source"]="fresh_unified_sportybet_snapshot"
+            merged.append(x)
+            seen.add(key)
 
     def template_key(product,line,pick):
         return (str(product or ""),f"{float(line):g}",str(pick or "").lower())
 
     templates={}
-    for row in (model_rows if isinstance(model_rows,list) else []):
+    for row in merged:
         if not isinstance(row,dict) or row.get("sport")!="virtual" or not row.get("betting_qualified"):
             continue
         line=row.get("line"); pick=str(row.get("pick") or "").lower()
-        if line is None or pick not in {"over","under"}: continue
-        try:key=template_key(row.get("product"),line,pick)
-        except (TypeError,ValueError): continue
-        try:prob=float(row.get("probability") or 0)
-        except (TypeError,ValueError):prob=0.0
+        if line is None or pick not in {"over","under"}:
+            continue
+        try:
+            key=template_key(row.get("product"),line,pick)
+        except (TypeError,ValueError):
+            continue
+        try:
+            prob=float(row.get("probability") or 0)
+        except (TypeError,ValueError):
+            prob=0.0
         prev=templates.get(key)
         if prev is None or prob>float(prev.get("probability") or 0):
             templates[key]=row
 
     out=[]
-    diagnostics={"seen":0,"qualified":0,"evidence_pass":0,"rejected_evidence":0,
-                  "current_feed_events":0,"model_templates":len(templates),
-                  "current_market_candidates":0,"reasons":{}}
-    diagnostics["current_feed_events"]=len(current_events) if isinstance(current_events,list) else 0
+    diagnostics={
+        "seen":0,"qualified":0,"evidence_pass":0,"rejected_evidence":0,
+        "current_feed_events":0,"model_templates":len(templates),
+        "current_market_candidates":0,"reasons":{}
+    }
+    diagnostics["current_feed_events"]=len({str(x.get("event_id") or "") for x in merged if isinstance(x,dict) and x.get("event_id")})
     diagnostics["model_template_keys"]=[list(k) for k in sorted(templates.keys())]
     diagnostics["current_product_counts"]={}
     diagnostics["current_market_line_counts"]={}
+    diagnostics["price_snapshot_sources"]={}
 
-    for event in current_events if isinstance(current_events,list) else []:
-        if not isinstance(event,dict): continue
-        if event.get("product") not in {"efootball_gt","efootball_adriatic","vfootball","zoom"}: continue
+    for event in merged:
+        if not isinstance(event,dict):
+            continue
+        if event.get("sport")!="virtual" or event.get("product") not in {"efootball_gt","efootball_adriatic","vfootball","zoom"}:
+            continue
+        if not upcoming(event,now):
+            continue
+        product=str(event.get("product") or "")
+        line=event.get("line")
+        pick=str(event.get("pick") or "").lower()
+        if line is None or pick not in {"over","under"}:
+            continue
+        template=templates.get(template_key(product,line,pick))
+        if not template:
+            continue
         try:
-            start_ms=float(event.get("start_time_ms"))
-            event_start=datetime.fromtimestamp(start_ms/1000.0,timezone.utc).isoformat()
+            prob=float(template.get("probability") or 0)
+            line=float(line)
         except (TypeError,ValueError):
             continue
-        if not upcoming({"start_time":event_start},now): continue
+        over=event.get("sportybet_over_odds")
+        under=event.get("sportybet_under_odds")
+        try:
+            over=float(over) if over is not None else None
+            under=float(under) if under is not None else None
+        except (TypeError,ValueError):
+            over=under=None
+        if over is None or under is None:
+            continue
+
         diagnostics["seen"]+=1
-        product=str(event.get("product") or "")
+        diagnostics["qualified"]+=1
+        diagnostics["current_market_candidates"]+=2
         diagnostics["current_product_counts"][product]=diagnostics["current_product_counts"].get(product,0)+1
-        markets=event.get("markets") or []
-        if not isinstance(markets,list): continue
+        lk=f"{product}|{float(line):g}"
+        diagnostics["current_market_line_counts"][lk]=diagnostics["current_market_line_counts"].get(lk,0)+1
+        source=str(event.get("price_snapshot_source") or "fresh_unified_sportybet_snapshot")
+        diagnostics["price_snapshot_sources"][source]=diagnostics["price_snapshot_sources"].get(source,0)+1
 
-        for market in markets:
-            if not isinstance(market,dict): continue
-            line=market.get("line")
-            if line is None: continue
-            try:line=float(line)
-            except (TypeError,ValueError):continue
-            outcomes=market.get("outcomes") or []
-            prices={}
-            for o in outcomes:
-                if not isinstance(o,dict): continue
-                name=str(o.get("name") or o.get("desc") or "").lower()
-                try:odds=float(o.get("odds"))
-                except (TypeError,ValueError):continue
-                if odds<=1: continue
-                if name.startswith("over"): prices["over"]=odds
-                elif name.startswith("under"): prices["under"]=odds
-            if "over" not in prices or "under" not in prices: continue
-            diagnostics["current_market_candidates"]+=2
-            lk=f"{product}|{float(line):g}"
-            diagnostics["current_market_line_counts"][lk]=diagnostics["current_market_line_counts"].get(lk,0)+1
-
-            for pick in ("over","under"):
-                template=templates.get(template_key(product,line,pick))
-                if not template: continue
-                diagnostics["qualified"]+=1
-                y={**template}
-                y.update({
-                    "sport":"virtual","product":product,
-                    "league":event.get("tournament") or event.get("category") or template.get("league"),
-                    "event_id":str(event.get("event_id") or ""),
-                    "start_time":event_start,
-                    "participant_1":event.get("participant_1") or event.get("team_1"),
-                    "participant_2":event.get("participant_2") or event.get("team_2"),
-                    "player_1":event.get("team_1") or event.get("participant_1"),
-                    "player_2":event.get("team_2") or event.get("participant_2"),
-                    "match":f"{event.get('team_1') or event.get('participant_1') or ''} vs {event.get('team_2') or event.get('participant_2') or ''}",
-                    "line":line,"pick":pick,"probability":template.get("probability"),"builder_probability":template.get("probability"),
-                    "bookmaker_available":True,"sportybet_over_odds":prices["over"],
-                    "sportybet_under_odds":prices["under"],"bookmaker_source":"SportyBet NG",
-                    "sportybet_event_id":str(event.get("event_id") or ""),
-                    "sportybet_match":f"{event.get('team_1') or event.get('participant_1') or ''} vs {event.get('team_2') or event.get('participant_2') or ''}",
-                    "market_odds_timestamp":datetime.now(timezone.utc).isoformat(),
-                    "sportybet_identity_match":True,"builder_pick":pick,"builder_market":"virtual_total"
-                })
-                passed,recent=virtual_recent_gate(product,line,pick)
-                if not passed:
-                    diagnostics["rejected_evidence"]+=1
-                    reason=str(recent.get("reason") or "recent_evidence_below_threshold")
-                    diagnostics["reasons"][reason]=diagnostics["reasons"].get(reason,0)+1
-                    continue
-                diagnostics["evidence_pass"]+=1
-                y["recent_evidence"]=recent
-                out.append(y)
+        y={**template}
+        y.update({
+            "sport":"virtual","product":product,
+            "league":event.get("league") or template.get("league"),
+            "event_id":str(event.get("event_id") or ""),
+            "start_time":event.get("start_time"),
+            "participant_1":event.get("participant_1") or event.get("player_1") or event.get("team_1"),
+            "participant_2":event.get("participant_2") or event.get("player_2") or event.get("team_2"),
+            "player_1":event.get("player_1") or event.get("participant_1") or event.get("team_1"),
+            "player_2":event.get("player_2") or event.get("participant_2") or event.get("team_2"),
+            "match":event.get("match") or f"{event.get('player_1') or event.get('participant_1') or ''} vs {event.get('player_2') or event.get('participant_2') or ''}",
+            "line":line,"pick":pick,
+            "probability":prob,"builder_probability":prob,
+            "bookmaker_available":True,
+            "sportybet_over_odds":over,"sportybet_under_odds":under,
+            "bookmaker_odds":over if pick=="over" else under,
+            "sportybet_odds":over if pick=="over" else under,
+            "bookmaker_source":"SportyBet NG",
+            "sportybet_event_id":str(event.get("sportybet_event_id") or event.get("event_id") or ""),
+            "sportybet_match":event.get("sportybet_match") or event.get("match"),
+            "market_odds_timestamp":event.get("market_odds_timestamp"),
+            "sportybet_identity_match":True,
+            "builder_pick":pick,"builder_market":"virtual_total",
+            "price_snapshot_source":source,
+        })
+        passed,recent=virtual_recent_gate(product,line,pick)
+        if not passed:
+            diagnostics["rejected_evidence"]+=1
+            reason=str(recent.get("reason") or "recent_evidence_below_threshold")
+            diagnostics["reasons"][reason]=diagnostics["reasons"].get(reason,0)+1
+            continue
+        diagnostics["evidence_pass"]+=1
+        y["recent_evidence"]=recent
+        out.append(y)
 
     diagnostics["quote_join"]=quote_diag
     diagnostics["stale_unified_prices_used"]=False
     diagnostics["current_feed_is_price_authority"]=True
+    diagnostics["price_authority"]="fresh SportyBet snapshot on Unified Upcoming Board; direct exact-event refresh overrides when an exact line matches"
     return out,diagnostics
 
 def market_rows(x):
