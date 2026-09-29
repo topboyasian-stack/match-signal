@@ -857,7 +857,9 @@ def build_value_batches(candidates):
         chosen_keys={(str(x.get("event_id") or ""),str(x.get("pick") or ""),str(x.get("line") or "")) for x in batch}
         used_leg_keys.update(chosen_keys)
         used_events.update(batch_events)
-        remaining=[x for x in remaining if (str(x.get("event_id") or ""),str(x.get("pick") or ""),str(x.get("line") or "")) not in used_leg_keys]
+        # A fixture may carry many O/U lines, but a fixture belongs to only one
+        # batch. Remove every remaining leg for the events already assigned.
+        remaining=[x for x in remaining if str(x.get("event_id") or "") not in used_events]
 
     batches.sort(key=lambda b:(b.get("combined_model_rating",0),b.get("avg_model_edge_percent",0),b.get("combined_odds",0)),reverse=True)
     for i,b in enumerate(batches,1):
