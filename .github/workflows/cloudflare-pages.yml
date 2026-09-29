@@ -39,6 +39,7 @@ on:
       - 'virtual-lab-confirmed-watch.js'
       - 'virtual-lab.css'
       - 'virtual-lab/**'
+      - 'data/odds_ticket_tracker.json'
       - 'data/virtual_lab_history.json'
       - 'data/virtual_lab_live.json'
       - 'data/virtual_lab_model_eval.json'
@@ -172,7 +173,7 @@ jobs:
           import { writeFileSync } from 'node:fs';
           const base = 'https://match-signal.pages.dev';
           const pages = ['/', '/upcoming.html', '/football.html', '/tennis.html', '/basketball.html', '/darts.html', '/table-tennis.html', '/league.html?sport=football&league=England%20Amateur%20-%20U21%20Professional%20Development%20League', '/reports.html', '/live.html', '/expansion.html', '/virtual-lab/', '/virtual-lab', '/research.html', '/virtual-lab.html'];
-          const assets = ['/api/sportybet-virtual','/api/sportybet-darts','/api/sportybet-table-tennis','/expansion.js', '/expansion-odds-builder.js', '/live-analysis.js', '/live-data-worker.js', '/virtual-lab-app.js', '/virtual-lab-confirmed-watch.js', '/virtual-lab.css', '/_redirects', '/data/predictions.json', '/data/expansion_status.json', '/data/odds_builder.json', '/data/virtual_lab_live.json','/data/virtual_lab_model_eval.json','/data/virtual_lab_eligibility.json','/data/virtual_lab_participants/registry.json','/data/virtual_lab_participant_lifecycle.json','/data/virtual_lab_participants/efootball_confirmed_watch.json'];
+          const assets = ['/api/sportybet-virtual','/api/sportybet-darts','/api/sportybet-table-tennis','/expansion.js', '/expansion-odds-builder.js', '/live-analysis.js', '/live-data-worker.js', '/virtual-lab-app.js', '/virtual-lab-confirmed-watch.js', '/virtual-lab.css', '/_redirects', '/data/predictions.json', '/data/expansion_status.json', '/data/odds_builder.json', '/data/odds_ticket_tracker.json', '/data/virtual_lab_live.json','/data/virtual_lab_model_eval.json','/data/virtual_lab_eligibility.json','/data/virtual_lab_participants/registry.json','/data/virtual_lab_participant_lifecycle.json','/data/virtual_lab_participants/efootball_confirmed_watch.json'];
           const failures = [];
           async function get(path) {
             const r = await fetch(base + path + (path.includes('?') ? '&' : '?') + 'smoke=' + Date.now(), {cache:'no-store'});
@@ -331,6 +332,23 @@ jobs:
               },null,2)+'\n');
             }
           } catch(e) { failures.push('/api/sportybet-virtual '+e.message); }
+
+          try {
+            const {r,body}=await get('/data/odds_ticket_tracker.json');
+            if (!r.ok) failures.push('/data/odds_ticket_tracker.json HTTP '+r.status);
+            else {
+              const t=JSON.parse(body);
+              if (t?.mode!=='PAPER_ONLY') failures.push('/data/odds_ticket_tracker.json is not PAPER_ONLY');
+              if (Number(t?.version||0)<2) failures.push('/data/odds_ticket_tracker.json tracker version is not current');
+              if (!Array.isArray(t?.tickets)) failures.push('/data/odds_ticket_tracker.json tickets is not an array');
+              for (const ticket of t.tickets||[]) {
+                if (!ticket.ticket_id) failures.push('/data/odds_ticket_tracker.json ticket missing ticket_id');
+                if (!ticket.snapshot_fingerprint) failures.push('/data/odds_ticket_tracker.json ticket missing snapshot_fingerprint');
+                if (!Array.isArray(ticket.legs)) failures.push('/data/odds_ticket_tracker.json ticket legs missing');
+              }
+              console.log('Paper ticket tracker production artifact passed: '+(t.tickets?.length||0)+' tracked tickets');
+            }
+          } catch(e) { failures.push('/data/odds_ticket_tracker.json '+e.message); }
 
           try {
             const {r,body}=await get('/data/odds_builder.json');
