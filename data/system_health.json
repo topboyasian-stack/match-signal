@@ -1,32 +1,32 @@
 {
-  "generated_at": "2026-09-29T14:22:37.181077+00:00",
-  "status": "HEALTHY",
+  "generated_at": "2026-09-29T14:27:43.760923+00:00",
+  "status": "DEGRADED",
   "critical_issues": 0,
-  "warning_issues": 0,
+  "warning_issues": 1,
   "info_issues": 1,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
       "status": "PASS",
-      "age_hours": 3.74,
+      "age_hours": 0.06,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.38,
+      "age_hours": 0.03,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 2.8,
+      "age_hours": 2.88,
       "threshold_hours": 4
     },
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 0.4,
+      "age_hours": 0.48,
       "threshold_hours": 0.5
     },
     {
@@ -49,18 +49,23 @@
         },
         "basketball": {
           "status": "RETIRED",
-          "provider": "http_429"
+          "provider": "not_active"
         }
       }
     },
     {
       "engine": "virtual_lab_research_collector",
       "status": "INFO",
-      "age_hours": 5.37,
+      "age_hours": 5.45,
       "threshold_hours": 2
     }
   ],
   "issues": [
+    {
+      "code": "TENNIS_FEED_EMPTY",
+      "severity": "warning",
+      "detail": "No current tennis predictions are published"
+    },
     {
       "code": "SELECTION_GATE_EMPTY",
       "severity": "info",
