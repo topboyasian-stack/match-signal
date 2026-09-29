@@ -55,6 +55,8 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Install runtime dependency
+        run: python -m pip install --upgrade requests
       - name: Run tennis total challenger research
         run: python scripts/tennis_total_research.py
       - name: Validate tennis research artifact

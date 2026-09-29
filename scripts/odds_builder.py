@@ -209,7 +209,18 @@ def refresh_virtual_quotes(rows):
         # quote look fresh.
         live_samples.append({"refresh_error":str(exc)[:240]})
     if not live_by_id and not live_by_match:
-        return rows,{"live_events":0,"live_match_keys":0,"live_pair_keys":0,"matched_by_id":0,"matched_by_match":0,"matched_by_participant_time":0,"unmatched":len(rows),"samples":live_samples,"market_samples":[(e.get("markets") or [])[:3] for e in live_samples if isinstance(e,dict)]}
+        # Fail closed: never carry an old Unified Upcoming price forward when the
+        # immediate SportyBet refresh is unavailable.
+        cleaned=[]
+        stale_keys=("sportybet_over_odds","sportybet_under_odds","bookmaker_odds","sportybet_odds","bookmaker_available","bookmaker_source","sportybet_event_id","sportybet_match","market_odds_timestamp","sportybet_identity_match","price_snapshot_source")
+        for original in rows:
+            if not isinstance(original,dict):
+                continue
+            x=dict(original)
+            for key in stale_keys:
+                x.pop(key,None)
+            cleaned.append(x)
+        return cleaned,{"live_events":0,"live_match_keys":0,"live_pair_keys":0,"matched_by_id":0,"matched_by_match":0,"matched_by_participant_time":0,"unmatched":len(rows),"samples":live_samples,"source":"live_refresh_unavailable","market_samples":[]}
     out=[]
     join_diag={"live_events":len(live_by_id),"live_match_keys":len(live_by_match),"live_pair_keys":len(live_by_pair),"matched_by_id":0,"matched_by_match":0,"matched_by_participant_time":0,"unmatched":0,"samples":live_samples}
     for x in rows:
