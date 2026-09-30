@@ -208,15 +208,15 @@ function resolveCurrentEvent(leg, found) {
   return { event: best, matched_by: best ? 'fixture_time' : 'none' };
 }
 
-async function collectVirtualEventsFromLiveFeed(context, targetIds) {
+async function collectVirtualEventsFromLiveFeed(context, targetIds, sources = 'efootball,vfootball') {
   const found = new Map();
   if (!targetIds || !targetIds.size) return found;
   try {
     const url = new URL('/api/sportybet-virtual', context.request.url);
-    url.searchParams.set('pageSize', '100');
+    url.searchParams.set('pageSize', '200');
     url.searchParams.set('pageNum', '1');
     url.searchParams.set('timeline', '168');
-    url.searchParams.set('sources', 'vfootball');
+    url.searchParams.set('sources', sources);
     url.searchParams.set('_t', String(Date.now()));
     const response = await fetch(url.toString(), {
       headers: { 'Accept': 'application/json', 'Cache-Control': 'no-cache' },
@@ -431,26 +431,6 @@ async function handlePost(context) {
         fallbackPath: '/api/ng/factsCenter/pcUpcomingEvents'
       }, virtualIds);
       for (const [id, event] of events) found.set(id, event);
-
-      // The Builder prices vFootball from the same normalized live feed.
-      // Reconcile against that feed before declaring an exact O/U market
-      // unavailable; this preserves the event/line actually used to qualify
-      // the paper ticket when SportyBet's catalogue endpoint omits market data.
-      const liveFeedEvents = await collectVirtualEventsFromLiveFeed(context, virtualIds);
-      for (const [id, event] of liveFeedEvents) {
-        const current = found.get(id);
-        if (!current || !Array.isArray(current.markets) || !current.markets.length) {
-          found.set(id, event);
-        } else {
-          const currentHasOu = current.markets.some(m => {
-            const desc = String(m?.desc || m?.name || m?.title || m?.specifier || '').toLowerCase();
-            return String(m?.id || '') === '189' || /over.?under|total|\bou\b/.test(desc);
-          });
-          if (!currentHasOu && Array.isArray(event.markets) && event.markets.length) {
-            found.set(id, { ...current, markets: event.markets });
-          }
-        }
-      }
     }
 
     if (efootballIds.size) {
@@ -459,6 +439,26 @@ async function handlePost(context) {
         marketId: '1,18,10,29,11,26,36,14,60100,186,189,202,204,210'
       }, efootballIds);
       for (const [id, event] of events) found.set(id, event);
+    }
+
+    // The Builder's prices and exact O/U ladders come from the normalized
+    // read-only virtual feed. Prefer that representation whenever it is
+    // available, instead of trusting a separate catalogue that may expose
+    // stale/different virtual market variants. The catalogue remains the
+    // fallback for events absent from the live normalized feed.
+    const allVirtualIds = new Set([...virtualIds, ...efootballIds]);
+    if (allVirtualIds.size) {
+      const liveFeedEvents = await collectVirtualEventsFromLiveFeed(context, allVirtualIds, 'efootball,vfootball');
+      for (const [id, event] of liveFeedEvents) {
+        const current = found.get(id);
+        const hasOu = Array.isArray(event?.markets) && event.markets.some(m => {
+          const desc = String(m?.desc || m?.name || m?.title || m?.specifier || '').toLowerCase();
+          return String(m?.id || '') === '18' || String(m?.id || '') === '189' || /over.?under|total|\bou\b/.test(desc);
+        });
+        if (!current || hasOu) {
+          found.set(id, event);
+        }
+      }
     }
 
     if (footballIds.size) {
