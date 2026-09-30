@@ -90,7 +90,7 @@ jobs:
           if data.get('status') == 'RESULTS_FIRST_SET':
               assert len(data['qualified_legs']) >= 2
               assert int(data.get('batch_count', 0)) == 1
-              assert int(data.get('batch_policy', {}).get('max_legs', 0)) <= 4
+              assert int(data.get('batch_policy', {}).get('results_first_max_legs', 4)) <= 4
           assert len(data['qualified_legs']) <= 20
           if data['qualified_legs']:
               assert float(data.get('market_price_combined_odds', 0)) >= float(policy.get('minimum_combined_odds', 1.0))
@@ -121,7 +121,7 @@ jobs:
               seen_batch_ids.add(batch.get('batch_id'))
               assert float(batch.get('combined_odds', 0)) >= float(data.get('batch_policy', {}).get('min_combined_odds', 2.0))
               if data.get('status') == 'RESULTS_FIRST_SET':
-                  assert int(batch.get('leg_count', len(batch.get('legs', [])))) <= int(data.get('batch_policy', {}).get('max_legs', 4))
+                  assert int(batch.get('leg_count', len(batch.get('legs', [])))) <= int(data.get('batch_policy', {}).get('results_first_max_legs', 4))
               assert int(batch.get('leg_count', len(batch.get('legs', [])))) >= 2
               assert batch.get('paper_only') is True
               assert batch.get('real_money_execution') is False
