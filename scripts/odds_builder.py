@@ -300,14 +300,18 @@ def refresh_virtual_quotes(rows):
                 y["sportybet_match"]=e.get("match") or e.get("name")
                 y["market_odds_timestamp"]=fetched_at
                 y["sportybet_identity_match"]=str(e.get("event_id"))==str(x.get("event_id")) or _norm_fixture(e.get("match") or e.get("name"))==key
-                # Preserve exact live market/outcome IDs for non-staking share-code creation.
-                # O/U providers reuse numeric outcome IDs (12/13) across every line,
-                # so the side must be matched by name, never by outcome ID alone.
+                # Preserve the exact current SportyBet O/U market and BOTH side-specific
+                # outcome IDs. The same numeric IDs are reused on every line, but the
+                # side is semantic: Over=12, Under=13 in the normalized live feed.
                 requested_side=_virtual_selection_side(x)
                 y.pop("sportybet_market_id",None)
                 y.pop("sportybet_specifier",None)
                 y.pop("sportybet_outcome_id",None)
                 y.pop("sportybet_outcome_name",None)
+                y.pop("sportybet_over_outcome_id",None)
+                y.pop("sportybet_over_outcome_name",None)
+                y.pop("sportybet_under_outcome_id",None)
+                y.pop("sportybet_under_outcome_name",None)
                 y["sportybet_selection_side"]=requested_side or None
                 for m in e.get("markets") or []:
                     if not isinstance(m,dict):
@@ -318,22 +322,27 @@ def refresh_virtual_quotes(rows):
                         same_line=False
                     if not same_line:
                         continue
+                    y["sportybet_market_id"]=str(m.get("id") or "")
+                    y["sportybet_specifier"]=m.get("specifier")
                     for o in m.get("outcomes") or []:
                         if not isinstance(o,dict):
                             continue
-                        name=str(o.get("name") or o.get("desc") or "").lower()
-                        if requested_side and not name.startswith(requested_side):
-                            continue
-                        if not requested_side:
-                            continue
-                        y["sportybet_market_id"]=str(m.get("id") or "")
-                        y["sportybet_specifier"]=m.get("specifier")
-                        y["sportybet_outcome_id"]=str(o.get("id") or "")
-                        y["sportybet_outcome_name"]=o.get("name") or o.get("desc")
-                        break
-                    if y.get("sportybet_outcome_id"):
-                        break
-        out.append(y)
+                        name=str(o.get("name") or o.get("desc") or "").strip()
+                        lower=name.lower()
+                        if lower.startswith("over"):
+                            y["sportybet_over_outcome_id"]=str(o.get("id") or "")
+                            y["sportybet_over_outcome_name"]=name
+                        elif lower.startswith("under"):
+                            y["sportybet_under_outcome_id"]=str(o.get("id") or "")
+                            y["sportybet_under_outcome_name"]=name
+                    if requested_side=="over" and y.get("sportybet_over_outcome_id"):
+                        y["sportybet_outcome_id"]=y["sportybet_over_outcome_id"]
+                        y["sportybet_outcome_name"]=y.get("sportybet_over_outcome_name")
+                    elif requested_side=="under" and y.get("sportybet_under_outcome_id"):
+                        y["sportybet_outcome_id"]=y["sportybet_under_outcome_id"]
+                        y["sportybet_outcome_name"]=y.get("sportybet_under_outcome_name")
+                    break
+                        out.append(y)
     return out,join_diag
 
 _TICKET_SPOILER_CACHE=None
@@ -699,6 +708,19 @@ def virtual_candidates(now):
                 "sportybet_match":event.get("sportybet_match") or event.get("match"),
                 "market_odds_timestamp":event.get("market_odds_timestamp"),
                 "sportybet_identity_match":True,
+                "sportybet_market_id":event.get("sportybet_market_id"),
+                "sportybet_specifier":event.get("sportybet_specifier"),
+                "sportybet_over_outcome_id":event.get("sportybet_over_outcome_id"),
+                "sportybet_over_outcome_name":event.get("sportybet_over_outcome_name"),
+                "sportybet_under_outcome_id":event.get("sportybet_under_outcome_id"),
+                "sportybet_under_outcome_name":event.get("sportybet_under_outcome_name"),
+                "sportybet_selection_side":side,
+                "sportybet_outcome_id":(
+                    event.get("sportybet_over_outcome_id") if side=="over" else event.get("sportybet_under_outcome_id")
+                ),
+                "sportybet_outcome_name":(
+                    event.get("sportybet_over_outcome_name") if side=="over" else event.get("sportybet_under_outcome_name")
+                ),
                 "builder_pick":side,"builder_market":"virtual_total",
                 "price_snapshot_source":source,
                 "directional_candidate_derived":bool(side!=pick),
