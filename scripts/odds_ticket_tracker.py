@@ -10,6 +10,8 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import urllib.parse
+import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -160,6 +162,151 @@ def flatten_history():
             key = f"__row__{len(merged)}"
         merged[key] = row
     return list(merged.values())
+
+
+def _score_pair(value):
+    if isinstance(value, dict):
+        pairs = [
+            (value.get("home"), value.get("away")),
+            (value.get("homeScore"), value.get("awayScore")),
+            (value.get("home_score"), value.get("away_score")),
+            (value.get("homeGoals"), value.get("awayGoals")),
+            (value.get("homeGoalsCount"), value.get("awayGoalsCount")),
+        ]
+        for a, b in pairs:
+            aa, bb = num(a), num(b)
+            if aa is not None and bb is not None:
+                return aa, bb
+    return None
+
+
+def result_event_score(event):
+    if not isinstance(event, dict):
+        return None
+    for key in ("setScore", "score", "finalScore"):
+        value = event.get(key)
+        hit = _score_pair(value)
+        if hit:
+            return hit
+        if isinstance(value, (list, tuple)) and len(value) >= 2:
+            aa, bb = num(value[0]), num(value[1])
+            if aa is not None and bb is not None:
+                return aa, bb
+    direct = _score_pair(event)
+    if direct:
+        return direct
+    for key in ("result", "resultScore"):
+        nested = event.get(key)
+        hit = _score_pair(nested)
+        if hit:
+            return hit
+    return None
+
+
+def backfill_vfootball_results(tickets, now_iso_value):
+    pending = []
+    wanted = set()
+    for ticket in tickets:
+        for leg in ticket.get("legs") or []:
+            product = norm(leg.get("product") or leg.get("sport"))
+            status = str(leg.get("status") or "PENDING").upper()
+            if status != "PENDING" or product != "vfootball" or not leg.get("event_id"):
+                continue
+            try:
+                start = datetime.fromisoformat(str(leg.get("start_time") or "").replace("Z", "+00:00"))
+                if start.tzinfo is None:
+                    start = start.replace(tzinfo=timezone.utc)
+            except (TypeError, ValueError):
+                continue
+            if (datetime.now(timezone.utc) - start).total_seconds() < 10 * 60:
+                continue
+            pending.append(leg)
+            wanted.add(str(leg.get("event_id")))
+    if not wanted:
+        return []
+
+    starts = []
+    for leg in pending:
+        try:
+            dt = datetime.fromisoformat(str(leg.get("start_time") or "").replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            starts.append(int(dt.timestamp() * 1000))
+        except (TypeError, ValueError):
+            pass
+    start_ms = min(starts) - 6 * 3600000 if starts else int(datetime.now(timezone.utc).timestamp() * 1000) - 86400000
+    end_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    params = urllib.parse.urlencode({
+        "source": "vfootball",
+        "pageSize": 100,
+        "pageNum": 1,
+        "startTime": start_ms,
+        "endTime": end_ms,
+    })
+    rows = []
+    try:
+        for page in range(1, 5):
+            query = urllib.parse.urlencode({
+                "source": "vfootball",
+                "pageSize": 100,
+                "pageNum": page,
+                "startTime": start_ms,
+                "endTime": end_ms,
+            })
+            request = urllib.request.Request(
+                "https://match-signal.pages.dev/api/sportybet-virtual-results?" + query,
+                headers={"Accept": "application/json", "User-Agent": "MatchSignal-OddsTicketTracker/1.0"},
+            )
+            with urllib.request.urlopen(request, timeout=30) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+            events = payload.get("events") if isinstance(payload, dict) else []
+            if not isinstance(events, list):
+                events = []
+            for event in events:
+                event_id = str(event.get("eventId") or event.get("event_id") or "")
+                if event_id not in wanted:
+                    continue
+                score = result_event_score(event)
+                if score is None:
+                    continue
+                rows.append((event_id, score))
+            if len(events) < 100:
+                break
+    except Exception as exc:
+        print("WARNING: vFootball result backfill failed:", exc)
+        return []
+
+    now_value = now_iso_value
+    out = []
+    seen = set()
+    leg_map = {str(leg.get("event_id")): leg for leg in pending}
+    for event_id, score in rows:
+        if event_id in seen or event_id not in leg_map:
+            continue
+        seen.add(event_id)
+        leg = leg_map[event_id]
+        pick, line = parse_virtual_pick(leg)
+        if pick not in {"over", "under"} or line is None:
+            continue
+        total = score[0] + score[1]
+        actual = "O" + str(int(line) if float(line).is_integer() else line) if total > line else "U" + str(int(line) if float(line).is_integer() else line) if total < line else "PUSH"
+        selected = "O" + str(int(line) if float(line).is_integer() else line) if pick == "over" else "U" + str(int(line) if float(line).is_integer() else line)
+        out.append({
+            "product": "vfootball",
+            "event_id": event_id,
+            "market": "ou",
+            "line": line,
+            "selection": selected,
+            "result": actual,
+            "win": None if actual == "PUSH" else actual == selected,
+            "score": f"{int(score[0])}:{int(score[1])}",
+            "final_score": [score[0], score[1]],
+            "settled_at": now_value,
+            "settlement_source": "SportyBet NG eventResultList via Match Signal vFootball backfill",
+            "record_id": f"{event_id}|ou|{line}|{selected}",
+            "trace_id": f"{event_id}|ou|{line}|{selected}",
+        })
+    return out
 
 
 def settle_virtual_leg(leg, rows):
@@ -431,6 +578,10 @@ def main():
         changed = True
 
     rows = flatten_history()
+    backfilled = backfill_vfootball_results(tickets, now)
+    if backfilled:
+        rows.extend(backfilled)
+        print('vFootball result backfill:', len(backfilled), 'legacy leg(s) recovered')
     # Re-evaluate all unresolved tickets. A ticket marked LOST stays LOST, but its
     # individual legs continue settling so the user can see exactly what happened.
     for ticket in tickets:
