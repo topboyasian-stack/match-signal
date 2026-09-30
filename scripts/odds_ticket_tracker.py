@@ -180,6 +180,53 @@ def _score_pair(value):
     return None
 
 
+def fixture_parts(value):
+    s = normalize_fixture(value)
+    if " v " in s:
+        left, right = s.split(" v ", 1)
+        return left.strip(), right.strip()
+    return "", ""
+
+
+def fixture_side_key(value):
+    s = re.sub(r"[^a-z0-9]+", "", norm(value))
+    if not s:
+        return ""
+    return s if len(s) <= 4 else s[:3]
+
+
+def event_start_time(event):
+    for key in ("start_time_ms", "startTime", "estimateStartTime"):
+        value = num(event.get(key)) if isinstance(event, dict) else None
+        if value is not None:
+            if 0 < value < 100000000000:
+                value *= 1000
+            return value
+    raw = event.get("start_time") if isinstance(event, dict) else None
+    if raw:
+        try:
+            return datetime.fromisoformat(str(raw).replace("Z", "+00:00")).timestamp() * 1000
+        except (TypeError, ValueError):
+            pass
+    return None
+
+
+def legacy_fixture_matches(leg, event, tolerance_seconds=90 * 60):
+    leg_home, leg_away = fixture_parts(leg.get("match"))
+    event_home = event.get("team_1") or event.get("homeTeamName") or event.get("homeTeam") or event.get("participant_1")
+    event_away = event.get("team_2") or event.get("awayTeamName") or event.get("awayTeam") or event.get("participant_2")
+    if not leg_home or not leg_away or not event_home or not event_away:
+        return False
+    exact = normalize_fixture(f"{leg_home} v {leg_away}") == normalize_fixture(f"{event_home} v {event_away}")
+    abbreviated = fixture_side_key(leg_home) == fixture_side_key(event_home) and fixture_side_key(leg_away) == fixture_side_key(event_away)
+    if not (exact or abbreviated):
+        return False
+    event_ms = event_start_time(event)
+    if event_ms is None:
+        return True
+    return close_time(leg.get("start_time"), datetime.fromtimestamp(event_ms / 1000, timezone.utc).isoformat(), tolerance_seconds=tolerance_seconds)
+
+
 def result_event_score(event):
     if not isinstance(event, dict):
         return None
@@ -205,12 +252,12 @@ def result_event_score(event):
 
 def backfill_vfootball_results(tickets, now_iso_value):
     pending = []
-    wanted = set()
+    wanted_ids = set()
     for ticket in tickets:
         for leg in ticket.get("legs") or []:
-            product = norm(leg.get("product") or leg.get("sport"))
-            status = str(leg.get("status") or "PENDING").upper()
-            if status != "PENDING" or product != "vfootball" or not leg.get("event_id"):
+            if str(leg.get("status") or "PENDING").upper() != "PENDING":
+                continue
+            if norm(leg.get("product") or leg.get("sport")) != "vfootball" or not leg.get("event_id"):
                 continue
             try:
                 start = datetime.fromisoformat(str(leg.get("start_time") or "").replace("Z", "+00:00"))
@@ -221,8 +268,8 @@ def backfill_vfootball_results(tickets, now_iso_value):
             if (datetime.now(timezone.utc) - start).total_seconds() < 10 * 60:
                 continue
             pending.append(leg)
-            wanted.add(str(leg.get("event_id")))
-    if not wanted:
+            wanted_ids.add(str(leg.get("event_id")))
+    if not pending:
         return []
 
     starts = []
@@ -236,78 +283,62 @@ def backfill_vfootball_results(tickets, now_iso_value):
             pass
     start_ms = min(starts) - 6 * 3600000 if starts else int(datetime.now(timezone.utc).timestamp() * 1000) - 86400000
     end_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
-    params = urllib.parse.urlencode({
-        "source": "vfootball",
-        "pageSize": 100,
-        "pageNum": 1,
-        "startTime": start_ms,
-        "endTime": end_ms,
-    })
-    rows = []
+
     try:
-        # The result proxy performs the bounded 8-page scan across all five VFL scopes.
-        # One proxy request is enough; repeating it multiplies the upstream load.
-        for page in range(1, 2):
-            query = urllib.parse.urlencode({
-                "source": "vfootball",
-                "pageSize": 100,
-                "pageNum": page,
-                "startTime": start_ms,
-                "endTime": end_ms,
-            })
-            request = urllib.request.Request(
-                "https://match-signal.pages.dev/api/sportybet-virtual-results?" + query,
-                headers={"Accept": "application/json", "User-Agent": "MatchSignal-OddsTicketTracker/1.0"},
-            )
-            with urllib.request.urlopen(request, timeout=30) as response:
-                payload = json.loads(response.read().decode("utf-8"))
-            events = payload.get("events") if isinstance(payload, dict) else []
-            if not isinstance(events, list):
-                events = []
-            for event in events:
-                event_id = str(event.get("eventId") or event.get("event_id") or "")
-                if event_id not in wanted:
-                    continue
-                score = result_event_score(event)
-                if score is None:
-                    continue
-                rows.append((event_id, score))
-            if len(events) < 100:
-                break
+        query = urllib.parse.urlencode({
+            "source": "vfootball", "pageSize": 100, "pageNum": 1,
+            "startTime": start_ms, "endTime": end_ms,
+        })
+        request = urllib.request.Request(
+            "https://match-signal.pages.dev/api/sportybet-virtual-results?" + query,
+            headers={"Accept": "application/json", "User-Agent": "MatchSignal-OddsTicketTracker/1.0"},
+        )
+        with urllib.request.urlopen(request, timeout=60) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        events = payload.get("events") if isinstance(payload, dict) else []
+        events = events if isinstance(events, list) else []
+        print("vFootball result backfill source:", len(events), "events; exact IDs wanted:", len(wanted_ids))
     except Exception as exc:
         print("WARNING: vFootball result backfill failed:", exc)
         return []
 
-    now_value = now_iso_value
     out = []
-    seen = set()
-    leg_map = {str(leg.get("event_id")): leg for leg in pending}
-    for event_id, score in rows:
-        if event_id in seen or event_id not in leg_map:
+    matched_ids = set()
+    matched_fixtures = set()
+    for event in events:
+        if not isinstance(event, dict):
             continue
-        seen.add(event_id)
-        leg = leg_map[event_id]
-        pick, line = parse_virtual_pick(leg)
-        if pick not in {"over", "under"} or line is None:
+        event_id = str(event.get("eventId") or event.get("event_id") or "").strip()
+        score = result_event_score(event)
+        if not event_id or score is None:
             continue
-        total = score[0] + score[1]
-        actual = "O" + str(int(line) if float(line).is_integer() else line) if total > line else "U" + str(int(line) if float(line).is_integer() else line) if total < line else "PUSH"
-        selected = "O" + str(int(line) if float(line).is_integer() else line) if pick == "over" else "U" + str(int(line) if float(line).is_integer() else line)
-        out.append({
-            "product": "vfootball",
-            "event_id": event_id,
-            "market": "ou",
-            "line": line,
-            "selection": selected,
-            "result": actual,
-            "win": None if actual == "PUSH" else actual == selected,
-            "score": f"{int(score[0])}:{int(score[1])}",
-            "final_score": [score[0], score[1]],
-            "settled_at": now_value,
-            "settlement_source": "SportyBet NG eventResultList via Match Signal vFootball backfill",
-            "record_id": f"{event_id}|ou|{line}|{selected}",
-            "trace_id": f"{event_id}|ou|{line}|{selected}",
-        })
+        for leg in pending:
+            same_id = event_id in wanted_ids and event_id == str(leg.get("event_id"))
+            same_fixture = legacy_fixture_matches(leg, event)
+            if not (same_id or same_fixture):
+                continue
+            pick, line = parse_virtual_pick(leg)
+            if pick not in {"over", "under"} or line is None:
+                continue
+            total = score[0] + score[1]
+            line_text = str(int(line) if float(line).is_integer() else line)
+            actual = "O" + line_text if total > line else "U" + line_text if total < line else "PUSH"
+            selected = "O" + line_text if pick == "over" else "U" + line_text
+            mode = "event_id" if same_id else "fixture"
+            out.append({
+                "product": "vfootball", "event_id": event_id,
+                "match": str(leg.get("match") or ""), "start_time": leg.get("start_time"),
+                "market": "ou", "line": line, "selection": selected,
+                "result": actual, "win": None if actual == "PUSH" else actual == selected,
+                "score": f"{int(score[0])}:{int(score[1])}", "final_score": [score[0], score[1]],
+                "settled_at": now_iso_value,
+                "settlement_source": "SportyBet NG eventResultList via Match Signal vFootball fixture backfill",
+                "record_id": f"{event_id}|ou|{line}|{selected}", "trace_id": f"{event_id}|ou|{line}|{selected}",
+                "backfill_match_mode": mode,
+            })
+            if same_id: matched_ids.add(event_id)
+            else: matched_fixtures.add(str(leg.get("match") or ""))
+    print("vFootball result backfill matches:", len(out), "legs; exact IDs:", len(matched_ids), "fixture/time:", len(matched_fixtures))
     return out
 
 
