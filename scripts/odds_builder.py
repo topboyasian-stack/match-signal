@@ -322,7 +322,7 @@ def _load_ticket_performance_index():
             line=leg.get("line")
             if line is None:
                 import re
-                match=re.search(r"(?:over|under)s+(d+(?:.d+)?)s*$",lower)
+                match=re.search(r"(?:over|under)\s+(\d+(?:\.\d+)?)\s*$",lower)
                 if match:
                     line=match.group(1)
             try:
