@@ -111,56 +111,36 @@ def find_event(pred, events):
     pid=str(pred.get('event_id') or '')
     if pid:
         for e in events:
-            if str(e.get('eventId') or '')==pid:
-                return e,'event_id'
-
-    sport=str(pred.get('sport') or '').lower()
-    if sport=='football':
+            if str(e.get('eventId') or '')==pid:return e,'event_id'
+    if pred.get('sport')=='football':
         home_name=pred.get('home_team') or pred.get('player_1')
         away_name=pred.get('away_team') or pred.get('player_2')
         pnames=(norm(home_name),norm(away_name))
+        if not pnames[0] or not pnames[1]:return None,None
     else:
         pnames=(person_key(pred.get('player_1')),person_key(pred.get('player_2')))
-    if not pnames[0] or not pnames[1]:
-        return None,None
-
+        if not pnames[0] or not pnames[1]:return None,None
     pstart=pred.get('start_time')
-    try:
-        pt=datetime.fromisoformat(str(pstart).replace('Z','+00:00')).astimezone(timezone.utc) if pstart else None
-    except ValueError:
-        pt=None
-
-    def similarity(a,b):
-        if a==b:return 1.0
-        sa=set(a.split()); sb=set(b.split())
-        overlap=len(sa&sb)/max(1,len(sa|sb))
-        return max(overlap,SequenceMatcher(None,a,b).ratio())
-
-    # Prefer the exact ordered pair, then permit a provider-side reversal. The
-    # later market mapper resolves p1/p2 from the actual outcome names, so a
-    # reversed fixture match does not silently swap the prediction.
-    candidates=[]
+    try:pt=datetime.fromisoformat(str(pstart).replace('Z','+00:00')).astimezone(timezone.utc) if pstart else None
+    except ValueError:pt=None
+    best=None
     for e in events:
-        raw_home=str(e.get('homeTeamName') or '')
-        raw_away=str(e.get('awayTeamName') or '')
-        names=(person_key(raw_home),person_key(raw_away)) if sport=='tennis' else (norm(raw_home),norm(raw_away))
-        direct_score=min(similarity(names[0],pnames[0]),similarity(names[1],pnames[1]))
-        reverse_score=min(similarity(names[0],pnames[1]),similarity(names[1],pnames[0]))
-        pair_score=max(direct_score,reverse_score)
-        threshold=0.74 if sport=='football' else 0.80
-        if pair_score<threshold:
-            continue
+        names=(person_key(e.get('homeTeamName')),person_key(e.get('awayTeamName'))) if pred.get('sport')=='tennis' else (norm(e.get('homeTeamName')),norm(e.get('awayTeamName')))
+        def similarity(a,b):
+            if a==b:return 1.0
+            sa=set(a.split()); sb=set(b.split())
+            overlap=len(sa&sb)/max(1,len(sa|sb))
+            return max(overlap,SequenceMatcher(None,a,b).ratio())
+        if pred.get('sport')=='football':
+            if similarity(names[0],pnames[0])<0.78 or similarity(names[1],pnames[1])<0.78:continue
+        elif names!=pnames:
+            if similarity(names[0],pnames[0])<0.84 or similarity(names[1],pnames[1])<0.84:continue
         est=e.get('estimateStartTime')
         try:et=datetime.fromtimestamp(float(est)/1000,tz=timezone.utc) if est else None
         except (TypeError,ValueError):et=None
-        delta=abs((et-pt).total_seconds()) if et and pt else (0 if not pt or not et else float('inf'))
-        if delta<=96*3600:
-            orientation='name_time' if direct_score>=reverse_score else 'name_time_reversed'
-            candidates.append((delta,-pair_score,orientation,e))
-    if not candidates:
-        return None,None
-    candidates.sort(key=lambda item:(item[0],item[1]))
-    return candidates[0][3],candidates[0][2]
+        delta=abs((et-pt).total_seconds()) if et and pt else 0
+        if delta<=72*3600 and (best is None or delta<best[0]):best=(delta,e)
+    return (best[1],'name_time') if best else (None,None)
 
 
 def extract_markets(pred,event):
@@ -177,18 +157,13 @@ def extract_markets(pred,event):
                 side='over' if ('over' in desc+' '+ol or oid.endswith('/12') or oid in {'12','4'}) else 'under' if ('under' in desc+' '+ol or oid.endswith('/13') or oid in {'13','5'}) else None
                 if side and m['line'] is not None:
                     totals.append({'line':m['line'],'side':side,'odds':o['odds'],'outcome':o['name'],'market_id':m['id'],'specifier':m['specifier'],'lastOddsChangeTime':m['lastOddsChangeTime']})
-        elif (
-            m['id'] in {'1','186'} or
-            ('winner' in desc or 'match winner' in desc or desc in {'win','1x2','match result','match outcome'})
-        ) and not winner:
+        elif (('winner' in desc or 'match winner' in desc or desc in {'win','1x2'}) or (pred.get('sport')=='tennis' and m['id']=='186')) and not winner:
             mapped={}
             for o in m['outcomes']:
                 ol=person_key(o['name'])
                 oid=str(o.get('id') or '')
                 if ol==p1 or (m['id']=='186' and oid in {'4','4.0'}):mapped['p1']=o['odds']
                 elif ol==p2 or (m['id']=='186' and oid in {'5','5.0'}):mapped['p2']=o['odds']
-                elif m['id']=='1' and re.fullmatch(r'(home|1)', ol):mapped['p1']=o['odds']
-                elif m['id']=='1' and re.fullmatch(r'(away|2)', ol):mapped['p2']=o['odds']
             if len(mapped)==2:
                 winner={'p1':mapped['p1'],'p2':mapped['p2'],'market_id':m['id'],'market':m['desc'],'lastOddsChangeTime':m['lastOddsChangeTime']}
     return winner,totals
@@ -217,15 +192,11 @@ def main():
     matched=0; winner_prices=0; total_prices=0
     for sport in ('football','tennis'):
         diagnostics['prediction_samples'][sport]=[{'event_id':p.get('event_id'),'p1':p.get('player_1') or p.get('home_team'),'p2':p.get('player_2') or p.get('away_team'),'start':p.get('start_time')} for p in predictions if p.get('sport')==sport][:10]
-    match_counts={'event_id':0,'name_time':0,'name_time_reversed':0,'unmatched':0}
     for p in predictions:
         sport=p.get('sport')
         if sport not in SPORT_IDS:continue
         event,match_type=find_event(p,[e for s,e in all_events if s==sport])
-        if not event:
-            match_counts['unmatched']+=1
-            continue
-        match_counts[match_type]=match_counts.get(match_type,0)+1
+        if not event:continue
         winner,totals=extract_markets(p,event)
         snap={'source':'SportyBet NG web API via Cloudflare proxy','fetched_at':fetched_at,'match_type':match_type,'sportybet_event_id':event.get('eventId'),'league':event.get('_league'),'sportybet_start_time':event.get('estimateStartTime')}
         if winner:
@@ -241,7 +212,6 @@ def main():
             if totals:
                 p['sportybet_total_games_odds']=totals
             matched+=1
-    diagnostics['match_counts']=match_counts
     status={'updated_at':fetched_at,'source':'SportyBet NG web API via Cloudflare proxy','endpoint':ENDPOINT,'sports_requested':['football','tennis'],'fixtures_received':len(all_events),'predictions_seen':sum(1 for p in predictions if p.get('sport') in SPORT_IDS),'predictions_matched':matched,'winner_price_records':winner_prices,'total_games_price_records':total_prices,'errors':errors,'status':'LIVE_MARKET_SYNC' if matched else 'NO_CURRENT_SPORTYBET_MATCHES','diagnostics':diagnostics}
     (DATA/'sportybet_odds_snapshot.json').write_text(json.dumps(status,indent=2)+'\n',encoding='utf-8')
     (DATA/'predictions.json').write_text(json.dumps(predictions,indent=2,ensure_ascii=False)+'\n',encoding='utf-8')
