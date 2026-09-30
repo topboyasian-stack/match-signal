@@ -524,11 +524,19 @@ async function handlePost(context) {
     }
 
     if (!shareResponse.ok) {
+      const fallbackSelections = selections.map(selection => ({
+        eventId: selection.eventId,
+        marketId: selection.marketId,
+        specifier: selection.specifier,
+        outcomeId: selection.outcomeId
+      }));
       return json({
         ok: false,
         error: 'SPORTYBET_BOOKING_HTTP_' + shareResponse.status,
         body_prefix: lastBody,
-        attempts: 3
+        attempts: 3,
+        fallback_direct_origin: true,
+        fallback_selections: fallbackSelections
       }, 502);
     }
 
