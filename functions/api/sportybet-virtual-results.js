@@ -17,6 +17,13 @@ const BROWSER_HEADERS={
   'User-Agent':'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/152.0 Safari/537.36'
 };
 const MARKET_IDS='1,18,10,29,11,26,36,14,60100,186,189,202,204,210';
+const VFOOTBALL_FIXED_SCOPES=[
+  {categoryId:'sv:category:202120001',tournamentId:'sv:league:1'},
+  {categoryId:'sv:category:202120002',tournamentId:'sv:league:2'},
+  {categoryId:'sv:category:202120003',tournamentId:'sv:league:3'},
+  {categoryId:'sv:category:202120004',tournamentId:'sv:league:4'},
+  {categoryId:'sv:category:202120005',tournamentId:'sv:league:5'}
+];
 const SOURCES={
   srl:{sportId:'sr:sport:1',upcoming:'/api/ng/factsCenter/pcUpcomingEvents'},
   efootball:{sportId:'sr:sport:137',upcoming:'/api/ng/factsCenter/pcUpcomingEvents'},
@@ -83,6 +90,14 @@ export async function onRequestGet(context){
   if(explicitCategory&&explicitTournament){
     scopes=[{categoryId:explicitCategory,tournamentId:explicitTournament}];
   }else{
+    // vFootball result history must not depend on the current upcoming feed.
+    // Completed VFL tournaments disappear from upcoming, so retain the stable
+    // five category/tournament result scopes as a bounded fallback.
+    if(source==='vfootball'){
+      VFOOTBALL_FIXED_SCOPES.forEach(function(scope){
+        if(!scopes.some(function(x){return x.categoryId===scope.categoryId&&x.tournamentId===scope.tournamentId;})) scopes.push(scope);
+      });
+    }
     try{
       for(const page of [1,2]){
         const body=await upstream(config.upcoming,{
@@ -120,8 +135,9 @@ export async function onRequestGet(context){
 
   const events=[];
   const resultErrors=[];
+  const maxPages=source==='vfootball'?4:8;
   for(const scope of scopes){
-    for(let page=pageNum;page<pageNum+8;page++){
+    for(let page=pageNum;page<pageNum+maxPages;page++){
       try{
         const body=await upstream('/api/ng/factsCenter/eventResultList',{
           sportId:config.sportId,

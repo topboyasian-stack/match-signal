@@ -10,10 +10,50 @@
     if (correct == null) correct = l.result_correct;
     if (correct == null && l.result && typeof l.result === 'object') correct = l.result.correct;
     if (correct == null && l.settlement && typeof l.settlement === 'object') correct = l.settlement.correct;
-    if (correct === true || correct === false) return {finished:true, correct:!!correct};
-    if (l.settled === true || l.final === true || l.status === 'FINAL' || l.status === 'ENDED') return {finished:true, correct:null};
+    var status = String(l.status || '').toUpperCase();
+    var resultText = typeof l.result === 'string' ? l.result.toUpperCase() : '';
+    if (status === 'VOID' || resultText === 'PUSH') return {finished:true, correct:null, status:'VOID', result:resultText || 'PUSH', final_score:l.final_score || l.score || null};
+    if (correct === true || correct === false) return {finished:true, correct:!!correct, status:status || null, result:resultText || null, final_score:l.final_score || l.score || null};
+    if (l.settled === true || l.final === true || status === 'FINAL' || status === 'ENDED') return {finished:true, correct:null, status:status || 'FINAL', result:resultText || null, final_score:l.final_score || l.score || null};
     return null;
   }
+
+  function settlementPickKey(l) {
+    var pick = String(l && (l.builder_pick || l.pick) || '').toLowerCase().replace(/\s+/g,' ').trim();
+    var line = l && l.line != null ? String(l.line) : '';
+    return String(l && (l.product || l.sport) || '').toLowerCase()+'|'+String(l && l.event_id || '')+'|'+String(l && l.market || '').toLowerCase()+'|'+line+'|'+pick;
+  }
+  function settlementFixtureKey(l) {
+    var match = String(l && l.match || '').toLowerCase().replace(/\s+/g,' ').trim();
+    var start = l && l.start_time ? String(l.start_time).slice(0,16) : '';
+    var line = l && l.line != null ? String(l.line) : '';
+    var pick = String(l && (l.builder_pick || l.pick) || '').toLowerCase().replace(/\s+/g,' ').trim();
+    return String(l && (l.product || l.sport) || '').toLowerCase()+'|'+match+'|'+start+'|'+String(l && l.market || '').toLowerCase()+'|'+line+'|'+pick;
+  }
+  function buildSettlementIndex(tracker, settledRows) {
+    var byKey = {};
+    function add(row) {
+      if (!row || typeof row !== 'object') return;
+      var status=String(row.status||'').toUpperCase();
+      var final=status==='WON'||status==='LOST'||status==='VOID'||row.correct===true||row.correct===false||row.settled===true;
+      if(!final)return;
+      byKey[settlementPickKey(row)]=row;
+      byKey[settlementFixtureKey(row)]=row;
+    }
+    var tickets=tracker&&Array.isArray(tracker.tickets)?tracker.tickets:[];
+    tickets.forEach(function(t){(Array.isArray(t.legs)?t.legs:[]).forEach(add);});
+    (Array.isArray(settledRows)?settledRows:[]).forEach(add);
+    return byKey;
+  }
+  function withTrackerSettlement(leg,index) {
+    var row=index&&(index[settlementPickKey(leg)]||index[settlementFixtureKey(leg)]);
+    if(!row)return leg;
+    var out=Object.assign({},leg);
+    ['status','correct','settled_at','result','final_score'].forEach(function(k){if(row[k]!==undefined&&row[k]!==null)out[k]=row[k];});
+    out.__tracker_settled=true;
+    return out;
+  }
+
   var liveStates = {};
   var virtualLiveStates = {};
   var bookingMemory = {};
@@ -197,6 +237,12 @@
     if(open){open.classList.toggle('disabled',!ready);open.setAttribute('aria-disabled',ready?'false':'true');if(ready){open.removeAttribute('tabindex');open.href=live.share_url||('https://www.sportybet.com/ng/?c=ng&shareCode='+encodeURIComponent(live.booking_code));}else{open.href='#';open.setAttribute('tabindex','-1');}}
     if(msgEl){
       var msg=live.error;
+      if(msg&&Array.isArray(live.validation)&&live.validation.length){
+        var reasonCounts={};
+        live.validation.filter(function(v){return v&&v.ok!==true;}).forEach(function(v){var key=String(v.reason||'Unavailable');reasonCounts[key]=(reasonCounts[key]||0)+1;});
+        var reasonKeys=Object.keys(reasonCounts);
+        if(reasonKeys.length)msg+=' · '+reasonKeys.slice(0,2).map(function(k){return reasonCounts[k]+'× '+k;}).join(' · ');
+      }
       if(!msg){
         if(partial){
           msg='Partial booking code: '+String(live.selection_count||0)+' of '+String(live.initial_selection_count||eligibility.total)+' selections booked';
@@ -226,13 +272,14 @@
             var raw=String(text||'').replace(/\s+/g,' ').slice(0,180);
             throw new Error('Booking API HTTP '+r.status+' returned a non-JSON response'+(raw?' · '+raw:''));
           }
-          if(!r.ok||!payload.ok)throw new Error(String(payload&&payload.message||payload&&payload.error||('HTTP '+r.status)));
-          var ready={booking_code:String(payload.booking_code||''),share_url:String(payload.share_url||''),expires_at:payload.expires_at||null,generated_at:new Date().toISOString(),initial_selection_count:Number(payload.initial_selection_count||0),requested_selection_count:Number(payload.requested_selection_count||0),selection_count:Number(payload.selection_count||0),excluded_count:Number(payload.excluded_count||0),unavailable_count:Number(payload.unavailable_count||0),partial:payload.partial===true,combined_odds:payload.combined_odds==null?null:Number(payload.combined_odds)};
+          if(!r.ok||!payload.ok){var err=new Error(String(payload&&payload.message||payload&&payload.error||('HTTP '+r.status)));err.payload=payload;throw err;}
+          var ready={booking_code:String(payload.booking_code||''),share_url:String(payload.share_url||''),expires_at:payload.expires_at||null,generated_at:new Date().toISOString(),initial_selection_count:Number(payload.initial_selection_count||0),requested_selection_count:Number(payload.requested_selection_count||0),selection_count:Number(payload.selection_count||0),excluded_count:Number(payload.excluded_count||0),unavailable_count:Number(payload.unavailable_count||0),partial:payload.partial===true,combined_odds:payload.combined_odds==null?null:Number(payload.combined_odds),validation:Array.isArray(payload.validation)?payload.validation:[]};
           writeBookingState(batch,ready);updateBookingPanel(batch,ready);return ready;
         });
       })
       .catch(function(err){
-        var failed={booking_code:'',generated_at:new Date().toISOString(),error:String(err&&err.message||err)};
+        var payload=err&&err.payload||{};
+        var failed={booking_code:'',generated_at:new Date().toISOString(),error:String(err&&err.message||err),validation:Array.isArray(payload.validation)?payload.validation:[],selection_count:Number(payload.selection_count||0),requested_selection_count:Number(payload.requested_selection_count||0),initial_selection_count:Number(payload.initial_selection_count||0),excluded_count:Number(payload.excluded_count||payload.unavailable_count||0)};
         writeBookingState(batch,failed);updateBookingPanel(batch,failed);return failed;
       });
   }
@@ -470,11 +517,14 @@
           ? 'NO QUALIFIED BATCHES'
           : (data.status||'—');
 
+    var settlementIndex=buildSettlementIndex(tracker,settledLegs);
     function legCard(l,i,batchIndex){
-      var settled=effectiveSettlement(l),isSettled=!!(settled&&settled.finished);
-      var resultText=settled&&settled.correct===true?'✓ WON':settled&&settled.correct===false?'✕ LOST':'ENDED';
-      var product=String(l.product||l.sport||'virtual').toUpperCase();
-      return '<article class="card '+(isSettled?'settled-card':'')+'"><div class="meta"><span>Leg '+(i+1)+' · '+esc(product)+' · '+esc(l.competition||'—')+'</span><span>'+(isSettled?'<b class="result-badge '+(settled.correct===true?'won':'lost')+'">'+resultText+'</b>':'SportyBet '+esc(l.bookmaker_odds==null?'—':l.bookmaker_odds))+'</span></div><div class="teams">'+esc(l.match||'—')+'</div><div class="pick">Selection: <b>'+esc(l.pick||'—')+'</b><span class="conf">Model '+pct(l.model_probability)+'</span></div>'+timer(l.start_time,l)+liveTrackerHtml(l)+'<div class="startTime">'+(isSettled?'Result confirmed · '+esc(local(l.start_time)):'Start: '+esc(local(l.start_time))+' <span>· your browser time</span>')+'</div><div class="section"><div class="row"><span>Market</span><b>'+esc(l.market||'—')+'</b></div><div class="row"><span>Model probability</span><b>'+pct(l.model_probability)+'</b></div><div class="row"><span>Model fair odds</span><b>'+esc(l.model_fair_odds==null?'—':l.model_fair_odds)+'</b></div><div class="row"><span>SportyBet price</span><b>'+esc(l.bookmaker_odds==null?'—':l.bookmaker_odds)+'</b></div><div class="row"><span>Model edge vs market</span><b>'+esc(l.model_edge==null?'—':pct(l.model_edge))+'</b></div><div class="row"><span>Market price age</span><b>'+esc(l.market_odds_age_seconds==null?'—':Math.round(Number(l.market_odds_age_seconds))+'s')+'</b></div><div class="row"><span>Result</span><b class="'+(isSettled?(settled.correct===true?'won-text':'lost-text'):'')+'">'+(isSettled?resultText:'Pending')+'</b></div></div></article>';
+      var viewLeg=withTrackerSettlement(l,settlementIndex);
+      var settled=effectiveSettlement(viewLeg),isSettled=!!(settled&&settled.finished);
+      var resultText=settled&&settled.correct===true?'✓ WON':settled&&settled.correct===false?'✕ LOST':settled&&settled.status==='VOID'?'↔ VOID':'ENDED';
+      var resultClass=settled&&settled.status==='VOID'?'void':settled&&settled.correct===true?'won':'lost';
+      var product=String(viewLeg.product||viewLeg.sport||'virtual').toUpperCase();
+      return '<article class="card '+(isSettled?'settled-card':'')+'"><div class="meta"><span>Leg '+(i+1)+' · '+esc(product)+' · '+esc(viewLeg.competition||'—')+'</span><span>'+(isSettled?'<b class="result-badge '+resultClass+'">'+resultText+'</b>':'SportyBet '+esc(viewLeg.bookmaker_odds==null?'—':viewLeg.bookmaker_odds))+'</span></div><div class="teams">'+esc(viewLeg.match||'—')+'</div><div class="pick">Selection: <b>'+esc(viewLeg.pick||'—')+'</b><span class="conf">Model '+pct(viewLeg.model_probability)+'</span></div>'+timer(viewLeg.start_time,viewLeg)+liveTrackerHtml(viewLeg)+'<div class="startTime">'+(isSettled?'Result confirmed'+(settled.result?' · '+esc(settled.result):'')+' · '+esc(local(viewLeg.start_time)):'Start: '+esc(local(viewLeg.start_time))+' <span>· your browser time</span>')+'</div><div class="section"><div class="row"><span>Market</span><b>'+esc(viewLeg.market||'—')+'</b></div><div class="row"><span>Model probability</span><b>'+pct(viewLeg.model_probability)+'</b></div><div class="row"><span>Model fair odds</span><b>'+esc(viewLeg.model_fair_odds==null?'—':viewLeg.model_fair_odds)+'</b></div><div class="row"><span>SportyBet price</span><b>'+esc(viewLeg.bookmaker_odds==null?'—':viewLeg.bookmaker_odds)+'</b></div><div class="row"><span>Model edge vs market</span><b>'+esc(viewLeg.model_edge==null?'—':pct(viewLeg.model_edge))+'</b></div><div class="row"><span>Market price age</span><b>'+esc(viewLeg.market_odds_age_seconds==null?'—':Math.round(Number(viewLeg.market_odds_age_seconds))+'s')+'</b></div><div class="row"><span>Result</span><b class="'+(isSettled?(settled.status==='VOID'?'void-text':settled.correct===true?'won-text':'lost-text'):'')+'">'+(isSettled?resultText:'Pending')+'</b></div></div></article>';
     }
 
     function batchCard(b,idx){
@@ -541,7 +591,13 @@
     target.innerHTML='<div class="empty">Loading Odds Builder data…</div>';
     Promise.all([
       fetch('./data/odds_builder.json?v=20260929-odds-builder-'+Date.now(),{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('odds_builder.json HTTP '+r.status);return r.json();}),
-      fetch('./data/odds_ticket_tracker.json?v=20260929-ticket-track-'+Date.now(),{cache:'no-store'}).then(function(r){if(!r.ok)return {tickets:[],summary:{}};return r.json();})
+      fetch('./data/odds_ticket_tracker.json?v=20260930-ticket-track-'+Date.now(),{cache:'no-store'}).then(function(r){
+        if(!r.ok)return {tickets:[],summary:{},ledger_error:'HTTP '+r.status+' while reading the paper settlement ledger.'};
+        return r.text().then(function(text){
+          try{return text?JSON.parse(text):{tickets:[],summary:{},ledger_error:'The paper settlement ledger returned an empty response.'};}
+          catch(e){return {tickets:[],summary:{},ledger_error:'The paper settlement ledger could not be parsed; batch cards remain available without settlement badges.'};}
+        });
+      })
     ]).then(function(results){
       var data=results[0],tracker=results[1];
       var legs=Array.isArray(data.qualified_legs)?data.qualified_legs:[];
