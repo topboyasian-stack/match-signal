@@ -237,6 +237,12 @@
     if(open){open.classList.toggle('disabled',!ready);open.setAttribute('aria-disabled',ready?'false':'true');if(ready){open.removeAttribute('tabindex');open.href=live.share_url||('https://www.sportybet.com/ng/?c=ng&shareCode='+encodeURIComponent(live.booking_code));}else{open.href='#';open.setAttribute('tabindex','-1');}}
     if(msgEl){
       var msg=live.error;
+      if(msg&&Array.isArray(live.validation)&&live.validation.length){
+        var reasonCounts={};
+        live.validation.filter(function(v){return v&&v.ok!==true;}).forEach(function(v){var key=String(v.reason||'Unavailable');reasonCounts[key]=(reasonCounts[key]||0)+1;});
+        var reasonKeys=Object.keys(reasonCounts);
+        if(reasonKeys.length)msg+=' · '+reasonKeys.slice(0,2).map(function(k){return reasonCounts[k]+'× '+k;}).join(' · ');
+      }
       if(!msg){
         if(partial){
           msg='Partial booking code: '+String(live.selection_count||0)+' of '+String(live.initial_selection_count||eligibility.total)+' selections booked';
@@ -266,13 +272,14 @@
             var raw=String(text||'').replace(/\s+/g,' ').slice(0,180);
             throw new Error('Booking API HTTP '+r.status+' returned a non-JSON response'+(raw?' · '+raw:''));
           }
-          if(!r.ok||!payload.ok)throw new Error(String(payload&&payload.message||payload&&payload.error||('HTTP '+r.status)));
-          var ready={booking_code:String(payload.booking_code||''),share_url:String(payload.share_url||''),expires_at:payload.expires_at||null,generated_at:new Date().toISOString(),initial_selection_count:Number(payload.initial_selection_count||0),requested_selection_count:Number(payload.requested_selection_count||0),selection_count:Number(payload.selection_count||0),excluded_count:Number(payload.excluded_count||0),unavailable_count:Number(payload.unavailable_count||0),partial:payload.partial===true,combined_odds:payload.combined_odds==null?null:Number(payload.combined_odds)};
+          if(!r.ok||!payload.ok){var err=new Error(String(payload&&payload.message||payload&&payload.error||('HTTP '+r.status)));err.payload=payload;throw err;}
+          var ready={booking_code:String(payload.booking_code||''),share_url:String(payload.share_url||''),expires_at:payload.expires_at||null,generated_at:new Date().toISOString(),initial_selection_count:Number(payload.initial_selection_count||0),requested_selection_count:Number(payload.requested_selection_count||0),selection_count:Number(payload.selection_count||0),excluded_count:Number(payload.excluded_count||0),unavailable_count:Number(payload.unavailable_count||0),partial:payload.partial===true,combined_odds:payload.combined_odds==null?null:Number(payload.combined_odds),validation:Array.isArray(payload.validation)?payload.validation:[]};
           writeBookingState(batch,ready);updateBookingPanel(batch,ready);return ready;
         });
       })
       .catch(function(err){
-        var failed={booking_code:'',generated_at:new Date().toISOString(),error:String(err&&err.message||err)};
+        var payload=err&&err.payload||{};
+        var failed={booking_code:'',generated_at:new Date().toISOString(),error:String(err&&err.message||err),validation:Array.isArray(payload.validation)?payload.validation:[],selection_count:Number(payload.selection_count||0),requested_selection_count:Number(payload.requested_selection_count||0),initial_selection_count:Number(payload.initial_selection_count||0),excluded_count:Number(payload.excluded_count||payload.unavailable_count||0)};
         writeBookingState(batch,failed);updateBookingPanel(batch,failed);return failed;
       });
   }
