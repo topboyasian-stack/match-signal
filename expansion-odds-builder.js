@@ -436,7 +436,16 @@
     }
     var tracked=Number(summary.tracked_tickets||tickets.length);
     var ongoing=Number(summary.pending||0),won=Number(summary.won||0),lost=Number(summary.lost||0);
-    var cards=tickets.slice(0,20).map(function(t,idx){
+    var displayTickets=tickets.slice().sort(function(a,b){
+      var as=String(a&&a.status||'PENDING').toUpperCase(), bs=String(b&&b.status||'PENDING').toUpperCase();
+      var ar=as==='WON'||as==='LOST'||as==='VOID' ? 1 : 0;
+      var br=bs==='WON'||bs==='LOST'||bs==='VOID' ? 1 : 0;
+      if(ar!==br) return br-ar;
+      var ad=Date.parse(a&&a.last_settled_at||a&&a.created_at||'')||0;
+      var bd=Date.parse(b&&b.last_settled_at||b&&b.created_at||'')||0;
+      return bd-ad;
+    });
+    var cards=displayTickets.slice(0,50).map(function(t,idx){
       var lc=t.leg_counts||{}, total=Number(t.leg_count||((t.legs||[]).length))||0;
       var settled=Number(t.settled_leg_count!=null?t.settled_leg_count:(Number(lc.won||0)+Number(lc.lost||0)+Number(lc.void||0)));
       var pending=Number(t.pending_leg_count!=null?t.pending_leg_count:(lc.pending||0));
