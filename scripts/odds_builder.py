@@ -932,6 +932,30 @@ def _batch_metrics(legs):
     }
 
 
+def _batch_capacity_diagnostic(eligible_pool):
+    """Measure the best 16-leg odds capacity without weakening any gate."""
+    pool=[x for x in eligible_pool if x.get("builder_eligible")]
+    ranked=sorted(pool,key=lambda x:float(x.get("bookmaker_odds") or 1.0),reverse=True)
+    chosen=[];events=set();participants=set();strict_product=1.0
+    for leg in ranked:
+        eid=str(leg.get("event_id") or "")
+        if eid and eid in events: continue
+        pids=set(_participants(leg))
+        if pids & participants: continue
+        chosen.append(leg); events.add(eid) if eid else None; participants.update(pids)
+        strict_product*=float(leg.get("bookmaker_odds") or 1.0)
+        if len(chosen)>=MAX_LEGS: break
+    relaxed=sorted(pool,key=lambda x:float(x.get("bookmaker_odds") or 1.0),reverse=True)[:MAX_LEGS]
+    relaxed_product=math.prod(float(x.get("bookmaker_odds") or 1.0) for x in relaxed) if relaxed else 1.0
+    return {
+        "eligible_legs":len(pool),
+        "strict_capacity_odds":round(strict_product,3),
+        "strict_capacity_legs":len(chosen),
+        "event_only_capacity_odds":round(relaxed_product,3),
+        "event_only_capacity_legs":len(relaxed),
+        "target_reachable_with_current_gates":relaxed_product>=MIN_COMBINED_ODDS,
+    }
+
 def build_value_batches(candidates):
     """Create several disjoint 4.00+ paper batches using odds efficiency.
 
@@ -1071,6 +1095,7 @@ def build_value_batches(candidates):
         "priority_product":"vfootball",
         "max_legs":MAX_LEGS,
         "used_unique_events":len(used_events),
+        "capacity":_batch_capacity_diagnostic(eligible_all),
         "ranking_metric":"naive joint model probability; leg-strength rating reported separately",
     }
 
@@ -1200,7 +1225,7 @@ def main():
             "stake_direct_feed":"NOT_CONNECTED","instruction":"Verify the displayed SportyBet price immediately before any manual wager."},
         "candidates_considered":{"football":len(football),"tennis":len(tennis),"virtual":len(virtual),"all_built":len(built)},
         "qualified_legs":selected if target_met else [],
-        "best_available_legs":selected,
+        "best_available_legs":selected if selected else sorted([x for x in built if x.get("builder_eligible") and str(x.get("product") or "")=="vfootball"], key=lambda x:float(x.get("bookmaker_odds") or 1.0), reverse=True)[:MAX_LEGS],
         "combined_odds_selected":round(combined,3) if selected else None,
         "naive_independence_hit_proxy":round(math.prod(float(x.get("model_probability") or 0) for x in selected),6) if selected else None,
         "batch_count":len(batches),
@@ -1223,7 +1248,7 @@ def main():
         "reference_odds_type":"MODEL_FAIR_ODDS_NOT_BOOKMAKER_PRICE",
         "market_price_combined_odds":round(combined,3) if selected else None,
         "theme":{"name":"Midnight Graphite / Electric Cyan / Signal Green","accent":"#28D7E8","positive":"#35D07F","background":"#080D14"},
-        "notes":["V6 qualifies on market edge, not probability alone.","Missing or stale SportyBet prices produce NO_BET/REJECTED.","Model fair odds never overwrite bookmaker odds.","Each Builder batch is a separate disjoint paper ticket at 4.00+ combined bookmaker odds; batches are ranked by combined model rating.","vFootball is prioritized because its existing untouched O/U evidence is currently the strongest active research lane.","Paper-only until V6 demonstrates stable calibration, edge and closing-line value over a meaningful sample."]
+        "notes":["V6 qualifies on market edge, not probability alone.","Zero batches are now diagnosable: capacity reports whether 4.00 is mathematically reachable under the existing 16-leg and correlation rules; no quality gate is weakened.","best_available_legs is informational when no batch exists and is not a qualified accumulator.","Missing or stale SportyBet prices produce NO_BET/REJECTED.","Model fair odds never overwrite bookmaker odds.","Each Builder batch is a separate disjoint paper ticket at 4.00+ combined bookmaker odds; batches are ranked by combined model rating.","vFootball is prioritized because its existing untouched O/U evidence is currently the strongest active research lane.","Paper-only until V6 demonstrates stable calibration, edge and closing-line value over a meaningful sample."]
     }
     OUTPUT.write_text(json.dumps(result,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
     print(json.dumps(result,indent=2))
