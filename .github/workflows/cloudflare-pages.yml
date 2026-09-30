@@ -310,11 +310,16 @@ jobs:
             const data = await dataResp.json();
             const now = Date.now();
             const candidates = (Array.isArray(data?.batches)?data.batches:[])
-              .filter(b => Array.isArray(b?.legs) && b.legs.length > 0 && b.legs.length <= 20)
-              .filter(b => b.legs.every(l => {
-                const t = Date.parse(l?.start_time || '');
-                return Number.isFinite(t) && t > now + 120000;
-              }));
+              .map(b => {
+                const legs = Array.isArray(b?.legs) ? b.legs : [];
+                const future = legs.filter(l => {
+                  const t = Date.parse(l?.start_time || '');
+                  return Number.isFinite(t) && t > now + 120000;
+                });
+                return {...b, __future_legs: future};
+              })
+              .filter(b => b.__future_legs.length >= 3 && b.__future_legs.length <= 20)
+              .sort((a,b) => b.__future_legs.length - a.__future_legs.length);
             let smoke = {
               verified_at: new Date().toISOString(),
               status: 'NOT_RUN',
