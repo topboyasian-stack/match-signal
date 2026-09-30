@@ -208,6 +208,49 @@ function resolveCurrentEvent(leg, found) {
   return { event: best, matched_by: best ? 'fixture_time' : 'none' };
 }
 
+async function collectVirtualEventsFromLiveFeed(context, targetIds) {
+  const found = new Map();
+  if (!targetIds || !targetIds.size) return found;
+  try {
+    const url = new URL('/api/sportybet-virtual', context.request.url);
+    url.searchParams.set('pageSize', '100');
+    url.searchParams.set('pageNum', '1');
+    url.searchParams.set('timeline', '168');
+    url.searchParams.set('sources', 'vfootball');
+    url.searchParams.set('_t', String(Date.now()));
+    const response = await fetch(url.toString(), {
+      headers: { 'Accept': 'application/json', 'Cache-Control': 'no-cache' },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(15000)
+    });
+    if (!response.ok) return found;
+    const payload = await response.json();
+    const events = Array.isArray(payload?.events) ? payload.events : [];
+    for (const row of events) {
+      const eventId = String(row?.event_id || row?.eventId || '');
+      if (!eventId || !targetIds.has(eventId)) continue;
+      const rawStart = Number(row?.start_time_ms || 0);
+      let estimateStartTime = rawStart;
+      if (!estimateStartTime && row?.start_time) {
+        const parsed = Date.parse(String(row.start_time));
+        if (Number.isFinite(parsed)) estimateStartTime = parsed;
+      }
+      found.set(eventId, {
+        eventId,
+        homeTeamName: String(row?.team_1 || row?.participant_1 || ''),
+        awayTeamName: String(row?.team_2 || row?.participant_2 || ''),
+        estimateStartTime,
+        matchStatus: String(row?.match_status || 'Not start'),
+        tournament: String(row?.competition || ''),
+        markets: Array.isArray(row?.markets) ? row.markets : []
+      });
+    }
+  } catch (error) {
+    // Existing SportyBet catalogue lookup remains the primary path.
+  }
+  return found;
+}
+
 function productForLeg(leg) {
   const product = String(leg?.product || '').toLowerCase();
   if (product === 'vfootball') return 'vfootball';
@@ -388,6 +431,26 @@ async function handlePost(context) {
         fallbackPath: '/api/ng/factsCenter/pcUpcomingEvents'
       }, virtualIds);
       for (const [id, event] of events) found.set(id, event);
+
+      // The Builder prices vFootball from the same normalized live feed.
+      // Reconcile against that feed before declaring an exact O/U market
+      // unavailable; this preserves the event/line actually used to qualify
+      // the paper ticket when SportyBet's catalogue endpoint omits market data.
+      const liveFeedEvents = await collectVirtualEventsFromLiveFeed(context, virtualIds);
+      for (const [id, event] of liveFeedEvents) {
+        const current = found.get(id);
+        if (!current || !Array.isArray(current.markets) || !current.markets.length) {
+          found.set(id, event);
+        } else {
+          const currentHasOu = current.markets.some(m => {
+            const desc = String(m?.desc || m?.name || m?.title || m?.specifier || '').toLowerCase();
+            return String(m?.id || '') === '189' || /over.?under|total|\bou\b/.test(desc);
+          });
+          if (!currentHasOu && Array.isArray(event.markets) && event.markets.length) {
+            found.set(id, { ...current, markets: event.markets });
+          }
+        }
+      }
     }
 
     if (efootballIds.size) {
