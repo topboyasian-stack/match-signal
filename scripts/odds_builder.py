@@ -913,7 +913,9 @@ def make_leg(x):
         match=f"{x.get('player_1')} vs {x.get('player_2')}"
         pick=f"{match} — {market}"
     else:
-        match=f"{x.get('home_team')} vs {x.get('away_team')}"
+        home=x.get("home_team") or x.get("player_1") or "Home"
+        away=x.get("away_team") or x.get("player_2") or "Away"
+        match=f"{home} vs {away}"
         pick=x.get("builder_pick")
     # Participant history is an informational ranking feature only. The batch
     # assembler now ranks by whole-ticket model probability and edge, so avoid
