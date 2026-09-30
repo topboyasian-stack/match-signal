@@ -21,8 +21,16 @@ function json(body, status = 200) {
 }
 
 function lineFromMarket(market) {
-  if (market?.line != null && Number.isFinite(Number(market.line))) return Number(market.line);
-  const match = String(market?.specifier || '').match(/(?:total|line)=([0-9]+(?:\.[0-9]+)?)/i);
+  const direct = Number(market?.line);
+  if (Number.isFinite(direct)) return direct;
+  const text = [
+    market?.specifier,
+    market?.desc,
+    market?.name,
+    market?.title
+  ].map(value => String(value || '')).join(' ');
+  const match = text.match(/(?:total|line|over|under)[^0-9]{0,8}([0-9]+(?:\.[0-9]+)?)/i)
+    || text.match(/\b([0-9]+(?:\.[0-9]+)?)\b/);
   return match ? Number(match[1]) : null;
 }
 
@@ -256,16 +264,29 @@ function findVirtualSelection(leg, event) {
   const markets = Array.isArray(event?.markets) ? event.markets : [];
   for (const market of markets) {
     const marketId = String(market?.id || '');
-    const desc = String(market?.desc || market?.name || market?.title || '').toLowerCase();
+    const desc = [
+      market?.desc,
+      market?.name,
+      market?.title,
+      market?.specifier
+    ].map(value => String(value || '')).join(' ').toLowerCase();
     const line = lineFromMarket(market);
-    const isOu = marketId === '189' || /over.?under|total/.test(desc);
+    const isOu = marketId === '189' || /over\s*\/?\s*under|over.?under|total|\bou\b/.test(desc);
     if (!isOu || line == null || Math.abs(line - requestedLine) > 1e-9) continue;
 
     const outcomes = Array.isArray(market?.outcomes) ? market.outcomes : [];
     const outcome = outcomes.find(o => {
-      const name = String(o?.desc || o?.name || o?.title || '').toLowerCase();
-      const active = o?.isActive == null || Number(o.isActive) === 1 || o.isActive === true;
-      return active && name.startsWith(side);
+      const rawName = String(o?.desc || o?.name || o?.title || '').toLowerCase().trim();
+      const normalized = rawName.replace(/[^a-z0-9]+/g, ' ');
+      const active = o?.isActive == null
+        ? (o?.active == null || o.active !== false)
+        : Number(o.isActive) === 1 || o.isActive === true;
+      const sideMatch = side === 'under'
+        ? /\bunder\b/.test(normalized) || /^u\b/.test(normalized)
+        : /\bover\b/.test(normalized) || /^o\b/.test(normalized);
+      const outcomeLine = lineFromMarket(o);
+      const lineMatch = outcomeLine == null || Math.abs(Number(outcomeLine) - requestedLine) < 1e-9;
+      return active && sideMatch && lineMatch;
     });
     if (!outcome) continue;
 
