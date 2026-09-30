@@ -135,7 +135,7 @@ export async function onRequestGet(context){
 
   const events=[];
   const resultErrors=[];
-  const maxPages=source==='vfootball'?4:8;
+  const maxPages=source==='vfootball'?8:8;
   for(const scope of scopes){
     for(let page=pageNum;page<pageNum+maxPages;page++){
       try{

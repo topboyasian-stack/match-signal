@@ -245,7 +245,9 @@ def backfill_vfootball_results(tickets, now_iso_value):
     })
     rows = []
     try:
-        for page in range(1, 5):
+        # The result proxy performs the bounded 8-page scan across all five VFL scopes.
+        # One proxy request is enough; repeating it multiplies the upstream load.
+        for page in range(1, 2):
             query = urllib.parse.urlencode({
                 "source": "vfootball",
                 "pageSize": 100,
