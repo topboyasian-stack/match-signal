@@ -268,7 +268,6 @@
         'Accept':'application/json, text/plain, */*',
         'Content-Type':'application/json',
         'Current-Country':'NG',
-        'Origin':location.origin
       },
       body:JSON.stringify({selections:selections}),
       cache:'no-store'
