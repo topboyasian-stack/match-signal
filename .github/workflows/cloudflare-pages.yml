@@ -319,7 +319,7 @@ jobs:
                 });
                 return {...b, __future_legs: future};
               })
-              .filter(b => b.__future_legs.length >= 3 && b.__future_legs.length <= 20)
+              .filter(b => b.__future_legs.length >= 2 && b.__future_legs.length <= 20)
               .sort((a,b) => b.__future_legs.length - a.__future_legs.length);
             let smoke = {
               verified_at: new Date().toISOString(),
@@ -334,7 +334,7 @@ jobs:
             };
             if (!candidates.length) {
               smoke.status = 'NO_FUTURE_BATCH';
-              console.log('SportyBet booking POST smoke test skipped: no fully future batch in production artifact');
+              console.log('SportyBet booking POST smoke test skipped: no fully future 2+ leg batch in production artifact');
             } else {
               let last = null;
               for (const batch of candidates.slice(0,3)) {
@@ -498,8 +498,3 @@ jobs:
             if git push origin main; then
               echo "Production verification recorded on attempt ${attempt}."
               exit 0
-            fi
-            sleep $((attempt * 2))
-          done
-          echo "Could not publish production verification after retries."
-          exit 1
