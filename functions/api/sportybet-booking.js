@@ -64,7 +64,7 @@ async function upstream(path, params) {
   return payload;
 }
 
-async function collectEvents({ sportId, marketId, timeline = 168, pageSize = 100, maxPages = 5, primaryPath = '/api/ng/factsCenter/pcUpcomingEvents', fallbackPath = null, fallbackParams = {} }, targetIds) {
+async function collectEvents({ sportId, marketId, timeline = 168, pageSize = 100, maxPages = 8, primaryPath = '/api/ng/factsCenter/pcUpcomingEvents', fallbackPath = null, fallbackParams = {} }, targetIds) {
   const found = new Map();
   const matchedTargets = new Set();
   let page = 1;
@@ -109,6 +109,46 @@ async function collectEvents({ sportId, marketId, timeline = 168, pageSize = 100
 
     if (count < pageSize) break;
     page++;
+  }
+  // A valid Builder event can disappear from the first WAP pages while the
+  // current catalogue is reordered. If the bounded primary scan did not find
+  // every target, rescan the fallback catalogue from page 1 before declaring
+  // the leg unavailable. This preserves the bounded request budget without
+  // making stale event IDs synonymous with unavailable fixtures.
+  if (matchedTargets.size < targetIds.size && fallbackPath && !usedFallback) {
+    usedFallback = true;
+    page = 1;
+    while (page <= maxPages && matchedTargets.size < targetIds.size) {
+      let data;
+      try {
+        data = await upstream(fallbackPath, {
+          sportId,
+          marketId,
+          pageSize,
+          pageNum: page,
+          todayGames: 'false',
+          timeline,
+          _t: Date.now(),
+          ...fallbackParams
+        });
+      } catch (error) {
+        break;
+      }
+      const tournaments = Array.isArray(data?.data?.tournaments) ? data.data.tournaments : [];
+      let count = 0;
+      for (const tournament of tournaments) {
+        for (const event of Array.isArray(tournament?.events) ? tournament.events : []) {
+          const normalized = normalizeEvent(event, tournament);
+          if (normalized.eventId) {
+            found.set(normalized.eventId, normalized);
+            if (targetIds.has(normalized.eventId)) matchedTargets.add(normalized.eventId);
+          }
+          count++;
+        }
+      }
+      if (count < pageSize) break;
+      page++;
+    }
   }
   return found;
 }
