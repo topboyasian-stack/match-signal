@@ -86,7 +86,9 @@ permissions:
 
 concurrency:
   group: cloudflare-pages-v2
-  cancel-in-progress: true
+  # Do not cancel a production promotion because another upstream workflow
+  # completed on the same main SHA. Each run checks out the latest main.
+  cancel-in-progress: false
 
 jobs:
   deploy:
