@@ -1348,7 +1348,7 @@ def main():
     try:
         from predict_today import attach_sportybet_market_layer
         if isinstance(prediction_rows,list) and prediction_rows:
-            market_stats = attach_sportybet_market_layer(prediction_rows)
+            _, market_stats = attach_sportybet_market_layer(prediction_rows)
             PREDICTIONS.write_text(json.dumps(prediction_rows,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
             market_refresh={"status":"ok","stats":market_stats}
         else:
