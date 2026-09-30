@@ -527,12 +527,15 @@ async function handlePost(context) {
       }, 409);
     }
 
-    if (selections.length < 3) {
+    // Match Signal deliberately supports the Builder's 2–4 leg research
+    // construction. SportyBet's share endpoint can return a valid code for a
+    // two-selection slip, so do not discard a valid 2-leg batch here.
+    if (selections.length < 2) {
       return json({
         ok: false,
         error: 'TOO_FEW_AVAILABLE_SELECTIONS',
         batch_id: batchId,
-        message: 'Only ' + selections.length + ' selection(s) remain available. SportyBet requires more than two valid selections for this type of booking.',
+        message: 'Fewer than two valid selections remain available on SportyBet.',
         initial_selection_count: legs.length,
         selection_count: selections.length,
         excluded_count: preExcluded.length,
