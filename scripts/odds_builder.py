@@ -1124,7 +1124,7 @@ def _batch_capacity_diagnostic(eligible_pool):
         "target_reachable_with_current_gates":relaxed_product>=TARGET_COMBINED_ODDS,
     }
 
-def _construct_model_first_batch(pool, max_legs=MAX_LEGS):
+def _construct_model_first_batch(pool, max_legs=MAX_LEGS, min_odds=MIN_COMBINED_ODDS):
     """Construct the strongest whole-ticket model-probability batch that can reach 4.00+.
 
     This is a constrained construction heuristic, not a qualification change:
@@ -1191,7 +1191,7 @@ def _construct_model_first_batch(pool, max_legs=MAX_LEGS):
                         rest=top_product
                 else:
                     rest=1.0
-                if new_product*rest >= MIN_COMBINED_ODDS:
+                if new_product*rest >= min_odds:
                     feasible.append(leg)
             if feasible:
                 def trade_key(x):
@@ -1316,7 +1316,7 @@ def build_value_batches(candidates):
 
     All legs are qualified before construction. The constructor maximizes the
     whole-ticket model probability subject to the existing 4.00+ SportyBet
-    price target, event uniqueness, participant-correlation controls and the
+    accuracy-first floor and optional 4.00+ target, event uniqueness, participant-correlation controls and the
     existing 16-leg cap. Bookmaker price is a feasibility constraint, not the
     primary ranking signal.
     """
