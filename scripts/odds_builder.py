@@ -37,6 +37,16 @@ TARGET_COMBINED_ODDS=4.0
 MIN_ACCURACY_FIRST_ODDS=2.0
 ACCURACY_PRESERVATION_RATIO=0.90
 BATCH_MIN_LEGS=2
+# Results-first Builder: use only market/line directions with demonstrated
+# settled-leg performance. Odds are secondary; a weak extra leg is never added
+# to reach a target.
+RESULTS_FIRST_ENABLED=True
+RESULTS_FIRST_MAX_LEGS=4
+RESULTS_FIRST_MIN_OBS=50
+RESULTS_FIRST_MIN_ACCURACY=0.90
+RESULTS_FIRST_MIN_COMBINED_ODDS=1.0
+RESULTS_FIRST_EFOOTBALL_MIN_TICKETS=10
+RESULTS_FIRST_EFOOTBALL_MAX_LOSS_RATE=0.50
 MIN_COMBINED_ODDS=MIN_ACCURACY_FIRST_ODDS
 VIRTUAL_MIN_PROB=0.65
 TICKET_SPOILER_MIN_SAMPLE=50
@@ -440,6 +450,109 @@ def ticket_performance_gate(product,line,pick):
     }
     return accuracy>=TICKET_SPOILER_MIN_ACCURACY,details
 
+_RESULTS_FIRST_CACHE=None
+
+def _load_results_first_index():
+    """Index actual settled ticket/leg results for results-first qualification."""
+    global _RESULTS_FIRST_CACHE
+    if _RESULTS_FIRST_CACHE is not None:
+        return _RESULTS_FIRST_CACHE
+    raw=load(DATA/"odds_ticket_tracker.json",{})
+    exact={}
+    product_tickets={}
+    tickets=raw.get("tickets") if isinstance(raw,dict) else []
+    import re
+    for ticket in tickets if isinstance(tickets,list) else []:
+        tstatus=str(ticket.get("status") or "")
+        if tstatus not in {"WON","LOST"}:
+            continue
+        for product in ticket.get("products") or []:
+            key=str(product or "")
+            row=product_tickets.setdefault(key,{"tickets":0,"wins":0,"losses":0})
+            row["tickets"]+=1
+            row["wins"]+=1 if tstatus=="WON" else 0
+            row["losses"]+=1 if tstatus=="LOST" else 0
+        for leg in ticket.get("legs") or []:
+            if not isinstance(leg,dict) or str(leg.get("status") or "") not in {"WON","LOST"}:
+                continue
+            product=str(leg.get("product") or "")
+            pick_text=str(leg.get("pick") or "").lower()
+            side="under" if "under" in pick_text else "over" if "over" in pick_text else None
+            if not product or not side:
+                continue
+            line=leg.get("line")
+            if line is None:
+                m=re.search(r"\\b(?:over|under)\\s+(\\d+(?:\\.\\d+)?)\\b",pick_text)
+                if m:
+                    line=m.group(1)
+            try:
+                line_key=f"{float(line):g}"
+            except (TypeError,ValueError):
+                continue
+            key=(product,line_key,side)
+            row=exact.setdefault(key,{"n":0,"wins":0,"losses":0})
+            row["n"]+=1
+            row["wins"]+=1 if str(leg.get("status"))=="WON" else 0
+            row["losses"]+=1 if str(leg.get("status"))=="LOST" else 0
+    _RESULTS_FIRST_CACHE={"exact":exact,"product_tickets":product_tickets}
+    return _RESULTS_FIRST_CACHE
+
+def results_first_gate(product,line,pick):
+    """Require demonstrated settled results before a leg can enter the Builder."""
+    idx=_load_results_first_index()
+    product=str(product or "")
+    side=str(pick or "").lower()
+    try:
+        line_key=f"{float(line):g}"
+    except (TypeError,ValueError):
+        return False,{"eligible":False,"reason":"invalid_line"}
+    exact=idx["exact"].get((product,line_key,side))
+    ticket_row=idx["product_tickets"].get(product,{"tickets":0,"wins":0,"losses":0})
+    ticket_n=int(ticket_row.get("tickets") or 0)
+    ticket_w=int(ticket_row.get("wins") or 0)
+    ticket_rate=(ticket_w/ticket_n) if ticket_n else None
+
+    # eFootball GT is currently a results-failure lane: 0/10 settled tickets.
+    # Do not let fresh but unproven generic O/U evidence override the ledger.
+    if product=="efootball_gt":
+        if ticket_n < RESULTS_FIRST_EFOOTBALL_MIN_TICKETS:
+            return False,{"eligible":False,"reason":"insufficient_settled_product_tickets",
+                           "product_ticket_n":ticket_n,"min_product_tickets":RESULTS_FIRST_EFOOTBALL_MIN_TICKETS}
+        if (ticket_rate or 0.0) < (1.0-RESULTS_FIRST_EFOOTBALL_MAX_LOSS_RATE):
+            return False,{"eligible":False,"reason":"settled_product_loss_rate_too_high",
+                           "product_ticket_n":ticket_n,"product_ticket_wins":ticket_w,
+                           "product_ticket_losses":int(ticket_row.get("losses") or 0),
+                           "product_ticket_accuracy":round(ticket_rate,4)}
+    if product!="vfootball":
+        return False,{"eligible":False,"reason":"no_results_first_lane","product":product}
+
+    if not exact:
+        return False,{"eligible":False,"reason":"no_settled_exact_line_side_results",
+                       "key":[product,line_key,side]}
+    n=int(exact.get("n") or 0)
+    wins=int(exact.get("wins") or 0)
+    accuracy=wins/n if n else 0.0
+    if n < RESULTS_FIRST_MIN_OBS:
+        return False,{"eligible":False,"reason":"insufficient_settled_exact_line_side_results",
+                       "n":n,"wins":wins,"min_n":RESULTS_FIRST_MIN_OBS,"key":[product,line_key,side]}
+    if accuracy < RESULTS_FIRST_MIN_ACCURACY:
+        return False,{"eligible":False,"reason":"settled_exact_line_side_accuracy_below_results_floor",
+                       "n":n,"wins":wins,"losses":int(exact.get("losses") or 0),
+                       "accuracy":round(accuracy,4),"min_accuracy":RESULTS_FIRST_MIN_ACCURACY,
+                       "key":[product,line_key,side]}
+
+    # Calibrate the live model probability from the settled-result posterior.
+    posterior=(wins+2.0)/(n+4.0)
+    return True,{
+        "eligible":True,"n":n,"wins":wins,"losses":int(exact.get("losses") or 0),
+        "accuracy":round(accuracy,4),"posterior_probability":round(posterior,6),
+        "min_n":RESULTS_FIRST_MIN_OBS,"min_accuracy":RESULTS_FIRST_MIN_ACCURACY,
+        "product_ticket_n":ticket_n,"product_ticket_wins":ticket_w,
+        "product_ticket_losses":int(ticket_row.get("losses") or 0),
+        "product_ticket_accuracy":round(ticket_rate,4) if ticket_rate is not None else None,
+        "source":"data/odds_ticket_tracker.json","role":"primary_results_gate"
+    }
+
 _VIRTUAL_RECENT_GATE_CACHE=None
 
 
@@ -657,7 +770,7 @@ def virtual_candidates(now):
 
     out=[]
     diagnostics={
-        "seen":0,"qualified":0,"evidence_pass":0,"rejected_evidence":0,"rejected_ticket_performance":0,
+        "seen":0,"qualified":0,"evidence_pass":0,"rejected_evidence":0,"rejected_ticket_performance":0,"rejected_results_first":0,
         "current_feed_events":0,"model_templates":len(templates),
         "current_market_candidates":0,"reasons":{}
     }
@@ -800,12 +913,24 @@ def virtual_candidates(now):
                 diagnostics["reasons"][reason]=diagnostics["reasons"].get(reason,0)+1
                 continue
 
+            results_pass,results_perf=results_first_gate(product,line,side) if RESULTS_FIRST_ENABLED else (True,{"eligible":False,"role":"disabled"})
+            if not results_pass:
+                diagnostics["rejected_results_first"]+=1
+                reason=str(results_perf.get("reason") or "results_first_rejected")
+                diagnostics["reasons"][reason]=diagnostics["reasons"].get(reason,0)+1
+                continue
+
             diagnostics["evidence_pass"]+=1
             evidence=virtual_directional_evidence(recent)
+            calibrated_probability=float(results_perf.get("posterior_probability") or prob)
+            y["probability"]=calibrated_probability
+            y["builder_probability"]=calibrated_probability
+            y["model"]="Results-first settled-leg calibration"
             y["recent_evidence"]=recent
             y["directional_evidence"]=evidence
             y["evidence_score"]=evidence["score"]
             y["ticket_performance"]=ticket_perf
+            y["results_first"]=results_perf
             out.append(y)
 
     diagnostics["quote_join"]=quote_diag
@@ -1306,76 +1431,76 @@ def _near_kickoff_window(pool, anchor):
     return out
 
 
+def _construct_results_first_batch(pool, max_legs=RESULTS_FIRST_MAX_LEGS):
+    """Choose the strongest proven legs; odds are only a tie-breaker."""
+    if not pool:
+        return []
+    ranked=sorted(pool,key=lambda x:(
+        -float(x.get("model_probability") or 0.0),
+        -float((x.get("results_first") or {}).get("accuracy") or 0.0),
+        -int((x.get("results_first") or {}).get("n") or 0),
+        -float(x.get("bookmaker_odds") or 1.0)
+    ))
+    selected=[]
+    events=set()
+    participants=set()
+    for leg in ranked:
+        eid=str(leg.get("event_id") or "")
+        if eid and eid in events:
+            continue
+        pids=set(_participants(leg))
+        if pids & participants:
+            continue
+        selected.append(leg)
+        if eid:
+            events.add(eid)
+        participants.update(pids)
+        if len(selected)>=max_legs:
+            break
+    return selected
+
 def build_value_batches(candidates):
-    """Create disjoint accuracy-first paper batches.
+    """Build one small results-first paper ticket from demonstrated outcomes.
 
-    The builder first finds the highest whole-ticket model-probability construction
-    above the 2.00+ floor. A 4.00+ construction is used only when its whole-ticket
-    model probability is at least ACCURACY_PRESERVATION_RATIO of that best floor
-    construction. This prevents adding weaker legs merely to chase an odds target.
-
-    All legs are qualified before construction. The constructor maximizes the
-    whole-ticket model probability subject to the existing 4.00+ SportyBet
-    accuracy-first floor and optional 4.00+ target, event uniqueness, participant-correlation controls and the
-    existing 16-leg cap. Bookmaker price is a feasibility constraint, not the
-    primary ranking signal.
+    The settled ledger is the primary selector. Only exact product/line/side
+    combinations with strong realized hit rates are eligible. This deliberately
+    abandons the 4.00 odds requirement when reaching it would require weaker
+    legs.
     """
     built=[make_leg(x) for x in candidates]
     eligible_all=[x for x in built if x.get("builder_eligible")]
-    vfootball_pool=[x for x in eligible_all if str(x.get("product") or "")=="vfootball"]
-    other_pool=[x for x in eligible_all if str(x.get("product") or "")!="vfootball"]
-    remaining=vfootball_pool if len(vfootball_pool)>=2 else eligible_all
-    fallback_pool=other_pool
+    eligible_results=[
+        x for x in eligible_all
+        if RESULTS_FIRST_ENABLED
+        and (x.get("results_first") or {}).get("eligible") is True
+    ]
+    vfootball_pool=[x for x in eligible_results if str(x.get("product") or "")=="vfootball"]
+    ordered=sorted(vfootball_pool,key=lambda x:(_kickoff_timestamp(x) if _kickoff_timestamp(x) is not None else float("inf")))
+
+    window_candidates=[]
+    for anchor in ordered:
+        window=_near_kickoff_window(ordered,anchor)
+        candidate=_construct_results_first_batch(window)
+        if len(candidate)>=BATCH_MIN_LEGS and _batch_kickoff_span_minutes(candidate)<=MAX_BATCH_KICKOFF_SPAN_MINUTES:
+            window_candidates.append(candidate)
+
     batches=[]
     used_events=set()
-
-    for _ in range(MAX_BATCHES):
-        if not remaining:
-            break
-        # Build only inside rolling kickoff windows so one ticket does not mix
-        # fixtures that are hours apart.
-        ordered=sorted(remaining,key=lambda x:(_kickoff_timestamp(x) if _kickoff_timestamp(x) is not None else float("inf")))
-        window_candidates=[]
-        for anchor in ordered:
-            window=_near_kickoff_window(ordered,anchor)
-            accuracy_candidate=_construct_model_first_batch(window, min_odds=MIN_ACCURACY_FIRST_ODDS)
-            target_candidate=_construct_model_first_batch(window, min_odds=TARGET_COMBINED_ODDS)
-            def ticket_prob(rows):
-                return math.prod(max(0.0005,min(0.9995,float(x.get("model_probability") or 0.0))) for x in rows) if rows else 0.0
-            accuracy_candidate = accuracy_candidate if len(accuracy_candidate) >= BATCH_MIN_LEGS else []
-            target_candidate = target_candidate if len(target_candidate) >= BATCH_MIN_LEGS else []
-            chosen_candidate=[]
-            if accuracy_candidate:
-                accuracy_prob=ticket_prob(accuracy_candidate)
-                if target_candidate:
-                    target_prob=ticket_prob(target_candidate)
-                    chosen_candidate = target_candidate if target_prob >= accuracy_prob * ACCURACY_PRESERVATION_RATIO else accuracy_candidate
-                else:
-                    chosen_candidate=accuracy_candidate
-            elif target_candidate:
-                chosen_candidate=target_candidate
-            if chosen_candidate and _batch_kickoff_span_minutes(chosen_candidate)<=MAX_BATCH_KICKOFF_SPAN_MINUTES:
-                window_candidates.append(chosen_candidate)
-        if not window_candidates:
-            if remaining is vfootball_pool and fallback_pool:
-                remaining=fallback_pool
-                fallback_pool=[]
-                continue
-            break
+    if window_candidates:
         batch=max(window_candidates,key=lambda rows:(
             math.prod(max(0.0005,min(0.9995,float(x.get("model_probability") or 0.0))) for x in rows),
-            sum(float(x.get("model_edge") or 0.0) for x in rows)/len(rows),
-            math.prod(float(x.get("bookmaker_odds") or 1.0) for x in rows)
+            min(_kickoff_timestamp(x) for x in rows if _kickoff_timestamp(x) is not None)
         ))
         batch=sorted(batch,key=lambda x:(_kickoff_timestamp(x) if _kickoff_timestamp(x) is not None else float("inf")))
         metrics=_batch_metrics(batch)
         combined=math.prod(float(x.get("bookmaker_odds") or 1.0) for x in batch)
         batch_events={str(x.get("event_id") or "") for x in batch if x.get("event_id")}
-        products=sorted({str(x.get("product") or "") for x in batch if x.get("product")})
+        used_events.update(batch_events)
         batches.append({
-            "batch_id":f"BATCH-{len(batches)+1:02d}",
-            "label":f"BATCH-{len(batches)+1:02d} · Combined Model Rating {metrics['model_rating']:.1f}/100",
-            "rank_pending":True,
+            "batch_id":"BATCH-01",
+            "label":f"BATCH-01 · Results-first Model Rating {metrics['model_rating']:.1f}/100",
+            "rank_pending":False,
+            "rank":1,
             "legs":batch,
             "leg_count":len(batch),
             "combined_odds":round(combined,3),
@@ -1384,38 +1509,32 @@ def build_value_batches(candidates):
             "leg_strength_rating":metrics["leg_strength_rating"],
             "avg_model_probability":metrics["avg_model_probability"],
             "avg_model_edge_percent":metrics["avg_model_edge_percent"],
-            "products":products,
-            "primary_lane":"vfootball" if any(str(x.get("product") or "")=="vfootball" for x in batch) else "fallback_virtual",
+            "products":sorted({str(x.get("product") or "") for x in batch if x.get("product")}),
+            "primary_lane":"vfootball",
             "paper_only":True,
             "real_money_execution":False,
-            "correlation_policy":"same-event and participant reuse prevented within each batch; no price-ranked fallback",
-            "construction_objective":"maximize whole-ticket model probability; 4.00+ target allowed only when >=90% of best 2.00+ model probability"
+            "correlation_policy":"same-event and participant reuse prevented; only results-first qualified legs",
+            "construction_objective":"maximize settled-results-backed whole-ticket probability; odds are secondary and never force weaker legs"
         })
-        used_events.update(batch_events)
-        remaining=[x for x in remaining if str(x.get("event_id") or "") not in used_events]
 
-    batches.sort(key=lambda b:(min([_kickoff_timestamp(x) for x in b.get("legs",[]) if _kickoff_timestamp(x) is not None] or [float("inf")]), -float(b.get("combined_model_rating") or 0), -float(b.get("avg_model_edge_percent") or 0), -float(b.get("combined_odds") or 0)))
-    for i,b in enumerate(batches,1):
-        b["rank"]=i
-        b["batch_id"]=f"BATCH-{i:02d}"
-        b["rank_pending"]=False
-        b["label"]=f"BATCH-{i:02d} · Combined Model Rating {float(b.get('combined_model_rating') or 0):.1f}/100"
     return batches,built,{
         "batch_count":len(batches),
-        "max_batches":MAX_BATCHES,
+        "max_batches":1,
         "disjoint":True,
-        "min_combined_odds":MIN_ACCURACY_FIRST_ODDS,
+        "min_combined_odds":RESULTS_FIRST_MIN_COMBINED_ODDS,
         "target_combined_odds":TARGET_COMBINED_ODDS,
         "accuracy_preservation_ratio":ACCURACY_PRESERVATION_RATIO,
-        "construction_priority":"model_accuracy_first",
+        "construction_priority":"settled_results_first",
         "priority_product":"vfootball",
-        "max_legs":MAX_LEGS,
+        "max_legs":RESULTS_FIRST_MAX_LEGS,
         "max_kickoff_span_minutes":MAX_BATCH_KICKOFF_SPAN_MINUTES,
         "builder_horizon_minutes":MAX_BUILDER_HORIZON_MINUTES,
         "used_unique_events":len(used_events),
-        "capacity":_batch_capacity_diagnostic(eligible_all),
-        "ranking_metric":"whole-ticket model probability first; 4.00+ target subject to accuracy-preservation ratio",
+        "eligible_results_first_legs":len(eligible_results),
+        "capacity":_batch_capacity_diagnostic(eligible_results),
+        "ranking_metric":"settled exact-line/side hit rate first; calibrated probability second; odds only tie-breaker"
     }
+
 
 def select_value(candidates):
     built=[make_leg(x) for x in candidates]
@@ -1508,9 +1627,10 @@ def main():
     settled_ids={str(x.get("event_id")) for x in load(HISTORY,[]) if isinstance(x,dict) and x.get("settled") and x.get("event_id")}
     selected=[x for x in selected if str(x.get("event_id")) not in settled_ids]
     sports=sorted({x["sport"] for x in selected})
-    accuracy_floor_met=combined>=MIN_ACCURACY_FIRST_ODDS and len(selected)>=BATCH_MIN_LEGS
-    target_met=combined>=TARGET_COMBINED_ODDS and accuracy_floor_met
-    status="LIVE_VALUE_SET" if target_met else ("ACCURACY_FIRST_SET" if accuracy_floor_met else ("BELOW_4_TARGET_AVAILABLE" if selected else "NO_BET"))
+    results_first_met=bool(selected) and len(selected)>=BATCH_MIN_LEGS
+    target_met=combined>=TARGET_COMBINED_ODDS and results_first_met
+    accuracy_floor_met=results_first_met
+    status="LIVE_VALUE_SET" if target_met else ("RESULTS_FIRST_SET" if results_first_met else ("NO_BET" if not selected else "RESULTS_FIRST_INSUFFICIENT"))
     rejection_counts={}
     for leg in built:
         leg_status=str(leg.get("status") or "REJECTED")
@@ -1544,10 +1664,14 @@ def main():
                 "source":"data/virtual_lab_participant_profiles.json"
             }
         },
-        "selection_policy":{"min_calibrated_probability":MIN_PROB,"virtual_min_probability":VIRTUAL_MIN_PROB,"virtual_builder_lines":"all current O/U lines with exact-side evidence; no forced line list","minimum_combined_odds":MIN_ACCURACY_FIRST_ODDS,
+        "selection_policy":{"min_calibrated_probability":MIN_PROB,"virtual_min_probability":VIRTUAL_MIN_PROB,"virtual_builder_lines":"all current O/U lines with exact-side evidence; no forced line list","minimum_combined_odds":RESULTS_FIRST_MIN_COMBINED_ODDS,
+            "results_first":True,
+            "results_first_min_observations":RESULTS_FIRST_MIN_OBS,
+            "results_first_min_accuracy":RESULTS_FIRST_MIN_ACCURACY,
+            "results_first_max_legs":RESULTS_FIRST_MAX_LEGS,
             "target_combined_odds":TARGET_COMBINED_ODDS,
             "accuracy_preservation_ratio":ACCURACY_PRESERVATION_RATIO,
-            "construction_priority":"model_accuracy_first","min_model_edge":MIN_EDGE,
+            "construction_priority":"settled_results_first","min_model_edge":MIN_EDGE,
             "max_odds_age_seconds":MAX_ODDS_AGE_SECONDS,"max_uncertainty":MAX_UNCERTAINTY,
             "max_legs":MAX_LEGS,
             "builder_horizon_minutes":MAX_BUILDER_HORIZON_MINUTES,
@@ -1567,22 +1691,26 @@ def main():
         "bookmaker_odds":{"status":"LIVE_SPORTYBET_SNAPSHOT","sportybet_direct_feed":"VIA_CLOUDFLARE_PROXY",
             "stake_direct_feed":"NOT_CONNECTED","instruction":"Verify the displayed SportyBet price immediately before any manual wager."},
         "candidates_considered":{"football":len(football),"tennis":len(tennis),"virtual":len(virtual),"all_built":len(built)},
-        "qualified_legs":selected if accuracy_floor_met else [],
+        "qualified_legs":selected if results_first_met else [],
         "best_available_legs":selected if selected else sorted([x for x in built if x.get("builder_eligible") and str(x.get("product") or "")=="vfootball"], key=lambda x:float(x.get("bookmaker_odds") or 1.0), reverse=True)[:MAX_LEGS],
         "combined_odds_selected":round(combined,3) if selected else None,
         "naive_independence_hit_proxy":round(math.prod(float(x.get("model_probability") or 0) for x in selected),6) if selected else None,
         "batch_count":len(batches),
         "batch_policy":{
-            "min_combined_odds":MIN_ACCURACY_FIRST_ODDS,
+            "min_combined_odds":RESULTS_FIRST_MIN_COMBINED_ODDS,
+            "results_first":True,
+            "results_first_min_observations":RESULTS_FIRST_MIN_OBS,
+            "results_first_min_accuracy":RESULTS_FIRST_MIN_ACCURACY,
+            "results_first_max_legs":RESULTS_FIRST_MAX_LEGS,
             "target_combined_odds":TARGET_COMBINED_ODDS,
             "accuracy_preservation_ratio":ACCURACY_PRESERVATION_RATIO,
-            "construction_priority":"model_accuracy_first",
+            "construction_priority":"settled_results_first",
             "max_batches":MAX_BATCHES,
             "max_legs":MAX_LEGS,
             "max_kickoff_span_minutes":MAX_BATCH_KICKOFF_SPAN_MINUTES,
             "builder_horizon_minutes":MAX_BUILDER_HORIZON_MINUTES,
             "disjoint_batches":True,
-            "ranking":"chronological kickoff windows first; within each 60-minute window maximize whole-ticket model probability subject to existing gates",
+            "ranking":"settled exact-line/side results first; calibrated probability second; odds only tie-breaker",
             "model_rating_definition":"100 × product of leg model probabilities (naive joint proxy)",
             "leg_strength_definition":"100 × geometric mean of leg model probabilities",
             "primary_lane":"vfootball",
@@ -1592,13 +1720,13 @@ def main():
         "rejected_candidates":[x for x in built if not x["real_money_eligible"]][:20],
         "settled_legs":recent_settled(load(HISTORY,[]),now,known),
         "builder_event_ids":sorted(known),"leg_count":len(selected),"sports_selected":sports,
-        "status":("UPSTREAM_RESEARCH_GATE_BLOCKED" if upstream_blocked and not virtual else ("LIVE_VALUE_SET" if target_met else ("ACCURACY_FIRST_SET" if accuracy_floor_met else ("BELOW_4_TARGET_AVAILABLE" if selected else "NO_BET")))),
+        "status":("UPSTREAM_RESEARCH_GATE_BLOCKED" if upstream_blocked and not virtual else ("LIVE_VALUE_SET" if target_met else ("RESULTS_FIRST_SET" if results_first_met else ("NO_BET" if not selected else "RESULTS_FIRST_INSUFFICIENT")))),
         "reference_combined_odds":round(math.prod(x["model_fair_odds"] for x in selected),3) if selected else None,
         "reference_odds_type":"MODEL_FAIR_ODDS_NOT_BOOKMAKER_PRICE",
         "market_price_combined_odds":round(combined,3) if selected else None,
         "sportybet_booking":booking_info,
         "theme":{"name":"Midnight Graphite / Electric Cyan / Signal Green","accent":"#28D7E8","positive":"#35D07F","background":"#080D14"},
-        "notes":["V6 qualifies on market edge, not probability alone.","Zero batches are now diagnosable: capacity reports whether 4.00 is mathematically reachable under the existing 16-leg and correlation rules; no quality gate is weakened.","best_available_legs is informational when no batch exists and is not a qualified accumulator.","Missing or stale SportyBet prices produce NO_BET/REJECTED.","Model fair odds never overwrite bookmaker odds.","Each Builder batch is a separate disjoint paper ticket; 2.00+ is the construction floor and 4.00+ is used only when whole-ticket model probability remains within the configured accuracy-preservation ratio. Legs are ordered by kickoff time and each batch is limited to a 60-minute kickoff span.","vFootball is prioritized because its existing untouched O/U evidence is currently the strongest active research lane.","Paper-only until V6 demonstrates stable calibration, edge and closing-line value over a meaningful sample.","Near-term Builder horizon is 180 minutes; later fixtures remain in the wider prediction system but are not carried into the Builder until a later refresh.","Builder refreshes every 15 minutes and after relevant upstream workflows, so near-term tickets are repeatedly revalidated before kickoff."]
+        "notes":["Results-first qualifies only from settled exact-line/side performance plus the existing live-price, freshness, data-quality and model-evidence gates.","Zero batches are now diagnosable: capacity reports whether 4.00 is mathematically reachable under the existing 16-leg and correlation rules; no quality gate is weakened.","best_available_legs is informational when no batch exists and is not a qualified accumulator.","Missing or stale SportyBet prices produce NO_BET/REJECTED.","Model fair odds never overwrite bookmaker odds.","The Builder is results-first: settled exact-line/side performance is the primary selector. It uses at most four proven legs and does not add weaker legs to chase 4.00+ odds. The ticket remains paper-only and legs are kept within a 60-minute kickoff span.","vFootball is the only active Results-first lane because its settled ticket legs contain large, repeatable samples at specific exact O/U lines. eFootball GT is held out after its settled ticket loss record.","Paper-only until the Results-first lane demonstrates stable ticket-level outcomes over a meaningful sample.","Near-term Builder horizon is 180 minutes; later fixtures remain in the wider prediction system but are not carried into the Builder until a later refresh.","Builder refreshes every 15 minutes and after relevant upstream workflows, so near-term tickets are repeatedly revalidated before kickoff."]
     }
     OUTPUT.write_text(json.dumps(result,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
     print(json.dumps(result,indent=2))
