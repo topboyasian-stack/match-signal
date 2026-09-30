@@ -1468,3 +1468,4 @@ if __name__=="__main__":
 
 # Refresh marker: exact-side virtual evidence gate is active.
 # Batch marker: vFootball-priority disjoint 4.00+ research batches.
+# Final market freshness marker: 2026-09-30
