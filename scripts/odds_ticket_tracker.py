@@ -20,6 +20,7 @@ TRACKER = DATA / "odds_ticket_tracker.json"
 VIRTUAL_HISTORY = DATA / "virtual_lab_history.json"
 PREDICTION_HISTORY = DATA / "prediction_history.json"
 EXPANSION_HISTORY = DATA / "expansion_prediction_history.json"
+SETTLEMENT_ARCHIVE = DATA / "virtual_lab_archive" / "settlements"
 
 MAX_TICKETS = 100
 
@@ -76,6 +77,42 @@ def ticket_id_from_batch(batch):
     return "T-" + fingerprint_batch(batch)
 
 
+def normalize_fixture(value):
+    s = norm(value).replace(" vs ", " v ").replace("vs", " v ")
+    s = re.sub(r"[^a-z0-9]+", " ", s)
+    return " ".join(s.split())
+
+
+def leg_fixture_key(leg):
+    product = norm(leg.get("product") or leg.get("sport"))
+    match = normalize_fixture(leg.get("match"))
+    return f"{product}|{match}" if product and match else ""
+
+
+def row_fixture_key(row):
+    product = norm(row.get("product") or row.get("sport"))
+    p1 = normalize_fixture(row.get("participant_1"))
+    p2 = normalize_fixture(row.get("participant_2"))
+    if not product or not p1 or not p2:
+        return ""
+    return f"{product}|{p1} v {p2}"
+
+
+def close_time(a, b, tolerance_seconds=30 * 60):
+    try:
+        if not a or not b:
+            return False
+        da = datetime.fromisoformat(str(a).replace("Z", "+00:00"))
+        db = datetime.fromisoformat(str(b).replace("Z", "+00:00"))
+        if da.tzinfo is None:
+            da = da.replace(tzinfo=timezone.utc)
+        if db.tzinfo is None:
+            db = db.replace(tzinfo=timezone.utc)
+        return abs((da - db).total_seconds()) <= tolerance_seconds
+    except (TypeError, ValueError):
+        return False
+
+
 def normalize_selection(value):
     s = norm(value)
     if re.fullmatch(r"o[0-9]+(?:\.[0-9]+)?", s):
@@ -94,21 +131,62 @@ def flatten_history():
         raw = load(path, [])
         if isinstance(raw, list):
             rows.extend(x for x in raw if isinstance(x, dict))
-    return rows
+
+    # Virtual Lab history is rolling; the append-only settlement archive is the
+    # durable source and must also be read so older Builder tickets can settle.
+    if SETTLEMENT_ARCHIVE.exists():
+        for path in sorted(SETTLEMENT_ARCHIVE.glob("*.jsonl")):
+            try:
+                for raw_line in path.read_text(encoding="utf-8").splitlines():
+                    if not raw_line.strip():
+                        continue
+                    row = json.loads(raw_line)
+                    if isinstance(row, dict):
+                        rows.append(row)
+            except (OSError, json.JSONDecodeError):
+                continue
+
+    merged = {}
+    for row in rows:
+        key = str(row.get("record_id") or row.get("trace_id") or "")
+        if not key:
+            key = "|".join([
+                str(row.get("event_id") or ""),
+                str(row.get("market") or ""),
+                str(row.get("line") if row.get("line") is not None else ""),
+                str(row.get("selection") or ""),
+            ])
+        if not key or key == "|||":
+            key = f"__row__{len(merged)}"
+        merged[key] = row
+    return list(merged.values())
 
 
 def settle_virtual_leg(leg, rows):
     event_id = str(leg.get("event_id") or "")
     wanted_pick, wanted_line = parse_virtual_pick(leg)
-    if not event_id or wanted_pick not in {"over", "under"} or wanted_line is None:
+    if wanted_pick not in {"over", "under"} or wanted_line is None:
         return None
 
-    matches = []
+    wanted_fixture = leg_fixture_key(leg)
+    wanted_product = norm(leg.get("product") or leg.get("sport"))
+    candidates = []
     for row in rows:
-        if str(row.get("event_id") or "") != event_id:
-            continue
         if str(row.get("market") or "").lower() != "ou":
             continue
+        row_product = norm(row.get("product") or row.get("sport"))
+        if wanted_product and row_product != wanted_product:
+            continue
+        exact_id = bool(event_id and str(row.get("event_id") or "") == event_id)
+        fallback_fixture = bool(
+            not exact_id and wanted_fixture and row_fixture_key(row) == wanted_fixture
+            and close_time(leg.get("start_time"), row.get("timestamp") or row.get("start_time"))
+        )
+        if exact_id or fallback_fixture:
+            candidates.append(row)
+
+    matches = []
+    for row in candidates:
         row_line = num(row.get("line"))
         if row_line is None or abs(row_line - wanted_line) > 1e-9:
             continue
@@ -125,15 +203,15 @@ def settle_virtual_leg(leg, rows):
                 "correct": bool(win),
                 "settled_at": row.get("settled_at"),
                 "result": actual or ("WON" if win else "LOST"),
-                "final_score": row.get("score"),
+                "final_score": row.get("final_score") or row.get("score"),
             }
-        if actual == "PUSH" or win is None and actual.startswith("P"):
+        if actual == "PUSH" or (win is None and actual.startswith("P")):
             return {
                 "status": "VOID",
                 "correct": None,
                 "settled_at": row.get("settled_at"),
                 "result": "PUSH",
-                "final_score": row.get("score"),
+                "final_score": row.get("final_score") or row.get("score"),
             }
     return None
 
@@ -214,6 +292,11 @@ def ticket_status(legs):
 def refresh_ticket(ticket, rows, now):
     changed = False
     for leg in ticket.get("legs") or []:
+        if not leg.get("fixture_key"):
+            fixture_key = leg_fixture_key(leg)
+            if fixture_key:
+                leg["fixture_key"] = fixture_key
+                changed = True
         if leg.get("status") not in {"PENDING", "WON", "LOST", "VOID"}:
             leg["status"] = "PENDING"
             changed = True
@@ -270,6 +353,7 @@ def make_ticket(batch, now):
     legs = []
     for leg in batch.get("legs") or []:
         copied = dict(leg)
+        copied["fixture_key"] = copied.get("fixture_key") or leg_fixture_key(copied)
         copied["status"] = "PENDING"
         copied.setdefault("correct", None)
         copied.setdefault("settled_at", None)
