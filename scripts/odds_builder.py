@@ -342,7 +342,7 @@ def refresh_virtual_quotes(rows):
                         y["sportybet_outcome_id"]=y["sportybet_under_outcome_id"]
                         y["sportybet_outcome_name"]=y.get("sportybet_under_outcome_name")
                     break
-                        out.append(y)
+            out.append(y)
     return out,join_diag
 
 _TICKET_SPOILER_CACHE=None
