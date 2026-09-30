@@ -1045,6 +1045,41 @@ def build_value_batches(candidates):
                 if combined>=MIN_COMBINED_ODDS or len(batch)>=MAX_LEGS:
                     break
         if not batch or combined<MIN_COMBINED_ODDS:
+            # The efficiency objective can legitimately prefer many low-odds
+            # legs and miss 4.00 even when a valid high-odds combination exists.
+            # Retry by bookmaker price, still respecting the same correlation
+            # policy. This changes construction ordering only; no qualification
+            # gate is weakened.
+            batch=[];batch_events=set();batch_participants=set();combined=1.0
+            for leg in sorted(remaining,key=lambda z:float(z.get("bookmaker_odds") or 1.0),reverse=True):
+                eid=str(leg.get("event_id") or "")
+                if eid and eid in batch_events:
+                    continue
+                pids=set(_participants(leg))
+                if pids & batch_participants:
+                    continue
+                batch.append(leg)
+                if eid:
+                    batch_events.add(eid)
+                batch_participants.update(pids)
+                combined*=float(leg.get("bookmaker_odds") or 1.0)
+                if combined>=MIN_COMBINED_ODDS or len(batch)>=MAX_LEGS:
+                    break
+            if not batch or combined<MIN_COMBINED_ODDS:
+                # Final event-only price-ranked fallback. Same eligible legs,
+                # same 4.00 target, same max-leg cap.
+                batch=[];batch_events=set();batch_participants=set();combined=1.0
+                for leg in sorted(remaining,key=lambda z:float(z.get("bookmaker_odds") or 1.0),reverse=True):
+                    eid=str(leg.get("event_id") or "")
+                    if eid and eid in batch_events:
+                        continue
+                    batch.append(leg)
+                    if eid:
+                        batch_events.add(eid)
+                    combined*=float(leg.get("bookmaker_odds") or 1.0)
+                    if combined>=MIN_COMBINED_ODDS or len(batch)>=MAX_LEGS:
+                        break
+        if not batch or combined<MIN_COMBINED_ODDS:
             # Exhaust the primary vFootball lane before opening other Virtual
             # products. This preserves the intended research priority.
             if remaining is vfootball_pool and fallback_pool:
