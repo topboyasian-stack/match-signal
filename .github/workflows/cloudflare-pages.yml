@@ -352,8 +352,11 @@ jobs:
               smoke.message = payload?.message || (!payload ? 'Non-JSON response' : null);
               if (!payload) smoke.raw_prefix = String(raw||'').replace(/\s+/g,' ').slice(0,240);
               if (payload?.validation) smoke.validation = payload.validation.slice(0,5);
-              if (!smoke.ok) failures.push('/api/sportybet-booking POST smoke failed: HTTP '+rr.status+' '+(smoke.error||smoke.message||'unknown'));
-              else console.log('SportyBet booking POST smoke passed: '+smoke.selection_count+' selections; booking code returned');
+              if (!smoke.ok) {
+                 console.error('SportyBet booking validation diagnostics:', JSON.stringify(payload?.validation||[], null, 2));
+                 console.error('SportyBet booking smoke payload:', JSON.stringify(payload||{raw_prefix:smoke.raw_prefix||null}, null, 2));
+                 failures.push('/api/sportybet-booking POST smoke failed: HTTP '+rr.status+' '+(smoke.error||smoke.message||'unknown'));
+               } else console.log('SportyBet booking POST smoke passed: '+smoke.selection_count+' selections; booking code returned');
             }
             writeFileSync('BOOKING-PRODUCTION-CHECK.json', JSON.stringify(smoke,null,2)+'\n');
           } catch(e) {
