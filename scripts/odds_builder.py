@@ -833,12 +833,12 @@ def virtual_candidates(now):
         source=str(event.get("price_snapshot_source") or "fresh_unified_sportybet_snapshot")
         diagnostics["price_snapshot_sources"][source]=diagnostics["price_snapshot_sources"].get(source,0)+1
 
-        # eFootball construction is direction-neutral: compare Over and Under
-        # on every exact SportyBet line in the discovery universe.
-        sides=["over","under"] if product.startswith("efootball_") else [pick]
+        # Direction-neutral for eFootball; vFootball uses live board probability.
+        is_efootball=product.startswith("efootball_")
+        sides=["over","under"] if is_efootball else ([pick] if pick in {"over","under"} else [])
 
         for side in sides:
-            template=templates.get(template_key(product,line,side))
+            template=templates.get(template_key(product,line,side)) if is_efootball else event
             if not template:
                 diagnostics["reasons"]["no_exact_line_model"]=diagnostics["reasons"].get("no_exact_line_model",0)+1
                 continue
