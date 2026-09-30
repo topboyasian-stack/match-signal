@@ -82,9 +82,15 @@ jobs:
           assert data.get('engine_version') == 'V6.1-RESEARCH-GATED'
           policy = data.get('selection_policy', {})
           assert policy.get('requires_live_sportybet_price') is True
+          assert policy.get('results_first') is True
+          assert policy.get('construction_priority') == 'settled_results_first'
           assert float(policy.get('min_model_edge', 0)) >= 0.025
           assert set(data.get('sports_supported', [])) >= {'football', 'tennis', 'virtual'}
           assert isinstance(data.get('qualified_legs'), list)
+          if data.get('status') == 'RESULTS_FIRST_SET':
+              assert len(data['qualified_legs']) >= 2
+              assert int(data.get('batch_count', 0)) == 1
+              assert int(data.get('batch_policy', {}).get('max_legs', 0)) <= 4
           assert len(data['qualified_legs']) <= 20
           if data['qualified_legs']:
               assert float(data.get('market_price_combined_odds', 0)) >= 4.0
@@ -160,6 +166,7 @@ jobs:
             exit 0
           fi
           git commit -m "🤖 Refresh research-gated Odds Builder"
+          # Results-first validation trigger 2026-10-01: settled performance is now primary.
           # Cloudflare verification may commit while this build is running.
           # Rebase once on the latest main so the generated artifact is not lost.
           if ! git pull --rebase origin main; then
