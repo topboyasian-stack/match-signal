@@ -998,6 +998,17 @@ def _construct_model_first_batch(pool, max_legs=MAX_LEGS):
         while remaining and len(selected)<max_legs and combined<MIN_COMBINED_ODDS:
             feasible=[]
             slots=max_legs-len(selected)-1
+            # Optimistic odds upper bound: pre-sort once per construction step
+            # instead of sorting the remaining pool once per candidate.
+            odds_ranked=sorted(
+                [(x,float(x.get("bookmaker_odds") or 1.0)) for x in remaining
+                 if float(x.get("bookmaker_odds") or 1.0)>1.0],
+                key=lambda z:z[1], reverse=True
+            )
+            top_count=min(slots,len(odds_ranked))
+            top_product=math.prod(v for _,v in odds_ranked[:top_count]) if top_count else 1.0
+            next_odds=odds_ranked[top_count][1] if top_count<len(odds_ranked) else 1.0
+            top_ids={id(x):v for x,v in odds_ranked[:top_count]}
             for leg in remaining:
                 if conflict(leg,selected_events,selected_participants):
                     continue
@@ -1005,14 +1016,14 @@ def _construct_model_first_batch(pool, max_legs=MAX_LEGS):
                 if odds<=1.0:
                     continue
                 new_product=combined*odds
-                # Optimistic odds upper bound: ignore future correlation conflicts,
-                # so this can only overstate reachability, never hide a reachable target.
-                rest=sorted(
-                    (float(x.get("bookmaker_odds") or 1.0) for x in remaining
-                     if x is not leg and not conflict(x, selected_events, selected_participants) and float(x.get("bookmaker_odds") or 1.0)>1.0),
-                    reverse=True
-                )[:slots]
-                if new_product*math.prod(rest) >= MIN_COMBINED_ODDS:
+                if slots:
+                    if id(leg) in top_ids:
+                        rest=(top_product/odds)*next_odds
+                    else:
+                        rest=top_product
+                else:
+                    rest=1.0
+                if new_product*rest >= MIN_COMBINED_ODDS:
                     feasible.append(leg)
             if feasible:
                 leg=max(feasible,key=lambda x:(
