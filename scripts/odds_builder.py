@@ -422,6 +422,32 @@ def virtual_recent_gate(product,line,pick):
     threshold=0.65 if product=="efootball_gt" else 0.75
     return hit>=threshold,{"n":len(exact),"wins":wins,"hit_rate":round(hit,4),"threshold":threshold,"side":str(pick or "").lower()}
 
+def virtual_directional_evidence(recent):
+    """Score exact product/line/side settlement evidence for eFootball ranking.
+
+    Bayesian shrinkage keeps small samples from dominating larger histories.
+    This is ranking-only; the existing evidence threshold remains the gate.
+    """
+    if not isinstance(recent,dict):
+        return {"score":0.0,"posterior_rate":0.0,"sample_confidence":0.0,"n":0,"wins":0}
+    try:
+        n=int(recent.get("n") or 0)
+        wins=int(recent.get("wins") or 0)
+    except (TypeError,ValueError):
+        return {"score":0.0,"posterior_rate":0.0,"sample_confidence":0.0,"n":0,"wins":0}
+    if n<8:
+        return {"score":0.0,"posterior_rate":0.0,"sample_confidence":0.0,"n":n,"wins":wins}
+    posterior=(wins+2.0)/(n+4.0)
+    sample_confidence=min(1.0,math.sqrt(n/30.0))
+    score=posterior*(0.75+0.25*sample_confidence)
+    return {
+        "score":round(score,6),
+        "posterior_rate":round(posterior,6),
+        "sample_confidence":round(sample_confidence,6),
+        "n":n,
+        "wins":wins
+    }
+
 def virtual_candidates(now):
     """Build Virtual candidates from the freshest exact SportyBet O/U snapshot.
 
@@ -562,7 +588,6 @@ def virtual_candidates(now):
         if not template:
             continue
         try:
-            prob=float(template.get("probability") or 0)
             line=float(line)
         except (TypeError,ValueError):
             continue
@@ -585,47 +610,79 @@ def virtual_candidates(now):
         source=str(event.get("price_snapshot_source") or "fresh_unified_sportybet_snapshot")
         diagnostics["price_snapshot_sources"][source]=diagnostics["price_snapshot_sources"].get(source,0)+1
 
-        y={**template}
-        y.update({
-            "sport":"virtual","product":product,
-            "league":event.get("league") or template.get("league"),
-            "event_id":str(event.get("event_id") or ""),
-            "start_time":event.get("start_time"),
-            "participant_1":event.get("participant_1") or event.get("player_1") or event.get("team_1"),
-            "participant_2":event.get("participant_2") or event.get("player_2") or event.get("team_2"),
-            "player_1":event.get("player_1") or event.get("participant_1") or event.get("team_1"),
-            "player_2":event.get("player_2") or event.get("participant_2") or event.get("team_2"),
-            "match":event.get("match") or f"{event.get('player_1') or event.get('participant_1') or ''} vs {event.get('player_2') or event.get('participant_2') or ''}",
-            "line":line,"pick":pick,
-            "probability":prob,"builder_probability":prob,
-            "bookmaker_available":True,
-            "sportybet_over_odds":over,"sportybet_under_odds":under,
-            "bookmaker_odds":over if pick=="over" else under,
-            "sportybet_odds":over if pick=="over" else under,
-            "bookmaker_source":"SportyBet NG",
-            "sportybet_event_id":str(event.get("sportybet_event_id") or event.get("event_id") or ""),
-            "sportybet_match":event.get("sportybet_match") or event.get("match"),
-            "market_odds_timestamp":event.get("market_odds_timestamp"),
-            "sportybet_identity_match":True,
-            "builder_pick":pick,"builder_market":"virtual_total",
-            "price_snapshot_source":source,
-        })
-        passed,recent=virtual_recent_gate(product,line,pick)
-        if not passed:
-            diagnostics["rejected_evidence"]+=1
-            reason=str(recent.get("reason") or "recent_evidence_below_threshold")
-            diagnostics["reasons"][reason]=diagnostics["reasons"].get(reason,0)+1
-            continue
-        ticket_pass,ticket_perf=ticket_performance_gate(product,line,pick)
-        if not ticket_pass:
-            diagnostics["rejected_ticket_performance"]+=1
-            reason="ticket_performance_below_threshold"
-            diagnostics["reasons"][reason]=diagnostics["reasons"].get(reason,0)+1
-            continue
-        diagnostics["evidence_pass"]+=1
-        y["recent_evidence"]=recent
-        y["ticket_performance"]=ticket_perf
-        out.append(y)
+        # eFootball construction is direction-neutral: compare Over and Under
+        # on the same exact line instead of inheriting only the model's preferred
+        # side. Exact-side settlement evidence decides which direction survives.
+        sides=[pick]
+        if product.startswith("efootball_"):
+            sides=["over","under"]
+
+        for side in sides:
+            probabilities=template.get("probabilities") or {}
+            try:
+                prob=probabilities.get(side)
+                if prob is None:
+                    if side==str(template.get("pick") or "").lower():
+                        prob=template.get("probability")
+                    else:
+                        preferred=probabilities.get(str(template.get("pick") or "").lower())
+                        if preferred is not None:
+                            prob=1.0-float(preferred)
+                prob=float(prob)
+            except (TypeError,ValueError):
+                continue
+            if not 0.0<prob<1.0:
+                continue
+
+            y={**template}
+            y.update({
+                "sport":"virtual","product":product,
+                "league":event.get("league") or template.get("league"),
+                "event_id":str(event.get("event_id") or ""),
+                "start_time":event.get("start_time"),
+                "participant_1":event.get("participant_1") or event.get("player_1") or event.get("team_1"),
+                "participant_2":event.get("participant_2") or event.get("player_2") or event.get("team_2"),
+                "player_1":event.get("player_1") or event.get("participant_1") or event.get("team_1"),
+                "player_2":event.get("player_2") or event.get("participant_2") or event.get("team_2"),
+                "match":event.get("match") or f"{event.get('player_1') or event.get('participant_1') or ''} vs {event.get('player_2') or event.get('participant_2') or ''}",
+                "line":line,"pick":side,
+                "probability":prob,"builder_probability":prob,
+                "bookmaker_available":True,
+                "sportybet_over_odds":over,"sportybet_under_odds":under,
+                "bookmaker_odds":over if side=="over" else under,
+                "sportybet_odds":over if side=="over" else under,
+                "bookmaker_source":"SportyBet NG",
+                "sportybet_event_id":str(event.get("sportybet_event_id") or event.get("event_id") or ""),
+                "sportybet_match":event.get("sportybet_match") or event.get("match"),
+                "market_odds_timestamp":event.get("market_odds_timestamp"),
+                "sportybet_identity_match":True,
+                "builder_pick":side,"builder_market":"virtual_total",
+                "price_snapshot_source":source,
+                "directional_candidate_derived":bool(side!=pick),
+                "source_model_pick":pick,
+            })
+
+            passed,recent=virtual_recent_gate(product,line,side)
+            if not passed:
+                diagnostics["rejected_evidence"]+=1
+                reason=str(recent.get("reason") or "recent_evidence_below_threshold")
+                diagnostics["reasons"][reason]=diagnostics["reasons"].get(reason,0)+1
+                continue
+
+            ticket_pass,ticket_perf=ticket_performance_gate(product,line,side)
+            if not ticket_pass:
+                diagnostics["rejected_ticket_performance"]+=1
+                reason="ticket_performance_below_threshold"
+                diagnostics["reasons"][reason]=diagnostics["reasons"].get(reason,0)+1
+                continue
+
+            diagnostics["evidence_pass"]+=1
+            evidence=virtual_directional_evidence(recent)
+            y["recent_evidence"]=recent
+            y["directional_evidence"]=evidence
+            y["evidence_score"]=evidence["score"]
+            y["ticket_performance"]=ticket_perf
+            out.append(y)
 
     diagnostics["quote_join"]=quote_diag
     diagnostics["stale_unified_prices_used"]=False
@@ -797,7 +854,18 @@ def make_leg(x):
     # loading/scoring the profile artifact for every candidate leg.
     participant_history={"available":False,"score":0.5,"participants":[]}
     history_bonus=0.0
-    selection_score=(edge if edge is not None else -1.0)
+    evidence_score=None
+    if str(x.get("product") or "").startswith("efootball_"):
+        try:
+            value=float(x.get("evidence_score"))
+            evidence_score=value if math.isfinite(value) else None
+        except (TypeError,ValueError):
+            evidence_score=None
+    if evidence_score is not None:
+        # Exact-side historical evidence is the primary eFootball ranking signal.
+        selection_score=(0.90*evidence_score)+(0.10*max(0.0,float(edge or 0.0)))
+    else:
+        selection_score=(edge if edge is not None else -1.0)
     return {
         "sport":x.get("sport"),"competition":x.get("league"),"event_id":x.get("event_id"),
         "start_time":x.get("start_time"),"match":match,"market":x.get("builder_market"),
@@ -809,6 +877,7 @@ def make_leg(x):
         "expected_value":round(ev,6) if ev is not None else None,
         "participant_history":participant_history,
         "participant_history_bonus":round(history_bonus,6),
+        "evidence_score":round(evidence_score,6) if evidence_score is not None else None,
         "selection_score":round(selection_score,6),
         "product":x.get("product"),
         "edge_percent":round(edge*100,2) if edge is not None else None,
@@ -898,13 +967,26 @@ def build_value_batches(candidates):
     for _ in range(MAX_BATCHES):
         if not remaining:
             break
-        remaining.sort(key=lambda x:(
-            efficiency(x),
-            -product_priority.get(str(x.get("product") or ""),0),
-            -float(x.get("model_edge") or 0),
-            -float(x.get("model_probability") or 0),
-            -float(x.get("bookmaker_odds") or 0)
-        ))
+        def batch_sort_key(x):
+            product=str(x.get("product") or "")
+            if product.startswith("efootball_") and x.get("evidence_score") is not None:
+                return (
+                    0,
+                    -float(x.get("evidence_score") or 0),
+                    -float(x.get("model_probability") or 0),
+                    -float(x.get("model_edge") or 0),
+                    efficiency(x),
+                    -float(x.get("bookmaker_odds") or 0)
+                )
+            return (
+                1,
+                efficiency(x),
+                -product_priority.get(product,0),
+                -float(x.get("model_edge") or 0),
+                -float(x.get("model_probability") or 0),
+                -float(x.get("bookmaker_odds") or 0)
+            )
+        remaining.sort(key=batch_sort_key)
         batch=[]
         batch_events=set()
         batch_participants=set()
@@ -1106,6 +1188,13 @@ def main():
             "min_data_quality":MIN_DATA_QUALITY,"requires_live_sportybet_price":True,
             "requires_complete_market_for_devig":True,"avoid_same_event_correlation":True,
             "participant_history_weighting":"qualified-leg ranking only; conservative exact-line settled O/U history; no eligibility bypass",
+            "efootball_direction_neutral_ranking":{
+                "enabled":True,
+                "sides_compared":["over","under"],
+                "primary_signal":"exact product + line + side settled evidence",
+                "ranking_method":"Bayesian-shrunk hit rate with sample-confidence adjustment; model edge is a secondary tie-break",
+                "eligibility_unchanged":True
+            },
             "never_force_accumulator":True,"real_money_execution":False},
         "bookmaker_odds":{"status":"LIVE_SPORTYBET_SNAPSHOT","sportybet_direct_feed":"VIA_CLOUDFLARE_PROXY",
             "stake_direct_feed":"NOT_CONNECTED","instruction":"Verify the displayed SportyBet price immediately before any manual wager."},
@@ -1120,7 +1209,7 @@ def main():
             "max_batches":MAX_BATCHES,
             "max_legs":MAX_LEGS,
             "disjoint_batches":True,
-            "ranking":"combined_model_rating descending, then average model edge, then combined odds",
+            "ranking":"eFootball exact-side evidence score first; otherwise combined model rating descending, then average model edge, then combined odds",
             "model_rating_definition":"100 × product of leg model probabilities (naive joint proxy)",
             "leg_strength_definition":"100 × geometric mean of leg model probabilities",
             "primary_lane":"vfootball"
