@@ -1,38 +1,38 @@
 {
-  "generated_at": "2026-09-30T06:02:00.607266+00:00",
-  "status": "HEALTHY",
-  "critical_issues": 0,
-  "warning_issues": 0,
+  "generated_at": "2026-09-30T08:19:46.151698+00:00",
+  "status": "FAIL",
+  "critical_issues": 1,
+  "warning_issues": 1,
   "info_issues": 0,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
       "status": "PASS",
-      "age_hours": 0.59,
+      "age_hours": 2.88,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.03,
+      "age_hours": 2.29,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 0.04,
+      "age_hours": 2.33,
       "threshold_hours": 4
     },
     {
       "engine": "unified_upcoming",
-      "status": "PASS",
-      "age_hours": 0.0,
+      "status": "STALE",
+      "age_hours": 2.3,
       "threshold_hours": 2
     },
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 3.63,
+      "age_hours": 0.0,
       "threshold_hours": 0.5,
       "heartbeat_source": "unified_live_refresh"
     },
@@ -55,7 +55,18 @@
       }
     }
   ],
-  "issues": [],
+  "issues": [
+    {
+      "code": "STALE_UNIFIED_UPCOMING",
+      "severity": "critical",
+      "detail": "generated_at age 2.30h exceeds 2h"
+    },
+    {
+      "code": "UNIFIED_BOARD_STALE",
+      "severity": "warning",
+      "detail": "unified board age 2.30h exceeds 2h"
+    }
+  ],
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
   "paper_only": true
 }
