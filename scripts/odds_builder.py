@@ -163,6 +163,16 @@ def _participant_pair_key(row):
         return ""
     return product+"|"+"|".join(sorted(vals[:2]))
 
+def _virtual_selection_side(row):
+    """Resolve the exact O/U side from the normalized Builder candidate."""
+    import re
+    side=str(row.get("builder_pick") or "").strip().lower()
+    if side in {"over","under"}:
+        return side
+    text=str(row.get("pick") or "").strip().lower()
+    match=re.search(r"\b(over|under)\b",text)
+    return match.group(1) if match else ""
+
 def refresh_virtual_quotes(rows):
     """Join unified fixtures to the current read-only SportyBet snapshot.
 
@@ -291,7 +301,14 @@ def refresh_virtual_quotes(rows):
                 y["market_odds_timestamp"]=fetched_at
                 y["sportybet_identity_match"]=str(e.get("event_id"))==str(x.get("event_id")) or _norm_fixture(e.get("match") or e.get("name"))==key
                 # Preserve exact live market/outcome IDs for non-staking share-code creation.
-                requested_side=str(x.get("builder_pick") or "").lower()
+                # O/U providers reuse numeric outcome IDs (12/13) across every line,
+                # so the side must be matched by name, never by outcome ID alone.
+                requested_side=_virtual_selection_side(x)
+                y.pop("sportybet_market_id",None)
+                y.pop("sportybet_specifier",None)
+                y.pop("sportybet_outcome_id",None)
+                y.pop("sportybet_outcome_name",None)
+                y["sportybet_selection_side"]=requested_side or None
                 for m in e.get("markets") or []:
                     if not isinstance(m,dict):
                         continue
@@ -306,6 +323,8 @@ def refresh_virtual_quotes(rows):
                             continue
                         name=str(o.get("name") or o.get("desc") or "").lower()
                         if requested_side and not name.startswith(requested_side):
+                            continue
+                        if not requested_side:
                             continue
                         y["sportybet_market_id"]=str(m.get("id") or "")
                         y["sportybet_specifier"]=m.get("specifier")
