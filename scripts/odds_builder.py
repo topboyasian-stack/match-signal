@@ -37,6 +37,9 @@ TICKET_SPOILER_MIN_ACCURACY=0.90
 PARTICIPANT_HISTORY_MIN_N=3
 PARTICIPANT_HISTORY_MAX_BONUS=0.035
 MAX_BATCHES=6
+# Keep Builder candidates close to kickoff so participant evidence and market prices can be refreshed.
+MAX_BUILDER_HORIZON_MINUTES=180
+MAX_BATCH_KICKOFF_SPAN_MINUTES=60
 
 
 def load(path, default):
@@ -44,6 +47,21 @@ def load(path, default):
         return json.loads(path.read_text(encoding="utf-8"))
     except (FileNotFoundError,json.JSONDecodeError):
         return default
+
+
+def kickoff_age_minutes(x, now):
+    try:
+        raw=x.get("start_time")
+        if not raw:return None
+        dt=datetime.fromisoformat(str(raw).replace("Z","+00:00")).astimezone(timezone.utc)
+        return (dt-now).total_seconds()/60.0
+    except (TypeError,ValueError):
+        return None
+
+
+def within_builder_horizon(x, now):
+    minutes=kickoff_age_minutes(x,now)
+    return minutes is not None and 0.0 < minutes <= MAX_BUILDER_HORIZON_MINUTES
 
 
 def upcoming(x, now):
@@ -107,7 +125,7 @@ def football_candidates(now):
     out=[]
     if not isinstance(raw,list):return out
     for x in raw:
-        if not isinstance(x,dict) or x.get("sport")!="football" or not upcoming(x,now):continue
+        if not isinstance(x,dict) or x.get("sport")!="football" or not within_builder_horizon(x,now):continue
         probs=x.get("calibrated_probabilities") or x.get("probabilities") or {}
         pick=x.get("pick")
         try:p=float(probs.get(pick,x.get("calibrated_confidence",x.get("confidence",0))) or 0)
@@ -122,7 +140,7 @@ def tennis_candidates(now):
     out=[]
     if not isinstance(raw,list):return out
     for x in raw:
-        if not isinstance(x,dict) or x.get("sport")!="tennis" or not upcoming(x,now):continue
+        if not isinstance(x,dict) or x.get("sport")!="tennis" or not within_builder_horizon(x,now):continue
         probs=x.get("calibrated_probabilities") or x.get("probabilities") or {}
         pick=x.get("pick")
         try:wp=float(probs.get(pick,x.get("calibrated_confidence",0)) or 0) if pick else 0.0
@@ -630,7 +648,7 @@ def virtual_candidates(now):
             continue
         if event.get("sport")!="virtual" or event.get("product") not in {"efootball_gt","efootball_adriatic","vfootball","zoom"}:
             continue
-        if not upcoming(event,now):
+        if not within_builder_horizon(event,now):
             continue
         product=str(event.get("product") or "")
         line=event.get("line")
@@ -1215,6 +1233,33 @@ def _construct_model_first_batch(pool, max_legs=MAX_LEGS):
     return []
 
 
+def _kickoff_timestamp(leg):
+    try:
+        raw=leg.get("start_time")
+        if not raw:return None
+        return datetime.fromisoformat(str(raw).replace("Z","+00:00")).astimezone(timezone.utc).timestamp()
+    except (TypeError,ValueError):
+        return None
+
+
+def _batch_kickoff_span_minutes(legs):
+    stamps=[_kickoff_timestamp(x) for x in legs]
+    stamps=[x for x in stamps if x is not None]
+    if len(stamps)<2:return 0.0
+    return (max(stamps)-min(stamps))/60.0
+
+
+def _near_kickoff_window(pool, anchor):
+    anchor_ts=_kickoff_timestamp(anchor)
+    if anchor_ts is None:return []
+    out=[]
+    for x in pool:
+        ts=_kickoff_timestamp(x)
+        if ts is not None and 0.0 <= (ts-anchor_ts)/60.0 <= MAX_BATCH_KICKOFF_SPAN_MINUTES:
+            out.append(x)
+    return out
+
+
 def build_value_batches(candidates):
     """Create disjoint 4.00+ paper batches, optimizing model strength first.
 
@@ -1236,13 +1281,27 @@ def build_value_batches(candidates):
     for _ in range(MAX_BATCHES):
         if not remaining:
             break
-        batch=_construct_model_first_batch(remaining)
-        if not batch:
+        # Build only inside rolling kickoff windows so one ticket does not mix
+        # fixtures that are hours apart.
+        ordered=sorted(remaining,key=lambda x:(_kickoff_timestamp(x) if _kickoff_timestamp(x) is not None else float("inf")))
+        window_candidates=[]
+        for anchor in ordered:
+            window=_near_kickoff_window(ordered,anchor)
+            candidate=_construct_model_first_batch(window)
+            if candidate and _batch_kickoff_span_minutes(candidate)<=MAX_BATCH_KICKOFF_SPAN_MINUTES:
+                window_candidates.append(candidate)
+        if not window_candidates:
             if remaining is vfootball_pool and fallback_pool:
                 remaining=fallback_pool
                 fallback_pool=[]
                 continue
             break
+        batch=max(window_candidates,key=lambda rows:(
+            math.prod(max(0.0005,min(0.9995,float(x.get("model_probability") or 0.0))) for x in rows),
+            sum(float(x.get("model_edge") or 0.0) for x in rows)/len(rows),
+            math.prod(float(x.get("bookmaker_odds") or 1.0) for x in rows)
+        ))
+        batch=sorted(batch,key=lambda x:(_kickoff_timestamp(x) if _kickoff_timestamp(x) is not None else float("inf")))
         metrics=_batch_metrics(batch)
         combined=math.prod(float(x.get("bookmaker_odds") or 1.0) for x in batch)
         batch_events={str(x.get("event_id") or "") for x in batch if x.get("event_id")}
@@ -1269,7 +1328,7 @@ def build_value_batches(candidates):
         used_events.update(batch_events)
         remaining=[x for x in remaining if str(x.get("event_id") or "") not in used_events]
 
-    batches.sort(key=lambda b:(b.get("combined_model_rating",0),b.get("avg_model_edge_percent",0),b.get("combined_odds",0)),reverse=True)
+    batches.sort(key=lambda b:(min([_kickoff_timestamp(x) for x in b.get("legs",[]) if _kickoff_timestamp(x) is not None] or [float("inf")]), -float(b.get("combined_model_rating") or 0), -float(b.get("avg_model_edge_percent") or 0), -float(b.get("combined_odds") or 0)))
     for i,b in enumerate(batches,1):
         b["rank"]=i
         b["batch_id"]=f"BATCH-{i:02d}"
@@ -1282,6 +1341,8 @@ def build_value_batches(candidates):
         "min_combined_odds":MIN_COMBINED_ODDS,
         "priority_product":"vfootball",
         "max_legs":MAX_LEGS,
+        "max_kickoff_span_minutes":MAX_BATCH_KICKOFF_SPAN_MINUTES,
+        "builder_horizon_minutes":MAX_BUILDER_HORIZON_MINUTES,
         "used_unique_events":len(used_events),
         "capacity":_batch_capacity_diagnostic(eligible_all),
         "ranking_metric":"whole-ticket model probability under 4.00+ odds and correlation constraints",
@@ -1416,6 +1477,8 @@ def main():
         "selection_policy":{"min_calibrated_probability":MIN_PROB,"virtual_min_probability":VIRTUAL_MIN_PROB,"virtual_builder_lines":"all current O/U lines with exact-side evidence; no forced line list","minimum_combined_odds":MIN_COMBINED_ODDS,"min_model_edge":MIN_EDGE,
             "max_odds_age_seconds":MAX_ODDS_AGE_SECONDS,"max_uncertainty":MAX_UNCERTAINTY,
             "max_legs":MAX_LEGS,
+            "builder_horizon_minutes":MAX_BUILDER_HORIZON_MINUTES,
+            "max_batch_kickoff_span_minutes":MAX_BATCH_KICKOFF_SPAN_MINUTES,
             "ticket_performance_filter":{"enabled":True,"min_settled_legs":TICKET_SPOILER_MIN_SAMPLE,"min_accuracy":TICKET_SPOILER_MIN_ACCURACY,"role":"construction_only; never substitutes for model evidence"},
             "min_data_quality":MIN_DATA_QUALITY,"requires_live_sportybet_price":True,
             "requires_complete_market_for_devig":True,"avoid_same_event_correlation":True,
@@ -1440,8 +1503,10 @@ def main():
             "min_combined_odds":MIN_COMBINED_ODDS,
             "max_batches":MAX_BATCHES,
             "max_legs":MAX_LEGS,
+            "max_kickoff_span_minutes":MAX_BATCH_KICKOFF_SPAN_MINUTES,
+            "builder_horizon_minutes":MAX_BUILDER_HORIZON_MINUTES,
             "disjoint_batches":True,
-            "ranking":"eFootball exact-side evidence score first; otherwise combined model rating descending, then average model edge, then combined odds",
+            "ranking":"chronological kickoff windows first; within each 60-minute window maximize whole-ticket model probability subject to existing gates",
             "model_rating_definition":"100 × product of leg model probabilities (naive joint proxy)",
             "leg_strength_definition":"100 × geometric mean of leg model probabilities",
             "primary_lane":"vfootball",
@@ -1457,7 +1522,7 @@ def main():
         "market_price_combined_odds":round(combined,3) if selected else None,
         "sportybet_booking":booking_info,
         "theme":{"name":"Midnight Graphite / Electric Cyan / Signal Green","accent":"#28D7E8","positive":"#35D07F","background":"#080D14"},
-        "notes":["V6 qualifies on market edge, not probability alone.","Zero batches are now diagnosable: capacity reports whether 4.00 is mathematically reachable under the existing 16-leg and correlation rules; no quality gate is weakened.","best_available_legs is informational when no batch exists and is not a qualified accumulator.","Missing or stale SportyBet prices produce NO_BET/REJECTED.","Model fair odds never overwrite bookmaker odds.","Each Builder batch is a separate disjoint paper ticket at 4.00+ combined bookmaker odds; batches are ranked by combined model rating.","vFootball is prioritized because its existing untouched O/U evidence is currently the strongest active research lane.","Paper-only until V6 demonstrates stable calibration, edge and closing-line value over a meaningful sample."]
+        "notes":["V6 qualifies on market edge, not probability alone.","Zero batches are now diagnosable: capacity reports whether 4.00 is mathematically reachable under the existing 16-leg and correlation rules; no quality gate is weakened.","best_available_legs is informational when no batch exists and is not a qualified accumulator.","Missing or stale SportyBet prices produce NO_BET/REJECTED.","Model fair odds never overwrite bookmaker odds.","Each Builder batch is a separate disjoint paper ticket at 4.00+ combined bookmaker odds; legs are ordered by kickoff time and each batch is limited to a 60-minute kickoff span.","vFootball is prioritized because its existing untouched O/U evidence is currently the strongest active research lane.","Paper-only until V6 demonstrates stable calibration, edge and closing-line value over a meaningful sample.","Near-term Builder horizon is 180 minutes; later fixtures remain in the wider prediction system but are not carried into the Builder until a later refresh.","Builder refreshes every 15 minutes and after relevant upstream workflows, so near-term tickets are repeatedly revalidated before kickoff."]
     }
     OUTPUT.write_text(json.dumps(result,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
     print(json.dumps(result,indent=2))
