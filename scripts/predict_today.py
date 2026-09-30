@@ -497,7 +497,20 @@ def attach_sportybet_market_layer(predictions):
                     "market_id": winner.get("market_id"),
                     "overround": round(float(winner.get("overround") or 0), 6),
                 }
-            model_probs = prediction.get("probabilities") or {}
+                # Preserve exact SportyBet IDs for the selected winner side.
+                prediction["sportybet_market_id"] = str(winner.get("market_id") or "")
+                winner_outcomes = winner.get("raw_outcomes") or []
+                if match["method"] == "reverse":
+                    winner_outcomes = list(reversed(winner_outcomes))
+                selected_outcome = None
+                if pick := prediction.get("pick"):
+                    side_index = {"p1": 0, "p2": 1}.get(pick)
+                    if side_index is not None and len(winner_outcomes) > side_index:
+                        selected_outcome = winner_outcomes[side_index]
+                if isinstance(selected_outcome, dict):
+                    prediction["sportybet_outcome_id"] = str(selected_outcome.get("id") or "")
+                    prediction["sportybet_outcome_name"] = selected_outcome.get("name")
+                model_probs = prediction.get("probabilities") or {}
             market_winner = prediction.get("sportybet_winner_odds") or {}
             pick = prediction.get("pick")
             model_pick_prob = model_probs.get(pick)
@@ -554,6 +567,21 @@ def attach_sportybet_market_layer(predictions):
                 for item in (snapshot.get("totals") or [])
                 if isinstance(item, dict)
             ]
+            if total_insight:
+                selected_total = next(
+                    (item for item in (snapshot.get("totals") or [])
+                     if item.get("line") is not None and total_insight.get("line") is not None
+                     and abs(float(item.get("line")) - float(total_insight.get("line"))) < 1e-9),
+                    None,
+                )
+                if selected_total:
+                    prediction["sportybet_market_id"] = str(selected_total.get("market_id") or "")
+                    prediction["sportybet_specifier"] = f"total={selected_total.get('line')}"
+                    selected_side = total_insight.get("pick")
+                    outcome_key = "over_outcome_id" if selected_side == "over" else "under_outcome_id"
+                    name_key = "over_outcome_name" if selected_side == "over" else "under_outcome_name"
+                    prediction["sportybet_outcome_id"] = str(selected_total.get(outcome_key) or "")
+                    prediction["sportybet_outcome_name"] = selected_total.get(name_key)
             prediction["market_insights"] = {
                 "provider": "SportyBet NG",
                 "available": True,
