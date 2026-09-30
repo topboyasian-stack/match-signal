@@ -32,6 +32,10 @@ OUTPUT=DATA/"unified_upcoming.json"
 NOW=datetime.now(timezone.utc)
 HORIZON=NOW+timedelta(days=7)
 EFOOTBALL_PRODUCT_MIN_HIT_RATE=0.65
+EFOOTBALL_DIRECTION_MIN_HOLDOUT_ROWS=30
+EFOOTBALL_DIRECTION_MIN_RECENT_ROWS=30
+EFOOTBALL_DIRECTION_MIN_HIT_RATE=0.65
+EFOOTBALL_DIRECTION_RECENT_WINDOW=50
 
 def load(name, default):
     try:
@@ -254,6 +258,72 @@ def load_virtual_history():
     history=load("virtual_lab_history.json",[])
     return [r for r in history if isinstance(r,dict) and r.get("market")=="ou" and r.get("win") is not None]
 
+def build_efootball_directional_gate(eval_art, history):
+    """Build exact product+line+side qualification evidence from untouched holdout + recent settled history.
+
+    This is deliberately separate from the product-wide bootstrap gate. The base
+    model must already pass its global walk-forward gate, then an exact O/U line
+    and direction must have at least 30 untouched holdout rows at >=65% hit rate
+    and at least 30 recent settled rows at >=65% hit rate. This does not lower
+    the evidence threshold; it makes the validation granular enough to avoid
+    blocking strong exact selections because another eFootball line/side is weak.
+    """
+    out={}
+    by_key=defaultdict(list)
+    for r in history if isinstance(history,list) else []:
+        if not isinstance(r,dict) or r.get("product")!="efootball_gt" or r.get("market")!="ou" or r.get("win") is None:
+            continue
+        try:
+            line=float(r.get("line"))
+        except (TypeError,ValueError):
+            continue
+        selection=str(r.get("selection") or "").upper()
+        side="over" if selection.startswith("O") else "under" if selection.startswith("U") else ""
+        if not side:
+            continue
+        stamp=dt(r.get("settled_at") or r.get("timestamp"))
+        by_key[(line,side)].append({
+            "win":bool(r.get("win")),
+            "timestamp":stamp
+        })
+
+    selection_eval=((eval_art.get("efootball_gt_diagnostics") or {}).get("selection") or {}) if isinstance(eval_art,dict) else {}
+    for selection_key, line_map in selection_eval.items():
+        key_text=str(selection_key).lower()
+        side="over" if key_text.startswith("o") else "under" if key_text.startswith("u") else ""
+        if not side:
+            continue
+        try:
+            line=float(key_text[1:])
+        except (TypeError,ValueError):
+            continue
+        report=(line_map or {}).get(str(line)) if isinstance(line_map,dict) else None
+        poisson=(report or {}).get("poisson") if isinstance(report,dict) else None
+        if not isinstance(poisson,dict):
+            continue
+        arr=sorted(by_key.get((line,side),[]), key=lambda x: x.get("timestamp") or datetime.min.replace(tzinfo=timezone.utc))
+        recent=arr[-min(EFOOTBALL_DIRECTION_RECENT_WINDOW,len(arr)):] if arr else []
+        holdout_n=int(poisson.get("n") or 0)
+        holdout_hit=float(poisson.get("hit_rate") or 0)
+        recent_n=len(recent)
+        recent_hit=(sum(1 for x in recent if x.get("win"))/recent_n) if recent_n else 0.0
+        passed=(
+            holdout_n>=EFOOTBALL_DIRECTION_MIN_HOLDOUT_ROWS and
+            holdout_hit>=EFOOTBALL_DIRECTION_MIN_HIT_RATE and
+            recent_n>=EFOOTBALL_DIRECTION_MIN_RECENT_ROWS and
+            recent_hit>=EFOOTBALL_DIRECTION_MIN_HIT_RATE
+        )
+        out[(line,side)]={
+            "pass":passed,
+            "holdout_n":holdout_n,
+            "holdout_hit_rate":round(holdout_hit,4),
+            "recent_n":recent_n,
+            "recent_hit_rate":round(recent_hit,4),
+            "threshold":EFOOTBALL_DIRECTION_MIN_HIT_RATE,
+            "basis":"strict chronological holdout + latest settled exact-line direction history",
+        }
+    return out
+
 def build_virtual_events(history, lifecycle, eligibility):
     """Forward Virtual/eFootball projections using the same base qualification policy
     as the Virtual Lab, without waiting for participant enhancement to pass.
@@ -359,6 +429,8 @@ def build_virtual_events(history, lifecycle, eligibility):
         product_bootstrap_gate[str(product)]=bool(
             viable_m and max(float(metrics.get(v,{}).get("hit_rate",0)) for v in viable_m)>=EFOOTBALL_PRODUCT_MIN_HIT_RATE
         )
+
+    directional_gate=build_efootball_directional_gate(eval_art, history)
 
     # Fit one stable lambda per product from the latest settled history.
     # Never recompute the grid separately for every fixture/market.
@@ -471,11 +543,11 @@ def build_virtual_events(history, lifecycle, eligibility):
             model_comp=comp_key in product_model_comp.get(product,set())
             model_line=float(line) in product_model_line.get(product,set())
 
+            directional_key=(float(line),chosen_pick)
+            directional=directional_gate.get(directional_key,{})
             if product.startswith("efootball"):
                 if not base_model_gate:
                     qualification_status="BASE_MODEL_GATE_PENDING"
-                elif not product_bootstrap_gate.get(product,False):
-                    qualification_status="PRODUCT_MODEL_VALIDATION_GATE_PENDING"
                 elif not model_line:
                     qualification_status="MODEL_LINE_SCOPE_GATE_PENDING"
                 elif edge is None:
@@ -488,10 +560,10 @@ def build_virtual_events(history, lifecycle, eligibility):
                     qualification_status="BETTING_QUALIFIED_PAPER"
                 elif product_bootstrap_gate.get(product,False):
                     qualification_status="BETTING_QUALIFIED_PAPER_BOOTSTRAP"
-                elif not active_comp:
-                    qualification_status="RAW_COMPETITION_GATE_PENDING"
+                elif directional.get("pass"):
+                    qualification_status="BETTING_QUALIFIED_PAPER_DIRECTIONAL"
                 else:
-                    qualification_status="MODEL_SCOPE_GATE_PENDING"
+                    qualification_status="DIRECTIONAL_LINE_VALIDATION_GATE_PENDING"
             elif product=="vfootball":
                 # vFootball has its own large untouched O/U evidence base and
                 # should be eligible for the Builder on the same validated
@@ -514,7 +586,7 @@ def build_virtual_events(history, lifecycle, eligibility):
             else:
                 qualification_status="RESEARCH_PROJECTION"
 
-            qualified=qualification_status in {"BETTING_QUALIFIED_PAPER","BETTING_QUALIFIED_PAPER_BOOTSTRAP"}
+            qualified=qualification_status in {"BETTING_QUALIFIED_PAPER","BETTING_QUALIFIED_PAPER_BOOTSTRAP","BETTING_QUALIFIED_PAPER_DIRECTIONAL"}
             add(out,{
                 "sport":"virtual",
                 "product":product,
@@ -546,6 +618,12 @@ def build_virtual_events(history, lifecycle, eligibility):
                 "participant_hot_watch":participant_hot,
                 "participant_enhancement_gate":participant_gate,
                 "product_bootstrap_gate":product_bootstrap_gate.get(product,False),
+                "directional_line_gate_pass":bool(directional.get("pass")),
+                "directional_line_holdout_n":directional.get("holdout_n"),
+                "directional_line_holdout_hit_rate":directional.get("holdout_hit_rate"),
+                "directional_line_recent_n":directional.get("recent_n"),
+                "directional_line_recent_hit_rate":directional.get("recent_hit_rate"),
+                "directional_line_gate_basis":directional.get("basis"),
                 "product_model_min_holdout_hit_rate":EFOOTBALL_PRODUCT_MIN_HIT_RATE if product.startswith("efootball") else None,
                 "base_model_gate":base_model_gate,
                 "raw_competition_eligible":active_comp,
@@ -555,7 +633,7 @@ def build_virtual_events(history, lifecycle, eligibility):
                 "qualification_status":qualification_status,
                 "betting_qualified":qualified,
                 "qualified_for_builder":qualified,
-                "qualification_engine":"Virtual Lab base walk-forward gate + qualified line + current SportyBet edge + competition evidence OR validated product-bootstrap evidence",
+                "qualification_engine":"Virtual Lab base walk-forward gate + model-qualified line + current SportyBet edge + competition evidence OR validated product-bootstrap evidence OR exact line/direction holdout + recent evidence",
                 "model":"Virtual Lab base O/U model",
                 "model_version":"VL-BOARD-2.0",
                 "paper_only":True,
