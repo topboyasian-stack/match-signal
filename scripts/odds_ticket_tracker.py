@@ -298,6 +298,8 @@ def backfill_vfootball_results(tickets, now_iso_value):
         events = payload.get("events") if isinstance(payload, dict) else []
         events = events if isinstance(events, list) else []
         print("vFootball result backfill source:", len(events), "events; exact IDs wanted:", len(wanted_ids))
+        print("vFootball pending fixture samples:", json.dumps([{"event_id":x.get("event_id"),"match":x.get("match"),"start_time":x.get("start_time")} for x in pending[:10]], ensure_ascii=False))
+        print("vFootball result event samples:", json.dumps([{"event_id":e.get("eventId") or e.get("event_id"),"homeTeamName":e.get("homeTeamName"),"awayTeamName":e.get("awayTeamName"),"team_1":e.get("team_1"),"team_2":e.get("team_2"),"participant_1":e.get("participant_1"),"participant_2":e.get("participant_2"),"estimateStartTime":e.get("estimateStartTime"),"start_time":e.get("start_time"),"matchStatus":e.get("matchStatus")} for e in events[:5]], ensure_ascii=False))
     except Exception as exc:
         print("WARNING: vFootball result backfill failed:", exc)
         return []
