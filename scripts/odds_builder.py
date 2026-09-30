@@ -966,9 +966,8 @@ def make_leg(x):
     else:
         match=f"{x.get('home_team')} vs {x.get('away_team')}"
         pick=x.get("builder_pick")
-    # Participant history is an informational ranking feature only. The batch
-    # assembler now ranks by whole-ticket model probability and edge, so avoid
-    # loading/scoring the profile artifact for every candidate leg.
+    # Participant history is a ranking feature only. It never bypasses
+    # eligibility, evidence, freshness, edge, uncertainty or ticket gates.
     participant_history={"available":False,"score":0.5,"participants":[]}
     history_bonus=0.0
     evidence_score=None
@@ -978,11 +977,18 @@ def make_leg(x):
             evidence_score=value if math.isfinite(value) else None
         except (TypeError,ValueError):
             evidence_score=None
+        participant_history=participant_history_signal(x)
+        if participant_history.get("available"):
+            history_bonus=max(-PARTICIPANT_HISTORY_MAX_BONUS,
+                              min(PARTICIPANT_HISTORY_MAX_BONUS,
+                                  (float(participant_history.get("score") or 0.5)-0.5)*2.0))
     if evidence_score is not None:
-        # Exact-side historical evidence is the primary eFootball ranking signal.
-        selection_score=(0.90*evidence_score)+(0.10*max(0.0,float(edge or 0.0)))
+        # Exact-line settled evidence remains primary; participant history is a
+        # small secondary ranking signal so recurring high-performing identities
+        # can surface without changing qualification thresholds.
+        selection_score=(0.90*evidence_score)+(0.10*max(0.0,float(edge or 0.0)))+history_bonus
     else:
-        selection_score=(edge if edge is not None else -1.0)
+        selection_score=(edge if edge is not None else -1.0)+history_bonus
     return {
         "sport":x.get("sport"),"competition":x.get("league"),"event_id":x.get("event_id"),
         "start_time":x.get("start_time"),"match":match,"market":x.get("builder_market"),
