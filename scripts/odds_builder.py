@@ -482,7 +482,7 @@ def _load_results_first_index():
                 continue
             line=leg.get("line")
             if line is None:
-                m=re.search(r"\\b(?:over|under)\\s+(\\d+(?:\\.\\d+)?)\\b",pick_text)
+                m=re.search(r"\b(?:over|under)\s+(\d+(?:\.\d+)?)\b",pick_text)
                 if m:
                     line=m.group(1)
             try:
