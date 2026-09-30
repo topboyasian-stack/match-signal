@@ -498,3 +498,8 @@ jobs:
             if git push origin main; then
               echo "Production verification recorded on attempt ${attempt}."
               exit 0
+            fi
+            sleep $((attempt * 2))
+          done
+          echo "Could not publish production verification after retries."
+          exit 1
