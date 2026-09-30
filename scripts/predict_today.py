@@ -431,6 +431,14 @@ def attach_sportybet_market_layer(predictions):
 
     fetched_at = stats["fetched_at"]
     for prediction in predictions:
+        # Never carry a previous SportyBet quote into a new market snapshot.
+        # An unmatched fixture must fail closed rather than look freshly priced.
+        for stale_key in (
+            "sportybet_market","sportybet_winner_odds","sportybet_total_market",
+            "sportybet_total_games_odds","market_insights","market_odds_timestamp",
+            "odds_timestamp","bookmaker_odds","sportybet_odds",
+        ):
+            prediction.pop(stale_key, None)
         sport = prediction.get("sport")
         events = batches.get(sport) or []
         if not events:
