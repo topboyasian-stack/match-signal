@@ -257,6 +257,45 @@
     }
   }
   function delay(ms){return new Promise(function(resolve){setTimeout(resolve,ms);});}
+  function directSportyBetShare(selections,attempt) {
+    attempt=attempt||1;
+    if(!Array.isArray(selections)||!selections.length)return Promise.reject(new Error('No direct booking selections were returned.'));
+    return fetch('https://www.sportybet.com/api/ng/orders/share?_t='+Date.now(),{
+      method:'POST',
+      mode:'cors',
+      credentials:'omit',
+      headers:{
+        'Accept':'application/json, text/plain, */*',
+        'Content-Type':'application/json',
+        'Current-Country':'NG',
+        'Origin':location.origin
+      },
+      body:JSON.stringify({selections:selections}),
+      cache:'no-store'
+    }).then(function(r){
+      return r.text().then(function(text){
+        var payload=null;
+        try{payload=text?JSON.parse(text):null;}catch(_){}
+        if(!r.ok){
+          if((r.status===502||r.status===503||r.status===504)&&attempt<2)return delay(500).then(function(){return directSportyBetShare(selections,attempt+1);});
+          throw new Error('Direct SportyBet booking HTTP '+r.status+(text?' · '+String(text).replace(/\\s+/g,' ').slice(0,160):''));
+        }
+        if(!payload||payload.bizCode!=null&&Number(payload.bizCode)!==10000){
+          throw new Error('Direct SportyBet booking returned an invalid response.');
+        }
+        var data=payload.data||{},code=String(data.shareCode||'').trim().toUpperCase();
+        if(!code)throw new Error('Direct SportyBet booking did not return a share code.');
+        return {
+          booking_code:code,
+          share_url:String(data.shareURL||('https://www.sportybet.com/ng/?c=ng&shareCode='+encodeURIComponent(code))),
+          expires_at:Number(data.deadline||0)?new Date(Number(data.deadline)).toISOString():null,
+          selection_count:Array.isArray(data.outcomes)?data.outcomes.length:selections.length,
+          excluded_count:Array.isArray(data.unavailableOutcomes)?data.unavailableOutcomes.length:0,
+          partial:Array.isArray(data.unavailableOutcomes)&&data.unavailableOutcomes.length>0
+        };
+      });
+    });
+  }
   function requestBookingCode(batch,force) {
     if(!batch||!batch.batch_id)return Promise.resolve();
     var current=readBookingState(batch);
@@ -272,7 +311,18 @@
             var raw=String(text||'').replace(/\s+/g,' ').slice(0,180);
             throw new Error('Booking API HTTP '+r.status+' returned a non-JSON response'+(raw?' · '+raw:''));
           }
-          if(!r.ok||!payload.ok){var err=new Error(String(payload&&payload.message||payload&&payload.error||('HTTP '+r.status)));err.payload=payload;throw err;}
+          if(!r.ok||!payload.ok){
+            if(payload&&payload.fallback_direct_origin&&Array.isArray(payload.fallback_selections)&&payload.fallback_selections.length){
+              return directSportyBetShare(payload.fallback_selections).then(function(direct){
+                var readyDirect={booking_code:String(direct.booking_code||''),share_url:String(direct.share_url||''),expires_at:direct.expires_at||null,generated_at:new Date().toISOString(),initial_selection_count:Number(batch.legs&&batch.legs.length||0),requested_selection_count:Number(direct.selection_count||0),selection_count:Number(direct.selection_count||0),excluded_count:Number(direct.excluded_count||0),unavailable_count:Number(direct.excluded_count||0),partial:direct.partial===true,validation:[]};
+                writeBookingState(batch,readyDirect);updateBookingPanel(batch,readyDirect);return readyDirect;
+              }).catch(function(directError){
+                var err=new Error(String(payload&&payload.error||payload&&payload.message||('HTTP '+r.status))+' · Direct-origin fallback: '+String(directError&&directError.message||directError));
+                err.payload=payload;throw err;
+              });
+            }
+            var err=new Error(String(payload&&payload.message||payload&&payload.error||('HTTP '+r.status)));err.payload=payload;throw err;
+          }
           var ready={booking_code:String(payload.booking_code||''),share_url:String(payload.share_url||''),expires_at:payload.expires_at||null,generated_at:new Date().toISOString(),initial_selection_count:Number(payload.initial_selection_count||0),requested_selection_count:Number(payload.requested_selection_count||0),selection_count:Number(payload.selection_count||0),excluded_count:Number(payload.excluded_count||0),unavailable_count:Number(payload.unavailable_count||0),partial:payload.partial===true,combined_odds:payload.combined_odds==null?null:Number(payload.combined_odds),validation:Array.isArray(payload.validation)?payload.validation:[]};
           writeBookingState(batch,ready);updateBookingPanel(batch,ready);return ready;
         });
