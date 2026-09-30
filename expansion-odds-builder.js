@@ -334,9 +334,33 @@
   }
   function ensureBookingCodes(batches) {
     var list=Array.isArray(batches)?batches:[];window.__matchSignalOddsBuilderBatches=list;
-    var chain=Promise.resolve();
-    list.forEach(function(batch){chain=chain.then(function(){return requestBookingCode(batch,false);}).then(function(){return delay(300);});});
-    return chain;
+    // Booking codes are time-sensitive. Never spend the booking window serially
+    // processing already-started batches before requesting the next future ticket.
+    // Generate all fully-future batches concurrently so the earliest valid ticket
+    // cannot expire merely because a previous batch took too long to map.
+    var future=list.filter(function(batch){
+      var e=bookingEligibility(batch);
+      return e.total>0 && e.upcoming===e.total;
+    }).sort(function(a,b){
+      var ad=dateOf(a&&a.start_time),bd=dateOf(b&&b.start_time);
+      return (ad?ad.getTime():Infinity)-(bd?bd.getTime():Infinity);
+    });
+    var started=list.filter(function(batch){
+      var e=bookingEligibility(batch);
+      return e.total>0 && e.upcoming<e.total;
+    });
+    return Promise.all(future.map(function(batch){
+      return requestBookingCode(batch,false);
+    })).then(function(){
+      // Do not create fresh codes for already-started tickets. Their panel
+      // remains available for historical state, while the next future batch
+      // carries the actionable booking code.
+      started.forEach(function(batch){
+        var state=readBookingState(batch);
+        if(!state||!state.booking_code) updateBookingPanel(batch,state||{error:'Kickoff passed; booking code no longer available for this batch.'});
+      });
+      return future;
+    });
   }
   function liveSettlement(l) {
     if (!l || !l.event_id) return null;
