@@ -1510,7 +1510,7 @@ def main():
     sports=sorted({x["sport"] for x in selected})
     accuracy_floor_met=combined>=MIN_ACCURACY_FIRST_ODDS and len(selected)>=BATCH_MIN_LEGS
     target_met=combined>=TARGET_COMBINED_ODDS and accuracy_floor_met
-    status="LIVE_VALUE_SET" if target_met else ("BELOW_4_TARGET_AVAILABLE" if selected else "NO_BET")
+    status="LIVE_VALUE_SET" if target_met else ("ACCURACY_FIRST_SET" if accuracy_floor_met else ("BELOW_4_TARGET_AVAILABLE" if selected else "NO_BET"))
     rejection_counts={}
     for leg in built:
         leg_status=str(leg.get("status") or "REJECTED")
@@ -1567,7 +1567,7 @@ def main():
         "bookmaker_odds":{"status":"LIVE_SPORTYBET_SNAPSHOT","sportybet_direct_feed":"VIA_CLOUDFLARE_PROXY",
             "stake_direct_feed":"NOT_CONNECTED","instruction":"Verify the displayed SportyBet price immediately before any manual wager."},
         "candidates_considered":{"football":len(football),"tennis":len(tennis),"virtual":len(virtual),"all_built":len(built)},
-        "qualified_legs":selected if target_met else [],
+        "qualified_legs":selected if accuracy_floor_met else [],
         "best_available_legs":selected if selected else sorted([x for x in built if x.get("builder_eligible") and str(x.get("product") or "")=="vfootball"], key=lambda x:float(x.get("bookmaker_odds") or 1.0), reverse=True)[:MAX_LEGS],
         "combined_odds_selected":round(combined,3) if selected else None,
         "naive_independence_hit_proxy":round(math.prod(float(x.get("model_probability") or 0) for x in selected),6) if selected else None,
