@@ -29,9 +29,11 @@ MIN_EDGE=0.025
 MAX_ODDS_AGE_SECONDS=900
 MAX_UNCERTAINTY=0.22
 MIN_DATA_QUALITY=0.70
-MIN_LEGS,MAX_LEGS=1,20
+MIN_LEGS,MAX_LEGS=1,16
 MIN_COMBINED_ODDS=4.0
 VIRTUAL_MIN_PROB=0.65
+TICKET_SPOILER_MIN_SAMPLE=50
+TICKET_SPOILER_MIN_ACCURACY=0.90
 PARTICIPANT_HISTORY_MIN_N=3
 PARTICIPANT_HISTORY_MAX_BONUS=0.035
 MAX_BATCHES=6
@@ -291,6 +293,75 @@ def refresh_virtual_quotes(rows):
         out.append(y)
     return out,join_diag
 
+_TICKET_SPOILER_CACHE=None
+
+def _load_ticket_performance_index():
+    """Index settled Builder-ticket outcomes by exact product/line/side.
+
+    This is a construction-only safeguard. It never substitutes for the
+    Virtual Lab evidence gate and only activates after a meaningful sample.
+    """
+    global _TICKET_SPOILER_CACHE
+    if _TICKET_SPOILER_CACHE is not None:
+        return _TICKET_SPOILER_CACHE
+    raw=load(DATA/"odds_ticket_tracker.json",{})
+    index={}
+    tickets=raw.get("tickets") if isinstance(raw,dict) else []
+    for ticket in tickets if isinstance(tickets,list) else []:
+        if str(ticket.get("status") or "") not in {"WON","LOST"}:
+            continue
+        for leg in ticket.get("legs") or []:
+            if not isinstance(leg,dict) or str(leg.get("status") or "") not in {"WON","LOST"}:
+                continue
+            product=str(leg.get("product") or "")
+            pick_text=str(leg.get("pick") or "")
+            lower=pick_text.lower()
+            side="under" if "under" in lower else "over" if "over" in lower else None
+            if not product or not side:
+                continue
+            line=leg.get("line")
+            if line is None:
+                import re
+                match=re.search(r"(?:over|under)\s+(\d+(?:\.\d+)?)\s*$",lower)
+                if match:
+                    line=match.group(1)
+            try:
+                line_key=f"{float(line):g}"
+            except (TypeError,ValueError):
+                continue
+            key=(product,line_key,side)
+            row=index.setdefault(key,{"n":0,"wins":0,"losses":0})
+            row["n"]+=1
+            if leg.get("status")=="WON":
+                row["wins"]+=1
+            else:
+                row["losses"]+=1
+    _TICKET_SPOILER_CACHE=index
+    return index
+
+def ticket_performance_gate(product,line,pick):
+    try:
+        key=(str(product or ""),f"{float(line):g}",str(pick or "").lower())
+    except (TypeError,ValueError):
+        return True,{"available":False,"reason":"invalid_key"}
+    row=_load_ticket_performance_index().get(key)
+    if not row or row.get("n",0)<TICKET_SPOILER_MIN_SAMPLE:
+        return True,{"available":False,"n":row.get("n",0) if row else 0,"min_n":TICKET_SPOILER_MIN_SAMPLE}
+    n=int(row["n"])
+    wins=int(row["wins"])
+    accuracy=wins/n if n else 0.0
+    details={
+        "available":True,
+        "n":n,
+        "wins":wins,
+        "losses":int(row["losses"]),
+        "accuracy":round(accuracy,4),
+        "min_accuracy":TICKET_SPOILER_MIN_ACCURACY,
+        "source":"data/odds_ticket_tracker.json",
+        "role":"construction_only",
+    }
+    return accuracy>=TICKET_SPOILER_MIN_ACCURACY,details
+
 _VIRTUAL_RECENT_GATE_CACHE=None
 
 
@@ -457,7 +528,7 @@ def virtual_candidates(now):
 
     out=[]
     diagnostics={
-        "seen":0,"qualified":0,"evidence_pass":0,"rejected_evidence":0,
+        "seen":0,"qualified":0,"evidence_pass":0,"rejected_evidence":0,"rejected_ticket_performance":0,
         "current_feed_events":0,"model_templates":len(templates),
         "current_market_candidates":0,"reasons":{}
     }
@@ -545,8 +616,15 @@ def virtual_candidates(now):
             reason=str(recent.get("reason") or "recent_evidence_below_threshold")
             diagnostics["reasons"][reason]=diagnostics["reasons"].get(reason,0)+1
             continue
+        ticket_pass,ticket_perf=ticket_performance_gate(product,line,pick)
+        if not ticket_pass:
+            diagnostics["rejected_ticket_performance"]+=1
+            reason="ticket_performance_below_threshold"
+            diagnostics["reasons"][reason]=diagnostics["reasons"].get(reason,0)+1
+            continue
         diagnostics["evidence_pass"]+=1
         y["recent_evidence"]=recent
+        y["ticket_performance"]=ticket_perf
         out.append(y)
 
     diagnostics["quote_join"]=quote_diag
@@ -909,6 +987,7 @@ def build_value_batches(candidates):
         "disjoint":True,
         "min_combined_odds":MIN_COMBINED_ODDS,
         "priority_product":"vfootball",
+        "max_legs":MAX_LEGS,
         "used_unique_events":len(used_events),
         "ranking_metric":"naive joint model probability; leg-strength rating reported separately",
     }
@@ -1022,6 +1101,8 @@ def main():
         },
         "selection_policy":{"min_calibrated_probability":MIN_PROB,"virtual_min_probability":VIRTUAL_MIN_PROB,"virtual_builder_lines":"all current O/U lines with exact-side evidence; no forced line list","minimum_combined_odds":MIN_COMBINED_ODDS,"min_model_edge":MIN_EDGE,
             "max_odds_age_seconds":MAX_ODDS_AGE_SECONDS,"max_uncertainty":MAX_UNCERTAINTY,
+            "max_legs":MAX_LEGS,
+            "ticket_performance_filter":{"enabled":True,"min_settled_legs":TICKET_SPOILER_MIN_SAMPLE,"min_accuracy":TICKET_SPOILER_MIN_ACCURACY,"role":"construction_only; never substitutes for model evidence"},
             "min_data_quality":MIN_DATA_QUALITY,"requires_live_sportybet_price":True,
             "requires_complete_market_for_devig":True,"avoid_same_event_correlation":True,
             "participant_history_weighting":"qualified-leg ranking only; conservative exact-line settled O/U history; no eligibility bypass",
@@ -1037,6 +1118,7 @@ def main():
         "batch_policy":{
             "min_combined_odds":MIN_COMBINED_ODDS,
             "max_batches":MAX_BATCHES,
+            "max_legs":MAX_LEGS,
             "disjoint_batches":True,
             "ranking":"combined_model_rating descending, then average model edge, then combined odds",
             "model_rating_definition":"100 × product of leg model probabilities (naive joint proxy)",
