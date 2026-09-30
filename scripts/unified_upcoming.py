@@ -31,6 +31,7 @@ DATA=ROOT/"data"
 OUTPUT=DATA/"unified_upcoming.json"
 NOW=datetime.now(timezone.utc)
 HORIZON=NOW+timedelta(days=7)
+EFOOTBALL_PRODUCT_MIN_HIT_RATE=0.65
 
 def load(name, default):
     try:
@@ -339,6 +340,7 @@ def build_virtual_events(history, lifecycle, eligibility):
             continue
         market_m=metrics.get("market") or {}
         viable_m=[]
+        viable_details=[]
         for variant_name in ("poisson","poisson_prior","efootball_shape"):
             m=metrics.get(variant_name)
             if not isinstance(m,dict): continue
@@ -347,7 +349,16 @@ def build_virtual_events(history, lifecycle, eligibility):
             if float(m.get("log_loss",9))>=float(market_m.get("log_loss",0)): continue
             if float(m.get("ece",9))>float(market_m.get("ece",9))+.02: continue
             viable_m.append(variant_name)
-        product_bootstrap_gate[str(product)]=bool(viable_m)
+            viable_details.append({
+                "variant":variant_name,
+                "hit_rate":round(float(m.get("hit_rate",0)),4),
+                "brier":round(float(m.get("brier",9)),4),
+                "log_loss":round(float(m.get("log_loss",9)),4),
+                "ece":round(float(m.get("ece",9)),4)
+            })
+        product_bootstrap_gate[str(product)]=bool(
+            viable_m and max(float(metrics.get(v,{}).get("hit_rate",0)) for v in viable_m)>=EFOOTBALL_PRODUCT_MIN_HIT_RATE
+        )
 
     # Fit one stable lambda per product from the latest settled history.
     # Never recompute the grid separately for every fixture/market.
@@ -463,6 +474,8 @@ def build_virtual_events(history, lifecycle, eligibility):
             if product.startswith("efootball"):
                 if not base_model_gate:
                     qualification_status="BASE_MODEL_GATE_PENDING"
+                elif not product_bootstrap_gate.get(product,False):
+                    qualification_status="PRODUCT_MODEL_VALIDATION_GATE_PENDING"
                 elif not model_line:
                     qualification_status="MODEL_LINE_SCOPE_GATE_PENDING"
                 elif edge is None:
@@ -533,6 +546,7 @@ def build_virtual_events(history, lifecycle, eligibility):
                 "participant_hot_watch":participant_hot,
                 "participant_enhancement_gate":participant_gate,
                 "product_bootstrap_gate":product_bootstrap_gate.get(product,False),
+                "product_model_min_holdout_hit_rate":EFOOTBALL_PRODUCT_MIN_HIT_RATE if product.startswith("efootball") else None,
                 "base_model_gate":base_model_gate,
                 "raw_competition_eligible":active_comp,
                 "raw_line_eligible":active_line,
