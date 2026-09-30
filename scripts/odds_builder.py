@@ -290,6 +290,30 @@ def refresh_virtual_quotes(rows):
                 y["sportybet_match"]=e.get("match") or e.get("name")
                 y["market_odds_timestamp"]=fetched_at
                 y["sportybet_identity_match"]=str(e.get("event_id"))==str(x.get("event_id")) or _norm_fixture(e.get("match") or e.get("name"))==key
+                # Preserve exact live market/outcome IDs for non-staking share-code creation.
+                requested_side=str(x.get("builder_pick") or "").lower()
+                for m in e.get("markets") or []:
+                    if not isinstance(m,dict):
+                        continue
+                    try:
+                        same_line=line is not None and m.get("line") is not None and abs(float(m.get("line"))-float(line))<1e-9
+                    except (TypeError,ValueError):
+                        same_line=False
+                    if not same_line:
+                        continue
+                    for o in m.get("outcomes") or []:
+                        if not isinstance(o,dict):
+                            continue
+                        name=str(o.get("name") or o.get("desc") or "").lower()
+                        if requested_side and not name.startswith(requested_side):
+                            continue
+                        y["sportybet_market_id"]=str(m.get("id") or "")
+                        y["sportybet_specifier"]=m.get("specifier")
+                        y["sportybet_outcome_id"]=str(o.get("id") or "")
+                        y["sportybet_outcome_name"]=o.get("name") or o.get("desc")
+                        break
+                    if y.get("sportybet_outcome_id"):
+                        break
         out.append(y)
     return out,join_diag
 
@@ -888,7 +912,12 @@ def make_leg(x):
         "status":"LIVE_VALUE" if eligible else ("STALE" if age is not None and age>MAX_ODDS_AGE_SECONDS else "REJECTED"),
         "source":x.get("model"),"market_source":x.get("market_source") or x.get("bookmaker_source"),
         "recent_evidence":x.get("recent_evidence"),
-        "market_odds_timestamp":x.get("odds_timestamp") or x.get("market_odds_timestamp")
+        "market_odds_timestamp":x.get("odds_timestamp") or x.get("market_odds_timestamp"),
+        "sportybet_event_id":x.get("sportybet_event_id") or x.get("event_id"),
+        "sportybet_market_id":x.get("sportybet_market_id"),
+        "sportybet_specifier":x.get("sportybet_specifier"),
+        "sportybet_outcome_id":x.get("sportybet_outcome_id"),
+        "sportybet_outcome_name":x.get("sportybet_outcome_name")
     }
 
 
@@ -931,6 +960,39 @@ def _batch_metrics(legs):
         "avg_model_edge_percent":round(sum(edges)/len(edges)*100.0,2) if edges else 0.0,
     }
 
+
+def _create_sportybet_booking_code(legs):
+    """Request a fresh non-staking SportyBet share code for the exact live batch."""
+    selections=[]
+    missing=[]
+    for leg in legs:
+        event_id=str(leg.get("sportybet_event_id") or "")
+        market_id=str(leg.get("sportybet_market_id") or "")
+        outcome_id=str(leg.get("sportybet_outcome_id") or "")
+        if not event_id or not market_id or not outcome_id:
+            missing.append(leg.get("match") or leg.get("pick"))
+            continue
+        item={"eventId":event_id,"marketId":market_id,"outcomeId":outcome_id}
+        if leg.get("sportybet_specifier") not in (None,""):
+            item["specifier"]=leg.get("sportybet_specifier")
+        selections.append(item)
+    if missing:
+        return {"status":"UNAVAILABLE","reason":"live_selection_mapping_incomplete","missing_legs":missing}
+    payload=json.dumps({"selections":selections}).encode("utf-8")
+    req=urllib.request.Request("https://www.sportybet.com/api/ng/orders/share",data=payload,method="POST",
+        headers={"Accept":"application/json","Content-Type":"application/json","Current-Country":"NG","User-Agent":"Match-Signal/1.0"})
+    try:
+        with urllib.request.urlopen(req,timeout=15) as response:
+            body=json.loads(response.read().decode("utf-8","replace"))
+        data=body.get("data") or {}
+        code=data.get("shareCode") or body.get("shareCode")
+        if not code:
+            return {"status":"UNAVAILABLE","reason":"sportybet_share_endpoint_returned_no_code","unavailable_outcomes":data.get("unavailableOutcomes") or []}
+        return {"status":"AVAILABLE","booking_code":str(code),"share_url":data.get("shareURL"),
+                "expires_at":data.get("deadline"),"selection_count":len(selections),
+                "unavailable_outcomes":data.get("unavailableOutcomes") or []}
+    except Exception as exc:
+        return {"status":"UNAVAILABLE","reason":"sportybet_share_request_failed","error":str(exc)[:240]}
 
 def _batch_capacity_diagnostic(eligible_pool):
     """Measure the best 16-leg odds capacity without weakening any gate."""
@@ -1073,12 +1135,42 @@ def _construct_model_first_batch(pool, max_legs=MAX_LEGS):
     candidates=[x for x in candidates if x and math.prod(float(y.get("bookmaker_odds") or 1.0) for y in x)>=MIN_COMBINED_ODDS]
     if not candidates:
         return []
-    return max(candidates,key=lambda rows:(
-        math.prod(max(0.0005,min(0.9995,float(x.get("model_probability") or 0.0))) for x in rows),
-        -len(rows),
-        sum(float(x.get("model_edge") or 0.0) for x in rows)/len(rows),
-        math.prod(float(x.get("bookmaker_odds") or 1.0) for x in rows)
-    ))
+    # Bounded frontier search repairs the greedy failure mode: it retains
+    # both model-heavy and price-feasible paths, then chooses the highest
+    # whole-ticket model probability that actually reaches 4.00+.
+    frontier=list({id(x):x for x in (ranked[:100]+price_ranked[:60])}.values())
+    states=[([],set(),set(),0.0,0.0)]
+    for _ in range(max_legs):
+        expanded=[]
+        for selected,events,participants,logp,logo in states:
+            start=0
+            if selected:
+                try:start=frontier.index(selected[-1])+1
+                except ValueError:start=0
+            for idx in range(start,len(frontier)):
+                leg=frontier[idx]
+                if conflict(leg,events,participants): continue
+                p=max(0.0005,min(0.9995,float(leg.get("model_probability") or 0.0)))
+                odds=max(1.0001,float(leg.get("bookmaker_odds") or 1.0))
+                ne=set(events); eid=str(leg.get("event_id") or "")
+                if eid: ne.add(eid)
+                np=set(participants)|set(_participants(leg))
+                expanded.append((selected+[leg],ne,np,logp+math.log(p),logo+math.log(odds)))
+        if not expanded: break
+        by_model=sorted(expanded,key=lambda s:(s[3],s[4]),reverse=True)[:900]
+        by_trade=sorted(expanded,key=lambda s:(s[3]+0.55*s[4],s[3],s[4]),reverse=True)[:900]
+        merged={tuple(id(x) for x in s[0]):s for s in by_model+by_trade}
+        states=list(merged.values())[:1800]
+        candidates.extend([s[0] for s in states if s[4]>=math.log(MIN_COMBINED_ODDS)])
+    valid=[rows for rows in candidates if rows and math.prod(float(y.get("bookmaker_odds") or 1.0) for y in rows)>=MIN_COMBINED_ODDS]
+    if valid:
+        return max(valid,key=lambda rows:(
+            math.prod(max(0.0005,min(0.9995,float(x.get("model_probability") or 0.0))) for x in rows),
+            -len(rows),
+            sum(float(x.get("model_edge") or 0.0) for x in rows)/len(rows),
+            math.prod(float(x.get("bookmaker_odds") or 1.0) for x in rows)
+        ))
+    return []
 
 
 def build_value_batches(candidates):
@@ -1218,6 +1310,9 @@ def main():
     primary=batches[0] if batches else None
     selected=list(primary.get("legs") or []) if primary else []
     combined=float(primary.get("combined_odds") or 1.0) if primary else 1.0
+    booking_info=_create_sportybet_booking_code(selected) if selected else {"status":"UNAVAILABLE","reason":"no_selected_batch"}
+    if primary is not None:
+        primary["sportybet_booking"]=booking_info
     selection_diag={"participant_correlation_skips":0,"unique_participants":len({_p for leg in selected for _p in _participants(leg)}) if selected else 0}
     previous=load(OUTPUT,{})
     previous_ids={str(x) for x in (previous.get("builder_event_ids",[]) if isinstance(previous,dict) else []) if x}
@@ -1290,7 +1385,8 @@ def main():
             "ranking":"eFootball exact-side evidence score first; otherwise combined model rating descending, then average model edge, then combined odds",
             "model_rating_definition":"100 × product of leg model probabilities (naive joint proxy)",
             "leg_strength_definition":"100 × geometric mean of leg model probabilities",
-            "primary_lane":"vfootball"
+            "primary_lane":"vfootball",
+            "booking_code_policy":"fresh non-staking share code from exact live event/market/outcome IDs; never fabricate"
         },
         "batches":batches,
         "rejected_candidates":[x for x in built if not x["real_money_eligible"]][:20],
@@ -1300,6 +1396,7 @@ def main():
         "reference_combined_odds":round(math.prod(x["model_fair_odds"] for x in selected),3) if selected else None,
         "reference_odds_type":"MODEL_FAIR_ODDS_NOT_BOOKMAKER_PRICE",
         "market_price_combined_odds":round(combined,3) if selected else None,
+        "sportybet_booking":booking_info,
         "theme":{"name":"Midnight Graphite / Electric Cyan / Signal Green","accent":"#28D7E8","positive":"#35D07F","background":"#080D14"},
         "notes":["V6 qualifies on market edge, not probability alone.","Zero batches are now diagnosable: capacity reports whether 4.00 is mathematically reachable under the existing 16-leg and correlation rules; no quality gate is weakened.","best_available_legs is informational when no batch exists and is not a qualified accumulator.","Missing or stale SportyBet prices produce NO_BET/REJECTED.","Model fair odds never overwrite bookmaker odds.","Each Builder batch is a separate disjoint paper ticket at 4.00+ combined bookmaker odds; batches are ranked by combined model rating.","vFootball is prioritized because its existing untouched O/U evidence is currently the strongest active research lane.","Paper-only until V6 demonstrates stable calibration, edge and closing-line value over a meaningful sample."]
     }
