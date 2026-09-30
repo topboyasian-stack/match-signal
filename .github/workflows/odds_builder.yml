@@ -30,7 +30,7 @@ on:
     types: [completed]
   schedule:
     # Refresh research diagnostics and full-market discovery builder every 15 minutes.
-    # Virtual paper-builder validation: variable-leg 4.00+ target.
+    # Virtual paper-builder validation: accuracy-first 2.00+ floor; 4.00+ secondary target.
     - cron: '*/15 * * * *'
   workflow_dispatch:
 
@@ -103,7 +103,7 @@ jobs:
               assert 'football' in sports or len(data['qualified_legs']) < 3
           if data.get('market_price_combined_odds') is not None:
               assert data['market_price_combined_odds'] > 1
-          if data.get('status') == 'BELOW_4_TARGET_AVAILABLE':
+          if data.get('status') in {'BELOW_4_TARGET_AVAILABLE','ACCURACY_FIRST_SET'}:
               assert data.get('best_available_legs')
           batches = data.get('batches', [])
           assert isinstance(batches, list)
@@ -113,7 +113,8 @@ jobs:
           for batch in batches:
               assert batch.get('batch_id') not in seen_batch_ids
               seen_batch_ids.add(batch.get('batch_id'))
-              assert float(batch.get('combined_odds', 0)) >= 4.0
+              assert float(batch.get('combined_odds', 0)) >= float(data.get('batch_policy', {}).get('min_combined_odds', 2.0))
+              assert int(batch.get('leg_count', len(batch.get('legs', [])))) >= 2
               assert batch.get('paper_only') is True
               assert batch.get('real_money_execution') is False
               assert float(batch.get('combined_model_rating', 0)) >= 0
@@ -143,6 +144,9 @@ jobs:
               'candidates': data.get('candidates_considered'),
               'reference_combined_odds': data.get('reference_combined_odds'),
               'batches': data.get('batch_count', 0),
+              'construction_priority': data.get('batch_policy', {}).get('construction_priority'),
+              'target_combined_odds': data.get('batch_policy', {}).get('target_combined_odds'),
+              'accuracy_preservation_ratio': data.get('batch_policy', {}).get('accuracy_preservation_ratio'),
               'top_model_rating': (data.get('batches') or [{}])[0].get('combined_model_rating') if data.get('batches') else None
           }))
           PY
