@@ -956,144 +956,147 @@ def _batch_capacity_diagnostic(eligible_pool):
         "target_reachable_with_current_gates":relaxed_product>=MIN_COMBINED_ODDS,
     }
 
-def build_value_batches(candidates):
-    """Create several disjoint 4.00+ paper batches using odds efficiency.
+def _construct_model_first_batch(pool, max_legs=MAX_LEGS):
+    """Construct the strongest whole-ticket model-probability batch that can reach 4.00+.
 
-    The objective is not to minimize the number of legs. It is to find batches
-    whose product of model probabilities is as strong as possible while the
-    actual SportyBet combined odds clear 4.00. vFootball receives priority as
-    the current strongest validated research lane.
+    This is a constrained construction heuristic, not a qualification change:
+    every input leg is already Builder-eligible. The selection objective is
+    whole-ticket model probability; SportyBet odds are used only as the hard
+    reachability constraint. Participant and event correlation rules remain
+    active.
+    """
+    if not pool:
+        return []
+
+    def sort_model(rows):
+        return sorted(rows, key=lambda x: (
+            -float(x.get("model_probability") or 0.0),
+            -float(x.get("evidence_score") or 0.0),
+            -float(x.get("model_edge") or 0.0),
+            -float(x.get("bookmaker_odds") or 1.0)
+        ))
+
+    def conflict(a, selected_events, selected_participants):
+        eid=str(a.get("event_id") or "")
+        if eid and eid in selected_events:
+            return True
+        return bool(set(_participants(a)) & selected_participants)
+
+    def greedy(seed=None):
+        selected=[]
+        selected_events=set()
+        selected_participants=set()
+        remaining=list(pool)
+        combined=1.0
+        if seed is not None:
+            selected=[seed]
+            eid=str(seed.get("event_id") or "")
+            if eid: selected_events.add(eid)
+            selected_participants.update(_participants(seed))
+            combined=float(seed.get("bookmaker_odds") or 1.0)
+            remaining=[x for x in remaining if not conflict(x,selected_events,selected_participants)]
+        while remaining and len(selected)<max_legs and combined<MIN_COMBINED_ODDS:
+            feasible=[]
+            slots=max_legs-len(selected)-1
+            for leg in remaining:
+                if conflict(leg,selected_events,selected_participants):
+                    continue
+                odds=float(leg.get("bookmaker_odds") or 1.0)
+                if odds<=1.0:
+                    continue
+                new_product=combined*odds
+                # Optimistic odds upper bound: ignore future correlation conflicts,
+                # so this can only overstate reachability, never hide a reachable target.
+                rest=sorted(
+                    (float(x.get("bookmaker_odds") or 1.0) for x in remaining
+                     if x is not leg and not conflict(x, selected_events, selected_participants) and float(x.get("bookmaker_odds") or 1.0)>1.0),
+                    reverse=True
+                )[:slots]
+                if new_product*math.prod(rest) >= MIN_COMBINED_ODDS:
+                    feasible.append(leg)
+            if feasible:
+                leg=max(feasible,key=lambda x:(
+                    float(x.get("model_probability") or 0.0),
+                    float(x.get("evidence_score") or 0.0),
+                    float(x.get("model_edge") or 0.0),
+                    float(x.get("bookmaker_odds") or 1.0)
+                ))
+            else:
+                # No model-first addition can still reach 4.00 within the leg cap.
+                # Use the strongest model leg among remaining; do not switch to
+                # price-first construction.
+                compatible=[x for x in remaining if not conflict(x,selected_events,selected_participants)]
+                if not compatible:
+                    break
+                leg=max(compatible,key=lambda x:(
+                    float(x.get("model_probability") or 0.0),
+                    float(x.get("evidence_score") or 0.0),
+                    float(x.get("model_edge") or 0.0),
+                    float(x.get("bookmaker_odds") or 1.0)
+                ))
+            selected.append(leg)
+            eid=str(leg.get("event_id") or "")
+            if eid: selected_events.add(eid)
+            selected_participants.update(_participants(leg))
+            combined*=float(leg.get("bookmaker_odds") or 1.0)
+            remaining=[x for x in remaining if x is not leg and not conflict(x,selected_events,selected_participants)]
+        return selected if combined>=MIN_COMBINED_ODDS else []
+
+    ranked=sort_model(pool)
+    seeds=[]
+    for row in ranked[:24]:
+        seeds.append(row)
+    for row in sorted(pool,key=lambda x:float(x.get("bookmaker_odds") or 1.0),reverse=True)[:12]:
+        if row not in seeds:
+            seeds.append(row)
+    candidates=[greedy(None)]
+    candidates.extend(greedy(seed) for seed in seeds)
+    candidates=[x for x in candidates if x and math.prod(float(y.get("bookmaker_odds") or 1.0) for y in x)>=MIN_COMBINED_ODDS]
+    if not candidates:
+        return []
+    return max(candidates,key=lambda rows:(
+        math.prod(max(0.0005,min(0.9995,float(x.get("model_probability") or 0.0))) for x in rows),
+        -len(rows),
+        sum(float(x.get("model_edge") or 0.0) for x in rows)/len(rows),
+        math.prod(float(x.get("bookmaker_odds") or 1.0) for x in rows)
+    ))
+
+
+def build_value_batches(candidates):
+    """Create disjoint 4.00+ paper batches, optimizing model strength first.
+
+    All legs are qualified before construction. The constructor maximizes the
+    whole-ticket model probability subject to the existing 4.00+ SportyBet
+    price target, event uniqueness, participant-correlation controls and the
+    existing 16-leg cap. Bookmaker price is a feasibility constraint, not the
+    primary ranking signal.
     """
     built=[make_leg(x) for x in candidates]
     eligible_all=[x for x in built if x.get("builder_eligible")]
-    # vFootball is the primary research lane. Use it exclusively while there
-    # are enough qualified legs to form the requested batch set; only fall back
-    # to other Virtual products when vFootball cannot supply another batch.
     vfootball_pool=[x for x in eligible_all if str(x.get("product") or "")=="vfootball"]
     other_pool=[x for x in eligible_all if str(x.get("product") or "")!="vfootball"]
     remaining=vfootball_pool if len(vfootball_pool)>=2 else eligible_all
     fallback_pool=other_pool
     batches=[]
     used_events=set()
-    used_leg_keys=set()
-    product_priority={"vfootball":3,"efootball_gt":2,"efootball_adriatic":1}
-
-    def efficiency(leg):
-        try:
-            p=max(0.0005,min(0.9995,float(leg.get("model_probability") or 0.0)))
-            odds=float(leg.get("bookmaker_odds") or 1.0)
-            if odds<=1.0:
-                return 999.0
-            return -math.log(p)/math.log(odds)
-        except (TypeError,ValueError,ZeroDivisionError):
-            return 999.0
 
     for _ in range(MAX_BATCHES):
         if not remaining:
             break
-        def batch_sort_key(x):
-            product=str(x.get("product") or "")
-            if product.startswith("efootball_") and x.get("evidence_score") is not None:
-                return (
-                    0,
-                    -float(x.get("evidence_score") or 0),
-                    -float(x.get("model_probability") or 0),
-                    -float(x.get("model_edge") or 0),
-                    efficiency(x),
-                    -float(x.get("bookmaker_odds") or 0)
-                )
-            return (
-                1,
-                efficiency(x),
-                -product_priority.get(product,0),
-                -float(x.get("model_edge") or 0),
-                -float(x.get("model_probability") or 0),
-                -float(x.get("bookmaker_odds") or 0)
-            )
-        remaining.sort(key=batch_sort_key)
-        batch=[]
-        batch_events=set()
-        batch_participants=set()
-        combined=1.0
-        for leg in remaining:
-            eid=str(leg.get("event_id") or "")
-            if eid and eid in batch_events:
-                continue
-            pids=set(_participants(leg))
-            if pids & batch_participants:
-                continue
-            batch.append(leg)
-            if eid:
-                batch_events.add(eid)
-            batch_participants.update(pids)
-            combined*=float(leg.get("bookmaker_odds") or 1.0)
-            if combined>=MIN_COMBINED_ODDS or len(batch)>=MAX_LEGS:
-                break
-        if not batch or combined<MIN_COMBINED_ODDS:
-            # If participant-correlation prevents a 4.00+ batch, retry using
-            # event uniqueness only. This still prevents same-event market
-            # duplication while avoiding an accidental empty Builder.
-            batch=[];batch_events=set();batch_participants=set();combined=1.0
-            for leg in remaining:
-                eid=str(leg.get("event_id") or "")
-                if eid and eid in batch_events:
-                    continue
-                batch.append(leg)
-                if eid:
-                    batch_events.add(eid)
-                combined*=float(leg.get("bookmaker_odds") or 1.0)
-                if combined>=MIN_COMBINED_ODDS or len(batch)>=MAX_LEGS:
-                    break
-        if not batch or combined<MIN_COMBINED_ODDS:
-            # The efficiency objective can legitimately prefer many low-odds
-            # legs and miss 4.00 even when a valid high-odds combination exists.
-            # Retry by bookmaker price, still respecting the same correlation
-            # policy. This changes construction ordering only; no qualification
-            # gate is weakened.
-            batch=[];batch_events=set();batch_participants=set();combined=1.0
-            for leg in sorted(remaining,key=lambda z:float(z.get("bookmaker_odds") or 1.0),reverse=True):
-                eid=str(leg.get("event_id") or "")
-                if eid and eid in batch_events:
-                    continue
-                pids=set(_participants(leg))
-                if pids & batch_participants:
-                    continue
-                batch.append(leg)
-                if eid:
-                    batch_events.add(eid)
-                batch_participants.update(pids)
-                combined*=float(leg.get("bookmaker_odds") or 1.0)
-                if combined>=MIN_COMBINED_ODDS or len(batch)>=MAX_LEGS:
-                    break
-            if not batch or combined<MIN_COMBINED_ODDS:
-                # Final event-only price-ranked fallback. Same eligible legs,
-                # same 4.00 target, same max-leg cap.
-                batch=[];batch_events=set();batch_participants=set();combined=1.0
-                for leg in sorted(remaining,key=lambda z:float(z.get("bookmaker_odds") or 1.0),reverse=True):
-                    eid=str(leg.get("event_id") or "")
-                    if eid and eid in batch_events:
-                        continue
-                    batch.append(leg)
-                    if eid:
-                        batch_events.add(eid)
-                    combined*=float(leg.get("bookmaker_odds") or 1.0)
-                    if combined>=MIN_COMBINED_ODDS or len(batch)>=MAX_LEGS:
-                        break
-        if not batch or combined<MIN_COMBINED_ODDS:
-            # Exhaust the primary vFootball lane before opening other Virtual
-            # products. This preserves the intended research priority.
+        batch=_construct_model_first_batch(remaining)
+        if not batch:
             if remaining is vfootball_pool and fallback_pool:
                 remaining=fallback_pool
                 fallback_pool=[]
                 continue
             break
-
         metrics=_batch_metrics(batch)
+        combined=math.prod(float(x.get("bookmaker_odds") or 1.0) for x in batch)
+        batch_events={str(x.get("event_id") or "") for x in batch if x.get("event_id")}
         products=sorted({str(x.get("product") or "") for x in batch if x.get("product")})
-        batch_id=f"BATCH-{len(batches)+1:02d}"
         batches.append({
-            "batch_id":batch_id,
-            "label":f"{batch_id} · Combined Model Rating {metrics['model_rating']:.1f}/100",
+            "batch_id":f"BATCH-{len(batches)+1:02d}",
+            "label":f"BATCH-{len(batches)+1:02d} · Combined Model Rating {metrics['model_rating']:.1f}/100",
             "rank_pending":True,
             "legs":batch,
             "leg_count":len(batch),
@@ -1104,16 +1107,13 @@ def build_value_batches(candidates):
             "avg_model_probability":metrics["avg_model_probability"],
             "avg_model_edge_percent":metrics["avg_model_edge_percent"],
             "products":products,
-            "primary_lane": "vfootball" if any(str(x.get("product") or "")=="vfootball" for x in batch) else "fallback_virtual",
+            "primary_lane":"vfootball" if any(str(x.get("product") or "")=="vfootball" for x in batch) else "fallback_virtual",
             "paper_only":True,
             "real_money_execution":False,
-            "correlation_policy":"same-event prevented; participant reuse used only as fallback if strict disjoint construction cannot reach 4.00+"
+            "correlation_policy":"same-event and participant reuse prevented within each batch; no price-ranked fallback",
+            "construction_objective":"maximize whole-ticket model probability subject to 4.00+ SportyBet odds"
         })
-        chosen_keys={(str(x.get("event_id") or ""),str(x.get("pick") or ""),str(x.get("line") or "")) for x in batch}
-        used_leg_keys.update(chosen_keys)
         used_events.update(batch_events)
-        # A fixture may carry many O/U lines, but a fixture belongs to only one
-        # batch. Remove every remaining leg for the events already assigned.
         remaining=[x for x in remaining if str(x.get("event_id") or "") not in used_events]
 
     batches.sort(key=lambda b:(b.get("combined_model_rating",0),b.get("avg_model_edge_percent",0),b.get("combined_odds",0)),reverse=True)
@@ -1131,9 +1131,8 @@ def build_value_batches(candidates):
         "max_legs":MAX_LEGS,
         "used_unique_events":len(used_events),
         "capacity":_batch_capacity_diagnostic(eligible_all),
-        "ranking_metric":"naive joint model probability; leg-strength rating reported separately",
+        "ranking_metric":"whole-ticket model probability under 4.00+ odds and correlation constraints",
     }
-
 
 def select_value(candidates):
     built=[make_leg(x) for x in candidates]
