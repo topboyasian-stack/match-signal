@@ -982,7 +982,7 @@ def _construct_model_first_batch(pool, max_legs=MAX_LEGS):
             return True
         return bool(set(_participants(a)) & selected_participants)
 
-    def greedy(seed=None):
+    def greedy(seed=None, tradeoff=0.0):
         selected=[]
         selected_events=set()
         selected_participants=set()
@@ -1026,12 +1026,16 @@ def _construct_model_first_batch(pool, max_legs=MAX_LEGS):
                 if new_product*rest >= MIN_COMBINED_ODDS:
                     feasible.append(leg)
             if feasible:
-                leg=max(feasible,key=lambda x:(
-                    float(x.get("model_probability") or 0.0),
-                    float(x.get("evidence_score") or 0.0),
-                    float(x.get("model_edge") or 0.0),
-                    float(x.get("bookmaker_odds") or 1.0)
-                ))
+                def trade_key(x):
+                    p=max(0.0005,min(0.9995,float(x.get("model_probability") or 0.0)))
+                    odds=max(1.0001,float(x.get("bookmaker_odds") or 1.0))
+                    # Lagrangian search explores the model/price frontier without
+                    # ever changing qualification. The final winner is still
+                    # selected by actual whole-ticket model probability.
+                    objective=(-math.log(p))-(tradeoff*math.log(odds))
+                    return (objective,-p,-float(x.get("evidence_score") or 0.0),
+                            -float(x.get("model_edge") or 0.0),-odds)
+                leg=min(feasible,key=trade_key)
             else:
                 # No model-first addition can still reach 4.00 within the leg cap.
                 # Use the strongest model leg among remaining; do not switch to
@@ -1054,14 +1058,18 @@ def _construct_model_first_batch(pool, max_legs=MAX_LEGS):
         return selected if combined>=MIN_COMBINED_ODDS else []
 
     ranked=sort_model(pool)
-    seeds=[]
-    for row in ranked[:24]:
-        seeds.append(row)
-    for row in sorted(pool,key=lambda x:float(x.get("bookmaker_odds") or 1.0),reverse=True)[:12]:
-        if row not in seeds:
-            seeds.append(row)
-    candidates=[greedy(None)]
-    candidates.extend(greedy(seed) for seed in seeds)
+    price_ranked=sorted(pool,key=lambda x:float(x.get("bookmaker_odds") or 1.0),reverse=True)
+    tradeoffs=(0.0,0.1,0.2,0.3,0.4,0.5,0.75,1.0)
+    candidates=[]
+    for tradeoff in tradeoffs:
+        candidates.append(greedy(None,tradeoff))
+        seed_rows=[]
+        for row in ranked[:8]:
+            if row not in seed_rows: seed_rows.append(row)
+        for row in price_ranked[:4]:
+            if row not in seed_rows: seed_rows.append(row)
+        for row in seed_rows:
+            candidates.append(greedy(row,tradeoff))
     candidates=[x for x in candidates if x and math.prod(float(y.get("bookmaker_odds") or 1.0) for y in x)>=MIN_COMBINED_ODDS]
     if not candidates:
         return []
