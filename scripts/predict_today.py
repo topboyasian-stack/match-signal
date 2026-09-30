@@ -528,6 +528,24 @@ def attach_sportybet_market_layer(predictions):
                     "market_id": total.get("market_id"),
                 }
             prediction["sportybet_total_market"] = total_insight
+            # Preserve the current SportyBet total ladder for the Odds Builder.
+            # This fixes Tennis Total Games pricing, which was modeled but not
+            # exposed in the field consumed by market_rows().
+            prediction["sportybet_total_games_odds"] = [
+                {
+                    "line": item.get("line"),
+                    "over": item.get("over"),
+                    "under": item.get("under"),
+                    "over_fair_prob": item.get("over_fair_prob"),
+                    "under_fair_prob": item.get("under_fair_prob"),
+                    "over_fair_odds": item.get("over_fair_odds"),
+                    "under_fair_odds": item.get("under_fair_odds"),
+                    "market_id": item.get("market_id"),
+                    "overround": item.get("overround"),
+                }
+                for item in (snapshot.get("totals") or [])
+                if isinstance(item, dict)
+            ]
             prediction["market_insights"] = {
                 "provider": "SportyBet NG",
                 "available": True,
