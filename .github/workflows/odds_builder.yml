@@ -178,8 +178,11 @@ jobs:
             echo "Rebase conflict detected; generated builder artifacts win over concurrent refresh artifacts."
             git rebase --abort || true
             git fetch origin main
-            git reset --soft origin/main
-            git add data/odds_builder.json data/tennis_total_research.json
+            # Reset both index and worktree state to the latest main before staging
+            # only the generated artifacts. This prevents a stale pre-rebase script
+            # from being accidentally committed during conflict recovery.
+            git reset --mixed origin/main
+            git add data/odds_builder.json data/tennis_total_research.json data/results_first_evidence_report.json
             git commit -m "🤖 Refresh research-gated Odds Builder"
           fi
           git push origin main
