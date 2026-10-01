@@ -87,6 +87,8 @@ jobs:
           assert policy.get('requires_live_sportybet_price') is True
           assert policy.get('results_first') is True
           assert policy.get('construction_priority') == 'settled_results_first'
+          assert float(policy.get('minimum_combined_odds', 0)) >= 1.50
+          assert float(policy.get('results_first_min_expected_roi', 0)) >= 0.02
           assert float(policy.get('min_model_edge', 0)) >= 0.025
           assert set(data.get('sports_supported', [])) >= {'football', 'tennis', 'virtual'}
           assert isinstance(data.get('qualified_legs'), list)
