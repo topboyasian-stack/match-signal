@@ -45,8 +45,13 @@ RESULTS_FIRST_MAX_LEGS=2
 RESULTS_FIRST_MIN_OBS=50
 RESULTS_FIRST_MIN_ACCURACY=0.90
 RESULTS_FIRST_MIN_COMBINED_ODDS=1.0
-RESULTS_FIRST_MIN_PRODUCT_TICKETS=10
-RESULTS_FIRST_MAX_PRODUCT_LOSS_RATE=0.50
+# Construction-specific ticket gate: only settled tickets with the same
+# 2-leg structure used by the current Results-first Builder may qualify it.
+# Historical larger accumulators remain diagnostic context and do not determine
+# whether the new construction lane has earned promotion.
+RESULTS_FIRST_CONSTRUCTION_LEG_COUNT=2
+RESULTS_FIRST_MIN_CONSTRUCTION_TICKETS=10
+RESULTS_FIRST_MAX_CONSTRUCTION_LOSS_RATE=0.50
 MIN_COMBINED_ODDS=MIN_ACCURACY_FIRST_ODDS
 VIRTUAL_MIN_PROB=0.65
 TICKET_SPOILER_MIN_SAMPLE=50
@@ -460,22 +465,43 @@ def _load_results_first_index():
     raw=load(DATA/"odds_ticket_tracker.json",{})
     exact={}
     product_tickets={}
+    construction_tickets={}
     tickets=raw.get("tickets") if isinstance(raw,dict) else []
     import re
     for ticket in tickets if isinstance(tickets,list) else []:
         tstatus=str(ticket.get("status") or "")
         if tstatus not in {"WON","LOST"}:
             continue
-        for product in ticket.get("products") or []:
-            key=str(product or "")
-            row=product_tickets.setdefault(key,{"tickets":0,"wins":0,"losses":0})
+
+        legs=ticket.get("legs") or []
+        try:
+            structure_legs=int(ticket.get("leg_count") or len(legs))
+        except (TypeError,ValueError):
+            structure_legs=len(legs)
+
+        # Count each product once per settled ticket. These broad product stats
+        # remain useful diagnostics, but they do not decide the current 2-leg lane.
+        product_names={str(product or "") for product in (ticket.get("products") or []) if product}
+        product_names.update(
+            str(leg.get("product") or leg.get("sport") or "")
+            for leg in legs if isinstance(leg,dict) and (leg.get("product") or leg.get("sport"))
+        )
+        for product in product_names:
+            row=product_tickets.setdefault(product,{"tickets":0,"wins":0,"losses":0})
             row["tickets"]+=1
             row["wins"]+=1 if tstatus=="WON" else 0
             row["losses"]+=1 if tstatus=="LOST" else 0
-        for leg in ticket.get("legs") or []:
+
+            ckey=(product,structure_legs)
+            crow=construction_tickets.setdefault(ckey,{"tickets":0,"wins":0,"losses":0})
+            crow["tickets"]+=1
+            crow["wins"]+=1 if tstatus=="WON" else 0
+            crow["losses"]+=1 if tstatus=="LOST" else 0
+
+        for leg in legs:
             if not isinstance(leg,dict) or str(leg.get("status") or "") not in {"WON","LOST"}:
                 continue
-            product=str(leg.get("product") or "")
+            product=str(leg.get("product") or leg.get("sport") or "")
             pick_text=str(leg.get("pick") or "").lower()
             side="under" if "under" in pick_text else "over" if "over" in pick_text else None
             if not product or not side:
@@ -494,7 +520,11 @@ def _load_results_first_index():
             row["n"]+=1
             row["wins"]+=1 if str(leg.get("status"))=="WON" else 0
             row["losses"]+=1 if str(leg.get("status"))=="LOST" else 0
-    _RESULTS_FIRST_CACHE={"exact":exact,"product_tickets":product_tickets}
+    _RESULTS_FIRST_CACHE={
+        "exact":exact,
+        "product_tickets":product_tickets,
+        "construction_tickets":construction_tickets,
+    }
     return _RESULTS_FIRST_CACHE
 
 def results_first_gate(product,line,pick):
@@ -512,23 +542,44 @@ def results_first_gate(product,line,pick):
     ticket_w=int(ticket_row.get("wins") or 0)
     ticket_rate=(ticket_w/ticket_n) if ticket_n else None
 
-    # Product-level settled ticket performance is a hard qualification gate.
-    # A leg can look strong while the tickets containing that product still lose
-    # more often than they win. Do not promote that product into a new Builder
-    # batch until its settled ticket record clears the loss-rate floor.
-    if ticket_n < RESULTS_FIRST_MIN_PRODUCT_TICKETS:
-        return False,{"eligible":False,"reason":"insufficient_settled_product_tickets",
-                       "product_ticket_n":ticket_n,"min_product_tickets":RESULTS_FIRST_MIN_PRODUCT_TICKETS,
+    # The current Builder is explicitly a 2-leg construction. Its qualification
+    # must therefore be based on the historical performance of 2-leg tickets,
+    # not on older 17-leg/large-accumulator outcomes that were built under a
+    # different construction policy.
+    construction_key=(product,RESULTS_FIRST_CONSTRUCTION_LEG_COUNT)
+    construction_row=idx["construction_tickets"].get(
+        construction_key,{"tickets":0,"wins":0,"losses":0}
+    )
+    construction_n=int(construction_row.get("tickets") or 0)
+    construction_w=int(construction_row.get("wins") or 0)
+    construction_rate=(construction_w/construction_n) if construction_n else None
+
+    if construction_n < RESULTS_FIRST_MIN_CONSTRUCTION_TICKETS:
+        return False,{"eligible":False,"reason":"insufficient_settled_construction_tickets",
+                       "construction_product":product,
+                       "construction_leg_count":RESULTS_FIRST_CONSTRUCTION_LEG_COUNT,
+                       "construction_ticket_n":construction_n,
+                       "min_construction_tickets":RESULTS_FIRST_MIN_CONSTRUCTION_TICKETS,
+                       "construction_ticket_wins":construction_w,
+                       "construction_ticket_losses":int(construction_row.get("losses") or 0),
+                       "all_product_ticket_n":ticket_n,
+                       "all_product_ticket_accuracy":round(ticket_rate or 0.0,4) if ticket_rate is not None else None,
                        "product":product}
-    product_loss_rate=(int(ticket_row.get("losses") or 0)/ticket_n) if ticket_n else 1.0
-    if product_loss_rate > RESULTS_FIRST_MAX_PRODUCT_LOSS_RATE:
-        return False,{"eligible":False,"reason":"settled_product_loss_rate_too_high",
-                       "product_ticket_n":ticket_n,"product_ticket_wins":ticket_w,
-                       "product_ticket_losses":int(ticket_row.get("losses") or 0),
-                       "product_ticket_accuracy":round(ticket_rate or 0.0,4),
-                       "product_loss_rate":round(product_loss_rate,4),
-                       "max_product_loss_rate":RESULTS_FIRST_MAX_PRODUCT_LOSS_RATE,
+    construction_loss_rate=(int(construction_row.get("losses") or 0)/construction_n)
+    if construction_loss_rate > RESULTS_FIRST_MAX_CONSTRUCTION_LOSS_RATE:
+        return False,{"eligible":False,"reason":"settled_construction_ticket_loss_rate_too_high",
+                       "construction_product":product,
+                       "construction_leg_count":RESULTS_FIRST_CONSTRUCTION_LEG_COUNT,
+                       "construction_ticket_n":construction_n,
+                       "construction_ticket_wins":construction_w,
+                       "construction_ticket_losses":int(construction_row.get("losses") or 0),
+                       "construction_ticket_accuracy":round(construction_rate or 0.0,4),
+                       "construction_loss_rate":round(construction_loss_rate,4),
+                       "max_construction_loss_rate":RESULTS_FIRST_MAX_CONSTRUCTION_LOSS_RATE,
+                       "all_product_ticket_n":ticket_n,
+                       "all_product_ticket_accuracy":round(ticket_rate or 0.0,4) if ticket_rate is not None else None,
                        "product":product}
+
     if product!="vfootball":
         return False,{"eligible":False,"reason":"no_results_first_lane","product":product}
 
