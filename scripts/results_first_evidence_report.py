@@ -141,6 +141,30 @@ def main():
             combined_odds = float(combined_odds)
         except (TypeError, ValueError):
             combined_odds = None
+        if combined_odds is None or combined_odds <= 1.0:
+            # Older paper-ticket snapshots may predate the top-level combined
+            # odds field. Reconstruct it from the immutable per-leg SportyBet
+            # prices rather than discarding otherwise valid profitability evidence.
+            leg_odds = []
+            for leg in ticket.get("legs") or []:
+                if not isinstance(leg, dict):
+                    continue
+                raw_odds = leg.get("bookmaker_odds_snapshot")
+                if raw_odds is None:
+                    raw_odds = leg.get("bookmaker_odds")
+                try:
+                    odds = float(raw_odds)
+                except (TypeError, ValueError):
+                    odds = None
+                if odds is None or odds <= 1.0:
+                    leg_odds = []
+                    break
+                leg_odds.append(odds)
+            if leg_odds:
+                combined_odds = 1.0
+                for odds in leg_odds:
+                    combined_odds *= odds
+                combined_odds = round(combined_odds, 6)
         settled_ticket_rows.append({
             "ticket_id": ticket.get("ticket_id"),
             "batch_id": ticket.get("batch_id"),
