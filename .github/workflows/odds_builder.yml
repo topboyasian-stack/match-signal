@@ -35,7 +35,7 @@ on:
     types: [completed]
   schedule:
     # Refresh research diagnostics and full-market discovery builder every 15 minutes.
-    # Virtual paper-builder validation: accuracy-first 2.80+ floor; 4.00+ secondary target.
+    # Virtual paper-builder validation: 2.70+ active floor; 2.80+ preferred target; 4.00+ stretch target.
     - cron: '*/15 * * * *'
   workflow_dispatch:
 
@@ -91,7 +91,7 @@ jobs:
           assert policy.get('requires_live_sportybet_price') is True
           assert policy.get('results_first') is True
           assert policy.get('construction_priority') == 'settled_results_first'
-          assert float(policy.get('minimum_combined_odds', 0)) >= 2.80
+          assert float(policy.get('minimum_combined_odds', 0)) >= 2.70
           assert float(policy.get('results_first_min_expected_roi', 0)) >= 0.02
           assert float(policy.get('min_model_edge', 0)) >= 0.025
           assert set(data.get('sports_supported', [])) >= {'football', 'tennis', 'virtual'}
@@ -199,7 +199,7 @@ jobs:
           fi
           git push origin main
 
-      - name: Notify subscribed devices about new 2.80+ batches
+      - name: Notify subscribed devices about new 2.70+ batches
         continue-on-error: true
         run: |
           python - <<'PY'
@@ -207,9 +207,9 @@ jobs:
           import urllib.request
           from pathlib import Path
           data=json.loads(Path('data/odds_builder.json').read_text(encoding='utf-8'))
-          batches=[b for b in (data.get('batches') or []) if float(b.get('combined_odds') or 0) >= 2.80 and len(b.get('legs') or []) >= 2]
+          batches=[b for b in (data.get('batches') or []) if float(b.get('combined_odds') or 0) >= 2.70 and len(b.get('legs') or []) >= 2]
           if not batches:
-              print('No 2.80+ batch to notify.')
+              print('No 2.70+ batch to notify.')
               raise SystemExit(0)
           payload=json.dumps({'batches':batches}).encode('utf-8')
           req=urllib.request.Request(
