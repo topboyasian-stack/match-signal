@@ -1875,10 +1875,12 @@ def main():
     settled_ids={str(x.get("event_id")) for x in load(HISTORY,[]) if isinstance(x,dict) and x.get("settled") and x.get("event_id")}
     selected=[x for x in selected if str(x.get("event_id")) not in settled_ids]
     sports=sorted({x["sport"] for x in selected})
-    results_first_met=bool(selected) and len(selected)>=BATCH_MIN_LEGS
-    target_met=combined>=TARGET_COMBINED_ODDS and results_first_met
+    primary_lane=str(primary.get("primary_lane") or "") if primary else ""
+    results_first_met=bool(selected) and len(selected)>=BATCH_MIN_LEGS and primary_lane=="vfootball"
+    value_floor_met=bool(selected) and len(selected)>=BATCH_MIN_LEGS and combined>=RESULTS_FIRST_MIN_COMBINED_ODDS
+    target_met=combined>=TARGET_COMBINED_ODDS and value_floor_met
     accuracy_floor_met=results_first_met
-    status="LIVE_VALUE_SET" if target_met else ("RESULTS_FIRST_SET" if results_first_met else ("NO_BET" if not selected else "RESULTS_FIRST_INSUFFICIENT"))
+    status="LIVE_VALUE_SET" if target_met else ("RESULTS_FIRST_SET" if results_first_met else ("VALUE_RESEARCH_SET" if value_floor_met else ("NO_BET" if not selected else "VALUE_RESEARCH_INSUFFICIENT")))
     rejection_counts={}
     for leg in built:
         leg_status=str(leg.get("status") or "REJECTED")
@@ -1966,7 +1968,7 @@ def main():
             "ranking":"settled exact-line/side results first; calibrated probability second; odds only tie-breaker",
             "model_rating_definition":"100 × product of leg model probabilities (naive joint proxy)",
             "leg_strength_definition":"100 × geometric mean of leg model probabilities",
-            "primary_lane":"vfootball",
+            "primary_lane":primary_lane or "none",
             "booking_code_policy":"fresh non-staking share code from exact live event/market/outcome IDs; never fabricate"
         },
         "batches":batches,
@@ -1979,7 +1981,7 @@ def main():
         "market_price_combined_odds":round(combined,3) if selected else None,
         "sportybet_booking":booking_info,
         "theme":{"name":"Midnight Graphite / Electric Cyan / Signal Green","accent":"#28D7E8","positive":"#35D07F","background":"#080D14"},
-        "notes":["Results-first qualifies only from settled exact-line/side performance plus the existing live-price, freshness, data-quality and model-evidence gates.","Zero batches are now diagnosable: capacity reports whether 4.00 is mathematically reachable under the existing 16-leg and correlation rules; no quality gate is weakened.","best_available_legs is informational when no batch exists and is not a qualified accumulator.","Missing or stale SportyBet prices produce NO_BET/REJECTED.","Model fair odds never overwrite bookmaker odds.","The Builder is results-first: it evaluates 2-, 3-, and 4-leg constructions independently. A shape is promoted only when its own settled-ticket sample, loss rate, combined odds, empirical ROI, exact-line evidence, and current expected ROI pass. No extra leg is added merely to reach a target. The ticket remains paper-only and legs are kept within a 60-minute kickoff span.","vFootball is the only active Results-first lane because its settled ticket legs contain large, repeatable samples at specific exact O/U lines. eFootball GT is held out after its settled ticket loss record.","Paper-only until the Results-first lane demonstrates stable ticket-level outcomes over a meaningful sample.","Near-term Builder horizon is 180 minutes; later fixtures remain in the wider prediction system but are not carried into the Builder until a later refresh.","Builder refreshes every 15 minutes and after relevant upstream workflows, so near-term tickets are repeatedly revalidated before kickoff."]
+        "notes":["Results-first qualifies only from settled exact-line/side performance plus the existing live-price, freshness, data-quality and model-evidence gates.","Zero batches are now diagnosable: capacity reports whether 4.00 is mathematically reachable under the existing leg/correlation rules; no per-leg evidence gate is weakened.","best_available_legs is informational when no batch exists and is not a qualified accumulator.","Missing or stale SportyBet prices produce NO_BET/REJECTED.","Model fair odds never overwrite bookmaker odds.","The Builder evaluates 2-, 3-, and 4-leg constructions. The vFootball Results-first lane is promoted only when its own settled-ticket sample, loss rate, combined odds, empirical ROI, exact-line evidence, and current expected ROI pass.","When the proven Results-first lane cannot qualify, the model-first value fallback may use independently Builder-eligible football, tennis, and exact-evidence eFootball legs; it still requires 2.80+ combined odds, current expected ROI >=2%, fresh SportyBet pricing, and the same correlation controls.","The ticket remains paper-only and legs remain capped at 4 in the active construction lanes.","Near-term Builder horizon is 720 minutes; price freshness remains capped at 900 seconds so extending the scan window does not permit stale odds.","Builder refreshes every 15 minutes and after relevant upstream workflows, so candidate prices are repeatedly revalidated before kickoff."]
     }
     OUTPUT.write_text(json.dumps(result,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
     print(json.dumps(result,indent=2))
