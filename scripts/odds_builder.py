@@ -44,7 +44,8 @@ RESULTS_FIRST_ENABLED=True
 RESULTS_FIRST_MAX_LEGS=2
 RESULTS_FIRST_MIN_OBS=50
 RESULTS_FIRST_MIN_ACCURACY=0.90
-RESULTS_FIRST_MIN_COMBINED_ODDS=1.0
+RESULTS_FIRST_MIN_COMBINED_ODDS=1.50
+RESULTS_FIRST_MIN_EXPECTED_ROI=0.02
 # Construction-specific ticket gate: only settled tickets with the same
 # 2-leg structure used by the current Results-first Builder may qualify it.
 # Historical larger accumulators remain diagnostic context and do not determine
@@ -493,10 +494,19 @@ def _load_results_first_index():
             row["losses"]+=1 if tstatus=="LOST" else 0
 
             ckey=(product,structure_legs)
-            crow=construction_tickets.setdefault(ckey,{"tickets":0,"wins":0,"losses":0})
+            crow=construction_tickets.setdefault(
+                ckey,{"tickets":0,"wins":0,"losses":0,"odds_sum":0.0,"odds_count":0}
+            )
             crow["tickets"]+=1
             crow["wins"]+=1 if tstatus=="WON" else 0
             crow["losses"]+=1 if tstatus=="LOST" else 0
+            try:
+                combined_odds=float(ticket.get("combined_odds"))
+                if combined_odds>1.0:
+                    crow["odds_sum"]+=combined_odds
+                    crow["odds_count"]+=1
+            except (TypeError,ValueError):
+                pass
 
         for leg in legs:
             if not isinstance(leg,dict) or str(leg.get("status") or "") not in {"WON","LOST"}:
@@ -580,6 +590,30 @@ def results_first_gate(product,line,pick):
                        "all_product_ticket_accuracy":round(ticket_rate or 0.0,4) if ticket_rate is not None else None,
                        "product":product}
 
+    odds_count=int(construction_row.get("odds_count") or 0)
+    avg_construction_odds=(float(construction_row.get("odds_sum") or 0.0)/odds_count) if odds_count else None
+    empirical_roi=(construction_rate*avg_construction_odds-1.0) if construction_rate is not None and avg_construction_odds else None
+    if avg_construction_odds is None or avg_construction_odds < RESULTS_FIRST_MIN_COMBINED_ODDS:
+        return False,{"eligible":False,"reason":"settled_construction_odds_too_low",
+                       "construction_product":product,
+                       "construction_leg_count":RESULTS_FIRST_CONSTRUCTION_LEG_COUNT,
+                       "construction_ticket_n":construction_n,
+                       "construction_avg_combined_odds":round(avg_construction_odds,4) if avg_construction_odds is not None else None,
+                       "min_construction_combined_odds":RESULTS_FIRST_MIN_COMBINED_ODDS,
+                       "construction_ticket_accuracy":round(construction_rate or 0.0,4),
+                       "empirical_expected_roi":round(empirical_roi,4) if empirical_roi is not None else None,
+                       "product":product}
+    if empirical_roi is None or empirical_roi < RESULTS_FIRST_MIN_EXPECTED_ROI:
+        return False,{"eligible":False,"reason":"settled_construction_expected_roi_below_floor",
+                       "construction_product":product,
+                       "construction_leg_count":RESULTS_FIRST_CONSTRUCTION_LEG_COUNT,
+                       "construction_ticket_n":construction_n,
+                       "construction_avg_combined_odds":round(avg_construction_odds,4),
+                       "construction_ticket_accuracy":round(construction_rate or 0.0,4),
+                       "empirical_expected_roi":round(empirical_roi,4),
+                       "min_expected_roi":RESULTS_FIRST_MIN_EXPECTED_ROI,
+                       "product":product}
+
     if product!="vfootball":
         return False,{"eligible":False,"reason":"no_results_first_lane","product":product}
 
@@ -612,6 +646,10 @@ def results_first_gate(product,line,pick):
         "construction_ticket_wins":construction_w,
         "construction_ticket_losses":int(construction_row.get("losses") or 0),
         "construction_ticket_accuracy":round(construction_rate,4) if construction_rate is not None else None,
+        "construction_avg_combined_odds":round(avg_construction_odds,4) if avg_construction_odds is not None else None,
+        "construction_empirical_expected_roi":round(empirical_roi,6) if empirical_roi is not None else None,
+        "min_construction_combined_odds":RESULTS_FIRST_MIN_COMBINED_ODDS,
+        "min_construction_expected_roi":RESULTS_FIRST_MIN_EXPECTED_ROI,
         "source":"data/odds_ticket_tracker.json","role":"primary_results_gate_construction_specific"
     }
 
@@ -1557,6 +1595,9 @@ def build_value_batches(candidates):
         batch=sorted(batch,key=lambda x:(_kickoff_timestamp(x) if _kickoff_timestamp(x) is not None else float("inf")))
         metrics=_batch_metrics(batch)
         combined=math.prod(float(x.get("bookmaker_odds") or 1.0) for x in batch)
+        current_expected_roi=(float(metrics.get("combined_model_probability") or 0.0)*combined)-1.0
+        if combined < RESULTS_FIRST_MIN_COMBINED_ODDS or current_expected_roi < RESULTS_FIRST_MIN_EXPECTED_ROI:
+            continue
         batch_events={str(x.get("event_id") or "") for x in batch if x.get("event_id")}
         used_events.update(batch_events)
         batches.append({
@@ -1735,6 +1776,7 @@ def main():
             "results_first_construction_leg_count":RESULTS_FIRST_CONSTRUCTION_LEG_COUNT,
             "results_first_min_construction_tickets":RESULTS_FIRST_MIN_CONSTRUCTION_TICKETS,
             "results_first_max_construction_loss_rate":RESULTS_FIRST_MAX_CONSTRUCTION_LOSS_RATE,
+            "results_first_min_expected_roi":RESULTS_FIRST_MIN_EXPECTED_ROI,
             "target_combined_odds":TARGET_COMBINED_ODDS,
             "accuracy_preservation_ratio":ACCURACY_PRESERVATION_RATIO,
             "construction_priority":"settled_results_first","min_model_edge":MIN_EDGE,
