@@ -47,9 +47,18 @@ export async function onRequestPost(context) {
   if (!env.PUSH_SUBSCRIPTIONS) return json({ ok:false, error:"push_storage_not_configured" }, 503);
   if (!env.VAPID_PRIVATE_KEY) return json({ ok:false, error:"vapid_private_key_not_configured" }, 503);
 
-  let body;
-  try { body = await context.request.json(); } catch (_) { return json({ ok:false, error:"invalid_json" }, 400); }
-  const batches = Array.isArray(body?.batches) ? body.batches : [];
+  let body = {};
+  try { body = await context.request.json(); } catch (_) { body = {}; }
+  const artifactUrl = "https://raw.githubusercontent.com/topboyasian-stack/match-signal/main/data/odds_builder.json?t=" + Date.now();
+  let artifact;
+  try {
+    const source = await fetch(artifactUrl, { headers: { "Cache-Control":"no-cache", "User-Agent":"Match-Signal-Push-Verifier" } });
+    if (!source.ok) return json({ ok:false, error:"builder_artifact_unavailable", status:source.status }, 502);
+    artifact = await source.json();
+  } catch (_) {
+    return json({ ok:false, error:"builder_artifact_unavailable" }, 502);
+  }
+  const batches = Array.isArray(artifact?.batches) ? artifact.batches : [];
   const candidates = [];
   for (const batch of batches) {
     const odds = Number(batch?.combined_odds || 0);
