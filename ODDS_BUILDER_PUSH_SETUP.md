@@ -14,19 +14,13 @@ Then add these production environment secrets/variables:
 - `VAPID_PRIVATE_KEY` — URL-safe base64 VAPID private key
 - `VAPID_SUBJECT` — a contact URL such as `mailto:your-address@example.com`
 
-Generate a key pair locally with:
+Generate a key pair locally after installing the package:
 
 ```bash
-npx @mmmike/web-push generate-vapid-keys
+npm install @mmmike/web-push@1.3.0
+node --input-type=module -e "import { generateVapidKeys } from '@mmmike/web-push/vapid'; console.log(await generateVapidKeys())"
 ```
 
-If that command is unavailable in the installed package version, use:
-
-```js
-import { generateVapidKeys } from "@mmmike/web-push/vapid";
-const keys = await generateVapidKeys();
-console.log(keys);
-```
 
 Set both VAPID keys in the Cloudflare Pages production environment; never commit the private key.
 
