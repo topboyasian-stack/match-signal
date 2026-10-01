@@ -1717,7 +1717,12 @@ def build_value_batches(candidates):
             secondary_metrics=_batch_metrics(secondary_batch)
             secondary_combined=math.prod(float(x.get("bookmaker_odds") or 1.0) for x in secondary_batch)
             secondary_roi=(float(secondary_metrics.get("combined_model_probability") or 0.0)*secondary_combined)-1.0
-            if secondary_combined>=RESULTS_FIRST_MIN_COMBINED_ODDS and secondary_roi>=RESULTS_FIRST_MIN_EXPECTED_ROI:
+            secondary_span=_batch_kickoff_span_minutes(secondary_batch)
+            if (
+                secondary_span<=MAX_BATCH_KICKOFF_SPAN_MINUTES
+                and secondary_combined>=RESULTS_FIRST_MIN_COMBINED_ODDS
+                and secondary_roi>=RESULTS_FIRST_MIN_EXPECTED_ROI
+            ):
                 batches.append({
                     "batch_id":"BATCH-01",
                     "label":f"BATCH-01 · Value Model Rating {secondary_metrics['model_rating']:.1f}/100",
@@ -1756,6 +1761,7 @@ def build_value_batches(candidates):
                     "eligible_results_first_legs":len(eligible_results),
                     "secondary_pool_eligible_legs":len(secondary_pool),
                     "secondary_expected_roi":round(secondary_roi,6),
+                    "secondary_kickoff_span_minutes":round(secondary_span,1),
                     "capacity":_batch_capacity_diagnostic(secondary_pool),
                     "construction_shape_diagnostics":construction_shapes,
                     "ranking_metric":"whole-ticket model probability first, exact current edge second, odds as hard reachability constraint"
