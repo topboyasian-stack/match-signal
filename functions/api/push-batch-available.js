@@ -1,6 +1,6 @@
 import { sendPushBatch } from "@mmmike/web-push/send";
 
-const MIN_ODDS = 2.8;
+const MIN_ODDS = 2.7;
 function json(body, status=200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -68,7 +68,7 @@ export async function onRequestPost(context) {
     clean.fingerprint = await fingerprint(batch);
     candidates.push(clean);
   }
-  if (!candidates.length) return json({ ok:true, notified:0, reason:"no_qualified_2_80_batch" });
+  if (!candidates.length) return json({ ok:true, notified:0, reason:"no_qualified_2_70_batch" });
 
   const subscriptions = [];
   let cursor;
