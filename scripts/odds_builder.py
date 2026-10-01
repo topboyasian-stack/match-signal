@@ -1625,7 +1625,26 @@ def build_value_batches(candidates):
         combined=math.prod(float(x.get("bookmaker_odds") or 1.0) for x in batch)
         current_expected_roi=(float(metrics.get("combined_model_probability") or 0.0)*combined)-1.0
         if combined < RESULTS_FIRST_MIN_COMBINED_ODDS or current_expected_roi < RESULTS_FIRST_MIN_EXPECTED_ROI:
-            continue
+            # This batch is below the results-first construction gate. Do not
+            # use `continue` here because this branch is outside the anchor loop.
+            return batches,built,{
+                "batch_count":0,
+                "max_batches":1,
+                "disjoint":True,
+                "min_combined_odds":RESULTS_FIRST_MIN_COMBINED_ODDS,
+                "target_combined_odds":TARGET_COMBINED_ODDS,
+                "accuracy_preservation_ratio":ACCURACY_PRESERVATION_RATIO,
+                "construction_priority":"settled_results_first",
+                "priority_product":"vfootball",
+                "max_legs":RESULTS_FIRST_MAX_LEGS,
+                "construction_shapes_considered":list(RESULTS_FIRST_CONSTRUCTION_LEG_COUNTS),
+                "promoted_construction_leg_count":promoted_shape,
+                "max_kickoff_span_minutes":MAX_BATCH_KICKOFF_SPAN_MINUTES,
+                "builder_horizon_minutes":MAX_BUILDER_HORIZON_MINUTES,
+                "used_unique_events":0,
+                "eligible_results_first_legs":len(eligible_results),
+                "rejection_reason":"combined_odds_or_expected_roi_below_results_first_gate"
+            }
         batch_events={str(x.get("event_id") or "") for x in batch if x.get("event_id")}
         used_events.update(batch_events)
         batches.append({
