@@ -111,15 +111,21 @@ function normalize(t, event, source, sportId){
     start_time_ms:(()=>{const raw=Number(event?.estimateStartTime);if(!Number.isFinite(raw)||raw<=0)return null;return raw<100000000000?raw*1000:raw})(),
     match_status:event?.matchStatus ?? null,
     live:Boolean(event?.live||event?.isLive||false),
-    score:extractScore(event),
+    score:(source.endsWith('_live')||event?.live||event?.isLive)?extractScore(event):null,
     markets:(Array.isArray(event?.markets)?event.markets:[]).map(m=>({
-      ...m,
+      id:String(m?.id||''),
+      name:String(m?.name||m?.desc||m?.title||''),
+      specifier:String(m?.specifier||''),
       line:m?.line!=null?Number(m.line):((String(m?.specifier||'').match(/(?:total|line)=([0-9]+(?:\\.[0-9]+)?)/i)||[])[1]!=null?Number((String(m?.specifier||'').match(/(?:total|line)=([0-9]+(?:\\.[0-9]+)?)/i)||[])[1]):null),
+      status:m?.status,
+      lastOddsChangeTime:m?.lastOddsChangeTime,
       outcomes:Array.isArray(m?.outcomes)?m.outcomes.map(o=>({
-        ...o,
-        name:String(o?.name||o?.desc||o?.title||'')
-      })):[]
-    }))
+        id:String(o?.id||''),
+        name:String(o?.name||o?.desc||o?.title||''),
+        odds:o?.odds!=null?Number(o.odds):null,
+        active:o?.isActive!==false
+      })).filter(o=>o.odds!=null):[]
+    })).filter(m=>m.outcomes.length)
   };
 }
 
