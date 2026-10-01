@@ -1,8 +1,6 @@
 import { sendPushBatch } from "@mmmike/web-push/send";
 
 const MIN_ODDS = 2.8;
-const DEFAULT_PUBLIC_KEY = "BFFGz7rdms4JOhI6Ht-FeNtO0u9ijAwsunxtcjwXm5YKl4lscPc_Hw5VEU3fePStevIoPKMBPwJGBm4EgXDEAE8";
-
 function json(body, status=200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -96,7 +94,7 @@ export async function onRequestPost(context) {
   if (!ready.length) return json({ ok:true, notified:0, reason:"already_notified", candidates });
 
   const vapid = {
-    publicKey: String(env.VAPID_PUBLIC_KEY || DEFAULT_PUBLIC_KEY),
+    publicKey: String(env.VAPID_PUBLIC_KEY || ""),
     privateKey: String(env.VAPID_PRIVATE_KEY),
     subject: String(env.VAPID_SUBJECT || "mailto:matchsignal@match-signal.pages.dev")
   };
