@@ -479,6 +479,28 @@ def ticket_status(legs):
     return "WON"
 
 
+def derive_combined_odds(ticket):
+    """Recover the immutable combined SportyBet price from leg snapshots."""
+    try:
+        leg_odds=[]
+        for leg in ticket.get("legs") or []:
+            value=leg.get("bookmaker_odds_snapshot")
+            if value is None:
+                value=leg.get("bookmaker_odds")
+            odds=num(value)
+            if odds is None or odds <= 1.0:
+                return None
+            leg_odds.append(odds)
+        if not leg_odds:
+            return None
+        combined=1.0
+        for odds in leg_odds:
+            combined*=odds
+        return round(combined,6)
+    except (TypeError,ValueError):
+        return None
+
+
 def refresh_ticket(ticket, rows, now):
     changed = False
     for leg in ticket.get("legs") or []:
@@ -506,6 +528,14 @@ def refresh_ticket(ticket, rows, now):
             ticket["lost_at"] = ticket.get("lost_at") or now
         elif new_status == "WON":
             ticket["won_at"] = ticket.get("won_at") or now
+    derived_odds=derive_combined_odds(ticket)
+    if (ticket.get("combined_odds") is None or num(ticket.get("combined_odds")) <= 1.0) and derived_odds is not None:
+        ticket["combined_odds"]=derived_odds
+        ticket["combined_odds_source"]="product_of_immutable_leg_bookmaker_snapshots"
+        ticket["odds_snapshot_complete"]=True
+        ticket["odds_backfilled_at"]=now
+        changed=True
+
     counts = {
         "won": sum(str(x.get("status")) == "WON" for x in ticket.get("legs") or []),
         "lost": sum(str(x.get("status")) == "LOST" for x in ticket.get("legs") or []),
@@ -544,6 +574,8 @@ def make_ticket(batch, now):
     for leg in batch.get("legs") or []:
         copied = dict(leg)
         copied["fixture_key"] = copied.get("fixture_key") or leg_fixture_key(copied)
+        if copied.get("bookmaker_odds_snapshot") is None and copied.get("bookmaker_odds") is not None:
+            copied["bookmaker_odds_snapshot"] = copied.get("bookmaker_odds")
         copied["status"] = "PENDING"
         copied.setdefault("correct", None)
         copied.setdefault("settled_at", None)
@@ -561,11 +593,14 @@ def make_ticket(batch, now):
         "last_seen_at": now,
         "last_settled_at": None,
         "status": "PENDING",
-        "combined_odds": batch.get("combined_odds"),
+        "combined_odds": num(batch.get("combined_odds")) if num(batch.get("combined_odds")) and num(batch.get("combined_odds")) > 1.0 else derive_combined_odds({"legs": legs}),
+        "combined_odds_source": "builder_batch_snapshot" if num(batch.get("combined_odds")) and num(batch.get("combined_odds")) > 1.0 else "product_of_immutable_leg_bookmaker_snapshots",
+        "odds_snapshot_complete": all(num(x.get("bookmaker_odds_snapshot")) and num(x.get("bookmaker_odds_snapshot")) > 1.0 for x in legs),
         "combined_model_rating": batch.get("combined_model_rating"),
         "combined_model_probability": batch.get("combined_model_probability"),
         "products": batch.get("products") or [],
         "primary_lane": batch.get("primary_lane"),
+        "odds_locked_at": now,
         "leg_count": len(legs),
         "settled_leg_count": 0,
         "pending_leg_count": len(legs),
