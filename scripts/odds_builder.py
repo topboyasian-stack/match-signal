@@ -41,7 +41,7 @@ BATCH_MIN_LEGS=2
 # settled-leg performance. Odds are secondary; a weak extra leg is never added
 # to reach a target.
 RESULTS_FIRST_ENABLED=True
-RESULTS_FIRST_MAX_LEGS=2
+RESULTS_FIRST_MAX_LEGS=4
 RESULTS_FIRST_MIN_OBS=50
 RESULTS_FIRST_MIN_ACCURACY=0.90
 RESULTS_FIRST_MIN_COMBINED_ODDS=1.50
@@ -50,6 +50,7 @@ RESULTS_FIRST_MIN_EXPECTED_ROI=0.02
 # 2-leg structure used by the current Results-first Builder may qualify it.
 # Historical larger accumulators remain diagnostic context and do not determine
 # whether the new construction lane has earned promotion.
+RESULTS_FIRST_CONSTRUCTION_LEG_COUNTS=(2,3,4)
 RESULTS_FIRST_CONSTRUCTION_LEG_COUNT=2
 RESULTS_FIRST_MIN_CONSTRUCTION_TICKETS=10
 RESULTS_FIRST_MAX_CONSTRUCTION_LOSS_RATE=0.50
@@ -537,8 +538,53 @@ def _load_results_first_index():
     }
     return _RESULTS_FIRST_CACHE
 
+def construction_shape_diagnostics(product, idx=None):
+    """Evaluate 2/3/4-leg ticket shapes independently from settled tickets."""
+    if idx is None:
+        idx=_load_results_first_index()
+    product=str(product or "")
+    rows=[]
+    for leg_count in RESULTS_FIRST_CONSTRUCTION_LEG_COUNTS:
+        row=idx["construction_tickets"].get(
+            (product,leg_count),
+            {"tickets":0,"wins":0,"losses":0,"odds_sum":0.0,"odds_count":0}
+        )
+        n=int(row.get("tickets") or 0)
+        wins=int(row.get("wins") or 0)
+        losses=int(row.get("losses") or 0)
+        accuracy=(wins/n) if n else None
+        loss_rate=(losses/n) if n else None
+        odds_count=int(row.get("odds_count") or 0)
+        avg_odds=(float(row.get("odds_sum") or 0.0)/odds_count) if odds_count else None
+        expected_roi=(accuracy*avg_odds-1.0) if accuracy is not None and avg_odds else None
+        qualifies=(
+            n >= RESULTS_FIRST_MIN_CONSTRUCTION_TICKETS
+            and loss_rate is not None
+            and loss_rate <= RESULTS_FIRST_MAX_CONSTRUCTION_LOSS_RATE
+            and avg_odds is not None
+            and avg_odds >= RESULTS_FIRST_MIN_COMBINED_ODDS
+            and expected_roi is not None
+            and expected_roi >= RESULTS_FIRST_MIN_EXPECTED_ROI
+        )
+        rows.append({
+            "leg_count":leg_count,
+            "ticket_n":n,
+            "ticket_wins":wins,
+            "ticket_losses":losses,
+            "ticket_accuracy":round(accuracy,4) if accuracy is not None else None,
+            "loss_rate":round(loss_rate,4) if loss_rate is not None else None,
+            "avg_combined_odds":round(avg_odds,4) if avg_odds is not None else None,
+            "break_even_accuracy":round(1.0/avg_odds,4) if avg_odds else None,
+            "empirical_expected_roi":round(expected_roi,6) if expected_roi is not None else None,
+            "min_ticket_n":RESULTS_FIRST_MIN_CONSTRUCTION_TICKETS,
+            "min_combined_odds":RESULTS_FIRST_MIN_COMBINED_ODDS,
+            "min_expected_roi":RESULTS_FIRST_MIN_EXPECTED_ROI,
+            "qualifies":bool(qualifies),
+        })
+    return rows
+
 def results_first_gate(product,line,pick):
-    """Require demonstrated settled results before a leg can enter the Builder."""
+    """Require demonstrated settled results and an independently proven 2/3/4-leg shape."""
     idx=_load_results_first_index()
     product=str(product or "")
     side=str(pick or "").lower()
@@ -546,93 +592,62 @@ def results_first_gate(product,line,pick):
         line_key=f"{float(line):g}"
     except (TypeError,ValueError):
         return False,{"eligible":False,"reason":"invalid_line"}
+
     exact=idx["exact"].get((product,line_key,side))
     ticket_row=idx["product_tickets"].get(product,{"tickets":0,"wins":0,"losses":0})
     ticket_n=int(ticket_row.get("tickets") or 0)
     ticket_w=int(ticket_row.get("wins") or 0)
     ticket_rate=(ticket_w/ticket_n) if ticket_n else None
 
-    # The current Builder is explicitly a 2-leg construction. Its qualification
-    # must therefore be based on the historical performance of 2-leg tickets,
-    # not on older 17-leg/large-accumulator outcomes that were built under a
-    # different construction policy.
-    construction_key=(product,RESULTS_FIRST_CONSTRUCTION_LEG_COUNT)
-    construction_row=idx["construction_tickets"].get(
-        construction_key,{"tickets":0,"wins":0,"losses":0}
+    shape_rows=construction_shape_diagnostics(product,idx)
+    viable_shapes=[row for row in shape_rows if row.get("qualifies")]
+    if not viable_shapes:
+        return False,{
+            "eligible":False,
+            "reason":"no_profitable_construction_shape",
+            "product":product,
+            "construction_shapes":shape_rows,
+            "construction_leg_count":None,
+            "all_product_ticket_n":ticket_n,
+            "all_product_ticket_accuracy":round(ticket_rate or 0.0,4) if ticket_rate is not None else None,
+        }
+
+    selected_shape=max(
+        viable_shapes,
+        key=lambda row:(
+            float(row.get("empirical_expected_roi") or -999.0),
+            float(row.get("ticket_accuracy") or -999.0),
+            int(row.get("ticket_n") or 0),
+            -int(row.get("leg_count") or 99),
+        )
     )
-    construction_n=int(construction_row.get("tickets") or 0)
-    construction_w=int(construction_row.get("wins") or 0)
-    construction_rate=(construction_w/construction_n) if construction_n else None
-
-    if construction_n < RESULTS_FIRST_MIN_CONSTRUCTION_TICKETS:
-        return False,{"eligible":False,"reason":"insufficient_settled_construction_tickets",
-                       "construction_product":product,
-                       "construction_leg_count":RESULTS_FIRST_CONSTRUCTION_LEG_COUNT,
-                       "construction_ticket_n":construction_n,
-                       "min_construction_tickets":RESULTS_FIRST_MIN_CONSTRUCTION_TICKETS,
-                       "construction_ticket_wins":construction_w,
-                       "construction_ticket_losses":int(construction_row.get("losses") or 0),
-                       "all_product_ticket_n":ticket_n,
-                       "all_product_ticket_accuracy":round(ticket_rate or 0.0,4) if ticket_rate is not None else None,
-                       "product":product}
-    construction_loss_rate=(int(construction_row.get("losses") or 0)/construction_n)
-    if construction_loss_rate > RESULTS_FIRST_MAX_CONSTRUCTION_LOSS_RATE:
-        return False,{"eligible":False,"reason":"settled_construction_ticket_loss_rate_too_high",
-                       "construction_product":product,
-                       "construction_leg_count":RESULTS_FIRST_CONSTRUCTION_LEG_COUNT,
-                       "construction_ticket_n":construction_n,
-                       "construction_ticket_wins":construction_w,
-                       "construction_ticket_losses":int(construction_row.get("losses") or 0),
-                       "construction_ticket_accuracy":round(construction_rate or 0.0,4),
-                       "construction_loss_rate":round(construction_loss_rate,4),
-                       "max_construction_loss_rate":RESULTS_FIRST_MAX_CONSTRUCTION_LOSS_RATE,
-                       "all_product_ticket_n":ticket_n,
-                       "all_product_ticket_accuracy":round(ticket_rate or 0.0,4) if ticket_rate is not None else None,
-                       "product":product}
-
-    odds_count=int(construction_row.get("odds_count") or 0)
-    avg_construction_odds=(float(construction_row.get("odds_sum") or 0.0)/odds_count) if odds_count else None
-    empirical_roi=(construction_rate*avg_construction_odds-1.0) if construction_rate is not None and avg_construction_odds else None
-    if avg_construction_odds is None or avg_construction_odds < RESULTS_FIRST_MIN_COMBINED_ODDS:
-        return False,{"eligible":False,"reason":"settled_construction_odds_too_low",
-                       "construction_product":product,
-                       "construction_leg_count":RESULTS_FIRST_CONSTRUCTION_LEG_COUNT,
-                       "construction_ticket_n":construction_n,
-                       "construction_avg_combined_odds":round(avg_construction_odds,4) if avg_construction_odds is not None else None,
-                       "min_construction_combined_odds":RESULTS_FIRST_MIN_COMBINED_ODDS,
-                       "construction_ticket_accuracy":round(construction_rate or 0.0,4),
-                       "empirical_expected_roi":round(empirical_roi,4) if empirical_roi is not None else None,
-                       "product":product}
-    if empirical_roi is None or empirical_roi < RESULTS_FIRST_MIN_EXPECTED_ROI:
-        return False,{"eligible":False,"reason":"settled_construction_expected_roi_below_floor",
-                       "construction_product":product,
-                       "construction_leg_count":RESULTS_FIRST_CONSTRUCTION_LEG_COUNT,
-                       "construction_ticket_n":construction_n,
-                       "construction_avg_combined_odds":round(avg_construction_odds,4),
-                       "construction_ticket_accuracy":round(construction_rate or 0.0,4),
-                       "empirical_expected_roi":round(empirical_roi,4),
-                       "min_expected_roi":RESULTS_FIRST_MIN_EXPECTED_ROI,
-                       "product":product}
+    construction_n=int(selected_shape.get("ticket_n") or 0)
+    construction_w=int(selected_shape.get("ticket_wins") or 0)
+    avg_construction_odds=selected_shape.get("avg_combined_odds")
+    empirical_roi=selected_shape.get("empirical_expected_roi")
 
     if product!="vfootball":
-        return False,{"eligible":False,"reason":"no_results_first_lane","product":product}
+        return False,{"eligible":False,"reason":"no_results_first_lane","product":product,"construction_shapes":shape_rows}
 
     if not exact:
         return False,{"eligible":False,"reason":"no_settled_exact_line_side_results",
-                       "key":[product,line_key,side]}
+                       "key":[product,line_key,side],"construction_shapes":shape_rows,
+                       "construction_leg_count":selected_shape["leg_count"]}
+
     n=int(exact.get("n") or 0)
     wins=int(exact.get("wins") or 0)
     accuracy=wins/n if n else 0.0
     if n < RESULTS_FIRST_MIN_OBS:
         return False,{"eligible":False,"reason":"insufficient_settled_exact_line_side_results",
-                       "n":n,"wins":wins,"min_n":RESULTS_FIRST_MIN_OBS,"key":[product,line_key,side]}
+                       "n":n,"wins":wins,"min_n":RESULTS_FIRST_MIN_OBS,"key":[product,line_key,side],
+                       "construction_shapes":shape_rows,"construction_leg_count":selected_shape["leg_count"]}
     if accuracy < RESULTS_FIRST_MIN_ACCURACY:
         return False,{"eligible":False,"reason":"settled_exact_line_side_accuracy_below_results_floor",
                        "n":n,"wins":wins,"losses":int(exact.get("losses") or 0),
                        "accuracy":round(accuracy,4),"min_accuracy":RESULTS_FIRST_MIN_ACCURACY,
-                       "key":[product,line_key,side]}
+                       "key":[product,line_key,side],"construction_shapes":shape_rows,
+                       "construction_leg_count":selected_shape["leg_count"]}
 
-    # Calibrate the live model probability from the settled-result posterior.
     posterior=(wins+2.0)/(n+4.0)
     return True,{
         "eligible":True,"n":n,"wins":wins,"losses":int(exact.get("losses") or 0),
@@ -641,13 +656,15 @@ def results_first_gate(product,line,pick):
         "product_ticket_n":ticket_n,"product_ticket_wins":ticket_w,
         "product_ticket_losses":int(ticket_row.get("losses") or 0),
         "product_ticket_accuracy":round(ticket_rate,4) if ticket_rate is not None else None,
-        "construction_leg_count":RESULTS_FIRST_CONSTRUCTION_LEG_COUNT,
+        "construction_leg_count":int(selected_shape["leg_count"]),
         "construction_ticket_n":construction_n,
         "construction_ticket_wins":construction_w,
-        "construction_ticket_losses":int(construction_row.get("losses") or 0),
-        "construction_ticket_accuracy":round(construction_rate,4) if construction_rate is not None else None,
-        "construction_avg_combined_odds":round(avg_construction_odds,4) if avg_construction_odds is not None else None,
-        "construction_empirical_expected_roi":round(empirical_roi,6) if empirical_roi is not None else None,
+        "construction_ticket_losses":int(selected_shape.get("ticket_losses") or 0),
+        "construction_ticket_accuracy":selected_shape.get("ticket_accuracy"),
+        "construction_loss_rate":selected_shape.get("loss_rate"),
+        "construction_avg_combined_odds":avg_construction_odds,
+        "construction_empirical_expected_roi":empirical_roi,
+        "construction_shapes":shape_rows,
         "min_construction_combined_odds":RESULTS_FIRST_MIN_COMBINED_ODDS,
         "min_construction_expected_roi":RESULTS_FIRST_MIN_EXPECTED_ROI,
         "source":"data/odds_ticket_tracker.json","role":"primary_results_gate_construction_specific"
@@ -1561,12 +1578,11 @@ def _construct_results_first_batch(pool, max_legs=RESULTS_FIRST_MAX_LEGS):
     return selected
 
 def build_value_batches(candidates):
-    """Build one small results-first paper ticket from demonstrated outcomes.
+    """Build one results-first paper ticket using the best proven 2/3/4-leg shape.
 
-    The settled ledger is the primary selector. Only exact product/line/side
-    combinations with strong realized hit rates are eligible. This deliberately
-    abandons the 4.00 odds requirement when reaching it would require weaker
-    legs.
+    A shape is promoted only when its own settled-ticket sample, realized odds,
+    historical ROI, exact-line evidence, and current expected ROI all pass.
+    No extra leg is added merely to reach a target.
     """
     built=[make_leg(x) for x in candidates]
     eligible_all=[x for x in built if x.get("builder_eligible")]
@@ -1578,10 +1594,22 @@ def build_value_batches(candidates):
     vfootball_pool=[x for x in eligible_results if str(x.get("product") or "")=="vfootball"]
     ordered=sorted(vfootball_pool,key=lambda x:(_kickoff_timestamp(x) if _kickoff_timestamp(x) is not None else float("inf")))
 
+    promoted_shape=None
+    if ordered:
+        gate_info=(ordered[0].get("results_first") or {})
+        promoted_shape=gate_info.get("construction_leg_count")
+        try:
+            promoted_shape=int(promoted_shape) if promoted_shape is not None else None
+        except (TypeError,ValueError):
+            promoted_shape=None
+
     window_candidates=[]
     for anchor in ordered:
         window=_near_kickoff_window(ordered,anchor)
-        candidate=_construct_results_first_batch(window)
+        max_legs=promoted_shape if promoted_shape in RESULTS_FIRST_CONSTRUCTION_LEG_COUNTS else RESULTS_FIRST_MAX_LEGS
+        candidate=_construct_results_first_batch(window,max_legs=max_legs)
+        if promoted_shape and len(candidate)!=promoted_shape:
+            continue
         if len(candidate)>=BATCH_MIN_LEGS and _batch_kickoff_span_minutes(candidate)<=MAX_BATCH_KICKOFF_SPAN_MINUTES:
             window_candidates.append(candidate)
 
@@ -1631,6 +1659,8 @@ def build_value_batches(candidates):
         "construction_priority":"settled_results_first",
         "priority_product":"vfootball",
         "max_legs":RESULTS_FIRST_MAX_LEGS,
+        "construction_shapes_considered":list(RESULTS_FIRST_CONSTRUCTION_LEG_COUNTS),
+        "promoted_construction_leg_count":promoted_shape,
         "max_kickoff_span_minutes":MAX_BATCH_KICKOFF_SPAN_MINUTES,
         "builder_horizon_minutes":MAX_BUILDER_HORIZON_MINUTES,
         "used_unique_events":len(used_events),
@@ -1773,7 +1803,7 @@ def main():
             "results_first_min_observations":RESULTS_FIRST_MIN_OBS,
             "results_first_min_accuracy":RESULTS_FIRST_MIN_ACCURACY,
             "results_first_max_legs":RESULTS_FIRST_MAX_LEGS,
-            "results_first_construction_leg_count":RESULTS_FIRST_CONSTRUCTION_LEG_COUNT,
+            "results_first_construction_leg_counts":list(RESULTS_FIRST_CONSTRUCTION_LEG_COUNTS),
             "results_first_min_construction_tickets":RESULTS_FIRST_MIN_CONSTRUCTION_TICKETS,
             "results_first_max_construction_loss_rate":RESULTS_FIRST_MAX_CONSTRUCTION_LOSS_RATE,
             "results_first_min_expected_roi":RESULTS_FIRST_MIN_EXPECTED_ROI,
@@ -1834,7 +1864,7 @@ def main():
         "market_price_combined_odds":round(combined,3) if selected else None,
         "sportybet_booking":booking_info,
         "theme":{"name":"Midnight Graphite / Electric Cyan / Signal Green","accent":"#28D7E8","positive":"#35D07F","background":"#080D14"},
-        "notes":["Results-first qualifies only from settled exact-line/side performance plus the existing live-price, freshness, data-quality and model-evidence gates.","Zero batches are now diagnosable: capacity reports whether 4.00 is mathematically reachable under the existing 16-leg and correlation rules; no quality gate is weakened.","best_available_legs is informational when no batch exists and is not a qualified accumulator.","Missing or stale SportyBet prices produce NO_BET/REJECTED.","Model fair odds never overwrite bookmaker odds.","The Builder is results-first: settled exact-line/side performance is the primary selector. It uses two proven legs when two qualify; adding a third or fourth leg would only lower the whole-ticket hit proxy, so odds never justify extra legs. The ticket remains paper-only and legs are kept within a 60-minute kickoff span.","vFootball is the only active Results-first lane because its settled ticket legs contain large, repeatable samples at specific exact O/U lines. eFootball GT is held out after its settled ticket loss record.","Paper-only until the Results-first lane demonstrates stable ticket-level outcomes over a meaningful sample.","Near-term Builder horizon is 180 minutes; later fixtures remain in the wider prediction system but are not carried into the Builder until a later refresh.","Builder refreshes every 15 minutes and after relevant upstream workflows, so near-term tickets are repeatedly revalidated before kickoff."]
+        "notes":["Results-first qualifies only from settled exact-line/side performance plus the existing live-price, freshness, data-quality and model-evidence gates.","Zero batches are now diagnosable: capacity reports whether 4.00 is mathematically reachable under the existing 16-leg and correlation rules; no quality gate is weakened.","best_available_legs is informational when no batch exists and is not a qualified accumulator.","Missing or stale SportyBet prices produce NO_BET/REJECTED.","Model fair odds never overwrite bookmaker odds.","The Builder is results-first: it evaluates 2-, 3-, and 4-leg constructions independently. A shape is promoted only when its own settled-ticket sample, loss rate, combined odds, empirical ROI, exact-line evidence, and current expected ROI pass. No extra leg is added merely to reach a target. The ticket remains paper-only and legs are kept within a 60-minute kickoff span.","vFootball is the only active Results-first lane because its settled ticket legs contain large, repeatable samples at specific exact O/U lines. eFootball GT is held out after its settled ticket loss record.","Paper-only until the Results-first lane demonstrates stable ticket-level outcomes over a meaningful sample.","Near-term Builder horizon is 180 minutes; later fixtures remain in the wider prediction system but are not carried into the Builder until a later refresh.","Builder refreshes every 15 minutes and after relevant upstream workflows, so near-term tickets are repeatedly revalidated before kickoff."]
     }
     OUTPUT.write_text(json.dumps(result,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
     print(json.dumps(result,indent=2))
