@@ -64,6 +64,8 @@ MAX_BATCHES=6
 # Keep Builder candidates close to kickoff so participant evidence and market prices can be refreshed.
 MAX_BUILDER_HORIZON_MINUTES=720
 MAX_BATCH_KICKOFF_SPAN_MINUTES=60
+MODEL_FIRST_MAX_KICKOFF_SPAN_MINUTES=270
+MODEL_FIRST_MIN_AVG_PROBABILITY=0.70
 
 
 def load(path, default):
@@ -1719,7 +1721,8 @@ def build_value_batches(candidates):
             secondary_roi=(float(secondary_metrics.get("combined_model_probability") or 0.0)*secondary_combined)-1.0
             secondary_span=_batch_kickoff_span_minutes(secondary_batch)
             if (
-                secondary_span<=MAX_BATCH_KICKOFF_SPAN_MINUTES
+                secondary_span<=MODEL_FIRST_MAX_KICKOFF_SPAN_MINUTES
+                and float(secondary_metrics.get("avg_model_probability") or 0.0)>=MODEL_FIRST_MIN_AVG_PROBABILITY
                 and secondary_combined>=RESULTS_FIRST_MIN_COMBINED_ODDS
                 and secondary_roi>=RESULTS_FIRST_MIN_EXPECTED_ROI
             ):
@@ -1762,6 +1765,8 @@ def build_value_batches(candidates):
                     "secondary_pool_eligible_legs":len(secondary_pool),
                     "secondary_expected_roi":round(secondary_roi,6),
                     "secondary_kickoff_span_minutes":round(secondary_span,1),
+                    "secondary_max_kickoff_span_minutes":MODEL_FIRST_MAX_KICKOFF_SPAN_MINUTES,
+                    "secondary_min_avg_model_probability":MODEL_FIRST_MIN_AVG_PROBABILITY,
                     "capacity":_batch_capacity_diagnostic(secondary_pool),
                     "construction_shape_diagnostics":construction_shapes,
                     "ranking_metric":"whole-ticket model probability first, exact current edge second, odds as hard reachability constraint"
@@ -1987,7 +1992,7 @@ def main():
         "market_price_combined_odds":round(combined,3) if selected else None,
         "sportybet_booking":booking_info,
         "theme":{"name":"Midnight Graphite / Electric Cyan / Signal Green","accent":"#28D7E8","positive":"#35D07F","background":"#080D14"},
-        "notes":["Results-first qualifies only from settled exact-line/side performance plus the existing live-price, freshness, data-quality and model-evidence gates.","Zero batches are now diagnosable: capacity reports whether 4.00 is mathematically reachable under the existing leg/correlation rules; no per-leg evidence gate is weakened.","best_available_legs is informational when no batch exists and is not a qualified accumulator.","Missing or stale SportyBet prices produce NO_BET/REJECTED.","Model fair odds never overwrite bookmaker odds.","The Builder evaluates 2-, 3-, and 4-leg constructions. The vFootball Results-first lane is promoted only when its own settled-ticket sample, loss rate, combined odds, empirical ROI, exact-line evidence, and current expected ROI pass.","When the proven Results-first lane cannot qualify, the model-first value fallback may use independently Builder-eligible football, tennis, and exact-evidence eFootball legs; it still requires 2.80+ combined odds, current expected ROI >=2%, fresh SportyBet pricing, and the same correlation controls.","The ticket remains paper-only and legs remain capped at 4 in the active construction lanes.","Near-term Builder horizon is 720 minutes; price freshness remains capped at 900 seconds so extending the scan window does not permit stale odds.","Builder refreshes every 15 minutes and after relevant upstream workflows, so candidate prices are repeatedly revalidated before kickoff."]
+        "notes":["Results-first qualifies only from settled exact-line/side performance plus the existing live-price, freshness, data-quality and model-evidence gates.","Zero batches are now diagnosable: capacity reports whether 4.00 is mathematically reachable under the existing leg/correlation rules; no per-leg evidence gate is weakened.","best_available_legs is informational when no batch exists and is not a qualified accumulator.","Missing or stale SportyBet prices produce NO_BET/REJECTED.","Model fair odds never overwrite bookmaker odds.","The Builder evaluates 2-, 3-, and 4-leg constructions. The vFootball Results-first lane is promoted only when its own settled-ticket sample, loss rate, combined odds, empirical ROI, exact-line evidence, and current expected ROI pass.","When the proven Results-first lane cannot qualify, the model-first value fallback may use independently Builder-eligible football, tennis, and exact-evidence eFootball legs; it still requires 2.80+ combined odds, current expected ROI >=2%, fresh SportyBet pricing, and the same correlation controls.","The ticket remains paper-only and legs remain capped at 4 in the active construction lanes.","The proven Results-first lane keeps a 60-minute kickoff span. The model-first paper value lane may span up to 270 minutes only when its whole-ticket probability and expected ROI gates still pass; this is explicitly research-only, not promoted as settled Results-first evidence.","Near-term Builder horizon is 720 minutes; price freshness remains capped at 900 seconds so extending the scan window does not permit stale odds.","Builder refreshes every 15 minutes and after relevant upstream workflows, so candidate prices are repeatedly revalidated before kickoff."]
     }
     OUTPUT.write_text(json.dumps(result,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
     print(json.dumps(result,indent=2))
