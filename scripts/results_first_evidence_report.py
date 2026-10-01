@@ -136,6 +136,11 @@ def main():
 
         settled_ou.sort(key=stamp)
         keys = sorted(set(r["exact_key"] for r in settled_ou))
+        combined_odds = ticket.get("combined_odds")
+        try:
+            combined_odds = float(combined_odds)
+        except (TypeError, ValueError):
+            combined_odds = None
         settled_ticket_rows.append({
             "ticket_id": ticket.get("ticket_id"),
             "batch_id": ticket.get("batch_id"),
@@ -144,6 +149,7 @@ def main():
             "ou_leg_count": len(settled_ou),
             "won_ou_legs": sum(1 for r in settled_ou if r["won"]),
             "lost_ou_legs": sum(1 for r in settled_ou if not r["won"]),
+            "combined_odds": combined_odds,
             "exact_keys": keys,
         })
 
@@ -210,10 +216,24 @@ def main():
 
     shape_records = []
     for shape, rows in shape_buckets.items():
+        stats = calc(rows)
+        odds = [r.get("combined_odds") for r in rows if r.get("combined_odds") is not None and r.get("combined_odds") > 0]
+        avg_odds = sum(odds) / len(odds) if odds else None
+        min_odds = min(odds) if odds else None
+        max_odds = max(odds) if odds else None
+        expected_roi = ((stats["accuracy"] * avg_odds) - 1.0) if avg_odds is not None and stats["accuracy"] is not None else None
+        break_even_accuracy = (1.0 / avg_odds) if avg_odds else None
         shape_records.append({
             "ticket_shape": shape,
             "settled_tickets": len(rows),
-            "ticket_history": calc(rows),
+            "ticket_history": stats,
+            "odds": {
+                "avg_combined_odds": round(avg_odds, 4) if avg_odds is not None else None,
+                "min_combined_odds": round(min_odds, 4) if min_odds is not None else None,
+                "max_combined_odds": round(max_odds, 4) if max_odds is not None else None,
+                "break_even_accuracy": round(break_even_accuracy, 6) if break_even_accuracy is not None else None,
+                "empirical_expected_roi": round(expected_roi, 6) if expected_roi is not None else None,
+            },
         })
     shape_records.sort(key=lambda row: row["ticket_shape"])
 
