@@ -1804,6 +1804,7 @@ def main():
             "results_first_min_accuracy":RESULTS_FIRST_MIN_ACCURACY,
             "results_first_max_legs":RESULTS_FIRST_MAX_LEGS,
             "results_first_construction_leg_counts":list(RESULTS_FIRST_CONSTRUCTION_LEG_COUNTS),
+            "results_first_construction_leg_count":batch_diag.get("promoted_construction_leg_count"),
             "results_first_min_construction_tickets":RESULTS_FIRST_MIN_CONSTRUCTION_TICKETS,
             "results_first_max_construction_loss_rate":RESULTS_FIRST_MAX_CONSTRUCTION_LOSS_RATE,
             "results_first_min_expected_roi":RESULTS_FIRST_MIN_EXPECTED_ROI,
