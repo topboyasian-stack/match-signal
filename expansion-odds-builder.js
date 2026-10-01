@@ -779,3 +779,4 @@
     load();window.setInterval(load,60000);window.setInterval(function(){var all=[];(window.__matchSignalOddsBuilderBatches||[]).forEach(function(b){all=all.concat(Array.isArray(b.legs)?b.legs:[]);});refreshVirtualLiveStatuses(all).then(updateLiveTrackers);},30000);window.setInterval(updateTimers,1000);
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
+})();
