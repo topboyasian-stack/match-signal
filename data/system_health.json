@@ -1,26 +1,26 @@
 {
-  "generated_at": "2026-10-01T05:38:55.187968+00:00",
-  "status": "FAIL",
-  "critical_issues": 3,
+  "generated_at": "2026-10-01T05:45:55.393282+00:00",
+  "status": "HEALTHY",
+  "critical_issues": 0,
   "warning_issues": 0,
   "info_issues": 1,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
-      "status": "STALE",
-      "age_hours": 8.86,
+      "status": "PASS",
+      "age_hours": 0.03,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 3.25,
+      "age_hours": 0.11,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
-      "status": "STALE",
-      "age_hours": 4.37,
+      "status": "PASS",
+      "age_hours": 0.0,
       "threshold_hours": 4
     },
     {
@@ -32,7 +32,7 @@
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 3.33,
+      "age_hours": 3.45,
       "threshold_hours": 0.5,
       "heartbeat_source": "unified_live_refresh"
     },
@@ -57,24 +57,9 @@
   ],
   "issues": [
     {
-      "code": "STALE_CORE_PREDICTION_PIPELINE",
-      "severity": "critical",
-      "detail": "updated_at age 8.86h exceeds 4h"
-    },
-    {
-      "code": "STALE_EXPANSION",
-      "severity": "critical",
-      "detail": "updated_at age 4.37h exceeds 4h"
-    },
-    {
       "code": "SELECTION_GATE_EMPTY",
       "severity": "info",
       "detail": "Current prediction feed exists but the selected-candidate layer returned zero qualified selections; no gate was weakened"
-    },
-    {
-      "code": "PIPELINE_STALE",
-      "severity": "critical",
-      "detail": "pipeline_status age 8.86h exceeds 4h"
     }
   ],
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
