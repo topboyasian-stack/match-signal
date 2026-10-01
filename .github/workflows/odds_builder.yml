@@ -33,7 +33,7 @@ on:
     types: [completed]
   schedule:
     # Refresh research diagnostics and full-market discovery builder every 15 minutes.
-    # Virtual paper-builder validation: accuracy-first 2.00+ floor; 4.00+ secondary target.
+    # Virtual paper-builder validation: accuracy-first 2.80+ floor; 4.00+ secondary target.
     - cron: '*/15 * * * *'
   workflow_dispatch:
 
@@ -89,7 +89,7 @@ jobs:
           assert policy.get('requires_live_sportybet_price') is True
           assert policy.get('results_first') is True
           assert policy.get('construction_priority') == 'settled_results_first'
-          assert float(policy.get('minimum_combined_odds', 0)) >= 1.50
+          assert float(policy.get('minimum_combined_odds', 0)) >= 2.80
           assert float(policy.get('results_first_min_expected_roi', 0)) >= 0.02
           assert float(policy.get('min_model_edge', 0)) >= 0.025
           assert set(data.get('sports_supported', [])) >= {'football', 'tennis', 'virtual'}
@@ -190,3 +190,29 @@ jobs:
             git commit -m "🤖 Refresh research-gated Odds Builder"
           fi
           git push origin main
+
+      - name: Notify subscribed devices about new 2.80+ batches
+        continue-on-error: true
+        run: |
+          python - <<'PY'
+          import json
+          import urllib.request
+          from pathlib import Path
+          data=json.loads(Path('data/odds_builder.json').read_text(encoding='utf-8'))
+          batches=[b for b in (data.get('batches') or []) if float(b.get('combined_odds') or 0) >= 2.80 and len(b.get('legs') or []) >= 2]
+          if not batches:
+              print('No 2.80+ batch to notify.')
+              raise SystemExit(0)
+          payload=json.dumps({'batches':batches}).encode('utf-8')
+          req=urllib.request.Request(
+              'https://match-signal.pages.dev/api/push-batch-available',
+              data=payload,
+              method='POST',
+              headers={'Content-Type':'application/json','User-Agent':'Match-Signal-GitHub-Action'}
+          )
+          try:
+              with urllib.request.urlopen(req, timeout=20) as r:
+                  print('Push notification response:', r.read().decode('utf-8','replace'))
+          except Exception as exc:
+              print('Push notification delivery skipped:', exc)
+          PY
