@@ -30,11 +30,11 @@ MAX_ODDS_AGE_SECONDS=900
 MAX_UNCERTAINTY=0.22
 MIN_DATA_QUALITY=0.70
 MIN_LEGS,MAX_LEGS=1,16
-# Accuracy-first ticket construction: 2.00+ is the minimum construction floor.
+# Accuracy-first ticket construction: 2.80+ is the minimum construction floor.
 # 4.00+ is a secondary target only when it preserves at least 90% of the
 # best available whole-ticket model probability.
 TARGET_COMBINED_ODDS=4.0
-MIN_ACCURACY_FIRST_ODDS=2.0
+MIN_ACCURACY_FIRST_ODDS=2.80
 ACCURACY_PRESERVATION_RATIO=0.90
 BATCH_MIN_LEGS=2
 # Results-first Builder: use only market/line directions with demonstrated
@@ -44,7 +44,7 @@ RESULTS_FIRST_ENABLED=True
 RESULTS_FIRST_MAX_LEGS=4
 RESULTS_FIRST_MIN_OBS=50
 RESULTS_FIRST_MIN_ACCURACY=0.90
-RESULTS_FIRST_MIN_COMBINED_ODDS=1.50
+RESULTS_FIRST_MIN_COMBINED_ODDS=2.80
 RESULTS_FIRST_MIN_EXPECTED_ROI=0.02
 # Construction-specific ticket gate: only settled tickets with the same
 # 2-leg structure used by the current Results-first Builder may qualify it.
@@ -1771,7 +1771,7 @@ def main():
         rejection_counts[leg_status]=rejection_counts.get(leg_status,0)+1
     result={
         "generated_at":now.isoformat(),"engine_version":"V6.1-RESEARCH-GATED",
-        "mode":"PAPER_ONLY","target_legs":"accuracy-first; variable legs with 2.00+ floor and 4.00+ secondary target","sports_supported":["football","tennis","virtual"],
+        "mode":"PAPER_ONLY","target_legs":"accuracy-first; variable legs with 2.80+ floor and 4.00+ secondary target","sports_supported":["football","tennis","virtual"],
         "research_gate":{
             "selection_gate_status":gate_status,
             "selected_predictions":selected_predictions,
