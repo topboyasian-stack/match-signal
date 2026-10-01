@@ -45,8 +45,8 @@ RESULTS_FIRST_MAX_LEGS=2
 RESULTS_FIRST_MIN_OBS=50
 RESULTS_FIRST_MIN_ACCURACY=0.90
 RESULTS_FIRST_MIN_COMBINED_ODDS=1.0
-RESULTS_FIRST_EFOOTBALL_MIN_TICKETS=10
-RESULTS_FIRST_EFOOTBALL_MAX_LOSS_RATE=0.50
+RESULTS_FIRST_MIN_PRODUCT_TICKETS=10
+RESULTS_FIRST_MAX_PRODUCT_LOSS_RATE=0.50
 MIN_COMBINED_ODDS=MIN_ACCURACY_FIRST_ODDS
 VIRTUAL_MIN_PROB=0.65
 TICKET_SPOILER_MIN_SAMPLE=50
@@ -512,17 +512,23 @@ def results_first_gate(product,line,pick):
     ticket_w=int(ticket_row.get("wins") or 0)
     ticket_rate=(ticket_w/ticket_n) if ticket_n else None
 
-    # eFootball GT is currently a results-failure lane: 0/10 settled tickets.
-    # Do not let fresh but unproven generic O/U evidence override the ledger.
-    if product=="efootball_gt":
-        if ticket_n < RESULTS_FIRST_EFOOTBALL_MIN_TICKETS:
-            return False,{"eligible":False,"reason":"insufficient_settled_product_tickets",
-                           "product_ticket_n":ticket_n,"min_product_tickets":RESULTS_FIRST_EFOOTBALL_MIN_TICKETS}
-        if (ticket_rate or 0.0) < (1.0-RESULTS_FIRST_EFOOTBALL_MAX_LOSS_RATE):
-            return False,{"eligible":False,"reason":"settled_product_loss_rate_too_high",
-                           "product_ticket_n":ticket_n,"product_ticket_wins":ticket_w,
-                           "product_ticket_losses":int(ticket_row.get("losses") or 0),
-                           "product_ticket_accuracy":round(ticket_rate,4)}
+    # Product-level settled ticket performance is a hard qualification gate.
+    # A leg can look strong while the tickets containing that product still lose
+    # more often than they win. Do not promote that product into a new Builder
+    # batch until its settled ticket record clears the loss-rate floor.
+    if ticket_n < RESULTS_FIRST_MIN_PRODUCT_TICKETS:
+        return False,{"eligible":False,"reason":"insufficient_settled_product_tickets",
+                       "product_ticket_n":ticket_n,"min_product_tickets":RESULTS_FIRST_MIN_PRODUCT_TICKETS,
+                       "product":product}
+    product_loss_rate=(int(ticket_row.get("losses") or 0)/ticket_n) if ticket_n else 1.0
+    if product_loss_rate > RESULTS_FIRST_MAX_PRODUCT_LOSS_RATE:
+        return False,{"eligible":False,"reason":"settled_product_loss_rate_too_high",
+                       "product_ticket_n":ticket_n,"product_ticket_wins":ticket_w,
+                       "product_ticket_losses":int(ticket_row.get("losses") or 0),
+                       "product_ticket_accuracy":round(ticket_rate or 0.0,4),
+                       "product_loss_rate":round(product_loss_rate,4),
+                       "max_product_loss_rate":RESULTS_FIRST_MAX_PRODUCT_LOSS_RATE,
+                       "product":product}
     if product!="vfootball":
         return False,{"eligible":False,"reason":"no_results_first_lane","product":product}
 
