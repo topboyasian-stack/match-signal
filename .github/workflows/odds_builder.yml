@@ -207,9 +207,11 @@ jobs:
           import urllib.request
           from pathlib import Path
           data=json.loads(Path('data/odds_builder.json').read_text(encoding='utf-8'))
-          batches=[b for b in (data.get('batches') or []) if float(b.get('combined_odds') or 0) >= 2.70 and len(b.get('legs') or []) >= 2]
+          gate=((data.get('research_gate') or {}).get('combined_odds_gate') or {})
+          floor=float(gate.get('floor') or 2.70)
+          batches=[b for b in (data.get('batches') or []) if float(b.get('combined_odds') or 0) >= floor and len(b.get('legs') or []) >= 2]
           if not batches:
-              print('No 2.70+ batch to notify.')
+              print(f'No batch at active floor {floor:.2f}x.')
               raise SystemExit(0)
           payload=json.dumps({'batches':batches}).encode('utf-8')
           req=urllib.request.Request(
