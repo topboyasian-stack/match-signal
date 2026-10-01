@@ -164,6 +164,9 @@ jobs:
           fi
           echo "project=$PROJECT" >> "$GITHUB_OUTPUT"
 
+      - name: Install Pages Function dependencies
+        run: npm install --no-audit --no-fund
+
       - name: Deploy to Cloudflare Pages
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -498,8 +501,3 @@ jobs:
             if git push origin main; then
               echo "Production verification recorded on attempt ${attempt}."
               exit 0
-            fi
-            sleep $((attempt * 2))
-          done
-          echo "Could not publish production verification after retries."
-          exit 1
