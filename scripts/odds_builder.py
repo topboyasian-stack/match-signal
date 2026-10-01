@@ -607,7 +607,12 @@ def results_first_gate(product,line,pick):
         "product_ticket_n":ticket_n,"product_ticket_wins":ticket_w,
         "product_ticket_losses":int(ticket_row.get("losses") or 0),
         "product_ticket_accuracy":round(ticket_rate,4) if ticket_rate is not None else None,
-        "source":"data/odds_ticket_tracker.json","role":"primary_results_gate"
+        "construction_leg_count":RESULTS_FIRST_CONSTRUCTION_LEG_COUNT,
+        "construction_ticket_n":construction_n,
+        "construction_ticket_wins":construction_w,
+        "construction_ticket_losses":int(construction_row.get("losses") or 0),
+        "construction_ticket_accuracy":round(construction_rate,4) if construction_rate is not None else None,
+        "source":"data/odds_ticket_tracker.json","role":"primary_results_gate_construction_specific"
     }
 
 _VIRTUAL_RECENT_GATE_CACHE=None
