@@ -889,7 +889,7 @@ def virtual_candidates(now):
     diagnostics={
         "seen":0,"qualified":0,"evidence_pass":0,"rejected_evidence":0,"rejected_ticket_performance":0,"rejected_results_first":0,
         "current_feed_events":0,"model_templates":len(templates),
-        "current_market_candidates":0,"reasons":{}
+        "current_market_candidates":0,"evidence_value_candidates":0,"reasons":{}
     }
     diagnostics["current_feed_events"]=len({str(x.get("event_id") or "") for x in merged if isinstance(x,dict) and x.get("event_id")})
     diagnostics["model_template_keys"]=[list(k) for k in sorted(templates.keys())]
@@ -1031,14 +1031,33 @@ def virtual_candidates(now):
                 continue
 
             results_pass,results_perf=results_first_gate(product,line,side) if RESULTS_FIRST_ENABLED else (True,{"eligible":False,"role":"disabled"})
+            evidence=virtual_directional_evidence(recent)
             if not results_pass:
-                diagnostics["rejected_results_first"]+=1
                 reason=str(results_perf.get("reason") or "results_first_rejected")
+                # eFootball has exact-line/side settlement evidence but does not
+                # have a promoted vFootball construction shape. Preserve those
+                # evidence-backed candidates for the model-first 2.80+ fallback
+                # instead of dropping them as if they lacked evidence.
+                if product.startswith("efootball_"):
+                    diagnostics["evidence_value_candidates"]+=1
+                    diagnostics["reasons"]["efootball_evidence_value_lane"]=diagnostics["reasons"].get("efootball_evidence_value_lane",0)+1
+                    calibrated_probability=float(evidence.get("posterior_rate") or prob)
+                    y["probability"]=calibrated_probability
+                    y["builder_probability"]=calibrated_probability
+                    y["model"]="Exact-line evidence calibration · eFootball value lane"
+                    y["recent_evidence"]=recent
+                    y["directional_evidence"]=evidence
+                    y["evidence_score"]=evidence["score"]
+                    y["ticket_performance"]=ticket_perf
+                    y["results_first"]=results_perf
+                    y["qualification_lane"]="efootball_exact_evidence_value"
+                    out.append(y)
+                    continue
+                diagnostics["rejected_results_first"]+=1
                 diagnostics["reasons"][reason]=diagnostics["reasons"].get(reason,0)+1
                 continue
 
             diagnostics["evidence_pass"]+=1
-            evidence=virtual_directional_evidence(recent)
             calibrated_probability=float(results_perf.get("posterior_probability") or prob)
             y["probability"]=calibrated_probability
             y["builder_probability"]=calibrated_probability
@@ -1673,6 +1692,75 @@ def build_value_batches(candidates):
             "construction_objective":"maximize settled-results-backed whole-ticket probability; odds are secondary and never force weaker legs"
         })
 
+    if not batches:
+        # Secondary value lane: only runs after the proven vFootball results-first
+        # lane cannot produce a valid ticket. Every input is still Builder-eligible
+        # with a fresh SportyBet price and >=2.5% current model edge.
+        secondary_pool=[
+            x for x in eligible_all
+            if str(x.get("product") or "")!="vfootball"
+            and (
+                str(x.get("sport") or "") in {"football","tennis"}
+                or str(x.get("product") or "").startswith("efootball_")
+            )
+        ]
+        secondary_batch=_construct_model_first_batch(
+            secondary_pool,
+            max_legs=RESULTS_FIRST_MAX_LEGS,
+            min_odds=RESULTS_FIRST_MIN_COMBINED_ODDS
+        )
+        if len(secondary_batch)>=BATCH_MIN_LEGS:
+            secondary_batch=sorted(
+                secondary_batch,
+                key=lambda x:(_kickoff_timestamp(x) if _kickoff_timestamp(x) is not None else float("inf"))
+            )
+            secondary_metrics=_batch_metrics(secondary_batch)
+            secondary_combined=math.prod(float(x.get("bookmaker_odds") or 1.0) for x in secondary_batch)
+            secondary_roi=(float(secondary_metrics.get("combined_model_probability") or 0.0)*secondary_combined)-1.0
+            if secondary_combined>=RESULTS_FIRST_MIN_COMBINED_ODDS and secondary_roi>=RESULTS_FIRST_MIN_EXPECTED_ROI:
+                batches.append({
+                    "batch_id":"BATCH-01",
+                    "label":f"BATCH-01 · Value Model Rating {secondary_metrics['model_rating']:.1f}/100",
+                    "rank_pending":False,
+                    "rank":1,
+                    "legs":secondary_batch,
+                    "leg_count":len(secondary_batch),
+                    "combined_odds":round(secondary_combined,3),
+                    "combined_model_rating":secondary_metrics["model_rating"],
+                    "combined_model_probability":secondary_metrics["combined_model_probability"],
+                    "leg_strength_rating":secondary_metrics["leg_strength_rating"],
+                    "avg_model_probability":secondary_metrics["avg_model_probability"],
+                    "avg_model_edge_percent":secondary_metrics["avg_model_edge_percent"],
+                    "products":sorted({str(x.get("product") or "") for x in secondary_batch if x.get("product")}),
+                    "primary_lane":"model_first_value",
+                    "paper_only":True,
+                    "real_money_execution":False,
+                    "correlation_policy":"same-event and participant reuse prevented; all legs independently Builder-eligible",
+                    "construction_objective":"maximize whole-ticket model probability subject to the 2.80+ odds floor; never add a leg after the model frontier cannot support the required ROI"
+                })
+                return batches,built,{
+                    "batch_count":1,
+                    "max_batches":1,
+                    "disjoint":True,
+                    "min_combined_odds":RESULTS_FIRST_MIN_COMBINED_ODDS,
+                    "target_combined_odds":TARGET_COMBINED_ODDS,
+                    "accuracy_preservation_ratio":ACCURACY_PRESERVATION_RATIO,
+                    "construction_priority":"model_first_value_fallback",
+                    "priority_product":"mixed",
+                    "max_legs":RESULTS_FIRST_MAX_LEGS,
+                    "construction_shapes_considered":list(RESULTS_FIRST_CONSTRUCTION_LEG_COUNTS),
+                    "promoted_construction_leg_count":promoted_shape,
+                    "max_kickoff_span_minutes":MAX_BATCH_KICKOFF_SPAN_MINUTES,
+                    "builder_horizon_minutes":MAX_BUILDER_HORIZON_MINUTES,
+                    "used_unique_events":len({str(x.get("event_id") or "") for x in secondary_batch if x.get("event_id")}),
+                    "eligible_results_first_legs":len(eligible_results),
+                    "secondary_pool_eligible_legs":len(secondary_pool),
+                    "secondary_expected_roi":round(secondary_roi,6),
+                    "capacity":_batch_capacity_diagnostic(secondary_pool),
+                    "construction_shape_diagnostics":construction_shapes,
+                    "ranking_metric":"whole-ticket model probability first, exact current edge second, odds as hard reachability constraint"
+                }
+
     return batches,built,{
         "batch_count":len(batches),
         "max_batches":1,
@@ -1691,7 +1779,8 @@ def build_value_batches(candidates):
         "eligible_results_first_legs":len(eligible_results),
         "capacity":_batch_capacity_diagnostic(eligible_results),
         "ranking_metric":"settled exact-line/side hit rate first; calibrated probability second; odds only tie-breaker",
-        "construction_shape_diagnostics":construction_shapes
+        "construction_shape_diagnostics":construction_shapes,
+        "secondary_pool_eligible_legs":sum(1 for x in eligible_all if str(x.get("product") or "")!="vfootball" and (str(x.get("sport") or "") in {"football","tennis"} or str(x.get("product") or "").startswith("efootball_")))
     }
 
 
