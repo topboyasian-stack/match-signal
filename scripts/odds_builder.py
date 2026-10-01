@@ -708,7 +708,7 @@ def results_first_gate(product,line,pick):
         "construction_avg_combined_odds":avg_construction_odds,
         "construction_empirical_expected_roi":empirical_roi,
         "construction_shapes":shape_rows,
-        "min_construction_combined_odds":RESULTS_FIRST_MIN_COMBINED_ODDS,
+        "min_construction_combined_odds":active_min_combined_odds(),
         "min_construction_expected_roi":RESULTS_FIRST_MIN_EXPECTED_ROI,
         "source":"data/odds_ticket_tracker.json","role":"primary_results_gate_construction_specific"
     }
@@ -1079,7 +1079,7 @@ def virtual_candidates(now):
                 reason=str(results_perf.get("reason") or "results_first_rejected")
                 # eFootball has exact-line/side settlement evidence but does not
                 # have a promoted vFootball construction shape. Preserve those
-                # evidence-backed candidates for the model-first 2.80+ fallback
+                # evidence-backed candidates for the model-first 2.70+ fallback
                 # instead of dropping them as if they lacked evidence.
                 if product.startswith("efootball_"):
                     diagnostics["evidence_value_candidates"]+=1
@@ -1697,7 +1697,7 @@ def build_value_batches(candidates):
                 "batch_count":0,
                 "max_batches":1,
                 "disjoint":True,
-                "min_combined_odds":RESULTS_FIRST_MIN_COMBINED_ODDS,
+                "min_combined_odds":active_min_combined_odds(),
                 "target_combined_odds":TARGET_COMBINED_ODDS,
                 "accuracy_preservation_ratio":ACCURACY_PRESERVATION_RATIO,
                 "construction_priority":"settled_results_first",
@@ -1788,13 +1788,13 @@ def build_value_batches(candidates):
                     "paper_only":True,
                     "real_money_execution":False,
                     "correlation_policy":"same-event and participant reuse prevented; all legs independently Builder-eligible",
-                    "construction_objective":"maximize whole-ticket model probability subject to the 2.80+ odds floor; never add a leg after the model frontier cannot support the required ROI"
+                    "construction_objective":"maximize whole-ticket model probability subject to the active 2.70+ odds floor (rising to 2.80 after the earned win-record gate); never add a leg after the model frontier cannot support the required ROI"
                 })
                 return batches,built,{
                     "batch_count":1,
                     "max_batches":1,
                     "disjoint":True,
-                    "min_combined_odds":RESULTS_FIRST_MIN_COMBINED_ODDS,
+                    "min_combined_odds":active_min_combined_odds(),
                     "target_combined_odds":TARGET_COMBINED_ODDS,
                     "accuracy_preservation_ratio":ACCURACY_PRESERVATION_RATIO,
                     "construction_priority":"model_first_value_fallback",
@@ -1820,7 +1820,7 @@ def build_value_batches(candidates):
         "batch_count":len(batches),
         "max_batches":1,
         "disjoint":True,
-        "min_combined_odds":RESULTS_FIRST_MIN_COMBINED_ODDS,
+        "min_combined_odds":active_min_combined_odds(),
         "target_combined_odds":TARGET_COMBINED_ODDS,
         "accuracy_preservation_ratio":ACCURACY_PRESERVATION_RATIO,
         "construction_priority":"settled_results_first",
@@ -2010,7 +2010,7 @@ def main():
         "naive_independence_hit_proxy":round(math.prod(float(x.get("model_probability") or 0) for x in selected),6) if selected else None,
         "batch_count":len(batches),
         "batch_policy":{
-            "min_combined_odds":RESULTS_FIRST_MIN_COMBINED_ODDS,
+            "min_combined_odds":active_min_combined_odds(),
             "results_first":True,
             "results_first_min_observations":RESULTS_FIRST_MIN_OBS,
             "results_first_min_accuracy":RESULTS_FIRST_MIN_ACCURACY,
