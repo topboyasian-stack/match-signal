@@ -437,7 +437,7 @@ jobs:
               const legs=Array.isArray(b?.qualified_legs)?b.qualified_legs:[];
               const combined=Number(b?.market_price_combined_odds||0);
               if (b?.mode!=='PAPER_ONLY') failures.push('/data/odds_builder.json is not PAPER_ONLY');
-              const allowedStatuses=new Set(['LIVE_VALUE_SET','BELOW_4_TARGET_AVAILABLE','NO_BET','UPSTREAM_RESEARCH_GATE_BLOCKED']);
+              const allowedStatuses=new Set(['LIVE_VALUE_SET','BELOW_4_TARGET_AVAILABLE','NO_BET','UPSTREAM_RESEARCH_GATE_BLOCKED','VALUE_RESEARCH_SET']);
               if (!allowedStatuses.has(b?.status)) failures.push('/data/odds_builder.json status is '+b?.status);
               if (b?.status==='LIVE_VALUE_SET') {
                 if (!legs.length) failures.push('/data/odds_builder.json LIVE_VALUE_SET has no qualified paper legs');
@@ -446,6 +446,11 @@ jobs:
               } else if (b?.status==='BELOW_4_TARGET_AVAILABLE') {
                 if (!Array.isArray(b?.best_available_legs) || !b.best_available_legs.length) failures.push('/data/odds_builder.json BELOW_4_TARGET_AVAILABLE has no best_available_legs');
                 if (!(combined>1 && combined<4)) failures.push('/data/odds_builder.json BELOW_4_TARGET_AVAILABLE has invalid combined odds: '+combined);
+              } else if (b?.status==='VALUE_RESEARCH_SET') {
+                if (legs.length < 2 || legs.length > 4) failures.push('/data/odds_builder.json VALUE_RESEARCH_SET leg count invalid: '+legs.length);
+                if (!(combined>=2.8)) failures.push('/data/odds_builder.json VALUE_RESEARCH_SET combined odds below 2.80: '+combined);
+                if (!Array.isArray(b?.batches) || !b.batches.length) failures.push('/data/odds_builder.json VALUE_RESEARCH_SET has no batches');
+                console.log('Paper Odds Builder research value state: VALUE_RESEARCH_SET; 2.80+ batch available without weakening stale/edge gates');
               } else {
                 if (legs.length) failures.push('/data/odds_builder.json '+b?.status+' unexpectedly contains qualified legs');
                 console.log('Paper Odds Builder production state: '+b?.status+' (no weak/stale ticket was forced)');
