@@ -1,6 +1,6 @@
 import { sendPushBatch } from "@mmmike/web-push/send";
 
-const MIN_ODDS = 2.7;
+const DEFAULT_MIN_ODDS = 2.7;
 function json(body, status=200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -59,16 +59,17 @@ export async function onRequestPost(context) {
     return json({ ok:false, error:"builder_artifact_unavailable" }, 502);
   }
   const batches = Array.isArray(artifact?.batches) ? artifact.batches : [];
+  const activeFloor = Number(artifact?.research_gate?.combined_odds_gate?.floor || DEFAULT_MIN_ODDS);
   const candidates = [];
   for (const batch of batches) {
     const odds = Number(batch?.combined_odds || 0);
     const legs = Array.isArray(batch?.legs) ? batch.legs : [];
-    if (odds < MIN_ODDS || legs.length < 2) continue;
+    if (odds < activeFloor || legs.length < 2) continue;
     const clean = summarize(batch);
     clean.fingerprint = await fingerprint(batch);
     candidates.push(clean);
   }
-  if (!candidates.length) return json({ ok:true, notified:0, reason:"no_qualified_2_70_batch" });
+  if (!candidates.length) return json({ ok:true, notified:0, reason:"no_qualified_active_floor_batch", active_floor:activeFloor });
 
   const subscriptions = [];
   let cursor;
