@@ -607,12 +607,7 @@ def results_first_gate(product,line,pick):
         "product_ticket_n":ticket_n,"product_ticket_wins":ticket_w,
         "product_ticket_losses":int(ticket_row.get("losses") or 0),
         "product_ticket_accuracy":round(ticket_rate,4) if ticket_rate is not None else None,
-        "construction_leg_count":RESULTS_FIRST_CONSTRUCTION_LEG_COUNT,
-        "construction_ticket_n":construction_n,
-        "construction_ticket_wins":construction_w,
-        "construction_ticket_losses":int(construction_row.get("losses") or 0),
-        "construction_ticket_accuracy":round(construction_rate,4) if construction_rate is not None else None,
-        "source":"data/odds_ticket_tracker.json","role":"primary_results_gate_construction_specific"
+        "source":"data/odds_ticket_tracker.json","role":"primary_results_gate"
     }
 
 _VIRTUAL_RECENT_GATE_CACHE=None
@@ -1732,9 +1727,6 @@ def main():
             "results_first_min_observations":RESULTS_FIRST_MIN_OBS,
             "results_first_min_accuracy":RESULTS_FIRST_MIN_ACCURACY,
             "results_first_max_legs":RESULTS_FIRST_MAX_LEGS,
-            "results_first_construction_leg_count":RESULTS_FIRST_CONSTRUCTION_LEG_COUNT,
-            "results_first_min_construction_tickets":RESULTS_FIRST_MIN_CONSTRUCTION_TICKETS,
-            "results_first_max_construction_loss_rate":RESULTS_FIRST_MAX_CONSTRUCTION_LOSS_RATE,
             "target_combined_odds":TARGET_COMBINED_ODDS,
             "accuracy_preservation_ratio":ACCURACY_PRESERVATION_RATIO,
             "construction_priority":"settled_results_first","min_model_edge":MIN_EDGE,
