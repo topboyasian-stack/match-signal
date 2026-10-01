@@ -37,7 +37,7 @@ TARGET_COMBINED_ODDS=4.0
 MIN_ACCURACY_FIRST_ODDS=2.80
 ACCURACY_PRESERVATION_RATIO=0.90
 BATCH_MIN_LEGS=2
-# Results-first Builder: use only market/line directions with demonstrated
+# Results-first Builder: 2.80 minimum combined odds; 4.00 remains secondary target: use only market/line directions with demonstrated
 # settled-leg performance. Odds are secondary; a weak extra leg is never added
 # to reach a target.
 RESULTS_FIRST_ENABLED=True
