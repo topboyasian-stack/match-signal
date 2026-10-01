@@ -652,12 +652,14 @@
     var topRating=top&&top.combined_model_rating!=null?Number(top.combined_model_rating):null;
     var topJoint=top&&top.combined_model_probability!=null?Number(top.combined_model_probability):null;
     var status=data.status==='LIVE_VALUE_SET'
-      ? batchCount+' RESEARCH BATCH'+(batchCount===1?'':'ES')+' · 2.80+'
-      : data.status==='BELOW_4_TARGET_AVAILABLE'
-        ? 'NO BATCH AT 2.80+ THRESHOLD'
-        : data.status==='UPSTREAM_RESEARCH_GATE_BLOCKED'
-          ? 'NO QUALIFIED BATCHES'
-          : (data.status||'—');
+      ? batchCount+' LIVE VALUE BATCH'+(batchCount===1?'':'ES')+' · 4.00+'
+      : data.status==='VALUE_RESEARCH_SET'
+        ? batchCount+' PAPER VALUE BATCH'+(batchCount===1?'':'ES')+' · 2.80+'
+        : data.status==='BELOW_4_TARGET_AVAILABLE'
+          ? 'NO BATCH AT 2.80+ THRESHOLD'
+          : data.status==='UPSTREAM_RESEARCH_GATE_BLOCKED'
+            ? 'NO QUALIFIED BATCHES'
+            : (data.status||'—');
 
     var settlementIndex=buildSettlementIndex(tracker,settledLegs);
     function legCard(l,i,batchIndex){
@@ -680,7 +682,7 @@
         .map(function(x){return String(x||'').toUpperCase();})
         .filter(Boolean)
         .join(' + ') || 'VIRTUAL';
-      var laneText=b.primary_lane==='vfootball'?'vFootball priority lane':'fallback virtual lane';
+      var laneText=b.primary_lane==='vfootball'?'vFootball Results-first lane':b.primary_lane==='model_first_value'?'Model-first paper value lane':'paper research lane';
       var batchNum=String(idx+1).padStart(2,'0');
       var body=legs.map(function(l,i){return legCard(l,i,idx);}).join('');
       var bookingPanel=bookingPanelHtml(b);
@@ -725,7 +727,7 @@
     }
 
     var ticketTrack=ticketTrackHtml(tracker);
-    target.innerHTML=pushNotificationHtml()+'<div class="builder-console"><div class="builder-console-head"><div><span class="builder-kicker">PAPER RESEARCH DESK</span><h3>Live 2.80+ Builder</h3><p>Fresh SportyBet prices are qualified in-process. Batches stay paper-only and disjoint by event.</p></div><div class="builder-live-state"><span class="pulse-dot"></span><b>'+(batchCount?'LIVE VALUE SET':'NO ACTIVE SET')+'</b><small>'+esc(status)+'</small></div></div><div class="builder-stat-row"><div class="builder-stat builder-stat-main"><small>Active batches</small><strong>'+batchCount+'/6</strong><span>Automatically refreshed</span></div><div class="builder-stat"><small>Sport lanes</small><strong>'+esc(sports.length?sports.join(' · '):'—')+'</strong><span>Current batch set</span></div><div class="builder-stat"><small>Top model rating</small><strong>'+esc(topRating==null?'—':topRating.toFixed(1)+'/100')+'</strong><span>Batch strength proxy</span></div><div class="builder-stat"><small>Top combined odds</small><strong>'+esc(top&&top.combined_odds!=null?Number(top.combined_odds).toFixed(3):'—')+'x</strong><span>SportyBet snapshot</span></div></div></div><div class="builder-batch-panel"><div class="builder-section-head"><div><span class="section-kicker">QUALIFIED SET</span><b>2.80+ paper research batches</b><span>Expand a batch for its booking code, live quote details, timer and legs.</span></div><div class="builder-section-note"><b>'+esc(virtualCount)+'</b><span>virtual candidates evaluated</span></div></div><div class="batch-list">'+(cards||'<div class="empty">No qualified 2.80+ batches are currently available.</div>')+'</div><div class="builder-feedbar"><span><b>SPORTYBET</b> live snapshot</span><span>Top joint proxy <b>'+esc(topJoint==null?'—':pct(topJoint))+'</b></span><span>Price freshness gate <b>&le; 15m</b></span><span>Paper only <b>Yes</b></span></div>'+gateNote+'</div>'+ticketTrack+'<div class="builder-note">The Builder refreshes automatically. Opening a batch reveals its exact selections and current SportyBet booking code.</div>';
+    target.innerHTML=pushNotificationHtml()+'<div class="builder-console"><div class="builder-console-head"><div><span class="builder-kicker">PAPER RESEARCH DESK</span><h3>Live 2.80+ Builder</h3><p>Fresh SportyBet prices are qualified in-process. Batches stay paper-only and disjoint by event.</p></div><div class="builder-live-state"><span class="pulse-dot"></span><b>'+(data.status==='LIVE_VALUE_SET'?'LIVE VALUE SET':batchCount?'PAPER VALUE SET':'NO ACTIVE SET')+'</b><small>'+esc(status)+'</small></div></div><div class="builder-stat-row"><div class="builder-stat builder-stat-main"><small>Active batches</small><strong>'+batchCount+'/6</strong><span>Automatically refreshed</span></div><div class="builder-stat"><small>Sport lanes</small><strong>'+esc(sports.length?sports.join(' · '):'—')+'</strong><span>Current batch set</span></div><div class="builder-stat"><small>Top model rating</small><strong>'+esc(topRating==null?'—':topRating.toFixed(1)+'/100')+'</strong><span>Batch strength proxy</span></div><div class="builder-stat"><small>Top combined odds</small><strong>'+esc(top&&top.combined_odds!=null?Number(top.combined_odds).toFixed(3):'—')+'x</strong><span>SportyBet snapshot</span></div></div></div><div class="builder-batch-panel"><div class="builder-section-head"><div><span class="section-kicker">QUALIFIED SET</span><b>2.80+ paper research batches</b><span>Expand a batch for its booking code, live quote details, timer and legs.</span></div><div class="builder-section-note"><b>'+esc(virtualCount)+'</b><span>virtual candidates evaluated</span></div></div><div class="batch-list">'+(cards||'<div class="empty">No qualified 2.80+ batches are currently available.</div>')+'</div><div class="builder-feedbar"><span><b>SPORTYBET</b> live snapshot</span><span>Top joint proxy <b>'+esc(topJoint==null?'—':pct(topJoint))+'</b></span><span>Price freshness gate <b>&le; 15m</b></span><span>Paper only <b>Yes</b></span></div>'+gateNote+'</div>'+ticketTrack+'<div class="builder-note">The Builder refreshes automatically. Opening a batch reveals its exact selections and current SportyBet booking code.</div>';
     updateTimers();
   }
   function load(){
