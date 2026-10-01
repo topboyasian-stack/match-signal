@@ -74,29 +74,30 @@
     });
     if(!Object.keys(targets).length||virtualLiveBusy)return Promise.resolve();
     virtualLiveBusy=true;
-    var pages=[1,2,3,4,5];
-    return Promise.all(pages.map(function(pageNum){
-      return fetch('./api/sportybet-virtual?sources=efootball,vfootball&pageSize=100&pageNum='+pageNum+'&timeline=24&_='+Date.now(),{cache:'no-store'})
-        .then(function(r){if(!r.ok)throw new Error('virtual live HTTP '+r.status);return r.json();})
-        .catch(function(){return {events:[]};});
-    })).then(function(results){
-      results.forEach(function(data){
-        var events=Array.isArray(data&&data.events)?data.events:[];
-        events.forEach(function(e){
-          var id=String(e&&e.event_id||'');if(!targets[id])return;
-          var startMs=Number(e&&e.start_time_ms||0);if(startMs>0&&startMs<100000000000)startMs*=1000;
-          var status=String(e&&e.match_status||'');
-          var statusLower=status.toLowerCase();
-          var live=(e&&e.live===true)||/live|running|playing|in.?play|started|1st half|2nd half|half time/.test(statusLower);
-          var finished=/finish|ended|final|completed|settled|closed/.test(statusLower);
-          var candidate={type:finished?'finished':live?'live':'upcoming',live:live,finished:finished,status:status,start_time:startMs||null,score:e&&e.score||null};
-          var previous=virtualLiveStates[id];
-          if(!previous||candidate.live||candidate.finished||!previous.live)virtualLiveStates[id]=candidate;
-        });
+    // One shared feed request is sufficient for the live tracker. The previous
+    // implementation fetched five pages every 10 seconds, multiplying the
+    // Cloudflare Pages Worker load without improving the tracker materially.
+    return fetch('./api/sportybet-virtual?sources=efootball,vfootball&pageSize=100&pageNum=1&timeline=24',{
+      cache:'default',
+      headers:{'Accept':'application/json'}
+    }).then(function(r){
+      if(!r.ok)throw new Error('virtual live HTTP '+r.status);
+      return r.json();
+    }).then(function(data){
+      var events=Array.isArray(data&&data.events)?data.events:[];
+      events.forEach(function(e){
+        var id=String(e&&e.event_id||'');if(!targets[id])return;
+        var startMs=Number(e&&e.start_time_ms||0);if(startMs>0&&startMs<100000000000)startMs*=1000;
+        var status=String(e&&e.match_status||'');
+        var statusLower=status.toLowerCase();
+        var live=(e&&e.live===true)||/live|running|playing|in.?play|started|1st half|2nd half|half time/.test(statusLower);
+        var finished=/finish|ended|final|completed|settled|closed/.test(statusLower);
+        var candidate={type:finished?'finished':live?'live':'upcoming',live:live,finished:finished,status:status,start_time:startMs||null,score:e&&e.score||null};
+        var previous=virtualLiveStates[id];
+        if(!previous||candidate.live||candidate.finished||!previous.live)virtualLiveStates[id]=candidate;
       });
     }).catch(function(){}).finally(function(){virtualLiveBusy=false;});
   }
-
   function formatElapsed(startMs){
     if(!startMs)return '';
     var total=Math.max(0,Math.floor((Date.now()-startMs)/1000)),h=Math.floor(total/3600),m=Math.floor((total%3600)/60),s=total%60;
@@ -774,7 +775,7 @@
         if(refresh){var b=findBatchById(refresh.getAttribute('data-booking-refresh'));if(b)requestBookingCode(b,true);}
       });
     }
-    load();window.setInterval(load,60000);window.setInterval(function(){var all=[];(window.__matchSignalOddsBuilderBatches||[]).forEach(function(b){all=all.concat(Array.isArray(b.legs)?b.legs:[]);});refreshVirtualLiveStatuses(all).then(updateLiveTrackers);},10000);window.setInterval(updateTimers,1000);
+    load();window.setInterval(load,60000);window.setInterval(function(){var all=[];(window.__matchSignalOddsBuilderBatches||[]).forEach(function(b){all=all.concat(Array.isArray(b.legs)?b.legs:[]);});refreshVirtualLiveStatuses(all).then(updateLiveTrackers);},30000);window.setInterval(updateTimers,1000);
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 }());
