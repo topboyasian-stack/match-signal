@@ -30,21 +30,25 @@ MAX_ODDS_AGE_SECONDS=900
 MAX_UNCERTAINTY=0.22
 MIN_DATA_QUALITY=0.70
 MIN_LEGS,MAX_LEGS=1,16
-# Accuracy-first ticket construction: 2.80+ is the minimum construction floor.
-# 4.00+ is a secondary target only when it preserves at least 90% of the
-# best available whole-ticket model probability.
-TARGET_COMBINED_ODDS=4.0
-MIN_ACCURACY_FIRST_ODDS=2.80
+# Accuracy-first ticket construction: 2.70+ is the active floor.
+# 2.80+ is a preferred target, not a hard gate yet. After 10 settled wins
+# at 2.80+ combined odds, the hard floor automatically rises to 2.80.
+# 4.00+ remains a stretch target only when accuracy is preserved.
+TARGET_COMBINED_ODDS=2.80
+STRETCH_COMBINED_ODDS=4.0
+MIN_ACCURACY_FIRST_ODDS=2.70
 ACCURACY_PRESERVATION_RATIO=0.90
 BATCH_MIN_LEGS=2
-# Results-first Builder: 2.80 minimum combined odds; 4.00 remains secondary target: use only market/line directions with demonstrated
-# settled-leg performance. Odds are secondary; a weak extra leg is never added
-# to reach a target.
+HIGH_ODDS_TARGET=2.80
+HIGH_ODDS_HARD_GATE_WIN_RECORDS=10
+# Results-first Builder: 2.70 minimum combined odds while the 2.80 gate is still
+# unearned; use only market/line directions with demonstrated settled performance.
+# A weak extra leg is never added merely to reach 2.70, 2.80, or 4.00.
 RESULTS_FIRST_ENABLED=True
 RESULTS_FIRST_MAX_LEGS=4
 RESULTS_FIRST_MIN_OBS=50
 RESULTS_FIRST_MIN_ACCURACY=0.90
-RESULTS_FIRST_MIN_COMBINED_ODDS=2.80
+RESULTS_FIRST_MIN_COMBINED_ODDS=2.70
 RESULTS_FIRST_MIN_EXPECTED_ROI=0.02
 # Construction-specific ticket gate: only settled tickets with the same
 # 2-leg structure used by the current Results-first Builder may qualify it.
@@ -66,6 +70,43 @@ MAX_BUILDER_HORIZON_MINUTES=720
 MAX_BATCH_KICKOFF_SPAN_MINUTES=60
 MODEL_FIRST_MAX_KICKOFF_SPAN_MINUTES=270
 MODEL_FIRST_MIN_AVG_PROBABILITY=0.70
+_COMBINED_ODDS_GATE_CACHE=None
+
+def combined_odds_gate_state():
+    """Return the currently earned combined-odds floor for this Builder run."""
+    global _COMBINED_ODDS_GATE_CACHE
+    if _COMBINED_ODDS_GATE_CACHE is not None:
+        return _COMBINED_ODDS_GATE_CACHE
+    wins=0
+    try:
+        tracker_path=DATA/"odds_ticket_tracker.json"
+        tracker=json.loads(tracker_path.read_text(encoding="utf-8"))
+        tickets=tracker.get("tickets") if isinstance(tracker,dict) else []
+        for ticket in tickets if isinstance(tickets,list) else []:
+            if str(ticket.get("status") or "").upper() != "WON":
+                continue
+            try:
+                odds=float(ticket.get("combined_odds") or 0.0)
+            except (TypeError,ValueError):
+                continue
+            if odds >= HIGH_ODDS_TARGET:
+                wins+=1
+    except Exception:
+        wins=0
+    hard_gate_active=wins >= HIGH_ODDS_HARD_GATE_WIN_RECORDS
+    floor=HIGH_ODDS_TARGET if hard_gate_active else MIN_ACCURACY_FIRST_ODDS
+    _COMBINED_ODDS_GATE_CACHE={
+        "floor":floor,
+        "preferred_target":HIGH_ODDS_TARGET,
+        "stretch_target":STRETCH_COMBINED_ODDS,
+        "hard_gate_active":hard_gate_active,
+        "settled_2_80_plus_wins":wins,
+        "wins_required_for_2_80_hard_gate":HIGH_ODDS_HARD_GATE_WIN_RECORDS
+    }
+    return _COMBINED_ODDS_GATE_CACHE
+
+def active_min_combined_odds():
+    return float(combined_odds_gate_state()["floor"])
 
 
 def load(path, default):
@@ -564,7 +605,7 @@ def construction_shape_diagnostics(product, idx=None):
             and loss_rate is not None
             and loss_rate <= RESULTS_FIRST_MAX_CONSTRUCTION_LOSS_RATE
             and avg_odds is not None
-            and avg_odds >= RESULTS_FIRST_MIN_COMBINED_ODDS
+            and avg_odds >= active_min_combined_odds()
             and expected_roi is not None
             and expected_roi >= RESULTS_FIRST_MIN_EXPECTED_ROI
         )
@@ -579,7 +620,7 @@ def construction_shape_diagnostics(product, idx=None):
             "break_even_accuracy":round(1.0/avg_odds,4) if avg_odds else None,
             "empirical_expected_roi":round(expected_roi,6) if expected_roi is not None else None,
             "min_ticket_n":RESULTS_FIRST_MIN_CONSTRUCTION_TICKETS,
-            "min_combined_odds":RESULTS_FIRST_MIN_COMBINED_ODDS,
+            "min_combined_odds":active_min_combined_odds(),
             "min_expected_roi":RESULTS_FIRST_MIN_EXPECTED_ROI,
             "qualifies":bool(qualifies),
         })
@@ -1649,7 +1690,7 @@ def build_value_batches(candidates):
         metrics=_batch_metrics(batch)
         combined=math.prod(float(x.get("bookmaker_odds") or 1.0) for x in batch)
         current_expected_roi=(float(metrics.get("combined_model_probability") or 0.0)*combined)-1.0
-        if combined < RESULTS_FIRST_MIN_COMBINED_ODDS or current_expected_roi < RESULTS_FIRST_MIN_EXPECTED_ROI:
+        if combined < active_min_combined_odds() or current_expected_roi < RESULTS_FIRST_MIN_EXPECTED_ROI:
             # This batch is below the results-first construction gate. Do not
             # use `continue` here because this branch is outside the anchor loop.
             return batches,built,{
@@ -1712,7 +1753,7 @@ def build_value_batches(candidates):
         secondary_batch=_construct_model_first_batch(
             secondary_pool,
             max_legs=RESULTS_FIRST_MAX_LEGS,
-            min_odds=RESULTS_FIRST_MIN_COMBINED_ODDS
+            min_odds=active_min_combined_odds()
         )
         if len(secondary_batch)>=BATCH_MIN_LEGS:
             secondary_batch=sorted(
@@ -1726,7 +1767,7 @@ def build_value_batches(candidates):
             if (
                 secondary_span<=MODEL_FIRST_MAX_KICKOFF_SPAN_MINUTES
                 and float(secondary_metrics.get("avg_model_probability") or 0.0)>=MODEL_FIRST_MIN_AVG_PROBABILITY
-                and secondary_combined>=RESULTS_FIRST_MIN_COMBINED_ODDS
+                and secondary_combined>=active_min_combined_odds()
                 and secondary_roi>=RESULTS_FIRST_MIN_EXPECTED_ROI
             ):
                 batches.append({
@@ -1891,19 +1932,22 @@ def main():
     sports=sorted({x["sport"] for x in selected})
     primary_lane=str(primary.get("primary_lane") or "") if primary else ""
     results_first_met=bool(selected) and len(selected)>=BATCH_MIN_LEGS and primary_lane=="vfootball"
-    value_floor_met=bool(selected) and len(selected)>=BATCH_MIN_LEGS and combined>=RESULTS_FIRST_MIN_COMBINED_ODDS
-    target_met=combined>=TARGET_COMBINED_ODDS and value_floor_met
+    odds_gate=combined_odds_gate_state()
+    value_floor_met=bool(selected) and len(selected)>=BATCH_MIN_LEGS and combined>=active_min_combined_odds()
+    preferred_target_met=bool(selected) and combined>=TARGET_COMBINED_ODDS
     accuracy_floor_met=results_first_met
-    status="LIVE_VALUE_SET" if target_met else ("RESULTS_FIRST_SET" if results_first_met else ("VALUE_RESEARCH_SET" if value_floor_met else ("NO_BET" if not selected else "VALUE_RESEARCH_INSUFFICIENT")))
+    status="LIVE_VALUE_SET" if results_first_met and value_floor_met else ("RESULTS_FIRST_SET" if results_first_met else ("VALUE_RESEARCH_SET" if value_floor_met else ("NO_BET" if not selected else "VALUE_RESEARCH_INSUFFICIENT")))
     rejection_counts={}
     for leg in built:
         leg_status=str(leg.get("status") or "REJECTED")
         rejection_counts[leg_status]=rejection_counts.get(leg_status,0)+1
     result={
         "generated_at":now.isoformat(),"engine_version":"V6.1-RESEARCH-GATED",
-        "mode":"PAPER_ONLY","target_legs":"accuracy-first; variable legs with 2.80+ floor and 4.00+ secondary target","sports_supported":["football","tennis","virtual"],
+        "mode":"PAPER_ONLY","target_legs":"accuracy-first; variable legs with 2.70+ active floor, 2.80+ preferred target, and 4.00+ stretch target","sports_supported":["football","tennis","virtual"],
         "research_gate":{
             "selection_gate_status":gate_status,
+            "combined_odds_gate":odds_gate,
+            "preferred_2_80_target_reached":preferred_target_met,
             "selected_predictions":selected_predictions,
             "tennis_live_eligible":tennis_live_eligible,
             "upstream_blocked":upstream_blocked,
@@ -1995,7 +2039,7 @@ def main():
         "market_price_combined_odds":round(combined,3) if selected else None,
         "sportybet_booking":booking_info,
         "theme":{"name":"Midnight Graphite / Electric Cyan / Signal Green","accent":"#28D7E8","positive":"#35D07F","background":"#080D14"},
-        "notes":["Results-first qualifies only from settled exact-line/side performance plus the existing live-price, freshness, data-quality and model-evidence gates.","Zero batches are now diagnosable: capacity reports whether 4.00 is mathematically reachable under the existing leg/correlation rules; no per-leg evidence gate is weakened.","best_available_legs is informational when no batch exists and is not a qualified accumulator.","Missing or stale SportyBet prices produce NO_BET/REJECTED.","Model fair odds never overwrite bookmaker odds.","The Builder evaluates 2-, 3-, and 4-leg constructions. The vFootball Results-first lane is promoted only when its own settled-ticket sample, loss rate, combined odds, empirical ROI, exact-line evidence, and current expected ROI pass.","When the proven Results-first lane cannot qualify, the model-first value fallback may use independently Builder-eligible football, tennis, and exact-evidence eFootball legs; every included leg must also have non-negative single-leg raw expected value. The fallback still requires 2.80+ combined odds, current expected ROI >=2%, fresh SportyBet pricing, and the same correlation controls.","The ticket remains paper-only and legs remain capped at 4 in the active construction lanes.","The proven Results-first lane keeps a 60-minute kickoff span. The model-first paper value lane may span up to 270 minutes only when its whole-ticket probability and expected ROI gates still pass; this is explicitly research-only, not promoted as settled Results-first evidence.","Near-term Builder horizon is 720 minutes; price freshness remains capped at 900 seconds so extending the scan window does not permit stale odds.","Builder refreshes every 15 minutes and after relevant upstream workflows, so candidate prices are repeatedly revalidated before kickoff."]
+        "notes":["Results-first qualifies only from settled exact-line/side performance plus the existing live-price, freshness, data-quality and model-evidence gates.","Zero batches are now diagnosable: capacity reports whether 4.00 is mathematically reachable under the existing leg/correlation rules; no per-leg evidence gate is weakened.","best_available_legs is informational when no batch exists and is not a qualified accumulator.","Missing or stale SportyBet prices produce NO_BET/REJECTED.","Model fair odds never overwrite bookmaker odds.","The Builder evaluates 2-, 3-, and 4-leg constructions. The vFootball Results-first lane is promoted only when its own settled-ticket sample, loss rate, combined odds, empirical ROI, exact-line evidence, and current expected ROI pass.","When the proven Results-first lane cannot qualify, the model-first value fallback may use independently Builder-eligible football, tennis, and exact-evidence eFootball legs; every included leg must also have non-negative single-leg raw expected value. The active combined-odds floor is 2.70x until 10 settled wins at 2.80x+ are recorded; 2.80x is a preferred target before then, not an eligibility gate. The fallback still requires current expected ROI >=2%, fresh SportyBet pricing, and the same correlation controls.","The ticket remains paper-only and legs remain capped at 4 in the active construction lanes.","The proven Results-first lane keeps a 60-minute kickoff span. The model-first paper value lane may span up to 270 minutes only when its whole-ticket probability and expected ROI gates still pass; this is explicitly research-only, not promoted as settled Results-first evidence.","Near-term Builder horizon is 720 minutes; price freshness remains capped at 900 seconds so extending the scan window does not permit stale odds.","Builder refreshes every 15 minutes and after relevant upstream workflows, so candidate prices are repeatedly revalidated before kickoff."]
     }
     OUTPUT.write_text(json.dumps(result,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
     print(json.dumps(result,indent=2))
