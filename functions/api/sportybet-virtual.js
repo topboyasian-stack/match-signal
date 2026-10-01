@@ -1,4 +1,4 @@
-function headers(){return {'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','Access-Control-Allow-Origin':'*','Access-Control-Allow-Methods':'GET,OPTIONS'}}
+function headers(){return {'Content-Type':'application/json; charset=utf-8','Cache-Control':'public, max-age=15, s-maxage=15, stale-while-revalidate=15','Access-Control-Allow-Origin':'*','Access-Control-Allow-Methods':'GET,OPTIONS'}}
 
 const ORIGIN='https://www.sportybet.com';
 const BROWSER_HEADERS={
@@ -142,7 +142,7 @@ export async function onRequestGet(context){
     const t0=Date.now();
     try{
       const data=await upstream('/api/ng/factsCenter/pcUpcomingEvents',{
-        sportId,marketId:'1,18,10,29,11,26,36,14,60100,186,189,202,204,210',
+        sportId,marketId:'1,18,186,189',
         pageSize,pageNum,todayGames:'false',timeline,_t:Date.now()
       });
       let n=0;
