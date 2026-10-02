@@ -1748,7 +1748,7 @@ def _construct_mixed_virtual_efootball_batches(pool, max_batches=4, max_legs=MIX
             if len(participants)!=len(set(participants)):
                 continue
             span=_batch_kickoff_span_minutes(rows)
-            if span>MAX_BATCH_KICKOFF_SPAN_MINUTES:
+            if span>MODEL_FIRST_MAX_KICKOFF_SPAN_MINUTES:
                 continue
             odds=math.prod(float(x.get("bookmaker_odds") or 1.0) for x in rows)
             if odds<min_odds:
@@ -1782,7 +1782,7 @@ def _construct_mixed_virtual_efootball_batches(pool, max_batches=4, max_legs=MIX
             if len(participants)!=len(set(participants)):
                 continue
             span=_batch_kickoff_span_minutes(rows)
-            if span>MAX_BATCH_KICKOFF_SPAN_MINUTES:
+            if span>MODEL_FIRST_MAX_KICKOFF_SPAN_MINUTES:
                 continue
             odds=math.prod(float(x.get("bookmaker_odds") or 1.0) for x in rows)
             if odds<min_odds:
