@@ -42,9 +42,9 @@ MIN_ACCURACY_FIRST_ODDS=2.70
 ACCURACY_PRESERVATION_RATIO=0.90
 BATCH_MIN_LEGS=2
 # Adaptive 2–4 leg construction safety tiers.
-# Longer tickets require stronger per-leg model probability. 90%+ is preferred;
-# 80% is the absolute floor for any active construction.
-LEG_COUNT_MIN_MODEL_PROBABILITY={2:0.80,3:0.85,4:0.88}
+# 90%+ per-leg model probability is preferred; 80% is the safety floor for
+# every included leg regardless of whether the ticket has 2, 3, or 4 legs.
+LEG_COUNT_MIN_MODEL_PROBABILITY={2:0.80,3:0.80,4:0.80}
 MIN_SAFE_LEG_MODEL_PROBABILITY=0.80
 PREFERRED_LEG_MODEL_PROBABILITY=0.90
 HIGH_ODDS_TARGET=2.80
