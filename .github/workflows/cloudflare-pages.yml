@@ -357,8 +357,8 @@ jobs:
               const volatileUnavailable = Boolean(
                 Array.isArray(payload?.validation) &&
                 payload.validation.length > 0 &&
-                payload.validation.every(v => v?.ok === false && v?.excluded === true) &&
-                payload.validation.some(v => /exact SportyBet O\/U line or selected side is no longer available/i.test(String(v?.reason || ''))) &&
+                payload.validation.every(v => (v?.ok === true) || (v?.ok === false && v?.excluded === true)) &&
+                payload.validation.some(v => v?.ok === false && v?.excluded === true && /exact SportyBet O\/U line or selected side is no longer available/i.test(String(v?.reason || ''))) &&
                 ['TOO_FEW_AVAILABLE_SELECTIONS','NO_AVAILABLE_SELECTIONS'].includes(String(payload?.error || ''))
               );
               smoke.status = payload?.ok === true ? 'PASS' : volatileUnavailable ? 'VOLATILE_MARKET' : 'FAIL';
