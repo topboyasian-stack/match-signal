@@ -123,6 +123,12 @@ jobs:
           batches = data.get('batches', [])
           assert isinstance(batches, list)
           assert int(data.get('batch_count', len(batches))) == len(batches)
+          for batch in batches:
+              if batch.get('primary_lane') == 'mixed_vfootball_efootball_value':
+                  products = {str(x.get('product') or '') for x in batch.get('legs', [])}
+                  assert 'vfootball' in products, 'mixed lane must contain VFootball'
+                  assert any(p.startswith('efootball_') for p in products), 'mixed lane must contain eFootball'
+                  assert 2 <= int(batch.get('leg_count', len(batch.get('legs', [])))) <= 3
           seen_batch_ids = set()
           seen_event_ids = set()
           for batch in batches:
