@@ -1976,6 +1976,12 @@ def build_value_batches(candidates):
         )
         if mixed_options:
             mixed_batches=[]
+            mixed_options.sort(
+                key=lambda option:min(
+                    _kickoff_timestamp(x) for x in option["rows"]
+                    if _kickoff_timestamp(x) is not None
+                ) if any(_kickoff_timestamp(x) is not None for x in option["rows"]) else float("inf")
+            )
             for idx,option in enumerate(mixed_options,1):
                 mixed_batch=sorted(
                     option["rows"],
