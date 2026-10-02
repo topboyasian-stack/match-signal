@@ -1716,7 +1716,7 @@ def _construct_results_first_batch(pool, max_legs=RESULTS_FIRST_MAX_LEGS):
     return selected
 
 def _construct_mixed_virtual_efootball_batches(pool, max_batches=4, max_legs=MIXED_RESEARCH_MAX_LEGS, min_odds=None):
-    """Build several disjoint 1x VFootball + 1-2x eFootball research batches.
+    """Build several disjoint 1x VFootball + 1-3x eFootball research batches.
 
     Every leg has already passed its individual Builder gates. This function
     only performs controlled composition and keeps batches disjoint by event and
@@ -1747,18 +1747,14 @@ def _construct_mixed_virtual_efootball_batches(pool, max_batches=4, max_legs=MIX
         -float(x.get("model_edge") or 0.0),
         -float(x.get("bookmaker_odds") or 1.0),
         _kickoff_timestamp(x) if _kickoff_timestamp(x) is not None else float("inf"),
-    ))[:80]
+    ))[:50]
     epool=sorted(epool,key=lambda x:(
         -float(x.get("model_probability") or 0.0),
         -float(x.get("evidence_score") or 0.0),
         -float(x.get("model_edge") or 0.0),
         -float(x.get("bookmaker_odds") or 1.0),
         _kickoff_timestamp(x) if _kickoff_timestamp(x) is not None else float("inf"),
-    ))[:100]
-
-    import itertools
-    options=[]
-    considered=0
+    ))[:40]
 
     # Adaptive 2–4 leg construction. A longer ticket is considered only when
     # every leg clears the stronger safety tier for that final leg count.
