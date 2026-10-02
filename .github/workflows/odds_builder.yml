@@ -128,7 +128,7 @@ jobs:
                   products = {str(x.get('product') or '') for x in batch.get('legs', [])}
                   assert 'vfootball' in products, 'mixed lane must contain VFootball'
                   assert any(p.startswith('efootball_') for p in products), 'mixed lane must contain eFootball'
-                  assert 2 <= int(batch.get('leg_count', len(batch.get('legs', [])))) <= 3
+                  assert 2 <= int(batch.get('leg_count', len(batch.get('legs', [])))) <= 4
           seen_batch_ids = set()
           seen_event_ids = set()
           seen_participants = set()
@@ -142,6 +142,11 @@ jobs:
               assert batch.get('paper_only') is True
               assert batch.get('real_money_execution') is False
               assert float(batch.get('combined_model_rating', 0)) >= 0
+              min_per_leg = data.get('batch_policy', {}).get('per_leg_min_model_probability') or {'2':0.80,'3':0.80,'4':0.80}
+              leg_count = int(batch.get('leg_count', len(batch.get('legs', []))))
+              required = float(min_per_leg.get(str(leg_count), min_per_leg.get(leg_count, 0.80)))
+              assert 2 <= leg_count <= 4
+              assert all(float(leg.get('model_probability', 0)) >= required for leg in batch.get('legs', [])), 'adaptive per-leg safety threshold failed'
               leg_ids = [str(x.get('event_id')) for x in batch.get('legs', [])]
               assert len(leg_ids) == len(set(leg_ids)), 'duplicate event inside batch'
               assert not (seen_event_ids & set(leg_ids)), 'batches must be disjoint by event'
@@ -176,8 +181,8 @@ jobs:
                       if data.get('status') == 'RESULTS_FIRST_SET':
                           assert span_seconds <= 3600, 'Results-first batch kickoff span exceeds 60 minutes'
                       elif data.get('status') == 'VALUE_RESEARCH_SET':
-                          if batch.get('primary_lane') == 'mixed_vfootball_efootball_value':
-                              assert span_seconds <= 360*60, 'Mixed research batch kickoff span exceeds 360 minutes'
+                          if batch.get('primary_lane') in {'mixed_vfootball_efootball_value','high_confidence_research'}:
+                              assert span_seconds <= 360*60, 'Adaptive research batch kickoff span exceeds 360 minutes'
                           else:
                               assert span_seconds <= 270*60, 'Paper value batch kickoff span exceeds 270 minutes'
                       else:
