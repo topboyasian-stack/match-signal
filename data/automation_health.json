@@ -1,23 +1,23 @@
 {
-  "updated_at": "2026-10-02T02:08:05.215594+00:00",
+  "updated_at": "2026-10-02T08:31:15.098506+00:00",
   "automation_status": "SELF_HEALING_ENABLED",
-  "pipeline_last_update": "2026-10-01T21:01:03.014169+00:00",
-  "pipeline_age_hours": 5.12,
-  "odds_builder_last_update": "2026-10-02T02:02:36.909911+00:00",
-  "odds_builder_age_hours": 0.09,
-  "expansion_last_update": "2026-10-01T23:52:18.950688+00:00",
-  "expansion_age_hours": 2.26,
-  "virtual_lab_last_update": "2026-10-02T02:07:58.683825+00:00",
+  "pipeline_last_update": "2026-10-02T05:28:27.210600+00:00",
+  "pipeline_age_hours": 3.05,
+  "odds_builder_last_update": "2026-10-02T08:27:22.595797+00:00",
+  "odds_builder_age_hours": 0.06,
+  "expansion_last_update": "2026-10-02T05:31:39.544390+00:00",
+  "expansion_age_hours": 2.99,
+  "virtual_lab_last_update": "2026-10-02T08:31:04.574560+00:00",
   "virtual_lab_age_hours": 0.0,
-  "virtual_lab_status_age_hours": 1.47,
-  "darts_age_hours": 62.52,
-  "table_tennis_age_hours": 61.28,
-  "unified_upcoming_age_hours": 0.55,
-  "virtual_lab_events": 564,
+  "virtual_lab_status_age_hours": 2.37,
+  "darts_age_hours": 68.9,
+  "table_tennis_age_hours": 67.67,
+  "unified_upcoming_age_hours": 1.02,
+  "virtual_lab_events": 694,
   "virtual_lab_products": {
-    "vfootball": 289,
-    "efootball_gt": 266,
-    "efootball_adriatic": 9
+    "efootball_gt": 241,
+    "efootball_adriatic": 11,
+    "vfootball": 442
   },
   "thresholds": {
     "pipeline_hours": 4,
@@ -37,12 +37,6 @@
       "detail": "Virtual Lab research-ledger self-heal"
     },
     {
-      "workflow": "tennis_pipeline.yml",
-      "action": "dispatch",
-      "status": "requested",
-      "detail": "core prediction pipeline self-heal"
-    },
-    {
       "workflow": "darts-x.yml",
       "action": "dispatch",
       "status": "failed",
@@ -53,12 +47,6 @@
       "action": "dispatch",
       "status": "failed",
       "detail": "could not create workflow dispatch event: HTTP 422: Workflow does not have 'workflow_dispatch' trigger (https://api.github.com/repos/topboyasian-stack/match-signal/actions/workflows/366290074/dispatches)"
-    },
-    {
-      "workflow": "unified-upcoming.yml",
-      "action": "dispatch",
-      "status": "requested",
-      "detail": "Unified board refresh after newer Virtual Lab snapshot"
     }
   ],
   "policy": "Watchdog proactively self-heals stale engines and force-restarts the actual core Live Prediction Pipeline; health publication is retried across concurrent data writers."
