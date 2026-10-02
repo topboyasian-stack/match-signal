@@ -1943,7 +1943,7 @@ def main():
         rejection_counts[leg_status]=rejection_counts.get(leg_status,0)+1
     result={
         "generated_at":now.isoformat(),"engine_version":"V6.1-RESEARCH-GATED",
-        "mode":"PAPER_ONLY","target_legs":"accuracy-first; variable legs with 2.70+ active floor, 2.80+ preferred target, and 4.00+ stretch target","sports_supported":["football","tennis","virtual"],
+        "mode":"PAPER_ONLY","target_legs":f"accuracy-first; {odds_gate[\"floor\"]:.2f}+ active floor, {TARGET_COMBINED_ODDS:.2f}+ preferred target, and {STRETCH_COMBINED_ODDS:.2f}+ stretch target","sports_supported":["football","tennis","virtual"],
         "research_gate":{
             "selection_gate_status":gate_status,
             "combined_odds_gate":odds_gate,
@@ -1972,7 +1972,8 @@ def main():
                 "source":"data/virtual_lab_participant_profiles.json"
             }
         },
-        "selection_policy":{"min_calibrated_probability":MIN_PROB,"virtual_min_probability":VIRTUAL_MIN_PROB,"virtual_builder_lines":"all current O/U lines with exact-side evidence; no forced line list","minimum_combined_odds":RESULTS_FIRST_MIN_COMBINED_ODDS,
+        "selection_policy":{"min_calibrated_probability":MIN_PROB,"virtual_min_probability":VIRTUAL_MIN_PROB,"virtual_builder_lines":"all current O/U lines with exact-side evidence; no forced line list","minimum_combined_odds":active_min_combined_odds(),
+            "accuracy_first_base_floor":RESULTS_FIRST_MIN_COMBINED_ODDS,
             "results_first":True,
             "results_first_min_observations":RESULTS_FIRST_MIN_OBS,
             "results_first_min_accuracy":RESULTS_FIRST_MIN_ACCURACY,
