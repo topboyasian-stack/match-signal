@@ -1,5 +1,7 @@
 """Match Signal V6 market-calibrated value engine.
 
+# 2026-10-02: force post-gate Builder regeneration for production verification.
+
 Research/paper-trading only. A candidate is eligible only when:
 - calibrated model probability clears the minimum threshold,
 - a fresh SportyBet price is actually present,
