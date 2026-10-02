@@ -1,23 +1,23 @@
 {
-  "updated_at": "2026-10-02T14:57:25.405673+00:00",
+  "updated_at": "2026-10-02T19:52:11.267979+00:00",
   "automation_status": "SELF_HEALING_ENABLED",
   "pipeline_last_update": "2026-10-02T14:43:04.951740+00:00",
-  "pipeline_age_hours": 0.24,
-  "odds_builder_last_update": "2026-10-02T14:52:57.083441+00:00",
-  "odds_builder_age_hours": 0.07,
-  "expansion_last_update": "2026-10-02T14:45:14.200267+00:00",
-  "expansion_age_hours": 0.2,
-  "virtual_lab_last_update": "2026-10-02T14:57:15.059347+00:00",
+  "pipeline_age_hours": 5.15,
+  "odds_builder_last_update": "2026-10-02T19:46:09.704333+00:00",
+  "odds_builder_age_hours": 0.1,
+  "expansion_last_update": "2026-10-02T16:49:37.283657+00:00",
+  "expansion_age_hours": 3.04,
+  "virtual_lab_last_update": "2026-10-02T19:52:00.938054+00:00",
   "virtual_lab_age_hours": 0.0,
-  "virtual_lab_status_age_hours": 1.02,
-  "darts_age_hours": 1.08,
-  "table_tennis_age_hours": 1.07,
-  "unified_upcoming_age_hours": 0.01,
-  "virtual_lab_events": 748,
+  "virtual_lab_status_age_hours": 1.94,
+  "darts_age_hours": 1.05,
+  "table_tennis_age_hours": 0.87,
+  "unified_upcoming_age_hours": 0.02,
+  "virtual_lab_events": 724,
   "virtual_lab_products": {
-    "efootball_gt": 295,
-    "efootball_adriatic": 11,
-    "vfootball": 442
+    "efootball_gt": 269,
+    "vfootball": 443,
+    "efootball_adriatic": 12
   },
   "thresholds": {
     "pipeline_hours": 4,
@@ -35,6 +35,18 @@
       "action": "dispatch",
       "status": "requested",
       "detail": "Virtual Lab research-ledger self-heal"
+    },
+    {
+      "workflow": "tennis_pipeline.yml",
+      "action": "dispatch",
+      "status": "requested",
+      "detail": "core prediction pipeline self-heal"
+    },
+    {
+      "workflow": "unified-upcoming.yml",
+      "action": "dispatch",
+      "status": "requested",
+      "detail": "Unified board refresh after newer Virtual Lab snapshot"
     }
   ],
   "policy": "Watchdog proactively self-heals stale engines and force-restarts the actual core Live Prediction Pipeline; health publication is retried across concurrent data writers."
