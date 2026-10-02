@@ -1689,13 +1689,13 @@ def _construct_results_first_batch(pool, max_legs=RESULTS_FIRST_MAX_LEGS):
             break
     return selected
 
-def _construct_mixed_virtual_efootball_batch(pool, max_legs=MIXED_RESEARCH_MAX_LEGS, min_odds=None):
-    """Build a controlled 1x VFootball + 1-2x eFootball research batch.
+def _construct_mixed_virtual_efootball_batches(pool, max_batches=4, max_legs=MIXED_RESEARCH_MAX_LEGS, min_odds=None):
+    """Build several disjoint 1x VFootball + 1-2x eFootball research batches.
 
-    This lane is intentionally separate from Results-first. Every input leg has
-    already passed its own Builder eligibility/evidence gates; construction adds
-    only composition, correlation, kickoff-span, whole-ticket probability,
-    combined-odds, and expected-ROI constraints.
+    Every leg has already passed its individual Builder gates. This function
+    only performs controlled composition and keeps batches disjoint by event and
+    participant identity so the Builder offers multiple independent choices from
+    the same fresh market scan.
     """
     if min_odds is None:
         min_odds=active_min_combined_odds()
@@ -1715,94 +1715,129 @@ def _construct_mixed_virtual_efootball_batch(pool, max_legs=MIXED_RESEARCH_MAX_L
         and float(x.get("expected_value") or 0.0)>=0.0
     ]
 
-    # Bound enumeration while preserving the strongest candidates.
     vpool=sorted(vpool,key=lambda x:(
         -float(x.get("model_probability") or 0.0),
         -float(x.get("evidence_score") or 0.0),
         -float(x.get("model_edge") or 0.0),
         -float(x.get("bookmaker_odds") or 1.0),
-    ))[:40]
+        _kickoff_timestamp(x) if _kickoff_timestamp(x) is not None else float("inf"),
+    ))[:80]
     epool=sorted(epool,key=lambda x:(
         -float(x.get("model_probability") or 0.0),
         -float(x.get("evidence_score") or 0.0),
         -float(x.get("model_edge") or 0.0),
         -float(x.get("bookmaker_odds") or 1.0),
-    ))[:60]
-
-    if not vpool or not epool:
-        return [], {
-            "vfootball_pool":len(vpool),
-            "efootball_pool":len(epool),
-            "candidate_combinations":0,
-            "reason":"missing_mixed_components"
-        }
+        _kickoff_timestamp(x) if _kickoff_timestamp(x) is not None else float("inf"),
+    ))[:100]
 
     import itertools
-    best=None
+    options=[]
     considered=0
+
+    # Prefer 2-leg batches so we can expose several independent choices without
+    # consuming the entire qualified eFootball pool in one 3-leg ticket.
     for vleg in vpool:
-        for ecount in (1,2):
-            if ecount>=max_legs or len(epool)<ecount:
+        for eleg in epool:
+            rows=[vleg,eleg]
+            event_ids=[str(x.get("event_id") or "") for x in rows if x.get("event_id")]
+            if len(event_ids)!=len(set(event_ids)):
                 continue
-            for es in itertools.combinations(epool,ecount):
-                rows=[vleg,*es]
-                # Avoid duplicate events and participant reuse inside a ticket.
-                event_ids=[str(x.get("event_id") or "") for x in rows if x.get("event_id")]
-                if len(event_ids)!=len(set(event_ids)):
-                    continue
-                participants=[]
-                for row in rows:
-                    participants.extend(_participants(row))
-                if len(participants)!=len(set(participants)):
-                    continue
+            participants=[]
+            for row in rows:
+                participants.extend(_participants(row))
+            if len(participants)!=len(set(participants)):
+                continue
+            span=_batch_kickoff_span_minutes(rows)
+            if span>MAX_BATCH_KICKOFF_SPAN_MINUTES:
+                continue
+            odds=math.prod(float(x.get("bookmaker_odds") or 1.0) for x in rows)
+            if odds<min_odds:
+                continue
+            metrics=_batch_metrics(rows)
+            avg_prob=float(metrics.get("avg_model_probability") or 0.0)
+            roi=(float(metrics.get("combined_model_probability") or 0.0)*odds)-1.0
+            if avg_prob<MIXED_RESEARCH_MIN_AVG_PROBABILITY or roi<RESULTS_FIRST_MIN_EXPECTED_ROI:
+                continue
+            considered+=1
+            options.append({
+                "rows":rows,"metrics":metrics,"odds":odds,"span":span,"roi":roi,
+                "score":(
+                    float(metrics.get("combined_model_probability") or 0.0),
+                    float(metrics.get("avg_model_edge_percent") or 0.0),
+                    float(metrics.get("leg_strength_rating") or 0.0),
+                    odds,
+                )
+            })
 
-                span=_batch_kickoff_span_minutes(rows)
-                if span>MODEL_FIRST_MAX_KICKOFF_SPAN_MINUTES:
-                    continue
-
-                odds=math.prod(float(x.get("bookmaker_odds") or 1.0) for x in rows)
-                if odds<min_odds:
-                    continue
-
-                metrics=_batch_metrics(rows)
-                avg_prob=float(metrics.get("avg_model_probability") or 0.0)
-                roi=(float(metrics.get("combined_model_probability") or 0.0)*odds)-1.0
-                if avg_prob<MIXED_RESEARCH_MIN_AVG_PROBABILITY or roi<RESULTS_FIRST_MIN_EXPECTED_ROI:
-                    continue
-
-                considered+=1
-                score=(
+    # Only use a 3-leg option when it can produce an additional disjoint choice.
+    for vleg in vpool:
+        for es in itertools.combinations(epool,2):
+            rows=[vleg,*es]
+            event_ids=[str(x.get("event_id") or "") for x in rows if x.get("event_id")]
+            if len(event_ids)!=len(set(event_ids)):
+                continue
+            participants=[]
+            for row in rows:
+                participants.extend(_participants(row))
+            if len(participants)!=len(set(participants)):
+                continue
+            span=_batch_kickoff_span_minutes(rows)
+            if span>MAX_BATCH_KICKOFF_SPAN_MINUTES:
+                continue
+            odds=math.prod(float(x.get("bookmaker_odds") or 1.0) for x in rows)
+            if odds<min_odds:
+                continue
+            metrics=_batch_metrics(rows)
+            avg_prob=float(metrics.get("avg_model_probability") or 0.0)
+            roi=(float(metrics.get("combined_model_probability") or 0.0)*odds)-1.0
+            if avg_prob<MIXED_RESEARCH_MIN_AVG_PROBABILITY or roi<RESULTS_FIRST_MIN_EXPECTED_ROI:
+                continue
+            considered+=1
+            options.append({
+                "rows":rows,"metrics":metrics,"odds":odds,"span":span,"roi":roi,
+                "score":(
                     float(metrics.get("combined_model_probability") or 0.0),
                     -len(rows),
                     float(metrics.get("avg_model_edge_percent") or 0.0),
                     odds,
                 )
-                if best is None or score>best[0]:
-                    best=(score,rows,metrics,odds,span,roi)
+            })
 
-    if best is None:
-        return [], {
-            "vfootball_pool":len(vpool),
-            "efootball_pool":len(epool),
-            "candidate_combinations":considered,
-            "reason":"no_mixed_combination_reached_all_gates"
-        }
+    options.sort(key=lambda o:o["score"],reverse=True)
+    selected_batches=[]
+    used_events=set()
+    used_participants=set()
 
-    _score,rows,metrics,odds,span,roi=best
-    rows=sorted(rows,key=lambda x:(_kickoff_timestamp(x) if _kickoff_timestamp(x) is not None else float("inf")))
-    return rows, {
+    for option in options:
+        if len(selected_batches)>=max_batches:
+            break
+        rows=option["rows"]
+        event_ids={str(x.get("event_id") or "") for x in rows if x.get("event_id")}
+        participants={p for row in rows for p in _participants(row)}
+        if event_ids & used_events or participants & used_participants:
+            continue
+        selected_batches.append(option)
+        used_events.update(event_ids)
+        used_participants.update(participants)
+
+    return selected_batches,{
         "vfootball_pool":len(vpool),
         "efootball_pool":len(epool),
         "candidate_combinations":considered,
-        "combined_odds":round(odds,3),
-        "kickoff_span_minutes":round(span,1),
-        "avg_model_probability":round(float(metrics.get("avg_model_probability") or 0.0),6),
-        "combined_model_probability":round(float(metrics.get("combined_model_probability") or 0.0),6),
-        "expected_roi":round(roi,6),
-        "leg_count":len(rows),
-        "composition":["vfootball"]+[str(x.get("product") or "") for x in rows if str(x.get("product") or "")!="vfootball"],
+        "batches_selected":len(selected_batches),
+        "max_batches":max_batches,
+        "min_combined_odds":min_odds,
+        "disjoint":True,
+        "batch_leg_counts":[len(x["rows"]) for x in selected_batches],
+        "combined_odds":[round(float(x["odds"]),3) for x in selected_batches],
+        "expected_rois":[round(float(x["roi"]),6) for x in selected_batches],
+        "kickoff_spans":[round(float(x["span"]),1) for x in selected_batches],
+        "composition":[
+            ["vfootball"]+[str(row.get("product") or "") for row in option["rows"] if str(row.get("product") or "")!="vfootball"]
+            for option in selected_batches
+        ],
+        "reason":None if selected_batches else "no_mixed_combination_reached_all_gates"
     }
-
 
 def build_value_batches(candidates):
     """Build one results-first paper ticket using the best proven 2/3/4-leg shape.
@@ -1911,30 +1946,32 @@ def build_value_batches(candidates):
                 "vfootball_exact_evidence_value","efootball_exact_evidence_value"
             }
         ]
-        mixed_batch,mixed_diag=_construct_mixed_virtual_efootball_batch(
+        mixed_pool=[
+            x for x in eligible_all
+            if str(x.get("qualification_lane") or "") in {
+                "vfootball_exact_evidence_value","efootball_exact_evidence_value"
+            }
+        ]
+        mixed_options,mixed_diag=_construct_mixed_virtual_efootball_batches(
             mixed_pool,
+            max_batches=min(4,MAX_BATCHES),
             max_legs=MIXED_RESEARCH_MAX_LEGS,
             min_odds=active_min_combined_odds()
         )
-        if len(mixed_batch)>=BATCH_MIN_LEGS:
-            mixed_metrics=_batch_metrics(mixed_batch)
-            mixed_combined=math.prod(float(x.get("bookmaker_odds") or 1.0) for x in mixed_batch)
-            mixed_roi=(float(mixed_metrics.get("combined_model_probability") or 0.0)*mixed_combined)-1.0
-            mixed_span=_batch_kickoff_span_minutes(mixed_batch)
-            mixed_sports={str(x.get("product") or "") for x in mixed_batch}
-            if (
-                mixed_span<=MODEL_FIRST_MAX_KICKOFF_SPAN_MINUTES
-                and float(mixed_metrics.get("avg_model_probability") or 0.0)>=MIXED_RESEARCH_MIN_AVG_PROBABILITY
-                and mixed_combined>=active_min_combined_odds()
-                and mixed_roi>=RESULTS_FIRST_MIN_EXPECTED_ROI
-                and "vfootball" in mixed_sports
-                and any(p.startswith("efootball_") for p in mixed_sports)
-            ):
-                batches.append({
-                    "batch_id":"BATCH-01",
-                    "label":f"BATCH-01 · Mixed Value Model Rating {mixed_metrics['model_rating']:.1f}/100",
+        if mixed_options:
+            mixed_batches=[]
+            for idx,option in enumerate(mixed_options,1):
+                mixed_batch=sorted(
+                    option["rows"],
+                    key=lambda x:(_kickoff_timestamp(x) if _kickoff_timestamp(x) is not None else float("inf"))
+                )
+                mixed_metrics=option["metrics"]
+                mixed_combined=float(option["odds"])
+                mixed_batches.append({
+                    "batch_id":f"BATCH-{idx:02d}",
+                    "label":f"BATCH-{idx:02d} · Mixed Value Model Rating {mixed_metrics['model_rating']:.1f}/100",
                     "rank_pending":False,
-                    "rank":1,
+                    "rank":idx,
                     "legs":mixed_batch,
                     "leg_count":len(mixed_batch),
                     "combined_odds":round(mixed_combined,3),
@@ -1943,36 +1980,36 @@ def build_value_batches(candidates):
                     "leg_strength_rating":mixed_metrics["leg_strength_rating"],
                     "avg_model_probability":mixed_metrics["avg_model_probability"],
                     "avg_model_edge_percent":mixed_metrics["avg_model_edge_percent"],
-                    "products":sorted(mixed_sports),
+                    "products":sorted({str(x.get("product") or "") for x in mixed_batch if x.get("product")}),
                     "primary_lane":"mixed_vfootball_efootball_value",
                     "paper_only":True,
                     "real_money_execution":False,
-                    "correlation_policy":"same-event and participant reuse prevented; 1 VFootball + 1-2 eFootball evidence-value legs only",
-                    "construction_objective":"maximize whole-ticket model probability with a controlled VFootball/eFootball mix; every leg remains independently Builder-eligible"
+                    "correlation_policy":"batches disjoint by event and participant; each batch contains 1 VFootball + 1-2 eFootball evidence-value legs",
+                    "construction_objective":"provide multiple independent paper choices from one fresh scan while preserving individual evidence/value gates"
                 })
-                return batches,built,{
-                    "batch_count":1,
-                    "max_batches":1,
-                    "disjoint":True,
-                    "min_combined_odds":active_min_combined_odds(),
-                    "target_combined_odds":TARGET_COMBINED_ODDS,
-                    "accuracy_preservation_ratio":ACCURACY_PRESERVATION_RATIO,
-                    "construction_priority":"mixed_vfootball_efootball_research",
-                    "priority_product":"mixed",
-                    "max_legs":MIXED_RESEARCH_MAX_LEGS,
-                    "construction_shapes_considered":[2,3],
-                    "promoted_construction_leg_count":None,
-                    "max_kickoff_span_minutes":MAX_BATCH_KICKOFF_SPAN_MINUTES,
-                    "builder_horizon_minutes":MAX_BUILDER_HORIZON_MINUTES,
-                    "used_unique_events":len({str(x.get("event_id") or "") for x in mixed_batch if x.get("event_id")}),
-                    "eligible_results_first_legs":len(eligible_results),
-                    "mixed_pool_eligible_legs":len(mixed_pool),
-                    "mixed_diagnostics":mixed_diag,
-                    "secondary_pool_eligible_legs":0,
-                    "capacity":_batch_capacity_diagnostic(mixed_pool),
-                    "construction_shape_diagnostics":construction_shapes,
-                    "ranking_metric":"whole-ticket model probability first, fewer legs second, exact current edge third, odds as hard reachability constraint"
-                }
+            return mixed_batches,built,{
+                "batch_count":len(mixed_batches),
+                "max_batches":min(4,MAX_BATCHES),
+                "disjoint":True,
+                "min_combined_odds":active_min_combined_odds(),
+                "target_combined_odds":TARGET_COMBINED_ODDS,
+                "accuracy_preservation_ratio":ACCURACY_PRESERVATION_RATIO,
+                "construction_priority":"mixed_vfootball_efootball_research",
+                "priority_product":"mixed",
+                "max_legs":MIXED_RESEARCH_MAX_LEGS,
+                "construction_shapes_considered":[2,3],
+                "promoted_construction_leg_count":None,
+                "max_kickoff_span_minutes":MAX_BATCH_KICKOFF_SPAN_MINUTES,
+                "builder_horizon_minutes":MAX_BUILDER_HORIZON_MINUTES,
+                "used_unique_events":len({str(x.get("event_id") or "") for b in mixed_batches for x in b["legs"] if x.get("event_id")}),
+                "eligible_results_first_legs":len(eligible_results),
+                "mixed_pool_eligible_legs":len(mixed_pool),
+                "mixed_diagnostics":mixed_diag,
+                "secondary_pool_eligible_legs":0,
+                "capacity":_batch_capacity_diagnostic(mixed_pool),
+                "construction_shape_diagnostics":construction_shapes,
+                "ranking_metric":"whole-ticket model probability first, leg strength second, exact current edge third, odds as hard reachability constraint; batches disjoint"
+            }
 
         # Secondary value lane: only runs after both proven vFootball and the
         # controlled mixed VFootball/eFootball research lane cannot produce a valid
@@ -2057,7 +2094,7 @@ def build_value_batches(candidates):
 
     return batches,built,{
         "batch_count":len(batches),
-        "max_batches":1,
+        "max_batches":MAX_BATCHES,
         "disjoint":True,
         "min_combined_odds":active_min_combined_odds(),
         "target_combined_odds":TARGET_COMBINED_ODDS,
