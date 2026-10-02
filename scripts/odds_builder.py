@@ -1835,6 +1835,117 @@ def _construct_mixed_virtual_efootball_batches(pool, max_batches=4, max_legs=MIX
         used_events.update(event_ids)
         used_participants.update(participants)
 
+def _construct_high_confidence_value_batches(pool,max_batches=4,max_legs=4,min_odds=None):
+    """Build several disjoint 2–4 leg research batches from >=80% exact-evidence legs.
+
+    No sport is forced. When eFootball cannot meet the safety threshold, strong
+    VFootball legs can form the ticket on their own. Every leg remains subject to
+    the existing Builder eligibility, fresh-price, EV, uncertainty, quality and
+    correlation gates.
+    """
+    if min_odds is None:
+        min_odds=active_min_combined_odds()
+    eligible=[
+        x for x in pool
+        if str(x.get("qualification_lane") or "") in {
+            "vfootball_exact_evidence_value","efootball_exact_evidence_value"
+        }
+        and float(x.get("model_probability") or 0.0)>=MIN_SAFE_LEG_MODEL_PROBABILITY
+        and float(x.get("expected_value") or 0.0)>=0.0
+    ]
+    eligible=sorted(eligible,key=lambda x:(
+        -float(x.get("model_probability") or 0.0),
+        -float(x.get("evidence_score") or 0.0),
+        -float(x.get("model_edge") or 0.0),
+        -float(x.get("bookmaker_odds") or 1.0),
+        _kickoff_timestamp(x) if _kickoff_timestamp(x) is not None else float("inf"),
+    ))[:120]
+
+    import itertools
+    options=[]
+    considered=0
+    for shape in (2,3,4):
+        required=min_model_probability_for_leg_count(shape)
+        for rows in itertools.combinations(eligible,shape):
+            if any(float(x.get("model_probability") or 0.0)<required for x in rows):
+                continue
+            event_ids=[str(x.get("event_id") or "") for x in rows if x.get("event_id")]
+            if len(event_ids)!=len(set(event_ids)):
+                continue
+            participants=[p for row in rows for p in _participants(row)]
+            if len(participants)!=len(set(participants)):
+                continue
+            span=_batch_kickoff_span_minutes(rows)
+            if span>MIXED_RESEARCH_MAX_KICKOFF_SPAN_MINUTES:
+                continue
+            odds=math.prod(float(x.get("bookmaker_odds") or 1.0) for x in rows)
+            if odds<min_odds:
+                continue
+            metrics=_batch_metrics(list(rows))
+            avg_prob=float(metrics.get("avg_model_probability") or 0.0)
+            roi=(float(metrics.get("combined_model_probability") or 0.0)*odds)-1.0
+            if avg_prob<MIN_SAFE_LEG_MODEL_PROBABILITY or roi<RESULTS_FIRST_MIN_EXPECTED_ROI:
+                continue
+            preferred_share=sum(
+                1 for x in rows
+                if float(x.get("model_probability") or 0.0)>=PREFERRED_LEG_MODEL_PROBABILITY
+            )/shape
+            strong_count=sum(
+                1 for x in rows
+                if float(x.get("model_probability") or 0.0)>=PREFERRED_LEG_MODEL_PROBABILITY
+            )
+            considered+=1
+            options.append({
+                "rows":list(rows),
+                "metrics":metrics,
+                "odds":odds,
+                "span":span,
+                "roi":roi,
+                "score":(
+                    shape,
+                    min(float(x.get("model_probability") or 0.0) for x in rows),
+                    strong_count,
+                    preferred_share,
+                    avg_prob,
+                    float(metrics.get("combined_model_probability") or 0.0),
+                    float(metrics.get("avg_model_edge_percent") or 0.0),
+                    roi,
+                    odds,
+                )
+            })
+
+    options.sort(key=lambda o:o["score"],reverse=True)
+    selected=[]
+    used_events=set()
+    used_participants=set()
+    for option in options:
+        if len(selected)>=max_batches:
+            break
+        rows=option["rows"]
+        events={str(x.get("event_id") or "") for x in rows if x.get("event_id")}
+        participants={p for row in rows for p in _participants(row)}
+        if events & used_events or participants & used_participants:
+            continue
+        selected.append(option)
+        used_events.update(events)
+        used_participants.update(participants)
+
+    return selected,{
+        "eligible_legs":len(eligible),
+        "candidate_combinations":considered,
+        "batches_selected":len(selected),
+        "max_batches":max_batches,
+        "min_combined_odds":min_odds,
+        "min_per_leg_model_probability":MIN_SAFE_LEG_MODEL_PROBABILITY,
+        "preferred_per_leg_model_probability":PREFERRED_LEG_MODEL_PROBABILITY,
+        "batch_leg_counts":[len(x["rows"]) for x in selected],
+        "combined_odds":[round(float(x["odds"]),3) for x in selected],
+        "expected_rois":[round(float(x["roi"]),6) for x in selected],
+        "kickoff_spans":[round(float(x["span"]),1) for x in selected],
+        "products":[sorted({str(row.get("product") or "") for row in x["rows"]}) for x in selected],
+        "reason":None if selected else "no_high_confidence_combination_reached_all_gates"
+    }
+
     return selected_batches,{
         "vfootball_pool":len(vpool),
         "efootball_pool":len(epool),
@@ -2058,6 +2169,73 @@ def build_value_batches(candidates):
                 "capacity":_batch_capacity_diagnostic(mixed_pool),
                 "construction_shape_diagnostics":construction_shapes,
                 "ranking_metric":"whole-ticket model probability first, leg strength second, exact current edge third, odds as hard reachability constraint; batches disjoint"
+            }
+
+        # High-confidence adaptive lane: when the VFootball/eFootball mixed
+        # composition cannot be formed, use any 2–4 legs that individually clear
+        # the 80% safety floor. This avoids forcing a weak eFootball leg merely
+        # to preserve a sport mix.
+        high_options,high_diag=_construct_high_confidence_value_batches(
+            mixed_pool,
+            max_batches=min(4,MAX_BATCHES),
+            max_legs=4,
+            min_odds=active_min_combined_odds()
+        )
+        if high_options:
+            high_batches=[]
+            high_options.sort(
+                key=lambda option:min(
+                    _kickoff_timestamp(x) for x in option["rows"]
+                    if _kickoff_timestamp(x) is not None
+                ) if any(_kickoff_timestamp(x) is not None for x in option["rows"]) else float("inf")
+            )
+            for idx,option in enumerate(high_options,1):
+                rows=sorted(
+                    option["rows"],
+                    key=lambda x:(_kickoff_timestamp(x) if _kickoff_timestamp(x) is not None else float("inf"))
+                )
+                metrics=option["metrics"]
+                odds=float(option["odds"])
+                high_batches.append({
+                    "batch_id":f"BATCH-{idx:02d}",
+                    "label":f"BATCH-{idx:02d} · High-Confidence Model Rating {metrics['model_rating']:.1f}/100",
+                    "rank_pending":False,
+                    "rank":idx,
+                    "legs":rows,
+                    "leg_count":len(rows),
+                    "combined_odds":round(odds,3),
+                    "combined_model_rating":metrics["model_rating"],
+                    "combined_model_probability":metrics["combined_model_probability"],
+                    "leg_strength_rating":metrics["leg_strength_rating"],
+                    "avg_model_probability":metrics["avg_model_probability"],
+                    "avg_model_edge_percent":metrics["avg_model_edge_percent"],
+                    "products":sorted({str(x.get("product") or "") for x in rows if x.get("product")}),
+                    "primary_lane":"high_confidence_research",
+                    "paper_only":True,
+                    "real_money_execution":False,
+                    "correlation_policy":"batches disjoint by event and participant; every leg clears the 80% safety floor and 90% is preferred",
+                    "construction_objective":"prefer the largest safe 2–4-leg construction without adding a weak leg for odds"
+                })
+            return high_batches,built,{
+                "batch_count":len(high_batches),
+                "max_batches":min(4,MAX_BATCHES),
+                "disjoint":True,
+                "min_combined_odds":active_min_combined_odds(),
+                "target_combined_odds":TARGET_COMBINED_ODDS,
+                "construction_priority":"high_confidence_adaptive_research",
+                "priority_product":"mixed",
+                "max_legs":4,
+                "adaptive_leg_counts":[2,3,4],
+                "per_leg_min_model_probability":LEG_COUNT_MIN_MODEL_PROBABILITY,
+                "preferred_per_leg_model_probability":PREFERRED_LEG_MODEL_PROBABILITY,
+                "mixed_diagnostics":mixed_diag,
+                "high_confidence_diagnostics":high_diag,
+                "used_unique_events":len({str(x.get("event_id") or "") for b in high_batches for x in b["legs"] if x.get("event_id")}),
+                "eligible_results_first_legs":len(eligible_results),
+                "mixed_pool_eligible_legs":len(mixed_pool),
+                "capacity":_batch_capacity_diagnostic(mixed_pool),
+                "construction_shape_diagnostics":construction_shapes,
+                "ranking_metric":"largest safe leg count first; per-leg model probability and 90%+ strength next; odds satisfy the active floor"
             }
 
         # Secondary value lane: only runs after both proven vFootball and the
