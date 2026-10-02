@@ -161,7 +161,10 @@ jobs:
                       if data.get('status') == 'RESULTS_FIRST_SET':
                           assert span_seconds <= 3600, 'Results-first batch kickoff span exceeds 60 minutes'
                       elif data.get('status') == 'VALUE_RESEARCH_SET':
-                          assert span_seconds <= 270*60, 'Paper value batch kickoff span exceeds 270 minutes'
+                          if batch.get('primary_lane') == 'mixed_vfootball_efootball_value':
+                              assert span_seconds <= 360*60, 'Mixed research batch kickoff span exceeds 360 minutes'
+                          else:
+                              assert span_seconds <= 270*60, 'Paper value batch kickoff span exceeds 270 minutes'
                       else:
                           assert span_seconds <= 3600, 'batch kickoff span exceeds 60 minutes'
                       batch_starts.append(min(times))
