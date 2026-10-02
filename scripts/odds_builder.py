@@ -31,8 +31,8 @@ MAX_UNCERTAINTY=0.22
 MIN_DATA_QUALITY=0.70
 MIN_LEGS,MAX_LEGS=1,16
 # Accuracy-first ticket construction: 2.70+ is the active floor.
-# 2.80+ is a preferred target, not a hard gate yet. After 10 settled wins
-# at 2.80+ combined odds, the hard floor automatically rises to 2.80.
+# 2.80+ is a preferred target until the current 2–4-leg construction family
+# earns 10 settled wins at 2.80+ combined odds; old larger accumulators do not count.
 # 4.00+ remains a stretch target only when accuracy is preserved.
 TARGET_COMBINED_ODDS=2.80
 STRETCH_COMBINED_ODDS=4.0
@@ -86,8 +86,14 @@ def combined_odds_gate_state():
             if str(ticket.get("status") or "").upper() != "WON":
                 continue
             try:
+                leg_count=int(ticket.get("leg_count") or len(ticket.get("legs") or []))
                 odds=float(ticket.get("combined_odds") or 0.0)
             except (TypeError,ValueError):
+                continue
+            # The current Builder is capped at 2–4 legs. Historical 11–16-leg
+            # wins cannot be used to promote the 2.80 hard floor for a new
+            # construction family whose own evidence has not earned it.
+            if leg_count not in RESULTS_FIRST_CONSTRUCTION_LEG_COUNTS:
                 continue
             if odds >= HIGH_ODDS_TARGET:
                 wins+=1
