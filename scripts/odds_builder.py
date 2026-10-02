@@ -1838,10 +1838,8 @@ def _construct_mixed_virtual_efootball_batches(pool, max_batches=4, max_legs=MIX
 def _construct_high_confidence_value_batches(pool,max_batches=4,max_legs=4,min_odds=None):
     """Build several disjoint 2–4 leg research batches from >=80% exact-evidence legs.
 
-    No sport is forced. When eFootball cannot meet the safety threshold, strong
-    VFootball legs can form the ticket on their own. Every leg remains subject to
-    the existing Builder eligibility, fresh-price, EV, uncertainty, quality and
-    correlation gates.
+    Uses a bounded beam/frontier rather than exhaustive combinations, so a large
+    live candidate pool cannot make the Builder refresh unresponsive.
     """
     if min_odds is None:
         min_odds=active_min_combined_odds()
@@ -1853,59 +1851,64 @@ def _construct_high_confidence_value_batches(pool,max_batches=4,max_legs=4,min_o
         and float(x.get("model_probability") or 0.0)>=MIN_SAFE_LEG_MODEL_PROBABILITY
         and float(x.get("expected_value") or 0.0)>=0.0
     ]
-    eligible=sorted(eligible,key=lambda x:(
+    # Keep enough diversity for four disjoint batches while bounding the search.
+    model_rank=sorted(eligible,key=lambda x:(
         -float(x.get("model_probability") or 0.0),
         -float(x.get("evidence_score") or 0.0),
         -float(x.get("model_edge") or 0.0),
-        -float(x.get("bookmaker_odds") or 1.0),
         _kickoff_timestamp(x) if _kickoff_timestamp(x) is not None else float("inf"),
-    ))[:120]
+    ))
+    odds_rank=sorted(eligible,key=lambda x:(
+        -float(x.get("bookmaker_odds") or 1.0),
+        -float(x.get("model_probability") or 0.0),
+        -float(x.get("model_edge") or 0.0),
+    ))
+    early_rank=sorted(eligible,key=lambda x:(
+        _kickoff_timestamp(x) if _kickoff_timestamp(x) is not None else float("inf"),
+        -float(x.get("model_probability") or 0.0),
+        -float(x.get("bookmaker_odds") or 1.0),
+    ))
+    pool_cap=36
+    bounded=[]
+    for row in model_rank[:20]+odds_rank[:12]+early_rank[:12]:
+        if row not in bounded:
+            bounded.append(row)
+        if len(bounded)>=pool_cap:
+            break
+    eligible=bounded
 
     import itertools
-    options=[]
-    considered=0
+    states=[()]
     for shape in (2,3,4):
         required=min_model_probability_for_leg_count(shape)
-        for rows in itertools.combinations(eligible,shape):
-            if any(float(x.get("model_probability") or 0.0)<required for x in rows):
+        expanded=[]
+        for combo in itertools.combinations(eligible,shape):
+            if any(float(x.get("model_probability") or 0.0)<required for x in combo):
                 continue
-            event_ids=[str(x.get("event_id") or "") for x in rows if x.get("event_id")]
+            event_ids=[str(x.get("event_id") or "") for x in combo if x.get("event_id")]
             if len(event_ids)!=len(set(event_ids)):
                 continue
-            participants=[p for row in rows for p in _participants(row)]
+            participants=[p for row in combo for p in _participants(row)]
             if len(participants)!=len(set(participants)):
                 continue
-            span=_batch_kickoff_span_minutes(rows)
+            span=_batch_kickoff_span_minutes(combo)
             if span>MIXED_RESEARCH_MAX_KICKOFF_SPAN_MINUTES:
                 continue
-            odds=math.prod(float(x.get("bookmaker_odds") or 1.0) for x in rows)
+            odds=math.prod(float(x.get("bookmaker_odds") or 1.0) for x in combo)
             if odds<min_odds:
                 continue
-            metrics=_batch_metrics(list(rows))
+            metrics=_batch_metrics(list(combo))
             avg_prob=float(metrics.get("avg_model_probability") or 0.0)
             roi=(float(metrics.get("combined_model_probability") or 0.0)*odds)-1.0
             if avg_prob<MIN_SAFE_LEG_MODEL_PROBABILITY or roi<RESULTS_FIRST_MIN_EXPECTED_ROI:
                 continue
-            preferred_share=sum(
-                1 for x in rows
-                if float(x.get("model_probability") or 0.0)>=PREFERRED_LEG_MODEL_PROBABILITY
-            )/shape
-            strong_count=sum(
-                1 for x in rows
-                if float(x.get("model_probability") or 0.0)>=PREFERRED_LEG_MODEL_PROBABILITY
-            )
-            considered+=1
-            options.append({
-                "rows":list(rows),
-                "metrics":metrics,
-                "odds":odds,
-                "span":span,
-                "roi":roi,
+            strong_count=sum(1 for x in combo if float(x.get("model_probability") or 0.0)>=PREFERRED_LEG_MODEL_PROBABILITY)
+            expanded.append({
+                "rows":list(combo),"metrics":metrics,"odds":odds,"span":span,"roi":roi,
                 "score":(
                     shape,
-                    min(float(x.get("model_probability") or 0.0) for x in rows),
+                    min(float(x.get("model_probability") or 0.0) for x in combo),
                     strong_count,
-                    preferred_share,
                     avg_prob,
                     float(metrics.get("combined_model_probability") or 0.0),
                     float(metrics.get("avg_model_edge_percent") or 0.0),
@@ -1913,8 +1916,10 @@ def _construct_high_confidence_value_batches(pool,max_batches=4,max_legs=4,min_o
                     odds,
                 )
             })
+        expanded.sort(key=lambda o:o["score"],reverse=True)
+        states=expanded[:400]
+    options=states
 
-    options.sort(key=lambda o:o["score"],reverse=True)
     selected=[]
     used_events=set()
     used_participants=set()
@@ -1932,7 +1937,7 @@ def _construct_high_confidence_value_batches(pool,max_batches=4,max_legs=4,min_o
 
     return selected,{
         "eligible_legs":len(eligible),
-        "candidate_combinations":considered,
+        "candidate_combinations":len(options),
         "batches_selected":len(selected),
         "max_batches":max_batches,
         "min_combined_odds":min_odds,
@@ -1944,25 +1949,6 @@ def _construct_high_confidence_value_batches(pool,max_batches=4,max_legs=4,min_o
         "kickoff_spans":[round(float(x["span"]),1) for x in selected],
         "products":[sorted({str(row.get("product") or "") for row in x["rows"]}) for x in selected],
         "reason":None if selected else "no_high_confidence_combination_reached_all_gates"
-    }
-
-    return selected_batches,{
-        "vfootball_pool":len(vpool),
-        "efootball_pool":len(epool),
-        "candidate_combinations":considered,
-        "batches_selected":len(selected_batches),
-        "max_batches":max_batches,
-        "min_combined_odds":min_odds,
-        "disjoint":True,
-        "batch_leg_counts":[len(x["rows"]) for x in selected_batches],
-        "combined_odds":[round(float(x["odds"]),3) for x in selected_batches],
-        "expected_rois":[round(float(x["roi"]),6) for x in selected_batches],
-        "kickoff_spans":[round(float(x["span"]),1) for x in selected_batches],
-        "composition":[
-            ["vfootball"]+[str(row.get("product") or "") for row in option["rows"] if str(row.get("product") or "")!="vfootball"]
-            for option in selected_batches
-        ],
-        "reason":None if selected_batches else "no_mixed_combination_reached_all_gates"
     }
 
 def build_value_batches(candidates):
