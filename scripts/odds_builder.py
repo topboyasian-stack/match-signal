@@ -1835,6 +1835,25 @@ def _construct_mixed_virtual_efootball_batches(pool, max_batches=4, max_legs=MIX
         used_events.update(event_ids)
         used_participants.update(participants)
 
+    return selected_batches,{
+        "vfootball_pool":len(vpool),
+        "efootball_pool":len(epool),
+        "candidate_combinations":considered,
+        "batches_selected":len(selected_batches),
+        "max_batches":max_batches,
+        "min_combined_odds":min_odds,
+        "disjoint":True,
+        "batch_leg_counts":[len(x["rows"]) for x in selected_batches],
+        "combined_odds":[round(float(x["odds"]),3) for x in selected_batches],
+        "expected_rois":[round(float(x["roi"]),6) for x in selected_batches],
+        "kickoff_spans":[round(float(x["span"]),1) for x in selected_batches],
+        "composition":[
+            ["vfootball"]+[str(row.get("product") or "") for row in option["rows"] if str(row.get("product") or "")!="vfootball"]
+            for option in selected_batches
+        ],
+        "reason":None if selected_batches else "no_mixed_combination_reached_all_gates"
+    }
+
 def _construct_high_confidence_value_batches(pool,max_batches=4,max_legs=4,min_odds=None):
     """Build several disjoint 2–4 leg research batches from >=80% exact-evidence legs.
 
