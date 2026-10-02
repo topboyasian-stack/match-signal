@@ -75,6 +75,13 @@ MODEL_FIRST_MAX_KICKOFF_SPAN_MINUTES=270
 # the 70% average frontier while retaining positive single-leg EV, live-price,
 # freshness, correlation, and whole-ticket ROI gates.
 MODEL_FIRST_MIN_AVG_PROBABILITY=0.68
+# Mixed research lane: preserve a small VFootball component only when its own
+# exact-line/value gates pass, then combine it with one or two qualified
+# eFootball value legs. This does not promote the batch to Results-first.
+MIXED_RESEARCH_MAX_LEGS=3
+MIXED_RESEARCH_MIN_AVG_PROBABILITY=0.68
+MIXED_RESEARCH_MIN_VFOOTBALL_LEGS=1
+MIXED_RESEARCH_MIN_EFOOTBALL_LEGS=1
 _COMBINED_ODDS_GATE_CACHE=None
 
 def combined_odds_gate_state():
@@ -1107,6 +1114,33 @@ def virtual_candidates(now):
                     y["qualification_lane"]="efootball_exact_evidence_value"
                     out.append(y)
                     continue
+
+                # VFootball may participate in the controlled mixed research lane
+                # when its own exact-line evidence and ticket-spoiler gates pass,
+                # even though the whole VFootball 2/3/4-leg construction family
+                # has not yet earned Results-first promotion. We do NOT reuse it
+                # in the pure fallback lane and we do NOT relax the 75% evidence
+                # threshold, live-price, edge, freshness, quality or uncertainty
+                # checks above.
+                if (
+                    product=="vfootball"
+                    and reason=="no_profitable_construction_shape"
+                ):
+                    diagnostics["evidence_value_candidates"]+=1
+                    diagnostics["reasons"]["vfootball_mixed_evidence_value_lane"]=diagnostics["reasons"].get("vfootball_mixed_evidence_value_lane",0)+1
+                    calibrated_probability=float(evidence.get("posterior_rate") or prob)
+                    y["probability"]=calibrated_probability
+                    y["builder_probability"]=calibrated_probability
+                    y["model"]="Exact-line evidence calibration · VFootball mixed research lane"
+                    y["recent_evidence"]=recent
+                    y["directional_evidence"]=evidence
+                    y["evidence_score"]=evidence["score"]
+                    y["ticket_performance"]=ticket_perf
+                    y["results_first"]=results_perf
+                    y["qualification_lane"]="vfootball_exact_evidence_value"
+                    out.append(y)
+                    continue
+
                 diagnostics["rejected_results_first"]+=1
                 diagnostics["reasons"][reason]=diagnostics["reasons"].get(reason,0)+1
                 continue
@@ -1654,6 +1688,121 @@ def _construct_results_first_batch(pool, max_legs=RESULTS_FIRST_MAX_LEGS):
             break
     return selected
 
+def _construct_mixed_virtual_efootball_batch(pool, max_legs=MIXED_RESEARCH_MAX_LEGS, min_odds=None):
+    """Build a controlled 1x VFootball + 1-2x eFootball research batch.
+
+    This lane is intentionally separate from Results-first. Every input leg has
+    already passed its own Builder eligibility/evidence gates; construction adds
+    only composition, correlation, kickoff-span, whole-ticket probability,
+    combined-odds, and expected-ROI constraints.
+    """
+    if min_odds is None:
+        min_odds=active_min_combined_odds()
+
+    vpool=[
+        x for x in pool
+        if str(x.get("product") or "")=="vfootball"
+        and str(x.get("qualification_lane") or "")=="vfootball_exact_evidence_value"
+        and float(x.get("model_probability") or 0.0)>=MIXED_RESEARCH_MIN_AVG_PROBABILITY
+        and float(x.get("expected_value") or 0.0)>=0.0
+    ]
+    epool=[
+        x for x in pool
+        if str(x.get("product") or "").startswith("efootball_")
+        and str(x.get("qualification_lane") or "")=="efootball_exact_evidence_value"
+        and float(x.get("model_probability") or 0.0)>=MIXED_RESEARCH_MIN_AVG_PROBABILITY
+        and float(x.get("expected_value") or 0.0)>=0.0
+    ]
+
+    # Bound enumeration while preserving the strongest candidates.
+    vpool=sorted(vpool,key=lambda x:(
+        -float(x.get("model_probability") or 0.0),
+        -float(x.get("evidence_score") or 0.0),
+        -float(x.get("model_edge") or 0.0),
+        -float(x.get("bookmaker_odds") or 1.0),
+    ))[:40]
+    epool=sorted(epool,key=lambda x:(
+        -float(x.get("model_probability") or 0.0),
+        -float(x.get("evidence_score") or 0.0),
+        -float(x.get("model_edge") or 0.0),
+        -float(x.get("bookmaker_odds") or 1.0),
+    ))[:60]
+
+    if not vpool or not epool:
+        return [], {
+            "vfootball_pool":len(vpool),
+            "efootball_pool":len(epool),
+            "candidate_combinations":0,
+            "reason":"missing_mixed_components"
+        }
+
+    import itertools
+    best=None
+    considered=0
+    for vleg in vpool:
+        for ecount in (1,2):
+            if ecount>=max_legs or len(epool)<ecount:
+                continue
+            for es in itertools.combinations(epool,ecount):
+                rows=[vleg,*es]
+                # Avoid duplicate events and participant reuse inside a ticket.
+                event_ids=[str(x.get("event_id") or "") for x in rows if x.get("event_id")]
+                if len(event_ids)!=len(set(event_ids)):
+                    continue
+                participants=[]
+                for row in rows:
+                    participants.extend(_participants(row))
+                if len(participants)!=len(set(participants)):
+                    continue
+
+                span=_batch_kickoff_span_minutes(rows)
+                if span>MODEL_FIRST_MAX_KICKOFF_SPAN_MINUTES:
+                    continue
+
+                odds=math.prod(float(x.get("bookmaker_odds") or 1.0) for x in rows)
+                if odds<min_odds:
+                    continue
+
+                metrics=_batch_metrics(rows)
+                avg_prob=float(metrics.get("avg_model_probability") or 0.0)
+                roi=(float(metrics.get("combined_model_probability") or 0.0)*odds)-1.0
+                if avg_prob<MIXED_RESEARCH_MIN_AVG_PROBABILITY or roi<RESULTS_FIRST_MIN_EXPECTED_ROI:
+                    continue
+
+                considered+=1
+                score=(
+                    float(metrics.get("combined_model_probability") or 0.0),
+                    -len(rows),
+                    float(metrics.get("avg_model_edge_percent") or 0.0),
+                    odds,
+                )
+                if best is None or score>best[0]:
+                    best=(score,rows,metrics,odds,span,roi)
+
+    if best is None:
+        return [], {
+            "vfootball_pool":len(vpool),
+            "efootball_pool":len(epool),
+            "candidate_combinations":considered,
+            "reason":"no_mixed_combination_reached_all_gates"
+        }
+
+    _score,rows,metrics,odds,span,roi=best
+    rows=sorted(rows,key=lambda x:(_kickoff_timestamp(x) if _kickoff_timestamp(x) is not None else float("inf")))
+    return rows, {
+        "vfootball_pool":len(vpool),
+        "efootball_pool":len(epool),
+        "candidate_combinations":considered,
+        "combined_odds":round(odds,3),
+        "kickoff_span_minutes":round(span,1),
+        "avg_model_probability":round(float(metrics.get("avg_model_probability") or 0.0),6),
+        "combined_model_probability":round(float(metrics.get("combined_model_probability") or 0.0),6),
+        "expected_roi":round(roi,6),
+        "leg_count":len(rows),
+        "composition":["vfootball"]+[str(x.get("product") or "") for x in rows if str(x.get("product") or "")!="vfootball"],
+    }
+
+
 def build_value_batches(candidates):
     """Build one results-first paper ticket using the best proven 2/3/4-leg shape.
 
@@ -1751,9 +1900,83 @@ def build_value_batches(candidates):
         })
 
     if not batches:
-        # Secondary value lane: only runs after the proven vFootball results-first
-        # lane cannot produce a valid ticket. Every input is still Builder-eligible
-        # with a fresh SportyBet price and >=2.5% current model edge.
+        # Controlled mixed research lane: when Results-first VFootball cannot
+        # qualify, allow exactly 1 VFootball evidence-value leg plus 1-2
+        # eFootball evidence-value legs. This is still research-only and does
+        # not promote the batch to settled Results-first evidence.
+        mixed_pool=[
+            x for x in eligible_all
+            if str(x.get("qualification_lane") or "") in {
+                "vfootball_exact_evidence_value","efootball_exact_evidence_value"
+            }
+        ]
+        mixed_batch,mixed_diag=_construct_mixed_virtual_efootball_batch(
+            mixed_pool,
+            max_legs=MIXED_RESEARCH_MAX_LEGS,
+            min_odds=active_min_combined_odds()
+        )
+        if len(mixed_batch)>=BATCH_MIN_LEGS:
+            mixed_metrics=_batch_metrics(mixed_batch)
+            mixed_combined=math.prod(float(x.get("bookmaker_odds") or 1.0) for x in mixed_batch)
+            mixed_roi=(float(mixed_metrics.get("combined_model_probability") or 0.0)*mixed_combined)-1.0
+            mixed_span=_batch_kickoff_span_minutes(mixed_batch)
+            mixed_sports={str(x.get("product") or "") for x in mixed_batch}
+            if (
+                mixed_span<=MODEL_FIRST_MAX_KICKOFF_SPAN_MINUTES
+                and float(mixed_metrics.get("avg_model_probability") or 0.0)>=MIXED_RESEARCH_MIN_AVG_PROBABILITY
+                and mixed_combined>=active_min_combined_odds()
+                and mixed_roi>=RESULTS_FIRST_MIN_EXPECTED_ROI
+                and "vfootball" in mixed_sports
+                and any(p.startswith("efootball_") for p in mixed_sports)
+            ):
+                batches.append({
+                    "batch_id":"BATCH-01",
+                    "label":f"BATCH-01 · Mixed Value Model Rating {mixed_metrics['model_rating']:.1f}/100",
+                    "rank_pending":False,
+                    "rank":1,
+                    "legs":mixed_batch,
+                    "leg_count":len(mixed_batch),
+                    "combined_odds":round(mixed_combined,3),
+                    "combined_model_rating":mixed_metrics["model_rating"],
+                    "combined_model_probability":mixed_metrics["combined_model_probability"],
+                    "leg_strength_rating":mixed_metrics["leg_strength_rating"],
+                    "avg_model_probability":mixed_metrics["avg_model_probability"],
+                    "avg_model_edge_percent":mixed_metrics["avg_model_edge_percent"],
+                    "products":sorted(mixed_sports),
+                    "primary_lane":"mixed_vfootball_efootball_value",
+                    "paper_only":True,
+                    "real_money_execution":False,
+                    "correlation_policy":"same-event and participant reuse prevented; 1 VFootball + 1-2 eFootball evidence-value legs only",
+                    "construction_objective":"maximize whole-ticket model probability with a controlled VFootball/eFootball mix; every leg remains independently Builder-eligible"
+                })
+                return batches,built,{
+                    "batch_count":1,
+                    "max_batches":1,
+                    "disjoint":True,
+                    "min_combined_odds":active_min_combined_odds(),
+                    "target_combined_odds":TARGET_COMBINED_ODDS,
+                    "accuracy_preservation_ratio":ACCURACY_PRESERVATION_RATIO,
+                    "construction_priority":"mixed_vfootball_efootball_research",
+                    "priority_product":"mixed",
+                    "max_legs":MIXED_RESEARCH_MAX_LEGS,
+                    "construction_shapes_considered":[2,3],
+                    "promoted_construction_leg_count":None,
+                    "max_kickoff_span_minutes":MAX_BATCH_KICKOFF_SPAN_MINUTES,
+                    "builder_horizon_minutes":MAX_BUILDER_HORIZON_MINUTES,
+                    "used_unique_events":len({str(x.get("event_id") or "") for x in mixed_batch if x.get("event_id")}),
+                    "eligible_results_first_legs":len(eligible_results),
+                    "mixed_pool_eligible_legs":len(mixed_pool),
+                    "mixed_diagnostics":mixed_diag,
+                    "secondary_pool_eligible_legs":0,
+                    "capacity":_batch_capacity_diagnostic(mixed_pool),
+                    "construction_shape_diagnostics":construction_shapes,
+                    "ranking_metric":"whole-ticket model probability first, fewer legs second, exact current edge third, odds as hard reachability constraint"
+                }
+
+        # Secondary value lane: only runs after both proven vFootball and the
+        # controlled mixed VFootball/eFootball research lane cannot produce a valid
+        # ticket. Every input is still Builder-eligible with a fresh SportyBet price
+        # and >=2.5% current model edge.
         secondary_pool=[
             x for x in eligible_all
             if str(x.get("product") or "")!="vfootball"
@@ -1850,7 +2073,8 @@ def build_value_batches(candidates):
         "capacity":_batch_capacity_diagnostic(eligible_results),
         "ranking_metric":"settled exact-line/side hit rate first; calibrated probability second; odds only tie-breaker",
         "construction_shape_diagnostics":construction_shapes,
-        "secondary_pool_eligible_legs":sum(1 for x in eligible_all if str(x.get("product") or "")!="vfootball" and (str(x.get("sport") or "") in {"football","tennis"} or str(x.get("product") or "").startswith("efootball_")))
+        "secondary_pool_eligible_legs":sum(1 for x in eligible_all if str(x.get("product") or "")!="vfootball" and (str(x.get("sport") or "") in {"football","tennis"} or str(x.get("product") or "").startswith("efootball_"))),
+        "mixed_pool_eligible_legs":sum(1 for x in eligible_all if str(x.get("qualification_lane") or "") in {"vfootball_exact_evidence_value","efootball_exact_evidence_value"})
     }
 
 
@@ -2055,7 +2279,7 @@ def main():
         "market_price_combined_odds":round(combined,3) if selected else None,
         "sportybet_booking":booking_info,
         "theme":{"name":"Midnight Graphite / Electric Cyan / Signal Green","accent":"#28D7E8","positive":"#35D07F","background":"#080D14"},
-        "notes":["Results-first qualifies only from settled exact-line/side performance plus the existing live-price, freshness, data-quality and model-evidence gates.","Zero batches are now diagnosable: capacity reports whether 4.00 is mathematically reachable under the existing leg/correlation rules; no per-leg evidence gate is weakened.","best_available_legs is informational when no batch exists and is not a qualified accumulator.","Missing or stale SportyBet prices produce NO_BET/REJECTED.","Model fair odds never overwrite bookmaker odds.","The Builder evaluates 2-, 3-, and 4-leg constructions. The vFootball Results-first lane is promoted only when its own settled-ticket sample, loss rate, combined odds, empirical ROI, exact-line evidence, and current expected ROI pass.","When the proven Results-first lane cannot qualify, the model-first value fallback may use independently Builder-eligible football, tennis, and exact-evidence eFootball legs; every included leg must also have non-negative single-leg raw expected value. The active combined-odds floor is 2.70x until 10 settled wins at 2.80x+ are recorded; 2.80x is a preferred target before then, not an eligibility gate. The fallback still requires current expected ROI >=2%, fresh SportyBet pricing, and the same correlation controls.","The ticket remains paper-only and legs remain capped at 4 in the active construction lanes.","The proven Results-first lane keeps a 60-minute kickoff span. The model-first paper value lane may span up to 270 minutes only when its whole-ticket probability and expected ROI gates still pass; this is explicitly research-only, not promoted as settled Results-first evidence.","Near-term Builder horizon is 720 minutes; price freshness remains capped at 900 seconds so extending the scan window does not permit stale odds.","Builder refreshes every 15 minutes and after relevant upstream workflows, so candidate prices are repeatedly revalidated before kickoff."]
+        "notes":["Results-first qualifies only from settled exact-line/side performance plus the existing live-price, freshness, data-quality and model-evidence gates.","Zero batches are now diagnosable: capacity reports whether 4.00 is mathematically reachable under the existing leg/correlation rules; no per-leg evidence gate is weakened.","best_available_legs is informational when no batch exists and is not a qualified accumulator.","Missing or stale SportyBet prices produce NO_BET/REJECTED.","Model fair odds never overwrite bookmaker odds.","The Builder evaluates 2-, 3-, and 4-leg constructions. The vFootball Results-first lane is promoted only when its own settled-ticket sample, loss rate, combined odds, empirical ROI, exact-line evidence, and current expected ROI pass.","When the proven Results-first lane cannot qualify, the controlled mixed research lane may use exactly 1 VFootball exact-evidence leg plus 1-2 exact-evidence eFootball legs; every included leg must remain independently Builder-eligible and have non-negative single-leg raw expected value. Only after that mixed lane fails does the broader football/tennis/eFootball value fallback run." The active combined-odds floor is 2.70x until 10 settled wins at 2.80x+ are recorded; 2.80x is a preferred target before then, not an eligibility gate. The fallback still requires current expected ROI >=2%, fresh SportyBet pricing, and the same correlation controls.","The ticket remains paper-only and legs remain capped at 4 in the active construction lanes.","The proven Results-first lane keeps a 60-minute kickoff span. The model-first paper value lane may span up to 270 minutes only when its whole-ticket probability and expected ROI gates still pass; this is explicitly research-only, not promoted as settled Results-first evidence.","Near-term Builder horizon is 720 minutes; price freshness remains capped at 900 seconds so extending the scan window does not permit stale odds.","Builder refreshes every 15 minutes and after relevant upstream workflows, so candidate prices are repeatedly revalidated before kickoff."]
     }
     OUTPUT.write_text(json.dumps(result,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
     print(json.dumps(result,indent=2))
