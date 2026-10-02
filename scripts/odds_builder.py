@@ -82,6 +82,7 @@ MIXED_RESEARCH_MAX_LEGS=3
 MIXED_RESEARCH_MIN_AVG_PROBABILITY=0.68
 MIXED_RESEARCH_MIN_VFOOTBALL_LEGS=1
 MIXED_RESEARCH_MIN_EFOOTBALL_LEGS=1
+MIXED_RESEARCH_MAX_KICKOFF_SPAN_MINUTES=360
 _COMBINED_ODDS_GATE_CACHE=None
 
 def combined_odds_gate_state():
@@ -1748,7 +1749,7 @@ def _construct_mixed_virtual_efootball_batches(pool, max_batches=4, max_legs=MIX
             if len(participants)!=len(set(participants)):
                 continue
             span=_batch_kickoff_span_minutes(rows)
-            if span>MODEL_FIRST_MAX_KICKOFF_SPAN_MINUTES:
+            if span>MIXED_RESEARCH_MAX_KICKOFF_SPAN_MINUTES:
                 continue
             odds=math.prod(float(x.get("bookmaker_odds") or 1.0) for x in rows)
             if odds<min_odds:
@@ -1782,7 +1783,7 @@ def _construct_mixed_virtual_efootball_batches(pool, max_batches=4, max_legs=MIX
             if len(participants)!=len(set(participants)):
                 continue
             span=_batch_kickoff_span_minutes(rows)
-            if span>MODEL_FIRST_MAX_KICKOFF_SPAN_MINUTES:
+            if span>MIXED_RESEARCH_MAX_KICKOFF_SPAN_MINUTES:
                 continue
             odds=math.prod(float(x.get("bookmaker_odds") or 1.0) for x in rows)
             if odds<min_odds:
@@ -1905,7 +1906,7 @@ def build_value_batches(candidates):
                 "max_legs":RESULTS_FIRST_MAX_LEGS,
                 "construction_shapes_considered":list(RESULTS_FIRST_CONSTRUCTION_LEG_COUNTS),
                 "promoted_construction_leg_count":promoted_shape,
-                "max_kickoff_span_minutes":MAX_BATCH_KICKOFF_SPAN_MINUTES,
+                "max_kickoff_span_minutes":MIXED_RESEARCH_MAX_KICKOFF_SPAN_MINUTES,
                 "builder_horizon_minutes":MAX_BUILDER_HORIZON_MINUTES,
                 "used_unique_events":0,
                 "eligible_results_first_legs":len(eligible_results),
@@ -2005,6 +2006,7 @@ def build_value_batches(candidates):
                 "eligible_results_first_legs":len(eligible_results),
                 "mixed_pool_eligible_legs":len(mixed_pool),
                 "mixed_diagnostics":mixed_diag,
+                "mixed_max_kickoff_span_minutes":MIXED_RESEARCH_MAX_KICKOFF_SPAN_MINUTES,
                 "secondary_pool_eligible_legs":0,
                 "capacity":_batch_capacity_diagnostic(mixed_pool),
                 "construction_shape_diagnostics":construction_shapes,
@@ -2112,7 +2114,8 @@ def build_value_batches(candidates):
         "ranking_metric":"settled exact-line/side hit rate first; calibrated probability second; odds only tie-breaker",
         "construction_shape_diagnostics":construction_shapes,
         "secondary_pool_eligible_legs":sum(1 for x in eligible_all if str(x.get("product") or "")!="vfootball" and (str(x.get("sport") or "") in {"football","tennis"} or str(x.get("product") or "").startswith("efootball_"))),
-        "mixed_pool_eligible_legs":sum(1 for x in eligible_all if str(x.get("qualification_lane") or "") in {"vfootball_exact_evidence_value","efootball_exact_evidence_value"})
+        "mixed_pool_eligible_legs":sum(1 for x in eligible_all if str(x.get("qualification_lane") or "") in {"vfootball_exact_evidence_value","efootball_exact_evidence_value"}),
+        "mixed_max_kickoff_span_minutes":MIXED_RESEARCH_MAX_KICKOFF_SPAN_MINUTES
     }
 
 
