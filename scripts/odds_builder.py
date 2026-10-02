@@ -69,7 +69,10 @@ MAX_BATCHES=6
 MAX_BUILDER_HORIZON_MINUTES=720
 MAX_BATCH_KICKOFF_SPAN_MINUTES=60
 MODEL_FIRST_MAX_KICKOFF_SPAN_MINUTES=270
-MODEL_FIRST_MIN_AVG_PROBABILITY=0.70
+# Controlled research-only fallback: allow strong exact-value legs just below
+# the 70% average frontier while retaining positive single-leg EV, live-price,
+# freshness, correlation, and whole-ticket ROI gates.
+MODEL_FIRST_MIN_AVG_PROBABILITY=0.68
 _COMBINED_ODDS_GATE_CACHE=None
 
 def combined_odds_gate_state():
