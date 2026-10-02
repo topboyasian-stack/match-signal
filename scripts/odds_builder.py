@@ -1954,7 +1954,7 @@ def main():
         rejection_counts[leg_status]=rejection_counts.get(leg_status,0)+1
     result={
         "generated_at":now.isoformat(),"engine_version":"V6.1-RESEARCH-GATED",
-        "mode":"PAPER_ONLY","target_legs":f"accuracy-first; {odds_gate[\"floor\"]:.2f}+ active floor, {TARGET_COMBINED_ODDS:.2f}+ preferred target, and {STRETCH_COMBINED_ODDS:.2f}+ stretch target","sports_supported":["football","tennis","virtual"],
+        "mode":"PAPER_ONLY","target_legs":f"accuracy-first; {odds_gate['floor']:.2f}+ active floor, {TARGET_COMBINED_ODDS:.2f}+ preferred target, and {STRETCH_COMBINED_ODDS:.2f}+ stretch target","sports_supported":["football","tennis","virtual"],
         "research_gate":{
             "selection_gate_status":gate_status,
             "combined_odds_gate":odds_gate,
