@@ -1368,6 +1368,7 @@ def make_leg(x):
         "source":x.get("model"),"market_source":x.get("market_source") or x.get("bookmaker_source"),
         "recent_evidence":x.get("recent_evidence"),
         "results_first":x.get("results_first"),
+        "qualification_lane":x.get("qualification_lane"),
         "market_odds_timestamp":x.get("odds_timestamp") or x.get("market_odds_timestamp"),
         "sportybet_event_id":x.get("sportybet_event_id") or x.get("event_id"),
         "sportybet_market_id":x.get("sportybet_market_id"),
