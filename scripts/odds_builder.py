@@ -1705,14 +1705,14 @@ def _construct_mixed_virtual_efootball_batches(pool, max_batches=4, max_legs=MIX
         x for x in pool
         if str(x.get("product") or "")=="vfootball"
         and str(x.get("qualification_lane") or "")=="vfootball_exact_evidence_value"
-        and float(x.get("model_probability") or 0.0)>=MIXED_RESEARCH_MIN_AVG_PROBABILITY
+        and float(x.get("model_probability") or 0.0)>=VIRTUAL_MIN_PROB
         and float(x.get("expected_value") or 0.0)>=0.0
     ]
     epool=[
         x for x in pool
         if str(x.get("product") or "").startswith("efootball_")
         and str(x.get("qualification_lane") or "")=="efootball_exact_evidence_value"
-        and float(x.get("model_probability") or 0.0)>=MIXED_RESEARCH_MIN_AVG_PROBABILITY
+        and float(x.get("model_probability") or 0.0)>=VIRTUAL_MIN_PROB
         and float(x.get("expected_value") or 0.0)>=0.0
     ]
 
@@ -1947,6 +1947,21 @@ def build_value_batches(candidates):
                 "vfootball_exact_evidence_value","efootball_exact_evidence_value"
             }
         ]
+        mixed_diag={
+            "vfootball_pool":0,
+            "efootball_pool":0,
+            "candidate_combinations":0,
+            "batches_selected":0,
+            "max_batches":min(4,MAX_BATCHES),
+            "min_combined_odds":active_min_combined_odds(),
+            "disjoint":True,
+            "batch_leg_counts":[],
+            "combined_odds":[],
+            "expected_rois":[],
+            "kickoff_spans":[],
+            "composition":[],
+            "reason":"not_run"
+        }
         mixed_pool=[
             x for x in eligible_all
             if str(x.get("qualification_lane") or "") in {
@@ -2115,7 +2130,8 @@ def build_value_batches(candidates):
         "construction_shape_diagnostics":construction_shapes,
         "secondary_pool_eligible_legs":sum(1 for x in eligible_all if str(x.get("product") or "")!="vfootball" and (str(x.get("sport") or "") in {"football","tennis"} or str(x.get("product") or "").startswith("efootball_"))),
         "mixed_pool_eligible_legs":sum(1 for x in eligible_all if str(x.get("qualification_lane") or "") in {"vfootball_exact_evidence_value","efootball_exact_evidence_value"}),
-        "mixed_max_kickoff_span_minutes":MIXED_RESEARCH_MAX_KICKOFF_SPAN_MINUTES
+        "mixed_max_kickoff_span_minutes":MIXED_RESEARCH_MAX_KICKOFF_SPAN_MINUTES,
+        "mixed_diagnostics":mixed_diag
     }
 
 
