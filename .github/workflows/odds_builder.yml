@@ -131,6 +131,7 @@ jobs:
                   assert 2 <= int(batch.get('leg_count', len(batch.get('legs', [])))) <= 3
           seen_batch_ids = set()
           seen_event_ids = set()
+          seen_participants = set()
           for batch in batches:
               assert batch.get('batch_id') not in seen_batch_ids
               seen_batch_ids.add(batch.get('batch_id'))
@@ -143,8 +144,22 @@ jobs:
               assert float(batch.get('combined_model_rating', 0)) >= 0
               leg_ids = [str(x.get('event_id')) for x in batch.get('legs', [])]
               assert len(leg_ids) == len(set(leg_ids)), 'duplicate event inside batch'
-              assert not (seen_event_ids & set(leg_ids)), 'batches must be disjoint'
+              assert not (seen_event_ids & set(leg_ids)), 'batches must be disjoint by event'
               seen_event_ids.update(leg_ids)
+              import re
+              batch_participants=set()
+              for leg in batch.get('legs', []):
+                  raw = leg.get('participant_1') or leg.get('player_1') or leg.get('team_1')
+                  raw2 = leg.get('participant_2') or leg.get('player_2') or leg.get('team_2')
+                  if not raw or not raw2:
+                      parts = [p.strip() for p in re.split(r"\s+vs\s+", str(leg.get('match') or ''), flags=re.I) if p.strip()]
+                      raw = parts[0] if len(parts) > 0 else raw
+                      raw2 = parts[1] if len(parts) > 1 else raw2
+                  for value in (raw, raw2):
+                      if value:
+                          batch_participants.add(re.sub(r"[^a-z0-9]+"," ",str(value).lower()).strip())
+              assert not (seen_participants & batch_participants), 'batches must be disjoint by participant'
+              seen_participants.update(batch_participants)
           if batches:
               # Batches are displayed chronologically. Model rating remains a
               # leg-quality metric, not the display sort key.
