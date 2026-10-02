@@ -1584,7 +1584,11 @@ def _construct_model_first_batch(pool, max_legs=MAX_LEGS, min_odds=MIN_COMBINED_
         merged={tuple(id(x) for x in s[0]):s for s in by_model+by_trade}
         states=list(merged.values())[:1800]
         candidates.extend([s[0] for s in states if s[4]>=math.log(min_odds)])
-    valid=[rows for rows in candidates if rows and math.prod(float(y.get("bookmaker_odds") or 1.0) for y in rows)>=min_odds]
+    # The public Builder contract is a 2–4-leg accumulator. A single high-odds leg
+    # can satisfy the numeric odds floor by itself (for example 2.80x), but that
+    # must never outrank a valid 2-leg construction and then be discarded later by
+    # build_value_batches. Enforce the minimum leg count at the construction stage.
+    valid=[rows for rows in candidates if rows and len(rows)>=min(BATCH_MIN_LEGS,max_legs) and math.prod(float(y.get("bookmaker_odds") or 1.0) for y in rows)>=min_odds]
     if valid:
         return max(valid,key=lambda rows:(
             math.prod(max(0.0005,min(0.9995,float(x.get("model_probability") or 0.0))) for x in rows),
