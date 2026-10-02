@@ -41,6 +41,12 @@ STRETCH_COMBINED_ODDS=4.0
 MIN_ACCURACY_FIRST_ODDS=2.70
 ACCURACY_PRESERVATION_RATIO=0.90
 BATCH_MIN_LEGS=2
+# Adaptive 2–4 leg construction safety tiers.
+# Longer tickets require stronger per-leg model probability. 90%+ is preferred;
+# 80% is the absolute floor for any active construction.
+LEG_COUNT_MIN_MODEL_PROBABILITY={2:0.80,3:0.85,4:0.88}
+MIN_SAFE_LEG_MODEL_PROBABILITY=0.80
+PREFERRED_LEG_MODEL_PROBABILITY=0.90
 HIGH_ODDS_TARGET=2.80
 HIGH_ODDS_HARD_GATE_WIN_RECORDS=10
 # Results-first Builder: 2.70 minimum combined odds while the 2.80 gate is still
@@ -78,8 +84,8 @@ MODEL_FIRST_MIN_AVG_PROBABILITY=0.68
 # Mixed research lane: preserve a small VFootball component only when its own
 # exact-line/value gates pass, then combine it with one or two qualified
 # eFootball value legs. This does not promote the batch to Results-first.
-MIXED_RESEARCH_MAX_LEGS=3
-MIXED_RESEARCH_MIN_AVG_PROBABILITY=0.68
+MIXED_RESEARCH_MAX_LEGS=4
+MIXED_RESEARCH_MIN_AVG_PROBABILITY=0.80
 MIXED_RESEARCH_MIN_VFOOTBALL_LEGS=1
 MIXED_RESEARCH_MIN_EFOOTBALL_LEGS=1
 MIXED_RESEARCH_MAX_KICKOFF_SPAN_MINUTES=360
@@ -162,6 +168,21 @@ def upcoming(x, now):
 
 def fair_odds(p):
     return round(1.0/float(p),3) if float(p)>0 else 0.0
+
+
+def min_model_probability_for_leg_count(leg_count):
+    try:
+        count=int(leg_count)
+    except (TypeError,ValueError):
+        count=BATCH_MIN_LEGS
+    return float(LEG_COUNT_MIN_MODEL_PROBABILITY.get(count,MIN_SAFE_LEG_MODEL_PROBABILITY))
+
+
+def legs_meet_safe_model_threshold(legs):
+    if not isinstance(legs,list) or len(legs)<BATCH_MIN_LEGS:
+        return False
+    required=min_model_probability_for_leg_count(len(legs))
+    return all(float(x.get("model_probability") or 0.0)>=required for x in legs)
 
 
 def prob_value(x, *keys):
@@ -1624,7 +1645,11 @@ def _construct_model_first_batch(pool, max_legs=MAX_LEGS, min_odds=MIN_COMBINED_
     # can satisfy the numeric odds floor by itself (for example 2.80x), but that
     # must never outrank a valid 2-leg construction and then be discarded later by
     # build_value_batches. Enforce the minimum leg count at the construction stage.
-    valid=[rows for rows in candidates if rows and len(rows)>=min(BATCH_MIN_LEGS,max_legs) and math.prod(float(y.get("bookmaker_odds") or 1.0) for y in rows)>=min_odds]
+    valid=[rows for rows in candidates
+           if rows
+           and BATCH_MIN_LEGS<=len(rows)<=min(RESULTS_FIRST_MAX_LEGS,max_legs)
+           and legs_meet_safe_model_threshold(rows)
+           and math.prod(float(y.get("bookmaker_odds") or 1.0) for y in rows)>=min_odds]
     if valid:
         return max(valid,key=lambda rows:(
             math.prod(max(0.0005,min(0.9995,float(x.get("model_probability") or 0.0))) for x in rows),
@@ -1735,75 +1760,68 @@ def _construct_mixed_virtual_efootball_batches(pool, max_batches=4, max_legs=MIX
     options=[]
     considered=0
 
-    # Prefer 2-leg batches so we can expose several independent choices without
-    # consuming the entire qualified eFootball pool in one 3-leg ticket.
-    for vleg in vpool:
-        for eleg in epool:
-            rows=[vleg,eleg]
-            event_ids=[str(x.get("event_id") or "") for x in rows if x.get("event_id")]
-            if len(event_ids)!=len(set(event_ids)):
-                continue
-            participants=[]
-            for row in rows:
-                participants.extend(_participants(row))
-            if len(participants)!=len(set(participants)):
-                continue
-            span=_batch_kickoff_span_minutes(rows)
-            if span>MIXED_RESEARCH_MAX_KICKOFF_SPAN_MINUTES:
-                continue
-            odds=math.prod(float(x.get("bookmaker_odds") or 1.0) for x in rows)
-            if odds<min_odds:
-                continue
-            metrics=_batch_metrics(rows)
-            avg_prob=float(metrics.get("avg_model_probability") or 0.0)
-            roi=(float(metrics.get("combined_model_probability") or 0.0)*odds)-1.0
-            if avg_prob<MIXED_RESEARCH_MIN_AVG_PROBABILITY or roi<RESULTS_FIRST_MIN_EXPECTED_ROI:
-                continue
-            considered+=1
-            options.append({
-                "rows":rows,"metrics":metrics,"odds":odds,"span":span,"roi":roi,
-                "score":(
-                    float(metrics.get("combined_model_probability") or 0.0),
-                    float(metrics.get("avg_model_edge_percent") or 0.0),
-                    float(metrics.get("leg_strength_rating") or 0.0),
-                    odds,
-                )
-            })
+    # Adaptive 2–4 leg construction. A longer ticket is considered only when
+    # every leg clears the stronger safety tier for that final leg count.
+    import itertools
+    options=[]
+    considered=0
 
-    # Only use a 3-leg option when it can produce an additional disjoint choice.
-    for vleg in vpool:
-        for es in itertools.combinations(epool,2):
-            rows=[vleg,*es]
-            event_ids=[str(x.get("event_id") or "") for x in rows if x.get("event_id")]
-            if len(event_ids)!=len(set(event_ids)):
+    for e_count in (1,2,3):
+        shape=1+e_count
+        required_leg_prob=min_model_probability_for_leg_count(shape)
+        for vleg in vpool:
+            if float(vleg.get("model_probability") or 0.0)<required_leg_prob:
                 continue
-            participants=[]
-            for row in rows:
-                participants.extend(_participants(row))
-            if len(participants)!=len(set(participants)):
-                continue
-            span=_batch_kickoff_span_minutes(rows)
-            if span>MIXED_RESEARCH_MAX_KICKOFF_SPAN_MINUTES:
-                continue
-            odds=math.prod(float(x.get("bookmaker_odds") or 1.0) for x in rows)
-            if odds<min_odds:
-                continue
-            metrics=_batch_metrics(rows)
-            avg_prob=float(metrics.get("avg_model_probability") or 0.0)
-            roi=(float(metrics.get("combined_model_probability") or 0.0)*odds)-1.0
-            if avg_prob<MIXED_RESEARCH_MIN_AVG_PROBABILITY or roi<RESULTS_FIRST_MIN_EXPECTED_ROI:
-                continue
-            considered+=1
-            options.append({
-                "rows":rows,"metrics":metrics,"odds":odds,"span":span,"roi":roi,
-                "score":(
-                    float(metrics.get("combined_model_probability") or 0.0),
-                    -len(rows),
-                    float(metrics.get("avg_model_edge_percent") or 0.0),
-                    odds,
-                )
-            })
+            for es in itertools.combinations(epool,e_count):
+                rows=[vleg,*es]
+                if any(float(x.get("model_probability") or 0.0)<required_leg_prob for x in rows):
+                    continue
+                event_ids=[str(x.get("event_id") or "") for x in rows if x.get("event_id")]
+                if len(event_ids)!=len(set(event_ids)):
+                    continue
+                participants=[]
+                for row in rows:
+                    participants.extend(_participants(row))
+                if len(participants)!=len(set(participants)):
+                    continue
+                span=_batch_kickoff_span_minutes(rows)
+                if span>MIXED_RESEARCH_MAX_KICKOFF_SPAN_MINUTES:
+                    continue
+                odds=math.prod(float(x.get("bookmaker_odds") or 1.0) for x in rows)
+                if odds<min_odds:
+                    continue
+                metrics=_batch_metrics(rows)
+                avg_prob=float(metrics.get("avg_model_probability") or 0.0)
+                roi=(float(metrics.get("combined_model_probability") or 0.0)*odds)-1.0
+                if avg_prob<MIXED_RESEARCH_MIN_AVG_PROBABILITY or roi<RESULTS_FIRST_MIN_EXPECTED_ROI:
+                    continue
+                if not legs_meet_safe_model_threshold(rows):
+                    continue
+                considered+=1
+                preferred_share=sum(
+                    1 for x in rows
+                    if float(x.get("model_probability") or 0.0)>=PREFERRED_LEG_MODEL_PROBABILITY
+                )/len(rows)
+                options.append({
+                    "rows":rows,
+                    "metrics":metrics,
+                    "odds":odds,
+                    "span":span,
+                    "roi":roi,
+                    "score":(
+                        shape,
+                        min(float(x.get("model_probability") or 0.0) for x in rows),
+                        avg_prob,
+                        preferred_share,
+                        float(metrics.get("combined_model_probability") or 0.0),
+                        float(metrics.get("avg_model_edge_percent") or 0.0),
+                        roi,
+                        odds,
+                    )
+                })
 
+    # The first sort key is leg count, so 4-leg options surface when all four
+    # legs are strong enough. No weak leg is ever added just to reach an odds target.
     options.sort(key=lambda o:o["score"],reverse=True)
     selected_batches=[]
     used_events=set()
@@ -1871,19 +1889,28 @@ def build_value_batches(candidates):
             promoted_shape=None
 
     window_candidates=[]
+    allowed_shapes=tuple(sorted({
+        int(shape) for shape in RESULTS_FIRST_CONSTRUCTION_LEG_COUNTS
+        if int(shape)>=BATCH_MIN_LEGS and int(shape)<=RESULTS_FIRST_MAX_LEGS
+    }))
     for anchor in ordered:
         window=_near_kickoff_window(ordered,anchor)
-        max_legs=promoted_shape if promoted_shape in RESULTS_FIRST_CONSTRUCTION_LEG_COUNTS else RESULTS_FIRST_MAX_LEGS
-        candidate=_construct_results_first_batch(window,max_legs=max_legs)
-        if promoted_shape and len(candidate)!=promoted_shape:
-            continue
-        if len(candidate)>=BATCH_MIN_LEGS and _batch_kickoff_span_minutes(candidate)<=MAX_BATCH_KICKOFF_SPAN_MINUTES:
-            window_candidates.append(candidate)
+        for shape in allowed_shapes:
+            candidate=_construct_results_first_batch(window,max_legs=shape)
+            if len(candidate)!=shape:
+                continue
+            if not legs_meet_safe_model_threshold(candidate):
+                continue
+            if _batch_kickoff_span_minutes(candidate)<=MAX_BATCH_KICKOFF_SPAN_MINUTES:
+                window_candidates.append(candidate)
 
     batches=[]
     used_events=set()
     if window_candidates:
         batch=max(window_candidates,key=lambda rows:(
+            len(rows),
+            min(float(x.get("model_probability") or 0.0) for x in rows),
+            sum(float(x.get("model_probability") or 0.0) for x in rows)/len(rows),
             math.prod(max(0.0005,min(0.9995,float(x.get("model_probability") or 0.0))) for x in rows),
             min(_kickoff_timestamp(x) for x in rows if _kickoff_timestamp(x) is not None)
         ))
@@ -2006,8 +2033,8 @@ def build_value_batches(candidates):
                     "primary_lane":"mixed_vfootball_efootball_value",
                     "paper_only":True,
                     "real_money_execution":False,
-                    "correlation_policy":"batches disjoint by event and participant; each batch contains 1 VFootball + 1-2 eFootball evidence-value legs",
-                    "construction_objective":"provide multiple independent paper choices from one fresh scan while preserving individual evidence/value gates"
+                    "correlation_policy":"batches disjoint by event and participant; each batch contains 1 VFootball + 1-3 eFootball evidence-value legs and every leg meets the adaptive safety tier",
+                    "construction_objective":"provide multiple independent paper choices from one fresh scan; prefer the largest safe 2–4-leg shape without forcing weak legs"
                 })
             return mixed_batches,built,{
                 "batch_count":len(mixed_batches),
@@ -2019,7 +2046,10 @@ def build_value_batches(candidates):
                 "construction_priority":"mixed_vfootball_efootball_research",
                 "priority_product":"mixed",
                 "max_legs":MIXED_RESEARCH_MAX_LEGS,
-                "construction_shapes_considered":[2,3],
+                "adaptive_leg_counts":[2,3,4],
+                "per_leg_min_model_probability":LEG_COUNT_MIN_MODEL_PROBABILITY,
+                "preferred_per_leg_model_probability":PREFERRED_LEG_MODEL_PROBABILITY,
+                "construction_shapes_considered":[2,3,4],
                 "promoted_construction_leg_count":None,
                 "max_kickoff_span_minutes":MAX_BATCH_KICKOFF_SPAN_MINUTES,
                 "builder_horizon_minutes":MAX_BUILDER_HORIZON_MINUTES,
