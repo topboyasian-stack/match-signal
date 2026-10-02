@@ -1388,7 +1388,7 @@ def _participants(leg):
         if v: vals.append(v)
     if not vals:
         match=str(leg.get("match") or "")
-        vals=[p.strip() for p in re.split(r"\\s+vs\\s+",match,flags=re.I) if p.strip()]
+        vals=[p.strip() for p in re.split(r"\s+vs\s+",match,flags=re.I) if p.strip()]
     out=[]
     for v in vals:
         s=re.sub(r"[^a-z0-9]+"," ",str(v).lower()).strip()
