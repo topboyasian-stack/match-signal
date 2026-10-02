@@ -1,40 +1,40 @@
 {
-  "generated_at": "2026-10-02T12:25:17.838495+00:00",
+  "generated_at": "2026-10-02T12:27:03.987890+00:00",
   "status": "FAIL",
-  "critical_issues": 3,
-  "warning_issues": 1,
+  "critical_issues": 2,
+  "warning_issues": 0,
   "info_issues": 0,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
       "status": "STALE",
-      "age_hours": 6.95,
+      "age_hours": 6.98,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 3.85,
+      "age_hours": 3.88,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 1.07,
+      "age_hours": 1.1,
       "threshold_hours": 4
     },
     {
       "engine": "unified_upcoming",
-      "status": "STALE",
-      "age_hours": 3.85,
+      "status": "PASS",
+      "age_hours": 0.0,
       "threshold_hours": 2
     },
     {
       "engine": "virtual_live_feed",
-      "status": "INFO",
-      "age_hours": 3.9,
+      "status": "PASS",
+      "age_hours": 3.93,
       "threshold_hours": 0.5,
-      "heartbeat_source": "virtual_lab_live.json"
+      "heartbeat_source": "unified_live_refresh"
     },
     {
       "engine": "retired_engines",
@@ -59,22 +59,12 @@
     {
       "code": "STALE_CORE_PREDICTION_PIPELINE",
       "severity": "critical",
-      "detail": "updated_at age 6.95h exceeds 4h"
-    },
-    {
-      "code": "STALE_UNIFIED_UPCOMING",
-      "severity": "critical",
-      "detail": "generated_at age 3.85h exceeds 2h"
+      "detail": "updated_at age 6.98h exceeds 4h"
     },
     {
       "code": "PIPELINE_STALE",
       "severity": "critical",
-      "detail": "pipeline_status age 6.95h exceeds 4h"
-    },
-    {
-      "code": "UNIFIED_BOARD_STALE",
-      "severity": "warning",
-      "detail": "unified board age 3.85h exceeds 2h"
+      "detail": "pipeline_status age 6.98h exceeds 4h"
     }
   ],
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
