@@ -1,0 +1,46 @@
+name: Match Signal Calibrated Builder Validation
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/odds_builder.py'
+      - 'data/odds_ticket_tracker.json'
+      - 'data/unified_upcoming.json'
+      - 'data/virtual_lab_model_eval.json'
+      - '.github/workflows/calibrated-builder-validation.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: python -m py_compile scripts/odds_builder.py
+      - run: python scripts/odds_builder.py
+      - name: Validate calibrated Builder output
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('data/odds_builder.json').read_text())
+          assert d.get('mode')=='PAPER_ONLY'
+          assert d.get('engine_version')=='V6.1-RESEARCH-GATED'
+          assert isinstance(d.get('batches'),list)
+          for b in d['batches']:
+              assert 2 <= int(b.get('leg_count',0)) <= 4
+              assert float(b.get('combined_model_probability',0)) <= float(b.get('raw_combined_model_probability',1)) + 1e-9
+              assert float(b.get('ticket_calibration_gamma',1)) >= 1.0
+              assert float(b.get('combined_odds',0)) >= 2.70
+              assert float(b.get('combined_model_probability',0))*float(b.get('combined_odds',0))-1 >= 0.02-1e-9
+          print(json.dumps({
+            'status':d.get('status'),
+            'batch_count':d.get('batch_count'),
+            'batches':d.get('batches'),
+            'risk_reasons':(d.get('research_gate') or {}).get('risk_reasons'),
+            'selection_reasons':(d.get('research_gate') or {}).get('selection_reasons'),
+          },indent=2))
+          PY
