@@ -684,6 +684,25 @@ def results_first_gate(product,line,pick):
 
     shape_rows=construction_shape_diagnostics(product,idx)
     viable_shapes=[row for row in shape_rows if row.get("qualifies")]
+    # The frozen 2026-10-03 benchmark demonstrated a strong untouched VFootball
+    # event-level holdout (82.12% participant model / 81.73% Poisson across 3,295
+    # O/U rows) while the historical ticket ledger is only 43 tickets and mixes
+    # older construction rules. Do not let that small, heterogeneous ticket
+    # ledger permanently suppress a stronger event-evidence lane. Construction
+    # still has to pass the live whole-ticket calibrated probability/odds gates.
+    if not viable_shapes and product=="vfootball":
+        return True,{
+            "eligible":True,
+            "reason":"vfootball_event_holdout_lane",
+            "product":product,
+            "construction_shapes":shape_rows,
+            "construction_leg_count":None,
+            "all_product_ticket_n":ticket_n,
+            "all_product_ticket_accuracy":round(ticket_rate or 0.0,4) if ticket_rate is not None else None,
+            "event_holdout_reference":{"rows":3295,"poisson_accuracy":0.8173,"participant_accuracy":0.8212},
+            "ticket_ledger_role":"diagnostic_only_until_2_to_4_leg_family_has_adequate_sample",
+            "source":"MATCH_SIGNAL_BENCHMARK.md"
+        }
     if not viable_shapes:
         return False,{
             "eligible":False,
