@@ -2279,12 +2279,13 @@ def build_value_batches(candidates):
         # merely because the much larger eFootball pool fills the shared search cap.
         # This lane uses the exact same 80% per-leg, fresh-price, correlation, odds,
         # and calibrated whole-ticket ROI gates.
+        vfootball_holdout_pool=[
+            x for x in eligible_all
+            if str(x.get("qualification_lane") or "")=="vfootball_event_holdout_value"
+            and str(x.get("product") or "")=="vfootball"
+        ]
         vfootball_options,vfootball_diag=_construct_high_confidence_value_batches(
-            [
-                x for x in eligible_all
-                if str(x.get("qualification_lane") or "")=="vfootball_event_holdout_value"
-                and str(x.get("product") or "")=="vfootball"
-            ],
+            vfootball_holdout_pool,
             max_batches=min(4,MAX_BATCHES),
             max_legs=RESULTS_FIRST_MAX_LEGS,
             min_odds=active_min_combined_odds()
@@ -2527,7 +2528,21 @@ def build_value_batches(candidates):
         "secondary_pool_eligible_legs":sum(1 for x in eligible_all if str(x.get("product") or "")!="vfootball" and (str(x.get("sport") or "") in {"football","tennis"} or str(x.get("product") or "").startswith("efootball_"))),
         "mixed_pool_eligible_legs":sum(1 for x in eligible_all if str(x.get("qualification_lane") or "") in {"vfootball_exact_evidence_value","vfootball_event_holdout_value","efootball_exact_evidence_value"}),
         "mixed_max_kickoff_span_minutes":MIXED_RESEARCH_MAX_KICKOFF_SPAN_MINUTES,
-        "mixed_diagnostics":mixed_diag
+        "mixed_diagnostics":mixed_diag,
+        "pure_vfootball_diagnostics":vfootball_diag,
+        "pure_vfootball_input":{
+            "eligible_legs":len(vfootball_holdout_pool),
+            "sample":[
+                {
+                    "match":str(x.get("match") or ""),
+                    "p":round(float(x.get("model_probability") or 0.0),6),
+                    "odds":round(float(x.get("bookmaker_odds") or 0.0),3),
+                    "ev":round(float(x.get("expected_value") or 0.0),6),
+                    "participants":_participants(x)
+                }
+                for x in vfootball_holdout_pool[:12]
+            ]
+        }
     }
 
 
