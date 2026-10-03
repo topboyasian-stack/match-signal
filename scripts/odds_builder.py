@@ -2078,6 +2078,113 @@ def _construct_high_confidence_value_batches(pool,max_batches=4,max_legs=4,min_o
         "reason":None if selected else "no_high_confidence_combination_reached_all_gates"
     }
 
+def _construct_vfootball_holdout_batches(pool,max_batches=4,max_legs=4,min_odds=None):
+    """Build disjoint VFootball holdout batches without the cross-sport frontier cap.
+
+    Inputs are already Builder-eligible exact-line event-holdout legs. The lane
+    keeps the same 80% per-leg floor, fresh-price/positive-EV filters, event and
+    participant correlation rules, 2.70+ combined-odds floor and +2% calibrated
+    whole-ticket ROI gate. It evaluates 2-, 3- and 4-leg shapes directly so a
+    large low-price virtual pool cannot hide a viable high-price pair.
+    """
+    if min_odds is None:
+        min_odds=active_min_combined_odds()
+    eligible=[
+        x for x in pool
+        if str(x.get("qualification_lane") or "")=="vfootball_event_holdout_value"
+        and str(x.get("product") or "")=="vfootball"
+        and float(x.get("model_probability") or 0.0)>=MIN_SAFE_LEG_MODEL_PROBABILITY
+        and float(x.get("expected_value") or 0.0)>=0.0
+    ]
+    # Price-first ordering keeps the accumulator target reachable while all
+    # candidates remain subject to the same model/ROI/correlation gates below.
+    eligible=sorted(
+        eligible,
+        key=lambda x:(
+            -float(x.get("bookmaker_odds") or 1.0),
+            -float(x.get("model_probability") or 0.0),
+            -float(x.get("model_edge") or 0.0),
+            _kickoff_timestamp(x) if _kickoff_timestamp(x) is not None else float("inf")
+        )
+    )[:50]
+
+    import itertools
+    options=[]
+    for shape in (2,3,4):
+        required=min_model_probability_for_leg_count(shape)
+        for combo in itertools.combinations(eligible,shape):
+            if any(float(x.get("model_probability") or 0.0)<required for x in combo):
+                continue
+            event_ids=[str(x.get("event_id") or "") for x in combo if x.get("event_id")]
+            if len(event_ids)!=len(set(event_ids)):
+                continue
+            participants=[p for row in combo for p in _participants(row)]
+            if len(participants)!=len(set(participants)):
+                continue
+            span=_batch_kickoff_span_minutes(combo)
+            if span>MIXED_RESEARCH_MAX_KICKOFF_SPAN_MINUTES:
+                continue
+            odds=math.prod(float(x.get("bookmaker_odds") or 1.0) for x in combo)
+            if odds<min_odds:
+                continue
+            metrics=_batch_metrics(list(combo))
+            raw_avg=sum(float(x.get("model_probability") or 0.0) for x in combo)/shape
+            if raw_avg<required:
+                continue
+            calibrated=float(metrics.get("combined_model_probability") or 0.0)
+            roi=(calibrated*odds)-1.0
+            if roi<RESULTS_FIRST_MIN_EXPECTED_ROI:
+                continue
+            if not legs_meet_safe_model_threshold(list(combo)):
+                continue
+            options.append({
+                "rows":list(combo),
+                "metrics":metrics,
+                "odds":odds,
+                "span":span,
+                "roi":roi,
+                "score":(
+                    calibrated,
+                    min(float(x.get("model_probability") or 0.0) for x in combo),
+                    raw_avg,
+                    sum(float(x.get("model_edge") or 0.0) for x in combo)/shape,
+                    roi,
+                    odds,
+                    shape,
+                )
+            })
+
+    options.sort(key=lambda x:x["score"],reverse=True)
+    selected=[]
+    used_events=set()
+    used_participants=set()
+    for option in options:
+        if len(selected)>=max_batches:
+            break
+        rows=option["rows"]
+        events={str(x.get("event_id") or "") for x in rows if x.get("event_id")}
+        participants={p for row in rows for p in _participants(row)}
+        if events & used_events or participants & used_participants:
+            continue
+        selected.append(option)
+        used_events.update(events)
+        used_participants.update(participants)
+
+    return selected,{
+        "eligible_legs":len(eligible),
+        "candidate_combinations":len(options),
+        "batches_selected":len(selected),
+        "max_batches":max_batches,
+        "min_combined_odds":min_odds,
+        "min_per_leg_model_probability":MIN_SAFE_LEG_MODEL_PROBABILITY,
+        "preferred_per_leg_model_probability":PREFERRED_LEG_MODEL_PROBABILITY,
+        "batch_leg_counts":[len(x["rows"]) for x in selected],
+        "combined_odds":[round(float(x["odds"]),3) for x in selected],
+        "expected_rois":[round(float(x["roi"]),6) for x in selected],
+        "kickoff_spans":[round(float(x["span"]),1) for x in selected],
+        "reason":None if selected else "no_vfootball_holdout_combination_reached_all_gates"
+    }
+
 def build_value_batches(candidates):
     """Build one results-first paper ticket using the best proven 2/3/4-leg shape.
 
@@ -2300,7 +2407,7 @@ def build_value_batches(candidates):
                 _kickoff_timestamp(x) if _kickoff_timestamp(x) is not None else float("inf")
             )
         )[:60]
-        vfootball_options,vfootball_diag=_construct_high_confidence_value_batches(
+        vfootball_options,vfootball_diag=_construct_vfootball_holdout_batches(
             vfootball_holdout_pool,
             max_batches=min(4,MAX_BATCHES),
             max_legs=RESULTS_FIRST_MAX_LEGS,
