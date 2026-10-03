@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-03T11:58:20.487616+00:00",
+  "generated_at": "2026-10-03T12:38:14.963406+00:00",
   "status": "FAIL",
   "critical_issues": 2,
   "warning_issues": 0,
@@ -8,19 +8,19 @@
     {
       "engine": "core_prediction_pipeline",
       "status": "STALE",
-      "age_hours": 6.78,
+      "age_hours": 7.44,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.12,
+      "age_hours": 0.22,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 1.33,
+      "age_hours": 1.99,
       "threshold_hours": 4
     },
     {
@@ -32,9 +32,9 @@
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 0.01,
+      "age_hours": 0.68,
       "threshold_hours": 0.5,
-      "heartbeat_source": "virtual_lab_live.json"
+      "heartbeat_source": "unified_live_refresh"
     },
     {
       "engine": "retired_engines",
@@ -59,7 +59,7 @@
     {
       "code": "STALE_CORE_PREDICTION_PIPELINE",
       "severity": "critical",
-      "detail": "updated_at age 6.78h exceeds 4h"
+      "detail": "updated_at age 7.44h exceeds 4h"
     },
     {
       "code": "SELECTION_GATE_EMPTY",
@@ -69,7 +69,7 @@
     {
       "code": "PIPELINE_STALE",
       "severity": "critical",
-      "detail": "pipeline_status age 6.78h exceeds 4h"
+      "detail": "pipeline_status age 7.44h exceeds 4h"
     }
   ],
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
