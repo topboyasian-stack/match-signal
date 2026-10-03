@@ -52,9 +52,10 @@ jobs:
           print(json.dumps({'status':d.get('status'),'batch_count':d.get('batch_count'),'batches':d.get('batches'),'gamma':[(b.get('ticket_calibration_gamma')) for b in d.get('batches',[])]},indent=2))
           PY
       - name: Commit experiment artifact
+        if: github.event_name == 'push'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/ticket_calibration_experiment.json
           git commit -m "🧪 Record ticket probability calibration experiment" || exit 0
-          git push origin HEAD
+          git push origin "HEAD:${GITHUB_REF_NAME}"
