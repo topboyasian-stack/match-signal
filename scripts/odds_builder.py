@@ -1507,6 +1507,31 @@ def _calibrated_ticket_probability(raw_probability):
     gamma=float(_ticket_calibration_gamma().get("gamma") or 1.0)
     return max(.0005,min(.9995,p**gamma))
 
+def _vfootball_holdout_lower_bound(leg,confidence=0.95):
+    """Conservative per-leg probability from the exact-line holdout sample.
+
+    This is deliberately separate from the historical settled-ticket calibration:
+    the holdout lane has large exact-line samples but does not yet have enough
+    settled 2–4-leg ticket outcomes to justify reusing the old ticket shrinkage.
+    """
+    try:
+        evidence=leg.get("recent_evidence") or {}
+        n=int(evidence.get("n") or 0)
+        wins=int(evidence.get("wins") or 0)
+        if n<=0 or wins<0 or wins>n:
+            return None
+        phat=wins/n
+        from statistics import NormalDist
+        z=NormalDist().inv_cdf(0.5+confidence/2.0)
+        z2=z*z
+        denom=1.0+(z2/n)
+        centre=phat+(z2/(2.0*n))
+        spread=z*math.sqrt((phat*(1.0-phat)/n)+(z2/(4.0*n*n)))
+        lower=(centre-spread)/denom
+        return max(0.0005,min(0.9995,lower))
+    except (TypeError,ValueError,AttributeError):
+        return None
+
 def _batch_metrics(legs):
     probs=[max(0.0005,min(0.9995,float(x.get("model_probability") or 0.0))) for x in legs if float(x.get("model_probability") or 0.0)>0]
     edges=[float(x.get("model_edge") or 0.0) for x in legs]
@@ -1522,14 +1547,37 @@ def _batch_metrics(legs):
             "avg_model_edge_percent":0.0
         }
     raw_combined=math.prod(probs)
-    calibrated=_calibrated_ticket_probability(raw_combined)
+    all_vfootball_holdout=all(
+        str(x.get("qualification_lane") or "")=="vfootball_event_holdout_value"
+        and str(x.get("product") or "")=="vfootball"
+        for x in legs
+    )
+    ticket_calibration_mode="historical_settled_ticket_gamma"
+    ticket_gamma=float(_ticket_calibration_gamma().get("gamma") or 1.0)
+    if all_vfootball_holdout:
+        lower_bounds=[_vfootball_holdout_lower_bound(x,confidence=0.95) for x in legs]
+        if all(v is not None for v in lower_bounds):
+            # Preserve a common-model-error cushion while avoiding the unrelated
+            # historical ticket gamma for this distinct event-holdout evidence regime.
+            calibrated=max(
+                0.0005,
+                min(raw_combined,
+                    math.prod(lower_bounds)*ACCURACY_PRESERVATION_RATIO)
+            )
+            ticket_calibration_mode="vfootball_event_holdout_wilson_lower_bound"
+            ticket_gamma=1.0
+        else:
+            calibrated=_calibrated_ticket_probability(raw_combined)
+    else:
+        calibrated=_calibrated_ticket_probability(raw_combined)
     geometric=math.exp(sum(math.log(p) for p in probs)/len(probs))
     return {
         "model_rating":round(calibrated*100.0,2),
         "raw_model_rating":round(raw_combined*100.0,2),
         "combined_model_probability":round(calibrated,6),
         "raw_combined_model_probability":round(raw_combined,6),
-        "ticket_calibration_gamma":round(float(_ticket_calibration_gamma().get("gamma") or 1.0),4),
+        "ticket_calibration_gamma":round(ticket_gamma,4),
+        "ticket_calibration_mode":ticket_calibration_mode,
         "leg_strength_rating":round(geometric*100.0,2),
         "avg_model_probability":round(sum(probs)/len(probs)*100.0,2),
         "avg_model_edge_percent":round(sum(edges)/len(edges)*100.0,2) if edges else 0.0,
