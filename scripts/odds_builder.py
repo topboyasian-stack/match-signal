@@ -1188,10 +1188,24 @@ def virtual_candidates(now):
                 continue
 
             diagnostics["evidence_pass"]+=1
-            calibrated_probability=float(results_perf.get("posterior_probability") or prob)
+            if (
+                product=="vfootball"
+                and str(results_perf.get("reason") or "")=="vfootball_event_holdout_lane"
+            ):
+                # The frozen event holdout earns the VFootball construction lane,
+                # but the leg probability should still come from the exact
+                # product+line+side evidence that already passed virtual_recent_gate.
+                # This keeps the 80% per-leg safety floor intact while preventing
+                # the older raw model probability from suppressing evidence-backed
+                # VFootball legs.
+                evidence_probability=float(evidence.get("posterior_rate") or prob)
+                calibrated_probability=max(float(prob),evidence_probability)
+                y["model"]="Exact-line evidence calibration · VFootball event-holdout lane"
+            else:
+                calibrated_probability=float(results_perf.get("posterior_probability") or prob)
+                y["model"]="Results-first settled-leg calibration"
             y["probability"]=calibrated_probability
             y["builder_probability"]=calibrated_probability
-            y["model"]="Results-first settled-leg calibration"
             y["recent_evidence"]=recent
             y["directional_evidence"]=evidence
             y["evidence_score"]=evidence["score"]
