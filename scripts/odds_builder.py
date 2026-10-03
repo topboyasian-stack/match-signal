@@ -1986,7 +1986,7 @@ def _construct_high_confidence_value_batches(pool,max_batches=4,max_legs=4,min_o
     eligible=bounded
 
     import itertools
-    states=[()]
+    states=[]
     for shape in (2,3,4):
         required=min_model_probability_for_leg_count(shape)
         expanded=[]
@@ -2025,8 +2025,11 @@ def _construct_high_confidence_value_batches(pool,max_batches=4,max_legs=4,min_o
                 )
             })
         expanded.sort(key=lambda o:o["score"],reverse=True)
-        states=expanded[:400]
-    options=states
+        states.extend(expanded[:400])
+    options=sorted(states,key=lambda o:o["score"],reverse=True)
+    # Evaluate all adaptive shapes together, then prefer the largest shape only
+    # when it actually clears the same calibrated whole-ticket ROI gate. A weak
+    # 4-leg frontier must never suppress a viable 2- or 3-leg construction.
 
     selected=[]
     used_events=set()
