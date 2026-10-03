@@ -2149,12 +2149,18 @@ def _construct_vfootball_holdout_batches(pool,max_batches=4,max_legs=4,min_odds=
                     rejection_counts["safety"]+=1; reason="safety"
             if reason is not None:
                 if len(first_failure_samples)<8 and shape==2:
-                    first_failure_samples.append({
+                    sample={
                         "reason":reason,
                         "legs":[str(x.get("match") or "") for x in combo],
                         "odds":round(math.prod(float(x.get("bookmaker_odds") or 1.0) for x in combo),3),
                         "probabilities":[round(float(x.get("model_probability") or 0.0),6) for x in combo],
-                    })
+                    }
+                    if reason=="roi":
+                        sample["raw_combined_probability"]=round(math.prod(float(x.get("model_probability") or 0.0) for x in combo),6)
+                        sample["calibrated_probability"]=round(float(metrics.get("combined_model_probability") or 0.0),6)
+                        sample["ticket_calibration_gamma"]=round(float(_ticket_calibration_gamma().get("gamma") or 1.0),6)
+                        sample["roi"]=round(float(roi),6)
+                    first_failure_samples.append(sample)
                 continue
             options.append({
                 "rows":list(combo),
