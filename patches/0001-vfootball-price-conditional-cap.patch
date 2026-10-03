@@ -1,0 +1,41 @@
+diff --git a/scripts/odds_builder.py b/scripts/odds_builder.py
+index 2e7cf4e2..339df6ff 100644
+--- a/scripts/odds_builder.py
++++ b/scripts/odds_builder.py
+@@ -28,6 +28,7 @@ RISK_GATE=DATA/"risk_gate.json"
+ 
+ MIN_PROB=0.60
+ MIN_EDGE=0.025
++PRICE_CONDITIONAL_CAP_VFOOTBALL=True
+ MAX_ODDS_AGE_SECONDS=900
+ MAX_UNCERTAINTY=0.22
+ MIN_DATA_QUALITY=0.70
+@@ -1352,6 +1353,19 @@ def participant_history_signal(x):
+ def make_leg(x):
+     p=float(x["builder_probability"])
+     bookmaker,implied,devig,complete=selected_price_and_devig(x)
++    # Price-conditional cap (VFootball). The exact-line evidence rate is an
++    # unconditional base rate for the line, not a probability for this event at this
++    # price. Audit (scripts/vfootball_walkforward_audit.py) showed legs priced well
++    # below the base rate hit at the market-implied rate, not the base rate, so
++    # base-rate-minus-price "edge" was adverse selection. A VFootball leg may not
++    # claim more than the de-vigged SportyBet probability until a conditional model
++    # demonstrably beats the price in time-safe evaluation.
++    uncapped_probability=p
++    price_cap_applied=False
++    if (PRICE_CONDITIONAL_CAP_VFOOTBALL and str(x.get("product") or "")=="vfootball"
++            and complete and devig is not None and p>devig):
++        p=float(devig)
++        price_cap_applied=True
+     age=odds_age(x)
+     quality=data_quality(x)
+     uncert=uncertainty(x,p)
+@@ -1406,6 +1420,8 @@ def make_leg(x):
+         "sport":x.get("sport"),"competition":x.get("league"),"event_id":x.get("event_id"),
+         "start_time":x.get("start_time"),"match":match,"market":x.get("builder_market"),
+         "pick":pick,"model_probability":round(p,6),"model_fair_odds":fair_odds(p),
++        "uncapped_model_probability":round(uncapped_probability,6),
++        "price_conditional_cap_applied":price_cap_applied,
+         "bookmaker_odds":round(bookmaker,3) if bookmaker is not None else None,
+         "market_implied_probability":round(implied,6) if implied is not None else None,
+         "de_vig_probability":round(devig,6) if devig is not None else None,
