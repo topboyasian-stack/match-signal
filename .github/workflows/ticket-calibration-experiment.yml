@@ -30,6 +30,8 @@ jobs:
           assert d['samples']['modern_2_to_4'] >= 10
           print(json.dumps(d['modern_2_to_4'],indent=2))
           PY
+      - name: Install Builder runtime dependency
+        run: python -m pip install --upgrade requests
       - name: Validate calibrated Builder syntax and output
         run: |
           python -m py_compile scripts/odds_builder.py
