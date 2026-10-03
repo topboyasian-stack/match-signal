@@ -30,6 +30,27 @@ jobs:
           assert d['samples']['modern_2_to_4'] >= 10
           print(json.dumps(d['modern_2_to_4'],indent=2))
           PY
+      - name: Install Builder runtime dependency
+        run: python -m pip install --upgrade requests
+      - name: Validate calibrated Builder syntax and output
+        run: |
+          python -m py_compile scripts/odds_builder.py
+          python scripts/odds_builder.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('data/odds_builder.json').read_text())
+          assert d.get('mode')=='PAPER_ONLY'
+          assert d.get('engine_version')=='V6.1-RESEARCH-GATED'
+          assert isinstance(d.get('batches'),list)
+          for b in d['batches']:
+              assert 2 <= int(b.get('leg_count',0)) <= 4
+              assert float(b.get('combined_model_probability',0)) <= float(b.get('raw_combined_model_probability',1)) + 1e-9
+              assert float(b.get('ticket_calibration_gamma',1)) >= 1.0
+              assert float(b.get('combined_odds',0)) >= 2.70
+              assert float(b.get('combined_model_probability',0))*float(b.get('combined_odds',0))-1 >= 0.02-1e-9
+          print(json.dumps({'status':d.get('status'),'batch_count':d.get('batch_count'),'batches':d.get('batches'),'gamma':[(b.get('ticket_calibration_gamma')) for b in d.get('batches',[])]},indent=2))
+          PY
       - name: Commit experiment artifact
         run: |
           git config user.name "github-actions[bot]"

@@ -1416,24 +1416,85 @@ def _participants(leg):
         if s and s not in out: out.append(s)
     return out
 
+_TICKET_CALIBRATION_CACHE=None
+
+def _ticket_calibration_gamma():
+    """Estimate a time-safe ticket-probability shrinkage exponent.
+
+    Individual VFootball probabilities are strong, but the old ticket layer
+    multiplied them into systematically overconfident joint probabilities.
+    This estimator learns a conservative exponent only from earlier settled
+    2–4-leg tickets, using a rolling Brier-minimization procedure. It never
+    uses pending/current tickets as training rows.
+    """
+    global _TICKET_CALIBRATION_CACHE
+    if _TICKET_CALIBRATION_CACHE is not None:
+        return _TICKET_CALIBRATION_CACHE
+    raw=load(DATA/"odds_ticket_tracker.json",{})
+    tickets=raw.get("tickets") if isinstance(raw,dict) else []
+    rows=[]
+    for ticket in tickets if isinstance(tickets,list) else []:
+        if str(ticket.get("status") or "").upper() not in {"WON","LOST"}:
+            continue
+        try:
+            leg_count=int(ticket.get("leg_count") or len(ticket.get("legs") or []))
+            raw_p=float(ticket.get("combined_model_probability"))
+        except (TypeError,ValueError):
+            continue
+        if not 2<=leg_count<=4 or not 0<raw_p<1:
+            continue
+        stamp=ticket.get("last_settled_at") or ticket.get("settled_at") or ticket.get("updated_at")
+        if not stamp:
+            continue
+        rows.append((str(stamp),raw_p,1.0 if str(ticket.get("status") or "").upper()=="WON" else 0.0))
+    rows.sort(key=lambda x:x[0])
+    warmup=8
+    gammas=[0.5+i*0.1 for i in range(46)]
+    chosen=[]
+    for i in range(warmup,len(rows)):
+        prior=rows[:i]
+        best=min(gammas,key=lambda g:sum((y-max(.0005,min(.9995,p**g)))**2 for _,p,y in prior)/len(prior))
+        chosen.append(best)
+    if len(chosen)<3:
+        result={"gamma":1.0,"sample":len(rows),"warmup":warmup,"trained":False,"source":"insufficient_settled_2_to_4_ticket_history"}
+    else:
+        gamma=max(1.0,min(4.0,sum(chosen)/len(chosen)))
+        result={"gamma":round(gamma,4),"sample":len(rows),"warmup":warmup,"trained":True,
+                "source":"chronological_2_to_4_ticket_brier_calibration","gamma_observations":len(chosen)}
+    _TICKET_CALIBRATION_CACHE=result
+    return result
+
+def _calibrated_ticket_probability(raw_probability):
+    try:
+        p=max(.0005,min(.9995,float(raw_probability)))
+    except (TypeError,ValueError):
+        return 0.0
+    gamma=float(_ticket_calibration_gamma().get("gamma") or 1.0)
+    return max(.0005,min(.9995,p**gamma))
+
 def _batch_metrics(legs):
     probs=[max(0.0005,min(0.9995,float(x.get("model_probability") or 0.0))) for x in legs if float(x.get("model_probability") or 0.0)>0]
     edges=[float(x.get("model_edge") or 0.0) for x in legs]
     if not probs:
         return {
             "model_rating":0.0,
+            "raw_model_rating":0.0,
             "combined_model_probability":0.0,
+            "raw_combined_model_probability":0.0,
+            "ticket_calibration_gamma":float(_ticket_calibration_gamma().get("gamma") or 1.0),
             "leg_strength_rating":0.0,
             "avg_model_probability":0.0,
             "avg_model_edge_percent":0.0
         }
-    combined=math.prod(probs)
+    raw_combined=math.prod(probs)
+    calibrated=_calibrated_ticket_probability(raw_combined)
     geometric=math.exp(sum(math.log(p) for p in probs)/len(probs))
     return {
-        # Headline rating is the whole-ticket naive joint model probability,
-        # expressed on a 0-100 scale. It is a transparent proxy, not a guarantee.
-        "model_rating":round(combined*100.0,2),
-        "combined_model_probability":round(combined,6),
+        "model_rating":round(calibrated*100.0,2),
+        "raw_model_rating":round(raw_combined*100.0,2),
+        "combined_model_probability":round(calibrated,6),
+        "raw_combined_model_probability":round(raw_combined,6),
+        "ticket_calibration_gamma":round(float(_ticket_calibration_gamma().get("gamma") or 1.0),4),
         "leg_strength_rating":round(geometric*100.0,2),
         "avg_model_probability":round(sum(probs)/len(probs)*100.0,2),
         "avg_model_edge_percent":round(sum(edges)/len(edges)*100.0,2) if edges else 0.0,
@@ -1645,18 +1706,27 @@ def _construct_model_first_batch(pool, max_legs=MAX_LEGS, min_odds=MIN_COMBINED_
     # can satisfy the numeric odds floor by itself (for example 2.80x), but that
     # must never outrank a valid 2-leg construction and then be discarded later by
     # build_value_batches. Enforce the minimum leg count at the construction stage.
-    valid=[rows for rows in candidates
-           if rows
-           and BATCH_MIN_LEGS<=len(rows)<=min(RESULTS_FIRST_MAX_LEGS,max_legs)
-           and legs_meet_safe_model_threshold(rows)
-           and math.prod(float(y.get("bookmaker_odds") or 1.0) for y in rows)>=min_odds]
+    valid=[]
+    for rows in candidates:
+        if not rows or not (BATCH_MIN_LEGS<=len(rows)<=min(RESULTS_FIRST_MAX_LEGS,max_legs)):
+            continue
+        if not legs_meet_safe_model_threshold(rows):
+            continue
+        odds=math.prod(float(y.get("bookmaker_odds") or 1.0) for y in rows)
+        if odds<min_odds:
+            continue
+        raw=math.prod(max(0.0005,min(0.9995,float(x.get("model_probability") or 0.0))) for x in rows)
+        calibrated=_calibrated_ticket_probability(raw)
+        if (calibrated*odds)-1.0 < RESULTS_FIRST_MIN_EXPECTED_ROI:
+            continue
+        valid.append((rows,calibrated,odds))
     if valid:
-        return max(valid,key=lambda rows:(
-            math.prod(max(0.0005,min(0.9995,float(x.get("model_probability") or 0.0))) for x in rows),
-            -len(rows),
-            sum(float(x.get("model_edge") or 0.0) for x in rows)/len(rows),
-            math.prod(float(x.get("bookmaker_odds") or 1.0) for x in rows)
-        ))
+        return max(valid,key=lambda item:(
+            item[1],
+            -len(item[0]),
+            sum(float(x.get("model_edge") or 0.0) for x in item[0])/len(item[0]),
+            item[2]
+        ))[0]
     return []
 
 
@@ -2138,6 +2208,8 @@ def build_value_batches(candidates):
                     "combined_odds":round(mixed_combined,3),
                     "combined_model_rating":mixed_metrics["model_rating"],
                     "combined_model_probability":mixed_metrics["combined_model_probability"],
+                    "raw_combined_model_probability":mixed_metrics["raw_combined_model_probability"],
+                    "ticket_calibration_gamma":mixed_metrics["ticket_calibration_gamma"],
                     "leg_strength_rating":mixed_metrics["leg_strength_rating"],
                     "avg_model_probability":mixed_metrics["avg_model_probability"],
                     "avg_model_edge_percent":mixed_metrics["avg_model_edge_percent"],
@@ -2211,6 +2283,8 @@ def build_value_batches(candidates):
                     "combined_odds":round(odds,3),
                     "combined_model_rating":metrics["model_rating"],
                     "combined_model_probability":metrics["combined_model_probability"],
+                    "raw_combined_model_probability":metrics["raw_combined_model_probability"],
+                    "ticket_calibration_gamma":metrics["ticket_calibration_gamma"],
                     "leg_strength_rating":metrics["leg_strength_rating"],
                     "avg_model_probability":metrics["avg_model_probability"],
                     "avg_model_edge_percent":metrics["avg_model_edge_percent"],
@@ -2288,6 +2362,8 @@ def build_value_batches(candidates):
                     "combined_odds":round(secondary_combined,3),
                     "combined_model_rating":secondary_metrics["model_rating"],
                     "combined_model_probability":secondary_metrics["combined_model_probability"],
+                    "raw_combined_model_probability":secondary_metrics["raw_combined_model_probability"],
+                    "ticket_calibration_gamma":secondary_metrics["ticket_calibration_gamma"],
                     "leg_strength_rating":secondary_metrics["leg_strength_rating"],
                     "avg_model_probability":secondary_metrics["avg_model_probability"],
                     "avg_model_edge_percent":secondary_metrics["avg_model_edge_percent"],
