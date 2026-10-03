@@ -1,0 +1,39 @@
+name: Match Signal Ticket Calibration Experiment
+on:
+  push:
+    branches: [recovery/ticket-calibration-v1]
+    paths:
+      - 'scripts/ticket_calibration_experiment.py'
+      - 'data/odds_ticket_tracker.json'
+      - '.github/workflows/ticket-calibration-experiment.yml'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  experiment:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Run calibration experiment
+        run: python scripts/ticket_calibration_experiment.py
+      - name: Validate diagnostic artifact
+        run: |
+          python - <<'PY'
+          import json
+          d=json.load(open('data/ticket_calibration_experiment.json'))
+          assert d['mode']=='PAPER_ONLY_DIAGNOSTIC'
+          assert d['production_selection_changed'] is False
+          assert d['samples']['modern_2_to_4'] >= 10
+          print(json.dumps(d['modern_2_to_4'],indent=2))
+          PY
+      - name: Commit experiment artifact
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/ticket_calibration_experiment.json
+          git commit -m "🧪 Record ticket probability calibration experiment" || exit 0
+          git push origin HEAD
