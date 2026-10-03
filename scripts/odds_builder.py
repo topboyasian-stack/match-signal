@@ -2279,11 +2279,27 @@ def build_value_batches(candidates):
         # merely because the much larger eFootball pool fills the shared search cap.
         # This lane uses the exact same 80% per-leg, fresh-price, correlation, odds,
         # and calibrated whole-ticket ROI gates.
-        vfootball_holdout_pool=[
+        vfootball_candidates=[
             x for x in eligible_all
             if str(x.get("qualification_lane") or "")=="vfootball_event_holdout_value"
             and str(x.get("product") or "")=="vfootball"
+            and float(x.get("model_probability") or 0.0)>=MIN_SAFE_LEG_MODEL_PROBABILITY
+            and float(x.get("expected_value") or 0.0)>=0.0
         ]
+        # The generic constructor deliberately caps its search frontier at 36.
+        # For this lane, sort the input by live bookmaker price first so that
+        # high-price holdout legs are not crowded out by hundreds of near-1.0
+        # probability / 1.0x-price candidates. Eligibility thresholds are
+        # unchanged; this only changes which already-eligible rows are searched.
+        vfootball_holdout_pool=sorted(
+            vfootball_candidates,
+            key=lambda x:(
+                -float(x.get("bookmaker_odds") or 1.0),
+                -float(x.get("model_probability") or 0.0),
+                -float(x.get("model_edge") or 0.0),
+                _kickoff_timestamp(x) if _kickoff_timestamp(x) is not None else float("inf")
+            )
+        )[:60]
         vfootball_options,vfootball_diag=_construct_high_confidence_value_batches(
             vfootball_holdout_pool,
             max_batches=min(4,MAX_BATCHES),
