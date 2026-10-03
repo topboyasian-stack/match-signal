@@ -1,6 +1,7 @@
 """Match Signal V6 market-calibrated value engine.
 
 # 2026-10-02: force post-gate Builder regeneration for production verification.
+# 2026-10-04: force a fresh market snapshot after booking-code volatility verification.
 
 Research/paper-trading only. A candidate is eligible only when:
 - calibrated model probability clears the minimum threshold,
