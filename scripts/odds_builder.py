@@ -2133,28 +2133,29 @@ def build_value_batches(candidates):
                 "active_min_combined_odds":active_min_combined_odds(),
                 "min_expected_roi":RESULTS_FIRST_MIN_EXPECTED_ROI,
             }
-        batch_events={str(x.get("event_id") or "") for x in batch if x.get("event_id")}
-        used_events.update(batch_events)
-        batches.append({
-            "batch_id":"BATCH-01",
-            "label":f"BATCH-01 · Results-first Model Rating {metrics['model_rating']:.1f}/100",
-            "rank_pending":False,
-            "rank":1,
-            "legs":batch,
-            "leg_count":len(batch),
-            "combined_odds":round(combined,3),
-            "combined_model_rating":metrics["model_rating"],
-            "combined_model_probability":metrics["combined_model_probability"],
-            "leg_strength_rating":metrics["leg_strength_rating"],
-            "avg_model_probability":metrics["avg_model_probability"],
-            "avg_model_edge_percent":metrics["avg_model_edge_percent"],
-            "products":sorted({str(x.get("product") or "") for x in batch if x.get("product")}),
-            "primary_lane":"vfootball",
-            "paper_only":True,
-            "real_money_execution":False,
-            "correlation_policy":"same-event and participant reuse prevented; only results-first qualified legs",
-            "construction_objective":"maximize settled-results-backed whole-ticket probability; odds are secondary and never force weaker legs"
-        })
+        else:
+            batch_events={str(x.get("event_id") or "") for x in batch if x.get("event_id")}
+            used_events.update(batch_events)
+            batches.append({
+                "batch_id":"BATCH-01",
+                "label":f"BATCH-01 · Results-first Model Rating {metrics['model_rating']:.1f}/100",
+                "rank_pending":False,
+                "rank":1,
+                "legs":batch,
+                "leg_count":len(batch),
+                "combined_odds":round(combined,3),
+                "combined_model_rating":metrics["model_rating"],
+                "combined_model_probability":metrics["combined_model_probability"],
+                "leg_strength_rating":metrics["leg_strength_rating"],
+                "avg_model_probability":metrics["avg_model_probability"],
+                "avg_model_edge_percent":metrics["avg_model_edge_percent"],
+                "products":sorted({str(x.get("product") or "") for x in batch if x.get("product")}),
+                "primary_lane":"vfootball",
+                "paper_only":True,
+                "real_money_execution":False,
+                "correlation_policy":"same-event and participant reuse prevented; only results-first qualified legs",
+                "construction_objective":"maximize settled-results-backed whole-ticket probability; odds are secondary and never force weaker legs"
+            })
 
     if not batches:
         # Controlled mixed research lane: when Results-first VFootball cannot
