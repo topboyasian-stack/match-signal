@@ -1,0 +1,93 @@
+{
+  "generated_at": "2026-10-03T12:00:00Z",
+  "mode": "PAPER_ONLY_DIAGNOSTIC",
+  "production_selection_changed": false,
+  "benchmark_scope": "Frozen walk-forward event-model evidence + settled Match Signal ticket results; no new live selections were promoted.",
+  "model_signal_benchmark": {
+    "overall_holdout": {
+      "rows": 4371,
+      "market_hit_rate": 0.409746,
+      "poisson_hit_rate": 0.760238,
+      "poisson_brier": 0.15443,
+      "participant_model_hit_rate": 0.752917,
+      "participant_model_brier": 0.156175
+    },
+    "vfootball_holdout": {
+      "rows": 3295,
+      "market_hit_rate": 0.374507,
+      "poisson_hit_rate": 0.817299,
+      "poisson_brier": 0.125892,
+      "participant_model_hit_rate": 0.821244,
+      "participant_model_brier": 0.126279
+    },
+    "efootball_gt_holdout": {
+      "rows": 1076,
+      "market_hit_rate": 0.517658,
+      "poisson_hit_rate": 0.585502,
+      "participant_model_hit_rate": 0.54368,
+      "participant_model_brier": 0.247723
+    }
+  },
+  "ticket_benchmark": {
+    "settled_tickets": {
+      "n": 43,
+      "wins": 15,
+      "losses": 28,
+      "accuracy": 0.348837,
+      "avg_model_probability": 0.551185,
+      "model_brier": 0.255274,
+      "model_log_loss": 0.705044,
+      "avg_market_implied_probability": 0.343027,
+      "market_brier": 0.194491,
+      "market_log_loss": 0.579095
+    },
+    "active_2_to_4_leg_family": {
+      "n": 19,
+      "wins": 7,
+      "losses": 12,
+      "accuracy": 0.368421,
+      "avg_model_probability": 0.705944,
+      "model_brier": 0.281697,
+      "model_log_loss": 0.760918,
+      "avg_market_implied_probability": 0.466138,
+      "market_brier": 0.148967,
+      "market_log_loss": 0.479964
+    },
+    "shapes": {
+      "2": {
+        "n": 7,
+        "wins": 4,
+        "losses": 3,
+        "accuracy": 0.571429,
+        "average_combined_odds": 1.696286,
+        "break_even_accuracy": 0.589523,
+        "unit_roi": -0.354429
+      },
+      "3": {
+        "n": 1,
+        "wins": 0,
+        "losses": 1,
+        "accuracy": 0,
+        "average_combined_odds": 5.28,
+        "break_even_accuracy": 0.189394,
+        "unit_roi": -1
+      },
+      "4": {
+        "n": 11,
+        "wins": 3,
+        "losses": 8,
+        "accuracy": 0.272727,
+        "average_combined_odds": 3.375727,
+        "break_even_accuracy": 0.296232,
+        "unit_roi": -0.243273
+      }
+    }
+  },
+  "conclusion": {
+    "underlying_event_model_has_signal": true,
+    "current_ticket_construction_has_not_demonstrated_edge": true,
+    "current_ticket_probability_is_overconfident": true,
+    "efootball_should_not_be_used_as_an_assumed_accuracy_booster": true,
+    "next_engine_target": "calibrated VFootball event probabilities + economically valid 2–4-leg construction tested walk-forward before production promotion"
+  }
+}
