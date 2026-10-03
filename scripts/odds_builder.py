@@ -2274,6 +2274,85 @@ def build_value_batches(candidates):
                 "ranking_metric":"whole-ticket model probability first, leg strength second, exact current edge third, odds as hard reachability constraint; batches disjoint"
             }
 
+        # VFootball-only holdout fallback: the mixed lane intentionally requires
+        # an eFootball partner, but a safe VFootball pair should never be suppressed
+        # merely because the much larger eFootball pool fills the shared search cap.
+        # This lane uses the exact same 80% per-leg, fresh-price, correlation, odds,
+        # and calibrated whole-ticket ROI gates.
+        vfootball_options,vfootball_diag=_construct_high_confidence_value_batches(
+            [
+                x for x in eligible_all
+                if str(x.get("qualification_lane") or "")=="vfootball_event_holdout_value"
+                and str(x.get("product") or "")=="vfootball"
+            ],
+            max_batches=min(4,MAX_BATCHES),
+            max_legs=RESULTS_FIRST_MAX_LEGS,
+            min_odds=active_min_combined_odds()
+        )
+        if vfootball_options:
+            vfootball_batches=[]
+            vfootball_options.sort(
+                key=lambda option:min(
+                    _kickoff_timestamp(x) for x in option["rows"]
+                    if _kickoff_timestamp(x) is not None
+                ) if any(_kickoff_timestamp(x) is not None for x in option["rows"]) else float("inf")
+            )
+            for idx,option in enumerate(vfootball_options,1):
+                rows=sorted(
+                    option["rows"],
+                    key=lambda x:(_kickoff_timestamp(x) if _kickoff_timestamp(x) is not None else float("inf"))
+                )
+                metrics=option["metrics"]
+                odds=float(option["odds"])
+                vfootball_batches.append({
+                    "batch_id":f"BATCH-{idx:02d}",
+                    "label":f"BATCH-{idx:02d} · VFootball Holdout Model Rating {metrics['model_rating']:.1f}/100",
+                    "rank_pending":False,
+                    "rank":idx,
+                    "legs":rows,
+                    "leg_count":len(rows),
+                    "combined_odds":round(odds,3),
+                    "combined_model_rating":metrics["model_rating"],
+                    "combined_model_probability":metrics["combined_model_probability"],
+                    "raw_combined_model_probability":metrics["raw_combined_model_probability"],
+                    "ticket_calibration_gamma":metrics["ticket_calibration_gamma"],
+                    "leg_strength_rating":metrics["leg_strength_rating"],
+                    "avg_model_probability":metrics["avg_model_probability"],
+                    "avg_model_edge_percent":metrics["avg_model_edge_percent"],
+                    "products":["vfootball"],
+                    "primary_lane":"vfootball_event_holdout_value",
+                    "paper_only":True,
+                    "real_money_execution":False,
+                    "correlation_policy":"batches disjoint by event and participant; exact-line VFootball holdout legs only",
+                    "construction_objective":"maximize whole-ticket VFootball event-holdout probability subject to the active 2.70+ odds and calibrated ROI gates"
+                })
+            return vfootball_batches,built,{
+                "batch_count":len(vfootball_batches),
+                "max_batches":min(4,MAX_BATCHES),
+                "disjoint":True,
+                "min_combined_odds":active_min_combined_odds(),
+                "target_combined_odds":TARGET_COMBINED_ODDS,
+                "accuracy_preservation_ratio":ACCURACY_PRESERVATION_RATIO,
+                "construction_priority":"vfootball_event_holdout_value",
+                "priority_product":"vfootball",
+                "max_legs":RESULTS_FIRST_MAX_LEGS,
+                "adaptive_leg_counts":[2,3,4],
+                "per_leg_min_model_probability":LEG_COUNT_MIN_MODEL_PROBABILITY,
+                "preferred_per_leg_model_probability":PREFERRED_LEG_MODEL_PROBABILITY,
+                "construction_shapes_considered":[2,3,4],
+                "promoted_construction_leg_count":None,
+                "max_kickoff_span_minutes":MIXED_RESEARCH_MAX_KICKOFF_SPAN_MINUTES,
+                "builder_horizon_minutes":MAX_BUILDER_HORIZON_MINUTES,
+                "used_unique_events":len({str(x.get("event_id") or "") for b in vfootball_batches for x in b["legs"] if x.get("event_id")}),
+                "eligible_results_first_legs":len(eligible_results),
+                "mixed_pool_eligible_legs":len(mixed_pool),
+                "mixed_diagnostics":mixed_diag,
+                "pure_vfootball_diagnostics":vfootball_diag,
+                "results_first_rejection":results_first_rejection,
+                "secondary_pool_eligible_legs":0,
+                "capacity":_batch_capacity_diagnostic(vfootball_options[0]["rows"])
+            }
+
         # High-confidence adaptive lane: when the VFootball/eFootball mixed
         # composition cannot be formed, use any 2–4 legs that individually clear
         # the 80% safety floor. This avoids forcing a weak eFootball leg merely
