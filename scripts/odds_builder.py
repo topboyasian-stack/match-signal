@@ -701,7 +701,8 @@ def results_first_gate(product,line,pick):
             "all_product_ticket_accuracy":round(ticket_rate or 0.0,4) if ticket_rate is not None else None,
             "event_holdout_reference":{"rows":3295,"poisson_accuracy":0.8173,"participant_accuracy":0.8212},
             "ticket_ledger_role":"diagnostic_only_until_2_to_4_leg_family_has_adequate_sample",
-            "source":"MATCH_SIGNAL_BENCHMARK.md"
+            "source":"MATCH_SIGNAL_BENCHMARK.md",
+            "qualification_lane":"vfootball_event_holdout_value"
         }
     if not viable_shapes:
         return False,{
@@ -1196,6 +1197,7 @@ def virtual_candidates(now):
             y["evidence_score"]=evidence["score"]
             y["ticket_performance"]=ticket_perf
             y["results_first"]=results_perf
+            y["qualification_lane"]=str(results_perf.get("qualification_lane") or "")
             out.append(y)
 
     diagnostics["quote_join"]=quote_diag
@@ -1818,7 +1820,7 @@ def _construct_mixed_virtual_efootball_batches(pool, max_batches=4, max_legs=MIX
     vpool=[
         x for x in pool
         if str(x.get("product") or "")=="vfootball"
-        and str(x.get("qualification_lane") or "")=="vfootball_exact_evidence_value"
+        and str(x.get("qualification_lane") or "") in {"vfootball_exact_evidence_value","vfootball_event_holdout_value"}
         and float(x.get("model_probability") or 0.0)>=VIRTUAL_MIN_PROB
         and float(x.get("expected_value") or 0.0)>=0.0
     ]
@@ -1954,7 +1956,7 @@ def _construct_high_confidence_value_batches(pool,max_batches=4,max_legs=4,min_o
     eligible=[
         x for x in pool
         if str(x.get("qualification_lane") or "") in {
-            "vfootball_exact_evidence_value","efootball_exact_evidence_value"
+            "vfootball_exact_evidence_value","vfootball_event_holdout_value","efootball_exact_evidence_value"
         }
         and float(x.get("model_probability") or 0.0)>=MIN_SAFE_LEG_MODEL_PROBABILITY
         and float(x.get("expected_value") or 0.0)>=0.0
@@ -2110,6 +2112,7 @@ def build_value_batches(candidates):
 
     batches=[]
     used_events=set()
+    results_first_rejection=None
     if window_candidates:
         batch=max(window_candidates,key=lambda rows:(
             len(rows),
@@ -2123,26 +2126,12 @@ def build_value_batches(candidates):
         combined=math.prod(float(x.get("bookmaker_odds") or 1.0) for x in batch)
         current_expected_roi=(float(metrics.get("combined_model_probability") or 0.0)*combined)-1.0
         if combined < active_min_combined_odds() or current_expected_roi < RESULTS_FIRST_MIN_EXPECTED_ROI:
-            # This batch is below the results-first construction gate. Do not
-            # use `continue` here because this branch is outside the anchor loop.
-            return batches,built,{
-                "batch_count":0,
-                "max_batches":1,
-                "disjoint":True,
-                "min_combined_odds":active_min_combined_odds(),
-                "target_combined_odds":TARGET_COMBINED_ODDS,
-                "accuracy_preservation_ratio":ACCURACY_PRESERVATION_RATIO,
-                "construction_priority":"settled_results_first",
-                "priority_product":"vfootball",
-                "max_legs":RESULTS_FIRST_MAX_LEGS,
-                "construction_shapes_considered":list(RESULTS_FIRST_CONSTRUCTION_LEG_COUNTS),
-                "promoted_construction_leg_count":promoted_shape,
-                "max_kickoff_span_minutes":MIXED_RESEARCH_MAX_KICKOFF_SPAN_MINUTES,
-                "builder_horizon_minutes":MAX_BUILDER_HORIZON_MINUTES,
-                "used_unique_events":0,
-                "eligible_results_first_legs":len(eligible_results),
-                "rejection_reason":"combined_odds_or_expected_roi_below_results_first_gate",
-                "construction_shape_diagnostics":construction_shapes
+            results_first_rejection={
+                "reason":"combined_odds_or_expected_roi_below_results_first_gate",
+                "candidate_combined_odds":round(combined,3),
+                "candidate_expected_roi":round(current_expected_roi,6),
+                "active_min_combined_odds":active_min_combined_odds(),
+                "min_expected_roi":RESULTS_FIRST_MIN_EXPECTED_ROI,
             }
         batch_events={str(x.get("event_id") or "") for x in batch if x.get("event_id")}
         used_events.update(batch_events)
@@ -2175,7 +2164,7 @@ def build_value_batches(candidates):
         mixed_pool=[
             x for x in eligible_all
             if str(x.get("qualification_lane") or "") in {
-                "vfootball_exact_evidence_value","efootball_exact_evidence_value"
+                "vfootball_exact_evidence_value","vfootball_event_holdout_value","efootball_exact_evidence_value"
             }
         ]
         mixed_diag={
@@ -2196,7 +2185,7 @@ def build_value_batches(candidates):
         mixed_pool=[
             x for x in eligible_all
             if str(x.get("qualification_lane") or "") in {
-                "vfootball_exact_evidence_value","efootball_exact_evidence_value"
+                "vfootball_exact_evidence_value","vfootball_event_holdout_value","efootball_exact_evidence_value"
             }
         ]
         mixed_options,mixed_diag=_construct_mixed_virtual_efootball_batches(
@@ -2442,7 +2431,7 @@ def build_value_batches(candidates):
         "ranking_metric":"settled exact-line/side hit rate first; calibrated probability second; odds only tie-breaker",
         "construction_shape_diagnostics":construction_shapes,
         "secondary_pool_eligible_legs":sum(1 for x in eligible_all if str(x.get("product") or "")!="vfootball" and (str(x.get("sport") or "") in {"football","tennis"} or str(x.get("product") or "").startswith("efootball_"))),
-        "mixed_pool_eligible_legs":sum(1 for x in eligible_all if str(x.get("qualification_lane") or "") in {"vfootball_exact_evidence_value","efootball_exact_evidence_value"}),
+        "mixed_pool_eligible_legs":sum(1 for x in eligible_all if str(x.get("qualification_lane") or "") in {"vfootball_exact_evidence_value","vfootball_event_holdout_value","efootball_exact_evidence_value"}),
         "mixed_max_kickoff_span_minutes":MIXED_RESEARCH_MAX_KICKOFF_SPAN_MINUTES,
         "mixed_diagnostics":mixed_diag
     }
