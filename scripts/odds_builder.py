@@ -1706,18 +1706,27 @@ def _construct_model_first_batch(pool, max_legs=MAX_LEGS, min_odds=MIN_COMBINED_
     # can satisfy the numeric odds floor by itself (for example 2.80x), but that
     # must never outrank a valid 2-leg construction and then be discarded later by
     # build_value_batches. Enforce the minimum leg count at the construction stage.
-    valid=[rows for rows in candidates
-           if rows
-           and BATCH_MIN_LEGS<=len(rows)<=min(RESULTS_FIRST_MAX_LEGS,max_legs)
-           and legs_meet_safe_model_threshold(rows)
-           and math.prod(float(y.get("bookmaker_odds") or 1.0) for y in rows)>=min_odds]
+    valid=[]
+    for rows in candidates:
+        if not rows or not (BATCH_MIN_LEGS<=len(rows)<=min(RESULTS_FIRST_MAX_LEGS,max_legs)):
+            continue
+        if not legs_meet_safe_model_threshold(rows):
+            continue
+        odds=math.prod(float(y.get("bookmaker_odds") or 1.0) for y in rows)
+        if odds<min_odds:
+            continue
+        raw=math.prod(max(0.0005,min(0.9995,float(x.get("model_probability") or 0.0))) for x in rows)
+        calibrated=_calibrated_ticket_probability(raw)
+        if (calibrated*odds)-1.0 < RESULTS_FIRST_MIN_EXPECTED_ROI:
+            continue
+        valid.append((rows,calibrated,odds))
     if valid:
-        return max(valid,key=lambda rows:(
-            math.prod(max(0.0005,min(0.9995,float(x.get("model_probability") or 0.0))) for x in rows),
-            -len(rows),
-            sum(float(x.get("model_edge") or 0.0) for x in rows)/len(rows),
-            math.prod(float(x.get("bookmaker_odds") or 1.0) for x in rows)
-        ))
+        return max(valid,key=lambda item:(
+            item[1],
+            -len(item[0]),
+            sum(float(x.get("model_edge") or 0.0) for x in item[0])/len(item[0]),
+            item[2]
+        ))[0]
     return []
 
 
