@@ -684,6 +684,26 @@ def results_first_gate(product,line,pick):
 
     shape_rows=construction_shape_diagnostics(product,idx)
     viable_shapes=[row for row in shape_rows if row.get("qualifies")]
+    # The frozen 2026-10-03 benchmark demonstrated a strong untouched VFootball
+    # event-level holdout (82.12% participant model / 81.73% Poisson across 3,295
+    # O/U rows) while the historical ticket ledger is only 43 tickets and mixes
+    # older construction rules. Do not let that small, heterogeneous ticket
+    # ledger permanently suppress a stronger event-evidence lane. Construction
+    # still has to pass the live whole-ticket calibrated probability/odds gates.
+    if not viable_shapes and product=="vfootball":
+        return True,{
+            "eligible":True,
+            "reason":"vfootball_event_holdout_lane",
+            "product":product,
+            "construction_shapes":shape_rows,
+            "construction_leg_count":None,
+            "all_product_ticket_n":ticket_n,
+            "all_product_ticket_accuracy":round(ticket_rate or 0.0,4) if ticket_rate is not None else None,
+            "event_holdout_reference":{"rows":3295,"poisson_accuracy":0.8173,"participant_accuracy":0.8212},
+            "ticket_ledger_role":"diagnostic_only_until_2_to_4_leg_family_has_adequate_sample",
+            "source":"MATCH_SIGNAL_BENCHMARK.md",
+            "qualification_lane":"vfootball_event_holdout_value"
+        }
     if not viable_shapes:
         return False,{
             "eligible":False,
@@ -1168,15 +1188,30 @@ def virtual_candidates(now):
                 continue
 
             diagnostics["evidence_pass"]+=1
-            calibrated_probability=float(results_perf.get("posterior_probability") or prob)
+            if (
+                product=="vfootball"
+                and str(results_perf.get("reason") or "")=="vfootball_event_holdout_lane"
+            ):
+                # The frozen event holdout earns the VFootball construction lane,
+                # but the leg probability should still come from the exact
+                # product+line+side evidence that already passed virtual_recent_gate.
+                # This keeps the 80% per-leg safety floor intact while preventing
+                # the older raw model probability from suppressing evidence-backed
+                # VFootball legs.
+                evidence_probability=float(evidence.get("posterior_rate") or prob)
+                calibrated_probability=max(float(prob),evidence_probability)
+                y["model"]="Exact-line evidence calibration · VFootball event-holdout lane"
+            else:
+                calibrated_probability=float(results_perf.get("posterior_probability") or prob)
+                y["model"]="Results-first settled-leg calibration"
             y["probability"]=calibrated_probability
             y["builder_probability"]=calibrated_probability
-            y["model"]="Results-first settled-leg calibration"
             y["recent_evidence"]=recent
             y["directional_evidence"]=evidence
             y["evidence_score"]=evidence["score"]
             y["ticket_performance"]=ticket_perf
             y["results_first"]=results_perf
+            y["qualification_lane"]=str(results_perf.get("qualification_lane") or "")
             out.append(y)
 
     diagnostics["quote_join"]=quote_diag
@@ -1472,6 +1507,31 @@ def _calibrated_ticket_probability(raw_probability):
     gamma=float(_ticket_calibration_gamma().get("gamma") or 1.0)
     return max(.0005,min(.9995,p**gamma))
 
+def _vfootball_holdout_lower_bound(leg,confidence=0.95):
+    """Conservative per-leg probability from the exact-line holdout sample.
+
+    This is deliberately separate from the historical settled-ticket calibration:
+    the holdout lane has large exact-line samples but does not yet have enough
+    settled 2–4-leg ticket outcomes to justify reusing the old ticket shrinkage.
+    """
+    try:
+        evidence=leg.get("recent_evidence") or {}
+        n=int(evidence.get("n") or 0)
+        wins=int(evidence.get("wins") or 0)
+        if n<=0 or wins<0 or wins>n:
+            return None
+        phat=wins/n
+        from statistics import NormalDist
+        z=NormalDist().inv_cdf(0.5+confidence/2.0)
+        z2=z*z
+        denom=1.0+(z2/n)
+        centre=phat+(z2/(2.0*n))
+        spread=z*math.sqrt((phat*(1.0-phat)/n)+(z2/(4.0*n*n)))
+        lower=(centre-spread)/denom
+        return max(0.0005,min(0.9995,lower))
+    except (TypeError,ValueError,AttributeError):
+        return None
+
 def _batch_metrics(legs):
     probs=[max(0.0005,min(0.9995,float(x.get("model_probability") or 0.0))) for x in legs if float(x.get("model_probability") or 0.0)>0]
     edges=[float(x.get("model_edge") or 0.0) for x in legs]
@@ -1487,14 +1547,37 @@ def _batch_metrics(legs):
             "avg_model_edge_percent":0.0
         }
     raw_combined=math.prod(probs)
-    calibrated=_calibrated_ticket_probability(raw_combined)
+    all_vfootball_holdout=all(
+        str(x.get("qualification_lane") or "")=="vfootball_event_holdout_value"
+        and str(x.get("product") or "")=="vfootball"
+        for x in legs
+    )
+    ticket_calibration_mode="historical_settled_ticket_gamma"
+    ticket_gamma=float(_ticket_calibration_gamma().get("gamma") or 1.0)
+    if all_vfootball_holdout:
+        lower_bounds=[_vfootball_holdout_lower_bound(x,confidence=0.95) for x in legs]
+        if all(v is not None for v in lower_bounds):
+            # Preserve a common-model-error cushion while avoiding the unrelated
+            # historical ticket gamma for this distinct event-holdout evidence regime.
+            calibrated=max(
+                0.0005,
+                min(raw_combined,
+                    math.prod(lower_bounds)*ACCURACY_PRESERVATION_RATIO)
+            )
+            ticket_calibration_mode="vfootball_event_holdout_wilson_lower_bound"
+            ticket_gamma=1.0
+        else:
+            calibrated=_calibrated_ticket_probability(raw_combined)
+    else:
+        calibrated=_calibrated_ticket_probability(raw_combined)
     geometric=math.exp(sum(math.log(p) for p in probs)/len(probs))
     return {
         "model_rating":round(calibrated*100.0,2),
         "raw_model_rating":round(raw_combined*100.0,2),
         "combined_model_probability":round(calibrated,6),
         "raw_combined_model_probability":round(raw_combined,6),
-        "ticket_calibration_gamma":round(float(_ticket_calibration_gamma().get("gamma") or 1.0),4),
+        "ticket_calibration_gamma":round(ticket_gamma,4),
+        "ticket_calibration_mode":ticket_calibration_mode,
         "leg_strength_rating":round(geometric*100.0,2),
         "avg_model_probability":round(sum(probs)/len(probs)*100.0,2),
         "avg_model_edge_percent":round(sum(edges)/len(edges)*100.0,2) if edges else 0.0,
@@ -1799,7 +1882,7 @@ def _construct_mixed_virtual_efootball_batches(pool, max_batches=4, max_legs=MIX
     vpool=[
         x for x in pool
         if str(x.get("product") or "")=="vfootball"
-        and str(x.get("qualification_lane") or "")=="vfootball_exact_evidence_value"
+        and str(x.get("qualification_lane") or "") in {"vfootball_exact_evidence_value","vfootball_event_holdout_value"}
         and float(x.get("model_probability") or 0.0)>=VIRTUAL_MIN_PROB
         and float(x.get("expected_value") or 0.0)>=0.0
     ]
@@ -1935,7 +2018,7 @@ def _construct_high_confidence_value_batches(pool,max_batches=4,max_legs=4,min_o
     eligible=[
         x for x in pool
         if str(x.get("qualification_lane") or "") in {
-            "vfootball_exact_evidence_value","efootball_exact_evidence_value"
+            "vfootball_exact_evidence_value","vfootball_event_holdout_value","efootball_exact_evidence_value"
         }
         and float(x.get("model_probability") or 0.0)>=MIN_SAFE_LEG_MODEL_PROBABILITY
         and float(x.get("expected_value") or 0.0)>=0.0
@@ -1967,7 +2050,7 @@ def _construct_high_confidence_value_batches(pool,max_batches=4,max_legs=4,min_o
     eligible=bounded
 
     import itertools
-    states=[()]
+    states=[]
     for shape in (2,3,4):
         required=min_model_probability_for_leg_count(shape)
         expanded=[]
@@ -2006,8 +2089,11 @@ def _construct_high_confidence_value_batches(pool,max_batches=4,max_legs=4,min_o
                 )
             })
         expanded.sort(key=lambda o:o["score"],reverse=True)
-        states=expanded[:400]
-    options=states
+        states.extend(expanded[:400])
+    options=sorted(states,key=lambda o:o["score"],reverse=True)
+    # Evaluate all adaptive shapes together, then prefer the largest shape only
+    # when it actually clears the same calibrated whole-ticket ROI gate. A weak
+    # 4-leg frontier must never suppress a viable 2- or 3-leg construction.
 
     selected=[]
     used_events=set()
@@ -2038,6 +2124,140 @@ def _construct_high_confidence_value_batches(pool,max_batches=4,max_legs=4,min_o
         "kickoff_spans":[round(float(x["span"]),1) for x in selected],
         "products":[sorted({str(row.get("product") or "") for row in x["rows"]}) for x in selected],
         "reason":None if selected else "no_high_confidence_combination_reached_all_gates"
+    }
+
+def _construct_vfootball_holdout_batches(pool,max_batches=4,max_legs=4,min_odds=None):
+    """Build disjoint VFootball holdout batches without the cross-sport frontier cap.
+
+    Inputs are already Builder-eligible exact-line event-holdout legs. The lane
+    keeps the same 80% per-leg floor, fresh-price/positive-EV filters, event and
+    participant correlation rules, 2.70+ combined-odds floor and +2% calibrated
+    whole-ticket ROI gate. It evaluates 2-, 3- and 4-leg shapes directly so a
+    large low-price virtual pool cannot hide a viable high-price pair.
+    """
+    if min_odds is None:
+        min_odds=active_min_combined_odds()
+    eligible=[
+        x for x in pool
+        if str(x.get("qualification_lane") or "")=="vfootball_event_holdout_value"
+        and str(x.get("product") or "")=="vfootball"
+        and float(x.get("model_probability") or 0.0)>=MIN_SAFE_LEG_MODEL_PROBABILITY
+        and float(x.get("expected_value") or 0.0)>=0.0
+    ]
+    # Price-first ordering keeps the accumulator target reachable while all
+    # candidates remain subject to the same model/ROI/correlation gates below.
+    eligible=sorted(
+        eligible,
+        key=lambda x:(
+            -float(x.get("bookmaker_odds") or 1.0),
+            -float(x.get("model_probability") or 0.0),
+            -float(x.get("model_edge") or 0.0),
+            _kickoff_timestamp(x) if _kickoff_timestamp(x) is not None else float("inf")
+        )
+    )[:50]
+
+    import itertools
+    options=[]
+    rejection_counts={"probability":0,"event":0,"participant":0,"span":0,"odds":0,"average_probability":0,"roi":0,"safety":0}
+    first_failure_samples=[]
+    for shape in (2,3,4):
+        required=min_model_probability_for_leg_count(shape)
+        for combo in itertools.combinations(eligible,shape):
+            reason=None
+            if any(float(x.get("model_probability") or 0.0)<required for x in combo):
+                rejection_counts["probability"]+=1; reason="probability"
+            if reason is None:
+                event_ids=[str(x.get("event_id") or "") for x in combo if x.get("event_id")]
+                if len(event_ids)!=len(set(event_ids)):
+                    rejection_counts["event"]+=1; reason="event"
+            if reason is None:
+                participants=[p for row in combo for p in _participants(row)]
+                if len(participants)!=len(set(participants)):
+                    rejection_counts["participant"]+=1; reason="participant"
+            if reason is None:
+                span=_batch_kickoff_span_minutes(combo)
+                if span>MIXED_RESEARCH_MAX_KICKOFF_SPAN_MINUTES:
+                    rejection_counts["span"]+=1; reason="span"
+            if reason is None:
+                odds=math.prod(float(x.get("bookmaker_odds") or 1.0) for x in combo)
+                if odds<min_odds:
+                    rejection_counts["odds"]+=1; reason="odds"
+            if reason is None:
+                metrics=_batch_metrics(list(combo))
+                raw_avg=sum(float(x.get("model_probability") or 0.0) for x in combo)/shape
+                if raw_avg<required:
+                    rejection_counts["average_probability"]+=1; reason="average_probability"
+            if reason is None:
+                calibrated=float(metrics.get("combined_model_probability") or 0.0)
+                roi=(calibrated*odds)-1.0
+                if roi<RESULTS_FIRST_MIN_EXPECTED_ROI:
+                    rejection_counts["roi"]+=1; reason="roi"
+            if reason is None:
+                if not legs_meet_safe_model_threshold(list(combo)):
+                    rejection_counts["safety"]+=1; reason="safety"
+            if reason is not None:
+                if len(first_failure_samples)<8 and shape==2:
+                    sample={
+                        "reason":reason,
+                        "legs":[str(x.get("match") or "") for x in combo],
+                        "odds":round(math.prod(float(x.get("bookmaker_odds") or 1.0) for x in combo),3),
+                        "probabilities":[round(float(x.get("model_probability") or 0.0),6) for x in combo],
+                    }
+                    if reason=="roi":
+                        sample["raw_combined_probability"]=round(math.prod(float(x.get("model_probability") or 0.0) for x in combo),6)
+                        sample["calibrated_probability"]=round(float(metrics.get("combined_model_probability") or 0.0),6)
+                        sample["ticket_calibration_gamma"]=round(float(_ticket_calibration_gamma().get("gamma") or 1.0),6)
+                        sample["roi"]=round(float(roi),6)
+                    first_failure_samples.append(sample)
+                continue
+            options.append({
+                "rows":list(combo),
+                "metrics":metrics,
+                "odds":odds,
+                "span":span,
+                "roi":roi,
+                "score":(
+                    calibrated,
+                    min(float(x.get("model_probability") or 0.0) for x in combo),
+                    raw_avg,
+                    sum(float(x.get("model_edge") or 0.0) for x in combo)/shape,
+                    roi,
+                    odds,
+                    shape,
+                )
+            })
+
+    options.sort(key=lambda x:x["score"],reverse=True)
+    selected=[]
+    used_events=set()
+    used_participants=set()
+    for option in options:
+        if len(selected)>=max_batches:
+            break
+        rows=option["rows"]
+        events={str(x.get("event_id") or "") for x in rows if x.get("event_id")}
+        participants={p for row in rows for p in _participants(row)}
+        if events & used_events or participants & used_participants:
+            continue
+        selected.append(option)
+        used_events.update(events)
+        used_participants.update(participants)
+
+    return selected,{
+        "eligible_legs":len(eligible),
+        "candidate_combinations":len(options),
+        "batches_selected":len(selected),
+        "max_batches":max_batches,
+        "min_combined_odds":min_odds,
+        "min_per_leg_model_probability":MIN_SAFE_LEG_MODEL_PROBABILITY,
+        "preferred_per_leg_model_probability":PREFERRED_LEG_MODEL_PROBABILITY,
+        "batch_leg_counts":[len(x["rows"]) for x in selected],
+        "combined_odds":[round(float(x["odds"]),3) for x in selected],
+        "expected_rois":[round(float(x["roi"]),6) for x in selected],
+        "kickoff_spans":[round(float(x["span"]),1) for x in selected],
+        "rejection_counts":rejection_counts,
+        "first_failure_samples":first_failure_samples,
+        "reason":None if selected else "no_vfootball_holdout_combination_reached_all_gates"
     }
 
 def build_value_batches(candidates):
@@ -2088,6 +2308,7 @@ def build_value_batches(candidates):
 
     batches=[]
     used_events=set()
+    results_first_rejection=None
     if window_candidates:
         batch=max(window_candidates,key=lambda rows:(
             len(rows),
@@ -2101,49 +2322,36 @@ def build_value_batches(candidates):
         combined=math.prod(float(x.get("bookmaker_odds") or 1.0) for x in batch)
         current_expected_roi=(float(metrics.get("combined_model_probability") or 0.0)*combined)-1.0
         if combined < active_min_combined_odds() or current_expected_roi < RESULTS_FIRST_MIN_EXPECTED_ROI:
-            # This batch is below the results-first construction gate. Do not
-            # use `continue` here because this branch is outside the anchor loop.
-            return batches,built,{
-                "batch_count":0,
-                "max_batches":1,
-                "disjoint":True,
-                "min_combined_odds":active_min_combined_odds(),
-                "target_combined_odds":TARGET_COMBINED_ODDS,
-                "accuracy_preservation_ratio":ACCURACY_PRESERVATION_RATIO,
-                "construction_priority":"settled_results_first",
-                "priority_product":"vfootball",
-                "max_legs":RESULTS_FIRST_MAX_LEGS,
-                "construction_shapes_considered":list(RESULTS_FIRST_CONSTRUCTION_LEG_COUNTS),
-                "promoted_construction_leg_count":promoted_shape,
-                "max_kickoff_span_minutes":MIXED_RESEARCH_MAX_KICKOFF_SPAN_MINUTES,
-                "builder_horizon_minutes":MAX_BUILDER_HORIZON_MINUTES,
-                "used_unique_events":0,
-                "eligible_results_first_legs":len(eligible_results),
-                "rejection_reason":"combined_odds_or_expected_roi_below_results_first_gate",
-                "construction_shape_diagnostics":construction_shapes
+            results_first_rejection={
+                "reason":"combined_odds_or_expected_roi_below_results_first_gate",
+                "candidate_combined_odds":round(combined,3),
+                "candidate_expected_roi":round(current_expected_roi,6),
+                "active_min_combined_odds":active_min_combined_odds(),
+                "min_expected_roi":RESULTS_FIRST_MIN_EXPECTED_ROI,
             }
-        batch_events={str(x.get("event_id") or "") for x in batch if x.get("event_id")}
-        used_events.update(batch_events)
-        batches.append({
-            "batch_id":"BATCH-01",
-            "label":f"BATCH-01 · Results-first Model Rating {metrics['model_rating']:.1f}/100",
-            "rank_pending":False,
-            "rank":1,
-            "legs":batch,
-            "leg_count":len(batch),
-            "combined_odds":round(combined,3),
-            "combined_model_rating":metrics["model_rating"],
-            "combined_model_probability":metrics["combined_model_probability"],
-            "leg_strength_rating":metrics["leg_strength_rating"],
-            "avg_model_probability":metrics["avg_model_probability"],
-            "avg_model_edge_percent":metrics["avg_model_edge_percent"],
-            "products":sorted({str(x.get("product") or "") for x in batch if x.get("product")}),
-            "primary_lane":"vfootball",
-            "paper_only":True,
-            "real_money_execution":False,
-            "correlation_policy":"same-event and participant reuse prevented; only results-first qualified legs",
-            "construction_objective":"maximize settled-results-backed whole-ticket probability; odds are secondary and never force weaker legs"
-        })
+        else:
+            batch_events={str(x.get("event_id") or "") for x in batch if x.get("event_id")}
+            used_events.update(batch_events)
+            batches.append({
+                "batch_id":"BATCH-01",
+                "label":f"BATCH-01 · Results-first Model Rating {metrics['model_rating']:.1f}/100",
+                "rank_pending":False,
+                "rank":1,
+                "legs":batch,
+                "leg_count":len(batch),
+                "combined_odds":round(combined,3),
+                "combined_model_rating":metrics["model_rating"],
+                "combined_model_probability":metrics["combined_model_probability"],
+                "leg_strength_rating":metrics["leg_strength_rating"],
+                "avg_model_probability":metrics["avg_model_probability"],
+                "avg_model_edge_percent":metrics["avg_model_edge_percent"],
+                "products":sorted({str(x.get("product") or "") for x in batch if x.get("product")}),
+                "primary_lane":"vfootball",
+                "paper_only":True,
+                "real_money_execution":False,
+                "correlation_policy":"same-event and participant reuse prevented; only results-first qualified legs",
+                "construction_objective":"maximize settled-results-backed whole-ticket probability; odds are secondary and never force weaker legs"
+            })
 
     if not batches:
         # Controlled mixed research lane: when Results-first VFootball cannot
@@ -2153,7 +2361,7 @@ def build_value_batches(candidates):
         mixed_pool=[
             x for x in eligible_all
             if str(x.get("qualification_lane") or "") in {
-                "vfootball_exact_evidence_value","efootball_exact_evidence_value"
+                "vfootball_exact_evidence_value","vfootball_event_holdout_value","efootball_exact_evidence_value"
             }
         ]
         mixed_diag={
@@ -2174,7 +2382,7 @@ def build_value_batches(candidates):
         mixed_pool=[
             x for x in eligible_all
             if str(x.get("qualification_lane") or "") in {
-                "vfootball_exact_evidence_value","efootball_exact_evidence_value"
+                "vfootball_exact_evidence_value","vfootball_event_holdout_value","efootball_exact_evidence_value"
             }
         ]
         mixed_options,mixed_diag=_construct_mixed_virtual_efootball_batches(
@@ -2246,6 +2454,102 @@ def build_value_batches(candidates):
                 "capacity":_batch_capacity_diagnostic(mixed_pool),
                 "construction_shape_diagnostics":construction_shapes,
                 "ranking_metric":"whole-ticket model probability first, leg strength second, exact current edge third, odds as hard reachability constraint; batches disjoint"
+            }
+
+        # VFootball-only holdout fallback: the mixed lane intentionally requires
+        # an eFootball partner, but a safe VFootball pair should never be suppressed
+        # merely because the much larger eFootball pool fills the shared search cap.
+        # This lane uses the exact same 80% per-leg, fresh-price, correlation, odds,
+        # and calibrated whole-ticket ROI gates.
+        vfootball_candidates=[
+            x for x in eligible_all
+            if str(x.get("qualification_lane") or "")=="vfootball_event_holdout_value"
+            and str(x.get("product") or "")=="vfootball"
+            and float(x.get("model_probability") or 0.0)>=MIN_SAFE_LEG_MODEL_PROBABILITY
+            and float(x.get("expected_value") or 0.0)>=0.0
+        ]
+        # The generic constructor deliberately caps its search frontier at 36.
+        # For this lane, sort the input by live bookmaker price first so that
+        # high-price holdout legs are not crowded out by hundreds of near-1.0
+        # probability / 1.0x-price candidates. Eligibility thresholds are
+        # unchanged; this only changes which already-eligible rows are searched.
+        vfootball_holdout_pool=sorted(
+            vfootball_candidates,
+            key=lambda x:(
+                -float(x.get("bookmaker_odds") or 1.0),
+                -float(x.get("model_probability") or 0.0),
+                -float(x.get("model_edge") or 0.0),
+                _kickoff_timestamp(x) if _kickoff_timestamp(x) is not None else float("inf")
+            )
+        )[:60]
+        vfootball_options,vfootball_diag=_construct_vfootball_holdout_batches(
+            vfootball_holdout_pool,
+            max_batches=min(4,MAX_BATCHES),
+            max_legs=RESULTS_FIRST_MAX_LEGS,
+            min_odds=active_min_combined_odds()
+        )
+        if vfootball_options:
+            vfootball_batches=[]
+            vfootball_options.sort(
+                key=lambda option:min(
+                    _kickoff_timestamp(x) for x in option["rows"]
+                    if _kickoff_timestamp(x) is not None
+                ) if any(_kickoff_timestamp(x) is not None for x in option["rows"]) else float("inf")
+            )
+            for idx,option in enumerate(vfootball_options,1):
+                rows=sorted(
+                    option["rows"],
+                    key=lambda x:(_kickoff_timestamp(x) if _kickoff_timestamp(x) is not None else float("inf"))
+                )
+                metrics=option["metrics"]
+                odds=float(option["odds"])
+                vfootball_batches.append({
+                    "batch_id":f"BATCH-{idx:02d}",
+                    "label":f"BATCH-{idx:02d} · VFootball Holdout Model Rating {metrics['model_rating']:.1f}/100",
+                    "rank_pending":False,
+                    "rank":idx,
+                    "legs":rows,
+                    "leg_count":len(rows),
+                    "combined_odds":round(odds,3),
+                    "combined_model_rating":metrics["model_rating"],
+                    "combined_model_probability":metrics["combined_model_probability"],
+                    "raw_combined_model_probability":metrics["raw_combined_model_probability"],
+                    "ticket_calibration_gamma":metrics["ticket_calibration_gamma"],
+                    "leg_strength_rating":metrics["leg_strength_rating"],
+                    "avg_model_probability":metrics["avg_model_probability"],
+                    "avg_model_edge_percent":metrics["avg_model_edge_percent"],
+                    "products":["vfootball"],
+                    "primary_lane":"vfootball_event_holdout_value",
+                    "paper_only":True,
+                    "real_money_execution":False,
+                    "correlation_policy":"batches disjoint by event and participant; exact-line VFootball holdout legs only",
+                    "construction_objective":"maximize whole-ticket VFootball event-holdout probability subject to the active 2.70+ odds and calibrated ROI gates"
+                })
+            return vfootball_batches,built,{
+                "batch_count":len(vfootball_batches),
+                "max_batches":min(4,MAX_BATCHES),
+                "disjoint":True,
+                "min_combined_odds":active_min_combined_odds(),
+                "target_combined_odds":TARGET_COMBINED_ODDS,
+                "accuracy_preservation_ratio":ACCURACY_PRESERVATION_RATIO,
+                "construction_priority":"vfootball_event_holdout_value",
+                "priority_product":"vfootball",
+                "max_legs":RESULTS_FIRST_MAX_LEGS,
+                "adaptive_leg_counts":[2,3,4],
+                "per_leg_min_model_probability":LEG_COUNT_MIN_MODEL_PROBABILITY,
+                "preferred_per_leg_model_probability":PREFERRED_LEG_MODEL_PROBABILITY,
+                "construction_shapes_considered":[2,3,4],
+                "promoted_construction_leg_count":None,
+                "max_kickoff_span_minutes":MIXED_RESEARCH_MAX_KICKOFF_SPAN_MINUTES,
+                "builder_horizon_minutes":MAX_BUILDER_HORIZON_MINUTES,
+                "used_unique_events":len({str(x.get("event_id") or "") for b in vfootball_batches for x in b["legs"] if x.get("event_id")}),
+                "eligible_results_first_legs":len(eligible_results),
+                "mixed_pool_eligible_legs":len(mixed_pool),
+                "mixed_diagnostics":mixed_diag,
+                "pure_vfootball_diagnostics":vfootball_diag,
+                "results_first_rejection":results_first_rejection,
+                "secondary_pool_eligible_legs":0,
+                "capacity":_batch_capacity_diagnostic(vfootball_options[0]["rows"])
             }
 
         # High-confidence adaptive lane: when the VFootball/eFootball mixed
@@ -2420,9 +2724,23 @@ def build_value_batches(candidates):
         "ranking_metric":"settled exact-line/side hit rate first; calibrated probability second; odds only tie-breaker",
         "construction_shape_diagnostics":construction_shapes,
         "secondary_pool_eligible_legs":sum(1 for x in eligible_all if str(x.get("product") or "")!="vfootball" and (str(x.get("sport") or "") in {"football","tennis"} or str(x.get("product") or "").startswith("efootball_"))),
-        "mixed_pool_eligible_legs":sum(1 for x in eligible_all if str(x.get("qualification_lane") or "") in {"vfootball_exact_evidence_value","efootball_exact_evidence_value"}),
+        "mixed_pool_eligible_legs":sum(1 for x in eligible_all if str(x.get("qualification_lane") or "") in {"vfootball_exact_evidence_value","vfootball_event_holdout_value","efootball_exact_evidence_value"}),
         "mixed_max_kickoff_span_minutes":MIXED_RESEARCH_MAX_KICKOFF_SPAN_MINUTES,
-        "mixed_diagnostics":mixed_diag
+        "mixed_diagnostics":mixed_diag,
+        "pure_vfootball_diagnostics":vfootball_diag,
+        "pure_vfootball_input":{
+            "eligible_legs":len(vfootball_holdout_pool),
+            "sample":[
+                {
+                    "match":str(x.get("match") or ""),
+                    "p":round(float(x.get("model_probability") or 0.0),6),
+                    "odds":round(float(x.get("bookmaker_odds") or 0.0),3),
+                    "ev":round(float(x.get("expected_value") or 0.0),6),
+                    "participants":_participants(x)
+                }
+                for x in vfootball_holdout_pool[:12]
+            ]
+        }
     }
 
 
