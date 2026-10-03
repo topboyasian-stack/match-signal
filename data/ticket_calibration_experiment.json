@@ -1,0 +1,239 @@
+{
+  "generated_at": "2026-10-03T12:21:11.123569+00:00",
+  "mode": "PAPER_ONLY_DIAGNOSTIC",
+  "production_selection_changed": false,
+  "method": "strict chronological ticket-level walk-forward; each calibration weight uses only earlier settled tickets",
+  "warmup_tickets": 8,
+  "grid": [
+    0.0,
+    0.05,
+    0.1,
+    0.15,
+    0.2,
+    0.25,
+    0.3,
+    0.35,
+    0.4,
+    0.45,
+    0.5,
+    0.55,
+    0.6,
+    0.65,
+    0.7,
+    0.75,
+    0.8,
+    0.85,
+    0.9,
+    0.95,
+    1.0
+  ],
+  "samples": {
+    "all_settled": 43,
+    "modern_2_to_4": 19
+  },
+  "all_settled": {
+    "n": 35,
+    "naive": {
+      "n": 35,
+      "hit_rate": 0.37142857142857144,
+      "avg_probability": 0.5296239714285714,
+      "brier": 0.2352481831423714,
+      "log_loss": 0.6631619918641249
+    },
+    "market": {
+      "n": 35,
+      "hit_rate": 0.37142857142857144,
+      "avg_probability": 0.35354271834757905,
+      "brier": 0.1950169386495844,
+      "log_loss": 0.5805294476811306
+    },
+    "linear_blend": {
+      "n": 35,
+      "hit_rate": 0.37142857142857144,
+      "avg_probability": 0.35407684206165213,
+      "brier": 0.19529193177924228,
+      "log_loss": 0.581248771134931
+    },
+    "logit_blend": {
+      "n": 35,
+      "hit_rate": 0.37142857142857144,
+      "avg_probability": 0.35397949741853707,
+      "brier": 0.19524032584079873,
+      "log_loss": 0.5811163169163109
+    },
+    "mean_linear_alpha": 0.0014285714285714286,
+    "mean_logit_alpha": 0.0014285714285714286
+  },
+  "modern_2_to_4": {
+    "n": 11,
+    "naive": {
+      "n": 11,
+      "hit_rate": 0.45454545454545453,
+      "avg_probability": 0.7498914545454546,
+      "brier": 0.23719648295218185,
+      "log_loss": 0.6682940671286881
+    },
+    "market": {
+      "n": 11,
+      "hit_rate": 0.45454545454545453,
+      "avg_probability": 0.5891309993039676,
+      "brier": 0.11753331175525422,
+      "log_loss": 0.4124336007739235
+    },
+    "linear_blend": {
+      "n": 11,
+      "hit_rate": 0.45454545454545453,
+      "avg_probability": 0.5891309993039676,
+      "brier": 0.11753331175525422,
+      "log_loss": 0.4124336007739235
+    },
+    "logit_blend": {
+      "n": 11,
+      "hit_rate": 0.45454545454545453,
+      "avg_probability": 0.5891309993039676,
+      "brier": 0.11753331175525422,
+      "log_loss": 0.4124336007739235
+    },
+    "mean_linear_alpha": 0.0,
+    "mean_logit_alpha": 0.0
+  },
+  "decision": {
+    "promotion_allowed": false,
+    "reason": "Calibration experiment must be independently reviewed before production use.",
+    "note": "A lower Brier/log-loss on the held-forward rows is evidence for calibration, not evidence of future profitability."
+  },
+  "modern_predictions": [
+    {
+      "ticket_id": "T-1313F038B554",
+      "settled_at": null,
+      "leg_count": 4,
+      "status": "LOST",
+      "model_probability": 0.599228,
+      "market_probability": 0.25163563160543534,
+      "linear_alpha": 0.0,
+      "linear_probability": 0.25163563160543534,
+      "logit_alpha": 0.0,
+      "logit_probability": 0.25163563160543534
+    },
+    {
+      "ticket_id": "T-1554690A85BF",
+      "settled_at": null,
+      "leg_count": 4,
+      "status": "LOST",
+      "model_probability": 0.599228,
+      "market_probability": 0.2545176889793841,
+      "linear_alpha": 0.0,
+      "linear_probability": 0.2545176889793841,
+      "logit_alpha": 0.0,
+      "logit_probability": 0.2545176889793841
+    },
+    {
+      "ticket_id": "T-BDA1B1499207",
+      "settled_at": null,
+      "leg_count": 3,
+      "status": "LOST",
+      "model_probability": 0.428572,
+      "market_probability": 0.1893939393939394,
+      "linear_alpha": 0.0,
+      "linear_probability": 0.1893939393939394,
+      "logit_alpha": 0.0,
+      "logit_probability": 0.18939393939393942
+    },
+    {
+      "ticket_id": "T-7D17D96F1BA3",
+      "settled_at": null,
+      "leg_count": 2,
+      "status": "LOST",
+      "model_probability": 0.642858,
+      "market_probability": 0.34305317324185247,
+      "linear_alpha": 0.0,
+      "linear_probability": 0.34305317324185247,
+      "logit_alpha": 0.0,
+      "logit_probability": 0.34305317324185247
+    },
+    {
+      "ticket_id": "T-4E67F8F165B1",
+      "settled_at": null,
+      "leg_count": 2,
+      "status": "LOST",
+      "model_probability": 0.642858,
+      "market_probability": 0.3024803387779794,
+      "linear_alpha": 0.0,
+      "linear_probability": 0.3024803387779794,
+      "logit_alpha": 0.0,
+      "logit_probability": 0.30248033877797936
+    },
+    {
+      "ticket_id": "T-0FA48D7C92D7",
+      "settled_at": null,
+      "leg_count": 2,
+      "status": "WON",
+      "model_probability": 0.90679,
+      "market_probability": 0.9066183136899365,
+      "linear_alpha": 0.0,
+      "linear_probability": 0.9066183136899365,
+      "logit_alpha": 0.0,
+      "logit_probability": 0.9066183136899365
+    },
+    {
+      "ticket_id": "T-942F41B0E8C2",
+      "settled_at": null,
+      "leg_count": 2,
+      "status": "WON",
+      "model_probability": 0.90679,
+      "market_probability": 0.9242144177449167,
+      "linear_alpha": 0.0,
+      "linear_probability": 0.9242144177449167,
+      "logit_alpha": 0.0,
+      "logit_probability": 0.9242144177449167
+    },
+    {
+      "ticket_id": "T-2BAA4983FFC9",
+      "settled_at": null,
+      "leg_count": 2,
+      "status": "WON",
+      "model_probability": 0.90679,
+      "market_probability": 0.8984725965858041,
+      "linear_alpha": 0.0,
+      "linear_probability": 0.8984725965858041,
+      "logit_alpha": 0.0,
+      "logit_probability": 0.8984725965858041
+    },
+    {
+      "ticket_id": "T-E88E0493D881",
+      "settled_at": null,
+      "leg_count": 2,
+      "status": "WON",
+      "model_probability": 0.90679,
+      "market_probability": 0.8190008190008189,
+      "linear_alpha": 0.0,
+      "linear_probability": 0.8190008190008189,
+      "logit_alpha": 0.0,
+      "logit_probability": 0.8190008190008189
+    },
+    {
+      "ticket_id": "T-A8FA9652BD80",
+      "settled_at": null,
+      "leg_count": 2,
+      "status": "LOST",
+      "model_probability": 0.899787,
+      "market_probability": 0.8818342151675486,
+      "linear_alpha": 0.0,
+      "linear_probability": 0.8818342151675486,
+      "logit_alpha": 0.0,
+      "logit_probability": 0.8818342151675486
+    },
+    {
+      "ticket_id": "T-08FC1388A253",
+      "settled_at": null,
+      "leg_count": 4,
+      "status": "WON",
+      "model_probability": 0.809115,
+      "market_probability": 0.7092198581560284,
+      "linear_alpha": 0.0,
+      "linear_probability": 0.7092198581560284,
+      "logit_alpha": 0.0,
+      "logit_probability": 0.7092198581560284
+    }
+  ]
+}
