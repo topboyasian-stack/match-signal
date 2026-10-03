@@ -2110,32 +2110,51 @@ def _construct_vfootball_holdout_batches(pool,max_batches=4,max_legs=4,min_odds=
 
     import itertools
     options=[]
+    rejection_counts={"probability":0,"event":0,"participant":0,"span":0,"odds":0,"average_probability":0,"roi":0,"safety":0}
+    first_failure_samples=[]
     for shape in (2,3,4):
         required=min_model_probability_for_leg_count(shape)
         for combo in itertools.combinations(eligible,shape):
+            reason=None
             if any(float(x.get("model_probability") or 0.0)<required for x in combo):
-                continue
-            event_ids=[str(x.get("event_id") or "") for x in combo if x.get("event_id")]
-            if len(event_ids)!=len(set(event_ids)):
-                continue
-            participants=[p for row in combo for p in _participants(row)]
-            if len(participants)!=len(set(participants)):
-                continue
-            span=_batch_kickoff_span_minutes(combo)
-            if span>MIXED_RESEARCH_MAX_KICKOFF_SPAN_MINUTES:
-                continue
-            odds=math.prod(float(x.get("bookmaker_odds") or 1.0) for x in combo)
-            if odds<min_odds:
-                continue
-            metrics=_batch_metrics(list(combo))
-            raw_avg=sum(float(x.get("model_probability") or 0.0) for x in combo)/shape
-            if raw_avg<required:
-                continue
-            calibrated=float(metrics.get("combined_model_probability") or 0.0)
-            roi=(calibrated*odds)-1.0
-            if roi<RESULTS_FIRST_MIN_EXPECTED_ROI:
-                continue
-            if not legs_meet_safe_model_threshold(list(combo)):
+                rejection_counts["probability"]+=1; reason="probability"
+            if reason is None:
+                event_ids=[str(x.get("event_id") or "") for x in combo if x.get("event_id")]
+                if len(event_ids)!=len(set(event_ids)):
+                    rejection_counts["event"]+=1; reason="event"
+            if reason is None:
+                participants=[p for row in combo for p in _participants(row)]
+                if len(participants)!=len(set(participants)):
+                    rejection_counts["participant"]+=1; reason="participant"
+            if reason is None:
+                span=_batch_kickoff_span_minutes(combo)
+                if span>MIXED_RESEARCH_MAX_KICKOFF_SPAN_MINUTES:
+                    rejection_counts["span"]+=1; reason="span"
+            if reason is None:
+                odds=math.prod(float(x.get("bookmaker_odds") or 1.0) for x in combo)
+                if odds<min_odds:
+                    rejection_counts["odds"]+=1; reason="odds"
+            if reason is None:
+                metrics=_batch_metrics(list(combo))
+                raw_avg=sum(float(x.get("model_probability") or 0.0) for x in combo)/shape
+                if raw_avg<required:
+                    rejection_counts["average_probability"]+=1; reason="average_probability"
+            if reason is None:
+                calibrated=float(metrics.get("combined_model_probability") or 0.0)
+                roi=(calibrated*odds)-1.0
+                if roi<RESULTS_FIRST_MIN_EXPECTED_ROI:
+                    rejection_counts["roi"]+=1; reason="roi"
+            if reason is None:
+                if not legs_meet_safe_model_threshold(list(combo)):
+                    rejection_counts["safety"]+=1; reason="safety"
+            if reason is not None:
+                if len(first_failure_samples)<8 and shape==2:
+                    first_failure_samples.append({
+                        "reason":reason,
+                        "legs":[str(x.get("match") or "") for x in combo],
+                        "odds":round(math.prod(float(x.get("bookmaker_odds") or 1.0) for x in combo),3),
+                        "probabilities":[round(float(x.get("model_probability") or 0.0),6) for x in combo],
+                    })
                 continue
             options.append({
                 "rows":list(combo),
@@ -2182,6 +2201,8 @@ def _construct_vfootball_holdout_batches(pool,max_batches=4,max_legs=4,min_odds=
         "combined_odds":[round(float(x["odds"]),3) for x in selected],
         "expected_rois":[round(float(x["roi"]),6) for x in selected],
         "kickoff_spans":[round(float(x["span"]),1) for x in selected],
+        "rejection_counts":rejection_counts,
+        "first_failure_samples":first_failure_samples,
         "reason":None if selected else "no_vfootball_holdout_combination_reached_all_gates"
     }
 
