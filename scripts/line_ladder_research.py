@@ -24,6 +24,7 @@ BUILDER = DATA / "odds_builder.json"
 LIVE = DATA / "virtual_lab_live.json"
 OUTPUT = DATA / "line_ladder_research.json"
 
+LINE_LADDER_RESEARCH_VERSION = "1.0.0-shadow"
 MODE = "PAPER_RESEARCH_ONLY"
 MIN_EVIDENCE = 50
 MIN_HOLDOUT = 30
@@ -554,6 +555,7 @@ def main():
 
     output = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
+        "version": LINE_LADDER_RESEARCH_VERSION,
         "mode": MODE,
         "status": "SHADOW_RESEARCH_ONLY",
         "scope": "virtual_ou_directional_anchor_to_live_ladder",
