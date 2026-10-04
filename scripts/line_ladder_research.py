@@ -333,6 +333,8 @@ def current_anchors(builder, desk=None):
             if product not in SUPPORTED_PRODUCTS:
                 continue
             probability = number(row.get("model_probability"))
+            if probability is None:
+                probability = number(row.get("probability"))
             if probability is None or probability < ANCHOR_MIN_PROB:
                 continue
             line = line_from_row(row)
@@ -441,6 +443,7 @@ def main():
     history = load_json(HISTORY, [])
     builder = load_json(BUILDER, {})
     live = load_json(LIVE, {})
+    desk = load_json(DESK, {})
 
     observations = normalize_history(history)
     exact, product_side_line, product_comp_side_line, _ = build_indexes(
