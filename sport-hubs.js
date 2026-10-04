@@ -69,32 +69,35 @@ function unifiedMarketLine(x){
   const pick=String(x.pick||x.selection||"").toUpperCase();
   const market=x.market==="over_under"?("O/U "+pick+" "+(x.line??"")):marketLabel(x);
   const fairLabel=Number.isFinite(fair)?fair.toFixed(2):"—";
-  const marketReference=book!=null?("Market reference @ "+book.toFixed(2)):"Market reference —";
+  const qualified=Boolean(x.betting_qualified) || String(x.qualification_status||"").startsWith("BETTING_QUALIFIED");
+  const marketReference=qualified
+    ? (book!=null?("SportyBet @ "+book.toFixed(2)):"SportyBet quote unavailable")
+    : "SportyBet quote withheld · research only";
   const edgeLabel=Number.isFinite(edge)?((edge>=0?"+":"")+(edge*100).toFixed(1)+"%"):"—";
   const band=String(x.model_candidate_status||"").replaceAll("_"," ");
-  const q=x.betting_qualified?"BETTING-QUALIFIED":(band||x.qualification_status||"MODEL RESEARCH");
+  const q=qualified?"BETTING-QUALIFIED":(band||x.qualification_status||"MODEL RESEARCH");
   return '<div class="ms-market-row">'+
     '<span class="ms-market-name"><b>'+E(market)+'</b></span>'+
     '<span>Model rating <b>'+(p==null?"—":P(p))+'</b></span>'+
     '<span>Fair <b>'+E(fairLabel)+'</b></span>'+
     '<span>Evidence <b>'+E(String(x.evidence_depth||"model").replaceAll("_"," "))+'</b></span>'+
-    '<span class="'+(book!=null?"ms-book-live":"ms-book-missing")+'">'+E(marketReference)+'</span>'+
+    '<span class="'+(qualified&&book!=null?"ms-book-live":"ms-book-missing")+'">'+E(marketReference)+'</span>'+
     '<span>Edge <b>'+E(edgeLabel)+'</b></span>'+
-    '<span class="ms-market-q '+(x.betting_qualified?"qualified":"paper")+'">'+E(q)+'</span>'+
+    '<span class="ms-market-q '+(qualified?"qualified":"paper")+'">'+E(q)+'</span>'+
   '</div>';
 }
 function primaryPrediction(rows){
   const rank=x=>{
     const p=Number(probabilityValue(x));
-    const q=x.betting_qualified||x.qualification_status==="BETTING_QUALIFIED_PAPER"||x.qualification_status==="BETTING_QUALIFIED_PAPER_BOOTSTRAP";
+    const q=Boolean(x.betting_qualified)||String(x.qualification_status||"").startsWith("BETTING_QUALIFIED");
     const tier=String(x.projection_tier||"");
     const evidence=String(x.evidence_depth||"");
     const edge=Number(x.model_edge_vs_market);
     return [
+      q?1:0,
       Number.isFinite(p)?p*100:0,
       evidence.includes("participant")?3:evidence.includes("historical")?2:1,
       tier.includes("deep")?2:tier.includes("research")?1:0,
-      q?1:0,
       Number.isFinite(edge)?Math.max(-5,Math.min(5,edge*100)):0
     ];
   };
@@ -146,7 +149,7 @@ function unifiedRow(group){
   const x=primaryPrediction(rows);
   if(!x)return "";
   const when=DT(x.start_time);
-  const qualified=Boolean(x.betting_qualified);
+  const qualified=Boolean(x.betting_qualified)||String(x.qualification_status||"").startsWith("BETTING_QUALIFIED");
   const candidateBand=String(x.model_candidate_status||"");
   const live=String(x.event_state||"").toUpperCase()==="LIVE";
   const settled=String(x.event_state||"").toUpperCase()==="SETTLED";
