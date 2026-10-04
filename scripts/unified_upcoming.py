@@ -221,10 +221,18 @@ def core_rows(rows, source_rows, selection_map=None):
         key=(str(x.get("event_id") or ""),str(x.get("pick") or ""))
         selected=selection_map.get(key) or selection_map.get((str(x.get("event_id") or ""), ""))
         if isinstance(selected,dict):
-            x["candidate_status"]=selected.get("candidate_status","BETTING_QUALIFIED_PAPER")
-            x["qualification_status"]="BETTING_QUALIFIED_PAPER"
-            x["live_eligible"]=False
-            x["qualification_basis"]=selected.get("qualification_basis")
+            candidate_status=str(selected.get("candidate_status") or "")
+            x["candidate_status"]=candidate_status or x.get("candidate_status")
+            x["model_rating"]=selected.get("model_rating", x.get("model_rating"))
+            x["candidate_group"]=selected.get("candidate_group", x.get("candidate_group"))
+            # Candidate collection is model-first research data. Only an
+            # explicit betting-qualified status may promote the core row.
+            if candidate_status.startswith("BETTING_QUALIFIED"):
+                x["qualification_status"]=candidate_status
+                x["live_eligible"]=False
+                x["qualification_basis"]=selected.get("qualification_basis")
+            else:
+                x["live_eligible"]=False
         add(rows,x)
 
 def pdl_rows(rows, source_rows):
