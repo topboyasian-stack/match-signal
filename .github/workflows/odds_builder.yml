@@ -79,6 +79,8 @@ jobs:
           PY
       - name: Run daily mixed accumulator builder
         run: python scripts/odds_builder.py
+      - name: Syntax-check shadow line-ladder module
+        run: python -m py_compile scripts/line_ladder_research.py
       - name: Run shadow directional line-ladder research
         run: python scripts/line_ladder_research.py
       - name: Validate shadow line-ladder report
