@@ -1,5 +1,8 @@
 """Shadow research for Match Signal's directional-anchor -> O/U line-ladder strategy.
 
+The current Upcoming Desk is a first-class shadow anchor source; this does not
+change qualification, Builder eligibility, or booking behavior.
+
 This module is deliberately outside the Odds Builder qualification path.
 
 It:
@@ -22,6 +25,7 @@ DATA = ROOT / "data"
 HISTORY = DATA / "virtual_lab_history.json"
 BUILDER = DATA / "odds_builder.json"
 LIVE = DATA / "virtual_lab_live.json"
+DESK = DATA / "unified_upcoming.json"
 OUTPUT = DATA / "line_ladder_research.json"
 
 LINE_LADDER_RESEARCH_VERSION = "1.0.0-shadow"
@@ -299,11 +303,21 @@ def chronological_pair_validation(observations):
     )
     return report
 
-def current_anchors(builder):
+def current_anchors(builder, desk=None):
     rows = []
+    desk_events = (desk or {}).get("events") or [] if isinstance(desk, dict) else []
     sources = [
         ("best_available_legs", builder.get("best_available_legs")),
         ("qualified_legs", builder.get("qualified_legs")),
+        ("desk_directional_anchors", [
+            row
+            for row in desk_events
+            if isinstance(row, dict)
+            and str(row.get("sport") or "") == "virtual"
+            and str(row.get("market") or "") == "over_under"
+            and number(row.get("probability")) is not None
+            and number(row.get("probability")) >= ANCHOR_MIN_PROB
+        ]),
         ("batches", [
             leg
             for batch in builder.get("batches") or []
@@ -351,6 +365,7 @@ def current_anchors(builder):
                         or row.get("market_odds")
                     ),
                     "start_time": row.get("start_time"),
+                    "desk_model_probability": number(row.get("probability")),
                 }
             )
     return rows
@@ -435,7 +450,7 @@ def main():
 
     live_by_id = live_ladder(live)
     ladders = []
-    for anchor in current_anchors(builder):
+    for anchor in current_anchors(builder, desk):
         event = live_by_id.get(anchor["event_id"])
         if not event:
             continue
@@ -570,6 +585,7 @@ def main():
             "live_updated_at": live.get("updated_at"),
             "live_status": live.get("status"),
             "live_events": live.get("events_count"),
+            "desk_events": len(desk.get("events") or []) if isinstance(desk, dict) else 0,
         },
         "policy": {
             "anchor_min_probability": ANCHOR_MIN_PROB,
@@ -582,6 +598,7 @@ def main():
         },
         "chronological_validation": validation[:200],
         "current_anchor_count": len(ladders),
+        "current_anchor_sources": sorted(set(str(x.get("source") or "") for x in ladders)),
         "current_anchors": ladders,
         "shadow_value_candidates": value_candidates[:50],
         "promotion_gate": {
