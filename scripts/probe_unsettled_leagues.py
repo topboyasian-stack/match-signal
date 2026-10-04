@@ -14,6 +14,7 @@ What to look for in the report:
   * returned_events > 0 but matched_pending == 0 -> result event IDs differ from upcoming event IDs
   * matched_pending > 0 but parsed_scores == 0   -> results exist but the score format is not parsed
   * matched_pending > 0 and parsed_scores > 0    -> settlement should work; look at windows/paging
+  * "proxy error:" lines                         -> the proxy swallowed an upstream failure
 """
 from __future__ import annotations
 
@@ -79,7 +80,7 @@ def query_variants(league):
 
 
 def run_variant(fetch, params):
-    info = {"requests": 0, "error": None, "events": []}
+    info = {"requests": 0, "error": None, "events": [], "proxy_errors": [], "proxy_scopes": None}
     for page in range(1, MAX_PAGES + 1):
         try:
             body = fetch(C.RESULT_API, dict(params, pageNum=page))
@@ -87,6 +88,14 @@ def run_variant(fetch, params):
             info["error"] = str(exc)[:240]
             break
         info["requests"] += 1
+        # The proxy swallows upstream failures and still answers ok:true with events:[]; surface them.
+        if isinstance(body, dict):
+            for err in (body.get("errors") or [])[:3]:
+                text = json.dumps(err) if not isinstance(err, str) else err
+                if text not in info["proxy_errors"]:
+                    info["proxy_errors"].append(text[:300])
+            if info["proxy_scopes"] is None and isinstance(body.get("scopes"), list):
+                info["proxy_scopes"] = len(body["scopes"])
         batch = C.result_events(body)
         info["events"].extend(batch)
         if len(batch) < 100:
@@ -104,6 +113,8 @@ def analyse(league, variant_name, info):
     return {
         "variant": variant_name, "requests": info["requests"], "error": info["error"],
         "returned_events": len(events),
+        "proxy_errors": info.get("proxy_errors", []),
+        "proxy_scopes": info.get("proxy_scopes"),
         "returned_distinct_ids": len(set(ids)),
         "matched_pending": len(matched),
         "parsed_scores": len(parsed),
@@ -155,7 +166,9 @@ def main():
               f"scope={item['category_id']}/{item['tournament_id']}")
         for r in item["results"]:
             print(f"   {r['variant']:22s} returned={r['returned_events']:4d} matched={r['matched_pending']:4d} "
-                  f"parsed={r['parsed_scores']:4d} err={r['error']}")
+                  f"parsed={r['parsed_scores']:4d} err={r['error']} scopes={r['proxy_scopes']}")
+            for e in r["proxy_errors"]:
+                print("        proxy error:", e)
         print("   VERDICT:", item["verdict"])
     if args.output:
         Path(args.output).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
