@@ -116,9 +116,6 @@ index e15af93..f7fc26f 100644
      selection_diag={"participant_correlation_skips":0,"unique_participants":len({_p for leg in selected for _p in _participants(leg)}) if selected else 0}
      previous=load(OUTPUT,{})
 @@ -2849,7 +2888,7 @@ def main():
-     rejection_counts={}
-     for leg in built:
-         leg_status=str(leg.get("status") or "REJECTED")
          rejection_counts[leg_status]=rejection_counts.get(leg_status,0)+1
      result={
          "generated_at":now.isoformat(),"engine_version":"V6.1-RESEARCH-GATED",
