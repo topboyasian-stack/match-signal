@@ -101,6 +101,43 @@ function primaryPrediction(rows){
     return String(a.market||"").localeCompare(String(b.market||""));
   })[0]||null;
 }
+function ladderAnchor(rows){
+  const candidates=(rows||[]).filter(x=>x&&x.market==="over_under"&&Number.isFinite(Number(x.line))&&Number.isFinite(Number(probabilityValue(x)))&&Number(probabilityValue(x))>=0.80);
+  return [...candidates].sort((a,b)=>{
+    const aq=Boolean(a.betting_qualified||a.qualified_for_builder), bq=Boolean(b.betting_qualified||b.qualified_for_builder);
+    if(aq!==bq)return bq-aq;
+    const ae=Number(a.model_edge_vs_market),be=Number(b.model_edge_vs_market);
+    if(Number.isFinite(ae)||Number.isFinite(be))return (Number.isFinite(be)?be:-999)-(Number.isFinite(ae)?ae:-999);
+    return Number(probabilityValue(b))-Number(probabilityValue(a));
+  })[0]||null;
+}
+function ladderRows(rows,anchor){
+  if(!anchor||anchor.market!=="over_under")return [];
+  const side=String(anchor.pick||anchor.selection||"").toLowerCase();
+  const line=Number(anchor.line);
+  if(!Number.isFinite(line)||!side)return [];
+  const same=(rows||[]).filter(x=>x&&x.market==="over_under"&&String(x.pick||x.selection||"").toLowerCase()===side&&Number.isFinite(Number(x.line)));
+  const safe=same.filter(x=>side==="over"?Number(x.line)<line:Number(x.line)>line);
+  safe.sort((a,b)=>side==="over"?Number(b.line)-Number(a.line):Number(a.line)-Number(b.line));
+  return safe.slice(0,3);
+}
+function shadowLadderMarkup(group){
+  const rows=group?.rows||[];
+  if(!rows.some(x=>x&&x.sport==="virtual"&&x.market==="over_under"))return "";
+  const anchor=ladderAnchor(rows.filter(x=>x.sport==="virtual"));
+  if(!anchor)return "";
+  const safe=ladderRows(rows,anchor);
+  if(!safe.length)return "";
+  const anchorP=probabilityValue(anchor);
+  const anchorOdds=bookmakerOdds(anchor);
+  const anchorText=(String(anchor.pick||"").toUpperCase()+" "+(anchor.line??""));
+  const safeHtml=safe.map(x=>{
+    const p=probabilityValue(x), odds=bookmakerOdds(x), edge=Number(x.model_edge_vs_market);
+    const edgeText=Number.isFinite(edge)?((edge>=0?"+":"")+((edge*100).toFixed(1))+"%"):"—";
+    return '<div class="ms-ladder-option"><span class="ms-ladder-line">'+E(String(x.pick||"").toUpperCase()+" "+(x.line??""))+'</span><span>Model <b>'+E(p==null?"—":P(p))+'</b></span><span class="'+(odds!=null?"ms-book-live":"ms-book-missing")+'">SportyBet '+E(odds!=null?("@ "+odds.toFixed(2)):"—")+'</span><span>Edge <b>'+E(edgeText)+'</b></span><span class="ms-ladder-tag">SAFER RUNG</span></div>';
+  }).join("");
+  return '<div class="ms-line-ladder"><div class="ms-line-ladder-head"><div><b>Shadow O/U line ladder</b><span>Same directional signal · safer thresholds shown separately</span></div><span class="ms-ladder-badge">PAPER RESEARCH</span></div><div class="ms-line-ladder-anchor"><span>Anchor · '+E(anchorText)+'</span><span>Model <b>'+E(anchorP==null?"—":P(anchorP))+'</b></span><span class="'+(anchorOdds!=null?"ms-book-live":"ms-book-missing")+'">SportyBet '+E(anchorOdds!=null?("@ "+anchorOdds.toFixed(2)):"—")+'</span></div><div class="ms-line-ladder-options">'+safeHtml+'</div><div class="ms-line-ladder-note">The safer rung is not assigned the anchor probability automatically. This display exposes the current desk ladder; promotion remains blocked until the shadow research passes its chronological evidence gate.</div></div>';
+}
 function unifiedRow(group){
   const rows=group.rows;
   const x=primaryPrediction(rows);
@@ -121,7 +158,7 @@ function unifiedRow(group){
     '<div class="ms-up-time"><b>'+E(when)+'</b><span>'+E(String(x.start_time||"").slice(0,10))+'</span></div>'+
     '<div class="ms-up-event"><div class="ms-up-meta"><span class="ms-sport-pill">'+sportIcon(x.sport)+' '+E(x.sport==="table_tennis"?"Table Tennis":(x.sport||"Sport"))+'</span><span>'+E(x.league||x.competition||"Unclassified")+'</span><span class="ms-fixture-market-count">1 prediction</span></div>'+
     '<div class="ms-up-match">'+E(x.player_1||x.home||"Participant 1")+' <span>vs</span> '+E(x.player_2||x.away||"Participant 2")+'</div>'+
-    '<div class="ms-market-stack">'+unifiedMarketLine(x)+'</div>'+
+    '<div class="ms-market-stack">'+unifiedMarketLine(x)+'</div>'+shadowLadderMarkup(group)+
     '<div class="ms-fixture-foot"><span class="'+(settled?(won?"ms-settled-win":"ms-settled-loss"):"")+'">'+E(q)+'</span><span>'+E(settled?("Result "+(x.final_score||x.settlement_result||"recorded")):(book!=null?"SportyBet quote matched to this prediction":"SportyBet quote not matched"))+'</span></div></div>'+
     '<div class="ms-up-status"><span class="ms-up-status-badge '+(settled?(won?"deep":"research"):(qualified?"deep":live?"testing":"research"))+'">'+E(status)+'</span><span class="ms-up-qual '+(qualified?"qualified":"paper")+'">'+E(qualified?"BETTING-QUALIFIED":"PAPER · NOT QUALIFIED")+'</span><small>'+E(evidenceLabel(x))+'</small></div>'+
   '</article>';
@@ -132,7 +169,7 @@ async function renderUnifiedBoard(){
   try{
     let payload={events:[],generated_at:null};
     let selectedRows=[];
-    let riskGate=null;
+    let riskGate=null; let ladderResearch=null;
     try{
       const [sel,rg]=await Promise.all([
         get('./data/selection_candidates.json'),
@@ -145,6 +182,14 @@ async function renderUnifiedBoard(){
       payload=await get('./data/unified_upcoming.json');
     }catch(_){
       payload={events:[],generated_at:null};
+    }
+    try{ ladderResearch=await get('./data/line_ladder_research.json'); }catch(_){ ladderResearch=null; }
+    const ladderDesk=Q('#lineLadderDesk');
+    if(ladderDesk){
+      const state=ladderResearch?.promotion_gate?.status||'SHADOW';
+      const anchors=Number(ladderResearch?.current_anchor_count||0);
+      const validated=Array.isArray(ladderResearch?.chronological_validation)?ladderResearch.chronological_validation.length:0;
+      ladderDesk.innerHTML='<div class="ms-line-ladder-desk-head"><div><b>Directional O/U Line Ladder</b><span>Shadow research layer on the Upcoming Prediction Desk · exact-line qualification is unchanged.</span></div><div class="ms-ladder-desk-stats"><span>'+E(state)+'</span><span>'+E(String(anchors))+' live anchors</span><span>'+E(String(validated))+' validated pairs</span></div></div>';
     }
     let all=Array.isArray(payload?.events)?payload.events:[];
     if(!all.length){
