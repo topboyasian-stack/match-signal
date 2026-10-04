@@ -55,7 +55,7 @@ jobs:
           git fetch origin main
           git reset --hard origin/main
       - name: Compile unified engines
-        run: python -m py_compile scripts/unified_upcoming.py scripts/unified_upcoming_cleanup.py scripts/system_health_audit.py scripts/predict_today.py
+        run: python -m py_compile scripts/unified_upcoming.py scripts/unified_upcoming_cleanup.py scripts/selection_candidate_collector.py scripts/system_health_audit.py scripts/predict_today.py
       - name: Build unified upcoming board
         run: python scripts/unified_upcoming.py
       - name: Remove retired sports from the user-facing board

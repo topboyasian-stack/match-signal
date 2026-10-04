@@ -205,8 +205,7 @@ def main():
 
     qualified = sum(1 for x in selected if x["betting_qualified"])
     high = sum(1 for x in selected if float(x["model_probability"]) >= 0.80)
-    OUT.write_text(json.dumps(selected, indent=2, ensure_ascii=False) + "
-", encoding="utf-8")
+    OUT.write_text(json.dumps(selected, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     summary = {
         "generated_at": now.isoformat(),
         "status": "ok",
@@ -221,8 +220,7 @@ def main():
         "artifact": "data/selection_candidates.json",
         "purpose": "model-first current candidate pool; independent from Odds Builder value/results qualification"
     }
-    STATUS_OUT.write_text(json.dumps(summary, indent=2, ensure_ascii=False) + "
-", encoding="utf-8")
+    STATUS_OUT.write_text(json.dumps(summary, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(json.dumps(summary, indent=2))
 
 
