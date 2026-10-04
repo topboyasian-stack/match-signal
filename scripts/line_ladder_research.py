@@ -204,34 +204,29 @@ def evidence_for(
 
 def chronological_pair_validation(observations):
     """Validate safer-rung hit/ROI chronologically, without user-ticket labels."""
-    _, _, _, by_event = build_indexes(observations)
-    pairs = defaultdict(list)
+    by_event_side = defaultdict(list)
+    for row in observations:
+        by_event_side[(row["product"], row["event_id"], row["side"])].append(row)
 
+    pairs = defaultdict(list)
     for anchor in observations:
+        event_rows = by_event_side.get(
+            (anchor["product"], anchor["event_id"], anchor["side"]), []
+        )
         if anchor["side"] == "over":
-            safe_lines = [
-                row["line"]
-                for row in observations
-                if row["product"] == anchor["product"]
-                and row["event_id"] == anchor["event_id"]
-                and row["line"] < anchor["line"]
-                and row["side"] == anchor["side"]
-            ]
-            target = sorted(set(safe_lines), reverse=True)[:MAX_SAFE_RUNG_DEPTH]
+            target = sorted(
+                {row["line"] for row in event_rows if row["line"] < anchor["line"]},
+                reverse=True,
+            )[:MAX_SAFE_RUNG_DEPTH]
         else:
-            safe_lines = [
-                row["line"]
-                for row in observations
-                if row["product"] == anchor["product"]
-                and row["event_id"] == anchor["event_id"]
-                and row["line"] > anchor["line"]
-                and row["side"] == anchor["side"]
-            ]
-            target = sorted(set(safe_lines))[:MAX_SAFE_RUNG_DEPTH]
+            target = sorted(
+                {row["line"] for row in event_rows if row["line"] > anchor["line"]}
+            )[:MAX_SAFE_RUNG_DEPTH]
 
         for safe_line in target:
-            safe = by_event.get(
-                (anchor["product"], anchor["event_id"], safe_line, anchor["side"])
+            safe = next(
+                (row for row in event_rows if row["line"] == safe_line),
+                None,
             )
             if safe is None:
                 continue
@@ -293,6 +288,7 @@ def chronological_pair_validation(observations):
                 },
             }
         )
+
     report.sort(
         key=lambda row: (
             row["holdout"]["safe"]["n"],
@@ -301,7 +297,6 @@ def chronological_pair_validation(observations):
         reverse=True,
     )
     return report
-
 
 def current_anchors(builder):
     rows = []
