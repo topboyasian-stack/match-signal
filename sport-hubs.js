@@ -70,9 +70,7 @@ function unifiedMarketLine(x){
   const market=x.market==="over_under"?("O/U "+pick+" "+(x.line??"")):marketLabel(x);
   const fairLabel=Number.isFinite(fair)?fair.toFixed(2):"—";
   const qualified=Boolean(x.betting_qualified) || String(x.qualification_status||"").startsWith("BETTING_QUALIFIED");
-  const marketReference=qualified
-    ? (book!=null?("SportyBet @ "+book.toFixed(2)):"SportyBet quote unavailable")
-    : "SportyBet quote withheld · research only";
+  const marketReference=book!=null?("SportyBet @ "+book.toFixed(2)):"SportyBet quote unavailable";
   const edgeLabel=Number.isFinite(edge)?((edge>=0?"+":"")+(edge*100).toFixed(1)+"%"):"—";
   const band=String(x.model_candidate_status||"").replaceAll("_"," ");
   const q=qualified?"BETTING-QUALIFIED":(band||x.qualification_status||"MODEL RESEARCH");
