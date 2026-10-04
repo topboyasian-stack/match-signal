@@ -1,0 +1,129 @@
+diff --git a/expansion-odds-builder.js b/expansion-odds-builder.js
+index e063d24..25d9f7e 100644
+--- a/expansion-odds-builder.js
++++ b/expansion-odds-builder.js
+@@ -177,10 +177,16 @@
+   }
+   function bookingStillValid(state) {
+     if(!state||!state.booking_code)return false;
+-    var expiry=state.expires_at?dateOf(state.expires_at):null;
+-    if(expiry)return expiry.getTime()>Date.now()+15000;
++    // A code is only trusted for BOOKING_FRESH_MS after it was verified, even if SportyBet's own
++    // deadline (the last kickoff) is hours away: virtual fixtures are re-listed quickly, so a
++    // cached code must be re-checked against the live listing instead of being shown as ready.
++    var BOOKING_FRESH_MS=10*60*1000,now=Date.now();
+     var created=state.generated_at?dateOf(state.generated_at):null;
+-    return !!created && (created.getTime()+10*60*1000)>Date.now();
++    var expiry=state.expires_at?dateOf(state.expires_at):null;
++    var limits=[];
++    if(created)limits.push(created.getTime()+BOOKING_FRESH_MS);
++    if(expiry)limits.push(expiry.getTime()-15000);
++    return limits.length>0&&Math.min.apply(null,limits)>now;
+   }
+   function bookingEligibility(batch) {
+     var legs=Array.isArray(batch&&batch.legs)?batch.legs:[];
+diff --git a/scripts/odds_builder.py b/scripts/odds_builder.py
+index e15af93..f7fc26f 100644
+--- a/scripts/odds_builder.py
++++ b/scripts/odds_builder.py
+@@ -15,7 +15,7 @@ No wager is placed and no 3-4 leg target is forced.
+ """
+ from __future__ import annotations
+ import json, math, urllib.parse, urllib.request
+-from datetime import datetime, timezone
++from datetime import datetime, timedelta, timezone
+ from pathlib import Path
+ 
+ ROOT=Path(__file__).resolve().parents[1]
+@@ -76,6 +76,9 @@ PARTICIPANT_HISTORY_MAX_BONUS=0.035
+ MAX_BATCHES=6
+ # Keep Builder candidates close to kickoff so participant evidence and market prices can be refreshed.
+ MAX_BUILDER_HORIZON_MINUTES=720
++MAX_VIRTUAL_LEAD_MINUTES=45
++BOOKING_REVALIDATION_BATCHES=3
++BOOKING_VALID_MINUTES=10
+ MAX_BATCH_KICKOFF_SPAN_MINUTES=60
+ MODEL_FIRST_MAX_KICKOFF_SPAN_MINUTES=270
+ # Controlled research-only fallback: allow strong exact-value legs just below
+@@ -157,6 +160,12 @@ def within_builder_horizon(x, now):
+     return minutes is not None and 0.0 < minutes <= MAX_BUILDER_HORIZON_MINUTES
+ 
+ 
++def within_virtual_lead(x, now):
++    """Virtual fixtures are re-listed quickly; only use ones that start soon enough to still exist at booking time."""
++    minutes=kickoff_age_minutes(x,now)
++    return minutes is not None and 0.0 < minutes <= MAX_VIRTUAL_LEAD_MINUTES
++
++
+ def upcoming(x, now):
+     try:
+         raw=x.get("start_time")
+@@ -1022,7 +1031,7 @@ def virtual_candidates(now):
+             continue
+         if event.get("sport")!="virtual" or event.get("product") not in {"efootball_gt","efootball_adriatic","vfootball","zoom"}:
+             continue
+-        if not within_builder_horizon(event,now):
++        if not within_builder_horizon(event,now) or not within_virtual_lead(event,now):
+             continue
+         product=str(event.get("product") or "")
+         line=event.get("line")
+@@ -1618,6 +1627,34 @@ def _create_sportybet_booking_code(legs):
+     except Exception as exc:
+         return {"status":"UNAVAILABLE","reason":"sportybet_share_request_failed","error":str(exc)[:240]}
+ 
++def _stamp_booking_validity(info, now):
++    """Mark when a share code was verified and when it must be treated as stale (snapshot freshness, not kickoff)."""
++    info=dict(info or {})
++    info["validated_at"]=now.isoformat()
++    info["valid_until"]=(now+timedelta(minutes=BOOKING_VALID_MINUTES)).isoformat()
++    info["clean"]=bool(info.get("status")=="AVAILABLE" and not info.get("unavailable_outcomes"))
++    return info
++
++
++def _validate_batch_bookings(batches, now, create=None):
++    """Ask SportyBet for a share code for the first few batches in the same run as the snapshot.
++
++    A batch is `clean` only if SportyBet accepted every selection (no unavailableOutcomes).
++    Nothing is dropped or rewritten: legs, odds and gates are untouched. Returns the index of
++    the first clean batch, or None.
++    """
++    create=create or _create_sportybet_booking_code
++    first_clean=None
++    for idx,batch in enumerate((batches or [])[:BOOKING_REVALIDATION_BATCHES]):
++        legs=list(batch.get("legs") or [])
++        info=_stamp_booking_validity(create(legs) if legs else {"status":"UNAVAILABLE","reason":"empty_batch"}, now)
++        batch["sportybet_booking"]=info
++        batch["booking_validated"]=info["clean"]
++        if info["clean"] and first_clean is None:
++            first_clean=idx
++    return first_clean
++
++
+ def _batch_capacity_diagnostic(eligible_pool):
+     """Measure the best 16-leg odds capacity without weakening any gate."""
+     pool=[x for x in eligible_pool if x.get("builder_eligible")]
+@@ -2825,8 +2862,10 @@ def main():
+     primary=batches[0] if batches else None
+     selected=list(primary.get("legs") or []) if primary else []
+     combined=float(primary.get("combined_odds") or 1.0) if primary else 1.0
+-    booking_info=_create_sportybet_booking_code(selected) if selected else {"status":"UNAVAILABLE","reason":"no_selected_batch"}
+-    if primary is not None:
++    first_clean_batch=_validate_batch_bookings(batches,now) if selected else None
++    booking_info=(primary or {}).get("sportybet_booking") if primary is not None else {"status":"UNAVAILABLE","reason":"no_selected_batch"}
++    if primary is not None and not booking_info:
++        booking_info={"status":"UNAVAILABLE","reason":"not_validated"}
+         primary["sportybet_booking"]=booking_info
+     selection_diag={"participant_correlation_skips":0,"unique_participants":len({_p for leg in selected for _p in _participants(leg)}) if selected else 0}
+     previous=load(OUTPUT,{})
+@@ -2849,7 +2888,7 @@ def main():
+     rejection_counts={}
+     for leg in built:
+         leg_status=str(leg.get("status") or "REJECTED")
+         rejection_counts[leg_status]=rejection_counts.get(leg_status,0)+1
+     result={
+         "generated_at":now.isoformat(),"engine_version":"V6.1-RESEARCH-GATED",
+-        "mode":"PAPER_ONLY","target_legs":f"accuracy-first; {odds_gate['floor']:.2f}+ active floor, {TARGET_COMBINED_ODDS:.2f}+ preferred target, and {STRETCH_COMBINED_ODDS:.2f}+ stretch target","sports_supported":["football","tennis","virtual"],
++        "mode":"PAPER_ONLY","booking_validation":{"validated_batches":min(len(batches),BOOKING_REVALIDATION_BATCHES) if selected else 0,"first_clean_batch_index":first_clean_batch,"valid_minutes":BOOKING_VALID_MINUTES,"max_virtual_lead_minutes":MAX_VIRTUAL_LEAD_MINUTES},"target_legs":f"accuracy-first; {odds_gate['floor']:.2f}+ active floor, {TARGET_COMBINED_ODDS:.2f}+ preferred target, and {STRETCH_COMBINED_ODDS:.2f}+ stretch target","sports_supported":["football","tennis","virtual"],
+         "research_gate":{
+             "selection_gate_status":gate_status,
+             "combined_odds_gate":odds_gate,
