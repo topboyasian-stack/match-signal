@@ -56,6 +56,8 @@ RESULTS_FIRST_MAX_LEGS=7
 RESULTS_FIRST_MIN_OBS=50
 RESULTS_FIRST_MIN_ACCURACY=0.90
 RESULTS_FIRST_MIN_COMBINED_ODDS=4.0
+# Existing Results-first expected-ROI floor used by construction diagnostics and QA.
+RESULTS_FIRST_MIN_EXPECTED_ROI=0.02
 # Construction-specific ticket diagnostics cover every adaptive shape from 2 through 7 legs.
 # A shape still needs its own settled evidence when the Results-first lane is promoted.
 RESULTS_FIRST_CONSTRUCTION_LEG_COUNTS=(2,3,4,5,6,7)
