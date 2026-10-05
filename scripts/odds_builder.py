@@ -3201,6 +3201,40 @@ def main():
     core_pool=football+tennis
     upstream_blocked = market_refresh.get("status")!="ok"
     batches,built,batch_diag=build_value_batches(core_pool+virtual)
+    # Evaluate the isolated Phase 2 track independently of the baseline batch path.
+    phase2_options,phase2_diag=_construct_phase2_cyclical_loop_batches(
+        built,
+        max_batches=min(4,MAX_BATCHES),
+        min_odds=active_min_combined_odds()
+    )
+    phase2_batches=[]
+    for idx,option in enumerate(phase2_options,1):
+        rows=sorted(option["rows"], key=lambda x:(_kickoff_timestamp(x) if _kickoff_timestamp(x) is not None else float("inf")))
+        metrics=option["metrics"]
+        odds=float(option["odds"])
+        risk=option.get("kelly_risk") or _phase2_kelly_diagnostic(metrics.get("combined_model_probability"),odds)
+        phase2_batches.append({
+            "batch_id":f"P2-BATCH-{idx:02d}",
+            "label":f"P2-BATCH-{idx:02d} · Cyclical Loop {metrics['model_rating']:.1f}/100",
+            "rank":idx,
+            "legs":rows,
+            "leg_count":len(rows),
+            "combined_odds":round(odds,3),
+            "combined_model_rating":metrics["model_rating"],
+            "combined_model_probability":metrics["combined_model_probability"],
+            "raw_combined_model_probability":metrics["raw_combined_model_probability"],
+            "ticket_calibration_gamma":metrics["ticket_calibration_gamma"],
+            "leg_strength_rating":metrics["leg_strength_rating"],
+            "avg_model_probability":metrics["avg_model_probability"],
+            "avg_model_edge_percent":metrics["avg_model_edge_percent"],
+            "products":sorted({str(row.get("product") or "") for row in rows}),
+            "primary_lane":"phase2_cyclical_loop",
+            "execution_track":"PHASE2_CYCLICAL_LOOP",
+            "paper_only":True,
+            "real_money_execution":False,
+            "risk_diagnostic":risk,
+            "strict_isolation":True
+        })
     primary=batches[0] if batches else None
     selected=list(primary.get("legs") or []) if primary else []
     combined=float(primary.get("combined_odds") or 1.0) if primary else 1.0
@@ -3221,7 +3255,11 @@ def main():
     value_floor_met=bool(selected) and len(selected)>=BATCH_MIN_LEGS and combined>=active_min_combined_odds()
     preferred_target_met=bool(selected) and combined>=TARGET_COMBINED_ODDS
     accuracy_floor_met=results_first_met
-    status="LIVE_VALUE_SET" if results_first_met and value_floor_met else ("RESULTS_FIRST_SET" if results_first_met else ("VALUE_RESEARCH_SET" if value_floor_met else ("NO_BET" if not selected else "VALUE_RESEARCH_INSUFFICIENT")))
+    status=("PHASE2_CYCLICAL_SET" if primary_lane=="phase2_cyclical_loop" and value_floor_met else
+            ("LIVE_VALUE_SET" if results_first_met and value_floor_met else
+             ("RESULTS_FIRST_SET" if results_first_met else
+              ("VALUE_RESEARCH_SET" if value_floor_met else
+               ("NO_BET" if not selected else "VALUE_RESEARCH_INSUFFICIENT")))))
     rejection_counts={}
     for leg in built:
         leg_status=str(leg.get("status") or "REJECTED")
@@ -3249,6 +3287,8 @@ def main():
             "evaluated":len(built),
             "rejections":rejection_counts,"selection_diversity":selection_diag,
             "batch_diagnostics":batch_diag,
+            "phase2_cyclical_loop":phase2_diag,
+            "phase2_cyclical_loop_batches":phase2_batches,
             "participant_history_weighting":{
                 "enabled":True,
                 "min_n":PARTICIPANT_HISTORY_MIN_N,
@@ -3299,7 +3339,9 @@ def main():
                 "virtual_efootball_only":True,
                 "strict_baseline_isolation":True,
                 "high_variance_odds_threshold":PHASE2_CYCLICAL_HIGH_VARIANCE_ODDS,
-                "kelly_risk_diagnostic":"paper_only; no staking execution"
+                "kelly_risk_diagnostic":"paper_only; no staking execution",
+                "separate_execution_track":True,
+                "phase2_batch_count":len(phase2_batches)
             }},
         "bookmaker_odds":{"status":"LIVE_SPORTYBET_SNAPSHOT","sportybet_direct_feed":"VIA_CLOUDFLARE_PROXY",
             "stake_direct_feed":"NOT_CONNECTED","instruction":"Verify the displayed SportyBet price immediately before any manual wager."},
@@ -3327,9 +3369,21 @@ def main():
             "model_rating_definition":"100 × product of leg model probabilities (naive joint proxy)",
             "leg_strength_definition":"100 × geometric mean of leg model probabilities",
             "primary_lane":primary_lane or "none",
-            "booking_code_policy":"fresh non-staking share code from exact live event/market/outcome IDs; never fabricate"
+            "booking_code_policy":"fresh non-staking share code from exact live event/market/outcome IDs; never fabricate",
+            "phase2_cyclical_loop":{
+                "enabled":PHASE2_CYCLICAL_LOOP_ENABLED,
+                "min_confidence":PHASE2_CYCLICAL_MIN_CONFIDENCE,
+                "min_legs":PHASE2_CYCLICAL_MIN_LEGS,
+                "max_legs":PHASE2_CYCLICAL_MAX_LEGS,
+                "pool_cap":PHASE2_CYCLICAL_POOL_CAP,
+                "virtual_efootball_only":True,
+                "strict_baseline_isolation":True,
+                "batch_count":len(phase2_batches),
+                "diagnostics":phase2_diag
+            }
         },
         "batches":batches,
+        "phase2_cyclical_loop_batches":phase2_batches,
         "rejected_candidates":[x for x in built if not x["real_money_eligible"]][:20],
         "settled_legs":recent_settled(load(HISTORY,[]),now,known),
         "builder_event_ids":sorted(known),"leg_count":len(selected),"sports_selected":sports,
