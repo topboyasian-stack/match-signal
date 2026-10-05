@@ -4,6 +4,13 @@ on:
   schedule:
     - cron: '20 1 * * *'
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/independent_football_model.py'
+      - 'scripts/build_football_team_history.py'
+      - 'scripts/football_model_council.py'
+      - '.github/workflows/football-statistical-history.yml'
 
 permissions:
   contents: write
