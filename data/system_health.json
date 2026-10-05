@@ -1,26 +1,26 @@
 {
-  "generated_at": "2026-10-05T16:02:17.192412+00:00",
-  "status": "FAIL",
-  "critical_issues": 2,
+  "generated_at": "2026-10-05T17:10:49.122122+00:00",
+  "status": "HEALTHY",
+  "critical_issues": 0,
   "warning_issues": 0,
-  "info_issues": 0,
+  "info_issues": 1,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
-      "status": "STALE",
-      "age_hours": 10.55,
+      "status": "PASS",
+      "age_hours": 0.06,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 3.41,
+      "age_hours": 0.58,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 0.07,
+      "age_hours": 0.01,
       "threshold_hours": 4
     },
     {
@@ -32,9 +32,9 @@
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 0.01,
+      "age_hours": 1.15,
       "threshold_hours": 0.5,
-      "heartbeat_source": "virtual_lab_live.json"
+      "heartbeat_source": "unified_live_refresh"
     },
     {
       "engine": "retired_engines",
@@ -46,7 +46,7 @@
         },
         "table_tennis_x": {
           "status": "RETIRED",
-          "artifact_at": "2026-10-05T12:49:16.511728+00:00"
+          "artifact_at": "2026-10-05T16:19:16.356349+00:00"
         },
         "basketball": {
           "status": "RETIRED",
@@ -57,14 +57,9 @@
   ],
   "issues": [
     {
-      "code": "STALE_CORE_PREDICTION_PIPELINE",
-      "severity": "critical",
-      "detail": "updated_at age 10.55h exceeds 4h"
-    },
-    {
-      "code": "PIPELINE_STALE",
-      "severity": "critical",
-      "detail": "pipeline_status age 10.55h exceeds 4h"
+      "code": "SELECTION_GATE_EMPTY",
+      "severity": "info",
+      "detail": "Current prediction feed exists but the selected-candidate layer returned zero qualified selections; no gate was weakened"
     }
   ],
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
