@@ -38,7 +38,7 @@ on:
     types: [completed]
   schedule:
     # Refresh research diagnostics and full-market discovery builder every 15 minutes.
-    # Virtual paper-builder validation: 2.70+ base floor; the earned 2.80 hard gate activates after the configured settled-win threshold; 4.00+ remains stretch.
+    # Paper-builder validation: 4.00x is the fixed combined-odds floor; leg count remains adaptive from 2–7 and no weak leg may be added just to reach the floor.
     - cron: '*/15 * * * *'
   workflow_dispatch:
 
@@ -120,7 +120,7 @@ jobs:
           assert policy.get('requires_live_sportybet_price') is True
           assert policy.get('results_first') is True
           assert policy.get('construction_priority') == 'settled_results_first'
-          assert float(policy.get('minimum_combined_odds', 0)) >= 2.70
+          assert float(policy.get('minimum_combined_odds', 0)) >= 4.00
           assert float(policy.get('results_first_min_expected_roi', 0)) >= 0.02
           assert float(policy.get('min_model_edge', 0)) >= 0.025
           assert set(data.get('sports_supported', [])) >= {'football', 'tennis', 'virtual'}
@@ -128,7 +128,7 @@ jobs:
           if data.get('status') == 'RESULTS_FIRST_SET':
               assert len(data['qualified_legs']) >= 2
               assert int(data.get('batch_count', 0)) == 1
-              assert int(data.get('batch_policy', {}).get('results_first_max_legs', 4)) <= 4
+              assert int(data.get('batch_policy', {}).get('results_first_max_legs', 7)) <= 7
           assert len(data['qualified_legs']) <= 20
           if data['qualified_legs']:
               assert float(data.get('market_price_combined_odds', 0)) >= float(policy.get('minimum_combined_odds', 1.0))
@@ -157,7 +157,7 @@ jobs:
                   products = {str(x.get('product') or '') for x in batch.get('legs', [])}
                   assert 'vfootball' in products, 'mixed lane must contain VFootball'
                   assert any(p.startswith('efootball_') for p in products), 'mixed lane must contain eFootball'
-                  assert 2 <= int(batch.get('leg_count', len(batch.get('legs', [])))) <= 4
+                  assert 2 <= int(batch.get('leg_count', len(batch.get('legs', [])))) <= 7
           seen_batch_ids = set()
           seen_event_ids = set()
           seen_participants = set()
@@ -171,10 +171,10 @@ jobs:
               assert batch.get('paper_only') is True
               assert batch.get('real_money_execution') is False
               assert float(batch.get('combined_model_rating', 0)) >= 0
-              min_per_leg = data.get('batch_policy', {}).get('per_leg_min_model_probability') or {'2':0.80,'3':0.80,'4':0.80}
+              min_per_leg = data.get('batch_policy', {}).get('per_leg_min_model_probability') or {'2':0.80,'3':0.80,'4':0.80,'5':0.80,'6':0.80,'7':0.80}
               leg_count = int(batch.get('leg_count', len(batch.get('legs', []))))
               required = float(min_per_leg.get(str(leg_count), min_per_leg.get(leg_count, 0.80)))
-              assert 2 <= leg_count <= 4
+              assert 2 <= leg_count <= 7
               assert all(float(leg.get('model_probability', 0)) >= required for leg in batch.get('legs', [])), 'adaptive per-leg safety threshold failed'
               leg_ids = [str(x.get('event_id')) for x in batch.get('legs', [])]
               assert len(leg_ids) == len(set(leg_ids)), 'duplicate event inside batch'
