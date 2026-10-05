@@ -428,7 +428,7 @@ def price_view(outcomes, side, probability):
         "fair_odds": 1 / probability if probability else None,
         "expected_roi": probability * odds - 1 if probability is not None else None,
         "edge_vs_de_vig": (
-            probability - de_vig if de_vig is not None else None
+            probability - de_vig if probability is not None and de_vig is not None else None
         ),
     }
 
