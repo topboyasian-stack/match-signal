@@ -1481,11 +1481,11 @@ def _ticket_calibration_gamma():
         best=min(gammas,key=lambda g:sum((y-max(.0005,min(.9995,p**g)))**2 for _,p,y in prior)/len(prior))
         chosen.append(best)
     if len(chosen)<3:
-        result={"gamma":1.0,"sample":len(rows),"warmup":warmup,"trained":False,"source":"insufficient_settled_2_to_4_ticket_history"}
+        result={"gamma":1.0,"sample":len(rows),"warmup":warmup,"trained":False,"source":"insufficient_settled_2_to_7_ticket_history"}
     else:
         gamma=max(1.0,min(4.0,sum(chosen)/len(chosen)))
         result={"gamma":round(gamma,4),"sample":len(rows),"warmup":warmup,"trained":True,
-                "source":"chronological_2_to_4_ticket_brier_calibration","gamma_observations":len(chosen)}
+                "source":"chronological_2_to_7_ticket_brier_calibration","gamma_observations":len(chosen)}
     _TICKET_CALIBRATION_CACHE=result
     return result
 
@@ -1961,8 +1961,8 @@ def _construct_mixed_virtual_efootball_batches(pool, max_batches=4, max_legs=MIX
                     )
                 })
 
-    # The first sort key is leg count, so 4-leg options surface when all four
-    # legs are strong enough. No weak leg is ever added just to reach an odds target.
+    # The first sort key is leg count, so larger options surface when all legs
+    # are strong enough. No weak leg is ever added just to reach an odds target.
     options.sort(key=lambda o:o["score"],reverse=True)
     selected_batches=[]
     used_events=set()
@@ -2124,8 +2124,8 @@ def _construct_vfootball_holdout_batches(pool,max_batches=4,max_legs=MIXED_RESEA
     Inputs are already Builder-eligible exact-line event-holdout legs. The lane
     keeps the same 80% per-leg floor, fresh-price/positive-EV filters, event and
     participant correlation rules, 4.00+ combined-odds floor and +2% calibrated
-    whole-ticket ROI gate. It evaluates 2-, 3- and 4-leg shapes directly so a
-    large low-price virtual pool cannot hide a viable high-price pair.
+    whole-ticket ROI gate. It evaluates the full adaptive 2–7-leg range directly
+    so a large low-price virtual pool cannot hide a viable high-price construction.
     """
     if min_odds is None:
         min_odds=active_min_combined_odds()
@@ -2417,7 +2417,7 @@ def build_value_batches(candidates):
                     "primary_lane":"mixed_vfootball_efootball_value",
                     "paper_only":True,
                     "real_money_execution":False,
-                    "correlation_policy":"batches disjoint by event and participant; each batch contains 1 VFootball + 1-3 eFootball evidence-value legs and every leg meets the adaptive safety tier",
+                    "correlation_policy":"batches disjoint by event and participant; each batch contains 1 VFootball + 1-6 eFootball evidence-value legs and every leg meets the adaptive safety tier",
                     "construction_objective":"provide multiple independent paper choices from one fresh scan; prefer the largest safe 2–7-leg shape without forcing weak legs"
                 })
             return mixed_batches,built,{
@@ -2551,7 +2551,7 @@ def build_value_batches(candidates):
         high_options,high_diag=_construct_high_confidence_value_batches(
             mixed_pool,
             max_batches=min(4,MAX_BATCHES),
-            max_legs=4,
+            max_legs=RESULTS_FIRST_MAX_LEGS,
             min_odds=active_min_combined_odds()
         )
         if high_options:
@@ -2844,7 +2844,7 @@ def main():
         "research_gate":{
             "selection_gate_status":gate_status,
             "combined_odds_gate":odds_gate,
-            "preferred_2_80_target_reached":preferred_target_met,
+            "minimum_4_00_floor_reached":preferred_target_met,
             "selected_predictions":selected_predictions,
             "tennis_live_eligible":tennis_live_eligible,
             "upstream_blocked":upstream_blocked,
