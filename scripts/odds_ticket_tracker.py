@@ -547,12 +547,13 @@ def _ticket_construction_snapshot_from_existing(ticket):
         "avg_model_edge_percent": num(ticket.get("avg_model_edge_percent")),
         "products": list(ticket.get("products") or []),
         "policy": {
-            "minimum_combined_odds": 4.0,
+            "minimum_combined_odds": None,
             "maximum_legs": 7,
             "adaptive_leg_counts": [2,3,4,5,6,7],
             "per_leg_min_model_probability": {"2":0.80,"3":0.80,"4":0.80,"5":0.80,"6":0.80,"7":0.80},
             "preferred_per_leg_model_probability": 0.90,
             "mode": "PAPER_ONLY",
+            "historical_policy_unknown": True,
         },
         "recorded_at": ticket.get("created_at"),
     }
@@ -738,7 +739,7 @@ def make_ticket(batch, now, builder=None):
 
     fingerprint = fingerprint_batch(batch)
     return {
-        "version": 2,
+        "version": 3,
         "ticket_id": ticket_id_from_batch(batch),
         "snapshot_fingerprint": fingerprint,
         "batch_id": batch.get("batch_id"),
@@ -818,6 +819,21 @@ def summary(tickets):
     finalize(shape_stats, ticket_shape)
     finalize(lane_stats, lambda ticket: str(ticket.get("primary_lane") or "unknown"))
 
+    losses_by_product = {}
+    losses_by_direction = {}
+    high_confidence_loss_legs = 0
+    high_confidence_loss_tickets = 0
+    for ticket in settled_tickets:
+        diagnostics = ticket.get("settlement_diagnostics") or {}
+        high_count = int(diagnostics.get("high_confidence_loss_count") or 0)
+        high_confidence_loss_legs += high_count
+        if high_count:
+            high_confidence_loss_tickets += 1
+        for product, count in (diagnostics.get("losses_by_product") or {}).items():
+            losses_by_product[product] = losses_by_product.get(product, 0) + int(count or 0)
+        for direction, count in (diagnostics.get("losses_by_direction") or {}).items():
+            losses_by_direction[direction] = losses_by_direction.get(direction, 0) + int(count or 0)
+
     return {
         "tracked_tickets": len(tickets),
         "pending": sum(x.get("status") == "PENDING" for x in tickets),
@@ -835,6 +851,14 @@ def summary(tickets):
             key: shape_stats[key] for key in sorted(shape_stats, key=lambda value: int(value))
         },
         "by_primary_lane": lane_stats,
+        "improvement_summary": {
+            "high_confidence_loss_tickets": high_confidence_loss_tickets,
+            "high_confidence_loss_legs": high_confidence_loss_legs,
+            "losses_by_product": losses_by_product,
+            "losses_by_direction": losses_by_direction,
+            "shape_comparison": "Use by_leg_count to compare 2–7-leg accuracy, average odds, and average model rating.",
+            "lane_comparison": "Use by_primary_lane to compare construction-lane performance.",
+        },
     }
 
 def main():
