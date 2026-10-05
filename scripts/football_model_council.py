@@ -127,11 +127,13 @@ def build():
         row for row in team_history
         if row.get("sport") == "football" and row.get("settled") and row.get("final_score")
     ]
-    source_history = team_history if team_history else football_rows
-    source_name = "football_team_history" if team_history else "prediction_history_settled_fallback"
+    source_history = team_history
+    source_name = "football_team_history" if team_history else "unavailable"
+    history_leagues = {str(row.get("league") or "") for row in source_history}
 
     evaluated = []
     skipped = 0
+    excluded_no_history = 0
     by_league = defaultdict(list)
 
     for row in sorted(football_rows, key=lambda item: item.get("start_time") or item.get("calculated_at") or ""):
@@ -139,6 +141,9 @@ def build():
         cutoff = row.get("start_time") or row.get("calculated_at")
         if actual is None or not parse_dt(cutoff):
             skipped += 1
+            continue
+        if row.get("league") not in history_leagues:
+            excluded_no_history += 1
             continue
 
         independent = independent_prediction(
@@ -193,6 +198,7 @@ def build():
     overall = {
         "settled_evaluated": len(evaluated),
         "skipped": skipped,
+        "excluded_no_history": excluded_no_history,
         "published_accuracy": accuracy(evaluated, "published_correct"),
         "independent_accuracy": accuracy(evaluated, "independent_correct"),
         "published_brier": round(sum(r["published_brier"] for r in evaluated) / len(evaluated), 4) if evaluated else None,
@@ -230,6 +236,7 @@ def build():
         "builder_eligibility_unchanged": True,
         "history_source": source_name,
         "history_rows_available": len(source_history),
+        "history_leagues": sorted(history_leagues),
         "overall": overall,
         "by_league": league_summary,
         "published_probability_bands": prob_bands(evaluated, "published_prob"),
