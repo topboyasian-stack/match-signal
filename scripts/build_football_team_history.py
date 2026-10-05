@@ -68,7 +68,6 @@ def fetch_day(league, slug, day):
 
 def main():
     today = datetime.now(timezone.utc).date()
-    start = today - timedelta(days=365)
     history = []
     errors = []
     prior_path = DATA / "football_team_history.json"
@@ -78,6 +77,12 @@ def main():
             prior_history = []
     except Exception:
         prior_history = []
+
+    # Backfill a full year once; thereafter refresh only the recent window and
+    # merge it into the preserved historical artifact.
+    lookback_days = 365 if not prior_history else 14
+    start = today - timedelta(days=lookback_days)
+    date_range = f"{start:%Y%m%d}-{today:%Y%m%d}"
 
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -95,7 +100,7 @@ def main():
                 errors.append(error)
 
     by_event = {}
-    for row in history:
+    for row in prior_history + history:
         event_id = row.get("event_id")
         if event_id:
             by_event[event_id] = row
@@ -115,6 +120,7 @@ def main():
     print(json.dumps({
         "status": "ok",
         "date_range": date_range,
+        "lookback_days": lookback_days,
         "matches": len(history),
         "errors": errors,
         "unique_teams": len({r["player_1"] for r in history} | {r["player_2"] for r in history}),
