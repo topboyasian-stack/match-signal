@@ -61,8 +61,14 @@ jobs:
       - name: Compile derived/health modules
         run: python -m py_compile scripts/autopilot_guard.py scripts/football_forward_readiness.py scripts/unified_upcoming.py scripts/selection_candidate_collector.py scripts/system_health_audit.py scripts/independent_football_model.py scripts/football_model_council.py
 
-      - name: Build walk-forward Football model council
-        run: python scripts/football_model_council.py
+      - name: Build walk-forward Football model council when history exists
+        shell: bash
+        run: |
+          if [ -s data/football_team_history.json ] && grep -q '"event_id"' data/football_team_history.json; then
+            python scripts/football_model_council.py
+          else
+            echo "Football team history unavailable; preserving prior council artifact."
+          fi
 
       - name: Build football forward-planning readiness
         run: python scripts/football_forward_readiness.py
@@ -98,7 +104,9 @@ jobs:
             fi
             git fetch origin main
             git reset --hard origin/main
-            python scripts/football_model_council.py
+            if [ -s data/football_team_history.json ] && grep -q '"event_id"' data/football_team_history.json; then
+              python scripts/football_model_council.py
+            fi
             python scripts/football_forward_readiness.py
             python scripts/unified_upcoming.py
             python scripts/selection_candidate_collector.py
