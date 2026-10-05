@@ -2952,4 +2952,5 @@ if __name__=="__main__":
 
 # Refresh marker: exact-side virtual evidence gate is active.
 # Batch marker: vFootball-priority disjoint 4.00+ research batches with 2–7 adaptive legs.
-# Final market freshness marker: 2026-09-30
+# Final market freshness marker: 2026-10-05
+# Trigger marker: regenerate Builder after QA policy alignment; no selection logic change.
