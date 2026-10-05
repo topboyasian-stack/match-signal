@@ -88,6 +88,7 @@ permissions:
   contents: write
   deployments: write
 
+# Production promotion guard: always deploy the latest main artifact set.
 concurrency:
   group: cloudflare-pages-v2
   # Do not cancel a production promotion because another upstream workflow
