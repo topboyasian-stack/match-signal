@@ -21,10 +21,53 @@ SESSION.headers.update({
 })
 
 
+def fetch_day(league, slug, day):
+    try:
+        response = SESSION.get(
+            f"{ESPN}/{slug}/scoreboard",
+            params={"dates": day.strftime("%Y%m%d"), "limit": 1000},
+            timeout=20,
+        )
+        response.raise_for_status()
+        rows = []
+        for event in response.json().get("events", []):
+            status = event.get("status", {}).get("type", {})
+            if not status.get("completed"):
+                continue
+            competition = (event.get("competitions") or [{}])[0]
+            competitors = competition.get("competitors") or []
+            if len(competitors) < 2:
+                continue
+            home = next((c for c in competitors if c.get("homeAway") == "home"), competitors[0])
+            away = next((c for c in competitors if c.get("homeAway") == "away"), competitors[1])
+            try:
+                hs = float(home.get("score"))
+                ass = float(away.get("score"))
+            except (TypeError, ValueError):
+                continue
+            home_name = (home.get("team") or {}).get("displayName")
+            away_name = (away.get("team") or {}).get("displayName")
+            if not home_name or not away_name:
+                continue
+            rows.append({
+                "sport": "football",
+                "league": league,
+                "event_id": str(event.get("id")),
+                "start_time": event.get("date"),
+                "calculated_at": event.get("date") or "",
+                "player_1": home_name,
+                "player_2": away_name,
+                "final_score": [hs, ass],
+                "settled": True,
+                "source": "ESPN completed scoreboard",
+            })
+        return rows, None
+    except Exception as exc:
+        return [], f"{league}:{day.isoformat()}:{str(exc)[:180]}"
+
+
 def main():
     today = datetime.now(timezone.utc).date()
-    start = today - timedelta(days=365)
-    date_range = f"{start:%Y%m%d}-{today:%Y%m%d}"
     history = []
     errors = []
     prior_path = DATA / "football_team_history.json"
@@ -35,49 +78,33 @@ def main():
     except Exception:
         prior_history = []
 
-    for league, slug in FOOTBALL_LEAGUES.items():
-        try:
-            response = SESSION.get(
-                f"{ESPN}/{slug}/scoreboard",
-                params={"dates": date_range, "limit": 1000},
-                timeout=60,
-            )
-            response.raise_for_status()
-            for event in response.json().get("events", []):
-                status = event.get("status", {}).get("type", {})
-                if not status.get("completed"):
-                    continue
-                competition = (event.get("competitions") or [{}])[0]
-                competitors = competition.get("competitors") or []
-                if len(competitors) < 2:
-                    continue
-                home = next((c for c in competitors if c.get("homeAway") == "home"), competitors[0])
-                away = next((c for c in competitors if c.get("homeAway") == "away"), competitors[1])
-                try:
-                    hs = float(home.get("score"))
-                    ass = float(away.get("score"))
-                except (TypeError, ValueError):
-                    continue
-                home_name = (home.get("team") or {}).get("displayName")
-                away_name = (away.get("team") or {}).get("displayName")
-                if not home_name or not away_name:
-                    continue
-                history.append({
-                    "sport": "football",
-                    "league": league,
-                    "event_id": str(event.get("id")),
-                    "start_time": event.get("date"),
-                    "calculated_at": event.get("date") or "",
-                    "player_1": home_name,
-                    "player_2": away_name,
-                    "final_score": [hs, ass],
-                    "settled": True,
-                    "source": "ESPN completed scoreboard",
-                })
-        except Exception as exc:
-            errors.append(f"{league}:{str(exc)[:180]}")
+    # Backfill a full year once; thereafter refresh only the recent window and
+    # merge it into the preserved historical artifact.
+    lookback_days = 365 if not prior_history else 14
+    start = today - timedelta(days=lookback_days)
+    date_range = f"{start:%Y%m%d}-{today:%Y%m%d}"
 
-    history.sort(key=lambda row: row.get("start_time") or "")
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    jobs = [
+        (league, slug, start + timedelta(days=offset))
+        for league, slug in FOOTBALL_LEAGUES.items()
+        for offset in range((today - start).days + 1)
+    ]
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        futures = {pool.submit(fetch_day, league, slug, day): (league, day) for league, slug, day in jobs}
+        for future in as_completed(futures):
+            rows, error = future.result()
+            history.extend(rows)
+            if error:
+                errors.append(error)
+
+    by_event = {}
+    for row in prior_history + history:
+        event_id = row.get("event_id")
+        if event_id:
+            by_event[event_id] = row
+    history = sorted(by_event.values(), key=lambda row: row.get("start_time") or "")
     # Never silently replace a non-empty research history with an empty file.
     # A total provider failure must fail closed so the model layer cannot lose
     # its independent team-history evidence.
@@ -93,6 +120,7 @@ def main():
     print(json.dumps({
         "status": "ok",
         "date_range": date_range,
+        "lookback_days": lookback_days,
         "matches": len(history),
         "errors": errors,
         "unique_teams": len({r["player_1"] for r in history} | {r["player_2"] for r in history}),
