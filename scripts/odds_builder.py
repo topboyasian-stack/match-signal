@@ -99,6 +99,8 @@ PHASE2_CYCLICAL_MIN_LEGS=2
 PHASE2_CYCLICAL_MIN_STREAK_LENGTH=2
 PHASE2_CYCLICAL_MIN_BREAK_OBSERVATIONS=8
 PHASE2_CYCLICAL_HIGH_VARIANCE_ODDS=4.0
+# Bound the experimental combination search so Phase 2 cannot dominate Builder runtime.
+PHASE2_CYCLICAL_POOL_CAP=40
 _COMBINED_ODDS_GATE_CACHE=None
 
 def combined_odds_gate_state():
@@ -1073,6 +1075,18 @@ def _construct_phase2_cyclical_loop_batches(pool,max_batches=4,min_odds=None):
         and float(x.get("model_probability") or 0.0)>=PHASE2_CYCLICAL_MIN_CONFIDENCE
     ]
     import itertools
+    eligible=sorted(
+        eligible,
+        key=lambda x:(
+            -float((x.get("phase2_cyclical_loop") or {}).get("confidence") or 0.0),
+            -float(x.get("model_probability") or 0.0),
+            -float(x.get("evidence_score") or 0.0),
+            -float(x.get("model_edge") or 0.0),
+            -float(x.get("bookmaker_odds") or 1.0),
+            _kickoff_timestamp(x) if _kickoff_timestamp(x) is not None else float("inf")
+        )
+    )[:PHASE2_CYCLICAL_POOL_CAP]
+    import itertools
     options=[]
     for shape in range(PHASE2_CYCLICAL_MIN_LEGS,PHASE2_CYCLICAL_MAX_LEGS+1):
         for combo in itertools.combinations(eligible,shape):
@@ -1135,6 +1149,7 @@ def _construct_phase2_cyclical_loop_batches(pool,max_batches=4,min_odds=None):
         "min_confidence":PHASE2_CYCLICAL_MIN_CONFIDENCE,
         "min_legs":PHASE2_CYCLICAL_MIN_LEGS,
         "max_legs":PHASE2_CYCLICAL_MAX_LEGS,
+        "pool_cap":PHASE2_CYCLICAL_POOL_CAP,
         "min_combined_odds":min_odds,
         "high_variance_odds_threshold":PHASE2_CYCLICAL_HIGH_VARIANCE_ODDS,
         "execution_track":"PHASE2_CYCLICAL_LOOP",
