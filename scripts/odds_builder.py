@@ -87,6 +87,18 @@ MIXED_RESEARCH_MIN_AVG_PROBABILITY=0.80
 MIXED_RESEARCH_MIN_VFOOTBALL_LEGS=1
 MIXED_RESEARCH_MIN_EFOOTBALL_LEGS=1
 MIXED_RESEARCH_MAX_KICKOFF_SPAN_MINUTES=360
+
+# Phase 2 isolated cyclical-loop research lane.
+# This is deliberately separate from the baseline football/tennis/Poisson paths.
+# It can only construct 2–3-leg Virtual/eFootball paper batches from legs that
+# already pass the Builder's normal eligibility/evidence gates.
+PHASE2_CYCLICAL_LOOP_ENABLED=True
+PHASE2_CYCLICAL_MIN_CONFIDENCE=0.78
+PHASE2_CYCLICAL_MAX_LEGS=3
+PHASE2_CYCLICAL_MIN_LEGS=2
+PHASE2_CYCLICAL_MIN_STREAK_LENGTH=2
+PHASE2_CYCLICAL_MIN_BREAK_OBSERVATIONS=8
+PHASE2_CYCLICAL_HIGH_VARIANCE_ODDS=4.0
 _COMBINED_ODDS_GATE_CACHE=None
 
 def combined_odds_gate_state():
@@ -851,6 +863,285 @@ def virtual_directional_evidence(recent):
         "wins":wins
     }
 
+# Phase 2 cyclical-loop history is a research signal only. It never changes
+# the baseline Builder eligibility gates.
+_PHASE2_CYCLE_HISTORY_CACHE=None
+
+def _load_phase2_cycle_history():
+    """Load chronological Virtual/eFootball O/U outcomes for cycle analysis."""
+    global _PHASE2_CYCLE_HISTORY_CACHE
+    if _PHASE2_CYCLE_HISTORY_CACHE is not None:
+        return _PHASE2_CYCLE_HISTORY_CACHE
+    files=sorted((DATA/"virtual_lab_archive"/"settlements").glob("*.jsonl"))
+    index={}
+    rows=[]
+    for path in files[-5:]:
+        try:
+            for raw in path.read_text(encoding="utf-8").splitlines():
+                if not raw.strip():
+                    continue
+                row=json.loads(raw)
+                if row.get("market")!="ou" or row.get("product") not in {"efootball_gt","efootball_adriatic","vfootball","zoom"}:
+                    continue
+                if row.get("line") is None or row.get("win") is None:
+                    continue
+                selection=str(row.get("selection") or "").upper()
+                if selection.startswith("O"):
+                    selected_side="over"
+                elif selection.startswith("U"):
+                    selected_side="under"
+                else:
+                    continue
+                actual_side=selected_side if row.get("win") is True else ("under" if selected_side=="over" else "over")
+                try:
+                    line_key=f"{float(row.get('line')):g}"
+                except (TypeError,ValueError):
+                    continue
+                stamp=str(row.get("settled_at") or row.get("timestamp") or "")
+                rows.append((stamp,str(row.get("product") or ""),line_key,actual_side))
+        except Exception:
+            continue
+    rows.sort(key=lambda item:item[0])
+    for stamp,product,line_key,actual_side in rows:
+        index.setdefault((product,line_key),[]).append({
+            "settled_at":stamp,
+            "actual_side":actual_side
+        })
+    _PHASE2_CYCLE_HISTORY_CACHE=index
+    return index
+
+def _phase2_cyclical_loop_signal(x):
+    """Score a candidate as a potential high-probability streak break.
+
+    A streak break is only flagged when:
+    - the candidate is Virtual/eFootball and already Builder-eligible,
+    - the latest exact product+line sequence has at least a 2-result streak,
+    - the candidate side is the opposite side of that current streak,
+    - the historical sequence contains enough prior break opportunities, and
+    - a blended model/evidence/cycle confidence reaches 78%.
+    
+    This is a research hypothesis, not a gambler's-fallacy override. The baseline
+    Builder never consumes this score unless the separate Phase 2 constructor wins.
+    """
+    result={
+        "enabled":PHASE2_CYCLICAL_LOOP_ENABLED,
+        "flagged":False,
+        "confidence":0.0,
+        "model_probability":0.0,
+        "evidence_posterior":None,
+        "cycle_break_posterior":None,
+        "current_streak_side":None,
+        "current_streak_length":0,
+        "historical_break_observations":0,
+        "historical_breaks":0,
+        "reason":"not_virtual_efootball"
+    }
+    product=str(x.get("product") or "")
+    if not PHASE2_CYCLICAL_LOOP_ENABLED or not (product.startswith("efootball_") or product=="vfootball"):
+        return result
+    try:
+        model_p=float(x.get("builder_probability") or 0.0)
+    except (TypeError,ValueError):
+        model_p=0.0
+    result["model_probability"]=round(model_p,6)
+    if model_p < PHASE2_CYCLICAL_MIN_CONFIDENCE:
+        result["reason"]="model_probability_below_78_percent"
+        return result
+
+    line=x.get("line")
+    side=str(x.get("builder_pick") or x.get("pick") or "").lower()
+    if side not in {"over","under"} or line is None:
+        result["reason"]="invalid_virtual_side_or_line"
+        return result
+    try:
+        line_key=f"{float(line):g}"
+    except (TypeError,ValueError):
+        result["reason"]="invalid_line"
+        return result
+
+    history=_load_phase2_cycle_history().get((product,line_key),[])
+    result["historical_break_observations"]=0
+    result["historical_breaks"]=0
+    if len(history)<(PHASE2_CYCLICAL_MIN_BREAK_OBSERVATIONS+2):
+        result["reason"]="insufficient_cycle_history"
+        return result
+
+    seq=[str(row.get("actual_side") or "") for row in history if row.get("actual_side") in {"over","under"}]
+    if len(seq)<(PHASE2_CYCLICAL_MIN_BREAK_OBSERVATIONS+2):
+        result["reason"]="insufficient_cycle_sequence"
+        return result
+
+    current_side=seq[-1]
+    current_len=1
+    for idx in range(len(seq)-2,-1,-1):
+        if seq[idx]==current_side:
+            current_len+=1
+        else:
+            break
+    result["current_streak_side"]=current_side
+    result["current_streak_length"]=current_len
+
+    if current_len < PHASE2_CYCLICAL_MIN_STREAK_LENGTH or side==current_side:
+        result["reason"]="no_current_opposite_side_streak_break"
+        return result
+
+    # Historical break rate: after at least a 2-result run of the opposite side,
+    # how often did the next observation switch to the candidate side?
+    opportunities=0
+    breaks=0
+    run_len=1
+    for idx in range(1,len(seq)-1):
+        if seq[idx]==seq[idx-1]:
+            run_len+=1
+        else:
+            run_len=1
+        if run_len>=PHASE2_CYCLICAL_MIN_STREAK_LENGTH and seq[idx+1] in {"over","under"}:
+            opportunities+=1
+            if seq[idx+1]==side:
+                breaks+=1
+    if opportunities < PHASE2_CYCLICAL_MIN_BREAK_OBSERVATIONS:
+        result["reason"]="insufficient_historical_break_opportunities"
+        result["historical_break_observations"]=opportunities
+        return result
+
+    cycle_p=(breaks+2.0)/(opportunities+4.0)
+    recent=x.get("recent_evidence") or {}
+    try:
+        n=int(recent.get("n") or 0)
+        wins=int(recent.get("wins") or 0)
+        evidence_p=(wins+2.0)/(n+4.0) if n>=8 else None
+    except (TypeError,ValueError):
+        evidence_p=None
+
+    # Model probability is primary, exact-line evidence is secondary, and the
+    # cycle reversal statistic is a deliberately modest third component.
+    confidence=(0.60*model_p)+(0.25*(evidence_p if evidence_p is not None else model_p))+(0.15*cycle_p)
+    flagged=(
+        model_p>=PHASE2_CYCLICAL_MIN_CONFIDENCE and
+        evidence_p is not None and
+        opportunities>=PHASE2_CYCLICAL_MIN_BREAK_OBSERVATIONS and
+        confidence>=PHASE2_CYCLICAL_MIN_CONFIDENCE
+    )
+    result.update({
+        "flagged":bool(flagged),
+        "confidence":round(confidence,6),
+        "evidence_posterior":round(evidence_p,6) if evidence_p is not None else None,
+        "cycle_break_posterior":round(cycle_p,6),
+        "historical_break_observations":opportunities,
+        "historical_breaks":breaks,
+        "reason":"high_probability_streak_break" if flagged else "cycle_confidence_below_78_percent"
+    })
+    return result
+
+def _phase2_kelly_diagnostic(probability,combined_odds):
+    """Paper-only Kelly diagnostic; never controls or executes staking."""
+    try:
+        p=float(probability)
+        odds=float(combined_odds)
+    except (TypeError,ValueError):
+        return {"applicable":False,"reason":"invalid_inputs"}
+    if odds<=PHASE2_CYCLICAL_HIGH_VARIANCE_ODDS or not 0.0<p<1.0:
+        return {
+            "applicable":False,
+            "combined_odds":round(odds,3),
+            "label":None,
+            "paper_only":True,
+            "reason":"4.00x_or_below"
+        }
+    b=odds-1.0
+    k=((b*p)-(1.0-p))/b if b>0 else 0.0
+    return {
+        "applicable":True,
+        "combined_odds":round(odds,3),
+        "kelly_fraction":round(max(0.0,min(1.0,k)),6),
+        "label":"High Variance - Fraction Stake Only",
+        "paper_only":True,
+        "execution":"none"
+    }
+
+def _construct_phase2_cyclical_loop_batches(pool,max_batches=4,min_odds=None):
+    """Construct isolated 2–3-leg cyclical Virtual/eFootball research batches."""
+    if min_odds is None:
+        min_odds=active_min_combined_odds()
+    eligible=[
+        x for x in pool
+        if str(x.get("sport") or "")=="virtual"
+        and (str(x.get("product") or "")=="vfootball" or str(x.get("product") or "").startswith("efootball_"))
+        and str((x.get("phase2_cyclical_loop") or {}).get("reason") or "")=="high_probability_streak_break"
+        and bool((x.get("phase2_cyclical_loop") or {}).get("flagged"))
+        and bool(x.get("builder_eligible"))
+        and float(x.get("model_probability") or 0.0)>=PHASE2_CYCLICAL_MIN_CONFIDENCE
+    ]
+    import itertools
+    options=[]
+    for shape in range(PHASE2_CYCLICAL_MIN_LEGS,PHASE2_CYCLICAL_MAX_LEGS+1):
+        for combo in itertools.combinations(eligible,shape):
+            event_ids=[str(x.get("event_id") or "") for x in combo if x.get("event_id")]
+            if len(event_ids)!=len(set(event_ids)):
+                continue
+            participants=[p for row in combo for p in _participants(row)]
+            if len(participants)!=len(set(participants)):
+                continue
+            if _batch_kickoff_span_minutes(combo)>MAX_BATCH_KICKOFF_SPAN_MINUTES:
+                continue
+            odds=math.prod(float(x.get("bookmaker_odds") or 1.0) for x in combo)
+            if odds<min_odds:
+                continue
+            if any(float((x.get("phase2_cyclical_loop") or {}).get("confidence") or 0.0)<PHASE2_CYCLICAL_MIN_CONFIDENCE for x in combo):
+                continue
+            metrics=_batch_metrics(list(combo))
+            roi=(float(metrics.get("combined_model_probability") or 0.0)*odds)-1.0
+            if roi<RESULTS_FIRST_MIN_EXPECTED_ROI:
+                continue
+            min_conf=min(float((x.get("phase2_cyclical_loop") or {}).get("confidence") or 0.0) for x in combo)
+            avg_prob=float(metrics.get("avg_model_probability") or 0.0)
+            options.append({
+                "rows":list(combo),
+                "metrics":metrics,
+                "odds":odds,
+                "span":_batch_kickoff_span_minutes(combo),
+                "roi":roi,
+                "min_confidence":min_conf,
+                "score":(
+                    min_conf,
+                    float(metrics.get("combined_model_probability") or 0.0),
+                    avg_prob,
+                    roi,
+                    odds,
+                )
+            })
+    options.sort(key=lambda row:row["score"],reverse=True)
+    selected=[]
+    used_events=set()
+    used_participants=set()
+    for option in options:
+        if len(selected)>=max_batches:
+            break
+        rows=option["rows"]
+        events={str(x.get("event_id") or "") for x in rows if x.get("event_id")}
+        participants={p for row in rows for p in _participants(row)}
+        if events & used_events or participants & used_participants:
+            continue
+        risk=_phase2_kelly_diagnostic(option["metrics"].get("combined_model_probability"),option["odds"])
+        option["kelly_risk"]=risk
+        selected.append(option)
+        used_events.update(events)
+        used_participants.update(participants)
+    return selected,{
+        "enabled":PHASE2_CYCLICAL_LOOP_ENABLED,
+        "eligible_legs":len(eligible),
+        "candidate_combinations":len(options),
+        "batches_selected":len(selected),
+        "min_confidence":PHASE2_CYCLICAL_MIN_CONFIDENCE,
+        "min_legs":PHASE2_CYCLICAL_MIN_LEGS,
+        "max_legs":PHASE2_CYCLICAL_MAX_LEGS,
+        "min_combined_odds":min_odds,
+        "high_variance_odds_threshold":PHASE2_CYCLICAL_HIGH_VARIANCE_ODDS,
+        "execution_track":"PHASE2_CYCLICAL_LOOP",
+        "mixed_with_baseline":False,
+        "reason":None if selected else "no_isolated_streak_break_combination_reached_all_gates"
+    }
+
 def virtual_candidates(now):
     """Build Virtual candidates from the freshest exact SportyBet O/U snapshot.
 
@@ -1394,6 +1685,12 @@ def make_leg(x):
         selection_score=(0.90*evidence_score)+(0.10*max(0.0,float(edge or 0.0)))+history_bonus
     else:
         selection_score=(edge if edge is not None else -1.0)+history_bonus
+    phase2_cycle=_phase2_cyclical_loop_signal(x) if str(x.get("sport") or "")=="virtual" else {
+        "enabled":PHASE2_CYCLICAL_LOOP_ENABLED,
+        "flagged":False,
+        "confidence":0.0,
+        "reason":"not_virtual"
+    }
     return {
         "sport":x.get("sport"),"competition":x.get("league"),"event_id":x.get("event_id"),
         "start_time":x.get("start_time"),"match":match,"market":x.get("builder_market"),
@@ -1418,6 +1715,7 @@ def make_leg(x):
         "recent_evidence":x.get("recent_evidence"),
         "results_first":x.get("results_first"),
         "qualification_lane":x.get("qualification_lane"),
+        "phase2_cyclical_loop":phase2_cycle,
         "market_odds_timestamp":x.get("odds_timestamp") or x.get("market_odds_timestamp"),
         "sportybet_event_id":x.get("sportybet_event_id") or x.get("event_id"),
         "sportybet_market_id":x.get("sportybet_market_id"),
@@ -2546,6 +2844,79 @@ def build_value_batches(candidates):
                 "capacity":_batch_capacity_diagnostic(vfootball_options[0]["rows"])
             }
 
+        # Isolated Phase 2 cyclical-loop lane. It is considered only after the
+        # proven/results-first and existing mixed research lanes fail. Its batches
+        # contain Virtual/eFootball legs only and are capped at 2–3 legs.
+        phase2_options,phase2_diag=_construct_phase2_cyclical_loop_batches(
+            eligible_all,
+            max_batches=min(4,MAX_BATCHES),
+            min_odds=active_min_combined_odds()
+        )
+        if phase2_options:
+            phase2_batches=[]
+            for idx,option in enumerate(phase2_options,1):
+                rows=sorted(
+                    option["rows"],
+                    key=lambda x:(_kickoff_timestamp(x) if _kickoff_timestamp(x) is not None else float("inf"))
+                )
+                metrics=option["metrics"]
+                odds=float(option["odds"])
+                risk=option.get("kelly_risk") or _phase2_kelly_diagnostic(metrics.get("combined_model_probability"),odds)
+                phase2_batches.append({
+                    "batch_id":f"BATCH-{idx:02d}",
+                    "label":f"BATCH-{idx:02d} · Phase 2 Cyclical Loop {metrics['model_rating']:.1f}/100",
+                    "rank_pending":False,
+                    "rank":idx,
+                    "legs":rows,
+                    "leg_count":len(rows),
+                    "combined_odds":round(odds,3),
+                    "combined_model_rating":metrics["model_rating"],
+                    "combined_model_probability":metrics["combined_model_probability"],
+                    "raw_combined_model_probability":metrics["raw_combined_model_probability"],
+                    "ticket_calibration_gamma":metrics["ticket_calibration_gamma"],
+                    "leg_strength_rating":metrics["leg_strength_rating"],
+                    "avg_model_probability":metrics["avg_model_probability"],
+                    "avg_model_edge_percent":metrics["avg_model_edge_percent"],
+                    "products":sorted({str(row.get("product") or "") for row in rows}),
+                    "primary_lane":"phase2_cyclical_loop",
+                    "execution_track":"PHASE2_CYCLICAL_LOOP",
+                    "paper_only":True,
+                    "real_money_execution":False,
+                    "cyclical_loop_policy":{
+                        "min_confidence":PHASE2_CYCLICAL_MIN_CONFIDENCE,
+                        "max_legs":PHASE2_CYCLICAL_MAX_LEGS,
+                        "min_legs":PHASE2_CYCLICAL_MIN_LEGS,
+                        "strict_virtual_efootball_isolation":True,
+                        "baseline_mixing":False
+                    },
+                    "risk_diagnostic":risk,
+                    "correlation_policy":"batch is disjoint by event and participant; no baseline football/tennis/Poisson legs are mixed into this track",
+                    "construction_objective":"maximize isolated streak-break confidence and calibrated whole-ticket probability while preserving the existing 4.00x and +2% ROI gates"
+                })
+            return phase2_batches,built,{
+                "batch_count":len(phase2_batches),
+                "max_batches":min(4,MAX_BATCHES),
+                "disjoint":True,
+                "min_combined_odds":active_min_combined_odds(),
+                "target_combined_odds":TARGET_COMBINED_ODDS,
+                "accuracy_preservation_ratio":ACCURACY_PRESERVATION_RATIO,
+                "construction_priority":"phase2_cyclical_loop",
+                "priority_product":"virtual_only",
+                "max_legs":PHASE2_CYCLICAL_MAX_LEGS,
+                "adaptive_leg_counts":[PHASE2_CYCLICAL_MIN_LEGS,PHASE2_CYCLICAL_MAX_LEGS],
+                "per_leg_min_model_probability":PHASE2_CYCLICAL_MIN_CONFIDENCE,
+                "preferred_per_leg_model_probability":PREFERRED_LEG_MODEL_PROBABILITY,
+                "construction_shapes_considered":[2,3],
+                "promoted_construction_leg_count":None,
+                "max_kickoff_span_minutes":MAX_BATCH_KICKOFF_SPAN_MINUTES,
+                "builder_horizon_minutes":MAX_BUILDER_HORIZON_MINUTES,
+                "used_unique_events":len({str(x.get("event_id") or "") for b in phase2_batches for x in b["legs"] if x.get("event_id")}),
+                "phase2_cyclical_loop":phase2_diag,
+                "capacity":_batch_capacity_diagnostic([x for b in phase2_batches for x in b["legs"]]),
+                "ranking_metric":"minimum streak-break confidence first; calibrated whole-ticket probability second; ROI/odds tie-breaker",
+                "strict_isolation":True
+            }
+
         # High-confidence adaptive lane: when the VFootball/eFootball mixed
         # composition cannot be formed, use any 2–7 legs that individually clear
         # the 80% safety floor. This avoids forcing a weak eFootball leg merely
@@ -2904,7 +3275,17 @@ def main():
                 "ranking_method":"Bayesian-shrunk hit rate with sample-confidence adjustment; model edge is a secondary tie-break",
                 "eligibility_unchanged":True
             },
-            "never_force_accumulator":True,"real_money_execution":False},
+            "never_force_accumulator":True,"real_money_execution":False,
+            "phase2_cyclical_loop":{
+                "enabled":PHASE2_CYCLICAL_LOOP_ENABLED,
+                "min_confidence":PHASE2_CYCLICAL_MIN_CONFIDENCE,
+                "min_legs":PHASE2_CYCLICAL_MIN_LEGS,
+                "max_legs":PHASE2_CYCLICAL_MAX_LEGS,
+                "virtual_efootball_only":True,
+                "strict_baseline_isolation":True,
+                "high_variance_odds_threshold":PHASE2_CYCLICAL_HIGH_VARIANCE_ODDS,
+                "kelly_risk_diagnostic":"paper_only; no staking execution"
+            }},
         "bookmaker_odds":{"status":"LIVE_SPORTYBET_SNAPSHOT","sportybet_direct_feed":"VIA_CLOUDFLARE_PROXY",
             "stake_direct_feed":"NOT_CONNECTED","instruction":"Verify the displayed SportyBet price immediately before any manual wager."},
         "candidates_considered":{"football":len(football),"tennis":len(tennis),"virtual":len(virtual),"all_built":len(built)},
@@ -2943,7 +3324,10 @@ def main():
         "market_price_combined_odds":round(combined,3) if selected else None,
         "sportybet_booking":booking_info,
         "theme":{"name":"Midnight Graphite / Electric Cyan / Signal Green","accent":"#28D7E8","positive":"#35D07F","background":"#080D14"},
-        "notes":["Results-first qualifies only from settled exact-line/side performance plus the existing live-price, freshness, data-quality and model-evidence gates.","Zero batches are now diagnosable: capacity reports whether 4.00 is mathematically reachable under the existing leg/correlation rules; no per-leg evidence gate is weakened.","best_available_legs is informational when no batch exists and is not a qualified accumulator.","Missing or stale SportyBet prices produce NO_BET/REJECTED.","Model fair odds never overwrite bookmaker odds.","The Builder evaluates 2–7-leg constructions adaptively. Every included leg must meet the 80% safety floor; 90%+ per-leg probability is preferred. The vFootball Results-first lane is promoted only when its own settled-ticket sample, loss rate, combined odds, empirical ROI, exact-line evidence, and current expected ROI pass.","When the proven Results-first lane cannot qualify, the controlled mixed research lane may use exactly 1 VFootball exact-evidence leg plus 1-6 exact-evidence eFootball legs; every included leg must remain independently Builder-eligible and have non-negative single-leg raw expected value. Only after that mixed lane fails does the broader football/tennis/eFootball value fallback run.","The active combined-odds floor is a fixed 4.00x minimum; it is not an earned win-record gate. The fallback still requires current expected ROI >=2%, fresh SportyBet pricing, and the same correlation controls.","The ticket remains paper-only and the active construction lanes allow 2 through 7 legs; they are never pinned to a single leg count and never padded with a weak leg.","The proven Results-first lane keeps a 60-minute kickoff span. The model-first paper value lane may span up to 270 minutes only when its whole-ticket probability and expected ROI gates still pass; this is explicitly research-only, not promoted as settled Results-first evidence.","Near-term Builder horizon is 720 minutes; price freshness remains capped at 900 seconds so extending the scan window does not permit stale odds.","Builder refreshes every 15 minutes and after relevant upstream workflows, so candidate prices are repeatedly revalidated before kickoff."]
+        "notes":["Results-first qualifies only from settled exact-line/side performance plus the existing live-price, freshness, data-quality and model-evidence gates.","Zero batches are now diagnosable: capacity reports whether 4.00 is mathematically reachable under the existing leg/correlation rules; no per-leg evidence gate is weakened.","best_available_legs is informational when no batch exists and is not a qualified accumulator.","Missing or stale SportyBet prices produce NO_BET/REJECTED.","Model fair odds never overwrite bookmaker odds.","The Builder evaluates 2–7-leg constructions adaptively. Every included leg must meet the 80% safety floor; 90%+ per-leg probability is preferred. The vFootball Results-first lane is promoted only when its own settled-ticket sample, loss rate, combined odds, empirical ROI, exact-line evidence, and current expected ROI pass.","When the proven Results-first lane cannot qualify, the controlled mixed research lane may use exactly 1 VFootball exact-evidence leg plus 1-6 exact-evidence eFootball legs; every included leg must remain independently Builder-eligible and have non-negative single-leg raw expected value. Only after that mixed lane fails does the broader football/tennis/eFootball value fallback run.","The active combined-odds floor is a fixed 4.00x minimum; it is not an earned win-record gate. The fallback still requires current expected ROI >=2%, fresh SportyBet pricing, and the same correlation controls.","The ticket remains paper-only and the active construction lanes allow 2 through 7 legs; they are never pinned to a single leg count and never padded with a weak leg.","The proven Results-first lane keeps a 60-minute kickoff span. The model-first paper value lane may span up to 270 minutes only when its whole-ticket probability and expected ROI gates still pass; this is explicitly research-only, not promoted as settled Results-first evidence.","Near-term Builder horizon is 720 minutes; price freshness remains capped at 900 seconds so extending the scan window does not permit stale odds.","Builder refreshes every 15 minutes and after relevant upstream workflows, so candidate prices are repeatedly revalidated before kickoff.",
+        "Phase 2 cyclical-loop research is isolated from the baseline model: only Virtual/eFootball legs with a model probability and blended streak-break confidence of at least 78% can enter its 2–3-leg constructor.",
+        "The cyclical-loop signal is evidence-backed sequence analysis, not a gambler's-fallacy override: it requires a current opposite-side streak and historical break observations. It cannot weaken the existing evidence, price, correlation, 4.00x or +2% ROI gates.",
+        "When Phase 2 combined odds exceed 4.00x, the Builder records a paper-only Kelly variance diagnostic labeled 'High Variance - Fraction Stake Only'; no live stake is calculated or executed."]
     }
     OUTPUT.write_text(json.dumps(result,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
     print(json.dumps(result,indent=2))
