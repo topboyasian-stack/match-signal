@@ -10,7 +10,6 @@ from pathlib import Path
 import requests
 
 from calibration import calibrate_prediction, calibrate_binary_market
-from independent_football_model import independent_prediction
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
@@ -738,7 +737,7 @@ def btts_probability(lam_home, lam_away):
     return (1 - math.exp(-lam_home)) * (1 - math.exp(-lam_away))
 
 
-def football_prediction(event, label, independent_history=None, independent_history_source=None):
+def football_prediction(event, label):
     competition = event.get("competitions", [{}])[0]
     competitors = competition.get("competitors", [])
     if len(competitors) < 2:
@@ -794,22 +793,6 @@ def football_prediction(event, label, independent_history=None, independent_hist
         },
         "handicap": {"line": spread["line"] if spread else None, "home_cover": round(handicap_prob, 4) if handicap_prob is not None else None, "away_cover": round(1 - handicap_prob, 4) if handicap_prob is not None else None},
         "model": source,
-        # Independent Football model is diagnostic only until the walk-forward
-        # council proves calibrated value. It never overrides the current pick.
-        "independent_model": (
-            {
-                **independent_prediction(event, label, independent_history or [], cutoff=event.get("date")),
-                "history_source": independent_history_source or "unavailable",
-                "used_for_current_pick": False,
-            }
-            if independent_history
-            else {
-                "available": False,
-                "history_source": independent_history_source or "unavailable",
-                "used_for_current_pick": False,
-                "reason": "no settled football history available for independent model",
-            }
-        ),
     }
 
 
@@ -981,16 +964,6 @@ def build_tennis_form(tour, start_date, end_date):
 
 def fetch_current_predictions():
     predictions, errors = [], []
-    football_history = load_json(DATA / "football_team_history.json", [])
-    if not isinstance(football_history, list) or not football_history:
-        fallback_history = load_json(DATA / "prediction_history.json", [])
-        football_history = [
-            row for row in fallback_history
-            if row.get("sport") == "football" and row.get("settled") and row.get("final_score")
-        ]
-        football_history_source = "prediction_history_settled_fallback"
-    else:
-        football_history_source = "football_team_history"
     qc = {"rejected_total": 0, "rejected_by_reason": {}, "rejected_by_tour": {}}
 
     def record_rejection(tour, reason):
@@ -1017,7 +990,7 @@ def fetch_current_predictions():
                         seen_events.add(event_id)
                     if event.get("status", {}).get("type", {}).get("completed"):
                         continue
-                    prediction = football_prediction(event, label, football_history, football_history_source)
+                    prediction = football_prediction(event, label)
                     if prediction:
                         predictions.append(prediction)
         except Exception as exc:
