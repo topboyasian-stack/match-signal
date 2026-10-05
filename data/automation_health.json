@@ -1,23 +1,23 @@
 {
-  "updated_at": "2026-10-05T05:49:17.080858+00:00",
+  "updated_at": "2026-10-05T12:48:19.173296+00:00",
   "automation_status": "SELF_HEALING_ENABLED",
   "pipeline_last_update": "2026-10-05T05:29:15.837701+00:00",
-  "pipeline_age_hours": 0.33,
-  "odds_builder_last_update": "2026-10-05T05:38:28.665195+00:00",
-  "odds_builder_age_hours": 0.18,
-  "expansion_last_update": "2026-10-05T05:32:08.190929+00:00",
-  "expansion_age_hours": 0.29,
-  "virtual_lab_last_update": "2026-10-05T05:49:13.995458+00:00",
+  "pipeline_age_hours": 7.32,
+  "odds_builder_last_update": "2026-10-05T12:37:58.332623+00:00",
+  "odds_builder_age_hours": 0.17,
+  "expansion_last_update": "2026-10-05T07:04:45.059835+00:00",
+  "expansion_age_hours": 5.73,
+  "virtual_lab_last_update": "2026-10-05T12:48:06.932187+00:00",
   "virtual_lab_age_hours": 0.0,
-  "virtual_lab_status_age_hours": 1.44,
-  "darts_age_hours": 5.49,
-  "table_tennis_age_hours": 4.68,
-  "unified_upcoming_age_hours": 0.19,
-  "virtual_lab_events": 164,
+  "virtual_lab_status_age_hours": 1.15,
+  "darts_age_hours": 6.82,
+  "table_tennis_age_hours": 5.35,
+  "unified_upcoming_age_hours": 0.28,
+  "virtual_lab_events": 651,
   "virtual_lab_products": {
-    "efootball_adriatic": 16,
-    "efootball_gt": 119,
-    "vfootball": 29
+    "efootball_gt": 196,
+    "efootball_adriatic": 13,
+    "vfootball": 442
   },
   "thresholds": {
     "pipeline_hours": 4,
@@ -35,6 +35,18 @@
       "action": "dispatch",
       "status": "requested",
       "detail": "Virtual Lab research-ledger self-heal"
+    },
+    {
+      "workflow": "live-expansion.yml",
+      "action": "dispatch",
+      "status": "requested",
+      "detail": "scheduled self-heal"
+    },
+    {
+      "workflow": "tennis_pipeline.yml",
+      "action": "dispatch",
+      "status": "requested",
+      "detail": "core prediction pipeline self-heal"
     },
     {
       "workflow": "darts-x.yml",
