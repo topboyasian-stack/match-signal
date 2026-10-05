@@ -774,46 +774,66 @@ def summary(tickets):
     shape_stats = {}
     lane_stats = {}
 
+    def ticket_shape(ticket):
+        return str(int(ticket.get("leg_count") or len(ticket.get("legs") or [])))
+
     def accumulate(group, key, ticket):
-        row = group.setdefault(key, {"tracked":0,"won":0,"lost":0,"settled":0,"accuracy":None,"avg_combined_odds":None,"avg_model_rating":None})
+        row = group.setdefault(
+            key,
+            {
+                "tracked": 0,
+                "won": 0,
+                "lost": 0,
+                "settled": 0,
+                "accuracy": None,
+                "avg_combined_odds": None,
+                "avg_model_rating": None,
+            },
+        )
         row["tracked"] += 1
         row["settled"] += 1
-        row["won"] += 1 if str(ticket.get("status") or "").upper()=="WON" else 0
-        row["lost"] += 1 if str(ticket.get("status") or "").upper()=="LOST" else 0
+        row["won"] += 1 if str(ticket.get("status") or "").upper() == "WON" else 0
+        row["lost"] += 1 if str(ticket.get("status") or "").upper() == "LOST" else 0
 
-    settled_tickets=[x for x in tickets if str(x.get("status") or "").upper() in {"WON","LOST"}]
+    settled_tickets = [
+        x for x in tickets
+        if str(x.get("status") or "").upper() in {"WON", "LOST"}
+    ]
+
     for ticket in settled_tickets:
-        shape=str(int(ticket.get("leg_count") or len(ticket.get("legs") or [])))
-        accumulate(shape_stats,shape,ticket)
-        accumulate(lane_stats,str(ticket.get("primary_lane") or "unknown"),ticket)
+        accumulate(shape_stats, ticket_shape(ticket), ticket)
+        accumulate(lane_stats, str(ticket.get("primary_lane") or "unknown"), ticket)
 
-    for group in (shape_stats,lane_stats):
-        for key,row in group.items():
-            row["accuracy"]=round(row["won"]/row["settled"],6) if row["settled"] else None
-            odds=[num(t.get("combined_odds")) for t in settled_tickets if (
-                (str(int(t.get("leg_count") or len(t.get("legs") or [])))==key) if group is shape_stats
-                else (str(t.get("primary_lane") or "unknown")==key)
-            )]
-            ratings=[num(t.get("combined_model_rating")) for t in settled_tickets if (
-                (str(int(t.get("leg_count") or len(t.get("legs") or [])))==key) if group is shape_stats
-                else (str(t.get("primary_lane") or "unknown")==key)
-            )]
-            odds=[x for x in odds if x is not None]
-            ratings=[x for x in ratings if x is not None]
-            row["avg_combined_odds"]=round(sum(odds)/len(odds),6) if odds else None
-            row["avg_model_rating"]=round(sum(ratings)/len(ratings),6) if ratings else None
+    def finalize(group, key_fn):
+        for key, row in group.items():
+            row["accuracy"] = round(row["won"] / row["settled"], 6) if row["settled"] else None
+            matching = [ticket for ticket in settled_tickets if key_fn(ticket) == key]
+            odds = [num(ticket.get("combined_odds")) for ticket in matching]
+            ratings = [num(ticket.get("combined_model_rating")) for ticket in matching]
+            odds = [value for value in odds if value is not None]
+            ratings = [value for value in ratings if value is not None]
+            row["avg_combined_odds"] = round(sum(odds) / len(odds), 6) if odds else None
+            row["avg_model_rating"] = round(sum(ratings) / len(ratings), 6) if ratings else None
+
+    finalize(shape_stats, ticket_shape)
+    finalize(lane_stats, lambda ticket: str(ticket.get("primary_lane") or "unknown"))
 
     return {
         "tracked_tickets": len(tickets),
         "pending": sum(x.get("status") == "PENDING" for x in tickets),
         "won": sum(x.get("status") == "WON" for x in tickets),
         "lost": sum(x.get("status") == "LOST" for x in tickets),
-        "active_with_loss": sum(x.get("status") == "LOST" and x.get("leg_counts", {}).get("pending", 0) > 0 for x in tickets),
+        "active_with_loss": sum(
+            x.get("status") == "LOST" and x.get("leg_counts", {}).get("pending", 0) > 0
+            for x in tickets
+        ),
         "legs_won": sum(x.get("leg_counts", {}).get("won", 0) for x in tickets),
         "legs_lost": sum(x.get("leg_counts", {}).get("lost", 0) for x in tickets),
         "legs_pending": sum(x.get("leg_counts", {}).get("pending", 0) for x in tickets),
-        "settled_tickets": sum(x.get("status") in {"WON","LOST"} for x in tickets),
-        "by_leg_count": {k: shape_stats[k] for k in sorted(shape_stats, key=lambda v:int(v))},
+        "settled_tickets": sum(x.get("status") in {"WON", "LOST"} for x in tickets),
+        "by_leg_count": {
+            key: shape_stats[key] for key in sorted(shape_stats, key=lambda value: int(value))
+        },
         "by_primary_lane": lane_stats,
     }
 
