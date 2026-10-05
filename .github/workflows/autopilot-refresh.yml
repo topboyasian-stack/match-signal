@@ -58,7 +58,13 @@ jobs:
           git reset --hard origin/main
 
       - name: Compile derived/health modules
-        run: python -m py_compile scripts/autopilot_guard.py scripts/football_forward_readiness.py scripts/unified_upcoming.py scripts/selection_candidate_collector.py scripts/system_health_audit.py
+        run: python -m py_compile scripts/autopilot_guard.py scripts/football_forward_readiness.py scripts/unified_upcoming.py scripts/selection_candidate_collector.py scripts/system_health_audit.py scripts/independent_football_model.py scripts/football_model_council.py
+
+      - name: Refresh independent Football team history
+        run: python scripts/build_football_team_history.py
+
+      - name: Build walk-forward Football model council
+        run: python scripts/football_model_council.py
 
       - name: Build football forward-planning readiness
         run: python scripts/football_forward_readiness.py
@@ -81,7 +87,7 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/autopilot_status.json data/football_forward_readiness.json data/unified_upcoming.json data/selection_candidates.json data/selection_candidate_status.json data/system_health.json
+          git add data/autopilot_status.json data/football_team_history.json data/football_model_council.json data/football_forward_readiness.json data/unified_upcoming.json data/selection_candidates.json data/selection_candidate_status.json data/system_health.json
           if git diff --cached --quiet; then
             echo "Autopilot derived layer already current."
             exit 0
@@ -94,12 +100,14 @@ jobs:
             fi
             git fetch origin main
             git reset --hard origin/main
+            python scripts/build_football_team_history.py
+            python scripts/football_model_council.py
             python scripts/football_forward_readiness.py
             python scripts/unified_upcoming.py
             python scripts/selection_candidate_collector.py
             python scripts/system_health_audit.py
             python scripts/autopilot_guard.py
-            git add data/autopilot_status.json data/football_forward_readiness.json data/unified_upcoming.json data/selection_candidates.json data/selection_candidate_status.json data/system_health.json
+            git add data/autopilot_status.json data/football_team_history.json data/football_model_council.json data/football_forward_readiness.json data/unified_upcoming.json data/selection_candidates.json data/selection_candidate_status.json data/system_health.json
             if git diff --cached --quiet; then
               echo "Latest main already contains the derived layer."
               exit 0
