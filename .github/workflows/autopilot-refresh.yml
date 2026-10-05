@@ -10,6 +10,7 @@ on:
       - "Match Signal Post-Pipeline Live Feed Reconcile"
       - "Match Signal PDL Prediction Feed"
       - "Match Signal Live Prediction Pipeline"
+      - "Match Signal Football Statistical History"
     types: [completed]
   push:
     branches: [main]
@@ -60,9 +61,6 @@ jobs:
       - name: Compile derived/health modules
         run: python -m py_compile scripts/autopilot_guard.py scripts/football_forward_readiness.py scripts/unified_upcoming.py scripts/selection_candidate_collector.py scripts/system_health_audit.py scripts/independent_football_model.py scripts/football_model_council.py
 
-      - name: Refresh independent Football team history
-        run: python scripts/build_football_team_history.py
-
       - name: Build walk-forward Football model council
         run: python scripts/football_model_council.py
 
@@ -100,7 +98,6 @@ jobs:
             fi
             git fetch origin main
             git reset --hard origin/main
-            python scripts/build_football_team_history.py
             python scripts/football_model_council.py
             python scripts/football_forward_readiness.py
             python scripts/unified_upcoming.py
