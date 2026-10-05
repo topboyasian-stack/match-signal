@@ -501,7 +501,147 @@ def derive_combined_odds(ticket):
         return None
 
 
-def refresh_ticket(ticket, rows, now):
+
+def _policy_snapshot_from_builder(builder):
+    policy=(builder.get("selection_policy") or {}) if isinstance(builder,dict) else {}
+    batch_policy=(builder.get("batch_policy") or {}) if isinstance(builder,dict) else {}
+    return {
+        "minimum_combined_odds": num(policy.get("minimum_combined_odds") or batch_policy.get("min_combined_odds") or 4.0),
+        "maximum_legs": int(policy.get("max_legs") or batch_policy.get("max_legs") or 7),
+        "adaptive_leg_counts": list(policy.get("adaptive_leg_counts") or [2,3,4,5,6,7]),
+        "per_leg_min_model_probability": policy.get("per_leg_min_model_probability") or {},
+        "preferred_per_leg_model_probability": num(policy.get("preferred_per_leg_model_probability") or 0.90),
+        "mode": str(builder.get("mode") or "PAPER_ONLY") if isinstance(builder,dict) else "PAPER_ONLY",
+    }
+
+
+def _construction_snapshot(batch, builder=None):
+    return {
+        "batch_id": batch.get("batch_id"),
+        "primary_lane": batch.get("primary_lane"),
+        "leg_count": len(batch.get("legs") or []),
+        "combined_odds": num(batch.get("combined_odds")),
+        "combined_model_rating": num(batch.get("combined_model_rating")),
+        "combined_model_probability": num(batch.get("combined_model_probability")),
+        "raw_combined_model_probability": num(batch.get("raw_combined_model_probability")),
+        "leg_strength_rating": num(batch.get("leg_strength_rating")),
+        "avg_model_probability": num(batch.get("avg_model_probability")),
+        "avg_model_edge_percent": num(batch.get("avg_model_edge_percent")),
+        "products": list(batch.get("products") or []),
+        "policy": _policy_snapshot_from_builder(builder),
+        "recorded_at": iso_now(),
+    }
+
+
+def _ticket_construction_snapshot_from_existing(ticket):
+    return {
+        "batch_id": ticket.get("batch_id"),
+        "primary_lane": ticket.get("primary_lane"),
+        "leg_count": int(ticket.get("leg_count") or len(ticket.get("legs") or [])),
+        "combined_odds": num(ticket.get("combined_odds")),
+        "combined_model_rating": num(ticket.get("combined_model_rating")),
+        "combined_model_probability": num(ticket.get("combined_model_probability")),
+        "raw_combined_model_probability": num(ticket.get("raw_combined_model_probability")),
+        "leg_strength_rating": num(ticket.get("leg_strength_rating")),
+        "avg_model_probability": num(ticket.get("avg_model_probability")),
+        "avg_model_edge_percent": num(ticket.get("avg_model_edge_percent")),
+        "products": list(ticket.get("products") or []),
+        "policy": {
+            "minimum_combined_odds": 4.0,
+            "maximum_legs": 7,
+            "adaptive_leg_counts": [2,3,4,5,6,7],
+            "per_leg_min_model_probability": {"2":0.80,"3":0.80,"4":0.80,"5":0.80,"6":0.80,"7":0.80},
+            "preferred_per_leg_model_probability": 0.90,
+            "mode": "PAPER_ONLY",
+        },
+        "recorded_at": ticket.get("created_at"),
+    }
+
+
+def _settlement_diagnostics(ticket):
+    legs = [x for x in (ticket.get("legs") or []) if isinstance(x,dict)]
+    won = [x for x in legs if str(x.get("status") or "").upper()=="WON"]
+    lost = [x for x in legs if str(x.get("status") or "").upper()=="LOST"]
+    void = [x for x in legs if str(x.get("status") or "").upper()=="VOID"]
+    pending = [x for x in legs if str(x.get("status") or "PENDING").upper()=="PENDING"]
+    settled = won + lost + void
+    hit_rate = (len(won) / (len(won)+len(lost))) if (won or lost) else None
+    loss_products = {}
+    loss_sides = {}
+    high_confidence_losses = []
+    loss_details = []
+    for leg in lost:
+        product = norm(leg.get("product") or leg.get("sport")) or "unknown"
+        loss_products[product] = loss_products.get(product,0) + 1
+        pick_text = norm(leg.get("builder_pick") or leg.get("pick"))
+        side, line = normalize_selection(pick_text)
+        if side in {"over","under"}:
+            loss_sides[side] = loss_sides.get(side,0) + 1
+        p = num(leg.get("model_probability")) or 0.0
+        if p >= 0.90:
+            high_confidence_losses.append(str(leg.get("event_id") or leg.get("match") or ""))
+        loss_details.append({
+            "event_id": leg.get("event_id"),
+            "match": leg.get("match"),
+            "product": product,
+            "pick": leg.get("pick") or leg.get("builder_pick"),
+            "line": leg.get("line") if leg.get("line") is not None else line,
+            "model_probability": p,
+            "model_edge": num(leg.get("model_edge")),
+            "bookmaker_odds": num(leg.get("bookmaker_odds_snapshot") if leg.get("bookmaker_odds_snapshot") is not None else leg.get("bookmaker_odds")),
+            "evidence_score": num(leg.get("evidence_score")),
+            "recent_evidence_n": (leg.get("recent_evidence") or {}).get("n"),
+            "recent_evidence_hit_rate": (leg.get("recent_evidence") or {}).get("hit_rate"),
+            "result": leg.get("result"),
+            "final_score": leg.get("final_score"),
+            "settled_at": leg.get("settled_at"),
+        })
+    average_leg_probability = (
+        sum(num(x.get("model_probability")) or 0.0 for x in settled) / len(settled)
+        if settled else None
+    )
+    probability_values = [num(x.get("model_probability")) for x in legs if num(x.get("model_probability")) is not None]
+    weakest_leg_probability = min(probability_values) if probability_values else None
+    status = str(ticket.get("status") or "PENDING").upper()
+    if status == "WON":
+        label = "ALL_SETTLED_LEGS_WON"
+    elif status == "LOST":
+        label = f"TICKET_LOST_{len(lost)}_OF_{len(legs)}_LEGS"
+    elif pending:
+        label = f"PARTIALLY_SETTLED_{len(settled)}_OF_{len(legs)}"
+    else:
+        label = "NOT_SETTLED"
+    return {
+        "diagnostic_version": 1,
+        "ticket_outcome": status,
+        "diagnostic_label": label,
+        "leg_count": len(legs),
+        "settled_leg_count": len(settled),
+        "won_leg_count": len(won),
+        "lost_leg_count": len(lost),
+        "void_leg_count": len(void),
+        "pending_leg_count": len(pending),
+        "leg_hit_rate_excluding_voids": round(hit_rate,6) if hit_rate is not None else None,
+        "average_settled_leg_model_probability": round(average_leg_probability,6) if average_leg_probability is not None else None,
+        "weakest_ticket_leg_model_probability": round(weakest_leg_probability,6) if weakest_leg_probability is not None else None,
+        "high_confidence_loss_count": len(high_confidence_losses),
+        "high_confidence_loss_events": high_confidence_losses,
+        "losses_by_product": loss_products,
+        "losses_by_direction": loss_sides,
+        "loss_details": loss_details,
+        "improvement_keys": {
+            "shape": f"{len(legs)}_leg" if len(legs) else "unknown",
+            "primary_lane": ticket.get("primary_lane"),
+            "combined_odds": num(ticket.get("combined_odds")),
+            "combined_model_rating": num(ticket.get("combined_model_rating")),
+            "combined_model_probability": num(ticket.get("combined_model_probability")),
+            "avg_model_probability": num(ticket.get("avg_model_probability")),
+            "avg_model_edge_percent": num(ticket.get("avg_model_edge_percent")),
+        },
+    }
+
+
+def refresh_ticket(ticket, rows, now, builder=None):
     changed = False
     for leg in ticket.get("legs") or []:
         if not leg.get("fixture_key"):
@@ -562,14 +702,27 @@ def refresh_ticket(ticket, rows, now):
     if ticket.get("last_settled_at") != latest_settled:
         ticket["last_settled_at"] = latest_settled
         changed = True
-    if ticket.get("version", 1) < 2:
-        ticket["version"] = 2
+    if not ticket.get("construction_snapshot"):
+        ticket["construction_snapshot"] = _ticket_construction_snapshot_from_existing(ticket)
+        changed = True
+
+    if ticket.get("status") in {"WON", "LOST"}:
+        diagnostics = _settlement_diagnostics(ticket)
+        if ticket.get("settlement_diagnostics") != diagnostics:
+            ticket["settlement_diagnostics"] = diagnostics
+            changed = True
+    elif ticket.get("settlement_diagnostics") is not None:
+        ticket.pop("settlement_diagnostics", None)
+        changed = True
+
+    if ticket.get("version", 1) < 3:
+        ticket["version"] = 3
         ticket["snapshot_fingerprint"] = ticket.get("snapshot_fingerprint") or ticket_id_from_batch(ticket)[2:]
         changed = True
     return changed
 
 
-def make_ticket(batch, now):
+def make_ticket(batch, now, builder=None):
     legs = []
     for leg in batch.get("legs") or []:
         copied = dict(leg)
@@ -598,6 +751,10 @@ def make_ticket(batch, now):
         "odds_snapshot_complete": all(num(x.get("bookmaker_odds_snapshot")) and num(x.get("bookmaker_odds_snapshot")) > 1.0 for x in legs),
         "combined_model_rating": batch.get("combined_model_rating"),
         "combined_model_probability": batch.get("combined_model_probability"),
+        "raw_combined_model_probability": batch.get("raw_combined_model_probability"),
+        "leg_strength_rating": batch.get("leg_strength_rating"),
+        "avg_model_probability": batch.get("avg_model_probability"),
+        "avg_model_edge_percent": batch.get("avg_model_edge_percent"),
         "products": batch.get("products") or [],
         "primary_lane": batch.get("primary_lane"),
         "odds_locked_at": now,
@@ -606,12 +763,46 @@ def make_ticket(batch, now):
         "pending_leg_count": len(legs),
         "legs": legs,
         "leg_counts": {"won": 0, "lost": 0, "void": 0, "pending": len(legs)},
+        "construction_snapshot": _construction_snapshot(batch, builder),
+        "settlement_diagnostics": None,
         "paper_only": True,
         "real_money_execution": False,
     }
 
 
 def summary(tickets):
+    shape_stats = {}
+    lane_stats = {}
+
+    def accumulate(group, key, ticket):
+        row = group.setdefault(key, {"tracked":0,"won":0,"lost":0,"settled":0,"accuracy":None,"avg_combined_odds":None,"avg_model_rating":None})
+        row["tracked"] += 1
+        row["settled"] += 1
+        row["won"] += 1 if str(ticket.get("status") or "").upper()=="WON" else 0
+        row["lost"] += 1 if str(ticket.get("status") or "").upper()=="LOST" else 0
+
+    settled_tickets=[x for x in tickets if str(x.get("status") or "").upper() in {"WON","LOST"}]
+    for ticket in settled_tickets:
+        shape=str(int(ticket.get("leg_count") or len(ticket.get("legs") or [])))
+        accumulate(shape_stats,shape,ticket)
+        accumulate(lane_stats,str(ticket.get("primary_lane") or "unknown"),ticket)
+
+    for group in (shape_stats,lane_stats):
+        for key,row in group.items():
+            row["accuracy"]=round(row["won"]/row["settled"],6) if row["settled"] else None
+            odds=[num(t.get("combined_odds")) for t in settled_tickets if (
+                (str(int(t.get("leg_count") or len(t.get("legs") or [])))==key) if group is shape_stats
+                else (str(t.get("primary_lane") or "unknown")==key)
+            )]
+            ratings=[num(t.get("combined_model_rating")) for t in settled_tickets if (
+                (str(int(t.get("leg_count") or len(t.get("legs") or [])))==key) if group is shape_stats
+                else (str(t.get("primary_lane") or "unknown")==key)
+            )]
+            odds=[x for x in odds if x is not None]
+            ratings=[x for x in ratings if x is not None]
+            row["avg_combined_odds"]=round(sum(odds)/len(odds),6) if odds else None
+            row["avg_model_rating"]=round(sum(ratings)/len(ratings),6) if ratings else None
+
     return {
         "tracked_tickets": len(tickets),
         "pending": sum(x.get("status") == "PENDING" for x in tickets),
@@ -621,9 +812,10 @@ def summary(tickets):
         "legs_won": sum(x.get("leg_counts", {}).get("won", 0) for x in tickets),
         "legs_lost": sum(x.get("leg_counts", {}).get("lost", 0) for x in tickets),
         "legs_pending": sum(x.get("leg_counts", {}).get("pending", 0) for x in tickets),
-        "settled_tickets": sum(x.get("status") in {"WON", "LOST"} for x in tickets),
+        "settled_tickets": sum(x.get("status") in {"WON","LOST"} for x in tickets),
+        "by_leg_count": {k: shape_stats[k] for k in sorted(shape_stats, key=lambda v:int(v))},
+        "by_primary_lane": lane_stats,
     }
-
 
 def main():
     now = iso_now()
@@ -650,7 +842,7 @@ def main():
                 t["batch_id"] = batch.get("batch_id")
                 changed = True
             continue
-        ticket = make_ticket(batch, now)
+        ticket = make_ticket(batch, now, builder)
         tickets.append(ticket)
         by_id[tid] = ticket
         changed = True
@@ -663,7 +855,7 @@ def main():
     # Re-evaluate all unresolved tickets. A ticket marked LOST stays LOST, but its
     # individual legs continue settling so the user can see exactly what happened.
     for ticket in tickets:
-        changed = refresh_ticket(ticket, rows, now) or changed
+        changed = refresh_ticket(ticket, rows, now, builder)
 
     # Keep a useful rolling paper ledger. Settled tickets are trimmed first.
     tickets.sort(key=lambda x: str(x.get("created_at") or ""), reverse=True)
@@ -675,7 +867,7 @@ def main():
         changed = True
 
     output = {
-        "version": 2,
+        "version": 3,
         "updated_at": now if changed or not TRACKER.exists() else existing.get("updated_at"),
         "mode": "PAPER_ONLY",
         "summary": summary(tickets),
