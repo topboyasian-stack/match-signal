@@ -1,38 +1,38 @@
 {
-  "generated_at": "2026-10-06T08:10:07.420146+00:00",
+  "generated_at": "2026-10-06T09:17:47.220461+00:00",
   "status": "FAIL",
-  "critical_issues": 3,
+  "critical_issues": 2,
   "warning_issues": 0,
   "info_issues": 1,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
       "status": "STALE",
-      "age_hours": 6.87,
+      "age_hours": 8.0,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.08,
+      "age_hours": 1.2,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
-      "status": "STALE",
-      "age_hours": 5.66,
+      "status": "PASS",
+      "age_hours": 1.12,
       "threshold_hours": 4
     },
     {
       "engine": "unified_upcoming",
       "status": "PASS",
-      "age_hours": 0.0,
+      "age_hours": 1.13,
       "threshold_hours": 2
     },
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 0.01,
+      "age_hours": 0.0,
       "threshold_hours": 0.5,
       "heartbeat_source": "virtual_lab_live.json"
     },
@@ -42,11 +42,11 @@
       "lanes": {
         "darts_x": {
           "status": "RETIRED",
-          "artifact_at": "2026-10-06T08:09:59.735127+00:00"
+          "artifact_at": "2026-10-06T08:19:17.547975+00:00"
         },
         "table_tennis_x": {
           "status": "RETIRED",
-          "artifact_at": "2026-10-06T02:42:47.624462+00:00"
+          "artifact_at": "2026-10-06T08:10:19.143044+00:00"
         },
         "basketball": {
           "status": "RETIRED",
@@ -59,12 +59,7 @@
     {
       "code": "STALE_CORE_PREDICTION_PIPELINE",
       "severity": "critical",
-      "detail": "updated_at age 6.87h exceeds 4h"
-    },
-    {
-      "code": "STALE_EXPANSION",
-      "severity": "critical",
-      "detail": "updated_at age 5.66h exceeds 4h"
+      "detail": "updated_at age 8.00h exceeds 4h"
     },
     {
       "code": "SELECTION_GATE_EMPTY",
@@ -74,7 +69,7 @@
     {
       "code": "PIPELINE_STALE",
       "severity": "critical",
-      "detail": "pipeline_status age 6.87h exceeds 4h"
+      "detail": "pipeline_status age 8.00h exceeds 4h"
     }
   ],
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
