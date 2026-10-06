@@ -37,7 +37,7 @@ assert ok
 assert details["status"] == "passed"
 
 # Fewer than 12 exact-side observations does not trigger the new guard.
-flags = [True] * 8 + [False] * 4
+flags = [True] * 7 + [False] * 4
 ok, details = _efootball_recent_spoiler_guard("efootball_gt", rows(flags))
 assert ok
 assert details["status"] == "not_triggered_insufficient_recent_sample"
