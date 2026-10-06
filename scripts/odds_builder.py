@@ -33,24 +33,23 @@ MAX_ODDS_AGE_SECONDS=900
 MAX_UNCERTAINTY=0.22
 MIN_DATA_QUALITY=0.70
 MIN_LEGS,MAX_LEGS=2,4
-# Fixed minimum accumulator policy: every published paper batch must reach 4.00x.
-# Leg count remains adaptive: 2–7 legs are available, but no weak leg is added just
-# to reach the odds target. Results-first/model/evidence/ROI gates remain intact.
+# Active accuracy-first policy: 2.70x is the current floor; 2.80x is preferred until earned.
+# Leg count remains adaptive from 2–4, but no weak leg is added just to reach the odds target.
 TARGET_COMBINED_ODDS=2.80
 STRETCH_COMBINED_ODDS=4.0
 MIN_ACCURACY_FIRST_ODDS=2.70
 ACCURACY_PRESERVATION_RATIO=0.90
 BATCH_MIN_LEGS=2
-# Adaptive 2–7 leg construction safety tiers.
+# Adaptive 2–4 leg construction safety tiers.
 # 90%+ per-leg model probability is preferred; 80% is the safety floor for every
-# included leg regardless of whether the ticket has 2 through 7 legs.
+# included leg regardless of whether the ticket has 2, 3, or 4 legs.
 LEG_COUNT_MIN_MODEL_PROBABILITY={2:0.80,3:0.80,4:0.80}
 MIN_SAFE_LEG_MODEL_PROBABILITY=0.80
 PREFERRED_LEG_MODEL_PROBABILITY=0.90
 HIGH_ODDS_TARGET=2.80
 HIGH_ODDS_HARD_GATE_WIN_RECORDS=10
-# Results-first Builder: 4.00 minimum combined odds is now a fixed eligibility floor.
-# A weak extra leg is never added merely to reach 4.00.
+# Results-first Builder: 2.70 minimum combined odds is the active eligibility floor.
+# The 2.80 target remains preferred until the 2–4-leg family earns 10 settled wins.
 RESULTS_FIRST_ENABLED=True
 RESULTS_FIRST_MAX_LEGS=4
 RESULTS_FIRST_MIN_OBS=50
@@ -58,7 +57,7 @@ RESULTS_FIRST_MIN_ACCURACY=0.90
 RESULTS_FIRST_MIN_COMBINED_ODDS=2.70
 # Existing Results-first expected-ROI floor used by construction diagnostics and QA.
 RESULTS_FIRST_MIN_EXPECTED_ROI=0.02
-# Construction-specific ticket diagnostics cover every adaptive shape from 2 through 7 legs.
+# Construction-specific ticket diagnostics cover the active 2–4-leg family.
 # A shape still needs its own settled evidence when the Results-first lane is promoted.
 RESULTS_FIRST_CONSTRUCTION_LEG_COUNTS=(2,3,4)
 RESULTS_FIRST_CONSTRUCTION_LEG_COUNT=2
@@ -125,6 +124,7 @@ def combined_odds_gate_state():
                 wins+=1
     except Exception:
         wins=0
+    hard_gate_active=wins >= HIGH_ODDS_HARD_GATE_WIN_RECORDS
     _COMBINED_ODDS_GATE_CACHE={
         "floor":TARGET_COMBINED_ODDS if hard_gate_active else MIN_ACCURACY_FIRST_ODDS,
         "preferred_target":HIGH_ODDS_TARGET,
@@ -2747,7 +2747,7 @@ def build_value_batches(candidates):
                 "construction_priority":"mixed_vfootball_efootball_research",
                 "priority_product":"mixed",
                 "max_legs":MIXED_RESEARCH_MAX_LEGS,
-                "adaptive_leg_counts":[2,3,4,5,6,7],
+                "adaptive_leg_counts":[2,3,4],
                 "per_leg_min_model_probability":LEG_COUNT_MIN_MODEL_PROBABILITY,
                 "preferred_per_leg_model_probability":PREFERRED_LEG_MODEL_PROBABILITY,
                 "construction_shapes_considered":[2,3,4,5,6,7],
@@ -2844,7 +2844,7 @@ def build_value_batches(candidates):
                 "construction_priority":"vfootball_event_holdout_value",
                 "priority_product":"vfootball",
                 "max_legs":RESULTS_FIRST_MAX_LEGS,
-                "adaptive_leg_counts":[2,3,4,5,6,7],
+                "adaptive_leg_counts":[2,3,4],
                 "per_leg_min_model_probability":LEG_COUNT_MIN_MODEL_PROBABILITY,
                 "preferred_per_leg_model_probability":PREFERRED_LEG_MODEL_PROBABILITY,
                 "construction_shapes_considered":[2,3,4,5,6,7],
@@ -2990,7 +2990,7 @@ def build_value_batches(candidates):
                 "construction_priority":"high_confidence_adaptive_research",
                 "priority_product":"mixed",
                 "max_legs":7,
-                "adaptive_leg_counts":[2,3,4,5,6,7],
+                "adaptive_leg_counts":[2,3,4],
                 "per_leg_min_model_probability":LEG_COUNT_MIN_MODEL_PROBABILITY,
                 "preferred_per_leg_model_probability":PREFERRED_LEG_MODEL_PROBABILITY,
                 "mixed_diagnostics":mixed_diag,
@@ -3316,7 +3316,7 @@ def main():
             "max_odds_age_seconds":MAX_ODDS_AGE_SECONDS,"max_uncertainty":MAX_UNCERTAINTY,
             "max_legs":MAX_LEGS,
             "active_construction_max_legs":RESULTS_FIRST_MAX_LEGS,
-            "adaptive_leg_counts":[2,3,4,5,6,7],
+            "adaptive_leg_counts":[2,3,4],
             "per_leg_min_model_probability":LEG_COUNT_MIN_MODEL_PROBABILITY,
             "preferred_per_leg_model_probability":PREFERRED_LEG_MODEL_PROBABILITY,
             "builder_horizon_minutes":MAX_BUILDER_HORIZON_MINUTES,
@@ -3395,9 +3395,9 @@ def main():
         "market_price_combined_odds":round(combined,3) if selected else None,
         "sportybet_booking":booking_info,
         "theme":{"name":"Midnight Graphite / Electric Cyan / Signal Green","accent":"#28D7E8","positive":"#35D07F","background":"#080D14"},
-        "notes":["Results-first qualifies only from settled exact-line/side performance plus the existing live-price, freshness, data-quality and model-evidence gates.","Zero batches are now diagnosable: capacity reports whether 4.00 is mathematically reachable under the existing leg/correlation rules; no per-leg evidence gate is weakened.","best_available_legs is informational when no batch exists and is not a qualified accumulator.","Missing or stale SportyBet prices produce NO_BET/REJECTED.","Model fair odds never overwrite bookmaker odds.","The Builder evaluates 2–4-leg constructions adaptively. Every included leg must meet the 80% safety floor; 90%+ per-leg probability is preferred. The vFootball Results-first lane is promoted only when its own settled-ticket sample, loss rate, combined odds, empirical ROI, exact-line evidence, and current expected ROI pass.","When the proven Results-first lane cannot qualify, the controlled mixed research lane may use exactly 1 VFootball exact-evidence leg plus 1-6 exact-evidence eFootball legs; every included leg must remain independently Builder-eligible and have non-negative single-leg raw expected value. Only after that mixed lane fails does the broader football/tennis/eFootball value fallback run.","The active combined-odds floor is 2.70x. The 2.80x target remains preferred and becomes the active floor after 10 settled wins in the current 2–4-leg construction family. The fallback still requires current expected ROI >=2%, fresh SportyBet pricing, and the same correlation controls.","The ticket remains paper-only and the active construction lanes allow 2 through 4 legs; they are never pinned to a single leg count and never padded with a weak leg.","The proven Results-first lane keeps a 60-minute kickoff span. The model-first paper value lane may span up to 270 minutes only when its whole-ticket probability and expected ROI gates still pass; this is explicitly research-only, not promoted as settled Results-first evidence.","Near-term Builder horizon is 720 minutes; price freshness remains capped at 900 seconds so extending the scan window does not permit stale odds.","Builder refreshes every 15 minutes and after relevant upstream workflows, so candidate prices are repeatedly revalidated before kickoff.",
+        "notes":["Results-first qualifies only from settled exact-line/side performance plus the existing live-price, freshness, data-quality and model-evidence gates.","Zero batches are now diagnosable: capacity reports whether the active 2.70x floor is reachable under the existing leg/correlation rules; no per-leg evidence gate is weakened.","best_available_legs is informational when no batch exists and is not a qualified accumulator.","Missing or stale SportyBet prices produce NO_BET/REJECTED.","Model fair odds never overwrite bookmaker odds.","The Builder evaluates 2–4-leg constructions adaptively. Every included leg must meet the 80% safety floor; 90%+ per-leg probability is preferred. The vFootball Results-first lane is promoted only when its own settled-ticket sample, loss rate, combined odds, empirical ROI, exact-line evidence, and current expected ROI pass.","When the proven Results-first lane cannot qualify, the controlled mixed research lane may use exactly 1 VFootball exact-evidence leg plus up to 3 exact-evidence eFootball legs; every included leg must remain independently Builder-eligible and have non-negative single-leg raw expected value. Only after that mixed lane fails does the broader football/tennis/eFootball value fallback run.","The active combined-odds floor is 2.70x. The 2.80x target remains preferred and becomes the active floor after 10 settled wins in the current 2–4-leg construction family. The fallback still requires current expected ROI >=2%, fresh SportyBet pricing, and the same correlation controls.","The ticket remains paper-only and the active construction lanes allow 2 through 4 legs; they are never pinned to a single leg count and never padded with a weak leg.","The proven Results-first lane keeps a 60-minute kickoff span. The model-first paper value lane may span up to 270 minutes only when its whole-ticket probability and expected ROI gates still pass; this is explicitly research-only, not promoted as settled Results-first evidence.","Near-term Builder horizon is 720 minutes; price freshness remains capped at 900 seconds so extending the scan window does not permit stale odds.","Builder refreshes every 15 minutes and after relevant upstream workflows, so candidate prices are repeatedly revalidated before kickoff.",
         "Phase 2 cyclical-loop research is isolated from the baseline model: only Virtual/eFootball legs with a model probability and blended streak-break confidence of at least 78% can enter its 2–3-leg constructor.",
-        "The cyclical-loop signal is evidence-backed sequence analysis, not a gambler's-fallacy override: it requires a current opposite-side streak and historical break observations. It cannot weaken the existing evidence, price, correlation, 4.00x or +2% ROI gates.",
+        "The cyclical-loop signal is evidence-backed sequence analysis, not a gambler's-fallacy override: it requires a current opposite-side streak and historical break observations. It cannot weaken the existing evidence, price, correlation, 2.70x or +2% ROI gates; 4.00x is reserved for the separate Phase 2 variance diagnostic.",
         "When Phase 2 combined odds exceed 4.00x, the Builder records a paper-only Kelly variance diagnostic labeled 'High Variance - Fraction Stake Only'; no live stake is calculated or executed."]
     }
     OUTPUT.write_text(json.dumps(result,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
@@ -3408,7 +3408,7 @@ if __name__=="__main__":
     main()
 
 # Refresh marker: exact-side virtual evidence gate is active.
-# Batch marker: vFootball-priority disjoint 4.00+ research batches with 2–7 adaptive legs.
+# Batch marker: vFootball-priority disjoint 2.70+ research batches with 2–4 adaptive legs.
 # Final market freshness marker: 2026-10-05
 # Trigger marker: regenerate Builder after QA policy alignment; no selection logic change.
 # Trigger marker 2: rerun after restoring the missing Results-first ROI constant.
