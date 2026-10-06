@@ -16,6 +16,7 @@ on:
       - 'data/unified_upcoming.json'
       - 'data/predictions.json'
       - 'scripts/odds_builder.py'
+      - 'scripts/test_odds_builder_efootball_spoiler.py'
       - 'scripts/selection_candidate_collector.py'
       - 'scripts/predict_today.py'
       - 'scripts/tennis_total_model.py'
@@ -82,6 +83,8 @@ jobs:
           PY
       - name: Run daily mixed accumulator builder
         run: python scripts/odds_builder.py
+      - name: Regression-check eFootball recent spoiler guard
+        run: python scripts/test_odds_builder_efootball_spoiler.py
       - name: Syntax-check shadow line-ladder module
         run: python -m py_compile scripts/line_ladder_research.py
       - name: Run shadow directional line-ladder research
