@@ -456,17 +456,17 @@ jobs:
               if (b?.status==='LIVE_VALUE_SET') {
                 if (!legs.length) failures.push('/data/odds_builder.json LIVE_VALUE_SET has no qualified paper legs');
                 if (!Array.isArray(b?.batches) || !b.batches.length) failures.push('/data/odds_builder.json LIVE_VALUE_SET has no batches');
-                if (!(combined>=4)) failures.push('/data/odds_builder.json LIVE_VALUE_SET combined odds below 4.00: '+combined);
+                if (!(combined>=Number((b?.research_gate?.combined_odds_gate?.floor)||2.7))) failures.push('/data/odds_builder.json LIVE_VALUE_SET combined odds below active floor: '+combined);
               } else if (b?.status==='BELOW_4_TARGET_AVAILABLE') {
                 if (!Array.isArray(b?.best_available_legs) || !b.best_available_legs.length) failures.push('/data/odds_builder.json BELOW_4_TARGET_AVAILABLE has no best_available_legs');
-                if (!(combined>1 && combined<4)) failures.push('/data/odds_builder.json BELOW_4_TARGET_AVAILABLE has invalid combined odds: '+combined);
+                if (!(combined>1 && combined<2.7)) failures.push('/data/odds_builder.json BELOW_4_TARGET_AVAILABLE has invalid combined odds: '+combined);
               } else if (b?.status==='VALUE_RESEARCH_SET' || b?.status==='RESULTS_FIRST_SET' || b?.status==='ACCURACY_FIRST_SET') {
                 const oddsGate=(b?.research_gate?.combined_odds_gate)||{};
-                const activeFloor=Number(oddsGate.floor||4.0);
-                if (legs.length < 2 || legs.length > 7) failures.push('/data/odds_builder.json '+b?.status+' leg count invalid: '+legs.length);
+                const activeFloor=Number(oddsGate.floor||2.7);
+                if (legs.length < 2 || legs.length > 4) failures.push('/data/odds_builder.json '+b?.status+' leg count invalid: '+legs.length);
                 if (!(combined>=activeFloor)) failures.push('/data/odds_builder.json VALUE_RESEARCH_SET combined odds below active floor '+activeFloor.toFixed(2)+': '+combined);
                 if (!Array.isArray(b?.batches) || !b.batches.length) failures.push('/data/odds_builder.json VALUE_RESEARCH_SET has no batches');
-                console.log('Paper Odds Builder qualified state: '+b?.status+'; active floor '+activeFloor.toFixed(2)+'x; preferred target '+Number(oddsGate.preferred_target||4.0).toFixed(2)+'x; hard gate '+(oddsGate.hard_gate_active?'ACTIVE':'NOT EARNED'));
+                console.log('Paper Odds Builder qualified state: '+b?.status+'; active floor '+activeFloor.toFixed(2)+'x; preferred target '+Number(oddsGate.preferred_target||2.8).toFixed(2)+'x; hard gate '+(oddsGate.hard_gate_active?'ACTIVE':'NOT EARNED'));
               } else {
                 if (legs.length) failures.push('/data/odds_builder.json '+b?.status+' unexpectedly contains qualified legs');
                 console.log('Paper Odds Builder production state: '+b?.status+' (no weak/stale ticket was forced)');

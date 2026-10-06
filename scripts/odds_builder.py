@@ -11,7 +11,7 @@ Research/paper-trading only. A candidate is eligible only when:
 - data/price freshness and uncertainty gates pass,
 - correlated selections are not duplicated in the same accumulator.
 
-No wager is placed and no leg count is forced; the adaptive construction range is 2–7 legs.
+No wager is placed and no leg count is forced; the adaptive construction range is 2–4 legs.
 """
 from __future__ import annotations
 import json, math, urllib.parse, urllib.request
@@ -32,39 +32,38 @@ MIN_EDGE=0.025
 MAX_ODDS_AGE_SECONDS=900
 MAX_UNCERTAINTY=0.22
 MIN_DATA_QUALITY=0.70
-MIN_LEGS,MAX_LEGS=1,7
-# Fixed minimum accumulator policy: every published paper batch must reach 4.00x.
-# Leg count remains adaptive: 2–7 legs are available, but no weak leg is added just
-# to reach the odds target. Results-first/model/evidence/ROI gates remain intact.
-TARGET_COMBINED_ODDS=4.0
+MIN_LEGS,MAX_LEGS=2,4
+# Active accuracy-first policy: 2.70x is the current floor; 2.80x is preferred until earned.
+# Leg count remains adaptive from 2–4, but no weak leg is added just to reach the odds target.
+TARGET_COMBINED_ODDS=2.80
 STRETCH_COMBINED_ODDS=4.0
-MIN_ACCURACY_FIRST_ODDS=4.0
+MIN_ACCURACY_FIRST_ODDS=2.70
 ACCURACY_PRESERVATION_RATIO=0.90
 BATCH_MIN_LEGS=2
-# Adaptive 2–7 leg construction safety tiers.
+# Adaptive 2–4 leg construction safety tiers.
 # 90%+ per-leg model probability is preferred; 80% is the safety floor for every
-# included leg regardless of whether the ticket has 2 through 7 legs.
-LEG_COUNT_MIN_MODEL_PROBABILITY={2:0.80,3:0.80,4:0.80,5:0.80,6:0.80,7:0.80}
+# included leg regardless of whether the ticket has 2, 3, or 4 legs.
+LEG_COUNT_MIN_MODEL_PROBABILITY={2:0.80,3:0.80,4:0.80}
 MIN_SAFE_LEG_MODEL_PROBABILITY=0.80
 PREFERRED_LEG_MODEL_PROBABILITY=0.90
-HIGH_ODDS_TARGET=4.0
-HIGH_ODDS_HARD_GATE_WIN_RECORDS=0
-# Results-first Builder: 4.00 minimum combined odds is now a fixed eligibility floor.
-# A weak extra leg is never added merely to reach 4.00.
+HIGH_ODDS_TARGET=2.80
+HIGH_ODDS_HARD_GATE_WIN_RECORDS=10
+# Results-first Builder: 2.70 minimum combined odds is the active eligibility floor.
+# The 2.80 target remains preferred until the 2–4-leg family earns 10 settled wins.
 RESULTS_FIRST_ENABLED=True
-RESULTS_FIRST_MAX_LEGS=7
+RESULTS_FIRST_MAX_LEGS=4
 RESULTS_FIRST_MIN_OBS=50
 RESULTS_FIRST_MIN_ACCURACY=0.90
-RESULTS_FIRST_MIN_COMBINED_ODDS=4.0
+RESULTS_FIRST_MIN_COMBINED_ODDS=2.70
 # Existing Results-first expected-ROI floor used by construction diagnostics and QA.
 RESULTS_FIRST_MIN_EXPECTED_ROI=0.02
-# Construction-specific ticket diagnostics cover every adaptive shape from 2 through 7 legs.
+# Construction-specific ticket diagnostics cover the active 2–4-leg family.
 # A shape still needs its own settled evidence when the Results-first lane is promoted.
-RESULTS_FIRST_CONSTRUCTION_LEG_COUNTS=(2,3,4,5,6,7)
+RESULTS_FIRST_CONSTRUCTION_LEG_COUNTS=(2,3,4)
 RESULTS_FIRST_CONSTRUCTION_LEG_COUNT=2
 RESULTS_FIRST_MIN_CONSTRUCTION_TICKETS=10
 RESULTS_FIRST_MAX_CONSTRUCTION_LOSS_RATE=0.50
-MIN_COMBINED_ODDS=4.0
+MIN_COMBINED_ODDS=2.70
 VIRTUAL_MIN_PROB=0.65
 TICKET_SPOILER_MIN_SAMPLE=50
 TICKET_SPOILER_MIN_ACCURACY=0.90
@@ -82,7 +81,7 @@ MODEL_FIRST_MIN_AVG_PROBABILITY=0.68
 # Mixed research lane: preserve a small VFootball component only when its own
 # exact-line/value gates pass, then combine it with one or two qualified
 # eFootball value legs. This does not promote the batch to Results-first.
-MIXED_RESEARCH_MAX_LEGS=7
+MIXED_RESEARCH_MAX_LEGS=4
 MIXED_RESEARCH_MIN_AVG_PROBABILITY=0.80
 MIXED_RESEARCH_MIN_VFOOTBALL_LEGS=1
 MIXED_RESEARCH_MIN_EFOOTBALL_LEGS=1
@@ -104,7 +103,7 @@ PHASE2_CYCLICAL_POOL_CAP=40
 _COMBINED_ODDS_GATE_CACHE=None
 
 def combined_odds_gate_state():
-    """Return the fixed 4.00x combined-odds floor for this Builder run."""
+    """Return the currently earned accuracy-first combined-odds floor for this Builder run."""
     global _COMBINED_ODDS_GATE_CACHE
     if _COMBINED_ODDS_GATE_CACHE is not None:
         return _COMBINED_ODDS_GATE_CACHE
@@ -125,14 +124,15 @@ def combined_odds_gate_state():
                 wins+=1
     except Exception:
         wins=0
+    hard_gate_active=wins >= HIGH_ODDS_HARD_GATE_WIN_RECORDS
     _COMBINED_ODDS_GATE_CACHE={
-        "floor":TARGET_COMBINED_ODDS,
-        "preferred_target":TARGET_COMBINED_ODDS,
+        "floor":TARGET_COMBINED_ODDS if hard_gate_active else MIN_ACCURACY_FIRST_ODDS,
+        "preferred_target":HIGH_ODDS_TARGET,
         "stretch_target":STRETCH_COMBINED_ODDS,
-        "hard_gate_active":True,
-        "gate_mode":"fixed_minimum",
-        "settled_4_00_plus_wins":wins,
-        "wins_required_for_4_00_hard_gate":0
+        "hard_gate_active":hard_gate_active,
+        "gate_mode":"earned_preferred_target",
+        "settled_2_80_plus_wins":wins,
+        "wins_required_for_2_80_hard_gate":HIGH_ODDS_HARD_GATE_WIN_RECORDS
     }
     return _COMBINED_ODDS_GATE_CACHE
 
@@ -628,7 +628,7 @@ def _load_results_first_index():
     return _RESULTS_FIRST_CACHE
 
 def construction_shape_diagnostics(product, idx=None):
-    """Evaluate 2–7-leg ticket shapes independently from settled tickets."""
+    """Evaluate 2–4-leg ticket shapes independently from settled tickets."""
     if idx is None:
         idx=_load_results_first_index()
     product=str(product or "")
@@ -673,7 +673,7 @@ def construction_shape_diagnostics(product, idx=None):
     return rows
 
 def results_first_gate(product,line,pick):
-    """Require demonstrated settled results and an independently proven 2–7-leg shape."""
+    """Require demonstrated settled results and an independently proven 2–4-leg shape."""
     idx=_load_results_first_index()
     product=str(product or "")
     side=str(pick or "").lower()
@@ -1048,7 +1048,7 @@ def _phase2_kelly_diagnostic(probability,combined_odds):
             "combined_odds":round(odds,3),
             "label":None,
             "paper_only":True,
-            "reason":"4.00x_or_below"
+            "reason":"high_variance_threshold_or_below"
         }
     b=odds-1.0
     k=((b*p)-(1.0-p))/b if b>0 else 0.0
@@ -1457,7 +1457,7 @@ def virtual_candidates(now):
 
                 # VFootball may participate in the controlled mixed research lane
                 # when its own exact-line evidence and ticket-spoiler gates pass,
-                # even though the whole VFootball 2–7-leg construction family
+                # even though the whole VFootball 2–4-leg construction family
                 # has not yet earned Results-first promotion. We do NOT reuse it
                 # in the pure fallback lane and we do NOT relax the 75% evidence
                 # threshold, live-price, edge, freshness, quality or uncertainty
@@ -1943,7 +1943,9 @@ def _batch_capacity_diagnostic(eligible_pool):
         "strict_capacity_legs":len(chosen),
         "event_only_capacity_odds":round(relaxed_product,3),
         "event_only_capacity_legs":len(relaxed),
-        "target_reachable_with_current_gates":relaxed_product>=TARGET_COMBINED_ODDS,
+        "active_floor_reachable_with_current_gates":relaxed_product>=active_min_combined_odds(),
+        "preferred_2_80_target_reachable":relaxed_product>=TARGET_COMBINED_ODDS,
+        "target_reachable_with_current_gates":relaxed_product>=active_min_combined_odds(),
     }
 
 def _construct_model_first_batch(pool, max_legs=MAX_LEGS, min_odds=MIN_COMBINED_ODDS):
@@ -2027,7 +2029,7 @@ def _construct_model_first_batch(pool, max_legs=MAX_LEGS, min_odds=MIN_COMBINED_
                             -float(x.get("model_edge") or 0.0),-odds)
                 leg=min(feasible,key=trade_key)
             else:
-                # No model-first addition can still reach 4.00 within the leg cap.
+                # No model-first addition can still reach the active odds floor within the leg cap.
                 # Use the strongest model leg among remaining; do not switch to
                 # price-first construction.
                 compatible=[x for x in remaining if not conflict(x,selected_events,selected_participants)]
@@ -2065,7 +2067,7 @@ def _construct_model_first_batch(pool, max_legs=MAX_LEGS, min_odds=MIN_COMBINED_
         return []
     # Bounded frontier search repairs the greedy failure mode: it retains
     # both model-heavy and price-feasible paths, then chooses the highest
-    # whole-ticket model probability that actually reaches 4.00+.
+    # whole-ticket model probability that actually reaches the active odds floor.
     frontier=list({id(x):x for x in (ranked[:100]+price_ranked[:60])}.values())
     states=[([],set(),set(),0.0,0.0)]
     for _ in range(max_legs):
@@ -2090,7 +2092,7 @@ def _construct_model_first_batch(pool, max_legs=MAX_LEGS, min_odds=MIN_COMBINED_
         merged={tuple(id(x) for x in s[0]):s for s in by_model+by_trade}
         states=list(merged.values())[:1800]
         candidates.extend([s[0] for s in states if s[4]>=math.log(min_odds)])
-    # The public Builder contract is a 2–7-leg accumulator. A single high-odds leg
+    # The public Builder contract is a 2–4-leg accumulator. A single high-odds leg
     # can satisfy the numeric odds floor by itself (for example a 4.00x+ single leg), but that
     # must never outrank a valid 2-leg construction and then be discarded later by
     # build_value_batches. Enforce the minimum leg count at the construction stage.
@@ -2438,8 +2440,8 @@ def _construct_vfootball_holdout_batches(pool,max_batches=4,max_legs=MIXED_RESEA
 
     Inputs are already Builder-eligible exact-line event-holdout legs. The lane
     keeps the same 80% per-leg floor, fresh-price/positive-EV filters, event and
-    participant correlation rules, 4.00+ combined-odds floor and +2% calibrated
-    whole-ticket ROI gate. It evaluates the full adaptive 2–7-leg range directly
+    participant correlation rules, 2.70+ combined-odds floor and +2% calibrated
+    whole-ticket ROI gate. It evaluates the active 2–4-leg range directly
     so a large low-price virtual pool cannot hide a viable high-price construction.
     """
     if min_odds is None:
@@ -2575,7 +2577,7 @@ def build_value_batches(candidates):
     No extra leg is added merely to reach a target.
     """
     built=[make_leg(x) for x in candidates]
-    # Diagnostic-only snapshot of the settled 2–7-leg construction lane.
+    # Diagnostic-only snapshot of the settled 2–4-leg construction lane.
     # This does not alter eligibility or selection; it only exposes why a shape
     # cannot currently be promoted when the Builder returns NO_BET.
     construction_shapes=construction_shape_diagnostics("vfootball")
@@ -2745,7 +2747,7 @@ def build_value_batches(candidates):
                 "construction_priority":"mixed_vfootball_efootball_research",
                 "priority_product":"mixed",
                 "max_legs":MIXED_RESEARCH_MAX_LEGS,
-                "adaptive_leg_counts":[2,3,4,5,6,7],
+                "adaptive_leg_counts":[2,3,4],
                 "per_leg_min_model_probability":LEG_COUNT_MIN_MODEL_PROBABILITY,
                 "preferred_per_leg_model_probability":PREFERRED_LEG_MODEL_PROBABILITY,
                 "construction_shapes_considered":[2,3,4,5,6,7],
@@ -2830,7 +2832,7 @@ def build_value_batches(candidates):
                     "paper_only":True,
                     "real_money_execution":False,
                     "correlation_policy":"batches disjoint by event and participant; exact-line VFootball holdout legs only",
-                    "construction_objective":"maximize whole-ticket VFootball event-holdout probability subject to the active 4.00+ odds and calibrated ROI gates"
+                    "construction_objective":"maximize whole-ticket VFootball event-holdout probability subject to the active 2.70+ odds and calibrated ROI gates"
                 })
             return vfootball_batches,built,{
                 "batch_count":len(vfootball_batches),
@@ -2842,7 +2844,7 @@ def build_value_batches(candidates):
                 "construction_priority":"vfootball_event_holdout_value",
                 "priority_product":"vfootball",
                 "max_legs":RESULTS_FIRST_MAX_LEGS,
-                "adaptive_leg_counts":[2,3,4,5,6,7],
+                "adaptive_leg_counts":[2,3,4],
                 "per_leg_min_model_probability":LEG_COUNT_MIN_MODEL_PROBABILITY,
                 "preferred_per_leg_model_probability":PREFERRED_LEG_MODEL_PROBABILITY,
                 "construction_shapes_considered":[2,3,4,5,6,7],
@@ -2906,7 +2908,7 @@ def build_value_batches(candidates):
                     },
                     "risk_diagnostic":risk,
                     "correlation_policy":"batch is disjoint by event and participant; no baseline football/tennis/Poisson legs are mixed into this track",
-                    "construction_objective":"maximize isolated streak-break confidence and calibrated whole-ticket probability while preserving the existing 4.00x and +2% ROI gates"
+                    "construction_objective":"maximize isolated streak-break confidence and calibrated whole-ticket probability while preserving the existing 2.70x and +2% ROI gates"
                 })
             return phase2_batches,built,{
                 "batch_count":len(phase2_batches),
@@ -2977,7 +2979,7 @@ def build_value_batches(candidates):
                     "paper_only":True,
                     "real_money_execution":False,
                     "correlation_policy":"batches disjoint by event and participant; every leg clears the 80% safety floor and 90% is preferred",
-                    "construction_objective":"prefer the largest safe 2–7-leg construction without adding a weak leg for odds"
+                    "construction_objective":"prefer the largest safe 2–4-leg construction without adding a weak leg for odds"
                 })
             return high_batches,built,{
                 "batch_count":len(high_batches),
@@ -2988,7 +2990,7 @@ def build_value_batches(candidates):
                 "construction_priority":"high_confidence_adaptive_research",
                 "priority_product":"mixed",
                 "max_legs":7,
-                "adaptive_leg_counts":[2,3,4,5,6,7],
+                "adaptive_leg_counts":[2,3,4],
                 "per_leg_min_model_probability":LEG_COUNT_MIN_MODEL_PROBABILITY,
                 "preferred_per_leg_model_probability":PREFERRED_LEG_MODEL_PROBABILITY,
                 "mixed_diagnostics":mixed_diag,
@@ -3266,11 +3268,11 @@ def main():
         rejection_counts[leg_status]=rejection_counts.get(leg_status,0)+1
     result={
         "generated_at":now.isoformat(),"engine_version":"V6.1-RESEARCH-GATED",
-        "mode":"PAPER_ONLY","target_legs":f"adaptive 2–7 legs; fixed {odds_gate['floor']:.2f}x minimum combined odds","sports_supported":["football","tennis","virtual"],
+        "mode":"PAPER_ONLY","target_legs":f"adaptive 2–4 legs; {odds_gate['floor']:.2f}x active minimum / {odds_gate['preferred_target']:.2f}x preferred combined odds","sports_supported":["football","tennis","virtual"],
         "research_gate":{
             "selection_gate_status":gate_status,
             "combined_odds_gate":odds_gate,
-            "minimum_4_00_floor_reached":preferred_target_met,
+            "preferred_2_80_target_reached":preferred_target_met,
             "selected_predictions":selected_predictions,
             "tennis_live_eligible":tennis_live_eligible,
             "upstream_blocked":upstream_blocked,
@@ -3314,7 +3316,7 @@ def main():
             "max_odds_age_seconds":MAX_ODDS_AGE_SECONDS,"max_uncertainty":MAX_UNCERTAINTY,
             "max_legs":MAX_LEGS,
             "active_construction_max_legs":RESULTS_FIRST_MAX_LEGS,
-            "adaptive_leg_counts":[2,3,4,5,6,7],
+            "adaptive_leg_counts":[2,3,4],
             "per_leg_min_model_probability":LEG_COUNT_MIN_MODEL_PROBABILITY,
             "preferred_per_leg_model_probability":PREFERRED_LEG_MODEL_PROBABILITY,
             "builder_horizon_minutes":MAX_BUILDER_HORIZON_MINUTES,
@@ -3393,9 +3395,9 @@ def main():
         "market_price_combined_odds":round(combined,3) if selected else None,
         "sportybet_booking":booking_info,
         "theme":{"name":"Midnight Graphite / Electric Cyan / Signal Green","accent":"#28D7E8","positive":"#35D07F","background":"#080D14"},
-        "notes":["Results-first qualifies only from settled exact-line/side performance plus the existing live-price, freshness, data-quality and model-evidence gates.","Zero batches are now diagnosable: capacity reports whether 4.00 is mathematically reachable under the existing leg/correlation rules; no per-leg evidence gate is weakened.","best_available_legs is informational when no batch exists and is not a qualified accumulator.","Missing or stale SportyBet prices produce NO_BET/REJECTED.","Model fair odds never overwrite bookmaker odds.","The Builder evaluates 2–7-leg constructions adaptively. Every included leg must meet the 80% safety floor; 90%+ per-leg probability is preferred. The vFootball Results-first lane is promoted only when its own settled-ticket sample, loss rate, combined odds, empirical ROI, exact-line evidence, and current expected ROI pass.","When the proven Results-first lane cannot qualify, the controlled mixed research lane may use exactly 1 VFootball exact-evidence leg plus 1-6 exact-evidence eFootball legs; every included leg must remain independently Builder-eligible and have non-negative single-leg raw expected value. Only after that mixed lane fails does the broader football/tennis/eFootball value fallback run.","The active combined-odds floor is a fixed 4.00x minimum; it is not an earned win-record gate. The fallback still requires current expected ROI >=2%, fresh SportyBet pricing, and the same correlation controls.","The ticket remains paper-only and the active construction lanes allow 2 through 7 legs; they are never pinned to a single leg count and never padded with a weak leg.","The proven Results-first lane keeps a 60-minute kickoff span. The model-first paper value lane may span up to 270 minutes only when its whole-ticket probability and expected ROI gates still pass; this is explicitly research-only, not promoted as settled Results-first evidence.","Near-term Builder horizon is 720 minutes; price freshness remains capped at 900 seconds so extending the scan window does not permit stale odds.","Builder refreshes every 15 minutes and after relevant upstream workflows, so candidate prices are repeatedly revalidated before kickoff.",
+        "notes":["Results-first qualifies only from settled exact-line/side performance plus the existing live-price, freshness, data-quality and model-evidence gates.","Zero batches are now diagnosable: capacity reports whether the active 2.70x floor is reachable under the existing leg/correlation rules; no per-leg evidence gate is weakened.","best_available_legs is informational when no batch exists and is not a qualified accumulator.","Missing or stale SportyBet prices produce NO_BET/REJECTED.","Model fair odds never overwrite bookmaker odds.","The Builder evaluates 2–4-leg constructions adaptively. Every included leg must meet the 80% safety floor; 90%+ per-leg probability is preferred. The vFootball Results-first lane is promoted only when its own settled-ticket sample, loss rate, combined odds, empirical ROI, exact-line evidence, and current expected ROI pass.","When the proven Results-first lane cannot qualify, the controlled mixed research lane may use exactly 1 VFootball exact-evidence leg plus up to 3 exact-evidence eFootball legs; every included leg must remain independently Builder-eligible and have non-negative single-leg raw expected value. Only after that mixed lane fails does the broader football/tennis/eFootball value fallback run.","The active combined-odds floor is 2.70x. The 2.80x target remains preferred and becomes the active floor after 10 settled wins in the current 2–4-leg construction family. The fallback still requires current expected ROI >=2%, fresh SportyBet pricing, and the same correlation controls.","The ticket remains paper-only and the active construction lanes allow 2 through 4 legs; they are never pinned to a single leg count and never padded with a weak leg.","The proven Results-first lane keeps a 60-minute kickoff span. The model-first paper value lane may span up to 270 minutes only when its whole-ticket probability and expected ROI gates still pass; this is explicitly research-only, not promoted as settled Results-first evidence.","Near-term Builder horizon is 720 minutes; price freshness remains capped at 900 seconds so extending the scan window does not permit stale odds.","Builder refreshes every 15 minutes and after relevant upstream workflows, so candidate prices are repeatedly revalidated before kickoff.",
         "Phase 2 cyclical-loop research is isolated from the baseline model: only Virtual/eFootball legs with a model probability and blended streak-break confidence of at least 78% can enter its 2–3-leg constructor.",
-        "The cyclical-loop signal is evidence-backed sequence analysis, not a gambler's-fallacy override: it requires a current opposite-side streak and historical break observations. It cannot weaken the existing evidence, price, correlation, 4.00x or +2% ROI gates.",
+        "The cyclical-loop signal is evidence-backed sequence analysis, not a gambler's-fallacy override: it requires a current opposite-side streak and historical break observations. It cannot weaken the existing evidence, price, correlation, 2.70x or +2% ROI gates; 4.00x is reserved for the separate Phase 2 variance diagnostic.",
         "When Phase 2 combined odds exceed 4.00x, the Builder records a paper-only Kelly variance diagnostic labeled 'High Variance - Fraction Stake Only'; no live stake is calculated or executed."]
     }
     OUTPUT.write_text(json.dumps(result,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
@@ -3406,7 +3408,7 @@ if __name__=="__main__":
     main()
 
 # Refresh marker: exact-side virtual evidence gate is active.
-# Batch marker: vFootball-priority disjoint 4.00+ research batches with 2–7 adaptive legs.
+# Batch marker: vFootball-priority disjoint 2.70+ research batches with 2–4 adaptive legs.
 # Final market freshness marker: 2026-10-05
 # Trigger marker: regenerate Builder after QA policy alignment; no selection logic change.
 # Trigger marker 2: rerun after restoring the missing Results-first ROI constant.
