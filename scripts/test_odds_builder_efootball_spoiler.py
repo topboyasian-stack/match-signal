@@ -1,6 +1,6 @@
 """Focused regression checks for the eFootball recent O/U spoiler guard."""
 
-from scripts.odds_builder import _efootball_recent_spoiler_guard
+from odds_builder import _efootball_recent_spoiler_guard
 
 
 def rows(flags):
