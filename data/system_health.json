@@ -1,26 +1,26 @@
 {
-  "generated_at": "2026-10-05T22:33:02.790043+00:00",
+  "generated_at": "2026-10-06T00:11:09.367660+00:00",
   "status": "FAIL",
-  "critical_issues": 3,
+  "critical_issues": 2,
   "warning_issues": 0,
   "info_issues": 1,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
       "status": "STALE",
-      "age_hours": 5.43,
+      "age_hours": 7.07,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 5.14,
+      "age_hours": 1.62,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
-      "status": "STALE",
-      "age_hours": 5.38,
+      "status": "PASS",
+      "age_hours": 1.58,
       "threshold_hours": 4
     },
     {
@@ -32,9 +32,9 @@
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 0.01,
+      "age_hours": 1.65,
       "threshold_hours": 0.5,
-      "heartbeat_source": "virtual_lab_live.json"
+      "heartbeat_source": "unified_live_refresh"
     },
     {
       "engine": "retired_engines",
@@ -46,7 +46,7 @@
         },
         "table_tennis_x": {
           "status": "RETIRED",
-          "artifact_at": "2026-10-05T16:19:16.356349+00:00"
+          "artifact_at": "2026-10-05T22:50:43.837307+00:00"
         },
         "basketball": {
           "status": "RETIRED",
@@ -59,12 +59,7 @@
     {
       "code": "STALE_CORE_PREDICTION_PIPELINE",
       "severity": "critical",
-      "detail": "updated_at age 5.43h exceeds 4h"
-    },
-    {
-      "code": "STALE_EXPANSION",
-      "severity": "critical",
-      "detail": "updated_at age 5.38h exceeds 4h"
+      "detail": "updated_at age 7.07h exceeds 4h"
     },
     {
       "code": "SELECTION_GATE_EMPTY",
@@ -74,7 +69,7 @@
     {
       "code": "PIPELINE_STALE",
       "severity": "critical",
-      "detail": "pipeline_status age 5.43h exceeds 4h"
+      "detail": "pipeline_status age 7.07h exceeds 4h"
     }
   ],
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
