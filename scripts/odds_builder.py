@@ -65,6 +65,13 @@ RESULTS_FIRST_MIN_CONSTRUCTION_TICKETS=10
 RESULTS_FIRST_MAX_CONSTRUCTION_LOSS_RATE=0.50
 MIN_COMBINED_ODDS=2.70
 VIRTUAL_MIN_PROB=0.65
+# eFootball exact-line/side spoiler guard: older wins must not mask a fresh collapse.
+# These are construction-eligibility safeguards, not model-probability overrides.
+EFOOTBALL_RECENT_SPOILER_MIN_OBS=12
+EFOOTBALL_RECENT_SPOILER_LAST10_MIN_HIT=0.50
+EFOOTBALL_RECENT_SPOILER_LAST20_MIN_OBS=20
+EFOOTBALL_RECENT_SPOILER_LAST20_MIN_HIT=0.55
+EFOOTBALL_RECENT_SPOILER_MAX_CONSECUTIVE_LOSSES=4
 TICKET_SPOILER_MIN_SAMPLE=50
 TICKET_SPOILER_MIN_ACCURACY=0.90
 PARTICIPANT_HISTORY_MIN_N=3
@@ -818,6 +825,70 @@ def _load_recent_virtual_evidence():
     return index
 
 
+def _efootball_recent_spoiler_guard(product,exact):
+    """Fail closed when an eFootball exact line/side deteriorates recently.
+
+    exact is ordered newest-first by _load_recent_virtual_evidence.
+    The base 65% exact-side gate remains unchanged; this guard only stops
+    stale older wins from masking a fresh collapse. It is intentionally scoped
+    to eFootball products so the existing VFootball lane is not altered.
+    """
+    product=str(product or "")
+    if not product.startswith("efootball_"):
+        return True,{"enabled":False}
+    n=len(exact) if isinstance(exact,list) else 0
+    details={
+        "enabled":True,
+        "n":n,
+        "min_n":EFOOTBALL_RECENT_SPOILER_MIN_OBS,
+        "last10_min_hit_rate":EFOOTBALL_RECENT_SPOILER_LAST10_MIN_HIT,
+        "last20_min_observations":EFOOTBALL_RECENT_SPOILER_LAST20_MIN_OBS,
+        "last20_min_hit_rate":EFOOTBALL_RECENT_SPOILER_LAST20_MIN_HIT,
+        "max_consecutive_losses":EFOOTBALL_RECENT_SPOILER_MAX_CONSECUTIVE_LOSSES,
+    }
+    if n < EFOOTBALL_RECENT_SPOILER_MIN_OBS:
+        details["status"]="not_triggered_insufficient_recent_sample"
+        return True,details
+
+    last10=exact[:10]
+    last20=exact[:20]
+    last10_wins=sum(1 for row in last10 if row.get("win") is True)
+    last20_wins=sum(1 for row in last20 if row.get("win") is True)
+    last10_hit=last10_wins/len(last10) if last10 else 0.0
+    last20_hit=last20_wins/len(last20) if last20 else 0.0
+    loss_streak=0
+    for row in exact:
+        if row.get("win") is True:
+            break
+        loss_streak+=1
+
+    details.update({
+        "last10_n":len(last10),
+        "last10_wins":last10_wins,
+        "last10_hit_rate":round(last10_hit,4),
+        "last20_n":len(last20),
+        "last20_wins":last20_wins,
+        "last20_hit_rate":round(last20_hit,4),
+        "consecutive_losses":loss_streak,
+    })
+
+    if loss_streak >= EFOOTBALL_RECENT_SPOILER_MAX_CONSECUTIVE_LOSSES:
+        details["status"]="blocked_recent_loss_streak"
+        details["reason"]="efootball_recent_loss_streak"
+        return False,details
+    if len(last10) >= 10 and last10_hit < EFOOTBALL_RECENT_SPOILER_LAST10_MIN_HIT:
+        details["status"]="blocked_last10_hit_rate"
+        details["reason"]="efootball_recent_last10_below_threshold"
+        return False,details
+    if len(last20) >= EFOOTBALL_RECENT_SPOILER_LAST20_MIN_OBS and last20_hit < EFOOTBALL_RECENT_SPOILER_LAST20_MIN_HIT:
+        details["status"]="blocked_last20_hit_rate"
+        details["reason"]="efootball_recent_last20_below_threshold"
+        return False,details
+
+    details["status"]="passed"
+    return True,details
+
+
 def virtual_recent_gate(product,line,pick):
     """Exact product + line + selected-side recent evidence gate.
 
@@ -837,7 +908,22 @@ def virtual_recent_gate(product,line,pick):
     wins=sum(1 for r in exact if r.get("win") is True)
     hit=wins/len(exact)
     threshold=0.65 if product=="efootball_gt" else 0.75
-    return hit>=threshold,{"n":len(exact),"wins":wins,"hit_rate":round(hit,4),"threshold":threshold,"side":str(pick or "").lower()}
+    details={
+        "n":len(exact),
+        "wins":wins,
+        "hit_rate":round(hit,4),
+        "threshold":threshold,
+        "side":str(pick or "").lower(),
+    }
+    if hit < threshold:
+        details["reason"]="recent_evidence_below_threshold"
+        return False,details
+    guard_pass,guard_details=_efootball_recent_spoiler_guard(product,exact)
+    details["efootball_recent_spoiler_guard"]=guard_details
+    if not guard_pass:
+        details["reason"]=guard_details.get("reason") or "efootball_recent_spoiler_guard"
+        return False,details
+    return True,details
 
 def virtual_directional_evidence(recent):
     """Score exact product/line/side settlement evidence for eFootball ranking.
@@ -3331,6 +3417,17 @@ def main():
                 "primary_signal":"exact product + line + side settled evidence",
                 "ranking_method":"Bayesian-shrunk hit rate with sample-confidence adjustment; model edge is a secondary tie-break",
                 "eligibility_unchanged":True
+            },
+            "efootball_recent_spoiler_guard":{
+                "enabled":True,
+                "min_exact_side_observations":EFOOTBALL_RECENT_SPOILER_MIN_OBS,
+                "last10_min_hit_rate":EFOOTBALL_RECENT_SPOILER_LAST10_MIN_HIT,
+                "last20_min_observations":EFOOTBALL_RECENT_SPOILER_LAST20_MIN_OBS,
+                "last20_min_hit_rate":EFOOTBALL_RECENT_SPOILER_LAST20_MIN_HIT,
+                "max_consecutive_losses":EFOOTBALL_RECENT_SPOILER_MAX_CONSECUTIVE_LOSSES,
+                "scope":"exact product + line + selected O/U side",
+                "action":"reject_candidate_before_construction",
+                "role":"construction eligibility safeguard; does not force Over or Under"
             },
             "never_force_accumulator":True,"real_money_execution":False,
             "phase2_cyclical_loop":{
