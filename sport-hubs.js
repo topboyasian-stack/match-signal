@@ -247,6 +247,105 @@ async function renderUnifiedBoard(){
       const line=x?.line==null?"":String(x.line);
       return [event+"|"+pick+"|"+line,x];
     }));
+
+    // The core prediction feed intentionally does not contain Virtual/eFootball.
+    // Bring the existing evidence-backed eFootball candidate lane onto the
+    // Upcoming Desk without turning it into a Builder qualification bypass.
+    const virtualCandidates=selectedRows.filter(x=>{
+      const product=String(x?.product||"").toLowerCase();
+      const group=String(x?.candidate_group||"").toLowerCase();
+      const p=Number(x?.model_probability);
+      const start=Date.parse(String(x?.start_time||""));
+      return (
+        x &&
+        String(x?.sport||"").toLowerCase()==="virtual" &&
+        (product==="efootball_gt" || product==="efootball_adriatic" || group==="efootball") &&
+        Number.isFinite(p) &&
+        p>=0.80 &&
+        Number.isFinite(start)
+      );
+    });
+
+    async function freshVirtualQuoteMap(){
+      const byEvent={};
+      try{
+        const feed=await get('./api/sportybet-virtual?sources=efootball&pageSize=100&pageNum=1&timeline=168');
+        const events=Array.isArray(feed?.events)?feed.events:[];
+        events.forEach(e=>{
+          const id=String(e?.event_id||"");
+          if(id)byEvent[id]=e;
+        });
+      }catch(_){}
+      return byEvent;
+    }
+
+    function virtualCandidateDeskRows(rows,quoteMap){
+      const now=Date.now();
+      return rows.map(row=>{
+        const eventId=String(row?.event_id||"");
+        const live=quoteMap[eventId];
+        const line=Number(row?.line);
+        const side=String(row?.pick||row?.selection||"").toLowerCase();
+        if(!live || !Number.isFinite(line) || (side!=="over" && side!=="under")) return null;
+        const matchStart=Date.parse(String(row?.start_time||""));
+        if(!Number.isFinite(matchStart) || matchStart < now) return null;
+
+        let over=null,under=null;
+        for(const market of Array.isArray(live?.markets)?live.markets:[]){
+          const ml=Number(market?.line);
+          if(!Number.isFinite(ml) || Math.abs(ml-line)>1e-9)continue;
+          for(const outcome of Array.isArray(market?.outcomes)?market.outcomes:[]){
+            const name=String(outcome?.name||"").toLowerCase();
+            const odds=Number(outcome?.odds);
+            if(!Number.isFinite(odds) || odds<=1)continue;
+            if(name.startsWith("over"))over=odds;
+            if(name.startsWith("under"))under=odds;
+          }
+          if(over!=null || under!=null)break;
+        }
+        const selectedOdds=side==="over"?over:under;
+        if(selectedOdds==null)return null;
+
+        const p=Number(row?.model_probability);
+        const fair=Number(row?.model_fair_odds);
+        const edge=Number(row?.model_edge_vs_market);
+        const candidateStatus=String(row?.candidate_status||row?.candidate_group||"MODEL_RESEARCH");
+        const qual=Boolean(row?.betting_qualified)||Boolean(row?.qualified_for_builder)||
+          String(row?.qualification_status||"").startsWith("BETTING_QUALIFIED");
+
+        return {
+          ...row,
+          sport:"virtual",
+          event_id:eventId,
+          start_time:row.start_time,
+          player_1:row.player_1||live?.participant_1,
+          player_2:row.player_2||live?.participant_2,
+          league:row.league||live?.competition||"eFootball",
+          competition:row.competition||live?.competition,
+          market:"over_under",
+          selection:"O/U "+side+" "+line,
+          pick:side,
+          probability:p,
+          confidence:p,
+          model_fair_odds:Number.isFinite(fair)?fair:(p>0?1/p:null),
+          bookmaker_odds:selectedOdds,
+          sportybet_odds:selectedOdds,
+          model_edge_vs_market:Number.isFinite(edge)?edge:null,
+          candidate_status:candidateStatus,
+          model_candidate_status:candidateStatus,
+          projection_tier:row.projection_tier||"deep_research_projection",
+          evidence_depth:row.evidence_depth||"exact_line_research",
+          qualification_status:row.qualification_status||"MODEL_RESEARCH",
+          betting_qualified:qual,
+          qualified_for_builder:Boolean(row?.qualified_for_builder),
+          paper_only:true,
+          live_money_eligible:false,
+          market_odds_timestamp:new Date().toISOString(),
+          source_engine:"Virtual Lab",
+          desk_source:"selection_candidates + fresh SportyBet virtual quote"
+        };
+      }).filter(Boolean);
+    }
     const annotate=(x)=>{
       const event=String(x?.event_id||"");
       const pick=String(x?.pick||x?.selection||"");
@@ -270,6 +369,26 @@ async function renderUnifiedBoard(){
       return x;
     };
     all=all.map(annotate);
+    try{
+      const quoteMap=await freshVirtualQuoteMap();
+      const virtualDeskRows=virtualCandidateDeskRows(virtualCandidates,quoteMap);
+      if(virtualDeskRows.length){
+        const existingKeys=new Set(all.map(row=>rowFixtureKey(row)));
+        for(const row of virtualDeskRows){
+          const key=rowFixtureKey(row);
+          if(!existingKeys.has(key)){
+            all.push(annotate(row));
+            existingKeys.add(key);
+          }else{
+            // Keep any existing unified event row, but add the richer eFootball
+            // candidate into its fixture group when it represents a distinct
+            // O/U line/side. This preserves the canonical event while exposing
+            // the evidence-backed market prediction.
+            all.push(row);
+          }
+        }
+      }
+    }catch(_){}
     const sport=Q('#upSport'), date=Q('#upDate'), search=Q('#upSearch');
     const setOptions=(el,vals)=>{if(!el||el.dataset.ready)return;el.innerHTML=vals.map(v=>'<option value="'+E(v.value)+'">'+E(v.label)+'</option>').join('');el.dataset.ready="1";};
     setOptions(sport,[{value:"all",label:"All active sports"},{value:"football",label:"⚽ Football"},{value:"tennis",label:"🎾 Tennis"},{value:"virtual",label:"🧪 Virtual / eFootball"}]);
