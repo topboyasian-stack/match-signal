@@ -1,26 +1,26 @@
 {
-  "generated_at": "2026-10-07T13:38:20.952457+00:00",
-  "status": "FAIL",
-  "critical_issues": 2,
+  "generated_at": "2026-10-07T15:34:57.074963+00:00",
+  "status": "HEALTHY",
+  "critical_issues": 0,
   "warning_issues": 0,
   "info_issues": 1,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
-      "status": "STALE",
-      "age_hours": 7.8,
+      "status": "PASS",
+      "age_hours": 0.05,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.19,
+      "age_hours": 1.94,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 1.55,
+      "age_hours": 0.01,
       "threshold_hours": 4
     },
     {
@@ -32,7 +32,7 @@
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 0.23,
+      "age_hours": 2.17,
       "threshold_hours": 0.5,
       "heartbeat_source": "unified_live_refresh"
     },
@@ -46,30 +46,27 @@
         },
         "table_tennis_x": {
           "status": "RETIRED",
-          "artifact_at": "2026-10-07T12:04:24.867492+00:00"
+          "artifact_at": "2026-10-07T14:39:23.833821+00:00"
         },
         "basketball": {
           "status": "RETIRED",
           "provider": "not_active"
         }
       }
+    },
+    {
+      "engine": "tennis_desk",
+      "status": "INFO",
+      "detail": "Core pipeline is holding tennis back for lack of actionable singles matches, while the desk itself still has active ATP/WTA rows.",
+      "autopilot_atp": 1,
+      "autopilot_wta": 0
     }
   ],
   "issues": [
     {
-      "code": "STALE_CORE_PREDICTION_PIPELINE",
-      "severity": "critical",
-      "detail": "updated_at age 7.80h exceeds 4h"
-    },
-    {
       "code": "SELECTION_GATE_EMPTY",
       "severity": "info",
       "detail": "Current prediction feed exists but the selected-candidate layer returned zero qualified selections; no gate was weakened"
-    },
-    {
-      "code": "PIPELINE_STALE",
-      "severity": "critical",
-      "detail": "pipeline_status age 7.80h exceeds 4h"
     }
   ],
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
