@@ -1,26 +1,26 @@
 {
-  "generated_at": "2026-10-07T09:20:14.232982+00:00",
-  "status": "HEALTHY",
-  "critical_issues": 0,
+  "generated_at": "2026-10-07T10:52:04.022377+00:00",
+  "status": "FAIL",
+  "critical_issues": 3,
   "warning_issues": 0,
   "info_issues": 1,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
-      "status": "PASS",
-      "age_hours": 3.5,
+      "status": "STALE",
+      "age_hours": 5.03,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.09,
+      "age_hours": 1.52,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
-      "status": "PASS",
-      "age_hours": 2.87,
+      "status": "STALE",
+      "age_hours": 4.4,
       "threshold_hours": 4
     },
     {
@@ -32,7 +32,7 @@
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 3.14,
+      "age_hours": 4.67,
       "threshold_hours": 0.5,
       "heartbeat_source": "unified_live_refresh"
     },
@@ -42,7 +42,7 @@
       "lanes": {
         "darts_x": {
           "status": "RETIRED",
-          "artifact_at": "2026-10-07T03:47:35.186045+00:00"
+          "artifact_at": "2026-10-07T10:42:18.025220+00:00"
         },
         "table_tennis_x": {
           "status": "RETIRED",
@@ -57,9 +57,24 @@
   ],
   "issues": [
     {
+      "code": "STALE_CORE_PREDICTION_PIPELINE",
+      "severity": "critical",
+      "detail": "updated_at age 5.03h exceeds 4h"
+    },
+    {
+      "code": "STALE_EXPANSION",
+      "severity": "critical",
+      "detail": "updated_at age 4.40h exceeds 4h"
+    },
+    {
       "code": "SELECTION_GATE_EMPTY",
       "severity": "info",
       "detail": "Current prediction feed exists but the selected-candidate layer returned zero qualified selections; no gate was weakened"
+    },
+    {
+      "code": "PIPELINE_STALE",
+      "severity": "critical",
+      "detail": "pipeline_status age 5.03h exceeds 4h"
     }
   ],
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
