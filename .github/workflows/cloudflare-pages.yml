@@ -172,13 +172,32 @@ jobs:
       - name: Install Pages Function dependencies
         run: npm install --no-audit --no-fund
 
+      - name: Prepare Cloudflare Pages deployment directory
+        env:
+          MAX_PAGES_FILE_BYTES: "26214400"
+        run: |
+          set -euo pipefail
+          rm -rf .pages-deploy
+          mkdir -p .pages-deploy
+          rsync -a             --exclude='.git/'             --exclude='.pages-deploy/'             --exclude='node_modules/'             --exclude='data/virtual_lab_history.json'             ./ .pages-deploy/
+          gzip -c data/virtual_lab_history.json > .pages-deploy/data/virtual_lab_history.json.gz
+          original_bytes=$(stat -c%s data/virtual_lab_history.json)
+          compressed_bytes=$(stat -c%s .pages-deploy/data/virtual_lab_history.json.gz)
+          echo "Canonical Virtual Lab history: $original_bytes bytes"
+          echo "Compressed Pages history asset: $compressed_bytes bytes"
+          test "$original_bytes" -gt "$MAX_PAGES_FILE_BYTES"
+          test "$compressed_bytes" -lt "$MAX_PAGES_FILE_BYTES"
+          test -s .pages-deploy/data/virtual_lab_history.json.gz
+          test ! -e .pages-deploy/data/virtual_lab_history.json
+          echo "Cloudflare Pages staging passed the 25 MiB single-file limit."
+
       - name: Deploy to Cloudflare Pages
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           PROJECT: ${{ steps.project.outputs.project }}
         run: |
-          npx wrangler@latest pages deploy . --project-name="$PROJECT"
+          npx wrangler@latest pages deploy .pages-deploy --project-name="$PROJECT"
 
       - name: Run production HTTP and asset smoke tests
         timeout-minutes: 3
@@ -187,7 +206,7 @@ jobs:
           import { writeFileSync } from 'node:fs';
           const base = 'https://match-signal.pages.dev';
           const pages = ['/', '/upcoming.html', '/football.html', '/tennis.html', '/basketball.html', '/darts.html', '/table-tennis.html', '/league.html?sport=football&league=England%20Amateur%20-%20U21%20Professional%20Development%20League', '/reports.html', '/live.html', '/expansion.html', '/virtual-lab/', '/virtual-lab', '/research.html', '/virtual-lab.html'];
-          const assets = ['/api/sportybet-virtual','/api/sportybet-darts','/api/sportybet-table-tennis','/expansion.js', '/expansion-odds-builder.js', '/live-analysis.js', '/live-data-worker.js', '/virtual-lab-app.js', '/virtual-lab-confirmed-watch.js', '/virtual-lab.css', '/_redirects', '/data/predictions.json', '/data/expansion_status.json', '/data/odds_builder.json', '/data/odds_ticket_tracker.json', '/data/virtual_lab_live.json','/data/virtual_lab_model_eval.json','/data/virtual_lab_eligibility.json','/data/virtual_lab_participants/registry.json','/data/virtual_lab_participant_lifecycle.json','/data/virtual_lab_participants/efootball_confirmed_watch.json'];
+          const assets = ['/api/sportybet-virtual','/api/sportybet-darts','/api/sportybet-table-tennis','/api/virtual-lab-history','/expansion.js', '/expansion-odds-builder.js', '/live-analysis.js', '/live-data-worker.js', '/virtual-lab-app.js', '/virtual-lab-confirmed-watch.js', '/virtual-lab.css', '/_redirects', '/data/predictions.json', '/data/expansion_status.json', '/data/odds_builder.json', '/data/odds_ticket_tracker.json', '/data/virtual_lab_live.json','/data/virtual_lab_model_eval.json','/data/virtual_lab_eligibility.json','/data/virtual_lab_participants/registry.json','/data/virtual_lab_participant_lifecycle.json','/data/virtual_lab_participants/efootball_confirmed_watch.json'];
           const failures = [];
           async function get(path) {
             const r = await fetch(base + path + (path.includes('?') ? '&' : '?') + 'smoke=' + Date.now(), {cache:'no-store'});
