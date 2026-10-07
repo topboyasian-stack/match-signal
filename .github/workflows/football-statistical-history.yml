@@ -76,6 +76,7 @@ jobs:
           git commit -m "🤖 Refresh Football statistical history and model council"
           for attempt in 1 2 3; do
             if git push origin main; then
+              GH_TOKEN="${{ github.token }}" gh workflow run cloudflare-pages.yml --ref main
               echo "Football statistical history publication succeeded."
               exit 0
             fi

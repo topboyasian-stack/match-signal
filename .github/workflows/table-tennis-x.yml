@@ -80,6 +80,7 @@ jobs:
           git commit -m "🤖 Refresh Table Tennis-X research engine"
           for attempt in 1 2 3 4; do
             if git push origin main; then
+              GH_TOKEN="${{ github.token }}" gh workflow run cloudflare-pages.yml --ref main
               echo "Table Tennis-X publication succeeded."
               exit 0
             fi

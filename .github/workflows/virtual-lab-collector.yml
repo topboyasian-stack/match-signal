@@ -169,6 +169,7 @@ jobs:
             git commit -m "🤖 Collect and settle Virtual Lab observations"
 
             if git push origin main; then
+              GH_TOKEN="${{ github.token }}" gh workflow run cloudflare-pages.yml --ref main
               echo "Virtual Lab collector publication succeeded on attempt $attempt."
               exit 0
             fi

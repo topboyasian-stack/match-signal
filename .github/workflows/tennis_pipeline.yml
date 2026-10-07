@@ -252,6 +252,7 @@ jobs:
           git commit -m "🤖 Refresh scheduled prediction pipeline"
           for attempt in 1 2 3; do
             if git push origin main; then
+              GH_TOKEN="${{ github.token }}" gh workflow run cloudflare-pages.yml --ref main
               exit 0
             fi
             echo "Push race detected; rebasing generated commit onto latest main (attempt $attempt)."

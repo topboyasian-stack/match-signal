@@ -261,6 +261,7 @@ jobs:
             git commit -m "🤖 Refresh research-gated Odds Builder"
           fi
           git push origin main
+          GH_TOKEN="${{ github.token }}" gh workflow run cloudflare-pages.yml --ref main
 
       - name: Notify subscribed devices about new 2.70+ batches
         continue-on-error: true

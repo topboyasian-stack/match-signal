@@ -105,6 +105,7 @@ jobs:
           git commit -m "🤖 Update paper ticket settlement tracker"
           for attempt in 1 2 3; do
             if git push origin main; then
+              GH_TOKEN="${{ github.token }}" gh workflow run cloudflare-pages.yml --ref main
               echo "Ticket tracker published on attempt ${attempt}."
               exit 0
             fi

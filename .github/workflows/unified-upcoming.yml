@@ -76,7 +76,10 @@ jobs:
           fi
           git commit -m "🤖 Refresh unified upcoming board"
           for attempt in 1 2 3; do
-            if git push origin main; then exit 0; fi
+            if git push origin main; then
+              GH_TOKEN="${{ github.token }}" gh workflow run cloudflare-pages.yml --ref main
+              exit 0
+            fi
             git fetch origin main
             git reset --hard origin/main
             python scripts/unified_upcoming.py
