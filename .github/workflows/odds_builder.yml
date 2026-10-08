@@ -184,7 +184,7 @@ jobs:
               products = {str(x.get('product') or '') for x in batch.get('legs', [])}
               lane = str(batch.get('primary_lane') or '')
               efootball_value_lane = (
-                  lane == 'model_first_value'
+                  (lane in {'model_first_value','efootball_exact_evidence_value'})
                   and products
                   and all(p.startswith('efootball_') for p in products)
               )
@@ -220,7 +220,9 @@ jobs:
                       raw2 = parts[1] if len(parts) > 1 else raw2
                   for value in (raw, raw2):
                       if value:
-                          batch_participants.add(re.sub(r"[^a-z0-9]+"," ",str(value).lower()).strip())
+                          embedded = re.search(r"\(([^()]*)\)\s*$", str(value))
+                          identity = embedded.group(1).strip() if embedded and embedded.group(1).strip() else str(value)
+                          batch_participants.add(re.sub(r"[^a-z0-9]+"," ",identity.lower()).strip())
               assert not (seen_participants & batch_participants), 'batches must be disjoint by participant'
               seen_participants.update(batch_participants)
           if batches:
