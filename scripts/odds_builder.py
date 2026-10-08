@@ -1832,7 +1832,13 @@ def make_leg(x):
 
 
 def _participants(leg):
-    """Return normalized participant identities for correlation control."""
+    """Return normalized participant identities for correlation control.
+    
+    Virtual/eFootball fixtures often encode the stable participant in parentheses,
+    e.g. "Boca Juniors (zaha)". Correlation must use that identity rather than the
+    whole display-team string, otherwise the same participant can be reused across
+    different fixtures without being detected.
+    """
     import re
     vals=[]
     for key in ("participant_1","participant_2","player_1","player_2","team_1","team_2"):
@@ -1843,8 +1849,12 @@ def _participants(leg):
         vals=[p.strip() for p in re.split(r"\s+vs\s+",match,flags=re.I) if p.strip()]
     out=[]
     for v in vals:
-        s=re.sub(r"[^a-z0-9]+"," ",str(v).lower()).strip()
-        if s and s not in out: out.append(s)
+        raw=str(v).strip()
+        # Prefer an explicit stable participant identity when the feed embeds one.
+        embedded=re.search(r"\(([^()]*)\)\s*$",raw)
+        identity=embedded.group(1).strip() if embedded and embedded.group(1).strip() else raw
+        normalized=re.sub(r"[^a-z0-9]+"," ",identity.lower()).strip()
+        if normalized and normalized not in out: out.append(normalized)
     return out
 
 _TICKET_CALIBRATION_CACHE=None
