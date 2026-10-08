@@ -113,6 +113,61 @@ PHASE2_CYCLICAL_HIGH_VARIANCE_ODDS=4.0
 # Bound the experimental combination search so Phase 2 cannot dominate Builder runtime.
 PHASE2_CYCLICAL_POOL_CAP=40
 _COMBINED_ODDS_GATE_CACHE=None
+_EFOOTBALL_HOLDOUT_SELECTION_CACHE=None
+EFOOTBALL_HOLDOUT_MIN_OBS=50
+
+def _efootball_holdout_selection_profile():
+    """Load independent walk-forward exact-selection performance for ranking only.
+    
+    This is a diagnostic prior from the frozen virtual-lab evaluation. It cannot
+    make an otherwise ineligible candidate eligible and it does not replace live
+    exact-line/side settlement evidence.
+    """
+    global _EFOOTBALL_HOLDOUT_SELECTION_CACHE
+    if _EFOOTBALL_HOLDOUT_SELECTION_CACHE is not None:
+        return _EFOOTBALL_HOLDOUT_SELECTION_CACHE
+    profile={}
+    try:
+        report=load(DATA/"virtual_lab_model_eval.json",{})
+        diagnostics=((report.get("efootball_gt_diagnostics") or {}).get("selection") or {})
+        for selection_key,obj in diagnostics.items():
+            if not isinstance(obj,dict) or len(obj)!=1:
+                continue
+            line_key=next(iter(obj.keys()))
+            metrics=obj.get(line_key) or {}
+            model=metrics.get("participant_model") or metrics.get("efootball_shape") or {}
+            try:
+                n=int(model.get("n") or 0)
+                hit=float(model.get("hit_rate"))
+            except (TypeError,ValueError):
+                continue
+            if n < EFOOTBALL_HOLDOUT_MIN_OBS:
+                continue
+            text_key=str(selection_key)
+            side="over" if text_key.lower().startswith("o") else "under" if text_key.lower().startswith("u") else ""
+            if not side:
+                continue
+            profile[(f"{float(line_key):g}",side)]={
+                "n":n,
+                "hit_rate":hit,
+                "brier":model.get("brier"),
+                "ece":model.get("ece"),
+                "source":"data/virtual_lab_model_eval.json",
+                "method":"strict chronological walk-forward participant-model holdout"
+            }
+    except Exception:
+        profile={}
+    _EFOOTBALL_HOLDOUT_SELECTION_CACHE=profile
+    return profile
+
+def _efootball_holdout_selection(row):
+    try:
+        line=f"{float(row.get('line')):g}"
+    except (TypeError,ValueError):
+        return None
+    side=_virtual_selection_side(row) or str((row.get("recent_evidence") or {}).get("side") or "").lower()
+    profile=_efootball_holdout_selection_profile().get((line,side))
+    return profile
 
 def combined_odds_gate_state():
     """Return the currently earned accuracy-first combined-odds floor for this Builder run."""
@@ -2080,9 +2135,13 @@ def _construct_efootball_value_batch(pool, min_odds=None, max_legs=RESULTS_FIRST
         and float(x.get("expected_value") or 0.0)>=0.0
         and x.get("builder_eligible") is True
     ]
+    def _rank_holdout(row):
+        holdout=_efootball_holdout_selection(row)
+        return float(holdout.get("hit_rate") or 0.0) if holdout else 0.0
     rows=sorted(rows,key=lambda x:(
         -float(x.get("model_probability") or 0.0),
         -float(x.get("evidence_score") or 0.0),
+        -_rank_holdout(x),
         -float(x.get("model_edge") or 0.0),
         -float(x.get("bookmaker_odds") or 1.0),
         _kickoff_timestamp(x) if _kickoff_timestamp(x) is not None else float("inf")
@@ -2129,7 +2188,8 @@ def _construct_efootball_value_batch(pool, min_odds=None, max_legs=RESULTS_FIRST
                 "combined_probability":best[2].get("combined_model_probability"),
                 "roi":round((float(best[2].get("combined_model_probability") or 0.0)*best[3])-1.0,6),
                 "span_minutes":round(float(best[4]),1),
-                "search_mode":"exhaustive_pairs_then_bounded_larger_shapes"
+                "search_mode":"exhaustive_pairs_then_bounded_larger_shapes",
+                "holdout_selection_ranking":"independent walk-forward participant-model hit rate after exact evidence score"
             }
     return [],{
         "shape":None,
