@@ -72,31 +72,59 @@ def side_of(row):
     return ""
 
 
-def exact_key(row):
+def participant_identity(row, keys):
+    import re
+    value = ""
+    for key in keys:
+        if row.get(key):
+            value = str(row.get(key)).strip()
+            break
+    embedded = re.search(r"\(([^()]*)\)\\s*$", value)
+    if embedded and embedded.group(1).strip():
+        value = embedded.group(1).strip()
+    return " ".join(re.sub(r"[^a-z0-9]+", " ", value.lower()).split())
+
+
+def fixture_key(row):
+    """Stable eFootball fixture key; provider event IDs can recur in one session."""
+    product = str(row.get("product") or "efootball_gt").strip().lower()
+    start = dt(row.get("start_time") or row.get("timestamp"))
+    p1 = participant_identity(row, ("participant_1", "player_1", "team_1", "home"))
+    p2 = participant_identity(row, ("participant_2", "player_2", "team_2", "away"))
     event_id = str(row.get("event_id") or "")
+    if start is not None and p1 and p2:
+        minute = int(start.timestamp() // 60)
+        return f"{product}|{minute}|{'|'.join(sorted((p1, p2)))}"
+    return f"{product}|event:{event_id}" if event_id else None
+
+
+def exact_key(row):
+    base = fixture_key(row)
     line = num(row.get("line"))
-    side = side_of(row)
-    if not event_id or line is None or not side:
+    if not base or line is None:
         return None
-    return f"{event_id}|{line:g}|{side}"
+    return f"{base}|{line:g}"
 
 
 def settlement_index(history):
+    # Outcomes are stored per O/U market/line in the independent settlement
+    # ledger. Use the fixture + total score to score either predicted direction,
+    # including a desk selection that differs from the ledger's favourite side.
     index = {}
     for row in history if isinstance(history, list) else []:
         if not isinstance(row, dict) or row.get("market") != "ou" or row.get("win") is None:
             continue
-        key = exact_key(row)
-        stamp = dt(row.get("timestamp") or row.get("settled_at"))
-        if not key or stamp is None:
+        base = fixture_key(row)
+        stamp = dt(row.get("settled_at") or row.get("timestamp"))
+        score = row.get("score") or row.get("final_score")
+        if not base or stamp is None or score is None:
             continue
-        # Event IDs can recur. Keep the latest settled occurrence for this
-        # exact event/line/side key.
-        previous = index.get(key)
+        previous = index.get(base)
         if previous is None or stamp > previous["_stamp"]:
             item = dict(row)
             item["_stamp"] = stamp
-            index[key] = item
+            item["_fixture_key"] = base
+            index[base] = item
     return index
 
 
@@ -134,6 +162,7 @@ def capture(trace, board):
             "trace_id": f"{key}|{observed.isoformat()}",
             "event_key": key,
             "event_id": str(row.get("event_id") or ""),
+            "product": str(row.get("product") or "efootball_gt"),
             "start_time": row.get("start_time"),
             "competition": row.get("league") or row.get("competition"),
             "participant_1": row.get("player_1"),
@@ -154,7 +183,7 @@ def capture(trace, board):
         # Keep every materially different forecast revision, but avoid writing
         # identical snapshots every five minutes.
         duplicate = any(
-            old.get("event_key") == key
+            (old.get("event_key") == key or exact_key(old) == key)
             and abs(float(old.get("model_probability") or 0) - float(record.get("model_probability") or 0)) < 1e-6
             and abs(((dt(old.get("observed_at")) or now) - observed).total_seconds()) < 1800
             for old in trace[-1000:]
@@ -164,33 +193,77 @@ def capture(trace, board):
 
 
 def reconcile(trace, history_index):
-    for key, item in history_index.items():
-        scored = []
-        for row in trace:
-            if row.get("event_key") != key:
+    for row in trace:
+        # Migrate existing trace rows from the old event-ID-only key. EFootball
+        # provider IDs can identify a session and be reused for different fixtures.
+        key = exact_key(row)
+        if key:
+            row["event_key"] = key
+            row.setdefault("product", "efootball_gt")
+
+    by_fixture = {}
+    for base, item in history_index.items():
+        by_fixture[base] = item
+    trace_by_fixture = {}
+    for row in trace:
+        base = fixture_key(row)
+        if base:
+            trace_by_fixture.setdefault(base, []).append(row)
+
+    for base, forecasts in trace_by_fixture.items():
+        item = by_fixture.get(base)
+        if not item:
+            continue
+        settled = item.get("_stamp")
+        score = item.get("score") or item.get("final_score")
+        try:
+            score_parts = [float(x) for x in str(score).replace(" ", "").split(":")[:2]]
+            if len(score_parts) != 2:
                 continue
+            total = sum(score_parts)
+        except (TypeError, ValueError):
+            continue
+
+        scored = []
+        for row in forecasts:
             observed = dt(row.get("observed_at"))
             start = dt(row.get("start_time"))
-            settled = item.get("_stamp")
-            if observed is None or start is None or settled is None:
+            line = num(row.get("line"))
+            side = side_of(row)
+            if observed is None or start is None or line is None or not side or settled is None:
                 continue
-            if observed < start and observed <= settled:
-                scored.append((observed, row))
+            # Strictly pre-kickoff forecasts only; the settlement timestamp must
+            # also be after the observation, preventing any future leakage.
+            if not (observed < start and observed <= settled):
+                continue
+            scored.append((observed, row, line, side, total))
+
         if not scored:
             continue
         latest = sorted(scored, key=lambda x: x[0])[-1][1]
-        for _, row in scored:
-            if row is latest:
-                row["settled"] = True
-                row["settled_at"] = item.get("settled_at")
-                row["actual_result"] = item.get("result") or item.get("actual_result")
-                row["win"] = bool(item.get("win"))
-                row["score"] = item.get("score") or item.get("final_score")
-                row["settlement_source"] = item.get("settlement_source")
-                row["scored_forecast"] = True
-            else:
+        for _, row, line, side, total in scored:
+            if row is not latest:
                 row["superseded_before_settlement"] = True
                 row["scored_forecast"] = False
+                continue
+            if total == line:
+                row["settled"] = True
+                row["push"] = True
+                row["actual_result"] = "PUSH"
+                row["settled_at"] = item.get("settled_at")
+                row["score"] = score
+                row["settlement_source"] = item.get("settlement_source")
+                row["scored_forecast"] = False
+                continue
+            actual_side = "over" if total > line else "under"
+            row["settled"] = True
+            row["push"] = False
+            row["settled_at"] = item.get("settled_at")
+            row["actual_result"] = actual_side
+            row["win"] = actual_side == side
+            row["score"] = score
+            row["settlement_source"] = item.get("settlement_source")
+            row["scored_forecast"] = True
 
 
 def settled_forecasts(trace):
