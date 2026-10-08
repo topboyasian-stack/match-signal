@@ -156,7 +156,7 @@ def capture(trace, board):
         duplicate = any(
             old.get("event_key") == key
             and abs(float(old.get("model_probability") or 0) - float(record.get("model_probability") or 0)) < 1e-6
-            and abs((dt(old.get("observed_at")) or now - observed).total_seconds()) < 1800
+            and abs(((dt(old.get("observed_at")) or now) - observed).total_seconds()) < 1800
             for old in trace[-1000:]
         )
         if not duplicate:
