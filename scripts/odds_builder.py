@@ -2685,6 +2685,78 @@ def _construct_vfootball_holdout_batches(pool,max_batches=4,max_legs=MIXED_RESEA
         "reason":None if selected else "no_vfootball_holdout_combination_reached_all_gates"
     }
 
+
+def _secondary_efootball_diagnostics(pool, min_odds=None):
+    """Explain whether an exact-evidence eFootball pair can satisfy the live constructor."""
+    if min_odds is None:
+        min_odds=active_min_combined_odds()
+    rows=[
+        x for x in pool
+        if str(x.get("product") or "").startswith("efootball_")
+        and float(x.get("model_probability") or 0.0) >= EFOOTBALL_VALUE_MIN_LEG_PROBABILITY
+        and float(x.get("expected_value") or 0.0) >= 0.0
+    ]
+    rows=sorted(rows,key=lambda x:(
+        -float(x.get("model_probability") or 0.0),
+        -float(x.get("bookmaker_odds") or 1.0),
+        -float(x.get("model_edge") or 0.0),
+        _kickoff_timestamp(x) if _kickoff_timestamp(x) is not None else float("inf")
+    ))
+    pair_total=0
+    pair_odds=0
+    pair_correlation=0
+    pair_span=0
+    pair_roi=0
+    qualified=[]
+    for i in range(len(rows)):
+        for j in range(i+1,len(rows)):
+            pair_total+=1
+            a,b=rows[i],rows[j]
+            odds=float(a.get("bookmaker_odds") or 1.0)*float(b.get("bookmaker_odds") or 1.0)
+            if odds < min_odds:
+                continue
+            pair_odds+=1
+            pa=set(_participants(a)); pb=set(_participants(b))
+            if pa & pb or str(a.get("event_id") or "")==str(b.get("event_id") or ""):
+                pair_correlation+=1
+                continue
+            span=_batch_kickoff_span_minutes([a,b])
+            if span > MODEL_FIRST_MAX_KICKOFF_SPAN_MINUTES:
+                pair_span+=1
+                continue
+            pair_metrics=_batch_metrics([a,b])
+            roi=float(pair_metrics.get("combined_model_probability") or 0.0)*odds-1.0
+            if roi < RESULTS_FIRST_MIN_EXPECTED_ROI:
+                pair_roi+=1
+                continue
+            qualified.append({
+                "legs":[
+                    {"match":a.get("match"),"p":float(a.get("model_probability") or 0.0),"odds":float(a.get("bookmaker_odds") or 0.0),"start":a.get("start_time")},
+                    {"match":b.get("match"),"p":float(b.get("model_probability") or 0.0),"odds":float(b.get("bookmaker_odds") or 0.0),"start":b.get("start_time")}
+                ],
+                "combined_odds":round(odds,3),
+                "combined_probability":pair_metrics.get("combined_model_probability"),
+                "roi":round(roi,6),
+                "span_minutes":round(span,1)
+            })
+    qualified.sort(key=lambda x:(-float(x.get("roi") or 0.0),-float(x.get("combined_probability") or 0.0),-float(x.get("combined_odds") or 0.0)))
+    return {
+        "pool_size":len(rows),
+        "top_legs":[
+            {"match":x.get("match"),"p":float(x.get("model_probability") or 0.0),"odds":float(x.get("bookmaker_odds") or 0.0),"ev":float(x.get("expected_value") or 0.0),"start":x.get("start_time")}
+            for x in rows[:20]
+        ],
+        "pair_scan":{
+            "pairs_total":pair_total,
+            "odds_reach_pairs":pair_odds,
+            "correlation_rejections":pair_correlation,
+            "kickoff_span_rejections":pair_span,
+            "roi_rejections":pair_roi,
+            "fully_qualified_pairs":len(qualified)
+        },
+        "best_pair":qualified[:5]
+    }
+
 def build_value_batches(candidates):
     """Build one results-first paper ticket using the best proven 2–7-leg shape.
 
@@ -3250,6 +3322,10 @@ def build_value_batches(candidates):
         "ranking_metric":"settled exact-line/side hit rate first; calibrated probability second; odds only tie-breaker",
         "construction_shape_diagnostics":construction_shapes,
         "secondary_pool_eligible_legs":sum(1 for x in eligible_all if str(x.get("product") or "")!="vfootball" and (str(x.get("sport") or "") in {"football","tennis"} or str(x.get("product") or "").startswith("efootball_"))),
+        "secondary_efootball_diagnostics":_secondary_efootball_diagnostics(
+            secondary_pool,
+            min_odds=active_min_combined_odds()
+        ),
         "mixed_pool_eligible_legs":sum(1 for x in eligible_all if str(x.get("qualification_lane") or "") in {"vfootball_exact_evidence_value","vfootball_event_holdout_value","efootball_exact_evidence_value"}),
         "mixed_max_kickoff_span_minutes":MIXED_RESEARCH_MAX_KICKOFF_SPAN_MINUTES,
         "mixed_diagnostics":mixed_diag,
