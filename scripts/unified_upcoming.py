@@ -36,6 +36,7 @@ EFOOTBALL_DIRECTION_MIN_HOLDOUT_ROWS=30
 EFOOTBALL_DIRECTION_MIN_RECENT_ROWS=30
 EFOOTBALL_DIRECTION_MIN_HIT_RATE=0.65
 EFOOTBALL_DIRECTION_RECENT_WINDOW=50
+SETTLED_DESK_RETENTION_HOURS=2
 EFOOTBALL_DESK_LEARNING_MIN_CALIBRATION_N=30
 EFOOTBALL_DESK_LEARNING_PATH="efootball_desk_learning.json"
 
@@ -112,6 +113,33 @@ def match_key(row):
     pair="|".join(sorted((p1,p2)))
     return f"{sport}|{day}|{pair}"
 
+
+def virtual_fixture_key(row):
+    """Disambiguate recurring SportyBet session IDs using kickoff and stable handles."""
+    import re
+    product=str(row.get("product") or "").strip().lower()
+    if not product:
+        return None
+    start=dt(row.get("start_time") or row.get("timestamp") or row.get("date"))
+    if start is None:
+        return None
+    def identity(*keys):
+        value=""
+        for key in keys:
+            if row.get(key):
+                value=str(row.get(key)).strip()
+                break
+        embedded=re.search(r"\(([^()]*)\)\s*$",value)
+        if embedded and embedded.group(1).strip():
+            value=embedded.group(1).strip()
+        return norm_name(value)
+    p1=identity("participant_1","player_1","team_1","home")
+    p2=identity("participant_2","player_2","team_2","away")
+    if not p1 or not p2:
+        return None
+    minute=int(start.timestamp()//60)
+    return f"{product}|{minute}|{'|'.join(sorted((p1,p2)))}"
+
 def explicit_live(row):
     text=" ".join(str(row.get(k) or "") for k in ("match_status","matchStatus","status","state")).lower()
     return bool(row.get("live") or row.get("isLive") or re.search(r"(live|started|inprogress|playing|period|set)",text))
@@ -139,6 +167,17 @@ def settlement_index():
             key=match_key(item)
             if key:
                 keys.add(key)
+            # Virtual/eFootball event IDs can recur across neighbouring matches.
+            # Only the product + kickoff minute + stable participant identities
+            # form an authoritative settled-fixture key.
+            product=str(item.get("product") or "").lower()
+            if product in {"efootball_gt","efootball_adriatic","vfootball","zoom"} and item.get("win") is not None:
+                fixture_key=virtual_fixture_key(item)
+                settled_at=dt(item.get("settled_at"))
+                if fixture_key and settled_at:
+                    previous=details.get(fixture_key)
+                    if previous is None or settled_at > (dt(previous.get("settled_at")) or datetime.min.replace(tzinfo=timezone.utc)):
+                        details[fixture_key]=dict(item)
 
     ingest(load("prediction_history.json",[]),True)
     ingest(load("expansion_prediction_history.json",[]),True)
@@ -151,11 +190,7 @@ def settlement_index():
 SETTLED_EVENT_IDS, SETTLED_MATCH_KEYS, SETTLED_DETAILS = settlement_index()
 
 def settled_record(row):
-    eid=str(row.get("event_id") or "")
-    market=str(row.get("market") or "winner")
-    line="" if row.get("line") is None else str(row.get("line"))
-    pick=str(row.get("pick") or row.get("selection") or "")
-    return SETTLED_DETAILS.get(f"{eid}|{market}|{line}|{pick}")
+    return SETTLED_DETAILS.get(virtual_fixture_key(row))
 
 def add(rows, row):
     if not isinstance(row,dict):return
@@ -173,22 +208,48 @@ def add(rows, row):
     # ledger. Event-id/match-key settlement is only authoritative once kickoff has
     # passed; explicit terminal provider state still wins immediately.
     started_or_due = bool(start and start <= NOW)
-    terminal=explicit_terminal(row) or (started_or_due and (eid in SETTLED_EVENT_IDS or match_key(row) in SETTLED_MATCH_KEYS))
+    is_virtual=(
+        str(row.get("sport") or "").lower()=="virtual"
+        or str(row.get("product") or "").lower() in {"efootball_gt","efootball_adriatic","vfootball","zoom"}
+    )
+    sr=settled_record(row) if is_virtual else None
+    history_terminal=(
+        virtual_fixture_key(row) in SETTLED_DETAILS
+        if is_virtual
+        else (eid in SETTLED_EVENT_IDS or match_key(row) in SETTLED_MATCH_KEYS)
+    )
+    terminal=explicit_terminal(row) or (started_or_due and history_terminal)
     if terminal:
-        sr=settled_record(row) if str(row.get("sport") or "")=="virtual" else None
         if sr and sr.get("settled_at"):
             try:
-                age=(NOW-dt(sr.get("settled_at"))).total_seconds()
+                settled_stamp=dt(sr.get("settled_at"))
+                age=(NOW-settled_stamp).total_seconds() if settled_stamp else float("inf")
             except Exception:
-                age=999999
-            if age<=48*3600:
+                age=float("inf")
+            if 0 <= age <= SETTLED_DESK_RETENTION_HOURS*3600:
                 row["event_state"]="SETTLED"
                 row["settled"]=True
-                row["settlement_result"]=sr.get("result") or sr.get("actual_result")
-                row["final_score"]=sr.get("score") or sr.get("final_score")
                 row["settled_at"]=sr.get("settled_at")
+                row["final_score"]=sr.get("score") or sr.get("final_score")
                 row["prediction_trace_id"]=sr.get("trace_id") or sr.get("record_id")
+                # Show the actual O/U result for this forecast line, not the
+                # independent collector's favourite side at that line.
+                line=num(row.get("line"))
+                score=row.get("final_score")
+                total=None
+                if isinstance(score,(list,tuple)) and len(score)>=2:
+                    try: total=float(score[0])+float(score[1])
+                    except (TypeError,ValueError): total=None
+                elif isinstance(score,str) and ":" in score:
+                    try: total=sum(float(x) for x in score.replace(" ","").split(":")[:2])
+                    except (TypeError,ValueError): total=None
+                if str(row.get("market") or "")=="over_under" and line is not None and total is not None:
+                    row["settlement_result"]="PUSH" if total==line else ("over" if total>line else "under")
+                else:
+                    row["settlement_result"]=sr.get("result") or sr.get("actual_result")
             else:
+                # Hide from Upcoming after the short grace period. The result
+                # remains in Virtual Lab history and the desk learning ledger.
                 return
         else:
             return
