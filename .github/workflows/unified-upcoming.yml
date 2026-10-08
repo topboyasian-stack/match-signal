@@ -66,6 +66,8 @@ jobs:
         run: python scripts/unified_upcoming_cleanup.py
       - name: Collect model-first selection candidates
         run: python scripts/selection_candidate_collector.py
+      - name: Capture the final eFootball desk forecast snapshot
+        run: python scripts/efootball_desk_learning.py
       - name: Audit complete system
         run: python scripts/system_health_audit.py
       - name: Publish unified board and health
