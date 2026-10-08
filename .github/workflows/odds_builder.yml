@@ -180,6 +180,28 @@ jobs:
               min_per_leg = data.get('batch_policy', {}).get('per_leg_min_model_probability') or {'2':0.80,'3':0.80,'4':0.80}
               leg_count = int(batch.get('leg_count', len(batch.get('legs', []))))
               required = float(min_per_leg.get(str(leg_count), min_per_leg.get(leg_count, 0.80)))
+              products = {str(x.get('product') or '') for x in batch.get('legs', [])}
+              lane = str(batch.get('primary_lane') or '')
+              efootball_value_lane = (
+                  lane == 'model_first_value'
+                  and products
+                  and all(p.startswith('efootball_') for p in products)
+              )
+              if efootball_value_lane:
+                  # Isolated evidence-value fallback: exact-side eFootball evidence
+                  # has a 65% minimum; this is VALUE_RESEARCH, not high-confidence.
+                  required = 0.65
+                  assert all(
+                      str(leg.get('qualification_lane') or '') == 'efootball_exact_evidence_value'
+                      for leg in batch.get('legs', [])
+                  )
+                  assert str(batch.get('paper_only')) == 'True' or batch.get('paper_only') is True
+                  assert str(batch.get('real_money_execution')) == 'False' or batch.get('real_money_execution') is False
+                  assert float(batch.get('combined_model_probability', 0)) > 0
+                  assert (
+                      float(batch.get('combined_model_probability', 0))
+                      * float(batch.get('combined_odds', 0)) - 1.0
+                  ) >= 0.02, 'eFootball value batch expected ROI floor failed'
               assert 2 <= leg_count <= 4
               assert all(float(leg.get('model_probability', 0)) >= required for leg in batch.get('legs', [])), 'adaptive per-leg safety threshold failed'
               leg_ids = [str(x.get('event_id')) for x in batch.get('legs', [])]
