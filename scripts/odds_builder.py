@@ -1950,7 +1950,19 @@ def _batch_metrics(legs):
     )
     ticket_calibration_mode="historical_settled_ticket_gamma"
     ticket_gamma=float(_ticket_calibration_gamma().get("gamma") or 1.0)
-    if all_vfootball_holdout:
+    all_efootball_evidence=all(
+        str(x.get("qualification_lane") or "")=="efootball_exact_evidence_value"
+        and str(x.get("product") or "").startswith("efootball_")
+        for x in legs
+    )
+    if all_efootball_evidence:
+        # Do not apply the historical VFootball ticket gamma to eFootball.
+        # eFootball has no adequate settled-ticket calibration sample yet;
+        # each leg already uses exact-line/side evidence calibration.
+        calibrated=raw_combined
+        ticket_calibration_mode="efootball_exact_evidence_independence_proxy"
+        ticket_gamma=1.0
+    elif all_vfootball_holdout:
         lower_bounds=[_vfootball_holdout_lower_bound(x,confidence=0.95) for x in legs]
         if all(v is not None for v in lower_bounds):
             # Preserve a common-model-error cushion while avoiding the unrelated
@@ -2039,7 +2051,12 @@ def _batch_capacity_diagnostic(eligible_pool):
         "target_reachable_with_current_gates":relaxed_product>=active_min_combined_odds(),
     }
 
-def _construct_model_first_batch(pool, max_legs=MAX_LEGS, min_odds=MIN_COMBINED_ODDS):
+def _construct_model_first_batch(
+    pool,
+    max_legs=MAX_LEGS,
+    min_odds=MIN_COMBINED_ODDS,
+    min_leg_probability=MIN_SAFE_LEG_MODEL_PROBABILITY,
+):
     """Construct the strongest whole-ticket model-probability batch that can reach 4.00+.
 
     This is a constrained construction heuristic, not a qualification change:
@@ -2191,13 +2208,21 @@ def _construct_model_first_batch(pool, max_legs=MAX_LEGS, min_odds=MIN_COMBINED_
     for rows in candidates:
         if not rows or not (BATCH_MIN_LEGS<=len(rows)<=min(RESULTS_FIRST_MAX_LEGS,max_legs)):
             continue
-        if not legs_meet_safe_model_threshold(rows):
+        if any(
+            float(x.get("model_probability") or 0.0) < float(min_leg_probability)
+            for x in rows
+        ):
             continue
         odds=math.prod(float(y.get("bookmaker_odds") or 1.0) for y in rows)
         if odds<min_odds:
             continue
         raw=math.prod(max(0.0005,min(0.9995,float(x.get("model_probability") or 0.0))) for x in rows)
-        calibrated=_calibrated_ticket_probability(raw)
+        all_efootball_evidence=all(
+            str(x.get("qualification_lane") or "")=="efootball_exact_evidence_value"
+            and str(x.get("product") or "").startswith("efootball_")
+            for x in rows
+        )
+        calibrated=raw if all_efootball_evidence else _calibrated_ticket_probability(raw)
         if (calibrated*odds)-1.0 < RESULTS_FIRST_MIN_EXPECTED_ROI:
             continue
         valid.append((rows,calibrated,odds))
@@ -3112,7 +3137,15 @@ def build_value_batches(candidates):
         secondary_batch=_construct_model_first_batch(
             secondary_pool,
             max_legs=RESULTS_FIRST_MAX_LEGS,
-            min_odds=active_min_combined_odds()
+            min_odds=active_min_combined_odds(),
+            min_leg_probability=(
+                EFOOTBALL_VALUE_MIN_LEG_PROBABILITY
+                if all(
+                    str(x.get("product") or "").startswith("efootball_")
+                    for x in secondary_pool
+                )
+                else MIN_SAFE_LEG_MODEL_PROBABILITY
+            )
         )
         secondary_is_efootball=bool(secondary_pool) and all(
             str(x.get("product") or "").startswith("efootball_")
@@ -3187,6 +3220,11 @@ def build_value_batches(candidates):
                     "secondary_max_kickoff_span_minutes":MODEL_FIRST_MAX_KICKOFF_SPAN_MINUTES,
                     "secondary_min_avg_model_probability":secondary_avg_threshold,
                     "secondary_efootball_value_lane":secondary_is_efootball,
+                    "secondary_ticket_calibration_mode":(
+                        "efootball_exact_evidence_independence_proxy"
+                        if secondary_is_efootball
+                        else "historical_settled_ticket_gamma"
+                    ),
                     "capacity":_batch_capacity_diagnostic(secondary_pool),
                     "construction_shape_diagnostics":construction_shapes,
                     "ranking_metric":"whole-ticket model probability first, exact current edge second, odds as hard reachability constraint"
