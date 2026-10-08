@@ -85,6 +85,11 @@ MODEL_FIRST_MAX_KICKOFF_SPAN_MINUTES=270
 # the 70% average frontier while retaining positive single-leg EV, live-price,
 # freshness, correlation, and whole-ticket ROI gates.
 MODEL_FIRST_MIN_AVG_PROBABILITY=0.68
+# eFootball exact-line evidence is currently validated at a 65% directional
+# threshold. Keep that lane evidence-based instead of requiring the unrelated
+# 68% frontier used by the generic secondary value lane.
+EFOOTBALL_VALUE_MIN_AVG_PROBABILITY=0.65
+EFOOTBALL_VALUE_MIN_LEG_PROBABILITY=0.65
 # Mixed research lane: preserve a small VFootball component only when its own
 # exact-line/value gates pass, then combine it with one or two qualified
 # eFootball value legs. This does not promote the batch to Results-first.
@@ -3109,6 +3114,20 @@ def build_value_batches(candidates):
             max_legs=RESULTS_FIRST_MAX_LEGS,
             min_odds=active_min_combined_odds()
         )
+        secondary_is_efootball=bool(secondary_pool) and all(
+            str(x.get("product") or "").startswith("efootball_")
+            for x in secondary_pool
+        )
+        secondary_avg_threshold=(
+            EFOOTBALL_VALUE_MIN_AVG_PROBABILITY
+            if secondary_is_efootball
+            else MODEL_FIRST_MIN_AVG_PROBABILITY
+        )
+        if secondary_is_efootball:
+            secondary_batch=[
+                x for x in secondary_batch
+                if float(x.get("model_probability") or 0.0)>=EFOOTBALL_VALUE_MIN_LEG_PROBABILITY
+            ]
         if len(secondary_batch)>=BATCH_MIN_LEGS:
             secondary_batch=sorted(
                 secondary_batch,
@@ -3120,7 +3139,7 @@ def build_value_batches(candidates):
             secondary_span=_batch_kickoff_span_minutes(secondary_batch)
             if (
                 secondary_span<=MODEL_FIRST_MAX_KICKOFF_SPAN_MINUTES
-                and float(secondary_metrics.get("avg_model_probability") or 0.0)>=MODEL_FIRST_MIN_AVG_PROBABILITY
+                and float(secondary_metrics.get("avg_model_probability") or 0.0)>=secondary_avg_threshold
                 and secondary_combined>=active_min_combined_odds()
                 and secondary_roi>=RESULTS_FIRST_MIN_EXPECTED_ROI
             ):
@@ -3166,7 +3185,8 @@ def build_value_batches(candidates):
                     "secondary_expected_roi":round(secondary_roi,6),
                     "secondary_kickoff_span_minutes":round(secondary_span,1),
                     "secondary_max_kickoff_span_minutes":MODEL_FIRST_MAX_KICKOFF_SPAN_MINUTES,
-                    "secondary_min_avg_model_probability":MODEL_FIRST_MIN_AVG_PROBABILITY,
+                    "secondary_min_avg_model_probability":secondary_avg_threshold,
+                    "secondary_efootball_value_lane":secondary_is_efootball,
                     "capacity":_batch_capacity_diagnostic(secondary_pool),
                     "construction_shape_diagnostics":construction_shapes,
                     "ranking_metric":"whole-ticket model probability first, exact current edge second, odds as hard reachability constraint"
