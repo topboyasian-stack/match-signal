@@ -36,6 +36,8 @@ EFOOTBALL_DIRECTION_MIN_HOLDOUT_ROWS=30
 EFOOTBALL_DIRECTION_MIN_RECENT_ROWS=30
 EFOOTBALL_DIRECTION_MIN_HIT_RATE=0.65
 EFOOTBALL_DIRECTION_RECENT_WINDOW=50
+EFOOTBALL_DESK_LEARNING_MIN_CALIBRATION_N=30
+EFOOTBALL_DESK_LEARNING_PATH="efootball_desk_learning.json"
 
 def load(name, default):
     try:
@@ -306,7 +308,13 @@ def build_efootball_directional_gate(eval_art, history):
         except (TypeError,ValueError):
             continue
         report=(line_map or {}).get(str(line)) if isinstance(line_map,dict) else None
-        poisson=(report or {}).get("poisson") if isinstance(report,dict) else None
+        # Prefer the participant-aware holdout variant when it exists; this
+        # is the same time-safe model family used for the eFootball desk.
+        poisson=(report or {}).get("participant_model") if isinstance(report,dict) else None
+        if not isinstance(poisson,dict):
+            poisson=(report or {}).get("efootball_shape") if isinstance(report,dict) else None
+        if not isinstance(poisson,dict):
+            poisson=(report or {}).get("poisson") if isinstance(report,dict) else None
         if not isinstance(poisson,dict):
             continue
         arr=sorted(by_key.get((line,side),[]), key=lambda x: x.get("timestamp") or datetime.min.replace(tzinfo=timezone.utc))
@@ -439,6 +447,8 @@ def build_virtual_events(history, lifecycle, eligibility):
         )
 
     directional_gate=build_efootball_directional_gate(eval_art, history)
+    desk_learning=load(EFOOTBALL_DESK_LEARNING_PATH,{})
+    desk_learning_calibration=(desk_learning.get("calibration") or {}) if isinstance(desk_learning,dict) else {}
 
     # Fit one stable lambda per product from the latest settled history.
     # Never recompute the grid separately for every fixture/market.
@@ -522,28 +532,85 @@ def build_virtual_events(history, lifecycle, eligibility):
                 market_over=inv_over/total_inv
                 market_under=inv_under/total_inv
 
-            # Same product-wide Poisson baseline used by the Virtual Lab evaluator.
-            lam=float(product_lambdas.get(product,2.5))
-            k=max(0,math.floor(line))
-            pmf=math.exp(-lam); cdf=pmf
-            for i in range(1,k+1):
-                pmf*=lam/i; cdf+=pmf
-            over=clamp(1-cdf)
-            under=clamp(1-over)
-
-            # Base model probability; participant enhancement is reported separately
-            # and never required for the base qualification gate.
-            model_prob=over
-            if market_over is not None and market_under is not None:
-                chosen_pick="over" if over>=under else "under"
-                chosen_model=model_prob if chosen_pick=="over" else under
-                chosen_market=market_over if chosen_pick=="over" else market_under
-                edge=chosen_model-chosen_market
-            else:
-                chosen_pick="over" if over>=under else "under"
-                chosen_model=model_prob if chosen_pick=="over" else under
-                chosen_market=None
-                edge=None
+            # Use the same time-safe walk-forward eFootball model family as
+            # scripts/virtual_lab_model_eval.py. The current SportyBet quote is
+            # used only to fit the event-level line-ladder Poisson anchor; all
+            # historical shape/participant learning is strictly pre-event.
+            over=under=None
+            validated_over=validated_under=None
+            validated_meta={}
+            try:
+                from virtual_lab_model_eval import build_events as _build_vl_events, fit_lambda as _fit_vl_lambda, probs as _vl_probs
+                historical_events=_build_vl_events(history)
+                prior_events=[h_event for h_event in historical_events if ts(h_event.get("timestamp")) < start.timestamp()]
+                market_rows=[]
+                if market_over is not None:
+                    market_rows.append({"line":float(line),"model_prob":float(market_over),"selection":"over","win":None})
+                if market_under is not None:
+                    market_rows.append({"line":float(line),"model_prob":float(market_under),"selection":"under","win":None})
+                current_lambda=_fit_vl_lambda([
+                    (float(line), float(market_over))
+                ]) if market_over is not None else None
+                if current_lambda is None:
+                    current_lambda=float(product_lambdas.get(product,2.5))
+                current_event={
+                    "key":f"desk|{e.get('event_id')}|{line}",
+                    "event_id":str(e.get("event_id") or ""),
+                    "timestamp":start.isoformat(),
+                    "product":product,
+                    "competition":competition,
+                    "home":home,
+                    "away":away,
+                    "rows":market_rows,
+                    "total":None,
+                    "lambda":current_lambda,
+                }
+                for side,mp in (("over",market_over),("under",market_under)):
+                    if mp is None:
+                        continue
+                    row={"line":float(line),"model_prob":float(mp),"selection":side,"win":None}
+                    result=_vl_probs(prior_events,current_event,row)
+                    if side=="over":
+                        validated_over=float(result[4])
+                    else:
+                        validated_under=float(result[4])
+                    validated_meta[side]={
+                        "market_probability":result[0],
+                        "poisson_probability":result[1],
+                        "product_prior_probability":result[2],
+                        "efootball_shape_probability":result[5],
+                        "participant_model_probability":result[4],
+                        "participant_history_n":result[5],
+                        "efootball_shape_n":result[7],
+                        "efootball_shape_weight":result[8],
+                    }
+            except Exception as exc:
+                validated_meta={"error":str(exc)[:240]}
+            if validated_over is None or validated_under is None:
+                lam=float(product_lambdas.get(product,2.5))
+                k=max(0,math.floor(line))
+                pmf=math.exp(-lam); cdf=pmf
+                for i in range(1,k+1):
+                    pmf*=lam/i; cdf+=pmf
+                fallback_over=clamp(1-cdf)
+                validated_over=validated_over if validated_over is not None else fallback_over
+                validated_under=validated_under if validated_under is not None else clamp(1-fallback_over)
+                validated_meta["fallback"]="product_lambda"
+            over=clamp(validated_over)
+            under=clamp(validated_under)
+            chosen_pick="over" if over>=under else "under"
+            chosen_model=over if chosen_pick=="over" else under
+            chosen_market=market_over if chosen_pick=="over" else market_under
+            # Desk-specific calibration is deliberately a second-stage correction:
+            # it only activates after enough prior settled desk forecasts exist.
+            raw_chosen_model=chosen_model
+            bucket_key=str(min(0.95,max(0.50,(math.floor(chosen_model/0.05)*0.05)))).rstrip("0").rstrip(".")
+            bucket=(desk_learning_calibration.get("buckets") or {}).get(bucket_key,{})
+            if bool(desk_learning_calibration.get("active")) and int(bucket.get("n") or 0)>=EFOOTBALL_DESK_LEARNING_MIN_CALIBRATION_N:
+                calibrated=num(bucket.get("calibrated_probability"))
+                if calibrated is not None:
+                    chosen_model=clamp(calibrated)
+            edge=chosen_model-chosen_market if chosen_market is not None else None
 
             comp_key=competition.casefold()
             active_comp=comp_key in product_active_comp.get(product,set())
@@ -608,6 +675,15 @@ def build_virtual_events(history, lifecycle, eligibility):
                 "pick":chosen_pick,
                 "probability":round(chosen_model,4),
                 "probabilities":{"over":round(over,4),"under":round(under,4)},
+                "raw_model_probability":round(raw_chosen_model,4),
+                "validated_model_family":"walk_forward_efootball_participant_model",
+                "validated_model_over_probability":round(over,4),
+                "validated_model_under_probability":round(under,4),
+                "validated_model_components":validated_meta,
+                "desk_learning_active":bool(desk_learning_calibration.get("active")),
+                "desk_learning_settled_n":int(desk_learning_calibration.get("settled_predictions") or 0),
+                "desk_learning_bucket":bucket_key,
+                "desk_calibrated_probability":round(chosen_model,4),
                 "market_reference_probability":round(chosen_market,4) if chosen_market is not None else None,
                 "model_edge_vs_market":round(edge,4) if edge is not None else None,
                 "model_fair_odds":round(1/chosen_model,3) if chosen_model else None,
@@ -620,7 +696,13 @@ def build_virtual_events(history, lifecycle, eligibility):
                 "market_odds_timestamp":e.get("timestamp") or e.get("captured_at") or live.get("updated_at"),
                 "prediction_status":"betting_qualified_paper" if qualified else "research_projection",
                 "projection_tier":"deep_research_projection",
-                "evidence_depth":"participant_lifecycle_plus_base_model" if participant_history>=3 else "feed_discovered_base_model",
+                "evidence_depth":(
+                    "desk_calibrated_walk_forward_participant_model"
+                    if desk_learning_calibration.get("active")
+                    else ("walk_forward_participant_model_plus_exact_direction" if directional.get("pass") else
+                          ("walk_forward_participant_model" if validated_meta else
+                           ("participant_lifecycle_plus_base_model" if participant_history>=3 else "feed_discovered_base_model")))
+                ),
                 "participant_status":participant_status,
                 "participant_history_rows":participant_history,
                 "participant_hot_watch":participant_hot,
@@ -642,8 +724,8 @@ def build_virtual_events(history, lifecycle, eligibility):
                 "betting_qualified":qualified,
                 "qualified_for_builder":qualified,
                 "qualification_engine":"Virtual Lab base walk-forward gate + model-qualified line + current SportyBet edge + competition evidence OR validated product-bootstrap evidence OR exact line/direction holdout + recent evidence",
-                "model":"Virtual Lab base O/U model",
-                "model_version":"VL-BOARD-2.0",
+                "model":"Virtual Lab walk-forward eFootball participant model",
+                "model_version":"VL-EFOOTBALL-WF-3.0",
                 "paper_only":True,
                 "identity_verified":bool(home and away),
             })
