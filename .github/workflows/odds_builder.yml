@@ -51,8 +51,9 @@ permissions:
 
 concurrency:
   group: match-signal-odds-builder
-  # A newer Builder run must replace an older network-stalled run.
-  cancel-in-progress: true
+  # Let an active Builder finish; newer pending runs can supersede older
+  # pending work without killing the live data/qualification pass.
+  cancel-in-progress: false
 
 jobs:
   build:
