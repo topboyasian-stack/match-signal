@@ -578,7 +578,7 @@ def build_virtual_events(history, lifecycle, eligibility):
                         "market_probability":result[0],
                         "poisson_probability":result[1],
                         "product_prior_probability":result[2],
-                        "efootball_shape_probability":result[5],
+                        "efootball_shape_probability":result[6],
                         "participant_model_probability":result[4],
                         "participant_history_n":result[5],
                         "efootball_shape_n":result[7],
