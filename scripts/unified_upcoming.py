@@ -450,6 +450,22 @@ def build_virtual_events(history, lifecycle, eligibility):
     desk_learning=load(EFOOTBALL_DESK_LEARNING_PATH,{})
     desk_learning_calibration=(desk_learning.get("calibration") or {}) if isinstance(desk_learning,dict) else {}
 
+    # Build the chronological Virtual Lab event history once per board refresh.
+    # Reusing it for every current eFootball market keeps the five-minute desk
+    # refresh bounded while preserving strict pre-event information flow.
+    validated_history_events=[]
+    validated_vl_probs=None
+    validated_fit_lambda=None
+    try:
+        from virtual_lab_model_eval import build_events as _build_vl_events, fit_lambda as _fit_vl_lambda, probs as _vl_probs
+        validated_history_events=_build_vl_events(history)
+        validated_vl_probs=_vl_probs
+        validated_fit_lambda=_fit_vl_lambda
+    except Exception:
+        validated_history_events=[]
+        validated_vl_probs=None
+        validated_fit_lambda=None
+
     # Fit one stable lambda per product from the latest settled history.
     # Never recompute the grid separately for every fixture/market.
     product_points={}
@@ -540,15 +556,15 @@ def build_virtual_events(history, lifecycle, eligibility):
             validated_over=validated_under=None
             validated_meta={}
             try:
-                from virtual_lab_model_eval import build_events as _build_vl_events, fit_lambda as _fit_vl_lambda, probs as _vl_probs
-                historical_events=_build_vl_events(history)
-                prior_events=[h_event for h_event in historical_events if ts(h_event.get("timestamp")) < start.timestamp()]
+                if validated_vl_probs is None or validated_fit_lambda is None:
+                    raise RuntimeError("validated walk-forward model helpers unavailable")
+                prior_events=[h_event for h_event in validated_history_events if ts(h_event.get("timestamp")) < start.timestamp()]
                 market_rows=[]
                 if market_over is not None:
                     market_rows.append({"line":float(line),"model_prob":float(market_over),"selection":"over","win":None})
                 if market_under is not None:
                     market_rows.append({"line":float(line),"model_prob":float(market_under),"selection":"under","win":None})
-                current_lambda=_fit_vl_lambda([
+                current_lambda=validated_fit_lambda([
                     (float(line), float(market_over))
                 ]) if market_over is not None else None
                 if current_lambda is None:
@@ -569,7 +585,7 @@ def build_virtual_events(history, lifecycle, eligibility):
                     if mp is None:
                         continue
                     row={"line":float(line),"model_prob":float(mp),"selection":side,"win":None}
-                    result=_vl_probs(prior_events,current_event,row)
+                    result=validated_vl_probs(prior_events,current_event,row)
                     if side=="over":
                         validated_over=float(result[4])
                     else:
