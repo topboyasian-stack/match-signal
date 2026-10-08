@@ -17,6 +17,7 @@ on:
     paths:
       - 'scripts/unified_upcoming.py'
       - 'scripts/selection_candidate_collector.py'
+      - 'scripts/efootball_desk_learning.py'
       - 'scripts/unified_upcoming_cleanup.py'
       - 'scripts/system_health_audit.py'
       - 'data/virtual_lab_participant_lifecycle.json'
@@ -56,7 +57,9 @@ jobs:
           git fetch origin main
           git reset --hard origin/main
       - name: Compile unified engines
-        run: python -m py_compile scripts/unified_upcoming.py scripts/unified_upcoming_cleanup.py scripts/selection_candidate_collector.py scripts/system_health_audit.py scripts/predict_today.py
+        run: python -m py_compile scripts/unified_upcoming.py scripts/unified_upcoming_cleanup.py scripts/selection_candidate_collector.py scripts/efootball_desk_learning.py scripts/system_health_audit.py scripts/predict_today.py
+      - name: Learn from prior eFootball desk forecasts before rebuilding the board
+        run: python scripts/efootball_desk_learning.py
       - name: Build unified upcoming board
         run: python scripts/unified_upcoming.py
       - name: Remove retired sports from the user-facing board
@@ -70,7 +73,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/unified_upcoming.json data/selection_candidates.json data/selection_candidate_status.json data/system_health.json
+          git add data/unified_upcoming.json data/selection_candidates.json data/selection_candidate_status.json data/system_health.json data/efootball_desk_learning.json data/efootball_desk_prediction_history.json
           if git diff --cached --quiet; then
             echo "Unified board already current."
             exit 0
@@ -86,8 +89,9 @@ jobs:
             python scripts/unified_upcoming.py
             python scripts/unified_upcoming_cleanup.py
             python scripts/selection_candidate_collector.py
+            python scripts/efootball_desk_learning.py
             python scripts/system_health_audit.py
-            git add data/unified_upcoming.json data/selection_candidates.json data/selection_candidate_status.json data/system_health.json
+            git add data/unified_upcoming.json data/selection_candidates.json data/selection_candidate_status.json data/system_health.json data/efootball_desk_learning.json data/efootball_desk_prediction_history.json
             if git diff --cached --quiet; then exit 0; fi
             git commit -m "🤖 Refresh unified upcoming board"
           done
