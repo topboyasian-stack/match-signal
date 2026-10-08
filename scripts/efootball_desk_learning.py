@@ -79,7 +79,7 @@ def participant_identity(row, keys):
         if row.get(key):
             value = str(row.get(key)).strip()
             break
-    embedded = re.search(r"\(([^()]*)\)\\s*$", value)
+    embedded = re.search(r"\(([^()]*)\)\s*$", value)
     if embedded and embedded.group(1).strip():
         value = embedded.group(1).strip()
     return " ".join(re.sub(r"[^a-z0-9]+", " ", value.lower()).split())
