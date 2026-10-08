@@ -3013,7 +3013,7 @@ def build_value_batches(candidates):
                 "target_combined_odds":TARGET_COMBINED_ODDS,
                 "accuracy_preservation_ratio":ACCURACY_PRESERVATION_RATIO,
                 "construction_priority":"mixed_vfootball_efootball_research",
-                "priority_product":"mixed",
+                "priority_product":secondary_lane,
                 "max_legs":MIXED_RESEARCH_MAX_LEGS,
                 "adaptive_leg_counts":[2,3,4],
                 "per_leg_min_model_probability":LEG_COUNT_MIN_MODEL_PROBABILITY,
@@ -3286,30 +3286,42 @@ def build_value_batches(candidates):
             # Require non-negative single-leg raw EV in the paper value lane.
             and float(x.get("expected_value") or 0.0) >= 0.0
         ]
-        secondary_is_efootball=bool(secondary_pool) and all(
-            str(x.get("product") or "").startswith("efootball_")
-            for x in secondary_pool
-        )
+        # Keep eFootball on its exact-evidence constructor even when the broader
+        # secondary pool also contains football/tennis candidates. Previously,
+        # "all(...)" made a mixed pool fall into the generic constructor, which
+        # could bypass eFootball participant-correlation and exact-line controls.
+        efootball_secondary_pool=[
+            x for x in secondary_pool
+            if str(x.get("product") or "").startswith("efootball_")
+        ]
+        non_efootball_secondary_pool=[
+            x for x in secondary_pool
+            if not str(x.get("product") or "").startswith("efootball_")
+        ]
         efootball_constructor_diag={"shape":None,"candidate_count":0,"combined_odds":None,"combined_probability":None,"roi":None,"span_minutes":None,"search_mode":"not_run"}
-        if secondary_is_efootball:
+        secondary_batch=[]
+        secondary_lane="none"
+        secondary_avg_threshold=MODEL_FIRST_MIN_AVG_PROBABILITY
+        if efootball_secondary_pool:
             secondary_batch,efootball_constructor_diag=_construct_efootball_value_batch(
-                secondary_pool,
+                efootball_secondary_pool,
                 min_odds=active_min_combined_odds(),
                 max_legs=RESULTS_FIRST_MAX_LEGS
             )
-        else:
+            if secondary_batch:
+                secondary_lane="efootball_exact_evidence_value"
+                secondary_avg_threshold=EFOOTBALL_VALUE_MIN_AVG_PROBABILITY
+        # Only use the generic constructor for genuinely non-eFootball candidates.
+        if not secondary_batch and non_efootball_secondary_pool:
             secondary_batch=_construct_model_first_batch(
-                secondary_pool,
+                non_efootball_secondary_pool,
                 max_legs=RESULTS_FIRST_MAX_LEGS,
                 min_odds=active_min_combined_odds(),
                 min_leg_probability=MIN_SAFE_LEG_MODEL_PROBABILITY
             )
-        secondary_avg_threshold=(
-            EFOOTBALL_VALUE_MIN_AVG_PROBABILITY
-            if secondary_is_efootball
-            else MODEL_FIRST_MIN_AVG_PROBABILITY
-        )
-        if secondary_is_efootball:
+            if secondary_batch:
+                secondary_lane="model_first_value"
+        if secondary_lane=="efootball_exact_evidence_value":
             secondary_batch=[
                 x for x in secondary_batch
                 if float(x.get("model_probability") or 0.0)>=EFOOTBALL_VALUE_MIN_LEG_PROBABILITY
@@ -3345,7 +3357,7 @@ def build_value_batches(candidates):
                     "avg_model_probability":secondary_metrics["avg_model_probability"],
                     "avg_model_edge_percent":secondary_metrics["avg_model_edge_percent"],
                     "products":sorted({str(x.get("product") or "") for x in secondary_batch if x.get("product")}),
-                    "primary_lane":"model_first_value",
+                    "primary_lane":secondary_lane,
                     "paper_only":True,
                     "real_money_execution":False,
                     "correlation_policy":"same-event and participant reuse prevented; all legs independently Builder-eligible",
@@ -3368,15 +3380,18 @@ def build_value_batches(candidates):
                     "used_unique_events":len({str(x.get("event_id") or "") for x in secondary_batch if x.get("event_id")}),
                     "eligible_results_first_legs":len(eligible_results),
                     "secondary_pool_eligible_legs":len(secondary_pool),
+                    "secondary_efootball_pool_eligible_legs":len(efootball_secondary_pool),
+                    "secondary_non_efootball_pool_eligible_legs":len(non_efootball_secondary_pool),
+                    "secondary_lane":secondary_lane,
                     "secondary_expected_roi":round(secondary_roi,6),
                     "secondary_kickoff_span_minutes":round(secondary_span,1),
                     "secondary_max_kickoff_span_minutes":MODEL_FIRST_MAX_KICKOFF_SPAN_MINUTES,
                     "secondary_min_avg_model_probability":secondary_avg_threshold,
-                    "secondary_efootball_value_lane":secondary_is_efootball,
+                    "secondary_efootball_value_lane":secondary_lane=="efootball_exact_evidence_value",
                     "secondary_efootball_constructor_diagnostics":efootball_constructor_diag,
                     "secondary_ticket_calibration_mode":(
                         "efootball_exact_evidence_independence_proxy"
-                        if secondary_is_efootball
+                        if secondary_lane=="efootball_exact_evidence_value"
                         else "historical_settled_ticket_gamma"
                     ),
                     "capacity":_batch_capacity_diagnostic(secondary_pool),
