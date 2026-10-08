@@ -2051,6 +2051,86 @@ def _batch_capacity_diagnostic(eligible_pool):
         "target_reachable_with_current_gates":relaxed_product>=active_min_combined_odds(),
     }
 
+
+def _construct_efootball_value_batch(pool, min_odds=None, max_legs=RESULTS_FIRST_MAX_LEGS):
+    """Deterministically construct the strongest exact-evidence eFootball value batch.
+
+    This lane is explicitly research-only: every leg uses exact product+line+side
+    evidence calibration at the 65% floor. It scans 2-leg pairs first because that
+    preserves the highest joint probability; 3/4 legs are considered only when a
+    shorter construction cannot reach the active odds floor.
+    """
+    if min_odds is None:
+        min_odds=active_min_combined_odds()
+    rows=[
+        x for x in pool
+        if str(x.get("qualification_lane") or "")=="efootball_exact_evidence_value"
+        and str(x.get("product") or "").startswith("efootball_")
+        and float(x.get("model_probability") or 0.0)>=EFOOTBALL_VALUE_MIN_LEG_PROBABILITY
+        and float(x.get("expected_value") or 0.0)>=0.0
+        and x.get("builder_eligible") is True
+    ]
+    rows=sorted(rows,key=lambda x:(
+        -float(x.get("model_probability") or 0.0),
+        -float(x.get("evidence_score") or 0.0),
+        -float(x.get("model_edge") or 0.0),
+        -float(x.get("bookmaker_odds") or 1.0),
+        _kickoff_timestamp(x) if _kickoff_timestamp(x) is not None else float("inf")
+    ))
+    import itertools
+    for shape in range(2,min(RESULTS_FIRST_MAX_LEGS,int(max_legs))+1):
+        # Pair scan is exhaustive. Larger shapes use a bounded high-quality
+        # frontier because pair opportunities normally reach the odds floor.
+        frontier=rows if shape==2 else rows[:50]
+        best=None
+        for combo in itertools.combinations(frontier,shape):
+            if any(float(x.get("model_probability") or 0.0)<EFOOTBALL_VALUE_MIN_LEG_PROBABILITY for x in combo):
+                continue
+            event_ids=[str(x.get("event_id") or "") for x in combo if x.get("event_id")]
+            if len(event_ids)!=len(set(event_ids)):
+                continue
+            participants=[p for row in combo for p in _participants(row)]
+            if len(participants)!=len(set(participants)):
+                continue
+            span=_batch_kickoff_span_minutes(combo)
+            if span>MODEL_FIRST_MAX_KICKOFF_SPAN_MINUTES:
+                continue
+            odds=math.prod(float(x.get("bookmaker_odds") or 1.0) for x in combo)
+            if odds<min_odds:
+                continue
+            metrics=_batch_metrics(list(combo))
+            roi=(float(metrics.get("combined_model_probability") or 0.0)*odds)-1.0
+            if roi<RESULTS_FIRST_MIN_EXPECTED_ROI:
+                continue
+            score=(
+                float(metrics.get("combined_model_probability") or 0.0),
+                float(metrics.get("avg_model_edge_percent") or 0.0),
+                roi,
+                odds,
+                -span
+            )
+            if best is None or score>best[0]:
+                best=(score,list(combo),metrics,odds,span)
+        if best is not None:
+            return best[1],{
+                "shape":shape,
+                "candidate_count":len(rows),
+                "combined_odds":round(float(best[3]),3),
+                "combined_probability":best[2].get("combined_model_probability"),
+                "roi":round((float(best[2].get("combined_model_probability") or 0.0)*best[3])-1.0,6),
+                "span_minutes":round(float(best[4]),1),
+                "search_mode":"exhaustive_pairs_then_bounded_larger_shapes"
+            }
+    return [],{
+        "shape":None,
+        "candidate_count":len(rows),
+        "combined_odds":None,
+        "combined_probability":None,
+        "roi":None,
+        "span_minutes":None,
+        "search_mode":"no_valid_shape"
+    }
+
 def _construct_model_first_batch(
     pool,
     max_legs=MAX_LEGS,
@@ -3206,23 +3286,24 @@ def build_value_batches(candidates):
             # Require non-negative single-leg raw EV in the paper value lane.
             and float(x.get("expected_value") or 0.0) >= 0.0
         ]
-        secondary_batch=_construct_model_first_batch(
-            secondary_pool,
-            max_legs=RESULTS_FIRST_MAX_LEGS,
-            min_odds=active_min_combined_odds(),
-            min_leg_probability=(
-                EFOOTBALL_VALUE_MIN_LEG_PROBABILITY
-                if all(
-                    str(x.get("product") or "").startswith("efootball_")
-                    for x in secondary_pool
-                )
-                else MIN_SAFE_LEG_MODEL_PROBABILITY
-            )
-        )
         secondary_is_efootball=bool(secondary_pool) and all(
             str(x.get("product") or "").startswith("efootball_")
             for x in secondary_pool
         )
+        efootball_constructor_diag={"shape":None,"candidate_count":0,"combined_odds":None,"combined_probability":None,"roi":None,"span_minutes":None,"search_mode":"not_run"}
+        if secondary_is_efootball:
+            secondary_batch,efootball_constructor_diag=_construct_efootball_value_batch(
+                secondary_pool,
+                min_odds=active_min_combined_odds(),
+                max_legs=RESULTS_FIRST_MAX_LEGS
+            )
+        else:
+            secondary_batch=_construct_model_first_batch(
+                secondary_pool,
+                max_legs=RESULTS_FIRST_MAX_LEGS,
+                min_odds=active_min_combined_odds(),
+                min_leg_probability=MIN_SAFE_LEG_MODEL_PROBABILITY
+            )
         secondary_avg_threshold=(
             EFOOTBALL_VALUE_MIN_AVG_PROBABILITY
             if secondary_is_efootball
@@ -3292,6 +3373,7 @@ def build_value_batches(candidates):
                     "secondary_max_kickoff_span_minutes":MODEL_FIRST_MAX_KICKOFF_SPAN_MINUTES,
                     "secondary_min_avg_model_probability":secondary_avg_threshold,
                     "secondary_efootball_value_lane":secondary_is_efootball,
+                    "secondary_efootball_constructor_diagnostics":efootball_constructor_diag,
                     "secondary_ticket_calibration_mode":(
                         "efootball_exact_evidence_independence_proxy"
                         if secondary_is_efootball
@@ -3326,6 +3408,7 @@ def build_value_batches(candidates):
             secondary_pool,
             min_odds=active_min_combined_odds()
         ),
+        "secondary_efootball_constructor_diagnostics":efootball_constructor_diag,
         "mixed_pool_eligible_legs":sum(1 for x in eligible_all if str(x.get("qualification_lane") or "") in {"vfootball_exact_evidence_value","vfootball_event_holdout_value","efootball_exact_evidence_value"}),
         "mixed_max_kickoff_span_minutes":MIXED_RESEARCH_MAX_KICKOFF_SPAN_MINUTES,
         "mixed_diagnostics":mixed_diag,
