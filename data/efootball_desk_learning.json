@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-08T22:32:21.406906+00:00",
+  "generated_at": "2026-10-08T22:45:44.302794+00:00",
   "mode": "PAPER_ONLY",
   "active": false,
   "policy": {
@@ -9,19 +9,111 @@
     "recent_window": 50,
     "future_leakage_protection": "only observations strictly before kickoff can become the scored forecast; settlement is read from independent virtual_lab_history"
   },
-  "settled_predictions": 0,
-  "pending_forecasts": 3440,
+  "settled_predictions": 9,
+  "pending_forecasts": 3457,
   "recent_window": {
-    "n": 0,
-    "accuracy": 0.0,
-    "brier": null
+    "n": 9,
+    "accuracy": 0.6666666666666666,
+    "brier": 0.30799040777777775
   },
   "calibration": {
     "active": false,
-    "settled_predictions": 0,
-    "buckets": {}
+    "settled_predictions": 9,
+    "buckets": {
+      "0.5": {
+        "n": 3,
+        "wins": 3,
+        "brier": 0.64005483,
+        "accuracy": 1.0,
+        "avg_brier": 0.21335161,
+        "posterior_probability": 0.6363636363636364,
+        "calibrated_probability": 0.512396694214876
+      },
+      "0.6": {
+        "n": 1,
+        "wins": 0,
+        "brier": 0.38738175999999996,
+        "accuracy": 0.0,
+        "avg_brier": 0.38738175999999996,
+        "posterior_probability": 0.4444444444444444,
+        "calibrated_probability": 0.5949820788530467
+      },
+      "0.75": {
+        "n": 1,
+        "wins": 1,
+        "brier": 0.05875775999999998,
+        "accuracy": 1.0,
+        "avg_brier": 0.05875775999999998,
+        "posterior_probability": 0.5555555555555556,
+        "calibrated_probability": 0.7437275985663082
+      },
+      "0.95": {
+        "n": 1,
+        "wins": 0,
+        "brier": 0.9242899600000001,
+        "accuracy": 0.0,
+        "avg_brier": 0.9242899600000001,
+        "posterior_probability": 0.4444444444444444,
+        "calibrated_probability": 0.9336917562724014
+      },
+      "0.85": {
+        "n": 2,
+        "wins": 1,
+        "brier": 0.7554695200000001,
+        "accuracy": 0.5,
+        "avg_brier": 0.37773476000000006,
+        "posterior_probability": 0.5,
+        "calibrated_probability": 0.828125
+      },
+      "0.9": {
+        "n": 1,
+        "wins": 1,
+        "brier": 0.005959840000000007,
+        "accuracy": 1.0,
+        "avg_brier": 0.005959840000000007,
+        "posterior_probability": 0.5555555555555556,
+        "calibrated_probability": 0.8888888888888888
+      }
+    }
   },
-  "exact_selection": {},
+  "exact_selection": {
+    "5.5|over": {
+      "n": 3,
+      "wins": 3,
+      "accuracy": 1.0,
+      "posterior_probability": 0.6363636363636364
+    },
+    "6.5|under": {
+      "n": 1,
+      "wins": 0,
+      "accuracy": 0.0,
+      "posterior_probability": 0.4444444444444444
+    },
+    "7.5|under": {
+      "n": 1,
+      "wins": 1,
+      "accuracy": 1.0,
+      "posterior_probability": 0.5555555555555556
+    },
+    "10.5|under": {
+      "n": 1,
+      "wins": 0,
+      "accuracy": 0.0,
+      "posterior_probability": 0.4444444444444444
+    },
+    "8.5|under": {
+      "n": 2,
+      "wins": 1,
+      "accuracy": 0.5,
+      "posterior_probability": 0.5
+    },
+    "9.5|under": {
+      "n": 1,
+      "wins": 1,
+      "accuracy": 1.0,
+      "posterior_probability": 0.5555555555555556
+    }
+  },
   "trace_artifact": "data/efootball_desk_prediction_history.json",
   "source_settlement": "data/virtual_lab_history.json"
 }
