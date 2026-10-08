@@ -1,40 +1,40 @@
 {
-  "generated_at": "2026-10-08T17:37:32.300334+00:00",
-  "status": "DEGRADED",
-  "critical_issues": 0,
+  "generated_at": "2026-10-08T19:50:36.908969+00:00",
+  "status": "FAIL",
+  "critical_issues": 2,
   "warning_issues": 1,
   "info_issues": 1,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
-      "status": "PASS",
-      "age_hours": 2.07,
+      "status": "STALE",
+      "age_hours": 4.28,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.2,
+      "age_hours": 0.4,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 2.02,
+      "age_hours": 0.41,
       "threshold_hours": 4
     },
     {
       "engine": "unified_upcoming",
       "status": "PASS",
-      "age_hours": 0.0,
+      "age_hours": 0.02,
       "threshold_hours": 2
     },
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 0.06,
+      "age_hours": 2.28,
       "threshold_hours": 0.5,
-      "heartbeat_source": "virtual_lab_live.json"
+      "heartbeat_source": "unified_live_refresh"
     },
     {
       "engine": "retired_engines",
@@ -46,7 +46,7 @@
         },
         "table_tennis_x": {
           "status": "RETIRED",
-          "artifact_at": "2026-10-08T17:34:32.798452+00:00"
+          "artifact_at": "2026-10-08T19:40:46.143547+00:00"
         },
         "basketball": {
           "status": "RETIRED",
@@ -57,6 +57,11 @@
   ],
   "issues": [
     {
+      "code": "STALE_CORE_PREDICTION_PIPELINE",
+      "severity": "critical",
+      "detail": "updated_at age 4.28h exceeds 4h"
+    },
+    {
       "code": "TENNIS_FEED_EMPTY",
       "severity": "warning",
       "detail": "No current tennis predictions are published"
@@ -65,6 +70,11 @@
       "code": "SELECTION_GATE_EMPTY",
       "severity": "info",
       "detail": "Current prediction feed exists but the selected-candidate layer returned zero qualified selections; no gate was weakened"
+    },
+    {
+      "code": "PIPELINE_STALE",
+      "severity": "critical",
+      "detail": "pipeline_status age 4.28h exceeds 4h"
     }
   ],
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
