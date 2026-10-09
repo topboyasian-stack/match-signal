@@ -132,7 +132,9 @@
       lines.push("Cohort note: tracker-wide leg statuses can include legs from still-pending tickets; do not combine that denominator with legs from fully settled tickets.");
     }
     const b = f.odds_builder || {};
-    lines.push("Odds Builder: " + age("odds_builder") + "; " + String(b.status || "unavailable") + ".");
+    lines.push("Odds Builder: " + age("odds_builder") + "; status " + String(b.status || "unavailable") +
+      "; evaluated " + n(b.evaluated_candidates) + ", LIVE_VALUE category " + n(b.live_value_candidates) +
+      ", REJECTED category " + n(b.rejected_candidates) + ".");
     if (Array.isArray(f.flags) && f.flags.length) lines.push("Flags: " + f.flags.join(" "));
     if (h.issue_count_check === "MISMATCH") lines.push("The health artifact's issue counts do not match the severities counted in its issue records.");
     return lines.join("\n");
