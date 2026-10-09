@@ -167,7 +167,7 @@ jobs:
           set -euo pipefail
           rm -rf .pages-deploy
           mkdir -p .pages-deploy
-          rsync -a             --exclude='.git/'             --exclude='.pages-deploy/'             --exclude='node_modules/'             --exclude='data/virtual_lab_history.json'             ./ .pages-deploy/
+          rsync -a             --exclude='.git/'             --exclude='.pages-deploy/'             --exclude='node_modules/'             --exclude='data/virtual_lab_history.json'             --exclude='data/efootball_desk_prediction_history.json'             ./ .pages-deploy/
           gzip -c data/virtual_lab_history.json > .pages-deploy/data/virtual_lab_history.json.gz
           original_bytes=$(stat -c%s data/virtual_lab_history.json)
           compressed_bytes=$(stat -c%s .pages-deploy/data/virtual_lab_history.json.gz)
@@ -177,6 +177,20 @@ jobs:
           test "$compressed_bytes" -lt "$MAX_PAGES_FILE_BYTES"
           test -s .pages-deploy/data/virtual_lab_history.json.gz
           test ! -e .pages-deploy/data/virtual_lab_history.json
+
+          # Preserve the canonical eFootball desk trace in Git, but avoid
+          # uploading its >25 MiB uncompressed form to Pages. No current page
+          # consumes this raw trace; the live desk reads the compact learning
+          # summary. Publish a compressed archival download instead.
+          gzip -c data/efootball_desk_prediction_history.json > .pages-deploy/data/efootball_desk_prediction_history.json.gz
+          desk_original_bytes=$(stat -c%s data/efootball_desk_prediction_history.json)
+          desk_compressed_bytes=$(stat -c%s .pages-deploy/data/efootball_desk_prediction_history.json.gz)
+          echo "Canonical eFootball desk trace (kept in Git): $desk_original_bytes bytes"
+          echo "Compressed eFootball desk archive: $desk_compressed_bytes bytes"
+          test "$desk_original_bytes" -gt "$MAX_PAGES_FILE_BYTES"
+          test "$desk_compressed_bytes" -lt "$MAX_PAGES_FILE_BYTES"
+          test -s .pages-deploy/data/efootball_desk_prediction_history.json.gz
+          test ! -e .pages-deploy/data/efootball_desk_prediction_history.json
           echo "Cloudflare Pages staging passed the 25 MiB single-file limit."
 
       - name: Deploy to Cloudflare Pages
