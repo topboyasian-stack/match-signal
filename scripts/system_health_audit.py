@@ -164,19 +164,56 @@ if prediction_count <= 0:
     checks.append(issue("CORE_PREDICTIONS_EMPTY", "critical", "data/pipeline_status.json reports zero current predictions"))
 if football_count <= 0:
     checks.append(issue("FOOTBALL_FEED_EMPTY", "critical", "No current football predictions are published"))
+def current_future_tennis_rows(rows):
+    found = []
+    for row in rows if isinstance(rows, list) else []:
+        if not isinstance(row, dict) or str(row.get("sport") or "").lower() != "tennis" or row.get("settled"):
+            continue
+        stamp = row.get("start_time") or row.get("date")
+        if not stamp:
+            continue
+        try:
+            start = datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))
+            if start.tzinfo is None:
+                start = start.replace(tzinfo=timezone.utc)
+        except (TypeError, ValueError):
+            continue
+        if start >= NOW:
+            found.append(row)
+    return found
+
+
 if tennis_count <= 0:
-    if int(autopilot_leagues.get("ATP") or 0) > 0 or int(autopilot_leagues.get("WTA") or 0) > 0:
+    published_tennis = current_future_tennis_rows(prediction_rows)
+    watch_tennis = [
+        row for row in published_tennis
+        if str(row.get("prediction_status") or "") == "watch_projection"
+        or str(row.get("qualification_status") or "") == "TENNIS_FORWARD_WATCH_NOT_QUALIFIED"
+    ]
+    if published_tennis and len(watch_tennis) == len(published_tennis):
+        checks.append(issue(
+            "TENNIS_CORE_FEED_EMPTY",
+            "warning",
+            f"Canonical tennis pipeline has zero actionable predictions; {len(watch_tennis)} unqualified ATP forward-window watch projections are published for research only"
+        ))
+    elif published_tennis:
+        checks.append(issue(
+            "TENNIS_PIPELINE_COUNT_MISMATCH",
+            "warning",
+            f"Pipeline status reports zero tennis predictions, but {len(published_tennis)} future tennis rows are present in the published prediction feed"
+        ))
+    elif int(autopilot_leagues.get("ATP") or 0) > 0 or int(autopilot_leagues.get("WTA") or 0) > 0:
         checks.append(
             {
                 "engine": "tennis_desk",
                 "status": "INFO",
-                "detail": "Core pipeline is holding tennis back for lack of actionable singles matches, while the desk itself still has active ATP/WTA rows.",
+                "detail": "Canonical core pipeline has no actionable tennis predictions; separate forward/readiness diagnostics still report active tennis rows.",
                 "autopilot_atp": int(autopilot_leagues.get("ATP") or 0),
                 "autopilot_wta": int(autopilot_leagues.get("WTA") or 0),
             }
         )
     else:
-        checks.append(issue("TENNIS_FEED_EMPTY", "warning", "No current tennis predictions are published"))
+        checks.append(issue("TENNIS_FEED_EMPTY", "warning", "No current tennis predictions or forward-window research rows are published"))
 
 virtual_products = virtual_live.get("product_counts") or {}
 for product in ("efootball_gt", "vfootball"):
