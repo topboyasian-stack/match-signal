@@ -14,6 +14,7 @@ on:
       - 'functions/_shared/analyst.mjs'
       - 'functions/api/analyst/**'
       - 'scripts/test_analyst_module.mjs'
+      - 'scripts/test_analyst_routes.mjs'
   push:
     branches: [main, ai-analyst-foundation]
     paths:
@@ -23,6 +24,7 @@ on:
       - 'scripts/test_user_ticket_review.py'
       - '.github/workflows/ai-analyst-foundation-tests.yml'
       - 'scripts/test_analyst_module.mjs'
+      - 'scripts/test_analyst_routes.mjs'
       - 'functions/api/analyst/**'
       - 'functions/_shared/analyst.mjs'
       - 'analyst.js'
@@ -54,6 +56,8 @@ jobs:
           node-version: '22'
       - name: Run private analyst module tests
         run: node scripts/test_analyst_module.mjs
+      - name: Run protected API route tests
+        run: node scripts/test_analyst_routes.mjs
       - name: Check analyst JavaScript syntax
         run: |
           node --check analyst.js
