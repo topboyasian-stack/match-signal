@@ -1,0 +1,38 @@
+name: AI Analyst Foundation Tests
+
+on:
+  pull_request:
+    paths:
+      - 'docs/AI_ANALYST_UPGRADE.md'
+      - 'schemas/user-ticket-review.schema.json'
+      - 'scripts/audit_user_ticket_review.py'
+      - 'scripts/test_user_ticket_review.py'
+      - '.github/workflows/ai-analyst-foundation-tests.yml'
+  push:
+    branches: [main, ai-analyst-foundation]
+    paths:
+      - 'docs/AI_ANALYST_UPGRADE.md'
+      - 'schemas/user-ticket-review.schema.json'
+      - 'scripts/audit_user_ticket_review.py'
+      - 'scripts/test_user_ticket_review.py'
+      - '.github/workflows/ai-analyst-foundation-tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-private-evidence-foundation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate JSON Schema syntax
+        run: python -m json.tool schemas/user-ticket-review.schema.json > /dev/null
+      - name: Run O/U line and evidence tests
+        run: python scripts/test_user_ticket_review.py

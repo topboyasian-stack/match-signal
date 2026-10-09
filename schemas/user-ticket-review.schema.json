@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://match-signal.pages.dev/schemas/user-ticket-review.schema.json",
+  "title": "Match Signal private user ticket review",
+  "description": "Private evidence input only. Do not commit populated records to the public repository or publish them as static assets.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "record_type", "mode", "updated_at", "tickets"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "record_type": { "const": "private_user_ticket_review" },
+    "mode": { "const": "PRIVATE_USER_EVIDENCE" },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "tickets": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/ticket" }
+    }
+  },
+  "$defs": {
+    "ticket": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ticket_ref", "captured_at", "reported_ticket_outcome", "legs"],
+      "properties": {
+        "ticket_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "description": "An internal, non-identifying reference. Do not use a sportsbook ticket ID or verification code."
+        },
+        "captured_at": { "type": "string", "format": "date-time" },
+        "reported_ticket_outcome": { "enum": ["PENDING", "WON", "LOST", "VOID"] },
+        "stake": { "type": "number", "minimum": 0 },
+        "total_odds": { "type": "number", "exclusiveMinimum": 1 },
+        "total_return": { "type": "number", "minimum": 0 },
+        "currency": { "type": "string", "default": "NGN", "maxLength": 8 },
+        "legs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/leg" }
+        }
+      }
+    },
+    "selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["market", "pick", "line", "odds"],
+      "properties": {
+        "market": { "const": "total_goals_over_under" },
+        "pick": { "enum": ["over", "under"] },
+        "line": { "type": "number", "minimum": 0 },
+        "odds": { "type": "number", "exclusiveMinimum": 1 }
+      }
+    },
+    "desk_snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["market", "pick", "line", "captured_at"],
+      "properties": {
+        "prediction_id": { "type": "string", "maxLength": 160 },
+        "model_version": { "type": "string", "maxLength": 100 },
+        "market": { "const": "total_goals_over_under" },
+        "pick": { "enum": ["over", "under"] },
+        "line": { "type": "number", "minimum": 0 },
+        "odds": { "type": "number", "exclusiveMinimum": 1 },
+        "model_probability": { "type": "number", "minimum": 0, "maximum": 1 },
+        "captured_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "score": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["home", "away"],
+      "properties": {
+        "home": { "type": "number", "minimum": 0 },
+        "away": { "type": "number", "minimum": 0 }
+      }
+    },
+    "leg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["leg_ref", "product", "match", "actual_selection"],
+      "properties": {
+        "leg_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[A-Za-z0-9_-]+$"
+        },
+        "product": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "competition": { "type": "string", "maxLength": 120 },
+        "match": { "type": "string", "minLength": 1, "maxLength": 240 },
+        "event_id": { "type": "string", "maxLength": 160 },
+        "kickoff_at": { "type": "string", "format": "date-time" },
+        "desk_snapshot": { "$ref": "#/$defs/desk_snapshot" },
+        "actual_selection": { "$ref": "#/$defs/selection" },
+        "final_score": { "$ref": "#/$defs/score" },
+        "settled_at": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}
