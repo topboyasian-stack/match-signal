@@ -7,6 +7,7 @@ import {
   extractJsonObject,
   summarizeReviewDocument,
   summarizeDiagnosticFacts,
+  sanitizeAnalystAnswer,
   validateReviewDocument
 } from "../functions/_shared/analyst.mjs";
 
@@ -111,4 +112,10 @@ assert.equal(facts.builder_ticket_results.ticket_shape_records[0].settled_ticket
 assert.ok(facts.flags.some(function(flag) { return flag.includes("different cohort scopes"); }));
 assert.equal(facts.artifacts.core_pipeline.status, "WITHIN_THRESHOLD");
 assert.equal(facts.odds_builder.evaluated_candidates, 1547);
+assert.equal(facts.odds_builder.live_value_candidates, 818);
+assert.equal(facts.odds_builder.rejected_candidates, 729);
+const sanitizedAnswer = sanitizeAnalystAnswer("Finding: 3 pipeline errors.\n\nEvidence: ```json\n{\"private\":\"raw data\"}\n```");
+assert.ok(sanitizedAnswer.includes("3 pipeline errors"));
+assert.ok(!sanitizedAnswer.includes("raw data"));
+assert.ok(sanitizedAnswer.includes("Raw JSON omitted"));
 console.log("AI Analyst module tests passed.");
