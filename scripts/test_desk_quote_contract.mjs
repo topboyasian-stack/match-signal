@@ -91,7 +91,8 @@ assert.match(candidateCollectorSource, /if product in RESEARCH_ONLY_VIRTUAL_PROD
 assert.match(source, /VFOOTBALL_RESEARCH_ONLY/);
 
 // A stale generated batch cannot put VFootball/Zoom back into the active Builder UI.
-const builderLegStart = builderUiSource.indexOf("function isActiveVirtualLeg(leg)");
+const builderScopeStart = builderUiSource.indexOf("var ACTIVE_VIRTUAL_MIN_PROBABILITY = 0.80;");
+const builderLegStart = builderUiSource.indexOf("function isActiveVirtualLeg(leg)", builderScopeStart);
 const builderBatchStart = builderUiSource.indexOf("function isActiveVirtualBatch(batch)", builderLegStart);
 const builderBatchEnd = builderUiSource.indexOf("\n  }", builderBatchStart);
 assert.ok(builderLegStart >= 0 && builderBatchStart > builderLegStart && builderBatchEnd > builderBatchStart, "active Builder scope helpers must exist");
@@ -103,8 +104,10 @@ vm.runInNewContext(
 );
 const isActiveVirtualLeg = builderScopeContext.isActiveVirtualLeg;
 const isActiveVirtualBatch = builderScopeContext.isActiveVirtualBatch;
-assert.equal(isActiveVirtualLeg({sport:"virtual",product:"efootball_gt"}), true);
-assert.equal(isActiveVirtualLeg({sport:"virtual",product:"efootball_adriatic"}), true);
+assert.equal(isActiveVirtualLeg({sport:"virtual",product:"efootball_gt",model_probability:0.83}), true);
+assert.equal(isActiveVirtualLeg({sport:"virtual",product:"efootball_adriatic",model_probability:0.83}), true);
+assert.equal(isActiveVirtualLeg({sport:"virtual",product:"efootball_gt",model_probability:0.754386}), false);
+assert.equal(isActiveVirtualLeg({sport:"virtual",product:"efootball_adriatic",model_probability:0.79}), false);
 assert.equal(isActiveVirtualLeg({sport:"virtual",product:"vfootball"}), false);
 assert.equal(isActiveVirtualLeg({sport:"virtual",product:"zoom"}), false);
 assert.equal(isActiveVirtualLeg({sport:"football",product:"football"}), true);
@@ -112,6 +115,7 @@ assert.equal(isActiveVirtualBatch({products:["efootball_gt"],legs:[{sport:"virtu
 assert.equal(isActiveVirtualBatch({products:["vfootball"],legs:[{sport:"virtual",product:"vfootball"}]}), false);
 assert.equal(isActiveVirtualBatch({products:["efootball_gt","vfootball"],legs:[{sport:"virtual",product:"efootball_gt"},{sport:"virtual",product:"vfootball"}]}), false);
 assert.equal(isActiveVirtualBatch({products:["zoom"],legs:[{sport:"virtual",product:"zoom"}]}), false);
+assert.match(builderUiSource, /ACTIVE_VIRTUAL_MIN_PROBABILITY = 0\.80/);
 assert.match(builderUiSource, /data\.batches\)\?data\.batches\.filter\(isActiveVirtualBatch\)/);
 assert.match(builderUiSource, /ensureBookingCodes\(activeBatches\)/);
 
