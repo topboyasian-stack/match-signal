@@ -28,6 +28,7 @@ def make_leg(actual_pick="over", actual_line=1.5, desk_pick="over", desk_line=2.
         },
         "desk_snapshot": {
             "market": "total_goals_over_under",
+            "provenance": "user_reported",
             "pick": desk_pick,
             "line": desk_line,
             "odds": 1.8,
