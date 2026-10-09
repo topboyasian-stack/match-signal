@@ -539,11 +539,15 @@ async function renderUnifiedBoard(){
         const state=String(x?.event_state||"").toUpperCase();
         const live=state==="LIVE" || x?.live===true || x?.isLive===true;
         const settled=state==="SETTLED";
-        // Client-side guard as well as the backend guard: a stale cached or
-        // delayed JSON refresh must not leave yesterday's/past kickoff games
-        // in Upcoming. Only explicit live rows and recent settled-result rows
-        // can remain after kickoff; archives are separate and untouched.
+        const sportKey=String(x?.sport||"").toLowerCase();
+        const productKey=String(x?.product||"").toLowerCase();
+        const isVirtual=sportKey==="virtual"||["efootball_gt","efootball_adriatic","vfootball","zoom"].includes(productKey);
+        const liveLimitMs=isVirtual?2*60*60*1000:(sportKey==="tennis"?8*60*60*1000:4*60*60*1000);
+        // Client-side guard as well as the backend guard: even a cached JSON
+        // record with a stale LIVE flag cannot remain on Upcoming indefinitely.
+        // A removed fixture stays in the canonical archive/history.
         if(kickoff<=now.getTime() && !live && !settled)return false;
+        if(kickoff<=now.getTime() && live && now.getTime()-kickoff>liveLimitMs)return false;
         if(settled){
           const settledAt=Date.parse(String(x?.settled_at||""));
           const settledAge=now.getTime()-settledAt;
