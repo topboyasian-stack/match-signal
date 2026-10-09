@@ -237,6 +237,8 @@ def check_each_totals_line_is_scored_independently():
 
 
 def check_exact_profiles_do_not_pool_products_and_calibration_requires_evidence():
+    source = (ROOT / "scripts" / "unified_upcoming.py").read_text(encoding="utf-8")
+    assert "desk_learning_calibration" not in source, "Virtual event builder must not use the removed global calibration variable"
     forecasts = [
         {"product": "efootball_gt", "line": 7.5, "pick": "under", "win": False, "model_probability": 0.90},
         {"product": "vfootball", "line": 7.5, "pick": "under", "win": True, "model_probability": 0.82},
