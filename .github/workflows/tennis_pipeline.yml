@@ -26,6 +26,7 @@ on:
       - 'scripts/behavior_validation.py'
       - 'scripts/v4_validation.py'
       - 'scripts/selective_prediction_gate.py'
+      - 'scripts/test_selection_gate_contract.py'
       - 'scripts/finalize_value_signals.py'
       - 'scripts/prediction_breakdown.py'
       - 'scripts/verify_performance_ledger.py'
@@ -215,6 +216,8 @@ jobs:
       - name: Apply conservative accuracy elevation candidate gate
         continue-on-error: true
         run: PYTHONPATH=. python scripts/selective_prediction_gate.py
+      - name: Validate selection-gate output isolation
+        run: python scripts/test_selection_gate_contract.py
       - name: Generate prediction-type, confidence, league and model breakdown
         continue-on-error: true
         run: PYTHONPATH=. python scripts/prediction_breakdown.py
@@ -245,7 +248,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/predictions.json data/prediction_pool.json data/selection_candidates.json data/selection_gate.json data/value_signal_status.json data/value_trial_ledger.json data/prediction_history.json data/accuracy.json data/tennis_performance.json data/football_performance.json data/pipeline_status.json data/risk_gate.json data/calibration.json data/football_team_history.json data/behavior_profiles.json data/individual_behavior.json data/behavior_validation.json data/current_performance.json data/v4_paper_ledger.json data/v4_validation.json data/prediction_breakdown.json data/sports_evaluation.json data/sportybet_odds_snapshot.json qa/report.json
+          git add data/predictions.json data/prediction_pool.json data/selection_candidates.json data/selection_gate.json data/selection_gate_selected.json data/value_signal_status.json data/value_trial_ledger.json data/prediction_history.json data/accuracy.json data/tennis_performance.json data/football_performance.json data/pipeline_status.json data/risk_gate.json data/calibration.json data/football_team_history.json data/behavior_profiles.json data/individual_behavior.json data/behavior_validation.json data/current_performance.json data/v4_paper_ledger.json data/v4_validation.json data/prediction_breakdown.json data/sports_evaluation.json data/sportybet_odds_snapshot.json qa/report.json
           if git diff --cached --quiet; then
             echo "No generated data or QA changes."
             exit 0
