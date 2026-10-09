@@ -97,7 +97,7 @@ const builderBatchEnd = builderUiSource.indexOf("\n  }", builderBatchStart);
 assert.ok(builderLegStart >= 0 && builderBatchStart > builderLegStart && builderBatchEnd > builderBatchStart, "active Builder scope helpers must exist");
 const builderScopeContext = {};
 vm.runInNewContext(
-  builderUiSource.slice(builderLegStart, builderBatchEnd + 2) +
+  builderUiSource.slice(builderLegStart, builderBatchEnd + 4) +
   "\nthis.isActiveVirtualLeg=isActiveVirtualLeg;this.isActiveVirtualBatch=isActiveVirtualBatch;",
   builderScopeContext
 );
