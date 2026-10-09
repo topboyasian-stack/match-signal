@@ -8,13 +8,14 @@ with an empty subset. PAPER ONLY; live eligibility stays false.
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
 PREDICTIONS = DATA / "predictions.json"
 POOL = DATA / "prediction_pool.json"
-SELECTED = DATA / "selection_candidates.json"
+SELECTED = DATA / "selection_gate_selected.json"
 EVAL = DATA / "sports_evaluation.json"
 PRECISION = DATA / "tennis_precision_gate.json"
 DEFAULT_MIN_CONFIDENCE = 0.65
@@ -196,20 +197,24 @@ def main():
     SELECTED.write_text(json.dumps(selected, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
     summary = {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
         "status": "ok",
         "mode": "PAPER_ONLY",
         "input_predictions": len(predictions),
         "selected_predictions": len(selected),
         "paper_betting_qualified": paper_value_count,
         "research_candidates": len(research_candidates),
-        "filtered_predictions": rejected,
+        "filtered_predictions": len(predictions) - len(selected),
+        "confidence_filtered_predictions": rejected,
         "selection_rate": round(len(selected) / len(predictions), 4) if predictions else 0.0,
         "rejection_reasons": reasons,
         "evidence_validated_count": evidence_validated_count,
         "public_feed_preserved": True,
         "tennis_confidence_threshold": tennis_min_confidence,
         "tennis_threshold_source": tennis_threshold_source,
-        "selected_artifact": "data/selection_candidates.json",
+        "selected_artifact": "data/selection_gate_selected.json",
+        "candidate_pool_artifact": "data/selection_candidates.json",
+        "candidate_pool_independent": True,
         "policy": "Tournament/selection history is an evidence tier, not a hard prerequisite. Betting-qualified PAPER selections require current model confidence plus an independent current value signal. Live-money approval remains a separate risk gate.",
     }
     (DATA / "selection_gate.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
