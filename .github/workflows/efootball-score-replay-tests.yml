@@ -36,6 +36,8 @@ jobs:
           python-version: '3.12'
       - name: Syntax-check Builder
         run: python -m py_compile scripts/odds_builder.py
+      - name: Syntax-check Builder UI
+        run: node --check expansion-odds-builder.js
       - name: Test settled-score O/U replay
         run: python scripts/test_odds_builder_score_replay.py
       - name: Regression-check eFootball spoiler guard
