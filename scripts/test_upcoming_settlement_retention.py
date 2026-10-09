@@ -148,8 +148,52 @@ def check_desk_forecast_reconciles_by_fixture_and_score():
     assert forecast.get("score") == "2:1"
 
 
+def check_past_unsettled_fixtures_are_hidden_but_live_fixtures_remain():
+    original_now = upcoming.NOW
+    original_horizon = upcoming.HORIZON
+    original_details = upcoming.SETTLED_DETAILS
+    original_event_ids = upcoming.SETTLED_EVENT_IDS
+    original_match_keys = upcoming.SETTLED_MATCH_KEYS
+    try:
+        now = datetime(2026, 10, 9, 13, 55, tzinfo=timezone.utc)
+        kickoff = now - timedelta(hours=3)
+        upcoming.NOW = now
+        upcoming.HORIZON = now + timedelta(days=7)
+        upcoming.SETTLED_DETAILS = {}
+        upcoming.SETTLED_EVENT_IDS = set()
+        upcoming.SETTLED_MATCH_KEYS = set()
+        stale = {
+            "sport": "football",
+            "event_id": "past-unsettled-fixture-test",
+            "start_time": iso(kickoff),
+            "player_1": "Home FC",
+            "player_2": "Away FC",
+        }
+        rows = []
+        upcoming.add(rows, dict(stale))
+        assert rows == [], "A past-kickoff non-live fixture must not remain on Upcoming"
+
+        live = {
+            **stale,
+            "event_id": "active-live-fixture-test",
+            "live": True,
+            "match_status": "LIVE",
+        }
+        live_rows = []
+        upcoming.add(live_rows, live)
+        assert len(live_rows) == 1, "An explicitly live fixture must remain visible"
+        assert live_rows[0].get("event_state") == "LIVE"
+    finally:
+        upcoming.NOW = original_now
+        upcoming.HORIZON = original_horizon
+        upcoming.SETTLED_DETAILS = original_details
+        upcoming.SETTLED_EVENT_IDS = original_event_ids
+        upcoming.SETTLED_MATCH_KEYS = original_match_keys
+
+
 if __name__ == "__main__":
     check_settled_fixture_is_shown_during_grace_then_hidden()
     check_reused_event_id_does_not_hide_a_different_fixture()
+    check_past_unsettled_fixtures_are_hidden_but_live_fixtures_remain()
     check_desk_forecast_reconciles_by_fixture_and_score()
-    print("PASS: settlement grace/expiry, reused-ID isolation, and time-safe eFootball desk reconciliation")
+    print("PASS: settled grace/expiry, stale kickoff removal, live retention, reused-ID isolation, and time-safe reconciliation")
