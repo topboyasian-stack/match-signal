@@ -59,6 +59,7 @@ const summary = summarizeReviewDocument(document);
 assert.equal(summary.ticket_count, 1);
 assert.equal(summary.actual_selection_outcomes.WON, 1);
 assert.equal(summary.actual_leg_hit_rate_excluding_pushes, 1);
+assert.equal(summary.desk_snapshot_timing.kickoff_time_missing, 1);
 assert.equal(document.tickets[0].reported_ticket_outcome, "LOST");
 const invalid = makeDocument(makeLeg("over", 1.5, "over", 2.5));
 invalid.tickets[0].legs[0].actual_selection.odds = 1;
