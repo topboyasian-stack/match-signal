@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-09T21:42:34.839159+00:00",
+  "generated_at": "2026-10-09T22:09:21.588222+00:00",
   "engine_version": "V6.1-RESEARCH-GATED",
   "mode": "PAPER_ONLY",
   "target_legs": "adaptive 2–4 legs; 2.70x active minimum / 2.80x preferred combined odds",
@@ -19,7 +19,7 @@
       "settled_2_80_plus_wins": 4,
       "wins_required_for_2_80_hard_gate": 10
     },
-    "preferred_2_80_target_reached": true,
+    "preferred_2_80_target_reached": false,
     "selected_predictions": 1,
     "tennis_live_eligible": false,
     "upstream_blocked": false,
@@ -28,9 +28,9 @@
       "status": "ok",
       "stats": {
         "provider": "SportyBet NG",
-        "fetched_at": "2026-10-09T21:42:35.127636+00:00",
+        "fetched_at": "2026-10-09T22:09:21.944455+00:00",
         "football_events": 2000,
-        "tennis_events": 152,
+        "tennis_events": 150,
         "matched": 96,
         "unmatched": 76,
         "match_errors": [],
@@ -50,25 +50,44 @@
   },
   "candidate_diagnostics": {
     "football_candidates": 0,
-    "tennis_candidates": 23,
-    "virtual_candidates": 1068,
+    "tennis_candidates": 24,
+    "virtual_candidates": 78,
     "virtual_gate_diagnostics": {
-      "seen": 3073,
-      "qualified": 3073,
-      "evidence_pass": 989,
-      "rejected_evidence": 1811,
-      "rejected_ticket_performance": 424,
+      "seen": 326,
+      "qualified": 326,
+      "evidence_pass": 0,
+      "rejected_evidence": 439,
+      "rejected_ticket_performance": 0,
       "rejected_results_first": 0,
-      "current_feed_events": 676,
+      "current_feed_events": 625,
       "model_templates": 17,
-      "current_market_candidates": 6146,
-      "evidence_value_candidates": 79,
+      "current_market_candidates": 652,
+      "evidence_value_candidates": 78,
       "reasons": {
-        "no_exact_line_model": 138,
-        "recent_evidence_below_threshold": 1791,
-        "ticket_performance_below_threshold": 424,
-        "efootball_evidence_value_lane": 79,
-        "insufficient_recent_side_evidence": 20
+        "no_exact_line_model": 135,
+        "recent_evidence_below_threshold": 439,
+        "efootball_evidence_value_lane": 78
+      },
+      "virtual_scope_policy": {
+        "active_products": [
+          "efootball_adriatic",
+          "efootball_gt"
+        ],
+        "research_only_products": [
+          "vfootball",
+          "zoom"
+        ],
+        "research_only_counts": {
+          "vfootball": {
+            "market_rows": 3990,
+            "unique_events": 399
+          },
+          "zoom": {
+            "market_rows": 0,
+            "unique_events": 0
+          }
+        },
+        "policy": "Only eFootball GT and eFootball Adriatic can enter active Virtual selection or Odds Builder construction. VFootball/Zoom feeds, settlement collection, Virtual Lab observations and archives are retained for research only."
       },
       "model_template_keys": [
         [
@@ -159,80 +178,70 @@
       ],
       "discovery_universe": {
         "scope": "all current SportyBet eFootball events and every observed O/U line inside the Builder horizon",
-        "events_scanned": 252,
+        "events_scanned": 226,
         "product_line_pairs_scanned": 14,
         "modelable_product_line_side_pairs": 17,
         "product_line_side_pairs_without_8_settled_observations": 11,
         "note": "No-evidence lines remain discovery-only and cannot qualify; no gate is weakened."
       },
       "current_product_counts": {
-        "efootball_gt": 368,
-        "vfootball": 2705
+        "efootball_gt": 326
       },
       "current_market_line_counts": {
-        "efootball_gt|4": 4,
-        "efootball_gt|3.5": 56,
-        "efootball_gt|2.5": 60,
-        "efootball_gt|4.5": 33,
-        "efootball_gt|5.5": 42,
-        "efootball_gt|6.5": 55,
-        "vfootball|0.5": 424,
-        "vfootball|1.5": 424,
-        "vfootball|2.5": 424,
-        "vfootball|3.5": 424,
-        "vfootball|4.5": 424,
-        "vfootball|5.5": 404,
-        "vfootball|6.5": 161,
-        "efootball_gt|1.5": 22,
-        "efootball_gt|3": 32,
-        "efootball_gt|5": 2,
-        "vfootball|7.5": 20,
+        "efootball_gt|1.5": 21,
+        "efootball_gt|2.5": 55,
+        "efootball_gt|3.5": 50,
+        "efootball_gt|5.5": 28,
+        "efootball_gt|6.5": 48,
         "efootball_gt|7": 1,
+        "efootball_gt|4.5": 23,
         "efootball_gt|7.5": 37,
+        "efootball_gt|5": 1,
         "efootball_gt|8.5": 10,
         "efootball_gt|9.5": 4,
-        "efootball_gt|2": 10
+        "efootball_gt|3": 31,
+        "efootball_gt|2": 12,
+        "efootball_gt|4": 5
       },
       "price_snapshot_sources": {
-        "fresh_direct_sportybet_match": 3069,
-        "fresh_unified_sportybet_snapshot": 4
+        "fresh_direct_sportybet_match": 326
       },
       "live_quote_refresh": {
         "source": null,
-        "live_events": 704,
-        "matched_by_id": 4892,
-        "matched_by_match": 0,
+        "live_events": 724,
+        "matched_by_id": 4552,
+        "matched_by_match": 40,
         "matched_by_participant_time": 0,
-        "unmatched": 103
+        "unmatched": 403
       },
       "quote_join": {
-        "live_events": 704,
-        "live_match_keys": 610,
-        "live_pair_keys": 580,
-        "matched_by_id": 4892,
-        "matched_by_match": 0,
+        "live_events": 724,
+        "live_match_keys": 630,
+        "live_pair_keys": 601,
+        "matched_by_id": 4552,
+        "matched_by_match": 40,
         "matched_by_participant_time": 0,
-        "unmatched": 103,
+        "unmatched": 403,
         "samples": [
           {
-            "event_id": "sr:match:75416246",
+            "event_id": "sr:match:75416454",
             "match": null,
-            "participant_1": "Brighton And Hove Albion (Thug)",
+            "participant_1": "AS Monaco (Troy)",
+            "participant_2": "Ajax Amsterdam (Alpha)",
+            "source": "cloudflare_proxy"
+          },
+          {
+            "event_id": "sr:match:75415292",
+            "match": null,
+            "participant_1": "Paris Saint Germain (Dusan)",
+            "participant_2": "Arsenal FC (Eros)",
+            "source": "cloudflare_proxy"
+          },
+          {
+            "event_id": "sr:match:75416710",
+            "match": null,
+            "participant_1": "AS Monaco (Troy)",
             "participant_2": "SC Freiburg (Lost)",
-            "source": "cloudflare_proxy"
-          },
-          {
-            "event_id": "sr:match:75415344",
-            "match": null,
-            "participant_1": "FC Barcelona (Fox)",
-            "participant_2": "Paris Saint Germain (Dusan)",
-            "source": "cloudflare_proxy"
-          },
-          {
-            "event_id": "sr:match:75416084",
-            "match": null,
-            "participant_1": "Brighton And Hove Albion (Thug)",
-            "participant_2": "AS Monaco (Troy)",
             "source": "cloudflare_proxy"
           }
         ]
@@ -241,24 +250,24 @@
       "current_feed_is_price_authority": true,
       "price_authority": "fresh SportyBet snapshot collected in-process immediately before Builder qualification"
     },
-    "evaluated": 1091,
+    "evaluated": 102,
     "rejections": {
-      "REJECTED": 444,
-      "LIVE_VALUE": 647
+      "REJECTED": 25,
+      "LIVE_VALUE": 77
     },
     "selection_diversity": {
       "participant_correlation_skips": 0,
-      "unique_participants": 4
+      "unique_participants": 0
     },
     "batch_diagnostics": {
-      "batch_count": 1,
-      "max_batches": 1,
+      "batch_count": 0,
+      "max_batches": 6,
       "disjoint": true,
       "min_combined_odds": 2.7,
       "target_combined_odds": 2.8,
       "accuracy_preservation_ratio": 0.9,
-      "construction_priority": "model_first_value_fallback",
-      "priority_product": "mixed",
+      "construction_priority": "settled_results_first",
+      "priority_product": "vfootball",
       "max_legs": 4,
       "construction_shapes_considered": [
         2,
@@ -268,38 +277,19 @@
       "promoted_construction_leg_count": null,
       "max_kickoff_span_minutes": 60,
       "builder_horizon_minutes": 720,
-      "used_unique_events": 2,
-      "eligible_results_first_legs": 569,
-      "secondary_pool_eligible_legs": 75,
-      "secondary_efootball_pool_eligible_legs": 75,
-      "secondary_non_efootball_pool_eligible_legs": 0,
-      "secondary_lane": "efootball_exact_evidence_value",
-      "secondary_expected_roi": 2.04752,
-      "secondary_kickoff_span_minutes": 91.0,
-      "secondary_max_kickoff_span_minutes": 270,
-      "secondary_min_avg_model_probability": 0.65,
-      "secondary_efootball_value_lane": true,
-      "secondary_efootball_constructor_diagnostics": {
-        "shape": 2,
-        "candidate_count": 75,
-        "combined_odds": 5.355,
-        "combined_probability": 0.569098,
-        "roi": 2.04752,
-        "span_minutes": 91.0,
-        "search_mode": "exhaustive_pairs_then_bounded_larger_shapes",
-        "holdout_selection_ranking": "independent walk-forward participant-model hit rate after exact evidence score"
-      },
-      "secondary_ticket_calibration_mode": "efootball_exact_evidence_independence_proxy",
+      "used_unique_events": 0,
+      "eligible_results_first_legs": 0,
       "capacity": {
-        "eligible_legs": 75,
-        "strict_capacity_odds": 40.41,
-        "strict_capacity_legs": 4,
-        "event_only_capacity_odds": 43.924,
-        "event_only_capacity_legs": 4,
-        "active_floor_reachable_with_current_gates": true,
-        "preferred_2_80_target_reachable": true,
-        "target_reachable_with_current_gates": true
+        "eligible_legs": 0,
+        "strict_capacity_odds": 1.0,
+        "strict_capacity_legs": 0,
+        "event_only_capacity_odds": 1.0,
+        "event_only_capacity_legs": 0,
+        "active_floor_reachable_with_current_gates": false,
+        "preferred_2_80_target_reachable": false,
+        "target_reachable_with_current_gates": false
       },
+      "ranking_metric": "settled exact-line/side hit rate first; calibrated probability second; odds only tie-breaker",
       "construction_shape_diagnostics": [
         {
           "leg_count": 2,
@@ -347,7 +337,75 @@
           "qualifies": false
         }
       ],
-      "ranking_metric": "whole-ticket model probability first, exact current edge second, odds as hard reachability constraint"
+      "secondary_pool_eligible_legs": 77,
+      "secondary_efootball_diagnostics": {
+        "pool_size": 0,
+        "top_legs": [],
+        "pair_scan": {
+          "pairs_total": 0,
+          "odds_reach_pairs": 0,
+          "correlation_rejections": 0,
+          "kickoff_span_rejections": 0,
+          "roi_rejections": 0,
+          "fully_qualified_pairs": 0
+        },
+        "best_pair": []
+      },
+      "secondary_efootball_constructor_diagnostics": {
+        "shape": null,
+        "candidate_count": 0,
+        "combined_odds": null,
+        "combined_probability": null,
+        "roi": null,
+        "span_minutes": null,
+        "search_mode": "no_valid_shape"
+      },
+      "mixed_pool_eligible_legs": 77,
+      "mixed_max_kickoff_span_minutes": 360,
+      "mixed_diagnostics": {
+        "vfootball_pool": 0,
+        "efootball_pool": 14,
+        "candidate_combinations": 0,
+        "batches_selected": 0,
+        "max_batches": 4,
+        "min_combined_odds": 2.7,
+        "disjoint": true,
+        "batch_leg_counts": [],
+        "combined_odds": [],
+        "expected_rois": [],
+        "kickoff_spans": [],
+        "composition": [],
+        "reason": "no_mixed_combination_reached_all_gates"
+      },
+      "pure_vfootball_diagnostics": {
+        "eligible_legs": 0,
+        "candidate_combinations": 0,
+        "batches_selected": 0,
+        "max_batches": 4,
+        "min_combined_odds": 2.7,
+        "min_per_leg_model_probability": 0.8,
+        "preferred_per_leg_model_probability": 0.9,
+        "batch_leg_counts": [],
+        "combined_odds": [],
+        "expected_rois": [],
+        "kickoff_spans": [],
+        "rejection_counts": {
+          "probability": 0,
+          "event": 0,
+          "participant": 0,
+          "span": 0,
+          "odds": 0,
+          "average_probability": 0,
+          "roi": 0,
+          "safety": 0
+        },
+        "first_failure_samples": [],
+        "reason": "no_vfootball_holdout_combination_reached_all_gates"
+      },
+      "pure_vfootball_input": {
+        "eligible_legs": 0,
+        "sample": []
+      }
     },
     "phase2_cyclical_loop": {
       "enabled": true,
@@ -468,645 +526,15 @@
   },
   "candidates_considered": {
     "football": 0,
-    "tennis": 23,
-    "virtual": 1068,
-    "all_built": 1091
+    "tennis": 24,
+    "virtual": 78,
+    "all_built": 102
   },
-  "qualified_legs": [
-    {
-      "sport": "virtual",
-      "competition": "Premier League 2x6",
-      "event_id": "sr:match:BAaEhArUYcOiNaqtZ7hPcoQ",
-      "start_time": "2026-10-10T04:18:00+00:00",
-      "match": "Liverpool (goldfer) vs Tottenham (zoyir)",
-      "market": "virtual_total",
-      "pick": "Liverpool (goldfer) vs Tottenham (zoyir) — O/U under 7.5",
-      "model_probability": 0.754386,
-      "model_fair_odds": 1.326,
-      "bookmaker_odds": 2.55,
-      "market_implied_probability": 0.392157,
-      "de_vig_probability": 0.3625,
-      "model_edge": 0.391886,
-      "expected_value": 0.923684,
-      "participant_history": {
-        "available": true,
-        "score": 0.5662,
-        "participants": [
-          {
-            "participant": "goldfer",
-            "n": 17,
-            "recent_n": 5,
-            "full_score": 0.8095,
-            "recent_score": 0.6667,
-            "score": 0.7167,
-            "available": true
-          },
-          {
-            "participant": "zoyir",
-            "n": 54,
-            "recent_n": 5,
-            "full_score": 0.3621,
-            "recent_score": 0.4444,
-            "score": 0.4156,
-            "available": true
-          }
-        ],
-        "line": "7.5",
-        "side": "under"
-      },
-      "participant_history_bonus": 0.035,
-      "evidence_score": 0.754386,
-      "selection_score": 0.753136,
-      "product": "efootball_gt",
-      "edge_percent": 39.19,
-      "odds_fresh": true,
-      "market_odds_age_seconds": 10.4,
-      "data_quality": 0.75,
-      "uncertainty": 0.089,
-      "market_complete": true,
-      "builder_eligible": true,
-      "real_money_eligible": false,
-      "paper_only": true,
-      "status": "LIVE_VALUE",
-      "source": "Exact-line evidence calibration · eFootball value lane",
-      "market_source": "SportyBet NG",
-      "recent_evidence": {
-        "n": 53,
-        "wins": 41,
-        "hit_rate": 0.7736,
-        "threshold": 0.65,
-        "side": "under",
-        "efootball_recent_spoiler_guard": {
-          "enabled": true,
-          "n": 53,
-          "min_n": 12,
-          "last10_min_hit_rate": 0.5,
-          "last20_min_observations": 20,
-          "last20_min_hit_rate": 0.55,
-          "max_consecutive_losses": 4,
-          "last10_n": 10,
-          "last10_wins": 10,
-          "last10_hit_rate": 1.0,
-          "last20_n": 20,
-          "last20_wins": 19,
-          "last20_hit_rate": 0.95,
-          "consecutive_losses": 0,
-          "status": "passed"
-        }
-      },
-      "results_first": {
-        "eligible": false,
-        "reason": "no_profitable_construction_shape",
-        "product": "efootball_gt",
-        "construction_shapes": [
-          {
-            "leg_count": 2,
-            "ticket_n": 0,
-            "ticket_wins": 0,
-            "ticket_losses": 0,
-            "ticket_accuracy": null,
-            "loss_rate": null,
-            "avg_combined_odds": null,
-            "break_even_accuracy": null,
-            "empirical_expected_roi": null,
-            "min_ticket_n": 10,
-            "min_combined_odds": 2.7,
-            "min_expected_roi": 0.02,
-            "qualifies": false
-          },
-          {
-            "leg_count": 3,
-            "ticket_n": 0,
-            "ticket_wins": 0,
-            "ticket_losses": 0,
-            "ticket_accuracy": null,
-            "loss_rate": null,
-            "avg_combined_odds": null,
-            "break_even_accuracy": null,
-            "empirical_expected_roi": null,
-            "min_ticket_n": 10,
-            "min_combined_odds": 2.7,
-            "min_expected_roi": 0.02,
-            "qualifies": false
-          },
-          {
-            "leg_count": 4,
-            "ticket_n": 0,
-            "ticket_wins": 0,
-            "ticket_losses": 0,
-            "ticket_accuracy": null,
-            "loss_rate": null,
-            "avg_combined_odds": null,
-            "break_even_accuracy": null,
-            "empirical_expected_roi": null,
-            "min_ticket_n": 10,
-            "min_combined_odds": 2.7,
-            "min_expected_roi": 0.02,
-            "qualifies": false
-          }
-        ],
-        "construction_leg_count": null,
-        "all_product_ticket_n": 0,
-        "all_product_ticket_accuracy": null
-      },
-      "qualification_lane": "efootball_exact_evidence_value",
-      "phase2_cyclical_loop": {
-        "enabled": true,
-        "flagged": false,
-        "confidence": 0.0,
-        "model_probability": 0.754386,
-        "evidence_posterior": null,
-        "cycle_break_posterior": null,
-        "current_streak_side": null,
-        "current_streak_length": 0,
-        "historical_break_observations": 0,
-        "historical_breaks": 0,
-        "reason": "model_probability_below_78_percent"
-      },
-      "market_odds_timestamp": "2026-10-09T21:43:53.215048+00:00",
-      "sportybet_event_id": "sr:match:BAaEhArUYcOiNaqtZ7hPcoQ",
-      "sportybet_market_id": "18",
-      "sportybet_specifier": "total=7.5",
-      "sportybet_outcome_id": "13",
-      "sportybet_outcome_name": "Under 7.5"
-    },
-    {
-      "sport": "virtual",
-      "competition": "Volta FA Cup",
-      "event_id": "sr:match:BAaEg|cC2eXa8tcJbpl0nLQ",
-      "start_time": "2026-10-10T05:49:00+00:00",
-      "match": "Aston Villa (Legion) vs Brighton (vladl3n)",
-      "market": "virtual_total",
-      "pick": "Aston Villa (Legion) vs Brighton (vladl3n) — O/U under 7.5",
-      "model_probability": 0.754386,
-      "model_fair_odds": 1.326,
-      "bookmaker_odds": 2.1,
-      "market_implied_probability": 0.47619,
-      "de_vig_probability": 0.44,
-      "model_edge": 0.314386,
-      "expected_value": 0.584211,
-      "participant_history": {
-        "available": true,
-        "score": 0.6212,
-        "participants": [
-          {
-            "participant": "legion",
-            "n": 46,
-            "recent_n": 5,
-            "full_score": 0.52,
-            "recent_score": 0.6667,
-            "score": 0.6153,
-            "available": true
-          },
-          {
-            "participant": "vladl3n",
-            "n": 52,
-            "recent_n": 5,
-            "full_score": 0.5536,
-            "recent_score": 0.6667,
-            "score": 0.6271,
-            "available": true
-          }
-        ],
-        "line": "7.5",
-        "side": "under"
-      },
-      "participant_history_bonus": 0.035,
-      "evidence_score": 0.754386,
-      "selection_score": 0.745386,
-      "product": "efootball_gt",
-      "edge_percent": 31.44,
-      "odds_fresh": true,
-      "market_odds_age_seconds": 10.4,
-      "data_quality": 0.75,
-      "uncertainty": 0.089,
-      "market_complete": true,
-      "builder_eligible": true,
-      "real_money_eligible": false,
-      "paper_only": true,
-      "status": "LIVE_VALUE",
-      "source": "Exact-line evidence calibration · eFootball value lane",
-      "market_source": "SportyBet NG",
-      "recent_evidence": {
-        "n": 53,
-        "wins": 41,
-        "hit_rate": 0.7736,
-        "threshold": 0.65,
-        "side": "under",
-        "efootball_recent_spoiler_guard": {
-          "enabled": true,
-          "n": 53,
-          "min_n": 12,
-          "last10_min_hit_rate": 0.5,
-          "last20_min_observations": 20,
-          "last20_min_hit_rate": 0.55,
-          "max_consecutive_losses": 4,
-          "last10_n": 10,
-          "last10_wins": 10,
-          "last10_hit_rate": 1.0,
-          "last20_n": 20,
-          "last20_wins": 19,
-          "last20_hit_rate": 0.95,
-          "consecutive_losses": 0,
-          "status": "passed"
-        }
-      },
-      "results_first": {
-        "eligible": false,
-        "reason": "no_profitable_construction_shape",
-        "product": "efootball_gt",
-        "construction_shapes": [
-          {
-            "leg_count": 2,
-            "ticket_n": 0,
-            "ticket_wins": 0,
-            "ticket_losses": 0,
-            "ticket_accuracy": null,
-            "loss_rate": null,
-            "avg_combined_odds": null,
-            "break_even_accuracy": null,
-            "empirical_expected_roi": null,
-            "min_ticket_n": 10,
-            "min_combined_odds": 2.7,
-            "min_expected_roi": 0.02,
-            "qualifies": false
-          },
-          {
-            "leg_count": 3,
-            "ticket_n": 0,
-            "ticket_wins": 0,
-            "ticket_losses": 0,
-            "ticket_accuracy": null,
-            "loss_rate": null,
-            "avg_combined_odds": null,
-            "break_even_accuracy": null,
-            "empirical_expected_roi": null,
-            "min_ticket_n": 10,
-            "min_combined_odds": 2.7,
-            "min_expected_roi": 0.02,
-            "qualifies": false
-          },
-          {
-            "leg_count": 4,
-            "ticket_n": 0,
-            "ticket_wins": 0,
-            "ticket_losses": 0,
-            "ticket_accuracy": null,
-            "loss_rate": null,
-            "avg_combined_odds": null,
-            "break_even_accuracy": null,
-            "empirical_expected_roi": null,
-            "min_ticket_n": 10,
-            "min_combined_odds": 2.7,
-            "min_expected_roi": 0.02,
-            "qualifies": false
-          }
-        ],
-        "construction_leg_count": null,
-        "all_product_ticket_n": 0,
-        "all_product_ticket_accuracy": null
-      },
-      "qualification_lane": "efootball_exact_evidence_value",
-      "phase2_cyclical_loop": {
-        "enabled": true,
-        "flagged": false,
-        "confidence": 0.0,
-        "model_probability": 0.754386,
-        "evidence_posterior": null,
-        "cycle_break_posterior": null,
-        "current_streak_side": null,
-        "current_streak_length": 0,
-        "historical_break_observations": 0,
-        "historical_breaks": 0,
-        "reason": "model_probability_below_78_percent"
-      },
-      "market_odds_timestamp": "2026-10-09T21:43:53.215048+00:00",
-      "sportybet_event_id": "sr:match:BAaEg|cC2eXa8tcJbpl0nLQ",
-      "sportybet_market_id": "18",
-      "sportybet_specifier": "total=7.5",
-      "sportybet_outcome_id": "13",
-      "sportybet_outcome_name": "Under 7.5"
-    }
-  ],
-  "best_available_legs": [
-    {
-      "sport": "virtual",
-      "competition": "Premier League 2x6",
-      "event_id": "sr:match:BAaEhArUYcOiNaqtZ7hPcoQ",
-      "start_time": "2026-10-10T04:18:00+00:00",
-      "match": "Liverpool (goldfer) vs Tottenham (zoyir)",
-      "market": "virtual_total",
-      "pick": "Liverpool (goldfer) vs Tottenham (zoyir) — O/U under 7.5",
-      "model_probability": 0.754386,
-      "model_fair_odds": 1.326,
-      "bookmaker_odds": 2.55,
-      "market_implied_probability": 0.392157,
-      "de_vig_probability": 0.3625,
-      "model_edge": 0.391886,
-      "expected_value": 0.923684,
-      "participant_history": {
-        "available": true,
-        "score": 0.5662,
-        "participants": [
-          {
-            "participant": "goldfer",
-            "n": 17,
-            "recent_n": 5,
-            "full_score": 0.8095,
-            "recent_score": 0.6667,
-            "score": 0.7167,
-            "available": true
-          },
-          {
-            "participant": "zoyir",
-            "n": 54,
-            "recent_n": 5,
-            "full_score": 0.3621,
-            "recent_score": 0.4444,
-            "score": 0.4156,
-            "available": true
-          }
-        ],
-        "line": "7.5",
-        "side": "under"
-      },
-      "participant_history_bonus": 0.035,
-      "evidence_score": 0.754386,
-      "selection_score": 0.753136,
-      "product": "efootball_gt",
-      "edge_percent": 39.19,
-      "odds_fresh": true,
-      "market_odds_age_seconds": 10.4,
-      "data_quality": 0.75,
-      "uncertainty": 0.089,
-      "market_complete": true,
-      "builder_eligible": true,
-      "real_money_eligible": false,
-      "paper_only": true,
-      "status": "LIVE_VALUE",
-      "source": "Exact-line evidence calibration · eFootball value lane",
-      "market_source": "SportyBet NG",
-      "recent_evidence": {
-        "n": 53,
-        "wins": 41,
-        "hit_rate": 0.7736,
-        "threshold": 0.65,
-        "side": "under",
-        "efootball_recent_spoiler_guard": {
-          "enabled": true,
-          "n": 53,
-          "min_n": 12,
-          "last10_min_hit_rate": 0.5,
-          "last20_min_observations": 20,
-          "last20_min_hit_rate": 0.55,
-          "max_consecutive_losses": 4,
-          "last10_n": 10,
-          "last10_wins": 10,
-          "last10_hit_rate": 1.0,
-          "last20_n": 20,
-          "last20_wins": 19,
-          "last20_hit_rate": 0.95,
-          "consecutive_losses": 0,
-          "status": "passed"
-        }
-      },
-      "results_first": {
-        "eligible": false,
-        "reason": "no_profitable_construction_shape",
-        "product": "efootball_gt",
-        "construction_shapes": [
-          {
-            "leg_count": 2,
-            "ticket_n": 0,
-            "ticket_wins": 0,
-            "ticket_losses": 0,
-            "ticket_accuracy": null,
-            "loss_rate": null,
-            "avg_combined_odds": null,
-            "break_even_accuracy": null,
-            "empirical_expected_roi": null,
-            "min_ticket_n": 10,
-            "min_combined_odds": 2.7,
-            "min_expected_roi": 0.02,
-            "qualifies": false
-          },
-          {
-            "leg_count": 3,
-            "ticket_n": 0,
-            "ticket_wins": 0,
-            "ticket_losses": 0,
-            "ticket_accuracy": null,
-            "loss_rate": null,
-            "avg_combined_odds": null,
-            "break_even_accuracy": null,
-            "empirical_expected_roi": null,
-            "min_ticket_n": 10,
-            "min_combined_odds": 2.7,
-            "min_expected_roi": 0.02,
-            "qualifies": false
-          },
-          {
-            "leg_count": 4,
-            "ticket_n": 0,
-            "ticket_wins": 0,
-            "ticket_losses": 0,
-            "ticket_accuracy": null,
-            "loss_rate": null,
-            "avg_combined_odds": null,
-            "break_even_accuracy": null,
-            "empirical_expected_roi": null,
-            "min_ticket_n": 10,
-            "min_combined_odds": 2.7,
-            "min_expected_roi": 0.02,
-            "qualifies": false
-          }
-        ],
-        "construction_leg_count": null,
-        "all_product_ticket_n": 0,
-        "all_product_ticket_accuracy": null
-      },
-      "qualification_lane": "efootball_exact_evidence_value",
-      "phase2_cyclical_loop": {
-        "enabled": true,
-        "flagged": false,
-        "confidence": 0.0,
-        "model_probability": 0.754386,
-        "evidence_posterior": null,
-        "cycle_break_posterior": null,
-        "current_streak_side": null,
-        "current_streak_length": 0,
-        "historical_break_observations": 0,
-        "historical_breaks": 0,
-        "reason": "model_probability_below_78_percent"
-      },
-      "market_odds_timestamp": "2026-10-09T21:43:53.215048+00:00",
-      "sportybet_event_id": "sr:match:BAaEhArUYcOiNaqtZ7hPcoQ",
-      "sportybet_market_id": "18",
-      "sportybet_specifier": "total=7.5",
-      "sportybet_outcome_id": "13",
-      "sportybet_outcome_name": "Under 7.5"
-    },
-    {
-      "sport": "virtual",
-      "competition": "Volta FA Cup",
-      "event_id": "sr:match:BAaEg|cC2eXa8tcJbpl0nLQ",
-      "start_time": "2026-10-10T05:49:00+00:00",
-      "match": "Aston Villa (Legion) vs Brighton (vladl3n)",
-      "market": "virtual_total",
-      "pick": "Aston Villa (Legion) vs Brighton (vladl3n) — O/U under 7.5",
-      "model_probability": 0.754386,
-      "model_fair_odds": 1.326,
-      "bookmaker_odds": 2.1,
-      "market_implied_probability": 0.47619,
-      "de_vig_probability": 0.44,
-      "model_edge": 0.314386,
-      "expected_value": 0.584211,
-      "participant_history": {
-        "available": true,
-        "score": 0.6212,
-        "participants": [
-          {
-            "participant": "legion",
-            "n": 46,
-            "recent_n": 5,
-            "full_score": 0.52,
-            "recent_score": 0.6667,
-            "score": 0.6153,
-            "available": true
-          },
-          {
-            "participant": "vladl3n",
-            "n": 52,
-            "recent_n": 5,
-            "full_score": 0.5536,
-            "recent_score": 0.6667,
-            "score": 0.6271,
-            "available": true
-          }
-        ],
-        "line": "7.5",
-        "side": "under"
-      },
-      "participant_history_bonus": 0.035,
-      "evidence_score": 0.754386,
-      "selection_score": 0.745386,
-      "product": "efootball_gt",
-      "edge_percent": 31.44,
-      "odds_fresh": true,
-      "market_odds_age_seconds": 10.4,
-      "data_quality": 0.75,
-      "uncertainty": 0.089,
-      "market_complete": true,
-      "builder_eligible": true,
-      "real_money_eligible": false,
-      "paper_only": true,
-      "status": "LIVE_VALUE",
-      "source": "Exact-line evidence calibration · eFootball value lane",
-      "market_source": "SportyBet NG",
-      "recent_evidence": {
-        "n": 53,
-        "wins": 41,
-        "hit_rate": 0.7736,
-        "threshold": 0.65,
-        "side": "under",
-        "efootball_recent_spoiler_guard": {
-          "enabled": true,
-          "n": 53,
-          "min_n": 12,
-          "last10_min_hit_rate": 0.5,
-          "last20_min_observations": 20,
-          "last20_min_hit_rate": 0.55,
-          "max_consecutive_losses": 4,
-          "last10_n": 10,
-          "last10_wins": 10,
-          "last10_hit_rate": 1.0,
-          "last20_n": 20,
-          "last20_wins": 19,
-          "last20_hit_rate": 0.95,
-          "consecutive_losses": 0,
-          "status": "passed"
-        }
-      },
-      "results_first": {
-        "eligible": false,
-        "reason": "no_profitable_construction_shape",
-        "product": "efootball_gt",
-        "construction_shapes": [
-          {
-            "leg_count": 2,
-            "ticket_n": 0,
-            "ticket_wins": 0,
-            "ticket_losses": 0,
-            "ticket_accuracy": null,
-            "loss_rate": null,
-            "avg_combined_odds": null,
-            "break_even_accuracy": null,
-            "empirical_expected_roi": null,
-            "min_ticket_n": 10,
-            "min_combined_odds": 2.7,
-            "min_expected_roi": 0.02,
-            "qualifies": false
-          },
-          {
-            "leg_count": 3,
-            "ticket_n": 0,
-            "ticket_wins": 0,
-            "ticket_losses": 0,
-            "ticket_accuracy": null,
-            "loss_rate": null,
-            "avg_combined_odds": null,
-            "break_even_accuracy": null,
-            "empirical_expected_roi": null,
-            "min_ticket_n": 10,
-            "min_combined_odds": 2.7,
-            "min_expected_roi": 0.02,
-            "qualifies": false
-          },
-          {
-            "leg_count": 4,
-            "ticket_n": 0,
-            "ticket_wins": 0,
-            "ticket_losses": 0,
-            "ticket_accuracy": null,
-            "loss_rate": null,
-            "avg_combined_odds": null,
-            "break_even_accuracy": null,
-            "empirical_expected_roi": null,
-            "min_ticket_n": 10,
-            "min_combined_odds": 2.7,
-            "min_expected_roi": 0.02,
-            "qualifies": false
-          }
-        ],
-        "construction_leg_count": null,
-        "all_product_ticket_n": 0,
-        "all_product_ticket_accuracy": null
-      },
-      "qualification_lane": "efootball_exact_evidence_value",
-      "phase2_cyclical_loop": {
-        "enabled": true,
-        "flagged": false,
-        "confidence": 0.0,
-        "model_probability": 0.754386,
-        "evidence_posterior": null,
-        "cycle_break_posterior": null,
-        "current_streak_side": null,
-        "current_streak_length": 0,
-        "historical_break_observations": 0,
-        "historical_breaks": 0,
-        "reason": "model_probability_below_78_percent"
-      },
-      "market_odds_timestamp": "2026-10-09T21:43:53.215048+00:00",
-      "sportybet_event_id": "sr:match:BAaEg|cC2eXa8tcJbpl0nLQ",
-      "sportybet_market_id": "18",
-      "sportybet_specifier": "total=7.5",
-      "sportybet_outcome_id": "13",
-      "sportybet_outcome_name": "Under 7.5"
-    }
-  ],
-  "combined_odds_selected": 5.355,
-  "naive_independence_hit_proxy": 0.569098,
-  "batch_count": 1,
+  "qualified_legs": [],
+  "best_available_legs": [],
+  "combined_odds_selected": null,
+  "naive_independence_hit_proxy": null,
+  "batch_count": 0,
   "batch_policy": {
     "min_combined_odds": 2.7,
     "results_first": true,
@@ -1124,8 +552,8 @@
     "ranking": "settled exact-line/side results first; calibrated probability second; odds only tie-breaker",
     "model_rating_definition": "100 × product of leg model probabilities (naive joint proxy)",
     "leg_strength_definition": "100 × geometric mean of leg model probabilities",
-    "primary_lane": "efootball_exact_evidence_value",
-    "efootball_value_lane_min_probability": 0.65,
+    "primary_lane": "none",
+    "efootball_value_lane_min_probability": 0.8,
     "booking_code_policy": "fresh non-staking share code from exact live event/market/outcome IDs; never fabricate",
     "phase2_cyclical_loop": {
       "enabled": true,
@@ -1153,355 +581,7 @@
       }
     }
   },
-  "batches": [
-    {
-      "batch_id": "BATCH-01",
-      "label": "BATCH-01 · Value Model Rating 56.9/100",
-      "rank_pending": false,
-      "rank": 1,
-      "legs": [
-        {
-          "sport": "virtual",
-          "competition": "Premier League 2x6",
-          "event_id": "sr:match:BAaEhArUYcOiNaqtZ7hPcoQ",
-          "start_time": "2026-10-10T04:18:00+00:00",
-          "match": "Liverpool (goldfer) vs Tottenham (zoyir)",
-          "market": "virtual_total",
-          "pick": "Liverpool (goldfer) vs Tottenham (zoyir) — O/U under 7.5",
-          "model_probability": 0.754386,
-          "model_fair_odds": 1.326,
-          "bookmaker_odds": 2.55,
-          "market_implied_probability": 0.392157,
-          "de_vig_probability": 0.3625,
-          "model_edge": 0.391886,
-          "expected_value": 0.923684,
-          "participant_history": {
-            "available": true,
-            "score": 0.5662,
-            "participants": [
-              {
-                "participant": "goldfer",
-                "n": 17,
-                "recent_n": 5,
-                "full_score": 0.8095,
-                "recent_score": 0.6667,
-                "score": 0.7167,
-                "available": true
-              },
-              {
-                "participant": "zoyir",
-                "n": 54,
-                "recent_n": 5,
-                "full_score": 0.3621,
-                "recent_score": 0.4444,
-                "score": 0.4156,
-                "available": true
-              }
-            ],
-            "line": "7.5",
-            "side": "under"
-          },
-          "participant_history_bonus": 0.035,
-          "evidence_score": 0.754386,
-          "selection_score": 0.753136,
-          "product": "efootball_gt",
-          "edge_percent": 39.19,
-          "odds_fresh": true,
-          "market_odds_age_seconds": 10.4,
-          "data_quality": 0.75,
-          "uncertainty": 0.089,
-          "market_complete": true,
-          "builder_eligible": true,
-          "real_money_eligible": false,
-          "paper_only": true,
-          "status": "LIVE_VALUE",
-          "source": "Exact-line evidence calibration · eFootball value lane",
-          "market_source": "SportyBet NG",
-          "recent_evidence": {
-            "n": 53,
-            "wins": 41,
-            "hit_rate": 0.7736,
-            "threshold": 0.65,
-            "side": "under",
-            "efootball_recent_spoiler_guard": {
-              "enabled": true,
-              "n": 53,
-              "min_n": 12,
-              "last10_min_hit_rate": 0.5,
-              "last20_min_observations": 20,
-              "last20_min_hit_rate": 0.55,
-              "max_consecutive_losses": 4,
-              "last10_n": 10,
-              "last10_wins": 10,
-              "last10_hit_rate": 1.0,
-              "last20_n": 20,
-              "last20_wins": 19,
-              "last20_hit_rate": 0.95,
-              "consecutive_losses": 0,
-              "status": "passed"
-            }
-          },
-          "results_first": {
-            "eligible": false,
-            "reason": "no_profitable_construction_shape",
-            "product": "efootball_gt",
-            "construction_shapes": [
-              {
-                "leg_count": 2,
-                "ticket_n": 0,
-                "ticket_wins": 0,
-                "ticket_losses": 0,
-                "ticket_accuracy": null,
-                "loss_rate": null,
-                "avg_combined_odds": null,
-                "break_even_accuracy": null,
-                "empirical_expected_roi": null,
-                "min_ticket_n": 10,
-                "min_combined_odds": 2.7,
-                "min_expected_roi": 0.02,
-                "qualifies": false
-              },
-              {
-                "leg_count": 3,
-                "ticket_n": 0,
-                "ticket_wins": 0,
-                "ticket_losses": 0,
-                "ticket_accuracy": null,
-                "loss_rate": null,
-                "avg_combined_odds": null,
-                "break_even_accuracy": null,
-                "empirical_expected_roi": null,
-                "min_ticket_n": 10,
-                "min_combined_odds": 2.7,
-                "min_expected_roi": 0.02,
-                "qualifies": false
-              },
-              {
-                "leg_count": 4,
-                "ticket_n": 0,
-                "ticket_wins": 0,
-                "ticket_losses": 0,
-                "ticket_accuracy": null,
-                "loss_rate": null,
-                "avg_combined_odds": null,
-                "break_even_accuracy": null,
-                "empirical_expected_roi": null,
-                "min_ticket_n": 10,
-                "min_combined_odds": 2.7,
-                "min_expected_roi": 0.02,
-                "qualifies": false
-              }
-            ],
-            "construction_leg_count": null,
-            "all_product_ticket_n": 0,
-            "all_product_ticket_accuracy": null
-          },
-          "qualification_lane": "efootball_exact_evidence_value",
-          "phase2_cyclical_loop": {
-            "enabled": true,
-            "flagged": false,
-            "confidence": 0.0,
-            "model_probability": 0.754386,
-            "evidence_posterior": null,
-            "cycle_break_posterior": null,
-            "current_streak_side": null,
-            "current_streak_length": 0,
-            "historical_break_observations": 0,
-            "historical_breaks": 0,
-            "reason": "model_probability_below_78_percent"
-          },
-          "market_odds_timestamp": "2026-10-09T21:43:53.215048+00:00",
-          "sportybet_event_id": "sr:match:BAaEhArUYcOiNaqtZ7hPcoQ",
-          "sportybet_market_id": "18",
-          "sportybet_specifier": "total=7.5",
-          "sportybet_outcome_id": "13",
-          "sportybet_outcome_name": "Under 7.5"
-        },
-        {
-          "sport": "virtual",
-          "competition": "Volta FA Cup",
-          "event_id": "sr:match:BAaEg|cC2eXa8tcJbpl0nLQ",
-          "start_time": "2026-10-10T05:49:00+00:00",
-          "match": "Aston Villa (Legion) vs Brighton (vladl3n)",
-          "market": "virtual_total",
-          "pick": "Aston Villa (Legion) vs Brighton (vladl3n) — O/U under 7.5",
-          "model_probability": 0.754386,
-          "model_fair_odds": 1.326,
-          "bookmaker_odds": 2.1,
-          "market_implied_probability": 0.47619,
-          "de_vig_probability": 0.44,
-          "model_edge": 0.314386,
-          "expected_value": 0.584211,
-          "participant_history": {
-            "available": true,
-            "score": 0.6212,
-            "participants": [
-              {
-                "participant": "legion",
-                "n": 46,
-                "recent_n": 5,
-                "full_score": 0.52,
-                "recent_score": 0.6667,
-                "score": 0.6153,
-                "available": true
-              },
-              {
-                "participant": "vladl3n",
-                "n": 52,
-                "recent_n": 5,
-                "full_score": 0.5536,
-                "recent_score": 0.6667,
-                "score": 0.6271,
-                "available": true
-              }
-            ],
-            "line": "7.5",
-            "side": "under"
-          },
-          "participant_history_bonus": 0.035,
-          "evidence_score": 0.754386,
-          "selection_score": 0.745386,
-          "product": "efootball_gt",
-          "edge_percent": 31.44,
-          "odds_fresh": true,
-          "market_odds_age_seconds": 10.4,
-          "data_quality": 0.75,
-          "uncertainty": 0.089,
-          "market_complete": true,
-          "builder_eligible": true,
-          "real_money_eligible": false,
-          "paper_only": true,
-          "status": "LIVE_VALUE",
-          "source": "Exact-line evidence calibration · eFootball value lane",
-          "market_source": "SportyBet NG",
-          "recent_evidence": {
-            "n": 53,
-            "wins": 41,
-            "hit_rate": 0.7736,
-            "threshold": 0.65,
-            "side": "under",
-            "efootball_recent_spoiler_guard": {
-              "enabled": true,
-              "n": 53,
-              "min_n": 12,
-              "last10_min_hit_rate": 0.5,
-              "last20_min_observations": 20,
-              "last20_min_hit_rate": 0.55,
-              "max_consecutive_losses": 4,
-              "last10_n": 10,
-              "last10_wins": 10,
-              "last10_hit_rate": 1.0,
-              "last20_n": 20,
-              "last20_wins": 19,
-              "last20_hit_rate": 0.95,
-              "consecutive_losses": 0,
-              "status": "passed"
-            }
-          },
-          "results_first": {
-            "eligible": false,
-            "reason": "no_profitable_construction_shape",
-            "product": "efootball_gt",
-            "construction_shapes": [
-              {
-                "leg_count": 2,
-                "ticket_n": 0,
-                "ticket_wins": 0,
-                "ticket_losses": 0,
-                "ticket_accuracy": null,
-                "loss_rate": null,
-                "avg_combined_odds": null,
-                "break_even_accuracy": null,
-                "empirical_expected_roi": null,
-                "min_ticket_n": 10,
-                "min_combined_odds": 2.7,
-                "min_expected_roi": 0.02,
-                "qualifies": false
-              },
-              {
-                "leg_count": 3,
-                "ticket_n": 0,
-                "ticket_wins": 0,
-                "ticket_losses": 0,
-                "ticket_accuracy": null,
-                "loss_rate": null,
-                "avg_combined_odds": null,
-                "break_even_accuracy": null,
-                "empirical_expected_roi": null,
-                "min_ticket_n": 10,
-                "min_combined_odds": 2.7,
-                "min_expected_roi": 0.02,
-                "qualifies": false
-              },
-              {
-                "leg_count": 4,
-                "ticket_n": 0,
-                "ticket_wins": 0,
-                "ticket_losses": 0,
-                "ticket_accuracy": null,
-                "loss_rate": null,
-                "avg_combined_odds": null,
-                "break_even_accuracy": null,
-                "empirical_expected_roi": null,
-                "min_ticket_n": 10,
-                "min_combined_odds": 2.7,
-                "min_expected_roi": 0.02,
-                "qualifies": false
-              }
-            ],
-            "construction_leg_count": null,
-            "all_product_ticket_n": 0,
-            "all_product_ticket_accuracy": null
-          },
-          "qualification_lane": "efootball_exact_evidence_value",
-          "phase2_cyclical_loop": {
-            "enabled": true,
-            "flagged": false,
-            "confidence": 0.0,
-            "model_probability": 0.754386,
-            "evidence_posterior": null,
-            "cycle_break_posterior": null,
-            "current_streak_side": null,
-            "current_streak_length": 0,
-            "historical_break_observations": 0,
-            "historical_breaks": 0,
-            "reason": "model_probability_below_78_percent"
-          },
-          "market_odds_timestamp": "2026-10-09T21:43:53.215048+00:00",
-          "sportybet_event_id": "sr:match:BAaEg|cC2eXa8tcJbpl0nLQ",
-          "sportybet_market_id": "18",
-          "sportybet_specifier": "total=7.5",
-          "sportybet_outcome_id": "13",
-          "sportybet_outcome_name": "Under 7.5"
-        }
-      ],
-      "leg_count": 2,
-      "combined_odds": 5.355,
-      "combined_model_rating": 56.91,
-      "combined_model_probability": 0.569098,
-      "raw_combined_model_probability": 0.569098,
-      "ticket_calibration_gamma": 1.0,
-      "leg_strength_rating": 75.44,
-      "avg_model_probability": 75.44,
-      "avg_model_edge_percent": 35.31,
-      "products": [
-        "efootball_gt"
-      ],
-      "primary_lane": "efootball_exact_evidence_value",
-      "paper_only": true,
-      "real_money_execution": false,
-      "correlation_policy": "same-event and participant reuse prevented; all legs independently Builder-eligible",
-      "construction_objective": "maximize whole-ticket model probability subject to the fixed 4.00+ odds floor; never add a leg after the model frontier cannot support the required ROI",
-      "sportybet_booking": {
-        "status": "AVAILABLE",
-        "booking_code": "VATQ8Z",
-        "share_url": "http://www.sportybet.com/ng/?shareCode=VATQ8Z",
-        "expires_at": 1792475340000,
-        "selection_count": 2,
-        "unavailable_outcomes": []
-      }
-    }
-  ],
+  "batches": [],
   "phase2_cyclical_loop_batches": [],
   "rejected_candidates": [
     {
@@ -2787,21 +1867,15 @@
     "sr:match:D395021026",
     "sr:match:D399021026"
   ],
-  "leg_count": 2,
-  "sports_selected": [
-    "virtual"
-  ],
-  "status": "VALUE_RESEARCH_SET",
-  "reference_combined_odds": 1.758,
+  "leg_count": 0,
+  "sports_selected": [],
+  "status": "NO_BET",
+  "reference_combined_odds": null,
   "reference_odds_type": "MODEL_FAIR_ODDS_NOT_BOOKMAKER_PRICE",
-  "market_price_combined_odds": 5.355,
+  "market_price_combined_odds": null,
   "sportybet_booking": {
-    "status": "AVAILABLE",
-    "booking_code": "VATQ8Z",
-    "share_url": "http://www.sportybet.com/ng/?shareCode=VATQ8Z",
-    "expires_at": 1792475340000,
-    "selection_count": 2,
-    "unavailable_outcomes": []
+    "status": "UNAVAILABLE",
+    "reason": "no_selected_batch"
   },
   "theme": {
     "name": "Midnight Graphite / Electric Cyan / Signal Green",
