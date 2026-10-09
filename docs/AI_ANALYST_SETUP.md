@@ -26,6 +26,7 @@ Official references:
 - For chat and parsing, the server sends selected system aggregates and up to eight recent user tickets to the configured model. Do not submit information that you do not want processed by that model.
 - Parsing returns a draft and never saves automatically. Check every fixture, product, selected side, line, odds, score and result before saving.
 - The original desk snapshot is stored only when explicitly present. It is never inferred from the actual ticket.
+- The review form also allows manual entry of the original desk side/line, the time it was seen, optional odds/probability, and kickoff time. Manually entered snapshots are marked user_reported. A timestamp claimed to be before kickoff is still unverified; a snapshot entered after kickoff is explicitly flagged. Do not present either as independently verified model-history evidence.
 - User-selected tickets remain a selection-biased evaluation cohort, separate from Builder outcomes and all model-training history.
 - The AI cannot change model weights, selection gates, deployments or place bets.
 
