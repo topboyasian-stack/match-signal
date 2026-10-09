@@ -144,7 +144,7 @@ export function validateReviewDocument(document) {
         if (!desk || typeof desk !== "object" || Array.isArray(desk)) errors.push(lw + ".desk_snapshot must be an object");
         else {
           checkKnownKeys(desk, new Set(["prediction_id", "model_version", "market", "pick", "line", "odds", "model_probability", "captured_at", "provenance"]), lw + ".desk_snapshot", errors);
-          if (desk.provenance !== undefined && !["user_reported", "captured_live", "matched_historical_snapshot"].includes(desk.provenance)) errors.push(lw + ".desk_snapshot.provenance is invalid");
+          if (desk.provenance !== undefined && desk.provenance !== "user_reported") errors.push(lw + ".desk_snapshot.provenance must be user_reported until the source is independently verified");
           if (desk.market !== VALID_MARKET) errors.push(lw + ".desk_snapshot.market is invalid");
           if (!VALID_PICKS.has(desk.pick)) errors.push(lw + ".desk_snapshot.pick is invalid");
           if (!finiteNumber(desk.line) || desk.line < 0) errors.push(lw + ".desk_snapshot.line is invalid");
@@ -191,6 +191,15 @@ export function analyzeLeg(leg) {
   const actual = leg.actual_selection, desk = leg.desk_snapshot;
   const actualResult = evaluatePick(actual.pick, actual.line, leg.final_score);
   const deskResult = desk ? evaluatePick(desk.pick, desk.line, leg.final_score) : null;
+  let deskSnapshotTiming = "desk_snapshot_missing";
+  if (desk) {
+    const kickoffMs = leg.kickoff_at ? Date.parse(leg.kickoff_at) : NaN;
+    const captureMs = desk.captured_at ? Date.parse(desk.captured_at) : NaN;
+    if (!Number.isFinite(kickoffMs)) deskSnapshotTiming = "kickoff_time_missing";
+    else if (!Number.isFinite(captureMs)) deskSnapshotTiming = "desk_capture_time_invalid";
+    else if (captureMs > kickoffMs) deskSnapshotTiming = "captured_after_kickoff";
+    else deskSnapshotTiming = "user_reported_pre_kickoff_time_unverified";
+  }
   let counterfactual = "not_comparable";
   if (actualResult !== null && deskResult !== null) {
     if (actualResult === "WON" && deskResult !== "WON") counterfactual = "actual_selection_won_desk_did_not";
@@ -204,7 +213,7 @@ export function analyzeLeg(leg) {
     actual_pick: actual.pick, actual_line: Number(actual.line), actual_odds: Number(actual.odds),
     actual_result: actualResult, desk_pick: desk ? desk.pick : null,
     desk_line: desk && finiteNumber(desk.line) ? Number(desk.line) : null,
-    desk_result: deskResult, line_adjustment: classifyLineAdjustment(desk, actual), counterfactual: counterfactual
+    desk_result: deskResult, line_adjustment: classifyLineAdjustment(desk, actual), desk_snapshot_timing: deskSnapshotTiming, counterfactual: counterfactual
   };
 }
 
