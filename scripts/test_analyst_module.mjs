@@ -99,7 +99,19 @@ const facts = summarizeDiagnosticFacts({
     ],
     product_records: []
   },
-  odds_builder: { generated_at: "2026-10-09T17:13:49.000Z", status: "VALUE_RESEARCH_SET", batch_count: 1, candidate_diagnostics: { evaluated: 1547, rejections: { LIVE_VALUE: 818, REJECTED: 729 } } }
+  odds_builder: { generated_at: "2026-10-09T17:13:49.000Z", status: "VALUE_RESEARCH_SET", batch_count: 1, candidate_diagnostics: { evaluated: 1547, rejections: { LIVE_VALUE: 818, REJECTED: 729 } } },
+  tennis_forward_status: {
+    updated_at: "2026-10-09T06:33:27.000Z", window_days: 14, scope: "ATP/WTA singles only",
+    tours: { ATP: { events_seen: 236, valid_singles: 0, new_predictions: 0, rejected: { "missing athlete id": 157, "non-singles draw": 79 }, error: null } }
+  },
+  prediction_desk: {
+    generated_at: "2026-10-09T17:35:00.000Z", horizon_days: 7, event_count: 80, live_count: 4, pending_settlement_count: 0,
+    publication_filters: { past_kickoff_rows_hidden: 13, stale_live_flags_hidden: 2, expired_settled_rows_hidden: 5 },
+    high_line_under_evidence: [
+      { product: "vfootball", line: 7.5, side: "under", event_rows: 4, walkforward_n: 10, walkforward_hit_rate: 1, walkforward_brier: 0.0006, walkforward_model_variant: "participant_model", qualification_status: "HIGH_LINE_UNDER_EVIDENCE_GATE_PENDING", betting_qualified: false },
+      { product: "vfootball", line: 8.5, side: "under", event_rows: 2, walkforward_n: 0, walkforward_hit_rate: null, walkforward_brier: null, walkforward_model_variant: null, qualification_status: "HIGH_LINE_UNDER_EVIDENCE_GATE_PENDING", betting_qualified: false }
+    ]
+  }
 }, new Date("2026-10-09T17:39:48.000Z"));
 assert.equal(facts.system_health.issue_count_check, "MATCH");
 assert.equal(facts.system_health.counted_issue_records_by_severity.critical, 0);
@@ -114,6 +126,14 @@ assert.equal(facts.artifacts.core_pipeline.status, "WITHIN_THRESHOLD");
 assert.equal(facts.odds_builder.evaluated_candidates, 1547);
 assert.equal(facts.odds_builder.live_value_candidates, 818);
 assert.equal(facts.odds_builder.rejected_candidates, 729);
+assert.ok(facts.flags.some(function(flag) { return flag.includes("TENNIS_FEED_EMPTY") && flag.includes("No current tennis predictions"); }));
+assert.ok(facts.flags.some(function(flag) { return flag.includes("tennis forward discovery") && flag.includes("cannot be treated as proof"); }));
+assert.equal(facts.tennis_forward_discovery.tours.ATP.events_seen, 236);
+assert.equal(facts.tennis_forward_discovery.tours.ATP.valid_singles, 0);
+assert.ok(facts.flags.some(function(flag) { return flag.includes("VFootball Under 7.5") && flag.includes("10/30"); }));
+assert.ok(facts.flags.some(function(flag) { return flag.includes("VFootball Under 8.5") && flag.includes("0/30"); }));
+assert.equal(facts.prediction_desk.publication_filters.past_kickoff_rows_hidden, 13);
+assert.equal(facts.artifacts.prediction_desk.status, "WITHIN_THRESHOLD");
 const sanitizedAnswer = sanitizeAnalystAnswer("Finding: 3 pipeline errors.\n\nEvidence: ```json\n{\"private\":\"raw data\"}\n```");
 assert.ok(sanitizedAnswer.includes("3 pipeline errors"));
 assert.ok(!sanitizedAnswer.includes("raw data"));
