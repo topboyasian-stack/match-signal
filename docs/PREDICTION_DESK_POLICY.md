@@ -36,6 +36,7 @@ Never infer evidence for Under 8.5 from Under 7.5 or another neighbouring line. 
 - Keep their upstream feed collection, Virtual Lab observations, settlement processing, existing user-ticket records, append-only history and model-evaluation artifacts. This policy is not permission to delete, rewrite or relabel historical records.
 - eFootball evidence thresholds remain in force, and every eFootball Builder leg must meet the active **80% minimum model-probability floor**. Prefer stronger evidence and probability; a high model estimate is not a guarantee.
 - Do not manufacture a batch to meet an odds target. When no eFootball combination passes current price, exact-line evidence, freshness, value, correlation and ticket gates, publish no Virtual batch and report the blocking reasons.
+- A separate **compact eFootball lane** may construct **4–5 legs at 2.00x+ combined odds** from already Builder-eligible eFootball GT/Adriatic exact-line/side evidence rows. It retains the 80% per-leg model floor, positive single-leg EV, current exact SportyBet quote and freshness gates, participant/event de-duplication, the 60-minute kickoff window, and at least +2% whole-ticket expected ROI. This is a research construction lane, not evidence that 4–5-leg tickets have proven results; its probability is an independence proxy until a suitable settled-ticket sample exists. It must not use VFootball/Zoom or fill missing slots with weaker legs.
 
 ## 6. Tennis discovery and publication
 
