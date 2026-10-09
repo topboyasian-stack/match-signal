@@ -240,7 +240,7 @@ jobs:
                 if (!body.includes('/reports.html')) failures.push(path+' missing retired-route redirect');
               }
               if (path==='/upcoming.html') {
-                for (const marker of ['Paper Odds Builder','expansion-odds-builder.js','oddsBuilder','Model estimate ≠ qualification. Exact-line prices stay visible; stale quotes cannot qualify or show a current edge.','2.70× floor','2.80× preferred','sport-hubs.js?v='])
+                for (const marker of ['Paper Odds Builder','expansion-odds-builder.js','oddsBuilder','Model estimate ≠ qualification. Exact-line prices stay visible; stale quotes cannot qualify or show a current edge.','2.70× floor','2.80× preferred','sport-hubs.js?v=20261009-deskfix3','Current-price gate passes','id="upLast"'])
                   if (!body.includes(marker)) failures.push(path+' missing '+marker);
                 if (body.includes('id="lineLadderDesk"') || body.includes('4.00+ target · no forced legs'))
                   failures.push(path+' contains retired line-ladder clutter or misleading Builder target');
@@ -276,7 +276,7 @@ jobs:
                 !body.includes('VFootball-specific 30-row/65% gate does not apply to this product') ||
                 !body.includes('grouped qualification conflicts')
               )) failures.push('/analyst.js missing deterministic facts or product-specific high-line Under qualification safeguards');
-              if (path==='/sport-hubs.js' && (!body.includes('EXACT_MARKET_LINE_SIDE_FRESH') || !body.includes('HIGH_LINE_UNDER_EVIDENCE_GATE_PENDING') || !body.includes('MODEL ESTIMATE ≥90% · NOT QUALIFIED') || !body.includes('SportyBet last seen @') || !body.includes('Exact-line SportyBet reference shown; current edge and qualification withheld'))) failures.push('/sport-hubs.js missing exact-quote, stale-reference visibility, high-line evidence or qualification protections');
+              if (path==='/sport-hubs.js' && (!body.includes('EXACT_MARKET_LINE_SIDE_FRESH') || !body.includes('HIGH_LINE_UNDER_EVIDENCE_GATE_PENDING') || !body.includes('MODEL ESTIMATE ≥90% · NOT QUALIFIED') || !body.includes('SportyBet last seen @') || !body.includes('NOT ACTIONABLE · PRICE STALE') || body.includes('MODEL GATE PASSED · PRICE STALE') || body.includes('class="ms-up-qual ') || body.includes('class="ms-market-q '))) failures.push('/sport-hubs.js missing exact-quote protection, actionable stale-price labeling or de-duplicated status display');
               if (path.endsWith('.json')) {
                 const parsed=JSON.parse(body);
                 if (path==='/data/unified_upcoming.json' && !Array.isArray(parsed.events)) failures.push(path+' missing events array');

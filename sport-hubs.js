@@ -175,18 +175,18 @@ function qualificationState(x){
   const quote=exactSportyBetQuote(x);
   if(quote.odds==null){
     const labels={
-      QUOTE_STALE:"MODEL GATE PASSED · PRICE STALE",
-      TIMESTAMP_UNVERIFIED:"MODEL GATE PASSED · QUOTE TIMESTAMP UNVERIFIED",
-      QUOTE_TIMESTAMP_IN_FUTURE:"MODEL GATE PASSED · QUOTE TIMESTAMP INVALID",
+      QUOTE_STALE:"NOT ACTIONABLE · PRICE STALE",
+      TIMESTAMP_UNVERIFIED:"NOT ACTIONABLE · QUOTE TIME UNVERIFIED",
+      QUOTE_TIMESTAMP_IN_FUTURE:"NOT ACTIONABLE · QUOTE TIME INVALID",
     };
-    return {modelQualified:true,currentPricePass:false,label:labels[quote.reason]||"MODEL GATE PASSED · PRICE UNVERIFIED",reason:quote.reason};
+    return {modelQualified:true,currentPricePass:false,label:labels[quote.reason]||"NOT ACTIONABLE · PRICE UNVERIFIED",reason:quote.reason};
   }
   const edge=exactMarketEdge(x,quote);
   if(edge==null){
-    return {modelQualified:true,currentPricePass:false,label:"MODEL GATE PASSED · VALUE UNVERIFIED",reason:"FRESH_TWO_SIDED_MARKET_REQUIRED"};
+    return {modelQualified:true,currentPricePass:false,label:"NOT ACTIONABLE · VALUE UNVERIFIED",reason:"FRESH_TWO_SIDED_MARKET_REQUIRED"};
   }
   if(edge<0.02){
-    return {modelQualified:true,currentPricePass:false,label:"MODEL GATE PASSED · CURRENT EDGE BELOW 2%",reason:"CURRENT_EDGE_BELOW_2_PERCENT",edge:edge};
+    return {modelQualified:true,currentPricePass:false,label:"NOT QUALIFIED · CURRENT EDGE BELOW 2%",reason:"CURRENT_EDGE_BELOW_2_PERCENT",edge:edge};
   }
   return {modelQualified:true,currentPricePass:true,label:"BETTING-QUALIFIED · PAPER",reason:"CURRENT_PRICE_GATE_PASSED",edge:edge};
 }
@@ -203,9 +203,6 @@ function unifiedMarketLine(x){
   const pick=String(x.pick||x.selection||"").toUpperCase();
   const market=isOverUnderPrediction(x)?("O/U "+pick+" "+(x.line??"")):marketLabel(x);
   const fairLabel=Number.isFinite(fair)?fair.toFixed(2):"—";
-  const qualification=qualificationState(x);
-  const qualified=qualification.currentPricePass;
-  const modelQualified=qualification.modelQualified;
   const marketReference=book!=null
     ?("SportyBet @ "+book.toFixed(2))
     :displayBook!=null
@@ -214,8 +211,6 @@ function unifiedMarketLine(x){
   const marketQuoteClass=book!=null?"ms-book-live":displayBook!=null?"ms-book-stale":"ms-book-missing";
   const edgeLabel=edge!=null?((edge>=0?"+":"")+(edge*100).toFixed(1)+"%"):"— (requires fresh two-sided exact market)";
   const evidence=evidenceLabel(x);
-  const q=qualification.label;
-  const candidateBand=String(x.model_candidate_status||"").replaceAll("_"," ");
   return '<div class="ms-market-row">'+
     '<span class="ms-market-name"><b>'+E(market)+'</b></span>'+
     '<span>Model estimate <b>'+(p==null?"—":P(p))+'</b></span>'+
@@ -223,8 +218,7 @@ function unifiedMarketLine(x){
     '<span>Evidence <b>'+E(String(evidence||"unavailable"))+'</b></span>'+
     '<span class="'+marketQuoteClass+'">'+E(marketReference)+'</span>'+
     '<span>Edge <b>'+E(edgeLabel)+'</b></span>'+
-    '<span class="ms-market-q '+(qualified?"qualified":"paper")+'">'+E(q)+'</span>'+
-  '</div>'+(candidateBand||modelQualified&&!qualified?'<div class="ms-fixture-band-note">'+(candidateBand?'Model band: '+E(candidateBand)+' · this label is not betting qualification. ':'')+(modelQualified&&!qualified?'Saved model status: '+E(String(x.qualification_status||"BETTING_QUALIFIED").replaceAll("_"," "))+' · current price gate: '+E(qualification.reason.replaceAll("_"," "))+'.':'')+'</div>':'');
+  '</div>';
 }
 function primaryPrediction(rows){
   const rank=x=>{
@@ -294,14 +288,13 @@ function unifiedRow(group){
     candidateBand==="MODEL_80_PLUS"?"MODEL ESTIMATE ≥80% · NOT QUALIFIED":
     candidateBand==="MODEL_70_PLUS"?"MODEL ESTIMATE ≥70% · NOT QUALIFIED":
     (live?"LIVE RESEARCH · NOT QUALIFIED":"MODEL RESEARCH · NOT QUALIFIED"))));
-  const q=settled?(won?"SETTLED · ✓":"SETTLED · ✕"):qualification.label;
   return '<article class="ms-up-row ms-fixture-card">'+
     '<div class="ms-up-time"><b>'+E(when)+'</b><span>'+E(String(x.start_time||"").slice(0,10))+'</span></div>'+
     '<div class="ms-up-event"><div class="ms-up-meta"><span class="ms-sport-pill">'+sportIcon(x.sport)+' '+E(x.sport==="table_tennis"?"Table Tennis":(x.sport||"Sport"))+'</span><span>'+E(x.league||x.competition||"Unclassified")+'</span><span class="ms-fixture-market-count">1 prediction</span></div>'+
     '<div class="ms-up-match">'+E(x.player_1||x.home||"Participant 1")+' <span>vs</span> '+E(x.player_2||x.away||"Participant 2")+'</div>'+
     '<div class="ms-market-stack">'+unifiedMarketLine(x)+'</div>'+
-    '<div class="ms-fixture-foot"><span class="'+(settled?(won?"ms-settled-win":"ms-settled-loss"):"")+'">'+E(q)+'</span><span>'+E(settled?("Result "+(x.final_score||x.settlement_result||"recorded")):(book!=null?"Fresh exact market/line/side quote":displayBook!=null?"Exact-line SportyBet reference shown; current edge and qualification withheld":"No verifiable exact-line quote; edge withheld"))+'</span></div></div>'+
-    '<div class="ms-up-status"><span class="ms-up-status-badge '+(settled?(won?"deep":"research"):(qualified?"deep":live?"testing":"research"))+'">'+E(status)+'</span><span class="ms-up-qual '+(settled?"paper":qualified?"qualified":"paper")+'">'+E(settled?"SETTLED HISTORY":qualified?"BETTING-QUALIFIED":"PAPER · PRICE/QUALIFICATION GATE PENDING")+'</span><small>'+E(evidenceLabel(x))+'</small></div>'+
+    (settled?'<div class="ms-fixture-foot"><span class="'+(won?"ms-settled-win":"ms-settled-loss")+'">'+E(won?"SETTLED · ✓ WIN":"SETTLED · ✕ LOSS")+'</span><span>'+E("Result "+(x.final_score||x.settlement_result||"recorded"))+'</span></div>':'')+'</div>'+
+    '<div class="ms-up-status"><span class="ms-up-status-badge '+(settled?(won?"deep":"research"):(qualified?"deep":live?"testing":"research"))+'">'+E(status)+'</span></div>'+
   '</article>';
 }
 async function renderUnifiedBoard(){
@@ -366,6 +359,17 @@ async function renderUnifiedBoard(){
       const labels=['football_tennis','football','football'];
       all=chunks.flatMap((rows,i)=>rows.map(r=>normalize(r,labels[i]))).filter(x=>x.start_time);
       payload.generated_at=new Date().toISOString();
+    }
+    const generatedAt=Date.parse(String(payload?.generated_at||""));
+    const generatedEl=Q('#upLast');
+    if(generatedEl){
+      if(Number.isFinite(generatedAt)){
+        generatedEl.textContent=new Date(generatedAt).toLocaleString([], {month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
+        generatedEl.title=new Date(generatedAt).toISOString();
+      }else{
+        generatedEl.textContent="Timestamp unavailable";
+        generatedEl.title="The upstream board artifact did not include a valid generated_at timestamp.";
+      }
     }
     const candidateMap=new Map(selectedRows.map(x=>{
       const event=String(x?.event_id||x?.id||"");
@@ -622,8 +626,16 @@ async function renderUnifiedBoard(){
         const label=new Date(day+"T00:00:00Z").toLocaleDateString([], {weekday:"long",month:"short",day:"numeric"});
         return '<section class="ms-up-day"><div class="ms-up-day-head"><h3>'+E(label)+'</h3><span>'+groupsForDay.length+' fixtures</span></div>'+groupsForDay.map(unifiedRow).join("")+'</section>';
       }).join(""):'<div class="ms-empty">No future fixtures match these filters. The engines remain active and the board will refresh with the next generated window.</div>';
-      const qualified=filteredRows.filter(x=>x.betting_qualified).length;
-      const strong=filteredRows.filter(x=>Number(probabilityValue(x))>=0.80).length;
+      // Count only the primary prediction displayed per fixture, and only if
+      // the current exact-line price/value gate passes for that displayed row.
+      const qualified=groups.filter(group=>{
+        const row=primaryPrediction(group.rows);
+        return Boolean(row&&qualificationState(row).currentPricePass);
+      }).length;
+      const strong=groups.filter(group=>{
+        const row=primaryPrediction(group.rows);
+        return Boolean(row&&Number(probabilityValue(row))>=0.80);
+      }).length;
       Q('#upCount').textContent=groups.length;
       const sEl=Q('#upStrong'); if(sEl)sEl.textContent=strong;
       const qEl=Q('#upQualified'); if(qEl)qEl.textContent=qualified;
