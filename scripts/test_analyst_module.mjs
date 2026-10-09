@@ -105,7 +105,7 @@ assert.equal(facts.system_health.issue_count_check, "MATCH");
 assert.equal(facts.system_health.counted_issue_records_by_severity.critical, 0);
 assert.equal(facts.pipeline.error_count, 3, "pipeline errors must use the source's exact count");
 assert.equal(facts.pipeline.market_matching.coverage_denominator, 120);
-assert.ok(Math.abs(facts.pipeline.market_matching.calculated_coverage - (58 / 120)) < 1e-9);
+assert.ok(Math.abs(facts.pipeline.market_matching.calculated_coverage - (58 / 120)) < 1e-6, "coverage is rounded to six decimal places");
 assert.equal(facts.builder_ticket_results.settled_tickets, 32);
 assert.equal(facts.builder_ticket_results.ticket_accuracy_excluding_pending, 0.15625);
 assert.equal(facts.builder_ticket_results.ticket_shape_records[0].settled_tickets, 13);
