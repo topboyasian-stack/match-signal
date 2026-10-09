@@ -192,7 +192,7 @@ function unifiedMarketLine(x){
   const edgeLabel=edge!=null?((edge>=0?"+":"")+(edge*100).toFixed(1)+"%"):"— (requires fresh two-sided exact market)";
   const evidence=evidenceLabel(x);
   const q=qualification.label;
-  const candidateBand=String(x.model_candidate_status||x.candidate_status||"").replaceAll("_"," ");
+  const candidateBand=String(x.model_candidate_status||"").replaceAll("_"," ");
   return '<div class="ms-market-row">'+
     '<span class="ms-market-name"><b>'+E(market)+'</b></span>'+
     '<span>Model estimate <b>'+(p==null?"—":P(p))+'</b></span>'+
