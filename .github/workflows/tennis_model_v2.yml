@@ -23,8 +23,8 @@ permissions:
   contents: write
 
 concurrency:
-  # Serialize shared prediction/data artifacts with the core prediction publisher.
-  group: match-signal-data-publish
+  # Keep this model's run serialization separate; publish uses a retry/rebuild if main advances.
+  group: match-signal-tennis-model-v2
   cancel-in-progress: false
 
 jobs:
