@@ -41,7 +41,7 @@ on:
     types: [completed]
   schedule:
     # Refresh research diagnostics and full-market discovery builder every 15 minutes.
-    # Paper-builder validation: 2.70x is the active combined-odds floor; 2.80x remains preferred until earned; leg count is adaptive from 2–4 and no weak leg may be added just to reach the floor.
+    # Standard lane: 2.70x active floor / 2.80x preferred; compact eFootball lane: 4–5 exact-evidence legs at 2.00x+ while preserving every leg/quote/value gate; no weak leg may be added just to reach a floor.
     - cron: '*/15 * * * *'
   workflow_dispatch:
 
@@ -87,6 +87,8 @@ jobs:
         run: python scripts/odds_builder.py
       - name: Regression-check eFootball recent spoiler guard
         run: python scripts/test_odds_builder_efootball_spoiler.py
+      - name: Test compact eFootball ticket construction
+        run: python scripts/test_compact_efootball_builder.py
       - name: Syntax-check shadow line-ladder module
         run: python -m py_compile scripts/line_ladder_research.py
       - name: Run shadow directional line-ladder research
@@ -138,7 +140,9 @@ jobs:
               assert int(data.get('batch_policy', {}).get('results_first_max_legs', 4)) <= 4
           assert len(data['qualified_legs']) <= 20
           if data['qualified_legs']:
-              assert float(data.get('market_price_combined_odds', 0)) >= float(policy.get('minimum_combined_odds', 1.0))
+              lane=str((data.get('batch_policy') or {}).get('primary_lane') or '')
+              selected_floor=2.00 if lane=='efootball_compact_2x' else float(policy.get('minimum_combined_odds', 1.0))
+              assert float(data.get('market_price_combined_odds', 0)) >= selected_floor
           if data.get('status') == 'UPSTREAM_RESEARCH_GATE_BLOCKED':
               assert not data['qualified_legs']
           for leg in data['qualified_legs']:
@@ -171,10 +175,18 @@ jobs:
           for batch in batches:
               assert batch.get('batch_id') not in seen_batch_ids
               seen_batch_ids.add(batch.get('batch_id'))
-              assert float(batch.get('combined_odds', 0)) >= float(data.get('batch_policy', {}).get('min_combined_odds', 2.0))
+              lane = str(batch.get('primary_lane') or '')
+              legs_in_batch = int(batch.get('leg_count', len(batch.get('legs', []))))
+              batch_odds = float(batch.get('combined_odds', 0))
+              if lane == 'efootball_compact_2x':
+                  assert 4 <= legs_in_batch <= 5
+                  assert batch_odds >= 2.00
+              else:
+                  assert 2 <= legs_in_batch <= 4
+                  assert batch_odds >= float(data.get('batch_policy', {}).get('min_combined_odds', 2.0))
               if data.get('status') == 'RESULTS_FIRST_SET':
-                  assert int(batch.get('leg_count', len(batch.get('legs', [])))) <= int(data.get('batch_policy', {}).get('results_first_max_legs', 4))
-              assert int(batch.get('leg_count', len(batch.get('legs', [])))) >= 2
+                  assert legs_in_batch <= int(data.get('batch_policy', {}).get('results_first_max_legs', 4))
+              assert legs_in_batch >= 2
               assert batch.get('paper_only') is True
               assert batch.get('real_money_execution') is False
               assert float(batch.get('combined_model_rating', 0)) >= 0
@@ -184,14 +196,18 @@ jobs:
               products = {str(x.get('product') or '') for x in batch.get('legs', [])}
               lane = str(batch.get('primary_lane') or '')
               efootball_value_lane = (
-                  (lane in {'model_first_value','efootball_exact_evidence_value'})
+                  (lane in {'model_first_value','efootball_exact_evidence_value','efootball_compact_2x'})
                   and products
                   and all(p.startswith('efootball_') for p in products)
               )
+              if lane == 'efootball_compact_2x':
+                  required = 0.80
+                  assert set(products) <= {'efootball_gt','efootball_adriatic'}
+                  assert all(str(leg.get('qualification_lane') or '') == 'efootball_exact_evidence_value' for leg in batch.get('legs', []))
               if efootball_value_lane:
                   # Isolated evidence-value fallback: exact-side eFootball evidence
                   # has a 65% minimum; this is VALUE_RESEARCH, not high-confidence.
-                  required = 0.65
+                  required = 0.80 if lane == 'efootball_compact_2x' else 0.65
                   assert all(
                       str(leg.get('qualification_lane') or '') == 'efootball_exact_evidence_value'
                       for leg in batch.get('legs', [])
@@ -203,7 +219,10 @@ jobs:
                       float(batch.get('combined_model_probability', 0))
                       * float(batch.get('combined_odds', 0)) - 1.0
                   ) >= 0.02, 'eFootball value batch expected ROI floor failed'
-              assert 2 <= leg_count <= 4
+              if lane == 'efootball_compact_2x':
+                  assert 4 <= leg_count <= 5
+              else:
+                  assert 2 <= leg_count <= 4
               assert all(float(leg.get('model_probability', 0)) >= required for leg in batch.get('legs', [])), 'adaptive per-leg safety threshold failed'
               leg_ids = [str(x.get('event_id')) for x in batch.get('legs', [])]
               assert len(leg_ids) == len(set(leg_ids)), 'duplicate event inside batch'
@@ -289,7 +308,7 @@ jobs:
           git push origin main
           GH_TOKEN="${{ github.token }}" gh workflow run cloudflare-pages.yml --ref main
 
-      - name: Notify subscribed devices about new 2.70+ batches
+      - name: Notify subscribed devices about newly qualified Builder batches
         continue-on-error: true
         run: |
           python - <<'PY'
@@ -299,9 +318,14 @@ jobs:
           data=json.loads(Path('data/odds_builder.json').read_text(encoding='utf-8'))
           gate=((data.get('research_gate') or {}).get('combined_odds_gate') or {})
           floor=float(gate.get('floor') or 2.70)
-          batches=[b for b in (data.get('batches') or []) if float(b.get('combined_odds') or 0) >= floor and len(b.get('legs') or []) >= 2]
+          batches=[]
+          for b in (data.get('batches') or []):
+              lane=str(b.get('primary_lane') or '')
+              batch_floor=2.00 if lane=='efootball_compact_2x' else floor
+              if float(b.get('combined_odds') or 0)>=batch_floor and len(b.get('legs') or [])>=2:
+                  batches.append(b)
           if not batches:
-              print(f'No batch at active floor {floor:.2f}x.')
+              print(f'No batch meets its lane-specific odds floor (standard {floor:.2f}x; compact eFootball 2.00x).')
               raise SystemExit(0)
           payload=json.dumps({'batches':batches}).encode('utf-8')
           req=urllib.request.Request(

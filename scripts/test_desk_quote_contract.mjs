@@ -9,6 +9,7 @@ const css = fs.readFileSync("sport-hubs.css", "utf8");
 const builderSource = fs.readFileSync("scripts/odds_builder.py", "utf8");
 const candidateCollectorSource = fs.readFileSync("scripts/selection_candidate_collector.py", "utf8");
 const builderUiSource = fs.readFileSync("expansion-odds-builder.js", "utf8");
+const pushBatchSource = fs.readFileSync("functions/api/push-batch-available.js", "utf8");
 const start = source.indexOf("function isOverUnderPrediction(x)");
 const end = source.indexOf("function qualificationState(x)", start);
 assert.ok(start >= 0 && end > start, "quote contract helpers must remain in the public Desk bundle");
@@ -116,8 +117,21 @@ assert.equal(isActiveVirtualBatch({products:["vfootball"],legs:[{sport:"virtual"
 assert.equal(isActiveVirtualBatch({products:["efootball_gt","vfootball"],legs:[{sport:"virtual",product:"efootball_gt",model_probability:0.83},{sport:"virtual",product:"vfootball"}]}), false);
 assert.equal(isActiveVirtualBatch({products:["zoom"],legs:[{sport:"virtual",product:"zoom"}]}), false);
 assert.match(builderUiSource, /ACTIVE_VIRTUAL_MIN_PROBABILITY = 0\.80/);
+assert.match(builderUiSource, /primaryLane==='efootball_compact_2x'/);
+assert.match(builderUiSource, /4–5 LEGS · 2\.00\+/);
+assert.match(builderUiSource, /standard batches at 2\.70x\+ and compact eFootball batches at 2\.00x\+/);
+assert.match(builderUiSource, /Compact eFootball ticket lane/);
 assert.match(builderUiSource, /data\.batches\)\?data\.batches\.filter\(isActiveVirtualBatch\)/);
 assert.match(builderUiSource, /ensureBookingCodes\(activeBatches\)/);
+
+// Background alerts must honour the separate compact eFootball floor rather than
+// applying the standard 2.70x gate to every batch.
+assert.match(pushBatchSource, /lane === "efootball_compact_2x"/);
+assert.match(pushBatchSource, /const batchFloor = compact \? compactFloor : activeFloor/);
+assert.match(pushBatchSource, /const minimumLegs = compact \? 4 : 2/);
+assert.match(pushBatchSource, /efootball_exact_evidence_value/);
+assert.match(pushBatchSource, /Number\(leg\?\.model_probability \|\| 0\) < 0\.80/);
+assert.match(pushBatchSource, /Compact eFootball/);
 
 // Display-only reference odds must remain separate from current-edge logic.
 assert.match(source, /const displayBook=quote\.displayOdds==null\?book:quote\.displayOdds;/);

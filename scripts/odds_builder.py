@@ -11,7 +11,7 @@ Research/paper-trading only. A candidate is eligible only when:
 - data/price freshness and uncertainty gates pass,
 - correlated selections are not duplicated in the same accumulator.
 
-No wager is placed and no leg count is forced; the adaptive construction range is 2–4 legs.
+The standard ticket lane remains 2–4 legs at the earned 2.70x/2.80x odds policy. A separate compact eFootball lane may construct 4–5 exact-evidence legs at 2.00x+ only when every normal leg/evidence/value/correlation gate passes. Neither lane forces a ticket or places a wager.
 """
 from __future__ import annotations
 import json, math, urllib.parse, urllib.request
@@ -89,6 +89,15 @@ MODEL_FIRST_MIN_AVG_PROBABILITY=0.68
 # Apply the same 80% per-leg safety floor to the eFootball fallback constructor.
 EFOOTBALL_VALUE_MIN_AVG_PROBABILITY=0.80
 EFOOTBALL_VALUE_MIN_LEG_PROBABILITY=0.80
+
+# Separate compact ticket shape matching the lower-odds eFootball examples.
+# Existing per-leg/evidence/price/value gates stay intact.
+COMPACT_EFOOTBALL_MIN_LEGS=4
+COMPACT_EFOOTBALL_MAX_LEGS=5
+COMPACT_EFOOTBALL_MIN_COMBINED_ODDS=2.00
+COMPACT_EFOOTBALL_MIN_EXPECTED_ROI=0.02
+COMPACT_EFOOTBALL_MAX_KICKOFF_SPAN_MINUTES=MAX_BATCH_KICKOFF_SPAN_MINUTES
+COMPACT_EFOOTBALL_SEARCH_FRONTIER=30
 
 # VFootball and Zoom remain observable in the feed, Virtual Lab, settlements,
 # and historical archives, but they cannot contribute to active Virtual batches.
@@ -2231,6 +2240,114 @@ def _construct_efootball_value_batch(pool, min_odds=None, max_legs=RESULTS_FIRST
         "search_mode":"no_valid_shape"
     }
 
+def _construct_efootball_compact_batch(pool):
+    """Construct a compact 4–5 leg eFootball ticket without relaxing leg gates.
+
+    Only already Builder-eligible, exact-evidence eFootball GT/Adriatic rows are
+    considered. Each leg clears the 80% floor and positive single-leg EV; the
+    ticket reaches 2.00x and at least +2% modelled EV. Joint probability is an
+    independence proxy, not settled ticket proof.
+    """
+    rows=[
+        x for x in pool
+        if isinstance(x,dict)
+        and str(x.get("qualification_lane") or "")=="efootball_exact_evidence_value"
+        and str(x.get("product") or "") in ACTIVE_VIRTUAL_PRODUCTS
+        and float(x.get("model_probability") or 0.0)>=EFOOTBALL_VALUE_MIN_LEG_PROBABILITY
+        and float(x.get("expected_value") or 0.0)>=0.0
+        and float(x.get("bookmaker_odds") or 0.0)>1.0
+        and x.get("builder_eligible") is True
+    ]
+    def _holdout_rate(row):
+        holdout=_efootball_holdout_selection(row)
+        return float(holdout.get("hit_rate") or 0.0) if holdout else 0.0
+    rows=sorted(rows,key=lambda x:(
+        -float(x.get("model_probability") or 0.0),
+        -float(x.get("evidence_score") or 0.0),
+        -_holdout_rate(x),
+        -float(x.get("model_edge") or 0.0),
+        -float(x.get("bookmaker_odds") or 1.0),
+        _kickoff_timestamp(x) if _kickoff_timestamp(x) is not None else float("inf")
+    ))
+    frontier=rows[:COMPACT_EFOOTBALL_SEARCH_FRONTIER]
+    diag={
+        "enabled":True,
+        "candidate_count":len(rows),
+        "search_frontier":len(frontier),
+        "min_legs":COMPACT_EFOOTBALL_MIN_LEGS,
+        "max_legs":COMPACT_EFOOTBALL_MAX_LEGS,
+        "min_combined_odds":COMPACT_EFOOTBALL_MIN_COMBINED_ODDS,
+        "min_per_leg_probability":EFOOTBALL_VALUE_MIN_LEG_PROBABILITY,
+        "min_expected_roi":COMPACT_EFOOTBALL_MIN_EXPECTED_ROI,
+        "max_kickoff_span_minutes":COMPACT_EFOOTBALL_MAX_KICKOFF_SPAN_MINUTES,
+        "combinations_checked":0,
+        "rejected_correlated":0,
+        "rejected_kickoff_span":0,
+        "rejected_odds_floor":0,
+        "rejected_expected_roi":0,
+        "shape":None,
+        "combined_odds":None,
+        "combined_probability":None,
+        "expected_roi":None,
+        "reason":"not_enough_eligible_efootball_legs" if len(frontier)<COMPACT_EFOOTBALL_MIN_LEGS else "no_compact_combination_passed_all_gates"
+    }
+    if len(frontier)<COMPACT_EFOOTBALL_MIN_LEGS:
+        return [],diag
+    import itertools
+    best=None
+    for shape in range(COMPACT_EFOOTBALL_MIN_LEGS,COMPACT_EFOOTBALL_MAX_LEGS+1):
+        if len(frontier)<shape:
+            continue
+        for combo in itertools.combinations(frontier,shape):
+            diag["combinations_checked"]+=1
+            event_ids=[str(x.get("event_id") or "") for x in combo if x.get("event_id")]
+            participants=[p for row in combo for p in _participants(row)]
+            if len(event_ids)!=len(set(event_ids)) or len(participants)!=len(set(participants)):
+                diag["rejected_correlated"]+=1
+                continue
+            span=_batch_kickoff_span_minutes(combo)
+            if span>COMPACT_EFOOTBALL_MAX_KICKOFF_SPAN_MINUTES:
+                diag["rejected_kickoff_span"]+=1
+                continue
+            odds=math.prod(float(x.get("bookmaker_odds") or 1.0) for x in combo)
+            if odds+1e-12<COMPACT_EFOOTBALL_MIN_COMBINED_ODDS:
+                diag["rejected_odds_floor"]+=1
+                continue
+            metrics=_batch_metrics(list(combo))
+            probability=float(metrics.get("combined_model_probability") or 0.0)
+            roi=probability*odds-1.0
+            if roi+1e-12<COMPACT_EFOOTBALL_MIN_EXPECTED_ROI:
+                diag["rejected_expected_roi"]+=1
+                continue
+            score=(
+                probability,
+                min(float(x.get("model_probability") or 0.0) for x in combo),
+                float(metrics.get("avg_model_probability") or 0.0),
+                sum(float(x.get("evidence_score") or 0.0) for x in combo)/len(combo),
+                float(metrics.get("avg_model_edge_percent") or 0.0),
+                -len(combo),
+                -span,
+                odds
+            )
+            if best is None or score>best[0]:
+                best=(score,list(combo),metrics,odds,span,roi)
+    if best is None:
+        return [],diag
+    selected=sorted(best[1],key=lambda x:(
+        _kickoff_timestamp(x) if _kickoff_timestamp(x) is not None else float("inf")
+    ))
+    diag.update({
+        "shape":len(selected),
+        "combined_odds":round(float(best[3]),3),
+        "combined_probability":best[2].get("combined_model_probability"),
+        "expected_roi":round(float(best[5]),6),
+        "span_minutes":round(float(best[4]),1),
+        "reason":"qualified_compact_efootball_combination",
+        "probability_method":"exact-evidence per-leg probabilities multiplied as an independence proxy; not settled-ticket performance proof"
+    })
+    return selected,diag
+
+
 def _construct_model_first_batch(
     pool,
     max_legs=MAX_LEGS,
@@ -2945,6 +3062,14 @@ def build_value_batches(candidates):
     No extra leg is added merely to reach a target.
     """
     built=[make_leg(x) for x in candidates]
+    compact_efootball_diag={
+        "enabled":True,
+        "candidate_count":0,
+        "min_legs":COMPACT_EFOOTBALL_MIN_LEGS,
+        "max_legs":COMPACT_EFOOTBALL_MAX_LEGS,
+        "min_combined_odds":COMPACT_EFOOTBALL_MIN_COMBINED_ODDS,
+        "reason":"not_reached_before_existing_lanes"
+    }
     # Diagnostic-only snapshot of the settled 2–4-leg construction lane.
     # This does not alter eligibility or selection; it only exposes why a shape
     # cannot currently be promoted when the Builder returns NO_BET.
@@ -3411,6 +3536,13 @@ def build_value_batches(candidates):
             if secondary_batch:
                 secondary_lane="efootball_exact_evidence_value"
                 secondary_avg_threshold=EFOOTBALL_VALUE_MIN_AVG_PROBABILITY
+        # Separate route for compact 4–5 leg tickets; all per-leg and value gates persist.
+        if not secondary_batch and efootball_secondary_pool:
+            compact_batch,compact_efootball_diag=_construct_efootball_compact_batch(efootball_secondary_pool)
+            if compact_batch:
+                secondary_batch=compact_batch
+                secondary_lane="efootball_compact_2x"
+                secondary_avg_threshold=EFOOTBALL_VALUE_MIN_AVG_PROBABILITY
         # Only use the generic constructor for genuinely non-eFootball candidates.
         if not secondary_batch and non_efootball_secondary_pool:
             secondary_batch=_construct_model_first_batch(
@@ -3426,6 +3558,11 @@ def build_value_batches(candidates):
                 x for x in secondary_batch
                 if float(x.get("model_probability") or 0.0)>=EFOOTBALL_VALUE_MIN_LEG_PROBABILITY
             ]
+        secondary_min_combined_odds=(
+            COMPACT_EFOOTBALL_MIN_COMBINED_ODDS
+            if secondary_lane=="efootball_compact_2x"
+            else active_min_combined_odds()
+        )
         if len(secondary_batch)>=BATCH_MIN_LEGS:
             secondary_batch=sorted(
                 secondary_batch,
@@ -3438,12 +3575,16 @@ def build_value_batches(candidates):
             if (
                 secondary_span<=MODEL_FIRST_MAX_KICKOFF_SPAN_MINUTES
                 and float(secondary_metrics.get("avg_model_probability") or 0.0)>=secondary_avg_threshold
-                and secondary_combined>=active_min_combined_odds()
+                and secondary_combined>=secondary_min_combined_odds
                 and secondary_roi>=RESULTS_FIRST_MIN_EXPECTED_ROI
             ):
                 batches.append({
                     "batch_id":"BATCH-01",
-                    "label":f"BATCH-01 · Value Model Rating {secondary_metrics['model_rating']:.1f}/100",
+                    "label":(
+                        f"BATCH-01 · Compact eFootball 2x Model Rating {secondary_metrics['model_rating']:.1f}/100"
+                        if secondary_lane=="efootball_compact_2x"
+                        else f"BATCH-01 · Value Model Rating {secondary_metrics['model_rating']:.1f}/100"
+                    ),
                     "rank_pending":False,
                     "rank":1,
                     "legs":secondary_batch,
@@ -3461,19 +3602,45 @@ def build_value_batches(candidates):
                     "paper_only":True,
                     "real_money_execution":False,
                     "correlation_policy":"same-event and participant reuse prevented; all legs independently Builder-eligible",
-                    "construction_objective":"maximize whole-ticket model probability subject to the fixed 4.00+ odds floor; never add a leg after the model frontier cannot support the required ROI"
+                    "construction_objective":(
+                        "construct 4–5 exact-evidence eFootball legs at 2.00x+ only when every leg is Builder-eligible and whole-ticket expected ROI is at least 2%; do not fill missing slots"
+                        if secondary_lane=="efootball_compact_2x"
+                        else "maximize whole-ticket model probability within the active odds floor; do not add weak legs to meet it"
+                    )
                 })
                 return batches,built,{
                     "batch_count":1,
                     "max_batches":1,
                     "disjoint":True,
-                    "min_combined_odds":active_min_combined_odds(),
-                    "target_combined_odds":TARGET_COMBINED_ODDS,
+                    "min_combined_odds":secondary_min_combined_odds,
+                    "target_combined_odds":(
+                        COMPACT_EFOOTBALL_MIN_COMBINED_ODDS
+                        if secondary_lane=="efootball_compact_2x"
+                        else TARGET_COMBINED_ODDS
+                    ),
                     "accuracy_preservation_ratio":ACCURACY_PRESERVATION_RATIO,
-                    "construction_priority":"model_first_value_fallback",
-                    "priority_product":"mixed",
-                    "max_legs":RESULTS_FIRST_MAX_LEGS,
-                    "construction_shapes_considered":list(RESULTS_FIRST_CONSTRUCTION_LEG_COUNTS),
+                    "construction_priority":(
+                        "compact_efootball_2x" if secondary_lane=="efootball_compact_2x"
+                        else "model_first_value_fallback"
+                    ),
+                    "priority_product":(
+                        "efootball_gt_or_adriatic" if secondary_lane=="efootball_compact_2x"
+                        else "mixed"
+                    ),
+                    "max_legs":(
+                        COMPACT_EFOOTBALL_MAX_LEGS if secondary_lane=="efootball_compact_2x"
+                        else RESULTS_FIRST_MAX_LEGS
+                    ),
+                    "adaptive_leg_counts":(
+                        [COMPACT_EFOOTBALL_MIN_LEGS,COMPACT_EFOOTBALL_MAX_LEGS]
+                        if secondary_lane=="efootball_compact_2x"
+                        else list(RESULTS_FIRST_CONSTRUCTION_LEG_COUNTS)
+                    ),
+                    "construction_shapes_considered":(
+                        [COMPACT_EFOOTBALL_MIN_LEGS,COMPACT_EFOOTBALL_MAX_LEGS]
+                        if secondary_lane=="efootball_compact_2x"
+                        else list(RESULTS_FIRST_CONSTRUCTION_LEG_COUNTS)
+                    ),
                     "promoted_construction_leg_count":promoted_shape,
                     "max_kickoff_span_minutes":MAX_BATCH_KICKOFF_SPAN_MINUTES,
                     "builder_horizon_minutes":MAX_BUILDER_HORIZON_MINUTES,
@@ -3489,6 +3656,8 @@ def build_value_batches(candidates):
                     "secondary_min_avg_model_probability":secondary_avg_threshold,
                     "secondary_efootball_value_lane":secondary_lane=="efootball_exact_evidence_value",
                     "secondary_efootball_constructor_diagnostics":efootball_constructor_diag,
+                    "secondary_efootball_compact_lane":secondary_lane=="efootball_compact_2x",
+                    "secondary_efootball_compact_diagnostics":compact_efootball_diag,
                     "secondary_ticket_calibration_mode":(
                         "efootball_exact_evidence_independence_proxy"
                         if secondary_lane=="efootball_exact_evidence_value"
@@ -3524,6 +3693,7 @@ def build_value_batches(candidates):
             min_odds=active_min_combined_odds()
         ),
         "secondary_efootball_constructor_diagnostics":efootball_constructor_diag,
+        "secondary_efootball_compact_diagnostics":compact_efootball_diag,
         "mixed_pool_eligible_legs":sum(1 for x in eligible_all if str(x.get("qualification_lane") or "") in {"vfootball_exact_evidence_value","vfootball_event_holdout_value","efootball_exact_evidence_value"}),
         "mixed_max_kickoff_span_minutes":MIXED_RESEARCH_MAX_KICKOFF_SPAN_MINUTES,
         "mixed_diagnostics":mixed_diag,
@@ -3670,9 +3840,11 @@ def main():
     selected=[x for x in selected if str(x.get("event_id")) not in settled_ids]
     sports=sorted({x["sport"] for x in selected})
     primary_lane=str(primary.get("primary_lane") or "") if primary else ""
+    compact_efootball_lane=primary_lane=="efootball_compact_2x"
+    selected_min_combined_odds=COMPACT_EFOOTBALL_MIN_COMBINED_ODDS if compact_efootball_lane else active_min_combined_odds()
     results_first_met=bool(selected) and len(selected)>=BATCH_MIN_LEGS and primary_lane=="vfootball"
     odds_gate=combined_odds_gate_state()
-    value_floor_met=bool(selected) and len(selected)>=BATCH_MIN_LEGS and combined>=active_min_combined_odds()
+    value_floor_met=bool(selected) and len(selected)>=BATCH_MIN_LEGS and combined>=selected_min_combined_odds
     preferred_target_met=bool(selected) and combined>=TARGET_COMBINED_ODDS
     accuracy_floor_met=results_first_met
     status=("PHASE2_CYCLICAL_SET" if primary_lane=="phase2_cyclical_loop" and value_floor_met else
@@ -3686,7 +3858,7 @@ def main():
         rejection_counts[leg_status]=rejection_counts.get(leg_status,0)+1
     result={
         "generated_at":now.isoformat(),"engine_version":"V6.1-RESEARCH-GATED",
-        "mode":"PAPER_ONLY","target_legs":f"adaptive 2–4 legs; {odds_gate['floor']:.2f}x active minimum / {odds_gate['preferred_target']:.2f}x preferred combined odds","sports_supported":["football","tennis","virtual"],
+        "mode":"PAPER_ONLY","target_legs":f"standard 2–4 legs at {odds_gate['floor']:.2f}x active minimum / {odds_gate['preferred_target']:.2f}x preferred; compact eFootball 4–5 legs at {COMPACT_EFOOTBALL_MIN_COMBINED_ODDS:.2f}x+ when all gates pass","sports_supported":["football","tennis","virtual"],
         "research_gate":{
             "selection_gate_status":gate_status,
             "combined_odds_gate":odds_gate,
@@ -3718,6 +3890,20 @@ def main():
             }
         },
         "selection_policy":{"min_calibrated_probability":MIN_PROB,"virtual_min_probability":VIRTUAL_MIN_PROB,"virtual_builder_lines":"all current O/U lines with exact-side evidence; no forced line list","minimum_combined_odds":active_min_combined_odds(),
+            "compact_efootball_ticket_lane":{
+                "enabled":True,
+                "active_products":sorted(ACTIVE_VIRTUAL_PRODUCTS),
+                "qualification_lane":"efootball_exact_evidence_value",
+                "min_legs":COMPACT_EFOOTBALL_MIN_LEGS,
+                "max_legs":COMPACT_EFOOTBALL_MAX_LEGS,
+                "min_combined_odds":COMPACT_EFOOTBALL_MIN_COMBINED_ODDS,
+                "min_per_leg_model_probability":EFOOTBALL_VALUE_MIN_LEG_PROBABILITY,
+                "min_single_leg_expected_value":0.0,
+                "min_expected_ticket_roi":COMPACT_EFOOTBALL_MIN_EXPECTED_ROI,
+                "max_kickoff_span_minutes":COMPACT_EFOOTBALL_MAX_KICKOFF_SPAN_MINUTES,
+                "settled_ticket_performance_claim":False,
+                "no_forced_legs":True
+            },
             "accuracy_first_base_floor":RESULTS_FIRST_MIN_COMBINED_ODDS,
             "results_first":True,
             "results_first_min_observations":RESULTS_FIRST_MIN_OBS,
@@ -3778,12 +3964,23 @@ def main():
             "stake_direct_feed":"NOT_CONNECTED","instruction":"Verify the displayed SportyBet price immediately before any manual wager."},
         "candidates_considered":{"football":len(football),"tennis":len(tennis),"virtual":len(virtual),"all_built":len(built)},
         "qualified_legs":selected if value_floor_met else [],
-        "best_available_legs":selected if selected else sorted([x for x in built if x.get("builder_eligible") and str(x.get("product") or "")=="vfootball"], key=lambda x:float(x.get("bookmaker_odds") or 1.0), reverse=True)[:MAX_LEGS],
+        "best_available_legs":selected if selected else sorted(
+            [x for x in built if x.get("builder_eligible") and (
+                (str(x.get("sport") or "")=="virtual" and str(x.get("product") or "") in ACTIVE_VIRTUAL_PRODUCTS)
+                or str(x.get("sport") or "") in {"football","tennis"}
+            )],
+            key=lambda x:(float(x.get("model_probability") or 0.0),float(x.get("evidence_score") or 0.0),float(x.get("model_edge") or 0.0),float(x.get("bookmaker_odds") or 1.0)),
+            reverse=True
+        )[:COMPACT_EFOOTBALL_MAX_LEGS],
         "combined_odds_selected":round(combined,3) if selected else None,
         "naive_independence_hit_proxy":round(math.prod(float(x.get("model_probability") or 0) for x in selected),6) if selected else None,
         "batch_count":len(batches),
         "batch_policy":{
-            "min_combined_odds":active_min_combined_odds(),
+            "min_combined_odds":selected_min_combined_odds if primary else active_min_combined_odds(),
+            "standard_min_combined_odds":active_min_combined_odds(),
+            "compact_efootball_min_combined_odds":COMPACT_EFOOTBALL_MIN_COMBINED_ODDS,
+            "compact_efootball_min_legs":COMPACT_EFOOTBALL_MIN_LEGS,
+            "compact_efootball_max_legs":COMPACT_EFOOTBALL_MAX_LEGS,
             "results_first":True,
             "results_first_min_observations":RESULTS_FIRST_MIN_OBS,
             "results_first_min_accuracy":RESULTS_FIRST_MIN_ACCURACY,
@@ -3793,6 +3990,7 @@ def main():
             "construction_priority":"settled_results_first",
             "max_batches":MAX_BATCHES,
             "max_legs":MAX_LEGS,
+            "compact_efootball_max_legs":COMPACT_EFOOTBALL_MAX_LEGS,
             "max_kickoff_span_minutes":MAX_BATCH_KICKOFF_SPAN_MINUTES,
             "builder_horizon_minutes":MAX_BUILDER_HORIZON_MINUTES,
             "disjoint_batches":True,
@@ -3825,7 +4023,7 @@ def main():
         "market_price_combined_odds":round(combined,3) if selected else None,
         "sportybet_booking":booking_info,
         "theme":{"name":"Midnight Graphite / Electric Cyan / Signal Green","accent":"#28D7E8","positive":"#35D07F","background":"#080D14"},
-        "notes":["Results-first qualifies only from settled exact-line/side performance plus the existing live-price, freshness, data-quality and model-evidence gates.","Zero batches are now diagnosable: capacity reports whether the active 2.70x floor is reachable under the existing leg/correlation rules; no per-leg evidence gate is weakened.","best_available_legs is informational when no batch exists and is not a qualified accumulator.","Missing or stale SportyBet prices produce NO_BET/REJECTED.","Model fair odds never overwrite bookmaker odds.","The Builder evaluates 2–4-leg constructions adaptively. Results-first and high-confidence lanes keep the 80% per-leg safety floor with 90%+ preferred. The isolated eFootball exact-evidence value fallback has its own 65% per-leg evidence floor and is labeled VALUE_RESEARCH rather than high-confidence; it still requires fresh SportyBet pricing, positive single-leg EV, current expected ROI >=2%, and the same correlation controls.","When the proven Results-first lane cannot qualify, the controlled mixed research lane remains conservative and requires independently Builder-eligible VFootball/eFootball evidence legs. Only after that mixed lane fails does the broader model-first value fallback run.","The active combined-odds floor is 2.70x. The 2.80x target remains preferred and becomes the active floor after 10 settled wins in the current 2–4-leg construction family. The fallback still requires current expected ROI >=2%, fresh SportyBet pricing, and the same correlation controls.","The ticket remains paper-only and the active construction lanes allow 2 through 4 legs; they are never pinned to a single leg count and never padded with a weak leg.","The proven Results-first lane keeps a 60-minute kickoff span. The model-first paper value lane may span up to 270 minutes only when its whole-ticket probability and expected ROI gates still pass; this is explicitly research-only, not promoted as settled Results-first evidence.","Near-term Builder horizon is 720 minutes; price freshness remains capped at 900 seconds so extending the scan window does not permit stale odds.","Builder refreshes every 15 minutes and after relevant upstream workflows, so candidate prices are repeatedly revalidated before kickoff.",
+        "notes":["Results-first qualifies only from settled exact-line/side performance plus the existing live-price, freshness, data-quality and model-evidence gates.","Zero batches are now diagnosable: capacity reports whether the active 2.70x floor is reachable under the existing leg/correlation rules; no per-leg evidence gate is weakened.","best_available_legs is informational when no batch exists and is not a qualified accumulator.","Missing or stale SportyBet prices produce NO_BET/REJECTED.","Model fair odds never overwrite bookmaker odds.","The Builder evaluates 2–4-leg constructions adaptively. Results-first and high-confidence lanes keep the 80% per-leg safety floor with 90%+ preferred. The isolated eFootball exact-evidence value fallback has its own 65% per-leg evidence floor and is labeled VALUE_RESEARCH rather than high-confidence; it still requires fresh SportyBet pricing, positive single-leg EV, current expected ROI >=2%, and the same correlation controls.","When the proven Results-first lane cannot qualify, the controlled mixed research lane remains conservative and requires independently Builder-eligible VFootball/eFootball evidence legs. Only after that mixed lane fails does the broader model-first value fallback run.","The active combined-odds floor is 2.70x. The 2.80x target remains preferred and becomes the active floor after 10 settled wins in the current 2–4-leg construction family. The fallback still requires current expected ROI >=2%, fresh SportyBet pricing, and the same correlation controls.","The ticket remains paper-only; standard construction allows 2–4 legs, while the separate compact eFootball lane allows 4–5 legs at 2.00x+ only when every existing qualification and ROI gate passes. Neither lane is padded with a weak leg.","The proven Results-first lane keeps a 60-minute kickoff span. The model-first paper value lane may span up to 270 minutes only when its whole-ticket probability and expected ROI gates still pass; this is explicitly research-only, not promoted as settled Results-first evidence.","Near-term Builder horizon is 720 minutes; price freshness remains capped at 900 seconds so extending the scan window does not permit stale odds.","Builder refreshes every 15 minutes and after relevant upstream workflows, so candidate prices are repeatedly revalidated before kickoff.",
         "Phase 2 cyclical-loop research is isolated from the baseline model: only Virtual/eFootball legs with a model probability and blended streak-break confidence of at least 78% can enter its 2–3-leg constructor.",
         "The cyclical-loop signal is evidence-backed sequence analysis, not a gambler's-fallacy override: it requires a current opposite-side streak and historical break observations. It cannot weaken the existing evidence, price, correlation, 2.70x or +2% ROI gates; 4.00x is reserved for the separate Phase 2 variance diagnostic.",
         "When Phase 2 combined odds exceed 4.00x, the Builder records a paper-only Kelly variance diagnostic labeled 'High Variance - Fraction Stake Only'; no live stake is calculated or executed."]
