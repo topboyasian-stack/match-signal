@@ -41,9 +41,17 @@ function evidenceLabel(x){
   }
   return base;
 }
+function isOverUnderPrediction(x){
+  const market=String(x?.market||"").toLowerCase().replace(/[\s-]+/g,"_");
+  const sourceMarket=String(x?.sportybet_odds_market||"").toLowerCase();
+  const side=String(x?.pick||x?.selection||"").toLowerCase();
+  return sourceMarket==="total" ||
+    ["over_under","total_goals_over_under","total_games","totals","total"].includes(market) ||
+    ((side==="over"||side==="under")&&x?.line!=null);
+}
 function marketLabel(x){
-  if(x.market==="over_under"){
-    return "O/U "+(x.pick||"—")+" "+(x.line??"");
+  if(isOverUnderPrediction(x)){
+    return "O/U "+(x.pick||x.selection||"—")+" "+(x.line??"");
   }
   if(x.pick==="p1"||x.pick==="p2"||x.pick==="draw"){
     const pick=x.pick==="p1"?x.player_1:x.pick==="p2"?x.player_2:"Draw";
@@ -72,11 +80,11 @@ function fixtureGroups(rows){
     const key=rowFixtureKey(row);
     if(!map.has(key))map.set(key,{key,rows:[]});
     const g=map.get(key);
-    const m=String(row.market||"winner");
+    const m=isOverUnderPrediction(row)?"over_under":"winner";
     const line=row.line==null?"":String(row.line);
     const pick=String(row.pick||row.selection||"");
     const dedupe=m+"|"+line+"|"+pick;
-    if(!g.rows.some(x=>(String(x.market||"winner")+"|"+(x.line==null?"":String(x.line))+"|"+String(x.pick||x.selection||""))===dedupe)){
+    if(!g.rows.some(x=>((isOverUnderPrediction(x)?"over_under":"winner")+"|"+(x.line==null?"":String(x.line))+"|"+String(x.pick||x.selection||""))===dedupe)){
       g.rows.push(row);
     }
   }
@@ -90,7 +98,7 @@ function fixtureGroups(rows){
   }).sort((a,b)=>new Date(a.rows[0].start_time)-new Date(b.rows[0].start_time));
 }
 function exactSportyBetQuote(x){
-  const market=String(x?.market||"winner").toLowerCase();
+  const market=isOverUnderPrediction(x)?"over_under":"winner";
   const value=Number(x?.bookmaker_odds??x?.sportybet_odds??x?.book_odds);
   if(!Number.isFinite(value)||value<=1)return {odds:null,reason:"NO_QUOTE"};
   const sourceMarket=String(x?.sportybet_odds_market||"").toLowerCase();
@@ -122,7 +130,7 @@ function exactMarketEdge(x,quote){
   const p=Number(probabilityValue(x));
   if(!Number.isFinite(p)||p<0||p>1)return null;
   let selectedOdds=Number(quote.odds),oppositeOdds=null,marketProb=null;
-  if(String(x?.market||"").toLowerCase()==="over_under"){
+  if(isOverUnderPrediction(x)){
     const line=Number(x?.line),quotedLine=Number(x?.sportybet_odds_line);
     if(!Number.isFinite(line)||!Number.isFinite(quotedLine)||Math.abs(line-quotedLine)>1e-9)return null;
     let over=Number(x?.sportybet_over_odds),under=Number(x?.sportybet_under_odds);
@@ -183,7 +191,7 @@ function unifiedMarketLine(x){
   const fair=Number(x.model_fair_odds);
   const edge=exactMarketEdge(x,quote);
   const pick=String(x.pick||x.selection||"").toUpperCase();
-  const market=x.market==="over_under"?("O/U "+pick+" "+(x.line??"")):marketLabel(x);
+  const market=isOverUnderPrediction(x)?("O/U "+pick+" "+(x.line??"")):marketLabel(x);
   const fairLabel=Number.isFinite(fair)?fair.toFixed(2):"—";
   const qualification=qualificationState(x);
   const qualified=qualification.currentPricePass;
