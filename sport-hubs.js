@@ -100,26 +100,30 @@ function fixtureGroups(rows){
 function exactSportyBetQuote(x){
   const market=isOverUnderPrediction(x)?"over_under":"winner";
   const value=Number(x?.bookmaker_odds??x?.sportybet_odds??x?.book_odds);
-  if(!Number.isFinite(value)||value<=1)return {odds:null,reason:"NO_QUOTE"};
+  if(!Number.isFinite(value)||value<=1)return {odds:null,displayOdds:null,reason:"NO_QUOTE",fresh:false};
   const sourceMarket=String(x?.sportybet_odds_market||"").toLowerCase();
   if(market==="over_under"){
-    if(sourceMarket!=="total")return {odds:null,reason:"MARKET_UNVERIFIED"};
+    if(sourceMarket!=="total")return {odds:null,displayOdds:null,reason:"MARKET_UNVERIFIED",fresh:false};
     const line=Number(x?.line),quotedLine=Number(x?.sportybet_odds_line);
     const side=String(x?.pick||x?.selection||"").toLowerCase();
     const quotedSide=String(x?.sportybet_odds_side||"").toLowerCase();
-    if(!Number.isFinite(line)||!Number.isFinite(quotedLine)||Math.abs(line-quotedLine)>1e-9)return {odds:null,reason:"LINE_MISMATCH"};
-    if((side!=="over"&&side!=="under")||quotedSide!==side)return {odds:null,reason:"SIDE_MISMATCH"};
+    if(!Number.isFinite(line)||!Number.isFinite(quotedLine)||Math.abs(line-quotedLine)>1e-9)return {odds:null,displayOdds:null,reason:"LINE_MISMATCH",fresh:false};
+    if((side!=="over"&&side!=="under")||quotedSide!==side)return {odds:null,displayOdds:null,reason:"SIDE_MISMATCH",fresh:false};
   }else if(sourceMarket!=="winner"){
-    return {odds:null,reason:"MARKET_UNVERIFIED"};
+    return {odds:null,displayOdds:null,reason:"MARKET_UNVERIFIED",fresh:false};
   }else{
     const side=String(x?.pick||x?.selection||"").toLowerCase();
-    if(!["p1","p2","draw"].includes(side)||String(x?.sportybet_odds_side||"").toLowerCase()!==side)return {odds:null,reason:"SIDE_MISMATCH"};
+    if(!["p1","p2","draw"].includes(side)||String(x?.sportybet_odds_side||"").toLowerCase()!==side)return {odds:null,displayOdds:null,reason:"SIDE_MISMATCH",fresh:false};
   }
+  // Identity matches the requested event-market-line-side. Preserve the last
+  // recorded quote for transparency when its timestamp is missing/stale, but
+  // never use that display-only value to calculate edge or qualify the pick.
   const timestamp=Date.parse(String(x?.market_odds_timestamp||x?.odds_timestamp||""));
   const now=Date.now();
-  if(!Number.isFinite(timestamp))return {odds:null,reason:"TIMESTAMP_UNVERIFIED"};
-  if(timestamp>now+2*60*1000||now-timestamp>15*60*1000)return {odds:null,reason:"QUOTE_STALE"};
-  return {odds:value,reason:"EXACT_MARKET_LINE_SIDE_FRESH",timestamp:timestamp};
+  if(!Number.isFinite(timestamp))return {odds:null,displayOdds:value,reason:"TIMESTAMP_UNVERIFIED",fresh:false};
+  if(timestamp>now+2*60*1000)return {odds:null,displayOdds:value,reason:"QUOTE_TIMESTAMP_IN_FUTURE",timestamp:timestamp,fresh:false};
+  if(now-timestamp>15*60*1000)return {odds:null,displayOdds:value,reason:"QUOTE_STALE",timestamp:timestamp,fresh:false};
+  return {odds:value,displayOdds:value,reason:"EXACT_MARKET_LINE_SIDE_FRESH",timestamp:timestamp,fresh:true};
 }
 function bookmakerOdds(x){
   return exactSportyBetQuote(x).odds;
