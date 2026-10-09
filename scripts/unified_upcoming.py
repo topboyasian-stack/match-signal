@@ -254,16 +254,13 @@ def add(rows, row):
         else:
             return
 
-    nowish=NOW-timedelta(minutes=30)
-    if start < nowish and not explicit_live(row):
-        # A kickoff already passed but settlement has not arrived yet. Keep it
-        # only briefly as a pending-settlement/live queue item; once the
-        # settlement ledger receives the result, it disappears automatically.
-        age_hours=(NOW-start).total_seconds()/3600
-        if age_hours>6:
-            return
-        row.setdefault("event_state","PENDING_SETTLEMENT")
-    elif explicit_live(row):
+    # Upcoming is not a stale-fixture queue. Once kickoff has passed, keep a
+    # row only when the provider explicitly reports it live, or when the exact
+    # settled fixture matched above is inside the short result-display grace.
+    # Missing/late settlement data must never make an old match look upcoming.
+    if start <= NOW and not explicit_live(row):
+        return
+    if explicit_live(row):
         row.setdefault("event_state","LIVE")
     else:
         row.setdefault("event_state","UPCOMING")
