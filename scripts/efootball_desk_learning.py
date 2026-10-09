@@ -293,21 +293,31 @@ def calibration(forecasts):
         if p is None:
             continue
         key = bucket_key(p)
-        b = buckets.setdefault(key, {"n": 0, "wins": 0, "brier": 0.0})
+        b = buckets.setdefault(key, {
+            "n": 0, "wins": 0, "brier": 0.0,
+            "model_probability_sum": 0.0, "model_probability_n": 0,
+        })
         b["n"] += 1
         b["wins"] += 1 if row.get("win") else 0
         b["brier"] += (p - (1.0 if row.get("win") else 0.0)) ** 2
+        b["model_probability_sum"] += p
+        b["model_probability_n"] += 1
 
     for key, b in buckets.items():
         n = int(b["n"])
         wins = int(b["wins"])
         empirical = (wins + 4.0) / (n + 8.0)
         weight = n / (n + 30.0)
-        center = float(key)
-        calibrated = (1.0 - weight) * center + weight * empirical
+        model_n = int(b.pop("model_probability_n") or 0)
+        model_sum = float(b.pop("model_probability_sum") or 0.0)
+        mean_model = model_sum / model_n if model_n else float(key)
+        calibrated = (1.0 - weight) * mean_model + weight * empirical
         b["accuracy"] = wins / n if n else 0.0
         b["avg_brier"] = b["brier"] / n if n else None
         b["posterior_probability"] = empirical
+        b["mean_model_probability"] = mean_model
+        b["calibration_weight"] = weight
+        b["calibration_offset"] = empirical - mean_model
         b["calibrated_probability"] = max(0.01, min(0.99, calibrated))
 
     return buckets
