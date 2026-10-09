@@ -258,7 +258,8 @@ def add(rows, row):
     # row only when the provider explicitly reports it live, or when the exact
     # settled fixture matched above is inside the short result-display grace.
     # Missing/late settlement data must never make an old match look upcoming.
-    if start <= NOW and not explicit_live(row):
+    settled_visible = str(row.get("event_state") or "").upper() == "SETTLED"
+    if start <= NOW and not explicit_live(row) and not settled_visible:
         return
     if explicit_live(row):
         row.setdefault("event_state","LIVE")
