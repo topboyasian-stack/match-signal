@@ -1091,6 +1091,7 @@ def main():
         else:
             high_line_under[key]=record
     desk_health={
+        "status":"GENERATED",
         "generated_at":NOW.isoformat(),
         "horizon_days":7,
         "event_count":len(final),
