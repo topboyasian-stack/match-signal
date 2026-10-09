@@ -64,6 +64,11 @@ on:
       - 'data/pdl_predictions.json'
       - 'data/pdl_status.json'
       - 'data/pipeline_status.json'
+      - 'data/system_health.json'
+      - 'data/tennis_forward_status.json'
+      - 'data/prediction_desk_health.json'
+      - 'data/unified_upcoming.json'
+      - 'data/results_first_evidence_report.json'
       - 'PRECISION-SPORTS-UPGRADE.md'
       - '_redirects'
       - 'VIRTUAL-LAB-*.md'
@@ -208,7 +213,7 @@ jobs:
           import { writeFileSync } from 'node:fs';
           const base = 'https://match-signal.pages.dev';
           const pages = ['/', '/upcoming.html', '/football.html', '/tennis.html', '/basketball.html', '/darts.html', '/table-tennis.html', '/league.html?sport=football&league=England%20Amateur%20-%20U21%20Professional%20Development%20League', '/reports.html', '/live.html', '/expansion.html', '/virtual-lab/', '/virtual-lab', '/research.html', '/virtual-lab.html', '/analyst.html'];
-          const assets = ['/api/sportybet-virtual','/api/sportybet-darts','/api/sportybet-table-tennis','/api/virtual-lab-history','/expansion.js', '/expansion-odds-builder.js', '/live-analysis.js', '/live-data-worker.js', '/virtual-lab-app.js', '/virtual-lab-confirmed-watch.js', '/virtual-lab.css', '/_redirects', '/data/predictions.json', '/data/expansion_status.json', '/data/odds_builder.json', '/data/odds_ticket_tracker.json', '/data/virtual_lab_live.json','/data/virtual_lab_model_eval.json','/data/virtual_lab_eligibility.json','/data/virtual_lab_participants/registry.json','/data/virtual_lab_participant_lifecycle.json','/data/virtual_lab_participants/efootball_confirmed_watch.json','/data/efootball_desk_prediction_history.json.gz','/analyst.js'];
+          const assets = ['/api/sportybet-virtual','/api/sportybet-darts','/api/sportybet-table-tennis','/api/virtual-lab-history','/expansion.js', '/expansion-odds-builder.js', '/live-analysis.js', '/live-data-worker.js', '/virtual-lab-app.js', '/virtual-lab-confirmed-watch.js', '/virtual-lab.css', '/_redirects', '/data/predictions.json', '/data/expansion_status.json', '/data/odds_builder.json', '/data/odds_ticket_tracker.json', '/data/system_health.json', '/data/tennis_forward_status.json', '/data/prediction_desk_health.json', '/data/results_first_evidence_report.json', '/data/virtual_lab_live.json','/data/virtual_lab_model_eval.json','/data/virtual_lab_eligibility.json','/data/virtual_lab_participants/registry.json','/data/virtual_lab_participant_lifecycle.json','/data/virtual_lab_participants/efootball_confirmed_watch.json','/data/efootball_desk_prediction_history.json.gz','/analyst.js'];
           const failures = [];
           async function get(path) {
             const r = await fetch(base + path + (path.includes('?') ? '&' : '?') + 'smoke=' + Date.now(), {cache:'no-store'});
