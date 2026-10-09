@@ -48,6 +48,8 @@ autopilot = load("autopilot_status.json", {})
 darts = load("darts_status.json", {})
 table = load("table_tennis_status.json", {})
 unified = load("unified_upcoming.json", {})
+tennis_forward = load("tennis_forward_status.json", {})
+desk_health = load("prediction_desk_health.json", {})
 qa = load("qa/report.json", {})
 selection = load("selection_gate.json", {})
 predictions_file = DATA / "predictions.json"
@@ -86,10 +88,28 @@ for args in [
     ("odds_builder", odds, "generated_at", 8),
     ("expansion", expansion, "updated_at", 4),
     ("unified_upcoming", unified, "generated_at", 2),
+    ("prediction_desk_health", desk_health, "generated_at", 2),
 ]:
     x = freshness(*args)
     if x:
         checks.append(x)
+
+# The separate 14-day tennis discovery task runs every six hours. A missing or
+# old report means the system cannot distinguish "no fixtures" from "discovery
+# did not refresh"; surface that as a distinct warning instead of guessing.
+tennis_forward_age = age_hours(tennis_forward.get("updated_at"))
+checks.append({
+    "engine": "tennis_forward_discovery",
+    "status": "PASS" if tennis_forward_age <= 8 else "STALE",
+    "age_hours": round(tennis_forward_age, 2),
+    "threshold_hours": 8,
+})
+if tennis_forward_age > 8:
+    checks.append(issue(
+        "TENNIS_FORWARD_DISCOVERY_STALE",
+        "warning",
+        f"tennis_forward_status age {tennis_forward_age:.2f}h exceeds the 8h threshold; the discovery result is too old to confirm current fixture coverage"
+    ))
 
 virtual_live_age = age_hours(virtual_live.get("updated_at"))
 unified_virtual = ((unified.get("summary") or {}).get("virtual_model") or {})
@@ -174,6 +194,7 @@ out = {
     "issues": [x for x in checks if "code" in x],
     "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
     "paper_only": True,
+    "prediction_desk_filters": desk_health.get("publication_filters") or {},
 }
 (DATA / "system_health.json").write_text(json.dumps(out, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 print(json.dumps(out, indent=2))
