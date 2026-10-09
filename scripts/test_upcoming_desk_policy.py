@@ -72,6 +72,33 @@ class UpcomingDeskPolicyTests(unittest.TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["event_id"], "desk-policy-test-future")
 
+    def test_tennis_forward_watch_remains_unqualified_in_unified_desk(self):
+        row = {
+            "event_id": "desk-policy-test-tennis-watch",
+            "sport": "tennis",
+            "league": "ATP",
+            "player_1": "Player Alpha",
+            "player_2": "Player Beta",
+            "start_time": (datetime.now(UTC) + timedelta(hours=1)).isoformat(),
+            "pick": "p1",
+            "confidence": 0.72,
+            "probabilities": {"p1": 0.72, "p2": 0.28},
+            "prediction_status": "watch_projection",
+            "projection_tier": "baseline_plus_enrichment",
+            "evidence_depth": "tennis_forward_window_ranking_form_watch",
+            "qualification_status": "TENNIS_FORWARD_WATCH_NOT_QUALIFIED",
+            "betting_qualified": False,
+            "qualified_for_builder": False,
+            "paper_only": True,
+        }
+        rows = []
+        ns["core_rows"](rows, [row])
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["projection_tier"], "baseline_plus_enrichment")
+        self.assertEqual(rows[0]["qualification_status"], "TENNIS_FORWARD_WATCH_NOT_QUALIFIED")
+        self.assertFalse(rows[0]["betting_qualified"])
+        self.assertFalse(rows[0]["qualified_for_builder"])
+
     def test_tennis_discovery_accepts_person_id_on_competitor_record(self):
         quality = tennis_ns["tennis_fixture_quality"]
         event = {
