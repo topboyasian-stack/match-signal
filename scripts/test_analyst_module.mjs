@@ -110,7 +110,8 @@ const facts = summarizeDiagnosticFacts({
     publication_filters: { past_kickoff_rows_hidden: 13, stale_live_flags_hidden: 2, expired_settled_rows_hidden: 5 },
     high_line_under_evidence: [
       { product: "vfootball", line: 7.5, side: "under", event_rows: 4, walkforward_n: 10, walkforward_hit_rate: 1, walkforward_brier: 0.0006, walkforward_model_variant: "participant_model", qualification_status: "HIGH_LINE_UNDER_EVIDENCE_GATE_PENDING", betting_qualified: false },
-      { product: "vfootball", line: 8.5, side: "under", event_rows: 2, walkforward_n: 0, walkforward_hit_rate: null, walkforward_brier: null, walkforward_model_variant: null, qualification_status: "HIGH_LINE_UNDER_EVIDENCE_GATE_PENDING", betting_qualified: false }
+      { product: "vfootball", line: 8.5, side: "under", event_rows: 2, walkforward_n: 0, walkforward_hit_rate: null, walkforward_brier: null, walkforward_model_variant: null, qualification_status: "HIGH_LINE_UNDER_EVIDENCE_GATE_PENDING", betting_qualified: false },
+      { product: "efootball_gt", line: 10.5, side: "under", event_rows: 3, walkforward_n: 69, walkforward_hit_rate: 0.5652, walkforward_brier: 0.2617, walkforward_model_variant: "participant_model", qualification_status: "BETTING_QUALIFIED_PAPER", betting_qualified: true }
     ]
   }
 }, new Date("2026-10-09T17:39:48.000Z"));
@@ -133,6 +134,7 @@ assert.equal(facts.tennis_forward_discovery.tours.ATP.events_seen, 236);
 assert.equal(facts.tennis_forward_discovery.tours.ATP.valid_singles, 0);
 assert.ok(facts.flags.some(function(flag) { return flag.includes("VFootball Under 7.5") && flag.includes("10/30"); }));
 assert.ok(facts.flags.some(function(flag) { return flag.includes("VFootball Under 8.5") && flag.includes("0/30"); }));
+assert.ok(!facts.flags.some(function(flag) { return flag.includes("VFootball Under 10.5"); }), "VFootball's high-line threshold must not be applied to eFootball");
 assert.equal(facts.prediction_desk.publication_filters.past_kickoff_rows_hidden, 13);
 assert.equal(facts.artifacts.prediction_desk.status, "WITHIN_THRESHOLD");
 const notGeneratedFacts = summarizeDiagnosticFacts({
