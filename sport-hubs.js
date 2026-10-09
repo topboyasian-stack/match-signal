@@ -12,6 +12,15 @@ function evidenceLabel(x){
   }
   const product=String(x.product||"").toLowerCase();
   if(product==="efootball_gt"||product==="vfootball"){
+    const line=Number(x.line);
+    const side=String(x.pick||x.selection||"").toLowerCase();
+    const wfN=Number(x.walkforward_exact_line_n);
+    const wfHit=Number(x.walkforward_exact_line_hit_rate);
+    if(product==="vfootball"&&side==="under"&&Number.isFinite(line)&&line>=7.5){
+      if(!Number.isFinite(wfN)||wfN<=0)return base+" · no exact-line walk-forward sample · NOT QUALIFIED";
+      if(wfN<30||!Number.isFinite(wfHit)||wfHit<0.65)return base+" · exact-line walk-forward "+Math.round(wfN)+"/30 · insufficient evidence · NOT QUALIFIED";
+      return base+" · exact-line walk-forward "+Math.round(wfN)+"/30 · "+Math.round(wfHit*100)+"% hit rate · separate value gates still apply";
+    }
     const n=Number(x.desk_learning_exact_n);
     if(Number.isFinite(n)){
       const count=Math.max(0,Math.round(n));
@@ -20,6 +29,7 @@ function evidenceLabel(x){
         ? count+" settled · "+Math.round(accuracy*100)+"% hit rate"
         : count+" settled";
       const source=String(x.desk_learning_adjustment_source||"NONE");
+      if(base==="feed discovered base model")base="feed baseline · no participant-specific calibration";
       let state;
       if(source==="EXACT_LINE_DIRECTION")state="exact-line calibrated";
       else if(source==="PROBABILITY_BUCKET")state="bucket calibrated";
@@ -144,8 +154,12 @@ function primaryPrediction(rows){
     const tier=String(x.projection_tier||"");
     const evidence=String(x.evidence_depth||"");
     const edge=Number(x.model_edge_vs_market);
+    const pendingHighUnder=String(x.qualification_status||"")==="HIGH_LINE_UNDER_EVIDENCE_GATE_PENDING";
+    const exactN=Number(x.walkforward_exact_line_n);
     return [
       q?1:0,
+      pendingHighUnder?0:1,
+      Number.isFinite(exactN)?Math.min(30,exactN):0,
       Number.isFinite(p)?p*100:0,
       evidence.includes("participant")?3:evidence.includes("historical")?2:1,
       tier.includes("deep")?2:tier.includes("research")?1:0,
@@ -299,9 +313,10 @@ async function renderUnifiedBoard(){
       try{
         const feed=await get('./api/sportybet-virtual?sources=efootball&pageSize=100&pageNum=1&timeline=168');
         const events=Array.isArray(feed?.events)?feed.events:[];
+        const fetchedAt=feed?.updated_at||feed?.server_time||null;
         events.forEach(e=>{
           const id=String(e?.event_id||"");
-          if(id)byEvent[id]=e;
+          if(id)byEvent[id]={...e,__quote_fetched_at:fetchedAt};
         });
       }catch(_){}
       return byEvent;
@@ -318,18 +333,22 @@ async function renderUnifiedBoard(){
         const matchStart=Date.parse(String(row?.start_time||""));
         if(!Number.isFinite(matchStart) || matchStart < now) return null;
 
-        let over=null,under=null;
+        let over=null,under=null,matchedMarket=null;
         for(const market of Array.isArray(live?.markets)?live.markets:[]){
           const ml=Number(market?.line);
           if(!Number.isFinite(ml) || Math.abs(ml-line)>1e-9)continue;
+          let marketOver=null,marketUnder=null;
           for(const outcome of Array.isArray(market?.outcomes)?market.outcomes:[]){
+            if(outcome?.active===false)continue;
             const name=String(outcome?.name||"").toLowerCase();
             const odds=Number(outcome?.odds);
             if(!Number.isFinite(odds) || odds<=1)continue;
-            if(name.startsWith("over"))over=odds;
-            if(name.startsWith("under"))under=odds;
+            if(name.startsWith("over"))marketOver=odds;
+            if(name.startsWith("under"))marketUnder=odds;
           }
-          if(over!=null || under!=null)break;
+          if(marketOver!=null||marketUnder!=null){
+            over=marketOver;under=marketUnder;matchedMarket=market;break;
+          }
         }
         const selectedOdds=side==="over"?over:under;
         if(selectedOdds==null)return null;
@@ -358,6 +377,11 @@ async function renderUnifiedBoard(){
           model_fair_odds:Number.isFinite(fair)?fair:(p>0?1/p:null),
           bookmaker_odds:selectedOdds,
           sportybet_odds:selectedOdds,
+          sportybet_odds_market:"total",
+          sportybet_odds_line:line,
+          sportybet_odds_side:side,
+          sportybet_over_odds:over,
+          sportybet_under_odds:under,
           model_edge_vs_market:Number.isFinite(edge)?edge:null,
           candidate_status:candidateStatus,
           model_candidate_status:candidateStatus,
@@ -368,7 +392,7 @@ async function renderUnifiedBoard(){
           qualified_for_builder:Boolean(row?.qualified_for_builder),
           paper_only:true,
           live_money_eligible:false,
-          market_odds_timestamp:new Date().toISOString(),
+          market_odds_timestamp:live?.__quote_fetched_at||matchedMarket?.lastOddsChangeTime||null,
           source_engine:"Virtual Lab",
           desk_source:"selection_candidates + fresh SportyBet virtual quote"
         };
