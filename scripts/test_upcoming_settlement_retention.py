@@ -249,28 +249,35 @@ def check_exact_profiles_do_not_pool_products_and_calibration_requires_evidence(
     assert profiles["vfootball"]["7.5|under"]["n"] == 1
     assert profiles["vfootball"]["7.5|under"]["wins"] == 1
 
+    # A real sample size of 15 still gets only a one-third shrinkage toward
+    # the observed calibration offset; this is a confidence correction, not
+    # permission to qualify a line for betting.
+    observed_offset = -0.20522608695652178
+    exact_weight = 15 / (15 + 30)
     exact_report = {"exact_selection": {
-        "7.5|under": {
-            "n": 20, "calibration_offset": -0.25,
-            "calibration_weight": 0.40, "accuracy": 0.50,
+        "8.5|under": {
+            "n": 15, "calibration_offset": observed_offset,
+            "calibration_weight": exact_weight, "accuracy": 11 / 15,
         }
     }, "calibration": {"active": False, "buckets": {}}}
-    p, source, detail = upcoming.calibrate_desk_probability(0.90, 7.5, "under", exact_report)
-    assert abs(p - 0.80) < 1e-9
+    raw_probability = 0.8574
+    p, source, detail = upcoming.calibrate_desk_probability(raw_probability, 8.5, "under", exact_report)
+    assert abs(p - (raw_probability + observed_offset * exact_weight)) < 1e-9
+    assert p < raw_probability, "Observed underperformance must lower the U8.5 Under estimate"
     assert source == "EXACT_LINE_DIRECTION"
-    assert detail["n"] == 20
+    assert detail["n"] == 15
 
     immature_report = {"exact_selection": {
         "7.5|under": {
-            "n": 19, "calibration_offset": -0.25,
-            "calibration_weight": 0.39, "accuracy": 0.50,
+            "n": 11, "calibration_offset": -0.25,
+            "calibration_weight": 11 / (11 + 30), "accuracy": 0.50,
         }
     }, "calibration": {"active": True, "buckets": {
         "0.9": {"n": 29, "calibration_offset": -0.20, "calibration_weight": 0.49}
     }}}
     p, source, _ = upcoming.calibrate_desk_probability(0.90, 7.5, "under", immature_report)
     assert abs(p - 0.90) < 1e-9
-    assert source == "NONE", "A global active flag must not bypass exact bucket sample gates"
+    assert source == "NONE", "A global active flag must not bypass exact and bucket sample gates"
 
 
 if __name__ == "__main__":
