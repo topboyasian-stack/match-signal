@@ -142,7 +142,7 @@ def validate_document(document: Any) -> list[str]:
                         errors.append(f"{lw}.desk_snapshot.model_probability must be between 0 and 1")
                     if not parse_datetime(desk.get("captured_at")):
                         errors.append(f"{lw}.desk_snapshot.captured_at must be an ISO date-time")
-                    if desk.get("provenance") is not None and desk.get("provenance") != "user_reported":
+                    if desk.get("provenance") != "user_reported":
                         errors.append(f"{lw}.desk_snapshot.provenance must be user_reported")
             score = leg.get("final_score")
             if score is not None:
