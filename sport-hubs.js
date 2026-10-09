@@ -100,26 +100,30 @@ function fixtureGroups(rows){
 function exactSportyBetQuote(x){
   const market=isOverUnderPrediction(x)?"over_under":"winner";
   const value=Number(x?.bookmaker_odds??x?.sportybet_odds??x?.book_odds);
-  if(!Number.isFinite(value)||value<=1)return {odds:null,reason:"NO_QUOTE"};
+  if(!Number.isFinite(value)||value<=1)return {odds:null,displayOdds:null,reason:"NO_QUOTE",fresh:false};
   const sourceMarket=String(x?.sportybet_odds_market||"").toLowerCase();
   if(market==="over_under"){
-    if(sourceMarket!=="total")return {odds:null,reason:"MARKET_UNVERIFIED"};
+    if(sourceMarket!=="total")return {odds:null,displayOdds:null,reason:"MARKET_UNVERIFIED",fresh:false};
     const line=Number(x?.line),quotedLine=Number(x?.sportybet_odds_line);
     const side=String(x?.pick||x?.selection||"").toLowerCase();
     const quotedSide=String(x?.sportybet_odds_side||"").toLowerCase();
-    if(!Number.isFinite(line)||!Number.isFinite(quotedLine)||Math.abs(line-quotedLine)>1e-9)return {odds:null,reason:"LINE_MISMATCH"};
-    if((side!=="over"&&side!=="under")||quotedSide!==side)return {odds:null,reason:"SIDE_MISMATCH"};
+    if(!Number.isFinite(line)||!Number.isFinite(quotedLine)||Math.abs(line-quotedLine)>1e-9)return {odds:null,displayOdds:null,reason:"LINE_MISMATCH",fresh:false};
+    if((side!=="over"&&side!=="under")||quotedSide!==side)return {odds:null,displayOdds:null,reason:"SIDE_MISMATCH",fresh:false};
   }else if(sourceMarket!=="winner"){
-    return {odds:null,reason:"MARKET_UNVERIFIED"};
+    return {odds:null,displayOdds:null,reason:"MARKET_UNVERIFIED",fresh:false};
   }else{
     const side=String(x?.pick||x?.selection||"").toLowerCase();
-    if(!["p1","p2","draw"].includes(side)||String(x?.sportybet_odds_side||"").toLowerCase()!==side)return {odds:null,reason:"SIDE_MISMATCH"};
+    if(!["p1","p2","draw"].includes(side)||String(x?.sportybet_odds_side||"").toLowerCase()!==side)return {odds:null,displayOdds:null,reason:"SIDE_MISMATCH",fresh:false};
   }
+  // Identity matches the requested event-market-line-side. Preserve the last
+  // recorded quote for transparency when its timestamp is missing/stale, but
+  // never use that display-only value to calculate edge or qualify the pick.
   const timestamp=Date.parse(String(x?.market_odds_timestamp||x?.odds_timestamp||""));
   const now=Date.now();
-  if(!Number.isFinite(timestamp))return {odds:null,reason:"TIMESTAMP_UNVERIFIED"};
-  if(timestamp>now+2*60*1000||now-timestamp>15*60*1000)return {odds:null,reason:"QUOTE_STALE"};
-  return {odds:value,reason:"EXACT_MARKET_LINE_SIDE_FRESH",timestamp:timestamp};
+  if(!Number.isFinite(timestamp))return {odds:null,displayOdds:value,reason:"TIMESTAMP_UNVERIFIED",fresh:false};
+  if(timestamp>now+2*60*1000)return {odds:null,displayOdds:value,reason:"QUOTE_TIMESTAMP_IN_FUTURE",timestamp:timestamp,fresh:false};
+  if(now-timestamp>15*60*1000)return {odds:null,displayOdds:value,reason:"QUOTE_STALE",timestamp:timestamp,fresh:false};
+  return {odds:value,displayOdds:value,reason:"EXACT_MARKET_LINE_SIDE_FRESH",timestamp:timestamp,fresh:true};
 }
 function bookmakerOdds(x){
   return exactSportyBetQuote(x).odds;
@@ -170,7 +174,12 @@ function qualificationState(x){
   }
   const quote=exactSportyBetQuote(x);
   if(quote.odds==null){
-    return {modelQualified:true,currentPricePass:false,label:"MODEL GATE PASSED · PRICE UNVERIFIED",reason:quote.reason};
+    const labels={
+      QUOTE_STALE:"MODEL GATE PASSED · PRICE STALE",
+      TIMESTAMP_UNVERIFIED:"MODEL GATE PASSED · QUOTE TIMESTAMP UNVERIFIED",
+      QUOTE_TIMESTAMP_IN_FUTURE:"MODEL GATE PASSED · QUOTE TIMESTAMP INVALID",
+    };
+    return {modelQualified:true,currentPricePass:false,label:labels[quote.reason]||"MODEL GATE PASSED · PRICE UNVERIFIED",reason:quote.reason};
   }
   const edge=exactMarketEdge(x,quote);
   if(edge==null){
@@ -188,6 +197,7 @@ function unifiedMarketLine(x){
   const p=probabilityValue(x);
   const quote=exactSportyBetQuote(x);
   const book=quote.odds;
+  const displayBook=quote.displayOdds==null?book:quote.displayOdds;
   const fair=Number(x.model_fair_odds);
   const edge=exactMarketEdge(x,quote);
   const pick=String(x.pick||x.selection||"").toUpperCase();
@@ -196,7 +206,12 @@ function unifiedMarketLine(x){
   const qualification=qualificationState(x);
   const qualified=qualification.currentPricePass;
   const modelQualified=qualification.modelQualified;
-  const marketReference=book!=null?("SportyBet @ "+book.toFixed(2)):"SportyBet exact quote "+String(quote.reason||"unavailable").replaceAll("_"," ").toLowerCase();
+  const marketReference=book!=null
+    ?("SportyBet @ "+book.toFixed(2))
+    :displayBook!=null
+      ?("SportyBet last seen @ "+displayBook.toFixed(2)+" · "+String(quote.reason||"unverified").replaceAll("_"," ").toLowerCase())
+      :("SportyBet exact quote "+String(quote.reason||"unavailable").replaceAll("_"," ").toLowerCase());
+  const marketQuoteClass=book!=null?"ms-book-live":displayBook!=null?"ms-book-stale":"ms-book-missing";
   const edgeLabel=edge!=null?((edge>=0?"+":"")+(edge*100).toFixed(1)+"%"):"— (requires fresh two-sided exact market)";
   const evidence=evidenceLabel(x);
   const q=qualification.label;
@@ -206,7 +221,7 @@ function unifiedMarketLine(x){
     '<span>Model estimate <b>'+(p==null?"—":P(p))+'</b></span>'+
     '<span>Model fair <b>'+E(fairLabel)+'</b></span>'+
     '<span>Evidence <b>'+E(String(evidence||"unavailable"))+'</b></span>'+
-    '<span class="'+(book!=null?"ms-book-live":"ms-book-missing")+'">'+E(marketReference)+'</span>'+
+    '<span class="'+marketQuoteClass+'">'+E(marketReference)+'</span>'+
     '<span>Edge <b>'+E(edgeLabel)+'</b></span>'+
     '<span class="ms-market-q '+(qualified?"qualified":"paper")+'">'+E(q)+'</span>'+
   '</div>'+(candidateBand||modelQualified&&!qualified?'<div class="ms-fixture-band-note">'+(candidateBand?'Model band: '+E(candidateBand)+' · this label is not betting qualification. ':'')+(modelQualified&&!qualified?'Saved model status: '+E(String(x.qualification_status||"BETTING_QUALIFIED").replaceAll("_"," "))+' · current price gate: '+E(qualification.reason.replaceAll("_"," "))+'.':'')+'</div>':'');
@@ -267,7 +282,9 @@ function unifiedRow(group){
   const candidateBand=String(x.model_candidate_status||"");
   const live=String(x.event_state||"").toUpperCase()==="LIVE";
   const settled=String(x.event_state||"").toUpperCase()==="SETTLED";
-  const book=bookmakerOdds(x);
+  const quote=exactSportyBetQuote(x);
+  const book=quote.odds;
+  const displayBook=quote.displayOdds==null?book:quote.displayOdds;
   const result=String(x.settlement_result||"").toUpperCase();
   const won=settled && (x.settlement_result===x.pick || result==="WIN" || result==="WON" || x.win===true);
   const status=settled?(won?"SETTLED · ✓ WIN":"SETTLED · ✕ LOSS"):
@@ -283,7 +300,7 @@ function unifiedRow(group){
     '<div class="ms-up-event"><div class="ms-up-meta"><span class="ms-sport-pill">'+sportIcon(x.sport)+' '+E(x.sport==="table_tennis"?"Table Tennis":(x.sport||"Sport"))+'</span><span>'+E(x.league||x.competition||"Unclassified")+'</span><span class="ms-fixture-market-count">1 prediction</span></div>'+
     '<div class="ms-up-match">'+E(x.player_1||x.home||"Participant 1")+' <span>vs</span> '+E(x.player_2||x.away||"Participant 2")+'</div>'+
     '<div class="ms-market-stack">'+unifiedMarketLine(x)+'</div>'+
-    '<div class="ms-fixture-foot"><span class="'+(settled?(won?"ms-settled-win":"ms-settled-loss"):"")+'">'+E(q)+'</span><span>'+E(settled?("Result "+(x.final_score||x.settlement_result||"recorded")):(book!=null?"Fresh exact market/line/side quote":"No fresh verifiable exact-line quote; edge withheld"))+'</span></div></div>'+
+    '<div class="ms-fixture-foot"><span class="'+(settled?(won?"ms-settled-win":"ms-settled-loss"):"")+'">'+E(q)+'</span><span>'+E(settled?("Result "+(x.final_score||x.settlement_result||"recorded")):(book!=null?"Fresh exact market/line/side quote":displayBook!=null?"Exact-line SportyBet reference shown; current edge and qualification withheld":"No verifiable exact-line quote; edge withheld"))+'</span></div></div>'+
     '<div class="ms-up-status"><span class="ms-up-status-badge '+(settled?(won?"deep":"research"):(qualified?"deep":live?"testing":"research"))+'">'+E(status)+'</span><span class="ms-up-qual '+(settled?"paper":qualified?"qualified":"paper")+'">'+E(settled?"SETTLED HISTORY":qualified?"BETTING-QUALIFIED":"PAPER · PRICE/QUALIFICATION GATE PENDING")+'</span><small>'+E(evidenceLabel(x))+'</small></div>'+
   '</article>';
 }
