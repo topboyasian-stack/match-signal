@@ -52,9 +52,9 @@ function normalizeTicket(parsed) {
         market: "total_goals_over_under",
         provenance: "user_reported",
         pick: desk.pick,
-        line: finite(desk.line) ? desk.line : null,
-        captured_at: typeof desk.captured_at === "string" && Number.isFinite(Date.parse(desk.captured_at)) ? desk.captured_at : now
+        line: finite(desk.line) ? desk.line : null
       };
+      if (typeof desk.captured_at === "string" && Number.isFinite(Date.parse(desk.captured_at))) item.desk_snapshot.captured_at = desk.captured_at;
       for (const key of ["prediction_id", "model_version"]) if (typeof desk[key] === "string") item.desk_snapshot[key] = desk[key].slice(0, key === "prediction_id" ? 160 : 100);
       for (const key of ["odds", "model_probability"]) if (finite(desk[key])) item.desk_snapshot[key] = desk[key];
     }
