@@ -632,11 +632,15 @@
     });
   }
 
+  var ACTIVE_VIRTUAL_MIN_PROBABILITY = 0.80;
   function isActiveVirtualLeg(leg){
     var product=String(leg&&leg.product||"").toLowerCase();
     var sport=String(leg&&leg.sport||"").toLowerCase();
     if(product==="vfootball"||product==="zoom")return false;
-    if(sport==="virtual")return product==="efootball_gt"||product==="efootball_adriatic";
+    if(sport==="virtual"){
+      var probability=Number(leg&&leg.model_probability);
+      return (product==="efootball_gt"||product==="efootball_adriatic")&&Number.isFinite(probability)&&probability>=ACTIVE_VIRTUAL_MIN_PROBABILITY;
+    }
     return true;
   }
   function isActiveVirtualBatch(batch){
