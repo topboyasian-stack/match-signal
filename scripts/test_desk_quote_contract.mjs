@@ -93,7 +93,7 @@ assert.match(source, /VFOOTBALL_RESEARCH_ONLY/);
 // A stale generated batch cannot put VFootball/Zoom back into the active Builder UI.
 const builderLegStart = builderUiSource.indexOf("function isActiveVirtualLeg(leg)");
 const builderBatchStart = builderUiSource.indexOf("function isActiveVirtualBatch(batch)", builderLegStart);
-const builderBatchEnd = builderUiSource.indexOf("\n}", builderBatchStart);
+const builderBatchEnd = builderUiSource.indexOf("\n  }", builderBatchStart);
 assert.ok(builderLegStart >= 0 && builderBatchStart > builderLegStart && builderBatchEnd > builderBatchStart, "active Builder scope helpers must exist");
 const builderScopeContext = {};
 vm.runInNewContext(
