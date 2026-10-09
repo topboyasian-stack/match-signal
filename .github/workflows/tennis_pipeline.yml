@@ -217,7 +217,7 @@ jobs:
         continue-on-error: true
         run: PYTHONPATH=. python scripts/selective_prediction_gate.py
       - name: Validate selection-gate output isolation
-        run: python scripts/test_selection_gate_contract.py
+        run: python scripts/test_selection_gate_contract.py --require-generated-artifacts
       - name: Generate prediction-type, confidence, league and model breakdown
         continue-on-error: true
         run: PYTHONPATH=. python scripts/prediction_breakdown.py
