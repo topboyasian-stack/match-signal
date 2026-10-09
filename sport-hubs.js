@@ -220,6 +220,12 @@ function unifiedMarketLine(x){
     '<span>Edge <b>'+E(edgeLabel)+'</b></span>'+
   '</div>';
 }
+// VFOOTBALL_RESEARCH_ONLY: source feed, Virtual Lab and history remain intact;
+ // active Virtual Desk and Builder selections are limited to eFootball products.
+function isActiveVirtualProduct(product){
+  const key=String(product||"").toLowerCase();
+  return key==="efootball_gt"||key==="efootball_adriatic";
+}
 function primaryPrediction(rows){
   const rank=x=>{
     const p=Number(probabilityValue(x));
@@ -383,13 +389,12 @@ async function renderUnifiedBoard(){
     // Upcoming Desk without turning it into a Builder qualification bypass.
     const virtualCandidates=selectedRows.filter(x=>{
       const product=String(x?.product||"").toLowerCase();
-      const group=String(x?.candidate_group||"").toLowerCase();
       const p=Number(x?.model_probability);
       const start=Date.parse(String(x?.start_time||""));
       return (
         x &&
         String(x?.sport||"").toLowerCase()==="virtual" &&
-        (product==="efootball_gt" || product==="efootball_adriatic" || group==="efootball") &&
+        isActiveVirtualProduct(product) &&
         Number.isFinite(p) &&
         p>=0.80 &&
         Number.isFinite(start)
@@ -595,6 +600,7 @@ async function renderUnifiedBoard(){
         const sportKey=String(x?.sport||"").toLowerCase();
         const productKey=String(x?.product||"").toLowerCase();
         const isVirtual=sportKey==="virtual"||["efootball_gt","efootball_adriatic","vfootball","zoom"].includes(productKey);
+        if (isVirtual && !isActiveVirtualProduct(productKey)) return false;
         const liveLimitMs=isVirtual?2*60*60*1000:(sportKey==="tennis"?8*60*60*1000:4*60*60*1000);
         // Client-side guard as well as the backend guard: even a cached JSON
         // record with a stale LIVE flag cannot remain on Upcoming indefinitely.
