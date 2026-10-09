@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 """Regression tests for the shared selection-candidate artifact contract."""
+import argparse
+import json
 from pathlib import Path
 import runpy
 
@@ -23,5 +25,19 @@ assert '"confidence_filtered_predictions": rejected' in gate_source
 collector_source = (ROOT / "scripts" / "selection_candidate_collector.py").read_text(encoding="utf-8")
 assert 'OUT = DATA / "selection_candidates.json"' in collector_source
 assert '"purpose": "model-first current candidate pool; independent from Odds Builder value/results qualification"' in collector_source
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--require-generated-artifacts", action="store_true")
+args = parser.parse_args()
+
+if args.require_generated_artifacts:
+    gate_status = json.loads((ROOT / "data" / "selection_gate.json").read_text(encoding="utf-8"))
+    selected_path = ROOT / gate_status["selected_artifact"]
+    candidate_path = ROOT / gate_status["candidate_pool_artifact"]
+    assert gate_status.get("generated_at"), "selection_gate.json must be timestamped"
+    assert selected_path == gate["SELECTED"]
+    assert candidate_path == collector["OUT"]
+    assert isinstance(json.loads(selected_path.read_text(encoding="utf-8")), list)
+    assert isinstance(json.loads(candidate_path.read_text(encoding="utf-8")), list)
 
 print("Selection Gate artifact separation and summary contract passed.")
