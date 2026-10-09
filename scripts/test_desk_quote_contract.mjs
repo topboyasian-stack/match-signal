@@ -8,6 +8,7 @@ const source = fs.readFileSync("sport-hubs.js", "utf8");
 const css = fs.readFileSync("sport-hubs.css", "utf8");
 const builderSource = fs.readFileSync("scripts/odds_builder.py", "utf8");
 const candidateCollectorSource = fs.readFileSync("scripts/selection_candidate_collector.py", "utf8");
+const builderUiSource = fs.readFileSync("expansion-odds-builder.js", "utf8");
 const start = source.indexOf("function isOverUnderPrediction(x)");
 const end = source.indexOf("function qualificationState(x)", start);
 assert.ok(start >= 0 && end > start, "quote contract helpers must remain in the public Desk bundle");
@@ -89,6 +90,31 @@ assert.match(candidateCollectorSource, /RESEARCH_ONLY_VIRTUAL_PRODUCTS = \{"vfoo
 assert.match(candidateCollectorSource, /if product in RESEARCH_ONLY_VIRTUAL_PRODUCTS:/);
 assert.match(source, /VFOOTBALL_RESEARCH_ONLY/);
 
+// A stale generated batch cannot put VFootball/Zoom back into the active Builder UI.
+const builderLegStart = builderUiSource.indexOf("function isActiveVirtualLeg(leg)");
+const builderBatchStart = builderUiSource.indexOf("function isActiveVirtualBatch(batch)", builderLegStart);
+const builderBatchEnd = builderUiSource.indexOf("\n}", builderBatchStart);
+assert.ok(builderLegStart >= 0 && builderBatchStart > builderLegStart && builderBatchEnd > builderBatchStart, "active Builder scope helpers must exist");
+const builderScopeContext = {};
+vm.runInNewContext(
+  builderUiSource.slice(builderLegStart, builderBatchEnd + 2) +
+  "\nthis.isActiveVirtualLeg=isActiveVirtualLeg;this.isActiveVirtualBatch=isActiveVirtualBatch;",
+  builderScopeContext
+);
+const isActiveVirtualLeg = builderScopeContext.isActiveVirtualLeg;
+const isActiveVirtualBatch = builderScopeContext.isActiveVirtualBatch;
+assert.equal(isActiveVirtualLeg({sport:"virtual",product:"efootball_gt"}), true);
+assert.equal(isActiveVirtualLeg({sport:"virtual",product:"efootball_adriatic"}), true);
+assert.equal(isActiveVirtualLeg({sport:"virtual",product:"vfootball"}), false);
+assert.equal(isActiveVirtualLeg({sport:"virtual",product:"zoom"}), false);
+assert.equal(isActiveVirtualLeg({sport:"football",product:"football"}), true);
+assert.equal(isActiveVirtualBatch({products:["efootball_gt"],legs:[{sport:"virtual",product:"efootball_gt"}]}), true);
+assert.equal(isActiveVirtualBatch({products:["vfootball"],legs:[{sport:"virtual",product:"vfootball"}]}), false);
+assert.equal(isActiveVirtualBatch({products:["efootball_gt","vfootball"],legs:[{sport:"virtual",product:"efootball_gt"},{sport:"virtual",product:"vfootball"}]}), false);
+assert.equal(isActiveVirtualBatch({products:["zoom"],legs:[{sport:"virtual",product:"zoom"}]}), false);
+assert.match(builderUiSource, /data\.batches\)\?data\.batches\.filter\(isActiveVirtualBatch\)/);
+assert.match(builderUiSource, /ensureBookingCodes\(activeBatches\)/);
+
 // Display-only reference odds must remain separate from current-edge logic.
 assert.match(source, /const displayBook=quote\.displayOdds==null\?book:quote\.displayOdds;/);
 assert.match(source, /const edge=exactMarketEdge\(x,quote\);/);
@@ -100,4 +126,4 @@ assert.match(source, /qualificationState\(row\)\.currentPricePass/);
 assert.doesNotMatch(source, /class="ms-up-qual /);
 assert.doesNotMatch(source, /class="ms-market-q /);
 assert.match(css, /\.ms-book-stale\{[^}]*var\(--ms-amber\)/);
-console.log("Prediction Desk exact-line quote contract, active eFootball-only virtual scope, and preservation safeguards passed.");
+console.log("Prediction Desk exact-line quote contract, active eFootball-only scope, Builder stale-artifact filter, and preservation safeguards passed.");
