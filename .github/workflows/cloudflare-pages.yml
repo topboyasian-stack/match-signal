@@ -525,51 +525,51 @@ jobs:
               const b=JSON.parse(body);
               const legs=Array.isArray(b?.qualified_legs)?b.qualified_legs:[];
               const combined=Number(b?.market_price_combined_odds||0);
-    const batches=Array.isArray(b?.batches)?b.batches:[];
-    const compactTicket=batches.find(batch=>String(batch?.primary_lane||'')==='efootball_compact_2x');
-    const compactLane=Boolean(compactTicket || String(b?.batch_policy?.primary_lane||'')==='efootball_compact_2x');
-    const compactPolicy=b?.selection_policy?.compact_efootball_ticket_lane||{};
-    const oddsGate=(b?.research_gate?.combined_odds_gate)||{};
-    const activeFloor=Number(oddsGate.floor||2.7);
-    const laneFloor=compactLane?Number(compactPolicy.min_combined_odds||b?.batch_policy?.compact_efootball_min_combined_odds||2.0):activeFloor;
-    const minLegs=compactLane?4:2;
-    const maxLegs=compactLane?5:4;
-    if (b?.mode!=='PAPER_ONLY') failures.push('/data/odds_builder.json is not PAPER_ONLY');
-    const allowedStatuses=new Set(['LIVE_VALUE_SET','BELOW_4_TARGET_AVAILABLE','NO_BET','UPSTREAM_RESEARCH_GATE_BLOCKED','VALUE_RESEARCH_SET','RESULTS_FIRST_SET','ACCURACY_FIRST_SET']);
-    if (!allowedStatuses.has(b?.status)) failures.push('/data/odds_builder.json status is '+b?.status);
-    if (compactLane && compactPolicy.enabled!==true) failures.push('/data/odds_builder.json compact lane batch has no enabled policy');
-    if (b?.status==='LIVE_VALUE_SET') {
-      if (!legs.length) failures.push('/data/odds_builder.json LIVE_VALUE_SET has no qualified paper legs');
-      if (!batches.length) failures.push('/data/odds_builder.json LIVE_VALUE_SET has no batches');
-      if (legs.length<minLegs || legs.length>maxLegs) failures.push('/data/odds_builder.json LIVE_VALUE_SET leg count invalid for lane: '+legs.length);
-      if (!(combined>=laneFloor)) failures.push('/data/odds_builder.json LIVE_VALUE_SET combined odds below lane floor '+laneFloor.toFixed(2)+': '+combined);
-    } else if (b?.status==='BELOW_4_TARGET_AVAILABLE') {
-      if (!Array.isArray(b?.best_available_legs) || !b.best_available_legs.length) failures.push('/data/odds_builder.json BELOW_4_TARGET_AVAILABLE has no best_available_legs');
-      if (!(combined>1 && combined<2.7)) failures.push('/data/odds_builder.json BELOW_4_TARGET_AVAILABLE has invalid combined odds: '+combined);
-    } else if (b?.status==='VALUE_RESEARCH_SET' || b?.status==='RESULTS_FIRST_SET' || b?.status==='ACCURACY_FIRST_SET') {
-      if (legs.length<minLegs || legs.length>maxLegs) failures.push('/data/odds_builder.json '+b?.status+' leg count invalid for lane: '+legs.length);
-      if (!(combined>=laneFloor)) failures.push('/data/odds_builder.json '+b?.status+' combined odds below lane floor '+laneFloor.toFixed(2)+': '+combined);
-      if (!batches.length) failures.push('/data/odds_builder.json qualified status has no batches');
-      console.log('Paper Odds Builder qualified state: '+b?.status+'; lane floor '+laneFloor.toFixed(2)+'x; '+(compactLane?'compact eFootball 4–5-leg lane':'standard '+activeFloor.toFixed(2)+'x lane'));
-    } else {
-      if (legs.length) failures.push('/data/odds_builder.json '+b?.status+' unexpectedly contains qualified legs');
-      console.log('Paper Odds Builder production state: '+b?.status+' (no weak/stale ticket was forced)');
-    }
-    for (const leg of legs) {
-      if (leg?.odds_fresh!==true) failures.push('/data/odds_builder.json qualified leg has stale odds');
-      if (!leg?.market_source || !String(leg.market_source).includes('SportyBet')) failures.push('/data/odds_builder.json qualified leg is not sourced from SportyBet');
-      if (compactLane && (!['efootball_gt','efootball_adriatic'].includes(String(leg?.product||'')) || String(leg?.qualification_lane||'')!=='efootball_exact_evidence_value' || Number(leg?.model_probability||0)<0.80))
-        failures.push('/data/odds_builder.json compact leg fails exact-evidence/80% active-product contract');
-    }
-    for (const batch of batches) {
-      if (String(batch?.primary_lane||'')!=='efootball_compact_2x') continue;
-      const batchLegs=Array.isArray(batch?.legs)?batch.legs:[];
-      const batchCount=Number(batch?.leg_count||batchLegs.length||0);
-      if (batchCount<4 || batchCount>5) failures.push('/data/odds_builder.json compact batch leg count outside 4–5');
-      if (Number(batch?.combined_odds||0)<2.0) failures.push('/data/odds_builder.json compact batch is below 2.00x');
-      if (batchLegs.some(leg=>!['efootball_gt','efootball_adriatic'].includes(String(leg?.product||'')) || String(leg?.qualification_lane||'')!=='efootball_exact_evidence_value' || Number(leg?.model_probability||0)<0.80))
-        failures.push('/data/odds_builder.json compact batch has an unqualified leg');
-    }
+              const batches=Array.isArray(b?.batches)?b.batches:[];
+              const compactTicket=batches.find(batch=>String(batch?.primary_lane||'')==='efootball_compact_2x');
+              const compactLane=Boolean(compactTicket || String(b?.batch_policy?.primary_lane||'')==='efootball_compact_2x');
+              const compactPolicy=b?.selection_policy?.compact_efootball_ticket_lane||{};
+              const oddsGate=(b?.research_gate?.combined_odds_gate)||{};
+              const activeFloor=Number(oddsGate.floor||2.7);
+              const laneFloor=compactLane?Number(compactPolicy.min_combined_odds||b?.batch_policy?.compact_efootball_min_combined_odds||2.0):activeFloor;
+              const minLegs=compactLane?4:2;
+              const maxLegs=compactLane?5:4;
+              if (b?.mode!=='PAPER_ONLY') failures.push('/data/odds_builder.json is not PAPER_ONLY');
+              if (compactLane && compactPolicy.enabled!==true) failures.push('/data/odds_builder.json compact lane has no enabled policy');
+              const allowedStatuses=new Set(['LIVE_VALUE_SET','BELOW_4_TARGET_AVAILABLE','NO_BET','UPSTREAM_RESEARCH_GATE_BLOCKED','VALUE_RESEARCH_SET','RESULTS_FIRST_SET','ACCURACY_FIRST_SET']);
+              if (!allowedStatuses.has(b?.status)) failures.push('/data/odds_builder.json status is '+b?.status);
+              if (b?.status==='LIVE_VALUE_SET') {
+                if (!legs.length) failures.push('/data/odds_builder.json LIVE_VALUE_SET has no qualified paper legs');
+                if (!Array.isArray(b?.batches) || !b.batches.length) failures.push('/data/odds_builder.json LIVE_VALUE_SET has no batches');
+                if (legs.length<minLegs || legs.length>maxLegs) failures.push('/data/odds_builder.json LIVE_VALUE_SET leg count invalid for lane: '+legs.length);
+                if (!(combined>=laneFloor)) failures.push('/data/odds_builder.json LIVE_VALUE_SET combined odds below lane floor '+laneFloor.toFixed(2)+': '+combined);
+              } else if (b?.status==='BELOW_4_TARGET_AVAILABLE') {
+                if (!Array.isArray(b?.best_available_legs) || !b.best_available_legs.length) failures.push('/data/odds_builder.json BELOW_4_TARGET_AVAILABLE has no best_available_legs');
+                if (!(combined>1 && combined<2.7)) failures.push('/data/odds_builder.json BELOW_4_TARGET_AVAILABLE has invalid combined odds: '+combined);
+              } else if (b?.status==='VALUE_RESEARCH_SET' || b?.status==='RESULTS_FIRST_SET' || b?.status==='ACCURACY_FIRST_SET') {
+                if (legs.length<minLegs || legs.length>maxLegs) failures.push('/data/odds_builder.json '+b?.status+' leg count invalid for lane: '+legs.length);
+                if (!(combined>=laneFloor)) failures.push('/data/odds_builder.json '+b?.status+' combined odds below lane floor '+laneFloor.toFixed(2)+': '+combined);
+                if (!Array.isArray(b?.batches) || !b.batches.length) failures.push('/data/odds_builder.json qualified status has no batches');
+                console.log('Paper Odds Builder qualified state: '+b?.status+'; lane floor '+laneFloor.toFixed(2)+'x; '+(compactLane?'compact eFootball 4–5-leg lane':'standard '+activeFloor.toFixed(2)+'x lane'));
+              } else {
+                if (legs.length) failures.push('/data/odds_builder.json '+b?.status+' unexpectedly contains qualified legs');
+                console.log('Paper Odds Builder production state: '+b?.status+' (no weak/stale ticket was forced)');
+              }
+              for (const leg of legs) {
+                if (leg?.odds_fresh!==true) failures.push('/data/odds_builder.json qualified leg has stale odds');
+                if (!leg?.market_source || !String(leg.market_source).includes('SportyBet')) failures.push('/data/odds_builder.json qualified leg is not sourced from SportyBet');
+                if (compactLane && (!['efootball_gt','efootball_adriatic'].includes(String(leg?.product||'')) || String(leg?.qualification_lane||'')!=='efootball_exact_evidence_value' || Number(leg?.model_probability||0)<0.80))
+                  failures.push('/data/odds_builder.json compact leg fails active eFootball exact-evidence/80% contract');
+              }
+              for (const batch of batches) {
+                if (String(batch?.primary_lane||'')!=='efootball_compact_2x') continue;
+                const batchLegs=Array.isArray(batch?.legs)?batch.legs:[];
+                const count=Number(batch?.leg_count||batchLegs.length||0);
+                if (count<4 || count>5) failures.push('/data/odds_builder.json compact batch leg count outside 4–5');
+                if (Number(batch?.combined_odds||0)<2.0) failures.push('/data/odds_builder.json compact batch below 2.00x');
+                if (batchLegs.some(leg=>!['efootball_gt','efootball_adriatic'].includes(String(leg?.product||'')) || String(leg?.qualification_lane||'')!=='efootball_exact_evidence_value' || Number(leg?.model_probability||0)<0.80))
+                  failures.push('/data/odds_builder.json compact batch contains an unqualified leg');
+              }
             }
           } catch(e) { failures.push('/data/odds_builder.json '+e.message); }
 
