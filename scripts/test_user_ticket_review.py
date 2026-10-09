@@ -9,7 +9,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from audit_user_ticket_review import (  # noqa: E402
     analyze_leg,
-    analyze_leg,
     evaluate_pick,
     summarize_document,
     validate_document,
