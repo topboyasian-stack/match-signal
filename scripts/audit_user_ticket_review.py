@@ -75,7 +75,7 @@ def validate_document(document: Any) -> list[str]:
         if not isinstance(ref, str) or not ref or len(ref) > 80 or not all(c.isalnum() or c in "_-" for c in ref):
             errors.append(f"{where}.ticket_ref must be a non-identifying internal reference")
         elif ref in ticket_refs:
-            errors.append(f"duplicate ticket_ref: {ref}")
+            errors.append(f"{where} has a duplicate ticket_ref")
         else:
             ticket_refs.add(ref)
         if not parse_datetime(ticket.get("captured_at")):
@@ -283,7 +283,7 @@ def main() -> int:
     try:
         document = json.loads(args.input.read_text(encoding="utf-8"))
     except OSError as exc:
-        print(json.dumps({"status": "ERROR", "error": f"cannot read input: {exc}"}), file=sys.stderr)
+        print(json.dumps({"status": "ERROR", "error": "cannot read input file"}), file=sys.stderr)
         return 2
     except json.JSONDecodeError as exc:
         print(json.dumps({"status": "ERROR", "error": f"invalid JSON at line {exc.lineno}, column {exc.colno}"}), file=sys.stderr)
