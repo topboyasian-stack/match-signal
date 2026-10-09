@@ -93,14 +93,23 @@ for args in [
     if x:
         checks.append(x)
 
-desk_health_age = age_hours(desk_health.get("generated_at"))
+desk_health_stamp = desk_health.get("generated_at")
+desk_health_age = age_hours(desk_health_stamp)
+desk_health_generated = str(desk_health.get("status") or "") == "GENERATED"
+desk_health_fresh = bool(desk_health_stamp) and desk_health_generated and desk_health_age <= 2
 checks.append({
     "engine": "prediction_desk_health",
-    "status": "PASS" if desk_health_age <= 2 else "STALE",
-    "age_hours": round(desk_health_age, 2),
+    "status": "PASS" if desk_health_fresh else "STALE",
+    "age_hours": round(desk_health_age, 2) if desk_health_stamp else None,
     "threshold_hours": 2,
 })
-if desk_health_age > 2:
+if not desk_health_stamp or not desk_health_generated:
+    checks.append(issue(
+        "PREDICTION_DESK_HEALTH_NOT_GENERATED",
+        "warning",
+        "Prediction Desk health sidecar has not yet been replaced by a timestamped generated snapshot"
+    ))
+elif desk_health_age > 2:
     checks.append(issue(
         "PREDICTION_DESK_HEALTH_STALE",
         "warning",
