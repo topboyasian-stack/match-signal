@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from audit_user_ticket_review import (  # noqa: E402
     analyze_leg,
+    analyze_leg,
     evaluate_pick,
     summarize_document,
     validate_document,
@@ -110,6 +111,19 @@ class UserTicketReviewTests(unittest.TestCase):
         self.assertAlmostEqual(summary["actual_leg_hit_rate_excluding_pushes"], 1.0)
         # The reported accumulator outcome is not replaced by its single leg.
         self.assertEqual(document["tickets"][0]["reported_ticket_outcome"], "LOST")
+
+    def test_desk_snapshot_time_remains_unverified_and_flags_after_kickoff(self):
+        leg = make_leg()
+        leg["kickoff_at"] = "2026-10-09T10:30:00Z"
+        result = analyze_leg(leg)
+        self.assertEqual(result["desk_snapshot_timing"], "user_reported_pre_kickoff_time_unverified")
+        leg["desk_snapshot"]["captured_at"] = "2026-10-09T10:45:00Z"
+        self.assertEqual(analyze_leg(leg)["desk_snapshot_timing"], "captured_after_kickoff")
+
+    def test_user_reported_provenance_is_validated(self):
+        document = make_document(make_leg())
+        document["tickets"][0]["legs"][0]["desk_snapshot"]["provenance"] = "captured_live"
+        self.assertTrue(any("provenance must be user_reported" in error for error in validate_document(document)))
 
 
 if __name__ == "__main__":
