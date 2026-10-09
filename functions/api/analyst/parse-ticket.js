@@ -68,7 +68,8 @@ export async function onRequestPost(context) {
   if (!context.env.AI || typeof context.env.AI.run !== "function") return jsonResponse({ error: "AI_BINDING_NOT_CONFIGURED", message: "Add a Workers AI binding named AI in Cloudflare Pages settings and redeploy." }, 503);
   const parsedBody = await readJsonBody(context.request, 24000);
   if (parsedBody.error) return jsonResponse({ error: parsedBody.error }, parsedBody.error === "REQUEST_TOO_LARGE" ? 413 : 400);
-  const rawText = typeof parsedBody.body.receipt_text === "string" ? parsedBody.body.receipt_text.trim() : "";
+  const body = parsedBody.body && typeof parsedBody.body === "object" && !Array.isArray(parsedBody.body) ? parsedBody.body : {};
+  const rawText = typeof body.receipt_text === "string" ? body.receipt_text.trim() : "";
   if (rawText.length < 20) return jsonResponse({ error: "RECEIPT_TEXT_REQUIRED" }, 400);
   if (rawText.length > 20000) return jsonResponse({ error: "RECEIPT_TEXT_TOO_LONG", max_characters: 20000 }, 413);
   const allowance = await consumeDailyAiAllowance(context.env);
