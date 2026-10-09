@@ -15,6 +15,9 @@ on:
       - 'functions/api/analyst/**'
       - 'scripts/test_analyst_module.mjs'
       - 'scripts/test_analyst_routes.mjs'
+      - 'scripts/unified_upcoming.py'
+      - 'scripts/test_upcoming_desk_policy.py'
+      - '.github/workflows/autopilot-refresh.yml'
   push:
     branches: [main, ai-analyst-foundation]
     paths:
@@ -30,6 +33,9 @@ on:
       - 'analyst.js'
       - 'analyst.html'
       - 'docs/AI_ANALYST_SETUP.md'
+      - 'scripts/unified_upcoming.py'
+      - 'scripts/test_upcoming_desk_policy.py'
+      - '.github/workflows/autopilot-refresh.yml'
   workflow_dispatch:
 
 permissions:
@@ -50,6 +56,8 @@ jobs:
         run: python -m json.tool schemas/user-ticket-review.schema.json > /dev/null
       - name: Run O/U line and evidence tests
         run: python scripts/test_user_ticket_review.py
+      - name: Run Prediction Desk freshness and exact-line evidence tests
+        run: python scripts/test_upcoming_desk_policy.py
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
