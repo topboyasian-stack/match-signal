@@ -131,10 +131,13 @@ def settlement_index(history):
 def eligible_current_rows(board):
     events = board.get("events") if isinstance(board, dict) else []
     out = []
+    # Keep engines separate downstream; capture both virtual products that are
+    # currently generated on the Upcoming Desk, rather than learning only GT.
+    supported_products = {"efootball_gt", "vfootball"}
     for row in events if isinstance(events, list) else []:
         if not isinstance(row, dict):
             continue
-        if str(row.get("product") or "") != "efootball_gt":
+        if str(row.get("product") or "").strip().lower() not in supported_products:
             continue
         if str(row.get("market") or "") != "over_under":
             continue
@@ -194,24 +197,28 @@ def capture(trace, board):
 
 def reconcile(trace, history_index):
     for row in trace:
-        # Migrate existing trace rows from the old event-ID-only key. EFootball
-        # provider IDs can identify a session and be reused for different fixtures.
+        # Migrate existing trace rows from the old event-ID-only key. Provider
+        # IDs can recur across sessions, so product/kickoff/participant identity
+        # remains canonical.
         key = exact_key(row)
         if key:
             row["event_key"] = key
             row.setdefault("product", "efootball_gt")
 
-    by_fixture = {}
-    for base, item in history_index.items():
-        by_fixture[base] = item
-    trace_by_fixture = {}
+    # Match fixture settlements once, but score forecasts independently by
+    # exact fixture + totals line. A 7.5 and an 8.5 prediction on the same match
+    # are separate desk decisions and must both learn from the final score.
+    forecasts_by_exact_key = {}
     for row in trace:
         base = fixture_key(row)
-        if base:
-            trace_by_fixture.setdefault(base, []).append(row)
+        key = exact_key(row)
+        if base and key:
+            forecasts_by_exact_key.setdefault(key, []).append(row)
 
-    for base, forecasts in trace_by_fixture.items():
-        item = by_fixture.get(base)
+    for exact, forecasts in forecasts_by_exact_key.items():
+        if not forecasts:
+            continue
+        item = history_index.get(fixture_key(forecasts[0]))
         if not item:
             continue
         settled = item.get("_stamp")
@@ -232,8 +239,8 @@ def reconcile(trace, history_index):
             side = side_of(row)
             if observed is None or start is None or line is None or not side or settled is None:
                 continue
-            # Strictly pre-kickoff forecasts only; the settlement timestamp must
-            # also be after the observation, preventing any future leakage.
+            # Strictly pre-kickoff forecasts only; settlement must be after the
+            # observation. A later revision supersedes only the same line.
             if not (observed < start and observed <= settled):
                 continue
             scored.append((observed, row, line, side, total))
@@ -246,6 +253,7 @@ def reconcile(trace, history_index):
                 row["superseded_before_settlement"] = True
                 row["scored_forecast"] = False
                 continue
+            row.pop("superseded_before_settlement", None)
             if total == line:
                 row["settled"] = True
                 row["push"] = True
@@ -264,7 +272,6 @@ def reconcile(trace, history_index):
             row["score"] = score
             row["settlement_source"] = item.get("settlement_source")
             row["scored_forecast"] = True
-
 
 def settled_forecasts(trace):
     rows = []
@@ -307,18 +314,40 @@ def calibration(forecasts):
 
 
 def exact_profiles(forecasts):
-    groups = {}
+    # Never pool products: eFootball GT and VFootball have different score
+    # distributions and each needs its own line/direction evidence.
+    products = {}
     for row in forecasts:
-        key = f"{num(row.get('line')):g}|{side_of(row)}"
-        g = groups.setdefault(key, {"n": 0, "wins": 0})
+        line = num(row.get("line"))
+        side = side_of(row)
+        if line is None or not side:
+            continue
+        product = str(row.get("product") or "efootball_gt").strip().lower()
+        key = f"{line:g}|{side}"
+        by_line = products.setdefault(product, {})
+        g = by_line.setdefault(key, {"n": 0, "wins": 0, "model_probability_sum": 0.0, "model_probability_n": 0})
         g["n"] += 1
         g["wins"] += 1 if row.get("win") else 0
-    for g in groups.values():
-        n = g["n"]
-        g["accuracy"] = g["wins"] / n if n else 0.0
-        g["posterior_probability"] = ((g["wins"] + 4.0) / (n + 8.0)) if n else None
-    return groups
+        p = num(row.get("model_probability"))
+        if p is not None:
+            g["model_probability_sum"] += p
+            g["model_probability_n"] += 1
 
+    for by_line in products.values():
+        for g in by_line.values():
+            n = g["n"]
+            wins = g["wins"]
+            posterior = (wins + 4.0) / (n + 8.0) if n else None
+            p_n = int(g.pop("model_probability_n"))
+            p_sum = float(g.pop("model_probability_sum"))
+            mean_p = p_sum / p_n if p_n else None
+            weight = n / (n + 30.0) if n else 0.0
+            g["accuracy"] = wins / n if n else 0.0
+            g["posterior_probability"] = posterior
+            g["mean_model_probability"] = mean_p
+            g["calibration_weight"] = weight
+            g["calibration_offset"] = (posterior - mean_p) if posterior is not None and mean_p is not None else 0.0
+    return products
 
 def main():
     board = load(UNIFIED, {})
@@ -337,24 +366,54 @@ def main():
     trace = trace[-TRACE_CAP:]
 
     settled = settled_forecasts(trace)
-    recent = settled[-RECENT_WINDOW:]
-    buckets = calibration(settled)
-    exact = exact_profiles(settled)
+    products = sorted({str(r.get("product") or "efootball_gt").strip().lower() for r in settled})
+    by_product = {}
+    for product in products:
+        product_settled = [r for r in settled if str(r.get("product") or "efootball_gt").strip().lower() == product]
+        recent = product_settled[-RECENT_WINDOW:]
+        buckets = calibration(product_settled)
+        exact = exact_profiles(product_settled).get(product, {})
+        bucket_active = any(int(b.get("n") or 0) >= MIN_CALIBRATION_N for b in buckets.values())
+        exact_active = any(int(x.get("n") or 0) >= EXACT_MIN_N for x in exact.values())
+        recent_accuracy = (
+            sum(1 for r in recent if r.get("win")) / len(recent)
+            if recent else 0.0
+        )
+        recent_brier = (
+            sum(
+                (float(r.get("model_probability") or 0)
+                 - (1.0 if r.get("win") else 0.0)) ** 2
+                for r in recent
+            ) / len(recent)
+            if recent else None
+        )
+        by_product[product] = {
+            "active": bucket_active or exact_active,
+            "settled_predictions": len(product_settled),
+            "pending_forecasts": sum(
+                1 for r in trace
+                if str(r.get("product") or "efootball_gt").strip().lower() == product and not r.get("settled")
+            ),
+            "recent_window": {
+                "n": len(recent),
+                "accuracy": recent_accuracy,
+                "brier": recent_brier,
+            },
+            "calibration": {
+                "active": bucket_active,
+                "minimum_bucket_predictions": MIN_CALIBRATION_N,
+                "buckets": buckets,
+            },
+            "exact_selection_active": exact_active,
+            "exact_selection": exact,
+        }
 
-    recent_accuracy = (
-        sum(1 for r in recent if r.get("win")) / len(recent)
-        if recent else 0.0
-    )
-    recent_brier = (
-        sum(
-            (float(r.get("model_probability") or 0)
-             - (1.0 if r.get("win") else 0.0)) ** 2
-            for r in recent
-        ) / len(recent)
-        if recent else None
-    )
-
-    active = len(settled) >= MIN_CALIBRATION_N
+    # Keep the original top-level fields compatible with existing readers:
+    # they describe eFootball GT only. New readers should use by_product.
+    gt = by_product.get("efootball_gt", {})
+    gt_calibration = gt.get("calibration") or {"active": False, "buckets": {}}
+    gt_exact = gt.get("exact_selection") or {}
+    active = bool(gt.get("active"))
     report = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "mode": "PAPER_ONLY",
@@ -364,21 +423,20 @@ def main():
             "exact_selection_min_predictions": EXACT_MIN_N,
             "bucket_width": BUCKET_WIDTH,
             "recent_window": RECENT_WINDOW,
+            "exact_scoring_granularity": "latest pre-kickoff forecast per product + fixture + totals line; different lines are scored independently",
             "future_leakage_protection": "only observations strictly before kickoff can become the scored forecast; settlement is read from independent virtual_lab_history",
+            "products_are_never_pooled": True,
         },
-        "settled_predictions": len(settled),
-        "pending_forecasts": sum(1 for r in trace if not r.get("settled")),
-        "recent_window": {
-            "n": len(recent),
-            "accuracy": recent_accuracy,
-            "brier": recent_brier,
-        },
+        "settled_predictions": int(gt.get("settled_predictions") or 0),
+        "total_settled_predictions": len(settled),
+        "pending_forecasts": int(gt.get("pending_forecasts") or 0),
+        "recent_window": gt.get("recent_window") or {"n": 0, "accuracy": 0.0, "brier": None},
         "calibration": {
-            "active": active,
-            "settled_predictions": len(settled),
-            "buckets": buckets,
+            **gt_calibration,
+            "settled_predictions": int(gt.get("settled_predictions") or 0),
         },
-        "exact_selection": exact,
+        "exact_selection": gt_exact,
+        "by_product": by_product,
         "trace_artifact": "data/efootball_desk_prediction_history.json",
         "source_settlement": "data/virtual_lab_history.json",
     }
@@ -387,10 +445,17 @@ def main():
     save(OUTPUT, report)
     print(json.dumps({
         "status": "ACTIVE" if active else "WARMUP",
-        "settled_predictions": len(settled),
-        "pending_forecasts": report["pending_forecasts"],
-        "recent_accuracy": recent_accuracy,
-        "recent_brier": recent_brier,
+        "settled_predictions": report["settled_predictions"],
+        "total_settled_predictions": report["total_settled_predictions"],
+        "by_product": {
+            product: {
+                "settled_predictions": metrics["settled_predictions"],
+                "active": metrics["active"],
+                "exact_selection_active": metrics["exact_selection_active"],
+                "recent_accuracy": metrics["recent_window"]["accuracy"],
+            }
+            for product, metrics in by_product.items()
+        },
     }, indent=2))
 
 
