@@ -231,7 +231,7 @@
       $("draftSection").classList.remove("hidden");
       const warnings = result.validation_errors || [];
       setMessage("draftStatus", warnings.length
-        ? "Review required: " + warnings.join("; ") + ". Edit the JSON until valid, then save."
+        ? "Review required: " + warnings.join("; ") + ". Correct the review fields or advanced JSON before saving."
         : "Draft extracted. Verify every leg, exact line, odds, score and reported result. No desk data will be guessed.", warnings.length ? "small error" : "small");
       setMessage("parseStatus", "Draft ready. Nothing has been saved.");
     } catch (error) {
