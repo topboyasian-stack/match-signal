@@ -89,6 +89,8 @@ User-selected legs are selection-biased evidence. Track them as a distinct cohor
 - The existing sport-engine boundaries, evidence archives, paper-only mode and no-forced-ticket rules remain intact.
 - Deployment is not complete until the affected Cloudflare production endpoint and visible feature are verified.
 
-## Scope of this first patch
+## Scope and staged rollout
 
-This is a non-production foundation. It adds a private-data contract, an aggregate-only O/U audit utility, tests, and a targeted CI workflow. It does not change predictions, qualification gates, ticket construction, settlement records, production pages, or Cloudflare bindings. It does not add an LLM API until private storage, authentication and provider configuration have been reviewed.
+The first isolated patch added the private-data contract, aggregate-only Python audit utility, tests, and CI. The next commit in this draft branch adds a private KV-backed record API, a token-protected on-demand chat endpoint, an explicit-review ticket parser, a private analyst page, and module tests. These are not available on main or production until reviewed, and the API intentionally returns a setup error until the dedicated KV, Workers AI binding, and secret are configured in Cloudflare.
+
+No predictions, qualification gates, ticket construction, settlement records, engine logic, or model weights are changed. AI calls are user-initiated only, capped at 25 requests per UTC day in the app, and limited to read-only explanations or ticket draft extraction. Parsing never saves automatically. User ticket evidence remains separate from Builder evidence and model training. The PR must stay off main until the code, CI, private-storage configuration, and production behavior are reviewed.
