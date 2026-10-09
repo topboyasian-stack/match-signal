@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 "use strict";
-const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const vm = require("node:vm");
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import vm from "node:vm";
 
 const source = fs.readFileSync("sport-hubs.js", "utf8");
 const css = fs.readFileSync("sport-hubs.css", "utf8");
