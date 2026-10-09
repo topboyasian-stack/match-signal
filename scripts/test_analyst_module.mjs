@@ -16,7 +16,7 @@ function makeLeg(actualPick, actualLine, deskPick, deskLine, home = 1, away = 1)
     product: "vfootball",
     match: "Sample FC vs Example FC",
     actual_selection: { market: "total_goals_over_under", pick: actualPick, line: actualLine, odds: 1.5 },
-    desk_snapshot: { market: "total_goals_over_under", pick: deskPick, line: deskLine, odds: 1.8, model_probability: 0.72, captured_at: stamp },
+    desk_snapshot: { market: "total_goals_over_under", provenance: "user_reported", pick: deskPick, line: deskLine, odds: 1.8, model_probability: 0.72, captured_at: stamp },
     final_score: { home: home, away: away },
     settled_at: stamp
   };
