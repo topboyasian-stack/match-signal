@@ -8,6 +8,12 @@ on:
       - 'scripts/audit_user_ticket_review.py'
       - 'scripts/test_user_ticket_review.py'
       - '.github/workflows/ai-analyst-foundation-tests.yml'
+      - 'docs/AI_ANALYST_SETUP.md'
+      - 'analyst.html'
+      - 'analyst.js'
+      - 'functions/_shared/analyst.mjs'
+      - 'functions/api/analyst/**'
+      - 'scripts/test_analyst_module.mjs'
   push:
     branches: [main, ai-analyst-foundation]
     paths:
@@ -36,3 +42,16 @@ jobs:
         run: python -m json.tool schemas/user-ticket-review.schema.json > /dev/null
       - name: Run O/U line and evidence tests
         run: python scripts/test_user_ticket_review.py
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run private analyst module tests
+        run: node scripts/test_analyst_module.mjs
+      - name: Check analyst JavaScript syntax
+        run: |
+          node --check analyst.js
+          node --check functions/_shared/analyst.mjs
+          node --check functions/api/analyst/records.js
+          node --check functions/api/analyst/chat.js
+          node --check functions/api/analyst/parse-ticket.js
