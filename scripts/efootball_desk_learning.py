@@ -403,7 +403,9 @@ def main():
             "settled_predictions": len(product_settled),
             "pending_forecasts": sum(
                 1 for r in trace
-                if str(r.get("product") or "efootball_gt").strip().lower() == product and not r.get("settled")
+                if str(r.get("product") or "efootball_gt").strip().lower() == product
+                and not r.get("settled")
+                and not r.get("superseded_before_settlement")
             ),
             "recent_window": {
                 "n": len(recent),
