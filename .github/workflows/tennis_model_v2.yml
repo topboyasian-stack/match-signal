@@ -23,7 +23,8 @@ permissions:
   contents: write
 
 concurrency:
-  group: match-signal-tennis-model-v2
+  # Serialize shared prediction/data artifacts with the core prediction publisher.
+  group: match-signal-data-publish
   cancel-in-progress: false
 
 jobs:
@@ -58,15 +59,38 @@ jobs:
         run: python scripts/test_selection_gate_contract.py --require-generated-artifacts
       - name: Refresh prediction breakdown
         run: PYTHONPATH=. python scripts/prediction_breakdown.py
-      - name: Commit model V2 artifacts
+      - name: Commit model V2 artifacts with concurrency-safe retry
         shell: bash
         run: |
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/predictions.json data/tennis_model_v2.json data/tennis_precision_gate.json data/tennis_ou_v3.json data/selection_candidates.json data/selection_candidate_status.json data/selection_gate.json data/selection_gate_selected.json data/prediction_breakdown.json qa/report.json
-          if git diff --cached --quiet; then
-            echo "No tennis model V2 changes."
-            exit 0
-          fi
-          git commit -m "🎾 Apply walk-forward tennis V2 and precision gate"
-          git push origin main
+          for attempt in 1 2 3; do
+            git add data/predictions.json data/tennis_model_v2.json data/tennis_precision_gate.json data/tennis_ou_v3.json data/selection_candidates.json data/selection_candidate_status.json data/selection_gate.json data/selection_gate_selected.json data/prediction_breakdown.json qa/report.json
+            if git diff --cached --quiet; then
+              echo "No tennis model V2 changes."
+              exit 0
+            fi
+            git commit -m "🎾 Apply walk-forward tennis V2 and precision gate"
+            if git push origin main; then
+              echo "Tennis model V2 artifact publication succeeded on attempt ${attempt}."
+              exit 0
+            fi
+            if [ "${attempt}" -eq 3 ]; then
+              echo "Tennis model V2 could not publish after three attempts."
+              exit 1
+            fi
+            echo "Concurrent main update detected; refreshing inputs and regenerating output (attempt ${attempt})."
+            git fetch origin main
+            git reset --hard origin/main
+            python scripts/tennis_model_v2.py
+            python scripts/tennis_ou_v3.py
+            python -m json.tool data/predictions.json >/dev/null
+            python qa/prediction_qa.py
+            python scripts/selection_candidate_collector.py
+            PYTHONPATH=. python scripts/selective_prediction_gate.py
+            python scripts/test_selection_gate_contract.py --require-generated-artifacts
+            PYTHONPATH=. python scripts/prediction_breakdown.py
+            sleep $((attempt * 2))
+          done
+          exit 1
