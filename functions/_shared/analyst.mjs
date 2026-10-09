@@ -143,7 +143,8 @@ export function validateReviewDocument(document) {
         const desk = leg.desk_snapshot;
         if (!desk || typeof desk !== "object" || Array.isArray(desk)) errors.push(lw + ".desk_snapshot must be an object");
         else {
-          checkKnownKeys(desk, new Set(["prediction_id", "model_version", "market", "pick", "line", "odds", "model_probability", "captured_at"]), lw + ".desk_snapshot", errors);
+          checkKnownKeys(desk, new Set(["prediction_id", "model_version", "market", "pick", "line", "odds", "model_probability", "captured_at", "provenance"]), lw + ".desk_snapshot", errors);
+          if (desk.provenance !== undefined && !["user_reported", "captured_live", "matched_historical_snapshot"].includes(desk.provenance)) errors.push(lw + ".desk_snapshot.provenance is invalid");
           if (desk.market !== VALID_MARKET) errors.push(lw + ".desk_snapshot.market is invalid");
           if (!VALID_PICKS.has(desk.pick)) errors.push(lw + ".desk_snapshot.pick is invalid");
           if (!finiteNumber(desk.line) || desk.line < 0) errors.push(lw + ".desk_snapshot.line is invalid");
