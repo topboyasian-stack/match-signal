@@ -276,7 +276,7 @@ function unifiedRow(group){
     '<div class="ms-up-match">'+E(x.player_1||x.home||"Participant 1")+' <span>vs</span> '+E(x.player_2||x.away||"Participant 2")+'</div>'+
     '<div class="ms-market-stack">'+unifiedMarketLine(x)+'</div>'+
     '<div class="ms-fixture-foot"><span class="'+(settled?(won?"ms-settled-win":"ms-settled-loss"):"")+'">'+E(q)+'</span><span>'+E(settled?("Result "+(x.final_score||x.settlement_result||"recorded")):(book!=null?"Fresh exact market/line/side quote":"No fresh verifiable exact-line quote; edge withheld"))+'</span></div></div>'+
-    '<div class="ms-up-status"><span class="ms-up-status-badge '+(settled?(won?"deep":"research"):(qualified?"deep":live?"testing":"research"))+'">'+E(status)+'</span><span class="ms-up-qual '+(qualified?"qualified":"paper")+'">'+E(qualified?"BETTING-QUALIFIED":"PAPER · PRICE/QUALIFICATION GATE PENDING")+'</span><small>'+E(evidenceLabel(x))+'</small></div>'+
+    '<div class="ms-up-status"><span class="ms-up-status-badge '+(settled?(won?"deep":"research"):(qualified?"deep":live?"testing":"research"))+'">'+E(status)+'</span><span class="ms-up-qual '+(settled?"paper":qualified?"qualified":"paper")+'">'+E(settled?"SETTLED HISTORY":qualified?"BETTING-QUALIFIED":"PAPER · PRICE/QUALIFICATION GATE PENDING")+'</span><small>'+E(evidenceLabel(x))+'</small></div>'+
   '</article>';
 }
 async function renderUnifiedBoard(){
