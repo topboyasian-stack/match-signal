@@ -110,7 +110,8 @@ const facts = summarizeDiagnosticFacts({
     publication_filters: { past_kickoff_rows_hidden: 13, stale_live_flags_hidden: 2, expired_settled_rows_hidden: 5 },
     high_line_under_evidence: [
       { product: "vfootball", line: 7.5, side: "under", event_rows: 4, walkforward_n: 10, walkforward_hit_rate: 1, walkforward_brier: 0.0006, walkforward_model_variant: "participant_model", qualification_status: "HIGH_LINE_UNDER_EVIDENCE_GATE_PENDING", betting_qualified: false },
-      { product: "vfootball", line: 8.5, side: "under", event_rows: 2, walkforward_n: 0, walkforward_hit_rate: null, walkforward_brier: null, walkforward_model_variant: null, qualification_status: "HIGH_LINE_UNDER_EVIDENCE_GATE_PENDING", betting_qualified: false }
+      { product: "vfootball", line: 8.5, side: "under", event_rows: 2, walkforward_n: 0, walkforward_hit_rate: null, walkforward_brier: null, walkforward_model_variant: null, qualification_status: "HIGH_LINE_UNDER_EVIDENCE_GATE_PENDING", betting_qualified: false },
+      { product: "efootball_gt", line: 8.5, side: "under", event_rows: 11, walkforward_n: 76, walkforward_hit_rate: 0.6447368421, walkforward_brier: 0.2287, walkforward_model_variant: "participant_model", qualification_status: "HIGH_LINE_UNDER_EVIDENCE_GATE_PENDING", betting_qualified: false }
     ]
   }
 }, new Date("2026-10-09T17:39:48.000Z"));
