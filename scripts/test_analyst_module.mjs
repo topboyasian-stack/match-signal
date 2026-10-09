@@ -81,7 +81,7 @@ const facts = summarizeDiagnosticFacts({
     generated_at: "2026-10-09T17:13:24.000Z", status: "DEGRADED",
     critical_issues: 0, warning_issues: 1, info_issues: 1,
     issue_count_by_severity: { critical: 0, warning: 1, info: 1, other: 0 },
-    issues: [{ code: "TENNIS_FEED_EMPTY", severity: "warning" }, { code: "SELECTION_GATE_EMPTY", severity: "info" }]
+    issues: [{ code: "TENNIS_FEED_EMPTY", severity: "warning", detail: "No current tennis predictions are published" }, { code: "SELECTION_GATE_EMPTY", severity: "info", detail: "Selected-candidate layer returned zero qualified selections" }]
   },
   core_pipeline: {
     updated_at: "2026-10-09T15:16:15.000Z", prediction_count: 120, football_count: 120, tennis_count: 0,
