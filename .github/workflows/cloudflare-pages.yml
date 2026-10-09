@@ -207,8 +207,8 @@ jobs:
           node --input-type=module <<'NODE'
           import { writeFileSync } from 'node:fs';
           const base = 'https://match-signal.pages.dev';
-          const pages = ['/', '/upcoming.html', '/football.html', '/tennis.html', '/basketball.html', '/darts.html', '/table-tennis.html', '/league.html?sport=football&league=England%20Amateur%20-%20U21%20Professional%20Development%20League', '/reports.html', '/live.html', '/expansion.html', '/virtual-lab/', '/virtual-lab', '/research.html', '/virtual-lab.html'];
-          const assets = ['/api/sportybet-virtual','/api/sportybet-darts','/api/sportybet-table-tennis','/api/virtual-lab-history','/expansion.js', '/expansion-odds-builder.js', '/live-analysis.js', '/live-data-worker.js', '/virtual-lab-app.js', '/virtual-lab-confirmed-watch.js', '/virtual-lab.css', '/_redirects', '/data/predictions.json', '/data/expansion_status.json', '/data/odds_builder.json', '/data/odds_ticket_tracker.json', '/data/virtual_lab_live.json','/data/virtual_lab_model_eval.json','/data/virtual_lab_eligibility.json','/data/virtual_lab_participants/registry.json','/data/virtual_lab_participant_lifecycle.json','/data/virtual_lab_participants/efootball_confirmed_watch.json'];
+          const pages = ['/', '/upcoming.html', '/football.html', '/tennis.html', '/basketball.html', '/darts.html', '/table-tennis.html', '/league.html?sport=football&league=England%20Amateur%20-%20U21%20Professional%20Development%20League', '/reports.html', '/live.html', '/expansion.html', '/virtual-lab/', '/virtual-lab', '/research.html', '/virtual-lab.html', '/analyst.html'];
+          const assets = ['/api/sportybet-virtual','/api/sportybet-darts','/api/sportybet-table-tennis','/api/virtual-lab-history','/expansion.js', '/expansion-odds-builder.js', '/live-analysis.js', '/live-data-worker.js', '/virtual-lab-app.js', '/virtual-lab-confirmed-watch.js', '/virtual-lab.css', '/_redirects', '/data/predictions.json', '/data/expansion_status.json', '/data/odds_builder.json', '/data/odds_ticket_tracker.json', '/data/virtual_lab_live.json','/data/virtual_lab_model_eval.json','/data/virtual_lab_eligibility.json','/data/virtual_lab_participants/registry.json','/data/virtual_lab_participant_lifecycle.json','/data/virtual_lab_participants/efootball_confirmed_watch.json','/data/efootball_desk_prediction_history.json.gz'];
           const failures = [];
           async function get(path) {
             const r = await fetch(base + path + (path.includes('?') ? '&' : '?') + 'smoke=' + Date.now(), {cache:'no-store'});
@@ -263,6 +263,30 @@ jobs:
               if (path.endsWith('.json')) JSON.parse(body);
             } catch(e) { failures.push(path+' '+e.message); }
           }
+          // Analyst-specific production check: its page must be present and the
+          // private record API must reject an unauthenticated same-origin request.
+          try {
+            const {r,body}=await get('/analyst.html');
+            if (!r.ok) failures.push('/analyst.html HTTP '+r.status);
+            if (!body.includes('AI Analyst') || !body.includes('MATCH SIGNAL')) failures.push('/analyst.html missing Analyst console markers');
+          } catch(e) { failures.push('/analyst.html '+e.message); }
+
+          try {
+            const r=await fetch(base+'/api/analyst/records?smoke='+Date.now(),{
+              method:'GET',
+              headers:{Origin:base,Accept:'application/json'},
+              cache:'no-store'
+            });
+            const body=await r.text();
+            let payload={};
+            try { payload=JSON.parse(body); } catch {}
+            if (r.status!==401 || payload.error!=='UNAUTHORIZED') {
+              failures.push('/api/analyst/records unauthenticated request expected HTTP 401 UNAUTHORIZED, received HTTP '+r.status+' '+String(payload.error||'non-JSON response'));
+            } else {
+              console.log('AI Analyst protected API passed: unauthenticated request rejected with HTTP 401.');
+            }
+          } catch(e) { failures.push('/api/analyst/records auth check '+e.message); }
+
           for (const path of ['/data/darts_model.json','/data/darts_status.json','/data/darts_upcoming.json','/data/darts_candidates.json','/data/table_tennis_model.json','/data/table_tennis_status.json','/data/table_tennis_upcoming.json','/data/table_tennis_candidates.json']) {
             try {
               const {r,body}=await get(path);
