@@ -1,50 +1,50 @@
 {
-  "generated_at": "2026-10-09T20:16:59.098363+00:00",
+  "generated_at": "2026-10-09T20:56:42.339243+00:00",
   "status": "DEGRADED",
   "critical_issues": 0,
   "warning_issues": 1,
-  "info_issues": 1,
+  "info_issues": 0,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
       "status": "PASS",
-      "age_hours": 1.33,
+      "age_hours": 0.09,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.11,
+      "age_hours": 0.65,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 1.29,
+      "age_hours": 0.03,
       "threshold_hours": 4
     },
     {
       "engine": "unified_upcoming",
       "status": "PASS",
-      "age_hours": 0.01,
+      "age_hours": 0.67,
       "threshold_hours": 2
     },
     {
       "engine": "prediction_desk_health",
       "status": "PASS",
-      "age_hours": 0.03,
+      "age_hours": 0.69,
       "threshold_hours": 2
     },
     {
       "engine": "tennis_forward_discovery",
       "status": "PASS",
-      "age_hours": 1.22,
+      "age_hours": 0.04,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 3.68,
+      "age_hours": 0.0,
       "threshold_hours": 0.5,
       "heartbeat_source": "unified_live_refresh"
     },
@@ -72,11 +72,6 @@
       "code": "TENNIS_CORE_FEED_EMPTY",
       "severity": "warning",
       "detail": "Canonical tennis pipeline has zero actionable predictions; 26 unqualified ATP forward-window watch projections are published for research only"
-    },
-    {
-      "code": "SELECTION_GATE_EMPTY",
-      "severity": "info",
-      "detail": "Current prediction feed exists but the selected-candidate layer returned zero qualified selections; no gate was weakened"
     }
   ],
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
