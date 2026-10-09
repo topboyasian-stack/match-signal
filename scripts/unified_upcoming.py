@@ -43,6 +43,7 @@ EFOOTBALL_DESK_LEARNING_PATH="efootball_desk_learning.json"
 # A high Under line can look almost certain from the Poisson tail even when the
 # exact line/direction has too little out-of-sample evidence. Keep it visible as
 # research, but do not qualify VFootball Under 7.5+ without its own evidence.
+VFOOTBALL_HIGH_UNDER_MIN_OOS_LINE=7.5
 VFOOTBALL_HIGH_UNDER_MIN_OOS_N=30
 VFOOTBALL_HIGH_UNDER_MIN_OOS_HIT_RATE=0.65
 MAX_LIVE_AGE_HOURS={"football":4.0,"tennis":8.0,"virtual":2.0}
@@ -139,6 +140,18 @@ def stale_live_flag(row, now=None):
     if start is None or start>now or not explicit_live(row):
         return False
     return (now-start)>timedelta(hours=live_age_limit_hours(row))
+
+def high_vfootball_under_requires_research(product, line, side, exact_oos):
+    """High VFootball Unders need a minimum exact-line chronological OOS sample."""
+    if str(product or "").lower()!="vfootball" or str(side or "").lower()!="under":
+        return False
+    value=num(line)
+    if value is None or value<VFOOTBALL_HIGH_UNDER_MIN_OOS_LINE:
+        return False
+    stats=exact_oos if isinstance(exact_oos,dict) else {}
+    n=num(stats.get("n")) or 0
+    hit=num(stats.get("hit_rate"))
+    return n<VFOOTBALL_HIGH_UNDER_MIN_OOS_N or hit is None or hit<VFOOTBALL_HIGH_UNDER_MIN_OOS_HIT_RATE
 
 def apply_bookmaker_fields(x):
     """Normalize current SportyBet quotes onto a unified prediction row."""
@@ -802,11 +815,8 @@ def build_virtual_events(history, lifecycle, eligibility):
             directional_key=(float(line),chosen_pick)
             directional=directional_gate.get(directional_key,{})
             exact_oos=exact_line_direction_oos(eval_art,product,line,chosen_pick)
-            high_vfootball_under_pending=(
-                product=="vfootball" and chosen_pick=="under" and float(line)>=7.5 and
-                (int(exact_oos.get("n") or 0)<VFOOTBALL_HIGH_UNDER_MIN_OOS_N or
-                 exact_oos.get("hit_rate") is None or
-                 float(exact_oos.get("hit_rate") or 0)<VFOOTBALL_HIGH_UNDER_MIN_OOS_HIT_RATE)
+            high_vfootball_under_pending=high_vfootball_under_requires_research(
+                product,line,chosen_pick,exact_oos
             )
             if product.startswith("efootball"):
                 if not base_model_gate:
