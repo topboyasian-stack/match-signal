@@ -375,9 +375,18 @@ async function readArtifact(request, path) {
 }
 
 export async function collectPublicDiagnostics(request) {
-  const paths = ["/data/system_health.json", "/data/pipeline_status.json", "/data/automation_health.json", "/data/results_first_evidence_report.json", "/data/odds_builder.json"];
+  const paths = [
+    "/data/system_health.json",
+    "/data/pipeline_status.json",
+    "/data/automation_health.json",
+    "/data/results_first_evidence_report.json",
+    "/data/odds_builder.json",
+    "/data/tennis_forward_status.json",
+    "/data/prediction_desk_health.json"
+  ];
   const values = await Promise.all(paths.map(function(path) { return readArtifact(request, path); }));
   const health = values[0], pipeline = values[1], automation = values[2], report = values[3], builder = values[4];
+  const tennisForward = values[5], deskHealth = values[6];
   return {
     collected_at: new Date().toISOString(),
     system_health: health.unavailable ? health : {
@@ -424,7 +433,45 @@ export async function collectPublicDiagnostics(request) {
       ticket_shape_records: (report.ticket_shape_records || []).slice(0, 10),
       product_records: (report.product_records || []).slice(0, 10)
     },
-    odds_builder: sanitizeBuilder(builder)
+    odds_builder: sanitizeBuilder(builder),
+    tennis_forward_status: tennisForward.unavailable ? tennisForward : {
+      updated_at: tennisForward.updated_at || null,
+      window_days: tennisForward.window_days == null ? null : tennisForward.window_days,
+      scope: tennisForward.scope || null,
+      tours: Object.fromEntries(Object.entries(tennisForward.tours || {}).map(function(entry) {
+        const tour = entry[0], item = entry[1] || {};
+        return [tour, {
+          source: item.source || null,
+          events_seen: item.events_seen == null ? null : item.events_seen,
+          valid_singles: item.valid_singles == null ? null : item.valid_singles,
+          new_predictions: item.new_predictions == null ? null : item.new_predictions,
+          rejected: item.rejected || {},
+          error: item.error || null
+        }];
+      }))
+    },
+    prediction_desk: deskHealth.unavailable ? deskHealth : {
+      generated_at: deskHealth.generated_at || null,
+      horizon_days: deskHealth.horizon_days == null ? null : deskHealth.horizon_days,
+      event_count: deskHealth.event_count == null ? null : deskHealth.event_count,
+      live_count: deskHealth.live_count == null ? null : deskHealth.live_count,
+      pending_settlement_count: deskHealth.pending_settlement_count == null ? null : deskHealth.pending_settlement_count,
+      publication_filters: deskHealth.publication_filters || {},
+      high_line_under_evidence: (deskHealth.high_line_under_evidence || []).slice(0, 12).map(function(item) {
+        return {
+          product: item.product || null,
+          line: item.line == null ? null : item.line,
+          side: item.side || null,
+          event_rows: item.event_rows == null ? null : item.event_rows,
+          walkforward_n: item.walkforward_n == null ? null : item.walkforward_n,
+          walkforward_hit_rate: item.walkforward_hit_rate == null ? null : item.walkforward_hit_rate,
+          walkforward_brier: item.walkforward_brier == null ? null : item.walkforward_brier,
+          walkforward_model_variant: item.walkforward_model_variant || null,
+          qualification_status: item.qualification_status || null,
+          betting_qualified: Boolean(item.betting_qualified)
+        };
+      })
+    }
   };
 }
 
@@ -437,6 +484,8 @@ export function summarizeDiagnosticFacts(diagnostics, now = new Date()) {
   const automation = diagnostics && diagnostics.automation || {};
   const report = diagnostics && diagnostics.results_first_report || {};
   const builder = diagnostics && diagnostics.odds_builder || {};
+  const tennisForward = diagnostics && diagnostics.tennis_forward_status || {};
+  const desk = diagnostics && diagnostics.prediction_desk || {};
   const market = pipeline.market_data || {};
   const tracker = report.tracker_summary || {};
   const healthIssues = Array.isArray(health.issues) ? health.issues : [];
@@ -481,6 +530,8 @@ export function summarizeDiagnosticFacts(diagnostics, now = new Date()) {
   const automationAge = age(automation.updated_at, 2);
   const reportAge = age(report.generated_at, null);
   const builderAge = age(builder.generated_at, 8);
+  const tennisForwardAge = age(tennisForward.updated_at, 8);
+  const deskAge = age(desk.generated_at, 2);
   const errorCount = pipeline.error_count == null
     ? (Array.isArray(pipeline.errors) ? pipeline.errors.length : null)
     : Number(pipeline.error_count);
@@ -528,8 +579,33 @@ export function summarizeDiagnosticFacts(diagnostics, now = new Date()) {
   if (pipeline.unavailable) flags.push("The core pipeline artifact could not be loaded.");
   if (pipeline.tennis_count === 0) flags.push("The published core pipeline contains zero tennis predictions.");
   if (errorCount > 0) flags.push("The core pipeline lists " + errorCount + " source/processing errors.");
+  for (const issue of healthIssues) {
+    const severity = String(issue && issue.severity || "").toLowerCase();
+    if (severity === "critical" || severity === "warning") {
+      flags.push(severity.toUpperCase() + " " + String(issue.code || "UNNAMED_ISSUE") + ": " + String(issue.detail || "No detail supplied."));
+    }
+  }
   if (healthAge.status === "STALE") flags.push("The system-health artifact is older than its one-hour fact-sheet threshold.");
   if (pipelineAge.status === "STALE") flags.push("The core-pipeline artifact is older than its four-hour fact-sheet threshold.");
+  if (tennisForward.unavailable) flags.push("The separate tennis forward-discovery artifact could not be loaded.");
+  if (tennisForwardAge.status === "STALE") flags.push("Tennis forward discovery is " + (tennisForwardAge.age_minutes / 60).toFixed(2) + "h old, beyond its 8h threshold; absence of predictions cannot be treated as proof that no fixtures exist.");
+  if (desk.unavailable) flags.push("The Prediction Desk health sidecar could not be loaded.");
+  if (deskAge.status === "STALE") flags.push("The Prediction Desk health sidecar is older than its two-hour threshold.");
+  const filters = desk.publication_filters || {};
+  if (Number(filters.stale_live_flags_hidden || 0) > 0 || Number(filters.past_kickoff_rows_hidden || 0) > 0) {
+    flags.push("The Prediction Desk filtered " + Number(filters.past_kickoff_rows_hidden || 0) + " past-kickoff rows and " + Number(filters.stale_live_flags_hidden || 0) + " over-age live flags; archived history is retained.");
+  }
+  for (const item of Array.isArray(desk.high_line_under_evidence) ? desk.high_line_under_evidence : []) {
+    const product = String(item.product || "").toLowerCase();
+    const line = num(item.line);
+    const side = String(item.side || "").toLowerCase();
+    const n = num(item.walkforward_n) || 0;
+    const hit = num(item.walkforward_hit_rate);
+    if (product === "vfootball" && side === "under" && line !== null && line >= 7.5 &&
+        (n < 30 || hit === null || hit < 0.65)) {
+      flags.push("VFootball Under " + line + " has only " + n + "/30 exact-line walk-forward rows and does not meet the high-line Under evidence gate; it must remain unqualified.");
+    }
+  }
   if (num(trackerWonLegs) !== null && num(trackerLostLegs) !== null &&
       sourceSettledOuLegs !== null && trackerWonLegs + trackerLostLegs !== sourceSettledOuLegs) {
     flags.push("Tracker-wide individual-leg counts and O/U legs in fully settled tickets have different cohort scopes; do not combine their denominators.");
@@ -543,7 +619,9 @@ export function summarizeDiagnosticFacts(diagnostics, now = new Date()) {
       core_pipeline: pipelineAge,
       automation: automationAge,
       results_first_report: reportAge,
-      odds_builder: builderAge
+      odds_builder: builderAge,
+      tennis_forward_discovery: tennisForwardAge,
+      prediction_desk: deskAge
     },
     system_health: {
       status: health.status || (health.unavailable ? "UNAVAILABLE" : "UNKNOWN"),
@@ -604,6 +682,27 @@ export function summarizeDiagnosticFacts(diagnostics, now = new Date()) {
       rejected_candidates: num(builder.candidate_diagnostics && builder.candidate_diagnostics.rejections && builder.candidate_diagnostics.rejections.REJECTED),
       candidate_category_labels: "Source field candidate_diagnostics.rejections contains category counts named LIVE_VALUE and REJECTED; these are not named evaluated_selections.",
       mode: builder.mode || null
+    },
+    tennis_forward_discovery: {
+      updated_at: tennisForward.updated_at || null,
+      age_hours: tennisForwardAge.age_minutes == null ? null : Number((tennisForwardAge.age_minutes/60).toFixed(2)),
+      status: tennisForwardAge.status,
+      window_days: num(tennisForward.window_days),
+      scope: tennisForward.scope || null,
+      tours: tennisForward.tours || {},
+      interpretation: "A stale discovery report cannot prove the event feed is empty. Valid singles and rejection counts are fixture-ingestion evidence, not a betting-signal sample."
+    },
+    prediction_desk: {
+      generated_at: desk.generated_at || null,
+      age_hours: deskAge.age_minutes == null ? null : Number((deskAge.age_minutes/60).toFixed(2)),
+      status: deskAge.status,
+      horizon_days: num(desk.horizon_days),
+      event_count: num(desk.event_count),
+      live_count: num(desk.live_count),
+      pending_settlement_count: num(desk.pending_settlement_count),
+      publication_filters: desk.publication_filters || {},
+      high_line_under_evidence: Array.isArray(desk.high_line_under_evidence) ? desk.high_line_under_evidence : [],
+      interpretation: "Upcoming hides past-kickoff fixtures after the live-duration guard or settlement grace while archives remain intact. A model probability band is not a qualification. Exact-line/side out-of-sample evidence is separate from user-reported private tickets."
     },
     flags: flags
   };
