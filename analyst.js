@@ -108,6 +108,7 @@
       return text + (a.threshold_hours == null ? "" : " (" + String(a.status).toLowerCase().replace(/_/g, " ") + ", " + a.threshold_hours + "h threshold)");
     };
     const h = f.system_health || {}, p = f.pipeline || {}, m = p.market_matching || {}, t = f.builder_ticket_results || {};
+    const tf = f.tennis_forward_discovery || {}, desk = f.prediction_desk || {};
     const rc = h.reported_issue_counts || {};
     const lines = [
       "VERIFIED SOURCE FACTS · calculated from records, not AI prose",
@@ -116,6 +117,39 @@
       "Pipeline: " + age("core_pipeline") + "; " + n(p.prediction_count) + " predictions (" + n(p.football_count) + " football, " + n(p.tennis_count) + " tennis); " + n(p.error_count) + " errors.",
       "Automation artifact: " + age("automation") + "."
     ];
+    const issues = Array.isArray(h.issues) ? h.issues : [];
+    if (issues.length) lines.push("Health issues: " + issues.map(function(x) {
+      return String(x.severity || "unknown").toUpperCase() + " " + String(x.code || "unnamed") + " — " + String(x.detail || "No detail supplied");
+    }).join("; ") + ".");
+    const tours = tf.tours || {};
+    const tennisParts = Object.keys(tours).map(function(tour) {
+      const x = tours[tour] || {};
+      const rejected = x.rejected && typeof x.rejected === "object"
+        ? Object.keys(x.rejected).map(function(k) { return k + ": " + n(x.rejected[k]); }).join(", ")
+        : "none recorded";
+      return tour + ": " + n(x.events_seen) + " events seen, " + n(x.valid_singles) + " valid singles, " +
+        n(x.new_predictions) + " new predictions; rejected " + rejected +
+        (x.error ? "; error " + String(x.error) : "");
+    });
+    lines.push("Tennis forward discovery: " + age("tennis_forward_discovery") +
+      "; window " + n(tf.window_days) + " days; " + (tennisParts.join(" | ") || "tour details unavailable") + ".");
+    const deskFilters = desk.publication_filters || {};
+    lines.push("Prediction Desk: " + age("prediction_desk") + "; " + n(desk.event_count) +
+      " published events; " + n(desk.live_count) + " live; " + n(desk.pending_settlement_count) +
+      " pending settlement. Hidden past-kickoff rows " + n(deskFilters.past_kickoff_rows_hidden) +
+      "; stale live flags removed " + n(deskFilters.stale_live_flags_hidden) +
+      "; expired settlement rows hidden " + n(deskFilters.expired_settled_rows_hidden) +
+      ". Hiding a row does not delete its archive history.");
+    const highUnder = Array.isArray(desk.high_line_under_evidence) ? desk.high_line_under_evidence : [];
+    if (highUnder.length) lines.push("High-line VFootball Unders: " + highUnder.map(function(x) {
+      const sample = n(x.walkforward_n);
+      const hit = x.walkforward_hit_rate == null ? "hit rate unavailable" : (100 * Number(x.walkforward_hit_rate)).toFixed(1) + "%";
+      const line = x.line == null ? "?" : String(x.line);
+      const enough = Number(x.walkforward_n || 0) >= 30 && Number(x.walkforward_hit_rate) >= 0.65;
+      return String(x.product || "virtual") + " U" + line + ": " + sample + " exact-line walk-forward rows, " + hit +
+        (enough ? "; sample available, separate Builder gates still apply" : "; insufficient evidence (<30 rows or <65%); NOT betting-qualified") +
+        (x.betting_qualified ? " (source qualification says qualified — verify this mismatch)" : "");
+    }).join("; ") + ".");
     if (m.coverage_denominator != null && m.calculated_coverage != null) lines.push(
       "Market matching: " + n(m.matching_records) + "/" + n(m.coverage_denominator) + " matchable records = " + (100 * Number(m.calculated_coverage)).toFixed(2) + "%; provider event counts are a separate measure."
     );
