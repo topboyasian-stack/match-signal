@@ -6,6 +6,8 @@ import vm from "node:vm";
 
 const source = fs.readFileSync("sport-hubs.js", "utf8");
 const css = fs.readFileSync("sport-hubs.css", "utf8");
+const builderSource = fs.readFileSync("scripts/odds_builder.py", "utf8");
+const candidateCollectorSource = fs.readFileSync("scripts/selection_candidate_collector.py", "utf8");
 const start = source.indexOf("function isOverUnderPrediction(x)");
 const end = source.indexOf("function qualificationState(x)", start);
 assert.ok(start >= 0 && end > start, "quote contract helpers must remain in the public Desk bundle");
@@ -62,6 +64,31 @@ const wrongSide = quote(row({ sportybet_odds_side: "over" }));
 assert.equal(wrongSide.displayOdds, null);
 assert.equal(wrongSide.reason, "SIDE_MISMATCH");
 
+// Active Virtual scope must include only eFootball GT and eFootball Adriatic.
+const scopeStart = source.indexOf("function isActiveVirtualProduct(product)");
+const scopeEnd = source.indexOf("\n}", scopeStart);
+assert.ok(scopeStart >= 0 && scopeEnd > scopeStart, "active Virtual scope helper must remain in the Desk bundle");
+const scopeContext = {};
+vm.runInNewContext(
+  source.slice(scopeStart, scopeEnd + 2) + "\nthis.isActiveVirtualProduct = isActiveVirtualProduct;",
+  scopeContext
+);
+const isActiveVirtualProduct = scopeContext.isActiveVirtualProduct;
+assert.equal(isActiveVirtualProduct("efootball_gt"), true);
+assert.equal(isActiveVirtualProduct("efootball_adriatic"), true);
+assert.equal(isActiveVirtualProduct("vfootball"), false);
+assert.equal(isActiveVirtualProduct("zoom"), false);
+assert.equal(isActiveVirtualProduct("srl"), false);
+assert.match(source, /if\s*\(\s*isVirtual\s*&&\s*!isActiveVirtualProduct\(productKey\)\s*\)\s*return false;/);
+assert.match(builderSource, /ACTIVE_VIRTUAL_PRODUCTS\s*=\s*\{"efootball_gt",\s*"efootball_adriatic"\}/);
+assert.match(builderSource, /event\.get\("product"\) not in ACTIVE_VIRTUAL_PRODUCTS/);
+assert.match(builderSource, /EFOOTBALL_VALUE_MIN_LEG_PROBABILITY=0\.80/);
+assert.match(builderSource, /RESEARCH_ONLY_VIRTUAL_PRODUCTS\s*=\s*\{"vfootball",\s*"zoom"\}/);
+assert.match(candidateCollectorSource, /ACTIVE_VIRTUAL_PRODUCTS = \{"efootball_gt", "efootball_adriatic"\}/);
+assert.match(candidateCollectorSource, /RESEARCH_ONLY_VIRTUAL_PRODUCTS = \{"vfootball", "zoom"\}/);
+assert.match(candidateCollectorSource, /if product in RESEARCH_ONLY_VIRTUAL_PRODUCTS:/);
+assert.match(source, /VFOOTBALL_RESEARCH_ONLY/);
+
 // Display-only reference odds must remain separate from current-edge logic.
 assert.match(source, /const displayBook=quote\.displayOdds==null\?book:quote\.displayOdds;/);
 assert.match(source, /const edge=exactMarketEdge\(x,quote\);/);
@@ -73,4 +100,4 @@ assert.match(source, /qualificationState\(row\)\.currentPricePass/);
 assert.doesNotMatch(source, /class="ms-up-qual /);
 assert.doesNotMatch(source, /class="ms-market-q /);
 assert.match(css, /\.ms-book-stale\{[^}]*var\(--ms-amber\)/);
-console.log("Prediction Desk exact-line quote contract and de-duplicated status assertions passed.");
+console.log("Prediction Desk exact-line quote contract, active eFootball-only virtual scope, and preservation safeguards passed.");
