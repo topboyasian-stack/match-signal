@@ -77,7 +77,7 @@ def check_reused_event_id_does_not_hide_a_different_fixture():
         old_kickoff = datetime(2026, 10, 8, 16, 42, tzinfo=timezone.utc)
         new_kickoff = datetime(2026, 10, 8, 16, 46, tzinfo=timezone.utc)
         settled_at = datetime(2026, 10, 8, 16, 44, tzinfo=timezone.utc)
-        now = datetime(2026, 10, 8, 16, 50, tzinfo=timezone.utc)
+        now = datetime(2026, 10, 8, 16, 45, tzinfo=timezone.utc)
         history = {
             "product": "efootball_gt",
             "event_id": "reused-session-id",
