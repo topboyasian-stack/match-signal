@@ -603,9 +603,9 @@ export function summarizeDiagnosticFacts(diagnostics, now = new Date()) {
     const side = String(item.side || "").toLowerCase();
     const n = num(item.walkforward_n) || 0;
     const hit = num(item.walkforward_hit_rate);
-    if (product === "vfootball" && side === "under" && line !== null && line >= 7.5 &&
+    if (["vfootball","efootball_gt"].includes(product) && side === "under" && line !== null && line >= 7.5 &&
         (n < 30 || hit === null || hit < 0.65)) {
-      flags.push("VFootball Under " + line + " has only " + n + "/30 exact-line walk-forward rows and does not meet the high-line Under evidence gate; it must remain unqualified.");
+      flags.push(" " + (product === "efootball_gt" ? "eFootball GT" : "VFootball") + " Under " + line + " has only " + n + "/30 exact-line walk-forward rows and does not meet the high-line Under evidence gate; affected rows must remain unqualified.");
     }
   }
   if (num(trackerWonLegs) !== null && num(trackerLostLegs) !== null &&
