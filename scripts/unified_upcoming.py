@@ -38,6 +38,7 @@ EFOOTBALL_DIRECTION_MIN_HIT_RATE=0.65
 EFOOTBALL_DIRECTION_RECENT_WINDOW=50
 SETTLED_DESK_RETENTION_HOURS=2
 EFOOTBALL_DESK_LEARNING_MIN_CALIBRATION_N=30
+EFOOTBALL_DESK_EXACT_MIN_N=20
 EFOOTBALL_DESK_LEARNING_PATH="efootball_desk_learning.json"
 
 def load(name, default):
@@ -507,7 +508,7 @@ def build_virtual_events(history, lifecycle, eligibility):
 
     directional_gate=build_efootball_directional_gate(eval_art, history)
     desk_learning=load(EFOOTBALL_DESK_LEARNING_PATH,{})
-    desk_learning_calibration=(desk_learning.get("calibration") or {}) if isinstance(desk_learning,dict) else {}
+    desk_learning_by_product=(desk_learning.get("by_product") or {}) if isinstance(desk_learning,dict) else {}
 
     # Build the chronological Virtual Lab event history once per board refresh.
     # Reusing it for every current eFootball market keeps the five-minute desk
@@ -671,20 +672,51 @@ def build_virtual_events(history, lifecycle, eligibility):
                 validated_over=validated_over if validated_over is not None else fallback_over
                 validated_under=validated_under if validated_under is not None else clamp(1-fallback_over)
                 validated_meta["fallback"]="product_lambda"
-            over=clamp(validated_over)
-            under=clamp(validated_under)
+            raw_over=clamp(validated_over)
+            raw_under=clamp(validated_under)
+            # Desk learning is product-specific. Prefer a mature exact
+            # product+line+direction calibration; fall back to a mature
+            # probability bucket only when no exact profile is available.
+            product_desk_learning=desk_learning_by_product.get(product,{}) if isinstance(desk_learning_by_product,dict) else {}
+            if not product_desk_learning and product=="efootball_gt" and isinstance(desk_learning,dict):
+                # Backward compatibility with reports written before by_product.
+                product_desk_learning={
+                    "calibration": desk_learning.get("calibration") or {},
+                    "exact_selection": desk_learning.get("exact_selection") or {},
+                    "settled_predictions": desk_learning.get("settled_predictions") or 0,
+                }
+            product_desk_calibration=product_desk_learning.get("calibration") or {}
+            product_exact_profiles=product_desk_learning.get("exact_selection") or {}
+
+            def calibrate_desk_side(raw_probability, side):
+                exact_key=f"{float(line):g}|{side}"
+                exact_profile=product_exact_profiles.get(exact_key,{})
+                exact_n=int(exact_profile.get("n") or 0)
+                if exact_n>=EFOOTBALL_DESK_EXACT_MIN_N:
+                    offset=num(exact_profile.get("calibration_offset"))
+                    weight=num(exact_profile.get("calibration_weight"))
+                    if offset is not None and weight is not None:
+                        return clamp(raw_probability + offset*weight), "EXACT_LINE_DIRECTION", exact_profile
+                probability_bucket_key=str(min(0.95,max(0.50,(math.floor(raw_probability/0.05)*0.05)))).rstrip("0").rstrip(".")
+                bucket=(product_desk_calibration.get("buckets") or {}).get(probability_bucket_key,{})
+                if bool(product_desk_calibration.get("active")) and int(bucket.get("n") or 0)>=EFOOTBALL_DESK_LEARNING_MIN_CALIBRATION_N:
+                    offset=num(bucket.get("calibration_offset"))
+                    weight=num(bucket.get("calibration_weight"))
+                    if offset is not None and weight is not None:
+                        return clamp(raw_probability + offset*weight), "PROBABILITY_BUCKET", bucket
+                return clamp(raw_probability), "NONE", exact_profile
+
+            over, over_learning_source, over_learning_profile=calibrate_desk_side(raw_over,"over")
+            under, under_learning_source, under_learning_profile=calibrate_desk_side(raw_under,"under")
             chosen_pick="over" if over>=under else "under"
             chosen_model=over if chosen_pick=="over" else under
+            raw_chosen_model=raw_over if chosen_pick=="over" else raw_under
             chosen_market=market_over if chosen_pick=="over" else market_under
-            # Desk-specific calibration is deliberately a second-stage correction:
-            # it only activates after enough prior settled desk forecasts exist.
-            raw_chosen_model=chosen_model
-            bucket_key=str(min(0.95,max(0.50,(math.floor(chosen_model/0.05)*0.05)))).rstrip("0").rstrip(".")
-            bucket=(desk_learning_calibration.get("buckets") or {}).get(bucket_key,{})
-            if bool(desk_learning_calibration.get("active")) and int(bucket.get("n") or 0)>=EFOOTBALL_DESK_LEARNING_MIN_CALIBRATION_N:
-                calibrated=num(bucket.get("calibrated_probability"))
-                if calibrated is not None:
-                    chosen_model=clamp(calibrated)
+            chosen_learning_source=over_learning_source if chosen_pick=="over" else under_learning_source
+            chosen_learning_profile=over_learning_profile if chosen_pick=="over" else under_learning_profile
+            chosen_exact_n=int(chosen_learning_profile.get("n") or 0) if chosen_learning_source=="EXACT_LINE_DIRECTION" else 0
+            chosen_exact_accuracy=num(chosen_learning_profile.get("accuracy")) if chosen_learning_source=="EXACT_LINE_DIRECTION" else None
+            bucket_key=str(min(0.95,max(0.50,(math.floor(raw_chosen_model/0.05)*0.05)))).rstrip("0").rstrip(".")
             edge=chosen_model-chosen_market if chosen_market is not None else None
 
             comp_key=competition.casefold()
@@ -752,12 +784,15 @@ def build_virtual_events(history, lifecycle, eligibility):
                 "probabilities":{"over":round(over,4),"under":round(under,4)},
                 "raw_model_probability":round(raw_chosen_model,4),
                 "validated_model_family":"walk_forward_efootball_participant_model",
-                "validated_model_over_probability":round(over,4),
-                "validated_model_under_probability":round(under,4),
+                "validated_model_over_probability":round(raw_over,4),
+                "validated_model_under_probability":round(raw_under,4),
                 "validated_model_components":validated_meta,
-                "desk_learning_active":bool(desk_learning_calibration.get("active")),
-                "desk_learning_settled_n":int(desk_learning_calibration.get("settled_predictions") or 0),
+                "desk_learning_active":chosen_learning_source!="NONE",
+                "desk_learning_settled_n":int(product_desk_learning.get("settled_predictions") or 0),
                 "desk_learning_bucket":bucket_key,
+                "desk_learning_adjustment_source":chosen_learning_source,
+                "desk_learning_exact_n":chosen_exact_n,
+                "desk_learning_exact_accuracy":round(chosen_exact_accuracy,4) if chosen_exact_accuracy is not None else None,
                 "desk_calibrated_probability":round(chosen_model,4),
                 "market_reference_probability":round(chosen_market,4) if chosen_market is not None else None,
                 "model_edge_vs_market":round(edge,4) if edge is not None else None,
