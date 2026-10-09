@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'docs/AI_ANALYST_UPGRADE.md'
+      - 'docs/PREDICTION_DESK_POLICY.md'
       - 'schemas/user-ticket-review.schema.json'
       - 'scripts/audit_user_ticket_review.py'
       - 'scripts/test_user_ticket_review.py'
@@ -15,10 +16,21 @@ on:
       - 'functions/api/analyst/**'
       - 'scripts/test_analyst_module.mjs'
       - 'scripts/test_analyst_routes.mjs'
+      - 'scripts/unified_upcoming.py'
+      - 'scripts/predict_today.py'
+      - 'scripts/tennis_forward_window.py'
+      - 'scripts/test_upcoming_desk_policy.py'
+      - 'sport-hubs.js'
+      - 'sport-hubs.css'
+      - 'upcoming.html'
+      - 'index.html'
+      - 'analyst.html'
+      - '.github/workflows/autopilot-refresh.yml'
   push:
     branches: [main, ai-analyst-foundation]
     paths:
       - 'docs/AI_ANALYST_UPGRADE.md'
+      - 'docs/PREDICTION_DESK_POLICY.md'
       - 'schemas/user-ticket-review.schema.json'
       - 'scripts/audit_user_ticket_review.py'
       - 'scripts/test_user_ticket_review.py'
@@ -30,6 +42,16 @@ on:
       - 'analyst.js'
       - 'analyst.html'
       - 'docs/AI_ANALYST_SETUP.md'
+      - 'scripts/unified_upcoming.py'
+      - 'scripts/predict_today.py'
+      - 'scripts/tennis_forward_window.py'
+      - 'scripts/test_upcoming_desk_policy.py'
+      - 'sport-hubs.js'
+      - 'sport-hubs.css'
+      - 'upcoming.html'
+      - 'index.html'
+      - 'analyst.html'
+      - '.github/workflows/autopilot-refresh.yml'
   workflow_dispatch:
 
 permissions:
@@ -50,6 +72,12 @@ jobs:
         run: python -m json.tool schemas/user-ticket-review.schema.json > /dev/null
       - name: Run O/U line and evidence tests
         run: python scripts/test_user_ticket_review.py
+      - name: Install test dependencies
+        run: python -m pip install --upgrade requests
+      - name: Run Prediction Desk freshness and exact-line evidence tests
+        run: python scripts/test_upcoming_desk_policy.py
+      - name: Compile changed Prediction Desk Python modules
+        run: python -m py_compile scripts/unified_upcoming.py scripts/predict_today.py scripts/tennis_forward_window.py scripts/system_health_audit.py scripts/selection_candidate_collector.py scripts/test_upcoming_desk_policy.py
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -61,6 +89,7 @@ jobs:
       - name: Check analyst JavaScript syntax
         run: |
           node --check analyst.js
+          node --check sport-hubs.js
           node --check functions/_shared/analyst.mjs
           node --check functions/api/analyst/records.js
           node --check functions/api/analyst/chat.js

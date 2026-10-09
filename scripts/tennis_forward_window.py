@@ -1,6 +1,6 @@
 """Extend tennis fixture discovery beyond the daily 7-day board.
 
-The production tennis model remains limited to ATP/WTA singles. This companion
+The production forward window currently collects ATP singles only; WTA remains retired until its feed is explicitly re-enabled. This companion
 step looks 14 days ahead so upcoming tour events are not invisible simply because
 ESPN has not placed them inside the original 7-day window yet. It never fabricates
 fixtures and never adds doubles or placeholder players.
@@ -44,7 +44,7 @@ def main() -> None:
     status = {
         "updated_at": datetime.now(timezone.utc).isoformat(),
         "window_days": 14,
-        "scope": "ATP/WTA singles only",
+        "scope": "active ATP singles only; WTA retired",
         "tours": {},
     }
 
@@ -70,10 +70,22 @@ def main() -> None:
                 if not prediction:
                     bucket["rejected"]["prediction construction failed"] = bucket["rejected"].get("prediction construction failed", 0) + 1
                     continue
+                # These extended-window rows keep valid singles visible for
+                # research when the stricter canonical prediction gate has no
+                # actionable row. They are explicitly unqualified and must not
+                # be promoted into the Builder by a model-probability band.
+                prediction["prediction_status"] = "watch_projection"
+                prediction["projection_tier"] = "baseline_plus_enrichment"
+                prediction["evidence_depth"] = "tennis_forward_window_ranking_form_watch"
+                prediction["qualification_status"] = "TENNIS_FORWARD_WATCH_NOT_QUALIFIED"
+                prediction["betting_qualified"] = False
+                prediction["qualified_for_builder"] = False
+                prediction["paper_only"] = True
                 prediction["coverage"] = {
                     "discovery_window_days": 14,
                     "fixture_source": "ESPN public tennis scoreboard",
-                    "model_scope": "ATP/WTA singles only",
+                    "model_scope": "active ATP singles only; WTA retired",
+                    "qualification": "research watch only; canonical betting gates unchanged",
                 }
                 predictions.append(prediction)
                 existing.add(event_id)

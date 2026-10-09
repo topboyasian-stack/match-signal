@@ -838,10 +838,17 @@ def tennis_fixture_quality(event):
     for competitor in competitors:
         athlete = competitor.get("athlete") or {}
         name = (athlete.get("displayName") or competitor.get("displayName") or "").strip()
-        if not athlete.get("id"):
+        # ESPN exposes the singles-player identifier on either the nested
+        # athlete record or the competitor itself depending on scoreboard shape.
+        # Accept either documented identity location, but never accept a team ID
+        # or infer an identity from a name alone.
+        athlete_id = str(athlete.get("id") or competitor.get("id") or "").strip()
+        if not athlete_id:
             return False, "missing athlete id"
         if name.lower() in GENERIC_TENNIS_NAMES or len(name) < 3:
             return False, "missing real player name"
+        if " / " in name or " & " in name:
+            return False, "non-singles competitor"
         names.append(name)
     if names[0].lower() == names[1].lower():
         return False, "duplicate player names"
@@ -881,15 +888,18 @@ def tennis_prediction(event, tour, rankings, form_map):
         return None
     p1, p2 = pair
     a1, a2 = p1.get("athlete", {}), p2.get("athlete", {})
-    id1, id2 = str(p1.get("id", "")), str(p2.get("id", ""))
+    id1, id2 = str(p1.get("id") or a1.get("id") or ""), str(p2.get("id") or a2.get("id") or "")
+    athlete_id1, athlete_id2 = str(a1.get("id") or ""), str(a2.get("id") or "")
     name1 = a1.get("displayName") or p1.get("displayName")
     name2 = a2.get("displayName") or p2.get("displayName")
     if not name1 or not name2:
         return None
-    rank1 = rankings.get(id1) or p1.get("rank") or a1.get("rank")
-    rank2 = rankings.get(id2) or p2.get("rank") or a2.get("rank")
-    f1 = form_map.get(id1, {}).get("score", 0.5)
-    f2 = form_map.get(id2, {}).get("score", 0.5)
+    rank1 = rankings.get(id1) or rankings.get(athlete_id1) or p1.get("rank") or a1.get("rank")
+    rank2 = rankings.get(id2) or rankings.get(athlete_id2) or p2.get("rank") or a2.get("rank")
+    f1row = form_map.get(id1) or form_map.get(athlete_id1) or {}
+    f2row = form_map.get(id2) or form_map.get(athlete_id2) or {}
+    f1 = f1row.get("score", 0.5)
+    f2 = f2row.get("score", 0.5)
     probability = tennis_match_probability(rank1, rank2, f1, f2)
     p1_prob, p2_prob = probability, 1 - probability
     q = solve_set_probability(p1_prob)
@@ -915,7 +925,7 @@ def tennis_prediction(event, tour, rankings, form_map):
         "player_1": name2, "player_2": name1, "venue": event.get("venue", {}).get("fullName"),
         "surface": event.get("surface") or "Unknown", "tournament": event.get("tournament_name") or tour,
         "round": event.get("round", {}).get("displayName"), "rankings": {"p1": rank2, "p2": rank1},
-        "form": {"p1": round(f2, 3), "p2": round(f1, 3), "p1_last10": form_map.get(id2, {}).get("record", ""), "p2_last10": form_map.get(id1, {}).get("record", "")},
+        "form": {"p1": round(f2, 3), "p2": round(f1, 3), "p1_last10": (form_map.get(id2) or form_map.get(athlete_id2) or {}).get("record", ""), "p2_last10": (form_map.get(id1) or form_map.get(athlete_id1) or {}).get("record", "")},
         "probabilities": {"p1": round(p2_prob, 4), "p2": round(p1_prob, 4)}, "pick": "p1" if p2_prob >= p1_prob else "p2", "confidence": round(max(p1_prob, p2_prob), 4),
         "analytics": {
             "set_win_prob": {"p1": round(1 - q, 4), "p2": round(q, 4)},
@@ -948,7 +958,8 @@ def build_tennis_form(tour, start_date, end_date):
             if not pair:
                 continue
             for c in pair:
-                pid = str(c.get("id", ""))
+                athlete = c.get("athlete") or {}
+                pid = str(c.get("id") or athlete.get("id") or "")
                 if not pid:
                     continue
                 bucket = form.setdefault(pid, {"results": []})

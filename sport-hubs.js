@@ -1,4 +1,4 @@
-(()=>{'use strict';const Q=s=>document.querySelector(s),E=v=>{const d=document.createElement('div');d.textContent=String(v??'');return d.innerHTML},N=v=>Number.isFinite(Number(v))?Number(v):null,P=v=>N(v)==null?'—':Math.round(N(v)*100)+'%',OD=p=>N(p)>0?(1/N(p)).toFixed(2):'—',DT=v=>{const d=new Date(v);return isNaN(d)?'—':d.toLocaleString([], {weekday:'short',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})};async function get(path){const r=await fetch(path+'?v='+Date.now(),{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);return r.json()}function mergeRows(base,pdl){const out=new Map();[...(Array.isArray(base)?base:[]),...(Array.isArray(pdl)?pdl:[])].forEach(row=>{if(!row||!row.event_id)return;out.set(String(row.event_id),row)});return [...out.values()]}const nav=()=>'<nav class="ms-nav"><a class="ms-brand ms-brand-link" href="./index.html" aria-label="Return to Match Signal main desk"><div class="ms-mark" aria-hidden="true"><svg viewBox="0 0 48 48" width="32" height="32" fill="none"><path d="M9 28.5a15 15 0 0 1 30 0" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/><path d="M14 29a10 10 0 0 1 20 0M19 29a5 5 0 0 1 10 0" stroke="#42e59a" stroke-width="2.4" stroke-linecap="round"/><path d="M24 29l9-11" stroke="#eef7fb" stroke-width="3" stroke-linecap="round"/><circle cx="24" cy="29" r="3.2" fill="#37e7ff"/><path d="M8 35h32" stroke="#7c6cff" stroke-width="1.8" stroke-linecap="round"/></svg></div><div><h1>Match Signal</h1><p>Real-data, market-calibrated sports prediction desk</p></div></a><div class="ms-tabs"><a class="ms-btn" href="./index.html">📅 Upcoming</a><a class="ms-btn" href="./football.html">⚽ Football</a><a class="ms-btn" href="./tennis.html">🎾 Tennis</a><a class="ms-btn" href="./live.html">🔴 Live</a><a class="ms-btn" href="./reports.html">📊 Reports</a><a class="ms-btn" href="./odds-builder.html">🧮 Odds Builder</a><a class="ms-btn" href="./virtual-lab/">🧪 Lab</a></div></nav>';function injectNav(){const n=Q('#msNav');if(n)n.innerHTML=nav()}function footballLeagues(rows){const base=['La Liga','Bundesliga','Ligue 1','Champions League'];return [...new Set([...base,...rows.filter(x=>x.sport==='football').map(x=>x.league).filter(Boolean)])]}function leagueCard(name,rows,sport,meta={}){const count=rows.filter(x=>x.sport===sport&&x.league===name).length;const calculating=meta.calculating===true&&count===0;const desc=sport==='football'&&name.includes('Professional Development')?'U21 academy competition · historical results + dedicated forward fixture model':sport==='tennis'?name+' tour · tournament-level fixtures and model signals':name+' · 22-day forward planning when fixtures are available';const badge=calculating?'Calculating':count===0?'Pending':count+' predictions';return '<article class="ms-league"><div class="ms-league-top"><h3>'+E(name)+'</h3><span class="ms-badge '+(calculating?'':'')+'">'+badge+'</span></div><p>'+E(desc)+'</p><a href="./league.html?sport='+encodeURIComponent(sport)+'&league='+encodeURIComponent(name)+'">Open league page →</a></article>'}function sportIcon(s){
+(()=>{'use strict';const Q=s=>document.querySelector(s),E=v=>{const d=document.createElement('div');d.textContent=String(v??'');return d.innerHTML},N=v=>Number.isFinite(Number(v))?Number(v):null,P=v=>N(v)==null?'—':Math.round(N(v)*100)+'%',OD=p=>N(p)>0?(1/N(p)).toFixed(2):'—',DT=v=>{const d=new Date(v);return isNaN(d)?'—':d.toLocaleString([], {weekday:'short',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})};async function get(path){const sep=String(path).includes('?')?'&':'?';const r=await fetch(path+sep+'v='+Date.now(),{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);return r.json()}function mergeRows(base,pdl){const out=new Map();[...(Array.isArray(base)?base:[]),...(Array.isArray(pdl)?pdl:[])].forEach(row=>{if(!row||!row.event_id)return;out.set(String(row.event_id),row)});return [...out.values()]}const nav=()=>'<nav class="ms-nav"><a class="ms-brand ms-brand-link" href="./index.html" aria-label="Return to Match Signal main desk"><div class="ms-mark" aria-hidden="true"><svg viewBox="0 0 48 48" width="32" height="32" fill="none"><path d="M9 28.5a15 15 0 0 1 30 0" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/><path d="M14 29a10 10 0 0 1 20 0M19 29a5 5 0 0 1 10 0" stroke="#42e59a" stroke-width="2.4" stroke-linecap="round"/><path d="M24 29l9-11" stroke="#eef7fb" stroke-width="3" stroke-linecap="round"/><circle cx="24" cy="29" r="3.2" fill="#37e7ff"/><path d="M8 35h32" stroke="#7c6cff" stroke-width="1.8" stroke-linecap="round"/></svg></div><div><h1>Match Signal</h1><p>Real-data, market-calibrated sports prediction desk</p></div></a><div class="ms-tabs"><a class="ms-btn" href="./index.html">📅 Upcoming</a><a class="ms-btn" href="./football.html">⚽ Football</a><a class="ms-btn" href="./tennis.html">🎾 Tennis</a><a class="ms-btn" href="./live.html">🔴 Live</a><a class="ms-btn" href="./reports.html">📊 Reports</a><a class="ms-btn" href="./odds-builder.html">🧮 Odds Builder</a><a class="ms-btn" href="./virtual-lab/">🧪 Lab</a></div></nav>';function injectNav(){const n=Q('#msNav');if(n)n.innerHTML=nav()}function footballLeagues(rows){const base=['La Liga','Bundesliga','Ligue 1','Champions League'];return [...new Set([...base,...rows.filter(x=>x.sport==='football').map(x=>x.league).filter(Boolean)])]}function leagueCard(name,rows,sport,meta={}){const count=rows.filter(x=>x.sport===sport&&x.league===name).length;const calculating=meta.calculating===true&&count===0;const desc=sport==='football'&&name.includes('Professional Development')?'U21 academy competition · historical results + dedicated forward fixture model':sport==='tennis'?name+' tour · tournament-level fixtures and model signals':name+' · 22-day forward planning when fixtures are available';const badge=calculating?'Calculating':count===0?'Pending':count+' predictions';return '<article class="ms-league"><div class="ms-league-top"><h3>'+E(name)+'</h3><span class="ms-badge '+(calculating?'':'')+'">'+badge+'</span></div><p>'+E(desc)+'</p><a href="./league.html?sport='+encodeURIComponent(sport)+'&league='+encodeURIComponent(name)+'">Open league page →</a></article>'}function sportIcon(s){
   return ({football:"⚽",tennis:"🎾",basketball:"🏀",darts:"🏹",table_tennis:"🏓",virtual:"🧪"}[s]||"•");
 }
 function evidenceLabel(x){
@@ -12,6 +12,15 @@ function evidenceLabel(x){
   }
   const product=String(x.product||"").toLowerCase();
   if(product==="efootball_gt"||product==="vfootball"){
+    const line=Number(x.line);
+    const side=String(x.pick||x.selection||"").toLowerCase();
+    const wfN=Number(x.walkforward_exact_line_n);
+    const wfHit=Number(x.walkforward_exact_line_hit_rate);
+    if(product==="vfootball"&&side==="under"&&Number.isFinite(line)&&line>=7.5){
+      if(!Number.isFinite(wfN)||wfN<=0)return base+" · no exact-line walk-forward sample · NOT QUALIFIED";
+      if(wfN<30||!Number.isFinite(wfHit)||wfHit<0.65)return base+" · exact-line walk-forward "+Math.round(wfN)+"/30 · insufficient evidence · NOT QUALIFIED";
+      return base+" · exact-line walk-forward "+Math.round(wfN)+"/30 · "+Math.round(wfHit*100)+"% hit rate · separate value gates still apply";
+    }
     const n=Number(x.desk_learning_exact_n);
     if(Number.isFinite(n)){
       const count=Math.max(0,Math.round(n));
@@ -20,6 +29,7 @@ function evidenceLabel(x){
         ? count+" settled · "+Math.round(accuracy*100)+"% hit rate"
         : count+" settled";
       const source=String(x.desk_learning_adjustment_source||"NONE");
+      if(base==="feed discovered base model")base="feed baseline · no participant-specific calibration";
       let state;
       if(source==="EXACT_LINE_DIRECTION")state="exact-line calibrated";
       else if(source==="PROBABILITY_BUCKET")state="bucket calibrated";
@@ -31,9 +41,17 @@ function evidenceLabel(x){
   }
   return base;
 }
+function isOverUnderPrediction(x){
+  const market=String(x?.market||"").toLowerCase().replace(/[\s-]+/g,"_");
+  const sourceMarket=String(x?.sportybet_odds_market||"").toLowerCase();
+  const side=String(x?.pick||x?.selection||"").toLowerCase();
+  return sourceMarket==="total" ||
+    ["over_under","total_goals_over_under","total_games","totals","total"].includes(market) ||
+    ((side==="over"||side==="under")&&x?.line!=null);
+}
 function marketLabel(x){
-  if(x.market==="over_under"){
-    return "O/U "+(x.pick||"—")+" "+(x.line??"");
+  if(isOverUnderPrediction(x)){
+    return "O/U "+(x.pick||x.selection||"—")+" "+(x.line??"");
   }
   if(x.pick==="p1"||x.pick==="p2"||x.pick==="draw"){
     const pick=x.pick==="p1"?x.player_1:x.pick==="p2"?x.player_2:"Draw";
@@ -62,11 +80,11 @@ function fixtureGroups(rows){
     const key=rowFixtureKey(row);
     if(!map.has(key))map.set(key,{key,rows:[]});
     const g=map.get(key);
-    const m=String(row.market||"winner");
+    const m=isOverUnderPrediction(row)?"over_under":"winner";
     const line=row.line==null?"":String(row.line);
     const pick=String(row.pick||row.selection||"");
     const dedupe=m+"|"+line+"|"+pick;
-    if(!g.rows.some(x=>(String(x.market||"winner")+"|"+(x.line==null?"":String(x.line))+"|"+String(x.pick||x.selection||""))===dedupe)){
+    if(!g.rows.some(x=>((isOverUnderPrediction(x)?"over_under":"winner")+"|"+(x.line==null?"":String(x.line))+"|"+String(x.pick||x.selection||""))===dedupe)){
       g.rows.push(row);
     }
   }
@@ -79,32 +97,119 @@ function fixtureGroups(rows){
     return g;
   }).sort((a,b)=>new Date(a.rows[0].start_time)-new Date(b.rows[0].start_time));
 }
+function exactSportyBetQuote(x){
+  const market=isOverUnderPrediction(x)?"over_under":"winner";
+  const value=Number(x?.bookmaker_odds??x?.sportybet_odds??x?.book_odds);
+  if(!Number.isFinite(value)||value<=1)return {odds:null,reason:"NO_QUOTE"};
+  const sourceMarket=String(x?.sportybet_odds_market||"").toLowerCase();
+  if(market==="over_under"){
+    if(sourceMarket!=="total")return {odds:null,reason:"MARKET_UNVERIFIED"};
+    const line=Number(x?.line),quotedLine=Number(x?.sportybet_odds_line);
+    const side=String(x?.pick||x?.selection||"").toLowerCase();
+    const quotedSide=String(x?.sportybet_odds_side||"").toLowerCase();
+    if(!Number.isFinite(line)||!Number.isFinite(quotedLine)||Math.abs(line-quotedLine)>1e-9)return {odds:null,reason:"LINE_MISMATCH"};
+    if((side!=="over"&&side!=="under")||quotedSide!==side)return {odds:null,reason:"SIDE_MISMATCH"};
+  }else if(sourceMarket!=="winner"){
+    return {odds:null,reason:"MARKET_UNVERIFIED"};
+  }else{
+    const side=String(x?.pick||x?.selection||"").toLowerCase();
+    if(!["p1","p2","draw"].includes(side)||String(x?.sportybet_odds_side||"").toLowerCase()!==side)return {odds:null,reason:"SIDE_MISMATCH"};
+  }
+  const timestamp=Date.parse(String(x?.market_odds_timestamp||x?.odds_timestamp||""));
+  const now=Date.now();
+  if(!Number.isFinite(timestamp))return {odds:null,reason:"TIMESTAMP_UNVERIFIED"};
+  if(timestamp>now+2*60*1000||now-timestamp>15*60*1000)return {odds:null,reason:"QUOTE_STALE"};
+  return {odds:value,reason:"EXACT_MARKET_LINE_SIDE_FRESH",timestamp:timestamp};
+}
 function bookmakerOdds(x){
-  const v=Number(x.bookmaker_odds??x.sportybet_odds??x.book_odds);
-  return Number.isFinite(v)&&v>1?v:null;
+  return exactSportyBetQuote(x).odds;
+}
+function exactMarketEdge(x,quote){
+  if(!quote||quote.odds==null)return null;
+  const selected=String(x?.pick||x?.selection||"").toLowerCase();
+  const p=Number(probabilityValue(x));
+  if(!Number.isFinite(p)||p<0||p>1)return null;
+  let selectedOdds=Number(quote.odds),oppositeOdds=null,marketProb=null;
+  if(isOverUnderPrediction(x)){
+    const line=Number(x?.line),quotedLine=Number(x?.sportybet_odds_line);
+    if(!Number.isFinite(line)||!Number.isFinite(quotedLine)||Math.abs(line-quotedLine)>1e-9)return null;
+    let over=Number(x?.sportybet_over_odds),under=Number(x?.sportybet_under_odds);
+    if((!Number.isFinite(over)||over<=1||!Number.isFinite(under)||under<=1) && Array.isArray(x?.sportybet_total_games_odds)){
+      over=under=null;
+      x.sportybet_total_games_odds.forEach(item=>{
+        const itemLine=Number(item?.line),side=String(item?.side||"").toLowerCase(),odds=Number(item?.odds);
+        if(!Number.isFinite(itemLine)||Math.abs(itemLine-line)>1e-9||!Number.isFinite(odds)||odds<=1)return;
+        if(side==="over")over=odds;if(side==="under")under=odds;
+      });
+    }
+    if(!Number.isFinite(over)||over<=1||!Number.isFinite(under)||under<=1)return null;
+    const sideOdds=selected==="over"?over:selected==="under"?under:null;
+    if(sideOdds==null||Math.abs(sideOdds-selectedOdds)>1e-9)return null;
+    const invOver=1/over,invUnder=1/under,sum=invOver+invUnder;
+    marketProb=(1/selectedOdds)/sum;
+  }else{
+    const winner=x?.sportybet_winner_odds;
+    if(!winner||typeof winner!=="object")return null;
+    const sides=["p1","p2","draw"].map(key=>({key,odds:Number(winner[key])})).filter(item=>Number.isFinite(item.odds)&&item.odds>1);
+    const picked=sides.find(item=>item.key===selected);
+    if(!picked||Math.abs(picked.odds-selectedOdds)>1e-9||sides.length<2)return null;
+    const sum=sides.reduce((total,item)=>total+1/item.odds,0);
+    if(sum<=0)return null;
+    marketProb=(1/selectedOdds)/sum;
+  }
+  return Number.isFinite(marketProb)?p-marketProb:null;
+}
+function qualificationState(x){
+  const raw=String(x?.qualification_status||"").trim();
+  const modelQualified=Boolean(x?.betting_qualified)||Boolean(x?.qualified_for_builder)||raw.startsWith("BETTING_QUALIFIED");
+  if(!modelQualified){
+    const detail=raw&&raw!=="MODEL_RESEARCH"&&raw!=="RESEARCH_PROJECTION"
+      ?raw.replaceAll("_"," ")
+      :"RESEARCH ONLY";
+    return {modelQualified:false,currentPricePass:false,label:"NOT QUALIFIED · "+detail,reason:"MODEL_GATE_NOT_PASSED"};
+  }
+  const quote=exactSportyBetQuote(x);
+  if(quote.odds==null){
+    return {modelQualified:true,currentPricePass:false,label:"MODEL GATE PASSED · PRICE UNVERIFIED",reason:quote.reason};
+  }
+  const edge=exactMarketEdge(x,quote);
+  if(edge==null){
+    return {modelQualified:true,currentPricePass:false,label:"MODEL GATE PASSED · VALUE UNVERIFIED",reason:"FRESH_TWO_SIDED_MARKET_REQUIRED"};
+  }
+  if(edge<0.02){
+    return {modelQualified:true,currentPricePass:false,label:"MODEL GATE PASSED · CURRENT EDGE BELOW 2%",reason:"CURRENT_EDGE_BELOW_2_PERCENT",edge:edge};
+  }
+  return {modelQualified:true,currentPricePass:true,label:"BETTING-QUALIFIED · PAPER",reason:"CURRENT_PRICE_GATE_PASSED",edge:edge};
+}
+function qualificationLabel(x){
+  return qualificationState(x).label;
 }
 function unifiedMarketLine(x){
   const p=probabilityValue(x);
+  const quote=exactSportyBetQuote(x);
+  const book=quote.odds;
   const fair=Number(x.model_fair_odds);
-  const book=bookmakerOdds(x);
-  const edge=Number(x.model_edge_vs_market);
+  const edge=exactMarketEdge(x,quote);
   const pick=String(x.pick||x.selection||"").toUpperCase();
-  const market=x.market==="over_under"?("O/U "+pick+" "+(x.line??"")):marketLabel(x);
+  const market=isOverUnderPrediction(x)?("O/U "+pick+" "+(x.line??"")):marketLabel(x);
   const fairLabel=Number.isFinite(fair)?fair.toFixed(2):"—";
-  const qualified=Boolean(x.betting_qualified) || String(x.qualification_status||"").startsWith("BETTING_QUALIFIED");
-  const marketReference=book!=null?("SportyBet @ "+book.toFixed(2)):"SportyBet quote unavailable";
-  const edgeLabel=Number.isFinite(edge)?((edge>=0?"+":"")+(edge*100).toFixed(1)+"%"):"—";
-  const band=String(x.model_candidate_status||"").replaceAll("_"," ");
-  const q=qualified?"BETTING-QUALIFIED":(band||x.qualification_status||"MODEL RESEARCH");
+  const qualification=qualificationState(x);
+  const qualified=qualification.currentPricePass;
+  const modelQualified=qualification.modelQualified;
+  const marketReference=book!=null?("SportyBet @ "+book.toFixed(2)):"SportyBet exact quote "+String(quote.reason||"unavailable").replaceAll("_"," ").toLowerCase();
+  const edgeLabel=edge!=null?((edge>=0?"+":"")+(edge*100).toFixed(1)+"%"):"— (requires fresh two-sided exact market)";
+  const evidence=evidenceLabel(x);
+  const q=qualification.label;
+  const candidateBand=String(x.model_candidate_status||"").replaceAll("_"," ");
   return '<div class="ms-market-row">'+
     '<span class="ms-market-name"><b>'+E(market)+'</b></span>'+
-    '<span>Model rating <b>'+(p==null?"—":P(p))+'</b></span>'+
-    '<span>Fair <b>'+E(fairLabel)+'</b></span>'+
-    '<span>Evidence <b>'+E(String(x.evidence_depth||"model").replaceAll("_"," "))+'</b></span>'+
-    '<span class="'+(qualified&&book!=null?"ms-book-live":"ms-book-missing")+'">'+E(marketReference)+'</span>'+
+    '<span>Model estimate <b>'+(p==null?"—":P(p))+'</b></span>'+
+    '<span>Model fair <b>'+E(fairLabel)+'</b></span>'+
+    '<span>Evidence <b>'+E(String(evidence||"unavailable"))+'</b></span>'+
+    '<span class="'+(book!=null?"ms-book-live":"ms-book-missing")+'">'+E(marketReference)+'</span>'+
     '<span>Edge <b>'+E(edgeLabel)+'</b></span>'+
     '<span class="ms-market-q '+(qualified?"qualified":"paper")+'">'+E(q)+'</span>'+
-  '</div>';
+  '</div>'+(candidateBand||modelQualified&&!qualified?'<div class="ms-fixture-band-note">'+(candidateBand?'Model band: '+E(candidateBand)+' · this label is not betting qualification. ':'')+(modelQualified&&!qualified?'Saved model status: '+E(String(x.qualification_status||"BETTING_QUALIFIED").replaceAll("_"," "))+' · current price gate: '+E(qualification.reason.replaceAll("_"," "))+'.':'')+'</div>':'');
 }
 function primaryPrediction(rows){
   const rank=x=>{
@@ -113,8 +218,12 @@ function primaryPrediction(rows){
     const tier=String(x.projection_tier||"");
     const evidence=String(x.evidence_depth||"");
     const edge=Number(x.model_edge_vs_market);
+    const pendingHighUnder=String(x.qualification_status||"")==="HIGH_LINE_UNDER_EVIDENCE_GATE_PENDING";
+    const exactN=Number(x.walkforward_exact_line_n);
     return [
       q?1:0,
+      pendingHighUnder?0:1,
+      Number.isFinite(exactN)?Math.min(30,exactN):0,
       Number.isFinite(p)?p*100:0,
       evidence.includes("participant")?3:evidence.includes("historical")?2:1,
       tier.includes("deep")?2:tier.includes("research")?1:0,
@@ -147,29 +256,14 @@ function ladderRows(rows,anchor){
   safe.sort((a,b)=>side==="over"?Number(b.line)-Number(a.line):Number(a.line)-Number(b.line));
   return safe.slice(0,3);
 }
-function shadowLadderMarkup(group){
-  const rows=group?.rows||[];
-  if(!rows.some(x=>x&&x.sport==="virtual"&&x.market==="over_under"))return "";
-  const anchor=ladderAnchor(rows.filter(x=>x.sport==="virtual"));
-  if(!anchor)return "";
-  const safe=ladderRows(rows,anchor);
-  if(!safe.length)return "";
-  const anchorP=probabilityValue(anchor);
-  const anchorOdds=bookmakerOdds(anchor);
-  const anchorText=(String(anchor.pick||"").toUpperCase()+" "+(anchor.line??""));
-  const safeHtml=safe.map(x=>{
-    const p=probabilityValue(x), odds=bookmakerOdds(x), edge=Number(x.model_edge_vs_market);
-    const edgeText=Number.isFinite(edge)?((edge>=0?"+":"")+((edge*100).toFixed(1))+"%"):"—";
-    return '<div class="ms-ladder-option"><span class="ms-ladder-line">'+E(String(x.pick||"").toUpperCase()+" "+(x.line??""))+'</span><span>Model <b>'+E(p==null?"—":P(p))+'</b></span><span class="'+(odds!=null?"ms-book-live":"ms-book-missing")+'">SportyBet '+E(odds!=null?("@ "+odds.toFixed(2)):"—")+'</span><span>Edge <b>'+E(edgeText)+'</b></span><span class="ms-ladder-tag">SAFER RUNG</span></div>';
-  }).join("");
-  return '<div class="ms-line-ladder"><div class="ms-line-ladder-head"><div><b>Shadow O/U line ladder</b><span>Same directional signal · safer thresholds shown separately</span></div><span class="ms-ladder-badge">PAPER RESEARCH</span></div><div class="ms-line-ladder-anchor"><span>Anchor · '+E(anchorText)+'</span><span>Model <b>'+E(anchorP==null?"—":P(anchorP))+'</b></span><span class="'+(anchorOdds!=null?"ms-book-live":"ms-book-missing")+'">SportyBet '+E(anchorOdds!=null?("@ "+anchorOdds.toFixed(2)):"—")+'</span></div><div class="ms-line-ladder-options">'+safeHtml+'</div><div class="ms-line-ladder-note">The safer rung is not assigned the anchor probability automatically. This display exposes the current desk ladder; promotion remains blocked until the shadow research passes its chronological evidence gate.</div></div>';
-}
 function unifiedRow(group){
   const rows=group.rows;
   const x=primaryPrediction(rows);
   if(!x)return "";
   const when=DT(x.start_time);
-  const qualified=Boolean(x.betting_qualified)||String(x.qualification_status||"").startsWith("BETTING_QUALIFIED");
+  const qualification=qualificationState(x);
+  const qualified=qualification.currentPricePass;
+  const modelQualified=qualification.modelQualified;
   const candidateBand=String(x.model_candidate_status||"");
   const live=String(x.event_state||"").toUpperCase()==="LIVE";
   const settled=String(x.event_state||"").toUpperCase()==="SETTLED";
@@ -177,19 +271,20 @@ function unifiedRow(group){
   const result=String(x.settlement_result||"").toUpperCase();
   const won=settled && (x.settlement_result===x.pick || result==="WIN" || result==="WON" || x.win===true);
   const status=settled?(won?"SETTLED · ✓ WIN":"SETTLED · ✕ LOSS"):
-    (qualified?"BETTING QUALIFIED · PAPER":
-    (candidateBand==="MODEL_90_PLUS"?"MODEL 90%+":
-    candidateBand==="MODEL_80_PLUS"?"MODEL 80%+":
-    candidateBand==="MODEL_70_PLUS"?"MODEL 70%+":
-    (live?"LIVE RESEARCH":"MODEL RESEARCH")));
-  const q=settled?(won?"SETTLED · ✓":"SETTLED · ✕"):(x.betting_qualified?"BETTING-QUALIFIED":(candidateBand||x.qualification_status||"MODEL RESEARCH"));
+    (qualified?"BETTING-QUALIFIED · PAPER":
+    (modelQualified?qualification.label:
+    (candidateBand==="MODEL_90_PLUS"?"MODEL ESTIMATE ≥90% · NOT QUALIFIED":
+    candidateBand==="MODEL_80_PLUS"?"MODEL ESTIMATE ≥80% · NOT QUALIFIED":
+    candidateBand==="MODEL_70_PLUS"?"MODEL ESTIMATE ≥70% · NOT QUALIFIED":
+    (live?"LIVE RESEARCH · NOT QUALIFIED":"MODEL RESEARCH · NOT QUALIFIED"))));
+  const q=settled?(won?"SETTLED · ✓":"SETTLED · ✕"):qualification.label;
   return '<article class="ms-up-row ms-fixture-card">'+
     '<div class="ms-up-time"><b>'+E(when)+'</b><span>'+E(String(x.start_time||"").slice(0,10))+'</span></div>'+
     '<div class="ms-up-event"><div class="ms-up-meta"><span class="ms-sport-pill">'+sportIcon(x.sport)+' '+E(x.sport==="table_tennis"?"Table Tennis":(x.sport||"Sport"))+'</span><span>'+E(x.league||x.competition||"Unclassified")+'</span><span class="ms-fixture-market-count">1 prediction</span></div>'+
     '<div class="ms-up-match">'+E(x.player_1||x.home||"Participant 1")+' <span>vs</span> '+E(x.player_2||x.away||"Participant 2")+'</div>'+
     '<div class="ms-market-stack">'+unifiedMarketLine(x)+'</div>'+
-    '<div class="ms-fixture-foot"><span class="'+(settled?(won?"ms-settled-win":"ms-settled-loss"):"")+'">'+E(q)+'</span><span>'+E(settled?("Result "+(x.final_score||x.settlement_result||"recorded")):(book!=null?"SportyBet quote matched to this prediction":"SportyBet quote not matched"))+'</span></div></div>'+
-    '<div class="ms-up-status"><span class="ms-up-status-badge '+(settled?(won?"deep":"research"):(qualified?"deep":live?"testing":"research"))+'">'+E(status)+'</span><span class="ms-up-qual '+(qualified?"qualified":"paper")+'">'+E(qualified?"BETTING-QUALIFIED":"PAPER · NOT QUALIFIED")+'</span><small>'+E(evidenceLabel(x))+'</small></div>'+
+    '<div class="ms-fixture-foot"><span class="'+(settled?(won?"ms-settled-win":"ms-settled-loss"):"")+'">'+E(q)+'</span><span>'+E(settled?("Result "+(x.final_score||x.settlement_result||"recorded")):(book!=null?"Fresh exact market/line/side quote":"No fresh verifiable exact-line quote; edge withheld"))+'</span></div></div>'+
+    '<div class="ms-up-status"><span class="ms-up-status-badge '+(settled?(won?"deep":"research"):(qualified?"deep":live?"testing":"research"))+'">'+E(status)+'</span><span class="ms-up-qual '+(settled?"paper":qualified?"qualified":"paper")+'">'+E(settled?"SETTLED HISTORY":qualified?"BETTING-QUALIFIED":"PAPER · PRICE/QUALIFICATION GATE PENDING")+'</span><small>'+E(evidenceLabel(x))+'</small></div>'+
   '</article>';
 }
 async function renderUnifiedBoard(){
@@ -198,7 +293,7 @@ async function renderUnifiedBoard(){
   try{
     let payload={events:[],generated_at:null};
     let selectedRows=[];
-    let riskGate=null; let ladderResearch=null;
+    let riskGate=null;
     try{
       const [sel,rg]=await Promise.all([
         get('./data/selection_candidates.json'),
@@ -211,14 +306,6 @@ async function renderUnifiedBoard(){
       payload=await get('./data/unified_upcoming.json');
     }catch(_){
       payload={events:[],generated_at:null};
-    }
-    try{ ladderResearch=await get('./data/line_ladder_research.json'); }catch(_){ ladderResearch=null; }
-    const ladderDesk=Q('#lineLadderDesk');
-    if(ladderDesk){
-      const state=ladderResearch?.promotion_gate?.status||'SHADOW';
-      const anchors=Number(ladderResearch?.current_anchor_count||0);
-      const validated=Array.isArray(ladderResearch?.chronological_validation)?ladderResearch.chronological_validation.length:0;
-      ladderDesk.innerHTML='<div class="ms-line-ladder-desk-head"><div><b>Directional O/U Line Ladder</b><span>Shadow research layer on the Upcoming Prediction Desk · exact-line qualification is unchanged.</span></div><div class="ms-ladder-desk-stats"><span>'+E(state)+'</span><span>'+E(String(anchors))+' live anchors</span><span>'+E(String(validated))+' validated pairs</span></div></div>';
     }
     let all=Array.isArray(payload?.events)?payload.events:[];
     if(!all.length){
@@ -291,16 +378,57 @@ async function renderUnifiedBoard(){
     async function freshVirtualQuoteMap(){
       const byEvent={};
       try{
-        const feed=await get('./api/sportybet-virtual?sources=efootball&pageSize=100&pageNum=1&timeline=168');
+        const feed=await get('./api/sportybet-virtual?sources=efootball,vfootball&pageSize=100&pageNum=1&timeline=168');
         const events=Array.isArray(feed?.events)?feed.events:[];
+        const fetchedAt=feed?.updated_at||feed?.server_time||null;
         events.forEach(e=>{
           const id=String(e?.event_id||"");
-          if(id)byEvent[id]=e;
+          if(id)byEvent[id]={...e,__quote_fetched_at:fetchedAt};
         });
       }catch(_){}
       return byEvent;
     }
 
+    function freshVirtualQuoteFields(row,live){
+      if(!row||!live||String(row?.market||"").toLowerCase()!=="over_under")return row;
+      const line=Number(row?.line);
+      const side=String(row?.pick||row?.selection||"").toLowerCase();
+      if(!Number.isFinite(line)||(side!=="over"&&side!=="under"))return row;
+      let over=null,under=null;
+      for(const market of Array.isArray(live?.markets)?live.markets:[]){
+        const marketLine=Number(market?.line);
+        const marketId=String(market?.id||"");
+        const marketName=String(market?.name||"").toLowerCase();
+        if(!["18","189"].includes(marketId)&&!marketName.includes("total")&&!marketName.includes("over/under")&&!marketName.includes("over under"))continue;
+        if(!Number.isFinite(marketLine)||Math.abs(marketLine-line)>1e-9)continue;
+        let thisOver=null,thisUnder=null;
+        for(const outcome of Array.isArray(market?.outcomes)?market.outcomes:[]){
+          if(outcome?.active===false)continue;
+          const name=String(outcome?.name||"").toLowerCase();
+          const odds=Number(outcome?.odds);
+          if(!Number.isFinite(odds)||odds<=1)continue;
+          if(name.startsWith("over"))thisOver=odds;
+          if(name.startsWith("under"))thisUnder=odds;
+        }
+        if(thisOver!=null||thisUnder!=null){over=thisOver;under=thisUnder;break;}
+      }
+      const selected=side==="over"?over:under;
+      if(selected==null)return row;
+      return {
+        ...row,
+        bookmaker_odds:selected,
+        sportybet_odds:selected,
+        sportybet_odds_market:"total",
+        sportybet_odds_line:line,
+        sportybet_odds_side:side,
+        sportybet_over_odds:over,
+        sportybet_under_odds:under,
+        bookmaker_available:Boolean(over&&under),
+        bookmaker_source:"SportyBet NG",
+        market_odds_timestamp:live?.__quote_fetched_at||null,
+        desk_quote_refresh:"fresh_exact_event_line_side",
+      };
+    }
     function virtualCandidateDeskRows(rows,quoteMap){
       const now=Date.now();
       return rows.map(row=>{
@@ -312,18 +440,25 @@ async function renderUnifiedBoard(){
         const matchStart=Date.parse(String(row?.start_time||""));
         if(!Number.isFinite(matchStart) || matchStart < now) return null;
 
-        let over=null,under=null;
+        let over=null,under=null,matchedMarket=null;
         for(const market of Array.isArray(live?.markets)?live.markets:[]){
           const ml=Number(market?.line);
+          const marketId=String(market?.id||"");
+          const marketName=String(market?.name||"").toLowerCase();
+          if(!["18","189"].includes(marketId)&&!marketName.includes("total")&&!marketName.includes("over/under")&&!marketName.includes("over under"))continue;
           if(!Number.isFinite(ml) || Math.abs(ml-line)>1e-9)continue;
+          let marketOver=null,marketUnder=null;
           for(const outcome of Array.isArray(market?.outcomes)?market.outcomes:[]){
+            if(outcome?.active===false)continue;
             const name=String(outcome?.name||"").toLowerCase();
             const odds=Number(outcome?.odds);
             if(!Number.isFinite(odds) || odds<=1)continue;
-            if(name.startsWith("over"))over=odds;
-            if(name.startsWith("under"))under=odds;
+            if(name.startsWith("over"))marketOver=odds;
+            if(name.startsWith("under"))marketUnder=odds;
           }
-          if(over!=null || under!=null)break;
+          if(marketOver!=null||marketUnder!=null){
+            over=marketOver;under=marketUnder;matchedMarket=market;break;
+          }
         }
         const selectedOdds=side==="over"?over:under;
         if(selectedOdds==null)return null;
@@ -352,6 +487,11 @@ async function renderUnifiedBoard(){
           model_fair_odds:Number.isFinite(fair)?fair:(p>0?1/p:null),
           bookmaker_odds:selectedOdds,
           sportybet_odds:selectedOdds,
+          sportybet_odds_market:"total",
+          sportybet_odds_line:line,
+          sportybet_odds_side:side,
+          sportybet_over_odds:over,
+          sportybet_under_odds:under,
           model_edge_vs_market:Number.isFinite(edge)?edge:null,
           candidate_status:candidateStatus,
           model_candidate_status:candidateStatus,
@@ -362,7 +502,7 @@ async function renderUnifiedBoard(){
           qualified_for_builder:Boolean(row?.qualified_for_builder),
           paper_only:true,
           live_money_eligible:false,
-          market_odds_timestamp:new Date().toISOString(),
+          market_odds_timestamp:live?.__quote_fetched_at||matchedMarket?.lastOddsChangeTime||null,
           source_engine:"Virtual Lab",
           desk_source:"selection_candidates + fresh SportyBet virtual quote"
         };
@@ -393,6 +533,11 @@ async function renderUnifiedBoard(){
     all=all.map(annotate);
     try{
       const quoteMap=await freshVirtualQuoteMap();
+      all=all.map(row=>{
+        if(String(row?.sport||"").toLowerCase()!=="virtual")return row;
+        const current=quoteMap[String(row?.event_id||"")];
+        return current?freshVirtualQuoteFields(row,current):row;
+      });
       const virtualDeskRows=virtualCandidateDeskRows(virtualCandidates,quoteMap);
       if(virtualDeskRows.length){
         const existingKeys=new Set(all.map(row=>rowFixtureKey(row)));
@@ -426,11 +571,15 @@ async function renderUnifiedBoard(){
         const state=String(x?.event_state||"").toUpperCase();
         const live=state==="LIVE" || x?.live===true || x?.isLive===true;
         const settled=state==="SETTLED";
-        // Client-side guard as well as the backend guard: a stale cached or
-        // delayed JSON refresh must not leave yesterday's/past kickoff games
-        // in Upcoming. Only explicit live rows and recent settled-result rows
-        // can remain after kickoff; archives are separate and untouched.
+        const sportKey=String(x?.sport||"").toLowerCase();
+        const productKey=String(x?.product||"").toLowerCase();
+        const isVirtual=sportKey==="virtual"||["efootball_gt","efootball_adriatic","vfootball","zoom"].includes(productKey);
+        const liveLimitMs=isVirtual?2*60*60*1000:(sportKey==="tennis"?8*60*60*1000:4*60*60*1000);
+        // Client-side guard as well as the backend guard: even a cached JSON
+        // record with a stale LIVE flag cannot remain on Upcoming indefinitely.
+        // A removed fixture stays in the canonical archive/history.
         if(kickoff<=now.getTime() && !live && !settled)return false;
+        if(kickoff<=now.getTime() && live && now.getTime()-kickoff>liveLimitMs)return false;
         if(settled){
           const settledAt=Date.parse(String(x?.settled_at||""));
           const settledAge=now.getTime()-settledAt;

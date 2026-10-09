@@ -8,6 +8,8 @@ on:
       - 'scripts/independent_football_model.py'
       - 'scripts/football_model_council.py'
       - 'scripts/build_football_team_history.py'
+      - 'scripts/unified_upcoming.py'
+      - 'docs/PREDICTION_DESK_POLICY.md'
       - 'data/odds_ticket_tracker.json'
       - 'data/unified_upcoming.json'
       - 'data/virtual_lab_model_eval.json'
@@ -37,10 +39,10 @@ jobs:
           assert d.get('engine_version')=='V6.1-RESEARCH-GATED'
           assert isinstance(d.get('batches'),list)
           for b in d['batches']:
-              assert 2 <= int(b.get('leg_count',0)) <= 7
+              assert 2 <= int(b.get('leg_count',0)) <= 4
               assert float(b.get('combined_model_probability',0)) <= float(b.get('raw_combined_model_probability',1)) + 1e-9
               assert float(b.get('ticket_calibration_gamma',1)) >= 1.0
-              assert float(b.get('combined_odds',0)) >= 4.00
+              assert float(b.get('combined_odds',0)) >= 2.70
               assert float(b.get('combined_model_probability',0))*float(b.get('combined_odds',0))-1 >= 0.02-1e-9
           council=json.loads(Path('data/football_model_council.json').read_text())
           assert council.get('mode')=='PAPER_RESEARCH_ONLY'

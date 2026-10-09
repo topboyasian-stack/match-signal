@@ -48,6 +48,8 @@ autopilot = load("autopilot_status.json", {})
 darts = load("darts_status.json", {})
 table = load("table_tennis_status.json", {})
 unified = load("unified_upcoming.json", {})
+tennis_forward = load("tennis_forward_status.json", {})
+desk_health = load("prediction_desk_health.json", {})
 qa = load("qa/report.json", {})
 selection = load("selection_gate.json", {})
 predictions_file = DATA / "predictions.json"
@@ -91,6 +93,46 @@ for args in [
     if x:
         checks.append(x)
 
+desk_health_stamp = desk_health.get("generated_at")
+desk_health_age = age_hours(desk_health_stamp)
+desk_health_generated = str(desk_health.get("status") or "") == "GENERATED"
+desk_health_fresh = bool(desk_health_stamp) and desk_health_generated and desk_health_age <= 2
+checks.append({
+    "engine": "prediction_desk_health",
+    "status": "PASS" if desk_health_fresh else "STALE",
+    "age_hours": round(desk_health_age, 2) if desk_health_stamp else None,
+    "threshold_hours": 2,
+})
+if not desk_health_stamp or not desk_health_generated:
+    checks.append(issue(
+        "PREDICTION_DESK_HEALTH_NOT_GENERATED",
+        "warning",
+        "Prediction Desk health sidecar has not yet been replaced by a timestamped generated snapshot"
+    ))
+elif desk_health_age > 2:
+    checks.append(issue(
+        "PREDICTION_DESK_HEALTH_STALE",
+        "warning",
+        f"Prediction Desk health sidecar age {desk_health_age:.2f}h exceeds 2h"
+    ))
+
+# The separate 14-day tennis discovery task runs every six hours. A missing or
+# old report means the system cannot distinguish "no fixtures" from "discovery
+# did not refresh"; surface that as a distinct warning instead of guessing.
+tennis_forward_age = age_hours(tennis_forward.get("updated_at"))
+checks.append({
+    "engine": "tennis_forward_discovery",
+    "status": "PASS" if tennis_forward_age <= 8 else "STALE",
+    "age_hours": round(tennis_forward_age, 2),
+    "threshold_hours": 8,
+})
+if tennis_forward_age > 8:
+    checks.append(issue(
+        "TENNIS_FORWARD_DISCOVERY_STALE",
+        "warning",
+        f"tennis_forward_status age {tennis_forward_age:.2f}h exceeds the 8h threshold; the discovery result is too old to confirm current fixture coverage"
+    ))
+
 virtual_live_age = age_hours(virtual_live.get("updated_at"))
 unified_virtual = ((unified.get("summary") or {}).get("virtual_model") or {})
 live_refresh = unified_virtual.get("live_refresh") or {}
@@ -122,19 +164,56 @@ if prediction_count <= 0:
     checks.append(issue("CORE_PREDICTIONS_EMPTY", "critical", "data/pipeline_status.json reports zero current predictions"))
 if football_count <= 0:
     checks.append(issue("FOOTBALL_FEED_EMPTY", "critical", "No current football predictions are published"))
+def current_future_tennis_rows(rows):
+    found = []
+    for row in rows if isinstance(rows, list) else []:
+        if not isinstance(row, dict) or str(row.get("sport") or "").lower() != "tennis" or row.get("settled"):
+            continue
+        stamp = row.get("start_time") or row.get("date")
+        if not stamp:
+            continue
+        try:
+            start = datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))
+            if start.tzinfo is None:
+                start = start.replace(tzinfo=timezone.utc)
+        except (TypeError, ValueError):
+            continue
+        if start >= NOW:
+            found.append(row)
+    return found
+
+
 if tennis_count <= 0:
-    if int(autopilot_leagues.get("ATP") or 0) > 0 or int(autopilot_leagues.get("WTA") or 0) > 0:
+    published_tennis = current_future_tennis_rows(prediction_rows)
+    watch_tennis = [
+        row for row in published_tennis
+        if str(row.get("prediction_status") or "") == "watch_projection"
+        or str(row.get("qualification_status") or "") == "TENNIS_FORWARD_WATCH_NOT_QUALIFIED"
+    ]
+    if published_tennis and len(watch_tennis) == len(published_tennis):
+        checks.append(issue(
+            "TENNIS_CORE_FEED_EMPTY",
+            "warning",
+            f"Canonical tennis pipeline has zero actionable predictions; {len(watch_tennis)} unqualified ATP forward-window watch projections are published for research only"
+        ))
+    elif published_tennis:
+        checks.append(issue(
+            "TENNIS_PIPELINE_COUNT_MISMATCH",
+            "warning",
+            f"Pipeline status reports zero tennis predictions, but {len(published_tennis)} future tennis rows are present in the published prediction feed"
+        ))
+    elif int(autopilot_leagues.get("ATP") or 0) > 0 or int(autopilot_leagues.get("WTA") or 0) > 0:
         checks.append(
             {
                 "engine": "tennis_desk",
                 "status": "INFO",
-                "detail": "Core pipeline is holding tennis back for lack of actionable singles matches, while the desk itself still has active ATP/WTA rows.",
+                "detail": "Canonical core pipeline has no actionable tennis predictions; separate forward/readiness diagnostics still report active tennis rows.",
                 "autopilot_atp": int(autopilot_leagues.get("ATP") or 0),
                 "autopilot_wta": int(autopilot_leagues.get("WTA") or 0),
             }
         )
     else:
-        checks.append(issue("TENNIS_FEED_EMPTY", "warning", "No current tennis predictions are published"))
+        checks.append(issue("TENNIS_FEED_EMPTY", "warning", "No current tennis predictions or forward-window research rows are published"))
 
 virtual_products = virtual_live.get("product_counts") or {}
 for product in ("efootball_gt", "vfootball"):
@@ -174,6 +253,7 @@ out = {
     "issues": [x for x in checks if "code" in x],
     "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
     "paper_only": True,
+    "prediction_desk_filters": desk_health.get("publication_filters") or {},
 }
 (DATA / "system_health.json").write_text(json.dumps(out, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 print(json.dumps(out, indent=2))
