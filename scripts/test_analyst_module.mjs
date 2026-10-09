@@ -134,6 +134,7 @@ assert.equal(facts.tennis_forward_discovery.tours.ATP.events_seen, 236);
 assert.equal(facts.tennis_forward_discovery.tours.ATP.valid_singles, 0);
 assert.ok(facts.flags.some(function(flag) { return flag.includes("VFootball Under 7.5") && flag.includes("10/30"); }));
 assert.ok(facts.flags.some(function(flag) { return flag.includes("VFootball Under 8.5") && flag.includes("0/30"); }));
+assert.ok(facts.flags.some(function(flag) { return flag.includes("eFootball GT Under 8.5") && flag.includes("76/30"); }));
 assert.equal(facts.prediction_desk.publication_filters.past_kickoff_rows_hidden, 13);
 assert.equal(facts.artifacts.prediction_desk.status, "WITHIN_THRESHOLD");
 const notGeneratedFacts = summarizeDiagnosticFacts({
