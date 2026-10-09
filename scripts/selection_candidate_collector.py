@@ -166,7 +166,6 @@ def compact(row, now):
         "qualified_for_builder": bool(row.get("qualified_for_builder")),
         "participant_status": row.get("participant_status"),
         "participant_history_rows": row.get("participant_history_rows"),
-        "market_odds_timestamp": row.get("market_odds_timestamp") or row.get("odds_timestamp"),
         "source_engine": row.get("source_engine"),
         "model": row.get("model"),
         "model_version": row.get("model_version"),
