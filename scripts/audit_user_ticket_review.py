@@ -11,7 +11,7 @@ import json
 import math
 import sys
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -33,6 +33,17 @@ def parse_datetime(value: Any) -> bool:
         return True
     except ValueError:
         return False
+
+def parse_timestamp(value: Any) -> float | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.timestamp()
+    except ValueError:
+        return None
 
 
 def _validate_selection(value: Any, where: str, errors: list[str]) -> None:
@@ -197,6 +208,18 @@ def analyze_leg(leg: dict[str, Any]) -> dict[str, Any]:
         counterfactual = "desk_selection_won_actual_did_not"
     else:
         counterfactual = "both_won" if actual_result == "WON" else "neither_won"
+    kickoff_time = parse_timestamp(leg.get("kickoff_at"))
+    capture_time = parse_timestamp(desk.get("captured_at")) if isinstance(desk, dict) else None
+    if not isinstance(desk, dict):
+        desk_snapshot_timing = "desk_snapshot_missing"
+    elif kickoff_time is None:
+        desk_snapshot_timing = "kickoff_time_missing"
+    elif capture_time is None:
+        desk_snapshot_timing = "desk_capture_time_invalid"
+    elif capture_time > kickoff_time:
+        desk_snapshot_timing = "captured_after_kickoff"
+    else:
+        desk_snapshot_timing = "user_reported_pre_kickoff_time_unverified"
     return {
         "product": str(leg.get("product") or "unknown").strip().lower(),
         "actual_pick": actual["pick"],
@@ -207,6 +230,7 @@ def analyze_leg(leg: dict[str, Any]) -> dict[str, Any]:
         "desk_line": float(desk["line"]) if isinstance(desk, dict) and finite_number(desk.get("line")) else None,
         "desk_result": desk_result,
         "line_adjustment": adjustment,
+        "desk_snapshot_timing": desk_snapshot_timing,
         "counterfactual": counterfactual,
     }
 
@@ -224,6 +248,7 @@ def summarize_document(document: dict[str, Any]) -> dict[str, Any]:
         lambda: {"settled_non_push": 0, "wins": 0, "losses": 0, "pushes": 0}
     )
     comparisons: dict[str, int] = defaultdict(int)
+    desk_timing: dict[str, int] = defaultdict(int)
 
     for item in analyses:
         result = item["actual_result"]
@@ -232,6 +257,7 @@ def summarize_document(document: dict[str, Any]) -> dict[str, Any]:
         else:
             outcomes[result] += 1
         line_edits[item["line_adjustment"]] += 1
+        desk_timing[item["desk_snapshot_timing"]] += 1
         key = (item["product"], item["actual_pick"], item["actual_line"])
         if result == "WON":
             groups[key]["settled_non_push"] += 1
@@ -267,6 +293,7 @@ def summarize_document(document: dict[str, Any]) -> dict[str, Any]:
         "actual_selection_outcomes": outcomes,
         "actual_leg_hit_rate_excluding_pushes": round(outcomes["WON"] / scored_non_push, 4) if scored_non_push else None,
         "line_adjustments": dict(sorted(line_edits.items())),
+        "desk_snapshot_timing": dict(sorted(desk_timing.items())),
         "desk_vs_actual_same_score_comparison": dict(sorted(comparisons.items())),
         "exact_product_pick_line": exact_line_summary,
         "interpretation_guard": (
