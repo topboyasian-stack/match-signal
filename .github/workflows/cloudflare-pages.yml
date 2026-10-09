@@ -270,7 +270,12 @@ jobs:
               const {r,body}=await get(path);
               if (!r.ok) failures.push(path+' HTTP '+r.status);
               if (!body.trim()) failures.push(path+' empty response');
-              if (path==='/analyst.js' && !body.includes('VERIFIED SOURCE FACTS')) failures.push('/analyst.js missing the deterministic fact panel');
+              if (path==='/analyst.js' && (
+                !body.includes('VERIFIED SOURCE FACTS') ||
+                !body.includes('High-line Under exact-line evidence') ||
+                !body.includes('VFootball-specific 30-row/65% gate does not apply to this product') ||
+                !body.includes('grouped qualification conflicts')
+              )) failures.push('/analyst.js missing deterministic facts or product-specific high-line Under qualification safeguards');
               if (path==='/sport-hubs.js' && (!body.includes('EXACT_MARKET_LINE_SIDE_FRESH') || !body.includes('HIGH_LINE_UNDER_EVIDENCE_GATE_PENDING') || !body.includes('MODEL ESTIMATE ≥90% · NOT QUALIFIED') || !body.includes('SportyBet last seen @') || !body.includes('Exact-line SportyBet reference shown; current edge and qualification withheld'))) failures.push('/sport-hubs.js missing exact-quote, stale-reference visibility, high-line evidence or qualification protections');
               if (path.endsWith('.json')) {
                 const parsed=JSON.parse(body);
