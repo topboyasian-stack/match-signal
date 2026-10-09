@@ -555,7 +555,7 @@ jobs:
       - name: Record Cloudflare production verification
         env:
           GH_TOKEN: ${{ github.token }}
-          DEPLOY_SOURCE_COMMIT: ${{ github.sha }}
+          DEPLOY_SOURCE_COMMIT: ${{ steps.source.outputs.sha }}
         run: |
           set -euo pipefail
           cp LIVE-PRODUCTION-CHECK.json /tmp/live-production-check.json 2>/dev/null || true
