@@ -34,6 +34,13 @@ class TennisForwardPublicationTests(unittest.TestCase):
         self.assertLess(stage, push)
         self.assertLess(push, retry)
 
+    def test_merge_or_generator_changes_trigger_a_publication_run(self):
+        source = WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn("push:", source)
+        self.assertIn("'.github/workflows/tennis-forward-window.yml'", source)
+        self.assertIn("'scripts/tennis_forward_window.py'", source)
+        self.assertIn("'scripts/merge_generated_feed.py'", source)
+
     def test_failed_push_does_not_silently_end_successfully(self):
         source = WORKFLOW.read_text(encoding="utf-8")
         self.assertIn("main moved during tennis publication", source)
