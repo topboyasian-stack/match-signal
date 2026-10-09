@@ -4,6 +4,7 @@ on:
     branches: [main]
     paths:
       - 'scripts/odds_builder.py'
+      - 'scripts/test_compact_efootball_builder.py'
       - 'scripts/predict_today.py'
       - 'scripts/independent_football_model.py'
       - 'scripts/football_model_council.py'
@@ -27,6 +28,8 @@ jobs:
         with: {python-version: '3.12'}
       - run: python -m pip install --upgrade requests
       - run: python -m py_compile scripts/odds_builder.py scripts/predict_today.py scripts/independent_football_model.py scripts/football_model_council.py scripts/build_football_team_history.py
+      - name: Test compact eFootball 2.00x ticket constructor
+        run: python scripts/test_compact_efootball_builder.py
       - run: python scripts/football_model_council.py
       - run: python scripts/odds_builder.py
       - name: Validate calibrated Builder output
@@ -39,11 +42,21 @@ jobs:
           assert d.get('engine_version')=='V6.1-RESEARCH-GATED'
           assert isinstance(d.get('batches'),list)
           for b in d['batches']:
-              assert 2 <= int(b.get('leg_count',0)) <= 4
+              lane=str(b.get('primary_lane') or '')
+              legs=int(b.get('leg_count',0))
+              odds=float(b.get('combined_odds',0))
+              if lane=='efootball_compact_2x':
+                  assert 4 <= legs <= 5
+                  assert odds >= 2.00
+                  assert set(b.get('products') or []) <= {'efootball_gt','efootball_adriatic'}
+                  assert all(str(x.get('qualification_lane') or '')=='efootball_exact_evidence_value' for x in b.get('legs',[]))
+                  assert all(float(x.get('model_probability',0)) >= 0.80 for x in b.get('legs',[]))
+              else:
+                  assert 2 <= legs <= 4
+                  assert odds >= 2.70
               assert float(b.get('combined_model_probability',0)) <= float(b.get('raw_combined_model_probability',1)) + 1e-9
               assert float(b.get('ticket_calibration_gamma',1)) >= 1.0
-              assert float(b.get('combined_odds',0)) >= 2.70
-              assert float(b.get('combined_model_probability',0))*float(b.get('combined_odds',0))-1 >= 0.02-1e-9
+              assert float(b.get('combined_model_probability',0))*odds-1 >= 0.02-1e-9
           council=json.loads(Path('data/football_model_council.json').read_text())
           assert council.get('mode')=='PAPER_RESEARCH_ONLY'
           assert council.get('production_pick_unchanged') is True
