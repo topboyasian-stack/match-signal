@@ -221,11 +221,12 @@ export function summarizeReviewDocument(document) {
   const analyses = [];
   for (const ticket of document.tickets || []) for (const leg of ticket.legs || []) analyses.push(analyzeLeg(leg));
   const outcomes = { WON: 0, LOST: 0, PUSH: 0, UNSETTLED_OR_MISSING_SCORE: 0 };
-  const lineAdjustments = {}, groups = new Map(), comparisons = {};
+  const lineAdjustments = {}, deskTiming = {}, groups = new Map(), comparisons = {};
   for (const item of analyses) {
     if (item.actual_result === null) outcomes.UNSETTLED_OR_MISSING_SCORE += 1;
     else outcomes[item.actual_result] += 1;
     lineAdjustments[item.line_adjustment] = (lineAdjustments[item.line_adjustment] || 0) + 1;
+    deskTiming[item.desk_snapshot_timing] = (deskTiming[item.desk_snapshot_timing] || 0) + 1;
     const key = JSON.stringify([item.product, item.actual_pick, item.actual_line]);
     if (!groups.has(key)) groups.set(key, { product: item.product, pick: item.actual_pick, line: item.actual_line, settled_non_push: 0, wins: 0, losses: 0, pushes: 0 });
     const group = groups.get(key);
@@ -250,6 +251,7 @@ export function summarizeReviewDocument(document) {
     scored_leg_count: outcomes.WON + outcomes.LOST + outcomes.PUSH, actual_selection_outcomes: outcomes,
     actual_leg_hit_rate_excluding_pushes: n ? Number((outcomes.WON / n).toFixed(4)) : null,
     line_adjustments: Object.fromEntries(Object.entries(lineAdjustments).sort()),
+    desk_snapshot_timing: Object.fromEntries(Object.entries(deskTiming).sort()),
     desk_vs_actual_same_score_comparison: Object.fromEntries(Object.entries(comparisons).sort()),
     exact_product_pick_line: exactLineSummary,
     interpretation_guard: "Descriptive evidence from user-selected tickets only; selection-biased and not a standalone model-validation sample. Do not update model parameters from this summary alone."
@@ -273,7 +275,8 @@ export function privateModelTicketContext(document, limit = 8) {
           kickoff_at: leg.kickoff_at || null, actual_selection: leg.actual_selection,
           desk_snapshot: leg.desk_snapshot || null, final_score: leg.final_score || null,
           actual_result: analysis.actual_result, desk_result_on_same_score: analysis.desk_result,
-          line_adjustment: analysis.line_adjustment, counterfactual: analysis.counterfactual
+          line_adjustment: analysis.line_adjustment, desk_snapshot_timing: analysis.desk_snapshot_timing,
+          counterfactual: analysis.counterfactual
         };
       })
     };
