@@ -20,6 +20,8 @@ on:
       - 'scripts/predict_today.py'
       - 'scripts/tennis_forward_window.py'
       - 'scripts/test_upcoming_desk_policy.py'
+      - 'scripts/test_tennis_forward_publication.py'
+      - '.github/workflows/tennis-forward-window.yml'
       - 'sport-hubs.js'
       - 'sport-hubs.css'
       - 'upcoming.html'
@@ -46,6 +48,8 @@ on:
       - 'scripts/predict_today.py'
       - 'scripts/tennis_forward_window.py'
       - 'scripts/test_upcoming_desk_policy.py'
+      - 'scripts/test_tennis_forward_publication.py'
+      - '.github/workflows/tennis-forward-window.yml'
       - 'sport-hubs.js'
       - 'sport-hubs.css'
       - 'upcoming.html'
@@ -76,8 +80,10 @@ jobs:
         run: python -m pip install --upgrade requests
       - name: Run Prediction Desk freshness and exact-line evidence tests
         run: python scripts/test_upcoming_desk_policy.py
+      - name: Test tennis forward publication retry contract
+        run: python scripts/test_tennis_forward_publication.py
       - name: Compile changed Prediction Desk Python modules
-        run: python -m py_compile scripts/unified_upcoming.py scripts/predict_today.py scripts/tennis_forward_window.py scripts/system_health_audit.py scripts/selection_candidate_collector.py scripts/test_upcoming_desk_policy.py
+        run: python -m py_compile scripts/unified_upcoming.py scripts/predict_today.py scripts/tennis_forward_window.py scripts/system_health_audit.py scripts/selection_candidate_collector.py scripts/test_upcoming_desk_policy.py scripts/test_tennis_forward_publication.py
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
