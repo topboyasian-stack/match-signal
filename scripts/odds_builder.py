@@ -2,6 +2,7 @@
 
 # 2026-10-02: force post-gate Builder regeneration for production verification.
 # 2026-10-04: force a fresh market snapshot after booking-code volatility verification.
+# 2026-10-10: derive thin eFootball half-line O/U evidence from unique settled scores without relaxing gates.
 
 Research/paper-trading only. A candidate is eligible only when:
 - calibrated model probability clears the minimum threshold,
@@ -860,10 +861,125 @@ def results_first_gate(product,line,pick):
     }
 
 _VIRTUAL_RECENT_GATE_CACHE=None
+_VIRTUAL_SCORE_REPLAY_DIAGNOSTICS=None
+VIRTUAL_SCORE_REPLAY_MIN_OBS=8
+VIRTUAL_SCORE_REPLAY_MAX_HALF_LINE=25.5
+
+
+def _derive_efootball_score_replay(rows,direct_index,min_n=VIRTUAL_SCORE_REPLAY_MIN_OBS):
+    """Replay settled eFootball scores against half-goal lines with thin direct samples.
+
+    This creates one historical outcome per unique product/event ID from a final
+    settled score, rather than treating repeated line/side archive records as
+    independent matches. It never infers score from a selected pick's win/loss.
+    Only half-goal lines are replayed (no push outcome); integer lines retain
+    their direct-settlement evidence requirement.
+    """
+    import re
+
+    grouped={}
+    for row in rows:
+        if not isinstance(row,dict):
+            continue
+        product=str(row.get("product") or "")
+        if row.get("market")!="ou" or product not in ACTIVE_VIRTUAL_PRODUCTS:
+            continue
+        event_id=str(row.get("event_id") or "").strip()
+        settled_at=str(row.get("settled_at") or "").strip()
+        if not event_id or not settled_at or not isinstance(row.get("win"),bool):
+            continue
+        match=re.fullmatch(r"(\d+)\s*[:\-]\s*(\d+)",str(row.get("score") or "").strip())
+        if not match:
+            continue
+        grouped.setdefault((product,event_id),[]).append({
+            "home":int(match.group(1)),
+            "away":int(match.group(2)),
+            "settled_at":settled_at,
+            "participant_1":row.get("participant_1"),
+            "participant_2":row.get("participant_2"),
+        })
+
+    score_events=[]
+    conflicts=0
+    for (product,event_id),items in grouped.items():
+        scores={(item["home"],item["away"]) for item in items}
+        # If records for one event disagree on the final score, fail closed.
+        if len(scores)!=1:
+            conflicts+=1
+            continue
+        representative=max(items,key=lambda item:item["settled_at"])
+        home,away=next(iter(scores))
+        score_events.append({
+            "product":product,
+            "event_id":event_id,
+            "home":home,
+            "away":away,
+            "total":home+away,
+            "score":f"{home}:{away}",
+            "settled_at":representative["settled_at"],
+            "participant_1":representative.get("participant_1"),
+            "participant_2":representative.get("participant_2"),
+            "source_event_record_count":len(items),
+        })
+    score_events.sort(key=lambda item:item["settled_at"],reverse=True)
+
+    derived={}
+    max_step=int(round(VIRTUAL_SCORE_REPLAY_MAX_HALF_LINE*2))
+    for product in sorted(ACTIVE_VIRTUAL_PRODUCTS):
+        product_events=[event for event in score_events if event["product"]==product]
+        if not product_events:
+            continue
+        # .5, 1.5, 2.5, ... 25.5. Integer lines are excluded because a push
+        # requires separate void/push accounting rather than a binary win flag.
+        for half_step in range(1,max_step+1,2):
+            line=half_step/2.0
+            line_key=f"{line:g}"
+            for side in ("over","under"):
+                key=(product,line_key,side)
+                direct_n=len(direct_index.get(key,[]))
+                if direct_n>=min_n:
+                    continue
+                replay_rows=[]
+                for event in product_events:
+                    total=float(event["total"])
+                    won=total>line if side=="over" else total<line
+                    replay_rows.append({
+                        "product":product,
+                        "event_id":event["event_id"],
+                        "market":"ou",
+                        "line":line,
+                        "selection":f"{'O' if side=='over' else 'U'}{line:g}",
+                        "selection_name":f"{'Over' if side=='over' else 'Under'} {line:g}",
+                        "win":bool(won),
+                        "score":event["score"],
+                        "score_total":event["total"],
+                        "settled_at":event["settled_at"],
+                        "timestamp":event["settled_at"],
+                        "participant_1":event.get("participant_1"),
+                        "participant_2":event.get("participant_2"),
+                        "derived_from_score":True,
+                        "evidence_source":"settled_score_replay",
+                        "source_direct_n":direct_n,
+                        "source_event_record_count":event.get("source_event_record_count",1),
+                    })
+                if replay_rows:
+                    derived[key]=replay_rows
+
+    return derived,{
+        "enabled":True,
+        "source":"data/virtual_lab_archive/settlements/*.jsonl final scores",
+        "unique_score_events":len(score_events),
+        "conflicting_score_events_skipped":conflicts,
+        "derived_product_line_side_pairs":len(derived),
+        "derived_rows":sum(len(value) for value in derived.values()),
+        "min_direct_observations_before_replay":min_n,
+        "max_replayed_half_line":VIRTUAL_SCORE_REPLAY_MAX_HALF_LINE,
+        "policy":"Active eFootball only; half-goal lines only; one row per unique event; used only when direct exact line/side history has fewer than 8 rows; current exact SportyBet quote and all value/quality/ticket gates remain mandatory."
+    }
 
 
 def _load_recent_virtual_evidence():
-    global _VIRTUAL_RECENT_GATE_CACHE
+    global _VIRTUAL_RECENT_GATE_CACHE,_VIRTUAL_SCORE_REPLAY_DIAGNOSTICS
     if _VIRTUAL_RECENT_GATE_CACHE is not None:
         return _VIRTUAL_RECENT_GATE_CACHE
     files=sorted((DATA/"virtual_lab_archive"/"settlements").glob("*.jsonl"))
@@ -883,7 +999,7 @@ def _load_recent_virtual_evidence():
             continue
     rows.sort(key=lambda r:str(r.get("settled_at") or r.get("timestamp") or ""),reverse=True)
     rows=rows[:2500]
-    index={}
+    direct_index={}
     for row in rows:
         try:
             line=float(row.get("line"))
@@ -893,7 +1009,16 @@ def _load_recent_virtual_evidence():
         if side is None:
             continue
         key=(str(row.get("product") or ""),f"{line:g}",side)
-        index.setdefault(key,[]).append(row)
+        direct_index.setdefault(key,[]).append(row)
+
+    derived_index,replay_diag=_derive_efootball_score_replay(rows,direct_index)
+    # Preserve the established direct exact-line/side series when it has enough
+    # observations. Otherwise use independent score replay rather than mixing
+    # duplicated rows or treating a different selected line as the evidence.
+    index=dict(direct_index)
+    index.update(derived_index)
+    replay_diag["thin_direct_keys_replaced"]=len(derived_index)
+    _VIRTUAL_SCORE_REPLAY_DIAGNOSTICS=replay_diag
     _VIRTUAL_RECENT_GATE_CACHE=index
     return index
 
@@ -976,12 +1101,22 @@ def virtual_recent_gate(product,line,pick):
         return False,{"reason":"invalid_line"}
     exact=index.get(key,[])
     min_n=8
+    score_derived=bool(exact and exact[0].get("derived_from_score") is True)
+    evidence_source="settled_score_replay" if score_derived else "direct_exact_line_side_settlements"
+    direct_n=int(exact[0].get("source_direct_n") or 0) if score_derived else len(exact)
+    evidence_meta={
+        "evidence_source":evidence_source,
+        "score_derived_evidence":score_derived,
+        "direct_exact_sample_n":direct_n,
+        "unique_event_n":len({str(row.get("event_id") or "") for row in exact if row.get("event_id")}),
+    }
     if len(exact)<min_n:
-        return False,{"n":len(exact),"reason":"insufficient_recent_side_evidence","min_n":min_n}
+        return False,{**evidence_meta,"n":len(exact),"reason":"insufficient_recent_side_evidence","min_n":min_n}
     wins=sum(1 for r in exact if r.get("win") is True)
     hit=wins/len(exact)
     threshold=0.65 if product=="efootball_gt" else 0.75
     details={
+        **evidence_meta,
         "n":len(exact),
         "wins":wins,
         "hit_rate":round(hit,4),
@@ -1434,12 +1569,18 @@ def virtual_candidates(now):
             wins=sum(1 for item in exact if item.get("win") is True)
             prob=(wins+2.0)/(n+4.0)
             key=template_key(product,line,side)
+            score_derived=bool(exact and exact[0].get("derived_from_score") is True)
+            direct_sample_n=int(exact[0].get("source_direct_n") or 0) if score_derived else n
             candidate={**row,
                        "probabilities":{"over":prob if side=="over" else 1.0-prob,
                                         "under":prob if side=="under" else 1.0-prob},
                        "probability":prob,
                        "pick":side,
-                       "model":"Virtual Lab exact-line empirical fallback"}
+                       "model":"Virtual Lab settled-score replay empirical fallback" if score_derived else "Virtual Lab exact-line empirical fallback",
+                       "evidence_source":"settled_score_replay" if score_derived else "direct_exact_line_side_settlements",
+                       "score_derived_evidence":score_derived,
+                       "evidence_sample_n":n,
+                       "direct_exact_sample_n":direct_sample_n}
             prev=templates.get(key)
             if prev is None or prob>float(prev.get("probability") or 0):
                 templates[key]=candidate
@@ -1479,13 +1620,18 @@ def virtual_candidates(now):
         "policy":"Only eFootball GT and eFootball Adriatic can enter active Virtual selection or Odds Builder construction. VFootball/Zoom feeds, settlement collection, Virtual Lab observations and archives are retained for research only."
     }
     diagnostics["model_template_keys"]=[list(k) for k in sorted(templates.keys())]
+    diagnostics["score_derived_evidence"]=dict(_VIRTUAL_SCORE_REPLAY_DIAGNOSTICS or {})
+    diagnostics["score_derived_model_template_keys"]=[
+        list(key) for key,value in sorted(templates.items()) if value.get("score_derived_evidence") is True
+    ]
     diagnostics["discovery_universe"]={
         "scope":"all current SportyBet eFootball events and every observed O/U line inside the Builder horizon",
         "events_scanned":len([x for x in discovery_events if x]),
         "product_line_pairs_scanned":len(discovery_lines),
         "modelable_product_line_side_pairs":len(discovery_modelable),
         "product_line_side_pairs_without_8_settled_observations":len(discovery_no_evidence),
-        "note":"No-evidence lines remain discovery-only and cannot qualify; no gate is weakened."
+        "score_derived_modelable_product_line_side_pairs":len(diagnostics["score_derived_model_template_keys"]),
+        "note":"No-evidence lines remain discovery-only. Thin eFootball half-line keys may use one outcome per unique settled score when fewer than 8 direct exact-line/side rows exist; current exact-line SportyBet price and all existing gates remain mandatory."
     }
     diagnostics["current_product_counts"]={}
     diagnostics["current_market_line_counts"]={}
@@ -1598,6 +1744,10 @@ def virtual_candidates(now):
                 ),
                 "builder_pick":side,"builder_market":"virtual_total",
                 "price_snapshot_source":source,
+                "evidence_source":template.get("evidence_source") or "direct_exact_line_side_settlements",
+                "score_derived_evidence":bool(template.get("score_derived_evidence")),
+                "evidence_sample_n":int(template.get("evidence_sample_n") or 0),
+                "direct_exact_sample_n":int(template.get("direct_exact_sample_n") or 0),
                 "directional_candidate_derived":bool(side!=pick),
                 "source_model_pick":pick,
             })
@@ -1630,7 +1780,11 @@ def virtual_candidates(now):
                     calibrated_probability=float(evidence.get("posterior_rate") or prob)
                     y["probability"]=calibrated_probability
                     y["builder_probability"]=calibrated_probability
-                    y["model"]="Exact-line evidence calibration · eFootball value lane"
+                    y["model"]=(
+                        "Settled-score replay · eFootball value lane"
+                        if y.get("score_derived_evidence")
+                        else "Exact-line evidence calibration · eFootball value lane"
+                    )
                     y["recent_evidence"]=recent
                     y["directional_evidence"]=evidence
                     y["evidence_score"]=evidence["score"]
