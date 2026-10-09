@@ -20,7 +20,8 @@ export async function onRequestPost(context) {
   }
   const parsed = await readJsonBody(context.request, 10000);
   if (parsed.error) return jsonResponse({ error: parsed.error }, parsed.error === "REQUEST_TOO_LARGE" ? 413 : 400);
-  const question = typeof parsed.body.question === "string" ? parsed.body.question.trim() : "";
+  const body = parsed.body && typeof parsed.body === "object" && !Array.isArray(parsed.body) ? parsed.body : {};
+  const question = typeof body.question === "string" ? body.question.trim() : "";
   if (!question) return jsonResponse({ error: "QUESTION_REQUIRED" }, 400);
   if (question.length > 1600) return jsonResponse({ error: "QUESTION_TOO_LONG", max_characters: 1600 }, 400);
 
