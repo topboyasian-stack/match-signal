@@ -40,6 +40,17 @@ SETTLED_DESK_RETENTION_HOURS=2
 EFOOTBALL_DESK_LEARNING_MIN_CALIBRATION_N=30
 EFOOTBALL_DESK_EXACT_MIN_N=12
 EFOOTBALL_DESK_LEARNING_PATH="efootball_desk_learning.json"
+# A high Under line can look almost certain from the Poisson tail even when the
+# exact line/direction has too little out-of-sample evidence. Keep it visible as
+# research, but do not qualify VFootball Under 7.5+ without its own evidence.
+VFOOTBALL_HIGH_UNDER_MIN_OOS_N=30
+VFOOTBALL_HIGH_UNDER_MIN_OOS_HIT_RATE=0.65
+MAX_LIVE_AGE_HOURS={"football":4.0,"tennis":8.0,"virtual":2.0}
+DESK_FILTER_STATS={
+    "past_kickoff_rows_hidden":0,
+    "stale_live_flags_hidden":0,
+    "expired_settled_rows_hidden":0,
+}
 
 def load(name, default):
     try:
@@ -87,6 +98,48 @@ def calibrate_desk_probability(raw_probability, line, side, product_report):
             return clamp(raw_probability + offset*weight), "PROBABILITY_BUCKET", bucket
     return clamp(raw_probability), "NONE", exact_profile
 
+def exact_line_direction_oos(eval_art, product, line, side):
+    """Return the exact product/line/side chronological OOS result, without treating it as qualification."""
+    side_key="o" if str(side).lower()=="over" else "u"
+    try:
+        line_key=f"{side_key}{float(line):g}"
+    except (TypeError,ValueError):
+        return {"n":0,"hit_rate":None,"brier":None,"variant":None}
+    product_rows=((eval_art.get("by_product_selection") or {}).get(str(product)) or {})
+    record=product_rows.get(line_key) if isinstance(product_rows,dict) else None
+    if not isinstance(record,dict):
+        return {"n":0,"hit_rate":None,"brier":None,"variant":None}
+    for variant in ("participant_model","poisson_prior","poisson","efootball_shape"):
+        stats=record.get(variant)
+        if isinstance(stats,dict):
+            try:
+                return {
+                    "n":int(stats.get("n") or 0),
+                    "hit_rate":num(stats.get("hit_rate")),
+                    "brier":num(stats.get("brier")),
+                    "variant":variant,
+                }
+            except (TypeError,ValueError):
+                pass
+    return {"n":0,"hit_rate":None,"brier":None,"variant":None}
+
+def live_age_limit_hours(row):
+    sport=str((row or {}).get("sport") or "").lower()
+    product=str((row or {}).get("product") or "").lower()
+    if sport=="virtual" or product in {"efootball_gt","efootball_adriatic","vfootball","zoom"}:
+        return MAX_LIVE_AGE_HOURS["virtual"]
+    if sport=="tennis":
+        return MAX_LIVE_AGE_HOURS["tennis"]
+    return MAX_LIVE_AGE_HOURS["football"]
+
+def stale_live_flag(row, now=None):
+    """A stale LIVE flag cannot keep a match on Upcoming indefinitely."""
+    now=now or NOW
+    start=dt((row or {}).get("start_time") or (row or {}).get("timestamp") or (row or {}).get("date"))
+    if start is None or start>now or not explicit_live(row):
+        return False
+    return (now-start)>timedelta(hours=live_age_limit_hours(row))
+
 def apply_bookmaker_fields(x):
     """Normalize current SportyBet quotes onto a unified prediction row."""
     winner=x.get("sportybet_winner_odds")
@@ -99,6 +152,7 @@ def apply_bookmaker_fields(x):
         if side and num(winner.get(side)) is not None:
             quote=num(winner.get(side))
             x["sportybet_odds_market"]="winner"
+            x["sportybet_odds_side"]=side
     if quote is None and isinstance(totals,list):
         for item in totals:
             if not isinstance(item,dict): continue
@@ -108,6 +162,7 @@ def apply_bookmaker_fields(x):
                 quote=num(item.get("odds"))
                 x["sportybet_odds_market"]="total"
                 x["sportybet_odds_line"]=il
+                x["sportybet_odds_side"]=side
                 break
     if quote is not None:
         x["bookmaker_odds"]=quote
@@ -216,10 +271,12 @@ SETTLED_EVENT_IDS, SETTLED_MATCH_KEYS, SETTLED_DETAILS = settlement_index()
 def settled_record(row):
     return SETTLED_DETAILS.get(virtual_fixture_key(row))
 
-def add(rows, row):
+def add(rows, row, now=None, horizon=None):
     if not isinstance(row,dict):return
+    now=now or NOW
+    horizon=horizon or (now+timedelta(days=7))
     start=dt(row.get("start_time"))
-    if not start or start>HORIZON:return
+    if not start or start>horizon:return
     eid=str(row.get("event_id") or "")
     if not eid:return
 
@@ -243,11 +300,14 @@ def add(rows, row):
         else (eid in SETTLED_EVENT_IDS or match_key(row) in SETTLED_MATCH_KEYS)
     )
     terminal=explicit_terminal(row) or (started_or_due and history_terminal)
+    if not terminal and stale_live_flag(row,now):
+        DESK_FILTER_STATS["stale_live_flags_hidden"]+=1
+        return
     if terminal:
         if sr and sr.get("settled_at"):
             try:
                 settled_stamp=dt(sr.get("settled_at"))
-                age=(NOW-settled_stamp).total_seconds() if settled_stamp else float("inf")
+                age=(now-settled_stamp).total_seconds() if settled_stamp else float("inf")
             except Exception:
                 age=float("inf")
             if 0 <= age <= SETTLED_DESK_RETENTION_HOURS*3600:
@@ -274,6 +334,7 @@ def add(rows, row):
             else:
                 # Hide from Upcoming after the short grace period. The result
                 # remains in Virtual Lab history and the desk learning ledger.
+                DESK_FILTER_STATS["expired_settled_rows_hidden"]+=1
                 return
         else:
             return
@@ -283,7 +344,8 @@ def add(rows, row):
     # settled fixture matched above is inside the short result-display grace.
     # Missing/late settlement data must never make an old match look upcoming.
     settled_visible = str(row.get("event_state") or "").upper() == "SETTLED"
-    if start <= NOW and not explicit_live(row) and not settled_visible:
+    if start <= now and not explicit_live(row) and not settled_visible:
+        DESK_FILTER_STATS["past_kickoff_rows_hidden"]+=1
         return
     if explicit_live(row):
         row.setdefault("event_state","LIVE")
@@ -739,6 +801,13 @@ def build_virtual_events(history, lifecycle, eligibility):
 
             directional_key=(float(line),chosen_pick)
             directional=directional_gate.get(directional_key,{})
+            exact_oos=exact_line_direction_oos(eval_art,product,line,chosen_pick)
+            high_vfootball_under_pending=(
+                product=="vfootball" and chosen_pick=="under" and float(line)>=7.5 and
+                (int(exact_oos.get("n") or 0)<VFOOTBALL_HIGH_UNDER_MIN_OOS_N or
+                 exact_oos.get("hit_rate") is None or
+                 float(exact_oos.get("hit_rate") or 0)<VFOOTBALL_HIGH_UNDER_MIN_OOS_HIT_RATE)
+            )
             if product.startswith("efootball"):
                 if not base_model_gate:
                     qualification_status="BASE_MODEL_GATE_PENDING"
@@ -759,11 +828,12 @@ def build_virtual_events(history, lifecycle, eligibility):
                 else:
                     qualification_status="DIRECTIONAL_LINE_VALIDATION_GATE_PENDING"
             elif product=="vfootball":
-                # vFootball has its own large untouched O/U evidence base and
-                # should be eligible for the Builder on the same validated
-                # product+competition+line+price gates rather than being
-                # permanently left as a research-only projection.
-                if not base_model_gate:
+                # A very high Under estimate is not enough on its own. Guard
+                # U7.5/U8.5 and higher until the exact direction has >=30
+                # chronological out-of-sample rows at the configured hit rate.
+                if high_vfootball_under_pending:
+                    qualification_status="HIGH_LINE_UNDER_EVIDENCE_GATE_PENDING"
+                elif not base_model_gate:
                     qualification_status="BASE_MODEL_GATE_PENDING"
                 elif not active_line or not model_line:
                     qualification_status="MODEL_LINE_SCOPE_GATE_PENDING"
@@ -808,6 +878,14 @@ def build_virtual_events(history, lifecycle, eligibility):
                 ),
                 "desk_learning_exact_n":chosen_exact_n,
                 "desk_learning_exact_accuracy":round(chosen_exact_accuracy,4) if chosen_exact_accuracy is not None else None,
+                "walkforward_exact_line_n":int(exact_oos.get("n") or 0),
+                "walkforward_exact_line_hit_rate":exact_oos.get("hit_rate"),
+                "walkforward_exact_line_brier":exact_oos.get("brier"),
+                "walkforward_exact_line_model_variant":exact_oos.get("variant"),
+                "walkforward_exact_line_status":(
+                    "INSUFFICIENT_SAMPLE" if int(exact_oos.get("n") or 0)<VFOOTBALL_HIGH_UNDER_MIN_OOS_N
+                    else "WALK_FORWARD_SAMPLE_AVAILABLE_NOT_QUALIFICATION"
+                ),
                 "desk_calibrated_probability":round(chosen_model,4),
                 "market_reference_probability":round(chosen_market,4) if chosen_market is not None else None,
                 "model_edge_vs_market":round(edge,4) if edge is not None else None,
@@ -951,10 +1029,49 @@ def main():
             "market_rule":"Market prices are reference/enrichment data, never displayed as independent model probabilities.",
             "real_money":False,
         },
-        "summary":{"events":len(final),"sports":dict(sorted(sports.items())),"dates":dict(sorted(dates.items())),"live":live_count,"pending_settlement":pending_settlement,"settled_hidden":len(SETTLED_EVENT_IDS),"virtual_model":virtual_meta,"live_core_refresh":live_meta},
+        "summary":{"events":len(final),"sports":dict(sorted(sports.items())),"dates":dict(sorted(dates.items())),"live":live_count,"pending_settlement":pending_settlement,"settled_hidden":len(SETTLED_EVENT_IDS),"virtual_model":virtual_meta,"live_core_refresh":live_meta,
+                   "publication_filters":dict(DESK_FILTER_STATS)},
         "events":final,
     }
     OUTPUT.write_text(json.dumps(result,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
+    # A compact sidecar lets the AI Analyst explain stale fixtures and weak
+    # exact-line evidence without pulling the entire multi-sport board into AI context.
+    high_line_under={}
+    for row in final:
+        if str(row.get("sport") or "").lower()!="virtual" or str(row.get("pick") or "").lower()!="under":
+            continue
+        ln=num(row.get("line"))
+        product=str(row.get("product") or "unknown")
+        if ln is None or ln<7.5:
+            continue
+        key=f"{product}|{ln:g}|under"
+        previous=high_line_under.get(key)
+        record={
+            "product":product,"line":ln,"side":"under",
+            "event_rows":1,
+            "walkforward_n":int(row.get("walkforward_exact_line_n") or 0),
+            "walkforward_hit_rate":row.get("walkforward_exact_line_hit_rate"),
+            "walkforward_brier":row.get("walkforward_exact_line_brier"),
+            "walkforward_model_variant":row.get("walkforward_exact_line_model_variant"),
+            "qualification_status":row.get("qualification_status") or "NOT_QUALIFIED",
+            "betting_qualified":bool(row.get("betting_qualified")),
+        }
+        if previous:
+            previous["event_rows"]+=1
+            previous["betting_qualified"]=previous["betting_qualified"] or record["betting_qualified"]
+        else:
+            high_line_under[key]=record
+    desk_health={
+        "generated_at":NOW.isoformat(),
+        "horizon_days":7,
+        "event_count":len(final),
+        "live_count":live_count,
+        "pending_settlement_count":pending_settlement,
+        "publication_filters":dict(DESK_FILTER_STATS),
+        "high_line_under_evidence":list(high_line_under.values()),
+        "policy":"Past kickoff rows are removed from Upcoming unless still credibly live or inside the two-hour settlement-result grace. Archived evidence is not deleted. High VFootball Under lines require their own exact-line chronological sample before betting qualification.",
+    }
+    (DATA/"prediction_desk_health.json").write_text(json.dumps(desk_health,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
     print(json.dumps(result["summary"],indent=2))
 
 if __name__=="__main__":
