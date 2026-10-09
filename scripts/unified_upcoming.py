@@ -374,8 +374,22 @@ def core_rows(rows, source_rows, selection_map=None):
         if sport not in {"football","tennis","basketball"}:continue
         x=dict(r)
         x["source_engine"]="core_prediction_engine"
-        x["projection_tier"]="deep_model"
-        x["evidence_depth"]="published_model_plus_enrichment"
+        tennis_watch=(
+            sport=="tennis" and (
+                str(r.get("prediction_status") or "")=="watch_projection"
+                or str(r.get("qualification_status") or "")=="TENNIS_FORWARD_WATCH_NOT_QUALIFIED"
+            )
+        )
+        # Keep the companion 14-day rows visible as research, without
+        # upgrading their weaker ranking/form projection to a deep model.
+        if tennis_watch:
+            x["projection_tier"]="baseline_plus_enrichment"
+            x["evidence_depth"]="tennis_forward_window_ranking_form_watch"
+            x["betting_qualified"]=False
+            x["qualified_for_builder"]=False
+        else:
+            x["projection_tier"]="deep_model"
+            x["evidence_depth"]="published_model_plus_enrichment"
         x["paper_only"]=True
         x=apply_bookmaker_fields(x)
         key=(str(x.get("event_id") or ""),str(x.get("pick") or ""))
