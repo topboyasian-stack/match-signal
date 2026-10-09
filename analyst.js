@@ -134,7 +134,7 @@
     lines.push("Tennis forward discovery: " + age("tennis_forward_discovery") +
       "; window " + n(tf.window_days) + " days; " + (tennisParts.join(" | ") || "tour details unavailable") + ".");
     const deskFilters = desk.publication_filters || {};
-    lines.push("Prediction Desk: " + age("prediction_desk") + "; " + n(desk.event_count) +
+    lines.push("Prediction Desk: " + age("prediction_desk") + "; status " + String(desk.status || "unavailable") + "; " + n(desk.event_count) +
       " published events; " + n(desk.live_count) + " live; " + n(desk.pending_settlement_count) +
       " pending settlement. Hidden past-kickoff rows " + n(deskFilters.past_kickoff_rows_hidden) +
       "; stale live flags removed " + n(deskFilters.stale_live_flags_hidden) +
