@@ -464,6 +464,9 @@ export async function collectPublicDiagnostics(request) {
           line: item.line == null ? null : item.line,
           side: item.side || null,
           event_rows: item.event_rows == null ? null : item.event_rows,
+          qualified_event_rows: item.qualified_event_rows == null ? null : item.qualified_event_rows,
+          unqualified_event_rows: item.unqualified_event_rows == null ? null : item.unqualified_event_rows,
+          qualification_statuses: Array.isArray(item.qualification_statuses) ? item.qualification_statuses.slice(0, 8) : [],
           walkforward_n: item.walkforward_n == null ? null : item.walkforward_n,
           walkforward_hit_rate: item.walkforward_hit_rate == null ? null : item.walkforward_hit_rate,
           walkforward_brier: item.walkforward_brier == null ? null : item.walkforward_brier,
@@ -605,7 +608,15 @@ export function summarizeDiagnosticFacts(diagnostics, now = new Date()) {
     const hit = num(item.walkforward_hit_rate);
     if (["vfootball","efootball_gt"].includes(product) && side === "under" && line !== null && line >= 7.5 &&
         (n < 30 || hit === null || hit < 0.65)) {
-      flags.push(" " + (product === "efootball_gt" ? "eFootball GT" : "VFootball") + " Under " + line + " has only " + n + "/30 exact-line walk-forward rows and does not meet the high-line Under evidence gate; affected rows must remain unqualified.");
+      flags.push((product === "efootball_gt" ? "eFootball GT" : "VFootball") + " Under " + line + " has " + n + "/30 exact-line walk-forward rows and " + (hit === null ? "no verified hit rate" : (100 * hit).toFixed(1) + "% hit rate") + "; it fails the high-line Under evidence gate and must remain unqualified.");
+    }
+    const qualifiedRows = num(item.qualified_event_rows);
+    const unqualifiedRows = num(item.unqualified_event_rows);
+    if (item.qualification_status === "MIXED_EVENT_QUALIFICATION" ||
+        (qualifiedRows !== null && unqualifiedRows !== null && qualifiedRows > 0 && unqualifiedRows > 0)) {
+      flags.push((product === "efootball_gt" ? "eFootball GT" : product === "vfootball" ? "VFootball" : product) +
+        " Under " + (line === null ? "high line" : line) + " combines " + qualifiedRows +
+        " qualified and " + unqualifiedRows + " unqualified event rows; the grouped line is not collectively qualified.");
     }
   }
   if (num(trackerWonLegs) !== null && num(trackerLostLegs) !== null &&
