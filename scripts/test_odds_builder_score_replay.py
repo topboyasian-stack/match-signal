@@ -106,9 +106,13 @@ def test_builder_ui_labels_score_replay_and_still_displays_exact_quote():
     assert "Settled-score replay" in ui
     assert "Evidence basis" in ui
     assert "viewLeg.bookmaker_odds" in ui
-    # The live quote join must still use an exact numeric line, never another rung.
+    # Provenance must survive make_leg() serialization into the Builder artifact.
     odds_builder_source = Path(__file__).resolve().parent / "odds_builder.py"
     python_code = odds_builder_source.read_text(encoding="utf-8")
+    assert '"evidence_source":x.get("evidence_source")' in python_code
+    assert '"score_derived_evidence":bool(x.get("score_derived_evidence"))' in python_code
+    assert '"evidence_sample_n":int(x.get("evidence_sample_n") or 0)' in python_code
+    # The live quote join must still use an exact numeric line, never another rung.
     assert "abs(float(m.get(\"line\"))-float(line))<1e-9" in python_code
 
 
