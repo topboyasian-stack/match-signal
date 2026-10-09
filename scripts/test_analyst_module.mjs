@@ -99,7 +99,7 @@ const facts = summarizeDiagnosticFacts({
     ],
     product_records: []
   },
-  odds_builder: { generated_at: "2026-10-09T17:13:49.000Z", status: "VALUE_RESEARCH_SET", batch_count: 1, candidate_diagnostics: { evaluated_candidates: 1547, rejected_candidates: 818, evaluated_selections: 729 } }
+  odds_builder: { generated_at: "2026-10-09T17:13:49.000Z", status: "VALUE_RESEARCH_SET", batch_count: 1, candidate_diagnostics: { evaluated: 1547, rejections: { LIVE_VALUE: 818, REJECTED: 729 } } }
 }, new Date("2026-10-09T17:39:48.000Z"));
 assert.equal(facts.system_health.issue_count_check, "MATCH");
 assert.equal(facts.system_health.counted_issue_records_by_severity.critical, 0);
