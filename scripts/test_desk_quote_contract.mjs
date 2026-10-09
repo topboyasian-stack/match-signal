@@ -116,6 +116,10 @@ assert.equal(isActiveVirtualBatch({products:["vfootball"],legs:[{sport:"virtual"
 assert.equal(isActiveVirtualBatch({products:["efootball_gt","vfootball"],legs:[{sport:"virtual",product:"efootball_gt",model_probability:0.83},{sport:"virtual",product:"vfootball"}]}), false);
 assert.equal(isActiveVirtualBatch({products:["zoom"],legs:[{sport:"virtual",product:"zoom"}]}), false);
 assert.match(builderUiSource, /ACTIVE_VIRTUAL_MIN_PROBABILITY = 0\.80/);
+assert.match(builderUiSource, /primaryLane==='efootball_compact_2x'/);
+assert.match(builderUiSource, /4–5 LEGS · 2\.00\+/);
+assert.match(builderUiSource, /standard batches at 2\.70x\+ and compact eFootball batches at 2\.00x\+/);
+assert.match(builderUiSource, /Compact eFootball ticket lane/);
 assert.match(builderUiSource, /data\.batches\)\?data\.batches\.filter\(isActiveVirtualBatch\)/);
 assert.match(builderUiSource, /ensureBookingCodes\(activeBatches\)/);
 
