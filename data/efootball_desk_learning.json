@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-09T13:01:08.763674+00:00",
+  "generated_at": "2026-10-09T13:49:21.779543+00:00",
   "mode": "PAPER_ONLY",
   "active": true,
   "policy": {
@@ -7,45 +7,81 @@
     "exact_selection_min_predictions": 20,
     "bucket_width": 0.05,
     "recent_window": 50,
-    "future_leakage_protection": "only observations strictly before kickoff can become the scored forecast; settlement is read from independent virtual_lab_history"
+    "exact_scoring_granularity": "latest pre-kickoff forecast per product + fixture + totals line; different lines are scored independently",
+    "future_leakage_protection": "only observations strictly before kickoff can become the scored forecast; settlement is read from independent virtual_lab_history",
+    "products_are_never_pooled": true
   },
-  "settled_predictions": 75,
-  "pending_forecasts": 8747,
+  "settled_predictions": 150,
+  "total_settled_predictions": 150,
+  "pending_forecasts": 8951,
   "recent_window": {
     "n": 50,
-    "accuracy": 0.62,
-    "brier": 0.2001295668
+    "accuracy": 0.66,
+    "brier": 0.208410418
   },
   "calibration": {
     "active": true,
-    "settled_predictions": 75,
+    "minimum_bucket_predictions": 30,
     "buckets": {
+      "0.7": {
+        "n": 30,
+        "wins": 22,
+        "brier": 5.8974506999999985,
+        "accuracy": 0.7333333333333333,
+        "avg_brier": 0.19658168999999995,
+        "posterior_probability": 0.6842105263157895,
+        "mean_model_probability": 0.7012999999999999,
+        "calibration_weight": 0.5,
+        "calibration_offset": -0.017089473684210432,
+        "calibrated_probability": 0.6927552631578947
+      },
       "0.5": {
-        "n": 21,
-        "wins": 11,
-        "brier": 5.2423838100000015,
-        "accuracy": 0.5238095238095238,
-        "avg_brier": 0.24963732428571436,
-        "posterior_probability": 0.5172413793103449,
-        "calibrated_probability": 0.5070993914807302
+        "n": 39,
+        "wins": 23,
+        "brier": 9.539912790000004,
+        "accuracy": 0.5897435897435898,
+        "avg_brier": 0.24461314846153856,
+        "posterior_probability": 0.574468085106383,
+        "mean_model_probability": 0.5381,
+        "calibration_weight": 0.5652173913043478,
+        "calibration_offset": 0.03636808510638301,
+        "calibrated_probability": 0.5586558741905644
       },
       "0.6": {
-        "n": 18,
-        "wins": 7,
-        "brier": 5.25927168,
-        "accuracy": 0.3888888888888889,
-        "avg_brier": 0.29218176,
-        "posterior_probability": 0.4230769230769231,
-        "calibrated_probability": 0.5336538461538461
+        "n": 29,
+        "wins": 16,
+        "brier": 7.3172710400000005,
+        "accuracy": 0.5517241379310345,
+        "avg_brier": 0.25231969103448276,
+        "posterior_probability": 0.5405405405405406,
+        "mean_model_probability": 0.6224000000000002,
+        "calibration_weight": 0.4915254237288136,
+        "calibration_offset": -0.0818594594594596,
+        "calibrated_probability": 0.5821639945029777
       },
       "0.75": {
+        "n": 16,
+        "wins": 15,
+        "brier": 1.45532416,
+        "accuracy": 0.9375,
+        "avg_brier": 0.09095776,
+        "posterior_probability": 0.7916666666666666,
+        "mean_model_probability": 0.7576,
+        "calibration_weight": 0.34782608695652173,
+        "calibration_offset": 0.03406666666666658,
+        "calibrated_probability": 0.7694492753623189
+      },
+      "0.9": {
         "n": 11,
-        "wins": 11,
-        "brier": 0.6463353599999998,
-        "accuracy": 1.0,
-        "avg_brier": 0.058757759999999985,
-        "posterior_probability": 0.7894736842105263,
-        "calibrated_probability": 0.7605905006418485
+        "wins": 7,
+        "brier": 3.44795824,
+        "accuracy": 0.6363636363636364,
+        "avg_brier": 0.3134507490909091,
+        "posterior_probability": 0.5789473684210527,
+        "mean_model_probability": 0.9228000000000001,
+        "calibration_weight": 0.2682926829268293,
+        "calibration_offset": -0.3438526315789474,
+        "calibrated_probability": 0.8305468549422337
       },
       "0.95": {
         "n": 1,
@@ -54,79 +90,299 @@
         "accuracy": 0.0,
         "avg_brier": 0.9242899600000001,
         "posterior_probability": 0.4444444444444444,
-        "calibrated_probability": 0.9336917562724014
+        "mean_model_probability": 0.9614,
+        "calibration_weight": 0.03225806451612903,
+        "calibration_offset": -0.5169555555555556,
+        "calibrated_probability": 0.9447240143369177
       },
       "0.85": {
-        "n": 5,
-        "wins": 4,
-        "brier": 0.8164738000000001,
-        "accuracy": 0.8,
-        "avg_brier": 0.16329476000000004,
-        "posterior_probability": 0.6153846153846154,
-        "calibrated_probability": 0.8164835164835166
+        "n": 15,
+        "wins": 11,
+        "brier": 3.1642213999999997,
+        "accuracy": 0.7333333333333333,
+        "avg_brier": 0.2109480933333333,
+        "posterior_probability": 0.6521739130434783,
+        "mean_model_probability": 0.8574,
+        "calibration_weight": 0.3333333333333333,
+        "calibration_offset": -0.20522608695652178,
+        "calibrated_probability": 0.7889913043478262
       },
-      "0.9": {
-        "n": 10,
-        "wins": 7,
-        "brier": 2.5963984,
-        "accuracy": 0.7,
-        "avg_brier": 0.25963984,
-        "posterior_probability": 0.6111111111111112,
-        "calibrated_probability": 0.8277777777777778
-      },
-      "0.7": {
+      "0.8": {
         "n": 9,
-        "wins": 7,
-        "brier": 1.60819521,
-        "accuracy": 0.7777777777777778,
-        "avg_brier": 0.1786883566666667,
-        "posterior_probability": 0.6470588235294118,
-        "calibrated_probability": 0.6877828054298641
+        "wins": 8,
+        "brier": 0.91075344,
+        "accuracy": 0.8888888888888888,
+        "avg_brier": 0.10119482666666667,
+        "posterior_probability": 0.7058823529411765,
+        "mean_model_probability": 0.8396,
+        "calibration_weight": 0.23076923076923078,
+        "calibration_offset": -0.1337176470588235,
+        "calibrated_probability": 0.8087420814479638
       }
-    }
+    },
+    "settled_predictions": 150
   },
   "exact_selection": {
+    "4.5|over": {
+      "n": 30,
+      "wins": 22,
+      "accuracy": 0.7333333333333333,
+      "posterior_probability": 0.6842105263157895,
+      "mean_model_probability": 0.7012999999999999,
+      "calibration_weight": 0.5,
+      "calibration_offset": -0.017089473684210432
+    },
     "5.5|over": {
-      "n": 21,
-      "wins": 11,
-      "accuracy": 0.5238095238095238,
-      "posterior_probability": 0.5172413793103449
+      "n": 39,
+      "wins": 23,
+      "accuracy": 0.5897435897435898,
+      "posterior_probability": 0.574468085106383,
+      "mean_model_probability": 0.5381,
+      "calibration_weight": 0.5652173913043478,
+      "calibration_offset": 0.03636808510638301
     },
     "6.5|under": {
-      "n": 18,
-      "wins": 7,
-      "accuracy": 0.3888888888888889,
-      "posterior_probability": 0.4230769230769231
+      "n": 29,
+      "wins": 16,
+      "accuracy": 0.5517241379310345,
+      "posterior_probability": 0.5405405405405406,
+      "mean_model_probability": 0.6224000000000002,
+      "calibration_weight": 0.4915254237288136,
+      "calibration_offset": -0.0818594594594596
     },
     "7.5|under": {
+      "n": 16,
+      "wins": 15,
+      "accuracy": 0.9375,
+      "posterior_probability": 0.7916666666666666,
+      "mean_model_probability": 0.7576,
+      "calibration_weight": 0.34782608695652173,
+      "calibration_offset": 0.03406666666666658
+    },
+    "9.5|under": {
       "n": 11,
-      "wins": 11,
-      "accuracy": 1.0,
-      "posterior_probability": 0.7894736842105263
+      "wins": 7,
+      "accuracy": 0.6363636363636364,
+      "posterior_probability": 0.5789473684210527,
+      "mean_model_probability": 0.9228000000000001,
+      "calibration_weight": 0.2682926829268293,
+      "calibration_offset": -0.3438526315789474
     },
     "10.5|under": {
       "n": 1,
       "wins": 0,
       "accuracy": 0.0,
-      "posterior_probability": 0.4444444444444444
+      "posterior_probability": 0.4444444444444444,
+      "mean_model_probability": 0.9614,
+      "calibration_weight": 0.03225806451612903,
+      "calibration_offset": -0.5169555555555556
     },
     "8.5|under": {
-      "n": 5,
-      "wins": 4,
-      "accuracy": 0.8,
-      "posterior_probability": 0.6153846153846154
+      "n": 15,
+      "wins": 11,
+      "accuracy": 0.7333333333333333,
+      "posterior_probability": 0.6521739130434783,
+      "mean_model_probability": 0.8574,
+      "calibration_weight": 0.3333333333333333,
+      "calibration_offset": -0.20522608695652178
     },
-    "9.5|under": {
-      "n": 10,
-      "wins": 7,
-      "accuracy": 0.7,
-      "posterior_probability": 0.6111111111111112
-    },
-    "4.5|over": {
+    "3.5|over": {
       "n": 9,
-      "wins": 7,
-      "accuracy": 0.7777777777777778,
-      "posterior_probability": 0.6470588235294118
+      "wins": 8,
+      "accuracy": 0.8888888888888888,
+      "posterior_probability": 0.7058823529411765,
+      "mean_model_probability": 0.8396,
+      "calibration_weight": 0.23076923076923078,
+      "calibration_offset": -0.1337176470588235
+    }
+  },
+  "by_product": {
+    "efootball_gt": {
+      "active": true,
+      "settled_predictions": 150,
+      "pending_forecasts": 8951,
+      "recent_window": {
+        "n": 50,
+        "accuracy": 0.66,
+        "brier": 0.208410418
+      },
+      "calibration": {
+        "active": true,
+        "minimum_bucket_predictions": 30,
+        "buckets": {
+          "0.7": {
+            "n": 30,
+            "wins": 22,
+            "brier": 5.8974506999999985,
+            "accuracy": 0.7333333333333333,
+            "avg_brier": 0.19658168999999995,
+            "posterior_probability": 0.6842105263157895,
+            "mean_model_probability": 0.7012999999999999,
+            "calibration_weight": 0.5,
+            "calibration_offset": -0.017089473684210432,
+            "calibrated_probability": 0.6927552631578947
+          },
+          "0.5": {
+            "n": 39,
+            "wins": 23,
+            "brier": 9.539912790000004,
+            "accuracy": 0.5897435897435898,
+            "avg_brier": 0.24461314846153856,
+            "posterior_probability": 0.574468085106383,
+            "mean_model_probability": 0.5381,
+            "calibration_weight": 0.5652173913043478,
+            "calibration_offset": 0.03636808510638301,
+            "calibrated_probability": 0.5586558741905644
+          },
+          "0.6": {
+            "n": 29,
+            "wins": 16,
+            "brier": 7.3172710400000005,
+            "accuracy": 0.5517241379310345,
+            "avg_brier": 0.25231969103448276,
+            "posterior_probability": 0.5405405405405406,
+            "mean_model_probability": 0.6224000000000002,
+            "calibration_weight": 0.4915254237288136,
+            "calibration_offset": -0.0818594594594596,
+            "calibrated_probability": 0.5821639945029777
+          },
+          "0.75": {
+            "n": 16,
+            "wins": 15,
+            "brier": 1.45532416,
+            "accuracy": 0.9375,
+            "avg_brier": 0.09095776,
+            "posterior_probability": 0.7916666666666666,
+            "mean_model_probability": 0.7576,
+            "calibration_weight": 0.34782608695652173,
+            "calibration_offset": 0.03406666666666658,
+            "calibrated_probability": 0.7694492753623189
+          },
+          "0.9": {
+            "n": 11,
+            "wins": 7,
+            "brier": 3.44795824,
+            "accuracy": 0.6363636363636364,
+            "avg_brier": 0.3134507490909091,
+            "posterior_probability": 0.5789473684210527,
+            "mean_model_probability": 0.9228000000000001,
+            "calibration_weight": 0.2682926829268293,
+            "calibration_offset": -0.3438526315789474,
+            "calibrated_probability": 0.8305468549422337
+          },
+          "0.95": {
+            "n": 1,
+            "wins": 0,
+            "brier": 0.9242899600000001,
+            "accuracy": 0.0,
+            "avg_brier": 0.9242899600000001,
+            "posterior_probability": 0.4444444444444444,
+            "mean_model_probability": 0.9614,
+            "calibration_weight": 0.03225806451612903,
+            "calibration_offset": -0.5169555555555556,
+            "calibrated_probability": 0.9447240143369177
+          },
+          "0.85": {
+            "n": 15,
+            "wins": 11,
+            "brier": 3.1642213999999997,
+            "accuracy": 0.7333333333333333,
+            "avg_brier": 0.2109480933333333,
+            "posterior_probability": 0.6521739130434783,
+            "mean_model_probability": 0.8574,
+            "calibration_weight": 0.3333333333333333,
+            "calibration_offset": -0.20522608695652178,
+            "calibrated_probability": 0.7889913043478262
+          },
+          "0.8": {
+            "n": 9,
+            "wins": 8,
+            "brier": 0.91075344,
+            "accuracy": 0.8888888888888888,
+            "avg_brier": 0.10119482666666667,
+            "posterior_probability": 0.7058823529411765,
+            "mean_model_probability": 0.8396,
+            "calibration_weight": 0.23076923076923078,
+            "calibration_offset": -0.1337176470588235,
+            "calibrated_probability": 0.8087420814479638
+          }
+        }
+      },
+      "exact_selection_active": true,
+      "exact_selection": {
+        "4.5|over": {
+          "n": 30,
+          "wins": 22,
+          "accuracy": 0.7333333333333333,
+          "posterior_probability": 0.6842105263157895,
+          "mean_model_probability": 0.7012999999999999,
+          "calibration_weight": 0.5,
+          "calibration_offset": -0.017089473684210432
+        },
+        "5.5|over": {
+          "n": 39,
+          "wins": 23,
+          "accuracy": 0.5897435897435898,
+          "posterior_probability": 0.574468085106383,
+          "mean_model_probability": 0.5381,
+          "calibration_weight": 0.5652173913043478,
+          "calibration_offset": 0.03636808510638301
+        },
+        "6.5|under": {
+          "n": 29,
+          "wins": 16,
+          "accuracy": 0.5517241379310345,
+          "posterior_probability": 0.5405405405405406,
+          "mean_model_probability": 0.6224000000000002,
+          "calibration_weight": 0.4915254237288136,
+          "calibration_offset": -0.0818594594594596
+        },
+        "7.5|under": {
+          "n": 16,
+          "wins": 15,
+          "accuracy": 0.9375,
+          "posterior_probability": 0.7916666666666666,
+          "mean_model_probability": 0.7576,
+          "calibration_weight": 0.34782608695652173,
+          "calibration_offset": 0.03406666666666658
+        },
+        "9.5|under": {
+          "n": 11,
+          "wins": 7,
+          "accuracy": 0.6363636363636364,
+          "posterior_probability": 0.5789473684210527,
+          "mean_model_probability": 0.9228000000000001,
+          "calibration_weight": 0.2682926829268293,
+          "calibration_offset": -0.3438526315789474
+        },
+        "10.5|under": {
+          "n": 1,
+          "wins": 0,
+          "accuracy": 0.0,
+          "posterior_probability": 0.4444444444444444,
+          "mean_model_probability": 0.9614,
+          "calibration_weight": 0.03225806451612903,
+          "calibration_offset": -0.5169555555555556
+        },
+        "8.5|under": {
+          "n": 15,
+          "wins": 11,
+          "accuracy": 0.7333333333333333,
+          "posterior_probability": 0.6521739130434783,
+          "mean_model_probability": 0.8574,
+          "calibration_weight": 0.3333333333333333,
+          "calibration_offset": -0.20522608695652178
+        },
+        "3.5|over": {
+          "n": 9,
+          "wins": 8,
+          "accuracy": 0.8888888888888888,
+          "posterior_probability": 0.7058823529411765,
+          "mean_model_probability": 0.8396,
+          "calibration_weight": 0.23076923076923078,
+          "calibration_offset": -0.1337176470588235
+        }
+      }
     }
   },
   "trace_artifact": "data/efootball_desk_prediction_history.json",
