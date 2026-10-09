@@ -6,6 +6,12 @@ on:
     types: [completed]
   schedule:
     - cron: "30 */6 * * *"
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/tennis-forward-window.yml'
+      - 'scripts/tennis_forward_window.py'
+      - 'scripts/merge_generated_feed.py'
   workflow_dispatch:
 
 permissions:
