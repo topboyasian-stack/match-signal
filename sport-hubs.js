@@ -346,7 +346,7 @@ async function renderUnifiedBoard(){
     async function freshVirtualQuoteMap(){
       const byEvent={};
       try{
-        const feed=await get('./api/sportybet-virtual?sources=efootball&pageSize=100&pageNum=1&timeline=168');
+        const feed=await get('./api/sportybet-virtual?sources=efootball,vfootball&pageSize=100&pageNum=1&timeline=168');
         const events=Array.isArray(feed?.events)?feed.events:[];
         const fetchedAt=feed?.updated_at||feed?.server_time||null;
         events.forEach(e=>{
@@ -357,6 +357,43 @@ async function renderUnifiedBoard(){
       return byEvent;
     }
 
+    function freshVirtualQuoteFields(row,live){
+      if(!row||!live||String(row?.market||"").toLowerCase()!=="over_under")return row;
+      const line=Number(row?.line);
+      const side=String(row?.pick||row?.selection||"").toLowerCase();
+      if(!Number.isFinite(line)||(side!=="over"&&side!=="under"))return row;
+      let over=null,under=null;
+      for(const market of Array.isArray(live?.markets)?live.markets:[]){
+        const marketLine=Number(market?.line);
+        if(!Number.isFinite(marketLine)||Math.abs(marketLine-line)>1e-9)continue;
+        let thisOver=null,thisUnder=null;
+        for(const outcome of Array.isArray(market?.outcomes)?market.outcomes:[]){
+          if(outcome?.active===false)continue;
+          const name=String(outcome?.name||"").toLowerCase();
+          const odds=Number(outcome?.odds);
+          if(!Number.isFinite(odds)||odds<=1)continue;
+          if(name.startsWith("over"))thisOver=odds;
+          if(name.startsWith("under"))thisUnder=odds;
+        }
+        if(thisOver!=null||thisUnder!=null){over=thisOver;under=thisUnder;break;}
+      }
+      const selected=side==="over"?over:under;
+      if(selected==null)return row;
+      return {
+        ...row,
+        bookmaker_odds:selected,
+        sportybet_odds:selected,
+        sportybet_odds_market:"total",
+        sportybet_odds_line:line,
+        sportybet_odds_side:side,
+        sportybet_over_odds:over,
+        sportybet_under_odds:under,
+        bookmaker_available:Boolean(over&&under),
+        bookmaker_source:"SportyBet NG",
+        market_odds_timestamp:live?.__quote_fetched_at||null,
+        desk_quote_refresh:"fresh_exact_event_line_side",
+      };
+    }
     function virtualCandidateDeskRows(rows,quoteMap){
       const now=Date.now();
       return rows.map(row=>{
@@ -458,6 +495,11 @@ async function renderUnifiedBoard(){
     all=all.map(annotate);
     try{
       const quoteMap=await freshVirtualQuoteMap();
+      all=all.map(row=>{
+        if(String(row?.sport||"").toLowerCase()!=="virtual")return row;
+        const current=quoteMap[String(row?.event_id||"")];
+        return current?freshVirtualQuoteFields(row,current):row;
+      });
       const virtualDeskRows=virtualCandidateDeskRows(virtualCandidates,quoteMap);
       if(virtualDeskRows.length){
         const existingKeys=new Set(all.map(row=>rowFixtureKey(row)));
