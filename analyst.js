@@ -141,14 +141,30 @@
       "; expired settlement rows hidden " + n(deskFilters.expired_settled_rows_hidden) +
       ". Hiding a row does not delete its archive history.");
     const highUnder = Array.isArray(desk.high_line_under_evidence) ? desk.high_line_under_evidence : [];
-    if (highUnder.length) lines.push("High-line VFootball Unders: " + highUnder.map(function(x) {
+    if (highUnder.length) lines.push("High-line Under exact-line evidence: " + highUnder.map(function(x) {
+      const product = String(x.product || "virtual").toLowerCase();
       const sample = n(x.walkforward_n);
       const hit = x.walkforward_hit_rate == null ? "hit rate unavailable" : (100 * Number(x.walkforward_hit_rate)).toFixed(1) + "%";
       const line = x.line == null ? "?" : String(x.line);
-      const enough = Number(x.walkforward_n || 0) >= 30 && Number(x.walkforward_hit_rate) >= 0.65;
-      return String(x.product || "virtual") + " U" + line + ": " + sample + " exact-line walk-forward rows, " + hit +
-        (enough ? "; sample available, separate Builder gates still apply" : "; insufficient evidence (<30 rows or <65%); NOT betting-qualified") +
-        (x.betting_qualified ? " (source qualification says qualified — verify this mismatch)" : "");
+      const status = String(x.qualification_status || "NOT_QUALIFIED");
+      const groupQualification = x.betting_qualified
+        ? "at least one event in this grouped product/line/side is marked paper-qualified"
+        : "no event in this grouped product/line/side is marked paper-qualified";
+      const isVFootballHighUnder = product === "vfootball" && String(x.side || "under").toLowerCase() === "under" && Number(x.line) >= 7.5;
+      let assessment;
+      if (isVFootballHighUnder) {
+        const enough = Number(x.walkforward_n || 0) >= 30 && x.walkforward_hit_rate != null && Number(x.walkforward_hit_rate) >= 0.65;
+        assessment = enough
+          ? "VFootball-specific 30-row/65% evidence threshold met; current-market and Builder gates still apply"
+          : "VFootball-specific 30-row/65% gate PENDING; this product/line/side must remain unqualified";
+        if (!enough && x.betting_qualified) {
+          assessment += "; WARNING: grouped qualification conflicts with this gate and needs event-level inspection";
+        }
+      } else {
+        assessment = "VFootball-specific 30-row/65% gate does not apply to this product; use its source qualification and product-specific gates";
+      }
+      return product + " U" + line + ": " + sample + " exact-line walk-forward rows, " + hit +
+        "; source status " + status + "; " + groupQualification + "; " + assessment;
     }).join("; ") + ".");
     if (m.coverage_denominator != null && m.calculated_coverage != null) lines.push(
       "Market matching: " + n(m.matching_records) + "/" + n(m.coverage_denominator) + " matchable records = " + (100 * Number(m.calculated_coverage)).toFixed(2) + "%; provider event counts are a separate measure."
