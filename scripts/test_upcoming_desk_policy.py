@@ -7,6 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ns = runpy.run_path(str(ROOT / "scripts" / "unified_upcoming.py"))
+tennis_ns = runpy.run_path(str(ROOT / "scripts" / "predict_today.py"))
 UTC = timezone.utc
 
 
@@ -70,6 +71,38 @@ class UpcomingDeskPolicyTests(unittest.TestCase):
         ns["add"](rows, future, now=self.now, horizon=self.horizon)
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["event_id"], "desk-policy-test-future")
+
+    def test_tennis_discovery_accepts_person_id_on_competitor_record(self):
+        quality = tennis_ns["tennis_fixture_quality"]
+        event = {
+            "draw_type": "Men's Singles",
+            "competitors": [
+                {"id": "person-101", "displayName": "Player Alpha"},
+                {"id": "person-202", "displayName": "Player Beta"},
+            ],
+        }
+        self.assertEqual(quality(event), (True, None))
+
+        missing_identity = {
+            "draw_type": "Men's Singles",
+            "competitors": [
+                {"displayName": "Player Alpha"},
+                {"displayName": "Player Beta"},
+            ],
+        }
+        self.assertEqual(quality(missing_identity), (False, "missing athlete id"))
+
+        doubles = dict(event, draw_type="Men's Doubles")
+        self.assertEqual(quality(doubles), (False, "non-singles draw"))
+
+        paired_name = {
+            "draw_type": "Singles",
+            "competitors": [
+                {"id": "pair-101", "displayName": "Player Alpha / Player Gamma"},
+                {"id": "person-202", "displayName": "Player Beta"},
+            ],
+        }
+        self.assertEqual(quality(paired_name), (False, "non-singles competitor"))
 
     def test_exact_line_walk_forward_evidence_is_not_inferred_from_neighboring_lines(self):
         evaluation = {
