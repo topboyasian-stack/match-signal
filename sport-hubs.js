@@ -16,9 +16,9 @@ function evidenceLabel(x){
     const side=String(x.pick||x.selection||"").toLowerCase();
     const wfN=Number(x.walkforward_exact_line_n);
     const wfHit=Number(x.walkforward_exact_line_hit_rate);
-    if(product==="vfootball"&&side==="under"&&Number.isFinite(line)&&line>=7.5){
+    if(["vfootball","efootball_gt"].includes(product)&&side==="under"&&Number.isFinite(line)&&line>=7.5){
       if(!Number.isFinite(wfN)||wfN<=0)return base+" · no exact-line walk-forward sample · NOT QUALIFIED";
-      if(wfN<30||!Number.isFinite(wfHit)||wfHit<0.65)return base+" · exact-line walk-forward "+Math.round(wfN)+"/30 · insufficient evidence · NOT QUALIFIED";
+      if(wfN<30||!Number.isFinite(wfHit)||wfHit<0.65)return base+" · exact-line walk-forward "+Math.round(wfN)+"/30 · hit rate "+(Number.isFinite(wfHit)?Math.round(wfHit*100)+"%":"unavailable")+" · insufficient evidence · NOT QUALIFIED";
       return base+" · exact-line walk-forward "+Math.round(wfN)+"/30 · "+Math.round(wfHit*100)+"% hit rate · separate value gates still apply";
     }
     const n=Number(x.desk_learning_exact_n);
