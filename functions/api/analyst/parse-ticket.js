@@ -50,6 +50,7 @@ function normalizeTicket(parsed) {
     if (desk && typeof desk === "object") {
       item.desk_snapshot = {
         market: "total_goals_over_under",
+        provenance: "user_reported",
         pick: desk.pick,
         line: finite(desk.line) ? desk.line : null,
         captured_at: typeof desk.captured_at === "string" && Number.isFinite(Date.parse(desk.captured_at)) ? desk.captured_at : now
