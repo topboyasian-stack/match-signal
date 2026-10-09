@@ -127,7 +127,7 @@ assert.equal(facts.odds_builder.evaluated_candidates, 1547);
 assert.equal(facts.odds_builder.live_value_candidates, 818);
 assert.equal(facts.odds_builder.rejected_candidates, 729);
 assert.ok(facts.flags.some(function(flag) { return flag.includes("TENNIS_FEED_EMPTY") && flag.includes("No current tennis predictions"); }));
-assert.ok(facts.flags.some(function(flag) { return flag.includes("tennis forward discovery") && flag.includes("cannot be treated as proof"); }));
+assert.ok(facts.flags.some(function(flag) { return flag.toLowerCase().includes("tennis forward discovery") && flag.includes("cannot be treated as proof"); }));
 assert.equal(facts.tennis_forward_discovery.tours.ATP.events_seen, 236);
 assert.equal(facts.tennis_forward_discovery.tours.ATP.valid_singles, 0);
 assert.ok(facts.flags.some(function(flag) { return flag.includes("VFootball Under 7.5") && flag.includes("10/30"); }));
