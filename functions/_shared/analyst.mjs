@@ -144,7 +144,7 @@ export function validateReviewDocument(document) {
         if (!desk || typeof desk !== "object" || Array.isArray(desk)) errors.push(lw + ".desk_snapshot must be an object");
         else {
           checkKnownKeys(desk, new Set(["prediction_id", "model_version", "market", "pick", "line", "odds", "model_probability", "captured_at", "provenance"]), lw + ".desk_snapshot", errors);
-          if (desk.provenance !== undefined && desk.provenance !== "user_reported") errors.push(lw + ".desk_snapshot.provenance must be user_reported until the source is independently verified");
+          if (desk.provenance !== "user_reported") errors.push(lw + ".desk_snapshot.provenance must be user_reported until the source is independently verified");
           if (desk.market !== VALID_MARKET) errors.push(lw + ".desk_snapshot.market is invalid");
           if (!VALID_PICKS.has(desk.pick)) errors.push(lw + ".desk_snapshot.pick is invalid");
           if (!finiteNumber(desk.line) || desk.line < 0) errors.push(lw + ".desk_snapshot.line is invalid");
