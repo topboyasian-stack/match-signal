@@ -131,9 +131,10 @@ def settlement_index(history):
 def eligible_current_rows(board):
     events = board.get("events") if isinstance(board, dict) else []
     out = []
-    # Keep engines separate downstream; capture both virtual products that are
-    # currently generated on the Upcoming Desk, rather than learning only GT.
-    supported_products = {"efootball_gt", "vfootball"}
+    # Capture every supported virtual engine separately. Product keys remain
+    # isolated in reconciliation/calibration so GT evidence cannot leak into
+    # Adriatic, VFootball, or Zoom.
+    supported_products = {"efootball_gt", "efootball_adriatic", "vfootball", "zoom"}
     for row in events if isinstance(events, list) else []:
         if not isinstance(row, dict):
             continue

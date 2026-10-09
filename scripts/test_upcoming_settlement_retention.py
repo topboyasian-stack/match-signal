@@ -191,6 +191,28 @@ def check_past_unsettled_fixtures_are_hidden_but_live_fixtures_remain():
         upcoming.SETTLED_MATCH_KEYS = original_match_keys
 
 
+def check_learning_capture_covers_each_virtual_product():
+    future = datetime.now(timezone.utc) + timedelta(hours=1)
+    products = {"efootball_gt", "efootball_adriatic", "vfootball", "zoom"}
+    rows = [
+        {
+            "product": product,
+            "sport": "virtual",
+            "event_id": "capture-" + product,
+            "start_time": iso(future),
+            "player_1": "Home (HANDLE_A)",
+            "player_2": "Away (HANDLE_B)",
+            "market": "over_under",
+            "line": 7.5,
+            "pick": "under",
+            "probability": 0.80,
+        }
+        for product in products
+    ]
+    captured = learning.eligible_current_rows({"events": rows})
+    assert {row["product"] for row in captured} == products, "Each virtual product must be captured independently"
+
+
 def check_each_totals_line_is_scored_independently():
     kickoff = datetime(2026, 10, 8, 16, 42, tzinfo=timezone.utc)
     settled_at = datetime(2026, 10, 8, 16, 50, tzinfo=timezone.utc)
@@ -285,6 +307,7 @@ if __name__ == "__main__":
     check_reused_event_id_does_not_hide_a_different_fixture()
     check_past_unsettled_fixtures_are_hidden_but_live_fixtures_remain()
     check_desk_forecast_reconciles_by_fixture_and_score()
+    check_learning_capture_covers_each_virtual_product()
     check_each_totals_line_is_scored_independently()
     check_exact_profiles_do_not_pool_products_and_calibration_requires_evidence()
     print("PASS: settled expiry, stale kickoff removal, per-line scoring, product-isolated profiles, evidence-gated calibration, and live retention")
