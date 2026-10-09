@@ -354,6 +354,16 @@ function sanitizeBuilder(builder) {
   };
 }
 
+function countIssueSeverities(issues) {
+  const counts = { critical: 0, warning: 0, info: 0, other: 0 };
+  for (const issue of Array.isArray(issues) ? issues : []) {
+    const severity = String(issue && issue.severity || "").toLowerCase();
+    if (Object.prototype.hasOwnProperty.call(counts, severity) && severity !== "other") counts[severity] += 1;
+    else counts.other += 1;
+  }
+  return counts;
+}
+
 async function readArtifact(request, path) {
   const url = new URL(path, request.url);
   try {
@@ -375,6 +385,8 @@ export async function collectPublicDiagnostics(request) {
       critical_issues: health.critical_issues == null ? null : health.critical_issues,
       warning_issues: health.warning_issues == null ? null : health.warning_issues,
       info_issues: health.info_issues == null ? null : health.info_issues,
+      issue_count_by_severity: countIssueSeverities(health.issues || []),
+      issues_truncated: Array.isArray(health.issues) && health.issues.length > 12,
       issues: (health.issues || []).slice(0, 12),
       checks: (health.checks || []).slice(0, 12).map(function(item) {
         return { engine: item.engine, status: item.status, age_hours: item.age_hours == null ? null : item.age_hours, threshold_hours: item.threshold_hours == null ? null : item.threshold_hours };
@@ -383,6 +395,7 @@ export async function collectPublicDiagnostics(request) {
     core_pipeline: pipeline.unavailable ? pipeline : {
       updated_at: pipeline.updated_at || null, prediction_count: pipeline.prediction_count == null ? null : pipeline.prediction_count,
       football_count: pipeline.football_count == null ? null : pipeline.football_count, tennis_count: pipeline.tennis_count == null ? null : pipeline.tennis_count,
+      error_count: Array.isArray(pipeline.errors) ? pipeline.errors.length : null,
       errors: (pipeline.errors || []).slice(0, 8), quality_control: pipeline.quality_control || null,
       market_data: pipeline.market_data ? {
         provider: pipeline.market_data.provider || null, fetched_at: pipeline.market_data.fetched_at || null,
@@ -412,6 +425,186 @@ export async function collectPublicDiagnostics(request) {
       product_records: (report.product_records || []).slice(0, 10)
     },
     odds_builder: sanitizeBuilder(builder)
+  };
+}
+
+export function summarizeDiagnosticFacts(diagnostics, now = new Date()) {
+  const current = new Date(now);
+  const collected = Date.parse(diagnostics && diagnostics.collected_at || "");
+  const nowMs = Number.isFinite(collected) ? collected : current.getTime();
+  const health = diagnostics && diagnostics.system_health || {};
+  const pipeline = diagnostics && diagnostics.core_pipeline || {};
+  const automation = diagnostics && diagnostics.automation || {};
+  const report = diagnostics && diagnostics.results_first_report || {};
+  const builder = diagnostics && diagnostics.odds_builder || {};
+  const market = pipeline.market_data || {};
+  const tracker = report.tracker_summary || {};
+  const healthIssues = Array.isArray(health.issues) ? health.issues : [];
+  const issueCounts = health.issue_count_by_severity || countIssueSeverities(healthIssues);
+  const reportedCounts = {
+    critical: health.critical_issues == null ? null : Number(health.critical_issues),
+    warning: health.warning_issues == null ? null : Number(health.warning_issues),
+    info: health.info_issues == null ? null : Number(health.info_issues)
+  };
+  const countDiscrepancies = [];
+  for (const severity of ["critical", "warning", "info"]) {
+    if (reportedCounts[severity] !== null && Number.isFinite(reportedCounts[severity]) &&
+        reportedCounts[severity] !== Number(issueCounts[severity] || 0)) {
+      countDiscrepancies.push({
+        severity,
+        reported: reportedCounts[severity],
+        counted_from_issue_records: Number(issueCounts[severity] || 0)
+      });
+    }
+  }
+  function age(timestamp, thresholdHours) {
+    if (!timestamp) return { timestamp: null, age_minutes: null, threshold_hours: thresholdHours, status: "UNAVAILABLE" };
+    const parsed = Date.parse(String(timestamp));
+    if (!Number.isFinite(parsed)) return { timestamp: String(timestamp), age_minutes: null, threshold_hours: thresholdHours, status: "INVALID_TIMESTAMP" };
+    const minutes = Math.max(0, (nowMs - parsed) / 60000);
+    const rounded = Math.round(minutes * 10) / 10;
+    let status = "AGE_ONLY";
+    if (thresholdHours !== null && thresholdHours !== undefined) status = minutes > thresholdHours * 60 ? "STALE" : "WITHIN_THRESHOLD";
+    return { timestamp: String(timestamp), age_minutes: rounded, threshold_hours: thresholdHours == null ? null : thresholdHours, status };
+  }
+  function num(value) {
+    const result = Number(value);
+    return value !== null && value !== undefined && Number.isFinite(result) ? result : null;
+  }
+  function rate(wins, losses) {
+    const w = num(wins), l = num(losses);
+    return w !== null && l !== null && w + l > 0 ? Number((w / (w + l)).toFixed(6)) : null;
+  }
+
+  const healthAge = age(health.generated_at, 1);
+  const pipelineAge = age(pipeline.updated_at, 4);
+  const automationAge = age(automation.updated_at, 2);
+  const reportAge = age(report.generated_at, null);
+  const builderAge = age(builder.generated_at, 8);
+  const errorCount = pipeline.error_count == null
+    ? (Array.isArray(pipeline.errors) ? pipeline.errors.length : null)
+    : Number(pipeline.error_count);
+  const matched = num(market.matched);
+  const unmatched = num(market.unmatched);
+  const matchableRows = matched !== null && unmatched !== null ? matched + unmatched : null;
+  const won = num(tracker.won), lost = num(tracker.lost), pending = num(tracker.pending);
+  const settled = num(tracker.settled_tickets) !== null ? num(tracker.settled_tickets) :
+    (won !== null && lost !== null ? won + lost : null);
+  const shapeRecords = (Array.isArray(report.ticket_shape_records) ? report.ticket_shape_records : []).map(function(item) {
+    const history = item && item.ticket_history || {};
+    return {
+      ticket_shape: item.ticket_shape || "unknown",
+      settled_tickets: num(item.settled_tickets) !== null ? num(item.settled_tickets) : num(history.n),
+      wins: num(history.wins),
+      losses: num(history.losses),
+      accuracy: num(history.accuracy),
+      avg_combined_odds: num(item.odds && item.odds.avg_combined_odds),
+      empirical_expected_roi: num(item.odds && item.odds.empirical_expected_roi)
+    };
+  });
+  const productRecords = (Array.isArray(report.product_records) ? report.product_records : []).map(function(item) {
+    const ticketHistory = item.ticket_history || {};
+    const legHistory = item.leg_history || {};
+    return {
+      product: item.product || "unknown",
+      ticket_count: num(item.ticket_count),
+      ticket_wins: num(ticketHistory.wins),
+      ticket_losses: num(ticketHistory.losses),
+      ticket_accuracy: num(ticketHistory.accuracy),
+      leg_sample_n: num(legHistory.n),
+      leg_wins: num(legHistory.wins),
+      leg_losses: num(legHistory.losses),
+      leg_hit_rate: num(legHistory.accuracy)
+    };
+  });
+  const trackerWonLegs = num(tracker.legs_won);
+  const trackerLostLegs = num(tracker.legs_lost);
+  const trackerPendingLegs = num(tracker.legs_pending);
+  const sourceSettledOuLegs = num(report.settled_ou_legs);
+  const sourceSettledOuTickets = num(report.settled_tickets_with_ou_legs);
+  const flags = [];
+  if (health.unavailable) flags.push("The system-health artifact could not be loaded.");
+  if (countDiscrepancies.length) flags.push("The issue-severity totals do not agree with the issue records.");
+  if (pipeline.unavailable) flags.push("The core pipeline artifact could not be loaded.");
+  if (pipeline.tennis_count === 0) flags.push("The published core pipeline contains zero tennis predictions.");
+  if (errorCount > 0) flags.push("The core pipeline lists " + errorCount + " source/processing errors.");
+  if (healthAge.status === "STALE") flags.push("The system-health artifact is older than its one-hour fact-sheet threshold.");
+  if (pipelineAge.status === "STALE") flags.push("The core-pipeline artifact is older than its four-hour fact-sheet threshold.");
+  if (num(trackerWonLegs) !== null && num(trackerLostLegs) !== null &&
+      sourceSettledOuLegs !== null && trackerWonLegs + trackerLostLegs !== sourceSettledOuLegs) {
+    flags.push("Tracker-wide individual-leg counts and O/U legs in fully settled tickets have different cohort scopes; do not combine their denominators.");
+  }
+
+  return {
+    schema_version: 1,
+    collected_at: diagnostics && diagnostics.collected_at || current.toISOString(),
+    artifacts: {
+      system_health: healthAge,
+      core_pipeline: pipelineAge,
+      automation: automationAge,
+      results_first_report: reportAge,
+      odds_builder: builderAge
+    },
+    system_health: {
+      status: health.status || (health.unavailable ? "UNAVAILABLE" : "UNKNOWN"),
+      reported_issue_counts: reportedCounts,
+      counted_issue_records_by_severity: issueCounts,
+      issue_count_check: countDiscrepancies.length ? "MISMATCH" : "MATCH",
+      issue_count_discrepancies: countDiscrepancies,
+      issues_truncated: health.issues_truncated === true,
+      issues: healthIssues.map(function(item) {
+        return { code: item.code || null, severity: item.severity || null, detail: item.detail || null };
+      })
+    },
+    pipeline: {
+      prediction_count: num(pipeline.prediction_count),
+      football_count: num(pipeline.football_count),
+      tennis_count: num(pipeline.tennis_count),
+      error_count: errorCount,
+      errors: (Array.isArray(pipeline.errors) ? pipeline.errors : []).map(function(item) { return String(item); }),
+      market_matching: {
+        provider: market.provider || null,
+        fetched_at: market.fetched_at || null,
+        football_source_events: num(market.football_events),
+        tennis_source_events: num(market.tennis_events),
+        matching_records: matched,
+        unmatched_records: unmatched,
+        coverage_denominator: matchableRows,
+        calculated_coverage: matchableRows && matched !== null ? Number((matched / matchableRows).toFixed(6)) : null,
+        reported_coverage: num(market.coverage),
+        coverage_definition: "matched / (matched + unmatched); football_events and tennis_events are separate provider-feed counts and are not this ratio's denominator"
+      }
+    },
+    builder_ticket_results: {
+      generated_at: report.generated_at || null,
+      report_age_minutes: reportAge.age_minutes,
+      tracked_tickets: num(tracker.tracked_tickets),
+      pending_tickets: pending,
+      won_tickets: won,
+      lost_tickets: lost,
+      settled_tickets: settled,
+      ticket_accuracy_excluding_pending: rate(won, lost),
+      individual_leg_statuses_across_tracker: {
+        won: trackerWonLegs, lost: trackerLostLegs, pending: trackerPendingLegs,
+        settled_individual_legs: trackerWonLegs !== null && trackerLostLegs !== null ? trackerWonLegs + trackerLostLegs : null,
+        cohort_note: "Tracker-wide individual leg statuses can include legs from tickets whose whole-ticket status is still pending."
+      },
+      settled_ou_legs_within_fully_settled_tickets: sourceSettledOuLegs,
+      fully_settled_tickets_with_ou_legs: sourceSettledOuTickets,
+      ticket_shape_records: shapeRecords,
+      product_records: productRecords,
+      interpretation: "Ticket accuracy uses won/(won+lost) and excludes pending tickets. It is not individual-leg hit rate or ROI. Different sources may summarize different settled cohorts."
+    },
+    odds_builder: {
+      generated_at: builder.generated_at || null,
+      status: builder.status || null,
+      batch_count: num(builder.batch_count),
+      evaluated_candidates: num(builder.candidate_diagnostics && builder.candidate_diagnostics.evaluated_candidates),
+      rejected_candidates: num(builder.candidate_diagnostics && builder.candidate_diagnostics.rejected_candidates),
+      evaluated_selections: num(builder.candidate_diagnostics && builder.candidate_diagnostics.evaluated_selections),
+      mode: builder.mode || null
+    },
+    flags: flags
   };
 }
 
