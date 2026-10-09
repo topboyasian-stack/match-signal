@@ -599,13 +599,20 @@ export function summarizeDiagnosticFacts(diagnostics, now = new Date()) {
       generated_at: builder.generated_at || null,
       status: builder.status || null,
       batch_count: num(builder.batch_count),
-      evaluated_candidates: num(builder.candidate_diagnostics && builder.candidate_diagnostics.evaluated_candidates),
-      rejected_candidates: num(builder.candidate_diagnostics && builder.candidate_diagnostics.rejected_candidates),
-      evaluated_selections: num(builder.candidate_diagnostics && builder.candidate_diagnostics.evaluated_selections),
+      evaluated_candidates: num(builder.candidate_diagnostics && (builder.candidate_diagnostics.evaluated != null ? builder.candidate_diagnostics.evaluated : builder.candidate_diagnostics.virtual_candidates)),
+      live_value_candidates: num(builder.candidate_diagnostics && builder.candidate_diagnostics.rejections && builder.candidate_diagnostics.rejections.LIVE_VALUE),
+      rejected_candidates: num(builder.candidate_diagnostics && builder.candidate_diagnostics.rejections && builder.candidate_diagnostics.rejections.REJECTED),
+      candidate_category_labels: "Source field candidate_diagnostics.rejections contains category counts named LIVE_VALUE and REJECTED; these are not named evaluated_selections.",
       mode: builder.mode || null
     },
     flags: flags
   };
+}
+
+export function sanitizeAnalystAnswer(text) {
+  const answer = String(text || "");
+  const dumpStart = /\n?\s*(?:\*\*)?(?:Evidence|Raw evidence|Supporting evidence|Source JSON)(?:\*\*)?\s*:?\s*```(?:json)?[\s\S]*$/i;
+  return answer.replace(dumpStart, "\n\n(Raw JSON omitted. See the separately calculated verified source facts below.)").trim();
 }
 
 export function extractJsonObject(text) {
