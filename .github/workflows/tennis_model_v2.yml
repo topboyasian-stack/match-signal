@@ -7,6 +7,7 @@ on:
       - 'scripts/tennis_model_v2.py'
       - 'scripts/tennis_ou_v3.py'
       - 'scripts/selective_prediction_gate.py'
+      - 'scripts/selection_candidate_collector.py'
       - 'scripts/test_selection_gate_contract.py'
       - 'scripts/predict_today.py'
       - 'qa/prediction_qa.py'
@@ -49,7 +50,9 @@ jobs:
         run: python -m json.tool data/predictions.json >/dev/null
       - name: Run prediction QA
         run: python qa/prediction_qa.py
-      - name: Refresh selection candidates after model upgrade
+      - name: Refresh model-first selection candidates after model upgrade
+        run: python scripts/selection_candidate_collector.py
+      - name: Apply conservative confidence and current value gate
         run: PYTHONPATH=. python scripts/selective_prediction_gate.py
       - name: Validate selection-gate output isolation
         run: python scripts/test_selection_gate_contract.py --require-generated-artifacts
@@ -60,7 +63,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/predictions.json data/tennis_model_v2.json data/tennis_precision_gate.json data/tennis_ou_v3.json data/selection_candidates.json data/selection_gate.json data/selection_gate_selected.json data/prediction_breakdown.json qa/report.json
+          git add data/predictions.json data/tennis_model_v2.json data/tennis_precision_gate.json data/tennis_ou_v3.json data/selection_candidates.json data/selection_candidate_status.json data/selection_gate.json data/selection_gate_selected.json data/prediction_breakdown.json qa/report.json
           if git diff --cached --quiet; then
             echo "No tennis model V2 changes."
             exit 0
