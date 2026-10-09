@@ -6,6 +6,12 @@ on:
     types: [completed]
   schedule:
     - cron: "30 */6 * * *"
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/tennis-forward-window.yml'
+      - 'scripts/tennis_forward_window.py'
+      - 'scripts/merge_generated_feed.py'
   workflow_dispatch:
 
 permissions:
@@ -39,35 +45,40 @@ jobs:
           git fetch origin main
           git reset --hard origin/main
 
-      - name: Snapshot latest main feed
-        run: git show origin/main:data/predictions.json > /tmp/latest_predictions.json
-
-      - name: Extend ATP/WTA singles discovery to 14 days
-        run: python scripts/tennis_forward_window.py
-
-      - name: Merge only new tennis rows into latest main feed
-        run: python scripts/merge_generated_feed.py /tmp/latest_predictions.json data/predictions.json
-
-      - name: Rebase publication onto latest main
+      - name: Generate and publish extended tennis coverage with retry
         shell: bash
         run: |
           set -euo pipefail
-          git fetch origin main
-          git reset --hard origin/main
-          cp /tmp/latest_predictions.json /tmp/pre_window_latest.json
-          # Re-run the window against the latest tree, then merge its genuinely new rows.
-          python scripts/tennis_forward_window.py
-          python scripts/merge_generated_feed.py /tmp/pre_window_latest.json data/predictions.json
-
-      - name: Commit extended tennis coverage
-        shell: bash
-        run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/predictions.json data/tennis_forward_status.json
-          if git diff --cached --quiet; then
-            echo "No forward-window changes."
-            exit 0
-          fi
-          git commit -m "🎾 Extend ATP/WTA singles prediction window"
-          git push origin main
+
+          # Multiple automation workflows publish to main concurrently. Build
+          # against the newest feed on every attempt so valid tennis rows and
+          # their discovery report are not lost to a non-fast-forward push.
+          for attempt in 1 2 3 4 5; do
+            echo "Tennis forward-window publication attempt ${attempt}/5"
+            git fetch origin main
+            git reset --hard origin/main
+            git show origin/main:data/predictions.json > /tmp/pre_window_latest.json
+
+            python scripts/tennis_forward_window.py
+            python scripts/merge_generated_feed.py /tmp/pre_window_latest.json data/predictions.json
+
+            git add data/predictions.json data/tennis_forward_status.json
+            if git diff --cached --quiet; then
+              echo "No forward-window changes to publish."
+              exit 0
+            fi
+
+            git commit -m "🎾 Extend ATP singles discovery window"
+            if git push origin main; then
+              echo "Published current tennis discovery report and additive fixture rows."
+              exit 0
+            fi
+
+            echo "main moved during tennis publication; rebuilding against the newest main before retrying."
+            sleep $((attempt * 2))
+          done
+
+          echo "Failed to publish tennis forward-window data after five attempts." >&2
+          exit 1
