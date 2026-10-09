@@ -31,6 +31,8 @@ A user may lower an Over line (for example, Over 2.5 to Over 1.5), raise an Unde
 
 The same final score can then be used to calculate two distinct outcomes: what happened to the desk selection and what happened to the actual selection. This is a descriptive counterfactual for that fixture, not proof that the user's adjustment has a long-run predictive edge. Only broader, chronological, selection-aware evaluation can establish that.
 
+The first analyst interface allows the user to enter a desk snapshot, records its provenance as user_reported, and compares its claimed capture time with kickoff when known. A user-entered pre-kickoff timestamp is not independently verified. These records can support a transparent personal-selection review, but are not admitted as verified training observations. A future improvement should join an exact match/market to an immutable Match Signal snapshot captured before kickoff when such an archive exists.
+
 ## Privacy and storage rules
 
 - Never commit actual user slips, ticket IDs/verification codes, private authentication tokens, API keys, or user betting records to this public repository.
@@ -77,6 +79,10 @@ The response format should distinguish fact, interpretation, uncertainty and rec
 7. Retain old artifacts and provide rollback.
 
 User-selected legs are selection-biased evidence. Track them as a distinct cohort and do not use them as if they were a random or complete sample of all desk predictions.
+
+### Current draft implementation
+
+The draft branch now contains a private token-protected KV ledger, an on-demand Workers AI analyst endpoint, a receipt parser that requires manual review before saving, and an analyst page with explicit desk snapshot capture. AI and KV bindings are intentionally required at runtime. Manual desk lines carry user_reported provenance, and the backend reports when kickoff is missing or the claimed snapshot timestamp is after kickoff. Nothing is active on production until configuration and endpoint/UX checks are completed.
 
 ## Acceptance criteria before production rollout
 
