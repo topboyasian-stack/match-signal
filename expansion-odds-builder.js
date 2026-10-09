@@ -632,9 +632,24 @@
     });
   }
 
+  function isActiveVirtualLeg(leg){
+    var product=String(leg&&leg.product||"").toLowerCase();
+    var sport=String(leg&&leg.sport||"").toLowerCase();
+    if(product==="vfootball"||product==="zoom")return false;
+    if(sport==="virtual")return product==="efootball_gt"||product==="efootball_adriatic";
+    return true;
+  }
+  function isActiveVirtualBatch(batch){
+    if(!batch||typeof batch!=="object")return false;
+    var products=Array.isArray(batch.products)?batch.products:[];
+    if(products.some(function(p){var k=String(p||"").toLowerCase();return k==="vfootball"||k==="zoom";}))return false;
+    var legs=Array.isArray(batch.legs)?batch.legs:[];
+    return legs.length>0&&legs.every(isActiveVirtualLeg);
+  }
+
   function render(data, tracker) {
     var target=document.getElementById('oddsBuilder'); if(!target)return;
-    var batches=Array.isArray(data.batches)?data.batches:[];
+    var batches=Array.isArray(data.batches)?data.batches.filter(isActiveVirtualBatch):[];
     window.__matchSignalOddsBuilderBatches=batches;
     var settledLegs=Array.isArray(data.settled_legs)?data.settled_legs:[];
     var sports=[], batchCount=batches.length;
@@ -749,8 +764,10 @@
       })
     ]).then(function(results){
       var data=results[0],tracker=results[1];
-      var legs=Array.isArray(data.qualified_legs)?data.qualified_legs:[];
-      return refreshLiveStatuses(legs).then(function(){return refreshVirtualLiveStatuses((data.batches||[]).reduce(function(all,b){return all.concat(Array.isArray(b.legs)?b.legs:[]);},[]));}).then(function(){render(data,tracker);}).then(function(){return ensureBookingCodes(Array.isArray(data.batches)?data.batches:[]);});
+      var activeBatches=Array.isArray(data.batches)?data.batches.filter(isActiveVirtualBatch):[];
+      var activeLegs=Array.isArray(data.qualified_legs)?data.qualified_legs.filter(isActiveVirtualLeg):[];
+      var activeData=Object.assign({},data,{batches:activeBatches,qualified_legs:activeLegs});
+      return refreshLiveStatuses(activeLegs).then(function(){return refreshVirtualLiveStatuses(activeBatches.reduce(function(all,b){return all.concat(Array.isArray(b.legs)?b.legs:[]);},[]));}).then(function(){render(activeData,tracker);}).then(function(){return ensureBookingCodes(activeBatches);});
     }).catch(function(e){target.innerHTML='<div class="empty">Accumulator data unavailable: '+esc(e.message)+'</div>';});
   }
   function boot(){
