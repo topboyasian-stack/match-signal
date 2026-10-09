@@ -58,6 +58,14 @@ class TennisForwardPublicationTests(unittest.TestCase):
                 workflow_run = source.split("workflow_run:", 1)[1].split("  schedule:", 1)[0]
                 self.assertIn('"Match Signal Tennis Forward Window"', workflow_run)
 
+    def test_unified_board_publishes_generated_desk_health_in_all_commit_paths(self):
+        source = (ROOT / ".github" / "workflows" / "unified-upcoming.yml").read_text(encoding="utf-8")
+        add_lines = [line for line in source.splitlines() if "git add data/unified_upcoming.json" in line]
+        self.assertGreaterEqual(len(add_lines), 2, "normal publication and conflict-retry paths should both stage the board")
+        for line in add_lines:
+            with self.subTest(add_line=line):
+                self.assertIn("data/prediction_desk_health.json", line)
+
     def test_discovery_scope_stays_explicitly_atp_only_and_watch_only(self):
         generator = (ROOT / "scripts" / "tennis_forward_window.py").read_text(encoding="utf-8")
         self.assertIn('"scope": "active ATP singles only; WTA retired"', generator)
