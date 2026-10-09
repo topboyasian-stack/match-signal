@@ -85,14 +85,18 @@ MODEL_FIRST_MAX_KICKOFF_SPAN_MINUTES=270
 # the 70% average frontier while retaining positive single-leg EV, live-price,
 # freshness, correlation, and whole-ticket ROI gates.
 MODEL_FIRST_MIN_AVG_PROBABILITY=0.68
-# eFootball exact-line evidence is currently validated at a 65% directional
-# threshold. Keep that lane evidence-based instead of requiring the unrelated
-# 68% frontier used by the generic secondary value lane.
-EFOOTBALL_VALUE_MIN_AVG_PROBABILITY=0.65
-EFOOTBALL_VALUE_MIN_LEG_PROBABILITY=0.65
-# Mixed research lane: preserve a small VFootball component only when its own
-# exact-line/value gates pass, then combine it with one or two qualified
-# eFootball value legs. This does not promote the batch to Results-first.
+# Exact-line evidence is necessary but is not sufficient for an active ticket.
+# Apply the same 80% per-leg safety floor to the eFootball fallback constructor.
+EFOOTBALL_VALUE_MIN_AVG_PROBABILITY=0.80
+EFOOTBALL_VALUE_MIN_LEG_PROBABILITY=0.80
+
+# VFootball and Zoom remain observable in the feed, Virtual Lab, settlements,
+# and historical archives, but they cannot contribute to active Virtual batches.
+ACTIVE_VIRTUAL_PRODUCTS={"efootball_gt","efootball_adriatic"}
+RESEARCH_ONLY_VIRTUAL_PRODUCTS={"vfootball","zoom"}
+
+# Mixed research construction remains in the code for forensic continuity;
+# the active candidate boundary below no longer supplies VFootball/Zoom legs.
 MIXED_RESEARCH_MAX_LEGS=4
 MIXED_RESEARCH_MIN_AVG_PROBABILITY=0.80
 MIXED_RESEARCH_MIN_VFOOTBALL_LEGS=1
@@ -1439,6 +1443,32 @@ def virtual_candidates(now):
         "current_market_candidates":0,"evidence_value_candidates":0,"reasons":{}
     }
     diagnostics["current_feed_events"]=len({str(x.get("event_id") or "") for x in merged if isinstance(x,dict) and x.get("event_id")})
+    research_only_virtual = {
+        product: {"market_rows": 0, "event_ids": set()}
+        for product in sorted(RESEARCH_ONLY_VIRTUAL_PRODUCTS)
+    }
+    for event in merged:
+        if not isinstance(event,dict):
+            continue
+        product=str(event.get("product") or "")
+        if product not in research_only_virtual:
+            continue
+        research_only_virtual[product]["market_rows"] += 1
+        event_id=str(event.get("event_id") or "")
+        if event_id:
+            research_only_virtual[product]["event_ids"].add(event_id)
+    diagnostics["virtual_scope_policy"]={
+        "active_products":sorted(ACTIVE_VIRTUAL_PRODUCTS),
+        "research_only_products":sorted(RESEARCH_ONLY_VIRTUAL_PRODUCTS),
+        "research_only_counts":{
+            product:{
+                "market_rows":values["market_rows"],
+                "unique_events":len(values["event_ids"])
+            }
+            for product,values in research_only_virtual.items()
+        },
+        "policy":"Only eFootball GT and eFootball Adriatic can enter active Virtual selection or Odds Builder construction. VFootball/Zoom feeds, settlement collection, Virtual Lab observations and archives are retained for research only."
+    }
     diagnostics["model_template_keys"]=[list(k) for k in sorted(templates.keys())]
     diagnostics["discovery_universe"]={
         "scope":"all current SportyBet eFootball events and every observed O/U line inside the Builder horizon",
@@ -1463,7 +1493,7 @@ def virtual_candidates(now):
     for event in merged:
         if not isinstance(event,dict):
             continue
-        if event.get("sport")!="virtual" or event.get("product") not in {"efootball_gt","efootball_adriatic","vfootball","zoom"}:
+        if event.get("sport")!="virtual" or event.get("product") not in ACTIVE_VIRTUAL_PRODUCTS:
             continue
         if not within_builder_horizon(event,now):
             continue
