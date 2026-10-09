@@ -24,6 +24,8 @@ STATUS_OUT = DATA / "selection_candidate_status.json"
 
 MAX_TOTAL = 700
 MIN_PROBABILITY = 0.55
+ACTIVE_VIRTUAL_PRODUCTS = {"efootball_gt", "efootball_adriatic"}
+RESEARCH_ONLY_VIRTUAL_PRODUCTS = {"vfootball", "zoom"}
 
 
 def load(path: Path, default):
@@ -185,6 +187,16 @@ def main():
     if isinstance(core, list):
         sources.extend(core)
 
+    research_only_virtual_event_ids = {product: set() for product in RESEARCH_ONLY_VIRTUAL_PRODUCTS}
+    for row in sources:
+        if not isinstance(row, dict):
+            continue
+        source_product = str(row.get("product") or "").strip().lower()
+        if source_product in RESEARCH_ONLY_VIRTUAL_PRODUCTS:
+            event_id = str(row.get("event_id") or "")
+            if event_id:
+                research_only_virtual_event_ids[source_product].add(event_id)
+
     seen = {}
     for row in sources:
         if not isinstance(row, dict):
@@ -192,13 +204,21 @@ def main():
         item = compact(row, now)
         if not item:
             continue
+        product = str(item.get("product") or "").strip().lower()
+        sport = str(item.get("sport") or "").strip().lower()
+        # Research-only virtual products are not part of the active candidate pool.
+        # Keep source feed and history intact; this is a publication boundary only.
+        if product in RESEARCH_ONLY_VIRTUAL_PRODUCTS:
+            continue
+        if sport == "virtual" and product not in ACTIVE_VIRTUAL_PRODUCTS:
+            continue
         key = item["candidate_id"]
         previous = seen.get(key)
         if previous is None or float(item["model_probability"]) > float(previous["model_probability"]):
             seen[key] = item
 
     rows = list(seen.values())
-    quotas = {"football": 180, "tennis": 140, "efootball": 180, "vfootball": 180, "virtual": 100, "other": 60}
+    quotas = {"football": 180, "tennis": 140, "efootball": 180, "other": 60}
     selected = []
     for group, quota in quotas.items():
         pool = [x for x in rows if x["candidate_group"] == group]
@@ -230,7 +250,14 @@ def main():
         "minimum_model_probability": MIN_PROBABILITY,
         "max_candidates": MAX_TOTAL,
         "artifact": "data/selection_candidates.json",
-        "purpose": "model-first current candidate pool; independent from Odds Builder value/results qualification"
+        "purpose": "model-first current candidate pool; independent from Odds Builder value/results qualification",
+        "virtual_scope_policy": {
+            "active_products": sorted(ACTIVE_VIRTUAL_PRODUCTS),
+            "research_only_products": sorted(RESEARCH_ONLY_VIRTUAL_PRODUCTS),
+            "research_only_source_events": {product: len(event_ids) for product, event_ids in research_only_virtual_event_ids.items()},
+            "research_only_candidates_published": 0,
+            "preservation": "VFootball/Zoom remain in source feeds, Virtual Lab observation and settlement collection, and historical archives; no old records are deleted."
+        }
     }
     STATUS_OUT.write_text(json.dumps(summary, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(json.dumps(summary, indent=2))
