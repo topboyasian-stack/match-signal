@@ -191,9 +191,91 @@ def check_past_unsettled_fixtures_are_hidden_but_live_fixtures_remain():
         upcoming.SETTLED_MATCH_KEYS = original_match_keys
 
 
+def check_each_totals_line_is_scored_independently():
+    kickoff = datetime(2026, 10, 8, 16, 42, tzinfo=timezone.utc)
+    settled_at = datetime(2026, 10, 8, 16, 50, tzinfo=timezone.utc)
+    history_row = {
+        "product": "efootball_gt",
+        "event_id": "same-fixture-many-lines",
+        "timestamp": iso(kickoff),
+        "participant_1": "SPARTAN",
+        "participant_2": "DART",
+        "market": "ou",
+        "line": 7.5,
+        "selection": "under",
+        "win": False,
+        "score": "4:5",
+        "settled_at": iso(settled_at),
+    }
+    forecasts = []
+    for line, pick, p in ((4.5, "over", 0.82), (7.5, "under", 0.90), (8.5, "under", 0.88)):
+        forecasts.append({
+            "product": "efootball_gt",
+            "event_id": "same-fixture-many-lines",
+            "start_time": iso(kickoff),
+            "participant_1": "Home (SPARTAN)",
+            "participant_2": "Away (DART)",
+            "line": line,
+            "pick": pick,
+            "model_probability": p,
+            "observed_at": iso(kickoff - timedelta(minutes=5)),
+            "settled": False,
+        })
+    index = learning.settlement_index([history_row])
+    learning.reconcile(forecasts, index)
+    results = {(row["line"], row["pick"]): row for row in forecasts}
+    assert results[(4.5, "over")].get("scored_forecast") is True
+    assert results[(4.5, "over")].get("win") is True
+    assert results[(7.5, "under")].get("scored_forecast") is True
+    assert results[(7.5, "under")].get("win") is False
+    assert results[(8.5, "under")].get("scored_forecast") is True
+    assert results[(8.5, "under")].get("win") is False
+    profiles = learning.exact_profiles(learning.settled_forecasts(forecasts))
+    gt = profiles["efootball_gt"]
+    assert gt["7.5|under"]["n"] == 1 and gt["7.5|under"]["wins"] == 0
+    assert gt["8.5|under"]["n"] == 1 and gt["8.5|under"]["wins"] == 0
+
+
+def check_exact_profiles_do_not_pool_products_and_calibration_requires_evidence():
+    forecasts = [
+        {"product": "efootball_gt", "line": 7.5, "pick": "under", "win": False, "model_probability": 0.90},
+        {"product": "vfootball", "line": 7.5, "pick": "under", "win": True, "model_probability": 0.82},
+    ]
+    profiles = learning.exact_profiles(forecasts)
+    assert profiles["efootball_gt"]["7.5|under"]["n"] == 1
+    assert profiles["efootball_gt"]["7.5|under"]["wins"] == 0
+    assert profiles["vfootball"]["7.5|under"]["n"] == 1
+    assert profiles["vfootball"]["7.5|under"]["wins"] == 1
+
+    exact_report = {"exact_selection": {
+        "7.5|under": {
+            "n": 20, "calibration_offset": -0.25,
+            "calibration_weight": 0.40, "accuracy": 0.50,
+        }
+    }, "calibration": {"active": False, "buckets": {}}}
+    p, source, detail = upcoming.calibrate_desk_probability(0.90, 7.5, "under", exact_report)
+    assert abs(p - 0.80) < 1e-9
+    assert source == "EXACT_LINE_DIRECTION"
+    assert detail["n"] == 20
+
+    immature_report = {"exact_selection": {
+        "7.5|under": {
+            "n": 19, "calibration_offset": -0.25,
+            "calibration_weight": 0.39, "accuracy": 0.50,
+        }
+    }, "calibration": {"active": True, "buckets": {
+        "0.9": {"n": 29, "calibration_offset": -0.20, "calibration_weight": 0.49}
+    }}}
+    p, source, _ = upcoming.calibrate_desk_probability(0.90, 7.5, "under", immature_report)
+    assert abs(p - 0.90) < 1e-9
+    assert source == "NONE", "A global active flag must not bypass exact bucket sample gates"
+
+
 if __name__ == "__main__":
     check_settled_fixture_is_shown_during_grace_then_hidden()
     check_reused_event_id_does_not_hide_a_different_fixture()
     check_past_unsettled_fixtures_are_hidden_but_live_fixtures_remain()
     check_desk_forecast_reconciles_by_fixture_and_score()
-    print("PASS: settled grace/expiry, stale kickoff removal, live retention, reused-ID isolation, and time-safe reconciliation")
+    check_each_totals_line_is_scored_independently()
+    check_exact_profiles_do_not_pool_products_and_calibration_requires_evidence()
+    print("PASS: settled expiry, stale kickoff removal, per-line scoring, product-isolated profiles, evidence-gated calibration, and live retention")
