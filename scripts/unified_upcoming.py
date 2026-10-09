@@ -723,8 +723,11 @@ def build_virtual_events(history, lifecycle, eligibility):
             chosen_market=market_over if chosen_pick=="over" else market_under
             chosen_learning_source=over_learning_source if chosen_pick=="over" else under_learning_source
             chosen_learning_profile=over_learning_profile if chosen_pick=="over" else under_learning_profile
-            chosen_exact_n=int(chosen_learning_profile.get("n") or 0) if chosen_learning_source=="EXACT_LINE_DIRECTION" else 0
-            chosen_exact_accuracy=num(chosen_learning_profile.get("accuracy")) if chosen_learning_source=="EXACT_LINE_DIRECTION" else None
+            # Expose the exact line/direction sample even during calibration
+            # warm-up so the desk can show users whether this line is learned.
+            chosen_exact_profile=product_exact_profiles.get(f"{float(line):g}|{chosen_pick}",{})
+            chosen_exact_n=int(chosen_exact_profile.get("n") or 0)
+            chosen_exact_accuracy=num(chosen_exact_profile.get("accuracy"))
             bucket_key=str(min(0.95,max(0.50,(math.floor(raw_chosen_model/0.05)*0.05)))).rstrip("0").rstrip(".")
             edge=chosen_model-chosen_market if chosen_market is not None else None
 

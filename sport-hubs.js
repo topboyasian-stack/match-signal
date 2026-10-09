@@ -3,11 +3,33 @@
 }
 function evidenceLabel(x){
   const d=String(x.evidence_depth||"").replaceAll("_"," ");
-  if(d)return d;
-  if(x.projection_tier==="deep_model")return "deep model";
-  if(x.projection_tier==="research_model")return "research model";
-  if(x.projection_tier==="testing_projection")return "testing projection";
-  return "baseline projection";
+  let base=d;
+  if(!base){
+    if(x.projection_tier==="deep_model")base="deep model";
+    else if(x.projection_tier==="research_model")base="research model";
+    else if(x.projection_tier==="testing_projection")base="testing projection";
+    else base="baseline projection";
+  }
+  const product=String(x.product||"").toLowerCase();
+  if(product==="efootball_gt"||product==="vfootball"){
+    const n=Number(x.desk_learning_exact_n);
+    if(Number.isFinite(n)){
+      const count=Math.max(0,Math.round(n));
+      const accuracy=Number(x.desk_learning_exact_accuracy);
+      const results=Number.isFinite(accuracy)
+        ? count+" settled · "+Math.round(accuracy*100)+"% hit rate"
+        : count+" settled";
+      const source=String(x.desk_learning_adjustment_source||"NONE");
+      let state;
+      if(source==="EXACT_LINE_DIRECTION")state="exact-line calibrated";
+      else if(source==="PROBABILITY_BUCKET")state="bucket calibrated";
+      else if(source==="SIDE_COMPARISON_ONLY")state="side comparison used; displayed side raw";
+      else if(count<12)state="line-calibration warm-up ("+count+"/12)";
+      else state="line history available; probability unadjusted";
+      return base+" · "+results+" · "+state;
+    }
+  }
+  return base;
 }
 function marketLabel(x){
   if(x.market==="over_under"){
