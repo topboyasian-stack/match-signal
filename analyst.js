@@ -149,7 +149,7 @@
       throw new Error("This ticket reference already exists. Discard and parse it again.");
     }
     const next = Object.assign({}, currentDocument, { updated_at: new Date().toISOString(), tickets: currentDocument.tickets.concat([ticket]) });
-    await api("./api/analyst/records", { method: "PUT", body: next });
+    await api("./api/analyst/records", { method: "PUT", headers: { "If-Match": currentDocument.updated_at }, body: next });
     await refreshLedger();
     $("draftSection").classList.add("hidden");
     $("receiptText").value = "";
@@ -172,7 +172,7 @@
     const document = JSON.parse(await file.text());
     if (!document || document.record_type !== "private_user_ticket_review" || !Array.isArray(document.tickets)) throw new Error("Not a Match Signal private-ticket review document.");
     if (!confirm("Replace the saved private ledger with " + document.tickets.length + " ticket(s)? Export your current ledger first if you need a backup.")) return;
-    await api("./api/analyst/records", { method: "PUT", body: document });
+    await api("./api/analyst/records", { method: "PUT", headers: { "If-Match": currentDocument.updated_at }, body: document });
     await refreshLedger();
     setMessage("ledgerStatus", "Imported and saved privately.", "sub success");
   }
