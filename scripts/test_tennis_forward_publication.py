@@ -47,6 +47,17 @@ class TennisForwardPublicationTests(unittest.TestCase):
         self.assertIn("Failed to publish tennis forward-window data after five attempts.", source)
         self.assertIn("exit 1", source)
 
+    def test_health_and_upcoming_rebuild_after_tennis_forward_publication(self):
+        workflows = [
+            ROOT / ".github" / "workflows" / "autopilot-refresh.yml",
+            ROOT / ".github" / "workflows" / "unified-upcoming.yml",
+        ]
+        for path in workflows:
+            with self.subTest(workflow=path.name):
+                source = path.read_text(encoding="utf-8")
+                workflow_run = source.split("workflow_run:", 1)[1].split("  schedule:", 1)[0]
+                self.assertIn('"Match Signal Tennis Forward Window"', workflow_run)
+
     def test_discovery_scope_stays_explicitly_atp_only_and_watch_only(self):
         generator = (ROOT / "scripts" / "tennis_forward_window.py").read_text(encoding="utf-8")
         self.assertIn('"scope": "active ATP singles only; WTA retired"', generator)
