@@ -29,13 +29,21 @@ For VFootball Under 7.5 and higher, a high tail probability or a `MODEL_90_PLUS`
 
 Never infer evidence for Under 8.5 from Under 7.5 or another neighbouring line. Show the actual line/side sample next to the estimate where available.
 
-## 5. Tennis discovery and publication
+## 5. Active Virtual product scope
+
+- Active Virtual Prediction Desk candidates and new Odds Builder batches are restricted to **eFootball GT** and **eFootball Adriatic**.
+- VFootball and Zoom are **research/monitor-only**. They must not enter the active Virtual candidate pool, Desk selection lane, or newly constructed Builder batches regardless of odds or model estimate.
+- Keep their upstream feed collection, Virtual Lab observations, settlement processing, existing user-ticket records, append-only history and model-evaluation artifacts. This policy is not permission to delete, rewrite or relabel historical records.
+- eFootball evidence thresholds remain in force, and every eFootball Builder leg must meet the active **80% minimum model-probability floor**. Prefer stronger evidence and probability; a high model estimate is not a guarantee.
+- Do not manufacture a batch to meet an odds target. When no eFootball combination passes current price, exact-line evidence, freshness, value, correlation and ticket gates, publish no Virtual batch and report the blocking reasons.
+
+## 6. Tennis discovery and publication
 
 The tennis forward-window report is a distinct ingestion-health signal. A stale report cannot prove no tournament or fixture exists. Validate identity from either the nested athlete identifier or the competitor-level person identifier, together with two distinct real singles-player names. Reject placeholder names, duplicate names, doubles draw markers, and team-pair names. Do not infer a person from a team ID or invent a player.
 
 If current tennis rows are absent, report the discovery artifact age, source error, fixture count, and rejection reason; do not quietly relabel an empty feed as healthy. Showing an unqualified research projection must not promote it to the Odds Builder.
 
-## 6. Analyst diagnosis order
+## 7. Analyst diagnosis order
 
 Every system-health answer should:
 
@@ -46,6 +54,6 @@ Every system-health answer should:
 5. Report the concrete finding and the next narrow diagnostic action. Do not stop at generic advice like “investigate the warning.”
 6. Never claim that a fix, deployment, model update, or learning event happened without corresponding tests or source evidence.
 
-## 7. Changes this policy does not authorize
+## 8. Changes this policy does not authorize
 
 This policy does not allow automatic wagers, weakened qualification thresholds, fabricated odds, background model-weight changes, deletion of historical evidence, or performance claims without an appropriate out-of-sample and settled sample.
