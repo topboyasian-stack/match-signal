@@ -796,10 +796,13 @@ def build_virtual_events(history, lifecycle, eligibility):
                 "validated_model_over_probability":round(raw_over,4),
                 "validated_model_under_probability":round(raw_under,4),
                 "validated_model_components":validated_meta,
-                "desk_learning_active":chosen_learning_source!="NONE",
+                "desk_learning_active":over_learning_source!="NONE" or under_learning_source!="NONE",
                 "desk_learning_settled_n":int(product_desk_learning.get("settled_predictions") or 0),
                 "desk_learning_bucket":bucket_key,
-                "desk_learning_adjustment_source":chosen_learning_source,
+                "desk_learning_adjustment_source":(
+                    chosen_learning_source if chosen_learning_source!="NONE"
+                    else ("SIDE_COMPARISON_ONLY" if over_learning_source!="NONE" or under_learning_source!="NONE" else "NONE")
+                ),
                 "desk_learning_exact_n":chosen_exact_n,
                 "desk_learning_exact_accuracy":round(chosen_exact_accuracy,4) if chosen_exact_accuracy is not None else None,
                 "desk_calibrated_probability":round(chosen_model,4),
