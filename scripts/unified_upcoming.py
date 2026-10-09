@@ -820,7 +820,7 @@ def build_virtual_events(history, lifecycle, eligibility):
                 "projection_tier":"deep_research_projection",
                 "evidence_depth":(
                     "desk_calibrated_walk_forward_participant_model"
-                    if desk_learning_calibration.get("active")
+                    if (over_learning_source!="NONE" or under_learning_source!="NONE")
                     else ("walk_forward_participant_model_plus_exact_direction" if directional.get("pass") else
                           ("walk_forward_participant_model" if validated_meta else
                            ("participant_lifecycle_plus_base_model" if participant_history>=3 else "feed_discovered_base_model")))
