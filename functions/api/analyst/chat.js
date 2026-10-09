@@ -52,8 +52,8 @@ export async function onRequestPost(context) {
     });
     const generated = await callAnalystModel(context.env, SYSTEM_PROMPT, prompt, 800);
     const answer = String(generated.answer || "").replace(
-      /\\n?\\s*(?:\\*\\*)?(?:Evidence|Raw evidence|Supporting evidence|Source JSON)\\s*:?\\s*```(?:json)?[\\s\\S]*$/i,
-      "\\n\\n(Raw JSON omitted. See the separately calculated verified source facts below.)"
+      /\n?\s*(?:\*\*)?(?:Evidence|Raw evidence|Supporting evidence|Source JSON)\s*:?\s*```(?:json)?[\s\S]*$/i,
+      "\n\n(Raw JSON omitted. See the separately calculated verified source facts below.)"
     ).trim();
     return jsonResponse({
       answer: answer,
