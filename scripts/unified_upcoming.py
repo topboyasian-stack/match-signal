@@ -42,10 +42,11 @@ EFOOTBALL_DESK_EXACT_MIN_N=12
 EFOOTBALL_DESK_LEARNING_PATH="efootball_desk_learning.json"
 # A high Under line can look almost certain from the Poisson tail even when the
 # exact line/direction has too little out-of-sample evidence. Keep it visible as
-# research, but do not qualify VFootball Under 7.5+ without its own evidence.
-VFOOTBALL_HIGH_UNDER_MIN_OOS_LINE=7.5
-VFOOTBALL_HIGH_UNDER_MIN_OOS_N=30
-VFOOTBALL_HIGH_UNDER_MIN_OOS_HIT_RATE=0.65
+# research, but do not qualify VFootball or eFootball GT Under 7.5+ without its
+# own exact product/line/side evidence.
+HIGH_LINE_UNDER_MIN_OOS_LINE=7.5
+HIGH_LINE_UNDER_MIN_OOS_N=30
+HIGH_LINE_UNDER_MIN_OOS_HIT_RATE=0.65
 MAX_LIVE_AGE_HOURS={"football":4.0,"tennis":8.0,"virtual":2.0}
 DESK_FILTER_STATS={
     "past_kickoff_rows_hidden":0,
@@ -141,17 +142,17 @@ def stale_live_flag(row, now=None):
         return False
     return (now-start)>timedelta(hours=live_age_limit_hours(row))
 
-def high_vfootball_under_requires_research(product, line, side, exact_oos):
-    """High VFootball Unders need a minimum exact-line chronological OOS sample."""
-    if str(product or "").lower()!="vfootball" or str(side or "").lower()!="under":
+def high_line_under_requires_research(product, line, side, exact_oos):
+    """High VFootball/eFootball GT Unders need exact-line chronological OOS evidence."""
+    if str(product or "").lower() not in {"vfootball","efootball_gt"} or str(side or "").lower()!="under":
         return False
     value=num(line)
-    if value is None or value<VFOOTBALL_HIGH_UNDER_MIN_OOS_LINE:
+    if value is None or value<HIGH_LINE_UNDER_MIN_OOS_LINE:
         return False
     stats=exact_oos if isinstance(exact_oos,dict) else {}
     n=num(stats.get("n")) or 0
     hit=num(stats.get("hit_rate"))
-    return n<VFOOTBALL_HIGH_UNDER_MIN_OOS_N or hit is None or hit<VFOOTBALL_HIGH_UNDER_MIN_OOS_HIT_RATE
+    return n<HIGH_LINE_UNDER_MIN_OOS_N or hit is None or hit<HIGH_LINE_UNDER_MIN_OOS_HIT_RATE
 
 def apply_bookmaker_fields(x):
     """Normalize current SportyBet quotes onto a unified prediction row."""
@@ -829,11 +830,13 @@ def build_virtual_events(history, lifecycle, eligibility):
             directional_key=(float(line),chosen_pick)
             directional=directional_gate.get(directional_key,{})
             exact_oos=exact_line_direction_oos(eval_art,product,line,chosen_pick)
-            high_vfootball_under_pending=high_vfootball_under_requires_research(
+            high_line_under_pending=high_line_under_requires_research(
                 product,line,chosen_pick,exact_oos
             )
             if product.startswith("efootball"):
-                if not base_model_gate:
+                if high_line_under_pending:
+                    qualification_status="HIGH_LINE_UNDER_EVIDENCE_GATE_PENDING"
+                elif not base_model_gate:
                     qualification_status="BASE_MODEL_GATE_PENDING"
                 elif not model_line:
                     qualification_status="MODEL_LINE_SCOPE_GATE_PENDING"
@@ -853,9 +856,10 @@ def build_virtual_events(history, lifecycle, eligibility):
                     qualification_status="DIRECTIONAL_LINE_VALIDATION_GATE_PENDING"
             elif product=="vfootball":
                 # A very high Under estimate is not enough on its own. Guard
-                # U7.5/U8.5 and higher until the exact direction has >=30
-                # chronological out-of-sample rows at the configured hit rate.
-                if high_vfootball_under_pending:
+                # U7.5 and higher in both virtual football engines until the
+                # exact line/side has >=30 chronological out-of-sample rows
+                # and >=65% hit rate. A neighbouring line cannot substitute.
+                if high_line_under_pending:
                     qualification_status="HIGH_LINE_UNDER_EVIDENCE_GATE_PENDING"
                 elif not base_model_gate:
                     qualification_status="BASE_MODEL_GATE_PENDING"
@@ -953,7 +957,7 @@ def build_virtual_events(history, lifecycle, eligibility):
                 "qualification_status":qualification_status,
                 "betting_qualified":qualified,
                 "qualified_for_builder":qualified,
-                "qualification_engine":"Virtual Lab base walk-forward gate + model-qualified line + current SportyBet edge + competition evidence OR validated product-bootstrap evidence OR exact line/direction holdout + recent evidence",
+                "qualification_engine":"Virtual Lab base walk-forward gate + exact high-line Under evidence gate + model-qualified line + current SportyBet edge + competition evidence OR validated product-bootstrap evidence OR exact line/direction holdout + recent evidence",
                 "model":"Virtual Lab walk-forward eFootball participant model",
                 "model_version":"VL-EFOOTBALL-WF-3.0",
                 "paper_only":True,
@@ -1075,6 +1079,8 @@ def main():
             continue
         key=f"{product}|{ln:g}|under"
         previous=high_line_under.get(key)
+        row_status=row.get("qualification_status") or "NOT_QUALIFIED"
+        row_qualified=bool(row.get("betting_qualified"))
         record={
             "product":product,"line":ln,"side":"under",
             "event_rows":1,
@@ -1082,12 +1088,28 @@ def main():
             "walkforward_hit_rate":row.get("walkforward_exact_line_hit_rate"),
             "walkforward_brier":row.get("walkforward_exact_line_brier"),
             "walkforward_model_variant":row.get("walkforward_exact_line_model_variant"),
-            "qualification_status":row.get("qualification_status") or "NOT_QUALIFIED",
-            "betting_qualified":bool(row.get("betting_qualified")),
+            "qualification_status":row_status,
+            "qualification_statuses":[row_status],
+            "qualified_event_rows":1 if row_qualified else 0,
+            "unqualified_event_rows":0 if row_qualified else 1,
+            # A grouped line is only described as qualified when every current
+            # event row is qualified. Mixed groups are explicitly not qualified.
+            "betting_qualified":row_qualified,
         }
         if previous:
             previous["event_rows"]+=1
-            previous["betting_qualified"]=previous["betting_qualified"] or record["betting_qualified"]
+            previous["qualified_event_rows"]+=1 if row_qualified else 0
+            previous["unqualified_event_rows"]+=0 if row_qualified else 1
+            if row_status not in previous["qualification_statuses"]:
+                previous["qualification_statuses"].append(row_status)
+            previous["qualification_status"]=(
+                previous["qualification_statuses"][0]
+                if len(previous["qualification_statuses"])==1
+                else "MIXED_EVENT_QUALIFICATION"
+            )
+            previous["betting_qualified"]=(
+                previous["qualified_event_rows"]==previous["event_rows"]
+            )
         else:
             high_line_under[key]=record
     desk_health={
@@ -1099,7 +1121,7 @@ def main():
         "pending_settlement_count":pending_settlement,
         "publication_filters":dict(DESK_FILTER_STATS),
         "high_line_under_evidence":list(high_line_under.values()),
-        "policy":"Past kickoff rows are removed from Upcoming unless still credibly live or inside the two-hour settlement-result grace. Archived evidence is not deleted. High VFootball Under lines require their own exact-line chronological sample before betting qualification.",
+        "policy":"Past kickoff rows are removed from Upcoming unless still credibly live or inside the two-hour settlement-result grace. Archived evidence is not deleted. VFootball and eFootball GT Under 7.5+ require at least 30 exact product/line/side chronological out-of-sample rows at >=65% hit rate; grouped qualification is true only if every grouped event passed its event-level gates.",
     }
     (DATA/"prediction_desk_health.json").write_text(json.dumps(desk_health,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
     print(json.dumps(result["summary"],indent=2))
