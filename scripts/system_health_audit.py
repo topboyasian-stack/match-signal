@@ -88,11 +88,24 @@ for args in [
     ("odds_builder", odds, "generated_at", 8),
     ("expansion", expansion, "updated_at", 4),
     ("unified_upcoming", unified, "generated_at", 2),
-    ("prediction_desk_health", desk_health, "generated_at", 2),
 ]:
     x = freshness(*args)
     if x:
         checks.append(x)
+
+desk_health_age = age_hours(desk_health.get("generated_at"))
+checks.append({
+    "engine": "prediction_desk_health",
+    "status": "PASS" if desk_health_age <= 2 else "STALE",
+    "age_hours": round(desk_health_age, 2),
+    "threshold_hours": 2,
+})
+if desk_health_age > 2:
+    checks.append(issue(
+        "PREDICTION_DESK_HEALTH_STALE",
+        "warning",
+        f"Prediction Desk health sidecar age {desk_health_age:.2f}h exceeds 2h"
+    ))
 
 # The separate 14-day tennis discovery task runs every six hours. A missing or
 # old report means the system cannot distinguish "no fixtures" from "discovery
