@@ -17,6 +17,7 @@ on:
       - 'data/predictions.json'
       - 'scripts/odds_builder.py'
       - 'scripts/test_odds_builder_efootball_spoiler.py'
+      - 'scripts/test_odds_builder_score_replay.py'
       - 'scripts/selection_candidate_collector.py'
       - 'scripts/predict_today.py'
       - 'scripts/tennis_total_model.py'
@@ -87,6 +88,8 @@ jobs:
         run: python scripts/odds_builder.py
       - name: Regression-check eFootball recent spoiler guard
         run: python scripts/test_odds_builder_efootball_spoiler.py
+      - name: Test settled-score replay for eFootball alternate O/U lines
+        run: python scripts/test_odds_builder_score_replay.py
       - name: Test compact eFootball ticket construction
         run: python scripts/test_compact_efootball_builder.py
       - name: Syntax-check shadow line-ladder module
