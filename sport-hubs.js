@@ -399,6 +399,21 @@ async function renderUnifiedBoard(){
       const horizon=Number(date?.value||7); const horizonEnd=new Date(now.getTime()+horizon*86400000);
       const q=String(search?.value||"").trim().toLowerCase();
       const filteredRows=all.filter(x=>{
+        const kickoff=Date.parse(String(x?.start_time||""));
+        if(!Number.isFinite(kickoff))return false;
+        const state=String(x?.event_state||"").toUpperCase();
+        const live=state==="LIVE" || x?.live===true || x?.isLive===true;
+        const settled=state==="SETTLED";
+        // Client-side guard as well as the backend guard: a stale cached or
+        // delayed JSON refresh must not leave yesterday's/past kickoff games
+        // in Upcoming. Only explicit live rows and recent settled-result rows
+        // can remain after kickoff; archives are separate and untouched.
+        if(kickoff<=now.getTime() && !live && !settled)return false;
+        if(settled){
+          const settledAt=Date.parse(String(x?.settled_at||""));
+          const settledAge=now.getTime()-settledAt;
+          if(!Number.isFinite(settledAt) || settledAge<0 || settledAge>2*60*60*1000)return false;
+        }
         if(sport?.value && sport.value!=="all" && x.sport!==sport.value)return false;
         const day=String(x.start_time||"").slice(0,10);
         if(date?.value==="today" && day!==today)return false;
