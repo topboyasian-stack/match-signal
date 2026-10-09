@@ -1,38 +1,38 @@
 {
-  "generated_at": "2026-10-09T02:16:30.894864+00:00",
-  "status": "FAIL",
-  "critical_issues": 3,
+  "generated_at": "2026-10-09T03:07:24.610942+00:00",
+  "status": "DEGRADED",
+  "critical_issues": 0,
   "warning_issues": 1,
   "info_issues": 1,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
-      "status": "STALE",
-      "age_hours": 4.98,
+      "status": "PASS",
+      "age_hours": 0.58,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.79,
+      "age_hours": 0.84,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
-      "status": "STALE",
-      "age_hours": 4.94,
+      "status": "PASS",
+      "age_hours": 0.6,
       "threshold_hours": 4
     },
     {
       "engine": "unified_upcoming",
       "status": "PASS",
-      "age_hours": 0.0,
+      "age_hours": 0.85,
       "threshold_hours": 2
     },
     {
       "engine": "virtual_live_feed",
-      "status": "PASS",
-      "age_hours": 0.03,
+      "status": "INFO",
+      "age_hours": 0.62,
       "threshold_hours": 0.5,
       "heartbeat_source": "virtual_lab_live.json"
     },
@@ -46,7 +46,7 @@
         },
         "table_tennis_x": {
           "status": "RETIRED",
-          "artifact_at": "2026-10-09T00:09:06.872993+00:00"
+          "artifact_at": "2026-10-09T02:31:03.620853+00:00"
         },
         "basketball": {
           "status": "RETIRED",
@@ -57,16 +57,6 @@
   ],
   "issues": [
     {
-      "code": "STALE_CORE_PREDICTION_PIPELINE",
-      "severity": "critical",
-      "detail": "updated_at age 4.98h exceeds 4h"
-    },
-    {
-      "code": "STALE_EXPANSION",
-      "severity": "critical",
-      "detail": "updated_at age 4.94h exceeds 4h"
-    },
-    {
       "code": "TENNIS_FEED_EMPTY",
       "severity": "warning",
       "detail": "No current tennis predictions are published"
@@ -75,11 +65,6 @@
       "code": "SELECTION_GATE_EMPTY",
       "severity": "info",
       "detail": "Current prediction feed exists but the selected-candidate layer returned zero qualified selections; no gate was weakened"
-    },
-    {
-      "code": "PIPELINE_STALE",
-      "severity": "critical",
-      "detail": "pipeline_status age 4.98h exceeds 4h"
     }
   ],
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
