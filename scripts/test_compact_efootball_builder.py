@@ -3,7 +3,7 @@
 from datetime import datetime, timedelta, timezone
 import math
 import unittest
-from scripts import odds_builder as builder
+import odds_builder as builder
 
 
 def leg(index, *, odds=1.15, probability=0.90, product="efootball_gt",
