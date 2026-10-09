@@ -23,9 +23,9 @@ A current price is reference data, not an independent model probability. Never s
 - Count rows removed by freshness guards in the generated Prediction Desk health sidecar so the Analyst can distinguish a clean board from a board that filtered stale records.
 - Hiding a row from Upcoming must never delete its history, settlement evidence, or archive record.
 
-## 4. High VFootball Under lines
+## 4. High-line virtual-football Unders
 
-For VFootball Under 7.5 and higher, a high tail probability or a `MODEL_90_PLUS` band is not sufficient for betting qualification. Require at least 30 chronological out-of-sample records for the exact product, line, and side, with a hit rate of at least 65%, before this additional line-specific gate can pass. A missing or smaller sample remains research-only. The normal model, current market, edge, freshness, and Builder gates still apply after this gate passes.
+For VFootball and eFootball GT Under 7.5 and higher, a high tail probability or a `MODEL_90_PLUS` band is not sufficient for betting qualification. Require at least 30 chronological out-of-sample records for the exact product, line, and side, with a hit rate of at least 65%, before this additional line-specific gate can pass. A missing or smaller sample remains research-only. The normal model, current market, edge, freshness, and Builder gates still apply after this gate passes. This additional evidence gate applies to both virtual football products; it does not replace the separate eFootball directional-validation or participant-history gates.
 
 Never infer evidence for Under 8.5 from Under 7.5 or another neighbouring line. Show the actual line/side sample next to the estimate where available.
 
