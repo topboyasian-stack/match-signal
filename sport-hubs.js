@@ -365,6 +365,9 @@ async function renderUnifiedBoard(){
       let over=null,under=null;
       for(const market of Array.isArray(live?.markets)?live.markets:[]){
         const marketLine=Number(market?.line);
+        const marketId=String(market?.id||"");
+        const marketName=String(market?.name||"").toLowerCase();
+        if(!["18","189"].includes(marketId)&&!marketName.includes("total")&&!marketName.includes("over/under")&&!marketName.includes("over under"))continue;
         if(!Number.isFinite(marketLine)||Math.abs(marketLine-line)>1e-9)continue;
         let thisOver=null,thisUnder=null;
         for(const outcome of Array.isArray(market?.outcomes)?market.outcomes:[]){
@@ -408,6 +411,9 @@ async function renderUnifiedBoard(){
         let over=null,under=null,matchedMarket=null;
         for(const market of Array.isArray(live?.markets)?live.markets:[]){
           const ml=Number(market?.line);
+          const marketId=String(market?.id||"");
+          const marketName=String(market?.name||"").toLowerCase();
+          if(!["18","189"].includes(marketId)&&!marketName.includes("total")&&!marketName.includes("over/under")&&!marketName.includes("over under"))continue;
           if(!Number.isFinite(ml) || Math.abs(ml-line)>1e-9)continue;
           let marketOver=null,marketUnder=null;
           for(const outcome of Array.isArray(market?.outcomes)?market.outcomes:[]){
