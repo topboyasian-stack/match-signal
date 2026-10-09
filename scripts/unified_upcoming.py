@@ -64,6 +64,29 @@ def num(v):
 def clamp(p):
     return max(.0005,min(.9995,float(p)))
 
+def calibrate_desk_probability(raw_probability, line, side, product_report):
+    """Apply only a sufficiently supported correction for this product/line/side."""
+    report=product_report if isinstance(product_report,dict) else {}
+    exact_profiles=report.get("exact_selection") or {}
+    exact_key=f"{float(line):g}|{side}"
+    exact_profile=exact_profiles.get(exact_key,{})
+    exact_n=int(exact_profile.get("n") or 0)
+    if exact_n>=EFOOTBALL_DESK_EXACT_MIN_N:
+        offset=num(exact_profile.get("calibration_offset"))
+        weight=num(exact_profile.get("calibration_weight"))
+        if offset is not None and weight is not None:
+            return clamp(raw_probability + offset*weight), "EXACT_LINE_DIRECTION", exact_profile
+
+    calibration=report.get("calibration") or {}
+    bucket_key=str(min(0.95,max(0.50,(math.floor(float(raw_probability)/0.05)*0.05)))).rstrip("0").rstrip(".")
+    bucket=(calibration.get("buckets") or {}).get(bucket_key,{})
+    if bool(calibration.get("active")) and int(bucket.get("n") or 0)>=EFOOTBALL_DESK_LEARNING_MIN_CALIBRATION_N:
+        offset=num(bucket.get("calibration_offset"))
+        weight=num(bucket.get("calibration_weight"))
+        if offset is not None and weight is not None:
+            return clamp(raw_probability + offset*weight), "PROBABILITY_BUCKET", bucket
+    return clamp(raw_probability), "NONE", exact_profile
+
 def apply_bookmaker_fields(x):
     """Normalize current SportyBet quotes onto a unified prediction row."""
     winner=x.get("sportybet_winner_odds")
@@ -688,26 +711,12 @@ def build_virtual_events(history, lifecycle, eligibility):
             product_desk_calibration=product_desk_learning.get("calibration") or {}
             product_exact_profiles=product_desk_learning.get("exact_selection") or {}
 
-            def calibrate_desk_side(raw_probability, side):
-                exact_key=f"{float(line):g}|{side}"
-                exact_profile=product_exact_profiles.get(exact_key,{})
-                exact_n=int(exact_profile.get("n") or 0)
-                if exact_n>=EFOOTBALL_DESK_EXACT_MIN_N:
-                    offset=num(exact_profile.get("calibration_offset"))
-                    weight=num(exact_profile.get("calibration_weight"))
-                    if offset is not None and weight is not None:
-                        return clamp(raw_probability + offset*weight), "EXACT_LINE_DIRECTION", exact_profile
-                probability_bucket_key=str(min(0.95,max(0.50,(math.floor(raw_probability/0.05)*0.05)))).rstrip("0").rstrip(".")
-                bucket=(product_desk_calibration.get("buckets") or {}).get(probability_bucket_key,{})
-                if bool(product_desk_calibration.get("active")) and int(bucket.get("n") or 0)>=EFOOTBALL_DESK_LEARNING_MIN_CALIBRATION_N:
-                    offset=num(bucket.get("calibration_offset"))
-                    weight=num(bucket.get("calibration_weight"))
-                    if offset is not None and weight is not None:
-                        return clamp(raw_probability + offset*weight), "PROBABILITY_BUCKET", bucket
-                return clamp(raw_probability), "NONE", exact_profile
-
-            over, over_learning_source, over_learning_profile=calibrate_desk_side(raw_over,"over")
-            under, under_learning_source, under_learning_profile=calibrate_desk_side(raw_under,"under")
+            over, over_learning_source, over_learning_profile=calibrate_desk_probability(
+                raw_over, line, "over", product_desk_learning
+            )
+            under, under_learning_source, under_learning_profile=calibrate_desk_probability(
+                raw_under, line, "under", product_desk_learning
+            )
             chosen_pick="over" if over>=under else "under"
             chosen_model=over if chosen_pick=="over" else under
             raw_chosen_model=raw_over if chosen_pick=="over" else raw_under
