@@ -31,6 +31,7 @@ function summarize(batch) {
   const legs = Array.isArray(batch?.legs) ? batch.legs : [];
   return {
     batch_id: String(batch?.batch_id || "BATCH-01"),
+    primary_lane: String(batch?.primary_lane || ""),
     fingerprint: "",
     combined_odds: odds,
     leg_count: legs.length,
@@ -60,11 +61,31 @@ export async function onRequestPost(context) {
   }
   const batches = Array.isArray(artifact?.batches) ? artifact.batches : [];
   const activeFloor = Number(artifact?.research_gate?.combined_odds_gate?.floor || DEFAULT_MIN_ODDS);
+  const compactPolicy = artifact?.selection_policy?.compact_efootball_ticket_lane || {};
+  const compactFloor = Number(
+    compactPolicy.min_combined_odds
+      || artifact?.batch_policy?.compact_efootball_min_combined_odds
+      || 2.0
+  );
+  const activeProducts = new Set(["efootball_gt", "efootball_adriatic"]);
   const candidates = [];
   for (const batch of batches) {
     const odds = Number(batch?.combined_odds || 0);
     const legs = Array.isArray(batch?.legs) ? batch.legs : [];
-    if (odds < activeFloor || legs.length < 2) continue;
+    const lane = String(batch?.primary_lane || "");
+    const compact = lane === "efootball_compact_2x";
+    const batchFloor = compact ? compactFloor : activeFloor;
+    const minimumLegs = compact ? 4 : 2;
+    if (odds < batchFloor || legs.length < minimumLegs) continue;
+    if (compact) {
+      if (legs.length > 5) continue;
+      const products = new Set(legs.map((leg) => String(leg?.product || "")));
+      if ([...products].some((product) => !activeProducts.has(product))) continue;
+      if (legs.some((leg) =>
+        String(leg?.qualification_lane || "") !== "efootball_exact_evidence_value"
+        || Number(leg?.model_probability || 0) < 0.80
+      )) continue;
+    }
     const clean = summarize(batch);
     clean.fingerprint = await fingerprint(batch);
     candidates.push(clean);
@@ -94,7 +115,7 @@ export async function onRequestPost(context) {
     if (await env.PUSH_SUBSCRIPTIONS.get(marker)) continue;
     const payload = {
       title: "🔔 Match Signal — Odds Builder",
-      body: `${item.leg_count}-leg batch available · ${item.combined_odds.toFixed(3)}x combined odds`,
+      body: `${item.primary_lane === "efootball_compact_2x" ? "Compact eFootball" : "Standard"} ${item.leg_count}-leg batch available · ${item.combined_odds.toFixed(3)}x combined odds`,
       url: "/odds-builder.html",
       tag: "match-signal-batch-" + item.fingerprint.slice(0, 24)
     };
