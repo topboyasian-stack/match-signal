@@ -6,6 +6,8 @@ import {
   evaluatePick,
   extractJsonObject,
   summarizeReviewDocument,
+  summarizeDiagnosticFacts,
+  sanitizeAnalystAnswer,
   validateReviewDocument
 } from "../functions/_shared/analyst.mjs";
 
@@ -72,4 +74,48 @@ unsupportedProvenance.tickets[0].legs[0].desk_snapshot.provenance = "captured_li
 assert.ok(validateReviewDocument(unsupportedProvenance).some(function(error) { return error.includes("provenance"); }));
 assert.equal(extractJsonObject('{"legs":[1]}').legs[0], 1);
 assert.equal(extractJsonObject("there is no JSON here"), null);
+
+const facts = summarizeDiagnosticFacts({
+  collected_at: "2026-10-09T17:39:48.000Z",
+  system_health: {
+    generated_at: "2026-10-09T17:13:24.000Z", status: "DEGRADED",
+    critical_issues: 0, warning_issues: 1, info_issues: 1,
+    issue_count_by_severity: { critical: 0, warning: 1, info: 1, other: 0 },
+    issues: [{ code: "TENNIS_FEED_EMPTY", severity: "warning" }, { code: "SELECTION_GATE_EMPTY", severity: "info" }]
+  },
+  core_pipeline: {
+    updated_at: "2026-10-09T15:16:15.000Z", prediction_count: 120, football_count: 120, tennis_count: 0,
+    error_count: 3, errors: ["source one", "source two", "tennis empty"],
+    market_data: { matched: 58, unmatched: 62, football_events: 2000, tennis_events: 130, coverage: 0.4833 }
+  },
+  automation: { updated_at: "2026-10-09T16:36:08.000Z" },
+  results_first_report: {
+    generated_at: "2026-10-09T17:15:08.000Z",
+    tracker_summary: { tracked_tickets: 100, pending: 68, won: 5, lost: 27, settled_tickets: 32, legs_won: 84, legs_lost: 36, legs_pending: 134 },
+    settled_ou_legs: 98, settled_tickets_with_ou_legs: 32,
+    ticket_shape_records: [
+      { ticket_shape: "ou_legs_2", settled_tickets: 13, ticket_history: { n: 13, wins: 1, losses: 12, accuracy: 0.076923 } },
+      { ticket_shape: "ou_legs_3", settled_tickets: 4, ticket_history: { n: 4, wins: 1, losses: 3, accuracy: 0.25 } }
+    ],
+    product_records: []
+  },
+  odds_builder: { generated_at: "2026-10-09T17:13:49.000Z", status: "VALUE_RESEARCH_SET", batch_count: 1, candidate_diagnostics: { evaluated: 1547, rejections: { LIVE_VALUE: 818, REJECTED: 729 } } }
+}, new Date("2026-10-09T17:39:48.000Z"));
+assert.equal(facts.system_health.issue_count_check, "MATCH");
+assert.equal(facts.system_health.counted_issue_records_by_severity.critical, 0);
+assert.equal(facts.pipeline.error_count, 3, "pipeline errors must use the source's exact count");
+assert.equal(facts.pipeline.market_matching.coverage_denominator, 120);
+assert.ok(Math.abs(facts.pipeline.market_matching.calculated_coverage - (58 / 120)) < 1e-6, "coverage is rounded to six decimal places");
+assert.equal(facts.builder_ticket_results.settled_tickets, 32);
+assert.equal(facts.builder_ticket_results.ticket_accuracy_excluding_pending, 0.15625);
+assert.equal(facts.builder_ticket_results.ticket_shape_records[0].settled_tickets, 13);
+assert.ok(facts.flags.some(function(flag) { return flag.includes("different cohort scopes"); }));
+assert.equal(facts.artifacts.core_pipeline.status, "WITHIN_THRESHOLD");
+assert.equal(facts.odds_builder.evaluated_candidates, 1547);
+assert.equal(facts.odds_builder.live_value_candidates, 818);
+assert.equal(facts.odds_builder.rejected_candidates, 729);
+const sanitizedAnswer = sanitizeAnalystAnswer("Finding: 3 pipeline errors.\n\nEvidence: ```json\n{\"private\":\"raw data\"}\n```");
+assert.ok(sanitizedAnswer.includes("3 pipeline errors"));
+assert.ok(!sanitizedAnswer.includes("raw data"));
+assert.ok(sanitizedAnswer.includes("Raw JSON omitted"));
 console.log("AI Analyst module tests passed.");

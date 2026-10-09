@@ -97,6 +97,49 @@
     setConnected(false);
     setMessage("connectionMessage", "Disconnected. Private records remain in the protected store until you delete them.", "small");
   }
+  function formatVerifiedFacts(f) {
+    if (!f || typeof f !== "object") return "";
+    const n = function(v) { return v == null || !Number.isFinite(Number(v)) ? "unavailable" : Number(v).toLocaleString(); };
+    const age = function(k) {
+      const a = f.artifacts && f.artifacts[k];
+      if (!a || a.age_minutes == null) return "age unavailable";
+      const v = Number(a.age_minutes);
+      const text = v >= 120 ? (v / 60).toFixed(2) + "h old" : Math.round(v) + "m old";
+      return text + (a.threshold_hours == null ? "" : " (" + String(a.status).toLowerCase().replace(/_/g, " ") + ", " + a.threshold_hours + "h threshold)");
+    };
+    const h = f.system_health || {}, p = f.pipeline || {}, m = p.market_matching || {}, t = f.builder_ticket_results || {};
+    const rc = h.reported_issue_counts || {};
+    const lines = [
+      "VERIFIED SOURCE FACTS · calculated from records, not AI prose",
+      "Collected: " + String(f.collected_at || "timestamp unavailable"),
+      "Health: " + String(h.status || "unknown") + "; critical " + n(rc.critical) + ", warning " + n(rc.warning) + ", info " + n(rc.info) + "; count check " + String(h.issue_count_check || "unavailable") + ".",
+      "Pipeline: " + age("core_pipeline") + "; " + n(p.prediction_count) + " predictions (" + n(p.football_count) + " football, " + n(p.tennis_count) + " tennis); " + n(p.error_count) + " errors.",
+      "Automation artifact: " + age("automation") + "."
+    ];
+    if (m.coverage_denominator != null && m.calculated_coverage != null) lines.push(
+      "Market matching: " + n(m.matching_records) + "/" + n(m.coverage_denominator) + " matchable records = " + (100 * Number(m.calculated_coverage)).toFixed(2) + "%; provider event counts are a separate measure."
+    );
+    if (t.tracked_tickets != null) {
+      const hit = t.ticket_accuracy_excluding_pending == null ? "unavailable" : (100 * Number(t.ticket_accuracy_excluding_pending)).toFixed(2) + "%";
+      lines.push("Builder report: " + age("results_first_report") + "; " + n(t.tracked_tickets) + " tracked, " + n(t.pending_tickets) + " pending, " + n(t.won_tickets) + " won, " + n(t.lost_tickets) + " lost; " + n(t.settled_tickets) + " settled; ticket accuracy " + hit + ".");
+      const shapes = Array.isArray(t.ticket_shape_records) ? t.ticket_shape_records : [];
+      if (shapes.length) lines.push("Settled ticket shapes: " + shapes.map(function(x) {
+        return String(x.ticket_shape || "shape").replace(/^ou_legs_/, "") + "-leg " + n(x.wins) + "/" + n(Number(x.wins || 0) + Number(x.losses || 0)) + " wins (" + (x.accuracy == null ? "rate unavailable" : (100 * Number(x.accuracy)).toFixed(2) + "%") + ")";
+      }).join("; ") + ".");
+    }
+    const l = t.individual_leg_statuses_across_tracker || {};
+    if (l.settled_individual_legs != null && t.settled_ou_legs_within_fully_settled_tickets != null && Number(l.settled_individual_legs) !== Number(t.settled_ou_legs_within_fully_settled_tickets)) {
+      lines.push("Cohort note: tracker-wide leg statuses can include legs from still-pending tickets; do not combine that denominator with legs from fully settled tickets.");
+    }
+    const b = f.odds_builder || {};
+    lines.push("Odds Builder: " + age("odds_builder") + "; status " + String(b.status || "unavailable") +
+      "; evaluated " + n(b.evaluated_candidates) + ", LIVE_VALUE category " + n(b.live_value_candidates) +
+      ", REJECTED category " + n(b.rejected_candidates) + ".");
+    if (Array.isArray(f.flags) && f.flags.length) lines.push("Flags: " + f.flags.join(" "));
+    if (h.issue_count_check === "MISMATCH") lines.push("The health artifact's issue counts do not match the severities counted in its issue records.");
+    return lines.join("\n");
+  }
+
   async function askQuestion(question) {
     const cleaned = String(question || $("question").value || "").trim();
     if (!cleaned) return;
@@ -115,6 +158,8 @@
         stamps.results_first_report ? "ticket report " + stamps.results_first_report : null
       ].filter(Boolean);
       if (lines.length) appendMessage("system", "Evidence timestamps: " + lines.join(" · "));
+      const factsText = formatVerifiedFacts(result.verified_facts);
+      if (factsText) appendMessage("system", factsText);
       setMessage("chatStatus", "Request " + result.usage.daily_requests_used + " of " + result.usage.daily_request_limit + " used today.");
     } catch (error) {
       answerNode.textContent = error.message + (error.status === 503 ? "\n\nConfigure Workers AI and the private KV/token bindings in Cloudflare, then redeploy." : "");
