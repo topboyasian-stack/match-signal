@@ -98,6 +98,20 @@ def test_integer_lines_are_not_replayed_without_push_accounting():
     assert ("efootball_gt", "3", "under") not in derived
 
 
+def test_builder_ui_labels_score_replay_and_still_displays_exact_quote():
+    from pathlib import Path
+
+    source = Path(__file__).resolve().parents[1] / "expansion-odds-builder.js"
+    ui = source.read_text(encoding="utf-8")
+    assert "Settled-score replay" in ui
+    assert "Evidence basis" in ui
+    assert "viewLeg.bookmaker_odds" in ui
+    # The live quote join must still use an exact numeric line, never another rung.
+    odds_builder_source = Path(__file__).resolve().parent / "odds_builder.py"
+    python_code = odds_builder_source.read_text(encoding="utf-8")
+    assert "abs(float(m.get(\"line\"))-float(line))<1e-9" in python_code
+
+
 if __name__ == "__main__":
     test_reconstructs_both_sides_from_final_scores()
     test_repeated_lines_for_the_same_event_count_once()
@@ -105,4 +119,5 @@ if __name__ == "__main__":
     test_eight_direct_observations_keep_priority_over_replay()
     test_score_replay_is_efootball_only()
     test_integer_lines_are_not_replayed_without_push_accounting()
+    test_builder_ui_labels_score_replay_and_still_displays_exact_quote()
     print("eFootball settled-score O/U line replay regression checks: PASS")
