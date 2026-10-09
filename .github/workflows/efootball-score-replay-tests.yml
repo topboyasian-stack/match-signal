@@ -1,0 +1,43 @@
+name: eFootball settled-score replay tests
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/odds_builder.py'
+      - 'scripts/test_odds_builder_score_replay.py'
+      - 'scripts/test_odds_builder_efootball_spoiler.py'
+      - 'scripts/test_compact_efootball_builder.py'
+      - '.github/workflows/efootball-score-replay-tests.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/odds_builder.py'
+      - 'scripts/test_odds_builder_score_replay.py'
+      - 'scripts/test_odds_builder_efootball_spoiler.py'
+      - 'scripts/test_compact_efootball_builder.py'
+      - '.github/workflows/efootball-score-replay-tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  score-replay-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Syntax-check Builder
+        run: python -m py_compile scripts/odds_builder.py
+      - name: Test settled-score O/U replay
+        run: python scripts/test_odds_builder_score_replay.py
+      - name: Regression-check eFootball spoiler guard
+        run: python scripts/test_odds_builder_efootball_spoiler.py
+      - name: Test compact eFootball ticket construction
+        run: python scripts/test_compact_efootball_builder.py
