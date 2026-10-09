@@ -116,6 +116,41 @@ function exactSportyBetQuote(x){
 function bookmakerOdds(x){
   return exactSportyBetQuote(x).odds;
 }
+function exactMarketEdge(x,quote){
+  if(!quote||quote.odds==null)return null;
+  const selected=String(x?.pick||x?.selection||"").toLowerCase();
+  const p=Number(probabilityValue(x));
+  if(!Number.isFinite(p)||p<0||p>1)return null;
+  let selectedOdds=Number(quote.odds),oppositeOdds=null,marketProb=null;
+  if(String(x?.market||"").toLowerCase()==="over_under"){
+    const line=Number(x?.line),quotedLine=Number(x?.sportybet_odds_line);
+    if(!Number.isFinite(line)||!Number.isFinite(quotedLine)||Math.abs(line-quotedLine)>1e-9)return null;
+    let over=Number(x?.sportybet_over_odds),under=Number(x?.sportybet_under_odds);
+    if((!Number.isFinite(over)||over<=1||!Number.isFinite(under)||under<=1) && Array.isArray(x?.sportybet_total_games_odds)){
+      over=under=null;
+      x.sportybet_total_games_odds.forEach(item=>{
+        const itemLine=Number(item?.line),side=String(item?.side||"").toLowerCase(),odds=Number(item?.odds);
+        if(!Number.isFinite(itemLine)||Math.abs(itemLine-line)>1e-9||!Number.isFinite(odds)||odds<=1)return;
+        if(side==="over")over=odds;if(side==="under")under=odds;
+      });
+    }
+    if(!Number.isFinite(over)||over<=1||!Number.isFinite(under)||under<=1)return null;
+    const sideOdds=selected==="over"?over:selected==="under"?under:null;
+    if(sideOdds==null||Math.abs(sideOdds-selectedOdds)>1e-9)return null;
+    const invOver=1/over,invUnder=1/under,sum=invOver+invUnder;
+    marketProb=(1/selectedOdds)/sum;
+  }else{
+    const winner=x?.sportybet_winner_odds;
+    if(!winner||typeof winner!=="object")return null;
+    const sides=["p1","p2","draw"].map(key=>({key,odds:Number(winner[key])})).filter(item=>Number.isFinite(item.odds)&&item.odds>1);
+    const picked=sides.find(item=>item.key===selected);
+    if(!picked||Math.abs(picked.odds-selectedOdds)>1e-9||sides.length<2)return null;
+    const sum=sides.reduce((total,item)=>total+1/item.odds,0);
+    if(sum<=0)return null;
+    marketProb=(1/selectedOdds)/sum;
+  }
+  return Number.isFinite(marketProb)?p-marketProb:null;
+}
 function qualificationLabel(x,qualified){
   if(qualified)return "BETTING-QUALIFIED · PAPER";
   const raw=String(x?.qualification_status||"").trim();
@@ -127,13 +162,13 @@ function unifiedMarketLine(x){
   const quote=exactSportyBetQuote(x);
   const book=quote.odds;
   const fair=Number(x.model_fair_odds);
-  const rawEdge=Number(x.model_edge_vs_market);
+  const edge=exactMarketEdge(x,quote);
   const pick=String(x.pick||x.selection||"").toUpperCase();
   const market=x.market==="over_under"?("O/U "+pick+" "+(x.line??"")):marketLabel(x);
   const fairLabel=Number.isFinite(fair)?fair.toFixed(2):"—";
   const qualified=Boolean(x.betting_qualified)||String(x.qualification_status||"").startsWith("BETTING_QUALIFIED");
   const marketReference=book!=null?("SportyBet @ "+book.toFixed(2)):"SportyBet exact quote "+String(quote.reason||"unavailable").replaceAll("_"," ").toLowerCase();
-  const edgeLabel=book!=null&&Number.isFinite(rawEdge)?((rawEdge>=0?"+":"")+(rawEdge*100).toFixed(1)+"%"):"— (requires verified fresh exact quote)";
+  const edgeLabel=edge!=null?((edge>=0?"+":"")+(edge*100).toFixed(1)+"%"):"— (requires fresh two-sided exact market)";
   const evidence=evidenceLabel(x);
   const q=qualificationLabel(x,qualified);
   const candidateBand=String(x.model_candidate_status||x.candidate_status||"").replaceAll("_"," ");
