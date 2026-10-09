@@ -153,14 +153,19 @@ class UpcomingDeskPolicyTests(unittest.TestCase):
         self.assertIsNone(missing["hit_rate"])
 
     def test_high_vfootball_under_requires_30_exact_line_rows_and_65_percent(self):
-        requires = ns["high_vfootball_under_requires_research"]
+        requires = ns["high_line_under_requires_research"]
         self.assertTrue(requires("vfootball", 7.5, "under", {"n": 10, "hit_rate": 1.0}))
         self.assertTrue(requires("vfootball", 8.5, "under", {"n": 0, "hit_rate": None}))
         self.assertTrue(requires("vfootball", 7.5, "under", {"n": 30, "hit_rate": 0.64}))
         self.assertFalse(requires("vfootball", 7.5, "under", {"n": 30, "hit_rate": 0.65}))
         self.assertFalse(requires("vfootball", 6.5, "under", {"n": 0, "hit_rate": None}))
-        self.assertFalse(requires("efootball_gt", 8.5, "under", {"n": 0, "hit_rate": None}))
+        self.assertTrue(requires("efootball_gt", 8.5, "under", {"n": 0, "hit_rate": None}))
         self.assertFalse(requires("vfootball", 8.5, "over", {"n": 0, "hit_rate": None}))
+        self.assertTrue(requires("efootball_gt", 8.5, "under", {"n": 76, "hit_rate": 0.6447368421}))
+        self.assertTrue(requires("efootball_gt", 9.5, "under", {"n": 98, "hit_rate": 0.6326530612}))
+        self.assertTrue(requires("efootball_gt", 10.5, "under", {"n": 69, "hit_rate": 0.5652173913}))
+        self.assertTrue(requires("efootball_gt", 11.5, "under", {"n": 31, "hit_rate": 0.6451612903}))
+        self.assertFalse(requires("efootball_gt", 7.5, "under", {"n": 101, "hit_rate": 0.6930693069}))
 
 
 if __name__ == "__main__":
