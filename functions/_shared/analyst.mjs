@@ -71,11 +71,18 @@ function validDateTime(value) {
 function validRef(value) {
   return typeof value === "string" && /^[A-Za-z0-9_-]{1,80}$/.test(value);
 }
+function checkKnownKeys(value, allowed, where, errors) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return;
+  if (Object.keys(value).some(function(key) { return !allowed.has(key); })) {
+    errors.push(where + " contains unsupported properties");
+  }
+}
 function validateSelection(value, where, errors) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     errors.push(where + " must be an object");
     return;
   }
+  checkKnownKeys(value, new Set(["market", "pick", "line", "odds"]), where, errors);
   if (value.market !== VALID_MARKET) errors.push(where + ".market is invalid");
   if (!VALID_PICKS.has(value.pick)) errors.push(where + ".pick is invalid");
   if (!finiteNumber(value.line) || value.line < 0) errors.push(where + ".line is invalid");
@@ -88,6 +95,7 @@ export function validateReviewDocument(document) {
   if (document.schema_version !== 1) errors.push("schema_version must be 1");
   if (document.record_type !== "private_user_ticket_review") errors.push("record_type is invalid");
   if (document.mode !== "PRIVATE_USER_EVIDENCE") errors.push("mode is invalid");
+  checkKnownKeys(document, new Set(["schema_version", "record_type", "mode", "updated_at", "tickets"]), "root", errors);
   if (!validDateTime(document.updated_at)) errors.push("updated_at must be a date-time");
   if (!Array.isArray(document.tickets)) return errors.concat("tickets must be an array");
   if (document.tickets.length > 1000) errors.push("tickets exceeds the safety limit");
@@ -99,6 +107,7 @@ export function validateReviewDocument(document) {
       errors.push(where + " must be an object");
       return;
     }
+    checkKnownKeys(ticket, new Set(["ticket_ref", "captured_at", "reported_ticket_outcome", "stake", "total_odds", "total_return", "currency", "legs"]), where, errors);
     if (!validRef(ticket.ticket_ref)) errors.push(where + ".ticket_ref is invalid");
     else if (ticketRefs.has(ticket.ticket_ref)) errors.push(where + " has a duplicate ticket_ref");
     else ticketRefs.add(ticket.ticket_ref);
@@ -120,6 +129,7 @@ export function validateReviewDocument(document) {
         errors.push(lw + " must be an object");
         return;
       }
+      checkKnownKeys(leg, new Set(["leg_ref", "product", "competition", "match", "event_id", "kickoff_at", "desk_snapshot", "actual_selection", "final_score", "settled_at"]), lw, errors);
       if (!validRef(leg.leg_ref)) errors.push(lw + ".leg_ref is invalid");
       else if (legRefs.has(leg.leg_ref)) errors.push(lw + " has a duplicate leg_ref");
       else legRefs.add(leg.leg_ref);
@@ -133,6 +143,7 @@ export function validateReviewDocument(document) {
         const desk = leg.desk_snapshot;
         if (!desk || typeof desk !== "object" || Array.isArray(desk)) errors.push(lw + ".desk_snapshot must be an object");
         else {
+          checkKnownKeys(desk, new Set(["prediction_id", "model_version", "market", "pick", "line", "odds", "model_probability", "captured_at"]), lw + ".desk_snapshot", errors);
           if (desk.market !== VALID_MARKET) errors.push(lw + ".desk_snapshot.market is invalid");
           if (!VALID_PICKS.has(desk.pick)) errors.push(lw + ".desk_snapshot.pick is invalid");
           if (!finiteNumber(desk.line) || desk.line < 0) errors.push(lw + ".desk_snapshot.line is invalid");
@@ -146,7 +157,10 @@ export function validateReviewDocument(document) {
       if (leg.final_score !== undefined && leg.final_score !== null) {
         const score = leg.final_score;
         if (!score || typeof score !== "object" || Array.isArray(score)) errors.push(lw + ".final_score must be an object");
-        else for (const side of ["home", "away"]) if (!finiteNumber(score[side]) || score[side] < 0) errors.push(lw + ".final_score." + side + " is invalid");
+        else {
+          checkKnownKeys(score, new Set(["home", "away"]), lw + ".final_score", errors);
+          for (const side of ["home", "away"]) if (!finiteNumber(score[side]) || score[side] < 0) errors.push(lw + ".final_score." + side + " is invalid");
+        }
       }
       if (leg.settled_at !== undefined && leg.settled_at !== null && !validDateTime(leg.settled_at)) errors.push(lw + ".settled_at is invalid");
     });
@@ -258,7 +272,7 @@ export function privateModelTicketContext(document, limit = 8) {
 
 export async function loadPrivateDocument(env) {
   const raw = await env.MATCH_SIGNAL_ANALYST_STORE.get(REVIEW_KEY);
-  if (!raw) return emptyReviewDocument();
+  if (!raw) return emptyReviewDocument("1970-01-01T00:00:00.000Z");
   let document;
   try { document = JSON.parse(raw); } catch { throw new Error("PRIVATE_RECORDS_INVALID_JSON"); }
   if (validateReviewDocument(document).length) throw new Error("PRIVATE_RECORDS_FAIL_VALIDATION");
