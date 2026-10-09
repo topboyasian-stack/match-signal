@@ -207,7 +207,7 @@ jobs:
               if efootball_value_lane:
                   # Isolated evidence-value fallback: exact-side eFootball evidence
                   # has a 65% minimum; this is VALUE_RESEARCH, not high-confidence.
-                  required = 0.65
+                  required = 0.80 if lane == 'efootball_compact_2x' else 0.65
                   assert all(
                       str(leg.get('qualification_lane') or '') == 'efootball_exact_evidence_value'
                       for leg in batch.get('legs', [])
