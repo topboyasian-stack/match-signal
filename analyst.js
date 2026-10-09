@@ -121,6 +121,100 @@
       setMessage("chatStatus", error.status === 429 ? "Daily AI request limit reached." : "Request failed; no ticket records were changed.", "small error");
     } finally { $("sendButton").disabled = false; }
   }
+  function toLocalDateTime(value) {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    const shifted = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+    return shifted.toISOString().slice(0, 16);
+  }
+  function addDeskField(parent, labelText, type, value, options) {
+    const field = document.createElement("div");
+    field.className = "field";
+    const label = document.createElement("label");
+    label.textContent = labelText;
+    const input = type === "select" ? document.createElement("select") : document.createElement("input");
+    if (type !== "select") input.type = type;
+    if (type === "select") {
+      [["over", "Over"], ["under", "Under"]].forEach(function(item) {
+        const option = document.createElement("option");
+        option.value = item[0];
+        option.textContent = item[1];
+        input.appendChild(option);
+      });
+    }
+    input.value = value == null ? "" : String(value);
+    if (options) Object.keys(options).forEach(function(key) { input.setAttribute(key, options[key]); });
+    const id = "deskField_" + Math.random().toString(36).slice(2, 10);
+    input.id = id;
+    label.htmlFor = id;
+    field.append(label, input);
+    parent.appendChild(field);
+    return input;
+  }
+  function renderDeskFields(ticket) {
+    const root = $("draftFields");
+    root.replaceChildren();
+    (ticket.legs || []).forEach(function(leg, index) {
+      const snapshot = leg.desk_snapshot || {};
+      const card = document.createElement("div");
+      card.className = "leg-editor";
+      card.setAttribute("data-leg-index", String(index));
+      const title = document.createElement("div");
+      title.className = "leg-editor-title";
+      title.textContent = "Leg " + (index + 1) + " · " + String(leg.match || "Match to verify");
+      const sub = document.createElement("p");
+      sub.className = "small";
+      sub.textContent = "Actual slip pick: " + String(leg.actual_selection && leg.actual_selection.pick || "unknown").toUpperCase() +
+        " " + String(leg.actual_selection && leg.actual_selection.line != null ? leg.actual_selection.line : "line missing") +
+        " @ " + String(leg.actual_selection && leg.actual_selection.odds != null ? leg.actual_selection.odds : "odds missing");
+      const fields = document.createElement("div");
+      fields.className = "desk-grid";
+      addDeskField(fields, "Desk side", "select", snapshot.pick || "over");
+      addDeskField(fields, "Desk goal line", "number", snapshot.line, { min: "0", step: "0.5", placeholder: "e.g. 2.5" });
+      addDeskField(fields, "Desk odds (optional)", "number", snapshot.odds, { min: "1.001", step: "0.01", placeholder: "e.g. 1.70" });
+      addDeskField(fields, "Desk model probability (optional)", "number", snapshot.model_probability, { min: "0", max: "1", step: "0.001", placeholder: "e.g. 0.83" });
+      addDeskField(fields, "When you saw this desk pick", "datetime-local", toLocalDateTime(snapshot.captured_at), {});
+      card.append(title, sub, fields);
+      root.appendChild(card);
+    });
+  }
+  function applyDeskFields(ticket) {
+    const cards = $("draftFields").querySelectorAll("[data-leg-index]");
+    cards.forEach(function(card) {
+      const fields = card.querySelectorAll("input,select");
+      const pick = fields[0] ? fields[0].value : "";
+      const lineText = fields[1] ? fields[1].value.trim() : "";
+      const oddsText = fields[2] ? fields[2].value.trim() : "";
+      const probabilityText = fields[3] ? fields[3].value.trim() : "";
+      const capturedText = fields[4] ? fields[4].value : "";
+      const index = Number(card.getAttribute("data-leg-index"));
+      const leg = ticket.legs[index];
+      if (!leg) return;
+      if (!lineText) {
+        delete leg.desk_snapshot;
+        return;
+      }
+      if (!capturedText) throw new Error("Leg " + (index + 1) + ": enter when you saw the original desk pick, or leave its desk line blank.");
+      const line = Number(lineText);
+      if (!Number.isFinite(line) || line < 0) throw new Error("Leg " + (index + 1) + ": the desk line is invalid.");
+      const snapshot = { market: "total_goals_over_under", pick: pick, line: line, captured_at: new Date(capturedText).toISOString(), provenance: "user_reported" };
+      if (oddsText) {
+        const odds = Number(oddsText);
+        if (!Number.isFinite(odds) || odds <= 1) throw new Error("Leg " + (index + 1) + ": desk odds must be greater than 1.");
+        snapshot.odds = odds;
+      }
+      if (probabilityText) {
+        const probability = Number(probabilityText);
+        if (!Number.isFinite(probability) || probability < 0 || probability > 1) throw new Error("Leg " + (index + 1) + ": desk model probability must be from 0 to 1.");
+        snapshot.model_probability = probability;
+      }
+      leg.desk_snapshot = snapshot;
+    });
+    $("ticketDraft").value = JSON.stringify(ticket, null, 2);
+    return ticket;
+  }
+
   async function parseReceipt() {
     const receiptText = $("receiptText").value.trim();
     if (receiptText.length < 20) { setMessage("parseStatus", "Paste the copied ticket text first.", "small error"); return; }
@@ -129,6 +223,7 @@
     try {
       const result = await api("./api/analyst/parse-ticket", { method: "POST", body: { receipt_text: receiptText } });
       $("ticketDraft").value = JSON.stringify(result.ticket, null, 2);
+      renderDeskFields(result.ticket);
       $("draftSection").classList.remove("hidden");
       const warnings = result.validation_errors || [];
       setMessage("draftStatus", warnings.length
@@ -145,6 +240,7 @@
     try { ticket = JSON.parse($("ticketDraft").value); }
     catch { throw new Error("The draft is not valid JSON. Correct it before saving."); }
     if (!ticket || typeof ticket !== "object" || !Array.isArray(ticket.legs)) throw new Error("The draft must be a ticket object with a legs array.");
+    ticket = applyDeskFields(ticket);
     if (currentDocument.tickets.some(function(existing) { return existing.ticket_ref === ticket.ticket_ref; })) {
       throw new Error("This ticket reference already exists. Discard and parse it again.");
     }
