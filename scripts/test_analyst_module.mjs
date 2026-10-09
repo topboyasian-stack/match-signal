@@ -105,6 +105,7 @@ const facts = summarizeDiagnosticFacts({
     tours: { ATP: { events_seen: 236, valid_singles: 0, new_predictions: 0, rejected: { "missing athlete id": 157, "non-singles draw": 79 }, error: null } }
   },
   prediction_desk: {
+    status: "GENERATED",
     generated_at: "2026-10-09T17:35:00.000Z", horizon_days: 7, event_count: 80, live_count: 4, pending_settlement_count: 0,
     publication_filters: { past_kickoff_rows_hidden: 13, stale_live_flags_hidden: 2, expired_settled_rows_hidden: 5 },
     high_line_under_evidence: [
@@ -134,6 +135,14 @@ assert.ok(facts.flags.some(function(flag) { return flag.includes("VFootball Unde
 assert.ok(facts.flags.some(function(flag) { return flag.includes("VFootball Under 8.5") && flag.includes("0/30"); }));
 assert.equal(facts.prediction_desk.publication_filters.past_kickoff_rows_hidden, 13);
 assert.equal(facts.artifacts.prediction_desk.status, "WITHIN_THRESHOLD");
+const notGeneratedFacts = summarizeDiagnosticFacts({
+  collected_at: "2026-10-09T17:39:48.000Z",
+  system_health: { generated_at: "2026-10-09T17:39:00.000Z", status: "HEALTHY", critical_issues: 0, warning_issues: 0, info_issues: 0, issue_count_by_severity: { critical: 0, warning: 0, info: 0, other: 0 }, issues: [] },
+  core_pipeline: { updated_at: "2026-10-09T17:20:00.000Z", prediction_count: 1, football_count: 1, tennis_count: 0, errors: [] },
+  tennis_forward_status: { updated_at: "2026-10-09T17:20:00.000Z", window_days: 14, tours: {} },
+  prediction_desk: { status: "NOT_GENERATED", generated_at: null, event_count: null, publication_filters: {}, high_line_under_evidence: [] }
+}, new Date("2026-10-09T17:39:48.000Z"));
+assert.ok(notGeneratedFacts.flags.some(function(flag) { return flag.includes("sidecar status is NOT_GENERATED"); }));
 const sanitizedAnswer = sanitizeAnalystAnswer("Finding: 3 pipeline errors.\n\nEvidence: ```json\n{\"private\":\"raw data\"}\n```");
 assert.ok(sanitizedAnswer.includes("3 pipeline errors"));
 assert.ok(!sanitizedAnswer.includes("raw data"));
