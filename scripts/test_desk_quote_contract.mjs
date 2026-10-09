@@ -111,9 +111,9 @@ assert.equal(isActiveVirtualLeg({sport:"virtual",product:"efootball_adriatic",mo
 assert.equal(isActiveVirtualLeg({sport:"virtual",product:"vfootball"}), false);
 assert.equal(isActiveVirtualLeg({sport:"virtual",product:"zoom"}), false);
 assert.equal(isActiveVirtualLeg({sport:"football",product:"football"}), true);
-assert.equal(isActiveVirtualBatch({products:["efootball_gt"],legs:[{sport:"virtual",product:"efootball_gt"}]}), true);
+assert.equal(isActiveVirtualBatch({products:["efootball_gt"],legs:[{sport:"virtual",product:"efootball_gt",model_probability:0.83}]}), true);
 assert.equal(isActiveVirtualBatch({products:["vfootball"],legs:[{sport:"virtual",product:"vfootball"}]}), false);
-assert.equal(isActiveVirtualBatch({products:["efootball_gt","vfootball"],legs:[{sport:"virtual",product:"efootball_gt"},{sport:"virtual",product:"vfootball"}]}), false);
+assert.equal(isActiveVirtualBatch({products:["efootball_gt","vfootball"],legs:[{sport:"virtual",product:"efootball_gt",model_probability:0.83},{sport:"virtual",product:"vfootball"}]}), false);
 assert.equal(isActiveVirtualBatch({products:["zoom"],legs:[{sport:"virtual",product:"zoom"}]}), false);
 assert.match(builderUiSource, /ACTIVE_VIRTUAL_MIN_PROBABILITY = 0\.80/);
 assert.match(builderUiSource, /data\.batches\)\?data\.batches\.filter\(isActiveVirtualBatch\)/);
