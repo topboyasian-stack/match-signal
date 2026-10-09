@@ -174,6 +174,7 @@
       addDeskField(fields, "Desk goal line", "number", snapshot.line, { min: "0", step: "0.5", placeholder: "e.g. 2.5" });
       addDeskField(fields, "Desk odds (optional)", "number", snapshot.odds, { min: "1.001", step: "0.01", placeholder: "e.g. 1.70" });
       addDeskField(fields, "Desk model probability (optional)", "number", snapshot.model_probability, { min: "0", max: "1", step: "0.001", placeholder: "e.g. 0.83" });
+      addDeskField(fields, "Kickoff time (if known)", "datetime-local", toLocalDateTime(leg.kickoff_at), {});
       addDeskField(fields, "When you saw this desk pick", "datetime-local", toLocalDateTime(snapshot.captured_at), {});
       card.append(title, sub, fields);
       root.appendChild(card);
@@ -187,10 +188,13 @@
       const lineText = fields[1] ? fields[1].value.trim() : "";
       const oddsText = fields[2] ? fields[2].value.trim() : "";
       const probabilityText = fields[3] ? fields[3].value.trim() : "";
-      const capturedText = fields[4] ? fields[4].value : "";
+      const kickoffText = fields[4] ? fields[4].value : "";
+      const capturedText = fields[5] ? fields[5].value : "";
       const index = Number(card.getAttribute("data-leg-index"));
       const leg = ticket.legs[index];
       if (!leg) return;
+      if (kickoffText) leg.kickoff_at = new Date(kickoffText).toISOString();
+      else delete leg.kickoff_at;
       if (!lineText) {
         delete leg.desk_snapshot;
         return;
