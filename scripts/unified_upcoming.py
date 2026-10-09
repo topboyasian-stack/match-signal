@@ -288,7 +288,7 @@ def add(rows, row, now=None, horizon=None):
     # genuinely future fixture merely because its ID appeared in an older settlement
     # ledger. Event-id/match-key settlement is only authoritative once kickoff has
     # passed; explicit terminal provider state still wins immediately.
-    started_or_due = bool(start and start <= NOW)
+    started_or_due = bool(start and start <= now)
     is_virtual=(
         str(row.get("sport") or "").lower()=="virtual"
         or str(row.get("product") or "").lower() in {"efootball_gt","efootball_adriatic","vfootball","zoom"}
@@ -939,6 +939,8 @@ def build_virtual_events(history, lifecycle, eligibility):
 
 def main():
     rows=[]
+    for key in DESK_FILTER_STATS:
+        DESK_FILTER_STATS[key]=0
     lifecycle=load("virtual_lab_participant_lifecycle.json",{})
     core_source=load("predictions.json",[])
     selected_rows=load("selection_candidates.json",[])
