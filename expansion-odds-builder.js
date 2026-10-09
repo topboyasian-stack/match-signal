@@ -577,7 +577,7 @@
     var enabled=false;
     try { enabled=localStorage.getItem('match-signal:odds-builder-push')==='enabled'; } catch(e) {}
     return '<section class="push-notify-panel" data-push-panel>'+
-      '<div class="push-notify-copy"><span class="section-kicker">BACKGROUND ALERTS</span><b>Odds Builder batch notifications</b><span>Get a native device notification even when Match Signal is closed. Alerts fire only for a newly qualified batch at 2.70x+ combined odds.</span></div>'+
+      '<div class="push-notify-copy"><span class="section-kicker">BACKGROUND ALERTS</span><b>Odds Builder batch notifications</b><span>Get a native device notification even when Match Signal is closed. Alerts cover standard batches at 2.70x+ and compact eFootball batches at 2.00x+ when every qualification gate passes.</span></div>'+
       '<div class="push-notify-actions"><span class="push-notify-status" data-push-status>'+esc(enabled?'Notifications enabled':'Notifications off')+'</span><button type="button" class="booking-btn primary" data-push-enable>'+esc(enabled?'Notifications enabled':'Enable notifications')+'</button></div>'+
       '</section>';
   }
@@ -670,7 +670,18 @@
     var top=batches.length?batches[0]:null;
     var topRating=top&&top.combined_model_rating!=null?Number(top.combined_model_rating):null;
     var topJoint=top&&top.combined_model_probability!=null?Number(top.combined_model_probability):null;
-    var status=data.status==='LIVE_VALUE_SET'
+    var selectionPolicy=data.selection_policy||{};
+    var batchPolicy=data.batch_policy||{};
+    var compactPolicy=selectionPolicy.compact_efootball_ticket_lane||{};
+    var primaryLane=String(top&&top.primary_lane||batchPolicy.primary_lane||'');
+    var compactEfootball=primaryLane==='efootball_compact_2x';
+    var gate=data.research_gate||{}, oddsGate=gate.combined_odds_gate||{};
+    var activeFloor=Number(compactEfootball?(batchPolicy.min_combined_odds||compactPolicy.min_combined_odds||2.0):(oddsGate.floor||2.7));
+    var preferredTarget=Number(oddsGate.preferred_target||2.8);
+    var floorLabel=compactEfootball?'2.00+ COMPACT':(activeFloor>=2.8?'2.80+':'2.70+');
+    var status=compactEfootball
+      ? batchCount+' COMPACT EFOOTBALL BATCH'+(batchCount===1?'':'ES')+' · 4–5 LEGS · 2.00+'
+      : data.status==='LIVE_VALUE_SET'
       ? batchCount+' LIVE VALUE BATCH'+(batchCount===1?'':'ES')+' · 4.00+'
       : data.status==='VALUE_RESEARCH_SET'
         ? batchCount+' PAPER VALUE BATCH'+(batchCount===1?'':'ES')+' · 2.80+'
@@ -733,17 +744,19 @@
       cards=fallback.map(function(l,i){return legCard(l,i,0);}).join('');
     }
 
-    var gate=data.research_gate||{}, virtualCount=Number((data.candidates_considered||{}).virtual||0);
-    var oddsGate=gate.combined_odds_gate||{};
-    var activeFloor=Number(oddsGate.floor||2.7);
-    var preferredTarget=Number(oddsGate.preferred_target||2.8);
-    var floorLabel=activeFloor>=2.8?'2.80+':'2.70+';
+    var virtualCount=Number((data.candidates_considered||{}).virtual||0);
+    var batchDiag=((data.candidate_diagnostics||{}).batch_diagnostics||{});
+    var compactDiag=batchDiag.secondary_efootball_compact_diagnostics||{};
     var gateNote;
-    if(batches.length){
-      gateNote='<div class="section"><b>Combined-odds gate</b><div class="sub">Active floor: '+esc(floorLabel)+' · preferred target: '+esc(preferredTarget.toFixed(2))+'x · 2.80 hard gate '+(oddsGate.hard_gate_active?'earned':'not yet earned')+' from '+esc(String(oddsGate.settled_2_80_plus_wins||0))+' settled wins.</div><div class="row"><span>Qualified Virtual candidates</span><b>'+esc(virtualCount)+'</b></div><div class="row"><span>SportyBet price authority</span><b>Fresh Unified Snapshot</b></div></div>';
-      gateNote='<div class="section"><b>Research batch gate active</b><div class="sub">The Builder evaluates Virtual lanes independently of the core tennis gate. vFootball is the primary lane because its existing untouched O/U evidence is currently the strongest active research lane.</div><div class="row"><span>Qualified Virtual candidates</span><b>'+esc(virtualCount)+'</b></div><div class="row"><span>SportyBet price authority</span><b>Fresh Unified Snapshot</b></div></div>';
+    if(batches.length&&compactEfootball){
+      gateNote='<div class="section"><b>Compact eFootball ticket lane</b><div class="sub">4–5 eFootball GT/Adriatic legs · minimum 2.00x combined odds · every leg at least 80% model probability · fresh exact SportyBet line/side · whole-ticket expected ROI at least +2%. This is paper research; joint probability remains an independence proxy, not proven ticket performance.</div><div class="row"><span>Qualified Virtual candidates</span><b>'+esc(virtualCount)+'</b></div><div class="row"><span>SportyBet price authority</span><b>Fresh Unified Snapshot</b></div></div>';
+    } else if(batches.length){
+      gateNote='<div class="section"><b>Research batch gate active</b><div class="sub">Standard batch lane: active combined-odds floor '+esc(floorLabel)+'; current exact SportyBet prices and evidence gates apply. Active Virtual products are eFootball GT and eFootball Adriatic; VFootball and Zoom remain research-only. No weaker legs are added to complete a ticket.</div><div class="row"><span>Qualified Virtual candidates</span><b>'+esc(virtualCount)+'</b></div><div class="row"><span>SportyBet price authority</span><b>Fresh Unified Snapshot</b></div></div>';
     } else if(virtualCount>0){
-      gateNote='<div class="section warning"><b>Virtual lane evaluated, but no '+floorLabel+' batch survived all gates</b><div class="sub">No weak selections are added just to reach 2.70, 2.80 or 4.00.</div><div class="row"><span>Virtual candidates</span><b>'+esc(virtualCount)+'</b></div></div>';
+      var compactDetail=compactDiag.reason
+        ? ' Compact eFootball check: '+String(compactDiag.reason).replace(/_/g,' ')+'. '
+        : ' The compact eFootball lane also checks 4–5 exact-evidence legs at 2.00x+. ';
+      gateNote='<div class="section warning"><b>Virtual lane evaluated, but no ticket survived all gates</b><div class="sub">The standard lane requires its 2.70x/2.80x target; the compact eFootball lane requires 4–5 exact-evidence legs, at least 2.00x and +2% expected ticket ROI. '+esc(compactDetail)+'No weak legs are added to reach an odds target.</div><div class="row"><span>Virtual candidates</span><b>'+esc(virtualCount)+'</b></div><div class="row"><span>Compact lane eligible legs</span><b>'+esc(compactDiag.candidate_count==null?'—':compactDiag.candidate_count)+'</b></div></div>';
     } else if(gate.upstream_blocked){
       gateNote='<div class="section warning"><b>No current batch available</b><div class="sub">The core prediction gate is separate from Virtual and was not allowed to manufacture a slip.</div></div>';
     } else {
