@@ -451,6 +451,7 @@ export async function collectPublicDiagnostics(request) {
       }))
     },
     prediction_desk: deskHealth.unavailable ? deskHealth : {
+      status: deskHealth.status || null,
       generated_at: deskHealth.generated_at || null,
       horizon_days: deskHealth.horizon_days == null ? null : deskHealth.horizon_days,
       event_count: deskHealth.event_count == null ? null : deskHealth.event_count,
@@ -590,6 +591,7 @@ export function summarizeDiagnosticFacts(diagnostics, now = new Date()) {
   if (tennisForward.unavailable) flags.push("The separate tennis forward-discovery artifact could not be loaded.");
   if (tennisForwardAge.status === "STALE") flags.push("Tennis forward discovery is " + (tennisForwardAge.age_minutes / 60).toFixed(2) + "h old, beyond its 8h threshold; absence of predictions cannot be treated as proof that no fixtures exist.");
   if (desk.unavailable) flags.push("The Prediction Desk health sidecar could not be loaded.");
+  if (desk.status && desk.status !== "GENERATED") flags.push("Prediction Desk health sidecar status is " + String(desk.status) + "; its counts are not a fresh generated board snapshot.");
   if (deskAge.status === "STALE") flags.push("The Prediction Desk health sidecar is older than its two-hour threshold.");
   const filters = desk.publication_filters || {};
   if (Number(filters.stale_live_flags_hidden || 0) > 0 || Number(filters.past_kickoff_rows_hidden || 0) > 0) {
