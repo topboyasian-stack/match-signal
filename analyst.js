@@ -141,14 +141,17 @@
       "; expired settlement rows hidden " + n(deskFilters.expired_settled_rows_hidden) +
       ". Hiding a row does not delete its archive history.");
     const highUnder = Array.isArray(desk.high_line_under_evidence) ? desk.high_line_under_evidence : [];
-    if (highUnder.length) lines.push("High-line VFootball Unders: " + highUnder.map(function(x) {
+    if (highUnder.length) lines.push("High-line virtual-football Unders (VFootball/eFootball GT): " + highUnder.map(function(x) {
       const sample = n(x.walkforward_n);
       const hit = x.walkforward_hit_rate == null ? "hit rate unavailable" : (100 * Number(x.walkforward_hit_rate)).toFixed(1) + "%";
       const line = x.line == null ? "?" : String(x.line);
-      const enough = Number(x.walkforward_n || 0) >= 30 && Number(x.walkforward_hit_rate) >= 0.65;
+      const enough = Number(x.walkforward_n || 0) >= 30 && Number.isFinite(Number(x.walkforward_hit_rate)) && Number(x.walkforward_hit_rate) >= 0.65;
+      const qualifiedRows = x.qualified_event_rows == null ? (x.betting_qualified ? n(x.event_rows) : 0) : n(x.qualified_event_rows);
+      const unqualifiedRows = x.unqualified_event_rows == null ? (x.betting_qualified ? 0 : n(x.event_rows)) : n(x.unqualified_event_rows);
+      const mixed = x.qualification_status === "MIXED_EVENT_QUALIFICATION" || (qualifiedRows > 0 && unqualifiedRows > 0);
       return String(x.product || "virtual") + " U" + line + ": " + sample + " exact-line walk-forward rows, " + hit +
-        (enough ? "; sample available, separate Builder gates still apply" : "; insufficient evidence (<30 rows or <65%); NOT betting-qualified") +
-        (x.betting_qualified ? " (source qualification says qualified — verify this mismatch)" : "");
+        (enough ? "; evidence threshold met, separate event/value/Builder gates still apply" : "; fails evidence threshold (<30 rows or <65%); affected rows NOT betting-qualified") +
+        (mixed ? "; MIXED GROUP: " + qualifiedRows + " qualified / " + unqualifiedRows + " unqualified event rows, so the grouped line is not collectively qualified" : "");
     }).join("; ") + ".");
     if (m.coverage_denominator != null && m.calculated_coverage != null) lines.push(
       "Market matching: " + n(m.matching_records) + "/" + n(m.coverage_denominator) + " matchable records = " + (100 * Number(m.calculated_coverage)).toFixed(2) + "%; provider event counts are a separate measure."
