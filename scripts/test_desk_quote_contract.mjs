@@ -140,7 +140,7 @@ assert.match(source, /SportyBet last seen @/);
 assert.match(source, /NOT ACTIONABLE · PRICE STALE/);
 assert.doesNotMatch(source, /MODEL GATE PASSED · PRICE STALE/);
 assert.match(source, /generatedEl\.textContent=new Date\(generatedAt\)\.toLocaleString/);
-assert.match(source, /qualificationState\(row\)\.currentPricePass/);
+assert.match(source, /gate\.currentPricePass\?1:0/);
 assert.doesNotMatch(source, /class="ms-up-qual /);
 assert.doesNotMatch(source, /class="ms-market-q /);
 assert.match(css, /\.ms-book-stale\{[^}]*var\(--ms-amber\)/);
