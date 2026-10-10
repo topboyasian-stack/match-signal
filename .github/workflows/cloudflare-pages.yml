@@ -301,7 +301,14 @@ jobs:
               if (path==='/expansion-odds-builder.js' && (!body.includes('function isActiveVirtualLeg(leg)') || !body.includes('function isActiveVirtualBatch(batch)') || !body.includes('ACTIVE_VIRTUAL_MIN_PROBABILITY = 0.80') || !body.includes('ensureBookingCodes(activeBatches)') || !body.includes("primaryLane==='efootball_compact_2x'") || !body.includes('4–5 LEGS · 2.00+') || !body.includes('Compact eFootball ticket lane'))) failures.push('/expansion-odds-builder.js missing active-scope, compact-lane or 80% stale-batch guard');
               if (path.endsWith('.json')) {
                 const parsed=JSON.parse(body);
-                if (path==='/data/unified_upcoming.json') {
+                if (path==='/data/odds_ticket_tracker.json') {
+                  if (!Array.isArray(parsed.tickets)) failures.push(path+' missing current tickets array');
+                  if (!Array.isArray(parsed.archived_tickets)) failures.push(path+' missing archived ticket snapshots array');
+                  const ticketSummary=parsed.summary||{};
+                  if (!Number.isFinite(Number(ticketSummary.active_pending))) failures.push(path+' missing active pending ticket count');
+                  if (!Number.isFinite(Number(ticketSummary.archived_pending))) failures.push(path+' missing archived pending ticket count');
+              }
+              if (path==='/data/unified_upcoming.json') {
                   if (!Array.isArray(parsed.events)) failures.push(path+' missing events array');
                   const generated=Date.parse(String(parsed.generated_at||''));
                   const age=Date.now()-generated;
