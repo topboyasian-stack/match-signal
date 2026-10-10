@@ -511,12 +511,31 @@ def check_append_only_settled_ledger_prevents_learning_loss():
 
 
 def check_recovered_desk_learning_baseline_is_preserved():
+    # The append-only durable ledger grows as new settled forecasts are learned.
+    # Assert preservation of the original four baseline decisions rather than
+    # incorrectly requiring the entire ledger to remain frozen at exactly four.
     baseline = learning.load(learning.SETTLED_LEDGER, [])
     forecasts = learning.settled_forecasts(baseline)
-    assert len(forecasts) == 4, "The four previously scored desk forecasts must be recovered into the durable ledger"
+    assert len(forecasts) >= 4, "Previously scored desk forecasts must remain in the durable ledger"
+
+    by_observation = {
+        str(row.get("observation_key") or row.get("trace_id") or ""): row
+        for row in forecasts
+    }
+    baseline_keys = {
+        "efootball_gt|29859706|fantazer|uruchi|4.5|2026-10-09T21:41:33.968389+00:00",
+        "efootball_gt|29859706|fantazer|uruchi|5.5|2026-10-09T21:41:33.968389+00:00",
+        "efootball_gt|29859706|bucho55|dreamer|4.5|2026-10-09T21:41:33.968389+00:00",
+        "efootball_gt|29859706|bucho55|dreamer|5.5|2026-10-09T21:41:33.968389+00:00",
+    }
+    preserved = [by_observation[key] for key in baseline_keys if key in by_observation]
+    assert len(preserved) == 4, "All four original scored decisions must be preserved when the ledger grows"
+    assert sum(1 for row in preserved if row.get("win") is True) == 2
+    assert sum(1 for row in preserved if row.get("win") is False) == 2
+
     profiles = learning.exact_profiles(forecasts)["efootball_gt"]
-    assert profiles["4.5|over"]["n"] == 2 and profiles["4.5|over"]["wins"] == 1
-    assert profiles["5.5|over"]["n"] == 2 and profiles["5.5|over"]["wins"] == 1
+    assert profiles["4.5|over"]["n"] >= 2 and profiles["4.5|over"]["wins"] >= 1
+    assert profiles["5.5|over"]["n"] >= 2 and profiles["5.5|over"]["wins"] >= 1
 
 if __name__ == "__main__":
     check_settled_fixture_is_shown_during_grace_then_hidden()
