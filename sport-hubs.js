@@ -434,7 +434,12 @@ async function renderUnifiedBoard(){
     }
     async function freshVirtualQuoteMap(requiredRows=[]){
       const byEvent={};
-      const required=(Array.isArray(requiredRows)?requiredRows:[]).filter(row=>row&&String(row?.sport||"").toLowerCase()==="virtual"&&String(row?.event_id||""));
+      const quoteNow=Date.now();
+      const required=(Array.isArray(requiredRows)?requiredRows:[]).filter(row=>{
+        if(!row||String(row?.sport||"").toLowerCase()!=="virtual"||!isOverUnderPrediction(row)||!String(row?.event_id||""))return false;
+        const start=virtualStartTimestamp(row);
+        return start!=null&&start>=quoteNow;
+      });
       try{
         // The first 100-event page often omits fixtures further down the active
         // eFootball feed. Paginate only a bounded number of pages, stopping as
@@ -484,7 +489,12 @@ async function renderUnifiedBoard(){
         if(thisOver!=null||thisUnder!=null){over=thisOver;under=thisUnder;break;}
       }
       const selected=side==="over"?over:under;
-      if(selected==null)return row;
+      if(selected==null)return {
+        ...row,
+        market_odds_timestamp:null,
+        odds_timestamp:null,
+        desk_quote_refresh:"exact_line_or_side_not_found_in_live_snapshot"
+      };
       return {
         ...row,
         bookmaker_odds:selected,
@@ -603,7 +613,9 @@ async function renderUnifiedBoard(){
     };
     all=all.map(annotate);
     try{
-      const requiredQuoteRows=[...all,...virtualCandidates];
+      const requiredQuoteRows=[...all,...virtualCandidates].filter(row=>
+        String(row?.sport||"").toLowerCase()==="virtual"&&isOverUnderPrediction(row)&&virtualStartTimestamp(row)>=Date.now()
+      );
       const quoteMap=await freshVirtualQuoteMap(requiredQuoteRows);
       all=all.map(row=>{
         if(String(row?.sport||"").toLowerCase()!=="virtual"||!isOverUnderPrediction(row))return row;
