@@ -11,11 +11,11 @@ const sandbox = { Date, Number, String, Math, Array, Boolean, Object, Map, Set, 
 vm.createContext(sandbox);
 vm.runInContext(
   source.slice(start, end) +
-    "\n;globalThis.__deskTestApi={exactVirtualMarketLine,exactSportyBetQuote,exactMarketEdge,qualificationState,primaryPrediction,qualifiedBestSelections,rawProbabilityValue,probabilityCalibrationInfo,probabilityValue,displayedFairOddsValue,isVirtualDeskCandidate};",
+    "\n;globalThis.__deskTestApi={exactVirtualMarketLine,exactSportyBetQuote,exactMarketEdge,exactMarketExpectedReturn,qualificationState,primaryPrediction,qualifiedBestSelections,rawProbabilityValue,probabilityCalibrationInfo,probabilityValue,displayedFairOddsValue,isVirtualDeskCandidate};",
   sandbox,
   { filename: "sport-hubs.js#prediction-desk-gates" }
 );
-const { exactVirtualMarketLine, qualificationState, primaryPrediction, qualifiedBestSelections, rawProbabilityValue, probabilityCalibrationInfo, probabilityValue, displayedFairOddsValue, isVirtualDeskCandidate } = sandbox.__deskTestApi;
+const { exactVirtualMarketLine, exactMarketEdge, qualificationState, primaryPrediction, qualifiedBestSelections, rawProbabilityValue, probabilityCalibrationInfo, probabilityValue, displayedFairOddsValue, exactMarketExpectedReturn, isVirtualDeskCandidate } = sandbox.__deskTestApi;
 
 function row(overrides = {}) {
   return {
@@ -46,6 +46,34 @@ function row(overrides = {}) {
 
 const valid = row();
 assert.equal(qualificationState(valid).currentPricePass, true, "fresh exact-line value can pass");
+
+// A positive model-vs-no-vig edge alone can still have negative expected return
+// at the actual offered odds. Qualified Best must require BOTH checks.
+const positiveMarketEdgeNegativeEV = row({
+  probability: 0.65,
+  bookmaker_odds: 1.42,
+  sportybet_odds: 1.42,
+  sportybet_over_odds: 1.42,
+  sportybet_under_odds: 2.35,
+  sportybet_odds_side: "over"
+});
+const quotedPrice = { odds: 1.42 };
+assert.ok(exactMarketEdge(positiveMarketEdgeNegativeEV, quotedPrice) >= 0.02, "fixture demonstrates a >=2% edge versus de-vigged market");
+assert.ok(exactMarketExpectedReturn(positiveMarketEdgeNegativeEV, quotedPrice) < 0, "same estimate has negative expected return at offered odds");
+assert.equal(qualificationState(positiveMarketEdgeNegativeEV).currentPricePass, false, "a market edge cannot override negative price EV");
+assert.equal(qualificationState(positiveMarketEdgeNegativeEV).reason, "CURRENT_PRICE_EV_BELOW_2_PERCENT");
+assert.equal(qualifiedBestSelections([positiveMarketEdgeNegativeEV], Date.now()).rows.length, 0, "negative-EV selection must not enter Qualified Best");
+
+const profitablePrice = row({
+  probability: 0.65,
+  bookmaker_odds: 1.9,
+  sportybet_odds: 1.9,
+  sportybet_over_odds: 1.9,
+  sportybet_under_odds: 2.0,
+  sportybet_odds_side: "over"
+});
+assert.ok(exactMarketExpectedReturn(profitablePrice, { odds: 1.9 }) >= 0.02, "positive expected-return example clears the economic threshold");
+assert.equal(qualificationState(profitablePrice).currentPricePass, true, "selection must pass both value gates");
 
 // A flag or candidate label must not override an explicit watch/not-qualified status.
 const watchOnly = row({
