@@ -719,6 +719,64 @@
     return legs.length>0&&legs.every(isActiveVirtualLeg);
   }
 
+  function qualificationMonitorHtml(data) {
+    // Observability only: near-misses never become qualified legs or booking batches.
+    var activeBatches=Array.isArray(data.batches)?data.batches:[];
+    if(activeBatches.length||Number(data.batch_count||0)>0)return '';
+    var diag=data.candidate_diagnostics||{};
+    var vdiag=diag.virtual_gate_diagnostics||{};
+    var items=Array.isArray(data.best_available_legs)?data.best_available_legs.slice(0,5):[];
+    var evidenceCandidates=Number(vdiag.evidence_value_candidates||0);
+    var observedAt=String(data.generated_at||'');
+    function formatPercent(value) {
+      var n=Number(value);
+      return isFinite(n)?(n*100).toFixed(1)+'%':'—';
+    }
+    var cards=items.map(function(x){
+      x=x||{};
+      var p=Number(x.model_probability);
+      var hasProbability=isFinite(p);
+      var belowFloor=hasProbability&&p<0.8;
+      var recent=x.recent_evidence||{};
+      var evidenceN=Number(recent.n||x.direct_exact_sample_n||x.evidence_sample_n||0);
+      var hasEvidence=evidenceN>0;
+      var wins=Number(recent.wins);
+      var hitRate=Number(recent.hit_rate);
+      var ticket=x.results_first||{};
+      var blockers=[];
+      if(belowFloor)blockers.push('Model probability is below the active 80% per-leg construction floor.');
+      if(ticket.reason==='no_profitable_construction_shape')blockers.push('No independently proven profitable settled-ticket shape for this product yet.');
+      else if(ticket.reason==='insufficient_settled_exact_line_side_results')blockers.push('Insufficient settled exact-line/side results for the Results-first lane.');
+      if(!blockers.length)blockers.push('This row is informational only; all independent ticket, pricing, and risk gates must pass before qualification.');
+      var facts=[];
+      facts.push('Model '+(hasProbability?formatPercent(p):'—'));
+      facts.push('SportyBet '+(x.bookmaker_odds==null?'—':Number(x.bookmaker_odds).toFixed(2)));
+      facts.push('Edge '+(x.model_edge==null?'—':formatPercent(x.model_edge)));
+      if(hasEvidence){
+        var observed=String(wins)+'/'+String(evidenceN);
+        var hr=isFinite(hitRate)?' · observed hit rate '+formatPercent(hitRate):'';
+        facts.push('Exact-line history '+observed+hr);
+      }
+      return '<div class="card" style="padding:11px;min-width:0">'+
+        '<div style="display:flex;gap:8px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap">'+
+        '<strong style="font-size:11px;line-height:1.45">'+esc(x.match||'Unknown fixture')+'</strong>'+
+        '<span style="font-size:8px;font-weight:900;letter-spacing:.06em;color:#ffd166;border:1px solid rgba(255,209,102,.2);border-radius:999px;padding:4px 6px">NOT QUALIFIED</span></div>'+
+        '<div style="margin-top:4px;font-size:9px;color:var(--ms-muted);line-height:1.45">'+esc(x.pick||'Candidate line unavailable')+'</div>'+
+        '<div style="margin-top:8px;font-size:9px;line-height:1.7">'+esc(facts.join(' · '))+'</div>'+
+        '<div style="margin-top:7px;font-size:8px;line-height:1.55;color:var(--ms-muted)"><b>Why it is not a ticket:</b> '+esc(blockers.join(' '))+'</div>'+
+        '</div>';
+    }).join('');
+    var empty='<div class="empty">No near-miss candidates were published in the latest artifact. This does not create a qualified leg.</div>';
+    return '<div class="builder-batch-panel" style="margin-top:12px">'+
+      '<div class="builder-section-head"><div><span class="section-kicker">QUALIFICATION MONITOR</span><b>Why no qualified legs?</b><span>Near-misses are visible for diagnosis only; they cannot be booked as a ticket.</span></div>'+
+      '<div class="builder-section-note"><b>0</b><span>qualified batches</span></div></div>'+
+      '<div class="sub" style="margin-bottom:10px">The scan is running, but the current candidate pool has not passed every active gate. The Builder checks again on its normal refresh schedule; elapsed time alone does not make a candidate qualified.</div>'+
+      '<div class="builder-feedbar"><span>Exact-evidence/value rows <b>'+esc(evidenceCandidates)+'</b></span><span>Result-first candidates passing <b>'+esc(Number(vdiag.evidence_pass||0))+'</b></span><span>Paper only <b>Yes</b></span></div>'+
+      '<div class="grid" style="margin-top:10px">'+(cards||empty)+'</div>'+
+      '<div class="sub" style="margin-top:10px">These rows are not picks or a recommendation. Probabilities and historic exact-line hit rates describe different measures; neither overrides ticket-family performance, a fresh exact SportyBet quote, edge, correlation, and whole-ticket ROI rules. No booking code is created from this panel.'+
+      (observedAt?' Latest artifact: '+esc(observedAt):'')+'</div></div>';
+  }
+
   function render(data, tracker) {
     var target=document.getElementById('oddsBuilder'); if(!target)return;
     var batches=Array.isArray(data.batches)?data.batches.filter(isActiveVirtualBatch):[];
@@ -844,7 +902,8 @@
     }
 
     var ticketTrack=ticketTrackHtml(tracker);
-    target.innerHTML=pushNotificationHtml()+'<div class="builder-console"><div class="builder-console-head"><div><span class="builder-kicker">PAPER RESEARCH DESK</span><h3>Live '+floorLabel+' Builder</h3><p>Fresh SportyBet prices are qualified in-process. Batches stay paper-only and disjoint by event.</p></div><div class="builder-live-state"><span class="pulse-dot"></span><b>'+(data.status==='LIVE_VALUE_SET'?'LIVE VALUE SET':batchCount?'PAPER VALUE SET':'NO ACTIVE SET')+'</b><small>'+esc(status)+'</small></div></div><div class="builder-stat-row"><div class="builder-stat builder-stat-main"><small>Active batches</small><strong>'+batchCount+'/6</strong><span>Automatically refreshed</span></div><div class="builder-stat"><small>Sport lanes</small><strong>'+esc(sports.length?sports.join(' · '):'—')+'</strong><span>Current batch set</span></div><div class="builder-stat"><small>Top model rating</small><strong>'+esc(topRating==null?'—':topRating.toFixed(1)+'/100')+'</strong><span>Batch strength proxy</span></div><div class="builder-stat"><small>Top combined odds</small><strong>'+esc(top&&top.combined_odds!=null?Number(top.combined_odds).toFixed(3):'—')+'x</strong><span>SportyBet snapshot</span></div></div></div><div class="builder-batch-panel"><div class="builder-section-head"><div><span class="section-kicker">QUALIFIED SET</span><b>'+floorLabel+' paper research batches</b><span>Expand a batch for its booking code, live quote details, timer and legs.</span></div><div class="builder-section-note"><b>'+esc(virtualCount)+'</b><span>virtual candidates evaluated</span></div></div><div class="batch-list">'+(cards||'<div class="empty">No qualified '+floorLabel+' batches are currently available.</div>')+'</div><div class="builder-feedbar"><span><b>SPORTYBET</b> live snapshot</span><span>Top joint proxy <b>'+esc(topJoint==null?'—':pct(topJoint))+'</b></span><span>Price freshness gate <b>&le; 15m</b></span><span>Paper only <b>Yes</b></span></div>'+gateNote+'</div>'+ticketTrack+'<div class="builder-note">The Builder refreshes automatically. Opening a batch reveals its exact selections and current SportyBet booking code.</div>';
+    var qualificationMonitor=qualificationMonitorHtml(data);
+    target.innerHTML=pushNotificationHtml()+'<div class="builder-console"><div class="builder-console-head"><div><span class="builder-kicker">PAPER RESEARCH DESK</span><h3>Live '+floorLabel+' Builder</h3><p>Fresh SportyBet prices are qualified in-process. Batches stay paper-only and disjoint by event.</p></div><div class="builder-live-state"><span class="pulse-dot"></span><b>'+(data.status==='LIVE_VALUE_SET'?'LIVE VALUE SET':batchCount?'PAPER VALUE SET':'NO ACTIVE SET')+'</b><small>'+esc(status)+'</small></div></div><div class="builder-stat-row"><div class="builder-stat builder-stat-main"><small>Active batches</small><strong>'+batchCount+'/6</strong><span>Automatically refreshed</span></div><div class="builder-stat"><small>Sport lanes</small><strong>'+esc(sports.length?sports.join(' · '):'—')+'</strong><span>Current batch set</span></div><div class="builder-stat"><small>Top model rating</small><strong>'+esc(topRating==null?'—':topRating.toFixed(1)+'/100')+'</strong><span>Batch strength proxy</span></div><div class="builder-stat"><small>Top combined odds</small><strong>'+esc(top&&top.combined_odds!=null?Number(top.combined_odds).toFixed(3):'—')+'x</strong><span>SportyBet snapshot</span></div></div></div><div class="builder-batch-panel"><div class="builder-section-head"><div><span class="section-kicker">QUALIFIED SET</span><b>'+floorLabel+' paper research batches</b><span>Expand a batch for its booking code, live quote details, timer and legs.</span></div><div class="builder-section-note"><b>'+esc(virtualCount)+'</b><span>virtual candidates evaluated</span></div></div><div class="batch-list">'+(cards||'<div class="empty">No qualified '+floorLabel+' batches are currently available.</div>')+'</div><div class="builder-feedbar"><span><b>SPORTYBET</b> live snapshot</span><span>Top joint proxy <b>'+esc(topJoint==null?'—':pct(topJoint))+'</b></span><span>Price freshness gate <b>&le; 15m</b></span><span>Paper only <b>Yes</b></span></div>'+gateNote+'</div>'+qualificationMonitor+ticketTrack+'<div class="builder-note">The Builder refreshes automatically. Opening a batch reveals its exact selections and current SportyBet booking code.</div>';
     updateTimers();
   }
   function load(){
