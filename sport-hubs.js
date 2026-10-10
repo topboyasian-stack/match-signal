@@ -34,7 +34,7 @@ function evidenceLabel(x){
       if(source==="EXACT_LINE_DIRECTION")state="exact-line calibrated";
       else if(source==="PROBABILITY_BUCKET")state="bucket calibrated";
       else if(source==="SIDE_COMPARISON_ONLY")state="side comparison used; displayed side raw";
-      else if(count<12)state="line-calibration warm-up ("+count+"/12)";
+      else if(count<12)state="exact-line calibration only ("+count+"/12; qualification is separate)";
       else state="line history available; probability unadjusted";
       return base+" · "+results+" · "+state;
     }
@@ -401,20 +401,65 @@ async function renderUnifiedBoard(){
       );
     });
 
-    async function freshVirtualQuoteMap(){
+    function virtualParticipantIdentity(row,keys){
+      let value="";
+      for(const key of keys){
+        if(row?.[key]!=null&&String(row[key]).trim()){value=String(row[key]).trim();break;}
+      }
+      const embedded=value.match(/\\(([^()]*)\\)\\s*$/);
+      if(embedded&&embedded[1].trim())value=embedded[1].trim();
+      return value.toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+    }
+    function virtualStartTimestamp(row){
+      const raw=row?.start_time_ms??row?.startTimeMs??row?.start_time??row?.startTime??row?.timestamp??row?.date;
+      if(typeof raw==="number"||(typeof raw==="string"&&/^\\d{10,13}$/.test(raw.trim()))){
+        const n=Number(raw);if(Number.isFinite(n))return n<1e11?n*1000:n;
+      }
+      const parsed=Date.parse(String(raw??""));
+      return Number.isFinite(parsed)?parsed:null;
+    }
+    function sameVirtualEvent(row,live){
+      const rowProduct=String(row?.product||"").toLowerCase();
+      const liveProduct=String(live?.product||"").toLowerCase();
+      if(rowProduct&&liveProduct&&rowProduct!==liveProduct)return false;
+      const rowA=virtualParticipantIdentity(row,["participant_1","player_1","team_1","home","home_name","homeName","player1"]);
+      const rowB=virtualParticipantIdentity(row,["participant_2","player_2","team_2","away","away_name","awayName","player2"]);
+      const liveA=virtualParticipantIdentity(live,["participant_1","player_1","team_1","home","home_name","homeName","player1"]);
+      const liveB=virtualParticipantIdentity(live,["participant_2","player_2","team_2","away","away_name","awayName","player2"]);
+      if(!rowA||!rowB||!liveA||!liveB)return false;
+      if([rowA,rowB].sort().join("|")!==[liveA,liveB].sort().join("|"))return false;
+      const rowTime=virtualStartTimestamp(row),liveTime=virtualStartTimestamp(live);
+      if(rowTime==null||liveTime==null||Math.abs(rowTime-liveTime)>90*1000)return false;
+      return true;
+    }
+    async function freshVirtualQuoteMap(requiredRows=[]){
       const byEvent={};
+      const required=(Array.isArray(requiredRows)?requiredRows:[]).filter(row=>row&&String(row?.sport||"").toLowerCase()==="virtual"&&String(row?.event_id||""));
       try{
-        const feed=await get('./api/sportybet-virtual?sources=efootball,vfootball&pageSize=100&pageNum=1&timeline=168');
-        const events=Array.isArray(feed?.events)?feed.events:[];
-        const fetchedAt=feed?.updated_at||feed?.server_time||null;
-        events.forEach(e=>{
-          const id=String(e?.event_id||"");
-          if(id)byEvent[id]={...e,__quote_fetched_at:fetchedAt};
-        });
+        // The first 100-event page often omits fixtures further down the active
+        // eFootball feed. Paginate only a bounded number of pages, stopping as
+        // soon as each requested fixture has an exact ID + participant + kickoff
+        // match. A reused provider ID by itself never validates a quote.
+        for(let page=1;page<=5;page++){
+          const feed=await get('./api/sportybet-virtual?sources=efootball,vfootball&pageSize=100&pageNum='+page+'&timeline=168');
+          const events=Array.isArray(feed?.events)?feed.events:[];
+          const fetchedAt=feed?.updated_at||feed?.server_time||null;
+          events.forEach(e=>{
+            const id=String(e?.event_id||"");
+            if(id){
+              if(!Array.isArray(byEvent[id]))byEvent[id]=[];
+              byEvent[id].push({...e,__quote_fetched_at:fetchedAt});
+            }
+          });
+          if(!events.length)break;
+          const allResolved=required.length>0&&required.every(row=>
+            (byEvent[String(row?.event_id||"")]||[]).some(event=>sameVirtualEvent(row,event))
+          );
+          if(allResolved)break;
+        }
       }catch(_){}
       return byEvent;
     }
-
     function freshVirtualQuoteFields(row,live){
       if(!row||!live||String(row?.market||"").toLowerCase()!=="over_under")return row;
       const line=Number(row?.line);
@@ -459,7 +504,7 @@ async function renderUnifiedBoard(){
       const now=Date.now();
       return rows.map(row=>{
         const eventId=String(row?.event_id||"");
-        const live=quoteMap[eventId];
+        const live=(Array.isArray(quoteMap[eventId])?quoteMap[eventId]:[]).find(event=>sameVirtualEvent(row,event));
         const line=Number(row?.line);
         const side=String(row?.pick||row?.selection||"").toLowerCase();
         if(!live || !Number.isFinite(line) || (side!=="over" && side!=="under")) return null;
@@ -558,11 +603,22 @@ async function renderUnifiedBoard(){
     };
     all=all.map(annotate);
     try{
-      const quoteMap=await freshVirtualQuoteMap();
+      const requiredQuoteRows=[...all,...virtualCandidates];
+      const quoteMap=await freshVirtualQuoteMap(requiredQuoteRows);
       all=all.map(row=>{
         if(String(row?.sport||"").toLowerCase()!=="virtual")return row;
-        const current=quoteMap[String(row?.event_id||"")];
-        return current?freshVirtualQuoteFields(row,current):row;
+        const candidates=quoteMap[String(row?.event_id||"")]||[];
+        const current=Array.isArray(candidates)?candidates.find(event=>sameVirtualEvent(row,event)):null;
+        if(current)return freshVirtualQuoteFields(row,current);
+        // Keep a previously observed price visible, but strip its freshness
+        // timestamps so the UI cannot treat a non-matched live fixture as a
+        // current exact-event price or compute an actionable edge from it.
+        return {
+          ...row,
+          market_odds_timestamp:null,
+          odds_timestamp:null,
+          desk_quote_refresh:"exact_event_not_found_in_live_snapshot"
+        };
       });
       const virtualDeskRows=virtualCandidateDeskRows(virtualCandidates,quoteMap);
       if(virtualDeskRows.length){
