@@ -240,7 +240,7 @@ jobs:
                 if (!body.includes('/reports.html')) failures.push(path+' missing retired-route redirect');
               }
               if (path==='/upcoming.html') {
-                for (const marker of ['Paper Odds Builder','expansion-odds-builder.js?v=20261009-compact-efootball3','oddsBuilder','Model estimate ≠ qualification. Exact-line prices stay visible; stale quotes cannot qualify or show a current edge.','2.70× floor','2.80× preferred','sport-hubs.js?v=20261009-efootball-only2','Current-price gate passes','id="upLast"'])
+                for (const marker of ['Paper Odds Builder','expansion-odds-builder.js?v=20261009-compact-efootball3','oddsBuilder','Model estimate ≠ qualification. Exact-line prices stay visible; stale quotes cannot qualify or show a current edge.','2.70× floor','2.80× preferred','sport-hubs.js?v=20261010-predictiondesk-exact-quote2','Current-price gate passes','id="upLast"'])
                   if (!body.includes(marker)) failures.push(path+' missing '+marker);
                 if (body.includes('id="lineLadderDesk"') || body.includes('4.00+ target · no forced legs'))
                   failures.push(path+' contains retired line-ladder clutter or misleading Builder target');
