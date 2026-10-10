@@ -432,6 +432,92 @@ def check_prediction_desk_copy_and_quote_matching_contract():
     assert "QUOTE_STALE" in source and "FRESH_TWO_SIDED_MARKET_REQUIRED" in source
 
 
+
+
+def check_capture_deduplicates_beyond_the_last_1000_rows():
+    now = datetime.now(timezone.utc)
+    kickoff = now + timedelta(hours=3)
+    event = {
+        "product": "efootball_gt", "sport": "virtual", "event_id": "dedupe-far-back",
+        "start_time": iso(kickoff), "player_1": "Home (HANDLE_A)", "player_2": "Away (HANDLE_B)",
+        "market": "over_under", "line": 7.5, "pick": "under", "probability": 0.80,
+        "raw_model_probability": 0.80, "model_version": "TEST-MODEL",
+        "validated_model_family": "test-family", "bookmaker_odds": 1.50,
+        "model_edge_vs_market": 0.10,
+    }
+    old = {
+        "trace_id": f"{learning.exact_key(event)}|{iso(now - timedelta(minutes=5))}",
+        "event_key": learning.exact_key(event), "product": "efootball_gt",
+        "start_time": iso(kickoff), "participant_1": event["player_1"], "participant_2": event["player_2"],
+        "line": 7.5, "pick": "under", "model_probability": 0.80,
+        "raw_model_probability": 0.80, "model_version": "TEST-MODEL",
+        "validated_model_family": "test-family", "bookmaker_odds": 1.50,
+        "model_edge_vs_market": 0.10, "observed_at": iso(now - timedelta(minutes=5)),
+        "settled": False,
+    }
+    fillers = [
+        {
+            "trace_id": f"filler-{i}", "product": "efootball_gt", "start_time": iso(kickoff + timedelta(minutes=i + 1)),
+            "participant_1": f"Home (FILLER{i})", "participant_2": f"Away (OTHER{i})",
+            "line": 7.5, "pick": "under", "model_probability": 0.70,
+            "observed_at": iso(now - timedelta(minutes=10)), "settled": False,
+        }
+        for i in range(1200)
+    ]
+    trace = [old] + fillers
+    original_count = len(trace)
+    added = learning.capture(trace, {"generated_at": iso(now), "events": [event]})
+    assert added == 0 and len(trace) == original_count, "An unchanged forecast hidden behind >1,000 newer rows must not be recaptured"
+
+    repriced = {**event, "bookmaker_odds": 1.60, "model_edge_vs_market": 0.15}
+    added = learning.capture(trace, {"generated_at": iso(now), "events": [repriced]})
+    assert added == 1 and len(trace) == original_count + 1, "Material quote/edge changes must remain in the desk trace"
+    added = learning.capture(trace, {"generated_at": iso(now), "events": [repriced]})
+    assert added == 0, "The same revised forecast should then deduplicate"
+
+
+def check_trace_bound_keeps_settled_and_imminent_fixtures():
+    now = datetime(2026, 10, 10, 10, 0, tzinfo=timezone.utc)
+    settled = {"trace_id": "settled", "settled": True, "scored_forecast": True,
+               "start_time": iso(now - timedelta(hours=2)), "observed_at": iso(now - timedelta(hours=3))}
+    overdue = {"trace_id": "overdue", "settled": False,
+               "start_time": iso(now - timedelta(minutes=5)), "observed_at": iso(now - timedelta(minutes=30))}
+    soon = {"trace_id": "soon", "settled": False,
+            "start_time": iso(now + timedelta(minutes=20)), "observed_at": iso(now - timedelta(minutes=10))}
+    later = {"trace_id": "later", "settled": False,
+             "start_time": iso(now + timedelta(hours=8)), "observed_at": iso(now - timedelta(minutes=1))}
+    retained = learning.bound_trace([settled, overdue, soon, later], now=now, cap=3)
+    retained_ids = {row["trace_id"] for row in retained}
+    assert retained_ids == {"settled", "overdue", "soon"}, "Trace cap must protect scored records and forecasts nearest to settlement"
+
+
+def check_append_only_settled_ledger_prevents_learning_loss():
+    kickoff = datetime(2026, 10, 8, 16, 42, tzinfo=timezone.utc)
+    observed = kickoff - timedelta(minutes=5)
+    original = {
+        "product": "efootball_gt", "event_id": "ledger-event-1", "start_time": iso(kickoff),
+        "participant_1": "Home (LEDGER_A)", "participant_2": "Away (LEDGER_B)",
+        "line": 4.5, "pick": "over", "model_probability": 0.70,
+        "observed_at": iso(observed), "settled_at": iso(kickoff + timedelta(minutes=10)),
+        "score": "3:1", "actual_result": "over", "settled": True, "scored_forecast": True, "win": True,
+    }
+    newer = {**original, "event_id": "ledger-event-2", "participant_1": "Home (LEDGER_C)",
+             "participant_2": "Away (LEDGER_D)", "observed_at": iso(observed + timedelta(minutes=1)),
+             "score": "1:2", "actual_result": "under", "win": False}
+    ledger, added = learning.merge_settled_observations([dict(original)], [dict(original), newer])
+    assert added == 1 and len(ledger) == 2, "Previously archived outcomes must remain while new scored outcomes append"
+    forecasts = learning.settled_forecasts(ledger)
+    assert len(forecasts) == 2 and sum(1 for row in forecasts if row.get("win")) == 1
+
+
+def check_recovered_desk_learning_baseline_is_preserved():
+    baseline = learning.load(learning.SETTLED_LEDGER, [])
+    forecasts = learning.settled_forecasts(baseline)
+    assert len(forecasts) == 4, "The four previously scored desk forecasts must be recovered into the durable ledger"
+    profiles = learning.exact_profiles(forecasts)["efootball_gt"]
+    assert profiles["4.5|over"]["n"] == 2 and profiles["4.5|over"]["wins"] == 1
+    assert profiles["5.5|over"]["n"] == 2 and profiles["5.5|over"]["wins"] == 1
+
 if __name__ == "__main__":
     check_settled_fixture_is_shown_during_grace_then_hidden()
     check_reused_event_id_does_not_hide_a_different_fixture()
@@ -444,4 +530,8 @@ if __name__ == "__main__":
     check_ambiguous_near_time_settlement_is_never_guessed()
     check_half_line_directional_gate_uses_unique_scores_and_excludes_conflicts()
     check_prediction_desk_copy_and_quote_matching_contract()
-    print("PASS: settlement retention, conservative reconciliation, unique score replay, line gates, calibration, and exact live quote contract")
+    check_capture_deduplicates_beyond_the_last_1000_rows()
+    check_trace_bound_keeps_settled_and_imminent_fixtures()
+    check_append_only_settled_ledger_prevents_learning_loss()
+    check_recovered_desk_learning_baseline_is_preserved()
+    print("PASS: settlement retention, deduplication, durable learning ledger, unique score replay, line gates, calibration, and exact quote contract")

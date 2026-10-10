@@ -172,7 +172,7 @@ jobs:
           set -euo pipefail
           rm -rf .pages-deploy
           mkdir -p .pages-deploy
-          rsync -a             --exclude='.git/'             --exclude='.pages-deploy/'             --exclude='node_modules/'             --exclude='data/virtual_lab_history.json'             --exclude='data/efootball_desk_prediction_history.json'             ./ .pages-deploy/
+          rsync -a             --exclude='.git/'             --exclude='.pages-deploy/'             --exclude='node_modules/'             --exclude='data/virtual_lab_history.json'             --exclude='data/efootball_desk_prediction_history.json'             --exclude='data/efootball_desk_settled_observations.json'             ./ .pages-deploy/
           gzip -c data/virtual_lab_history.json > .pages-deploy/data/virtual_lab_history.json.gz
           original_bytes=$(stat -c%s data/virtual_lab_history.json)
           compressed_bytes=$(stat -c%s .pages-deploy/data/virtual_lab_history.json.gz)
@@ -196,6 +196,15 @@ jobs:
           test "$desk_compressed_bytes" -lt "$MAX_PAGES_FILE_BYTES"
           test -s .pages-deploy/data/efootball_desk_prediction_history.json.gz
           test ! -e .pages-deploy/data/efootball_desk_prediction_history.json
+
+          # The settled desk ledger is a durable learning archive, but only its
+          # compressed form is published to Pages to keep individual assets small.
+          gzip -c data/efootball_desk_settled_observations.json > .pages-deploy/data/efootball_desk_settled_observations.json.gz
+          ledger_compressed_bytes=$(stat -c%s .pages-deploy/data/efootball_desk_settled_observations.json.gz)
+          echo "Compressed settled desk observations archive: $ledger_compressed_bytes bytes"
+          test "$ledger_compressed_bytes" -lt "$MAX_PAGES_FILE_BYTES"
+          test -s .pages-deploy/data/efootball_desk_settled_observations.json.gz
+          test ! -e .pages-deploy/data/efootball_desk_settled_observations.json
           echo "Cloudflare Pages staging passed the 25 MiB single-file limit."
 
       - name: Deploy to Cloudflare Pages
