@@ -54,7 +54,11 @@ jobs:
         run: |
           python - <<'PY'
           import json
+          import sys
+          from datetime import datetime, timezone
           from pathlib import Path
+          sys.path.insert(0, '.')
+          from scripts.odds_ticket_tracker import ticket_is_stale_pending
           d=json.loads(Path('data/odds_ticket_tracker.json').read_text())
           assert d.get('mode') == 'PAPER_ONLY'
           assert isinstance(d.get('tickets'), list)
@@ -65,6 +69,10 @@ jobs:
           assert isinstance(d.get('archived_tickets',[]), list)
           assert int(summary.get('active_pending',0)) >= 0
           assert int(summary.get('archived_pending',0)) >= 0
+          now = datetime.now(timezone.utc)
+          assert not any(ticket_is_stale_pending(t, now) for t in d['tickets']), 'stale pending ticket leaked into current track'
+          assert int(summary.get('active_pending',0)) == sum(str(t.get('status') or '').upper() == 'PENDING' for t in d['tickets'])
+          assert int(summary.get('archived_pending',0)) == sum(str(t.get('status') or '').upper() == 'PENDING' for t in d.get('archived_tickets',[]))
           all_tickets = list(d['tickets']) + list(d.get('archived_tickets',[]))
           ids = [str(t.get('ticket_id') or '') for t in all_tickets]
           assert len(ids) == len(set(ids)), 'duplicate ticket IDs across active/archive lists'
