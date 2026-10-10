@@ -440,6 +440,7 @@ async function renderUnifiedBoard(){
         const start=virtualStartTimestamp(row);
         return start!=null&&start>=quoteNow;
       });
+      if(!required.length)return byEvent;
       try{
         // The first 100-event page often omits fixtures further down the active
         // eFootball feed. Paginate only a bounded number of pages, stopping as
@@ -456,7 +457,7 @@ async function renderUnifiedBoard(){
               byEvent[id].push({...e,__quote_fetched_at:fetchedAt});
             }
           });
-          if(!events.length)break;
+          if(events.length<100)break;
           const allResolved=required.length>0&&required.every(row=>
             (byEvent[String(row?.event_id||"")]||[]).some(event=>sameVirtualEvent(row,event))
           );
