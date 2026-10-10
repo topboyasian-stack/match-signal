@@ -441,17 +441,30 @@ def load_virtual_history():
     return [r for r in history if isinstance(r,dict) and r.get("market")=="ou" and r.get("win") is not None]
 
 def build_efootball_directional_gate(eval_art, history):
-    """Build exact product+line+side qualification evidence from untouched holdout + recent settled history.
+    """Build granular O/U qualification evidence without counting duplicate scores.
 
-    This is deliberately separate from the product-wide bootstrap gate. The base
-    model must already pass its global walk-forward gate, then an exact O/U line
-    and direction must have at least 30 untouched holdout rows at >=65% hit rate
-    and at least 30 recent settled rows at >=65% hit rate. This does not lower
-    the evidence threshold; it makes the validation granular enough to avoid
-    blocking strong exact selections because another eFootball line/side is weak.
+    Qualification still requires >=30 untouched out-of-sample rows at >=65%
+    AND >=30 recent settled outcomes at >=65%. Half-goal lines (for example
+    7.5) use one verified final score per unique fixture so a single event
+    repeated across multiple O/U rows cannot inflate the recent sample. Integer
+    lines retain direct exact-line outcomes to preserve explicit push handling.
     """
     out={}
     by_key=defaultdict(list)
+    score_candidates={}
+    score_conflicts=set()
+
+    def score_total(value):
+        if value is None:
+            return None
+        parts=str(value).replace(" ","").split(":")
+        if len(parts)!=2:
+            return None
+        values=[num(part) for part in parts]
+        if any(v is None or v<0 or not float(v).is_integer() for v in values):
+            return None
+        return int(values[0])+int(values[1])
+
     for r in history if isinstance(history,list) else []:
         if not isinstance(r,dict) or r.get("product")!="efootball_gt" or r.get("market")!="ou" or r.get("win") is None:
             continue
@@ -464,10 +477,23 @@ def build_efootball_directional_gate(eval_art, history):
         if not side:
             continue
         stamp=dt(r.get("settled_at") or r.get("timestamp"))
-        by_key[(line,side)].append({
-            "win":bool(r.get("win")),
-            "timestamp":stamp
-        })
+        by_key[(line,side)].append({"win":bool(r.get("win")),"timestamp":stamp})
+
+        total=score_total(r.get("score") or r.get("final_score"))
+        fixture=virtual_fixture_key(r)
+        if total is None or not fixture or stamp is None:
+            continue
+        current=score_candidates.get(fixture)
+        if current is None or stamp>current["timestamp"]:
+            score_candidates[fixture]={"total":total,"timestamp":stamp,"fixture_key":fixture}
+            score_conflicts.discard(fixture)
+        elif stamp==current["timestamp"] and total!=current["total"]:
+            score_conflicts.add(fixture)
+
+    # Any conflict at the latest settlement timestamp is excluded. This is
+    # intentionally fail-closed rather than choosing whichever duplicate row
+    # happens to occur last in the archive.
+    unique_scores={key:value for key,value in score_candidates.items() if key not in score_conflicts}
 
     selection_eval=((eval_art.get("efootball_gt_diagnostics") or {}).get("selection") or {}) if isinstance(eval_art,dict) else {}
     for selection_key, line_map in selection_eval.items():
@@ -480,8 +506,8 @@ def build_efootball_directional_gate(eval_art, history):
         except (TypeError,ValueError):
             continue
         report=(line_map or {}).get(str(line)) if isinstance(line_map,dict) else None
-        # Prefer the participant-aware holdout variant when it exists; this
-        # is the same time-safe model family used for the eFootball desk.
+        # Prefer participant-aware holdout when available. This is independent
+        # of the recent settled ledger and keeps the existing OOS threshold.
         poisson=(report or {}).get("participant_model") if isinstance(report,dict) else None
         if not isinstance(poisson,dict):
             poisson=(report or {}).get("efootball_shape") if isinstance(report,dict) else None
@@ -489,8 +515,21 @@ def build_efootball_directional_gate(eval_art, history):
             poisson=(report or {}).get("poisson") if isinstance(report,dict) else None
         if not isinstance(poisson,dict):
             continue
-        arr=sorted(by_key.get((line,side),[]), key=lambda x: x.get("timestamp") or datetime.min.replace(tzinfo=timezone.utc))
-        recent=arr[-min(EFOOTBALL_DIRECTION_RECENT_WINDOW,len(arr)):] if arr else []
+
+        is_half_line=abs((line % 1.0)-0.5)<1e-9
+        if is_half_line:
+            recent=[
+                {"win":(record["total"]>line if side=="over" else record["total"]<line),"timestamp":record["timestamp"]}
+                for record in unique_scores.values()
+            ]
+            recent.sort(key=lambda x:x.get("timestamp") or datetime.min.replace(tzinfo=timezone.utc))
+            recent=recent[-min(EFOOTBALL_DIRECTION_RECENT_WINDOW,len(recent)):] if recent else []
+            recent_source="UNIQUE_SETTLED_SCORE_REPLAY"
+        else:
+            arr=sorted(by_key.get((line,side),[]),key=lambda x:x.get("timestamp") or datetime.min.replace(tzinfo=timezone.utc))
+            recent=arr[-min(EFOOTBALL_DIRECTION_RECENT_WINDOW,len(arr)):] if arr else []
+            recent_source="DIRECT_EXACT_LINE"
+
         holdout_n=int(poisson.get("n") or 0)
         holdout_hit=float(poisson.get("hit_rate") or 0)
         recent_n=len(recent)
@@ -508,7 +547,9 @@ def build_efootball_directional_gate(eval_art, history):
             "recent_n":recent_n,
             "recent_hit_rate":round(recent_hit,4),
             "threshold":EFOOTBALL_DIRECTION_MIN_HIT_RATE,
-            "basis":"strict chronological holdout + latest settled exact-line direction history",
+            "recent_evidence_source":recent_source,
+            "excluded_conflicting_score_fixtures":len(score_conflicts),
+            "basis":"strict chronological holdout + recent unique settled-score replay for half-goal lines; direct exact-line outcomes for integer lines",
         }
     return out
 
