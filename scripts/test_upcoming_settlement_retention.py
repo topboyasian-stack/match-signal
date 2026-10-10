@@ -422,6 +422,7 @@ def check_prediction_desk_copy_and_quote_matching_contract():
     learning_source = (ROOT / "scripts" / "efootball_desk_learning.py").read_text(encoding="utf-8")
     assert "unmatched_samples_by_product" in learning_source, "Settlement diagnostics must retain GT samples separately from VFootball"
     assert "for r in trace if isinstance(r, dict)" in learning_source, "Products with pending forecasts must remain visible before the first scored result"
+    assert "kickoff_and_history_gap_by_product" in learning_source, "Diagnostics must separate future fixtures from already-played unmatched fixtures"
     assert "line-calibration warm-up (" not in source
     assert "for(let page=1;page<=5;page++)" in source
     assert "if(!required.length)return byEvent;" in source
@@ -430,6 +431,37 @@ def check_prediction_desk_copy_and_quote_matching_contract():
     assert "exact_event_not_found_in_live_snapshot" in source
     assert "exact_line_or_side_not_found_in_live_snapshot" in source, "Missing current line/side must invalidate quote freshness"
     assert "QUOTE_STALE" in source and "FRESH_TWO_SIDED_MARKET_REQUIRED" in source
+
+
+
+
+def check_unmatched_diagnostics_separate_past_and_future_kickoffs():
+    now = datetime.now(timezone.utc)
+    forecasts = []
+    for label, kickoff in (
+        ("past-diagnostic", now - timedelta(hours=1)),
+        ("future-diagnostic", now + timedelta(hours=1)),
+    ):
+        forecasts.append({
+            "product": "efootball_gt",
+            "event_id": label,
+            "start_time": iso(kickoff),
+            "participant_1": f"Home ({label}-HANDLE-A)",
+            "participant_2": f"Away ({label}-HANDLE-B)",
+            "line": 2.5,
+            "pick": "over",
+            "model_probability": 0.80,
+            "observed_at": iso(kickoff - timedelta(minutes=5)),
+            "settled": False,
+        })
+    stats = learning.reconcile(forecasts, {})
+    gt = stats["kickoff_and_history_gap_by_product"]["efootball_gt"]
+    assert gt["groups_with_kickoff"] == 2
+    assert gt["past_kickoff_0_to_2h_groups"] == 1
+    assert gt["future_kickoff_groups"] == 1
+    assert gt["groups_with_pre_kickoff_observation"] == 2
+    assert gt["nearest_same_product_history_missing"] == 2
+    assert stats["scored_forecasts"] == 0, "Diagnostic counts must not create settlement outcomes"
 
 
 if __name__ == "__main__":
@@ -444,4 +476,5 @@ if __name__ == "__main__":
     check_ambiguous_near_time_settlement_is_never_guessed()
     check_half_line_directional_gate_uses_unique_scores_and_excludes_conflicts()
     check_prediction_desk_copy_and_quote_matching_contract()
-    print("PASS: settlement retention, conservative reconciliation, unique score replay, line gates, calibration, and exact live quote contract")
+    check_unmatched_diagnostics_separate_past_and_future_kickoffs()
+    print("PASS: settlement retention, conservative reconciliation, unique score replay, kickoff-gap diagnostics, line gates, calibration, and exact live quote contract")

@@ -295,6 +295,7 @@ def reconcile(trace, history_index):
     # diagnosable without dumping the large append-only trace/archive.
     identity_index = {}
     names_index = {}
+    names_by_product = {}
     event_id_index = {}
     history_products = {}
     for item in history_index.values():
@@ -304,6 +305,7 @@ def reconcile(trace, history_index):
         if identity:
             identity_index.setdefault(identity, []).append(item)
             names_index.setdefault(identity[1], []).append(item)
+            names_by_product.setdefault((product, identity[1]), []).append(item)
         event_id = str(item.get("event_id") or "")
         if product and event_id:
             event_id_index.setdefault((product, event_id), []).append(item)
@@ -352,12 +354,55 @@ def reconcile(trace, history_index):
     unmatched_samples_by_product = {}
     unmatched_reason_counts = {}
     match_counts_by_product = {}
+    kickoff_and_history_gap_by_product = {}
+    now = datetime.now(timezone.utc)
     for exact, forecasts in forecasts_by_exact_key.items():
         if not forecasts:
             continue
         product = str(forecasts[0].get("product") or "efootball_gt").strip().lower()
         product_counts = match_counts_by_product.setdefault(product, {"forecast_line_groups": 0, "matched_exact": 0, "matched_near_time": 0, "unmatched": 0, "unmatched_reason_counts": {}})
         product_counts["forecast_line_groups"] += 1
+        kickoff_metrics = kickoff_and_history_gap_by_product.setdefault(product, {
+            "groups_with_kickoff": 0,
+            "future_kickoff_groups": 0,
+            "past_kickoff_0_to_2h_groups": 0,
+            "past_kickoff_2_to_24h_groups": 0,
+            "past_kickoff_over_24h_groups": 0,
+            "groups_with_pre_kickoff_observation": 0,
+            "groups_with_post_kickoff_observation_only": 0,
+            "groups_with_settled_trace_flag": 0,
+            "groups_with_scored_trace_flag": 0,
+            "nearest_same_product_history_missing": 0,
+            "nearest_same_product_history_under_2m": 0,
+            "nearest_same_product_history_2m_to_2h": 0,
+            "nearest_same_product_history_2h_to_24h": 0,
+            "nearest_same_product_history_1d_to_7d": 0,
+            "nearest_same_product_history_over_7d": 0,
+            "nearest_history_before_kickoff": 0,
+            "nearest_history_after_kickoff": 0,
+        })
+        group_start = dt(forecasts[0].get("start_time") or forecasts[0].get("timestamp"))
+        if group_start is not None:
+            kickoff_metrics["groups_with_kickoff"] += 1
+            age_seconds = (now - group_start).total_seconds()
+            if age_seconds < 0:
+                kickoff_metrics["future_kickoff_groups"] += 1
+            elif age_seconds < 2 * 3600:
+                kickoff_metrics["past_kickoff_0_to_2h_groups"] += 1
+            elif age_seconds < 24 * 3600:
+                kickoff_metrics["past_kickoff_2_to_24h_groups"] += 1
+            else:
+                kickoff_metrics["past_kickoff_over_24h_groups"] += 1
+            observations = [dt(row.get("observed_at")) for row in forecasts]
+            observations = [stamp for stamp in observations if stamp is not None]
+            if any(stamp < group_start for stamp in observations):
+                kickoff_metrics["groups_with_pre_kickoff_observation"] += 1
+            elif observations and all(stamp >= group_start for stamp in observations):
+                kickoff_metrics["groups_with_post_kickoff_observation_only"] += 1
+            if any(row.get("settled") is True for row in forecasts):
+                kickoff_metrics["groups_with_settled_trace_flag"] += 1
+            if any(row.get("scored_forecast") is True for row in forecasts):
+                kickoff_metrics["groups_with_scored_trace_flag"] += 1
         item, match_method = resolve_settlement(forecasts[0], history_index, identity_index, names_index)
         if not item:
             stats["unmatched_line_groups"] += 1
@@ -367,6 +412,32 @@ def reconcile(trace, history_index):
             if match_method == "AMBIGUOUS":
                 stats["ambiguous_line_groups"] += 1
             product_samples = unmatched_samples_by_product.setdefault(product, [])
+            identity_for_gap = fixture_identity(forecasts[0])
+            same_product_histories = (names_by_product or {}).get((product, identity_for_gap[1]), []) if identity_for_gap else []
+            closest_same_product = min(
+                same_product_histories,
+                key=lambda hist: abs((hist.get("_event_time") - group_start).total_seconds())
+                if group_start is not None and hist.get("_event_time") is not None else float("inf"),
+                default=None,
+            )
+            if not closest_same_product or group_start is None or closest_same_product.get("_event_time") is None:
+                kickoff_metrics["nearest_same_product_history_missing"] += 1
+            else:
+                delta_seconds = abs((closest_same_product.get("_event_time") - group_start).total_seconds())
+                if delta_seconds < 120:
+                    kickoff_metrics["nearest_same_product_history_under_2m"] += 1
+                elif delta_seconds < 2 * 3600:
+                    kickoff_metrics["nearest_same_product_history_2m_to_2h"] += 1
+                elif delta_seconds < 24 * 3600:
+                    kickoff_metrics["nearest_same_product_history_2h_to_24h"] += 1
+                elif delta_seconds < 7 * 24 * 3600:
+                    kickoff_metrics["nearest_same_product_history_1d_to_7d"] += 1
+                else:
+                    kickoff_metrics["nearest_same_product_history_over_7d"] += 1
+                if closest_same_product.get("_event_time") < group_start:
+                    kickoff_metrics["nearest_history_before_kickoff"] += 1
+                else:
+                    kickoff_metrics["nearest_history_after_kickoff"] += 1
             if len(unmatched_samples) < 8 or len(product_samples) < 4:
                 latest_forecast = max(
                     forecasts,
@@ -466,6 +537,7 @@ def reconcile(trace, history_index):
 
     stats["unmatched_reason_counts"] = unmatched_reason_counts
     stats["match_counts_by_product"] = match_counts_by_product
+    stats["kickoff_and_history_gap_by_product"] = kickoff_and_history_gap_by_product
     stats["unmatched_samples_by_product"] = unmatched_samples_by_product
     stats["unmatched_samples"] = unmatched_samples
     stats["scored_forecasts"] = sum(1 for row in trace if row.get("scored_forecast") is True)
