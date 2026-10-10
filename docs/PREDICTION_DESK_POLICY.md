@@ -9,6 +9,14 @@ This policy is a safety and correctness contract for the public Prediction Desk,
 - An event may remain visible as research when it has not qualified. Visibility does not authorize a bet or relax a gate.
 - Private, user-reported slips are a selection-biased review cohort. Do not merge them silently into the public model history or claim they retrain model weights.
 
+## 2. Qualified Best and per-fixture ranking
+
+- The public Qualified Best shortlist contains future fixtures only and publishes at most one passing selection per fixture.
+- Rank a selection that passes the complete current exact-price gate ahead of any higher model-probability row that is stale, mismatched, watch-only, or otherwise unqualified.
+- An explicit watch/research/not-qualified status vetoes contradictory upstream qualification flags. A probability band or candidate-pool label is never a qualification decision.
+- The empty state must show zero and the leading gate blockers; never weaken a gate to fill the shortlist.
+- Hide started or settled fixtures from Qualified Best and Upcoming without deleting their archived evidence or settlement history.
+
 ## 2. SportyBet quote contract
 
 A quote is matched only when the event identity, market, selected outcome, and (for totals) exact goal/game line match the prediction. The quote needs a timestamp within the configured 15-minute display window. A displayed model edge must be recalculated from the same fresh two-sided market quote, with the bookmaker margin removed. If the opposite side or timestamp is absent, the price or edge must be labelled unavailable/unverified rather than inferred from a neighbouring line.

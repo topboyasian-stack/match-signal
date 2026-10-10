@@ -49,6 +49,19 @@ function isOverUnderPrediction(x){
     ["over_under","total_goals_over_under","total_games","totals","total"].includes(market) ||
     ((side==="over"||side==="under")&&x?.line!=null);
 }
+function exactVirtualMarketLine(market){
+  if(market?.line!=null){
+    const direct=Number(market.line);
+    if(Number.isFinite(direct))return direct;
+  }
+  const specifier=String(market?.specifier??market?.specifiers??market?.marketSpecifier??"");
+  const match=specifier.match(/(?:^|[,\s;|&])(?:total|line)\s*=\s*(-?\d+(?:\.\d+)?)(?=$|[,\s;|&])/i);
+  if(match){
+    const parsed=Number(match[1]);
+    if(Number.isFinite(parsed))return parsed;
+  }
+  return null;
+}
 function marketLabel(x){
   if(isOverUnderPrediction(x)){
     return "O/U "+(x.pick||x.selection||"—")+" "+(x.line??"");
@@ -163,14 +176,29 @@ function exactMarketEdge(x,quote){
   }
   return Number.isFinite(marketProb)?p-marketProb:null;
 }
+function qualificationVetoReason(x){
+  const gate=x?.selection_gate||{};
+  const fields=[
+    x?.qualification_status,
+    x?.candidate_status,
+    x?.model_candidate_status,
+    x?.prediction_status,
+    gate?.status,
+    ...(Array.isArray(gate?.reasons)?gate.reasons:[])
+  ].filter(value=>value!=null&&String(value).trim()).map(value=>String(value).trim());
+  if(x?.watch_projection===true||x?.forward_watch===true||x?.research_only===true)return "EXPLICIT_QUALIFICATION_VETO";
+  return fields.some(value=>/(?:NOT[\s_-]*QUALIFIED|UNQUALIFIED|WATCH|RESEARCH|PROJECTION_ONLY|EVIDENCE[\s_-]*GATE[\s_-]*PENDING|PENDING[\s_-]*EVIDENCE)/i.test(value))
+    ?"EXPLICIT_QUALIFICATION_VETO":null;
+}
 function qualificationState(x){
   const raw=String(x?.qualification_status||"").trim();
-  const modelQualified=Boolean(x?.betting_qualified)||Boolean(x?.qualified_for_builder)||raw.startsWith("BETTING_QUALIFIED");
+  const veto=qualificationVetoReason(x);
+  const modelQualified=!veto&&(Boolean(x?.betting_qualified)||Boolean(x?.qualified_for_builder)||raw.startsWith("BETTING_QUALIFIED"));
   if(!modelQualified){
-    const detail=raw&&raw!=="MODEL_RESEARCH"&&raw!=="RESEARCH_PROJECTION"
-      ?raw.replaceAll("_"," ")
-      :"RESEARCH ONLY";
-    return {modelQualified:false,currentPricePass:false,label:"NOT QUALIFIED · "+detail,reason:"MODEL_GATE_NOT_PASSED"};
+    const detail=veto
+      ?String(raw||x?.candidate_status||x?.model_candidate_status||"explicit watch/research gate").replaceAll("_"," ")
+      :(raw&&raw!=="MODEL_RESEARCH"&&raw!=="RESEARCH_PROJECTION"?raw.replaceAll("_"," "):"RESEARCH ONLY");
+    return {modelQualified:false,currentPricePass:false,label:"NOT QUALIFIED · "+detail,reason:veto||"MODEL_GATE_NOT_PASSED"};
   }
   const quote=exactSportyBetQuote(x);
   if(quote.odds==null){
@@ -190,6 +218,7 @@ function qualificationState(x){
   }
   return {modelQualified:true,currentPricePass:true,label:"BETTING-QUALIFIED · PAPER",reason:"CURRENT_PRICE_GATE_PASSED",edge:edge};
 }
+
 function qualificationLabel(x){
   return qualificationState(x).label;
 }
@@ -220,6 +249,19 @@ function unifiedMarketLine(x){
     '<span>Edge <b>'+E(edgeLabel)+'</b></span>'+
   '</div>';
 }
+function qualifiedBestRow(x){
+  const when=DT(x.start_time);
+  const status=qualificationState(x);
+  const edge=Number.isFinite(status.edge)?(status.edge>=0?"+":"")+(status.edge*100).toFixed(1)+"%":"—";
+  return '<article class="ms-up-row ms-fixture-card ms-qualified-best-row">'+
+    '<div class="ms-up-time"><b>'+E(when)+'</b><span>'+E(String(x.start_time||"").slice(0,10))+'</span></div>'+
+    '<div class="ms-up-event"><div class="ms-up-meta"><span class="ms-sport-pill">'+sportIcon(x.sport)+' '+E(x.sport==="table_tennis"?"Table Tennis":(x.sport||"Sport"))+'</span><span>'+E(x.league||x.competition||"Unclassified")+'</span><span class="ms-fixture-market-count">Qualified market</span></div>'+
+    '<div class="ms-up-match">'+E(x.player_1||x.home||"Participant 1")+' <span>vs</span> '+E(x.player_2||x.away||"Participant 2")+'</div>'+
+    '<div class="ms-market-stack">'+unifiedMarketLine(x)+'</div>'+
+    '<div class="ms-fixture-foot"><span class="ms-qualified-gate-badge">QUALIFIED BEST · PAPER</span><span>Exact SportyBet market · edge '+E(edge)+' after margin removal</span></div></div>'+
+    '<div class="ms-up-status"><span class="ms-up-status-badge deep">QUALIFIED BEST · PAPER</span></div>'+
+  '</article>';
+}
 // VFOOTBALL_RESEARCH_ONLY: source feed, Virtual Lab and history remain intact;
  // active Virtual Desk and Builder selections are limited to eFootball products.
 function isActiveVirtualProduct(product){
@@ -228,15 +270,16 @@ function isActiveVirtualProduct(product){
 }
 function primaryPrediction(rows){
   const rank=x=>{
+    const gate=qualificationState(x);
     const p=Number(probabilityValue(x));
-    const q=Boolean(x.betting_qualified)||String(x.qualification_status||"").startsWith("BETTING_QUALIFIED");
     const tier=String(x.projection_tier||"");
     const evidence=String(x.evidence_depth||"");
     const edge=Number(x.model_edge_vs_market);
     const pendingHighUnder=String(x.qualification_status||"")==="HIGH_LINE_UNDER_EVIDENCE_GATE_PENDING";
     const exactN=Number(x.walkforward_exact_line_n);
     return [
-      q?1:0,
+      gate.currentPricePass?1:0,
+      gate.modelQualified?1:0,
       pendingHighUnder?0:1,
       Number.isFinite(exactN)?Math.min(30,exactN):0,
       Number.isFinite(p)?p*100:0,
@@ -250,6 +293,94 @@ function primaryPrediction(rows){
     for(let i=0;i<ra.length;i++)if(ra[i]!==rb[i])return rb[i]-ra[i];
     return String(a.market||"").localeCompare(String(b.market||""));
   })[0]||null;
+}
+function qualificationBlockerLabel(reason){
+  const labels={
+    EXPLICIT_QUALIFICATION_VETO:"Explicit watch/research/not-qualified status",
+    MODEL_GATE_NOT_PASSED:"Model/evidence qualification not passed",
+    NO_QUOTE:"No exact SportyBet quote",
+    MARKET_UNVERIFIED:"Market identity unverified",
+    LINE_MISMATCH:"Quoted line does not match",
+    SIDE_MISMATCH:"Quoted selection does not match",
+    TIMESTAMP_UNVERIFIED:"Quote timestamp missing",
+    QUOTE_TIMESTAMP_IN_FUTURE:"Quote timestamp invalid",
+    QUOTE_STALE:"Quote older than 15 minutes",
+    FRESH_TWO_SIDED_MARKET_REQUIRED:"Fresh two-sided exact market missing",
+    CURRENT_EDGE_BELOW_2_PERCENT:"Current edge below +2%"
+  };
+  return labels[reason]||String(reason||"NOT_QUALIFIED").replaceAll("_"," ").toLowerCase();
+}
+function qualifiedBestSelections(rows,now=Date.now()){
+  const horizon=now+7*24*60*60*1000;
+  const exactMarkets=new Map();
+  for(const row of Array.isArray(rows)?rows:[]){
+    if(!row)continue;
+    const kickoff=Date.parse(String(row?.start_time||""));
+    if(!Number.isFinite(kickoff)||kickoff<=now||kickoff>horizon)continue;
+    const state=String(row?.event_state||"").toUpperCase();
+    if(["LIVE","SETTLED","FINAL","FINISHED","ENDED"].includes(state)||row?.live===true||row?.isLive===true)continue;
+    const sport=String(row?.sport||"").toLowerCase();
+    const product=String(row?.product||"").toLowerCase();
+    const virtual=sport==="virtual"||["efootball_gt","efootball_adriatic","vfootball","zoom"].includes(product);
+    if(virtual&&!isActiveVirtualProduct(product))continue;
+    const market=isOverUnderPrediction(row)?"over_under":String(row?.market||"winner");
+    const line=row?.line==null?"":String(row.line);
+    const side=String(row?.pick||row?.selection||"").toLowerCase();
+    const identity=[rowFixtureKey(row),market,line,side].join("|");
+    const gate=qualificationState(row);
+    const existing=exactMarkets.get(identity);
+    const quality=x=>(x.gate.currentPricePass?3:0)+(x.gate.modelQualified?1:0);
+    const candidate={row,gate};
+    if(!existing||quality(candidate)>quality(existing)||
+      (quality(candidate)===quality(existing)&&Number(probabilityValue(row)||0)>Number(probabilityValue(existing.row)||0))){
+      exactMarkets.set(identity,candidate);
+    }
+  }
+  const blockerCounts={};
+  let modelQualifiedMarkets=0,freshExactQuoteMarkets=0,twoSidedValueMarkets=0,edgePassingMarkets=0;
+  const bestByFixture=new Map();
+  for(const candidate of exactMarkets.values()){
+    const row=candidate.row,gate=qualificationState(row);
+    if(gate.modelQualified)modelQualifiedMarkets++;
+    const quote=exactSportyBetQuote(row);
+    if(quote.odds!=null)freshExactQuoteMarkets++;
+    const edge=exactMarketEdge(row,quote);
+    if(edge!=null)twoSidedValueMarkets++;
+    if(!gate.currentPricePass){
+      const reason=gate.reason||"MODEL_GATE_NOT_PASSED";
+      blockerCounts[reason]=(blockerCounts[reason]||0)+1;
+      continue;
+    }
+    edgePassingMarkets++;
+    const fixture=rowFixtureKey(row),previous=bestByFixture.get(fixture);
+    const score=x=>{
+      const state=qualificationState(x);
+      return [Number.isFinite(state.edge)?state.edge:-999,Number(probabilityValue(x)||0),-Date.parse(String(x.start_time||""))];
+    };
+    if(!previous){
+      bestByFixture.set(fixture,row);
+    }else{
+      const a=score(row),b=score(previous);
+      if(a[0]>b[0]||(a[0]===b[0]&&(a[1]>b[1]||(a[1]===b[1]&&a[2]>b[2]))))bestByFixture.set(fixture,row);
+    }
+  }
+  const selected=[...bestByFixture.values()].sort((a,b)=>{
+    const ga=qualificationState(a),gb=qualificationState(b);
+    const ea=Number.isFinite(ga.edge)?ga.edge:-999,eb=Number.isFinite(gb.edge)?gb.edge:-999;
+    if(ea!==eb)return eb-ea;
+    const pa=Number(probabilityValue(a)||0),pb=Number(probabilityValue(b)||0);
+    if(pa!==pb)return pb-pa;
+    return Date.parse(String(a.start_time||""))-Date.parse(String(b.start_time||""));
+  });
+  return {rows:selected,diagnostics:{
+    futureCandidateMarkets:exactMarkets.size,
+    modelQualifiedMarkets,
+    freshExactQuoteMarkets,
+    twoSidedValueMarkets,
+    edgePassingMarkets,
+    qualifiedFixtures:selected.length,
+    blockerCounts
+  }};
 }
 function ladderAnchor(rows){
   const candidates=(rows||[]).filter(x=>x&&x.market==="over_under"&&Number.isFinite(Number(x.line))&&Number.isFinite(Number(probabilityValue(x)))&&Number(probabilityValue(x))>=0.80);
@@ -473,7 +604,7 @@ async function renderUnifiedBoard(){
       if(!Number.isFinite(line)||(side!=="over"&&side!=="under"))return row;
       let over=null,under=null;
       for(const market of Array.isArray(live?.markets)?live.markets:[]){
-        const marketLine=Number(market?.line);
+        const marketLine=exactVirtualMarketLine(market);
         const marketId=String(market?.id||"");
         const marketName=String(market?.name||"").toLowerCase();
         if(!["18","189"].includes(marketId)&&!marketName.includes("total")&&!marketName.includes("over/under")&&!marketName.includes("over under"))continue;
@@ -524,7 +655,7 @@ async function renderUnifiedBoard(){
 
         let over=null,under=null,matchedMarket=null;
         for(const market of Array.isArray(live?.markets)?live.markets:[]){
-          const ml=Number(market?.line);
+          const ml=exactVirtualMarketLine(market);
           const marketId=String(market?.id||"");
           const marketName=String(market?.name||"").toLowerCase();
           if(!["18","189"].includes(marketId)&&!marketName.includes("total")&&!marketName.includes("over/under")&&!marketName.includes("over under"))continue;
@@ -603,10 +734,15 @@ async function renderUnifiedBoard(){
         x.candidate_group=candidate.candidate_group||null;
         x.candidate_source="selection_candidates";
       }
-      x.betting_qualified=Boolean(x.betting_qualified)||Boolean(x.qualified_for_builder)||
-        x.qualification_status==="BETTING_QUALIFIED_PAPER"||
-        x.qualification_status==="BETTING_QUALIFIED_PAPER_BOOTSTRAP"||
-        x.qualification_status==="BETTING_QUALIFIED_PAPER_DIRECTIONAL";
+      if(qualificationVetoReason(x)){
+        x.betting_qualified=false;
+        x.qualified_for_builder=false;
+      }else{
+        x.betting_qualified=Boolean(x.betting_qualified)||Boolean(x.qualified_for_builder)||
+          x.qualification_status==="BETTING_QUALIFIED_PAPER"||
+          x.qualification_status==="BETTING_QUALIFIED_PAPER_BOOTSTRAP"||
+          x.qualification_status==="BETTING_QUALIFIED_PAPER_DIRECTIONAL";
+      }
       x.paper_only=true;
       x.live_money_eligible=Boolean(x.live_money_eligible) ||
         Boolean(riskGate?.gate?.[String(x?.sport||"").toLowerCase()]?.live_eligible);
@@ -695,6 +831,26 @@ async function renderUnifiedBoard(){
         return true;
       });
       const groups=fixtureGroups(filteredRows);
+      const best=qualifiedBestSelections(filteredRows,now.getTime());
+      const bestBoard=Q('#qualifiedBestBoard');
+      if(bestBoard){
+        bestBoard.innerHTML=best.rows.length
+          ?best.rows.slice(0,12).map(qualifiedBestRow).join("")
+          :'<div class="ms-qualified-best-empty">'+(best.diagnostics.futureCandidateMarkets===0
+            ?"No future candidate markets in this filtered view."
+            :"Zero qualified picks from "+best.diagnostics.futureCandidateMarkets+" future market candidates. No pick was forced.")+'</div>';
+      }
+      const bestSummary=Q('#qualifiedBestSummary');
+      if(bestSummary){
+        const blockerText=Object.entries(best.diagnostics.blockerCounts)
+          .sort((a,b)=>b[1]-a[1]).slice(0,3)
+          .map(([reason,count])=>qualificationBlockerLabel(reason)+" ("+count+")").join(" · ");
+        bestSummary.innerHTML=best.rows.length
+          ?'<span><b>'+best.rows.length+'</b> qualified fixture'+(best.rows.length===1?'':'s')+' · exact SportyBet market/line/side · quote ≤15 min · edge ≥+2% after margin removal'+(best.rows.length>12?' · showing top 12 by current edge':'')+'</span>'
+          :'<span><b>0 qualified picks.</b> '+(best.diagnostics.futureCandidateMarkets===0
+            ?"No future candidates in this filtered view."
+            :"Blockers: "+E(blockerText||"No current candidate passed every gate.")+". No selections were relaxed to fill the list.")+'</span>';
+      }
       const byDay=new Map();
       for(const group of groups){const day=String(group.rows[0].start_time).slice(0,10);if(!byDay.has(day))byDay.set(day,[]);byDay.get(day).push(group);}
       root.innerHTML=groups.length?[...byDay.entries()].map(([day,groupsForDay])=>{
@@ -703,10 +859,7 @@ async function renderUnifiedBoard(){
       }).join(""):'<div class="ms-empty">No future fixtures match these filters. The engines remain active and the board will refresh with the next generated window.</div>';
       // Count only the primary prediction displayed per fixture, and only if
       // the current exact-line price/value gate passes for that displayed row.
-      const qualified=groups.filter(group=>{
-        const row=primaryPrediction(group.rows);
-        return Boolean(row&&qualificationState(row).currentPricePass);
-      }).length;
+      const qualified=best.rows.length;
       const strong=groups.filter(group=>{
         const row=primaryPrediction(group.rows);
         return Boolean(row&&Number(probabilityValue(row))>=0.80);
