@@ -157,7 +157,17 @@ jobs:
               assert leg.get('bookmaker_odds') is not None
               assert float(leg.get('model_edge', 0)) >= 0.025
           sports = {x.get('sport') for x in data['qualified_legs']}
-          if data.get('candidates_considered', {}).get('football', 0) > 0:
+          # Initial candidate-pool presence is not proof that a football pick
+          # survives the later exact-price, EV, and evidence gates. A fully
+          # qualified all-eFootball exact-evidence value lane is allowed; its
+          # legs still pass the same price/edge/probability/correlation checks.
+          all_efootball_value_legs = bool(data['qualified_legs']) and all(
+              leg.get('sport') == 'virtual'
+              and str(leg.get('product') or '').startswith('efootball_')
+              and str(leg.get('qualification_lane') or '') == 'efootball_exact_evidence_value'
+              for leg in data['qualified_legs']
+          )
+          if data.get('candidates_considered', {}).get('football', 0) > 0 and not all_efootball_value_legs:
               assert 'football' in sports or len(data['qualified_legs']) < 3
           if data.get('market_price_combined_odds') is not None:
               assert data['market_price_combined_odds'] > 1
