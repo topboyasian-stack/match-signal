@@ -98,6 +98,29 @@ def fixture_key(row):
     return f"{product}|event:{event_id}" if event_id else None
 
 
+
+def score_pair(value):
+    """Parse a final virtual score as a canonical pair and total goals."""
+    if value is None:
+        return None
+    parts = str(value).replace(" ", "").split(":")
+    if len(parts) != 2:
+        return None
+    values = [num(part) for part in parts]
+    if any(x is None or x < 0 or not float(x).is_integer() for x in values):
+        return None
+    left, right = (int(x) for x in values)
+    return f"{left}:{right}", left + right
+
+
+def fixture_identity(row):
+    product = str(row.get("product") or "efootball_gt").strip().lower()
+    p1 = participant_identity(row, ("participant_1", "player_1", "team_1", "home"))
+    p2 = participant_identity(row, ("participant_2", "player_2", "team_2", "away"))
+    if not p1 or not p2:
+        return None
+    return product, tuple(sorted((p1, p2)))
+
 def exact_key(row):
     base = fixture_key(row)
     line = num(row.get("line"))
@@ -107,26 +130,81 @@ def exact_key(row):
 
 
 def settlement_index(history):
-    # Outcomes are stored per O/U market/line in the independent settlement
-    # ledger. Use the fixture + total score to score either predicted direction,
-    # including a desk selection that differs from the ledger's favourite side.
-    index = {}
+    """Index only settled, score-verifiable O/U outcomes.
+
+    A final score plus an explicit settled_at timestamp is sufficient even if a
+    particular market-line row omits its win flag. Older canonical rows without
+    settled_at retain the legacy win-flag requirement. Conflicting scores at the
+    same latest settlement timestamp are excluded rather than guessed.
+    """
+    candidates = {}
     for row in history if isinstance(history, list) else []:
-        if not isinstance(row, dict) or row.get("market") != "ou" or row.get("win") is None:
+        if not isinstance(row, dict) or row.get("market") != "ou":
+            continue
+        raw_score = row.get("score") or row.get("final_score")
+        parsed_score = score_pair(raw_score)
+        settled_stamp = dt(row.get("settled_at"))
+        stamp = settled_stamp or (dt(row.get("timestamp")) if row.get("win") is not None else None)
+        if not parsed_score or stamp is None:
+            continue
+        if row.get("win") is None and settled_stamp is None:
             continue
         base = fixture_key(row)
-        stamp = dt(row.get("settled_at") or row.get("timestamp"))
-        score = row.get("score") or row.get("final_score")
-        if not base or stamp is None or score is None:
+        if not base:
             continue
-        previous = index.get(base)
-        if previous is None or stamp > previous["_stamp"]:
-            item = dict(row)
-            item["_stamp"] = stamp
-            item["_fixture_key"] = base
-            index[base] = item
+        item = dict(row)
+        item["_stamp"] = stamp
+        item["_fixture_key"] = base
+        item["_score_pair"] = parsed_score[0]
+        item["_score_total"] = parsed_score[1]
+        item["_identity"] = fixture_identity(row)
+        item["_event_time"] = dt(row.get("start_time") or row.get("timestamp"))
+        candidates.setdefault(base, []).append(item)
+
+    index = {}
+    for base, rows in candidates.items():
+        latest_stamp = max(row["_stamp"] for row in rows)
+        latest = [row for row in rows if row["_stamp"] == latest_stamp]
+        if len({row["_score_pair"] for row in latest}) != 1:
+            # Same fixture and same latest settlement time but conflicting
+            # scores is not safe evidence for learning or qualification.
+            continue
+        index[base] = latest[-1]
     return index
 
+
+def resolve_settlement(row, history_index):
+    """Use exact fixture keys first, then a conservative unique 90s fallback.
+
+    The fallback exists for provider kickoff timestamps that straddle a minute
+    boundary. Provider event IDs alone are never used for fuzzy matching because
+    those IDs can recur between eFootball sessions.
+    """
+    base = fixture_key(row)
+    if base and base in history_index:
+        return history_index[base], "EXACT"
+
+    identity = fixture_identity(row)
+    event_time = dt(row.get("start_time") or row.get("timestamp"))
+    if identity is None or event_time is None:
+        return None, "UNMATCHED"
+    candidates = []
+    for candidate_key, item in history_index.items():
+        if item.get("_identity") != identity:
+            continue
+        candidate_time = item.get("_event_time")
+        if candidate_time is None:
+            continue
+        if abs((candidate_time - event_time).total_seconds()) <= 90:
+            candidates.append((candidate_key, item))
+    # If recurring participants create more than one plausible fixture, fail
+    # closed. Never guess which session a forecast belongs to.
+    unique = {key: item for key, item in candidates}
+    if len(unique) == 1:
+        return next(iter(unique.values())), "NEAR_TIME"
+    if len(unique) > 1:
+        return None, "AMBIGUOUS"
+    return None, "UNMATCHED"
 
 def eligible_current_rows(board):
     events = board.get("events") if isinstance(board, dict) else []
@@ -198,6 +276,16 @@ def capture(trace, board):
 
 
 def reconcile(trace, history_index):
+    stats = {
+        "trace_rows": len(trace),
+        "history_index_fixtures": len(history_index),
+        "forecast_line_groups": 0,
+        "matched_line_groups_exact": 0,
+        "matched_line_groups_near_time": 0,
+        "unmatched_line_groups": 0,
+        "ambiguous_line_groups": 0,
+        "scored_forecasts": 0,
+    }
     for row in trace:
         # Migrate existing trace rows from the old event-ID-only key. Provider
         # IDs can recur across sessions, so product/kickoff/participant identity
@@ -207,31 +295,37 @@ def reconcile(trace, history_index):
             row["event_key"] = key
             row.setdefault("product", "efootball_gt")
 
-    # Match fixture settlements once, but score forecasts independently by
-    # exact fixture + totals line. A 7.5 and an 8.5 prediction on the same match
-    # are separate desk decisions and must both learn from the final score.
+    # Score each fixture + totals line once, selecting the latest strictly
+    # pre-kickoff forecast. A different line on the same match remains a
+    # separate decision and learns from the same verified final score.
     forecasts_by_exact_key = {}
     for row in trace:
         base = fixture_key(row)
         key = exact_key(row)
         if base and key:
             forecasts_by_exact_key.setdefault(key, []).append(row)
+    stats["forecast_line_groups"] = len(forecasts_by_exact_key)
 
     for exact, forecasts in forecasts_by_exact_key.items():
         if not forecasts:
             continue
-        item = history_index.get(fixture_key(forecasts[0]))
+        item, match_method = resolve_settlement(forecasts[0], history_index)
         if not item:
+            stats["unmatched_line_groups"] += 1
+            if match_method == "AMBIGUOUS":
+                stats["ambiguous_line_groups"] += 1
             continue
+        if match_method == "EXACT":
+            stats["matched_line_groups_exact"] += 1
+        elif match_method == "NEAR_TIME":
+            stats["matched_line_groups_near_time"] += 1
+
         settled = item.get("_stamp")
-        score = item.get("score") or item.get("final_score")
-        try:
-            score_parts = [float(x) for x in str(score).replace(" ", "").split(":")[:2]]
-            if len(score_parts) != 2:
-                continue
-            total = sum(score_parts)
-        except (TypeError, ValueError):
+        score = item.get("score") or item.get("final_score") or item.get("_score_pair")
+        parsed_score = score_pair(score)
+        if not parsed_score:
             continue
+        total = parsed_score[1]
 
         scored = []
         for row in forecasts:
@@ -261,19 +355,22 @@ def reconcile(trace, history_index):
                 row["push"] = True
                 row["actual_result"] = "PUSH"
                 row["settled_at"] = item.get("settled_at")
-                row["score"] = score
+                row["score"] = item.get("score") or item.get("final_score") or item.get("_score_pair")
                 row["settlement_source"] = item.get("settlement_source")
                 row["scored_forecast"] = False
                 continue
             actual_side = "over" if total > line else "under"
             row["settled"] = True
             row["push"] = False
-            row["settled_at"] = item.get("settled_at")
+            row["settled_at"] = item.get("settled_at") or item.get("_stamp").isoformat()
             row["actual_result"] = actual_side
             row["win"] = actual_side == side
-            row["score"] = score
+            row["score"] = item.get("score") or item.get("final_score") or item.get("_score_pair")
             row["settlement_source"] = item.get("settlement_source")
             row["scored_forecast"] = True
+
+    stats["scored_forecasts"] = sum(1 for row in trace if row.get("scored_forecast") is True)
+    return stats
 
 def settled_forecasts(trace):
     rows = []
@@ -370,7 +467,7 @@ def main():
 
     capture(trace, board)
     history_index = settlement_index(history)
-    reconcile(trace, history_index)
+    reconciliation = reconcile(trace, history_index)
 
     # Bound the learning ledger while retaining all currently relevant and
     # recently settled forecasts.
@@ -453,6 +550,7 @@ def main():
         "by_product": by_product,
         "trace_artifact": "data/efootball_desk_prediction_history.json",
         "source_settlement": "data/virtual_lab_history.json",
+        "reconciliation_diagnostics": reconciliation,
     }
 
     save(TRACE, trace)
