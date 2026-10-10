@@ -13,6 +13,7 @@ on:
     branches: [main]
     paths:
       - 'scripts/odds_ticket_tracker.py'
+      - 'scripts/test_odds_ticket_tracker.py'
       - 'data/odds_builder.json'
       - 'scripts/results_first_evidence_report.py'
       - '.github/workflows/odds-ticket-tracker.yml'
@@ -43,6 +44,9 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Test stale paper-ticket archive rules
+        run: python scripts/test_odds_ticket_tracker.py
+
       - name: Run ticket tracker
         run: python scripts/odds_ticket_tracker.py
 
@@ -57,8 +61,16 @@ jobs:
           summary=d.get('summary') or {}
           for key in ('tracked_tickets','pending','won','lost','legs_won','legs_lost','legs_pending'):
               assert int(summary.get(key,0)) >= 0
-          assert int(d.get('version',0)) >= 2
+          assert int(d.get('version',0)) >= 4
+          assert isinstance(d.get('archived_tickets',[]), list)
+          assert int(summary.get('active_pending',0)) >= 0
+          assert int(summary.get('archived_pending',0)) >= 0
+          all_tickets = list(d['tickets']) + list(d.get('archived_tickets',[]))
+          ids = [str(t.get('ticket_id') or '') for t in all_tickets]
+          assert len(ids) == len(set(ids)), 'duplicate ticket IDs across active/archive lists'
           for ticket in d['tickets']:
+              assert str(ticket.get('status') or '').upper() != 'PENDING' or not __import__('datetime').datetime.fromisoformat(str(max((leg.get('start_time') or '') for leg in ticket.get('legs') or [])).replace('Z','+00:00')).timestamp() < __import__('datetime').datetime.now(__import__('datetime').timezone.utc).timestamp() - 6*3600, 'stale pending ticket leaked into active list'
+          for ticket in all_tickets:
               assert ticket.get('paper_only') is True
               assert ticket.get('real_money_execution') is False
               assert ticket.get('status') in {'PENDING','LOST','WON'}
