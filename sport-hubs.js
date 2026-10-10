@@ -91,9 +91,11 @@ function probabilityCalibrationInfo(x){
   const raw=rawProbabilityValue(x);
   const product=String(x?.product||"").toLowerCase();
   const side=String(x?.pick||x?.selection||"").toLowerCase();
-  const line=Number(x?.line);
-  const n=Number(x?.walkforward_exact_line_n);
-  const hit=Number(x?.walkforward_exact_line_hit_rate);
+  const line=x?.line==null||String(x.line).trim()===""?NaN:Number(x.line);
+  const rawN=x?.walkforward_exact_line_n;
+  const rawHit=x?.walkforward_exact_line_hit_rate;
+  const n=rawN==null||String(rawN).trim()===""?NaN:Number(rawN);
+  const hit=rawHit==null||String(rawHit).trim()===""?NaN:Number(rawHit);
   if(raw===null||!["efootball_gt","efootball_adriatic"].includes(product)||
      !isOverUnderPrediction(x)||!Number.isFinite(line)||(side!=="over"&&side!=="under")||
      !Number.isFinite(n)||n<30||!Number.isFinite(hit)||hit<0||hit>1)return null;
@@ -108,6 +110,12 @@ function probabilityCalibrationInfo(x){
 function probabilityValue(x){
   const calibrated=probabilityCalibrationInfo(x);
   return calibrated?calibrated.probability:rawProbabilityValue(x);
+}
+function displayedFairOddsValue(x){
+  const calibration=probabilityCalibrationInfo(x);
+  if(calibration&&calibration.probability>0)return 1/calibration.probability;
+  const fair=Number(x?.model_fair_odds);
+  return Number.isFinite(fair)&&fair>1?fair:null;
 }
 function isVirtualDeskCandidate(row){
   if(!row)return false;
@@ -272,7 +280,7 @@ function unifiedMarketLine(x){
   const quote=exactSportyBetQuote(x);
   const book=quote.odds;
   const displayBook=quote.displayOdds==null?book:quote.displayOdds;
-  const fair=Number(x.model_fair_odds);
+  const fair=displayedFairOddsValue(x);
   const edge=exactMarketEdge(x,quote);
   const pick=String(x.pick||x.selection||"").toUpperCase();
   const market=isOverUnderPrediction(x)?("O/U "+pick+" "+(x.line??"")):marketLabel(x);
