@@ -722,7 +722,7 @@
   function qualificationMonitorHtml(data) {
     // Observability only: near-misses never become qualified legs or booking batches.
     var activeBatches=Array.isArray(data.batches)?data.batches:[];
-    if(activeBatches.length||Number(data.batch_count||0)>0)return '';
+    if(activeBatches.length)return '';
     var diag=data.candidate_diagnostics||{};
     var vdiag=diag.virtual_gate_diagnostics||{};
     var items=Array.isArray(data.best_available_legs)?data.best_available_legs.slice(0,5):[];
@@ -753,7 +753,7 @@
       facts.push('SportyBet '+(x.bookmaker_odds==null?'—':Number(x.bookmaker_odds).toFixed(2)));
       facts.push('Edge '+(x.model_edge==null?'—':formatPercent(x.model_edge)));
       if(hasEvidence){
-        var observed=String(wins)+'/'+String(evidenceN);
+        var observed=isFinite(wins)?String(wins)+'/'+String(evidenceN):String(evidenceN)+' settled rows';
         var hr=isFinite(hitRate)?' · observed hit rate '+formatPercent(hitRate):'';
         facts.push('Exact-line history '+observed+hr);
       }
