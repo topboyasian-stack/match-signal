@@ -88,7 +88,7 @@ jobs:
             exit 0
           fi
           git commit -m "🤖 Refresh unified upcoming board"
-          for attempt in 1 2 3 4 5; do
+          for attempt in 1 2 3 4 5 6; do
             if git push origin main; then
               # The data push already triggers the production workflow. Dispatch
               # it explicitly as a belt-and-suspenders step, but do not convert
@@ -126,5 +126,5 @@ jobs:
             git commit -m "🤖 Refresh unified upcoming board"
             sleep $((attempt * 4))
           done
-          echo "Failed to publish generated Prediction Desk data after five synchronized attempts."
+          echo "Failed to publish generated Prediction Desk data after six synchronized attempts."
           exit 1
