@@ -1,3 +1,5 @@
+import { marketLineFromSportyBet, participantFromName } from "../_shared/sportybet-virtual-normalization.mjs";
+
 function headers(){return {'Content-Type':'application/json; charset=utf-8','Cache-Control':'public, max-age=15, s-maxage=15, stale-while-revalidate=15','Access-Control-Allow-Origin':'*','Access-Control-Allow-Methods':'GET,OPTIONS'}}
 
 const ORIGIN='https://www.sportybet.com';
@@ -24,12 +26,6 @@ async function upstream(path, params){
 
 function tournaments(body){
   return Array.isArray(body?.data?.tournaments)?body.data.tournaments:[];
-}
-
-function participantFromName(value){
-  const text=String(value||'').trim();
-  const m=text.match(/\\(([^()]+)\\)\\s*$/);
-  return m&&m[1]?m[1].trim():'';
 }
 
 function scoreValue(value){
@@ -116,7 +112,7 @@ function normalize(t, event, source, sportId){
       id:String(m?.id||''),
       name:String(m?.name||m?.desc||m?.title||''),
       specifier:String(m?.specifier||''),
-      line:m?.line!=null?Number(m.line):((String(m?.specifier||'').match(/(?:total|line)=([0-9]+(?:\\.[0-9]+)?)/i)||[])[1]!=null?Number((String(m?.specifier||'').match(/(?:total|line)=([0-9]+(?:\\.[0-9]+)?)/i)||[])[1]):null),
+      line:marketLineFromSportyBet(m),
       status:m?.status,
       lastOddsChangeTime:m?.lastOddsChangeTime,
       outcomes:Array.isArray(m?.outcomes)?m.outcomes.map(o=>({
