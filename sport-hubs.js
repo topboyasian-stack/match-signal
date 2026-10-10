@@ -239,6 +239,14 @@ function qualificationVetoReason(x){
   return fields.some(value=>/(?:NOT[\s_-]*QUALIFIED|UNQUALIFIED|WATCH|RESEARCH|PROJECTION_ONLY|EVIDENCE[\s_-]*GATE[\s_-]*PENDING|PENDING[\s_-]*EVIDENCE)/i.test(value))
     ?"EXPLICIT_QUALIFICATION_VETO":null;
 }
+function exactMarketExpectedReturn(x,quote){
+  if(!quote||quote.odds==null)return null;
+  const probability=probabilityValue(x);
+  if(probability===null)return null;
+  const p=Number(probability),odds=Number(quote.odds);
+  if(!Number.isFinite(p)||p<0||p>1||!Number.isFinite(odds)||odds<=1)return null;
+  return p*odds-1;
+}
 function qualificationState(x){
   const raw=String(x?.qualification_status||"").trim();
   const veto=qualificationVetoReason(x);
@@ -268,7 +276,14 @@ function qualificationState(x){
   if(edge<0.02){
     return {modelQualified:true,currentPricePass:false,label:"NOT QUALIFIED · CURRENT EDGE BELOW 2%",reason:"CURRENT_EDGE_BELOW_2_PERCENT",edge:edge};
   }
-  return {modelQualified:true,currentPricePass:true,label:"BETTING-QUALIFIED · PAPER",reason:"CURRENT_PRICE_GATE_PASSED",edge:edge};
+  const expectedReturn=exactMarketExpectedReturn(x,quote);
+  if(expectedReturn===null){
+    return {modelQualified:true,currentPricePass:false,label:"NOT ACTIONABLE · EXPECTED RETURN UNVERIFIED",reason:"EXPECTED_RETURN_UNVERIFIED",edge:edge};
+  }
+  if(expectedReturn<0.02){
+    return {modelQualified:true,currentPricePass:false,label:"NOT QUALIFIED · EXPECTED RETURN BELOW 2% AT OFFERED ODDS",reason:"CURRENT_PRICE_EV_BELOW_2_PERCENT",edge:edge,expectedReturn:expectedReturn};
+  }
+  return {modelQualified:true,currentPricePass:true,label:"BETTING-QUALIFIED · PAPER",reason:"CURRENT_PRICE_GATE_PASSED",edge:edge,expectedReturn:expectedReturn};
 }
 
 function qualificationLabel(x){
@@ -282,6 +297,7 @@ function unifiedMarketLine(x){
   const displayBook=quote.displayOdds==null?book:quote.displayOdds;
   const fair=displayedFairOddsValue(x);
   const edge=exactMarketEdge(x,quote);
+  const expectedReturn=exactMarketExpectedReturn(x,quote);
   const pick=String(x.pick||x.selection||"").toUpperCase();
   const market=isOverUnderPrediction(x)?("O/U "+pick+" "+(x.line??"")):marketLabel(x);
   const fairLabel=Number.isFinite(fair)?fair.toFixed(2):"—";
@@ -300,19 +316,21 @@ function unifiedMarketLine(x){
     '<span>Model fair <b>'+E(fairLabel)+'</b></span>'+
     '<span>Evidence <b>'+E(String(evidence||"unavailable"))+'</b></span>'+
     '<span class="'+marketQuoteClass+'">'+E(marketReference)+'</span>'+
-    '<span>Edge <b>'+E(edgeLabel)+'</b></span>'+
+    '<span>Market edge <b>'+E(edgeLabel)+'</b></span>'+
+    '<span>Expected return at offered odds <b>'+E(expectedReturn==null?"—":((expectedReturn>=0?"+":"")+(expectedReturn*100).toFixed(1)+"%"))+'</b></span>'+
   '</div>';
 }
 function qualifiedBestRow(x){
   const when=DT(x.start_time);
   const status=qualificationState(x);
   const edge=Number.isFinite(status.edge)?(status.edge>=0?"+":"")+(status.edge*100).toFixed(1)+"%":"—";
+  const ev=Number.isFinite(status.expectedReturn)?(status.expectedReturn>=0?"+":"")+(status.expectedReturn*100).toFixed(1)+"%":"—";
   return '<article class="ms-up-row ms-fixture-card ms-qualified-best-row">'+
     '<div class="ms-up-time"><b>'+E(when)+'</b><span>'+E(String(x.start_time||"").slice(0,10))+'</span></div>'+
     '<div class="ms-up-event"><div class="ms-up-meta"><span class="ms-sport-pill">'+sportIcon(x.sport)+' '+E(x.sport==="table_tennis"?"Table Tennis":(x.sport||"Sport"))+'</span><span>'+E(x.league||x.competition||"Unclassified")+'</span><span class="ms-fixture-market-count">Qualified market</span></div>'+
     '<div class="ms-up-match">'+E(x.player_1||x.home||"Participant 1")+' <span>vs</span> '+E(x.player_2||x.away||"Participant 2")+'</div>'+
     '<div class="ms-market-stack">'+unifiedMarketLine(x)+'</div>'+
-    '<div class="ms-fixture-foot"><span class="ms-qualified-gate-badge">QUALIFIED BEST · PAPER</span><span>Exact SportyBet market · edge '+E(edge)+' after margin removal</span></div></div>'+
+    '<div class="ms-fixture-foot"><span class="ms-qualified-gate-badge">QUALIFIED BEST · PAPER</span><span>Market edge '+E(edge)+' after margin removal · expected return '+E(ev)+' at quoted odds</span></div></div>'+
     '<div class="ms-up-status"><span class="ms-up-status-badge deep">QUALIFIED BEST · PAPER</span></div>'+
   '</article>';
 }
@@ -356,6 +374,8 @@ function qualificationBlockerLabel(reason){
     MODEL_LINE_SCOPE_GATE_PENDING:"Model line-scope validation still pending",
     HIGH_LINE_UNDER_EVIDENCE_GATE_PENDING:"High-line Under evidence still insufficient",
     NO_QUOTE:"No exact SportyBet quote",
+    EXPECTED_RETURN_UNVERIFIED:"Expected return could not be calculated",
+    CURRENT_PRICE_EV_BELOW_2_PERCENT:"Expected return below +2% at the exact offered odds",
     MARKET_UNVERIFIED:"Market identity unverified",
     LINE_MISMATCH:"Quoted line does not match",
     SIDE_MISMATCH:"Quoted selection does not match",
@@ -412,17 +432,19 @@ function qualifiedBestSelections(rows,now=Date.now()){
     const fixture=rowFixtureKey(row),previous=bestByFixture.get(fixture);
     const score=x=>{
       const state=qualificationState(x);
-      return [Number.isFinite(state.edge)?state.edge:-999,Number(probabilityValue(x)||0),-Date.parse(String(x.start_time||""))];
+      return [Number.isFinite(state.expectedReturn)?state.expectedReturn:-999,Number.isFinite(state.edge)?state.edge:-999,Number(probabilityValue(x)||0),-Date.parse(String(x.start_time||""))];
     };
     if(!previous){
       bestByFixture.set(fixture,row);
     }else{
       const a=score(row),b=score(previous);
-      if(a[0]>b[0]||(a[0]===b[0]&&(a[1]>b[1]||(a[1]===b[1]&&a[2]>b[2]))))bestByFixture.set(fixture,row);
+      if(a[0]>b[0]||(a[0]===b[0]&&(a[1]>b[1]||(a[1]===b[1]&&(a[2]>b[2]||(a[2]===b[2]&&a[3]>b[3]))))))bestByFixture.set(fixture,row);
     }
   }
   const selected=[...bestByFixture.values()].sort((a,b)=>{
     const ga=qualificationState(a),gb=qualificationState(b);
+    const eva=Number.isFinite(ga.expectedReturn)?ga.expectedReturn:-999,evb=Number.isFinite(gb.expectedReturn)?gb.expectedReturn:-999;
+    if(eva!==evb)return evb-eva;
     const ea=Number.isFinite(ga.edge)?ga.edge:-999,eb=Number.isFinite(gb.edge)?gb.edge:-999;
     if(ea!==eb)return eb-ea;
     const pa=Number(probabilityValue(a)||0),pb=Number(probabilityValue(b)||0);
@@ -891,7 +913,7 @@ async function renderUnifiedBoard(){
           .sort((a,b)=>b[1]-a[1]).slice(0,3)
           .map(([reason,count])=>qualificationBlockerLabel(reason)+" ("+count+")").join(" · ");
         bestSummary.innerHTML=best.rows.length
-          ?'<span><b>'+best.rows.length+'</b> qualified fixture'+(best.rows.length===1?'':'s')+' · exact SportyBet market/line/side · quote ≤15 min · edge ≥+2% after margin removal'+(best.rows.length>12?' · showing top 12 by current edge':'')+'</span>'
+          ?'<span><b>'+best.rows.length+'</b> qualified fixture'+(best.rows.length===1?'':'s')+' · exact SportyBet market/line/side · quote ≤15 min · market edge ≥+2% after margin removal and expected return ≥+2% at offered odds'+(best.rows.length>12?' · showing top 12 by expected return':'')+'</span>'
           :'<span><b>0 qualified picks.</b> '+(best.diagnostics.futureCandidateMarkets===0
             ?"No future candidates in this filtered view."
             :"Blockers: "+E(blockerText||"No current candidate passed every gate.")+". No selections were relaxed to fill the list.")+'</span>';
