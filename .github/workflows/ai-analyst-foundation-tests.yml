@@ -24,6 +24,7 @@ on:
       - 'scripts/test_upcoming_desk_policy.py'
       - 'scripts/test_tennis_forward_publication.py'
       - 'scripts/test_desk_quote_contract.mjs'
+      - 'scripts/test_prediction_desk_gates.mjs'
       - '.github/workflows/unified-upcoming.yml'
       - '.github/workflows/tennis-forward-window.yml'
       - 'sport-hubs.js'
@@ -56,6 +57,7 @@ on:
       - 'scripts/test_upcoming_desk_policy.py'
       - 'scripts/test_tennis_forward_publication.py'
       - 'scripts/test_desk_quote_contract.mjs'
+      - 'scripts/test_prediction_desk_gates.mjs'
       - '.github/workflows/unified-upcoming.yml'
       - '.github/workflows/tennis-forward-window.yml'
       - 'sport-hubs.js'
@@ -100,6 +102,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Run Prediction Desk qualification and calibration regressions
+        run: node scripts/test_prediction_desk_gates.mjs
       - name: Run private analyst module tests
         run: node scripts/test_analyst_module.mjs
       - name: Run protected API route tests
