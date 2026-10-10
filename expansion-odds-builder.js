@@ -40,7 +40,9 @@
       byKey[settlementPickKey(row)]=row;
       byKey[settlementFixtureKey(row)]=row;
     }
-    var tickets=tracker&&Array.isArray(tracker.tickets)?tracker.tickets:[];
+    var tickets=[];
+    if(tracker&&Array.isArray(tracker.tickets))tickets=tickets.concat(tracker.tickets);
+    if(tracker&&Array.isArray(tracker.archived_tickets))tickets=tickets.concat(tracker.archived_tickets);
     tickets.forEach(function(t){(Array.isArray(t.legs)?t.legs:[]).forEach(add);});
     (Array.isArray(settledRows)?settledRows:[]).forEach(add);
     return byKey;
