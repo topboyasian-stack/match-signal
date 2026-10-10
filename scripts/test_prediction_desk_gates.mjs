@@ -11,11 +11,11 @@ const sandbox = { Date, Number, String, Math, Array, Boolean, Object, Map, Set, 
 vm.createContext(sandbox);
 vm.runInContext(
   source.slice(start, end) +
-    "\n;globalThis.__deskTestApi={exactVirtualMarketLine,exactSportyBetQuote,exactMarketEdge,qualificationState,primaryPrediction,qualifiedBestSelections};",
+    "\n;globalThis.__deskTestApi={exactVirtualMarketLine,exactSportyBetQuote,exactMarketEdge,qualificationState,primaryPrediction,qualifiedBestSelections,rawProbabilityValue,probabilityCalibrationInfo,probabilityValue,isVirtualDeskCandidate};",
   sandbox,
   { filename: "sport-hubs.js#prediction-desk-gates" }
 );
-const { exactVirtualMarketLine, qualificationState, primaryPrediction, qualifiedBestSelections } = sandbox.__deskTestApi;
+const { exactVirtualMarketLine, qualificationState, primaryPrediction, qualifiedBestSelections, rawProbabilityValue, probabilityCalibrationInfo, probabilityValue, isVirtualDeskCandidate } = sandbox.__deskTestApi;
 
 function row(overrides = {}) {
   return {
@@ -98,6 +98,37 @@ const past = row({ start_time: new Date(Date.now() - 60 * 1000).toISOString() })
 assert.equal(qualifiedBestSelections([past], Date.now()).rows.length, 0, "past-kickoff rows never enter Qualified Best");
 const vfootball = row({ sport: "virtual", product: "vfootball", event_id: "vfb-1" });
 assert.equal(qualifiedBestSelections([vfootball], Date.now()).rows.length, 0, "VFootball remains outside active qualified Desk scope");
+ 
+// Upstream-qualified eFootball rows below the 80% discovery threshold must still
+// reach the exact-price gate. Model-only rows below 80% stay out of that lane.
+const qualifiedSeventy = {
+  ...row({ sport: "virtual", product: "efootball_gt", probability: 0.7117, line: 7.5, pick: "under", event_id: "efootball-qualified-71" }),
+  betting_qualified: true,
+  qualified_for_builder: true,
+  qualification_status: "BETTING_QUALIFIED_PAPER_DIRECTIONAL"
+};
+assert.equal(isVirtualDeskCandidate(qualifiedSeventy), true, "an upstream-qualified 71% eFootball candidate must reach the exact-price gate");
+assert.equal(isVirtualDeskCandidate({ ...qualifiedSeventy, betting_qualified: false, qualified_for_builder: false, qualification_status: "DIRECTIONAL_LINE_VALIDATION_GATE_PENDING" }), false, "a sub-80% pending research candidate is not promoted");
+
+const overconfidentUnder = {
+  ...row({ sport: "virtual", product: "efootball_gt", probability: 0.9614, line: 10.5, pick: "under", event_id: "efootball-under-105" }),
+  walkforward_exact_line_n: 69,
+  walkforward_exact_line_hit_rate: 0.5652173913043478
+};
+const calibration = probabilityCalibrationInfo(overconfidentUnder);
+assert.ok(calibration, "adequately sampled exact-line walk-forward evidence enables conservative Desk blending");
+assert.ok(probabilityValue(overconfidentUnder) < 0.70, "a 96% raw estimate with a 56.5% historical hit rate must not remain near-certain");
+assert.ok(probabilityValue(overconfidentUnder) < rawProbabilityValue(overconfidentUnder), "poor exact-line outcomes must pull the Desk estimate down");
+assert.equal(calibration.n, 69, "calibration labels retain their evidence sample size");
+
+const pendingDirectional = {
+  ...overconfidentUnder,
+  betting_qualified: false,
+  qualified_for_builder: false,
+  qualification_status: "DIRECTIONAL_LINE_VALIDATION_GATE_PENDING"
+};
+assert.equal(qualificationState(pendingDirectional).currentPricePass, false, "calibration never bypasses an upstream directional validation gate");
+assert.equal(qualificationState(pendingDirectional).reason, "DIRECTIONAL_LINE_VALIDATION_GATE_PENDING", "the Desk should explain the actual blocker instead of a generic model gate");
 
 // Parse only an explicit total/line provider specifier when market.line is absent.
 assert.equal(exactVirtualMarketLine({ specifier: "total=7.5" }), 7.5, "provider total specifier is recognized");
