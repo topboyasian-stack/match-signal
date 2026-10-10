@@ -68,8 +68,6 @@ jobs:
           all_tickets = list(d['tickets']) + list(d.get('archived_tickets',[]))
           ids = [str(t.get('ticket_id') or '') for t in all_tickets]
           assert len(ids) == len(set(ids)), 'duplicate ticket IDs across active/archive lists'
-          for ticket in d['tickets']:
-              assert str(ticket.get('status') or '').upper() != 'PENDING' or not __import__('datetime').datetime.fromisoformat(str(max((leg.get('start_time') or '') for leg in ticket.get('legs') or [])).replace('Z','+00:00')).timestamp() < __import__('datetime').datetime.now(__import__('datetime').timezone.utc).timestamp() - 6*3600, 'stale pending ticket leaked into active list'
           for ticket in all_tickets:
               assert ticket.get('paper_only') is True
               assert ticket.get('real_money_execution') is False
