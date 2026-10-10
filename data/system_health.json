@@ -1,26 +1,26 @@
 {
-  "generated_at": "2026-10-10T18:55:43.905099+00:00",
-  "status": "FAIL",
-  "critical_issues": 2,
+  "generated_at": "2026-10-10T20:07:52.820786+00:00",
+  "status": "DEGRADED",
+  "critical_issues": 0,
   "warning_issues": 1,
   "info_issues": 0,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
-      "status": "STALE",
-      "age_hours": 4.48,
+      "status": "PASS",
+      "age_hours": 0.09,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.94,
+      "age_hours": 0.61,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 3.58,
+      "age_hours": 0.05,
       "threshold_hours": 4
     },
     {
@@ -38,13 +38,13 @@
     {
       "engine": "tennis_forward_discovery",
       "status": "PASS",
-      "age_hours": 4.43,
+      "age_hours": 0.05,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 0.9,
+      "age_hours": 2.1,
       "threshold_hours": 0.5,
       "heartbeat_source": "unified_live_refresh"
     },
@@ -58,7 +58,7 @@
         },
         "table_tennis_x": {
           "status": "RETIRED",
-          "artifact_at": "2026-10-10T18:02:19.084850+00:00"
+          "artifact_at": "2026-10-10T19:48:09.369596+00:00"
         },
         "basketball": {
           "status": "RETIRED",
@@ -69,25 +69,15 @@
   ],
   "issues": [
     {
-      "code": "STALE_CORE_PREDICTION_PIPELINE",
-      "severity": "critical",
-      "detail": "updated_at age 4.48h exceeds 4h"
-    },
-    {
       "code": "TENNIS_CORE_FEED_EMPTY",
       "severity": "warning",
       "detail": "Canonical tennis pipeline has zero actionable predictions; 17 unqualified ATP forward-window watch projections are published for research only"
-    },
-    {
-      "code": "PIPELINE_STALE",
-      "severity": "critical",
-      "detail": "pipeline_status age 4.48h exceeds 4h"
     }
   ],
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
   "paper_only": true,
   "prediction_desk_filters": {
-    "past_kickoff_rows_hidden": 22,
+    "past_kickoff_rows_hidden": 8,
     "stale_live_flags_hidden": 0,
     "expired_settled_rows_hidden": 0
   }
