@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-10T12:46:32.770581+00:00",
+  "generated_at": "2026-10-10T12:58:49.693591+00:00",
   "status": "FAIL",
   "critical_issues": 2,
   "warning_issues": 1,
@@ -8,19 +8,19 @@
     {
       "engine": "core_prediction_pipeline",
       "status": "STALE",
-      "age_hours": 7.03,
+      "age_hours": 7.23,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.12,
+      "age_hours": 0.2,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 3.78,
+      "age_hours": 3.98,
       "threshold_hours": 4
     },
     {
@@ -38,15 +38,15 @@
     {
       "engine": "tennis_forward_discovery",
       "status": "PASS",
-      "age_hours": 6.5,
+      "age_hours": 0.03,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 0.04,
+      "age_hours": 0.24,
       "threshold_hours": 0.5,
-      "heartbeat_source": "virtual_lab_live.json"
+      "heartbeat_source": "unified_live_refresh"
     },
     {
       "engine": "retired_engines",
@@ -54,7 +54,7 @@
       "lanes": {
         "darts_x": {
           "status": "RETIRED",
-          "artifact_at": "2026-10-10T06:06:28.577102+00:00"
+          "artifact_at": "2026-10-10T12:47:16.610598+00:00"
         },
         "table_tennis_x": {
           "status": "RETIRED",
@@ -71,23 +71,23 @@
     {
       "code": "STALE_CORE_PREDICTION_PIPELINE",
       "severity": "critical",
-      "detail": "updated_at age 7.03h exceeds 4h"
+      "detail": "updated_at age 7.23h exceeds 4h"
     },
     {
       "code": "TENNIS_CORE_FEED_EMPTY",
       "severity": "warning",
-      "detail": "Canonical tennis pipeline has zero actionable predictions; 8 unqualified ATP forward-window watch projections are published for research only"
+      "detail": "Canonical tennis pipeline has zero actionable predictions; 14 unqualified ATP forward-window watch projections are published for research only"
     },
     {
       "code": "PIPELINE_STALE",
       "severity": "critical",
-      "detail": "pipeline_status age 7.03h exceeds 4h"
+      "detail": "pipeline_status age 7.23h exceeds 4h"
     }
   ],
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
   "paper_only": true,
   "prediction_desk_filters": {
-    "past_kickoff_rows_hidden": 23,
+    "past_kickoff_rows_hidden": 19,
     "stale_live_flags_hidden": 0,
     "expired_settled_rows_hidden": 0
   }
