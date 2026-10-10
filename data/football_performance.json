@@ -1,9 +1,9 @@
 {
-  "updated_at": "2026-10-10T05:45:41.852106+00:00",
+  "updated_at": "2026-10-10T13:36:21.234504+00:00",
   "status": "PAPER_RESEARCH_ONLY",
-  "settled": 196,
-  "correct": 93,
-  "accuracy": 0.4745,
+  "settled": 197,
+  "correct": 94,
+  "accuracy": 0.4772,
   "by_league": {
     "Champions League": {
       "settled": 10,
@@ -41,9 +41,9 @@
       "accuracy": 0.5
     },
     "EPL": {
-      "settled": 20,
-      "correct": 8,
-      "accuracy": 0.4
+      "settled": 21,
+      "correct": 9,
+      "accuracy": 0.4286
     },
     "Saudi Pro League": {
       "settled": 3,
@@ -83,12 +83,134 @@
     },
     {
       "label": "70%+",
-      "settled": 24,
-      "correct": 20,
-      "accuracy": 0.8333
+      "settled": 25,
+      "correct": 21,
+      "accuracy": 0.84
     }
   ],
   "recent_settled": [
+    {
+      "sport": "football",
+      "league": "EPL",
+      "event_id": "401879268",
+      "start_time": "2026-10-10T11:30Z",
+      "player_1": "Arsenal",
+      "player_2": "Leeds United",
+      "venue": "Emirates Stadium",
+      "surface": "Grass",
+      "probabilities": {
+        "p1": 0.701,
+        "draw": 0.199,
+        "p2": 0.1
+      },
+      "pick": "p1",
+      "confidence": 0.701,
+      "expected_goals": {
+        "p1": 2.19,
+        "p2": 0.67,
+        "total": 2.86
+      },
+      "markets": {
+        "over_under": {
+          "line": 2.5,
+          "over": 0.5446,
+          "under": 0.4554,
+          "pick": "over",
+          "source": "market O/U calibrated"
+        },
+        "btts": {
+          "yes": 0.4333,
+          "no": 0.5667,
+          "pick": "no",
+          "source": "Poisson xG model"
+        }
+      },
+      "handicap": {
+        "line": -1.5,
+        "home_cover": 0.4802,
+        "away_cover": 0.5198
+      },
+      "model": "ESPN market + form + home edge",
+      "raw_probabilities": {
+        "p1": 0.7238,
+        "draw": 0.1838,
+        "p2": 0.0924
+      },
+      "raw_confidence": 0.7238,
+      "calibrated_probabilities": {
+        "p1": 0.701,
+        "draw": 0.199,
+        "p2": 0.1
+      },
+      "calibrated_confidence": 0.701,
+      "calibration": {
+        "market": "football:1x2",
+        "method": "recency_weighted_empirical_bayes",
+        "sample_size": 169,
+        "effective_sample": 12.73,
+        "empirical": 0.6472,
+        "raw": 0.7238,
+        "bin_center": 0.725
+      },
+      "model_version": "5.0 historical-calibrated",
+      "calculated_at": "2026-09-22T22:55:11.646883+00:00",
+      "sportybet_winner_odds": {
+        "p1": 1.43,
+        "draw": 4.88,
+        "p2": 7.36,
+        "fair_p1": 0.672347,
+        "fair_draw": 0.19702,
+        "fair_p2": 0.130633,
+        "fair_odds_p1": 1.487,
+        "fair_odds_draw": 5.076,
+        "fair_odds_p2": 7.655,
+        "market_id": "1",
+        "overround": 0.040088
+      },
+      "odds_timestamp": null,
+      "market_insights": {
+        "provider": "SportyBet NG",
+        "available": true,
+        "matched_event_id": "sr:match:72221292",
+        "match_score": 1.0,
+        "winner_model_edge_vs_market": 0.241567,
+        "winner_model_pick": "p1",
+        "winner_market_fair_prob": 0.672347,
+        "total": {
+          "line": 2.5,
+          "pick": "over",
+          "book_odds": 1.68,
+          "fair_prob": 0.5613577023498694,
+          "fair_odds": 1.7813953488372096,
+          "model_prob": 0.5347,
+          "model_edge_vs_market": -0.026658,
+          "overround": 0.060354374307862724,
+          "market_id": "18"
+        },
+        "snapshot_at": null,
+        "source": "SportyBet NG",
+        "winner_model_probability": 0.3722,
+        "winner_market_probability": 0.130633,
+        "winner_expected_value": 1.739392,
+        "winner_book_odds": 7.36,
+        "winner_fair_odds": 2.6867,
+        "winner_value_signal": true
+      },
+      "value_evidence_frozen_at": "2026-09-29T10:39:27.167177+00:00",
+      "actual_markets": {
+        "over_under": "over",
+        "btts": "yes"
+      },
+      "final_score": [
+        2,
+        1
+      ],
+      "settled": true,
+      "settled_at": "2026-10-10T13:35:55.169979+00:00",
+      "actual": "p1",
+      "correct": true,
+      "brier": 0.139002
+    },
     {
       "sport": "football",
       "league": "La Liga",
@@ -5229,85 +5351,6 @@
       "actual": "p1",
       "correct": true,
       "brier": 0.387474
-    },
-    {
-      "sport": "football",
-      "league": "La Liga",
-      "event_id": "401882865",
-      "start_time": "2026-09-20T14:15Z",
-      "player_1": "Atlético Madrid",
-      "player_2": "Real Madrid",
-      "venue": "Riyadh Air Metropolitano",
-      "surface": "Grass",
-      "probabilities": {
-        "p1": 0.2858,
-        "draw": 0.256,
-        "p2": 0.4582
-      },
-      "pick": "p2",
-      "confidence": 0.4582,
-      "expected_goals": {
-        "p1": 1.39,
-        "p2": 1.85,
-        "total": 3.24
-      },
-      "markets": {
-        "over_under": {
-          "line": 3.5,
-          "over": 0.406,
-          "under": 0.594,
-          "pick": "under",
-          "source": "market O/U calibrated"
-        },
-        "btts": {
-          "yes": 0.6329,
-          "no": 0.3671,
-          "pick": "yes",
-          "source": "Poisson xG model"
-        }
-      },
-      "handicap": {
-        "line": 0.5,
-        "home_cover": 0.5177,
-        "away_cover": 0.4823
-      },
-      "model": "ESPN market + form + home edge",
-      "raw_probabilities": {
-        "p1": 0.2764,
-        "draw": 0.2476,
-        "p2": 0.476
-      },
-      "raw_confidence": 0.476,
-      "calibrated_probabilities": {
-        "p1": 0.2858,
-        "draw": 0.256,
-        "p2": 0.4582
-      },
-      "calibrated_confidence": 0.4582,
-      "calibration": {
-        "market": "football:1x2",
-        "method": "recency_weighted_empirical_bayes",
-        "sample_size": 143,
-        "effective_sample": 52.61,
-        "empirical": 0.4481,
-        "raw": 0.476,
-        "bin_center": 0.475
-      },
-      "model_version": "5.0 historical-calibrated",
-      "calculated_at": "2026-09-20T09:29:46.161078+00:00",
-      "actual_markets": {
-        "over_under": "under",
-        "btts": "yes"
-      },
-      "final_score": [
-        2,
-        1
-      ],
-      "settled": true,
-      "settled_at": "2026-09-20T17:01:57.840283+00:00",
-      "actual": "p1",
-      "correct": false,
-      "brier": 0.785565
     }
   ]
 }
