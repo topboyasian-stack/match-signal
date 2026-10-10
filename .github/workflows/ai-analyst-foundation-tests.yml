@@ -25,6 +25,13 @@ on:
       - 'scripts/test_tennis_forward_publication.py'
       - 'scripts/test_desk_quote_contract.mjs'
       - 'scripts/test_prediction_desk_gates.mjs'
+      - 'scripts/odds_ticket_tracker.py'
+      - 'scripts/test_odds_ticket_tracker.py'
+      - 'scripts/odds_builder.py'
+      - 'expansion-odds-builder.js'
+      - 'odds-builder.html'
+      - '.github/workflows/odds-ticket-tracker.yml'
+      - '.github/workflows/cloudflare-pages.yml'
       - '.github/workflows/unified-upcoming.yml'
       - '.github/workflows/tennis-forward-window.yml'
       - 'sport-hubs.js'
@@ -58,6 +65,13 @@ on:
       - 'scripts/test_tennis_forward_publication.py'
       - 'scripts/test_desk_quote_contract.mjs'
       - 'scripts/test_prediction_desk_gates.mjs'
+      - 'scripts/odds_ticket_tracker.py'
+      - 'scripts/test_odds_ticket_tracker.py'
+      - 'scripts/odds_builder.py'
+      - 'expansion-odds-builder.js'
+      - 'odds-builder.html'
+      - '.github/workflows/odds-ticket-tracker.yml'
+      - '.github/workflows/cloudflare-pages.yml'
       - '.github/workflows/unified-upcoming.yml'
       - '.github/workflows/tennis-forward-window.yml'
       - 'sport-hubs.js'
@@ -97,11 +111,15 @@ jobs:
       - name: Test tennis forward publication retry contract
         run: python scripts/test_tennis_forward_publication.py
       - name: Compile changed Prediction Desk Python modules
-        run: python -m py_compile scripts/unified_upcoming.py scripts/predict_today.py scripts/tennis_forward_window.py scripts/system_health_audit.py scripts/selection_candidate_collector.py scripts/efootball_desk_learning.py scripts/test_upcoming_desk_policy.py scripts/test_upcoming_settlement_retention.py scripts/test_tennis_forward_publication.py
+        run: python -m py_compile scripts/unified_upcoming.py scripts/predict_today.py scripts/tennis_forward_window.py scripts/system_health_audit.py scripts/selection_candidate_collector.py scripts/efootball_desk_learning.py scripts/test_upcoming_desk_policy.py scripts/test_upcoming_settlement_retention.py scripts/test_tennis_forward_publication.py scripts/odds_ticket_tracker.py scripts/odds_builder.py scripts/test_odds_ticket_tracker.py
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Run stale paper-ticket archive regression tests
+        run: python scripts/test_odds_ticket_tracker.py
+      - name: Check Paper Ledger JavaScript syntax
+        run: node --check expansion-odds-builder.js
       - name: Run Prediction Desk qualification and calibration regressions
         run: node scripts/test_prediction_desk_gates.mjs
       - name: Run private analyst module tests

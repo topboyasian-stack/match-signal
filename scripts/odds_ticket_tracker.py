@@ -12,7 +12,7 @@ import json
 import re
 import urllib.parse
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -25,6 +25,7 @@ EXPANSION_HISTORY = DATA / "expansion_prediction_history.json"
 SETTLEMENT_ARCHIVE = DATA / "virtual_lab_archive" / "settlements"
 
 MAX_TICKETS = 100
+STALE_PENDING_AFTER_HOURS = 6
 
 
 def load(path: Path, default):
@@ -861,17 +862,64 @@ def summary(tickets):
         },
     }
 
+def ticket_is_stale_pending(ticket, now_dt, stale_after_hours=STALE_PENDING_AFTER_HOURS):
+    """True when a pending ticket's latest scheduled leg is long past but unresolved.
+
+    The immutable ticket stays in the ledger archive and is still rechecked on
+    every tracker run; this flag only moves it out of the current ongoing list.
+    Unknown/missing kickoff times are never auto-archived.
+    """
+    if str(ticket.get("status") or "PENDING").upper() != "PENDING":
+        return False
+    legs = ticket.get("legs") or []
+    if not isinstance(legs, list) or not legs:
+        return False
+    starts = []
+    for leg in legs:
+        if not isinstance(leg, dict):
+            return False
+        raw = leg.get("start_time") or leg.get("startTime") or leg.get("start_time_iso")
+        if not raw:
+            return False
+        try:
+            value = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+            if value.tzinfo is None:
+                value = value.replace(tzinfo=timezone.utc)
+            starts.append(value.astimezone(timezone.utc))
+        except (TypeError, ValueError):
+            return False
+    if not starts:
+        return False
+    now_utc = now_dt if now_dt.tzinfo else now_dt.replace(tzinfo=timezone.utc)
+    cutoff = now_utc.astimezone(timezone.utc) - timedelta(hours=max(1, int(stale_after_hours)))
+    return max(starts) < cutoff
+
+
 def main():
-    now = iso_now()
+    now_dt = datetime.now(timezone.utc)
+    now = now_dt.isoformat()
     builder = load(BUILDER, {})
     batches = builder.get("batches") if isinstance(builder, dict) else []
     batches = batches if isinstance(batches, list) else []
 
     existing = load(TRACKER, {})
-    tickets = existing.get("tickets") if isinstance(existing, dict) else []
-    tickets = tickets if isinstance(tickets, list) else []
+    current = existing.get("tickets") if isinstance(existing, dict) else []
+    archived_existing = existing.get("archived_tickets") if isinstance(existing, dict) else []
+    current = current if isinstance(current, list) else []
+    archived_existing = archived_existing if isinstance(archived_existing, list) else []
 
-    by_id = {str(t.get("ticket_id")): t for t in tickets if isinstance(t, dict) and t.get("ticket_id")}
+    # Re-hydrate both current and archived records before settlement matching. This
+    # lets an older unresolved ticket move back to the current/history list if a late
+    # authoritative result finally arrives.
+    merged_by_id = {}
+    for ticket in archived_existing + current:
+        if not isinstance(ticket, dict):
+            continue
+        tid = str(ticket.get("ticket_id") or "")
+        if tid:
+            merged_by_id[tid] = ticket
+    tickets = list(merged_by_id.values())
+    by_id = {str(t.get("ticket_id")): t for t in tickets if t.get("ticket_id")}
     changed = False
 
     # Register every exact batch once. A refreshed batch with different legs is a
@@ -896,26 +944,63 @@ def main():
     if backfilled:
         rows.extend(backfilled)
         print('vFootball result backfill:', len(backfilled), 'legacy leg(s) recovered')
-    # Re-evaluate all unresolved tickets. A ticket marked LOST stays LOST, but its
-    # individual legs continue settling so the user can see exactly what happened.
+    # Re-evaluate current and archived tickets alike. A newly matched result can
+    # restore an archived snapshot to the normal settled-ticket view.
     for ticket in tickets:
-        changed = refresh_ticket(ticket, rows, now, builder)
+        changed = refresh_ticket(ticket, rows, now, builder) or changed
 
-    # Keep a useful rolling paper ledger. Settled tickets are trimmed first.
-    tickets.sort(key=lambda x: str(x.get("created_at") or ""), reverse=True)
-    if len(tickets) > MAX_TICKETS:
-        settled = [x for x in tickets if x.get("status") in {"WON", "LOST"}]
-        pending = [x for x in tickets if x.get("status") not in {"WON", "LOST"}]
-        tickets = pending + settled[: max(0, MAX_TICKETS - len(pending))]
-        tickets.sort(key=lambda x: str(x.get("created_at") or ""), reverse=True)
-        changed = True
+    fresh_or_settled = []
+    stale_pending = []
+    for ticket in tickets:
+        if ticket_is_stale_pending(ticket, now_dt):
+            if ticket.get("archive_reason") != "STALE_PENDING_KICKOFF":
+                ticket["archive_reason"] = "STALE_PENDING_KICKOFF"
+                changed = True
+            stale_pending.append(ticket)
+        else:
+            if ticket.get("archive_reason"):
+                ticket.pop("archive_reason", None)
+                changed = True
+            fresh_or_settled.append(ticket)
 
+    fresh_or_settled.sort(key=lambda x: str(x.get("created_at") or ""), reverse=True)
+    pending = [x for x in fresh_or_settled if str(x.get("status") or "").upper() == "PENDING"]
+    settled = [x for x in fresh_or_settled if str(x.get("status") or "").upper() in {"WON", "LOST"}]
+    other = [x for x in fresh_or_settled if x not in pending and x not in settled]
+    # The main track prioritizes current pending tickets and then the latest settled
+    # records. Overflow is retained in archived_tickets, never silently discarded.
+    if len(pending) >= MAX_TICKETS:
+        current_tickets = pending[:MAX_TICKETS]
+        overflow = settled + other + pending[MAX_TICKETS:]
+    else:
+        keep_settled = settled[:max(0, MAX_TICKETS - len(pending))]
+        kept_ids = {str(x.get("ticket_id") or "") for x in pending + keep_settled}
+        current_tickets = pending + keep_settled
+        overflow = [x for x in fresh_or_settled if str(x.get("ticket_id") or "") not in kept_ids]
+    current_tickets.sort(key=lambda x: str(x.get("created_at") or ""), reverse=True)
+    for ticket in overflow:
+        reason = "ACTIVE_TRACK_CAPACITY" if str(ticket.get("status") or "").upper() == "PENDING" else "SETTLED_HISTORY_ROLLING_WINDOW"
+        if ticket.get("archive_reason") != reason:
+            ticket["archive_reason"] = reason
+            changed = True
+    archived_tickets = stale_pending + overflow
+    archived_tickets.sort(key=lambda x: str(x.get("created_at") or ""), reverse=True)
+
+    all_retained = current_tickets + archived_tickets
+    stats = summary(all_retained)
+    stats["active_pending"] = sum(str(x.get("status") or "").upper() == "PENDING" for x in current_tickets)
+    stats["archived_pending"] = sum(str(x.get("status") or "").upper() == "PENDING" for x in archived_tickets)
+    stats["visible_tickets"] = len(current_tickets)
+    stats["archived_tickets"] = len(archived_tickets)
     output = {
-        "version": 3,
-        "updated_at": now if changed or not TRACKER.exists() else existing.get("updated_at"),
+        "version": 4,
+        "updated_at": now if changed or not TRACKER.exists() or
+            existing.get("tickets") != current_tickets or existing.get("archived_tickets") != archived_tickets
+            else existing.get("updated_at"),
         "mode": "PAPER_ONLY",
-        "summary": summary(tickets),
-        "tickets": tickets,
+        "summary": stats,
+        "tickets": current_tickets,
+        "archived_tickets": archived_tickets,
     }
 
     old_norm = json.dumps(existing, sort_keys=True, ensure_ascii=False)
@@ -926,7 +1011,8 @@ def main():
     print(json.dumps({
         "changed": old_norm != new_norm,
         "summary": output["summary"],
-        "new_ticket_count": sum(1 for t in tickets if t.get("created_at") == now),
+        "new_ticket_count": sum(1 for t in all_retained if t.get("created_at") == now),
+        "archived_stale_pending": stats["archived_pending"],
     }, indent=2))
 
 
