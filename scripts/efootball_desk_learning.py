@@ -295,6 +295,7 @@ def reconcile(trace, history_index):
     # diagnosable without dumping the large append-only trace/archive.
     identity_index = {}
     names_index = {}
+    event_id_index = {}
     history_products = {}
     for item in history_index.values():
         product = str(item.get("product") or "").strip().lower()
@@ -303,6 +304,9 @@ def reconcile(trace, history_index):
         if identity:
             identity_index.setdefault(identity, []).append(item)
             names_index.setdefault(identity[1], []).append(item)
+        event_id = str(item.get("event_id") or "")
+        if product and event_id:
+            event_id_index.setdefault((product, event_id), []).append(item)
     trace_products = {}
     trace_identity_n = 0
     trace_time_n = 0
@@ -345,17 +349,25 @@ def reconcile(trace, history_index):
     stats["forecast_line_groups"] = len(forecasts_by_exact_key)
 
     unmatched_samples = []
+    unmatched_samples_by_product = {}
     unmatched_reason_counts = {}
+    match_counts_by_product = {}
     for exact, forecasts in forecasts_by_exact_key.items():
         if not forecasts:
             continue
+        product = str(forecasts[0].get("product") or "efootball_gt").strip().lower()
+        product_counts = match_counts_by_product.setdefault(product, {"forecast_line_groups": 0, "matched_exact": 0, "matched_near_time": 0, "unmatched": 0, "unmatched_reason_counts": {}})
+        product_counts["forecast_line_groups"] += 1
         item, match_method = resolve_settlement(forecasts[0], history_index, identity_index, names_index)
         if not item:
             stats["unmatched_line_groups"] += 1
+            product_counts["unmatched"] += 1
+            product_counts["unmatched_reason_counts"][match_method] = product_counts["unmatched_reason_counts"].get(match_method, 0) + 1
             unmatched_reason_counts[match_method] = unmatched_reason_counts.get(match_method, 0) + 1
             if match_method == "AMBIGUOUS":
                 stats["ambiguous_line_groups"] += 1
-            if len(unmatched_samples) < 8:
+            product_samples = unmatched_samples_by_product.setdefault(product, [])
+            if len(unmatched_samples) < 8 or len(product_samples) < 4:
                 latest_forecast = max(
                     forecasts,
                     key=lambda row: dt(row.get("observed_at")) or datetime.min.replace(tzinfo=timezone.utc),
@@ -372,9 +384,10 @@ def reconcile(trace, history_index):
                 delta = None
                 if closest and event_time is not None and closest.get("_event_time") is not None:
                     delta = round((closest["_event_time"] - event_time).total_seconds(), 2)
-                unmatched_samples.append({
+                sample = {
                     "reason": match_method,
-                    "trace_product": str(latest_forecast.get("product") or "").strip().lower(),
+                    "trace_product": product,
+                    "trace_event_id": str(latest_forecast.get("event_id") or "")[:100] or None,
                     "trace_event_id_present": bool(latest_forecast.get("event_id")),
                     "trace_start_time": latest_forecast.get("start_time") or latest_forecast.get("timestamp"),
                     "trace_participants_normalized": list(identity[1]) if identity else None,
@@ -384,12 +397,23 @@ def reconcile(trace, history_index):
                     "closest_history_time": closest.get("_event_time").isoformat() if closest and closest.get("_event_time") else None,
                     "closest_history_time_delta_seconds": delta,
                     "closest_history_participants_normalized": list(closest.get("_identity")[1]) if closest and closest.get("_identity") else None,
-                })
+                }
+                same_id = event_id_index.get((product, str(latest_forecast.get("event_id") or "")), [])
+                closest_id = min(same_id, key=lambda hist: abs((hist.get("_event_time") - event_time).total_seconds()) if event_time is not None and hist.get("_event_time") is not None else float("inf"), default=None)
+                sample["same_product_event_id_history_count"] = len(same_id)
+                sample["closest_history_time_delta_seconds_by_event_id"] = round((closest_id.get("_event_time") - event_time).total_seconds(), 2) if closest_id and event_time is not None and closest_id.get("_event_time") is not None else None
+                sample["event_id_candidate_participants_match"] = bool(identity and closest_id and closest_id.get("_identity") and identity[1] == closest_id.get("_identity")[1])
+                if len(unmatched_samples) < 8:
+                    unmatched_samples.append(sample)
+                if len(product_samples) < 4:
+                    product_samples.append(sample)
             continue
         if match_method == "EXACT":
             stats["matched_line_groups_exact"] += 1
+            product_counts["matched_exact"] += 1
         elif match_method == "NEAR_TIME":
             stats["matched_line_groups_near_time"] += 1
+            product_counts["matched_near_time"] += 1
 
         settled = item.get("_stamp")
         score = item.get("score") or item.get("final_score") or item.get("_score_pair")
@@ -441,6 +465,8 @@ def reconcile(trace, history_index):
             row["scored_forecast"] = True
 
     stats["unmatched_reason_counts"] = unmatched_reason_counts
+    stats["match_counts_by_product"] = match_counts_by_product
+    stats["unmatched_samples_by_product"] = unmatched_samples_by_product
     stats["unmatched_samples"] = unmatched_samples
     stats["scored_forecasts"] = sum(1 for row in trace if row.get("scored_forecast") is True)
     return stats
@@ -548,7 +574,10 @@ def main():
     trace = trace[-TRACE_CAP:]
 
     settled = settled_forecasts(trace)
-    products = sorted({str(r.get("product") or "efootball_gt").strip().lower() for r in settled})
+    products = sorted(
+        {str(r.get("product") or "efootball_gt").strip().lower() for r in settled}
+        | {str(r.get("product") or "efootball_gt").strip().lower() for r in trace if isinstance(r, dict)}
+    )
     by_product = {}
     for product in products:
         product_settled = [r for r in settled if str(r.get("product") or "efootball_gt").strip().lower() == product]

@@ -419,6 +419,9 @@ def check_prediction_desk_copy_and_quote_matching_contract():
     source = (ROOT / "sport-hubs.js").read_text(encoding="utf-8")
     assert "exact-line calibration only (" in source
     assert "qualification is separate" in source
+    learning_source = (ROOT / "scripts" / "efootball_desk_learning.py").read_text(encoding="utf-8")
+    assert "unmatched_samples_by_product" in learning_source, "Settlement diagnostics must retain GT samples separately from VFootball"
+    assert "for r in trace if isinstance(r, dict)" in learning_source, "Products with pending forecasts must remain visible before the first scored result"
     assert "line-calibration warm-up (" not in source
     assert "for(let page=1;page<=5;page++)" in source
     assert "if(!required.length)return byEvent;" in source
