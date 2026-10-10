@@ -192,8 +192,11 @@ def combined_odds_gate_state():
     try:
         tracker_path=DATA/"odds_ticket_tracker.json"
         tracker=json.loads(tracker_path.read_text(encoding="utf-8"))
-        tickets=tracker.get("tickets") if isinstance(tracker,dict) else []
-        for ticket in tickets if isinstance(tickets,list) else []:
+        tickets=[]
+        if isinstance(tracker,dict):
+            tickets.extend(tracker.get("tickets") or [])
+            tickets.extend(tracker.get("archived_tickets") or [])
+        for ticket in tickets:
             if str(ticket.get("status") or "").upper() != "WON":
                 continue
             try:
