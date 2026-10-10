@@ -423,6 +423,7 @@ def check_prediction_desk_copy_and_quote_matching_contract():
     assert "for(let page=1;page<=5;page++)" in source
     assert "sameVirtualEvent(row,event)" in source
     assert "exact_event_not_found_in_live_snapshot" in source
+    assert "exact_line_or_side_not_found_in_live_snapshot" in source, "Missing current line/side must invalidate quote freshness"
     assert "QUOTE_STALE" in source and "FRESH_TWO_SIDED_MARKET_REQUIRED" in source
 
 
