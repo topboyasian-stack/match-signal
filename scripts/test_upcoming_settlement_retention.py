@@ -302,6 +302,130 @@ def check_exact_profiles_do_not_pool_products_and_calibration_requires_evidence(
     assert source == "NONE", "A global active flag must not bypass exact and bucket sample gates"
 
 
+
+
+def check_learning_reconciliation_matches_cross_minute_kickoff_safely():
+    kickoff = datetime(2026, 10, 8, 16, 42, 30, tzinfo=timezone.utc)
+    history_kickoff = datetime(2026, 10, 8, 16, 43, 30, tzinfo=timezone.utc)
+    settled_at = datetime(2026, 10, 8, 16, 50, tzinfo=timezone.utc)
+    history_row = {
+        "product": "efootball_gt",
+        "event_id": "reused-session-id",
+        "timestamp": iso(history_kickoff),
+        "participant_1": "SPARTAN",
+        "participant_2": "DART",
+        "market": "ou",
+        "line": 2.5,
+        "selection": "over",
+        "score": "2:1",
+        "settled_at": iso(settled_at),
+        # Missing win is acceptable only because score + settled_at are present.
+    }
+    forecast = {
+        "event_id": "different-provider-id",
+        "product": "efootball_gt",
+        "start_time": iso(kickoff),
+        "participant_1": "Manchester City (SPARTAN)",
+        "participant_2": "FC Bayern (DART)",
+        "line": 2.5,
+        "pick": "over",
+        "model_probability": 0.70,
+        "observed_at": iso(kickoff - timedelta(minutes=5)),
+        "settled": False,
+    }
+    history_index = learning.settlement_index([history_row])
+    stats = learning.reconcile([forecast], history_index)
+    assert forecast.get("scored_forecast") is True, "Minute-boundary drift should reconcile by unique participants + kickoff proximity"
+    assert forecast.get("win") is True and forecast.get("score") == "2:1"
+    assert stats["matched_line_groups_near_time"] == 1
+    assert stats["scored_forecasts"] == 1
+
+
+def check_ambiguous_near_time_settlement_is_never_guessed():
+    forecast_kickoff = datetime(2026, 10, 8, 16, 43, tzinfo=timezone.utc)
+    rows = []
+    for minute, score in ((42, "2:1"), (44, "1:0")):
+        event_time = datetime(2026, 10, 8, 16, minute, tzinfo=timezone.utc)
+        rows.append({
+            "product": "efootball_gt",
+            "event_id": "same-reused-id",
+            "timestamp": iso(event_time),
+            "participant_1": "SPARTAN",
+            "participant_2": "DART",
+            "market": "ou",
+            "line": 2.5,
+            "selection": "over",
+            "win": True,
+            "score": score,
+            "settled_at": iso(event_time + timedelta(minutes=5)),
+        })
+    forecast = {
+        "event_id": "another-reused-id",
+        "product": "efootball_gt",
+        "start_time": iso(forecast_kickoff),
+        "participant_1": "Home (SPARTAN)",
+        "participant_2": "Away (DART)",
+        "line": 2.5,
+        "pick": "over",
+        "model_probability": 0.70,
+        "observed_at": iso(forecast_kickoff - timedelta(minutes=5)),
+        "settled": False,
+    }
+    stats = learning.reconcile([forecast], learning.settlement_index(rows))
+    assert forecast.get("scored_forecast") is not True, "Two plausible recurring-participant fixtures must stay unmatched"
+    assert stats["ambiguous_line_groups"] == 1
+    assert stats["scored_forecasts"] == 0
+
+
+def check_half_line_directional_gate_uses_unique_scores_and_excludes_conflicts():
+    history = []
+    for index in range(32):
+        kickoff = datetime(2026, 10, 8, 0, 0, tzinfo=timezone.utc) + timedelta(minutes=10 * index)
+        settled_at = kickoff + timedelta(minutes=4)
+        base = {
+            "product": "efootball_gt",
+            "event_id": f"directional-event-{index}",
+            "timestamp": iso(kickoff),
+            "participant_1": f"Home (HANDLE_A{index})",
+            "participant_2": f"Away (HANDLE_B{index})",
+            "market": "ou",
+            "line": 7.5,
+            "selection": "under",
+            "win": True,
+            "score": "2:1",
+            "settled_at": iso(settled_at),
+        }
+        history.append(base)
+        if index == 1:
+            history.append(dict(base))  # duplicate market row must not add sample size
+        if index == 2:
+            conflict = dict(base)
+            conflict["score"] = "5:5"
+            conflict["win"] = False
+            history.append(conflict)  # conflicting final score at same settlement time is excluded
+
+    eval_art = {"efootball_gt_diagnostics": {"selection": {
+        "u7.5": {"7.5": {"participant_model": {"n": 30, "hit_rate": 0.70}}}
+    }}}
+    gate = upcoming.build_efootball_directional_gate(eval_art, history)[(7.5, "under")]
+    assert gate["recent_evidence_source"] == "UNIQUE_SETTLED_SCORE_REPLAY"
+    assert gate["recent_n"] == 31, "32 unique events minus one conflicting event; duplicate rows must not count"
+    assert gate["recent_hit_rate"] == 1.0
+    assert gate["excluded_conflicting_score_fixtures"] == 1
+    assert gate["pass"] is True, "Both unchanged >=30 and >=65% recent and holdout gates must pass"
+
+
+def check_prediction_desk_copy_and_quote_matching_contract():
+    source = (ROOT / "sport-hubs.js").read_text(encoding="utf-8")
+    assert "exact-line calibration only (" in source
+    assert "qualification is separate" in source
+    assert "line-calibration warm-up (" not in source
+    assert "for(let page=1;page<=5;page++)" in source
+    assert "sameVirtualEvent(row,event)" in source
+    assert "exact_event_not_found_in_live_snapshot" in source
+    assert "QUOTE_STALE" in source and "FRESH_TWO_SIDED_MARKET_REQUIRED" in source
+
+
 if __name__ == "__main__":
     check_settled_fixture_is_shown_during_grace_then_hidden()
     check_reused_event_id_does_not_hide_a_different_fixture()
@@ -310,4 +434,8 @@ if __name__ == "__main__":
     check_learning_capture_covers_each_virtual_product()
     check_each_totals_line_is_scored_independently()
     check_exact_profiles_do_not_pool_products_and_calibration_requires_evidence()
-    print("PASS: settled expiry, stale kickoff removal, per-line scoring, product-isolated profiles, evidence-gated calibration, and live retention")
+    check_learning_reconciliation_matches_cross_minute_kickoff_safely()
+    check_ambiguous_near_time_settlement_is_never_guessed()
+    check_half_line_directional_gate_uses_unique_scores_and_excludes_conflicts()
+    check_prediction_desk_copy_and_quote_matching_contract()
+    print("PASS: settlement retention, conservative reconciliation, unique score replay, line gates, calibration, and exact live quote contract")
