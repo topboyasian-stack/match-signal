@@ -15,7 +15,7 @@ vm.runInContext(
   sandbox,
   { filename: "sport-hubs.js#prediction-desk-gates" }
 );
-const { exactVirtualMarketLine, qualificationState, primaryPrediction, qualifiedBestSelections, rawProbabilityValue, probabilityCalibrationInfo, probabilityValue, displayedFairOddsValue, exactMarketExpectedReturn, isVirtualDeskCandidate } = sandbox.__deskTestApi;
+const { exactVirtualMarketLine, exactMarketEdge, qualificationState, primaryPrediction, qualifiedBestSelections, rawProbabilityValue, probabilityCalibrationInfo, probabilityValue, displayedFairOddsValue, exactMarketExpectedReturn, isVirtualDeskCandidate } = sandbox.__deskTestApi;
 
 function row(overrides = {}) {
   return {
