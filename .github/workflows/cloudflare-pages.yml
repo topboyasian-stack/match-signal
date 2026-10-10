@@ -256,13 +256,13 @@ jobs:
                   if (!body.includes(marker)) failures.push(path+' missing '+marker);
               }
               if (path==='/upcoming.html') {
-                for (const marker of ['Paper Odds Builder','expansion-odds-builder.js?v=20261010-paper-ledger-stale-archive1','oddsBuilder','Model estimate ≠ qualification. Exact-line prices stay visible; stale quotes cannot qualify or show a current edge.','2.70× floor','2.80× preferred','sport-hubs.js?v=20261010-predictiondesk-ev-calibration3','id="upLast"'])
+                for (const marker of ['Paper Odds Builder','expansion-odds-builder.js?v=20261010-qualification-monitor1','oddsBuilder','Model estimate ≠ qualification. Exact-line prices stay visible; stale quotes cannot qualify or show a current edge.','2.70× floor','2.80× preferred','sport-hubs.js?v=20261010-predictiondesk-ev-calibration3','id="upLast"'])
                   if (!body.includes(marker)) failures.push(path+' missing '+marker);
                 if (body.includes('id="lineLadderDesk"') || body.includes('4.00+ target · no forced legs'))
                   failures.push(path+' contains retired line-ladder clutter or misleading Builder target');
               }
               if (path==='/odds-builder.html') {
-                for (const marker of ['Live Odds Builder — Standard 2.70x+ / Compact eFootball 2.00x+','Compact eFootball lane: 4–5 eFootball GT/Adriatic legs at 2.00x+','80% model floor','expansion-odds-builder.js?v=20261010-paper-ledger-stale-archive1'])
+                for (const marker of ['Live Odds Builder — Standard 2.70x+ / Compact eFootball 2.00x+','Compact eFootball lane: 4–5 eFootball GT/Adriatic legs at 2.00x+','80% model floor','expansion-odds-builder.js?v=20261010-qualification-monitor1'])
                   if (!body.includes(marker)) failures.push(path+' missing '+marker);
               }
               if (path==='/football.html' || path==='/tennis.html' || path==='/basketball.html' || path==='/reports.html') {
@@ -298,7 +298,7 @@ jobs:
               )) failures.push('/analyst.js missing deterministic facts or product-specific high-line Under qualification safeguards');
               if (path==='/sport-hubs.js' && (!body.includes('EXACT_MARKET_LINE_SIDE_FRESH') || !body.includes('HIGH_LINE_UNDER_EVIDENCE_GATE_PENDING') || !body.includes('MODEL ESTIMATE ≥90% · NOT QUALIFIED') || !body.includes('SportyBet last seen @') || !body.includes('NOT ACTIONABLE · PRICE STALE') || body.includes('MODEL GATE PASSED · PRICE STALE') || body.includes('class="ms-up-qual ') || body.includes('class="ms-market-q ') || !body.includes('VFOOTBALL_RESEARCH_ONLY') || !body.includes('isVirtual && !isActiveVirtualProduct(productKey)') || !body.includes('EXPLICIT_QUALIFICATION_VETO') || !body.includes('function qualifiedBestSelections') || !body.includes('function exactVirtualMarketLine') || !body.includes('gate.currentPricePass?1:0'))) failures.push('/sport-hubs.js missing qualified-first ranking, explicit watch-status veto, exact quote or virtual-line normalization safeguards');
               if (path==='/sport-hubs.css' && !body.includes('.ms-qualified-best-row')) failures.push('/sport-hubs.css missing Qualified Best presentation styles');
-              if (path==='/expansion-odds-builder.js' && (!body.includes('function isActiveVirtualLeg(leg)') || !body.includes('function isActiveVirtualBatch(batch)') || !body.includes('ACTIVE_VIRTUAL_MIN_PROBABILITY = 0.80') || !body.includes('ensureBookingCodes(activeBatches)') || !body.includes("primaryLane==='efootball_compact_2x'") || !body.includes('4–5 LEGS · 2.00+') || !body.includes('Compact eFootball ticket lane'))) failures.push('/expansion-odds-builder.js missing active-scope, compact-lane or 80% stale-batch guard');
+              if (path==='/expansion-odds-builder.js' && (!body.includes('function isActiveVirtualLeg(leg)') || !body.includes('function isActiveVirtualBatch(batch)') || !body.includes('ACTIVE_VIRTUAL_MIN_PROBABILITY = 0.80') || !body.includes('ensureBookingCodes(activeBatches)') || !body.includes("primaryLane==='efootball_compact_2x'") || !body.includes('4–5 LEGS · 2.00+') || !body.includes('Compact eFootball ticket lane') || !body.includes('function qualificationMonitorHtml(data)') || !body.includes('NOT QUALIFIED'))) failures.push('/expansion-odds-builder.js missing active-scope, compact-lane or 80% stale-batch guard');
               if (path.endsWith('.json')) {
                 const parsed=JSON.parse(body);
                 if (path==='/data/odds_ticket_tracker.json') {
