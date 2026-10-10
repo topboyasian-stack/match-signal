@@ -14,7 +14,7 @@ assert.match(helper, /Why it is not a ticket/, 'monitor must show per-candidate 
 assert.match(helper, /Model probability is below the active 80% per-leg construction floor/, 'monitor must explain the probability floor');
 assert.match(helper, /No independently proven profitable settled-ticket shape/, 'monitor must explain construction evidence blockers');
 assert.match(helper, /No booking code is created from this panel/, 'monitor must disclose no-booking behavior');
-assert.match(helper, /if\(activeBatches\.length\|\|Number\(data\.batch_count\|\|0\)>0\)return ''/, 'monitor must appear only when no batch exists');
+assert.match(helper, /if\(activeBatches\.length\)return ''/, 'monitor must appear only when no active batch exists');
 assert.doesNotMatch(helper, /requestBookingCode|ensureBookingCodes|GenUI|fetch\(/, 'monitor must not perform booking or network actions');
 
 console.log('Qualification monitor contract tests passed.');
