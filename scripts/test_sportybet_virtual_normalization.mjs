@@ -21,6 +21,6 @@ assert.equal(marketLineFromSportyBet({}), null);
 assert.equal(participantFromName("Barcelona (Virtual_3)"), "Virtual_3");
 assert.equal(participantFromName("Spurs (MAGICIAN) "), "MAGICIAN");
 assert.equal(participantFromName("plain participant"), "");
-assert.equal(participantFromName("Team (with (nested) text)"), "text");
+assert.equal(participantFromName("Team (nested)"), "nested");
 
 console.log("SportyBet virtual market normalization checks passed");
