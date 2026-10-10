@@ -21,6 +21,7 @@ DATA = ROOT / "data"
 UNIFIED = DATA / "unified_upcoming.json"
 HISTORY = DATA / "virtual_lab_history.json"
 TRACE = DATA / "efootball_desk_prediction_history.json"
+SETTLED_LEDGER = DATA / "efootball_desk_settled_observations.json"
 OUTPUT = DATA / "efootball_desk_learning.json"
 
 BUCKET_WIDTH = 0.05
@@ -28,6 +29,9 @@ MIN_CALIBRATION_N = 30
 EXACT_MIN_N = 20
 RECENT_WINDOW = 50
 TRACE_CAP = 50000
+CAPTURE_PROBABILITY_DELTA = 0.01
+CAPTURE_ODDS_DELTA = 0.01
+CAPTURE_EDGE_DELTA = 0.005
 
 
 def load(path: Path, default):
@@ -234,9 +238,45 @@ def eligible_current_rows(board):
     return out
 
 
+def materially_same_forecast(old, new):
+    """True when an older row already records the same material desk state.
+
+    Snapshots stay deduplicated for the life of a fixture, not merely while they
+    happen to remain in the last 1,000 trace rows. Quote or model changes still
+    create a new revision; unchanged five-minute refreshes do not flood the cap.
+    """
+    if exact_key(old) != exact_key(new) or side_of(old) != side_of(new):
+        return False
+    if str(old.get("model_version") or "") != str(new.get("model_version") or ""):
+        return False
+    if str(old.get("validated_model_family") or "") != str(new.get("validated_model_family") or ""):
+        return False
+
+    def close(a, b, tolerance):
+        a, b = num(a), num(b)
+        if a is None or b is None:
+            return a is None and b is None
+        return abs(a - b) < tolerance
+
+    return (
+        close(old.get("model_probability"), new.get("model_probability"), CAPTURE_PROBABILITY_DELTA)
+        and close(old.get("raw_model_probability"), new.get("raw_model_probability"), CAPTURE_PROBABILITY_DELTA)
+        and close(old.get("bookmaker_odds"), new.get("bookmaker_odds"), CAPTURE_ODDS_DELTA)
+        and close(old.get("model_edge_vs_market"), new.get("model_edge_vs_market"), CAPTURE_EDGE_DELTA)
+    )
+
+
 def capture(trace, board):
     now = datetime.now(timezone.utc)
     generated_at = board.get("generated_at") if isinstance(board, dict) else None
+    existing_by_market = {}
+    for old in trace:
+        key = exact_key(old)
+        side = side_of(old)
+        if key and side:
+            existing_by_market.setdefault((key, side), []).append(old)
+
+    added = 0
     for row in eligible_current_rows(board):
         key = exact_key(row)
         if not key:
@@ -264,18 +304,97 @@ def capture(trace, board):
             "paper_only": True,
             "settled": False,
         }
-        # Keep every materially different forecast revision, but avoid writing
-        # identical snapshots every five minutes.
-        duplicate = any(
-            (old.get("event_key") == key or exact_key(old) == key)
-            and side_of(old) == side_of(record)
-            and abs(float(old.get("model_probability") or 0) - float(record.get("model_probability") or 0)) < 1e-6
-            and abs(((dt(old.get("observed_at")) or now) - observed).total_seconds()) < 1800
-            for old in trace[-1000:]
-        )
-        if not duplicate:
-            trace.append(record)
+        market_key = (key, side_of(record))
+        duplicates = existing_by_market.get(market_key, [])
+        if any(materially_same_forecast(old, record) for old in duplicates):
+            continue
+        trace.append(record)
+        existing_by_market.setdefault(market_key, []).append(record)
+        added += 1
+    return added
 
+
+def settled_observation_key(row):
+    """Stable identifier for one settled desk forecast revision."""
+    base = exact_key(row)
+    observed = dt(row.get("observed_at"))
+    if base and observed:
+        return f"{base}|{observed.isoformat()}"
+    return str(row.get("observation_key") or row.get("trace_id") or "").strip() or None
+
+
+def merge_settled_observations(ledger, trace):
+    """Append newly settled forecasts to a small, durable learning ledger.
+
+    The large active trace is capped for runtime safety. This separate ledger
+    ensures a scored forecast is not lost just because thousands of later
+    upcoming snapshots push it out of the rolling trace window.
+    """
+    out = []
+    seen = set()
+    for row in ledger if isinstance(ledger, list) else []:
+        if not isinstance(row, dict):
+            continue
+        item = dict(row)
+        key = settled_observation_key(item)
+        if not key or key in seen:
+            continue
+        item["observation_key"] = key
+        out.append(item)
+        seen.add(key)
+
+    added = 0
+    for row in trace if isinstance(trace, list) else []:
+        if not isinstance(row, dict) or row.get("settled") is not True:
+            continue
+        if row.get("scored_forecast") is not True and row.get("actual_result") != "PUSH":
+            continue
+        key = settled_observation_key(row)
+        if not key or key in seen:
+            continue
+        item = dict(row)
+        item["observation_key"] = key
+        item["archive_source"] = "efootball_desk_prediction_history"
+        out.append(item)
+        seen.add(key)
+        added += 1
+
+    out.sort(key=lambda r: str(r.get("settled_at") or r.get("observed_at") or ""))
+    return out, added
+
+
+def bound_trace(trace, now=None, cap=TRACE_CAP):
+    """Keep settled rows and imminent-to-settle forecasts ahead of distant rows."""
+    now = now or datetime.now(timezone.utc)
+    if len(trace) <= cap:
+        return sorted(trace, key=lambda r: str(r.get("observed_at") or ""))
+
+    settled_rows = [
+        row for row in trace
+        if row.get("settled") is True or row.get("scored_forecast") is True or row.get("actual_result") == "PUSH"
+    ]
+    pending_rows = [
+        row for row in trace
+        if row.get("settled") is not True and row.get("scored_forecast") is not True and row.get("actual_result") != "PUSH"
+    ]
+    settled_rows.sort(key=lambda r: str(r.get("settled_at") or r.get("observed_at") or ""))
+    if len(settled_rows) >= cap:
+        retained = settled_rows[-cap:]
+    else:
+        def pending_priority(row):
+            start = dt(row.get("start_time"))
+            observed = dt(row.get("observed_at"))
+            observed_epoch = observed.timestamp() if observed else 0.0
+            if start is None:
+                return (2, float("inf"), -observed_epoch)
+            if start <= now:
+                return (0, start.timestamp(), -observed_epoch)
+            return (1, start.timestamp(), -observed_epoch)
+
+        pending_rows.sort(key=pending_priority)
+        retained = settled_rows + pending_rows[:max(0, cap - len(settled_rows))]
+    retained.sort(key=lambda r: str(r.get("observed_at") or ""))
+    return retained
 
 def reconcile(trace, history_index):
     stats = {
@@ -561,19 +680,24 @@ def main():
     board = load(UNIFIED, {})
     history = load(HISTORY, [])
     trace = load(TRACE, [])
+    settled_ledger = load(SETTLED_LEDGER, [])
     if not isinstance(trace, list):
         trace = []
+    if not isinstance(settled_ledger, list):
+        settled_ledger = []
 
-    capture(trace, board)
+    captured = capture(trace, board)
     history_index = settlement_index(history)
     reconciliation = reconcile(trace, history_index)
+    settled_ledger, ledger_added = merge_settled_observations(settled_ledger, trace)
+    reconciliation["captured_new_forecasts"] = captured
+    reconciliation["settled_ledger_rows"] = len(settled_ledger)
+    reconciliation["settled_ledger_added_this_run"] = ledger_added
 
-    # Bound the learning ledger while retaining all currently relevant and
-    # recently settled forecasts.
-    trace.sort(key=lambda r: str(r.get("observed_at") or ""))
-    trace = trace[-TRACE_CAP:]
-
-    settled = settled_forecasts(trace)
+    # The active trace is a bounded work queue; settled rows are retained there
+    # when capacity allows and are always preserved in the append-only ledger.
+    trace = bound_trace(trace)
+    settled = settled_forecasts(settled_ledger)
     products = sorted(
         {str(r.get("product") or "efootball_gt").strip().lower() for r in settled}
         | {str(r.get("product") or "efootball_gt").strip().lower() for r in trace if isinstance(r, dict)}
@@ -651,11 +775,13 @@ def main():
         "exact_selection": gt_exact,
         "by_product": by_product,
         "trace_artifact": "data/efootball_desk_prediction_history.json",
+        "settled_observations_artifact": "data/efootball_desk_settled_observations.json",
         "source_settlement": "data/virtual_lab_history.json",
         "reconciliation_diagnostics": reconciliation,
     }
 
     save(TRACE, trace)
+    save(SETTLED_LEDGER, settled_ledger)
     save(OUTPUT, report)
     print(json.dumps({
         "status": "ACTIVE" if active else "WARMUP",
