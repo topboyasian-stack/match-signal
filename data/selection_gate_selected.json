@@ -12,7 +12,8 @@
     "round": "Round 3",
     "rankings": {
       "p1": 65,
-      "p2": 5
+      "p2": 5,
+      "gap": -60
     },
     "form": {
       "p1": 0.5,
@@ -21,11 +22,11 @@
       "p2_last10": "WWLWLLW"
     },
     "probabilities": {
-      "p1": 0.1043,
-      "p2": 0.8957
+      "p1": 0.204,
+      "p2": 0.796
     },
     "pick": "p2",
-    "confidence": 0.8957,
+    "confidence": 0.796,
     "analytics": {
       "set_win_prob": {
         "p1": 0.2003,
@@ -40,19 +41,41 @@
       "expected_games": 23.44,
       "total_games": {
         "line": 22.5,
-        "over": 0.5,
-        "under": 0.5,
-        "pick": null,
+        "over": 0.5359,
+        "under": 0.4641,
+        "pick": "over",
         "base_model_over": 0.5927,
         "base_model_under": 0.4073,
-        "source": "fixture-specific continuous set/game model"
+        "source": "continuous tennis model + walk-forward O/U calibration v4",
+        "pre_calibration_source": "walk-forward tennis set/game model",
+        "calibration_status": "PAPER_RESEARCH",
+        "calibration_features": {
+          "line": 22.5,
+          "three_sets_bin": "low",
+          "confidence_bin": "very_high",
+          "tour": "ATP",
+          "empirical_over_rate": 0.3089,
+          "calibration_source": "line_only",
+          "empirical_weight": 0.2,
+          "prior_model_over": 0.5927,
+          "global_over_rate": 0.4289
+        }
       },
       "games_handicap": {
         "estimated_margin_p1": 0.0,
         "pick": null
-      }
+      },
+      "elo": {
+        "p1": 1476.4,
+        "p2": 1500.0,
+        "p1_win_prob": 0.4661,
+        "weight": 0.75
+      },
+      "walkforward_raw_p1": 0.204,
+      "walkforward_calibrated_p1": 0.204,
+      "ranking_probability": 0.0601
     },
-    "model": "ESPN fixture + ATP/WTA ranking + recent form",
+    "model": "ESPN + ranking/form base + walk-forward player Elo + current ATP/WTA rank + walk-forward probability calibration",
     "prediction_status": "watch_projection",
     "projection_tier": "baseline_plus_enrichment",
     "evidence_depth": "tennis_forward_window_ranking_form_watch",
@@ -491,7 +514,11 @@
       }
     ],
     "signal_quality": {
-      "secondary_analytics_calibrated": true
+      "secondary_analytics_calibrated": true,
+      "elo_available": true,
+      "elo_gap": -23.6,
+      "ranking_available": true,
+      "components": 3
     },
     "architecture": "independent statistical + market benchmark + calibration + value",
     "decision": "PAPER ONLY",
@@ -532,6 +559,7 @@
     },
     "live_eligible": false,
     "testing_mode": "paper",
+    "model_version": "2026-09-17-walkforward-calibrated",
     "candidate_status": "BETTING_QUALIFIED_PAPER",
     "qualification_basis": {
       "confidence_ok": true,
