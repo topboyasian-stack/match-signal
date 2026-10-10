@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-10-10T07:03:45.640551+00:00",
+  "generated_at": "2026-10-10T07:13:53.074392+00:00",
   "mode": "PAPER_ONLY",
-  "active": false,
+  "active": true,
   "policy": {
     "minimum_calibration_predictions": 30,
     "exact_selection_min_predictions": 20,
@@ -11,124 +11,334 @@
     "future_leakage_protection": "only observations strictly before kickoff can become the scored forecast; settlement is read from independent virtual_lab_history",
     "products_are_never_pooled": true
   },
-  "settled_predictions": 4,
-  "total_settled_predictions": 4,
-  "pending_forecasts": 5637,
+  "settled_predictions": 88,
+  "total_settled_predictions": 88,
+  "pending_forecasts": 4760,
   "recent_window": {
-    "n": 4,
-    "accuracy": 0.5,
-    "brier": 0.27098665
+    "n": 50,
+    "accuracy": 0.56,
+    "brier": 0.2530252038
   },
   "calibration": {
     "active": false,
     "minimum_bucket_predictions": 30,
     "buckets": {
       "0.7": {
-        "n": 2,
-        "wins": 1,
-        "brier": 0.58104338,
-        "accuracy": 0.5,
-        "avg_brier": 0.29052169,
-        "posterior_probability": 0.5,
-        "mean_model_probability": 0.7013,
-        "calibration_weight": 0.0625,
-        "calibration_offset": -0.20130000000000003,
-        "calibrated_probability": 0.68871875
+        "n": 12,
+        "wins": 7,
+        "brier": 3.08366028,
+        "accuracy": 0.5833333333333334,
+        "avg_brier": 0.25697169000000003,
+        "posterior_probability": 0.55,
+        "mean_model_probability": 0.7012999999999999,
+        "calibration_weight": 0.2857142857142857,
+        "calibration_offset": -0.15129999999999988,
+        "calibrated_probability": 0.6580714285714285
       },
       "0.5": {
-        "n": 2,
-        "wins": 1,
-        "brier": 0.50290322,
-        "accuracy": 0.5,
-        "avg_brier": 0.25145161,
-        "posterior_probability": 0.5,
+        "n": 20,
+        "wins": 9,
+        "brier": 5.105232200000001,
+        "accuracy": 0.45,
+        "avg_brier": 0.2552616100000001,
+        "posterior_probability": 0.4642857142857143,
         "mean_model_probability": 0.5381,
-        "calibration_weight": 0.0625,
-        "calibration_offset": -0.03810000000000002,
-        "calibrated_probability": 0.53571875
+        "calibration_weight": 0.4,
+        "calibration_offset": -0.07381428571428572,
+        "calibrated_probability": 0.5085742857142856
+      },
+      "0.8": {
+        "n": 1,
+        "wins": 1,
+        "brier": 0.025728159999999996,
+        "accuracy": 1.0,
+        "avg_brier": 0.025728159999999996,
+        "posterior_probability": 0.5555555555555556,
+        "mean_model_probability": 0.8396,
+        "calibration_weight": 0.03225806451612903,
+        "calibration_offset": -0.28404444444444443,
+        "calibrated_probability": 0.8304372759856631
+      },
+      "0.6": {
+        "n": 25,
+        "wins": 11,
+        "brier": 6.991743999999999,
+        "accuracy": 0.44,
+        "avg_brier": 0.27966975999999993,
+        "posterior_probability": 0.45454545454545453,
+        "mean_model_probability": 0.6224000000000003,
+        "calibration_weight": 0.45454545454545453,
+        "calibration_offset": -0.16785454545454576,
+        "calibrated_probability": 0.5461024793388431
+      },
+      "0.75": {
+        "n": 20,
+        "wins": 14,
+        "brier": 4.2663552,
+        "accuracy": 0.7,
+        "avg_brier": 0.21331775999999997,
+        "posterior_probability": 0.6428571428571429,
+        "mean_model_probability": 0.7576,
+        "calibration_weight": 0.4,
+        "calibration_offset": -0.11474285714285715,
+        "calibrated_probability": 0.7117028571428572
+      },
+      "0.85": {
+        "n": 7,
+        "wins": 5,
+        "brier": 1.57194332,
+        "accuracy": 0.7142857142857143,
+        "avg_brier": 0.2245633314285714,
+        "posterior_probability": 0.6,
+        "mean_model_probability": 0.8574,
+        "calibration_weight": 0.1891891891891892,
+        "calibration_offset": -0.2574000000000001,
+        "calibrated_probability": 0.8087027027027027
+      },
+      "0.9": {
+        "n": 3,
+        "wins": 2,
+        "brier": 0.8634795200000001,
+        "accuracy": 0.6666666666666666,
+        "avg_brier": 0.2878265066666667,
+        "posterior_probability": 0.5454545454545454,
+        "mean_model_probability": 0.9228,
+        "calibration_weight": 0.09090909090909091,
+        "calibration_offset": -0.37734545454545454,
+        "calibrated_probability": 0.8884958677685949
       }
     },
-    "settled_predictions": 4
+    "settled_predictions": 88
   },
   "exact_selection": {
     "4.5|over": {
-      "n": 2,
-      "wins": 1,
-      "accuracy": 0.5,
-      "posterior_probability": 0.5,
-      "mean_model_probability": 0.7013,
-      "calibration_weight": 0.0625,
-      "calibration_offset": -0.20130000000000003
+      "n": 12,
+      "wins": 7,
+      "accuracy": 0.5833333333333334,
+      "posterior_probability": 0.55,
+      "mean_model_probability": 0.7012999999999999,
+      "calibration_weight": 0.2857142857142857,
+      "calibration_offset": -0.15129999999999988
     },
     "5.5|over": {
-      "n": 2,
-      "wins": 1,
-      "accuracy": 0.5,
-      "posterior_probability": 0.5,
+      "n": 20,
+      "wins": 9,
+      "accuracy": 0.45,
+      "posterior_probability": 0.4642857142857143,
       "mean_model_probability": 0.5381,
-      "calibration_weight": 0.0625,
-      "calibration_offset": -0.03810000000000002
+      "calibration_weight": 0.4,
+      "calibration_offset": -0.07381428571428572
+    },
+    "3.5|over": {
+      "n": 1,
+      "wins": 1,
+      "accuracy": 1.0,
+      "posterior_probability": 0.5555555555555556,
+      "mean_model_probability": 0.8396,
+      "calibration_weight": 0.03225806451612903,
+      "calibration_offset": -0.28404444444444443
+    },
+    "6.5|under": {
+      "n": 25,
+      "wins": 11,
+      "accuracy": 0.44,
+      "posterior_probability": 0.45454545454545453,
+      "mean_model_probability": 0.6224000000000003,
+      "calibration_weight": 0.45454545454545453,
+      "calibration_offset": -0.16785454545454576
+    },
+    "7.5|under": {
+      "n": 20,
+      "wins": 14,
+      "accuracy": 0.7,
+      "posterior_probability": 0.6428571428571429,
+      "mean_model_probability": 0.7576,
+      "calibration_weight": 0.4,
+      "calibration_offset": -0.11474285714285715
+    },
+    "8.5|under": {
+      "n": 7,
+      "wins": 5,
+      "accuracy": 0.7142857142857143,
+      "posterior_probability": 0.6,
+      "mean_model_probability": 0.8574,
+      "calibration_weight": 0.1891891891891892,
+      "calibration_offset": -0.2574000000000001
+    },
+    "9.5|under": {
+      "n": 3,
+      "wins": 2,
+      "accuracy": 0.6666666666666666,
+      "posterior_probability": 0.5454545454545454,
+      "mean_model_probability": 0.9228,
+      "calibration_weight": 0.09090909090909091,
+      "calibration_offset": -0.37734545454545454
     }
   },
   "by_product": {
     "efootball_gt": {
-      "active": false,
-      "settled_predictions": 4,
-      "pending_forecasts": 5637,
+      "active": true,
+      "settled_predictions": 88,
+      "pending_forecasts": 4760,
       "recent_window": {
-        "n": 4,
-        "accuracy": 0.5,
-        "brier": 0.27098665
+        "n": 50,
+        "accuracy": 0.56,
+        "brier": 0.2530252038
       },
       "calibration": {
         "active": false,
         "minimum_bucket_predictions": 30,
         "buckets": {
           "0.7": {
-            "n": 2,
-            "wins": 1,
-            "brier": 0.58104338,
-            "accuracy": 0.5,
-            "avg_brier": 0.29052169,
-            "posterior_probability": 0.5,
-            "mean_model_probability": 0.7013,
-            "calibration_weight": 0.0625,
-            "calibration_offset": -0.20130000000000003,
-            "calibrated_probability": 0.68871875
+            "n": 12,
+            "wins": 7,
+            "brier": 3.08366028,
+            "accuracy": 0.5833333333333334,
+            "avg_brier": 0.25697169000000003,
+            "posterior_probability": 0.55,
+            "mean_model_probability": 0.7012999999999999,
+            "calibration_weight": 0.2857142857142857,
+            "calibration_offset": -0.15129999999999988,
+            "calibrated_probability": 0.6580714285714285
           },
           "0.5": {
-            "n": 2,
-            "wins": 1,
-            "brier": 0.50290322,
-            "accuracy": 0.5,
-            "avg_brier": 0.25145161,
-            "posterior_probability": 0.5,
+            "n": 20,
+            "wins": 9,
+            "brier": 5.105232200000001,
+            "accuracy": 0.45,
+            "avg_brier": 0.2552616100000001,
+            "posterior_probability": 0.4642857142857143,
             "mean_model_probability": 0.5381,
-            "calibration_weight": 0.0625,
-            "calibration_offset": -0.03810000000000002,
-            "calibrated_probability": 0.53571875
+            "calibration_weight": 0.4,
+            "calibration_offset": -0.07381428571428572,
+            "calibrated_probability": 0.5085742857142856
+          },
+          "0.8": {
+            "n": 1,
+            "wins": 1,
+            "brier": 0.025728159999999996,
+            "accuracy": 1.0,
+            "avg_brier": 0.025728159999999996,
+            "posterior_probability": 0.5555555555555556,
+            "mean_model_probability": 0.8396,
+            "calibration_weight": 0.03225806451612903,
+            "calibration_offset": -0.28404444444444443,
+            "calibrated_probability": 0.8304372759856631
+          },
+          "0.6": {
+            "n": 25,
+            "wins": 11,
+            "brier": 6.991743999999999,
+            "accuracy": 0.44,
+            "avg_brier": 0.27966975999999993,
+            "posterior_probability": 0.45454545454545453,
+            "mean_model_probability": 0.6224000000000003,
+            "calibration_weight": 0.45454545454545453,
+            "calibration_offset": -0.16785454545454576,
+            "calibrated_probability": 0.5461024793388431
+          },
+          "0.75": {
+            "n": 20,
+            "wins": 14,
+            "brier": 4.2663552,
+            "accuracy": 0.7,
+            "avg_brier": 0.21331775999999997,
+            "posterior_probability": 0.6428571428571429,
+            "mean_model_probability": 0.7576,
+            "calibration_weight": 0.4,
+            "calibration_offset": -0.11474285714285715,
+            "calibrated_probability": 0.7117028571428572
+          },
+          "0.85": {
+            "n": 7,
+            "wins": 5,
+            "brier": 1.57194332,
+            "accuracy": 0.7142857142857143,
+            "avg_brier": 0.2245633314285714,
+            "posterior_probability": 0.6,
+            "mean_model_probability": 0.8574,
+            "calibration_weight": 0.1891891891891892,
+            "calibration_offset": -0.2574000000000001,
+            "calibrated_probability": 0.8087027027027027
+          },
+          "0.9": {
+            "n": 3,
+            "wins": 2,
+            "brier": 0.8634795200000001,
+            "accuracy": 0.6666666666666666,
+            "avg_brier": 0.2878265066666667,
+            "posterior_probability": 0.5454545454545454,
+            "mean_model_probability": 0.9228,
+            "calibration_weight": 0.09090909090909091,
+            "calibration_offset": -0.37734545454545454,
+            "calibrated_probability": 0.8884958677685949
           }
         }
       },
-      "exact_selection_active": false,
+      "exact_selection_active": true,
       "exact_selection": {
         "4.5|over": {
-          "n": 2,
-          "wins": 1,
-          "accuracy": 0.5,
-          "posterior_probability": 0.5,
-          "mean_model_probability": 0.7013,
-          "calibration_weight": 0.0625,
-          "calibration_offset": -0.20130000000000003
+          "n": 12,
+          "wins": 7,
+          "accuracy": 0.5833333333333334,
+          "posterior_probability": 0.55,
+          "mean_model_probability": 0.7012999999999999,
+          "calibration_weight": 0.2857142857142857,
+          "calibration_offset": -0.15129999999999988
         },
         "5.5|over": {
-          "n": 2,
-          "wins": 1,
-          "accuracy": 0.5,
-          "posterior_probability": 0.5,
+          "n": 20,
+          "wins": 9,
+          "accuracy": 0.45,
+          "posterior_probability": 0.4642857142857143,
           "mean_model_probability": 0.5381,
-          "calibration_weight": 0.0625,
-          "calibration_offset": -0.03810000000000002
+          "calibration_weight": 0.4,
+          "calibration_offset": -0.07381428571428572
+        },
+        "3.5|over": {
+          "n": 1,
+          "wins": 1,
+          "accuracy": 1.0,
+          "posterior_probability": 0.5555555555555556,
+          "mean_model_probability": 0.8396,
+          "calibration_weight": 0.03225806451612903,
+          "calibration_offset": -0.28404444444444443
+        },
+        "6.5|under": {
+          "n": 25,
+          "wins": 11,
+          "accuracy": 0.44,
+          "posterior_probability": 0.45454545454545453,
+          "mean_model_probability": 0.6224000000000003,
+          "calibration_weight": 0.45454545454545453,
+          "calibration_offset": -0.16785454545454576
+        },
+        "7.5|under": {
+          "n": 20,
+          "wins": 14,
+          "accuracy": 0.7,
+          "posterior_probability": 0.6428571428571429,
+          "mean_model_probability": 0.7576,
+          "calibration_weight": 0.4,
+          "calibration_offset": -0.11474285714285715
+        },
+        "8.5|under": {
+          "n": 7,
+          "wins": 5,
+          "accuracy": 0.7142857142857143,
+          "posterior_probability": 0.6,
+          "mean_model_probability": 0.8574,
+          "calibration_weight": 0.1891891891891892,
+          "calibration_offset": -0.2574000000000001
+        },
+        "9.5|under": {
+          "n": 3,
+          "wins": 2,
+          "accuracy": 0.6666666666666666,
+          "posterior_probability": 0.5454545454545454,
+          "mean_model_probability": 0.9228,
+          "calibration_weight": 0.09090909090909091,
+          "calibration_offset": -0.37734545454545454
         }
       }
     },
@@ -154,50 +364,50 @@
   "settled_observations_artifact": "data/efootball_desk_settled_observations.json",
   "source_settlement": "data/virtual_lab_history.json",
   "reconciliation_diagnostics": {
-    "trace_rows": 53343,
-    "history_index_fixtures": 4972,
-    "forecast_line_groups": 11530,
-    "matched_line_groups_exact": 0,
+    "trace_rows": 52069,
+    "history_index_fixtures": 5014,
+    "forecast_line_groups": 11678,
+    "matched_line_groups_exact": 84,
     "matched_line_groups_near_time": 0,
-    "unmatched_line_groups": 11530,
+    "unmatched_line_groups": 11594,
     "ambiguous_line_groups": 0,
-    "scored_forecasts": 0,
+    "scored_forecasts": 84,
     "unmatched_reason_counts": {
-      "NO_IDENTITY_MATCH": 6389,
-      "TIME_MISMATCH": 5141
+      "NO_IDENTITY_MATCH": 6433,
+      "TIME_MISMATCH": 5161
     },
     "trace_product_counts": {
-      "vfootball": 45903,
-      "efootball_gt": 7440
+      "vfootball": 45993,
+      "efootball_gt": 6076
     },
     "history_index_product_counts": {
-      "efootball_gt": 2864,
+      "efootball_gt": 2906,
       "efootball_adriatic": 5,
       "vfootball": 2103
     },
-    "trace_rows_with_identity": 53343,
-    "trace_rows_with_time": 53343,
-    "trace_rows_with_identity_and_time": 53343,
-    "history_identity_groups": 867,
+    "trace_rows_with_identity": 52069,
+    "trace_rows_with_time": 52069,
+    "trace_rows_with_identity_and_time": 52069,
+    "history_identity_groups": 871,
     "match_counts_by_product": {
       "vfootball": {
-        "forecast_line_groups": 10110,
+        "forecast_line_groups": 10200,
         "matched_exact": 0,
         "matched_near_time": 0,
-        "unmatched": 10110,
+        "unmatched": 10200,
         "unmatched_reason_counts": {
-          "NO_IDENTITY_MATCH": 5690,
-          "TIME_MISMATCH": 4420
+          "NO_IDENTITY_MATCH": 5750,
+          "TIME_MISMATCH": 4450
         }
       },
       "efootball_gt": {
-        "forecast_line_groups": 1420,
-        "matched_exact": 0,
+        "forecast_line_groups": 1478,
+        "matched_exact": 84,
         "matched_near_time": 0,
-        "unmatched": 1420,
+        "unmatched": 1394,
         "unmatched_reason_counts": {
-          "TIME_MISMATCH": 721,
-          "NO_IDENTITY_MATCH": 699
+          "TIME_MISMATCH": 711,
+          "NO_IDENTITY_MATCH": 683
         }
       }
     },
@@ -288,21 +498,21 @@
         {
           "reason": "TIME_MISMATCH",
           "trace_product": "efootball_gt",
-          "trace_event_id": "sr:match:BAaEhAqCPdvO7lclildPnqQ",
+          "trace_event_id": "sr:match:BAaEg|QGLfuanuNBN0MCl5g",
           "trace_event_id_present": true,
           "trace_start_time": "2026-10-10T04:00:00+00:00",
           "trace_participants_normalized": [
-            "flamez",
-            "goldfer"
+            "legion",
+            "radahn"
           ],
           "same_participants_any_product_count": 4,
           "closest_history_product": "efootball_gt",
           "closest_history_event_id_present": true,
-          "closest_history_time": "2026-10-09T04:00:00+00:00",
-          "closest_history_time_delta_seconds": -86400.0,
+          "closest_history_time": "2026-10-10T05:40:00+00:00",
+          "closest_history_time_delta_seconds": 6000.0,
           "closest_history_participants_normalized": [
-            "flamez",
-            "goldfer"
+            "legion",
+            "radahn"
           ],
           "same_product_event_id_history_count": 0,
           "closest_history_time_delta_seconds_by_event_id": null,
@@ -311,21 +521,21 @@
         {
           "reason": "TIME_MISMATCH",
           "trace_product": "efootball_gt",
-          "trace_event_id": "sr:match:BAaEhAqCPdvO7lclildPnqQ",
+          "trace_event_id": "sr:match:BAaEg|QGLfuanuNBN0MCl5g",
           "trace_event_id_present": true,
           "trace_start_time": "2026-10-10T04:00:00+00:00",
           "trace_participants_normalized": [
-            "flamez",
-            "goldfer"
+            "legion",
+            "radahn"
           ],
           "same_participants_any_product_count": 4,
           "closest_history_product": "efootball_gt",
           "closest_history_event_id_present": true,
-          "closest_history_time": "2026-10-09T04:00:00+00:00",
-          "closest_history_time_delta_seconds": -86400.0,
+          "closest_history_time": "2026-10-10T05:40:00+00:00",
+          "closest_history_time_delta_seconds": 6000.0,
           "closest_history_participants_normalized": [
-            "flamez",
-            "goldfer"
+            "legion",
+            "radahn"
           ],
           "same_product_event_id_history_count": 0,
           "closest_history_time_delta_seconds_by_event_id": null,
@@ -334,21 +544,21 @@
         {
           "reason": "TIME_MISMATCH",
           "trace_product": "efootball_gt",
-          "trace_event_id": "sr:match:BAaEhAqjoeoG6sbu0ETUlJw",
+          "trace_event_id": "sr:match:BAaEg|RCWdHCni5O8v83sdQ",
           "trace_event_id_present": true,
           "trace_start_time": "2026-10-10T04:00:00+00:00",
           "trace_participants_normalized": [
-            "riko",
-            "v1nniepuh"
+            "haiko",
+            "mers"
           ],
-          "same_participants_any_product_count": 16,
+          "same_participants_any_product_count": 17,
           "closest_history_product": "efootball_gt",
           "closest_history_event_id_present": true,
-          "closest_history_time": "2026-10-09T04:00:00+00:00",
-          "closest_history_time_delta_seconds": -86400.0,
+          "closest_history_time": "2026-10-10T05:40:00+00:00",
+          "closest_history_time_delta_seconds": 6000.0,
           "closest_history_participants_normalized": [
-            "riko",
-            "v1nniepuh"
+            "haiko",
+            "mers"
           ],
           "same_product_event_id_history_count": 0,
           "closest_history_time_delta_seconds_by_event_id": null,
@@ -357,21 +567,21 @@
         {
           "reason": "TIME_MISMATCH",
           "trace_product": "efootball_gt",
-          "trace_event_id": "sr:match:BAaEhAqjoeoG6sbu0ETUlJw",
+          "trace_event_id": "sr:match:BAaEg|RCWdHCni5O8v83sdQ",
           "trace_event_id_present": true,
           "trace_start_time": "2026-10-10T04:00:00+00:00",
           "trace_participants_normalized": [
-            "riko",
-            "v1nniepuh"
+            "haiko",
+            "mers"
           ],
-          "same_participants_any_product_count": 16,
+          "same_participants_any_product_count": 17,
           "closest_history_product": "efootball_gt",
           "closest_history_event_id_present": true,
-          "closest_history_time": "2026-10-09T04:00:00+00:00",
-          "closest_history_time_delta_seconds": -86400.0,
+          "closest_history_time": "2026-10-10T05:40:00+00:00",
+          "closest_history_time_delta_seconds": 6000.0,
           "closest_history_participants_normalized": [
-            "riko",
-            "v1nniepuh"
+            "haiko",
+            "mers"
           ],
           "same_product_event_id_history_count": 0,
           "closest_history_time_delta_seconds_by_event_id": null,
@@ -541,8 +751,8 @@
         "event_id_candidate_participants_match": false
       }
     ],
-    "captured_new_forecasts": 3343,
-    "settled_ledger_rows": 4,
+    "captured_new_forecasts": 2069,
+    "settled_ledger_rows": 88,
     "settled_ledger_added_this_run": 0
   }
 }
