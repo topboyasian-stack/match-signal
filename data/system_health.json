@@ -1,32 +1,32 @@
 {
-  "generated_at": "2026-10-10T09:07:46.647233+00:00",
-  "status": "DEGRADED",
-  "critical_issues": 0,
+  "generated_at": "2026-10-10T10:42:03.421270+00:00",
+  "status": "FAIL",
+  "critical_issues": 2,
   "warning_issues": 1,
   "info_issues": 0,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
-      "status": "PASS",
-      "age_hours": 3.38,
+      "status": "STALE",
+      "age_hours": 4.96,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.12,
+      "age_hours": 1.57,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 0.13,
+      "age_hours": 1.7,
       "threshold_hours": 4
     },
     {
       "engine": "unified_upcoming",
       "status": "PASS",
-      "age_hours": 0.02,
+      "age_hours": 0.0,
       "threshold_hours": 2
     },
     {
@@ -38,13 +38,13 @@
     {
       "engine": "tennis_forward_discovery",
       "status": "PASS",
-      "age_hours": 2.85,
+      "age_hours": 4.42,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 2.14,
+      "age_hours": 3.71,
       "threshold_hours": 0.5,
       "heartbeat_source": "unified_live_refresh"
     },
@@ -58,7 +58,7 @@
         },
         "table_tennis_x": {
           "status": "RETIRED",
-          "artifact_at": "2026-10-10T07:00:02.442395+00:00"
+          "artifact_at": "2026-10-10T09:28:09.476205+00:00"
         },
         "basketball": {
           "status": "RETIRED",
@@ -69,15 +69,25 @@
   ],
   "issues": [
     {
+      "code": "STALE_CORE_PREDICTION_PIPELINE",
+      "severity": "critical",
+      "detail": "updated_at age 4.96h exceeds 4h"
+    },
+    {
       "code": "TENNIS_CORE_FEED_EMPTY",
       "severity": "warning",
-      "detail": "Canonical tennis pipeline has zero actionable predictions; 11 unqualified ATP forward-window watch projections are published for research only"
+      "detail": "Canonical tennis pipeline has zero actionable predictions; 10 unqualified ATP forward-window watch projections are published for research only"
+    },
+    {
+      "code": "PIPELINE_STALE",
+      "severity": "critical",
+      "detail": "pipeline_status age 4.96h exceeds 4h"
     }
   ],
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
   "paper_only": true,
   "prediction_desk_filters": {
-    "past_kickoff_rows_hidden": 15,
+    "past_kickoff_rows_hidden": 16,
     "stale_live_flags_hidden": 0,
     "expired_settled_rows_hidden": 0
   }
