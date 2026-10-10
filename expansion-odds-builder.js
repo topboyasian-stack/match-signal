@@ -563,9 +563,12 @@
       var products=(Array.isArray(t.products)?t.products:[]).map(function(x){return String(x||'').toUpperCase();}).filter(Boolean).join(' · ')||'VIRTUAL';
       var created=t.created_at?local(t.created_at):'Unknown';
       var label=status==='WON'||status==='LOST'?ticketLabel(t):'<span class="ticket-status pending">ARCHIVED · UNRESOLVED</span>';
+      var archiveReason=String(t.archive_reason||'STALE_PENDING_KICKOFF');
       var reason=(status==='WON'||status==='LOST')
         ?'Older settled ticket snapshot retained for history and audit.'
-        :'Latest kickoff is more than six hours old and official settlement is still unmatched. This snapshot is hidden from current ongoing tickets but remains here and will be rechecked for late settlement.';
+        :archiveReason==='ACTIVE_TRACK_CAPACITY'
+          ?'Retained outside the current track to keep the visible ticket list bounded. The original snapshot remains available here.'
+          :'Latest kickoff is more than six hours old and official settlement is still unmatched. This snapshot is hidden from current ongoing tickets but remains here and will be rechecked for late settlement.';
       return '<details class="ticket-card '+(status==='LOST'?'ticket-lost':status==='WON'?'ticket-won':'ticket-pending')+' ticket-archived">'+
         '<summary class="ticket-card-summary">'+
           '<div class="ticket-card-title"><span class="ticket-kicker">ARCHIVED PAPER TICKET · '+esc2(t.ticket_id||'—')+'</span><strong>'+(t.batch_id?esc2(t.batch_id)+' · ':'')+label+'</strong><small>'+esc2(products)+' · Created '+esc2(created)+'</small></div>'+
@@ -622,7 +625,7 @@
     if(!cards) cards='<div class="empty">No current or settled paper tickets in this view.</div>';
     var archiveCards=archivedTickets.slice(0,100).map(archivedTicketHtml).join('');
     var archiveSection=archivedTickets.length
-      ?'<details class="ticket-archive"><summary class="ticket-archive-summary"><strong>Archived paper snapshots ('+esc2(archivedTickets.length)+')</strong><span>Older unresolved batches are removed from current ongoing tickets; their original legs and settlement state are preserved below.</span></summary><div class="ticket-list">'+archiveCards+'</div>'+(archivedTickets.length>100?'<div class="sub">Showing the 100 newest archived snapshots; older records remain in the saved paper ledger.</div>':'')+'</details>'
+      ?'<details class="ticket-archive"><summary class="ticket-archive-summary"><strong>Archived paper snapshots ('+esc2(archivedTickets.length)+')</strong><span>Older unresolved batches and overflow history are removed from the current list; their original legs and settlement state are preserved below.</span></summary><div class="ticket-list">'+archiveCards+'</div>'+(archivedTickets.length>100?'<div class="sub">Showing the 100 newest archived snapshots; older records remain in the saved paper ledger.</div>':'')+'</details>'
       :'';
 
     return '<section class="ticket-track">'+
