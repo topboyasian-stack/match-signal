@@ -72,13 +72,53 @@ function marketLabel(x){
   }
   return x.pick||x.markets?.over_under?.pick||"Model projection";
 }
+function rawProbabilityValue(x){
+  const valid=value=>{
+    if(value===null||value===undefined||String(value).trim()==="")return null;
+    const n=Number(value);
+    return Number.isFinite(n)&&n>=0&&n<=1?n:null;
+  };
+  const direct=valid(x?.probability);
+  if(direct!==null)return direct;
+  const confidence=valid(x?.confidence);
+  if(confidence!==null)return confidence;
+  const model=valid(x?.model_probability);
+  if(model!==null)return model;
+  const pr=x?.probabilities||{};
+  return valid(x?.pick?pr[x.pick]:null);
+}
+function probabilityCalibrationInfo(x){
+  const raw=rawProbabilityValue(x);
+  const product=String(x?.product||"").toLowerCase();
+  const side=String(x?.pick||x?.selection||"").toLowerCase();
+  const line=Number(x?.line);
+  const n=Number(x?.walkforward_exact_line_n);
+  const hit=Number(x?.walkforward_exact_line_hit_rate);
+  if(raw===null||!["efootball_gt","efootball_adriatic"].includes(product)||
+     !isOverUnderPrediction(x)||!Number.isFinite(line)||(side!=="over"&&side!=="under")||
+     !Number.isFinite(n)||n<30||!Number.isFinite(hit)||hit<0||hit>1)return null;
+  // Blend the model estimate toward its own exact-line chronological walk-forward
+  // hit rate. n/(n+30) is the same evidence-weighting form used by the desk
+  // learner; it reduces unsupported certainty without pretending the historical
+  // rate is a guarantee. This adjustment affects Desk display/value evaluation only.
+  const weight=n/(n+30);
+  const probability=Math.max(0.01,Math.min(0.99,raw+(hit-raw)*weight));
+  return {raw,probability,hitRate:hit,n,weight};
+}
 function probabilityValue(x){
-  const p=x.probability;
-  if(Number.isFinite(Number(p)))return Number(p);
-  if(Number.isFinite(Number(x.confidence)))return Number(x.confidence);
-  const pr=x.probabilities||{};
-  if(x.pick&&Number.isFinite(Number(pr[x.pick])))return Number(pr[x.pick]);
-  return null;
+  const calibrated=probabilityCalibrationInfo(x);
+  return calibrated?calibrated.probability:rawProbabilityValue(x);
+}
+function isVirtualDeskCandidate(row){
+  if(!row)return false;
+  const product=String(row?.product||"").toLowerCase();
+  const probability=rawProbabilityValue(row);
+  const start=Date.parse(String(row?.start_time||""));
+  const upstreamQualified=Boolean(row?.betting_qualified)||Boolean(row?.qualified_for_builder)||
+    String(row?.qualification_status||"").startsWith("BETTING_QUALIFIED");
+  return String(row?.sport||"").toLowerCase()==="virtual"&&
+    isActiveVirtualProduct(product)&&Number.isFinite(probability)&&
+    (probability>=0.80||upstreamQualified)&&Number.isFinite(start);
 }
 function rowFixtureKey(x){
   const norm=s=>String(s||"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
@@ -144,7 +184,8 @@ function bookmakerOdds(x){
 function exactMarketEdge(x,quote){
   if(!quote||quote.odds==null)return null;
   const selected=String(x?.pick||x?.selection||"").toLowerCase();
-  const p=Number(probabilityValue(x));
+  const probability=probabilityValue(x);
+  const p=probability===null?NaN:Number(probability);
   if(!Number.isFinite(p)||p<0||p>1)return null;
   let selectedOdds=Number(quote.odds),oppositeOdds=null,marketProb=null;
   if(isOverUnderPrediction(x)){
@@ -198,7 +239,10 @@ function qualificationState(x){
     const detail=veto
       ?String(raw||x?.candidate_status||x?.model_candidate_status||"explicit watch/research gate").replaceAll("_"," ")
       :(raw&&raw!=="MODEL_RESEARCH"&&raw!=="RESEARCH_PROJECTION"?raw.replaceAll("_"," "):"RESEARCH ONLY");
-    return {modelQualified:false,currentPricePass:false,label:"NOT QUALIFIED · "+detail,reason:veto||"MODEL_GATE_NOT_PASSED"};
+    const modelReason=raw.includes("DIRECTIONAL_LINE_VALIDATION_GATE_PENDING")?"DIRECTIONAL_LINE_VALIDATION_GATE_PENDING":
+      raw.includes("MODEL_LINE_SCOPE_GATE_PENDING")?"MODEL_LINE_SCOPE_GATE_PENDING":
+      raw.includes("HIGH_LINE_UNDER_EVIDENCE_GATE_PENDING")?"HIGH_LINE_UNDER_EVIDENCE_GATE_PENDING":"MODEL_GATE_NOT_PASSED";
+    return {modelQualified:false,currentPricePass:false,label:"NOT QUALIFIED · "+detail,reason:veto||modelReason};
   }
   const quote=exactSportyBetQuote(x);
   if(quote.odds==null){
@@ -224,6 +268,7 @@ function qualificationLabel(x){
 }
 function unifiedMarketLine(x){
   const p=probabilityValue(x);
+  const calibration=probabilityCalibrationInfo(x);
   const quote=exactSportyBetQuote(x);
   const book=quote.odds;
   const displayBook=quote.displayOdds==null?book:quote.displayOdds;
@@ -242,7 +287,8 @@ function unifiedMarketLine(x){
   const evidence=evidenceLabel(x);
   return '<div class="ms-market-row">'+
     '<span class="ms-market-name"><b>'+E(market)+'</b></span>'+
-    '<span>Model estimate <b>'+(p==null?"—":P(p))+'</b></span>'+
+    '<span>'+(calibration?'Desk-calibrated estimate':'Model estimate')+' <b>'+(p==null?"—":P(p))+'</b></span>'+
+    (calibration?'<span>Raw model <b>'+P(calibration.raw)+'</b> · exact-line walk-forward '+P(calibration.hitRate)+' (n='+Math.round(calibration.n)+')</span>':'')+
     '<span>Model fair <b>'+E(fairLabel)+'</b></span>'+
     '<span>Evidence <b>'+E(String(evidence||"unavailable"))+'</b></span>'+
     '<span class="'+marketQuoteClass+'">'+E(marketReference)+'</span>'+
@@ -298,6 +344,9 @@ function qualificationBlockerLabel(reason){
   const labels={
     EXPLICIT_QUALIFICATION_VETO:"Explicit watch/research/not-qualified status",
     MODEL_GATE_NOT_PASSED:"Model/evidence qualification not passed",
+    DIRECTIONAL_LINE_VALIDATION_GATE_PENDING:"Directional line validation still pending",
+    MODEL_LINE_SCOPE_GATE_PENDING:"Model line-scope validation still pending",
+    HIGH_LINE_UNDER_EVIDENCE_GATE_PENDING:"High-line Under evidence still insufficient",
     NO_QUOTE:"No exact SportyBet quote",
     MARKET_UNVERIFIED:"Market identity unverified",
     LINE_MISMATCH:"Quoted line does not match",
@@ -518,19 +567,7 @@ async function renderUnifiedBoard(){
     // The core prediction feed intentionally does not contain Virtual/eFootball.
     // Bring the existing evidence-backed eFootball candidate lane onto the
     // Upcoming Desk without turning it into a Builder qualification bypass.
-    const virtualCandidates=selectedRows.filter(x=>{
-      const product=String(x?.product||"").toLowerCase();
-      const p=Number(x?.model_probability);
-      const start=Date.parse(String(x?.start_time||""));
-      return (
-        x &&
-        String(x?.sport||"").toLowerCase()==="virtual" &&
-        isActiveVirtualProduct(product) &&
-        Number.isFinite(p) &&
-        p>=0.80 &&
-        Number.isFinite(start)
-      );
-    });
+    const virtualCandidates=selectedRows.filter(isVirtualDeskCandidate);
 
     function virtualParticipantIdentity(row,keys){
       let value="";
