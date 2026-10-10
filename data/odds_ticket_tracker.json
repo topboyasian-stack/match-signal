@@ -4,14 +4,14 @@
   "mode": "PAPER_ONLY",
   "summary": {
     "tracked_tickets": 100,
-    "pending": 70,
+    "pending": 69,
     "won": 5,
-    "lost": 25,
-    "active_with_loss": 0,
+    "lost": 26,
+    "active_with_loss": 1,
     "legs_won": 85,
-    "legs_lost": 34,
-    "legs_pending": 137,
-    "settled_tickets": 30,
+    "legs_lost": 35,
+    "legs_pending": 136,
+    "settled_tickets": 31,
     "by_leg_count": {
       "2": {
         "tracked": 12,
@@ -32,34 +32,34 @@
         "avg_model_rating": 39.71
       },
       "4": {
-        "tracked": 16,
+        "tracked": 17,
         "won": 3,
-        "lost": 13,
-        "settled": 16,
-        "accuracy": 0.1875,
-        "avg_combined_odds": 3.028688,
-        "avg_model_rating": 52.563125
+        "lost": 14,
+        "settled": 17,
+        "accuracy": 0.176471,
+        "avg_combined_odds": 3.035706,
+        "avg_model_rating": 51.705882
       }
     },
     "by_primary_lane": {
       "vfootball_event_holdout_value": {
-        "tracked": 30,
+        "tracked": 31,
         "won": 5,
-        "lost": 25,
-        "settled": 30,
-        "accuracy": 0.166667,
-        "avg_combined_odds": 3.1057,
-        "avg_model_rating": 51.645
+        "lost": 26,
+        "settled": 31,
+        "accuracy": 0.16129,
+        "avg_combined_odds": 3.107065,
+        "avg_model_rating": 51.204516
       }
     },
     "improvement_summary": {
       "high_confidence_loss_tickets": 10,
       "high_confidence_loss_legs": 15,
       "losses_by_product": {
-        "vfootball": 34
+        "vfootball": 35
       },
       "losses_by_direction": {
-        "under": 34
+        "under": 35
       },
       "shape_comparison": "Use by_leg_count to compare 2–7-leg accuracy, average odds, and average model rating.",
       "lane_comparison": "Use by_primary_lane to compare construction-lane performance."
@@ -1207,8 +1207,8 @@
       "batch_id": "BATCH-01",
       "created_at": "2026-10-09T19:25:12.506529+00:00",
       "last_seen_at": "2026-10-09T19:25:12.506529+00:00",
-      "last_settled_at": "2026-10-09T22:37:37.678587+00:00",
-      "status": "PENDING",
+      "last_settled_at": "2026-10-10T00:05:46.608384+00:00",
+      "status": "LOST",
       "combined_odds": 3.148,
       "combined_odds_source": "builder_batch_snapshot",
       "odds_snapshot_complete": true,
@@ -1224,8 +1224,8 @@
       "primary_lane": "vfootball_event_holdout_value",
       "odds_locked_at": "2026-10-09T19:25:12.506529+00:00",
       "leg_count": 4,
-      "settled_leg_count": 1,
-      "pending_leg_count": 3,
+      "settled_leg_count": 2,
+      "pending_leg_count": 2,
       "legs": [
         {
           "sport": "virtual",
@@ -1399,7 +1399,7 @@
           "builder_eligible": true,
           "real_money_eligible": false,
           "paper_only": true,
-          "status": "PENDING",
+          "status": "LOST",
           "source": "Exact-line evidence calibration · VFootball event-holdout lane",
           "market_source": "SportyBet NG",
           "recent_evidence": {
@@ -1497,10 +1497,13 @@
           "sportybet_outcome_name": "Under 4.5",
           "fixture_key": "vfootball|cry v mci",
           "bookmaker_odds_snapshot": 1.3,
-          "correct": null,
-          "settled_at": null,
-          "result": null,
-          "final_score": null
+          "correct": false,
+          "settled_at": "2026-10-10T00:05:46.608384+00:00",
+          "result": "O4.5",
+          "final_score": [
+            4.0,
+            4.0
+          ]
         },
         {
           "sport": "virtual",
@@ -1777,9 +1780,9 @@
       ],
       "leg_counts": {
         "won": 1,
-        "lost": 0,
+        "lost": 1,
         "void": 0,
-        "pending": 3
+        "pending": 2
       },
       "construction_snapshot": {
         "batch_id": "BATCH-01",
@@ -1813,9 +1816,61 @@
         },
         "recorded_at": "2026-10-09T19:25:12.518271+00:00"
       },
-      "settlement_diagnostics": null,
+      "settlement_diagnostics": {
+        "diagnostic_version": 1,
+        "ticket_outcome": "LOST",
+        "diagnostic_label": "TICKET_LOST_1_OF_4_LEGS",
+        "leg_count": 4,
+        "settled_leg_count": 2,
+        "won_leg_count": 1,
+        "lost_leg_count": 1,
+        "void_leg_count": 0,
+        "pending_leg_count": 2,
+        "leg_hit_rate_excluding_voids": 0.5,
+        "average_settled_leg_model_probability": 0.8912,
+        "weakest_ticket_leg_model_probability": 0.8912,
+        "high_confidence_loss_count": 0,
+        "high_confidence_loss_events": [],
+        "losses_by_product": {
+          "vfootball": 1
+        },
+        "losses_by_direction": {
+          "under": 1
+        },
+        "loss_details": [
+          {
+            "event_id": "sr:match:200026100921120",
+            "match": "CRY vs MCI",
+            "product": "vfootball",
+            "pick": "CRY vs MCI — O/U under 4.5",
+            "line": 4.5,
+            "model_probability": 0.8912,
+            "model_edge": 0.153297,
+            "bookmaker_odds": 1.3,
+            "evidence_score": null,
+            "recent_evidence_n": 189,
+            "recent_evidence_hit_rate": 0.8624,
+            "result": "O4.5",
+            "final_score": [
+              4.0,
+              4.0
+            ],
+            "settled_at": "2026-10-10T00:05:46.608384+00:00"
+          }
+        ],
+        "improvement_keys": {
+          "shape": "4_leg",
+          "primary_lane": "vfootball_event_holdout_value",
+          "combined_odds": 3.148,
+          "combined_model_rating": 37.99,
+          "combined_model_probability": 0.379949,
+          "avg_model_probability": 89.12,
+          "avg_model_edge_percent": 16.99
+        }
+      },
       "paper_only": true,
-      "real_money_execution": false
+      "real_money_execution": false,
+      "lost_at": "2026-10-10T00:05:46.608384+00:00"
     },
     {
       "version": 3,
