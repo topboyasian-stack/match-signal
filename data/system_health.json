@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-10T13:30:07.265709+00:00",
+  "generated_at": "2026-10-10T13:35:17.485938+00:00",
   "status": "FAIL",
   "critical_issues": 3,
   "warning_issues": 1,
@@ -8,19 +8,19 @@
     {
       "engine": "core_prediction_pipeline",
       "status": "STALE",
-      "age_hours": 7.76,
+      "age_hours": 7.84,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.08,
+      "age_hours": 0.07,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "STALE",
-      "age_hours": 4.5,
+      "age_hours": 4.59,
       "threshold_hours": 4
     },
     {
@@ -32,21 +32,21 @@
     {
       "engine": "prediction_desk_health",
       "status": "PASS",
-      "age_hours": 0.01,
+      "age_hours": 0.02,
       "threshold_hours": 2
     },
     {
       "engine": "tennis_forward_discovery",
       "status": "PASS",
-      "age_hours": 0.55,
+      "age_hours": 0.64,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 0.77,
+      "age_hours": 0.03,
       "threshold_hours": 0.5,
-      "heartbeat_source": "unified_live_refresh"
+      "heartbeat_source": "virtual_lab_live.json"
     },
     {
       "engine": "retired_engines",
@@ -71,12 +71,12 @@
     {
       "code": "STALE_CORE_PREDICTION_PIPELINE",
       "severity": "critical",
-      "detail": "updated_at age 7.76h exceeds 4h"
+      "detail": "updated_at age 7.84h exceeds 4h"
     },
     {
       "code": "STALE_EXPANSION",
       "severity": "critical",
-      "detail": "updated_at age 4.50h exceeds 4h"
+      "detail": "updated_at age 4.59h exceeds 4h"
     },
     {
       "code": "TENNIS_CORE_FEED_EMPTY",
@@ -86,13 +86,13 @@
     {
       "code": "PIPELINE_STALE",
       "severity": "critical",
-      "detail": "pipeline_status age 7.76h exceeds 4h"
+      "detail": "pipeline_status age 7.84h exceeds 4h"
     }
   ],
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
   "paper_only": true,
   "prediction_desk_filters": {
-    "past_kickoff_rows_hidden": 19,
+    "past_kickoff_rows_hidden": 132,
     "stale_live_flags_hidden": 0,
     "expired_settled_rows_hidden": 0
   }
