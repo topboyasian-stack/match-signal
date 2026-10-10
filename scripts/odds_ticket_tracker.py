@@ -953,8 +953,14 @@ def main():
     stale_pending = []
     for ticket in tickets:
         if ticket_is_stale_pending(ticket, now_dt):
+            if ticket.get("archive_reason") != "STALE_PENDING_KICKOFF":
+                ticket["archive_reason"] = "STALE_PENDING_KICKOFF"
+                changed = True
             stale_pending.append(ticket)
         else:
+            if ticket.get("archive_reason"):
+                ticket.pop("archive_reason", None)
+                changed = True
             fresh_or_settled.append(ticket)
 
     fresh_or_settled.sort(key=lambda x: str(x.get("created_at") or ""), reverse=True)
@@ -972,6 +978,11 @@ def main():
         current_tickets = pending + keep_settled
         overflow = [x for x in fresh_or_settled if str(x.get("ticket_id") or "") not in kept_ids]
     current_tickets.sort(key=lambda x: str(x.get("created_at") or ""), reverse=True)
+    for ticket in overflow:
+        reason = "ACTIVE_TRACK_CAPACITY" if str(ticket.get("status") or "").upper() == "PENDING" else "SETTLED_HISTORY_ROLLING_WINDOW"
+        if ticket.get("archive_reason") != reason:
+            ticket["archive_reason"] = reason
+            changed = True
     archived_tickets = stale_pending + overflow
     archived_tickets.sort(key=lambda x: str(x.get("created_at") or ""), reverse=True)
 
