@@ -406,13 +406,13 @@ async function renderUnifiedBoard(){
       for(const key of keys){
         if(row?.[key]!=null&&String(row[key]).trim()){value=String(row[key]).trim();break;}
       }
-      const embedded=value.match(/\\(([^()]*)\\)\\s*$/);
+      const embedded=value.match(/\(([^()]*)\)\s*$/);
       if(embedded&&embedded[1].trim())value=embedded[1].trim();
       return value.toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
     }
     function virtualStartTimestamp(row){
       const raw=row?.start_time_ms??row?.startTimeMs??row?.start_time??row?.startTime??row?.timestamp??row?.date;
-      if(typeof raw==="number"||(typeof raw==="string"&&/^\\d{10,13}$/.test(raw.trim()))){
+      if(typeof raw==="number"||(typeof raw==="string"&&/^\d{10,13}$/.test(raw.trim()))){
         const n=Number(raw);if(Number.isFinite(n))return n<1e11?n*1000:n;
       }
       const parsed=Date.parse(String(raw??""));
