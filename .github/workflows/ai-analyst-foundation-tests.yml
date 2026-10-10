@@ -19,6 +19,8 @@ on:
       - 'scripts/unified_upcoming.py'
       - 'scripts/efootball_desk_learning.py'
       - 'scripts/test_upcoming_settlement_retention.py'
+      - 'scripts/selection_candidate_collector.py'
+      - 'scripts/test_selection_candidate_collector.py'
       - 'scripts/predict_today.py'
       - 'scripts/tennis_forward_window.py'
       - 'scripts/test_upcoming_desk_policy.py'
@@ -105,6 +107,8 @@ jobs:
         run: python -m pip install --upgrade requests
       - name: Run Prediction Desk freshness and exact-line evidence tests
         run: python scripts/test_upcoming_desk_policy.py
+      - name: Test exact two-sided SportyBet candidate quotes
+        run: python scripts/test_selection_candidate_collector.py
       - name: Run settlement reconciliation and score replay regressions
         run: python scripts/test_upcoming_settlement_retention.py
       - name: Run exact-line stale-quote display contract tests
@@ -112,7 +116,7 @@ jobs:
       - name: Test tennis forward publication retry contract
         run: python scripts/test_tennis_forward_publication.py
       - name: Compile changed Prediction Desk Python modules
-        run: python -m py_compile scripts/unified_upcoming.py scripts/predict_today.py scripts/tennis_forward_window.py scripts/system_health_audit.py scripts/selection_candidate_collector.py scripts/efootball_desk_learning.py scripts/test_upcoming_desk_policy.py scripts/test_upcoming_settlement_retention.py scripts/test_tennis_forward_publication.py scripts/odds_ticket_tracker.py scripts/odds_builder.py scripts/test_odds_ticket_tracker.py
+        run: python -m py_compile scripts/unified_upcoming.py scripts/predict_today.py scripts/tennis_forward_window.py scripts/system_health_audit.py scripts/selection_candidate_collector.py scripts/efootball_desk_learning.py scripts/test_upcoming_desk_policy.py scripts/test_upcoming_settlement_retention.py scripts/test_tennis_forward_publication.py scripts/odds_ticket_tracker.py scripts/odds_builder.py scripts/test_odds_ticket_tracker.py scripts/test_selection_candidate_collector.py
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:

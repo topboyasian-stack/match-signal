@@ -112,6 +112,63 @@ def group_for(row):
     return sport or "other"
 
 
+def totals_sides_for_line(row):
+    """Return the exact line's two SportyBet prices; never borrow a neighboring line."""
+    line = num(row.get("line"))
+    if line is None:
+        return None, None
+
+    over = under = None
+    quote_market = str(row.get("sportybet_odds_market") or "").lower()
+    quote_line = num(row.get("sportybet_odds_line"))
+    if quote_market == "total" and quote_line is not None and abs(quote_line - line) < 1e-6:
+        direct_over = num(row.get("sportybet_over_odds"))
+        direct_under = num(row.get("sportybet_under_odds"))
+        if direct_over is not None and direct_over > 1:
+            over = direct_over
+        if direct_under is not None and direct_under > 1:
+            under = direct_under
+
+    totals = row.get("sportybet_total_games_odds")
+    if isinstance(totals, list):
+        for item in totals:
+            if not isinstance(item, dict):
+                continue
+            item_line = num(item.get("line"))
+            if item_line is None or abs(item_line - line) >= 1e-6:
+                continue
+
+            item_over = num(item.get("over"))
+            item_under = num(item.get("under"))
+            if item_over is not None and item_over > 1:
+                over = item_over
+            if item_under is not None and item_under > 1:
+                under = item_under
+
+            side = str(item.get("side") or "").lower()
+            odds = num(item.get("odds"))
+            if odds is not None and odds > 1:
+                if side == "over":
+                    over = odds
+                elif side == "under":
+                    under = odds
+
+    return over, under
+
+
+def winner_market_sides(row):
+    """Copy the three current winner prices used for exact-market de-vigging."""
+    raw = row.get("sportybet_winner_odds")
+    if not isinstance(raw, dict):
+        return None
+    result = {}
+    for side in ("p1", "draw", "p2"):
+        odds = num(raw.get(side))
+        if odds is not None and odds > 1:
+            result[side] = odds
+    return result or None
+
+
 def compact(row, now):
     start = dt(row.get("start_time"))
     if start is None or start <= now or start > now + timedelta(days=7):
@@ -127,6 +184,8 @@ def compact(row, now):
     sport = str(row.get("sport") or "").strip() or ("virtual" if product else None)
     qualified = bool(row.get("betting_qualified") or row.get("qualified_for_builder"))
     status = "BETTING_QUALIFIED_PAPER" if qualified else candidate_band(p)
+    sportybet_over_odds, sportybet_under_odds = totals_sides_for_line(row)
+    sportybet_winner_odds = winner_market_sides(row)
     candidate_id = "|".join([
         str(row.get("event_id") or ""),
         str(row.get("market") or "winner"),
@@ -153,6 +212,11 @@ def compact(row, now):
         "sportybet_odds_market": row.get("sportybet_odds_market"),
         "sportybet_odds_line": num(row.get("sportybet_odds_line")),
         "sportybet_odds_side": row.get("sportybet_odds_side"),
+        # Preserve both current market sides: the browser independently de-vigs
+        # these prices and will fail closed if either side is missing.
+        "sportybet_over_odds": sportybet_over_odds,
+        "sportybet_under_odds": sportybet_under_odds,
+        "sportybet_winner_odds": sportybet_winner_odds,
         "market_odds_timestamp": row.get("market_odds_timestamp") or row.get("odds_timestamp"),
         "model_edge_vs_market": num(row.get("model_edge_vs_market") or row.get("model_edge") or row.get("edge")),
         "walkforward_exact_line_n": num(row.get("walkforward_exact_line_n")),
