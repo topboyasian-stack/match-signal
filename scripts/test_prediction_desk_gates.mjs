@@ -159,6 +159,8 @@ assert.equal(calibration.n, 69, "calibration labels retain their evidence sample
 assert.ok(Math.abs(displayedFairOddsValue(overconfidentUnder)-(1/probabilityValue(overconfidentUnder)))<1e-9, "fair odds must agree with the calibrated Desk estimate");
 assert.equal(probabilityCalibrationInfo({ ...overconfidentUnder, walkforward_exact_line_hit_rate: null }), null, "a null hit rate is not treated as 0% evidence");
 assert.equal(probabilityCalibrationInfo({ ...overconfidentUnder, walkforward_exact_line_n: null }), null, "a null sample count cannot unlock calibration");
+assert.equal(probabilityCalibrationInfo({ ...overconfidentUnder, line: null }), null, "a missing exact O/U line cannot unlock line-specific calibration");
+assert.equal(probabilityCalibrationInfo({ ...overconfidentUnder, line: "" }), null, "an empty exact O/U line cannot unlock line-specific calibration");
 
 const pendingDirectional = {
   ...overconfidentUnder,
