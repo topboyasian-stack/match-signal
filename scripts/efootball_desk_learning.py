@@ -173,12 +173,12 @@ def settlement_index(history):
     return index
 
 
-def resolve_settlement(row, history_index):
-    """Use exact fixture keys first, then a conservative unique 90s fallback.
+def resolve_settlement(row, history_index, identity_index=None, names_index=None):
+    """Resolve a settlement only by exact key or unique same-product identity/time.
 
-    The fallback exists for provider kickoff timestamps that straddle a minute
-    boundary. Provider event IDs alone are never used for fuzzy matching because
-    those IDs can recur between eFootball sessions.
+    Diagnostic return reasons distinguish missing identity/time, participant
+    identity mismatch, product mismatch, and time mismatch. Event IDs are never
+    used for fuzzy matching because they recur between virtual sessions.
     """
     base = fixture_key(row)
     if base and base in history_index:
@@ -187,24 +187,26 @@ def resolve_settlement(row, history_index):
     identity = fixture_identity(row)
     event_time = dt(row.get("start_time") or row.get("timestamp"))
     if identity is None or event_time is None:
-        return None, "UNMATCHED"
-    candidates = []
-    for candidate_key, item in history_index.items():
-        if item.get("_identity") != identity:
-            continue
+        return None, "MISSING_IDENTITY_OR_TIME"
+    candidates = (identity_index or {}).get(identity) if identity_index is not None else None
+    if candidates is None:
+        candidates = [item for item in history_index.values() if item.get("_identity") == identity]
+    if not candidates:
+        if names_index is not None and names_index.get(identity[1]):
+            return None, "PRODUCT_MISMATCH"
+        return None, "NO_IDENTITY_MATCH"
+
+    within = []
+    for item in candidates:
         candidate_time = item.get("_event_time")
-        if candidate_time is None:
-            continue
-        if abs((candidate_time - event_time).total_seconds()) <= 90:
-            candidates.append((candidate_key, item))
-    # If recurring participants create more than one plausible fixture, fail
-    # closed. Never guess which session a forecast belongs to.
-    unique = {key: item for key, item in candidates}
+        if candidate_time is not None and abs((candidate_time - event_time).total_seconds()) <= 90:
+            within.append(item)
+    unique = {str(item.get("_fixture_key")): item for item in within}
     if len(unique) == 1:
         return next(iter(unique.values())), "NEAR_TIME"
     if len(unique) > 1:
         return None, "AMBIGUOUS"
-    return None, "UNMATCHED"
+    return None, "TIME_MISMATCH"
 
 def eligible_current_rows(board):
     events = board.get("events") if isinstance(board, dict) else []
@@ -285,8 +287,35 @@ def reconcile(trace, history_index):
         "unmatched_line_groups": 0,
         "ambiguous_line_groups": 0,
         "scored_forecasts": 0,
+        "unmatched_reason_counts": {},
     }
+
+    # Pre-index stable identities once. This is both faster than scanning the
+    # complete settlement ledger for every forecast line and makes mismatches
+    # diagnosable without dumping the large append-only trace/archive.
+    identity_index = {}
+    names_index = {}
+    history_products = {}
+    for item in history_index.values():
+        product = str(item.get("product") or "").strip().lower()
+        history_products[product] = history_products.get(product, 0) + 1
+        identity = item.get("_identity")
+        if identity:
+            identity_index.setdefault(identity, []).append(item)
+            names_index.setdefault(identity[1], []).append(item)
+    trace_products = {}
+    trace_identity_n = 0
+    trace_time_n = 0
+    trace_both_n = 0
     for row in trace:
+        product = str(row.get("product") or "").strip().lower()
+        trace_products[product] = trace_products.get(product, 0) + 1
+        has_identity = fixture_identity(row) is not None
+        has_time = dt(row.get("start_time") or row.get("timestamp")) is not None
+        trace_identity_n += int(has_identity)
+        trace_time_n += int(has_time)
+        trace_both_n += int(has_identity and has_time)
+
         # Migrate existing trace rows from the old event-ID-only key. Provider
         # IDs can recur across sessions, so product/kickoff/participant identity
         # remains canonical.
@@ -294,6 +323,15 @@ def reconcile(trace, history_index):
         if key:
             row["event_key"] = key
             row.setdefault("product", "efootball_gt")
+
+    stats.update({
+        "trace_product_counts": trace_products,
+        "history_index_product_counts": history_products,
+        "trace_rows_with_identity": trace_identity_n,
+        "trace_rows_with_time": trace_time_n,
+        "trace_rows_with_identity_and_time": trace_both_n,
+        "history_identity_groups": len(identity_index),
+    })
 
     # Score each fixture + totals line once, selecting the latest strictly
     # pre-kickoff forecast. A different line on the same match remains a
@@ -306,14 +344,47 @@ def reconcile(trace, history_index):
             forecasts_by_exact_key.setdefault(key, []).append(row)
     stats["forecast_line_groups"] = len(forecasts_by_exact_key)
 
+    unmatched_samples = []
+    unmatched_reason_counts = {}
     for exact, forecasts in forecasts_by_exact_key.items():
         if not forecasts:
             continue
-        item, match_method = resolve_settlement(forecasts[0], history_index)
+        item, match_method = resolve_settlement(forecasts[0], history_index, identity_index, names_index)
         if not item:
             stats["unmatched_line_groups"] += 1
+            unmatched_reason_counts[match_method] = unmatched_reason_counts.get(match_method, 0) + 1
             if match_method == "AMBIGUOUS":
                 stats["ambiguous_line_groups"] += 1
+            if len(unmatched_samples) < 8:
+                latest_forecast = max(
+                    forecasts,
+                    key=lambda row: dt(row.get("observed_at")) or datetime.min.replace(tzinfo=timezone.utc),
+                )
+                identity = fixture_identity(latest_forecast)
+                event_time = dt(latest_forecast.get("start_time") or latest_forecast.get("timestamp"))
+                any_product_matches = (names_index or {}).get(identity[1], []) if identity else []
+                closest = min(
+                    any_product_matches,
+                    key=lambda hist: abs((hist.get("_event_time") - event_time).total_seconds())
+                    if event_time is not None and hist.get("_event_time") is not None else float("inf"),
+                    default=None,
+                )
+                delta = None
+                if closest and event_time is not None and closest.get("_event_time") is not None:
+                    delta = round((closest["_event_time"] - event_time).total_seconds(), 2)
+                unmatched_samples.append({
+                    "reason": match_method,
+                    "trace_product": str(latest_forecast.get("product") or "").strip().lower(),
+                    "trace_event_id_present": bool(latest_forecast.get("event_id")),
+                    "trace_start_time": latest_forecast.get("start_time") or latest_forecast.get("timestamp"),
+                    "trace_participants_normalized": list(identity[1]) if identity else None,
+                    "same_participants_any_product_count": len(any_product_matches),
+                    "closest_history_product": str(closest.get("product") or "").strip().lower() if closest else None,
+                    "closest_history_event_id_present": bool(closest and closest.get("event_id")),
+                    "closest_history_time": closest.get("_event_time").isoformat() if closest and closest.get("_event_time") else None,
+                    "closest_history_time_delta_seconds": delta,
+                    "closest_history_participants_normalized": list(closest.get("_identity")[1]) if closest and closest.get("_identity") else None,
+                })
             continue
         if match_method == "EXACT":
             stats["matched_line_groups_exact"] += 1
@@ -369,6 +440,8 @@ def reconcile(trace, history_index):
             row["settlement_source"] = item.get("settlement_source")
             row["scored_forecast"] = True
 
+    stats["unmatched_reason_counts"] = unmatched_reason_counts
+    stats["unmatched_samples"] = unmatched_samples
     stats["scored_forecasts"] = sum(1 for row in trace if row.get("scored_forecast") is True)
     return stats
 
