@@ -606,7 +606,7 @@ async function renderUnifiedBoard(){
       const requiredQuoteRows=[...all,...virtualCandidates];
       const quoteMap=await freshVirtualQuoteMap(requiredQuoteRows);
       all=all.map(row=>{
-        if(String(row?.sport||"").toLowerCase()!=="virtual")return row;
+        if(String(row?.sport||"").toLowerCase()!=="virtual"||!isOverUnderPrediction(row))return row;
         const candidates=quoteMap[String(row?.event_id||"")]||[];
         const current=Array.isArray(candidates)?candidates.find(event=>sameVirtualEvent(row,event)):null;
         if(current)return freshVirtualQuoteFields(row,current);
