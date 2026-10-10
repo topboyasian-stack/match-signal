@@ -88,12 +88,30 @@ jobs:
             exit 0
           fi
           git commit -m "🤖 Refresh unified upcoming board"
-          for attempt in 1 2 3; do
+          for attempt in 1 2 3 4 5; do
             if git push origin main; then
-              GH_TOKEN="${{ github.token }}" gh workflow run cloudflare-pages.yml --ref main
+              # The data push already triggers the production workflow. Dispatch
+              # it explicitly as a belt-and-suspenders step, but do not convert
+              # a successful publication into a failed run if dispatch is denied.
+              if ! GH_TOKEN="${{ github.token }}" gh workflow run cloudflare-pages.yml --ref main; then
+                echo "Explicit deploy dispatch failed; the data push remains published and its push trigger can deploy it."
+              fi
               exit 0
             fi
+
+            echo "main advanced during publication attempt ${attempt}; fetching the current head."
             git fetch origin main
+            # First try to replay the generated artifact commit on the new head.
+            # If the same generated files changed remotely, abort and rebuild from
+            # the current main rather than overwriting newer results or histories.
+            if git rebase origin/main; then
+              echo "Rebased generated board commit onto current main."
+              sleep $((attempt * 4))
+              continue
+            fi
+
+            echo "Rebase conflict; rebuild the board from the latest main."
+            git rebase --abort || true
             git reset --hard origin/main
             python scripts/unified_upcoming.py
             python scripts/unified_upcoming_cleanup.py
@@ -101,7 +119,12 @@ jobs:
             python scripts/efootball_desk_learning.py
             python scripts/system_health_audit.py
             git add data/unified_upcoming.json data/prediction_desk_health.json data/selection_candidates.json data/selection_candidate_status.json data/system_health.json data/efootball_desk_learning.json data/efootball_desk_prediction_history.json data/efootball_desk_settled_observations.json
-            if git diff --cached --quiet; then exit 0; fi
+            if git diff --cached --quiet; then
+              echo "Latest main already contains the current generated board."
+              exit 0
+            fi
             git commit -m "🤖 Refresh unified upcoming board"
+            sleep $((attempt * 4))
           done
+          echo "Failed to publish generated Prediction Desk data after five synchronized attempts."
           exit 1
