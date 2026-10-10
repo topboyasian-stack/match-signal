@@ -29,6 +29,7 @@ on:
       - 'scripts/test_odds_ticket_tracker.py'
       - 'scripts/odds_builder.py'
       - 'expansion-odds-builder.js'
+      - 'scripts/test_odds_builder_qualification_monitor.mjs'
       - 'odds-builder.html'
       - '.github/workflows/odds-ticket-tracker.yml'
       - '.github/workflows/cloudflare-pages.yml'
@@ -120,6 +121,8 @@ jobs:
         run: python scripts/test_odds_ticket_tracker.py
       - name: Check Paper Ledger JavaScript syntax
         run: node --check expansion-odds-builder.js
+      - name: Test Odds Builder qualification monitor contract
+        run: node scripts/test_odds_builder_qualification_monitor.mjs
       - name: Run Prediction Desk qualification and calibration regressions
         run: node scripts/test_prediction_desk_gates.mjs
       - name: Run private analyst module tests
