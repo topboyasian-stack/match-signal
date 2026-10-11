@@ -8,6 +8,7 @@ on:
       - '.github/workflows/virtual-lab-collector.yml'
       - 'scripts/virtual_lab_collector.py'
       - 'scripts/virtual_lab_model_eval.py'
+      - 'scripts/test_virtual_lab_model_eval.py'
       - 'scripts/virtual_lab_participant_profiles.py'
       - 'scripts/virtual_lab_confirmed_participants.py'
       - 'scripts/virtual_lab_h2h_enricher.py'
@@ -39,7 +40,7 @@ concurrency:
 jobs:
   collect:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 20
     steps:
       - name: Checkout latest main
         uses: actions/checkout@v4
@@ -95,6 +96,9 @@ jobs:
           assert products <= {'efootball_gt'}, f'confirmed watch contamination: {products}'
           print('Optional manual eFootball watch namespace OK:', sorted(products), len(watch.get('participants',[])))
           PY
+
+      - name: Regression-test accelerated line-ladder fit
+        run: python scripts/test_virtual_lab_model_eval.py
 
       - name: Run strict chronological model evaluation
         run: python scripts/virtual_lab_model_eval.py
