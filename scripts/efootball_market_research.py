@@ -176,6 +176,17 @@ def side_score(event,side):
     for v in candidates:
         n=score(v)
         if n is not None:return n
+    # SportyBet's completed eventResultList rows commonly expose the final
+    # score as setScore="home:away" rather than separate homeScore/awayScore.
+    # Only trust this compact score when the provider marks the event final.
+    raw_set_score=event.get("setScore") or event.get("set_score")
+    status=re.sub(r"[^a-z0-9 ]"," ",str(event.get("matchStatus") or event.get("status") or "").lower())
+    status=" ".join(status.split())
+    final_status={"end","ended","finished","final","completed","complete","status end","status final","status finished","match end","match ended"}
+    if raw_set_score is not None and status in final_status:
+        match=re.fullmatch(r"\\s*(\\d+(?:\\.\\d+)?)\\s*:\\s*(\\d+(?:\\.\\d+)?)\\s*",str(raw_set_score))
+        if match:
+            return float(match.group(1 if side=="home" else 2))
     target=side+"score"
     def walk(x,depth=0):
         if depth>4 or not isinstance(x,dict):return None
@@ -271,7 +282,7 @@ def fetch_results(pending,now):
     # smoke check. If optional time filters produce no rows, retry unfiltered.
     if missing:
         dates=[dt(s.get("start_time")) for s in missing];dates=[d for d in dates if d]
-        base={"source":"efootball","pageSize":5,"pageNum":1}
+        base={"source":"efootball","pageSize":100,"pageNum":1}
         filtered=dict(base)
         if dates:
             filtered["startTime"]=int((min(dates)-timedelta(days=1)).timestamp()*1000)
@@ -289,7 +300,7 @@ def fetch_results(pending,now):
     ordered=sorted(scopes.items(),key=lambda x:min(dt(s.get("start_time")) or now for s in x[1]))
     for (cat,tour),samples in ordered[:12]:
         dates=[dt(s.get("start_time")) for s in samples];dates=[d for d in dates if d]
-        base={"source":"efootball","categoryId":cat,"tournamentId":tour,"pageSize":5,"pageNum":1}
+        base={"source":"efootball","categoryId":cat,"tournamentId":tour,"pageSize":100,"pageNum":1}
         filtered=dict(base)
         if dates:
             filtered["startTime"]=int((min(dates)-timedelta(days=1)).timestamp()*1000)
