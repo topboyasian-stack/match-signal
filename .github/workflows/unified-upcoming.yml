@@ -12,7 +12,8 @@ on:
     types: [completed]
   schedule:
     # Keep the unified desk live around the clock, including overnight eFootball sessions.
-    - cron: '*/5 * * * *'
+    # Run one minute after the virtual quote sync's :01/:06/:11... cadence.
+    - cron: '2-59/5 * * * *'
   push:
     branches: [main]
     paths:
