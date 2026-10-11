@@ -1,52 +1,52 @@
 {
-  "generated_at": "2026-10-11T13:14:47.792278+00:00",
-  "status": "FAIL",
-  "critical_issues": 2,
+  "generated_at": "2026-10-11T13:22:02.660172+00:00",
+  "status": "DEGRADED",
+  "critical_issues": 0,
   "warning_issues": 1,
-  "info_issues": 1,
+  "info_issues": 0,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
-      "status": "STALE",
-      "age_hours": 5.22,
+      "status": "PASS",
+      "age_hours": 0.13,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.09,
+      "age_hours": 0.21,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 3.25,
+      "age_hours": 3.37,
       "threshold_hours": 4
     },
     {
       "engine": "unified_upcoming",
       "status": "PASS",
-      "age_hours": 0.0,
+      "age_hours": 0.01,
       "threshold_hours": 2
     },
     {
       "engine": "prediction_desk_health",
       "status": "PASS",
-      "age_hours": 0.02,
+      "age_hours": 0.01,
       "threshold_hours": 2
     },
     {
       "engine": "tennis_forward_discovery",
       "status": "PASS",
-      "age_hours": 5.19,
+      "age_hours": 0.02,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 0.03,
+      "age_hours": 0.15,
       "threshold_hours": 0.5,
-      "heartbeat_source": "virtual_lab_live.json"
+      "heartbeat_source": "unified_live_refresh"
     },
     {
       "engine": "retired_engines",
@@ -54,11 +54,11 @@
       "lanes": {
         "darts_x": {
           "status": "RETIRED",
-          "artifact_at": "2026-10-11T10:56:48.999262+00:00"
+          "artifact_at": "2026-10-11T13:13:38.867162+00:00"
         },
         "table_tennis_x": {
           "status": "RETIRED",
-          "artifact_at": "2026-10-11T09:10:06.768220+00:00"
+          "artifact_at": "2026-10-11T13:13:50.326945+00:00"
         },
         "basketball": {
           "status": "RETIRED",
@@ -69,30 +69,15 @@
   ],
   "issues": [
     {
-      "code": "STALE_CORE_PREDICTION_PIPELINE",
-      "severity": "critical",
-      "detail": "updated_at age 5.22h exceeds 4h"
-    },
-    {
       "code": "TENNIS_CORE_FEED_EMPTY",
       "severity": "warning",
-      "detail": "Canonical tennis pipeline has zero actionable predictions; 9 unqualified ATP forward-window watch projections are published for research only"
-    },
-    {
-      "code": "SELECTION_GATE_EMPTY",
-      "severity": "info",
-      "detail": "Current prediction feed exists but the selected-candidate layer returned zero qualified selections; no gate was weakened"
-    },
-    {
-      "code": "PIPELINE_STALE",
-      "severity": "critical",
-      "detail": "pipeline_status age 5.22h exceeds 4h"
+      "detail": "Canonical tennis pipeline has zero actionable predictions; 11 unqualified ATP forward-window watch projections are published for research only"
     }
   ],
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
   "paper_only": true,
   "prediction_desk_filters": {
-    "past_kickoff_rows_hidden": 21,
+    "past_kickoff_rows_hidden": 8,
     "stale_live_flags_hidden": 0,
     "expired_settled_rows_hidden": 0
   }
