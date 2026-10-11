@@ -216,7 +216,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           PROJECT: ${{ steps.project.outputs.project }}
         run: |
-          npx wrangler@latest pages deploy .pages-deploy --project-name="$PROJECT"
+          npx wrangler@latest pages deploy .pages-deploy --project-name="$PROJECT" --branch=main --commit-hash="${{ steps.source.outputs.sha }}"
 
       - name: Run production HTTP and asset smoke tests
         timeout-minutes: 3
