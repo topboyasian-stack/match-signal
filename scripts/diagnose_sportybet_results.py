@@ -189,7 +189,7 @@ def probe(scope: dict[str, Any], use_time_filter: bool, now: datetime) -> dict[s
     return result
 
 
-def probe_deployed_proxy(scope: dict[str, Any], use_time_filter: bool, now: datetime) -> dict[str, Any]:
+def probe_deployed_proxy(scope: dict[str, Any], window_hours: float | None, now: datetime) -> dict[str, Any]:
     """Ask the deployed Cloudflare proxy, whose outbound network differs from Actions."""
     params: dict[str, Any] = {
         "source": "efootball",
@@ -198,15 +198,15 @@ def probe_deployed_proxy(scope: dict[str, Any], use_time_filter: bool, now: date
         "pageSize": 100,
         "pageNum": 1,
     }
-    if use_time_filter:
-        params["startTime"] = int((scope["start"] - timedelta(hours=3)).timestamp() * 1000)
+    if window_hours is not None:
+        params["startTime"] = int((now - timedelta(hours=window_hours)).timestamp() * 1000)
         params["endTime"] = int((now + timedelta(minutes=2)).timestamp() * 1000)
     result: dict[str, Any] = {
         "probe": "deployed_match_signal_proxy",
         "categoryId": scope["categoryId"],
         "tournamentId": scope["tournamentId"],
         "targetEventId": scope["eventId"],
-        "time_filter": use_time_filter,
+        "window_hours_before_now": window_hours,
     }
     try:
         response = requests.get(
@@ -236,7 +236,6 @@ def probe_deployed_proxy(scope: dict[str, Any], use_time_filter: bool, now: date
         result["request_error"] = str(exc)[:600]
     return result
 
-
 def main() -> None:
     now = datetime.now(timezone.utc)
     scopes = choose_scopes(now)
@@ -256,7 +255,8 @@ def main() -> None:
         for with_filter in (False, True):
             print("DIRECT_RESULT_API_PROBE:", json.dumps(probe(scope, with_filter, now), ensure_ascii=False))
             time.sleep(0.4)
-            print("DEPLOYED_PROXY_PROBE:", json.dumps(probe_deployed_proxy(scope, with_filter, now), ensure_ascii=False))
+        for window_hours in (None, 3, 24, 26):
+            print("DEPLOYED_PROXY_PROBE:", json.dumps(probe_deployed_proxy(scope, window_hours, now), ensure_ascii=False))
             time.sleep(0.4)
     print("DIAGNOSTIC_FINISHED_AT:", datetime.now(timezone.utc).isoformat())
     print("SAFETY: diagnostic only; no archive or production-selection writes performed")
