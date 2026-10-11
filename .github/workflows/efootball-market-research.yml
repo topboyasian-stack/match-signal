@@ -2,8 +2,8 @@ name: Isolated eFootball Winner and BTTS Market Research
 
 on:
   schedule:
-    # Off-peak fallback; normal collection follows the successful live-feed sync.
-    - cron: '3,18,33,48 * * * *'
+    # Offset fallback if workflow_run chaining is delayed; cron change re-registers the scheduled workflow.
+    - cron: '8,23,38,53 * * * *'
   workflow_dispatch:
   workflow_run:
     workflows:
@@ -78,8 +78,7 @@ jobs:
       - name: Capture and settle paper-only market observations
         env:
           MATCH_SIGNAL_PUBLIC_BASE: https://match-signal.pages.dev
-          # Code changes and manual dispatches should immediately validate settlement;
-          # the normal five-minute schedule remains throttled by the 15-minute interval.
+          # Non-scheduled runs force an immediate settlement pass; scheduled runs honor the collector's five-minute settlement interval.
           EFOOTBALL_RESEARCH_FORCE_SETTLE: ${{ github.event_name != 'schedule' && '1' || '0' }}
         run: python scripts/efootball_market_research.py
       - name: Validate isolated archive contract
