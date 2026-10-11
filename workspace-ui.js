@@ -57,7 +57,7 @@ function teamLogoTitleMatches(name,title){
   return identityKey===searchKey||identityKey==='atletico '+searchKey||identityKey==='as '+searchKey;
 }
 function initials(name){const w=clean(name,'team').split(/\s+/).filter(Boolean);return (w.length>1?w[0][0]+w[1][0]:(w[0]||'MS').slice(0,2)).toUpperCase();}
-const cache=new Map(),entries=new Map(),queue=[];let busy=false;const prefix='match-signal-media-v6:';
+const cache=new Map(),entries=new Map(),queue=[];let busy=false;const prefix='match-signal-media-v7:';
 let teamRegistry={};
 const registryReady=(async()=>{
   try{
@@ -105,6 +105,9 @@ function commonsTitleUrl(title){
 async function lookup(kind,name){
   const cleaned=clean(name,kind),key=norm(cleaned,kind);
   if(key.length<3)return null;
+  // Team artwork must come from the persistent, identity-audited registry.
+  // Browser-side search cannot guarantee the correct club, even after title checks.
+  if(kind==='team')return null;
   let queryName=cleaned;
   if(kind==='player'&&cleaned.includes(',')){
     const p=cleaned.split(',').map(x=>x.trim()).filter(Boolean);
@@ -212,6 +215,12 @@ async function enqueue(node){
       });
       return;
     }
+  }
+  if(kind==='team'){
+    // Unknown or ambiguous clubs deliberately show initials. A false badge is
+    // worse than a visible, honest fallback while the persistent sync resolves it.
+    paint({nodes:[node]},null);
+    return;
   }
   const k=kind+':'+n,cached=getCache(k);
   if(cached!==undefined){paint({nodes:[node]},cached);return;}
