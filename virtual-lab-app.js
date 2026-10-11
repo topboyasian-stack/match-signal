@@ -29,6 +29,14 @@ const num=v=>{const n=Number(String(v??'').replace('%',''));return Number.isFini
 const date=v=>{const d=new Date(v);return isNaN(d.getTime())?String(v||'—'):d.toLocaleString()};
 const fmtPct=v=>v==null?'—':(v*100).toFixed(1)+'%';
 const fmtNum=v=>v==null?'—':Number(v).toFixed(3);
+const attrEsc=v=>esc(v).replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+function mediaSlot(name,kind){
+  const raw=String(name||'Unknown').trim(),clean=kind==='team'?raw.replace(/\s*\([^()]+\)\s*$/,'').trim():raw;
+  const words=clean.split(/\s+/).filter(Boolean),initials=(words.length>1?words[0][0]+words[1][0]:(words[0]||'MS').slice(0,2)).toUpperCase();
+  return '<span class="ws-media-slot" data-ws-media-kind="'+kind+'" data-ws-media-name="'+attrEsc(raw)+'" title="'+attrEsc(clean)+'" aria-hidden="true">'+esc(initials)+'</span>';
+}
+function productMatchesFilter(event,filter){if(!filter||filter==='all')return true;if(filter==='efootball')return ['efootball_gt','efootball_adriatic'].includes(String(event?.product||''));return String(event?.product||'')===filter;}
+
 
 function participantIdentity(value){
   const s=String(value??'').trim();
@@ -1094,7 +1102,7 @@ function updateDiagnostics(extra={}){
 function renderLive(){
   const product=$('product')?.value||'all',market=$('market')?.value||'all';
   const allEvents=displayableLiveEventsFrom(state.live)
-    .filter(e=>product==='all'||e.product===product)
+    .filter(e=>productMatchesFilter(e,product))
     .slice(0,30);
   const cards=[];
   for(const e of allEvents){
@@ -1110,7 +1118,9 @@ function renderLive(){
       const calN=Number(p?.primary?.calibrationN);
       const pick=p&&p.primary?'<div class="predictionBox"><div class="predictionTop"><span class="predictionLabel">RESEARCH PICK</span><span class="predictionType">'+(p.primary.marketType==='ou'?'TOTALS':'MATCH RESULT')+'</span></div><div class="predictionPick">'+esc(p.primary.pickCode||'—')+' <b>'+fmtPct(p.primary.calibratedProb)+'</b></div><div class="predictionMeta">Book '+(Number.isFinite(bookmakerOdds)?bookmakerOdds.toFixed(2):'—')+' · Edge '+fmtPct(edge)+' · n='+(Number.isFinite(calN)?calN:0)+'</div></div>':'<div class="predictionBox mutedPrediction"><div class="predictionLabel">NO QUALIFIED SIGNAL</div><div class="predictionPick">MARKET BASELINE ONLY</div><div class="predictionMeta">The fixture is live in the feed, but the research gate has not qualified a signal.</div></div>';
       const identityLine=(e.participant_1||e.participant_2)?'<div class="participantIdentityLine"><span class="participantIdentityLabel">STABLE PARTICIPANT</span><strong>'+esc(e.participant_1||'UNVERIFIED')+'</strong><span>vs</span><strong>'+esc(e.participant_2||'UNVERIFIED')+'</strong><span class="participantIdentityStatus">'+(e.identity_verified?'✓ VERIFIED':'⚠ IDENTITY UNVERIFIED')+'</span></div>':'<div class="participantIdentityLine participantIdentityUnknown"><span class="participantIdentityLabel">STABLE PARTICIPANT</span><strong>IDENTITY NOT DERIVED FROM CURRENT FEED</strong><span class="participantIdentityStatus">⚠ SOURCE DID NOT EXPOSE IT</span></div>';
-      cards.push('<article class="liveCard" data-product="'+esc(e.product||'')+'"><div class="liveTop"><span>'+esc(e.competition||e.product||'Virtual')+'</span><span>'+esc(e.start_time?date(e.start_time):'Time n/a')+'</span></div><div class="liveTeams"><strong>'+esc(e.home||'Upcoming fixture')+'</strong> <span>vs</span> <strong>'+esc(e.away||'Upcoming fixture')+'</strong>'+identityLine+'</div>'+pick+'<div class="liveOdds">'+(chips||'<span class="liveMeta">No readable markets</span>')+'</div></article>');
+      const homeName=String(e.home||'Upcoming fixture'),awayName=String(e.away||'Upcoming fixture');
+      const matchup='<div class="ws-fixture-sides"><div class="ws-fixture-team">'+mediaSlot(homeName,'team')+'<span class="ws-fixture-team-name">'+esc(homeName)+'</span></div><span class="ws-fixture-vs">VS</span><div class="ws-fixture-team">'+mediaSlot(awayName,'team')+'<span class="ws-fixture-team-name">'+esc(awayName)+'</span></div></div>';
+      cards.push('<article class="liveCard" data-product="'+esc(e.product||'')+'"><div class="liveTop"><span>'+esc(e.competition||e.product||'Virtual')+'</span><span>'+esc(e.start_time?date(e.start_time):'Time n/a')+'</span></div><div class="liveTeams">'+matchup+identityLine+'</div>'+pick+'<div class="liveOdds">'+(chips||'<span class="liveMeta">No readable markets</span>')+'</div></article>');
     }catch(err){
       console.warn('Virtual Lab fixture card skipped:',e?.event_id,err);
     }
@@ -1135,7 +1145,7 @@ function renderNearQualifiedRadar(){
   const modelComps=state.eligibility.model_qualified_competitions||[];
   const rawLines=state.eligibility.raw_eligible_ou_lines||[];
   const modelLines=state.eligibility.model_qualified_ou_lines||[];
-  const upcoming=upcomingEventsFrom(state.live).filter(e=>product==='all'||e.product===product);
+  const upcoming=upcomingEventsFrom(state.live).filter(e=>productMatchesFilter(e,product));
   const candidates=[];
   for(const e of upcoming){
     const leagueRaw=isResearchDeskEvent(e);
@@ -1246,7 +1256,7 @@ function renderPredictionDesk(){
       ' · O/U 1.5 n='+(expRec?expRec.entityN:0)+' · '+(expRec&&expRec.entityOverRate!=null?fmtPct(expRec.entityOverRate):'—')+
       ' · exact-pair O1.5 n='+(expRec?expRec.pairN:0):'No prior participant recurrence sample yet.';
     const identityHtml=(p.participant_1||p.participant_2)?'<div class="participantIdentityLine"><span class="participantIdentityLabel">STABLE PARTICIPANT</span><strong>'+esc(p.participant_1||'UNVERIFIED')+'</strong><span>vs</span><strong>'+esc(p.participant_2||'UNVERIFIED')+'</strong><span class="participantIdentityStatus">'+(p.identity_verified?'✓ VERIFIED':'⚠ IDENTITY UNVERIFIED')+'</span></div>':'<div class="participantIdentityLine participantIdentityUnknown"><span class="participantIdentityLabel">STABLE PARTICIPANT</span><strong>IDENTITY NOT EXPOSED BY LIVE FEED</strong><span class="participantIdentityStatus">⚠ NO GUESSING</span></div>';
-    return '<article class="predictionCard"><div class="predictionHeader"><div><small>'+esc(p.product)+' · '+esc(p.competition)+'</small><h3>'+esc(p.home)+' <span>vs</span> '+esc(p.away)+'</h3>'+identityHtml+'</div><time>'+esc(p.start_time?date(p.start_time):'—')+'</time></div>'+evidenceHtml+primaryHtml+'<div class="calcTable"><div class="calcHead"><span>Market</span><span>Pick</span><span>Fair / model probability</span><span>Fair odds</span><span>SportyBet</span></div>'+row(p.bestWinner,'1X2')+row(p.bestOU,'O/U')+row(p.experimentalOU,'O/U 1.5')+'</div><div class="recurrenceNote">'+recurrenceText+'</div><div class="calcNote">Fair probability is the current de-vig SportyBet market baseline. Model probability uses the walk-forward line-ladder/product evidence model. The participant recurrence overlay is only activated after its untouched validation gate passes; until then, participant evidence remains research-only. Base-evidence picks use the validated line/competition evidence and the walk-forward Poisson/product model. O/U 1.5 remains a research watch and is not activated from ticket streaks alone.</div><button class="btn builderAdd" data-pick="'+i+'" '+(p.primary?'':'disabled')+'>'+addLabel+'</button></article>';
+    return '<article class="predictionCard"><div class="predictionHeader"><div><small>'+esc(p.product)+' · '+esc(p.competition)+'</small><h3><span class="ws-entity-label">'+mediaSlot(p.home||'Participant 1','team')+'<span class="ws-entity-name">'+esc(p.home||'Participant 1')+'</span></span> <span>vs</span> <span class="ws-entity-label">'+mediaSlot(p.away||'Participant 2','team')+'<span class="ws-entity-name">'+esc(p.away||'Participant 2')+'</span></span></h3>'+identityHtml+'</div><time>'+esc(p.start_time?date(p.start_time):'—')+'</time></div>'+evidenceHtml+primaryHtml+'<div class="calcTable"><div class="calcHead"><span>Market</span><span>Pick</span><span>Fair / model probability</span><span>Fair odds</span><span>SportyBet</span></div>'+row(p.bestWinner,'1X2')+row(p.bestOU,'O/U')+row(p.experimentalOU,'O/U 1.5')+'</div><div class="recurrenceNote">'+recurrenceText+'</div><div class="calcNote">Fair probability is the current de-vig SportyBet market baseline. Model probability uses the walk-forward line-ladder/product evidence model. The participant recurrence overlay is only activated after its untouched validation gate passes; until then, participant evidence remains research-only. Base-evidence picks use the validated line/competition evidence and the walk-forward Poisson/product model. O/U 1.5 remains a research watch and is not activated from ticket streaks alone.</div><button class="btn builderAdd" data-pick="'+i+'" '+(p.primary?'':'disabled')+'>'+addLabel+'</button></article>';
   }).join('');
   renderNearQualifiedRadar();
   host.querySelectorAll('.builderAdd').forEach(function(btn){btn.addEventListener('click',function(){const p=picks[Number(btn.dataset.pick)];if(p&&!state.builder.some(function(x){return x.event_id===p.event_id;})){state.builder.push(p);state.builder=state.builder.slice(-4);renderBuilder();}});});
@@ -1260,7 +1270,7 @@ function builderEligiblePick(p){
 }
 function builderSourceCandidates(){
   const product=$('product')?.value||'all';
-  const upcoming=upcomingEventsFrom(state.live).filter(e=>product==='all'||e.product===product);
+  const upcoming=upcomingEventsFrom(state.live).filter(e=>productMatchesFilter(e,product));
   const selected=[];
   for(const e of upcoming){
     if(!isResearchDeskEvent(e))continue;
@@ -1502,7 +1512,7 @@ async function loadLive(silent=false){
 
 function rebuildPredictionDesk(){
   const product=$('product').value;
-  const upcoming=upcomingEventsFrom(state.live).filter(e=>product==='all'||e.product===product);
+  const upcoming=upcomingEventsFrom(state.live).filter(e=>productMatchesFilter(e,product));
   const eligible=upcoming
     .filter(isResearchDeskEvent);
 
