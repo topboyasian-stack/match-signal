@@ -183,11 +183,14 @@ def test_result_proxy_upstream_errors_are_preserved():
  class FakeResponse:
   def raise_for_status(self):pass
   def json(self):return {"ok":True,"events":[],"errors":[{"page":1,"error":"upstream HTTP 503"}]}
- with patch.object(mod.requests,"get",side_effect=[FakeResponse(),FakeResponse()]) as get:
+ with patch.object(mod.requests,"get",return_value=FakeResponse()) as get:
   rows,errors=mod.fetch_results([{"event_id":"legacy-event","start_time":"2026-10-11T09:30:00+00:00"}],now)
   assert rows==[],rows
   assert errors and any("upstream HTTP 503" in err for err in errors),errors
-  assert get.call_count==2
+  assert get.call_count==1,get.call_count
+  params=get.call_args.kwargs["params"]
+  assert "startTime" in params and "endTime" in params,params
+  assert params["endTime"]-params["startTime"]==int(timedelta(hours=3).total_seconds()*1000),params
 
 if __name__=="__main__":
  test_live_feed_compaction_preserves_scope_ids();test_markets();test_capture();test_live_market_coverage_reports_actual_btts_availability();test_settlement_and_summary();test_settlement_accepts_provider_final_set_score();test_legacy_missing_scope_uses_bounded_discovery();test_draw_and_append_only_merge();test_settlement_due_uses_elapsed_time_not_exact_minute();test_scoped_result_lookup_uses_bounded_time_window();test_legacy_scope_discovery_uses_bounded_time_window();test_result_queries_bucket_stale_observations_with_three_hour_windows();test_result_proxy_upstream_errors_are_preserved()
