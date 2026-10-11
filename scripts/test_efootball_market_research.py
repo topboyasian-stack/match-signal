@@ -119,50 +119,79 @@ def test_settlement_due_uses_elapsed_time_not_exact_minute():
  with patch.dict(mod.os.environ,{"EFOOTBALL_RESEARCH_FORCE_SETTLE":"1"}):
   assert mod.settlement_due(archive,now) is True
 
-def test_scoped_result_lookup_retries_without_time_filters():
+def test_scoped_result_lookup_uses_bounded_time_window():
  now=datetime(2026,10,11,10,17,tzinfo=timezone.utc)
  event={"eventId":"scoped-event","homeScore":"2","awayScore":"1"}
  class FakeResponse:
-  def __init__(self,payload):self.payload=payload
   def raise_for_status(self):pass
-  def json(self):return self.payload
- with patch.object(mod.requests,"get",side_effect=[FakeResponse({"events":[]}),FakeResponse({"events":[event]})]) as get:
+  def json(self):return {"events":[event]}
+ with patch.object(mod.requests,"get",return_value=FakeResponse()) as get:
   rows,errors=mod.fetch_results([{"event_id":"scoped-event","category_id":"cat-1","tournament_id":"tour-1","start_time":"2026-10-11T10:00:00+00:00"}],now)
   assert rows==[event] and not errors,(rows,errors)
-  assert get.call_count==2
-  first=get.call_args_list[0].kwargs["params"]
-  second=get.call_args_list[1].kwargs["params"]
-  assert "startTime" in first and "endTime" in first,first
-  assert "startTime" not in second and "endTime" not in second,second
-  assert first["pageSize"]==100 and second["pageSize"]==100,(first,second)
-  assert second["categoryId"]=="cat-1" and second["tournamentId"]=="tour-1"
-
-def test_legacy_scope_discovery_retries_without_time_filters():
+  assert get.call_count==1,get.call_count
+  params=get.call_args.kwargs["params"]
+  assert params["categoryId"]=="cat-1" and params["tournamentId"]=="tour-1"
+  assert "startTime" in params and "endTime" in params,params
+  start=datetime.fromtimestamp(params["startTime"]/1000,tz=timezone.utc)
+  end=datetime.fromtimestamp(params["endTime"]/1000,tz=timezone.utc)
+  assert end-start==timedelta(hours=3),(start,end)
+  assert start<=datetime(2026,10,11,10,0,tzinfo=timezone.utc)<=end
+def test_legacy_scope_discovery_uses_bounded_time_window():
  now=datetime(2026,10,11,10,17,tzinfo=timezone.utc)
  event={"eventId":"legacy-event","homeScore":"1","awayScore":"0"}
  class FakeResponse:
-  def __init__(self,payload):self.payload=payload
   def raise_for_status(self):pass
-  def json(self):return self.payload
- with patch.object(mod.requests,"get",side_effect=[FakeResponse({"events":[]}),FakeResponse({"events":[event]})]) as get:
+  def json(self):return {"events":[event]}
+ with patch.object(mod.requests,"get",return_value=FakeResponse()) as get:
   rows,errors=mod.fetch_results([{"event_id":"legacy-event","start_time":"2026-10-11T09:30:00+00:00"}],now)
   assert rows==[event] and not errors,(rows,errors)
-  assert get.call_count==2
-  second=get.call_args_list[1].kwargs["params"]
-  assert second["source"]=="efootball" and "startTime" not in second and "endTime" not in second,second
-  assert second["pageSize"]==100,second
+  assert get.call_count==1,get.call_count
+  params=get.call_args.kwargs["params"]
+  assert params["source"]=="efootball" and "categoryId" not in params and "tournamentId" not in params
+  assert "startTime" in params and "endTime" in params,params
+  assert (params["endTime"]-params["startTime"])==int(timedelta(hours=3).total_seconds()*1000)
+  assert params["pageSize"]==100,params
 
+
+def test_result_queries_bucket_stale_observations_with_three_hour_windows():
+ now=datetime(2026,10,11,10,30,tzinfo=timezone.utc)
+ samples=[
+  {"event_id":"old-a","category_id":"cat-1","tournament_id":"tour-1","start_time":"2026-10-08T08:00:00+00:00"},
+  {"event_id":"old-b","category_id":"cat-1","tournament_id":"tour-1","start_time":"2026-10-08T08:30:00+00:00"},
+  {"event_id":"old-c","category_id":"cat-1","tournament_id":"tour-1","start_time":"2026-10-08T12:00:00+00:00"},
+ ]
+ calls=[]
+ class FakeResponse:
+  def __init__(self,rows):self.rows=rows
+  def raise_for_status(self):pass
+  def json(self):return {"events":self.rows}
+ def fake_get(url,params,timeout):
+  start=datetime.fromtimestamp(params["startTime"]/1000,tz=timezone.utc)
+  end=datetime.fromtimestamp(params["endTime"]/1000,tz=timezone.utc)
+  assert timedelta(0)<end-start<=timedelta(hours=3),(start,end)
+  calls.append(params.copy())
+  matching=[{"eventId":s["event_id"]} for s in samples if start<=datetime.fromisoformat(s["start_time"].replace("Z","+00:00"))<=end]
+  return FakeResponse(matching)
+ with patch.object(mod.requests,"get",side_effect=fake_get):
+  rows,errors=mod.fetch_results(samples,now)
+ assert {r["eventId"] for r in rows}=={"old-a","old-b","old-c"},rows
+ assert not errors,errors
+ assert len(calls)==2,len(calls)
+ assert all(x["categoryId"]=="cat-1" and x["tournamentId"]=="tour-1" for x in calls)
 def test_result_proxy_upstream_errors_are_preserved():
  now=datetime(2026,10,11,10,17,tzinfo=timezone.utc)
  class FakeResponse:
   def raise_for_status(self):pass
   def json(self):return {"ok":True,"events":[],"errors":[{"page":1,"error":"upstream HTTP 503"}]}
- with patch.object(mod.requests,"get",side_effect=[FakeResponse(),FakeResponse()]) as get:
+ with patch.object(mod.requests,"get",return_value=FakeResponse()) as get:
   rows,errors=mod.fetch_results([{"event_id":"legacy-event","start_time":"2026-10-11T09:30:00+00:00"}],now)
   assert rows==[],rows
   assert errors and any("upstream HTTP 503" in err for err in errors),errors
-  assert get.call_count==2
+  assert get.call_count==1,get.call_count
+  params=get.call_args.kwargs["params"]
+  assert "startTime" in params and "endTime" in params,params
+  assert params["endTime"]-params["startTime"]==int(timedelta(hours=3).total_seconds()*1000),params
 
 if __name__=="__main__":
- test_live_feed_compaction_preserves_scope_ids();test_markets();test_capture();test_live_market_coverage_reports_actual_btts_availability();test_settlement_and_summary();test_settlement_accepts_provider_final_set_score();test_legacy_missing_scope_uses_bounded_discovery();test_draw_and_append_only_merge();test_settlement_due_uses_elapsed_time_not_exact_minute();test_scoped_result_lookup_retries_without_time_filters();test_legacy_scope_discovery_retries_without_time_filters();test_result_proxy_upstream_errors_are_preserved()
+ test_live_feed_compaction_preserves_scope_ids();test_markets();test_capture();test_live_market_coverage_reports_actual_btts_availability();test_settlement_and_summary();test_settlement_accepts_provider_final_set_score();test_legacy_missing_scope_uses_bounded_discovery();test_draw_and_append_only_merge();test_settlement_due_uses_elapsed_time_not_exact_minute();test_scoped_result_lookup_uses_bounded_time_window();test_legacy_scope_discovery_uses_bounded_time_window();test_result_queries_bucket_stale_observations_with_three_hour_windows();test_result_proxy_upstream_errors_are_preserved()
  print("eFootball winner/BTTS research tests: PASS (12 groups)")

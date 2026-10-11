@@ -255,6 +255,46 @@ def summary(archive,at):
       "observations_count":len(archive.get("observations",[])),"summary_by_product_market":sums,
       "promotion_policy":{"preliminary_review_after":100,"preferred_review":"200-300+ settled samples per product/market plus independent chronological holdout",
        "requirements":["positive post-margin returns","calibration against no-vig market baseline","chronological holdout","stable exact-market settlement","no participant identity leakage"],"automatic_promotion":False}}
+def result_windows(samples,now):
+    """Partition pending observations into provider-safe three-hour result queries.
+
+    SportyBet's result proxy returns business error 19999 for broad/oversized
+    history windows, but a three-hour window returned exact event matches in
+    the live proxy diagnostic. Keep each request bounded, including old pending
+    rows, rather than silently dropping them outside a rolling recent window.
+    """
+    dated=[];undated=[]
+    for sample in samples:
+        start=dt(sample.get("start_time"))
+        if start is None:undated.append(sample)
+        else:dated.append((start,sample))
+    dated.sort(key=lambda pair:pair[0])
+    max_sample_span=timedelta(hours=2,minutes=15)
+    end_pad=timedelta(minutes=30)
+    max_window=timedelta(hours=3)
+    buckets=[];current=[]
+    for pair in dated:
+        if current and pair[0]-current[0][0]>max_sample_span:
+            buckets.append(current);current=[]
+        current.append(pair)
+    if current:buckets.append(current)
+    windows=[]
+    for bucket in buckets:
+        first,last=bucket[0][0],bucket[-1][0]
+        end=min(last+end_pad,now+timedelta(minutes=2))
+        start=end-max_window
+        # The 2h15m bucket ceiling leaves at least 15m of margin in the
+        # three-hour provider window, even when end is clamped to the current time.
+        if start>first:
+            start=first-timedelta(minutes=15)
+            end=start+max_window
+        windows.append((start,end,[sample for _,sample in bucket]))
+    if undated:
+        end=now+timedelta(minutes=2)
+        windows.append((end-max_window,end,undated))
+    return sorted(windows,key=lambda item:item[0])
+
+
 def fetch_results(pending,now):
     scopes=defaultdict(list); missing=[]
     for s in pending:
@@ -278,43 +318,25 @@ def fetch_results(pending,now):
         except Exception as exc:
             return [],f"{label}: {exc}"
 
-    # Use the same small page size validated by the production result-proxy
-    # smoke check. If optional time filters produce no rows, retry unfiltered.
+    # Older observations are queried in date buckets. Do not retry without
+    # time filters: the production diagnostic showed that unbounded requests
+    # produce business errors while a bounded three-hour request returns rows.
     if missing:
-        dates=[dt(s.get("start_time")) for s in missing];dates=[d for d in dates if d]
         base={"source":"efootball","pageSize":100,"pageNum":1}
-        filtered=dict(base)
-        if dates:
-            filtered["startTime"]=int((min(dates)-timedelta(days=1)).timestamp()*1000)
-            filtered["endTime"]=int((now+timedelta(minutes=2)).timestamp()*1000)
-        rows,err=request_rows(filtered,45,"broad eFootball scope discovery")
-        if err:errors.append(err)
-        if rows:
-            events.extend(rows)
-        else:
-            fallback,err2=request_rows(base,45,"unfiltered broad eFootball scope discovery")
-            if err2:errors.append(err2)
-            if fallback:events.extend(fallback)
-            elif not err and not err2:errors.append("broad eFootball result endpoint returned no rows with or without time filters")
+        for index,(start,end,bucket) in enumerate(result_windows(missing,now),1):
+            filtered={**base,"startTime":int(start.timestamp()*1000),"endTime":int(end.timestamp()*1000)}
+            rows,err=request_rows(filtered,45,f"broad eFootball scope discovery window {index}")
+            if err:errors.append(err)
+            if rows:events.extend(rows)
 
     ordered=sorted(scopes.items(),key=lambda x:min(dt(s.get("start_time")) or now for s in x[1]))
     for (cat,tour),samples in ordered[:12]:
-        dates=[dt(s.get("start_time")) for s in samples];dates=[d for d in dates if d]
         base={"source":"efootball","categoryId":cat,"tournamentId":tour,"pageSize":100,"pageNum":1}
-        filtered=dict(base)
-        if dates:
-            filtered["startTime"]=int((min(dates)-timedelta(days=1)).timestamp()*1000)
-            filtered["endTime"]=int((now+timedelta(minutes=2)).timestamp()*1000)
-        rows,err=request_rows(filtered,35,f"{cat}/{tour} date-filtered result lookup")
-        if err:errors.append(err)
-        if rows:
-            events.extend(rows);continue
-        fallback,err2=request_rows(base,35,f"{cat}/{tour} unfiltered result lookup")
-        if err2:errors.append(err2)
-        if fallback:
-            events.extend(fallback);continue
-        if not err and not err2:
-            errors.append(f"{cat}/{tour}: no result rows with or without time filters")
+        for index,(start,end,bucket) in enumerate(result_windows(samples,now),1):
+            filtered={**base,"startTime":int(start.timestamp()*1000),"endTime":int(end.timestamp()*1000)}
+            rows,err=request_rows(filtered,35,f"{cat}/{tour} bounded result lookup window {index}")
+            if err:errors.append(err)
+            if rows:events.extend(rows)
 
     result_ids={str(e.get("eventId") or e.get("event_id") or "") for e in events
                 if e.get("eventId") or e.get("event_id")}
