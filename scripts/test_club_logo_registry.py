@@ -89,6 +89,36 @@ class ClubLogoRegistryTests(unittest.TestCase):
         }
         self.assertTrue(_existing_entry_is_safe("boca juniors", good))
 
+
+    def test_rejects_crossed_out_and_holiday_variant_crests(self):
+        cases = [
+            ("Real Madrid", "Real Madrid CF logo crossed out.png"),
+            ("Juventus", "Juventus FC logo variant - 2018 Xmas.jpg"),
+        ]
+        for team, title in cases:
+            with self.subTest(team=team):
+                self.assertFalse(_candidate_title_matches(team, title))
+                bad = {"name": team, "title": "File:" + title, "path": "/assets/club-logos/unsafe.png"}
+                self.assertFalse(_existing_entry_is_safe(normalize_team(team), bad))
+
+    def test_paris_fc_is_not_an_alias_for_paris_saint_germain(self):
+        self.assertNotIn("paris", ALIASES)
+        self.assertIn("PSG", ALIASES["paris saint germain"])
+        ambiguous = {
+            "name": "Paris",
+            "title": "File:Logo PSG.png",
+            "path": "/assets/club-logos/paris.png",
+            "canonical_key": "paris",
+        }
+        self.assertFalse(_existing_entry_is_safe("paris", ambiguous))
+        verified_psg = {
+            "name": "Paris Saint-Germain FC",
+            "title": "File:Logo PSG.png",
+            "path": "/assets/club-logos/paris.png",
+            "canonical_key": "paris saint germain",
+        }
+        self.assertTrue(_existing_entry_is_safe("paris saint germain", verified_psg))
+
     def test_downloaded_image_signature_is_checked(self):
         self.assertTrue(_signature_ok(b"\x89PNG\r\n\x1a\n" + b"x" * 10, "image/png"))
         self.assertTrue(_signature_ok(b"\xff\xd8\xff" + b"x" * 10, "image/jpeg"))
