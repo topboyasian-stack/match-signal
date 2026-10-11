@@ -2,7 +2,8 @@ name: Isolated eFootball Winner and BTTS Market Research
 
 on:
   schedule:
-    # Canonical five-minute cadence; settlement timing is elapsed-time based.
+    # Expected cadence is five minutes; trust archive telemetry, not the cron alone.
+    # Capture stays gated on a recent LIVE snapshot; prior observations can still settle.
     - cron: '*/5 * * * *'
   workflow_dispatch:
   pull_request:
