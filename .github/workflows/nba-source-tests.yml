@@ -1,0 +1,33 @@
+name: Validate NBA historical source and season gates
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/expansion_pipeline.py'
+      - 'scripts/test_expansion_sources.py'
+      - '.github/workflows/nba-source-tests.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/expansion_pipeline.py'
+      - 'scripts/test_expansion_sources.py'
+      - '.github/workflows/nba-source-tests.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  source-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pipeline imports
+        run: python -m pip install --upgrade requests pandas
+      - name: Compile and run source tests
+        run: |
+          python -m py_compile scripts/expansion_pipeline.py scripts/live_expansion_pipeline.py scripts/run_live_expansion.py scripts/test_expansion_sources.py
+          python scripts/test_expansion_sources.py

@@ -12,8 +12,10 @@ on:
   push:
     branches: [main]
     paths:
+      - 'scripts/expansion_pipeline.py'
       - 'scripts/live_expansion_pipeline.py'
       - 'scripts/run_live_expansion.py'
+      - 'scripts/test_expansion_sources.py'
       - 'scripts/repair_ere_live.py'
       - 'scripts/eredivisie_source.py'
       - 'scripts/qa_ere_live.py'
@@ -50,6 +52,9 @@ jobs:
         run: |
           git fetch origin main
           git reset --hard origin/main
+
+      - name: Test bounded NBA history collection and season isolation
+        run: python scripts/test_expansion_sources.py
 
       - name: Generate live-experimental NBA + Eredivisie signals
         run: python scripts/run_live_expansion.py
