@@ -255,9 +255,10 @@ def main():
     status = {
         "updated_at": NOW.isoformat(), "release_mode": "LIVE_EXPERIMENTAL", "live_trading_approved": False,
         "competitions": {
-            "NBA": {"historical_events": len(nba_history), "current_fixtures": len(nba_fixtures), "collection_errors": len(nba_errors), "status": "LIVE_EXPERIMENTAL" if nba_predictions else ("PRESEASON_READY" if NOW < NBA_START else "NO_CURRENT_FIXTURES")},
+            "NBA": {"historical_events": len(nba_history), "current_fixtures": len(nba_fixtures), "collection_errors": len(nba_errors), "status": "LIVE_EXPERIMENTAL" if nba_predictions else ("PRESEASON_READY" if NOW < NBA_START else "NO_CURRENT_FIXTURES"), "history_source": "ESPN seven-day scoreboard windows; parquet/Elo fallback if needed"},
             "Eredivisie": {"historical_events": len(ere_history), "current_fixtures": len(ere_fixtures), "published_predictions": len(ere_predictions), "collection_errors": len(ere_errors), "status": "LIVE_EXPERIMENTAL" if ere_predictions else "NO_CURRENT_FIXTURES", "fixture_source": "ESPN primary; Football-Data fixtures.csv; SofaScore daily schedule fallback"},
         },
+        "source_diagnostics": {"NBA": nba_errors[:5], "Eredivisie": ere_errors[:5]},
         "monitoring": {"settlement": "expansion_prediction_history.json", "promotion_rule": "live evidence + calibration + market benchmark; automatic demotion on data failure", "market_data_is_benchmark_only": True},
         "notes": ["Independent probabilities never consume market probabilities.", "LIVE_EXPERIMENTAL signals are real generated predictions, not guarantees or live-trading approval.", "NBA remains preseason-ready until 2026-10-20, then enters live experimental mode automatically.", "Eredivisie uses ESPN when available, Football-Data's current fixture feed as the first fallback, and SofaScore's daily schedule as the second fallback."],
     }
