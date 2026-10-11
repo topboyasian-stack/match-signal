@@ -11,11 +11,11 @@ const sandbox = { Date, Number, String, Math, Array, Boolean, Object, Map, Set, 
 vm.createContext(sandbox);
 vm.runInContext(
   source.slice(start, end) +
-    "\n;globalThis.__deskTestApi={exactVirtualMarketLine,exactSportyBetQuote,exactMarketEdge,exactMarketExpectedReturn,qualificationState,primaryPrediction,qualifiedBestSelections,unmatchedVirtualQuoteUpdate,rawProbabilityValue,probabilityCalibrationInfo,probabilityValue,displayedFairOddsValue,isVirtualDeskCandidate};",
+    "\n;globalThis.__deskTestApi={exactVirtualMarketLine,exactSportyBetQuote,exactMarketEdge,exactMarketExpectedReturn,qualificationState,primaryPrediction,qualifiedBestSelections,unmatchedVirtualQuoteUpdate,rawProbabilityValue,probabilityCalibrationInfo,probabilityValue,displayedFairOddsValue,isVirtualDeskCandidate,sameVirtualEvent,virtualSnapshotHasCompleteFirstPage};",
   sandbox,
   { filename: "sport-hubs.js#prediction-desk-gates" }
 );
-const { exactVirtualMarketLine, exactMarketEdge, qualificationState, primaryPrediction, qualifiedBestSelections, unmatchedVirtualQuoteUpdate, rawProbabilityValue, probabilityCalibrationInfo, probabilityValue, displayedFairOddsValue, exactMarketExpectedReturn, isVirtualDeskCandidate } = sandbox.__deskTestApi;
+const { exactVirtualMarketLine, exactMarketEdge, qualificationState, primaryPrediction, qualifiedBestSelections, unmatchedVirtualQuoteUpdate, rawProbabilityValue, probabilityCalibrationInfo, probabilityValue, displayedFairOddsValue, exactMarketExpectedReturn, isVirtualDeskCandidate, sameVirtualEvent, virtualSnapshotHasCompleteFirstPage } = sandbox.__deskTestApi;
 
 const lastKnownQuote = {
   event_id: "virtual-keep-last-quote",
@@ -191,5 +191,32 @@ assert.equal(qualificationState(pendingDirectional).reason, "DIRECTIONAL_LINE_VA
 assert.equal(exactVirtualMarketLine({ specifier: "total=7.5" }), 7.5, "provider total specifier is recognized");
 assert.equal(exactVirtualMarketLine({ specifier: "total=7.5", line: 8.5 }), 8.5, "explicit market.line takes precedence");
 assert.equal(exactVirtualMarketLine({ specifier: "period=1" }), null, "unrelated specifier is not treated as a totals line");
+
+
+const virtualKickoff = Date.now() + 60 * 60 * 1000;
+const virtualDeskFixture = {
+  event_id: "virtual-event-identity-1",
+  product: "efootball_gt",
+  sport: "virtual",
+  start_time: new Date(virtualKickoff).toISOString(),
+  participant_1: "Real Madrid (HandleA)",
+  participant_2: "Liverpool (HandleB)"
+};
+const virtualLiveQuote = {
+  event_id: "virtual-event-identity-1",
+  product: "efootball_gt",
+  sport: "virtual",
+  start_time: new Date(virtualKickoff + 5 * 60 * 1000).toISOString(),
+  participant_1: "HandleA",
+  participant_2: "HandleB"
+};
+assert.equal(sameVirtualEvent(virtualDeskFixture, virtualLiveQuote), true, "exact event and participants tolerate five-minute kickoff drift");
+assert.equal(sameVirtualEvent(virtualDeskFixture, { ...virtualLiveQuote, start_time: new Date(virtualKickoff + 16 * 60 * 1000).toISOString() }), false, "large kickoff drift cannot match quote");
+assert.equal(sameVirtualEvent(virtualDeskFixture, { ...virtualLiveQuote, event_id: "different-event" }), false, "different provider event ID cannot validate quote");
+assert.equal(sameVirtualEvent(virtualDeskFixture, { ...virtualLiveQuote, participant_2: "HandleC" }), false, "wrong participant cannot validate quote");
+assert.equal(sameVirtualEvent(virtualDeskFixture, { ...virtualLiveQuote, product: "efootball_adriatic" }), false, "different product cannot validate quote");
+assert.equal(virtualSnapshotHasCompleteFirstPage({status:"LIVE"}, 0, false, false), false, "empty snapshot does not invalidate prior quotes");
+assert.equal(virtualSnapshotHasCompleteFirstPage({status:"LIVE"}, 24, false, false), true, "healthy non-empty short snapshot can be complete");
+assert.equal(virtualSnapshotHasCompleteFirstPage({status:"LIVE"}, 24, true, false), false, "source errors prevent snapshot completion");
 
 console.log("Prediction Desk gate regressions passed: explicit status veto, probability-band separation, exact line/side, 15-minute freshness, qualified-first ranking, future-only shortlist, active virtual scope, and provider specifier normalization.");
