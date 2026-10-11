@@ -1,11 +1,11 @@
 {
   "status": "VERIFIED",
   "provider": "Cloudflare Pages",
-  "source_commit": "cb248117b60b80d7cc5037fd868e096886f60b9f",
-  "verified_at": "2026-10-11T18:37:34.114223+00:00",
+  "source_commit": "7ce4cd4764f2536f9fdb66bb54039f6120b9cf6e",
+  "verified_at": "2026-10-11T18:39:08.683585+00:00",
   "live_virtual_feed": {
     "endpoint": "/api/sportybet-virtual",
-    "verified_at": "2026-10-11T18:37:29.655Z",
+    "verified_at": "2026-10-11T18:39:03.281Z",
     "status": "LIVE",
     "events_count": 200,
     "product_counts": {
@@ -17,38 +17,58 @@
       "efootball_live": {
         "status": "EMPTY",
         "events": 0,
-        "latency_ms": 252,
+        "latency_ms": 242,
         "endpoint": "/api/ng/factsCenter/wapConfigurableIndexLiveEvents"
       },
       "vfootball_live": {
         "status": "EMPTY",
         "events": 0,
-        "latency_ms": 730,
+        "latency_ms": 739,
         "endpoint": "/api/ng/factsCenter/wapConfigurableIndexLiveEvents"
       },
       "efootball": {
         "status": "LIVE",
         "events": 100,
-        "latency_ms": 1381
+        "latency_ms": 1545
       },
       "vfootball": {
         "status": "LIVE",
         "events": 100,
-        "latency_ms": 2040
+        "latency_ms": 2195
       }
     },
     "errors": []
   },
   "booking_api": {
-    "verified_at": "2026-10-11T18:37:27.538Z",
-    "status": "NO_FUTURE_BATCH",
-    "http_status": null,
-    "ok": false,
-    "batch_id": null,
-    "selection_count": 0,
+    "verified_at": "2026-10-11T18:38:55.869Z",
+    "status": "VOLATILE_MARKET",
+    "http_status": 409,
+    "ok": true,
+    "batch_id": "BATCH-01",
+    "selection_count": 1,
     "booking_code_available": false,
-    "error": null,
-    "message": null
+    "error": "TOO_FEW_AVAILABLE_SELECTIONS",
+    "message": "Fewer than two valid selections remain available on SportyBet.",
+    "volatile_market": true,
+    "validation": [
+      {
+        "event_id": "sr:match:BAaEoY-IEdFO1l68fN38zaQ",
+        "ok": true,
+        "resolved_by": "event_id",
+        "resolved_event_id": "sr:match:BAaEoY-IEdFO1l68fN38zaQ",
+        "market_id": "18",
+        "outcome_id": "13",
+        "specifier": "total=9.5",
+        "outcome": "Under 9.5",
+        "current_odds": 1.47
+      },
+      {
+        "event_id": "sr:match:BAaEoZnmqcY65MJYvCYSFQw",
+        "ok": false,
+        "excluded": true,
+        "reason": "The exact SportyBet O/U line or selected side is no longer available."
+      }
+    ]
   },
   "checks": [
     "core_pages",
