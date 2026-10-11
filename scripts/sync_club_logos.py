@@ -27,7 +27,7 @@ REGISTRY_PATH = DATA / "club-logo-registry.json"
 COMMONS_API = "https://commons.wikimedia.org/w/api.php"
 USER_AGENT = "MatchSignal-ClubLogoRegistry/1.0 (https://github.com/topboyasian-stack/match-signal)"
 MAX_IMAGE_BYTES = 2_000_000
-MISS_RETRY_DAYS = 7
+MISS_RETRY_DAYS = 1
 
 DATA_SOURCES = [
     "data/odds_builder.json",
@@ -47,15 +47,55 @@ TEAM_FIELDS = (
     "participant_1", "participant_2",
 )
 ARTWORK_RE = re.compile(r"\b(logo|crest|badge|emblem|coat of arms)\b", re.I)
-NONLOGO_ARTIFACT_RE = re.compile(r"\b(rugby|pin badge|supporters? club|supporters|fan club|souvenir|main stand|side view|stadium|shirt|jersey|poster|sticker|key ?ring|medal|collection|toy|window|photograph|photo|mural|building|signboard|shopfront|on window)\b", re.I)
+NONLOGO_ARTIFACT_RE = re.compile(r"\b(rugby|pin badge|supporters? club|supporters|fan club|souvenir|main stand|side view|stadium|shirt|jersey|poster|sticker|key ?ring|medal|collection|toy|window|photograph|photo|mural|building|signboard|shopfront|on window|crossed out|xmas|christmas|festive|defaced|satirical|parody|unofficial|fan art)\b", re.I)
 HISTORIC_ARTWORK_RE = re.compile(r"\b(old|original|historic|historical|vintage|antique|retro|altes|alte|alter)\b|\b(?:18\d{2}|19\d{2})\b", re.I)
 CLUB_CLUE_RE = re.compile(
     r"\b(football|soccer|club|olympique|racing|athletic|sporting|futbol|fútbol|fc|afc|sc|ac|cf)\b|"
     r"\b(?:f\.c\.|a\.f\.c\.|c\.f\.|s\.c\.|a\.c\.)\b",
     re.I,
 )
-SEARCH_POLICY_VERSION = 4
+SEARCH_POLICY_VERSION = 5
 ALIASES = {
+    # National teams and common club/provider-name variants.
+    "france": ("France national football team", "France national soccer team"),
+    "germany": ("Germany national football team", "Germany national soccer team"),
+    "spain": ("Spain national football team", "Spain national soccer team"),
+    "england": ("England national football team", "England national soccer team"),
+    "argentina": ("Argentina national football team", "Argentina national soccer team"),
+    "brazil": ("Brazil national football team", "Brazil national soccer team"),
+    "italy": ("Italy national football team", "Italy national soccer team"),
+    "netherlands": ("Netherlands national football team", "Netherlands national soccer team", "Holland national football team"),
+    "portugal": ("Portugal national football team", "Portugal national soccer team"),
+    "morocco": ("Morocco national football team", "Morocco national soccer team"),
+    "norway": ("Norway national football team", "Norway national soccer team"),
+    "czechia": ("Czechia national football team", "Czech Republic national football team"),
+    "aston villa": ("Aston Villa FC", "Aston Villa Football Club"),
+    "brighton": ("Brighton and Hove Albion", "Brighton & Hove Albion FC"),
+    "west ham": ("West Ham United", "West Ham United FC"),
+    "burnley": ("Burnley FC", "Burnley Football Club"),
+    "southampton": ("Southampton FC", "Southampton Football Club"),
+    "middlesbrough": ("Middlesbrough FC", "Middlesbrough Football Club"),
+    "feyenoord": ("Feyenoord Rotterdam", "Feyenoord FC"),
+    "az alkmaar": ("AZ", "AZ Alkmaar FC"),
+    "twente": ("FC Twente", "Twente Enschede"),
+    "fenerbahce": ("Fenerbahce SK", "Fenerbahçe"),
+    "besiktas": ("Besiktas JK", "Beşiktaş"),
+    "trabzonspor": ("Trabzonspor FC", "Trabzonspor Kulübü"),
+    "al ahli": ("Al-Ahli Saudi Club", "Al Ahli Saudi"),
+    "al ittihad": ("Al-Ittihad Club", "Al Ittihad Jeddah"),
+    "braga": ("SC Braga", "Sporting Clube de Braga"),
+    "como": ("Como 1907", "Calcio Como"),
+    "sassuolo": ("US Sassuolo Calcio", "Sassuolo FC"),
+    "bologna": ("Bologna FC 1909", "Bologna Football Club"),
+    "vitoria": ("Vitoria SC", "Vitoria de Guimaraes", "Vitória Sport Clube"),
+    "seoul": ("FC Seoul",),
+    "gangwon": ("Gangwon FC",),
+    "shanghai shenhua": ("Shanghai Shenhua FC",),
+    "everton": ("Everton FC", "Everton Football Club"),
+    "fulham": ("Fulham FC", "Fulham Football Club"),
+    "crystal palace": ("Crystal Palace FC", "Crystal Palace Football Club"),
+    "brentford": ("Brentford FC", "Brentford Football Club"),
+    "leicester": ("Leicester City", "Leicester City FC"),
     "real madrid": ("Real Madrid CF", "Real Madrid Club de Futbol"),
     "liverpool": ("Liverpool FC", "Liverpool F.C.", "Liverpool Football Club"),
     "arsenal": ("Arsenal FC", "Arsenal Football Club"),
@@ -81,7 +121,6 @@ ALIASES = {
     "barcelona": ("FC Barcelona", "Barcelona FC", "Barca"),
     "psg": ("Paris Saint-Germain", "Paris Saint-Germain FC"),
     "paris sg": ("Paris Saint-Germain", "PSG"),
-    "paris": ("Paris Saint-Germain", "Paris Saint-Germain FC", "PSG"),
     "juve": ("Juventus", "Juventus FC"),
     "juventus": ("Juventus FC",),
     "inter": ("Inter Milan", "FC Internazionale Milano"),
@@ -183,8 +222,8 @@ def _candidate_title_matches(term, title):
         return False
 
     # Normalize common prefixes and a few generic descriptors seen in Commons.
-    identity_key = re.sub(r"\s+(?:official|team|football|soccer|club badge|football lion)$", "", identity_key).strip()
-    search_key = re.sub(r"\s+(?:official|team|football|soccer|club badge|football lion)$", "", search_key).strip()
+    identity_key = re.sub(r"\s+(?:official|national(?: football| soccer)? team|football team|soccer team|team|football|soccer|club badge|football lion)$", "", identity_key).strip()
+    search_key = re.sub(r"\s+(?:official|national(?: football| soccer)? team|football team|soccer team|team|football|soccer|club badge|football lion)$", "", search_key).strip()
 
     # Identity must be the whole pre-artwork phrase, not a substring/prefix.
     # Some official club names include a leading "Club Atlético" prefix; allow
@@ -461,10 +500,22 @@ def _retry_due(value, now):
         return True
 
 
+def clear_misses_for_policy_change(registry, misses):
+    """Release unresolved lookup cooldowns when validation/search rules change."""
+    if registry.get("search_policy_version") != SEARCH_POLICY_VERSION:
+        misses.clear()
+    registry["search_policy_version"] = SEARCH_POLICY_VERSION
+
+
 def sync_registry(max_new=80):
     registry = _registry()
     teams = registry.setdefault("teams", {})
     misses = registry.setdefault("misses", {})
+    previous_count = len(misses)
+    previous_policy = registry.get("search_policy_version")
+    clear_misses_for_policy_change(registry, misses)
+    if previous_policy != SEARCH_POLICY_VERSION and previous_count:
+        print(f"Logo search policy changed ({previous_policy!r} -> {SEARCH_POLICY_VERSION}); retrying {previous_count} previous misses.")
     discoveries = collect_clubs()
     now = datetime.now(timezone.utc)
     attempts = []

@@ -478,6 +478,17 @@ function qualifiedBestSelections(rows,now=Date.now()){
     blockerCounts
   }};
 }
+function unmatchedVirtualQuoteUpdate(row,snapshot){
+  if(snapshot?.snapshotComplete===true){
+    return {...row,market_odds_timestamp:null,odds_timestamp:null,desk_quote_refresh:"exact_event_not_found_in_live_snapshot"};
+  }
+  return {
+    ...row,
+    desk_quote_refresh:snapshot?.snapshotAvailable===true
+      ?"live_quote_snapshot_incomplete_previous_quote_preserved"
+      :"live_quote_feed_unavailable_previous_quote_preserved"
+  };
+}
 function ladderAnchor(rows){
   const candidates=(rows||[]).filter(x=>x&&x.market==="over_under"&&Number.isFinite(Number(x.line))&&Number.isFinite(Number(probabilityValue(x)))&&Number(probabilityValue(x))>=0.80);
   return [...candidates].sort((a,b)=>{
@@ -649,37 +660,62 @@ async function renderUnifiedBoard(){
     }
     async function freshVirtualQuoteMap(requiredRows=[]){
       const byEvent={};
+      const status={byEvent,snapshotAvailable:false,snapshotComplete:false,successfulPages:0,failureReason:null};
       const quoteNow=Date.now();
       const required=(Array.isArray(requiredRows)?requiredRows:[]).filter(row=>{
         if(!row||String(row?.sport||"").toLowerCase()!=="virtual"||!isOverUnderPrediction(row)||!String(row?.event_id||""))return false;
         const start=virtualStartTimestamp(row);
         return start!=null&&start>=quoteNow;
       });
-      if(!required.length)return byEvent;
-      try{
-        // The first 100-event page often omits fixtures further down the active
-        // eFootball feed. Paginate only a bounded number of pages, stopping as
-        // soon as each requested fixture has an exact ID + participant + kickoff
-        // match. A reused provider ID by itself never validates a quote.
-        for(let page=1;page<=5;page++){
-          const feed=await get('./api/sportybet-virtual?sources=efootball,vfootball&pageSize=100&pageNum='+page+'&timeline=168');
-          const events=Array.isArray(feed?.events)?feed.events:[];
-          const fetchedAt=feed?.updated_at||feed?.server_time||null;
-          events.forEach(e=>{
-            const id=String(e?.event_id||"");
-            if(id){
-              if(!Array.isArray(byEvent[id]))byEvent[id]=[];
-              byEvent[id].push({...e,__quote_fetched_at:fetchedAt});
-            }
-          });
-          if(events.length<100)break;
-          const allResolved=required.length>0&&required.every(row=>
-            (byEvent[String(row?.event_id||"")]||[]).some(event=>sameVirtualEvent(row,event))
-          );
-          if(allResolved)break;
+      if(!required.length){
+        status.snapshotAvailable=true;
+        status.snapshotComplete=true;
+        return status;
+      }
+      for(let page=1;page<=5;page++){
+        let feed;
+        try{
+          feed=await get('./api/sportybet-virtual?sources=efootball,vfootball&pageSize=100&pageNum='+page+'&timeline=168');
+        }catch(error){
+          status.failureReason=String(error?.message||error||"live quote fetch failed");
+          break;
         }
-      }catch(_){}
-      return byEvent;
+        if(!feed||feed.ok===false||!Array.isArray(feed.events)){
+          status.failureReason="live quote response is not a usable event snapshot";
+          break;
+        }
+        status.snapshotAvailable=true;
+        status.successfulPages++;
+        const events=feed.events;
+        const fetchedAt=feed.updated_at||feed.server_time||null;
+        events.forEach(e=>{
+          const id=String(e?.event_id||"");
+          if(id){
+            if(!Array.isArray(byEvent[id]))byEvent[id]=[];
+            byEvent[id].push({...e,__quote_fetched_at:fetchedAt});
+          }
+        });
+        const allResolved=required.every(row=>
+          (byEvent[String(row?.event_id||"")]||[]).some(event=>sameVirtualEvent(row,event))
+        );
+        if(allResolved){
+          status.snapshotComplete=true;
+          break;
+        }
+        const sourceErrors=Object.values(feed.source_status||{}).some(item=>String(item?.status||"").toUpperCase()==="ERROR");
+        const feedErrors=Array.isArray(feed.errors)&&feed.errors.length>0;
+        // Empty/upstream-error responses cannot prove an old event disappeared.
+        if(feed.status==="LIVE"&&events.length<100&&!sourceErrors&&!feedErrors){
+          status.snapshotComplete=true;
+          break;
+        }
+        if(events.length===0||feed.status==="UPSTREAM_EMPTY"){
+          status.failureReason=sourceErrors||feedErrors?"upstream feed reported an error or empty source":"upstream snapshot contained no events";
+          break;
+        }
+        if(page===5)status.failureReason="page limit reached before every requested event was found";
+      }
+      return status;
     }
     function freshVirtualQuoteFields(row,live){
       if(!row||!live||String(row?.market||"").toLowerCase()!=="over_under")return row;
@@ -838,21 +874,16 @@ async function renderUnifiedBoard(){
       const requiredQuoteRows=[...all,...virtualCandidates].filter(row=>
         String(row?.sport||"").toLowerCase()==="virtual"&&isOverUnderPrediction(row)&&virtualStartTimestamp(row)>=Date.now()
       );
-      const quoteMap=await freshVirtualQuoteMap(requiredQuoteRows);
+      const quoteSnapshot=await freshVirtualQuoteMap(requiredQuoteRows);
+      const quoteMap=quoteSnapshot.byEvent;
       all=all.map(row=>{
         if(String(row?.sport||"").toLowerCase()!=="virtual"||!isOverUnderPrediction(row))return row;
         const candidates=quoteMap[String(row?.event_id||"")]||[];
         const current=Array.isArray(candidates)?candidates.find(event=>sameVirtualEvent(row,event)):null;
         if(current)return freshVirtualQuoteFields(row,current);
-        // Keep a previously observed price visible, but strip its freshness
-        // timestamps so the UI cannot treat a non-matched live fixture as a
-        // current exact-event price or compute an actionable edge from it.
-        return {
-          ...row,
-          market_odds_timestamp:null,
-          odds_timestamp:null,
-          desk_quote_refresh:"exact_event_not_found_in_live_snapshot"
-        };
+        // Partial API snapshots are not proof that a fixture vanished. Preserve
+        // the quote's timestamp; the strict 15-minute freshness check remains.
+        return unmatchedVirtualQuoteUpdate(row,quoteSnapshot);
       });
       const virtualDeskRows=virtualCandidateDeskRows(virtualCandidates,quoteMap);
       if(virtualDeskRows.length){
@@ -974,7 +1005,7 @@ async function renderHub(){const sport=document.body.dataset.sport;const [base,p
    This keeps team crests and verified player headshots working on legacy desk pages. */
 if(!window.__MATCH_SIGNAL_WORKSPACE_UI__){
   const workspaceScript=document.createElement('script');
-  workspaceScript.src='./workspace-ui.js?v=20261011-workspace-media7';
+  workspaceScript.src='./workspace-ui.js?v=20261011-workspace-media8';
   document.body.appendChild(workspaceScript);
 }
 })();

@@ -11,11 +11,27 @@ const sandbox = { Date, Number, String, Math, Array, Boolean, Object, Map, Set, 
 vm.createContext(sandbox);
 vm.runInContext(
   source.slice(start, end) +
-    "\n;globalThis.__deskTestApi={exactVirtualMarketLine,exactSportyBetQuote,exactMarketEdge,exactMarketExpectedReturn,qualificationState,primaryPrediction,qualifiedBestSelections,rawProbabilityValue,probabilityCalibrationInfo,probabilityValue,displayedFairOddsValue,isVirtualDeskCandidate};",
+    "\n;globalThis.__deskTestApi={exactVirtualMarketLine,exactSportyBetQuote,exactMarketEdge,exactMarketExpectedReturn,qualificationState,primaryPrediction,qualifiedBestSelections,unmatchedVirtualQuoteUpdate,rawProbabilityValue,probabilityCalibrationInfo,probabilityValue,displayedFairOddsValue,isVirtualDeskCandidate};",
   sandbox,
   { filename: "sport-hubs.js#prediction-desk-gates" }
 );
-const { exactVirtualMarketLine, exactMarketEdge, qualificationState, primaryPrediction, qualifiedBestSelections, rawProbabilityValue, probabilityCalibrationInfo, probabilityValue, displayedFairOddsValue, exactMarketExpectedReturn, isVirtualDeskCandidate } = sandbox.__deskTestApi;
+const { exactVirtualMarketLine, exactMarketEdge, qualificationState, primaryPrediction, qualifiedBestSelections, unmatchedVirtualQuoteUpdate, rawProbabilityValue, probabilityCalibrationInfo, probabilityValue, displayedFairOddsValue, exactMarketExpectedReturn, isVirtualDeskCandidate } = sandbox.__deskTestApi;
+
+const lastKnownQuote = {
+  event_id: "virtual-keep-last-quote",
+  market_odds_timestamp: new Date(Date.now() - 2 * 60 * 1000).toISOString(),
+  odds_timestamp: new Date(Date.now() - 2 * 60 * 1000).toISOString(),
+  bookmaker_odds: 1.92
+};
+const partialSnapshot = unmatchedVirtualQuoteUpdate(lastKnownQuote, {snapshotAvailable:true, snapshotComplete:false});
+assert.equal(partialSnapshot.market_odds_timestamp, lastKnownQuote.market_odds_timestamp, "partial snapshot preserves last quote timestamp");
+assert.equal(partialSnapshot.odds_timestamp, lastKnownQuote.odds_timestamp, "partial snapshot preserves legacy timestamp");
+assert.equal(partialSnapshot.desk_quote_refresh, "live_quote_snapshot_incomplete_previous_quote_preserved");
+const unavailableSnapshot = unmatchedVirtualQuoteUpdate(lastKnownQuote, {snapshotAvailable:false, snapshotComplete:false});
+assert.equal(unavailableSnapshot.market_odds_timestamp, lastKnownQuote.market_odds_timestamp, "failed live request preserves timestamp");
+const completeSnapshot = unmatchedVirtualQuoteUpdate(lastKnownQuote, {snapshotAvailable:true, snapshotComplete:true});
+assert.equal(completeSnapshot.market_odds_timestamp, null, "only a complete snapshot invalidates an unmatched quote");
+assert.equal(completeSnapshot.odds_timestamp, null, "complete unmatched snapshot clears both timestamps");
 
 function row(overrides = {}) {
   return {

@@ -43,7 +43,14 @@ jobs:
           python -m py_compile scripts/sync_club_logos.py scripts/odds_ticket_tracker.py
 
       - name: Download missing verified logo assets
-        run: python scripts/sync_club_logos.py --max-new 80
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Multiple bounded passes cover the discovered club pool without repeating failed names in this policy version.
+          for pass in 1 2 3; do
+            echo "Club logo discovery pass $pass/3"
+            python scripts/sync_club_logos.py --max-new 80
+          done
 
       - name: Publish permanent logo assets
         shell: bash

@@ -32,11 +32,11 @@ host.innerHTML='<nav class="ws-nav" aria-label="Match Signal workspaces"><a clas
 function clean(name,kind){let s=String(name||'').trim();if(kind==='team')s=s.replace(/\s*\([^()]+\)\s*$/,'').trim();return s;}
 function norm(name,kind,preserveTitle=false){let raw=preserveTitle?String(name||'').trim():clean(name,kind);if(!preserveTitle&&kind==='player'&&raw.includes(',')){const parts=raw.split(',').map(x=>x.trim()).filter(Boolean);if(parts.length>1)raw=parts.slice(1).join(' ')+' '+parts[0];}let s=raw.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/&/g,' and ').replace(/[^a-z0-9]+/g,' ').trim().replace(/\s+/g,' ');if(kind==='team')s=s.replace(/^(fc|afc|sc|ac|club)\s+/,'').replace(/\s+(football club|fc|cf|afc|sc|ac)$/,'').trim();return s;}
 function initials(name){const w=clean(name,'team').split(/\s+/).filter(Boolean);return (w.length>1?w[0][0]+w[1][0]:(w[0]||'MS').slice(0,2)).toUpperCase();}
-const cache=new Map(),entries=new Map(),queue=[];let busy=false;const prefix='match-signal-media-v4:';
+const cache=new Map(),entries=new Map(),queue=[];let busy=false;const prefix='match-signal-media-v5:';
 let teamRegistry={};
 const registryReady=(async()=>{
   try{
-    const response=await fetch(route('/data/club-logo-registry.json'),{cache:'no-cache'});
+    const response=await fetch(route('/data/club-logo-registry.json')+'?v='+Date.now(),{cache:'no-store'});
     if(!response.ok)return;
     const payload=await response.json();
     if(payload&&payload.teams&&typeof payload.teams==='object')teamRegistry=payload.teams;
