@@ -426,7 +426,8 @@ def check_prediction_desk_copy_and_quote_matching_contract():
     assert "for(let page=1;page<=5;page++)" in source
     assert "if(!required.length){" in source, "empty required-set fast path must be explicit"
     assert "status.snapshotComplete=true;" in source, "quote refresh must report when the snapshot is complete"
-    assert 'if(feed.status==="LIVE"&&events.length<100&&!sourceErrors&&!feedErrors){' in source, "only a healthy terminal page may prove unmatched events absent"
+    assert "if(virtualSnapshotHasCompleteFirstPage(feed,events.length,sourceErrors,feedErrors)){" in source, "snapshot completion must use the explicit completeness guard"
+    assert "eventCount>0" in source, "an empty response cannot prove unmatched events absent"
     assert "live_quote_feed_unavailable_previous_quote_preserved" in source, "failed quote refresh must preserve last-known timestamp state"
     assert "sameVirtualEvent(row,event)" in source
     assert "exact_event_not_found_in_live_snapshot" in source
