@@ -48,7 +48,20 @@ async function upstream(path,params){
     throw new Error(path+' returned non-JSON content');
   }
   if(payload?.bizCode!==undefined && payload.bizCode!==10000){
-    throw new Error(path+' bizCode '+payload.bizCode);
+    // Preserve bounded upstream diagnostics. SportyBet's business errors can
+    // arrive as HTTP 200 JSON, so status alone is insufficient to isolate
+    // a rejected result query. Never include the full payload in public logs.
+    const detailKeys=['message','msg','error','errMsg','errorMsg','bizMessage','bizMsg','description','desc'];
+    let detail='';
+    for(const key of detailKeys){
+      const value=payload[key];
+      if(typeof value==='string' && value.trim()){
+        detail=value.trim().slice(0,240);
+        break;
+      }
+    }
+    const shape=Object.keys(payload).slice(0,16).join(',');
+    throw new Error(path+' bizCode '+payload.bizCode+(detail?' detail='+detail:' fields='+shape));
   }
   return payload;
 }
