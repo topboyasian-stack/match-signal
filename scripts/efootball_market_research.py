@@ -15,6 +15,7 @@ ARCHIVE=DATA/"efootball_market_research.json"
 BASE=os.getenv("MATCH_SIGNAL_PUBLIC_BASE","https://match-signal.pages.dev").rstrip("/")
 PRODUCTS={"efootball_gt","efootball_adriatic"}
 WINDOW=15
+MAX_SNAPSHOT_AGE=timedelta(minutes=10)
 
 def now_utc(): return datetime.now(timezone.utc)
 def dt(v):
@@ -108,6 +109,39 @@ def capture(live,archive,now):
             if row and row["sample_id"] not in seen:
                 rows.append(row); seen.add(row["sample_id"]); added+=1
     return added
+
+def inspect_live_snapshot(live,archive,now):
+    """Capture only from a recent, successful feed snapshot.
+
+    This prevents old prices from being presented as newly observed quotes.
+    Main still attempts settlement for already-recorded observations when this
+    gate rejects a stale/empty snapshot.
+    """
+    updated=dt(live.get("updated_at")) if isinstance(live,dict) else None
+    age=(now-updated).total_seconds() if updated else None
+    events=live.get("events",[]) if isinstance(live,dict) else []
+    try:
+        event_count=int(live.get("events_count") or 0)
+    except (TypeError,ValueError):
+        event_count=0
+    fresh=(
+        updated is not None
+        and age is not None
+        and -60.0 <= age <= MAX_SNAPSHOT_AGE.total_seconds()
+        and live.get("status")=="LIVE"
+        and isinstance(events,list)
+        and event_count>0
+        and len(events)>0
+    )
+    added=capture(live,archive,now) if fresh else 0
+    coverage=market_coverage(live,now)
+    coverage.update({
+        "snapshot_fresh":bool(fresh),
+        "snapshot_updated_at":updated.isoformat() if updated else None,
+        "snapshot_age_seconds":round(age,1) if age is not None else None,
+        "freshness_status":"FRESH" if fresh else "STALE_CAPTURE_DISABLED",
+    })
+    return added,coverage,bool(fresh),age
 
 def market_coverage(live,now):
     """Report whether the source actually supplies usable winner/BTTS quotes."""
@@ -389,8 +423,11 @@ def main():
     try:live=json.loads(LIVE.read_text(encoding="utf-8"))
     except Exception as exc:raise SystemExit(f"cannot read current virtual feed: {exc}")
     a=read_archive(ARCHIVE);a.setdefault("observations",[])
-    added=capture(live,a,now)
-    coverage=market_coverage(live,now)
+    added,coverage,feed_snapshot_fresh,feed_snapshot_age_seconds=inspect_live_snapshot(live,a,now)
+    capture_skipped_reason=None if feed_snapshot_fresh else (
+      "Live snapshot is stale, missing its timestamp, empty, or not marked LIVE; "
+      "new quote capture disabled. Existing observations remain eligible for settlement."
+    )
     a["market_coverage"]=coverage
     pending=[s for s in a["observations"] if isinstance(s,dict) and s.get("settlement_status")=="PENDING" and (dt(s.get("start_time")) or now)<now]
     settled=0;errors=[]
@@ -412,10 +449,16 @@ def main():
       "settlement_errors":errors,"settlement_checked_at":settlement_checked_at,
       "settlement_attempted":attempted_settlement,"pending_due_settlement_check":len(pending),
       "result_events_seen":result_events_seen,"exact_result_ids_matched":exact_result_ids_matched,
+      "feed_snapshot_fresh":feed_snapshot_fresh,
+      "feed_snapshot_age_seconds":round(feed_snapshot_age_seconds,1) if feed_snapshot_age_seconds is not None else None,
+      "capture_skipped_reason":capture_skipped_reason,
       "market_coverage":coverage}
     a["summary"]=summary(a,now);ARCHIVE.write_text(json.dumps(a,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
     print(json.dumps({"status":"PASS","captured_new":added,"settled_new":settled,"observations":len(a["observations"]),
       "pending_due_settlement_check":len(pending),"result_events_seen":result_events_seen,
       "exact_result_ids_matched":exact_result_ids_matched,"settlement_errors":errors,
+      "feed_snapshot_fresh":feed_snapshot_fresh,
+      "feed_snapshot_age_seconds":round(feed_snapshot_age_seconds,1) if feed_snapshot_age_seconds is not None else None,
+      "capture_skipped_reason":capture_skipped_reason,
       "market_coverage":coverage,"research_only":True},indent=2))
 if __name__=="__main__":main()

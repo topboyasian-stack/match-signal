@@ -38,6 +38,26 @@ def test_capture():
  assert mod.capture(fixture(now,-1),{"observations":[]},now)==0
  live["events"][0]["product"]="vfootball"
  assert mod.capture(live,{"observations":[]},now)==0
+def test_live_snapshot_freshness_gate():
+ now=datetime(2026,10,11,10,0,tzinfo=timezone.utc)
+ fresh=fixture(now)
+ fresh.update({"updated_at":now.isoformat(),"status":"LIVE","events_count":len(fresh["events"])})
+ archive={"observations":[]}
+ added,coverage,is_fresh,age=mod.inspect_live_snapshot(fresh,archive,now)
+ assert is_fresh and added==2 and len(archive["observations"])==2
+ assert coverage["freshness_status"]=="FRESH" and coverage["snapshot_age_seconds"]==0
+
+ stale=fixture(now)
+ stale.update({"updated_at":(now-timedelta(minutes=11)).isoformat(),"status":"LIVE","events_count":len(stale["events"])})
+ archive={"observations":[]}
+ added,coverage,is_fresh,age=mod.inspect_live_snapshot(stale,archive,now)
+ assert not is_fresh and added==0 and not archive["observations"]
+ assert coverage["freshness_status"]=="STALE_CAPTURE_DISABLED"
+
+ empty={"updated_at":now.isoformat(),"status":"UPSTREAM_EMPTY","events_count":0,"events":[]}
+ added,coverage,is_fresh,age=mod.inspect_live_snapshot(empty,{"observations":[]},now)
+ assert not is_fresh and added==0
+
 def test_live_market_coverage_reports_actual_btts_availability():
  now=datetime(2026,10,11,10,0,tzinfo=timezone.utc)
  live=fixture(now)
@@ -193,5 +213,5 @@ def test_result_proxy_upstream_errors_are_preserved():
   assert params["endTime"]-params["startTime"]==int(timedelta(hours=3).total_seconds()*1000),params
 
 if __name__=="__main__":
- test_live_feed_compaction_preserves_scope_ids();test_markets();test_capture();test_live_market_coverage_reports_actual_btts_availability();test_settlement_and_summary();test_settlement_accepts_provider_final_set_score();test_legacy_missing_scope_uses_bounded_discovery();test_draw_and_append_only_merge();test_settlement_due_uses_elapsed_time_not_exact_minute();test_scoped_result_lookup_uses_bounded_time_window();test_legacy_scope_discovery_uses_bounded_time_window();test_result_queries_bucket_stale_observations_with_three_hour_windows();test_result_proxy_upstream_errors_are_preserved()
- print("eFootball winner/BTTS research tests: PASS (12 groups)")
+ test_live_feed_compaction_preserves_scope_ids();test_markets();test_capture();test_live_snapshot_freshness_gate();test_live_market_coverage_reports_actual_btts_availability();test_settlement_and_summary();test_settlement_accepts_provider_final_set_score();test_legacy_missing_scope_uses_bounded_discovery();test_draw_and_append_only_merge();test_settlement_due_uses_elapsed_time_not_exact_minute();test_scoped_result_lookup_uses_bounded_time_window();test_legacy_scope_discovery_uses_bounded_time_window();test_result_queries_bucket_stale_observations_with_three_hour_windows();test_result_proxy_upstream_errors_are_preserved()
+ print("eFootball winner/BTTS research tests: PASS (13 groups)")
