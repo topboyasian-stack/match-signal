@@ -130,3 +130,16 @@ body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.22;ba
 .ws-fixture-team-name{overflow-wrap:anywhere}
 .ws-lab-priority{margin:0 0 18px}
 @media(max-width:720px){.ws-lab-priority{padding:14px}.vl-alias-chip strong{font-size:9px!important}.participantIdentityLine{gap:5px}}
+
+
+/* 2026 workspace redesign: editorial research header, richer cards, safe virtual participant media. */
+.hero{position:relative;isolation:isolate;padding:24px 22px 28px;border:1px solid rgba(55,231,255,.15);border-radius:24px;background:radial-gradient(650px 240px at 4% 0%,rgba(55,231,255,.12),transparent 70%),radial-gradient(520px 240px at 100% 0%,rgba(136,120,255,.13),transparent 70%),linear-gradient(135deg,rgba(15,23,33,.98),rgba(8,12,19,.98));box-shadow:0 22px 65px rgba(0,0,0,.2);overflow:hidden}
+.hero:after{content:"";position:absolute;right:-42px;top:-100px;width:250px;height:250px;border:1px solid rgba(55,231,255,.12);border-radius:50%;box-shadow:0 0 0 24px rgba(55,231,255,.025),0 0 0 52px rgba(136,120,255,.025);z-index:-1;pointer-events:none}
+.hero h1{max-width:780px}.hero .eyebrow{display:inline-flex;align-items:center;gap:8px}.hero .eyebrow:before{content:"";width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 16px rgba(66,229,154,.7)}
+.ws-research-overview{box-shadow:0 16px 46px rgba(0,0,0,.18);transition:border-color .2s ease,transform .2s ease}.ws-metric-card{min-height:124px;position:relative;overflow:hidden}.ws-metric-card:after{content:"";position:absolute;right:-24px;bottom:-36px;width:92px;height:92px;border:1px solid rgba(55,231,255,.08);border-radius:28px;transform:rotate(28deg);pointer-events:none}
+.ws-action{transition:transform .18s ease,border-color .18s ease,background .18s ease}.ws-action:hover{transform:translateY(-2px)}
+.liveCard,.predictionCard,.panel{box-shadow:0 12px 32px rgba(0,0,0,.12)}
+.ws-media-slot[data-ws-media-kind="virtual"]{border-radius:12px;background:linear-gradient(145deg,#252047,#11121f);border-color:rgba(136,120,255,.48);color:#d8d0ff}
+.ws-media-slot[data-ws-media-kind="virtual"] .ws-media-image{display:none}
+@media(max-width:720px){.hero{padding:18px 15px;border-radius:18px}.hero h1{font-size:clamp(34px,11vw,48px)}.hero:after{right:-130px;opacity:.65}}
+@media(prefers-reduced-motion:reduce){.ws-research-overview,.ws-action{transition:none}}
