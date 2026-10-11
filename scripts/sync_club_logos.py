@@ -47,14 +47,14 @@ TEAM_FIELDS = (
     "participant_1", "participant_2",
 )
 ARTWORK_RE = re.compile(r"\b(logo|crest|badge|emblem|coat of arms)\b", re.I)
-NONLOGO_ARTIFACT_RE = re.compile(r"\b(rugby|pin badge|supporters? club|supporters|fan club|souvenir|main stand|side view|stadium|shirt|jersey|poster|sticker|key ?ring|medal|collection|toy|window|photograph|photo|mural|building|signboard|shopfront|on window)\b", re.I)
+NONLOGO_ARTIFACT_RE = re.compile(r"\b(rugby|pin badge|supporters? club|supporters|fan club|souvenir|main stand|side view|stadium|shirt|jersey|poster|sticker|key ?ring|medal|collection|toy|window|photograph|photo|mural|building|signboard|shopfront|on window|crossed[ -]?out|xmas|christmas|holiday|special edition|variant|mockup|concept|fan[- ]made|unofficial)\b", re.I)
 HISTORIC_ARTWORK_RE = re.compile(r"\b(old|original|historic|historical|vintage|antique|retro|altes|alte|alter)\b|\b(?:18\d{2}|19\d{2})\b", re.I)
 CLUB_CLUE_RE = re.compile(
     r"\b(football|soccer|club|olympique|racing|athletic|sporting|futbol|fútbol|fc|afc|sc|ac|cf)\b|"
     r"\b(?:f\.c\.|a\.f\.c\.|c\.f\.|s\.c\.|a\.c\.)\b",
     re.I,
 )
-SEARCH_POLICY_VERSION = 4
+SEARCH_POLICY_VERSION = 5
 ALIASES = {
     "real madrid": ("Real Madrid CF", "Real Madrid Club de Futbol"),
     "liverpool": ("Liverpool FC", "Liverpool F.C.", "Liverpool Football Club"),
@@ -81,7 +81,7 @@ ALIASES = {
     "barcelona": ("FC Barcelona", "Barcelona FC", "Barca"),
     "psg": ("Paris Saint-Germain", "Paris Saint-Germain FC"),
     "paris sg": ("Paris Saint-Germain", "PSG"),
-    "paris": ("Paris Saint-Germain", "Paris Saint-Germain FC", "PSG"),
+    "paris saint germain": ("Paris Saint-Germain", "Paris Saint-Germain FC", "PSG", "Paris SG"),
     "juve": ("Juventus", "Juventus FC"),
     "juventus": ("Juventus FC",),
     "inter": ("Inter Milan", "FC Internazionale Milano"),
