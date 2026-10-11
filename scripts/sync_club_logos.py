@@ -54,7 +54,7 @@ CLUB_CLUE_RE = re.compile(
     r"\b(?:f\.c\.|a\.f\.c\.|c\.f\.|s\.c\.|a\.c\.)\b",
     re.I,
 )
-SEARCH_POLICY_VERSION = 3
+SEARCH_POLICY_VERSION = 4
 ALIASES = {
     "real madrid": ("Real Madrid CF", "Real Madrid Club de Futbol"),
     "liverpool": ("Liverpool FC", "Liverpool F.C.", "Liverpool Football Club"),
@@ -144,13 +144,40 @@ def _candidate_title_matches(term, title):
         return False
     if NONLOGO_ARTIFACT_RE.search(base) or HISTORIC_ARTWORK_RE.search(base):
         return False
-    if not ARTWORK_RE.search(base) or not CLUB_CLUE_RE.search(base):
-        return False
+    if not CLUB_CLUE_RE.search(base):
+        # Prefix-style titles such as "Logo Liverpool FC (2024)" may not repeat
+        # an organization clue before the artwork word. Validate the parsed
+        # identity below rather than rejecting them here.
+        has_prefix_artwork = bool(re.match(
+            r"^(?:logo|crest|badge|emblem|coat of arms)(?:\s+of)?[\s:_-]+",
+            base,
+            flags=re.I,
+        ))
+        if not has_prefix_artwork:
+            return False
 
-    artwork_match = ARTWORK_RE.search(base)
-    # Strip everything after the first "logo/crest/badge/emblem" token before
-    # matching identity; descriptive tail text is not evidence of club identity.
-    identity_phrase = base[:artwork_match.start()].strip(" _-.,:;()[]{}")
+    # Commons filenames often place "Logo/Crest of" before the club name.
+    # Accept that shape only when the entire remaining identity matches the
+    # requested club (or a registered exact alias); do not accept substrings.
+    prefix_artwork = re.match(
+        r"^(?:logo|crest|badge|emblem|coat of arms)(?:\s+of)?[\s:_-]+",
+        base,
+        flags=re.I,
+    )
+    if prefix_artwork:
+        # Keep parentheses intact until the modern edition year is removed.
+        identity_phrase = base[prefix_artwork.end():].strip(" _-.,:;[]{}")
+        # Parenthesized modern edition years are identity metadata, not a
+        # signal that a crest is historical. Explicit 18xx/19xx years remain
+        # blocked by HISTORIC_ARTWORK_RE above.
+        identity_phrase = re.sub(r"\s*\((?:20\d{2})\)\s*$", "", identity_phrase).strip(" _-.,:;()[]{}")
+    else:
+        artwork_match = ARTWORK_RE.search(base)
+        if not artwork_match:
+            return False
+        # Strip everything after the first artwork descriptor before matching
+        # identity; descriptive tail text is not evidence of club identity.
+        identity_phrase = base[:artwork_match.start()].strip(" _-.,:;()[]{}")
     identity_key = normalize_team(identity_phrase)
     if not identity_key:
         return False
@@ -342,7 +369,7 @@ def _candidate_for(name: str):
             "generator": "search",
             "gsrsearch": f'"{term}" (logo OR crest OR badge OR emblem)',
             "gsrnamespace": 6,
-            "gsrlimit": 12,
+            "gsrlimit": 30,
             "prop": "imageinfo",
             "iiprop": "url|extmetadata|mime",
             "iiurlwidth": 256,
