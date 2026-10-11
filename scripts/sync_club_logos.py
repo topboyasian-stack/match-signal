@@ -52,20 +52,49 @@ CLUB_CLUE_RE = re.compile(
     r"\b(?:f\.c\.|a\.f\.c\.|c\.f\.|s\.c\.|a\.c\.)\b",
     re.I,
 )
+SEARCH_POLICY_VERSION = 2
 ALIASES = {
-    "man city": ("Manchester City",),
-    "man utd": ("Manchester United",),
-    "newcastle utd": ("Newcastle United",),
-    "wolves": ("Wolverhampton Wanderers",),
-    "spurs": ("Tottenham Hotspur",),
-    "psg": ("Paris Saint-Germain",),
-    "barca": ("Barcelona",),
-    "bayern": ("Bayern Munich",),
-    "juve": ("Juventus",),
-    "inter": ("Inter Milan",),
-    "atletico": ("Atletico Madrid",),
-    "ath madrid": ("Atletico Madrid",),
-    "sporting lisbon": ("Sporting CP",),
+    "real madrid": ("Real Madrid CF", "Real Madrid Club de Futbol"),
+    "liverpool": ("Liverpool FC", "Liverpool F.C.", "Liverpool Football Club"),
+    "arsenal": ("Arsenal FC", "Arsenal Football Club"),
+    "man city": ("Manchester City", "Manchester City FC", "Manchester City Football Club"),
+    "manchester city": ("Man City", "Manchester City FC", "Manchester City Football Club"),
+    "man utd": ("Manchester United", "Manchester United FC", "Manchester United Football Club"),
+    "manchester united": ("Man Utd", "Manchester United FC", "Manchester United Football Club"),
+    "newcastle": ("Newcastle United", "Newcastle United FC", "Newcastle United Football Club"),
+    "newcastle utd": ("Newcastle United", "Newcastle United FC"),
+    "nottm forest": ("Nottingham Forest", "Nottingham Forest FC"),
+    "b dortmund": ("Borussia Dortmund", "Borussia Dortmund FC"),
+    "atleti": ("Atletico Madrid", "Club Atletico de Madrid"),
+    "atletico": ("Atletico Madrid", "Club Atletico de Madrid"),
+    "atletico de madrid": ("Atletico Madrid", "Club Atletico de Madrid"),
+    "ath madrid": ("Atletico Madrid", "Athletic Club Madrid"),
+    "chelsea": ("Chelsea FC", "Chelsea Football Club"),
+    "tottenham": ("Tottenham Hotspur", "Tottenham Hotspur FC"),
+    "spurs": ("Tottenham Hotspur", "Tottenham Hotspur FC"),
+    "wolves": ("Wolverhampton Wanderers", "Wolverhampton Wanderers FC"),
+    "bayern": ("Bayern Munich", "FC Bayern Munich", "FC Bayern Munchen"),
+    "bayern munchen": ("Bayern Munich", "FC Bayern Munich"),
+    "barca": ("Barcelona", "FC Barcelona", "Barcelona FC"),
+    "barcelona": ("FC Barcelona", "Barcelona FC", "Barca"),
+    "psg": ("Paris Saint-Germain", "Paris Saint-Germain FC"),
+    "paris sg": ("Paris Saint-Germain", "PSG"),
+    "paris": ("Paris Saint-Germain", "Paris Saint-Germain FC", "PSG"),
+    "juve": ("Juventus", "Juventus FC"),
+    "juventus": ("Juventus FC",),
+    "inter": ("Inter Milan", "FC Internazionale Milano"),
+    "inter milan": ("Inter", "FC Internazionale Milano"),
+    "napoli": ("SSC Napoli", "Napoli FC"),
+    "roma": ("AS Roma", "Roma FC"),
+    "fiorentina": ("ACF Fiorentina", "Fiorentina FC"),
+    "benfica": ("SL Benfica", "Sport Lisboa e Benfica"),
+    "ajax": ("AFC Ajax", "Ajax Amsterdam"),
+    "psv": ("PSV Eindhoven", "PSV Eindhoven FC"),
+    "porto": ("FC Porto", "Futebol Clube do Porto"),
+    "sporting lisbon": ("Sporting CP", "Sporting Clube de Portugal"),
+    "sporting cp": ("Sporting Lisbon", "Sporting Clube de Portugal"),
+    "boca juniors": ("Club Atletico Boca Juniors",),
+    "river plate": ("Club Atletico River Plate",),
 }
 
 
@@ -119,7 +148,7 @@ def license_allowed(value) -> bool:
     lic = re.sub(r"\s+", " ", lic).strip()
     if lic in {"cc0", "cc0 1.0", "public domain", "public domain mark", "pd"}:
         return True
-    return bool(re.fullmatch(r"cc by(?:-sa)?(?:\s+\d+(?:\.\d+)?)?(?:\s+international)?", lic))
+    return bool(re.fullmatch(r"cc by(?:-sa)?(?:\s+\d+(?:\.\d+)?)?(?:\s+(?:international|unported|generic|united states))?", lic))
 
 
 def _registry():
@@ -128,6 +157,9 @@ def _registry():
         if isinstance(raw, dict):
             raw.setdefault("teams", {})
             raw.setdefault("misses", {})
+            if raw.get("search_policy_version") != SEARCH_POLICY_VERSION:
+                raw["misses"] = {}
+                raw["search_policy_version"] = SEARCH_POLICY_VERSION
             return raw
     except (OSError, json.JSONDecodeError):
         pass
@@ -402,7 +434,7 @@ def sync_registry(max_new=80):
                 asset_path = ASSET_DIR / (filename + ext)
                 # Avoid overwriting a different asset when an extension changes.
                 asset_path.write_bytes(content)
-                teams[key] = {
+                entry = {
                     "name": item["name"],
                     "path": "/assets/club-logos/" + asset_path.name,
                     "provider": "Wikimedia Commons",
@@ -414,8 +446,25 @@ def sync_registry(max_new=80):
                     "mime": mime,
                     "bytes": len(content),
                     "aliases": [item["name"]],
+                    "canonical_key": key,
                     "downloaded_at": now_iso(),
                 }
+                teams[key] = entry
+                # Register provider/display-name variants against the same
+                # verified asset, so "Man City" and "Manchester City FC" reuse it.
+                for alias in ALIASES.get(key, ()):
+                    alias_key = normalize_team(alias)
+                    if not alias_key:
+                        continue
+                    existing_alias = teams.get(alias_key)
+                    if existing_alias and existing_alias.get("path") and existing_alias.get("path") != entry["path"]:
+                        continue
+                    if alias_key != key:
+                        teams[alias_key] = {
+                            **entry,
+                            "name": alias,
+                            "aliases": list(dict.fromkeys([item["name"], alias])),
+                        }
                 misses.pop(key, None)
                 changes += 1
                 print(f"Saved licensed club logo: {item['name']} ({candidate['licence']})")
@@ -429,11 +478,13 @@ def sync_registry(max_new=80):
                 print(f"Logo fallback retained for {item['name']}: {misses[key]['reason']}")
 
     registry["schema_version"] = 1
+    registry["search_policy_version"] = SEARCH_POLICY_VERSION
     registry["generated_at"] = now_iso()
     registry["source_policy"] = "Local raster assets are copied only from verified CC0, Public Domain, CC BY, or CC BY-SA Wikimedia Commons previews; source, license, and attribution metadata are retained."
     registry["scan_summary"] = {
         "discovered_teams": len(discoveries),
-        "permanent_logos": len(teams),
+        "permanent_logos": len({str(v.get("path")) for v in teams.values() if isinstance(v, dict) and v.get("path")}),
+        "registered_names": len(teams),
         "unresolved_names": len(misses),
         "new_assets_this_run": changes,
         "last_scan_at": now_iso(),
