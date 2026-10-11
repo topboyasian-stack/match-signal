@@ -197,12 +197,24 @@ def summary(archive,at):
       "promotion_policy":{"preliminary_review_after":100,"preferred_review":"200-300+ settled samples per product/market plus independent chronological holdout",
        "requirements":["positive post-margin returns","calibration against no-vig market baseline","chronological holdout","stable exact-market settlement","no participant identity leakage"],"automatic_promotion":False}}
 def fetch_results(pending,now):
-    scopes=defaultdict(list)
+    scopes=defaultdict(list); missing=[]
     for s in pending:
         cat,tour=str(s.get("category_id") or ""),str(s.get("tournament_id") or "")
         if cat and tour:scopes[(cat,tour)].append(s)
-    if not scopes:return [],(["pending samples lack provider category/tournament IDs"] if pending else [])
+        else:missing.append(s)
     events=[];errors=[]
+    # Legacy feed snapshots may predate scope-ID preservation. Make one bounded
+    # source discovery request for those rows; the endpoint scans active scopes
+    # and results are still settled only by exact SportyBet event ID.
+    if missing:
+        dates=[dt(s.get("start_time")) for s in missing];dates=[d for d in dates if d]
+        params={"source":"efootball","pageSize":100,"pageNum":1,
+          "startTime":int((min(dates)-timedelta(days=1)).timestamp()*1000) if dates else "",
+          "endTime":int((now+timedelta(minutes=2)).timestamp()*1000)}
+        try:
+            r=requests.get(BASE+"/api/sportybet-virtual-results",params=params,timeout=45);r.raise_for_status()
+            events.extend(settlement_events(r.json()))
+        except Exception as exc:errors.append(f"broad eFootball scope discovery: {exc}")
     ordered=sorted(scopes.items(),key=lambda x:min(dt(s.get("start_time")) or now for s in x[1]))
     for (cat,tour),samples in ordered[:12]:
         dates=[dt(s.get("start_time")) for s in samples];dates=[d for d in dates if d]
@@ -213,6 +225,7 @@ def fetch_results(pending,now):
             r=requests.get(BASE+"/api/sportybet-virtual-results",params=params,timeout=35);r.raise_for_status()
             events.extend(settlement_events(r.json()))
         except Exception as exc:errors.append(f"{cat}/{tour}: {exc}")
+    if missing and not events and not errors:errors.append("broad eFootball result scope discovery returned no event rows")
     return events,errors
 def read_archive(path):
     try:
