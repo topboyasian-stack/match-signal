@@ -28,23 +28,29 @@ function badge(text,cls){
 function annotate(){
   if(!watch)return;
   document.querySelectorAll('.liveCard').forEach(card=>{
-    const teams=card.querySelector('.liveTeams');if(!teams)return;
+    if(!card.isConnected)return;
+    const teams=card.querySelector('.liveTeams');if(!teams||!teams.isConnected)return;
     const product=String(card.dataset.product||'');
     if(product!==PRODUCT)return;
     teams.querySelectorAll('strong').forEach(node=>{
-      if(!match(node.textContent).length)return;
-      if(!node.parentElement.querySelector('.confirmedWatchTag'))node.insertBefore(badge('🔥 MANUAL WATCH'),node);
+      if(!node.isConnected||!teams.contains(node)||!match(node.textContent).length)return;
+      const parent=node.parentElement;
+      if(!parent||!parent.isConnected||!card.contains(parent)||parent.querySelector('.confirmedWatchTag'))return;
+      // The tag belongs in the participant's parent, immediately before the
+      // <strong>. Calling node.insertBefore(tag,node) used the strong element
+      // as its own parent and raised NotFoundError during live DOM updates.
+      parent.insertBefore(badge('🔥 MANUAL WATCH'),node);
     });
   });
   document.querySelectorAll('.predictionDesk .predictionCard').forEach(card=>{
-    if(String(card.dataset.product||'')!==PRODUCT)return;
+    if(!card.isConnected||String(card.dataset.product||'')!==PRODUCT)return;
     const text=card.textContent||'';
     const hits=(watch.participants||[]).some(x=>text.split(/\\s+vs\\s+/i).map(identity).map(norm).includes(norm(identity(x.participant))));
     if(hits&&!card.querySelector('.confirmedWatchTag'))card.prepend(badge('🔥 MONITORED','deskWatch'));
   });
 }
 function renderPanel(){
-  const host=document.getElementById('participantLab');if(!host)return;
+  const host=document.getElementById('participantLab');if(!host||!host.parentNode)return;
   const existing=document.getElementById('confirmedWatchPanel');if(existing)existing.remove();
   const panel=document.createElement('div');panel.id='confirmedWatchPanel';panel.className='confirmedWatchPanel';
   const title=document.createElement('div');title.innerHTML='<strong>🔥 Manual eFootball annotations</strong><span>Optional GT Sports League annotations</span>';panel.appendChild(title);
