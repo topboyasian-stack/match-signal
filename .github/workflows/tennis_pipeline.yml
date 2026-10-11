@@ -33,7 +33,8 @@ on:
       - 'qa/**'
       - '.github/workflows/tennis_pipeline.yml'
   schedule:
-    - cron: '7 */4 * * *'
+    # Same four-hour cadence; minute offset changed to reactivate the missed core refresh schedule.
+    - cron: '11 */4 * * *'
   workflow_dispatch:
 
 permissions:
