@@ -17,7 +17,7 @@ const inferredActive=pagePath.includes('/virtual-lab')?'lab':
   pagePath.endsWith('/live.html')?'live':
   pagePath.endsWith('/odds-builder.html')?'builder':
   pagePath.endsWith('/league.html')?(new URLSearchParams(location.search).get('sport')==='tennis'?'tennis':'football'):'desk';
-const sharedCssUrl=route('/workspace-ui.css?v=20261011-workspace-media2');
+const sharedCssUrl=route('/workspace-ui.css?v=20261011-workspace-media3');
 const existingCss=document.querySelector('link[href*="workspace-ui.css"]');
 if(existingCss)existingCss.href=sharedCssUrl;else{const l=document.createElement('link');l.rel='stylesheet';l.href=sharedCssUrl;document.head.appendChild(l);}
 if(!document.getElementById('workspace-ui-polish')){
@@ -46,6 +46,16 @@ function getCache(k){
 function saveCache(k,media,ttl){
   cache.set(k,media||null);
   try{localStorage.setItem(prefix+k,JSON.stringify({media:media||null,at:Date.now(),ttl:ttl||86400000}));}catch(_){}
+}
+function updateMediaCoverage(){
+  const slots=Array.from(document.querySelectorAll('[data-ws-media-kind="team"][data-ws-media-name],[data-ws-media-kind="player"][data-ws-media-name]')).filter(node=>node.isConnected);
+  const hits=slots.filter(node=>node.dataset.wsMediaStatus==='hit'||!!(node.querySelector('.ws-media-image')?.complete&&node.querySelector('.ws-media-image')?.naturalWidth>0)).length;
+  const pending=slots.filter(node=>!['hit','miss'].includes(node.dataset.wsMediaStatus||'')).length;
+  const resolved=Math.max(0,slots.length-pending),missing=Math.max(0,resolved-hits),rate=resolved?Math.round(hits/resolved*100):null;
+  const report={page:location.pathname,measured_at:new Date().toISOString(),slots:slots.length,loaded_hits:hits,resolved,pending,initials_fallbacks:missing,hit_rate_pct:rate};
+  window.__MATCH_SIGNAL_MEDIA_COVERAGE__=report;
+  const output=document.querySelector('.ws-media-coverage');
+  if(output)output.textContent=slots.length===0?'Image coverage · no team/player image slots on this view':('Actual image hits · '+hits+'/'+resolved+' resolved ('+(rate==null?'—':rate+'%')+') · '+pending+' pending · '+missing+' initials');
 }
 function plain(v){return String(v||'').replace(/<[^>]*>/g,' ').replace(/&nbsp;/gi,' ').replace(/\s+/g,' ').trim();}
 function licenceAllowed(v){
@@ -99,35 +109,56 @@ function fallbackName(node){return initials(node.dataset.wsMediaName||'');}
 function paint(item,media){
   item.nodes.forEach(node=>{
     if(!node.isConnected)return;
-    node.classList.remove('has-media');
+    node.classList.remove('has-media','media-pending');
     node.removeAttribute('href');node.removeAttribute('target');node.removeAttribute('rel');
+    const fallback=fallbackName(node);
     if(media&&media.url&&media.sourceUrl){
-      node.replaceChildren();
+      node.replaceChildren(document.createTextNode(fallback));
+      node.dataset.wsMediaStatus='pending';
+      node.classList.add('media-pending');
+      node.title='Loading verified artwork…';
       const img=document.createElement('img');
-      img.className='ws-media-image';img.alt='';img.loading='lazy';img.decoding='async';img.referrerPolicy='no-referrer';img.src=media.url;
-      img.addEventListener('error',()=>{
-        node.classList.remove('has-media');node.removeAttribute('href');node.removeAttribute('target');node.removeAttribute('rel');
-        node.replaceChildren(document.createTextNode(fallbackName(node)));
-        node.title='No verified artwork available';node.setAttribute('aria-label',String(node.dataset.wsMediaName||'Entity')+' image unavailable');
+      img.className='ws-media-image';img.alt='';img.loading='lazy';img.decoding='async';img.referrerPolicy='no-referrer';
+      const fail=()=>{
+        if(!node.isConnected)return;
+        node.dataset.wsMediaStatus='miss';
+        node.classList.remove('has-media','media-pending');
+        node.removeAttribute('href');node.removeAttribute('target');node.removeAttribute('rel');
+        node.replaceChildren(document.createTextNode(fallback));
+        node.title='No verified artwork available';
+        node.setAttribute('aria-label',String(node.dataset.wsMediaName||'Entity')+' image unavailable');
+        updateMediaCoverage();
+      };
+      img.addEventListener('load',()=>{
+        if(!node.isConnected)return;
+        if(!(img.naturalWidth>0)){fail();return;}
+        node.dataset.wsMediaStatus='hit';
+        node.classList.remove('media-pending');
+        node.classList.add('has-media');
+        node.href=media.sourceUrl;node.target='_blank';node.rel='noopener noreferrer';
+        node.title=[media.provider,media.licence,media.artist].filter(Boolean).join(' · ');
+        node.setAttribute('aria-label','Open licensed image source and licence for '+String(node.dataset.wsMediaName||'entity')+' in a new tab');
+        updateMediaCoverage();
       },{once:true});
-      node.href=media.sourceUrl;node.target='_blank';node.rel='noopener noreferrer';
-      node.title=[media.provider,media.licence,media.artist].filter(Boolean).join(' · ');
-      node.setAttribute('aria-label','Open licensed image source and licence for '+String(node.dataset.wsMediaName||'entity')+' in a new tab');
-      node.appendChild(img);node.classList.add('has-media');
+      img.addEventListener('error',fail,{once:true});
+      node.appendChild(img);
+      img.src=media.url;
     }else{
-      node.replaceChildren(document.createTextNode(fallbackName(node)));
+      node.replaceChildren(document.createTextNode(fallback));
+      node.dataset.wsMediaStatus='miss';
       node.title='No exact name match with a verified reusable image licence';
       node.setAttribute('aria-label',String(node.dataset.wsMediaName||'Entity')+' image unavailable; initials shown');
     }
     node.dataset.wsMediaResolved='true';
   });
+  updateMediaCoverage();
 }
 function enqueue(node){
   if(!node||node.dataset.wsMediaResolved==='true')return;
   const kind=node.dataset.wsMediaKind;
   if(!['team','player'].includes(kind))return;
   const name=clean(node.dataset.wsMediaName||'',kind),n=norm(name,kind);
-  if(n.length<3){node.dataset.wsMediaResolved='true';return;}
+  if(n.length<3){node.dataset.wsMediaResolved='true';node.dataset.wsMediaStatus='miss';updateMediaCoverage();return;}
   const k=kind+':'+n,cached=getCache(k);
   if(cached!==undefined){paint({nodes:[node]},cached);return;}
   if(entries.has(k)){entries.get(k).nodes.push(node);return;}
@@ -140,8 +171,8 @@ async function drain(){
   saveCache(item.key,media,media?30*86400000:2*3600000);
   paint(item,media);busy=false;window.setTimeout(drain,2250);
 }
-let io=null;function watch(node){if(node.dataset.wsMediaResolved==='true'||node.dataset.wsMediaObserved==='true')return;node.dataset.wsMediaObserved='true';if(io)io.observe(node);else enqueue(node);}
-function scan(root){if(root?.matches?.('[data-ws-media-kind][data-ws-media-name]'))watch(root);root?.querySelectorAll?.('[data-ws-media-kind][data-ws-media-name]').forEach(watch);}
+let io=null;function watch(node){if(node.dataset.wsMediaResolved==='true'||node.dataset.wsMediaObserved==='true')return;node.dataset.wsMediaObserved='true';if(['team','player'].includes(node.dataset.wsMediaKind)&&!node.dataset.wsMediaStatus)node.dataset.wsMediaStatus='pending';if(io)io.observe(node);else enqueue(node);updateMediaCoverage();}
+function scan(root){if(root?.matches?.('[data-ws-media-kind][data-ws-media-name]'))watch(root);root?.querySelectorAll?.('[data-ws-media-kind][data-ws-media-name]').forEach(watch);updateMediaCoverage();}
 if('IntersectionObserver'in window)io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){io.unobserve(e.target);enqueue(e.target);}}),{rootMargin:'360px 0px'});
 function mediaLabel(name,kind){
   const raw=String(name||'').trim()||'Unknown';
@@ -198,10 +229,11 @@ function ensureMediaAttribution(){
   if(document.querySelector('.ws-media-credit'))return;
   const note=document.createElement('p');
   note.className='ws-media-credit';
-  note.innerHTML='Club crests and tennis-player photos appear only when there is an exact entity-name match and an allowed reuse licence. Click an image to open its source and licence. Missing or ambiguous artwork falls back to initials; eFootball gamer handles are never presented as real-person headshots. Source: <a href="https://commons.wikimedia.org/" target="_blank" rel="noopener noreferrer">Wikimedia Commons</a>.';
+  note.innerHTML='Club crests and tennis-player photos appear only when there is an exact entity-name match and an allowed reuse licence. Click an image to open its source and licence. Missing or ambiguous artwork falls back to initials; eFootball gamer handles are never presented as real-person headshots. <span class="ws-media-coverage" role="status" aria-live="polite">Measuring actual image loads…</span> Source: <a href="https://commons.wikimedia.org/" target="_blank" rel="noopener noreferrer">Wikimedia Commons</a>.';
   const target=document.querySelector('footer')||document.querySelector('.ms-wrap')||document.querySelector('main')||host;
   if(target)target.appendChild(note);
 }
 ensureMediaAttribution();
+updateMediaCoverage();
 reportSummary();
 })();
