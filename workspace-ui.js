@@ -32,7 +32,7 @@ host.innerHTML='<nav class="ws-nav" aria-label="Match Signal workspaces"><a clas
 function clean(name,kind){let s=String(name||'').trim();if(kind==='team')s=s.replace(/\s*\([^()]+\)\s*$/,'').trim();return s;}
 function norm(name,kind){let raw=clean(name,kind);if(kind==='player'&&raw.includes(',')){const parts=raw.split(',').map(x=>x.trim()).filter(Boolean);if(parts.length>1)raw=parts.slice(1).join(' ')+' '+parts[0];}let s=raw.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/&/g,' and ').replace(/[^a-z0-9]+/g,' ').trim().replace(/\s+/g,' ');if(kind==='team')s=s.replace(/^(fc|afc|sc|ac|club)\s+/,'').replace(/\s+(football club|fc|cf|afc|sc|ac)$/,'').trim();return s;}
 function initials(name){const w=clean(name,'team').split(/\s+/).filter(Boolean);return (w.length>1?w[0][0]+w[1][0]:(w[0]||'MS').slice(0,2)).toUpperCase();}
-const cache=new Map(),entries=new Map(),queue=[];let busy=false;const prefix='match-signal-media-v2:';
+const cache=new Map(),entries=new Map(),queue=[];let busy=false;const prefix='match-signal-media-v3:';
 function getCache(k){
   if(cache.has(k))return cache.get(k);
   try{
@@ -81,7 +81,7 @@ async function lookup(kind,name){
     : '"'+queryName+'" (tennis OR portrait OR headshot OR player)';
   const params=new URLSearchParams({
     action:'query',generator:'search',gsrsearch:search,gsrnamespace:'6',gsrlimit:'12',
-    prop:'imageinfo',iiprop:'url|extmetadata',iiurlwidth:'128',format:'json',origin:'*'
+    prop:'imageinfo',iiprop:'url|extmetadata|mime',iiurlwidth:'128',format:'json',origin:'*'
   });
   const controller=new AbortController(),timer=window.setTimeout(()=>controller.abort(),7000);
   try{
@@ -92,14 +92,14 @@ async function lookup(kind,name){
     const data=await response.json(),pages=Object.values(data?.query?.pages||{}),candidates=[];
     for(const page of pages){
       const title=String(page?.title||''),titleBase=title.replace(/^File:/i,'').replace(/\.[^.]+$/,'');
-      const titleKey=norm(titleBase,kind),info=Array.isArray(page?.imageinfo)?page.imageinfo[0]:null,meta=info?.extmetadata||{};
+      const titleKey=norm(titleBase,kind),info=Array.isArray(page?.imageinfo)?page.imageinfo[0]:null,meta=info?.extmetadata||{},isImage=String(info?.mime||'').startsWith('image/');
       const licence=plain(meta.LicenseShortName?.value||meta.UsageTerms?.value||''),url=String(info?.thumburl||info?.url||'');
-      if(!info||!/^https:\/\/upload\.wikimedia\.org\//i.test(url)||!licenceAllowed(licence))continue;
+      if(!info||!/^https:\/\/(?:upload|thumb)\.wikimedia\.org\//i.test(url)||!licenceAllowed(licence))continue;
       if(!(' '+titleKey+' ').includes(' '+key+' '))continue;
       if(kind==='team'&&!/\b(logo|crest|badge|emblem|coat of arms)\b/i.test(titleKey))continue;
-      if(kind==='player'&&!/\b(tennis|portrait|headshot|player|athlete|photo)\b/i.test(titleKey))continue;
+      if(kind==='player'&&!isImage)continue;
       const licenseUrl=plain(meta.LicenseUrl?.value||''),artist=plain(meta.Artist?.value||meta.Credit?.value||'').slice(0,180);
-      const score=(titleKey===key?100:0)+(kind==='team'?(/\b(crest|badge|emblem)\b/i.test(titleKey)?8:0):(/\b(portrait|headshot)\b/i.test(titleKey)?8:0));
+      const score=(titleKey===key?100:0)+(kind==='team'?(/\b(crest|badge|emblem)\b/i.test(titleKey)?8:0):(/\b(portrait|headshot|profile)\b/i.test(titleKey)?20:(/\b(photo|forehand|backhand|tennis|olympics|wimbledon|open)\b/i.test(titleKey)?8:0)));
       candidates.push({url,provider:'Wikimedia Commons',sourceUrl:commonsTitleUrl(title),licence,licenseUrl,artist,title,score});
     }
     candidates.sort((a,b)=>b.score-a.score);
