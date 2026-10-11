@@ -43,7 +43,7 @@ function teamLogoTitleMatches(name,title){
   if(!clubClue.test(base)&&!prefixArtwork)return false;
   let identityPhrase='';
   if(prefixArtwork){
-    identityPhrase=base.slice(prefixArtwork[0].length).trim().replace(/\s*\((?:19|20)\d{2}(?:\s*-\s*(?:19|20)\d{2})?)\s*\)\s*$/,'');
+    identityPhrase=base.slice(prefixArtwork[0].length).trim().replace(/\s*\((?:19|20)\d{2}(?:\s*-\s*(?:19|20)\d{2})?\)\s*$/,'');
   }else{
     const artwork=/\b(logo|crest|badge|emblem|coat of arms)\b/i.exec(base);
     if(!artwork)return false;
