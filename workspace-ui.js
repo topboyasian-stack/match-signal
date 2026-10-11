@@ -32,7 +32,7 @@ host.innerHTML='<nav class="ws-nav" aria-label="Match Signal workspaces"><a clas
 function clean(name,kind){let s=String(name||'').trim();if(kind==='team')s=s.replace(/\s*\([^()]+\)\s*$/,'').trim();return s;}
 function norm(name,kind,preserveTitle=false){let raw=preserveTitle?String(name||'').trim():clean(name,kind);if(!preserveTitle&&kind==='player'&&raw.includes(',')){const parts=raw.split(',').map(x=>x.trim()).filter(Boolean);if(parts.length>1)raw=parts.slice(1).join(' ')+' '+parts[0];}let s=raw.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/&/g,' and ').replace(/[^a-z0-9]+/g,' ').trim().replace(/\s+/g,' ');if(kind==='team')s=s.replace(/^(fc|afc|sc|ac|club)\s+/,'').replace(/\s+(football club|fc|cf|afc|sc|ac)$/,'').trim();return s;}
 function initials(name){const w=clean(name,'team').split(/\s+/).filter(Boolean);return (w.length>1?w[0][0]+w[1][0]:(w[0]||'MS').slice(0,2)).toUpperCase();}
-const cache=new Map(),entries=new Map(),queue=[];let busy=false;const prefix='match-signal-media-v4:';
+const cache=new Map(),entries=new Map(),queue=[];let busy=false;const prefix='match-signal-media-v5:';
 let teamRegistry={};
 const registryReady=(async()=>{
   try{
@@ -80,6 +80,9 @@ function commonsTitleUrl(title){
 async function lookup(kind,name){
   const cleaned=clean(name,kind),key=norm(cleaned,kind);
   if(key.length<3)return null;
+  // Browser-side Commons matching has weaker team identity checks than the
+  // audited registry, so never use it for club crests.
+  if(kind==='team')return null;
   let queryName=cleaned;
   if(kind==='player'&&cleaned.includes(',')){
     const p=cleaned.split(',').map(x=>x.trim()).filter(Boolean);
@@ -186,6 +189,12 @@ async function enqueue(node){
       });
       return;
     }
+  }
+  if(kind==='team'){
+    // Unregistered or ambiguous clubs deliberately keep initials until the
+    // persistent sync publishes a licence-verified, identity-audited local asset.
+    paint({nodes:[node]},null);
+    return;
   }
   const k=kind+':'+n,cached=getCache(k);
   if(cached!==undefined){paint({nodes:[node]},cached);return;}
