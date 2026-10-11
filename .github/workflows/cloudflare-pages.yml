@@ -613,6 +613,10 @@ jobs:
           console.log('Production HTTP smoke tests passed: '+pages.length+' pages, '+assets.length+' assets, NBA ESPN proxy');
           NODE
 
+      - name: Verify live eFootball quote coverage for Qualified Best
+        timeout-minutes: 3
+        run: node scripts/test_live_virtual_quote_coverage.mjs
+
       - name: Record Cloudflare production verification
         env:
           GH_TOKEN: ${{ github.token }}
