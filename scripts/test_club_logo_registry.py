@@ -57,6 +57,8 @@ class ClubLogoRegistryTests(unittest.TestCase):
         self.assertFalse(_candidate_title_matches("Wolves", "New York Wolves Supporters Club Pin Badge.jpg"))
         self.assertFalse(_candidate_title_matches("Liverpool FC", "Liverpool FC crest, Main Stand - side view.jpg"))
         self.assertFalse(_candidate_title_matches("Arsenal", "Arsenal FC old crest small.png"))
+        self.assertFalse(_candidate_title_matches("Athletic Club", "Athletic Club crest 1901.png"))
+        self.assertTrue(_candidate_title_matches("Athletic Club", "Athletic Club crest 2024.png"))
         self.assertFalse(_candidate_title_matches("Barcelona", "FC Barcelona original crest (1899-1910).png"))
 
     def test_identity_phrase_before_artwork_must_match_the_complete_team(self):
