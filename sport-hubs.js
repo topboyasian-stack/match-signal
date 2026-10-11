@@ -833,6 +833,7 @@ async function renderUnifiedBoard(){
       return x;
     };
     all=all.map(annotate);
+    const refreshVirtualQuoteData=async()=>{
     try{
       const requiredQuoteRows=[...all,...virtualCandidates].filter(row=>
         String(row?.sport||"").toLowerCase()==="virtual"&&isOverUnderPrediction(row)&&virtualStartTimestamp(row)>=Date.now()
@@ -871,6 +872,7 @@ async function renderUnifiedBoard(){
         }
       }
     }catch(_){}
+    };
     const sport=Q('#upSport'), date=Q('#upDate'), search=Q('#upSearch');
     const setOptions=(el,vals)=>{if(!el||el.dataset.ready)return;el.innerHTML=vals.map(v=>'<option value="'+E(v.value)+'">'+E(v.label)+'</option>').join('');el.dataset.ready="1";};
     setOptions(sport,[{value:"all",label:"All active sports"},{value:"football",label:"⚽ Football"},{value:"tennis",label:"🎾 Tennis"},{value:"virtual",label:"🧪 Virtual / eFootball"}]);
@@ -958,7 +960,11 @@ async function renderUnifiedBoard(){
       search.addEventListener('input',draw);
       root.dataset.bound='1';
     }
+    // Paint the canonical fixture board before slower exact live-quote reconciliation.
+    // Quote enrichment still runs with all original safeguards, then redraws the
+    // same view so only fresh exact event/line/side matches can qualify.
     draw();
+    refreshVirtualQuoteData().then(()=>draw()).catch(()=>{});
   }catch(e){
     root.innerHTML='<div class="ms-empty">Unified upcoming feed unavailable: '+E(e.message)+'</div>';
   }
@@ -968,7 +974,7 @@ async function renderHub(){const sport=document.body.dataset.sport;const [base,p
    This keeps team crests and verified player headshots working on legacy desk pages. */
 if(!window.__MATCH_SIGNAL_WORKSPACE_UI__){
   const workspaceScript=document.createElement('script');
-  workspaceScript.src='./workspace-ui.js?v=20261011-workspace-media4';
+  workspaceScript.src='./workspace-ui.js?v=20261011-workspace-media5';
   document.body.appendChild(workspaceScript);
 }
 })();
