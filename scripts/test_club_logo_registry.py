@@ -59,6 +59,14 @@ class ClubLogoRegistryTests(unittest.TestCase):
         self.assertFalse(_candidate_title_matches("Arsenal", "Arsenal FC old crest small.png"))
         self.assertFalse(_candidate_title_matches("Barcelona", "FC Barcelona original crest (1899-1910).png"))
 
+    def test_identity_phrase_before_artwork_must_match_the_complete_team(self):
+        self.assertTrue(_candidate_title_matches("Athletic Club Bilbao", "Athletic Club Bilbao crest.png"))
+        self.assertFalse(_candidate_title_matches("Athletic Club Bilbao", "Athletic Club Miami NEW Logo 3 copy.png"))
+        self.assertFalse(_candidate_title_matches("Barcelona", "FC Barcelona Logo on Window.jpg"))
+        self.assertTrue(_candidate_title_matches("Barcelona", "FC Barcelona crest.png"))
+        self.assertTrue(_candidate_title_matches("Boca Juniors", "Club Atlético Boca Juniors logo (70 stars).png"))
+        self.assertTrue(_candidate_title_matches("Belgium", "Belgium football lion crest.png"))
+
     def test_old_or_wrong_registry_entry_is_not_reused_forever(self):
         bad = {
             "name": "Athletic Club",
