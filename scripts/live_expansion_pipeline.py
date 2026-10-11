@@ -255,7 +255,7 @@ def main():
     status = {
         "updated_at": NOW.isoformat(), "release_mode": "LIVE_EXPERIMENTAL", "live_trading_approved": False,
         "competitions": {
-            "NBA": {"historical_events": len(nba_history), "current_fixtures": len(nba_fixtures), "collection_errors": len(nba_errors), "status": "LIVE_EXPERIMENTAL" if nba_predictions else ("PRESEASON_READY" if NOW < NBA_START else "NO_CURRENT_FIXTURES"), "history_source": "ESPN seven-day scoreboard windows; parquet/Elo fallback if needed"},
+            "NBA": {"historical_events": len(nba_history), "current_fixtures": len(nba_fixtures), "collection_errors": len(nba_errors), "status": "LIVE_EXPERIMENTAL" if nba_predictions else ("PRESEASON_READY" if NOW < NBA_START else "NO_CURRENT_FIXTURES"), "history_source": "llimllib/nba_data gamelogs.parquet; ESPN daily scoreboard and NBA Elo CSV fallbacks"},
             "Eredivisie": {"historical_events": len(ere_history), "current_fixtures": len(ere_fixtures), "published_predictions": len(ere_predictions), "collection_errors": len(ere_errors), "status": "LIVE_EXPERIMENTAL" if ere_predictions else "NO_CURRENT_FIXTURES", "fixture_source": "ESPN primary; Football-Data fixtures.csv; SofaScore daily schedule fallback"},
         },
         "source_diagnostics": {"NBA": nba_errors[:5], "Eredivisie": ere_errors[:5]},
