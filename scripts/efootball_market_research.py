@@ -68,10 +68,11 @@ def make_sample(e,m,kind,now):
         if not isinstance(o,dict) or o.get("active") is False: continue
         try: price=float(o.get("odds"))
         except (TypeError,ValueError): continue
+        if not math.isfinite(price) or price<=1: continue
         label=str(o.get("name") or o.get("desc") or o.get("title") or "")
         key=canon(kind,label,p1,p2)
         raw.append({"id":str(o.get("id") or ""),"name":label,"odds":price,"canonical":key})
-        if key and math.isfinite(price) and price>1: odds[key]=price
+        if key: odds[key]=price
     required={"yes","no"} if kind=="btts" else {"home","away"}
     if not required.issubset(odds): return None
     probs=no_vig(odds)
