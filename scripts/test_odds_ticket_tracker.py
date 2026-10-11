@@ -8,6 +8,9 @@ from __future__ import annotations
 
 import sys
 import unittest
+import json
+import urllib.parse
+from unittest.mock import patch
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -15,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.odds_ticket_tracker import ticket_is_stale_pending
+from scripts.odds_ticket_tracker import backfill_virtual_results, ticket_is_stale_pending
 
 
 class StalePaperTicketArchiveTests(unittest.TestCase):
@@ -63,3 +66,83 @@ class StalePaperTicketArchiveTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+class VirtualResultBackfillTests(unittest.TestCase):
+    def ticket(self, product, event_id):
+        start = datetime.now(timezone.utc).replace(microsecond=0)
+        start = start.replace(year=start.year, month=start.month, day=start.day)
+        from datetime import timedelta
+        start -= timedelta(hours=2)
+        return {
+            "status": "PENDING",
+            "legs": [{
+                "status": "PENDING",
+                "product": product,
+                "event_id": event_id,
+                "match": "Liverpool (PlayerA) vs Tottenham (PlayerB)",
+                "market": "virtual_total",
+                "builder_pick": "under",
+                "pick": "Liverpool vs Tottenham — O/U under 5.5",
+                "line": 5.5,
+                "start_time": start.isoformat(),
+            }],
+        }
+
+    def fake_result_response(self, request, timeout=60):
+        class Response:
+            def __enter__(self):
+                return self
+            def __exit__(self, *args):
+                return False
+            def read(self):
+                return json.dumps({
+                    "ok": True,
+                    "events": [{"eventId": self_event_id, "score": "5:2"}],
+                    "errors": [],
+                }).encode("utf-8")
+        self.assertIn("source=" + self_source, request.full_url)
+        return Response()
+
+    def run_backfill_for_product(self, product, source):
+        event_id = "sr:match:test-" + product
+        tickets = [self.ticket(product, event_id)]
+        def opener(request, timeout=60):
+            class Response:
+                def __enter__(self):
+                    return self
+                def __exit__(self, *args):
+                    return False
+                def read(self):
+                    return json.dumps({
+                        "ok": True,
+                        "events": [{"eventId": event_id, "score": "5:2"}],
+                        "errors": [],
+                    }).encode("utf-8")
+            self.assertEqual(urllib.parse.parse_qs(urllib.parse.urlparse(request.full_url).query)["source"], [source])
+            return Response()
+        with patch("scripts.odds_ticket_tracker.urllib.request.urlopen", side_effect=opener):
+            rows = backfill_virtual_results(tickets, datetime.now(timezone.utc).isoformat())
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["product"], product)
+        self.assertEqual(rows[0]["event_id"], event_id)
+        self.assertEqual(rows[0]["result"], "O5.5")
+        self.assertFalse(rows[0]["win"])
+        self.assertEqual(rows[0]["backfill_match_mode"], "event_id")
+
+    def test_efootball_pending_leg_uses_efootball_result_source(self):
+        self.run_backfill_for_product("efootball_gt", "efootball")
+
+    def test_efootball_adriatic_pending_leg_uses_efootball_result_source(self):
+        self.run_backfill_for_product("efootball_adriatic", "efootball")
+
+    def test_vfootball_pending_leg_keeps_vfootball_result_source(self):
+        self.run_backfill_for_product("vfootball", "vfootball")
+
+    def test_recent_pending_leg_is_not_sent_to_result_api(self):
+        ticket = self.ticket("efootball_gt", "sr:match:too-recent")
+        from datetime import timedelta
+        ticket["legs"][0]["start_time"] = (datetime.now(timezone.utc) - timedelta(minutes=2)).isoformat()
+        with patch("scripts.odds_ticket_tracker.urllib.request.urlopen") as mocked:
+            self.assertEqual(backfill_virtual_results([ticket], datetime.now(timezone.utc).isoformat()), [])
+        mocked.assert_not_called()
