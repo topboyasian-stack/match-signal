@@ -97,6 +97,37 @@ def test_settlement_due_uses_elapsed_time_not_exact_minute():
  with patch.dict(mod.os.environ,{"EFOOTBALL_RESEARCH_FORCE_SETTLE":"1"}):
   assert mod.settlement_due(archive,now) is True
 
+def test_scoped_result_lookup_retries_without_time_filters():
+ now=datetime(2026,10,11,10,17,tzinfo=timezone.utc)
+ event={"eventId":"scoped-event","homeScore":"2","awayScore":"1"}
+ class FakeResponse:
+  def __init__(self,payload):self.payload=payload
+  def raise_for_status(self):pass
+  def json(self):return self.payload
+ with patch.object(mod.requests,"get",side_effect=[FakeResponse({"events":[]}),FakeResponse({"events":[event]})]) as get:
+  rows,errors=mod.fetch_results([{"event_id":"scoped-event","category_id":"cat-1","tournament_id":"tour-1","start_time":"2026-10-11T10:00:00+00:00"}],now)
+  assert rows==[event] and not errors,(rows,errors)
+  assert get.call_count==2
+  first=get.call_args_list[0].kwargs["params"]
+  second=get.call_args_list[1].kwargs["params"]
+  assert "startTime" in first and "endTime" in first,first
+  assert "startTime" not in second and "endTime" not in second,second
+  assert second["categoryId"]=="cat-1" and second["tournamentId"]=="tour-1"
+
+def test_legacy_scope_discovery_retries_without_time_filters():
+ now=datetime(2026,10,11,10,17,tzinfo=timezone.utc)
+ event={"eventId":"legacy-event","homeScore":"1","awayScore":"0"}
+ class FakeResponse:
+  def __init__(self,payload):self.payload=payload
+  def raise_for_status(self):pass
+  def json(self):return self.payload
+ with patch.object(mod.requests,"get",side_effect=[FakeResponse({"events":[]}),FakeResponse({"events":[event]})]) as get:
+  rows,errors=mod.fetch_results([{"event_id":"legacy-event","start_time":"2026-10-11T09:30:00+00:00"}],now)
+  assert rows==[event] and not errors,(rows,errors)
+  assert get.call_count==2
+  second=get.call_args_list[1].kwargs["params"]
+  assert second["source"]=="efootball" and "startTime" not in second and "endTime" not in second,second
+
 if __name__=="__main__":
- test_live_feed_compaction_preserves_scope_ids();test_markets();test_capture();test_live_market_coverage_reports_actual_btts_availability();test_settlement_and_summary();test_legacy_missing_scope_uses_bounded_discovery();test_draw_and_append_only_merge();test_settlement_due_uses_elapsed_time_not_exact_minute()
- print("eFootball winner/BTTS research tests: PASS (8 groups)")
+ test_live_feed_compaction_preserves_scope_ids();test_markets();test_capture();test_live_market_coverage_reports_actual_btts_availability();test_settlement_and_summary();test_legacy_missing_scope_uses_bounded_discovery();test_draw_and_append_only_merge();test_settlement_due_uses_elapsed_time_not_exact_minute();test_scoped_result_lookup_retries_without_time_filters();test_legacy_scope_discovery_retries_without_time_filters()
+ print("eFootball winner/BTTS research tests: PASS (10 groups)")

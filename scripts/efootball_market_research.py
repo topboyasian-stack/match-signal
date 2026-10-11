@@ -251,30 +251,71 @@ def fetch_results(pending,now):
         if cat and tour:scopes[(cat,tour)].append(s)
         else:missing.append(s)
     events=[];errors=[]
-    # Legacy feed snapshots may predate scope-ID preservation. Make one bounded
-    # source discovery request for those rows; the endpoint scans active scopes
-    # and results are still settled only by exact SportyBet event ID.
+
+    def request_rows(params,timeout,label):
+        try:
+            r=requests.get(BASE+"/api/sportybet-virtual-results",params=params,timeout=timeout)
+            r.raise_for_status()
+            return settlement_events(r.json()),None
+        except Exception as exc:
+            return [],f"{label}: {exc}"
+
+    # Some SportyBet result scopes return an empty list when a startTime/endTime
+    # filter is supplied, while the same endpoint returns completed events for
+    # the scope without those optional filters. Try both, but still settle only
+    # when the exact archived event ID is present in a returned result.
     if missing:
         dates=[dt(s.get("start_time")) for s in missing];dates=[d for d in dates if d]
-        params={"source":"efootball","pageSize":100,"pageNum":1,
-          "startTime":int((min(dates)-timedelta(days=1)).timestamp()*1000) if dates else "",
-          "endTime":int((now+timedelta(minutes=2)).timestamp()*1000)}
-        try:
-            r=requests.get(BASE+"/api/sportybet-virtual-results",params=params,timeout=45);r.raise_for_status()
-            events.extend(settlement_events(r.json()))
-        except Exception as exc:errors.append(f"broad eFootball scope discovery: {exc}")
+        base={"source":"efootball","pageSize":100,"pageNum":1}
+        filtered=dict(base)
+        if dates:
+            filtered["startTime"]=int((min(dates)-timedelta(days=1)).timestamp()*1000)
+            filtered["endTime"]=int((now+timedelta(minutes=2)).timestamp()*1000)
+        rows,err=request_rows(filtered,45,"broad eFootball scope discovery")
+        if rows:
+            events.extend(rows)
+        else:
+            fallback,err2=request_rows(base,45,"unfiltered broad eFootball scope discovery")
+            if fallback:events.extend(fallback)
+            else:
+                if err:errors.append(err)
+                if err2:errors.append(err2)
+                if not err and not err2:errors.append("broad eFootball result endpoint returned no rows with or without time filters")
+
     ordered=sorted(scopes.items(),key=lambda x:min(dt(s.get("start_time")) or now for s in x[1]))
     for (cat,tour),samples in ordered[:12]:
         dates=[dt(s.get("start_time")) for s in samples];dates=[d for d in dates if d]
-        params={"source":"efootball","categoryId":cat,"tournamentId":tour,"pageSize":100,"pageNum":1,
-          "startTime":int((min(dates)-timedelta(days=1)).timestamp()*1000) if dates else "",
-          "endTime":int((now+timedelta(minutes=2)).timestamp()*1000)}
-        try:
-            r=requests.get(BASE+"/api/sportybet-virtual-results",params=params,timeout=35);r.raise_for_status()
-            events.extend(settlement_events(r.json()))
-        except Exception as exc:errors.append(f"{cat}/{tour}: {exc}")
-    if missing and not events and not errors:errors.append("broad eFootball result scope discovery returned no event rows")
-    return events,errors
+        base={"source":"efootball","categoryId":cat,"tournamentId":tour,"pageSize":100,"pageNum":1}
+        filtered=dict(base)
+        if dates:
+            filtered["startTime"]=int((min(dates)-timedelta(days=1)).timestamp()*1000)
+            filtered["endTime"]=int((now+timedelta(minutes=2)).timestamp()*1000)
+        rows,err=request_rows(filtered,35,f"{cat}/{tour} date-filtered result lookup")
+        if rows:
+            events.extend(rows);continue
+        fallback,err2=request_rows(base,35,f"{cat}/{tour} unfiltered result lookup")
+        if fallback:
+            events.extend(fallback);continue
+        if err:errors.append(err)
+        if err2:errors.append(err2)
+        if not err and not err2:
+            errors.append(f"{cat}/{tour}: no result rows with or without time filters")
+
+    result_ids={str(e.get("eventId") or e.get("event_id") or "") for e in events
+                if e.get("eventId") or e.get("event_id")}
+    pending_ids={str(s.get("event_id") or "") for s in pending if s.get("event_id")}
+    matched=result_ids & pending_ids
+    if pending and not matched:
+        if events:
+            errors.append(f"result endpoint returned {len(events)} rows but none matched the {len(pending_ids)} pending exact event IDs; no scores were inferred")
+        elif not errors:
+            errors.append(f"no result rows returned for {len(pending)} pending observations")
+    # Deduplicate API rows by exact event ID before the caller settles samples.
+    dedup={}
+    for e in events:
+        event_id=str(e.get("eventId") or e.get("event_id") or "")
+        if event_id:dedup[event_id]=e
+    return list(dedup.values()),errors
 def read_archive(path):
     try:
         v=json.loads(path.read_text(encoding="utf-8"))
@@ -317,19 +358,28 @@ def main():
     a["market_coverage"]=coverage
     pending=[s for s in a["observations"] if isinstance(s,dict) and s.get("settlement_status")=="PENDING" and (dt(s.get("start_time")) or now)<now]
     settled=0;errors=[]
+    result_events_seen=0;exact_result_ids_matched=0
     previous_run=a.get("last_run") or {}
     settlement_checked_at=previous_run.get("settlement_checked_at")
     attempted_settlement=settlement_due(a,now)
     if attempted_settlement:
         settlement_checked_at=now.isoformat()
         try:
-            events,errs=fetch_results(pending,now);settled=settle(a,events,now);errors.extend(errs)
+            events,errs=fetch_results(pending,now)
+            result_events_seen=len(events)
+            result_ids={str(e.get("eventId") or e.get("event_id") or "") for e in events if e.get("eventId") or e.get("event_id")}
+            exact_result_ids_matched=len(result_ids & {str(s.get("event_id") or "") for s in pending if s.get("event_id")})
+            settled=settle(a,events,now);errors.extend(errs)
         except Exception as exc:errors.append("result source unavailable: "+str(exc))
     a.update(schema_version=1,mode="PAPER_RESEARCH_ONLY",live_trading_approved=False,production_qualification_enabled=False,odds_builder_eligible=False,updated_at=now.isoformat())
     a["last_run"]={"captured_at":now.isoformat(),"captured_new":added,"settled_new":settled,
       "settlement_errors":errors,"settlement_checked_at":settlement_checked_at,
       "settlement_attempted":attempted_settlement,"pending_due_settlement_check":len(pending),
+      "result_events_seen":result_events_seen,"exact_result_ids_matched":exact_result_ids_matched,
       "market_coverage":coverage}
     a["summary"]=summary(a,now);ARCHIVE.write_text(json.dumps(a,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
-    print(json.dumps({"status":"PASS","captured_new":added,"settled_new":settled,"observations":len(a["observations"]),"settlement_errors":errors,"market_coverage":coverage,"research_only":True},indent=2))
+    print(json.dumps({"status":"PASS","captured_new":added,"settled_new":settled,"observations":len(a["observations"]),
+      "pending_due_settlement_check":len(pending),"result_events_seen":result_events_seen,
+      "exact_result_ids_matched":exact_result_ids_matched,"settlement_errors":errors,
+      "market_coverage":coverage,"research_only":True},indent=2))
 if __name__=="__main__":main()

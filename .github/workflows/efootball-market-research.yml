@@ -44,6 +44,9 @@ jobs:
       - name: Capture and settle paper-only market observations
         env:
           MATCH_SIGNAL_PUBLIC_BASE: https://match-signal.pages.dev
+          # Code changes and manual dispatches should immediately validate settlement;
+          # the normal five-minute schedule remains throttled by the 15-minute interval.
+          EFOOTBALL_RESEARCH_FORCE_SETTLE: ${{ github.event_name != 'schedule' && '1' || '0' }}
         run: python scripts/efootball_market_research.py
       - name: Validate isolated archive contract
         run: |
