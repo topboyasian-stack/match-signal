@@ -165,11 +165,12 @@ def _candidate_title_matches(term, title):
         flags=re.I,
     )
     if prefix_artwork:
-        identity_phrase = base[prefix_artwork.end():].strip(" _-.,:;()[]{}")
+        # Keep parentheses intact until the modern edition year is removed.
+        identity_phrase = base[prefix_artwork.end():].strip(" _-.,:;[]{}")
         # Parenthesized modern edition years are identity metadata, not a
         # signal that a crest is historical. Explicit 18xx/19xx years remain
         # blocked by HISTORIC_ARTWORK_RE above.
-        identity_phrase = re.sub(r"\s*\((?:20\d{2})\)\s*$", "", identity_phrase).strip()
+        identity_phrase = re.sub(r"\s*\((?:20\d{2})\)\s*$", "", identity_phrase).strip(" _-.,:;()[]{}")
     else:
         artwork_match = ARTWORK_RE.search(base)
         if not artwork_match:
