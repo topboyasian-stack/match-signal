@@ -44,3 +44,100 @@
 .ws-live-fixture-row .ws-fixture-vs{font-size:9px;letter-spacing:.1em;color:var(--ws-muted);font-weight:900}
 .ws-live-fixture-row .ws-media-slot.has-media{background:#fff}
 @media(max-width:600px){.ws-fixture-match{gap:5px}.ws-fixture-match .ws-media-slot{width:28px;height:28px;flex-basis:28px}.ws-live-fixture-row{gap:5px}.ws-live-fixture-row .ws-media-slot{width:30px;height:30px;flex-basis:30px}.ws-live-fixture-row .ws-entity-name{font-size:10px}}
+
+
+/* Shared fixture and result-card treatment across the desk, league pages, Live and Virtual Lab. */
+.ms-up-row.ms-fixture-card,
+.ms-pred,
+.ms-live .grid > .card,
+.liveCard,
+.predictionCard {
+  position:relative;
+  border:1px solid rgba(55,231,255,.17) !important;
+  border-radius:16px !important;
+  background:linear-gradient(145deg,rgba(17,29,42,.98),rgba(8,14,21,.98)) !important;
+  box-shadow:0 12px 30px rgba(0,0,0,.2);
+  transition:border-color .16s ease,box-shadow .16s ease,transform .16s ease;
+}
+.ms-up-row.ms-fixture-card:hover,
+.ms-pred:hover,
+.ms-live .grid > .card:hover,
+.liveCard:hover,
+.predictionCard:hover {
+  border-color:rgba(55,231,255,.34) !important;
+  box-shadow:0 16px 34px rgba(0,0,0,.25);
+}
+.ms-pred .ms-match,
+.ms-up-match,
+.ms-live .ws-fixture-sides,
+.liveCard .ws-fixture-sides {
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:8px;
+}
+.ms-pred .ws-entity-label,
+.ms-up-match .ws-entity-label,
+.ms-live .ws-fixture-team,
+.liveCard .ws-fixture-team {
+  min-width:0;
+  align-items:center;
+}
+.ms-fixture-foot .ms-settled-win,
+.ms-fixture-foot .ms-settled-loss {
+  display:inline-flex;
+  align-items:center;
+  padding:4px 9px;
+  border-radius:999px;
+  font-size:10px;
+  letter-spacing:.02em;
+  border:1px solid transparent;
+}
+.ms-fixture-foot .ms-settled-win {
+  color:#42e59a !important;
+  border-color:rgba(66,229,154,.24);
+  background:rgba(66,229,154,.08);
+}
+.ms-fixture-foot .ms-settled-loss {
+  color:#ff7585 !important;
+  border-color:rgba(255,93,115,.24);
+  background:rgba(255,93,115,.08);
+}
+.ws-media-credit {
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:6px 10px;
+}
+.ws-media-coverage {
+  display:inline-flex;
+  align-items:center;
+  padding:4px 8px;
+  border:1px solid rgba(130,149,168,.2);
+  border-radius:999px;
+  background:rgba(255,255,255,.025);
+  color:var(--ws-text);
+  font-variant-numeric:tabular-nums;
+  font-size:10px;
+  font-weight:800;
+}
+.ws-media-slot { isolation:isolate; }
+.ws-media-slot .ws-media-image {
+  position:absolute;
+  inset:0;
+  z-index:1;
+  opacity:0;
+  transition:opacity .16s ease;
+}
+.ws-media-slot.has-media .ws-media-image { opacity:1; }
+@media(max-width:640px) {
+  .ms-pred,
+  .ms-live .grid > .card,
+  .liveCard,
+  .predictionCard { border-radius:13px !important; }
+  .ms-pred .ms-match,
+  .ms-up-match,
+  .ms-live .ws-fixture-sides,
+  .liveCard .ws-fixture-sides { gap:5px; }
+  .ws-media-coverage { font-size:9px; }
+}

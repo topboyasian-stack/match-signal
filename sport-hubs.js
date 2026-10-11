@@ -968,7 +968,7 @@ async function renderHub(){const sport=document.body.dataset.sport;const [base,p
    This keeps team crests and verified player headshots working on legacy desk pages. */
 if(!window.__MATCH_SIGNAL_WORKSPACE_UI__){
   const workspaceScript=document.createElement('script');
-  workspaceScript.src='./workspace-ui.js?v=20261011-workspace-media2';
+  workspaceScript.src='./workspace-ui.js?v=20261011-workspace-media3';
   document.body.appendChild(workspaceScript);
 }
 })();
