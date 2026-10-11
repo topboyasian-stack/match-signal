@@ -10,7 +10,6 @@ import argparse
 import concurrent.futures
 import html
 import json
-import mimetypes
 import re
 import time
 import unicodedata
@@ -111,7 +110,7 @@ def split_fixture(value):
 
 
 def is_football_product(value) -> bool:
-    product = normalize_text(value)
+    product = normalize_text(value).replace(" ", "_")
     return product in FOOTBALL_PRODUCTS or product.startswith("efootball") or product.startswith("vfootball")
 
 
@@ -152,7 +151,7 @@ def collect_clubs():
         key = normalize_team(clean)
         if not key or len(key) < 3 or key in {"home", "away", "team one", "team two", "unknown"}:
             return
-        if field in {"participant_1", "participant_2"} and normalize_text(product) in VIRTUAL_PRODUCTS:
+        if field in {"participant_1", "participant_2"} and normalize_text(product).replace(" ", "_") in VIRTUAL_PRODUCTS:
             # In virtual feeds participant fields can be gamer handles. Only accept
             # those that explicitly carry a parenthesized club label.
             if not re.search(r"\([^()]+\)\s*$", str(raw or "")):
