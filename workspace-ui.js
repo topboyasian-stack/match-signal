@@ -17,7 +17,7 @@ const inferredActive=pagePath.includes('/virtual-lab')?'lab':
   pagePath.endsWith('/live.html')?'live':
   pagePath.endsWith('/odds-builder.html')?'builder':
   pagePath.endsWith('/league.html')?(new URLSearchParams(location.search).get('sport')==='tennis'?'tennis':'football'):'desk';
-const sharedCssUrl=route('/workspace-ui.css?v=20261011-workspace-ui4');
+const sharedCssUrl=route('/workspace-ui.css?v=20261011-workspace-ui5');
 const existingCss=document.querySelector('link[href*="workspace-ui.css"]');
 if(existingCss)existingCss.href=sharedCssUrl;else{const l=document.createElement('link');l.rel='stylesheet';l.href=sharedCssUrl;document.head.appendChild(l);}
 if(!document.getElementById('workspace-ui-polish')){
