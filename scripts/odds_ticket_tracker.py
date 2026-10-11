@@ -20,6 +20,8 @@ DATA = ROOT / "data"
 BUILDER = DATA / "odds_builder.json"
 TRACKER = DATA / "odds_ticket_tracker.json"
 VIRTUAL_HISTORY = DATA / "virtual_lab_history.json"
+VIRTUAL_PENDING = DATA / "virtual_lab_pending.json"
+VIRTUAL_LIVE = DATA / "virtual_lab_live.json"
 PREDICTION_HISTORY = DATA / "prediction_history.json"
 EXPANSION_HISTORY = DATA / "expansion_prediction_history.json"
 SETTLEMENT_ARCHIVE = DATA / "virtual_lab_archive" / "settlements"
@@ -261,26 +263,73 @@ def result_event_score(event):
     return None
 
 
-def backfill_virtual_results(tickets, now_iso_value):
-    """Recover missed O/U settlements for both eFootball and VFootball paper legs.
+def result_source_for_product(value):
+    product = norm(value).replace(" ", "_")
+    if product in {"vfootball", "zoom"}:
+        return "vfootball"
+    if product in {"efootball", "efootball_gt", "efootball_adriatic"} or product.startswith("efootball_"):
+        return "efootball"
+    return ""
 
-    The normal collector/archive remains the primary source. This bounded fallback
-    asks the same read-only result API for any older, still-pending event IDs and
-    preserves the product from the ticket so settlement matching remains exact.
+
+def virtual_result_scope_index():
+    """Recover exact SportyBet result scopes recorded with original fixtures.
+
+    Completed tournaments often disappear from the current-upcoming feed. The
+    Virtual Lab pending ledger keeps the original category/tournament IDs and is
+    therefore a better lookup source than asking the API to rediscover scopes.
+    """
+    index = {}
+    for path in (VIRTUAL_PENDING, VIRTUAL_LIVE):
+        payload = load(path, [])
+        if isinstance(payload, list):
+            rows = payload
+        elif isinstance(payload, dict):
+            rows = []
+            for key in ("events", "pending", "live", "fixtures", "observations"):
+                values = payload.get(key)
+                if isinstance(values, list):
+                    rows.extend(values)
+                elif isinstance(values, dict):
+                    rows.extend(values.values())
+            # Some live snapshots are keyed directly by event ID.
+            if not rows:
+                rows = list(payload.values())
+        else:
+            rows = []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            event_id = str(row.get("event_id") or row.get("eventId") or "").strip()
+            category_id = str(row.get("category_id") or row.get("categoryId") or "").strip()
+            tournament_id = str(row.get("tournament_id") or row.get("tournamentId") or "").strip()
+            product = row.get("product") or row.get("sport") or row.get("source") or ""
+            source = result_source_for_product(product)
+            if event_id and category_id and tournament_id and source:
+                index[event_id] = {
+                    "source": source,
+                    "category_id": category_id,
+                    "tournament_id": tournament_id,
+                }
+    return index
+
+
+def backfill_virtual_results(tickets, now_iso_value, scope_index=None):
+    """Recover missed O/U ticket results using each event's saved SportyBet scope.
+
+    If a ticket event is in the Virtual Lab pending/live source, query its
+    original category and tournament directly. Only legacy events with no saved
+    scope use bounded endpoint discovery as a fallback. Settlement is still
+    guarded by the exact event (or fixture/time fallback), product, O/U side,
+    and line before any ticket state is changed.
     """
     pending_by_source = {}
     for ticket in tickets:
         for leg in ticket.get("legs") or []:
             if str(leg.get("status") or "PENDING").upper() != "PENDING":
                 continue
-            product = norm(leg.get("product") or leg.get("sport"))
-            if product == "vfootball":
-                source = "vfootball"
-            elif product in {"efootball", "efootball_gt", "efootball_adriatic"}:
-                source = "efootball"
-            else:
-                continue
-            if not leg.get("event_id"):
+            source = result_source_for_product(leg.get("product") or leg.get("sport"))
+            if not source or not leg.get("event_id"):
                 continue
             try:
                 start = datetime.fromisoformat(str(leg.get("start_time") or "").replace("Z", "+00:00"))
@@ -295,9 +344,23 @@ def backfill_virtual_results(tickets, now_iso_value):
     if not pending_by_source:
         return []
 
+    scope_index = virtual_result_scope_index() if scope_index is None else scope_index
+    grouped = {}
+    for source, pending in pending_by_source.items():
+        for leg in pending:
+            saved = scope_index.get(str(leg.get("event_id") or "")) or {}
+            category_id = str(saved.get("category_id") or "")
+            tournament_id = str(saved.get("tournament_id") or "")
+            # Never send a scope captured for another source family.
+            if saved.get("source") and saved.get("source") != source:
+                category_id = tournament_id = ""
+            key = (source, category_id, tournament_id)
+            grouped.setdefault(key, []).append(leg)
+
     out = []
     seen_records = set()
-    for source, pending in pending_by_source.items():
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    for (source, category_id, tournament_id), pending in grouped.items():
         wanted_ids = {str(leg.get("event_id")) for leg in pending if leg.get("event_id")}
         starts = []
         for leg in pending:
@@ -308,30 +371,38 @@ def backfill_virtual_results(tickets, now_iso_value):
                 starts.append(int(dt.timestamp() * 1000))
             except (TypeError, ValueError):
                 pass
-        start_ms = min(starts) - 6 * 3600000 if starts else int(datetime.now(timezone.utc).timestamp() * 1000) - 86400000
-        end_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+        start_ms = min(starts) - 6 * 3600000 if starts else now_ms - 86400000
+        end_ms = now_ms
 
+        query_values = {
+            "source": source, "pageSize": 100, "pageNum": 1,
+            "startTime": start_ms, "endTime": end_ms,
+        }
+        if category_id and tournament_id:
+            query_values["categoryId"] = category_id
+            query_values["tournamentId"] = tournament_id
+        query = urllib.parse.urlencode(query_values)
+        mode = "saved_scope" if category_id and tournament_id else "scope_discovery"
         try:
-            query = urllib.parse.urlencode({
-                "source": source, "pageSize": 100, "pageNum": 1,
-                "startTime": start_ms, "endTime": end_ms,
-            })
             request = urllib.request.Request(
                 "https://match-signal.pages.dev/api/sportybet-virtual-results?" + query,
-                headers={"Accept": "application/json", "User-Agent": "MatchSignal-OddsTicketTracker/2.0"},
+                headers={"Accept": "application/json", "User-Agent": "MatchSignal-OddsTicketTracker/2.1"},
             )
             with urllib.request.urlopen(request, timeout=60) as response:
                 payload = json.loads(response.read().decode("utf-8"))
             events = payload.get("events") if isinstance(payload, dict) else []
             events = events if isinstance(events, list) else []
+            errors = payload.get("errors") if isinstance(payload, dict) else []
+            errors = errors if isinstance(errors, list) else []
             print(
-                source, "result backfill source:", len(events),
-                "events; pending legs:", len(pending),
-                "exact IDs wanted:", len(wanted_ids),
-                "reported source errors:", len(payload.get("errors") or []) if isinstance(payload, dict) else 0,
+                f"{source} result backfill scope mode={mode} category={category_id or '-'} "
+                f"tournament={tournament_id or '-'} events={len(events)} "
+                f"pending_legs={len(pending)} wanted_ids={len(wanted_ids)} errors={len(errors)}"
             )
+            if errors:
+                print(source, "result backfill error samples:", json.dumps(errors[:2], ensure_ascii=False)[:900])
         except Exception as exc:
-            print(f"WARNING: {source} result backfill failed:", exc)
+            print(f"WARNING: {source} result backfill failed (mode={mode}, category={category_id or '-'}, tournament={tournament_id or '-'}):", exc)
             continue
 
         matched_ids = set()
@@ -352,11 +423,11 @@ def backfill_virtual_results(tickets, now_iso_value):
                 pick, line = parse_virtual_pick(leg)
                 if pick not in {"over", "under"} or line is None:
                     continue
+                product = norm(leg.get("product") or leg.get("sport"))
                 total = score[0] + score[1]
                 line_text = str(int(line) if float(line).is_integer() else line)
                 actual = "O" + line_text if total > line else "U" + line_text if total < line else "PUSH"
                 selected = "O" + line_text if pick == "over" else "U" + line_text
-                product = norm(leg.get("product") or leg.get("sport"))
                 record_id = f"{ticket_event_id}|ou|{line}|{selected}"
                 if record_id in seen_records:
                     continue
@@ -370,17 +441,18 @@ def backfill_virtual_results(tickets, now_iso_value):
                     "win": None if actual == "PUSH" else actual == selected,
                     "score": f"{int(score[0])}:{int(score[1])}", "final_score": [score[0], score[1]],
                     "settled_at": now_iso_value,
-                    "settlement_source": f"SportyBet NG eventResultList via Match Signal {source} ticket backfill",
+                    "settlement_source": f"SportyBet NG eventResultList via Match Signal {source} ticket backfill ({mode})",
                     "record_id": record_id, "trace_id": record_id,
                     "backfill_match_mode": "event_id" if same_id else "fixture_time",
+                    "result_scope": {"category_id": category_id or None, "tournament_id": tournament_id or None},
                 })
                 if same_id:
                     matched_ids.add(ticket_event_id)
                 else:
                     matched_fixtures.add(str(leg.get("match") or ""))
         print(
-            source, "result backfill matches:", len(matched_ids) + len(matched_fixtures),
-            "legs; exact IDs:", len(matched_ids), "fixture/time:", len(matched_fixtures),
+            f"{source} result backfill matches mode={mode}: {len(matched_ids) + len(matched_fixtures)} "
+            f"legs; exact IDs={len(matched_ids)} fixture/time={len(matched_fixtures)}"
         )
     return out
 
