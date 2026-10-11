@@ -289,6 +289,48 @@ def summary(archive,at):
       "observations_count":len(archive.get("observations",[])),"summary_by_product_market":sums,
       "promotion_policy":{"preliminary_review_after":100,"preferred_review":"200-300+ settled samples per product/market plus independent chronological holdout",
        "requirements":["positive post-margin returns","calibration against no-vig market baseline","chronological holdout","stable exact-market settlement","no participant identity leakage"],"automatic_promotion":False}}
+def settlement_coverage(pending,events,now,still_pending_event_ids=None):
+    """Explain incomplete settlement lookup coverage instead of treating partial matches as healthy."""
+    starts={}
+    for sample in pending:
+        event_id=str(sample.get("event_id") or "")
+        start=dt(sample.get("start_time"))
+        if not event_id:
+            continue
+        if event_id not in starts or (start and (starts[event_id] is None or start<starts[event_id])):
+            starts[event_id]=start
+    pending_ids=set(starts)
+    result_ids={str(e.get("eventId") or e.get("event_id") or "") for e in events
+                if isinstance(e,dict) and (e.get("eventId") or e.get("event_id"))}
+    matched=pending_ids & result_ids
+    unmatched=pending_ids-result_ids
+    still_pending=set(still_pending_event_ids or ())
+    returned_unsettled=matched & still_pending
+    overdue_unmatched={event_id for event_id in unmatched
+        if starts.get(event_id) is not None and now-starts[event_id]>=timedelta(minutes=15)}
+    overdue_returned_unsettled={event_id for event_id in returned_unsettled
+        if starts.get(event_id) is not None and now-starts[event_id]>=timedelta(minutes=15)}
+    def oldest_minutes(ids):
+        ages=[(now-starts[event_id]).total_seconds()/60 for event_id in ids if starts.get(event_id) is not None]
+        return round(max(ages),1) if ages else None
+    return {
+        "pending_observation_count":len(pending),
+        "pending_event_id_count":len(pending_ids),
+        "result_events_seen":len(events),
+        "exact_result_ids_matched":len(matched),
+        "unmatched_event_id_count":len(unmatched),
+        "unmatched_event_ids_sample":sorted(unmatched)[:10],
+        "oldest_unmatched_age_minutes":oldest_minutes(unmatched),
+        "overdue_unmatched_event_id_count":len(overdue_unmatched),
+        "overdue_unmatched_event_ids":sorted(overdue_unmatched)[:10],
+        "matched_but_unsettled_event_id_count":len(returned_unsettled),
+        "matched_but_unsettled_event_ids":sorted(returned_unsettled)[:10],
+        "oldest_matched_but_unsettled_age_minutes":oldest_minutes(returned_unsettled),
+        "overdue_matched_but_unsettled_event_id_count":len(overdue_returned_unsettled),
+        "overdue_matched_but_unsettled_event_ids":sorted(overdue_returned_unsettled)[:10],
+    }
+
+
 def result_windows(samples,now):
     """Partition pending observations into provider-safe three-hour result queries.
 
@@ -372,15 +414,6 @@ def fetch_results(pending,now):
             if err:errors.append(err)
             if rows:events.extend(rows)
 
-    result_ids={str(e.get("eventId") or e.get("event_id") or "") for e in events
-                if e.get("eventId") or e.get("event_id")}
-    pending_ids={str(s.get("event_id") or "") for s in pending if s.get("event_id")}
-    matched=result_ids & pending_ids
-    if pending and not matched:
-        if events:
-            errors.append(f"result endpoint returned {len(events)} rows but none matched the {len(pending_ids)} pending exact event IDs; no scores were inferred")
-        elif not errors:
-            errors.append(f"no result rows returned for {len(pending)} pending observations")
     dedup={}
     for e in events:
         event_id=str(e.get("eventId") or e.get("event_id") or "")
@@ -396,7 +429,8 @@ def settlement_due(archive,now):
     if os.getenv("EFOOTBALL_RESEARCH_FORCE_SETTLE")=="1": return True
     last_run=archive.get("last_run") or {}
     last_attempt=dt(last_run.get("settlement_checked_at"))
-    return last_attempt is None or now-last_attempt>=timedelta(minutes=15)
+    # Match the intended collector cadence so finished events are retried promptly.
+    return last_attempt is None or now-last_attempt>=timedelta(minutes=5)
 def merge(remote,candidate):
     out=dict(remote); rows={}
     for source in (remote.get("observations",[]),candidate.get("observations",[])):
@@ -430,8 +464,8 @@ def main():
     )
     a["market_coverage"]=coverage
     pending=[s for s in a["observations"] if isinstance(s,dict) and s.get("settlement_status")=="PENDING" and (dt(s.get("start_time")) or now)<now]
-    settled=0;errors=[]
-    result_events_seen=0;exact_result_ids_matched=0
+    settled=0;errors=[];warnings=[]
+    result_events_seen=0;exact_result_ids_matched=0;settlement_diagnostics=None
     previous_run=a.get("last_run") or {}
     settlement_checked_at=previous_run.get("settlement_checked_at")
     attempted_settlement=settlement_due(a,now)
@@ -440,13 +474,33 @@ def main():
         try:
             events,errs=fetch_results(pending,now)
             result_events_seen=len(events)
-            result_ids={str(e.get("eventId") or e.get("event_id") or "") for e in events if e.get("eventId") or e.get("event_id")}
-            exact_result_ids_matched=len(result_ids & {str(s.get("event_id") or "") for s in pending if s.get("event_id")})
-            settled=settle(a,events,now);errors.extend(errs)
-        except Exception as exc:errors.append("result source unavailable: "+str(exc))
+            settled=settle(a,events,now)
+            still_pending_ids={str(s.get("event_id") or "") for s in pending
+                               if s.get("settlement_status")=="PENDING" and s.get("event_id")}
+            settlement_diagnostics=settlement_coverage(pending,events,now,still_pending_ids)
+            exact_result_ids_matched=settlement_diagnostics["exact_result_ids_matched"]
+            errors.extend(errs)
+            if settlement_diagnostics["overdue_unmatched_event_id_count"]:
+                warnings.append(
+                    f'{settlement_diagnostics["overdue_unmatched_event_id_count"]} pending event IDs '
+                    f'were at least 15 minutes past kickoff but absent from result responses; '
+                    f'{exact_result_ids_matched}/{settlement_diagnostics["pending_event_id_count"]} '
+                    'pending event IDs matched. Will retry on the next settlement pass.'
+                )
+            if settlement_diagnostics["overdue_matched_but_unsettled_event_id_count"]:
+                warnings.append(
+                    f'{settlement_diagnostics["overdue_matched_but_unsettled_event_id_count"]} '
+                    'returned event IDs were at least 15 minutes past kickoff but still lacked '
+                    'a confirmed final score/status.'
+                )
+        except Exception as exc:
+            error="result source unavailable: "+str(exc)
+            errors.append(error)
+            settlement_diagnostics={"status":"QUERY_FAILED","error":str(exc)[:800]}
     a.update(schema_version=1,mode="PAPER_RESEARCH_ONLY",live_trading_approved=False,production_qualification_enabled=False,odds_builder_eligible=False,updated_at=now.isoformat())
     a["last_run"]={"captured_at":now.isoformat(),"captured_new":added,"settled_new":settled,
-      "settlement_errors":errors,"settlement_checked_at":settlement_checked_at,
+      "settlement_errors":errors,"settlement_warnings":warnings,"settlement_diagnostics":settlement_diagnostics,
+      "settlement_checked_at":settlement_checked_at,
       "settlement_attempted":attempted_settlement,"pending_due_settlement_check":len(pending),
       "result_events_seen":result_events_seen,"exact_result_ids_matched":exact_result_ids_matched,
       "feed_snapshot_fresh":feed_snapshot_fresh,
@@ -457,6 +511,7 @@ def main():
     print(json.dumps({"status":"PASS","captured_new":added,"settled_new":settled,"observations":len(a["observations"]),
       "pending_due_settlement_check":len(pending),"result_events_seen":result_events_seen,
       "exact_result_ids_matched":exact_result_ids_matched,"settlement_errors":errors,
+      "settlement_warnings":warnings,"settlement_diagnostics":settlement_diagnostics,
       "feed_snapshot_fresh":feed_snapshot_fresh,
       "feed_snapshot_age_seconds":round(feed_snapshot_age_seconds,1) if feed_snapshot_age_seconds is not None else None,
       "capture_skipped_reason":capture_skipped_reason,

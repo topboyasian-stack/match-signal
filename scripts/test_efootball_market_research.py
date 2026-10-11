@@ -132,9 +132,9 @@ def test_settlement_due_uses_elapsed_time_not_exact_minute():
  now=datetime(2026,10,11,10,17,tzinfo=timezone.utc)
  assert mod.settlement_due({},now) is True
  archive={"last_run":{"captured_at":(now-timedelta(minutes=1)).isoformat(),
-   "settlement_checked_at":(now-timedelta(minutes=14)).isoformat()}}
+   "settlement_checked_at":(now-timedelta(minutes=4)).isoformat()}}
  assert mod.settlement_due(archive,now) is False
- archive["last_run"]["settlement_checked_at"]=(now-timedelta(minutes=15)).isoformat()
+ archive["last_run"]["settlement_checked_at"]=(now-timedelta(minutes=5)).isoformat()
  assert mod.settlement_due(archive,now) is True
  with patch.dict(mod.os.environ,{"EFOOTBALL_RESEARCH_FORCE_SETTLE":"1"}):
   assert mod.settlement_due(archive,now) is True
@@ -198,6 +198,27 @@ def test_result_queries_bucket_stale_observations_with_three_hour_windows():
  assert not errors,errors
  assert len(calls)==2,len(calls)
  assert all(x["categoryId"]=="cat-1" and x["tournamentId"]=="tour-1" for x in calls)
+def test_settlement_coverage_reports_partial_and_overdue_results():
+ now=datetime(2026,10,11,11,0,tzinfo=timezone.utc)
+ pending=[
+  {"event_id":"old-missing","start_time":"2026-10-11T10:30:00+00:00","settlement_status":"PENDING"},
+  {"event_id":"recent-missing","start_time":"2026-10-11T10:58:00+00:00","settlement_status":"PENDING"},
+  {"event_id":"returned-live","start_time":"2026-10-11T10:30:00+00:00","settlement_status":"PENDING"},
+  {"event_id":"returned-final","start_time":"2026-10-11T10:45:00+00:00","settlement_status":"PENDING"},
+ ]
+ events=[
+  {"eventId":"returned-live","matchStatus":"Live"},
+  {"eventId":"returned-final","matchStatus":"End","setScore":"2:1"},
+ ]
+ diag=mod.settlement_coverage(pending,events,now,{"returned-live"})
+ assert diag["pending_event_id_count"]==4,diag
+ assert diag["exact_result_ids_matched"]==2,diag
+ assert diag["unmatched_event_id_count"]==2,diag
+ assert diag["overdue_unmatched_event_ids"]==["old-missing"],diag
+ assert diag["matched_but_unsettled_event_ids"]==["returned-live"],diag
+ assert diag["overdue_matched_but_unsettled_event_ids"]==["returned-live"],diag
+
+
 def test_result_proxy_upstream_errors_are_preserved():
  now=datetime(2026,10,11,10,17,tzinfo=timezone.utc)
  class FakeResponse:
@@ -213,5 +234,5 @@ def test_result_proxy_upstream_errors_are_preserved():
   assert params["endTime"]-params["startTime"]==int(timedelta(hours=3).total_seconds()*1000),params
 
 if __name__=="__main__":
- test_live_feed_compaction_preserves_scope_ids();test_markets();test_capture();test_live_snapshot_freshness_gate();test_live_market_coverage_reports_actual_btts_availability();test_settlement_and_summary();test_settlement_accepts_provider_final_set_score();test_legacy_missing_scope_uses_bounded_discovery();test_draw_and_append_only_merge();test_settlement_due_uses_elapsed_time_not_exact_minute();test_scoped_result_lookup_uses_bounded_time_window();test_legacy_scope_discovery_uses_bounded_time_window();test_result_queries_bucket_stale_observations_with_three_hour_windows();test_result_proxy_upstream_errors_are_preserved()
- print("eFootball winner/BTTS research tests: PASS (13 groups)")
+ test_live_feed_compaction_preserves_scope_ids();test_markets();test_capture();test_live_snapshot_freshness_gate();test_live_market_coverage_reports_actual_btts_availability();test_settlement_and_summary();test_settlement_accepts_provider_final_set_score();test_legacy_missing_scope_uses_bounded_discovery();test_draw_and_append_only_merge();test_settlement_due_uses_elapsed_time_not_exact_minute();test_scoped_result_lookup_uses_bounded_time_window();test_legacy_scope_discovery_uses_bounded_time_window();test_result_queries_bucket_stale_observations_with_three_hour_windows();test_settlement_coverage_reports_partial_and_overdue_results();test_result_proxy_upstream_errors_are_preserved()
+ print("eFootball winner/BTTS research tests: PASS (14 groups)")

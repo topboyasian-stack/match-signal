@@ -2,10 +2,13 @@ name: Isolated eFootball Winner and BTTS Market Research
 
 on:
   schedule:
-    # Expected cadence is five minutes; trust archive telemetry, not the cron alone.
-    # Capture stays gated on a recent LIVE snapshot; prior observations can still settle.
-    - cron: '*/5 * * * *'
+    # Off-peak fallback; normal collection follows the successful live-feed sync.
+    - cron: '3,18,33,48 * * * *'
   workflow_dispatch:
+  workflow_run:
+    workflows:
+      - "Match Signal Virtual Lab Live Sync"
+    types: [completed]
   pull_request:
     paths:
       - 'scripts/efootball_market_research.py'
@@ -47,7 +50,7 @@ jobs:
           python scripts/test_efootball_market_research.py
 
   research:
-    if: github.event_name != 'pull_request'
+    if: ${{ github.event_name != 'pull_request' && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
