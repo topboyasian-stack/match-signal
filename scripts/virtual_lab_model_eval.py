@@ -60,14 +60,21 @@ def poisson_over(lam,line):
     return clamp(1-cdf)
 
 def fit_lambda(points):
-    pts=[p for p in points if p[0] is not None and p[1] is not None]
+    """Coarse-to-fine ladder fit; preserve 0.01 resolution with fewer trials."""
+    pts=[(float(line),clamp(float(prob))) for line,prob in points if line is not None and prob is not None]
     if not pts:return None
-    best=(5.,float("inf"))
-    for i in range(25,2001):
+    def loss(lam):
+        return sum((poisson_over(lam,line)-prob)**2 for line,prob in pts)/len(pts)
+    best_lam,best_loss=5.0,float("inf")
+    for i in range(25,2001,25):
         lam=i/100
-        loss=sum((poisson_over(lam,line)-prob)**2 for line,prob in pts)/len(pts)
-        if loss<best[1]:best=(lam,loss)
-    return best[0]
+        value=loss(lam)
+        if value<best_loss:best_lam,best_loss=lam,value
+    low=max(.25,best_lam-.30);high=min(20.0,best_lam+.30)
+    for i in range(max(25,int(round(low*100))),min(2000,int(round(high*100)))+1):
+        lam=i/100;value=loss(lam)
+        if value<best_loss:best_lam,best_loss=lam,value
+    return best_lam
 
 def build_events(rows):
     groups={}
