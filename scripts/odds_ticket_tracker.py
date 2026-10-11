@@ -470,6 +470,74 @@ def backfill_virtual_results(tickets, now_iso_value, scope_index=None):
         )
     return out
 
+def _is_authoritative_score_row(row):
+    """Accept only settled score rows traced to SportyBet's result endpoint."""
+    if not isinstance(row, dict) or not row.get("settled_at"):
+        return False
+    settlement_source = norm(row.get("settlement_source"))
+    trace_source = norm(row.get("trace_source"))
+    return (
+        "sportybet" in settlement_source and "eventresultlist" in settlement_source
+    ) or trace_source == "sportybet_ng_result_proxy"
+
+
+def replay_ou_leg_from_exact_event_score(leg, rows):
+    """Settle an O/U line from an authoritative score stored for the same event.
+
+    Virtual Lab stores settlement rows for some O/U lines but Builder may select
+    a different line for the same event. The score is event-level, so replaying
+    it is safe only when event ID + product match exactly, the row is explicitly
+    settled from the SportyBet result endpoint, and every qualifying score row
+    agrees. If the stored scores conflict or provenance is missing, do not settle.
+    """
+    event_id = str(leg.get("event_id") or "").strip()
+    product = norm(leg.get("product") or leg.get("sport"))
+    pick, line = parse_virtual_pick(leg)
+    if not event_id or not product or pick not in {"over", "under"} or line is None:
+        return None
+
+    scores = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        if str(row.get("event_id") or "").strip() != event_id:
+            continue
+        if norm(row.get("product") or row.get("sport")) != product:
+            continue
+        if not _is_authoritative_score_row(row):
+            continue
+        market = norm(row.get("market"))
+        if market not in {"ou", "winner", "1x2", "total", "total games"}:
+            continue
+        score = result_event_score(row)
+        if score is None or any(value < 0 for value in score):
+            continue
+        key = (float(score[0]), float(score[1]))
+        scores.setdefault(key, []).append(row)
+
+    # A disagreement for this exact event is a hard stop, not a reason to guess.
+    if len(scores) != 1:
+        return None
+
+    (home, away), evidence_rows = next(iter(scores.items()))
+    total = home + away
+    line_text = str(int(line) if float(line).is_integer() else line)
+    actual = "O" + line_text if total > line else "U" + line_text if total < line else "PUSH"
+    selected = "O" + line_text if pick == "over" else "U" + line_text
+    settled_at = max(str(row.get("settled_at") or "") for row in evidence_rows)
+    source = next((str(row.get("settlement_source")) for row in reversed(evidence_rows) if row.get("settlement_source")), "SportyBet eventResultList")
+    return {
+        "status": "VOID" if actual == "PUSH" else "WON" if actual == selected else "LOST",
+        "correct": None if actual == "PUSH" else actual == selected,
+        "settled_at": settled_at,
+        "result": actual,
+        "final_score": [home, away],
+        "settlement_source": "exact-event score replay from " + source,
+        "score_replay": True,
+        "score_evidence_record_ids": sorted({str(row.get("record_id") or row.get("trace_id") or "") for row in evidence_rows if row.get("record_id") or row.get("trace_id")}),
+    }
+
+
 def settle_virtual_leg(leg, rows):
     event_id = str(leg.get("event_id") or "")
     wanted_pick, wanted_line = parse_virtual_pick(leg)
@@ -521,6 +589,12 @@ def settle_virtual_leg(leg, rows):
                 "result": "PUSH",
                 "final_score": row.get("final_score") or row.get("score"),
             }
+    # If the archive has an authoritative score for this exact event/product
+    # but only at another O/U line, replay the score against the ticket's
+    # immutable line. Missing provenance or conflicting scores stays pending.
+    replayed = replay_ou_leg_from_exact_event_score(leg, rows)
+    if replayed:
+        return replayed
     return None
 
 
