@@ -47,7 +47,7 @@ TEAM_FIELDS = (
     "participant_1", "participant_2",
 )
 ARTWORK_RE = re.compile(r"\b(logo|crest|badge|emblem|coat of arms)\b", re.I)
-NONLOGO_ARTIFACT_RE = re.compile(r"\b(rugby|pin badge|supporters? club|supporters|fan club|souvenir|main stand|side view|stadium|shirt|jersey|poster|sticker|key ?ring|medal|collection|toy)\b", re.I)
+NONLOGO_ARTIFACT_RE = re.compile(r"\b(rugby|pin badge|supporters? club|supporters|fan club|souvenir|main stand|side view|stadium|shirt|jersey|poster|sticker|key ?ring|medal|collection|toy|window|photograph|photo|mural|building|signboard|shopfront|on window)\b", re.I)
 HISTORIC_ARTWORK_RE = re.compile(r"\b(old|original|historic|historical|vintage|antique|retro|altes|alte|alter)\b|\b(?:18\d{2}|19\d{2})\s*[-–]\s*(?:18\d{2}|19\d{2})\b", re.I)
 CLUB_CLUE_RE = re.compile(
     r"\b(football|soccer|club|olympique|racing|athletic|sporting|futbol|fútbol|fc|afc|sc|ac|cf)\b|"
@@ -131,33 +131,41 @@ def normalize_team(value) -> str:
 
 
 def _candidate_title_matches(term, title):
-    """Require the artwork title to lead with the requested club identity.
+    """Require the words before 'logo/crest' to identify the requested team.
 
-    Broad substring matches are unsafe: "Seattle Athletic Club" is not
-    Athletic Club Bilbao, "Racing Club Vichy Rugby" is not the football club,
-    and a pin-badge photo is not a reusable crest asset.
+    A filename that merely begins with "Athletic Club" may refer to a different
+    organization such as Athletic Club Miami. Compare the full identity phrase
+    before the artwork descriptor to the complete requested name or a known
+    official alias. Prefer a safe miss to a plausible-looking false logo.
     """
     base = re.sub(r"\.[^.]+$", "", re.sub(r"^File:", "", str(title or ""), flags=re.I))
-    title_key = normalize_text(base)
     search_key = normalize_team(term)
-    if not title_key or not search_key:
+    if not base or not search_key:
         return False
     if NONLOGO_ARTIFACT_RE.search(base) or HISTORIC_ARTWORK_RE.search(base):
         return False
     if not ARTWORK_RE.search(base) or not CLUB_CLUE_RE.search(base):
         return False
-    accepted_prefixes = (
-        search_key,
-        "fc " + search_key,
-        "afc " + search_key,
-        "sc " + search_key,
-        "ac " + search_key,
-        "club " + search_key,
-        "club atletico " + search_key,
-        "atletico " + search_key,
-        "the " + search_key,
-    )
-    return any(title_key == prefix or title_key.startswith(prefix + " ") for prefix in accepted_prefixes)
+
+    artwork_match = ARTWORK_RE.search(base)
+    # Strip everything after the first "logo/crest/badge/emblem" token before
+    # matching identity; descriptive tail text is not evidence of club identity.
+    identity_phrase = base[:artwork_match.start()].strip(" _-.,:;()[]{}")
+    identity_key = normalize_team(identity_phrase)
+    if not identity_key:
+        return False
+
+    # Normalize common prefixes and a few generic descriptors seen in Commons.
+    identity_key = re.sub(r"\s+(?:official|team|football|soccer|club badge|football lion)$", "", identity_key).strip()
+    search_key = re.sub(r"\s+(?:official|team|football|soccer|club badge|football lion)$", "", search_key).strip()
+
+    # Identity must be the whole pre-artwork phrase, not a substring/prefix.
+    # Some official club names include a leading "Club Atlético" prefix; allow
+    # that exact legal form without allowing arbitrary trailing city/organization
+    # words such as "Athletic Club Miami".
+    accepted_identity_keys = {search_key, "atletico " + search_key}
+    return identity_key in accepted_identity_keys
+
 
 
 def _existing_entry_is_safe(key, entry):
