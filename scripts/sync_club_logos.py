@@ -160,7 +160,11 @@ def _candidate_title_matches(term, title):
     search_key = re.sub(r"\s+(?:official|team|football|soccer|club badge|football lion)$", "", search_key).strip()
 
     # Identity must be the whole pre-artwork phrase, not a substring/prefix.
-    return identity_key == search_key
+    # Some official club names include a leading "Club Atlético" prefix; allow
+    # that exact legal form without allowing arbitrary trailing city/organization
+    # words such as "Athletic Club Miami".
+    accepted_identity_keys = {search_key, "atletico " + search_key}
+    return identity_key in accepted_identity_keys
 
 
 
