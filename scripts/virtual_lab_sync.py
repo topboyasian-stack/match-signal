@@ -63,7 +63,9 @@ def compact(raw,fallback_product=None):
     if not start and raw.get("start_time_ms") is not None:
         try:start=datetime.fromtimestamp(float(raw["start_time_ms"])/1000,tz=timezone.utc).isoformat().replace("+00:00","Z")
         except (TypeError,ValueError):start=None
-    return {"product":product,"provider":"SportyBet NG","event_id":str(raw.get("event_id") or raw.get("eventId") or ""),"timestamp":datetime.now(tz=timezone.utc).isoformat(),"competition":t,"category":c,"participant_1":h,"participant_2":a,"start_time":start,"match_status":raw.get("match_status",raw.get("matchStatus")),"markets":markets,"source":"SportyBet NG via Match Signal live virtual connector"}
+    return {"product":product,"provider":"SportyBet NG","event_id":str(raw.get("event_id") or raw.get("eventId") or ""),
+        "category_id":str(raw.get("category_id") or raw.get("categoryId") or ""),
+        "tournament_id":str(raw.get("tournament_id") or raw.get("tournamentId") or ""),"timestamp":datetime.now(tz=timezone.utc).isoformat(),"competition":t,"category":c,"participant_1":h,"participant_2":a,"start_time":start,"match_status":raw.get("match_status",raw.get("matchStatus")),"markets":markets,"source":"SportyBet NG via Match Signal live virtual connector"}
 
 def collect_proxy():
     events=[]
