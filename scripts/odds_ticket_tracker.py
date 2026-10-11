@@ -354,13 +354,25 @@ def backfill_virtual_results(tickets, now_iso_value, scope_index=None):
             # Never send a scope captured for another source family.
             if saved.get("source") and saved.get("source") != source:
                 category_id = tournament_id = ""
-            key = (source, category_id, tournament_id)
+            try:
+                start_dt = datetime.fromisoformat(str(leg.get("start_time") or "").replace("Z", "+00:00"))
+                if start_dt.tzinfo is None:
+                    start_dt = start_dt.replace(tzinfo=timezone.utc)
+                day_bucket = start_dt.astimezone(timezone.utc).strftime("%Y-%m-%d")
+            except (TypeError, ValueError):
+                # The collection phase already filters malformed timestamps, but
+                # keep this defensive fallback for legacy ticket data.
+                day_bucket = "unknown-day"
+            # A single query spanning weeks of pending tickets causes SportyBet's
+            # eventResultList to reject otherwise valid scopes (bizCode 19999).
+            # Split both scoped and legacy lookups into small UTC-day windows.
+            key = (source, category_id, tournament_id, day_bucket)
             grouped.setdefault(key, []).append(leg)
 
     out = []
     seen_records = set()
     now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
-    for (source, category_id, tournament_id), pending in grouped.items():
+    for (source, category_id, tournament_id, day_bucket), pending in grouped.items():
         wanted_ids = {str(leg.get("event_id")) for leg in pending if leg.get("event_id")}
         starts = []
         for leg in pending:
@@ -372,7 +384,9 @@ def backfill_virtual_results(tickets, now_iso_value, scope_index=None):
             except (TypeError, ValueError):
                 pass
         start_ms = min(starts) - 6 * 3600000 if starts else now_ms - 86400000
-        end_ms = now_ms
+        # Allow up to 36 hours after the latest kickoff to catch final results,
+        # but don't query an unnecessarily broad range for older events.
+        end_ms = min(now_ms, max(starts) + 36 * 3600000) if starts else now_ms
 
         query_values = {
             "source": source, "pageSize": 100, "pageNum": 1,
@@ -396,7 +410,7 @@ def backfill_virtual_results(tickets, now_iso_value, scope_index=None):
             errors = errors if isinstance(errors, list) else []
             print(
                 f"{source} result backfill scope mode={mode} category={category_id or '-'} "
-                f"tournament={tournament_id or '-'} events={len(events)} "
+                f"tournament={tournament_id or '-'} day={day_bucket} events={len(events)} "
                 f"pending_legs={len(pending)} wanted_ids={len(wanted_ids)} errors={len(errors)}"
             )
             if errors:

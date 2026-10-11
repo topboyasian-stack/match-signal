@@ -137,6 +137,44 @@ class VirtualResultBackfillTests(unittest.TestCase):
     def test_vfootball_pending_leg_keeps_vfootball_result_source(self):
         self.run_backfill_for_product("vfootball", "vfootball")
 
+    def test_legacy_lookup_splits_old_pending_events_by_utc_day(self):
+        from datetime import timedelta
+
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+        offsets = [2, 26, 50]
+        tickets = []
+        event_rows = []
+        for index, hours_ago in enumerate(offsets, 1):
+            event_id = f"sr:match:window-{index}"
+            ticket = self.ticket("efootball_gt", event_id)
+            ticket["legs"][0]["start_time"] = (now - timedelta(hours=hours_ago)).isoformat()
+            tickets.append(ticket)
+            event_rows.append({"eventId": event_id, "score": "5:2"})
+
+        windows = []
+        def opener(request, timeout=60):
+            query = urllib.parse.parse_qs(urllib.parse.urlparse(request.full_url).query)
+            windows.append((int(query["startTime"][0]), int(query["endTime"][0])))
+            class Response:
+                def __enter__(self):
+                    return self
+                def __exit__(self, *args):
+                    return False
+                def read(self):
+                    return json.dumps({"ok": True, "events": event_rows, "errors": []}).encode("utf-8")
+            return Response()
+
+        with patch("scripts.odds_ticket_tracker.urllib.request.urlopen", side_effect=opener):
+            rows = backfill_virtual_results(
+                tickets, now.isoformat(), scope_index={}
+            )
+
+        self.assertEqual(len(rows), 3)
+        self.assertEqual(len(windows), 3, "three kickoff dates should not share one broad request")
+        self.assertTrue(all(end - start <= 43 * 3600000 for start, end in windows))
+        self.assertEqual({row["event_id"] for row in rows}, {row["eventId"] for row in event_rows})
+        self.assertTrue(all(row["result"] == "O5.5" for row in rows))
+
     def test_recent_pending_leg_is_not_sent_to_result_api(self):
         ticket = self.ticket("efootball_gt", "sr:match:too-recent")
         from datetime import timedelta
