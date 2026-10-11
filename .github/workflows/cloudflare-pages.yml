@@ -10,6 +10,8 @@ on:
       - 'upcoming.html'
       - 'sport-hubs.js'
       - 'sport-hubs.css'
+      - 'workspace-ui.css'
+      - 'workspace-ui.js'
       - 'league.html'
       - 'reports.html'
       - '_redirects'
@@ -115,6 +117,8 @@ jobs:
           test -s live-analysis.js
           test -s live-data-worker.js
           test -s data/predictions.json
+          test -s workspace-ui.css
+          test -s workspace-ui.js
           test -s virtual-lab-app.js
           test -s virtual-lab-confirmed-watch.js
           test -s data/virtual_lab_participant_lifecycle.json
@@ -134,6 +138,7 @@ jobs:
           print(f'Prediction rows: {len(rows)}; tennis rows: {len(tennis_rows)}')
           PY
           python scripts/validate_virtual_lab_v1.py
+          node --check workspace-ui.js
           node --check virtual-lab-app.js
           node --check virtual-lab-confirmed-watch.js
           node --check sport-hubs.js
@@ -225,7 +230,7 @@ jobs:
           import { writeFileSync } from 'node:fs';
           const base = 'https://match-signal.pages.dev';
           const pages = ['/', '/upcoming.html', '/odds-builder.html', '/football.html', '/tennis.html', '/basketball.html', '/darts.html', '/table-tennis.html', '/league.html?sport=football&league=England%20Amateur%20-%20U21%20Professional%20Development%20League', '/reports.html', '/live.html', '/expansion.html', '/virtual-lab/', '/virtual-lab', '/research.html', '/virtual-lab.html', '/analyst.html'];
-          const assets = ['/api/sportybet-virtual','/api/sportybet-darts','/api/sportybet-table-tennis','/api/virtual-lab-history','/expansion.js', '/expansion-odds-builder.js', '/live-analysis.js', '/live-data-worker.js', '/virtual-lab-app.js', '/virtual-lab-confirmed-watch.js', '/virtual-lab.css', '/_redirects', '/data/predictions.json', '/data/unified_upcoming.json', '/data/selection_candidates.json', '/data/expansion_status.json', '/data/odds_builder.json', '/data/odds_ticket_tracker.json', '/data/system_health.json', '/data/tennis_forward_status.json', '/data/prediction_desk_health.json', '/data/results_first_evidence_report.json', '/data/virtual_lab_live.json','/data/virtual_lab_model_eval.json','/data/virtual_lab_eligibility.json','/data/virtual_lab_participants/registry.json','/data/virtual_lab_participant_lifecycle.json','/data/virtual_lab_participants/efootball_confirmed_watch.json','/data/efootball_desk_prediction_history.json.gz','/sport-hubs.js','/analyst.js'];
+          const assets = ['/api/sportybet-virtual','/api/sportybet-darts','/api/sportybet-table-tennis','/api/virtual-lab-history','/expansion.js', '/expansion-odds-builder.js', '/live-analysis.js', '/live-data-worker.js', '/virtual-lab-app.js', '/virtual-lab-confirmed-watch.js', '/virtual-lab.css', '/_redirects', '/data/predictions.json', '/data/unified_upcoming.json', '/data/selection_candidates.json', '/data/expansion_status.json', '/data/odds_builder.json', '/data/odds_ticket_tracker.json', '/data/system_health.json', '/data/tennis_forward_status.json', '/data/prediction_desk_health.json', '/data/results_first_evidence_report.json', '/data/virtual_lab_live.json','/data/virtual_lab_model_eval.json','/data/virtual_lab_eligibility.json','/data/virtual_lab_participants/registry.json','/data/virtual_lab_participant_lifecycle.json','/data/virtual_lab_participants/efootball_confirmed_watch.json','/data/efootball_desk_prediction_history.json.gz','/sport-hubs.js','/workspace-ui.js','/workspace-ui.css','/analyst.js'];
           const failures = [];
           async function get(path) {
             const r = await fetch(base + path + (path.includes('?') ? '&' : '?') + 'smoke=' + Date.now(), {cache:'no-store'});
@@ -248,6 +253,9 @@ jobs:
               if (path==='/live.html' && (body.includes('nav-fix.js') || body.includes('?sport=football'))) failures.push(path+' contains retired navigation behavior');
               if (!r.ok) failures.push(path+' HTTP '+r.status);
               if (!body.includes('<html') && path.endsWith('.html')) failures.push(path+' did not return HTML');
+              if(path==='/reports.html'&&(!body.includes('id="workspace-nav"')||!body.includes('researchLabSummary'))) failures.push(path+' missing shared Reports workspace UI');
+              if(path==='/analyst.html'&&(!body.includes('noindex,nofollow')||!body.includes('data-active="analyst"'))) failures.push(path+' missing private Analyst workspace contract');
+              if(path==='/virtual-lab/'&&(!body.includes('data-active="lab"')||!body.includes('value="efootball" selected'))) failures.push(path+' missing eFootball-first Lab workspace UI');
               if (path==='/expansion.html') {
                 if (!body.includes('/reports.html')) failures.push(path+' missing retired-route redirect');
               }

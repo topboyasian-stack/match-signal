@@ -17,6 +17,8 @@ on:
       - 'table-tennis.css'
       - 'live.html'
       - 'research.html'
+      - 'workspace-ui.css'
+      - 'workspace-ui.js'
       - 'virtual-lab/**'
       - 'live-analysis.js'
       - 'live-data-worker.js'
@@ -78,9 +80,12 @@ jobs:
           test -s live-data-worker.js
           test -s virtual-lab.js
           test -s virtual-lab.css
+          test -s workspace-ui.css
+          test -s workspace-ui.js
           test -s data/predictions.json
           test -s data/virtual_lab_live.json
           test -s data/virtual_lab_participant_lifecycle.json
+          node --check workspace-ui.js
           python -m py_compile scripts/darts_pipeline.py scripts/table_tennis_pipeline.py
           python - <<'PY'
           import json
