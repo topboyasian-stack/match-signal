@@ -89,7 +89,7 @@ class VirtualResultBackfillTests(unittest.TestCase):
             }],
         }
 
-    def run_backfill_for_product(self, product, source):
+    def run_backfill_for_product(self, product, source, exact_scope=False):
         event_id = "sr:match:test-" + product
         tickets = [self.ticket(product, event_id)]
         def opener(request, timeout=60):
@@ -104,10 +104,17 @@ class VirtualResultBackfillTests(unittest.TestCase):
                         "events": [{"eventId": event_id, "score": "5:2"}],
                         "errors": [],
                     }).encode("utf-8")
-            self.assertEqual(urllib.parse.parse_qs(urllib.parse.urlparse(request.full_url).query)["source"], [source])
+            query = urllib.parse.parse_qs(urllib.parse.urlparse(request.full_url).query)
+            self.assertEqual(query["source"], [source])
+            if exact_scope:
+                self.assertEqual(query["categoryId"], ["cat-test"])
+                self.assertEqual(query["tournamentId"], ["tour-test"])
             return Response()
+        scope_index = {
+            event_id: {"source": source, "category_id": "cat-test", "tournament_id": "tour-test"}
+        } if exact_scope else {}
         with patch("scripts.odds_ticket_tracker.urllib.request.urlopen", side_effect=opener):
-            rows = backfill_virtual_results(tickets, datetime.now(timezone.utc).isoformat())
+            rows = backfill_virtual_results(tickets, datetime.now(timezone.utc).isoformat(), scope_index=scope_index)
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["product"], product)
         self.assertEqual(rows[0]["event_id"], event_id)
@@ -123,6 +130,9 @@ class VirtualResultBackfillTests(unittest.TestCase):
 
     def test_efootball_adriatic_pending_leg_uses_efootball_result_source(self):
         self.run_backfill_for_product("efootball_adriatic", "efootball")
+
+    def test_efootball_reuses_saved_exact_result_scope(self):
+        self.run_backfill_for_product("efootball_gt", "efootball", exact_scope=True)
 
     def test_vfootball_pending_leg_keeps_vfootball_result_source(self):
         self.run_backfill_for_product("vfootball", "vfootball")
