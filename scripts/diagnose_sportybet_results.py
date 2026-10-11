@@ -6,6 +6,7 @@ import json
 import os
 import time
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any
 
 import requests
@@ -60,8 +61,68 @@ def list_events(body: Any) -> list[dict[str, Any]]:
     return []
 
 
+def choose_archived_pending_scopes(now: datetime) -> list[dict[str, Any]]:
+    """Target the actual pending archive IDs the collector could not match."""
+    archive_path = Path(__file__).resolve().parents[1] / "data" / "efootball_market_research.json"
+    try:
+        archive = json.loads(archive_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        print("ARCHIVE_TARGET_READ_ERROR:", str(exc)[:300])
+        return []
+    samples = archive.get("observations", []) if isinstance(archive, dict) else []
+    if not isinstance(samples, list):
+        return []
+    pending = {}
+    for row in samples:
+        if not isinstance(row, dict) or row.get("settlement_status") != "PENDING":
+            continue
+        event_id = str(row.get("event_id") or "")
+        category = str(row.get("category_id") or "")
+        tournament = str(row.get("tournament_id") or "")
+        start = stamp(row.get("start_time"))
+        product = str(row.get("product") or "")
+        if not event_id or not category or not tournament or not start:
+            continue
+        age_minutes = (now - start).total_seconds() / 60
+        if age_minutes < 10 or age_minutes > 24 * 60:
+            continue
+        old = pending.get(event_id)
+        if old is None or start < old["start"]:
+            pending[event_id] = {
+                "categoryId": category,
+                "tournamentId": tournament,
+                "eventId": event_id,
+                "start": start,
+                "product": product,
+                "age_minutes": round(age_minutes, 1),
+            }
+    if not pending:
+        return []
+    last_run = archive.get("last_run") or {}
+    diagnostics = last_run.get("settlement_diagnostics") or {}
+    preferred_ids = diagnostics.get("unmatched_event_ids_sample") or []
+    ordered = []
+    seen = set()
+    for event_id in preferred_ids:
+        event_id = str(event_id)
+        if event_id in pending and event_id not in seen:
+            ordered.append(pending[event_id])
+            seen.add(event_id)
+    for row in sorted(pending.values(), key=lambda x: x["age_minutes"], reverse=True):
+        if row["eventId"] not in seen:
+            ordered.append(row)
+            seen.add(row["eventId"])
+    selected = ordered[:2]
+    if selected:
+        print("ARCHIVE_TARGETED_DIAGNOSTICS: prioritizing pending/missed event IDs from the current research archive")
+    return selected
+
+
 def choose_scopes(now: datetime) -> list[dict[str, Any]]:
-    """Choose up to two real eFootball event scopes from the current deployed feed."""
+    """Prefer missed archived IDs, then fall back to current-feed discovery."""
+    archived_scopes = choose_archived_pending_scopes(now)
+    if archived_scopes:
+        return archived_scopes
     try:
         response = requests.get(
             BASE + "/api/sportybet-virtual",
@@ -135,9 +196,12 @@ def probe(scope: dict[str, Any], use_time_filter: bool, now: datetime) -> dict[s
         "pageNum": 1,
     }
     if use_time_filter:
-        start = scope["start"] - timedelta(hours=3)
+        # Mirror the collector's bounded query shape: 15m before the target
+        # kickoff through the remainder of a fixed three-hour result window.
+        start = scope["start"] - timedelta(minutes=15)
+        end = start + timedelta(hours=3)
         params["startTime"] = int(start.timestamp() * 1000)
-        params["endTime"] = int((now + timedelta(minutes=2)).timestamp() * 1000)
+        params["endTime"] = int(end.timestamp() * 1000)
 
     result: dict[str, Any] = {
         "product": scope.get("product"),
@@ -249,6 +313,7 @@ def main() -> None:
             "tournamentId": scope["tournamentId"],
             "targetEventId": scope["eventId"],
             "start": scope["start"].isoformat() if scope.get("start") else None,
+            "age_minutes": scope.get("age_minutes"),
         }, ensure_ascii=False))
         if not scope.get("start"):
             scope["start"] = now - timedelta(minutes=30)
