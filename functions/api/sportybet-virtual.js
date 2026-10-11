@@ -148,7 +148,7 @@ export async function onRequestGet(context){
     const t0=Date.now();
     try{
       const data=await upstream('/api/ng/factsCenter/pcUpcomingEvents',{
-        sportId,marketId:'1,18,186,189',
+        sportId,marketId:'1,18,10,29,11,26,36,14,60100,186,189,202,204,210',
         pageSize,pageNum,todayGames:'false',timeline,_t:Date.now()
       });
       let n=0;
