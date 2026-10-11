@@ -3,6 +3,7 @@
 import unittest
 
 from scripts.sync_club_logos import (
+    ALIASES,
     _signature_ok,
     is_football_product,
     license_allowed,
@@ -33,10 +34,18 @@ class ClubLogoRegistryTests(unittest.TestCase):
     def test_license_allowlist_accepts_attribution_licenses_only(self):
         self.assertTrue(license_allowed("CC BY 4.0"))
         self.assertTrue(license_allowed("CC BY-SA 4.0"))
+        self.assertTrue(license_allowed("CC BY-SA 3.0 Unported"))
+        self.assertTrue(license_allowed("CC BY 2.0 Generic"))
         self.assertTrue(license_allowed("Public domain"))
         self.assertTrue(license_allowed("CC0 1.0"))
         self.assertFalse(license_allowed("CC BY-NC-SA 4.0"))
         self.assertFalse(license_allowed("All rights reserved"))
+
+    def test_common_provider_names_have_verified_search_aliases(self):
+        self.assertIn("Liverpool FC", ALIASES["liverpool"])
+        self.assertIn("Manchester City FC", ALIASES["man city"])
+        self.assertIn("FC Barcelona", ALIASES["barcelona"])
+        self.assertIn("Tottenham Hotspur FC", ALIASES["spurs"])
 
     def test_downloaded_image_signature_is_checked(self):
         self.assertTrue(_signature_ok(b"\x89PNG\r\n\x1a\n" + b"x" * 10, "image/png"))

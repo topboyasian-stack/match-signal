@@ -58,20 +58,19 @@ jobs:
             exit 0
           fi
           git commit -m "🛡️ Store verified licensed club logo assets"
-          for attempt in 1 2 3; do
+          for attempt in 1 2 3 4 5 6; do
             if git push origin main; then
               echo "Persistent logo registry published."
               exit 0
             fi
+            echo "Concurrent main update detected; rebasing the existing asset commit (attempt \${attempt}/6)."
             git fetch origin main
-            git reset --hard origin/main
-            python scripts/sync_club_logos.py --max-new 80
-            git add -f data/club-logo-registry.json
-            git add -f assets/club-logos/ 2>/dev/null || true
-            if git diff --cached --quiet; then
-              echo "Registry is up to date after concurrent main update."
-              exit 0
-            fi
-            git commit -m "🛡️ Store verified licensed club logo assets"
+            # Keep the already-downloaded/licence-checked assets. Resetting to
+            # origin/main here discarded them and repeated every Commons lookup,
+            # making the publisher lose the race again.
+            git rebase origin/main
+            sleep $((attempt * 4))
           done
+          echo "Logo registry commit could not be published after six rebase retries."
+          git status --short
           exit 1
