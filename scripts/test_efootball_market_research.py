@@ -3,6 +3,7 @@
 import importlib.util
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from unittest.mock import patch
 spec=importlib.util.spec_from_file_location("efootball_market_research",Path(__file__).with_name("efootball_market_research.py"))
 mod=importlib.util.module_from_spec(spec);spec.loader.exec_module(mod)
 def fixture(now,offset=10):
@@ -37,6 +38,22 @@ def test_settlement_and_summary():
  s=mod.summary(a,now);assert s["summary_by_product_market"]["efootball_gt|match_winner"]["settled"]==1
  assert s["summary_by_product_market"]["efootball_gt|btts"]["settled"]==1
  assert s["production_qualification_enabled"] is False and s["odds_builder_eligible"] is False
+def test_legacy_missing_scope_uses_bounded_discovery():
+ now=datetime(2026,10,11,10,30,tzinfo=timezone.utc)
+ payload={"events":[{"eventId":"legacy-e","homeScore":"2","awayScore":"1"}]}
+ class FakeResponse:
+  def raise_for_status(self): pass
+  def json(self): return payload
+ with patch.object(mod.requests,"get",return_value=FakeResponse()) as get:
+  events,errors=mod.fetch_results([{"event_id":"legacy-e","start_time":"2026-10-11T10:00:00+00:00"}],now)
+  assert events==payload["events"] and not errors
+  args,kwargs=get.call_args
+  assert args[0].endswith("/api/sportybet-virtual-results")
+  assert kwargs["params"]["source"]=="efootball"
+  assert "categoryId" not in kwargs["params"] and "tournamentId" not in kwargs["params"]
+  a={"observations":[{"event_id":"legacy-e","market_type":"match_winner","odds":{"home":1.8,"draw":3.4,"away":4.5},"market_probabilities_no_vig":{"home":.55,"draw":.29,"away":.16},"market_favourite":"home","favourite_odds":1.8,"settlement_status":"PENDING"}]}
+  assert mod.settle(a,events,now)==1
+  assert a["observations"][0]["actual_outcome"]=="home"
 def test_draw_and_append_only_merge():
  row={"sample_id":"same","event_id":"e","market_type":"match_winner","odds":{"home":1.8,"away":2.0},"market_probabilities_no_vig":{"home":.52,"away":.48},"market_favourite":"home","favourite_odds":1.8,"settlement_status":"PENDING"}
  a={"observations":[row.copy()]}
@@ -47,5 +64,5 @@ def test_draw_and_append_only_merge():
  m=mod.merge({"observations":[frozen]},{"observations":[settled]})
  assert m["observations"][0]["settlement_status"]=="SETTLED" and m["odds_builder_eligible"] is False
 if __name__=="__main__":
- test_markets();test_capture();test_settlement_and_summary();test_draw_and_append_only_merge()
- print("eFootball winner/BTTS research tests: PASS (4 groups)")
+ test_markets();test_capture();test_settlement_and_summary();test_legacy_missing_scope_uses_bounded_discovery();test_draw_and_append_only_merge()
+ print("eFootball winner/BTTS research tests: PASS (5 groups)")
