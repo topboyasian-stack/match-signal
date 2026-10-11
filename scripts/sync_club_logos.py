@@ -47,7 +47,7 @@ TEAM_FIELDS = (
     "participant_1", "participant_2",
 )
 ARTWORK_RE = re.compile(r"\b(logo|crest|badge|emblem|coat of arms)\b", re.I)
-NONLOGO_ARTIFACT_RE = re.compile(r"\b(rugby|pin badge|supporters? club|supporters|fan club|souvenir|main stand|side view|stadium|shirt|jersey|poster|sticker|key ?ring|medal|collection|toy)\b", re.I)
+NONLOGO_ARTIFACT_RE = re.compile(r"\b(rugby|pin badge|supporters? club|supporters|fan club|souvenir|main stand|side view|stadium|window|wall|building|photo|photograph|poster|banner|street|shirt|jersey|kit|sticker|key ?ring|medal|collection|toy|mockup|concept|merchandise|copy)\b", re.I)
 HISTORIC_ARTWORK_RE = re.compile(r"\b(old|original|historic|historical|vintage|antique|retro|altes|alte|alter)\b|\b(?:18\d{2}|19\d{2})\s*[-–]\s*(?:18\d{2}|19\d{2})\b", re.I)
 CLUB_CLUE_RE = re.compile(
     r"\b(football|soccer|club|olympique|racing|athletic|sporting|futbol|fútbol|fc|afc|sc|ac|cf)\b|"
@@ -144,6 +144,12 @@ def _candidate_title_matches(term, title):
         return False
     if NONLOGO_ARTIFACT_RE.search(base) or HISTORIC_ARTWORK_RE.search(base):
         return False
+    # "Athletic Club" is a particularly ambiguous name. Our sports UI means
+    # Athletic Club Bilbao; do not accept Miami, Seattle, or other same-name
+    # organizations unless the file title explicitly identifies Bilbao/Bilbo.
+    if search_key in {"athletic club", "athletic club bilbao", "athletic club de bilbao", "athletic bilbao"}:
+        if not re.search(r"\b(bilbao|bilbo)\b", title_key):
+            return False
     if not ARTWORK_RE.search(base) or not CLUB_CLUE_RE.search(base):
         return False
     accepted_prefixes = (
