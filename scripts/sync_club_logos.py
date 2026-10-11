@@ -156,8 +156,8 @@ def _candidate_title_matches(term, title):
         return False
 
     # Normalize common prefixes and a few generic descriptors seen in Commons.
-    identity_key = re.sub(r"\s+(?:official|team|football|soccer|club badge)$", "", identity_key).strip()
-    search_key = re.sub(r"\s+(?:official|team|football|soccer|club badge)$", "", search_key).strip()
+    identity_key = re.sub(r"\s+(?:official|team|football|soccer|club badge|football lion)$", "", identity_key).strip()
+    search_key = re.sub(r"\s+(?:official|team|football|soccer|club badge|football lion)$", "", search_key).strip()
 
     # Identity must be the whole pre-artwork phrase, not a substring/prefix.
     return identity_key == search_key
