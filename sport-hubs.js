@@ -668,7 +668,8 @@ async function renderUnifiedBoard(){
         // requested fixture has an exact ID + participant identity + kickoff match.
         for(let page=1;page<=5;page++){
           const feed=await get('./api/sportybet-virtual?sources=efootball,vfootball&pageSize=100&pageNum='+page+'&timeline=168');
-          const events=Array.isArray(feed?.events)?feed.events:[];
+          if(!Array.isArray(feed?.events)||feed.events.length===0)return null;
+          const events=feed.events;
           const fetchedAt=feed?.updated_at||feed?.server_time||null;
           if(events.length<100)sourceComplete=true;
           events.forEach(e=>{
