@@ -175,6 +175,70 @@ class VirtualResultBackfillTests(unittest.TestCase):
         self.assertEqual({row["event_id"] for row in rows}, {row["eventId"] for row in event_rows})
         self.assertTrue(all(row["result"] == "O5.5" for row in rows))
 
+    def _score_replay_leg(self, line=4.5, pick="under", product="efootball_gt"):
+        return {
+            "product": product,
+            "sport": "virtual",
+            "event_id": "sr:match:score-replay",
+            "match": "Liverpool (PlayerA) vs Tottenham (PlayerB)",
+            "market": "virtual_total",
+            "builder_pick": pick,
+            "pick": f"Under {line}" if pick == "under" else f"Over {line}",
+            "line": line,
+            "start_time": "2026-10-10T10:00:00Z",
+            "status": "PENDING",
+        }
+
+    def _authoritative_score_row(self, line=5.5, score="2:1", product="efootball_gt", market="ou"):
+        return {
+            "product": product,
+            "event_id": "sr:match:score-replay",
+            "market": market,
+            "line": line,
+            "selection": "U" + str(line),
+            "result": "U" + str(line),
+            "actual_result": "U" + str(line),
+            "win": True,
+            "score": score,
+            "settled_at": "2026-10-10T11:00:00+00:00",
+            "settlement_source": "SportyBet NG eventResultList via Match Signal proxy",
+            "record_id": f"sr:match:score-replay|ou|{line}|U{line}",
+        }
+
+    def test_authoritative_same_event_score_replays_across_different_ou_line(self):
+        leg = self._score_replay_leg(line=4.5, pick="under")
+        row = self._authoritative_score_row(line=5.5, score="2:1")
+        settled = settle_virtual_leg(leg, [row])
+        self.assertIsNotNone(settled)
+        self.assertEqual(settled["status"], "WON")
+        self.assertTrue(settled["correct"])
+        self.assertEqual(settled["result"], "U4.5")
+        self.assertEqual(settled["final_score"], [2.0, 1.0])
+        self.assertTrue(settled["score_replay"])
+        self.assertIn("SportyBet", settled["settlement_source"])
+
+    def test_authoritative_score_replay_respects_builder_line_and_push(self):
+        leg = self._score_replay_leg(line=3.0, pick="under")
+        row = self._authoritative_score_row(line=5.5, score="2:1")
+        settled = settle_virtual_leg(leg, [row])
+        self.assertEqual(settled["status"], "VOID")
+        self.assertIsNone(settled["correct"])
+        self.assertEqual(settled["result"], "PUSH")
+
+    def test_score_replay_rejects_missing_authoritative_provenance(self):
+        leg = self._score_replay_leg()
+        row = self._authoritative_score_row()
+        row["settlement_source"] = "model estimated final score"
+        self.assertIsNone(settle_virtual_leg(leg, [row]))
+
+    def test_score_replay_rejects_product_mismatch_and_conflicting_scores(self):
+        leg = self._score_replay_leg()
+        wrong_product = self._authoritative_score_row(product="efootball_adriatic")
+        self.assertIsNone(settle_virtual_leg(leg, [wrong_product]))
+        one = self._authoritative_score_row(line=5.5, score="2:1")
+        two = self._authoritative_score_row(line=6.5, score="4:2")
+        self.assertIsNone(settle_virtual_leg(leg, [one, two]))
+
     def test_recent_pending_leg_is_not_sent_to_result_api(self):
         ticket = self.ticket("efootball_gt", "sr:match:too-recent")
         from datetime import timedelta
