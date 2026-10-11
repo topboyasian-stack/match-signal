@@ -829,7 +829,7 @@
       : data.status==='LIVE_VALUE_SET'
       ? batchCount+' LIVE VALUE BATCH'+(batchCount===1?'':'ES')+' · 4.00+'
       : data.status==='VALUE_RESEARCH_SET'
-        ? batchCount+' PAPER VALUE BATCH'+(batchCount===1?'':'ES')+' · 2.80+'
+        ? batchCount+' PAPER VALUE BATCH'+(batchCount===1?'':'ES')+' · '+floorLabel
         : data.status==='BELOW_4_TARGET_AVAILABLE'
           ? 'NO BATCH AT '+floorLabel+' THRESHOLD'
           : data.status==='UPSTREAM_RESEARCH_GATE_BLOCKED'
@@ -869,7 +869,7 @@
         .map(function(x){return String(x||'').toUpperCase();})
         .filter(Boolean)
         .join(' + ') || 'VIRTUAL';
-      var laneText=b.primary_lane==='vfootball'?'vFootball Results-first lane':b.primary_lane==='model_first_value'?'Model-first paper value lane':'paper research lane';
+      var laneText=b.primary_lane==='vfootball'?'vFootball Results-first lane':b.primary_lane==='model_first_value'?'Model-first paper value lane':b.primary_lane==='efootball_exact_evidence_value'?'eFootball exact-evidence value research lane':'paper research lane';
       var batchNum=String(idx+1).padStart(2,'0');
       var body=legs.map(function(l,i){return legCard(l,i,idx);}).join('');
       var bookingPanel=bookingPanelHtml(b);
