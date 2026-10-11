@@ -108,6 +108,54 @@ def capture(live,archive,now):
             if row and row["sample_id"] not in seen:
                 rows.append(row); seen.add(row["sample_id"]); added+=1
     return added
+
+def market_coverage(live,now):
+    """Report whether the source actually supplies usable winner/BTTS quotes."""
+    out={"captured_at":now.isoformat(),"source":"current SportyBet virtual feed",
+         "window_minutes":WINDOW,"products":{}}
+    events=live.get("events",[]) if isinstance(live,dict) and isinstance(live.get("events"),list) else []
+    for product in sorted(PRODUCTS):
+        product_events=[e for e in events if isinstance(e,dict) and e.get("product")==product]
+        inventory=defaultdict(lambda:{"count":0,"names":[]})
+        type_counts=defaultdict(int); sampleable=defaultdict(int)
+        near_type_counts=defaultdict(int); near_sampleable=defaultdict(int)
+        near_events=0; upcoming_events=0; markets_29=0; markets_29_names=set()
+        for e in product_events:
+            start=dt(e.get("start_time") or e.get("start_time_ms"))
+            if start is None or start<=now: continue
+            upcoming_events+=1
+            mins=(start-now).total_seconds()/60
+            is_near=0<mins<=WINDOW
+            if is_near: near_events+=1
+            for m in e.get("markets",[]) if isinstance(e.get("markets"),list) else []:
+                if not isinstance(m,dict): continue
+                market_id=str(m.get("id") or "unknown")
+                name=str(m.get("name") or m.get("desc") or m.get("title") or "unknown")
+                key=market_id+"|"+name
+                inventory[key]["count"]+=1
+                if name not in inventory[key]["names"] and len(inventory[key]["names"])<4:
+                    inventory[key]["names"].append(name)
+                if market_id=="29":
+                    markets_29+=1
+                    markets_29_names.add(name)
+                kind=classify(m)
+                if kind not in {"match_winner","btts"}: continue
+                type_counts[kind]+=1
+                sample=make_sample(e,m,kind,now)
+                if sample: sampleable[kind]+=1
+                if is_near:
+                    near_type_counts[kind]+=1
+                    if sample: near_sampleable[kind]+=1
+        out["products"][product]={
+            "feed_events":len(product_events),"upcoming_events_with_time":upcoming_events,
+            "events_within_capture_window":near_events,
+            "market_type_rows":dict(type_counts),"usable_two_way_quote_rows":dict(sampleable),
+            "near_kickoff_market_type_rows":dict(near_type_counts),
+            "near_kickoff_usable_quote_rows":dict(near_sampleable),
+            "market_id_29_rows":markets_29,"market_id_29_names":sorted(markets_29_names),
+            "market_inventory":{k:v["count"] for k,v in sorted(inventory.items())}
+        }
+    return out
 def score(v):
     if isinstance(v,(int,float)):
         return float(v) if math.isfinite(float(v)) else None
@@ -245,6 +293,8 @@ def merge(remote,candidate):
     out["observations"]=sorted(rows.values(),key=lambda s:(str(s.get("start_time") or ""),str(s.get("product") or ""),str(s.get("market_type") or ""),str(s.get("sample_id") or "")))
     old_run=remote.get("last_run") or {}; new_run=candidate.get("last_run") or {}
     if (dt(new_run.get("captured_at")) or datetime.min.replace(tzinfo=timezone.utc)) >= (dt(old_run.get("captured_at")) or datetime.min.replace(tzinfo=timezone.utc)):out["last_run"]=new_run
+    old_coverage=remote.get("market_coverage") or {}; new_coverage=candidate.get("market_coverage") or {}
+    if (dt(new_coverage.get("captured_at")) or datetime.min.replace(tzinfo=timezone.utc)) >= (dt(old_coverage.get("captured_at")) or datetime.min.replace(tzinfo=timezone.utc)):out["market_coverage"]=new_coverage
     out.update(schema_version=1,mode="PAPER_RESEARCH_ONLY",live_trading_approved=False,production_qualification_enabled=False,odds_builder_eligible=False)
     return out
 def main():
@@ -257,6 +307,8 @@ def main():
     except Exception as exc:raise SystemExit(f"cannot read current virtual feed: {exc}")
     a=read_archive(ARCHIVE);a.setdefault("observations",[])
     added=capture(live,a,now)
+    coverage=market_coverage(live,now)
+    a["market_coverage"]=coverage
     pending=[s for s in a["observations"] if isinstance(s,dict) and s.get("settlement_status")=="PENDING" and (dt(s.get("start_time")) or now)<now]
     settled=0;errors=[]
     if now.minute%30<=2 or os.getenv("EFOOTBALL_RESEARCH_FORCE_SETTLE")=="1":
@@ -264,7 +316,7 @@ def main():
             events,errs=fetch_results(pending,now);settled=settle(a,events,now);errors.extend(errs)
         except Exception as exc:errors.append("result source unavailable: "+str(exc))
     a.update(schema_version=1,mode="PAPER_RESEARCH_ONLY",live_trading_approved=False,production_qualification_enabled=False,odds_builder_eligible=False,updated_at=now.isoformat())
-    a["last_run"]={"captured_at":now.isoformat(),"captured_new":added,"settled_new":settled,"settlement_errors":errors}
+    a["last_run"]={"captured_at":now.isoformat(),"captured_new":added,"settled_new":settled,"settlement_errors":errors,"market_coverage":coverage}
     a["summary"]=summary(a,now);ARCHIVE.write_text(json.dumps(a,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
-    print(json.dumps({"status":"PASS","captured_new":added,"settled_new":settled,"observations":len(a["observations"]),"settlement_errors":errors,"research_only":True},indent=2))
+    print(json.dumps({"status":"PASS","captured_new":added,"settled_new":settled,"observations":len(a["observations"]),"settlement_errors":errors,"market_coverage":coverage,"research_only":True},indent=2))
 if __name__=="__main__":main()

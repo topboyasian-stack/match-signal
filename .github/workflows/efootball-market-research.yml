@@ -56,8 +56,13 @@ jobs:
           assert d.get('production_qualification_enabled') is False
           assert d.get('odds_builder_eligible') is False
           assert isinstance(d.get('observations'), list)
+          assert isinstance(d.get('market_coverage'), dict), 'missing live market-coverage audit'
           assert all(x.get('product') in {'efootball_gt','efootball_adriatic'} for x in d['observations'])
           assert all(x.get('market_type') in {'match_winner','btts'} for x in d['observations'])
+          for product, stats in d['market_coverage'].get('products', {}).items():
+              print(product, 'market ID 29 rows=', stats.get('market_id_29_rows'),
+                    'usable upcoming quotes=', stats.get('usable_two_way_quote_rows'),
+                    'near-kickoff usable quotes=', stats.get('near_kickoff_usable_quote_rows'))
           print('Research archive contract passed:', len(d['observations']), 'rows')
           PY
       - name: Publish research archive without clobbering concurrent observations
