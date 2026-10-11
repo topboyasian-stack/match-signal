@@ -55,7 +55,8 @@ function updateMediaCoverage(){
   const report={page:location.pathname,measured_at:new Date().toISOString(),slots:slots.length,loaded_hits:hits,resolved,pending,initials_fallbacks:missing,hit_rate_pct:rate};
   window.__MATCH_SIGNAL_MEDIA_COVERAGE__=report;
   const output=document.querySelector('.ws-media-coverage');
-  if(output)output.textContent=slots.length===0?'Image coverage · no team/player image slots on this view':('Actual image hits · '+hits+'/'+resolved+' resolved ('+(rate==null?'—':rate+'%')+') · '+pending+' pending · '+missing+' initials');
+  const label=slots.length===0?'Image coverage · no team/player image slots on this view':('Actual image hits · '+hits+'/'+resolved+' resolved ('+(rate==null?'—':rate+'%')+') · '+pending+' pending · '+missing+' initials');
+  if(output&&output.textContent!==label)output.textContent=label;
 }
 function plain(v){return String(v||'').replace(/<[^>]*>/g,' ').replace(/&nbsp;/gi,' ').replace(/\s+/g,' ').trim();}
 function licenceAllowed(v){
@@ -203,7 +204,7 @@ function decorateVirtualFixtureCards(root){
   });
 }
 decorateVirtualFixtureCards(document);scan(document);
-new MutationObserver(rs=>{rs.forEach(r=>r.addedNodes.forEach(n=>{if(n.nodeType===1){decorateVirtualFixtureCards(n);scan(n);}}));if(rs.some(r=>r.removedNodes.length))updateMediaCoverage();}).observe(document.documentElement,{childList:true,subtree:true});
+new MutationObserver(rs=>{let removedMediaSlot=false;rs.forEach(r=>{r.addedNodes.forEach(n=>{if(n.nodeType===1){decorateVirtualFixtureCards(n);scan(n);}});r.removedNodes.forEach(n=>{if(n.nodeType===1&&(n.matches?.('[data-ws-media-kind][data-ws-media-name]')||n.querySelector?.('[data-ws-media-kind][data-ws-media-name]')))removedMediaSlot=true;});});if(removedMediaSlot)updateMediaCoverage();}).observe(document.documentElement,{childList:true,subtree:true});
 function ageLabel(v){const t=Date.parse(v||'');if(!Number.isFinite(t))return 'timestamp unavailable';const m=Math.max(0,Math.round((Date.now()-t)/60000));return m<60?m+'m ago':(m/60).toFixed(1)+'h ago';}
 function ageM(v){const t=Date.parse(v||'');return Number.isFinite(t)?Math.max(0,(Date.now()-t)/60000):Infinity;}
 async function json(path){const r=await fetch(route(path)+'?v='+Date.now(),{cache:'no-store'});if(!r.ok)throw Error();return r.json();}
