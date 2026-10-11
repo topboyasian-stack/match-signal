@@ -1,0 +1,49 @@
+name: Validate eFootball market research
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/efootball_market_research.py'
+      - 'scripts/test_efootball_market_research.py'
+      - 'scripts/virtual_lab_sync.py'
+      - 'functions/api/sportybet-virtual.js'
+      - '.github/workflows/efootball-market-research-tests.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/efootball_market_research.py'
+      - 'scripts/test_efootball_market_research.py'
+      - 'scripts/virtual_lab_sync.py'
+      - 'functions/api/sportybet-virtual.js'
+      - '.github/workflows/efootball-market-research-tests.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  offline-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install HTTP dependency
+        run: python -m pip install --upgrade requests
+      - name: Compile and run isolated market tests
+        run: |
+          python -m py_compile scripts/efootball_market_research.py scripts/test_efootball_market_research.py
+          python scripts/test_efootball_market_research.py
+      - name: Check that production qualification remains disabled
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          source=Path('scripts/efootball_market_research.py').read_text()
+          for contract in ('production_qualification_enabled=False','odds_builder_eligible=False','live_trading_approved=False'):
+              assert contract in source, f'missing fail-closed research contract: {contract}'
+          assert 'efootball_gt' in source and 'efootball_adriatic' in source
+          assert 'vfootball' not in source.lower().replace('efootball_market_research','')
+          print('Fail-closed research contract check passed.')
+          PY
