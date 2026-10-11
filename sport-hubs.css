@@ -95,3 +95,15 @@ body{background:
 .ms-qualified-best-empty{padding:12px;border:1px dashed var(--ms-border);border-radius:10px;color:var(--ms-muted);font-size:12px;line-height:1.55}
 @media(max-width:640px){.ms-qualified-best-wrap{padding:10px}.ms-qualified-best-head{flex-direction:column}.ms-qualified-best-head h3{font-size:14px}.ms-qualified-best-row .ms-fixture-foot{align-items:flex-start;flex-direction:column}}
 
+
+/* Verified entity imagery. Failed/ambiguous lookups remain initials, never guessed faces. */
+.ws-entity-label{display:inline-flex;align-items:center;gap:7px;min-width:0;vertical-align:middle}
+.ws-entity-name{min-width:0;overflow-wrap:anywhere}
+.ws-media-slot{width:30px;height:30px;flex:0 0 30px;display:inline-grid;place-items:center;position:relative;overflow:hidden;border:1px solid #37e7ff42;border-radius:9px;background:linear-gradient(145deg,#152433,#091019);color:#a8eeff;font-size:10px;font-weight:900;vertical-align:middle}
+.ws-media-slot[data-ws-media-kind="player"]{border-radius:50%;background:linear-gradient(145deg,#1b2334,#10121e);border-color:#8a7bff50;color:#d5ccff}
+.ws-media-slot.has-media{background:#fff;border-color:#ffffff22;font-size:0;color:transparent}
+.ws-media-image{width:100%;height:100%;display:block;object-fit:contain;background:#fff}
+.ws-media-slot[data-ws-media-kind="player"] .ws-media-image{object-fit:cover}
+.ms-match .ws-entity-label{margin:2px 2px 2px 0}
+.ms-up-match .ws-media-slot{width:26px;height:26px;flex-basis:26px}
+@media(max-width:600px){.ws-entity-label{gap:4px}.ws-media-slot{width:26px;height:26px;flex-basis:26px}}
