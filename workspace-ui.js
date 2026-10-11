@@ -17,7 +17,7 @@ const inferredActive=pagePath.includes('/virtual-lab')?'lab':
   pagePath.endsWith('/live.html')?'live':
   pagePath.endsWith('/odds-builder.html')?'builder':
   pagePath.endsWith('/league.html')?(new URLSearchParams(location.search).get('sport')==='tennis'?'tennis':'football'):'desk';
-const sharedCssUrl=route('/workspace-ui.css?v=20261011-workspace-media5');
+const sharedCssUrl=route('/workspace-ui.css?v=20261011-workspace-media6');
 const existingCss=document.querySelector('link[href*="workspace-ui.css"]');
 if(existingCss)existingCss.href=sharedCssUrl;else{const l=document.createElement('link');l.rel='stylesheet';l.href=sharedCssUrl;document.head.appendChild(l);}
 if(!document.getElementById('workspace-ui-polish')){
@@ -36,7 +36,7 @@ const cache=new Map(),entries=new Map(),queue=[];let busy=false;const prefix='ma
 let teamRegistry={};
 const registryReady=(async()=>{
   try{
-    const response=await fetch(route('/data/club-logo-registry.json'),{cache:'force-cache'});
+    const response=await fetch(route('/data/club-logo-registry.json'),{cache:'no-cache'});
     if(!response.ok)return;
     const payload=await response.json();
     if(payload&&payload.teams&&typeof payload.teams==='object')teamRegistry=payload.teams;
