@@ -92,11 +92,11 @@ async function lookup(kind,name){
     const data=await response.json(),pages=Object.values(data?.query?.pages||{}),candidates=[];
     for(const page of pages){
       const title=String(page?.title||''),titleBase=title.replace(/^File:/i,'').replace(/\.[^.]+$/,'');
-      const titleKey=norm(titleBase,kind,true),info=Array.isArray(page?.imageinfo)?page.imageinfo[0]:null,meta=info?.extmetadata||{},isImage=String(info?.mime||'').startsWith('image/');
+      const titleKey=norm(titleBase,kind,true),info=Array.isArray(page?.imageinfo)?page.imageinfo[0]:null,meta=info?.extmetadata||{},isImage=/^image\/(?:jpe?g|png|webp|gif|avif)$/i.test(String(info?.mime||''));
       const licence=plain(meta.LicenseShortName?.value||meta.UsageTerms?.value||''),url=String(info?.thumburl||info?.url||'');
       if(!info||!/^https:\/\/(?:upload|thumb)\.wikimedia\.org\//i.test(url)||!licenceAllowed(licence))continue;
       if(!(' '+titleKey+' ').includes(' '+key+' '))continue;
-      if(kind==='team'&&!/\b(logo|crest|badge|emblem|coat of arms)\b/i.test(titleKey))continue;
+      if(kind==='team'&&(!/\b(logo|crest|badge|emblem|coat of arms)\b/i.test(titleKey)||!/\b(football|soccer|club|olympique|racing|athletic|sporting|futbol|fútbol|fc|afc|sc|ac|cf)\b|\b(?:f\.c\.|a\.f\.c\.|c\.f\.|s\.c\.|a\.c\.)\b/i.test(titleBase)))continue;
       if(kind==='player'&&!isImage)continue;
       const licenseUrl=plain(meta.LicenseUrl?.value||''),artist=plain(meta.Artist?.value||meta.Credit?.value||'').slice(0,180);
       const score=(titleKey===key?100:0)+(kind==='team'?(/\b(crest|badge|emblem)\b/i.test(titleKey)?8:0):(/\b(portrait|headshot|profile)\b/i.test(titleKey)?20:(/\b(photo|forehand|backhand|tennis|olympics|wimbledon|open)\b/i.test(titleKey)?8:0)));
