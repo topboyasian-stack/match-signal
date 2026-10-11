@@ -131,6 +131,38 @@ class ClubLogoRegistryTests(unittest.TestCase):
         }
         self.assertTrue(_existing_entry_is_safe("boca juniors", good))
 
+
+    def test_rejects_current_photo_graffiti_and_brand_logo_registry_artifacts(self):
+        bad_entries = [
+            ("southampton", {
+                "name": "Southampton",
+                "canonical_key": "southampton",
+                "title": "File:Southampton FC crest - geograph.org.uk - 1723706.jpg",
+                "path": "/assets/club-logos/southampton.jpg",
+            }),
+            ("twente", {
+                "name": "Twente",
+                "canonical_key": "twente",
+                "title": "File:FC Twente logo's in graffiti.jpg",
+                "path": "/assets/club-logos/twente.jpg",
+            }),
+            ("milan", {
+                "name": "AC Milan",
+                "canonical_key": "milan",
+                "title": "File:AC Milan badge stadio Giuseppe Meazza.jpg",
+                "path": "/assets/club-logos/milan.jpg",
+            }),
+            ("monaco", {
+                "name": "Monaco",
+                "canonical_key": "monaco",
+                "title": "File:Club Monaco Official Logo.png",
+                "path": "/assets/club-logos/monaco.png",
+            }),
+        ]
+        for key, entry in bad_entries:
+            with self.subTest(team=key):
+                self.assertFalse(_existing_entry_is_safe(key, entry))
+
     def test_policy_change_retries_previous_misses_immediately(self):
         registry = {"search_policy_version": 5}
         misses = {"arsenal": {"retry_after": "2099-01-01T00:00:00+00:00"}}
