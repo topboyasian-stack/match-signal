@@ -357,6 +357,42 @@ function isActiveVirtualProduct(product){
   const key=String(product||"").toLowerCase();
   return key==="efootball_gt"||key==="efootball_adriatic";
 }
+function virtualParticipantIdentity(row,keys){
+  let value="";
+  for(const key of keys){
+    if(row?.[key]!=null&&String(row[key]).trim()){value=String(row[key]).trim();break;}
+  }
+  const embedded=value.match(/\(([^()]*)\)\s*$/);
+  if(embedded&&embedded[1].trim())value=embedded[1].trim();
+  return value.toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+}
+function virtualStartTimestamp(row){
+  const raw=row?.start_time_ms??row?.startTimeMs??row?.start_time??row?.startTime??row?.timestamp??row?.date;
+  if(typeof raw==="number"||(typeof raw==="string"&&/^\d{10,13}$/.test(raw.trim()))){
+    const n=Number(raw);if(Number.isFinite(n))return n<1e11?n*1000:n;
+  }
+  const parsed=Date.parse(String(raw??""));
+  return Number.isFinite(parsed)?parsed:null;
+}
+function sameVirtualEvent(row,live){
+  const rowEventId=String(row?.event_id||"");
+  const liveEventId=String(live?.event_id||"");
+  if(!rowEventId||!liveEventId||rowEventId!==liveEventId)return false;
+  const rowProduct=String(row?.product||"").toLowerCase();
+  const liveProduct=String(live?.product||"").toLowerCase();
+  if(rowProduct&&liveProduct&&rowProduct!==liveProduct)return false;
+  const rowA=virtualParticipantIdentity(row,["participant_1","player_1","team_1","home","home_name","homeName","player1"]);
+  const rowB=virtualParticipantIdentity(row,["participant_2","player_2","team_2","away","away_name","awayName","player2"]);
+  const liveA=virtualParticipantIdentity(live,["participant_1","player_1","team_1","home","home_name","homeName","player1"]);
+  const liveB=virtualParticipantIdentity(live,["participant_2","player_2","team_2","away","away_name","awayName","player2"]);
+  if(!rowA||!rowB||!liveA||!liveB)return false;
+  if([rowA,rowB].sort().join("|")!==[liveA,liveB].sort().join("|"))return false;
+  const rowTime=virtualStartTimestamp(row),liveTime=virtualStartTimestamp(live);
+  // The exact provider event ID, product and participants are mandatory.
+  // Provider-normalized kickoff timestamps can drift a little between feeds.
+  if(rowTime==null||liveTime==null||Math.abs(rowTime-liveTime)>10*60*1000)return false;
+  return true;
+}
 function primaryPrediction(rows){
   const rank=x=>{
     const gate=qualificationState(x);
@@ -616,37 +652,6 @@ async function renderUnifiedBoard(){
     // Upcoming Desk without turning it into a Builder qualification bypass.
     const virtualCandidates=selectedRows.filter(isVirtualDeskCandidate);
 
-    function virtualParticipantIdentity(row,keys){
-      let value="";
-      for(const key of keys){
-        if(row?.[key]!=null&&String(row[key]).trim()){value=String(row[key]).trim();break;}
-      }
-      const embedded=value.match(/\(([^()]*)\)\s*$/);
-      if(embedded&&embedded[1].trim())value=embedded[1].trim();
-      return value.toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
-    }
-    function virtualStartTimestamp(row){
-      const raw=row?.start_time_ms??row?.startTimeMs??row?.start_time??row?.startTime??row?.timestamp??row?.date;
-      if(typeof raw==="number"||(typeof raw==="string"&&/^\d{10,13}$/.test(raw.trim()))){
-        const n=Number(raw);if(Number.isFinite(n))return n<1e11?n*1000:n;
-      }
-      const parsed=Date.parse(String(raw??""));
-      return Number.isFinite(parsed)?parsed:null;
-    }
-    function sameVirtualEvent(row,live){
-      const rowProduct=String(row?.product||"").toLowerCase();
-      const liveProduct=String(live?.product||"").toLowerCase();
-      if(rowProduct&&liveProduct&&rowProduct!==liveProduct)return false;
-      const rowA=virtualParticipantIdentity(row,["participant_1","player_1","team_1","home","home_name","homeName","player1"]);
-      const rowB=virtualParticipantIdentity(row,["participant_2","player_2","team_2","away","away_name","awayName","player2"]);
-      const liveA=virtualParticipantIdentity(live,["participant_1","player_1","team_1","home","home_name","homeName","player1"]);
-      const liveB=virtualParticipantIdentity(live,["participant_2","player_2","team_2","away","away_name","awayName","player2"]);
-      if(!rowA||!rowB||!liveA||!liveB)return false;
-      if([rowA,rowB].sort().join("|")!==[liveA,liveB].sort().join("|"))return false;
-      const rowTime=virtualStartTimestamp(row),liveTime=virtualStartTimestamp(live);
-      if(rowTime==null||liveTime==null||Math.abs(rowTime-liveTime)>90*1000)return false;
-      return true;
-    }
     async function freshVirtualQuoteMap(requiredRows=[]){
       const byEvent={};
       const quoteNow=Date.now();
@@ -655,16 +660,17 @@ async function renderUnifiedBoard(){
         const start=virtualStartTimestamp(row);
         return start!=null&&start>=quoteNow;
       });
-      if(!required.length)return byEvent;
+      if(!required.length)return null;
+      let sourceComplete=false;
       try{
         // The first 100-event page often omits fixtures further down the active
-        // eFootball feed. Paginate only a bounded number of pages, stopping as
-        // soon as each requested fixture has an exact ID + participant + kickoff
-        // match. A reused provider ID by itself never validates a quote.
+        // eFootball feed. Paginate a bounded number of pages, stopping when each
+        // requested fixture has an exact ID + participant identity + kickoff match.
         for(let page=1;page<=5;page++){
           const feed=await get('./api/sportybet-virtual?sources=efootball,vfootball&pageSize=100&pageNum='+page+'&timeline=168');
           const events=Array.isArray(feed?.events)?feed.events:[];
           const fetchedAt=feed?.updated_at||feed?.server_time||null;
+          if(events.length<100)sourceComplete=true;
           events.forEach(e=>{
             const id=String(e?.event_id||"");
             if(id){
@@ -672,13 +678,16 @@ async function renderUnifiedBoard(){
               byEvent[id].push({...e,__quote_fetched_at:fetchedAt});
             }
           });
-          if(events.length<100)break;
+          if(events.length<100){sourceComplete=true;break;}
           const allResolved=required.length>0&&required.every(row=>
             (byEvent[String(row?.event_id||"")]||[]).some(event=>sameVirtualEvent(row,event))
           );
-          if(allResolved)break;
+          if(allResolved){sourceComplete=true;break;}
         }
-      }catch(_){}
+      }catch(_){return null;}
+      // If five full pages did not resolve all rows, treat the snapshot as
+      // incomplete rather than stripping timestamps from unobserved candidates.
+      if(!sourceComplete)return null;
       return byEvent;
     }
     function freshVirtualQuoteFields(row,live){
@@ -839,6 +848,9 @@ async function renderUnifiedBoard(){
         String(row?.sport||"").toLowerCase()==="virtual"&&isOverUnderPrediction(row)&&virtualStartTimestamp(row)>=Date.now()
       );
       const quoteMap=await freshVirtualQuoteMap(requiredQuoteRows);
+      // A failed/incomplete pull is not a negative quote observation. Preserve
+      // the last timestamp; the existing 15-minute gate still expires stale prices.
+      if(!quoteMap)return;
       all=all.map(row=>{
         if(String(row?.sport||"").toLowerCase()!=="virtual"||!isOverUnderPrediction(row))return row;
         const candidates=quoteMap[String(row?.event_id||"")]||[];
@@ -874,6 +886,7 @@ async function renderUnifiedBoard(){
     }catch(_){}
     };
     const sport=Q('#upSport'), date=Q('#upDate'), search=Q('#upSearch');
+    let virtualQuoteRefreshComplete=false;
     const setOptions=(el,vals)=>{if(!el||el.dataset.ready)return;el.innerHTML=vals.map(v=>'<option value="'+E(v.value)+'">'+E(v.label)+'</option>').join('');el.dataset.ready="1";};
     setOptions(sport,[{value:"all",label:"All active sports"},{value:"football",label:"⚽ Football"},{value:"tennis",label:"🎾 Tennis"},{value:"virtual",label:"🧪 Virtual / eFootball"}]);
     setOptions(date,[{value:"7",label:"Next 7 days"},{value:"today",label:"Today"},{value:"tomorrow",label:"Tomorrow"},{value:"3",label:"Next 3 days"}]);
@@ -917,14 +930,21 @@ async function renderUnifiedBoard(){
         return true;
       });
       const groups=fixtureGroups(filteredRows);
-      const best=qualifiedBestSelections(filteredRows,now.getTime());
+      const isVirtualQualificationRow=x=>String(x?.sport||"").toLowerCase()==="virtual"||["efootball_gt","efootball_adriatic","vfootball","zoom"].includes(String(x?.product||"").toLowerCase());
+      const virtualQuotePending=!virtualQuoteRefreshComplete&&filteredRows.some(isVirtualQualificationRow);
+      // Never flash stale Virtual/eFootball rows as qualified before the exact
+      // live quote pass has finished. Other sports remain available immediately.
+      const qualificationRows=virtualQuoteRefreshComplete?filteredRows:filteredRows.filter(x=>!isVirtualQualificationRow(x));
+      const best=qualifiedBestSelections(qualificationRows,now.getTime());
       const bestBoard=Q('#qualifiedBestBoard');
       if(bestBoard){
         bestBoard.innerHTML=best.rows.length
           ?best.rows.slice(0,12).map(qualifiedBestRow).join("")
-          :'<div class="ms-qualified-best-empty">'+(best.diagnostics.futureCandidateMarkets===0
-            ?"No future candidate markets in this filtered view."
-            :"Zero qualified picks from "+best.diagnostics.futureCandidateMarkets+" future market candidates. No pick was forced.")+'</div>';
+          :virtualQuotePending
+            ?'<div class="ms-qualified-best-empty">Verifying current SportyBet event identity, exact line/side and quote freshness for Virtual/eFootball…</div>'
+            :'<div class="ms-qualified-best-empty">'+(best.diagnostics.futureCandidateMarkets===0
+              ?"No future candidate markets in this filtered view."
+              :"Zero qualified picks from "+best.diagnostics.futureCandidateMarkets+" future market candidates. No pick was forced.")+'</div>';
       }
       const bestSummary=Q('#qualifiedBestSummary');
       if(bestSummary){
@@ -932,10 +952,12 @@ async function renderUnifiedBoard(){
           .sort((a,b)=>b[1]-a[1]).slice(0,3)
           .map(([reason,count])=>qualificationBlockerLabel(reason)+" ("+count+")").join(" · ");
         bestSummary.innerHTML=best.rows.length
-          ?'<span><b>'+best.rows.length+'</b> qualified fixture'+(best.rows.length===1?'':'s')+' · exact SportyBet market/line/side · quote ≤15 min · market edge ≥+2% after margin removal and expected return ≥+2% at offered odds'+(best.rows.length>12?' · showing top 12 by expected return':'')+'</span>'
-          :'<span><b>0 qualified picks.</b> '+(best.diagnostics.futureCandidateMarkets===0
-            ?"No future candidates in this filtered view."
-            :"Blockers: "+E(blockerText||"No current candidate passed every gate.")+". No selections were relaxed to fill the list.")+'</span>';
+          ?'<span><b>'+best.rows.length+'</b> qualified fixture'+(best.rows.length===1?'':'s')+' · exact SportyBet market/line/side · quote ≤15 min · market edge ≥+2% after margin removal and expected return ≥+2% at offered odds'+(best.rows.length>12?' · showing top 12 by expected return':'')+(virtualQuotePending?' · checking live Virtual/eFootball quotes before listing those selections':'')+'</span>'
+          :virtualQuotePending
+            ?'<span><b>Checking current exact prices.</b> Virtual/eFootball picks will appear only after event identity, exact market/line/side, quote freshness and value gates are rechecked.</span>'
+            :'<span><b>0 qualified picks.</b> '+(best.diagnostics.futureCandidateMarkets===0
+              ?"No future candidates in this filtered view."
+              :"Blockers: "+E(blockerText||"No current candidate passed every gate.")+". No selections were relaxed to fill the list.")+'</span>';
       }
       const byDay=new Map();
       for(const group of groups){const day=String(group.rows[0].start_time).slice(0,10);if(!byDay.has(day))byDay.set(day,[]);byDay.get(day).push(group);}
@@ -964,7 +986,7 @@ async function renderUnifiedBoard(){
     // Quote enrichment still runs with all original safeguards, then redraws the
     // same view so only fresh exact event/line/side matches can qualify.
     draw();
-    refreshVirtualQuoteData().then(()=>draw()).catch(()=>{});
+    refreshVirtualQuoteData().then(()=>{virtualQuoteRefreshComplete=true;draw();}).catch(()=>{virtualQuoteRefreshComplete=true;draw();});
   }catch(e){
     root.innerHTML='<div class="ms-empty">Unified upcoming feed unavailable: '+E(e.message)+'</div>';
   }
