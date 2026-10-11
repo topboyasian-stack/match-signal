@@ -184,7 +184,7 @@ def side_score(event,side):
     status=" ".join(status.split())
     final_status={"end","ended","finished","final","completed","complete","status end","status final","status finished","match end","match ended"}
     if raw_set_score is not None and status in final_status:
-        match=re.fullmatch(r"\\s*(\\d+(?:\\.\\d+)?)\\s*:\\s*(\\d+(?:\\.\\d+)?)\\s*",str(raw_set_score))
+        match=re.fullmatch(r"\s*(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)\s*",str(raw_set_score))
         if match:
             return float(match.group(1 if side=="home" else 2))
     target=side+"score"
