@@ -11,7 +11,8 @@ sync=importlib.util.module_from_spec(sync_spec);sync_spec.loader.exec_module(syn
 def fixture(now,offset=10):
  return {"events":[{"product":"efootball_gt","event_id":"event-1","category_id":"cat","tournament_id":"tour","competition":"GT","participant_1":"Alpha","participant_2":"Beta","start_time":(now+timedelta(minutes=offset)).isoformat(),"markets":[
   {"id":"1","name":"Match Result","outcomes":[{"id":"h","name":"1","odds":1.8,"active":True},{"id":"d","name":"X","odds":3.4,"active":True},{"id":"a","name":"2","odds":4.5,"active":True}]},
-  {"id":"10","name":"Both Teams to Score","outcomes":[{"id":"y","name":"Yes","odds":2.0,"active":True},{"id":"n","name":"No","odds":1.7,"active":True}]},
+  {"id":"10","name":"Double Chance","outcomes":[{"id":"1x","name":"1X","odds":1.2,"active":True},{"id":"12","name":"12","odds":1.3,"active":True},{"id":"x2","name":"X2","odds":1.4,"active":True}]},
+  {"id":"29","name":"GG/NG","outcomes":[{"id":"y","name":"GG","odds":2.0,"active":True},{"id":"n","name":"NG","odds":1.7,"active":True}]},
   {"id":"18","name":"Total Goals","specifier":"total=3.5","outcomes":[{"name":"Over","odds":1.9},{"name":"Under","odds":1.9}]}
  ]}]}
 def test_live_feed_compaction_preserves_scope_ids():
@@ -21,7 +22,8 @@ def test_live_feed_compaction_preserves_scope_ids():
  assert row["category_id"]=="cat-1" and row["tournament_id"]=="tour-1"
 def test_markets():
  assert mod.classify({"id":"1","name":"Match Result","outcomes":[{"name":"1"},{"name":"X"},{"name":"2"}]})=="match_winner"
- assert mod.classify({"id":"10","name":"Both Teams to Score","outcomes":[{"name":"Yes"},{"name":"No"}]})=="btts"
+ assert mod.classify({"id":"10","name":"Double Chance","outcomes":[{"name":"1X"},{"name":"12"},{"name":"X2"}]}) is None
+ assert mod.classify({"id":"29","name":"GG/NG","outcomes":[{"name":"GG"},{"name":"NG"}]})=="btts"
  assert mod.classify({"id":"55","name":"GG/NGG","outcomes":[{"name":"GG"},{"name":"NGG"}]})=="btts"
  assert mod.classify({"id":"18","name":"Total Goals","outcomes":[{"name":"Over"},{"name":"Under"}]}) is None
  assert mod.classify({"id":"1","name":"1st Half Result","outcomes":[{"name":"1"},{"name":"X"},{"name":"2"}]}) is None
@@ -36,6 +38,20 @@ def test_capture():
  assert mod.capture(fixture(now,-1),{"observations":[]},now)==0
  live["events"][0]["product"]="vfootball"
  assert mod.capture(live,{"observations":[]},now)==0
+def test_live_market_coverage_reports_actual_btts_availability():
+ now=datetime(2026,10,11,10,0,tzinfo=timezone.utc)
+ live=fixture(now)
+ coverage=mod.market_coverage(live,now)
+ gt=coverage["products"]["efootball_gt"]
+ assert gt["market_id_29_rows"]==1
+ assert gt["usable_two_way_quote_rows"]["btts"]==1
+ assert gt["usable_two_way_quote_rows"]["match_winner"]==1
+ assert gt["near_kickoff_usable_quote_rows"]["btts"]==1
+ # A source event containing market 10 Double Chance is not a BTTS observation.
+ live["events"][0]["markets"]=[m for m in live["events"][0]["markets"] if m["id"]!="29"]
+ coverage=mod.market_coverage(live,now)["products"]["efootball_gt"]
+ assert coverage["market_id_29_rows"]==0
+ assert "btts" not in coverage["usable_two_way_quote_rows"]
 def test_settlement_and_summary():
  now=datetime(2026,10,11,10,0,tzinfo=timezone.utc);a={"observations":[]};mod.capture(fixture(now),a,now)
  assert mod.settle(a,[{"eventId":"event-1","homeScore":"3","awayScore":"2"}],now+timedelta(hours=1))==2
@@ -71,5 +87,5 @@ def test_draw_and_append_only_merge():
  m=mod.merge({"observations":[frozen]},{"observations":[settled]})
  assert m["observations"][0]["settlement_status"]=="SETTLED" and m["odds_builder_eligible"] is False
 if __name__=="__main__":
- test_live_feed_compaction_preserves_scope_ids();test_markets();test_capture();test_settlement_and_summary();test_legacy_missing_scope_uses_bounded_discovery();test_draw_and_append_only_merge()
- print("eFootball winner/BTTS research tests: PASS (6 groups)")
+ test_live_feed_compaction_preserves_scope_ids();test_markets();test_capture();test_live_market_coverage_reports_actual_btts_availability();test_settlement_and_summary();test_legacy_missing_scope_uses_bounded_discovery();test_draw_and_append_only_merge()
+ print("eFootball winner/BTTS research tests: PASS (7 groups)")
