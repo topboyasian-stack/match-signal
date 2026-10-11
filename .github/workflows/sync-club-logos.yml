@@ -41,6 +41,7 @@ jobs:
         run: |
           python -m unittest scripts.test_club_logo_registry scripts.test_odds_ticket_tracker -v
           python -m py_compile scripts/sync_club_logos.py scripts/odds_ticket_tracker.py
+          node scripts/test_workspace_media_titles.mjs
 
       - name: Download missing verified logo assets
         shell: bash

@@ -31,8 +31,33 @@ host.innerHTML='<nav class="ws-nav" aria-label="Match Signal workspaces"><a clas
 }
 function clean(name,kind){let s=String(name||'').trim();if(kind==='team')s=s.replace(/\s*\([^()]+\)\s*$/,'').trim();return s;}
 function norm(name,kind,preserveTitle=false){let raw=preserveTitle?String(name||'').trim():clean(name,kind);if(!preserveTitle&&kind==='player'&&raw.includes(',')){const parts=raw.split(',').map(x=>x.trim()).filter(Boolean);if(parts.length>1)raw=parts.slice(1).join(' ')+' '+parts[0];}let s=raw.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/&/g,' and ').replace(/[^a-z0-9]+/g,' ').trim().replace(/\s+/g,' ');if(kind==='team')s=s.replace(/^(fc|afc|sc|ac|club)\s+/,'').replace(/\s+(football club|fc|cf|afc|sc|ac)$/,'').trim();return s;}
+function teamLogoTitleMatches(name,title){
+  const base=String(title||'').replace(/^File:/i,'').replace(/\.[^.]+$/,'');
+  let searchKey=norm(name,'team');
+  if(!base||!searchKey)return false;
+  const rejected=/\b(rugby|pin badge|supporters? club|supporters|fan club|souvenir|main stand|side view|stadium|shirt|jersey|poster|sticker|key ?ring|medal|collection|toy|window|photograph|photo|mural|building|signboard|shopfront|on window|crossed out|xmas|christmas|festive|defaced|satirical|parody|unofficial|fan art|geograph|graffiti|stadio|club monaco|fashion|apparel|clothing|retail|department store|sportswear|boutique|designer label)\b/i;
+  const historic=/\b(old|original|historic|historical|vintage|antique|retro|altes|alte|alter)\b|\b(?:18\d{2}|19\d{2})\b/i;
+  if(rejected.test(base)||historic.test(base))return false;
+  const clubClue=/\b(football|soccer|club|olympique|racing|athletic|sporting|futbol|fútbol|fc|afc|sc|ac|cf)\b|\b(?:f\.c\.|a\.f\.c\.|c\.f\.|s\.c\.|a\.c\.)\b/i;
+  const prefixArtwork=/^(?:logo|crest|badge|emblem|coat of arms)(?:\s+of)?[\s:_-]+/i.exec(base);
+  if(!clubClue.test(base)&&!prefixArtwork)return false;
+  let identityPhrase='';
+  if(prefixArtwork){
+    identityPhrase=base.slice(prefixArtwork[0].length).trim().replace(/\s*\((?:19|20)\d{2}(?:\s*-\s*(?:19|20)\d{2})?)\s*\)\s*$/,'');
+  }else{
+    const artwork=/\b(logo|crest|badge|emblem|coat of arms)\b/i.exec(base);
+    if(!artwork)return false;
+    identityPhrase=base.slice(0,artwork.index).trim().replace(/[_\-.,:;()\[\]{}]+$/,'');
+  }
+  const suffix=/\s+(?:official|national(?: football| soccer)? team|football team|soccer team|team|football|soccer|club badge|football lion)$/;
+  const identityKey=norm(identityPhrase,'team').replace(suffix,'').trim();
+  searchKey=searchKey.replace(suffix,'').trim();
+  if(!identityKey||!searchKey)return false;
+  // A club's registered name may include the common AS or Atlético prefix.
+  return identityKey===searchKey||identityKey==='atletico '+searchKey||identityKey==='as '+searchKey;
+}
 function initials(name){const w=clean(name,'team').split(/\s+/).filter(Boolean);return (w.length>1?w[0][0]+w[1][0]:(w[0]||'MS').slice(0,2)).toUpperCase();}
-const cache=new Map(),entries=new Map(),queue=[];let busy=false;const prefix='match-signal-media-v5:';
+const cache=new Map(),entries=new Map(),queue=[];let busy=false;const prefix='match-signal-media-v6:';
 let teamRegistry={};
 const registryReady=(async()=>{
   try{
@@ -104,8 +129,9 @@ async function lookup(kind,name){
       const titleKey=norm(titleBase,kind,true),info=Array.isArray(page?.imageinfo)?page.imageinfo[0]:null,meta=info?.extmetadata||{},isImage=/^image\/(?:jpe?g|png|webp|gif|avif)$/i.test(String(info?.mime||''));
       const licence=plain(meta.LicenseShortName?.value||meta.UsageTerms?.value||''),url=String(info?.thumburl||info?.url||'');
       if(!info||!/^https:\/\/(?:upload|thumb)\.wikimedia\.org\//i.test(url)||!licenceAllowed(licence))continue;
-      if(!(' '+titleKey+' ').includes(' '+key+' '))continue;
-      if(kind==='team'&&(!/\b(logo|crest|badge|emblem|coat of arms)\b/i.test(titleKey)||!/\b(football|soccer|club|olympique|racing|athletic|sporting|futbol|fútbol|fc|afc|sc|ac|cf)\b|\b(?:f\.c\.|a\.f\.c\.|c\.f\.|s\.c\.|a\.c\.)\b/i.test(titleBase)))continue;
+      if(kind==='team'){
+        if(!teamLogoTitleMatches(cleaned,titleBase))continue;
+      }else if(!(' '+titleKey+' ').includes(' '+key+' '))continue;
       if(kind==='player'&&!isImage)continue;
       const licenseUrl=plain(meta.LicenseUrl?.value||''),artist=plain(meta.Artist?.value||meta.Credit?.value||'').slice(0,180);
       const score=(titleKey===key?100:0)+(kind==='team'?(/\b(crest|badge|emblem)\b/i.test(titleKey)?8:0):(/\b(portrait|headshot|profile)\b/i.test(titleKey)?20:(/\b(photo|forehand|backhand|tennis|olympics|wimbledon|open)\b/i.test(titleKey)?8:0)));
