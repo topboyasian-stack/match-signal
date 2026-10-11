@@ -701,13 +701,23 @@
   }
 
   var ACTIVE_VIRTUAL_MIN_PROBABILITY = 0.80;
-  function isActiveVirtualLeg(leg){
+  var EFOOTBALL_EXACT_EVIDENCE_MIN_PROBABILITY = 0.65;
+  var PHASE2_CYCLICAL_MIN_PROBABILITY = 0.78;
+  function activeVirtualProbabilityFloor(leg,batchLane){
+    var legLane=String(leg&&leg.qualification_lane||"").toLowerCase();
+    var lane=String(batchLane||leg&&leg.execution_track||"").toLowerCase();
+    if(lane==="phase2_cyclical_loop"||lane==="phase2_cyclical_loop_research")return PHASE2_CYCLICAL_MIN_PROBABILITY;
+    if(legLane==="efootball_exact_evidence_value")return EFOOTBALL_EXACT_EVIDENCE_MIN_PROBABILITY;
+    return ACTIVE_VIRTUAL_MIN_PROBABILITY;
+  }
+  function isActiveVirtualLeg(leg,batchLane){
     var product=String(leg&&leg.product||"").toLowerCase();
     var sport=String(leg&&leg.sport||"").toLowerCase();
     if(product==="vfootball"||product==="zoom")return false;
     if(sport==="virtual"){
       var probability=Number(leg&&leg.model_probability);
-      return (product==="efootball_gt"||product==="efootball_adriatic")&&Number.isFinite(probability)&&probability>=ACTIVE_VIRTUAL_MIN_PROBABILITY;
+      var floor=activeVirtualProbabilityFloor(leg,batchLane);
+      return (product==="efootball_gt"||product==="efootball_adriatic")&&Number.isFinite(probability)&&probability>=floor;
     }
     return true;
   }
@@ -716,17 +726,20 @@
     var products=Array.isArray(batch.products)?batch.products:[];
     if(products.some(function(p){var k=String(p||"").toLowerCase();return k==="vfootball"||k==="zoom";}))return false;
     var legs=Array.isArray(batch.legs)?batch.legs:[];
-    return legs.length>0&&legs.every(isActiveVirtualLeg);
+    var lane=String(batch.primary_lane||batch.execution_track||"").toLowerCase();
+    return legs.length>0&&legs.every(function(leg){return isActiveVirtualLeg(leg,lane);});
   }
 
-  function qualificationMonitorHtml(data) {
-    // Observability only: near-misses never become qualified legs or booking batches.
-    var activeBatches=Array.isArray(data.batches)?data.batches:[];
-    if(activeBatches.length)return '';
+  function qualificationMonitorHtml(data,visibleBatchCount) {
+    // Explain the distinction between a leg passing its own gates and a ticket passing all batch gates.
+    if(Number(visibleBatchCount||0)>0)return '';
     var diag=data.candidate_diagnostics||{};
     var vdiag=diag.virtual_gate_diagnostics||{};
+    var individual=diag.individual_leg_diagnostics||{};
     var items=Array.isArray(data.best_available_legs)?data.best_available_legs.slice(0,5):[];
     var evidenceCandidates=Number(vdiag.evidence_value_candidates||0);
+    var legPassCount=Number(individual.builder_eligible_leg_count||0);
+    var exactPassCount=Number(individual.efootball_exact_evidence_at_65_percent_floor||0);
     var observedAt=String(data.generated_at||'');
     function formatPercent(value) {
       var n=Number(value);
@@ -736,44 +749,50 @@
       x=x||{};
       var p=Number(x.model_probability);
       var hasProbability=isFinite(p);
-      var belowFloor=hasProbability&&p<0.8;
+      var lane=String(x.qualification_lane||"").toLowerCase();
+      var floor=lane==="efootball_exact_evidence_value"?EFOOTBALL_EXACT_EVIDENCE_MIN_PROBABILITY:ACTIVE_VIRTUAL_MIN_PROBABILITY;
+      var belowFloor=hasProbability&&p<floor;
       var recent=x.recent_evidence||{};
       var evidenceN=Number(recent.n||x.direct_exact_sample_n||x.evidence_sample_n||0);
       var hasEvidence=evidenceN>0;
       var wins=Number(recent.wins);
       var hitRate=Number(recent.hit_rate);
       var ticket=x.results_first||{};
+      var legPassed=x.builder_eligible===true;
       var blockers=[];
-      if(belowFloor)blockers.push('Model probability is below the active 80% per-leg construction floor.');
-      if(ticket.reason==='no_profitable_construction_shape')blockers.push('No independently proven profitable settled-ticket shape for this product yet.');
+      if(belowFloor)blockers.push('Model probability is below this lane’s '+formatPercent(floor)+' per-leg floor.');
+      if(legPassed)blockers.push('Individual evidence, fresh-price, edge, data-quality and uncertainty checks passed, but no whole-ticket construction has passed yet.');
+      if(ticket.reason==='no_profitable_construction_shape')blockers.push('The settled-ticket construction family has not demonstrated profitable results.');
       else if(ticket.reason==='insufficient_settled_exact_line_side_results')blockers.push('Insufficient settled exact-line/side results for the Results-first lane.');
-      if(!blockers.length)blockers.push('This row is informational only; all independent ticket, pricing, and risk gates must pass before qualification.');
+      if(!blockers.length)blockers.push('This row remains informational only; current price, correlation, ticket odds and whole-ticket ROI must all pass.');
       var facts=[];
       facts.push('Model '+(hasProbability?formatPercent(p):'—'));
+      facts.push('Lane floor '+formatPercent(floor));
       facts.push('SportyBet '+(x.bookmaker_odds==null?'—':Number(x.bookmaker_odds).toFixed(2)));
       facts.push('Edge '+(x.model_edge==null?'—':formatPercent(x.model_edge)));
       if(hasEvidence){
-        var observed=isFinite(wins)?String(wins)+'/'+String(evidenceN):String(evidenceN)+' settled rows';
-        var hr=isFinite(hitRate)?' · observed hit rate '+formatPercent(hitRate):'';
+        var observed=Number.isFinite(wins)?String(wins)+'/'+String(evidenceN):String(evidenceN)+' settled rows';
+        var hr=Number.isFinite(hitRate)?' · observed hit rate '+formatPercent(hitRate):'';
         facts.push('Exact-line history '+observed+hr);
       }
+      var badge=legPassed?'INDIVIDUAL GATES PASS':'NOT QUALIFIED';
       return '<div class="card" style="padding:11px;min-width:0">'+
         '<div style="display:flex;gap:8px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap">'+
         '<strong style="font-size:11px;line-height:1.45">'+esc(x.match||'Unknown fixture')+'</strong>'+
-        '<span style="font-size:8px;font-weight:900;letter-spacing:.06em;color:#ffd166;border:1px solid rgba(255,209,102,.2);border-radius:999px;padding:4px 6px">NOT QUALIFIED</span></div>'+
+        '<span style="font-size:8px;font-weight:900;letter-spacing:.06em;color:#ffd166;border:1px solid rgba(255,209,102,.2);border-radius:999px;padding:4px 6px">'+badge+'</span></div>'+
         '<div style="margin-top:4px;font-size:9px;color:var(--ms-muted);line-height:1.45">'+esc(x.pick||'Candidate line unavailable')+'</div>'+
         '<div style="margin-top:8px;font-size:9px;line-height:1.7">'+esc(facts.join(' · '))+'</div>'+
-        '<div style="margin-top:7px;font-size:8px;line-height:1.55;color:var(--ms-muted)"><b>Why it is not a ticket:</b> '+esc(blockers.join(' '))+'</div>'+
+        '<div style="margin-top:7px;font-size:8px;line-height:1.55;color:var(--ms-muted)"><b>Why it is not a qualified batch:</b> '+esc(blockers.join(' '))+'</div>'+
         '</div>';
     }).join('');
-    var empty='<div class="empty">No near-miss candidates were published in the latest artifact. This does not create a qualified leg.</div>';
+    var empty='<div class="empty">No current individual candidate passed all leg-level gates. The system will continue scanning; no ticket is forced.</div>';
     return '<div class="builder-batch-panel" style="margin-top:12px">'+
-      '<div class="builder-section-head"><div><span class="section-kicker">QUALIFICATION MONITOR</span><b>Why no qualified legs?</b><span>Near-misses are visible for diagnosis only; they cannot be booked as a ticket.</span></div>'+
+      '<div class="builder-section-head"><div><span class="section-kicker">QUALIFICATION MONITOR</span><b>Why no qualified batch?</b><span>Individual legs and whole-ticket batches have separate gates.</span></div>'+
       '<div class="builder-section-note"><b>0</b><span>qualified batches</span></div></div>'+
-      '<div class="sub" style="margin-bottom:10px">The scan is running, but the current candidate pool has not passed every active gate. The Builder checks again on its normal refresh schedule; elapsed time alone does not make a candidate qualified.</div>'+
-      '<div class="builder-feedbar"><span>Exact-evidence/value rows <b>'+esc(evidenceCandidates)+'</b></span><span>Result-first candidates passing <b>'+esc(Number(vdiag.evidence_pass||0))+'</b></span><span>Paper only <b>Yes</b></span></div>'+
+      '<div class="sub" style="margin-bottom:10px">The Builder refreshes every 15 minutes. The eFootball exact-evidence research lane uses a 65% per-leg and average floor; the standard high-confidence lane retains its 80% floor. Neither lane can bypass exact-line evidence, fresh SportyBet price, correlation, odds and whole-ticket expected-return gates.</div>'+
+      '<div class="builder-feedbar"><span>Individual leg gates passed <b>'+esc(legPassCount)+'</b></span><span>Exact-evidence eFootball legs at 65%+ <b>'+esc(exactPassCount)+'</b></span><span>Results-first candidates passing <b>'+esc(Number(vdiag.evidence_pass||0))+'</b></span><span>Paper only <b>Yes</b></span></div>'+
       '<div class="grid" style="margin-top:10px">'+(cards||empty)+'</div>'+
-      '<div class="sub" style="margin-top:10px">These rows are not picks or a recommendation. Probabilities and historic exact-line hit rates describe different measures; neither overrides ticket-family performance, a fresh exact SportyBet quote, edge, correlation, and whole-ticket ROI rules. No booking code is created from this panel.'+
+      '<div class="sub" style="margin-top:10px">A row marked “Individual gates pass” has not earned a qualified-ticket label: no ticket is declared qualified unless its complete construction passes correlation, timing, minimum combined odds and expected-return checks. No booking code is created from this panel.'+
       (observedAt?' Latest artifact: '+esc(observedAt):'')+'</div></div>';
   }
 
@@ -887,7 +906,7 @@
     var compactDiag=batchDiag.secondary_efootball_compact_diagnostics||{};
     var gateNote;
     if(batches.length&&compactEfootball){
-      gateNote='<div class="section"><b>Compact eFootball ticket lane</b><div class="sub">4–5 eFootball GT/Adriatic legs · minimum 2.00x combined odds · every leg at least 80% model probability · fresh exact SportyBet line/side · whole-ticket expected ROI at least +2%. This is paper research; joint probability remains an independence proxy, not proven ticket performance.</div><div class="row"><span>Qualified Virtual candidates</span><b>'+esc(virtualCount)+'</b></div><div class="row"><span>SportyBet price authority</span><b>Fresh Unified Snapshot</b></div></div>';
+      gateNote='<div class="section"><b>Compact eFootball ticket lane</b><div class="sub">4–5 eFootball GT/Adriatic legs · minimum 2.00x combined odds · each leg at least 65% with exact-line evidence and recent-spoiler checks · fresh exact SportyBet line/side · whole-ticket expected ROI at least +2%. This is paper value research, not settled Results-first proof; joint probability remains an independence proxy.</div><div class="row"><span>Qualified Virtual candidates</span><b>'+esc(virtualCount)+'</b></div><div class="row"><span>SportyBet price authority</span><b>Fresh Unified Snapshot</b></div></div>';
     } else if(batches.length){
       gateNote='<div class="section"><b>Research batch gate active</b><div class="sub">Standard batch lane: active combined-odds floor '+esc(floorLabel)+'; current exact SportyBet prices and evidence gates apply. Active Virtual products are eFootball GT and eFootball Adriatic; VFootball and Zoom remain research-only. No weaker legs are added to complete a ticket.</div><div class="row"><span>Qualified Virtual candidates</span><b>'+esc(virtualCount)+'</b></div><div class="row"><span>SportyBet price authority</span><b>Fresh Unified Snapshot</b></div></div>';
     } else if(virtualCount>0){
@@ -902,7 +921,7 @@
     }
 
     var ticketTrack=ticketTrackHtml(tracker);
-    var qualificationMonitor=qualificationMonitorHtml(data);
+    var qualificationMonitor=qualificationMonitorHtml(data,batches.length);
     target.innerHTML=pushNotificationHtml()+'<div class="builder-console"><div class="builder-console-head"><div><span class="builder-kicker">PAPER RESEARCH DESK</span><h3>Live '+floorLabel+' Builder</h3><p>Fresh SportyBet prices are qualified in-process. Batches stay paper-only and disjoint by event.</p></div><div class="builder-live-state"><span class="pulse-dot"></span><b>'+(data.status==='LIVE_VALUE_SET'?'LIVE VALUE SET':batchCount?'PAPER VALUE SET':'NO ACTIVE SET')+'</b><small>'+esc(status)+'</small></div></div><div class="builder-stat-row"><div class="builder-stat builder-stat-main"><small>Active batches</small><strong>'+batchCount+'/6</strong><span>Automatically refreshed</span></div><div class="builder-stat"><small>Sport lanes</small><strong>'+esc(sports.length?sports.join(' · '):'—')+'</strong><span>Current batch set</span></div><div class="builder-stat"><small>Top model rating</small><strong>'+esc(topRating==null?'—':topRating.toFixed(1)+'/100')+'</strong><span>Batch strength proxy</span></div><div class="builder-stat"><small>Top combined odds</small><strong>'+esc(top&&top.combined_odds!=null?Number(top.combined_odds).toFixed(3):'—')+'x</strong><span>SportyBet snapshot</span></div></div></div><div class="builder-batch-panel"><div class="builder-section-head"><div><span class="section-kicker">QUALIFIED SET</span><b>'+floorLabel+' paper research batches</b><span>Expand a batch for its booking code, live quote details, timer and legs.</span></div><div class="builder-section-note"><b>'+esc(virtualCount)+'</b><span>virtual candidates evaluated</span></div></div><div class="batch-list">'+(cards||'<div class="empty">No qualified '+floorLabel+' batches are currently available.</div>')+'</div><div class="builder-feedbar"><span><b>SPORTYBET</b> live snapshot</span><span>Top joint proxy <b>'+esc(topJoint==null?'—':pct(topJoint))+'</b></span><span>Price freshness gate <b>&le; 15m</b></span><span>Paper only <b>Yes</b></span></div>'+gateNote+'</div>'+qualificationMonitor+ticketTrack+'<div class="builder-note">The Builder refreshes automatically. Opening a batch reveals its exact selections and current SportyBet booking code.</div>';
     updateTimers();
   }
