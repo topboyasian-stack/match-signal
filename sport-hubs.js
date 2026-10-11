@@ -357,6 +357,46 @@ function isActiveVirtualProduct(product){
   const key=String(product||"").toLowerCase();
   return key==="efootball_gt"||key==="efootball_adriatic";
 }
+function virtualParticipantIdentity(row,keys){
+  let value="";
+  for(const key of keys){
+    if(row?.[key]!=null&&String(row[key]).trim()){value=String(row[key]).trim();break;}
+  }
+  const embedded=value.match(/\(([^()]*)\)\s*$/);
+  if(embedded&&embedded[1].trim())value=embedded[1].trim();
+  return value.toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+}
+function virtualStartTimestamp(row){
+  const raw=row?.start_time_ms??row?.startTimeMs??row?.start_time??row?.startTime??row?.timestamp??row?.date;
+  if(typeof raw==="number"||(typeof raw==="string"&&/^\d{10,13}$/.test(raw.trim()))){
+    const n=Number(raw);if(Number.isFinite(n))return n<1e11?n*1000:n;
+  }
+  const parsed=Date.parse(String(raw??""));
+  return Number.isFinite(parsed)?parsed:null;
+}
+function sameVirtualEvent(row,live){
+  const rowEventId=String(row?.event_id||"");
+  const liveEventId=String(live?.event_id||"");
+  if(!rowEventId||!liveEventId||rowEventId!==liveEventId)return false;
+  const rowProduct=String(row?.product||"").toLowerCase();
+  const liveProduct=String(live?.product||"").toLowerCase();
+  if(rowProduct&&liveProduct&&rowProduct!==liveProduct)return false;
+  const rowA=virtualParticipantIdentity(row,["participant_1","player_1","team_1","home","home_name","homeName","player1"]);
+  const rowB=virtualParticipantIdentity(row,["participant_2","player_2","team_2","away","away_name","awayName","player2"]);
+  const liveA=virtualParticipantIdentity(live,["participant_1","player_1","team_1","home","home_name","homeName","player1"]);
+  const liveB=virtualParticipantIdentity(live,["participant_2","player_2","team_2","away","away_name","awayName","player2"]);
+  if(!rowA||!rowB||!liveA||!liveB)return false;
+  if([rowA,rowB].sort().join("|")!==[liveA,liveB].sort().join("|"))return false;
+  const rowTime=virtualStartTimestamp(row),liveTime=virtualStartTimestamp(live);
+  // Provider IDs, product and participant identity are mandatory; tolerate
+  // ten minutes of kickoff normalization drift, not unrelated fixtures.
+  if(rowTime==null||liveTime==null||Math.abs(rowTime-liveTime)>10*60*1000)return false;
+  return true;
+}
+function virtualSnapshotHasCompleteFirstPage(feed,eventCount,sourceErrors,feedErrors){
+  // Empty replies, even if labelled LIVE, do not prove that all old events vanished.
+  return Boolean(feed&&feed.status==="LIVE"&&eventCount>0&&eventCount<100&&!sourceErrors&&!feedErrors);
+}
 function primaryPrediction(rows){
   const rank=x=>{
     const gate=qualificationState(x);
@@ -627,37 +667,6 @@ async function renderUnifiedBoard(){
     // Upcoming Desk without turning it into a Builder qualification bypass.
     const virtualCandidates=selectedRows.filter(isVirtualDeskCandidate);
 
-    function virtualParticipantIdentity(row,keys){
-      let value="";
-      for(const key of keys){
-        if(row?.[key]!=null&&String(row[key]).trim()){value=String(row[key]).trim();break;}
-      }
-      const embedded=value.match(/\(([^()]*)\)\s*$/);
-      if(embedded&&embedded[1].trim())value=embedded[1].trim();
-      return value.toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
-    }
-    function virtualStartTimestamp(row){
-      const raw=row?.start_time_ms??row?.startTimeMs??row?.start_time??row?.startTime??row?.timestamp??row?.date;
-      if(typeof raw==="number"||(typeof raw==="string"&&/^\d{10,13}$/.test(raw.trim()))){
-        const n=Number(raw);if(Number.isFinite(n))return n<1e11?n*1000:n;
-      }
-      const parsed=Date.parse(String(raw??""));
-      return Number.isFinite(parsed)?parsed:null;
-    }
-    function sameVirtualEvent(row,live){
-      const rowProduct=String(row?.product||"").toLowerCase();
-      const liveProduct=String(live?.product||"").toLowerCase();
-      if(rowProduct&&liveProduct&&rowProduct!==liveProduct)return false;
-      const rowA=virtualParticipantIdentity(row,["participant_1","player_1","team_1","home","home_name","homeName","player1"]);
-      const rowB=virtualParticipantIdentity(row,["participant_2","player_2","team_2","away","away_name","awayName","player2"]);
-      const liveA=virtualParticipantIdentity(live,["participant_1","player_1","team_1","home","home_name","homeName","player1"]);
-      const liveB=virtualParticipantIdentity(live,["participant_2","player_2","team_2","away","away_name","awayName","player2"]);
-      if(!rowA||!rowB||!liveA||!liveB)return false;
-      if([rowA,rowB].sort().join("|")!==[liveA,liveB].sort().join("|"))return false;
-      const rowTime=virtualStartTimestamp(row),liveTime=virtualStartTimestamp(live);
-      if(rowTime==null||liveTime==null||Math.abs(rowTime-liveTime)>90*1000)return false;
-      return true;
-    }
     async function freshVirtualQuoteMap(requiredRows=[]){
       const byEvent={};
       const status={byEvent,snapshotAvailable:false,snapshotComplete:false,successfulPages:0,failureReason:null};
@@ -705,7 +714,7 @@ async function renderUnifiedBoard(){
         const sourceErrors=Object.values(feed.source_status||{}).some(item=>String(item?.status||"").toUpperCase()==="ERROR");
         const feedErrors=Array.isArray(feed.errors)&&feed.errors.length>0;
         // Empty/upstream-error responses cannot prove an old event disappeared.
-        if(feed.status==="LIVE"&&events.length<100&&!sourceErrors&&!feedErrors){
+        if(virtualSnapshotHasCompleteFirstPage(feed,events.length,sourceErrors,feedErrors)){
           status.snapshotComplete=true;
           break;
         }
