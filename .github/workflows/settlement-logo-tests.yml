@@ -1,0 +1,40 @@
+name: Match Signal Settlement and Logo Regression
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/odds_ticket_tracker.py'
+      - 'scripts/test_odds_ticket_tracker.py'
+      - 'scripts/sync_club_logos.py'
+      - 'scripts/test_club_logo_registry.py'
+      - 'workspace-ui.js'
+      - 'data/club-logo-registry.json'
+      - '.github/workflows/sync-club-logos.yml'
+      - '.github/workflows/settlement-logo-tests.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout pull request
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install registry dependency
+        run: python -m pip install --upgrade requests
+
+      - name: Run settlement and logo registry regression tests
+        run: python -m unittest scripts.test_odds_ticket_tracker scripts.test_club_logo_registry -v
+
+      - name: Check Python syntax
+        run: python -m py_compile scripts/odds_ticket_tracker.py scripts/test_odds_ticket_tracker.py scripts/sync_club_logos.py scripts/test_club_logo_registry.py
+
+      - name: Check workspace UI JavaScript syntax
+        run: node --check workspace-ui.js
