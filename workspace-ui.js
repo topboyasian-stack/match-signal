@@ -49,7 +49,7 @@ function saveCache(k,media,ttl){
 }
 function updateMediaCoverage(){
   const slots=Array.from(document.querySelectorAll('[data-ws-media-kind="team"][data-ws-media-name],[data-ws-media-kind="player"][data-ws-media-name]')).filter(node=>node.isConnected);
-  const hits=slots.filter(node=>node.dataset.wsMediaStatus==='hit'||!!(node.querySelector('.ws-media-image')?.complete&&node.querySelector('.ws-media-image')?.naturalWidth>0)).length;
+  const hits=slots.filter(node=>node.dataset.wsMediaStatus==='hit').length;
   const pending=slots.filter(node=>!['hit','miss'].includes(node.dataset.wsMediaStatus||'')).length;
   const resolved=Math.max(0,slots.length-pending),missing=Math.max(0,resolved-hits),rate=resolved?Math.round(hits/resolved*100):null;
   const report={page:location.pathname,measured_at:new Date().toISOString(),slots:slots.length,loaded_hits:hits,resolved,pending,initials_fallbacks:missing,hit_rate_pct:rate};
@@ -203,7 +203,7 @@ function decorateVirtualFixtureCards(root){
   });
 }
 decorateVirtualFixtureCards(document);scan(document);
-new MutationObserver(rs=>rs.forEach(r=>r.addedNodes.forEach(n=>{if(n.nodeType===1){decorateVirtualFixtureCards(n);scan(n);}}))).observe(document.documentElement,{childList:true,subtree:true});
+new MutationObserver(rs=>{rs.forEach(r=>r.addedNodes.forEach(n=>{if(n.nodeType===1){decorateVirtualFixtureCards(n);scan(n);}}));if(rs.some(r=>r.removedNodes.length))updateMediaCoverage();}).observe(document.documentElement,{childList:true,subtree:true});
 function ageLabel(v){const t=Date.parse(v||'');if(!Number.isFinite(t))return 'timestamp unavailable';const m=Math.max(0,Math.round((Date.now()-t)/60000));return m<60?m+'m ago':(m/60).toFixed(1)+'h ago';}
 function ageM(v){const t=Date.parse(v||'');return Number.isFinite(t)?Math.max(0,(Date.now()-t)/60000):Infinity;}
 async function json(path){const r=await fetch(route(path)+'?v='+Date.now(),{cache:'no-store'});if(!r.ok)throw Error();return r.json();}
