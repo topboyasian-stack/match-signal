@@ -23,22 +23,38 @@ def get(u,p=None):r=S.get(u,params=p,timeout=40);r.raise_for_status();return r.j
 def text(u):r=S.get(u,timeout=60);r.raise_for_status();return r.text
 def evs(slug,a,b):return get(f'{BASE}/{slug}/scoreboard',{'dates':f'{a:%Y%m%d}-{b:%Y%m%d}'}).get('events',[])
 def team(c):t=c.get('team') or {};return str(t.get('id') or c.get('id') or ''),(t.get('displayName') or c.get('displayName') or '').strip()
+def nba_regular_season_start(year):
+ # Official opening dates known for the current and previous seasons; use Oct 20
+ # as a conservative fallback for future seasons. Preseason is not training data.
+ known={2025: datetime(2025,10,21,tzinfo=timezone.utc), 2026: datetime(2026,10,20,tzinfo=timezone.utc)}
+ return known.get(int(year),datetime(int(year),10,20,tzinfo=timezone.utc))
+
+def is_nba_regular_season_date(value):
+ d=dt(value)
+ if not d:return False
+ season_year=d.year if d.month>=10 else d.year-1
+ return d>=nba_regular_season_start(season_year)
+
 def collect_espn(slug):
  rows=[];errs=[];seen=set();a=NOW-timedelta(days=365)
+ # ESPN scoreboard date ranges are bounded; ask for at most seven calendar days.
+ # The prior 30-day request caused the NBA history pull to return empty.
  while a<NOW:
-  b=min(NOW,a+timedelta(days=30))
+  b=min(NOW,a+timedelta(days=6))
   try:es=evs(slug,a,b)
-  except Exception as e:errs.append(str(e));es=[]
+  except Exception as e:errs.append(f"{a.date()}..{b.date()}: {e}");es=[]
   for e in es:
    cs=(e.get('competitions') or [{}])[0].get('competitors',[])
    if len(cs)!=2 or not (e.get('status') or {}).get('type',{}).get('completed'):continue
+   event_date=dt(e.get('date'))
+   if slug=='basketball/nba' and not is_nba_regular_season_date(event_date):continue
    h=next((x for x in cs if x.get('homeAway')=='home'),cs[0]);a1=next((x for x in cs if x.get('homeAway')=='away'),cs[1]);hid,hn=team(h);aid,an=team(a1)
    try:hs=float(h.get('score'));as_=float(a1.get('score'))
    except:continue
    if not hn or not an:continue
    k=str(e.get('id') or f'{hn}|{an}|{e.get("date")}')
    if k in seen:continue
-   seen.add(k);rows.append({'event_id':k,'date':e.get('date'),'home':hn,'away':an,'home_id':hid,'away_id':aid,'home_score':hs,'away_score':as_,'markets':{}})
+   seen.add(k);rows.append({'event_id':k,'date':e.get('date'),'home':hn,'away':an,'home_id':hid,'away_id':aid,'home_score':hs,'away_score':as_,'markets':{},'source':'ESPN'})
   a=b+timedelta(days=1)
  return sorted(rows,key=lambda x:x['date']),errs
 def ere_fallback():
@@ -105,8 +121,10 @@ def nba_fallback():
  return [],errors
 def collect(name):
  rows,errs=collect_espn('basketball/nba' if name=='NBA' else 'soccer/ned.1')
- if rows:return rows,[]
- return nba_fallback() if name=='NBA' else ere_fallback()
+ if rows:return rows,errs
+ fallback_rows,fallback_errors=nba_fallback() if name=='NBA' else ere_fallback()
+ # Do not hide primary-provider errors when a fallback succeeds or fails.
+ return fallback_rows,errs+fallback_errors
 def weights(hist,cut):
  s=defaultdict(lambda:{'pf':0.,'pa':0.,'n':0.,'last':None})
  for r in hist:
@@ -121,14 +139,20 @@ def nba_predict(r,hist):
  cut=dt(r['date']) or NOW;s=weights(hist,cut);h=s.get(r['home'],{});a=s.get(r['away'],{});hp=h.get('pf',0)/max(h.get('n',1),1e-9);ap=a.get('pf',0)/max(a.get('n',1),1e-9);hd=h.get('pa',0)/max(h.get('n',1),1e-9);ad=a.get('pa',0)/max(a.get('n',1),1e-9);lp=sum(x['pf'] for x in s.values())/max(sum(x['n'] for x in s.values()),1e-9);hm=.58*(hp+ad)/2+.42*lp+2.5;am=.58*(ap+hd)/2+.42*lp;hr=(cut-h['last']).total_seconds()/86400 if h.get('last') else 4;ar=(cut-a['last']).total_seconds()/86400 if a.get('last') else 4;adj=max(-2,min(2,(hr-ar)*.35));hm+=adj;am-=adj;p=1/(1+math.exp(-(hm-am)/7.5));return {'moneyline':{'home':p,'away':1-p},'expected_score':{'home':hm,'away':am},'expected_total':hm+am,'rest_days':{'home':hr,'away':ar},'model':'NBA independent recency-weighted offense/defense + home/rest; no market input','paper_only':True}
 def current(name):
  if name=='NBA' and NOW<NBA_START:return []
- try:es=evs('basketball/nba' if name=='NBA' else 'soccer/ned.1',NOW-timedelta(days=1),NOW+timedelta(days=7))
+ start=NOW-timedelta(days=1)
+ if name=='NBA':start=max(start,NBA_START)
+ end=NOW+timedelta(days=6)
+ try:es=evs('basketball/nba' if name=='NBA' else 'soccer/ned.1',start,end)
  except:return []
  out=[]
  for e in es:
   cs=(e.get('competitions') or [{}])[0].get('competitors',[])
   if len(cs)!=2:continue
+  event_date=dt(e.get('date'))
+  # Never place preseason or stale past events in the regular-season feed.
+  if not event_date or (name=='NBA' and event_date<NBA_START):continue
   h=next((x for x in cs if x.get('homeAway')=='home'),cs[0]);a=next((x for x in cs if x.get('homeAway')=='away'),cs[1]);_,hn=team(h);_,an=team(a)
-  if hn and an:out.append({'event_id':str(e.get('id')),'date':e.get('date'),'home':hn,'away':an,'markets':{}})
+  if hn and an:out.append({'event_id':str(e.get('id')),'date':event_date.isoformat(),'home':hn,'away':an,'markets':{}})
  return out
 def run():
  nh,ne=collect('NBA');eh,ee=collect('Eredivisie');nc=current('NBA');ec=current('Eredivisie');np=[{'sport':'basketball','league':'NBA','event_id':r['event_id'],'start_time':r['date'],'player_1':r['home'],'player_2':r['away'],'independent':nba_predict(r,nh),'market':r['markets'],'prediction_status':'research_only','paper_only':True} for r in nc];ep=[]
