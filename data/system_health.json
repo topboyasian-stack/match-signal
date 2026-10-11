@@ -1,50 +1,50 @@
 {
-  "generated_at": "2026-10-11T14:23:37.839432+00:00",
-  "status": "FAIL",
-  "critical_issues": 1,
+  "generated_at": "2026-10-11T14:58:12.611676+00:00",
+  "status": "DEGRADED",
+  "critical_issues": 0,
   "warning_issues": 1,
   "info_issues": 0,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
       "status": "PASS",
-      "age_hours": 1.15,
+      "age_hours": 0.05,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.27,
+      "age_hours": 0.57,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
-      "status": "STALE",
-      "age_hours": 4.39,
+      "status": "PASS",
+      "age_hours": 0.02,
       "threshold_hours": 4
     },
     {
       "engine": "unified_upcoming",
       "status": "PASS",
-      "age_hours": 0.0,
+      "age_hours": 0.01,
       "threshold_hours": 2
     },
     {
       "engine": "prediction_desk_health",
       "status": "PASS",
-      "age_hours": 0.0,
+      "age_hours": 0.01,
       "threshold_hours": 2
     },
     {
       "engine": "tennis_forward_discovery",
       "status": "PASS",
-      "age_hours": 1.05,
+      "age_hours": 0.02,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 1.18,
+      "age_hours": 1.76,
       "threshold_hours": 0.5,
       "heartbeat_source": "unified_live_refresh"
     },
@@ -69,11 +69,6 @@
   ],
   "issues": [
     {
-      "code": "STALE_EXPANSION",
-      "severity": "critical",
-      "detail": "updated_at age 4.39h exceeds 4h"
-    },
-    {
       "code": "TENNIS_CORE_FEED_EMPTY",
       "severity": "warning",
       "detail": "Canonical tennis pipeline has zero actionable predictions; 11 unqualified ATP forward-window watch projections are published for research only"
@@ -82,7 +77,7 @@
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
   "paper_only": true,
   "prediction_desk_filters": {
-    "past_kickoff_rows_hidden": 10,
+    "past_kickoff_rows_hidden": 6,
     "stale_live_flags_hidden": 0,
     "expired_settled_rows_hidden": 0
   }
