@@ -17,12 +17,12 @@ const inferredActive=pagePath.includes('/virtual-lab')?'lab':
   pagePath.endsWith('/live.html')?'live':
   pagePath.endsWith('/odds-builder.html')?'builder':
   pagePath.endsWith('/league.html')?(new URLSearchParams(location.search).get('sport')==='tennis'?'tennis':'football'):'desk';
-const sharedCssUrl=route('/workspace-ui.css?v=20261011-workspace-media4');
+const sharedCssUrl=route('/workspace-ui.css?v=20261011-workspace-media5');
 const existingCss=document.querySelector('link[href*="workspace-ui.css"]');
 if(existingCss)existingCss.href=sharedCssUrl;else{const l=document.createElement('link');l.rel='stylesheet';l.href=sharedCssUrl;document.head.appendChild(l);}
 if(!document.getElementById('workspace-ui-polish')){
   const style=document.createElement('style');style.id='workspace-ui-polish';
-  style.textContent='.ws-media-credit{max-width:1380px;margin:10px auto 16px;padding:8px 6px;color:var(--ws-muted);font-size:9px;line-height:1.5;opacity:.82}footer .ws-media-credit{margin:12px 0 0;padding:10px 0;border-top:1px solid #27374655}.ws-role-card{display:flex;flex-direction:column;gap:6px;min-height:130px}.ws-role-card strong{display:block;font-size:15px;line-height:1.25;color:var(--ws-text)}.ws-role-card p{margin:0;color:var(--ws-muted);font-size:11px;line-height:1.5}.ws-role-card a{margin-top:auto;color:var(--ws-cyan);font-size:10px;font-weight:900;text-decoration:none}.ws-role-card a:hover{text-decoration:underline}';
+  style.textContent='.ws-media-credit{max-width:1380px;margin:10px auto 16px;padding:8px 6px;color:var(--ws-muted);font-size:11px;line-height:1.55;opacity:.98}footer .ws-media-credit{margin:12px 0 0;padding:10px 0;border-top:1px solid #27374655}.ws-role-card{display:flex;flex-direction:column;gap:6px;min-height:130px}.ws-role-card strong{display:block;font-size:15px;line-height:1.25;color:var(--ws-text)}.ws-role-card p{margin:0;color:var(--ws-muted);font-size:12px;line-height:1.55}.ws-role-card a{margin-top:auto;color:var(--ws-cyan);font-size:11px;font-weight:900;text-decoration:none}.ws-role-card a:hover{text-decoration:underline}';
   document.head.appendChild(style);
 }
 if(host){
