@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.odds_ticket_tracker import backfill_virtual_results, ticket_is_stale_pending
+from scripts.odds_ticket_tracker import backfill_virtual_results, settle_virtual_leg, ticket_is_stale_pending
 
 
 class StalePaperTicketArchiveTests(unittest.TestCase):
@@ -89,21 +89,6 @@ class VirtualResultBackfillTests(unittest.TestCase):
             }],
         }
 
-    def fake_result_response(self, request, timeout=60):
-        class Response:
-            def __enter__(self):
-                return self
-            def __exit__(self, *args):
-                return False
-            def read(self):
-                return json.dumps({
-                    "ok": True,
-                    "events": [{"eventId": self_event_id, "score": "5:2"}],
-                    "errors": [],
-                }).encode("utf-8")
-        self.assertIn("source=" + self_source, request.full_url)
-        return Response()
-
     def run_backfill_for_product(self, product, source):
         event_id = "sr:match:test-" + product
         tickets = [self.ticket(product, event_id)]
@@ -129,6 +114,9 @@ class VirtualResultBackfillTests(unittest.TestCase):
         self.assertEqual(rows[0]["result"], "O5.5")
         self.assertFalse(rows[0]["win"])
         self.assertEqual(rows[0]["backfill_match_mode"], "event_id")
+        settled = settle_virtual_leg(tickets[0]["legs"][0], rows)
+        self.assertEqual(settled["status"], "LOST")
+        self.assertEqual(settled["final_score"], [5.0, 2.0])
 
     def test_efootball_pending_leg_uses_efootball_result_source(self):
         self.run_backfill_for_product("efootball_gt", "efootball")
