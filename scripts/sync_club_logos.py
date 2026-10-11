@@ -47,12 +47,14 @@ TEAM_FIELDS = (
     "participant_1", "participant_2",
 )
 ARTWORK_RE = re.compile(r"\b(logo|crest|badge|emblem|coat of arms)\b", re.I)
+NONLOGO_ARTIFACT_RE = re.compile(r"\b(rugby|pin badge|supporters? club|supporters|fan club|souvenir|main stand|side view|stadium|shirt|jersey|poster|sticker|key ?ring|medal|collection|toy)\b", re.I)
+HISTORIC_ARTWORK_RE = re.compile(r"\b(old|original|historic|historical|vintage|antique|retro|altes|alte|alter)\b|\b(?:18\\d{2}|19(?:0\\d|1\\d|2\\d|3\\d|4\\d|5\\d|6\\d|7\\d|8\\d|9\\d))(?:\\s*[-–]\\s*(?:18\\d{2}|19\\d{2}))?\b", re.I)
 CLUB_CLUE_RE = re.compile(
     r"\b(football|soccer|club|olympique|racing|athletic|sporting|futbol|fútbol|fc|afc|sc|ac|cf)\b|"
     r"\b(?:f\.c\.|a\.f\.c\.|c\.f\.|s\.c\.|a\.c\.)\b",
     re.I,
 )
-SEARCH_POLICY_VERSION = 2
+SEARCH_POLICY_VERSION = 3
 ALIASES = {
     "real madrid": ("Real Madrid CF", "Real Madrid Club de Futbol"),
     "liverpool": ("Liverpool FC", "Liverpool F.C.", "Liverpool Football Club"),
@@ -95,6 +97,8 @@ ALIASES = {
     "sporting cp": ("Sporting Lisbon", "Sporting Clube de Portugal"),
     "boca juniors": ("Club Atletico Boca Juniors",),
     "river plate": ("Club Atletico River Plate",),
+    "athletic club": ("Athletic Club Bilbao", "Athletic Club de Bilbao", "Athletic Bilbao"),
+    "racing club": ("Racing Club de Avellaneda", "Racing Club Argentina"),
 }
 
 
@@ -124,6 +128,45 @@ def normalize_team(value) -> str:
     text = re.sub(r"^(fc|afc|sc|ac|club)\s+", "", text)
     text = re.sub(r"\s+(football club|fc|cf|afc|sc|ac)$", "", text).strip()
     return text
+
+
+def _candidate_title_matches(term, title):
+    """Require the artwork title to lead with the requested club identity.
+
+    Broad substring matches are unsafe: "Seattle Athletic Club" is not
+    Athletic Club Bilbao, "Racing Club Vichy Rugby" is not the football club,
+    and a pin-badge photo is not a reusable crest asset.
+    """
+    base = re.sub(r"\.[^.]+$", "", re.sub(r"^File:", "", str(title or ""), flags=re.I))
+    title_key = normalize_text(base)
+    search_key = normalize_team(term)
+    if not title_key or not search_key:
+        return False
+    if NONLOGO_ARTIFACT_RE.search(base) or HISTORIC_ARTWORK_RE.search(base):
+        return False
+    if not ARTWORK_RE.search(base) or not CLUB_CLUE_RE.search(base):
+        return False
+    accepted_prefixes = (
+        search_key,
+        "fc " + search_key,
+        "afc " + search_key,
+        "sc " + search_key,
+        "ac " + search_key,
+        "club " + search_key,
+        "club atletico " + search_key,
+        "atletico " + search_key,
+        "the " + search_key,
+    )
+    return any(title_key == prefix or title_key.startswith(prefix + " ") for prefix in accepted_prefixes)
+
+
+def _existing_entry_is_safe(key, entry):
+    if not isinstance(entry, dict):
+        return False
+    title = str(entry.get("title") or "")
+    terms = [str(entry.get("matched_term") or ""), str(entry.get("name") or key), str(key)]
+    terms.extend(ALIASES.get(normalize_team(entry.get("canonical_key") or key), ()))
+    return any(term and _candidate_title_matches(term, title) for term in terms)
 
 
 def split_fixture(value):
@@ -334,14 +377,12 @@ def _candidate_for(name: str):
                 continue
             if not _allowed_image_mime(mime) or not license_allowed(licence):
                 continue
-            if not search_key or (" " + search_key + " ") not in (" " + title_key + " "):
-                continue
-            if not ARTWORK_RE.search(title_base) or not CLUB_CLUE_RE.search(title_base):
+            if not search_key or not _candidate_title_matches(term, title_base):
                 continue
             exact_bonus = 100 if title_key == search_key else 0
-            crest_bonus = 12 if re.search(r"\b(crest|badge|emblem)\b", title_base, re.I) else 0
-            logo_bonus = 8 if re.search(r"\blogo\b", title_base, re.I) else 0
-            score = exact_bonus + crest_bonus + logo_bonus
+            current_logo_bonus = 16 if re.search(r"\b(logo|crest)\b", title_base, re.I) else 0
+            emblem_bonus = 6 if re.search(r"\b(emblem|coat of arms)\b", title_base, re.I) else 0
+            score = 70 + exact_bonus + current_logo_bonus + emblem_bonus
             candidate = {
                 "title": title,
                 "url": url,
@@ -351,6 +392,7 @@ def _candidate_for(name: str):
                 "artist": plain((metadata.get("Artist") or {}).get("value") or (metadata.get("Credit") or {}).get("value") or "")[:220],
                 "mime": mime,
                 "score": score,
+                "matched_term": term,
             }
             if best is None or candidate["score"] > best["score"]:
                 best = candidate
