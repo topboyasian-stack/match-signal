@@ -13,6 +13,14 @@ async function keyForEndpoint(endpoint) {
   return "sub:" + [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+function probabilityFloorForLeg(leg, batchLane) {
+  const lane = String(batchLane || "").toLowerCase();
+  const legLane = String(leg?.qualification_lane || "").toLowerCase();
+  if (lane === "phase2_cyclical_loop" || lane === "phase2_cyclical_loop_research") return 0.78;
+  if (legLane === "efootball_exact_evidence_value") return 0.65;
+  return 0.80;
+}
+
 async function fingerprint(batch) {
   const legs = Array.isArray(batch?.legs) ? batch.legs : [];
   const source = legs.map((leg) => [
@@ -77,13 +85,14 @@ export async function onRequestPost(context) {
     const batchFloor = compact ? compactFloor : activeFloor;
     const minimumLegs = compact ? 4 : 2;
     if (odds < batchFloor || legs.length < minimumLegs) continue;
-    if (compact) {
-      if (legs.length > 5) continue;
+    const exactEvidenceValueLane = lane === "efootball_exact_evidence_value";
+    if (compact || exactEvidenceValueLane) {
+      if (compact && legs.length > 5) continue;
       const products = new Set(legs.map((leg) => String(leg?.product || "")));
       if ([...products].some((product) => !activeProducts.has(product))) continue;
       if (legs.some((leg) =>
         String(leg?.qualification_lane || "") !== "efootball_exact_evidence_value"
-        || Number(leg?.model_probability || 0) < 0.80
+        || Number(leg?.model_probability || 0) < probabilityFloorForLeg(leg, lane)
       )) continue;
     }
     const clean = summarize(batch);
@@ -115,7 +124,7 @@ export async function onRequestPost(context) {
     if (await env.PUSH_SUBSCRIPTIONS.get(marker)) continue;
     const payload = {
       title: "🔔 Match Signal — Odds Builder",
-      body: `${item.primary_lane === "efootball_compact_2x" ? "Compact eFootball" : "Standard"} ${item.leg_count}-leg batch available · ${item.combined_odds.toFixed(3)}x combined odds`,
+      body: `${item.primary_lane === "efootball_compact_2x" ? "Compact eFootball" : item.primary_lane === "efootball_exact_evidence_value" ? "eFootball exact-evidence research" : "Standard"} ${item.leg_count}-leg batch available · ${item.combined_odds.toFixed(3)}x combined odds`,
       url: "/odds-builder.html",
       tag: "match-signal-batch-" + item.fingerprint.slice(0, 24)
     };
