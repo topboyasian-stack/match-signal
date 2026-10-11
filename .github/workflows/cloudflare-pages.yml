@@ -71,12 +71,18 @@ on:
       - 'data/prediction_desk_health.json'
       - 'data/unified_upcoming.json'
       - 'data/results_first_evidence_report.json'
+      - 'data/club-logo-registry.json'
+      - 'assets/club-logos/**'
       - 'PRECISION-SPORTS-UPGRADE.md'
       - '_redirects'
       - 'VIRTUAL-LAB-*.md'
       - 'functions/api/virtual-lab-history.js'
       - 'functions/api/sportybet-virtual-results.js'
       - '.github/workflows/cloudflare-pages.yml'
+  workflow_run:
+    workflows:
+      - "Match Signal Persistent Club Logo Registry"
+    types: [completed]
   workflow_dispatch:
 
 permissions:
