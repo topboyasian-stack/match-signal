@@ -424,8 +424,10 @@ def check_prediction_desk_copy_and_quote_matching_contract():
     assert "for r in trace if isinstance(r, dict)" in learning_source, "Products with pending forecasts must remain visible before the first scored result"
     assert "line-calibration warm-up (" not in source
     assert "for(let page=1;page<=5;page++)" in source
-    assert "if(!required.length)return byEvent;" in source
-    assert "if(events.length<100)break;" in source
+    assert "if(!required.length){" in source, "empty required-set fast path must be explicit"
+    assert "status.snapshotComplete=true;" in source, "quote refresh must report when the snapshot is complete"
+    assert 'if(feed.status==="LIVE"&&events.length<100&&!sourceErrors&&!feedErrors){' in source, "only a healthy terminal page may prove unmatched events absent"
+    assert "live_quote_feed_unavailable_previous_quote_preserved" in source, "failed quote refresh must preserve last-known timestamp state"
     assert "sameVirtualEvent(row,event)" in source
     assert "exact_event_not_found_in_live_snapshot" in source
     assert "exact_line_or_side_not_found_in_live_snapshot" in source, "Missing current line/side must invalidate quote freshness"
