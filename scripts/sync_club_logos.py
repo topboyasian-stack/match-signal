@@ -149,7 +149,7 @@ def _candidate_title_matches(term, title):
         # an organization clue before the artwork word. Validate the parsed
         # identity below rather than rejecting them here.
         has_prefix_artwork = bool(re.match(
-            r"^(?:logo|crest|badge|emblem|coat of arms)(?:\\s+of)?[\\s:_-]+",
+            r"^(?:logo|crest|badge|emblem|coat of arms)(?:\s+of)?[\s:_-]+",
             base,
             flags=re.I,
         ))
@@ -160,7 +160,7 @@ def _candidate_title_matches(term, title):
     # Accept that shape only when the entire remaining identity matches the
     # requested club (or a registered exact alias); do not accept substrings.
     prefix_artwork = re.match(
-        r"^(?:logo|crest|badge|emblem|coat of arms)(?:\\s+of)?[\\s:_-]+",
+        r"^(?:logo|crest|badge|emblem|coat of arms)(?:\s+of)?[\s:_-]+",
         base,
         flags=re.I,
     )
@@ -169,7 +169,7 @@ def _candidate_title_matches(term, title):
         # Parenthesized modern edition years are identity metadata, not a
         # signal that a crest is historical. Explicit 18xx/19xx years remain
         # blocked by HISTORIC_ARTWORK_RE above.
-        identity_phrase = re.sub(r"\\s*\\((?:20\\d{2})\\)\\s*$", "", identity_phrase).strip()
+        identity_phrase = re.sub(r"\s*\((?:20\d{2})\)\s*$", "", identity_phrase).strip()
     else:
         artwork_match = ARTWORK_RE.search(base)
         if not artwork_match:
