@@ -141,3 +141,85 @@
   .liveCard .ws-fixture-sides { gap:5px; }
   .ws-media-coverage { font-size:9px; }
 }
+
+
+/* Match Signal readability + responsive-card repair, 2026-10-11.
+   Preserve all existing content/gates; improve legibility and stop wide market rows
+   from forcing fixture cards off-screen on smaller displays. */
+.ms-panel-head h2 { font-size:13px !important; line-height:1.4; letter-spacing:.055em; }
+.ms-up-summary,.ms-qualified-best-summary { font-size:12px !important; line-height:1.55; }
+.ms-qualified-best-head p { font-size:12px !important; line-height:1.55; }
+.ms-up-time b { font-size:13px !important; line-height:1.35; }
+.ms-up-time span,.ms-up-day-head span { font-size:11px !important; line-height:1.4; }
+.ms-up-day-head h3 { font-size:13px !important; line-height:1.4; }
+.ms-up-meta,.ms-up-details,.ms-fixture-band-note { font-size:11px !important; line-height:1.5; }
+.ms-up-status-badge,.ms-up-qual,.ms-qualified-best-pill,.ms-qualified-gate-badge {
+  font-size:10px !important; line-height:1.4; letter-spacing:.025em;
+  white-space:normal; overflow-wrap:anywhere; padding:5px 8px;
+}
+.ms-fixture-foot { font-size:11px !important; line-height:1.5; }
+.ms-market-stack { min-width:0; max-width:100%; display:grid; gap:8px; }
+.ms-market-row {
+  min-width:0 !important;
+  grid-template-columns:repeat(4,minmax(0,1fr)) !important;
+  gap:7px !important;
+  padding:9px !important;
+  font-size:11px !important;
+  line-height:1.45;
+}
+.ms-market-row>span { min-width:0; overflow-wrap:anywhere; }
+.ms-market-row b { font-size:12px !important; line-height:1.4; }
+.ms-market-row .ms-market-name { font-size:12px !important; }
+.ms-fixture-card,.ms-up-row,.ms-up-event,.ms-up-status,.ms-pred,.ms-league,.liveCard,.predictionCard {
+  min-width:0; box-sizing:border-box;
+}
+.ms-up-row.ms-fixture-card { grid-template-columns:minmax(105px, .72fr) minmax(0,2.3fr) minmax(140px, .95fr); }
+.ms-pred-meta,.ms-market span,.ms-prob small,.ms-market small,.ms-note,.ms-status,.ms-league p,
+.liveTop,.liveChip,.predictionMeta,.liveNote,.liveCardMeta,.control label,.panelHead span,.metric small,
+.ws-media-credit,footer .ws-media-credit,.ws-media-coverage {
+  font-size:11px !important; line-height:1.5;
+}
+.ws-media-credit,footer .ws-media-credit { opacity:.98; }
+.ws-media-coverage { font-weight:850; }
+.ms-empty,.empty,.liveEmpty,.empty-state,.ms-qualified-best-empty {
+  font-size:14px !important; line-height:1.6 !important; min-height:96px;
+  padding:24px !important; overflow-wrap:anywhere;
+}
+.ws-entity-name,.ws-fixture-match .ws-entity-name,.ws-live-fixture-row .ws-entity-name {
+  min-width:0; overflow-wrap:anywhere; line-height:1.45;
+}
+.ws-media-slot { font-size:11px; }
+.ws-role-card p { font-size:12px !important; line-height:1.55; }
+.ws-role-card a { font-size:11px !important; }
+.ms-league h3 { font-size:17px; line-height:1.35; }
+.ms-league a { font-size:13px; }
+.ms-prob small,.ms-market small { font-size:10px !important; }
+.ms-panel-head,.ms-pred-meta,.ms-up-meta { min-width:0; }
+@media(max-width:1080px) {
+  .ms-up-row.ms-fixture-card { grid-template-columns:minmax(90px,.65fr) minmax(0,2fr) minmax(125px,.9fr); }
+  .ms-market-row { grid-template-columns:repeat(3,minmax(0,1fr)) !important; }
+}
+@media(max-width:840px) {
+  .ms-up-row.ms-fixture-card,.ms-up-row {
+    grid-template-columns:minmax(0,1fr) !important;
+    gap:8px;
+  }
+  .ms-up-status { grid-column:auto !important; display:flex; flex-wrap:wrap; align-items:center; }
+  .ms-market-row { grid-template-columns:repeat(2,minmax(0,1fr)) !important; }
+  .ms-up-match { line-height:1.5; }
+  .ms-qualified-best-head { flex-direction:column; }
+}
+@media(max-width:640px) {
+  .ms-wrap { padding-left:12px; padding-right:12px; }
+  .ms-panel { padding:12px; }
+  .ms-hero { padding:18px; }
+  .ms-hero p { font-size:14px; line-height:1.55; }
+  .ms-up-row.ms-fixture-card { padding:12px; }
+  .ms-market-row { gap:6px !important; padding:8px !important; }
+  .ms-up-meta,.ms-up-details { gap:6px; }
+  .ms-fixture-match { align-items:flex-start; gap:6px; }
+  .ws-fixture-match .ws-media-slot { width:30px; height:30px; flex-basis:30px; }
+  .ws-media-credit { align-items:flex-start; }
+  .ws-nav-link { font-size:11px !important; }
+  .ms-empty,.empty,.liveEmpty,.empty-state,.ms-qualified-best-empty { padding:18px !important; }
+}
