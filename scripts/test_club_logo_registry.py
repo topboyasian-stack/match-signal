@@ -4,6 +4,8 @@ import unittest
 
 from scripts.sync_club_logos import (
     ALIASES,
+    _candidate_title_matches,
+    _existing_entry_is_safe,
     _signature_ok,
     is_football_product,
     license_allowed,
@@ -46,6 +48,30 @@ class ClubLogoRegistryTests(unittest.TestCase):
         self.assertIn("Manchester City FC", ALIASES["man city"])
         self.assertIn("FC Barcelona", ALIASES["barcelona"])
         self.assertIn("Tottenham Hotspur FC", ALIASES["spurs"])
+
+    def test_logo_candidates_must_be_current_and_club_specific(self):
+        self.assertTrue(_candidate_title_matches("Boca Juniors", "Club Atletico Boca Juniors logo (70 stars).png"))
+        self.assertTrue(_candidate_title_matches("Belgium", "Belgium football lion crest.png"))
+        self.assertFalse(_candidate_title_matches("Athletic Club", "Seattle Athletic Club logo emblem.jpg"))
+        self.assertFalse(_candidate_title_matches("Racing Club", "Logo Racing Club Vichy Rugby RCV.gif"))
+        self.assertFalse(_candidate_title_matches("Wolves", "New York Wolves Supporters Club Pin Badge.jpg"))
+        self.assertFalse(_candidate_title_matches("Liverpool FC", "Liverpool FC crest, Main Stand - side view.jpg"))
+        self.assertFalse(_candidate_title_matches("Arsenal", "Arsenal FC old crest small.png"))
+        self.assertFalse(_candidate_title_matches("Barcelona", "FC Barcelona original crest (1899-1910).png"))
+
+    def test_old_or_wrong_registry_entry_is_not_reused_forever(self):
+        bad = {
+            "name": "Athletic Club",
+            "title": "File:Seattle Athletic Club logo emblem.jpg",
+            "path": "/assets/club-logos/athletic-club.jpg",
+        }
+        self.assertFalse(_existing_entry_is_safe("athletic club", bad))
+        good = {
+            "name": "Boca Juniors",
+            "title": "File:Club Atlético Boca Juniors logo (70 stars).png",
+            "path": "/assets/club-logos/boca-juniors.png",
+        }
+        self.assertTrue(_existing_entry_is_safe("boca juniors", good))
 
     def test_downloaded_image_signature_is_checked(self):
         self.assertTrue(_signature_ok(b"\x89PNG\r\n\x1a\n" + b"x" * 10, "image/png"))
