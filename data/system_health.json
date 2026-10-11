@@ -1,26 +1,26 @@
 {
-  "generated_at": "2026-10-11T02:19:11.141075+00:00",
+  "generated_at": "2026-10-11T05:44:56.955991+00:00",
   "status": "DEGRADED",
   "critical_issues": 0,
   "warning_issues": 1,
-  "info_issues": 0,
+  "info_issues": 1,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
       "status": "PASS",
-      "age_hours": 2.81,
+      "age_hours": 0.09,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.06,
+      "age_hours": 3.42,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 0.48,
+      "age_hours": 0.05,
       "threshold_hours": 4
     },
     {
@@ -38,15 +38,15 @@
     {
       "engine": "tennis_forward_discovery",
       "status": "PASS",
-      "age_hours": 2.77,
+      "age_hours": 0.05,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 0.04,
+      "age_hours": 3.47,
       "threshold_hours": 0.5,
-      "heartbeat_source": "virtual_lab_live.json"
+      "heartbeat_source": "unified_live_refresh"
     },
     {
       "engine": "retired_engines",
@@ -54,7 +54,7 @@
       "lanes": {
         "darts_x": {
           "status": "RETIRED",
-          "artifact_at": "2026-10-10T23:58:59.064696+00:00"
+          "artifact_at": "2026-10-11T04:26:18.584385+00:00"
         },
         "table_tennis_x": {
           "status": "RETIRED",
@@ -71,13 +71,18 @@
     {
       "code": "TENNIS_CORE_FEED_EMPTY",
       "severity": "warning",
-      "detail": "Canonical tennis pipeline has zero actionable predictions; 17 unqualified ATP forward-window watch projections are published for research only"
+      "detail": "Canonical tennis pipeline has zero actionable predictions; 9 unqualified ATP forward-window watch projections are published for research only"
+    },
+    {
+      "code": "SELECTION_GATE_EMPTY",
+      "severity": "info",
+      "detail": "Current prediction feed exists but the selected-candidate layer returned zero qualified selections; no gate was weakened"
     }
   ],
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
   "paper_only": true,
   "prediction_desk_filters": {
-    "past_kickoff_rows_hidden": 1,
+    "past_kickoff_rows_hidden": 8,
     "stale_live_flags_hidden": 0,
     "expired_settled_rows_hidden": 0
   }
