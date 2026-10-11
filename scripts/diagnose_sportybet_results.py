@@ -189,6 +189,54 @@ def probe(scope: dict[str, Any], use_time_filter: bool, now: datetime) -> dict[s
     return result
 
 
+def probe_deployed_proxy(scope: dict[str, Any], use_time_filter: bool, now: datetime) -> dict[str, Any]:
+    """Ask the deployed Cloudflare proxy, whose outbound network differs from Actions."""
+    params: dict[str, Any] = {
+        "source": "efootball",
+        "categoryId": scope["categoryId"],
+        "tournamentId": scope["tournamentId"],
+        "pageSize": 100,
+        "pageNum": 1,
+    }
+    if use_time_filter:
+        params["startTime"] = int((scope["start"] - timedelta(hours=3)).timestamp() * 1000)
+        params["endTime"] = int((now + timedelta(minutes=2)).timestamp() * 1000)
+    result: dict[str, Any] = {
+        "probe": "deployed_match_signal_proxy",
+        "categoryId": scope["categoryId"],
+        "tournamentId": scope["tournamentId"],
+        "targetEventId": scope["eventId"],
+        "time_filter": use_time_filter,
+    }
+    try:
+        response = requests.get(
+            BASE + "/api/sportybet-virtual-results", params=params, timeout=25
+        )
+        result["http_status"] = response.status_code
+        result["content_type"] = response.headers.get("content-type")
+        try:
+            payload = response.json()
+        except ValueError:
+            result["non_json_preview"] = response.text[:300]
+            return result
+        if isinstance(payload, dict):
+            result["payload_keys"] = sorted(payload.keys())[:30]
+            events = list_events(payload)
+            result["returned_events"] = len(events)
+            result["exact_target_event_matches"] = sum(
+                1 for e in events
+                if str(e.get("eventId") or e.get("event_id") or "") == scope["eventId"]
+            )
+            errors = payload.get("errors")
+            if isinstance(errors, list):
+                result["errors"] = [str(e)[:900] for e in errors[:5]]
+            if payload.get("ok") is not None:
+                result["ok"] = payload.get("ok")
+    except Exception as exc:
+        result["request_error"] = str(exc)[:600]
+    return result
+
+
 def main() -> None:
     now = datetime.now(timezone.utc)
     scopes = choose_scopes(now)
@@ -206,7 +254,9 @@ def main() -> None:
         if not scope.get("start"):
             scope["start"] = now - timedelta(minutes=30)
         for with_filter in (False, True):
-            print("RESULT_API_PROBE:", json.dumps(probe(scope, with_filter, now), ensure_ascii=False))
+            print("DIRECT_RESULT_API_PROBE:", json.dumps(probe(scope, with_filter, now), ensure_ascii=False))
+            time.sleep(0.4)
+            print("DEPLOYED_PROXY_PROBE:", json.dumps(probe_deployed_proxy(scope, with_filter, now), ensure_ascii=False))
             time.sleep(0.4)
     print("DIAGNOSTIC_FINISHED_AT:", datetime.now(timezone.utc).isoformat())
     print("SAFETY: diagnostic only; no archive or production-selection writes performed")
