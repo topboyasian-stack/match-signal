@@ -29,6 +29,9 @@ on:
       - '.github/workflows/tennis_pipeline.yml'
       - 'scripts/virtual_lab_sync.py'
       - '.github/workflows/virtual-lab-sync.yml'
+      - 'assets/club-logos/**'
+      - 'data/club-logo-registry.json'
+      - '.github/workflows/sync-club-logos.yml'
   workflow_run:
     workflows:
       - "Match Signal Autopilot Refresh"
@@ -37,6 +40,7 @@ on:
       - "Match Signal Saudi Pro League Live Experimental"
       - "Match Signal Odds Builder"
       - "Match Signal Virtual Lab Live Sync"
+      - "Match Signal Persistent Club Logo Registry"
     types: [completed]
   workflow_dispatch:
 
