@@ -224,3 +224,35 @@
   .ws-nav-link { font-size:11px !important; }
   .ms-empty,.empty,.liveEmpty,.empty-state,.ms-qualified-best-empty { padding:18px !important; }
 }
+
+
+/* Virtual Lab and research-workspace mobile overflow repair. */
+@media(max-width:640px) {
+  .shell { width:100%; max-width:100vw; padding:20px 12px 50px !important; }
+  .shell > *, .shell .panel, .shell .panelHead, .shell .panelHead h2,
+  .shell .panelHead span, .shell .owner, .shell .controls, .shell .control,
+  .shell .actions, .shell .strategyCard, .shell .strategyResult {
+    min-width:0; max-width:100%; box-sizing:border-box;
+  }
+  .shell .panelHead { flex-wrap:wrap; align-items:flex-start; gap:8px; }
+  .shell .panelHead h2, .shell .panelHead span {
+    white-space:normal; overflow-wrap:anywhere;
+  }
+  .shell .panelHead span { flex:0 1 auto; }
+  .shell .tableWrap { width:100%; max-width:100%; min-width:0; overflow-x:auto; }
+  .shell .tableWrap table { min-width:560px; }
+  .shell .metrics { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+  .shell .metric { min-width:0; padding:11px; }
+  .shell .metric small { font-size:11px !important; }
+  .shell .metric strong { font-size:21px; overflow-wrap:anywhere; }
+  .shell .controls { display:flex; flex-wrap:wrap; width:100%; }
+  .shell .control { min-width:0; flex:1 1 140px; }
+  .shell .actions { margin-left:0; width:100%; flex-wrap:wrap; }
+  .shell .resultGrid,.shell .guideGrid,.shell .modelGrid,
+  .shell .grid2,.shell .strategy { grid-template-columns:minmax(0,1fr); }
+  .shell .empty,.shell .gate,.shell .tableWrap.empty {
+    width:auto; min-width:0; max-width:100%; overflow-wrap:anywhere;
+  }
+  .shell .empty { min-height:96px; padding:18px !important; font-size:14px !important; }
+  .shell .badge { white-space:normal; max-width:100%; overflow-wrap:anywhere; }
+}
