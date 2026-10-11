@@ -17,7 +17,14 @@ const inferredActive=pagePath.includes('/virtual-lab')?'lab':
   pagePath.endsWith('/live.html')?'live':
   pagePath.endsWith('/odds-builder.html')?'builder':
   pagePath.endsWith('/league.html')?(new URLSearchParams(location.search).get('sport')==='tennis'?'tennis':'football'):'desk';
-if(!document.querySelector('link[href*="workspace-ui.css"]')){const l=document.createElement('link');l.rel='stylesheet';l.href=route('/workspace-ui.css?v=20261011-intelligence-ui2');document.head.appendChild(l);}
+const sharedCssUrl=route('/workspace-ui.css?v=20261011-workspace-ui3');
+const existingCss=document.querySelector('link[href*="workspace-ui.css"]');
+if(existingCss)existingCss.href=sharedCssUrl;else{const l=document.createElement('link');l.rel='stylesheet';l.href=sharedCssUrl;document.head.appendChild(l);}
+if(!document.getElementById('workspace-ui-polish')){
+  const style=document.createElement('style');style.id='workspace-ui-polish';
+  style.textContent='.ws-media-credit{max-width:1380px;margin:10px auto 16px;padding:8px 6px;color:var(--ws-muted);font-size:9px;line-height:1.5;opacity:.82}footer .ws-media-credit{margin:12px 0 0;padding:10px 0;border-top:1px solid #27374655}.ws-role-card{display:flex;flex-direction:column;gap:6px;min-height:130px}.ws-role-card strong{display:block;font-size:15px;line-height:1.25;color:var(--ws-text)}.ws-role-card p{margin:0;color:var(--ws-muted);font-size:11px;line-height:1.5}.ws-role-card a{margin-top:auto;color:var(--ws-cyan);font-size:10px;font-weight:900;text-decoration:none}.ws-role-card a:hover{text-decoration:underline}';
+  document.head.appendChild(style);
+}
 if(host){
 const active=host.dataset.active||inferredActive,links=[['Desk','/index.html','⌂','desk'],['Football','/football.html','⚽','football'],['Tennis','/tennis.html','🎾','tennis'],['Live','/live.html','◉','live'],['Reports','/reports.html','▥','reports'],['Odds Builder','/odds-builder.html','⇄','builder'],['Virtual Lab','/virtual-lab/','⚗','lab'],['AI Analyst','/analyst.html','✦','analyst']];
 host.innerHTML='<nav class="ws-nav" aria-label="Match Signal workspaces"><a class="ws-brand" href="/index.html" aria-label="Match Signal main desk"><span class="ws-brand-mark" aria-hidden="true"><svg viewBox="0 0 48 48" width="28" height="28" fill="none"><path d="M7 29a17 17 0 0 1 34 0" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/><path d="M13 29a11 11 0 0 1 22 0M19 29a5 5 0 0 1 10 0" stroke="#42e59a" stroke-width="2.5" stroke-linecap="round"/><path d="M24 29 34 15" stroke="#eef7fb" stroke-width="3" stroke-linecap="round"/><circle cx="24" cy="29" r="3" fill="#37e7ff"/></svg></span><span><strong>MATCH SIGNAL</strong><small>Research &amp; intelligence</small></span></a><div class="ws-nav-right"><div class="ws-nav-links">'+links.map(([label,href,icon,key])=>'<a class="ws-nav-link '+(active===key?'active':'')+'" '+(active===key?'aria-current="page" ':'')+'href="'+route(href)+'"><span aria-hidden="true">'+icon+'</span>'+label+(key==='analyst'?'<span class="ws-private">PRIVATE</span>':'')+'</a>').join('')+'</div><span class="ws-nav-status"><i></i>PAPER / RESEARCH ONLY</span></div></nav>';
@@ -59,5 +66,15 @@ target.innerHTML='<div class="ws-overview-head"><div><div class="ws-overview-eye
 '<p class="ws-overview-note"><strong>Promotion boundary:</strong> Winner and GG/NG figures are descriptive bookmaker-favourite baselines, not independent Match Signal model outcomes. Lab eligibility remains '+esc((g.policy?.eligible_markets||[]).join(', ')||'unavailable')+' only; automatic promotion is disabled. System health reports '+esc(h.status||'UNKNOWN')+'.</p>';
 const button=document.getElementById('wsReloadResearch');if(button)button.addEventListener('click',reportSummary,{once:true});
 }
+function ensureMediaAttribution(){
+  if(document.querySelector('.ws-media-credit'))return;
+  const note=document.createElement('p');
+  note.className='ws-media-credit';
+  note.textContent='Club crests and real-player headshots are resolved through TheSportsDB only when the team/player name matches exactly. Ambiguous or missing artwork stays as initials; eFootball gamer handles are not presented as real-person photos. Team marks and photos remain with their respective rights holders.';
+  const footer=document.querySelector('footer');
+  if(footer)footer.appendChild(note);
+  else if(host)host.insertAdjacentElement('afterend',note);
+}
+ensureMediaAttribution();
 reportSummary();
 })();
