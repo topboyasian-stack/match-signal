@@ -3,6 +3,11 @@ import { readFile } from "node:fs/promises";
 import vm from "node:vm";
 
 const source = await readFile(new URL("../sport-hubs.js", import.meta.url), "utf8");
+assert.match(source,/let virtualQuoteRefreshState="pending"/,"Virtual/eFootball starts in an explicit verification state");
+assert.match(source,/virtualQuoteRefreshState==="complete"\)return true/,"only a complete snapshot can admit all Virtual/eFootball rows");
+assert.match(source,/virtualQuoteRefreshState==="partial"&&x\.desk_quote_refresh==="fresh_exact_event_line_side"/,"partial snapshots only admit candidates tagged exact by this refresh");
+assert.match(source,/snapshot-level qualified fixtures/,"empty Qualified Best explains when saved snapshot rows fail current verification");
+assert.match(source,/refreshVirtualQuoteData\(\)\.then\(snapshot=>/,"the redraw is driven by quote snapshot completeness");
 const start = source.indexOf("function isOverUnderPrediction(x){");
 const end = source.indexOf("function ladderAnchor(rows){", start);
 assert.ok(start >= 0 && end > start, "production desk gate functions are extractable");

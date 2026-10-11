@@ -666,6 +666,9 @@ async function renderUnifiedBoard(){
     // Bring the existing evidence-backed eFootball candidate lane onto the
     // Upcoming Desk without turning it into a Builder qualification bypass.
     const virtualCandidates=selectedRows.filter(isVirtualDeskCandidate);
+    // Track the saved-pool baseline for diagnosis only; it is not a live qualification.
+    const virtualSnapshotQualifiedFixtureCount=qualifiedBestSelections(virtualCandidates,Date.now()).rows.length;
+    let virtualQuoteRefreshState="pending";
 
     async function freshVirtualQuoteMap(requiredRows=[]){
       const byEvent={};
@@ -846,7 +849,8 @@ async function renderUnifiedBoard(){
           live_money_eligible:false,
           market_odds_timestamp:live?.__quote_fetched_at||matchedMarket?.lastOddsChangeTime||null,
           source_engine:"Virtual Lab",
-          desk_source:"selection_candidates + fresh SportyBet virtual quote"
+          desk_source:"selection_candidates + fresh SportyBet virtual quote",
+          desk_quote_refresh:"fresh_exact_event_line_side"
         };
       }).filter(Boolean);
     }
@@ -879,11 +883,12 @@ async function renderUnifiedBoard(){
     };
     all=all.map(annotate);
     const refreshVirtualQuoteData=async()=>{
+    let quoteSnapshot={snapshotAvailable:false,snapshotComplete:false};
     try{
       const requiredQuoteRows=[...all,...virtualCandidates].filter(row=>
         String(row?.sport||"").toLowerCase()==="virtual"&&isOverUnderPrediction(row)&&virtualStartTimestamp(row)>=Date.now()
       );
-      const quoteSnapshot=await freshVirtualQuoteMap(requiredQuoteRows);
+      quoteSnapshot=await freshVirtualQuoteMap(requiredQuoteRows);
       const quoteMap=quoteSnapshot.byEvent;
       all=all.map(row=>{
         if(String(row?.sport||"").toLowerCase()!=="virtual"||!isOverUnderPrediction(row))return row;
@@ -912,6 +917,7 @@ async function renderUnifiedBoard(){
         }
       }
     }catch(_){}
+      return {snapshotAvailable:Boolean(quoteSnapshot?.snapshotAvailable),snapshotComplete:Boolean(quoteSnapshot?.snapshotComplete)};
     };
     const sport=Q('#upSport'), date=Q('#upDate'), search=Q('#upSearch');
     const setOptions=(el,vals)=>{if(!el||el.dataset.ready)return;el.innerHTML=vals.map(v=>'<option value="'+E(v.value)+'">'+E(v.label)+'</option>').join('');el.dataset.ready="1";};
@@ -956,26 +962,44 @@ async function renderUnifiedBoard(){
         }
         return true;
       });
+      const isVirtualQualificationRow=x=>String(x?.sport||"").toLowerCase()==="virtual"||["efootball_gt","efootball_adriatic","vfootball","zoom"].includes(String(x?.product||"").toLowerCase());
+      const virtualViewActive=!sport?.value||sport.value==="all"||sport.value==="virtual";
+      const virtualRowsInView=filteredRows.some(isVirtualQualificationRow);
+      const virtualQuotePending=virtualQuoteRefreshState==="pending"&&virtualViewActive&&virtualCandidates.length>0;
+      // Until reconciliation completes, never count saved Virtual/eFootball quotes as live-qualified.
+      // For a partial snapshot, only rows marked exact by this refresh can qualify.
+      const qualificationRows=filteredRows.filter(x=>{
+        if(!isVirtualQualificationRow(x))return true;
+        if(virtualQuoteRefreshState==="complete")return true;
+        return virtualQuoteRefreshState==="partial"&&x.desk_quote_refresh==="fresh_exact_event_line_side";
+      });
       const groups=fixtureGroups(filteredRows);
-      const best=qualifiedBestSelections(filteredRows,now.getTime());
+      const best=qualifiedBestSelections(qualificationRows,now.getTime());
+      const blockerText=Object.entries(best.diagnostics.blockerCounts)
+        .sort((a,b)=>b[1]-a[1]).slice(0,3)
+        .map(([reason,count])=>qualificationBlockerLabel(reason)+" ("+count+")").join(" · ");
+      const noQualifiedMessage=virtualQuotePending
+        ?"Verifying current SportyBet event identity, exact line/side, quote freshness and value gates. Saved Virtual/eFootball candidates are withheld until verification finishes."
+        :virtualViewActive&&virtualQuoteRefreshState==="unavailable"&&virtualSnapshotQualifiedFixtureCount>0
+          ?"Live SportyBet verification is unavailable. "+virtualSnapshotQualifiedFixtureCount+" snapshot-level qualified fixtures are being held back; stale prices are not being shown as current."
+          :virtualViewActive&&virtualQuoteRefreshState==="partial"
+            ?"Live SportyBet snapshot is incomplete. Only candidates with an exact line/side from this refresh are eligible; unverified snapshot rows are held back."
+            :virtualViewActive&&virtualQuoteRefreshState==="complete"&&virtualSnapshotQualifiedFixtureCount>0&&virtualRowsInView
+              ?"0 currently qualified picks after live verification. The saved snapshot had "+virtualSnapshotQualifiedFixtureCount+" snapshot-level qualified fixtures, but none currently pass every exact-line, model-scope, freshness, edge and expected-return gate. Stale prices are not retained."
+              :(best.diagnostics.futureCandidateMarkets===0
+                ?"No future candidate markets in this filtered view."
+                :"Zero qualified picks from "+best.diagnostics.futureCandidateMarkets+" future market candidates. Blockers: "+E(blockerText||"No current candidate passed every gate")+". No pick was forced.");
       const bestBoard=Q('#qualifiedBestBoard');
       if(bestBoard){
         bestBoard.innerHTML=best.rows.length
           ?best.rows.slice(0,12).map(qualifiedBestRow).join("")
-          :'<div class="ms-qualified-best-empty">'+(best.diagnostics.futureCandidateMarkets===0
-            ?"No future candidate markets in this filtered view."
-            :"Zero qualified picks from "+best.diagnostics.futureCandidateMarkets+" future market candidates. No pick was forced.")+'</div>';
+          :'<div class="ms-qualified-best-empty">'+E(noQualifiedMessage)+'</div>';
       }
       const bestSummary=Q('#qualifiedBestSummary');
       if(bestSummary){
-        const blockerText=Object.entries(best.diagnostics.blockerCounts)
-          .sort((a,b)=>b[1]-a[1]).slice(0,3)
-          .map(([reason,count])=>qualificationBlockerLabel(reason)+" ("+count+")").join(" · ");
         bestSummary.innerHTML=best.rows.length
-          ?'<span><b>'+best.rows.length+'</b> qualified fixture'+(best.rows.length===1?'':'s')+' · exact SportyBet market/line/side · quote ≤15 min · market edge ≥+2% after margin removal and expected return ≥+2% at offered odds'+(best.rows.length>12?' · showing top 12 by expected return':'')+'</span>'
-          :'<span><b>0 qualified picks.</b> '+(best.diagnostics.futureCandidateMarkets===0
-            ?"No future candidates in this filtered view."
-            :"Blockers: "+E(blockerText||"No current candidate passed every gate.")+". No selections were relaxed to fill the list.")+'</span>';
+          ?'<span><b>'+best.rows.length+'</b> qualified fixture'+(best.rows.length===1?'':'s')+' · exact SportyBet market/line/side · quote ≤15 min · market edge ≥+2% after margin removal and expected return ≥+2% at offered odds'+(best.rows.length>12?' · showing top 12 by expected return':'')+(virtualQuoteRefreshState==="partial"?' · partial live snapshot; only exact current quotes counted':'')+'</span>'
+          :'<span><b>'+(virtualQuotePending?'Checking current exact prices.':'0 qualified picks.')+'</b> '+E(noQualifiedMessage)+'</span>';
       }
       const byDay=new Map();
       for(const group of groups){const day=String(group.rows[0].start_time).slice(0,10);if(!byDay.has(day))byDay.set(day,[]);byDay.get(day).push(group);}
@@ -1004,7 +1028,10 @@ async function renderUnifiedBoard(){
     // Quote enrichment still runs with all original safeguards, then redraws the
     // same view so only fresh exact event/line/side matches can qualify.
     draw();
-    refreshVirtualQuoteData().then(()=>draw()).catch(()=>{});
+    refreshVirtualQuoteData().then(snapshot=>{
+      virtualQuoteRefreshState=!snapshot?.snapshotAvailable?"unavailable":snapshot.snapshotComplete?"complete":"partial";
+      draw();
+    }).catch(()=>{virtualQuoteRefreshState="unavailable";draw();});
   }catch(e){
     root.innerHTML='<div class="ms-empty">Unified upcoming feed unavailable: '+E(e.message)+'</div>';
   }
