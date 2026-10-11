@@ -1,0 +1,28 @@
+name: Diagnose SportyBet eFootball Result API
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/diagnose_sportybet_results.py'
+      - '.github/workflows/diagnose-sportybet-results.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install diagnostic HTTP dependency
+        run: python -m pip install --upgrade requests
+      - name: Probe the public feed and SportyBet result endpoint
+        env:
+          MATCH_SIGNAL_PUBLIC_BASE: https://match-signal.pages.dev
+        run: python scripts/diagnose_sportybet_results.py
