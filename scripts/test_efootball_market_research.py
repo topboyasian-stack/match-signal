@@ -86,6 +86,17 @@ def test_draw_and_append_only_merge():
  settled={"sample_id":"same","settlement_status":"SETTLED","settled_at":"2026-10-11T11:00:00+00:00","odds":{"home":1.8}}
  m=mod.merge({"observations":[frozen]},{"observations":[settled]})
  assert m["observations"][0]["settlement_status"]=="SETTLED" and m["odds_builder_eligible"] is False
+def test_settlement_due_uses_elapsed_time_not_exact_minute():
+ now=datetime(2026,10,11,10,17,tzinfo=timezone.utc)
+ assert mod.settlement_due({},now) is True
+ archive={"last_run":{"captured_at":(now-timedelta(minutes=1)).isoformat(),
+   "settlement_checked_at":(now-timedelta(minutes=14)).isoformat()}}
+ assert mod.settlement_due(archive,now) is False
+ archive["last_run"]["settlement_checked_at"]=(now-timedelta(minutes=15)).isoformat()
+ assert mod.settlement_due(archive,now) is True
+ with patch.dict(mod.os.environ,{"EFOOTBALL_RESEARCH_FORCE_SETTLE":"1"}):
+  assert mod.settlement_due(archive,now) is True
+
 if __name__=="__main__":
- test_live_feed_compaction_preserves_scope_ids();test_markets();test_capture();test_live_market_coverage_reports_actual_btts_availability();test_settlement_and_summary();test_legacy_missing_scope_uses_bounded_discovery();test_draw_and_append_only_merge()
- print("eFootball winner/BTTS research tests: PASS (7 groups)")
+ test_live_feed_compaction_preserves_scope_ids();test_markets();test_capture();test_live_market_coverage_reports_actual_btts_availability();test_settlement_and_summary();test_legacy_missing_scope_uses_bounded_discovery();test_draw_and_append_only_merge();test_settlement_due_uses_elapsed_time_not_exact_minute()
+ print("eFootball winner/BTTS research tests: PASS (8 groups)")

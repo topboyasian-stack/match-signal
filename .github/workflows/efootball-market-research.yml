@@ -2,7 +2,8 @@ name: Isolated eFootball Winner and BTTS Market Research
 
 on:
   schedule:
-    - cron: '2-59/5 * * * *'
+    # Canonical five-minute cadence; settlement timing is elapsed-time based.
+    - cron: '*/5 * * * *'
   workflow_dispatch:
   push:
     branches: [main]

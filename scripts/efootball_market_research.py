@@ -280,6 +280,12 @@ def read_archive(path):
         v=json.loads(path.read_text(encoding="utf-8"))
         return v if isinstance(v,dict) else {"observations":[]}
     except (OSError,json.JSONDecodeError):return {"observations":[]}
+def settlement_due(archive,now):
+    """Retry settlement based on elapsed time, not an exact wall-clock minute."""
+    if os.getenv("EFOOTBALL_RESEARCH_FORCE_SETTLE")=="1": return True
+    last_run=archive.get("last_run") or {}
+    last_attempt=dt(last_run.get("settlement_checked_at"))
+    return last_attempt is None or now-last_attempt>=timedelta(minutes=15)
 def merge(remote,candidate):
     out=dict(remote); rows={}
     for source in (remote.get("observations",[]),candidate.get("observations",[])):
@@ -311,12 +317,19 @@ def main():
     a["market_coverage"]=coverage
     pending=[s for s in a["observations"] if isinstance(s,dict) and s.get("settlement_status")=="PENDING" and (dt(s.get("start_time")) or now)<now]
     settled=0;errors=[]
-    if now.minute%30<=2 or os.getenv("EFOOTBALL_RESEARCH_FORCE_SETTLE")=="1":
+    previous_run=a.get("last_run") or {}
+    settlement_checked_at=previous_run.get("settlement_checked_at")
+    attempted_settlement=settlement_due(a,now)
+    if attempted_settlement:
+        settlement_checked_at=now.isoformat()
         try:
             events,errs=fetch_results(pending,now);settled=settle(a,events,now);errors.extend(errs)
         except Exception as exc:errors.append("result source unavailable: "+str(exc))
     a.update(schema_version=1,mode="PAPER_RESEARCH_ONLY",live_trading_approved=False,production_qualification_enabled=False,odds_builder_eligible=False,updated_at=now.isoformat())
-    a["last_run"]={"captured_at":now.isoformat(),"captured_new":added,"settled_new":settled,"settlement_errors":errors,"market_coverage":coverage}
+    a["last_run"]={"captured_at":now.isoformat(),"captured_new":added,"settled_new":settled,
+      "settlement_errors":errors,"settlement_checked_at":settlement_checked_at,
+      "settlement_attempted":attempted_settlement,"pending_due_settlement_check":len(pending),
+      "market_coverage":coverage}
     a["summary"]=summary(a,now);ARCHIVE.write_text(json.dumps(a,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
     print(json.dumps({"status":"PASS","captured_new":added,"settled_new":settled,"observations":len(a["observations"]),"settlement_errors":errors,"market_coverage":coverage,"research_only":True},indent=2))
 if __name__=="__main__":main()
