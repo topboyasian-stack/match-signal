@@ -3,10 +3,23 @@
 const esc=v=>{const n=document.createElement('span');n.textContent=String(v??'');return n.innerHTML;};
 const basePath=location.pathname.startsWith('/match-signal/')?'/match-signal':'';
 const route=path=>basePath+path;
-const host=document.getElementById('workspace-nav');
-if(!document.querySelector('link[href*="workspace-ui.css"]')){const l=document.createElement('link');l.rel='stylesheet';l.href=route('/workspace-ui.css?v=20261011-intelligence-ui1');document.head.appendChild(l);}
+let host=document.getElementById('workspace-nav');
+if(!host){
+  const legacyHost=document.getElementById('msNav');
+  if(legacyHost){host=document.createElement('div');host.id='workspace-nav';legacyHost.replaceWith(host);}
+}
+const pagePath=location.pathname.toLowerCase();
+const inferredActive=pagePath.includes('/virtual-lab')?'lab':
+  pagePath.endsWith('/reports.html')?'reports':
+  pagePath.endsWith('/analyst.html')?'analyst':
+  pagePath.endsWith('/football.html')?'football':
+  pagePath.endsWith('/tennis.html')?'tennis':
+  pagePath.endsWith('/live.html')?'live':
+  pagePath.endsWith('/odds-builder.html')?'builder':
+  pagePath.endsWith('/league.html')?(new URLSearchParams(location.search).get('sport')==='tennis'?'tennis':'football'):'desk';
+if(!document.querySelector('link[href*="workspace-ui.css"]')){const l=document.createElement('link');l.rel='stylesheet';l.href=route('/workspace-ui.css?v=20261011-intelligence-ui2');document.head.appendChild(l);}
 if(host){
-const active=host.dataset.active||'',links=[['Desk','/index.html','⌂','desk'],['Football','/football.html','⚽','football'],['Tennis','/tennis.html','🎾','tennis'],['Live','/live.html','◉','live'],['Reports','/reports.html','▥','reports'],['Odds Builder','/odds-builder.html','⇄','builder'],['Virtual Lab','/virtual-lab/','⚗','lab'],['AI Analyst','/analyst.html','✦','analyst']];
+const active=host.dataset.active||inferredActive,links=[['Desk','/index.html','⌂','desk'],['Football','/football.html','⚽','football'],['Tennis','/tennis.html','🎾','tennis'],['Live','/live.html','◉','live'],['Reports','/reports.html','▥','reports'],['Odds Builder','/odds-builder.html','⇄','builder'],['Virtual Lab','/virtual-lab/','⚗','lab'],['AI Analyst','/analyst.html','✦','analyst']];
 host.innerHTML='<nav class="ws-nav" aria-label="Match Signal workspaces"><a class="ws-brand" href="/index.html" aria-label="Match Signal main desk"><span class="ws-brand-mark" aria-hidden="true"><svg viewBox="0 0 48 48" width="28" height="28" fill="none"><path d="M7 29a17 17 0 0 1 34 0" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/><path d="M13 29a11 11 0 0 1 22 0M19 29a5 5 0 0 1 10 0" stroke="#42e59a" stroke-width="2.5" stroke-linecap="round"/><path d="M24 29 34 15" stroke="#eef7fb" stroke-width="3" stroke-linecap="round"/><circle cx="24" cy="29" r="3" fill="#37e7ff"/></svg></span><span><strong>MATCH SIGNAL</strong><small>Research &amp; intelligence</small></span></a><div class="ws-nav-right"><div class="ws-nav-links">'+links.map(([label,href,icon,key])=>'<a class="ws-nav-link '+(active===key?'active':'')+'" '+(active===key?'aria-current="page" ':'')+'href="'+route(href)+'"><span aria-hidden="true">'+icon+'</span>'+label+(key==='analyst'?'<span class="ws-private">PRIVATE</span>':'')+'</a>').join('')+'</div><span class="ws-nav-status"><i></i>PAPER / RESEARCH ONLY</span></div></nav>';
 }
 function clean(name,kind){let s=String(name||'').trim();if(kind==='team')s=s.replace(/\s*\([^()]+\)\s*$/,'').trim();return s;}
