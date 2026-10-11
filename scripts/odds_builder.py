@@ -86,10 +86,13 @@ MODEL_FIRST_MAX_KICKOFF_SPAN_MINUTES=270
 # the 70% average frontier while retaining positive single-leg EV, live-price,
 # freshness, correlation, and whole-ticket ROI gates.
 MODEL_FIRST_MIN_AVG_PROBABILITY=0.68
-# Exact-line evidence is necessary but is not sufficient for an active ticket.
-# Apply the same 80% per-leg safety floor to the eFootball fallback constructor.
-EFOOTBALL_VALUE_MIN_AVG_PROBABILITY=0.80
-EFOOTBALL_VALUE_MIN_LEG_PROBABILITY=0.80
+# Exact-line evidence is necessary but is not sufficient for a ticket.
+# The isolated eFootball exact-evidence VALUE_RESEARCH lane uses a 65% per-leg
+# and 65% average floor; standard/high-confidence lanes retain their 80% floor.
+# Fresh price, exact-side evidence, spoiler guard, correlation, combined odds,
+# and whole-ticket expected-ROI gates still apply unchanged.
+EFOOTBALL_VALUE_MIN_AVG_PROBABILITY=0.65
+EFOOTBALL_VALUE_MIN_LEG_PROBABILITY=0.65
 
 # Separate compact ticket shape matching the lower-odds eFootball examples.
 # Existing per-leg/evidence/price/value gates stay intact.
@@ -2402,12 +2405,12 @@ def _construct_efootball_value_batch(pool, min_odds=None, max_legs=RESULTS_FIRST
     }
 
 def _construct_efootball_compact_batch(pool):
-    """Construct a compact 4–5 leg eFootball ticket without relaxing leg gates.
+    """Construct a compact 4–5 leg eFootball exact-evidence research ticket.
 
     Only already Builder-eligible, exact-evidence eFootball GT/Adriatic rows are
-    considered. Each leg clears the 80% floor and positive single-leg EV; the
-    ticket reaches 2.00x and at least +2% modelled EV. Joint probability is an
-    independence proxy, not settled ticket proof.
+    considered. Each leg clears the lane's 65% floor and positive single-leg EV;
+    the ticket reaches 2.00x and at least +2% modelled EV. Joint probability is
+    an independence proxy, not settled ticket proof.
     """
     rows=[
         x for x in pool
@@ -4017,6 +4020,17 @@ def main():
     for leg in built:
         leg_status=str(leg.get("status") or "REJECTED")
         rejection_counts[leg_status]=rejection_counts.get(leg_status,0)+1
+    individually_eligible=[x for x in built if x.get("builder_eligible") is True]
+    efootball_exact_individuals=[
+        x for x in individually_eligible
+        if str(x.get("qualification_lane") or "")=="efootball_exact_evidence_value"
+        and str(x.get("product") or "") in ACTIVE_VIRTUAL_PRODUCTS
+    ]
+    efootball_exact_floor_pass=[
+        x for x in efootball_exact_individuals
+        if float(x.get("model_probability") or 0.0)>=EFOOTBALL_VALUE_MIN_LEG_PROBABILITY
+        and float(x.get("expected_value") or 0.0)>=0.0
+    ]
     result={
         "generated_at":now.isoformat(),"engine_version":"V6.1-RESEARCH-GATED",
         "mode":"PAPER_ONLY","target_legs":f"standard 2–4 legs at {odds_gate['floor']:.2f}x active minimum / {odds_gate['preferred_target']:.2f}x preferred; compact eFootball 4–5 legs at {COMPACT_EFOOTBALL_MIN_COMBINED_ODDS:.2f}x+ when all gates pass","sports_supported":["football","tennis","virtual"],
@@ -4038,6 +4052,16 @@ def main():
             "virtual_candidates":len(virtual),
             "virtual_gate_diagnostics":virtual_diag,
             "evaluated":len(built),
+            "individual_leg_diagnostics":{
+                "builder_eligible_leg_count":len(individually_eligible),
+                "efootball_exact_evidence_leg_candidates":len(efootball_exact_individuals),
+                "efootball_exact_evidence_at_65_percent_floor":len(efootball_exact_floor_pass),
+                "efootball_exact_evidence_below_65_percent_floor":len(efootball_exact_individuals)-len(efootball_exact_floor_pass),
+                "efootball_exact_evidence_min_probability":EFOOTBALL_VALUE_MIN_LEG_PROBABILITY,
+                "standard_construction_min_probability":MIN_SAFE_LEG_MODEL_PROBABILITY,
+                "ticket_qualification_independent":True,
+                "note":"Individual leg eligibility is not a qualified ticket. Whole-ticket odds, ROI, timing, correlation, exact evidence, and current quote gates still apply."
+            },
             "rejections":rejection_counts,"selection_diversity":selection_diag,
             "batch_diagnostics":batch_diag,
             "phase2_cyclical_loop":phase2_diag,
@@ -4184,7 +4208,7 @@ def main():
         "market_price_combined_odds":round(combined,3) if selected else None,
         "sportybet_booking":booking_info,
         "theme":{"name":"Midnight Graphite / Electric Cyan / Signal Green","accent":"#28D7E8","positive":"#35D07F","background":"#080D14"},
-        "notes":["Results-first qualifies only from settled exact-line/side performance plus the existing live-price, freshness, data-quality and model-evidence gates.","Zero batches are now diagnosable: capacity reports whether the active 2.70x floor is reachable under the existing leg/correlation rules; no per-leg evidence gate is weakened.","best_available_legs is informational when no batch exists and is not a qualified accumulator.","Missing or stale SportyBet prices produce NO_BET/REJECTED.","Model fair odds never overwrite bookmaker odds.","The Builder evaluates 2–4-leg constructions adaptively. Results-first and high-confidence lanes keep the 80% per-leg safety floor with 90%+ preferred. The isolated eFootball exact-evidence value fallback has its own 65% per-leg evidence floor and is labeled VALUE_RESEARCH rather than high-confidence; it still requires fresh SportyBet pricing, positive single-leg EV, current expected ROI >=2%, and the same correlation controls.","When the proven Results-first lane cannot qualify, the controlled mixed research lane remains conservative and requires independently Builder-eligible VFootball/eFootball evidence legs. Only after that mixed lane fails does the broader model-first value fallback run.","The active combined-odds floor is 2.70x. The 2.80x target remains preferred and becomes the active floor after 10 settled wins in the current 2–4-leg construction family. The fallback still requires current expected ROI >=2%, fresh SportyBet pricing, and the same correlation controls.","The ticket remains paper-only; standard construction allows 2–4 legs, while the separate compact eFootball lane allows 4–5 legs at 2.00x+ only when every existing qualification and ROI gate passes. Neither lane is padded with a weak leg.","The proven Results-first lane keeps a 60-minute kickoff span. The model-first paper value lane may span up to 270 minutes only when its whole-ticket probability and expected ROI gates still pass; this is explicitly research-only, not promoted as settled Results-first evidence.","Near-term Builder horizon is 720 minutes; price freshness remains capped at 900 seconds so extending the scan window does not permit stale odds.","Builder refreshes every 15 minutes and after relevant upstream workflows, so candidate prices are repeatedly revalidated before kickoff.",
+        "notes":["Results-first qualifies only from settled exact-line/side performance plus the existing live-price, freshness, data-quality and model-evidence gates.","Zero batches are diagnosable: capacity and individual-leg diagnostics separate candidates passing leg-level price/evidence/quality checks from tickets passing whole-ticket construction; no batch is forced.","best_available_legs is informational when no batch exists and is not a qualified accumulator.","Missing or stale SportyBet prices produce NO_BET/REJECTED.","Model fair odds never overwrite bookmaker odds.","The Builder evaluates 2–4-leg constructions adaptively. Results-first and high-confidence lanes keep the 80% per-leg safety floor with 90%+ preferred. The isolated eFootball exact-evidence fallback uses a 65% per-leg and average-probability floor and is labeled VALUE_RESEARCH rather than high-confidence; it still requires exact-line/side settlement evidence, the recent-spoiler guard, fresh SportyBet pricing, positive single-leg EV, current whole-ticket expected ROI >=2%, valid timing, and the same event/participant-correlation controls.","When the proven Results-first lane cannot qualify, the controlled mixed research lane remains conservative and requires independently Builder-eligible VFootball/eFootball evidence legs. Only after that mixed lane fails does the broader model-first value fallback run.","The active combined-odds floor is 2.70x. The 2.80x target remains preferred and becomes the active floor after 10 settled wins in the current 2–4-leg construction family. The fallback still requires current expected ROI >=2%, fresh SportyBet pricing, and the same correlation controls.","The ticket remains paper-only; standard construction allows 2–4 legs, while the separate compact eFootball lane allows 4–5 legs at 2.00x+ only when every existing qualification and ROI gate passes. Neither lane is padded with a weak leg.","The proven Results-first lane keeps a 60-minute kickoff span. The model-first paper value lane may span up to 270 minutes only when its whole-ticket probability and expected ROI gates still pass; this is explicitly research-only, not promoted as settled Results-first evidence.","Near-term Builder horizon is 720 minutes; price freshness remains capped at 900 seconds so extending the scan window does not permit stale odds.","Builder refreshes every 15 minutes and after relevant upstream workflows, so candidate prices are repeatedly revalidated before kickoff.",
         "Phase 2 cyclical-loop research is isolated from the baseline model: only Virtual/eFootball legs with a model probability and blended streak-break confidence of at least 78% can enter its 2–3-leg constructor.",
         "The cyclical-loop signal is evidence-backed sequence analysis, not a gambler's-fallacy override: it requires a current opposite-side streak and historical break observations. It cannot weaken the existing evidence, price, correlation, 2.70x or +2% ROI gates; 4.00x is reserved for the separate Phase 2 variance diagnostic.",
         "When Phase 2 combined odds exceed 4.00x, the Builder records a paper-only Kelly variance diagnostic labeled 'High Variance - Fraction Stake Only'; no live stake is calculated or executed."]

@@ -46,12 +46,42 @@ class CompactEfootballBuilderTests(unittest.TestCase):
         self.assertEqual(len(selected),4)
         self.assertGreaterEqual(math.prod(x["bookmaker_odds"] for x in selected),2.00)
 
-    def test_under_80_percent_leg_is_never_used_to_reach_two_x(self):
+    def test_below_65_percent_leg_is_never_used_to_reach_two_x(self):
         rows=[leg(i,odds=1.10,probability=0.90) for i in range(4)]
-        rows.append(leg(4,odds=1.60,probability=0.79))
+        rows.append(leg(4,odds=1.60,probability=0.64))
         selected,diag=builder._construct_efootball_compact_batch(rows)
         self.assertEqual(selected,[])
+        self.assertEqual(diag["candidate_count"],4, "the 64% leg is below the exact-evidence lane floor")
         self.assertEqual(diag["reason"],"no_compact_combination_passed_all_gates")
+
+    def test_65_to_79_percent_exact_evidence_legs_are_evaluated_but_ticket_roi_still_applies(self):
+        rows=[leg(i,odds=1.25,probability=0.70) for i in range(4)]
+        selected,diag=builder._construct_efootball_compact_batch(rows)
+        self.assertEqual(selected,[])
+        self.assertEqual(diag["candidate_count"],4, "70% exact-evidence legs must reach the constructor")
+        self.assertEqual(diag["combinations_checked"],1)
+        self.assertGreater(diag["rejected_expected_roi"],0, "low joint probability must still fail whole-ticket ROI")
+
+    def test_exact_evidence_value_constructor_accepts_70_percent_pair_when_all_gates_pass(self):
+        rows=[
+            leg(0,odds=2.35,probability=0.70,expected_value=0.645,minute=0),
+            leg(1,odds=2.35,probability=0.70,expected_value=0.645,minute=5)
+        ]
+        selected,diag=builder._construct_efootball_value_batch(rows,min_odds=2.70,max_legs=4)
+        self.assertEqual(len(selected),2)
+        self.assertEqual(diag["candidate_count"],2)
+        self.assertGreaterEqual(diag["combined_odds"],2.70)
+        self.assertGreaterEqual(diag["roi"],0.02)
+        self.assertEqual(selected[0]["qualification_lane"],"efootball_exact_evidence_value")
+
+    def test_exact_evidence_value_constructor_rejects_below_65_percent_pair(self):
+        rows=[
+            leg(0,odds=2.35,probability=0.64,expected_value=0.50,minute=0),
+            leg(1,odds=2.35,probability=0.64,expected_value=0.50,minute=5)
+        ]
+        selected,diag=builder._construct_efootball_value_batch(rows,min_odds=2.70,max_legs=4)
+        self.assertEqual(selected,[])
+        self.assertEqual(diag["candidate_count"],0)
 
     def test_ticket_must_retain_two_percent_expected_roi(self):
         rows=[leg(i,odds=1.20,probability=0.80) for i in range(4)]
