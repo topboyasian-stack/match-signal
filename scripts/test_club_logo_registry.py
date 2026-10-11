@@ -7,6 +7,8 @@ from scripts.sync_club_logos import (
     _candidate_title_matches,
     _existing_entry_is_safe,
     _signature_ok,
+    _safe_svg_content,
+    _select_exact_dataset_logo_path,
     clear_misses_for_policy_change,
     is_football_product,
     license_allowed,
@@ -130,6 +132,34 @@ class ClubLogoRegistryTests(unittest.TestCase):
             "path": "/assets/club-logos/boca-juniors.png",
         }
         self.assertTrue(_existing_entry_is_safe("boca juniors", good))
+
+    def test_svg_dataset_selection_requires_one_exact_name_match(self):
+        paths = [
+            "logos/england/Arsenal.svg",
+            "logos/england/Arsenal_Women.svg",
+            "logos/spain/Barcelona.svg",
+            "logos/ecuador/Barcelona_SC.svg",
+            "logos/uruguay/Nacional.svg",
+            "logos/colombia/Nacional.svg",
+            "logos/france/Paris_FC.svg",
+            "logos/france/Paris_Saint-Germain.svg",
+            "images/england.png",
+        ]
+        self.assertEqual(_select_exact_dataset_logo_path("Arsenal", paths), "logos/england/Arsenal.svg")
+        self.assertEqual(_select_exact_dataset_logo_path("Barcelona", paths), "logos/spain/Barcelona.svg")
+        self.assertIsNone(_select_exact_dataset_logo_path("Nacional", paths), "duplicate exact names must be treated as ambiguous")
+        self.assertIsNone(_select_exact_dataset_logo_path("Paris", paths), "generic Paris must not resolve to PSG or Paris FC")
+        self.assertEqual(_select_exact_dataset_logo_path("Paris Saint-Germain", paths), "logos/france/Paris_Saint-Germain.svg")
+        self.assertIsNone(_select_exact_dataset_logo_path("Athletic Club Bilbao", ["logos/usa/Athletic_Club_Miami.svg"]))
+
+    def test_svg_dataset_rejects_active_or_external_content(self):
+        valid = b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><path d="M0 0h10v10H0z" fill="#123456"/></svg>'
+        self.assertTrue(_safe_svg_content(valid))
+        self.assertFalse(_safe_svg_content(b'<svg><script>alert(1)</script></svg>'))
+        self.assertFalse(_safe_svg_content(b'<svg><image href="https://example.com/logo.png"/></svg>'))
+        self.assertFalse(_safe_svg_content(b'<!DOCTYPE svg [<!ENTITY x SYSTEM "file:///etc/passwd">]><svg>&x;</svg>'))
+        self.assertFalse(_safe_svg_content(b'<svg onload="alert(1)"></svg>'))
+        self.assertFalse(_safe_svg_content(b'<html></html>'))
 
     def test_policy_change_retries_previous_misses_immediately(self):
         registry = {"search_policy_version": 5}

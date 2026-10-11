@@ -12,7 +12,9 @@ import html
 import json
 import re
 import time
+import threading
 import unicodedata
+import xml.etree.ElementTree as ET
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -27,6 +29,13 @@ REGISTRY_PATH = DATA / "club-logo-registry.json"
 COMMONS_API = "https://commons.wikimedia.org/w/api.php"
 USER_AGENT = "MatchSignal-ClubLogoRegistry/1.0 (https://github.com/topboyasian-stack/match-signal)"
 MAX_IMAGE_BYTES = 2_000_000
+MAX_SVG_BYTES = 500_000
+LOGO_DATASET_REPO = "JoseArroyave/football-logos"
+LOGO_DATASET_API = "https://api.github.com/repos/JoseArroyave/football-logos"
+LOGO_DATASET_RAW = "https://raw.githubusercontent.com/JoseArroyave/football-logos"
+_DATASET_LOGO_PATHS = None
+_DATASET_LOGO_COMMIT = None
+_DATASET_LOGO_LOCK = threading.Lock()
 MISS_RETRY_DAYS = 1
 
 DATA_SOURCES = [
@@ -54,7 +63,7 @@ CLUB_CLUE_RE = re.compile(
     r"\b(?:f\.c\.|a\.f\.c\.|c\.f\.|s\.c\.|a\.c\.)\b",
     re.I,
 )
-SEARCH_POLICY_VERSION = 6
+SEARCH_POLICY_VERSION = 7
 ALIASES = {
     # National teams and common club/provider-name variants.
     "france": ("France national football team", "France national soccer team"),
@@ -234,9 +243,231 @@ def _candidate_title_matches(term, title):
 
 
 
+def _dataset_name_key(value):
+    """Normalize an SVG filename or team spelling without erasing club suffixes."""
+    text = str(value or "")
+    if text.lower().endswith(".svg"):
+        text = text[:-4]
+    text = text.replace("_", " ").replace("-", " ")
+    text = unicodedata.normalize("NFKD", text)
+    text = "".join(ch for ch in text if not unicodedata.combining(ch))
+    return re.sub(r"[^a-z0-9]+", " ", text.lower()).strip()
+
+
+def _dataset_variant_names(name):
+    """Known exact aliases and conventional club-name forms, ordered from safest to broader."""
+    key = normalize_team(name)
+    terms = [str(name or "").strip()]
+    terms.extend(ALIASES.get(key, ()))
+    variants = []
+    seen = set()
+
+    def add(value):
+        value = str(value or "").strip()
+        normalized = _dataset_name_key(value)
+        if normalized and normalized not in seen:
+            seen.add(normalized)
+            variants.append(value)
+
+    for term in terms:
+        base = _dataset_name_key(term)
+        if not base:
+            continue
+        add(term)
+        # The source names national-team SVGs using "National_Team".
+        for suffix in (" national football team", " national soccer team"):
+            if base.endswith(suffix):
+                add(base[:-len(suffix)] + " national team")
+                add(base[:-len(suffix)])
+        for suffix in (" football team", " soccer team", " football club"):
+            if base.endswith(suffix):
+                add(base[:-len(suffix)])
+        # Some providers omit club initials. These are still exact full-stem matches.
+        club_suffixes = (" fc", " afc", " sc", " ac", " cf", " football club")
+        if not any(base.endswith(suffix) for suffix in club_suffixes):
+            for suffix in club_suffixes:
+                add(base + suffix)
+        club_prefixes = ("fc ", "afc ", "sc ", "ac ", "as ", "us ", "club ")
+        if not any(base.startswith(prefix) for prefix in club_prefixes):
+            for prefix in club_prefixes:
+                add(prefix + base)
+    return variants
+
+
+def _select_exact_dataset_logo_path(name, paths):
+    """Return one uniquely exact SVG filename match; never guess among duplicate names."""
+    if normalize_team(name) == "paris":
+        # "Paris" is ambiguous across PSG and Paris FC/provider shorthand.
+        return None
+    index = {}
+    for path in paths:
+        path = str(path or "")
+        if not path.startswith("logos/") or not path.lower().endswith(".svg"):
+            continue
+        stem = path.rsplit("/", 1)[-1]
+        key = _dataset_name_key(stem)
+        if key:
+            index.setdefault(key, []).append(path)
+    # An exact basename that appears in multiple countries is itself ambiguous.
+    direct_matches = index.get(_dataset_name_key(name), [])
+    if len(direct_matches) == 1:
+        return direct_matches[0]
+    if len(direct_matches) > 1:
+        return None
+    for variant in _dataset_variant_names(name):
+        variant_key = _dataset_name_key(variant)
+        if variant_key == _dataset_name_key(name):
+            continue
+        candidates = index.get(variant_key, [])
+        if len(candidates) == 1:
+            return candidates[0]
+        # Never accept a generated variant if that exact stem is ambiguous.
+        if len(candidates) > 1:
+            continue
+    return None
+
+
+def _load_dataset_logo_paths():
+    """Load and pin one upstream commit so index lookup and downloads use the same tree."""
+    global _DATASET_LOGO_PATHS, _DATASET_LOGO_COMMIT
+    if _DATASET_LOGO_PATHS is not None and _DATASET_LOGO_COMMIT:
+        return _DATASET_LOGO_PATHS, _DATASET_LOGO_COMMIT
+    with _DATASET_LOGO_LOCK:
+        if _DATASET_LOGO_PATHS is not None and _DATASET_LOGO_COMMIT:
+            return _DATASET_LOGO_PATHS, _DATASET_LOGO_COMMIT
+        headers = {"User-Agent": USER_AGENT, "Accept": "application/vnd.github+json"}
+        commit_response = requests.get(
+            f"{LOGO_DATASET_API}/commits/main", headers=headers, timeout=25
+        )
+        commit_response.raise_for_status()
+        commit_sha = str(commit_response.json().get("sha") or "")
+        if not re.fullmatch(r"[0-9a-f]{40}", commit_sha):
+            raise ValueError("Could not pin the external logo dataset commit.")
+        tree_response = requests.get(
+            f"{LOGO_DATASET_API}/git/trees/{commit_sha}?recursive=1",
+            headers=headers, timeout=40,
+        )
+        tree_response.raise_for_status()
+        payload = tree_response.json()
+        if payload.get("truncated") is True:
+            raise ValueError("External logo dataset tree was truncated.")
+        paths = []
+        for item in payload.get("tree") or []:
+            path = str(item.get("path") or "")
+            size = item.get("size")
+            if (
+                item.get("type") == "blob"
+                and path.startswith("logos/")
+                and path.lower().endswith(".svg")
+                and isinstance(size, int)
+                and 0 < size <= MAX_SVG_BYTES
+            ):
+                paths.append(path)
+        if not paths:
+            raise ValueError("External logo dataset returned no usable SVG paths.")
+        _DATASET_LOGO_PATHS = paths
+        _DATASET_LOGO_COMMIT = commit_sha
+        return _DATASET_LOGO_PATHS, _DATASET_LOGO_COMMIT
+
+
+def _safe_svg_content(content):
+    """Reject SVG scripts, external references and active-content features."""
+    if not isinstance(content, (bytes, bytearray)) or not content or len(content) > MAX_SVG_BYTES:
+        return False
+    try:
+        source = bytes(content).decode("utf-8-sig")
+    except UnicodeDecodeError:
+        return False
+    if re.search(
+        r"<!\s*(?:doctype|entity)|<\s*(?:script|foreignObject|iframe|object|embed)\b|javascript\s*:|"
+        r"on[a-z]+\s*=|@import|url\(\s*['\"]?(?:https?:|//|javascript:)|"
+        r"(?:href|src)\s*=\s*['\"]\s*(?:https?:|//|javascript:|data:text/html)",
+        source, flags=re.I,
+    ):
+        return False
+    try:
+        root = ET.fromstring(source)
+    except ET.ParseError:
+        return False
+    if root.tag.rsplit("}", 1)[-1].lower() != "svg":
+        return False
+    for element in root.iter():
+        if element.tag.rsplit("}", 1)[-1].lower() in {"script", "foreignobject", "iframe", "object", "embed"}:
+            return False
+        for attr, value in element.attrib.items():
+            attr_name = attr.rsplit("}", 1)[-1].lower()
+            value = str(value or "").strip().lower()
+            if attr_name.startswith("on"):
+                return False
+            if attr_name in {"href", "src"} and value.startswith(
+                ("http:", "https:", "//", "javascript:", "data:text/html")
+            ):
+                return False
+            if "url(" in value and re.search(r"url\(\s*['\"]?(?:https?:|//|javascript:)", value, re.I):
+                return False
+    return True
+
+
+def _dataset_path_matches_name(name, source_path):
+    return _select_exact_dataset_logo_path(name, [source_path]) == source_path
+
+
+def _dataset_candidate_for(name):
+    try:
+        paths, commit_sha = _load_dataset_logo_paths()
+        source_path = _select_exact_dataset_logo_path(name, paths)
+        if not source_path:
+            return None
+        encoded_path = quote(source_path, safe="/_().-")
+        raw_url = f"{LOGO_DATASET_RAW}/{commit_sha}/{encoded_path}"
+        page_url = f"https://github.com/{LOGO_DATASET_REPO}/blob/{commit_sha}/{encoded_path}"
+        return {
+            "provider": LOGO_DATASET_REPO,
+            "source_repository": LOGO_DATASET_REPO,
+            "source_path": source_path,
+            "source_commit": commit_sha,
+            "raw_url": raw_url,
+            "source_url": page_url,
+            "title": source_path.rsplit("/", 1)[-1],
+            "licence": "MIT",
+            "license_url": f"https://github.com/{LOGO_DATASET_REPO}/blob/{commit_sha}/LICENSE",
+            "artist": "Jose Arroyave and repository contributors",
+        }
+    except Exception as exc:
+        print(f"Secondary club-logo dataset unavailable for {name}: {str(exc)[:160]}")
+        return None
+
+
+def _download_dataset_logo(candidate):
+    response = requests.get(
+        str(candidate.get("raw_url") or ""),
+        headers={"User-Agent": USER_AGENT, "Accept": "image/svg+xml"},
+        timeout=25,
+    )
+    response.raise_for_status()
+    content = response.content
+    if not _safe_svg_content(content):
+        raise ValueError("Dataset SVG failed safe-content validation.")
+    return content
+
+
 def _existing_entry_is_safe(key, entry):
     if not isinstance(entry, dict):
         return False
+    if entry.get("provider") == LOGO_DATASET_REPO:
+        source_path = str(entry.get("source_path") or "")
+        source_commit = str(entry.get("source_commit") or "")
+        if (
+            entry.get("source_repository") != LOGO_DATASET_REPO
+            or entry.get("licence") != "MIT"
+            or not re.fullmatch(r"[0-9a-f]{40}", source_commit)
+            or not source_path.startswith("logos/")
+            or not source_path.lower().endswith(".svg")
+        ):
+            return False
+        terms = [str(entry.get("canonical_key") or key), str(entry.get("name") or key), str(key)]
+        terms.extend(entry.get("aliases") or [])
+        return any(term and _dataset_path_matches_name(term, source_path) for term in terms)
     title = str(entry.get("title") or "")
     terms = [str(entry.get("matched_term") or ""), str(entry.get("name") or key), str(key)]
     terms.extend(ALIASES.get(normalize_team(entry.get("canonical_key") or key), ()))
@@ -526,7 +757,11 @@ def sync_registry(max_new=80):
     # club image forever from the shared registry.
     for key, entry in list(teams.items()):
         local_path = ROOT / str((entry or {}).get("path") or "").lstrip("/")
-        if not local_path.exists() or not _existing_entry_is_safe(key, entry):
+        if (
+            not local_path.exists()
+            or not _existing_entry_is_safe(key, entry)
+            or (str(entry.get("provider") or "") == LOGO_DATASET_REPO and not _safe_svg_content(local_path.read_bytes()))
+        ):
             teams.pop(key, None)
             misses.pop(key, None)
             removed_invalid_entries += 1
@@ -536,7 +771,11 @@ def sync_registry(max_new=80):
         entry = teams.get(key)
         if entry:
             local_path = ROOT / str(entry.get("path") or "").lstrip("/")
-            if local_path.exists() and _existing_entry_is_safe(key, entry):
+            if (
+                local_path.exists()
+                and _existing_entry_is_safe(key, entry)
+                and (str(entry.get("provider") or "") != LOGO_DATASET_REPO or _safe_svg_content(local_path.read_bytes()))
+            ):
                 continue
             teams.pop(key, None)
             misses.pop(key, None)
@@ -554,14 +793,28 @@ def sync_registry(max_new=80):
         return False
 
     def process(item):
+        dataset_error = None
+        try:
+            candidate = _dataset_candidate_for(item["name"])
+            if candidate:
+                content = _download_dataset_logo(candidate)
+                return item, (candidate, content, ".svg", "image/svg+xml"), None
+        except Exception as exc:
+            dataset_error = str(exc)[:180]
         try:
             candidate = _candidate_for(item["name"])
             if not candidate:
-                return item, None, "No exact name-matched CC0/Public Domain/CC BY/CC BY-SA raster artwork found."
+                message = "No exact-name match in the pinned SVG dataset or reusable CC0/Public Domain/CC BY/CC BY-SA Commons raster."
+                if dataset_error:
+                    message += " Dataset issue: " + dataset_error
+                return item, None, message
             content, ext, mime = _download_asset(candidate)
             return item, (candidate, content, ext, mime), None
         except Exception as exc:
-            return item, None, str(exc)[:240]
+            message = str(exc)[:180]
+            if dataset_error:
+                message = dataset_error + "; Commons: " + message
+            return item, None, message
 
     changes = 0
     ASSET_DIR.mkdir(parents=True, exist_ok=True)
@@ -576,21 +829,41 @@ def sync_registry(max_new=80):
                 asset_path = ASSET_DIR / (filename + ext)
                 # Avoid overwriting a different asset when an extension changes.
                 asset_path.write_bytes(content)
-                entry = {
-                    "name": item["name"],
-                    "path": "/assets/club-logos/" + asset_path.name,
-                    "provider": "Wikimedia Commons",
-                    "source_url": candidate["source_url"],
-                    "title": candidate["title"],
-                    "licence": candidate["licence"],
-                    "license_url": candidate["license_url"],
-                    "artist": candidate["artist"],
-                    "mime": mime,
-                    "bytes": len(content),
-                    "aliases": [item["name"]],
-                    "canonical_key": key,
-                    "downloaded_at": now_iso(),
-                }
+                if candidate.get("provider") == LOGO_DATASET_REPO:
+                    entry = {
+                        "name": item["name"],
+                        "path": "/assets/club-logos/" + asset_path.name,
+                        "provider": LOGO_DATASET_REPO,
+                        "source_repository": candidate["source_repository"],
+                        "source_path": candidate["source_path"],
+                        "source_commit": candidate["source_commit"],
+                        "source_url": candidate["source_url"],
+                        "title": candidate["title"],
+                        "licence": candidate["licence"],
+                        "license_url": candidate["license_url"],
+                        "artist": candidate["artist"],
+                        "mime": mime,
+                        "bytes": len(content),
+                        "aliases": [item["name"]],
+                        "canonical_key": key,
+                        "downloaded_at": now_iso(),
+                    }
+                else:
+                    entry = {
+                        "name": item["name"],
+                        "path": "/assets/club-logos/" + asset_path.name,
+                        "provider": "Wikimedia Commons",
+                        "source_url": candidate["source_url"],
+                        "title": candidate["title"],
+                        "licence": candidate["licence"],
+                        "license_url": candidate["license_url"],
+                        "artist": candidate["artist"],
+                        "mime": mime,
+                        "bytes": len(content),
+                        "aliases": [item["name"]],
+                        "canonical_key": key,
+                        "downloaded_at": now_iso(),
+                    }
                 teams[key] = entry
                 # Register provider/display-name variants against the same
                 # verified asset, so "Man City" and "Manchester City FC" reuse it.
@@ -636,7 +909,7 @@ def sync_registry(max_new=80):
     registry["search_policy_version"] = SEARCH_POLICY_VERSION
     registry["quality_audit"] = {"invalid_entries_removed": removed_invalid_entries, "orphan_assets_removed": removed_orphan_files}
     registry["generated_at"] = now_iso()
-    registry["source_policy"] = "Local raster assets are copied only from verified CC0, Public Domain, CC BY, or CC BY-SA Wikimedia Commons previews; source, license, and attribution metadata are retained."
+    registry["source_policy"] = "Primary: exact identity-matched Wikimedia Commons raster previews under CC0/Public Domain/CC BY/CC BY-SA with attribution. Fallback: exact-name SVG files from JoseArroyave/football-logos at a pinned upstream commit under the repository's declared MIT license; source path and license notice are retained. Club marks can remain trademarks of their respective owners. Ambiguous or unresolved names use initials instead of a guessed crest."
     registry["scan_summary"] = {
         "discovered_teams": len(discoveries),
         "permanent_logos": len({str(v.get("path")) for v in teams.values() if isinstance(v, dict) and v.get("path")}),
