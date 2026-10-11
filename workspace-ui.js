@@ -17,7 +17,7 @@ const inferredActive=pagePath.includes('/virtual-lab')?'lab':
   pagePath.endsWith('/live.html')?'live':
   pagePath.endsWith('/odds-builder.html')?'builder':
   pagePath.endsWith('/league.html')?(new URLSearchParams(location.search).get('sport')==='tennis'?'tennis':'football'):'desk';
-const sharedCssUrl=route('/workspace-ui.css?v=20261011-workspace-media1');
+const sharedCssUrl=route('/workspace-ui.css?v=20261011-workspace-media2');
 const existingCss=document.querySelector('link[href*="workspace-ui.css"]');
 if(existingCss)existingCss.href=sharedCssUrl;else{const l=document.createElement('link');l.rel='stylesheet';l.href=sharedCssUrl;document.head.appendChild(l);}
 if(!document.getElementById('workspace-ui-polish')){
@@ -32,15 +32,114 @@ host.innerHTML='<nav class="ws-nav" aria-label="Match Signal workspaces"><a clas
 function clean(name,kind){let s=String(name||'').trim();if(kind==='team')s=s.replace(/\s*\([^()]+\)\s*$/,'').trim();return s;}
 function norm(name,kind){let raw=clean(name,kind);if(kind==='player'&&raw.includes(',')){const parts=raw.split(',').map(x=>x.trim()).filter(Boolean);if(parts.length>1)raw=parts.slice(1).join(' ')+' '+parts[0];}let s=raw.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/&/g,' and ').replace(/[^a-z0-9]+/g,' ').trim().replace(/\s+/g,' ');if(kind==='team')s=s.replace(/^(fc|afc|sc|ac|club)\s+/,'').replace(/\s+(football club|fc|cf|afc|sc|ac)$/,'').trim();return s;}
 function initials(name){const w=clean(name,'team').split(/\s+/).filter(Boolean);return (w.length>1?w[0][0]+w[1][0]:(w[0]||'MS').slice(0,2)).toUpperCase();}
-const cache=new Map(),entries=new Map(),queue=[];let busy=false;const prefix='match-signal-media-v1:';
-function getCache(k){if(cache.has(k))return cache.get(k);try{const x=JSON.parse(localStorage.getItem(prefix+k)||'null');if(!x)return undefined;if(Date.now()-x.at>x.ttl){localStorage.removeItem(prefix+k);return undefined;}cache.set(k,x.url||null);return x.url||null;}catch(_){return undefined;}}
-function saveCache(k,url,ttl){cache.set(k,url||null);try{localStorage.setItem(prefix+k,JSON.stringify({url:url||null,at:Date.now(),ttl:ttl||86400000}));}catch(_){}}
-function srcFor(kind,row){const urls=kind==='team'?[row.strBadge,row.strTeamBadge,row.strLogo,row.strTeamLogo]:[row.strCutout,row.strThumb,row.strRender,row.strThumbCard];return urls.find(u=>typeof u==='string'&&/^https:\/\//i.test(u))||null;}
-function exactRow(kind,name,data){const k=norm(name,kind),rows=kind==='team'?(data.teams||[]):(data.player||data.players||[]),fields=kind==='team'?['strTeam','strTeamShort','strTeamAlternate']:['strPlayer'];return rows.find(r=>fields.some(f=>r[f]&&norm(r[f],kind)===k&&srcFor(kind,r))&&(kind!=='player'||!r.strSport||/tennis/i.test(String(r.strSport))))||null;}
-async function lookup(kind,name){const n=clean(name,kind),key=norm(n,kind);if(key.length<3)return null;const queryName=kind==='player'&&n.includes(',')?n.split(',').map(x=>x.trim()).slice(1).join(' ')+' '+n.split(',')[0].trim():n;const base=kind==='team'?'https://www.thesportsdb.com/api/v1/json/123/searchteams.php?t=':'https://www.thesportsdb.com/api/v1/json/123/searchplayers.php?p=';try{const r=await fetch(base+encodeURIComponent(queryName),{mode:'cors',credentials:'omit',cache:'force-cache'});if(!r.ok)throw Error();const data=await r.json(),row=exactRow(kind,n,data),url=row?srcFor(kind,row):null;saveCache(kind+':'+key,url,url?30*86400000:86400000);return url;}catch(_){saveCache(kind+':'+key,null,2*3600000);return null;}}
-function paint(item,url){item.nodes.forEach(node=>{if(!node.isConnected)return;if(url){node.replaceChildren();const img=document.createElement('img');img.className='ws-media-image';img.alt='';img.loading='lazy';img.decoding='async';img.referrerPolicy='no-referrer';img.src=url;img.addEventListener('error',()=>{node.classList.remove('has-media');img.remove();node.textContent=initials(node.dataset.wsMediaName||'');},{once:true});node.appendChild(img);node.classList.add('has-media');}node.dataset.wsMediaResolved='true';});}
-function enqueue(node){if(!node||node.dataset.wsMediaResolved==='true')return;const kind=node.dataset.wsMediaKind;if(!['team','player'].includes(kind))return;const name=clean(node.dataset.wsMediaName||'',kind),n=norm(name,kind);if(n.length<3){node.dataset.wsMediaResolved='true';return;}const k=kind+':'+n,cached=getCache(k);if(cached!==undefined){paint({nodes:[node]},cached);return;}if(entries.has(k)){entries.get(k).nodes.push(node);return;}const item={key:k,kind,name,nodes:[node]};entries.set(k,item);queue.push(item);drain();}
-async function drain(){if(busy||!queue.length)return;busy=true;const item=queue.shift(),url=await lookup(item.kind,item.name);paint(item,url);busy=false;window.setTimeout(drain,2250);}
+const cache=new Map(),entries=new Map(),queue=[];let busy=false;const prefix='match-signal-media-v2:';
+function getCache(k){
+  if(cache.has(k))return cache.get(k);
+  try{
+    const x=JSON.parse(localStorage.getItem(prefix+k)||'null');
+    if(!x)return undefined;
+    if(Date.now()-x.at>x.ttl){localStorage.removeItem(prefix+k);return undefined;}
+    const media=Object.prototype.hasOwnProperty.call(x,'media')?x.media:null;
+    cache.set(k,media);return media;
+  }catch(_){return undefined;}
+}
+function saveCache(k,media,ttl){
+  cache.set(k,media||null);
+  try{localStorage.setItem(prefix+k,JSON.stringify({media:media||null,at:Date.now(),ttl:ttl||86400000}));}catch(_){}
+}
+function plain(v){return String(v||'').replace(/<[^>]*>/g,' ').replace(/&nbsp;/gi,' ').replace(/\s+/g,' ').trim();}
+function licenceAllowed(v){
+  const s=plain(v).toLowerCase().replace(/[–—]/g,'-').replace(/\s+/g,' ').trim();
+  if(/^(cc0(?: 1\.0)?|public domain(?: mark)?|pd)$/.test(s))return true;
+  return /^cc by(?:-sa)?(?:\s+\d+(?:\.\d+)?)?$/.test(s);
+}
+function commonsTitleUrl(title){
+  const file=String(title||'').replace(/^File:/i,'').replace(/ /g,'_');
+  return 'https://commons.wikimedia.org/wiki/File:'+encodeURIComponent(file);
+}
+async function lookup(kind,name){
+  const cleaned=clean(name,kind),key=norm(cleaned,kind);
+  if(key.length<3)return null;
+  let queryName=cleaned;
+  if(kind==='player'&&cleaned.includes(',')){
+    const p=cleaned.split(',').map(x=>x.trim()).filter(Boolean);
+    if(p.length>1)queryName=p.slice(1).join(' ')+' '+p[0];
+  }
+  const search=kind==='team'
+    ? '"'+queryName+'" (logo OR crest OR badge OR emblem)'
+    : '"'+queryName+'" (tennis OR portrait OR headshot OR player)';
+  const params=new URLSearchParams({
+    action:'query',generator:'search',gsrsearch:search,gsrnamespace:'6',gsrlimit:'12',
+    prop:'imageinfo',iiprop:'url|extmetadata',iiurlwidth:'128',format:'json',origin:'*'
+  });
+  const controller=new AbortController(),timer=window.setTimeout(()=>controller.abort(),7000);
+  try{
+    const response=await fetch('https://commons.wikimedia.org/w/api.php?'+params.toString(),{
+      mode:'cors',credentials:'omit',cache:'force-cache',signal:controller.signal
+    });
+    if(!response.ok)throw Error('Commons HTTP '+response.status);
+    const data=await response.json(),pages=Object.values(data?.query?.pages||{}),candidates=[];
+    for(const page of pages){
+      const title=String(page?.title||''),titleBase=title.replace(/^File:/i,'').replace(/\.[^.]+$/,'');
+      const titleKey=norm(titleBase,kind),info=Array.isArray(page?.imageinfo)?page.imageinfo[0]:null,meta=info?.extmetadata||{};
+      const licence=plain(meta.LicenseShortName?.value||meta.UsageTerms?.value||''),url=String(info?.thumburl||info?.url||'');
+      if(!info||!/^https:\/\/upload\.wikimedia\.org\//i.test(url)||!licenceAllowed(licence))continue;
+      if(!(' '+titleKey+' ').includes(' '+key+' '))continue;
+      if(kind==='team'&&!/\b(logo|crest|badge|emblem|coat of arms)\b/i.test(titleKey))continue;
+      if(kind==='player'&&!/\b(tennis|portrait|headshot|player|athlete|photo)\b/i.test(titleKey))continue;
+      const licenseUrl=plain(meta.LicenseUrl?.value||''),artist=plain(meta.Artist?.value||meta.Credit?.value||'').slice(0,180);
+      const score=(titleKey===key?100:0)+(kind==='team'?(/\b(crest|badge|emblem)\b/i.test(titleKey)?8:0):(/\b(portrait|headshot)\b/i.test(titleKey)?8:0));
+      candidates.push({url,provider:'Wikimedia Commons',sourceUrl:commonsTitleUrl(title),licence,licenseUrl,artist,title,score});
+    }
+    candidates.sort((a,b)=>b.score-a.score);
+    return candidates[0]||null;
+  }finally{window.clearTimeout(timer);}
+}
+function fallbackName(node){return initials(node.dataset.wsMediaName||'');}
+function paint(item,media){
+  item.nodes.forEach(node=>{
+    if(!node.isConnected)return;
+    node.classList.remove('has-media');
+    node.removeAttribute('href');node.removeAttribute('target');node.removeAttribute('rel');
+    if(media&&media.url&&media.sourceUrl){
+      node.replaceChildren();
+      const img=document.createElement('img');
+      img.className='ws-media-image';img.alt='';img.loading='lazy';img.decoding='async';img.referrerPolicy='no-referrer';img.src=media.url;
+      img.addEventListener('error',()=>{
+        node.classList.remove('has-media');node.removeAttribute('href');node.removeAttribute('target');node.removeAttribute('rel');
+        node.replaceChildren(document.createTextNode(fallbackName(node)));
+        node.title='No verified artwork available';node.setAttribute('aria-label',String(node.dataset.wsMediaName||'Entity')+' image unavailable');
+      },{once:true});
+      node.href=media.sourceUrl;node.target='_blank';node.rel='noopener noreferrer';
+      node.title=[media.provider,media.licence,media.artist].filter(Boolean).join(' · ');
+      node.setAttribute('aria-label','Open licensed image source and licence for '+String(node.dataset.wsMediaName||'entity')+' in a new tab');
+      node.appendChild(img);node.classList.add('has-media');
+    }else{
+      node.replaceChildren(document.createTextNode(fallbackName(node)));
+      node.title='No exact name match with a verified reusable image licence';
+      node.setAttribute('aria-label',String(node.dataset.wsMediaName||'Entity')+' image unavailable; initials shown');
+    }
+    node.dataset.wsMediaResolved='true';
+  });
+}
+function enqueue(node){
+  if(!node||node.dataset.wsMediaResolved==='true')return;
+  const kind=node.dataset.wsMediaKind;
+  if(!['team','player'].includes(kind))return;
+  const name=clean(node.dataset.wsMediaName||'',kind),n=norm(name,kind);
+  if(n.length<3){node.dataset.wsMediaResolved='true';return;}
+  const k=kind+':'+n,cached=getCache(k);
+  if(cached!==undefined){paint({nodes:[node]},cached);return;}
+  if(entries.has(k)){entries.get(k).nodes.push(node);return;}
+  const item={key:k,kind,name,nodes:[node]};entries.set(k,item);queue.push(item);drain();
+}
+async function drain(){
+  if(busy||!queue.length)return;
+  busy=true;const item=queue.shift();let media=null;
+  try{media=await lookup(item.kind,item.name);}catch(_){}
+  saveCache(item.key,media,media?30*86400000:2*3600000);
+  paint(item,media);busy=false;window.setTimeout(drain,2250);
+}
 let io=null;function watch(node){if(node.dataset.wsMediaResolved==='true'||node.dataset.wsMediaObserved==='true')return;node.dataset.wsMediaObserved='true';if(io)io.observe(node);else enqueue(node);}
 function scan(root){if(root?.matches?.('[data-ws-media-kind][data-ws-media-name]'))watch(root);root?.querySelectorAll?.('[data-ws-media-kind][data-ws-media-name]').forEach(watch);}
 if('IntersectionObserver'in window)io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){io.unobserve(e.target);enqueue(e.target);}}),{rootMargin:'360px 0px'});
@@ -50,7 +149,7 @@ function mediaLabel(name,kind){
   const words=normalized.split(/\s+/).filter(Boolean);
   const initials=(words.length>1?words[0][0]+words[1][0]:(words[0]||'MS').slice(0,2)).toUpperCase();
   const label=document.createElement('span');label.className='ws-entity-label ws-fixture-team';
-  const slot=document.createElement('span');slot.className='ws-media-slot';slot.dataset.wsMediaKind=kind;slot.dataset.wsMediaName=raw;slot.setAttribute('aria-hidden','true');slot.textContent=initials;
+  const slot=document.createElement('a');slot.className='ws-media-slot';slot.dataset.wsMediaKind=kind;slot.dataset.wsMediaName=raw;slot.title='Looking for licensed artwork…';slot.textContent=initials;
   const textNode=document.createElement('span');textNode.className='ws-entity-name';textNode.textContent=raw;
   label.append(slot,textNode);return label;
 }
@@ -99,10 +198,9 @@ function ensureMediaAttribution(){
   if(document.querySelector('.ws-media-credit'))return;
   const note=document.createElement('p');
   note.className='ws-media-credit';
-  note.textContent='Club crests and real-player headshots are resolved through TheSportsDB only when the team/player name matches exactly. Ambiguous or missing artwork stays as initials; eFootball gamer handles are not presented as real-person photos. Team marks and photos remain with their respective rights holders.';
-  const footer=document.querySelector('footer');
-  if(footer)footer.appendChild(note);
-  else if(host)host.insertAdjacentElement('afterend',note);
+  note.innerHTML='Club crests and tennis-player photos appear only when there is an exact entity-name match and an allowed reuse licence. Click an image to open its source and licence. Missing or ambiguous artwork falls back to initials; eFootball gamer handles are never presented as real-person headshots. Source: <a href="https://commons.wikimedia.org/" target="_blank" rel="noopener noreferrer">Wikimedia Commons</a>.';
+  const target=document.querySelector('footer')||document.querySelector('.ms-wrap')||document.querySelector('main')||host;
+  if(target)target.appendChild(note);
 }
 ensureMediaAttribution();
 reportSummary();
