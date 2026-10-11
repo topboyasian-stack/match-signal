@@ -94,7 +94,9 @@ def collect_direct():
                 for e in t.get("events") or []:
                     events.append({
                         "product":product_for(tn,cat,str(e.get("homeTeamName") or ""),str(e.get("awayTeamName") or "")) or product_hint,
-                        "tournament":tn,"category":cat,"event_id":str(e.get("eventId") or ""),
+                        "tournament":tn,"category":cat,"event_id":str(e.get("eventId") or e.get("event_id") or ""),
+                        "tournament_id":str(t.get("id") or t.get("tournamentId") or t.get("tournament_id") or e.get("tournamentId") or e.get("tournament_id") or ""),
+                        "category_id":str(t.get("categoryId") or (t.get("category") or {}).get("id") or (t.get("category") or {}).get("categoryId") or t.get("category_id") or e.get("categoryId") or e.get("category_id") or ""),
                         "participant_1":str(e.get("homeTeamName") or ""),"participant_2":str(e.get("awayTeamName") or ""),
                         "start_time_ms":e.get("estimateStartTime"),"match_status":e.get("matchStatus"),"markets":e.get("markets") or []
                     })

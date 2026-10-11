@@ -58,8 +58,9 @@ function tournaments(body){
 }
 
 function scopeFromTournament(t){
-  const categoryId=String(t?.categoryId||t?.category?.id||'');
-  const tournamentId=String(t?.id||t?.tournamentId||'');
+  const e=Array.isArray(t?.events)?t.events[0]:null;
+  const categoryId=String(t?.categoryId||t?.category?.id||t?.category?.categoryId||t?.category_id||e?.categoryId||e?.category?.id||e?.category_id||'');
+  const tournamentId=String(t?.id||t?.tournamentId||t?.tournament_id||e?.tournamentId||e?.tournament?.id||e?.tournament_id||'');
   return categoryId&&tournamentId?{categoryId,tournamentId}:null;
 }
 
