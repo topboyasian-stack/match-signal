@@ -112,6 +112,7 @@ def test_scoped_result_lookup_retries_without_time_filters():
   second=get.call_args_list[1].kwargs["params"]
   assert "startTime" in first and "endTime" in first,first
   assert "startTime" not in second and "endTime" not in second,second
+  assert first["pageSize"]==5 and second["pageSize"]==5,(first,second)
   assert second["categoryId"]=="cat-1" and second["tournamentId"]=="tour-1"
 
 def test_legacy_scope_discovery_retries_without_time_filters():
@@ -127,7 +128,19 @@ def test_legacy_scope_discovery_retries_without_time_filters():
   assert get.call_count==2
   second=get.call_args_list[1].kwargs["params"]
   assert second["source"]=="efootball" and "startTime" not in second and "endTime" not in second,second
+  assert second["pageSize"]==5,second
+
+def test_result_proxy_upstream_errors_are_preserved():
+ now=datetime(2026,10,11,10,17,tzinfo=timezone.utc)
+ class FakeResponse:
+  def raise_for_status(self):pass
+  def json(self):return {"ok":True,"events":[],"errors":[{"page":1,"error":"upstream HTTP 503"}]}
+ with patch.object(mod.requests,"get",side_effect=[FakeResponse(),FakeResponse()]) as get:
+  rows,errors=mod.fetch_results([{"event_id":"legacy-event","start_time":"2026-10-11T09:30:00+00:00"}],now)
+  assert rows==[],rows
+  assert errors and any("upstream HTTP 503" in err for err in errors),errors
+  assert get.call_count==2
 
 if __name__=="__main__":
- test_live_feed_compaction_preserves_scope_ids();test_markets();test_capture();test_live_market_coverage_reports_actual_btts_availability();test_settlement_and_summary();test_legacy_missing_scope_uses_bounded_discovery();test_draw_and_append_only_merge();test_settlement_due_uses_elapsed_time_not_exact_minute();test_scoped_result_lookup_retries_without_time_filters();test_legacy_scope_discovery_retries_without_time_filters()
- print("eFootball winner/BTTS research tests: PASS (10 groups)")
+ test_live_feed_compaction_preserves_scope_ids();test_markets();test_capture();test_live_market_coverage_reports_actual_btts_availability();test_settlement_and_summary();test_legacy_missing_scope_uses_bounded_discovery();test_draw_and_append_only_merge();test_settlement_due_uses_elapsed_time_not_exact_minute();test_scoped_result_lookup_retries_without_time_filters();test_legacy_scope_discovery_retries_without_time_filters();test_result_proxy_upstream_errors_are_preserved()
+ print("eFootball winner/BTTS research tests: PASS (11 groups)")
