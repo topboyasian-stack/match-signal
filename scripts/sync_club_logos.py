@@ -47,14 +47,14 @@ TEAM_FIELDS = (
     "participant_1", "participant_2",
 )
 ARTWORK_RE = re.compile(r"\b(logo|crest|badge|emblem|coat of arms)\b", re.I)
-NONLOGO_ARTIFACT_RE = re.compile(r"\b(rugby|pin badge|supporters? club|supporters|fan club|souvenir|main stand|side view|stadium|shirt|jersey|poster|sticker|key ?ring|medal|collection|toy|window|photograph|photo|mural|building|signboard|shopfront|on window|crossed out|xmas|christmas|festive|defaced|satirical|parody|unofficial|fan art)\b", re.I)
+NONLOGO_ARTIFACT_RE = re.compile(r"\b(rugby|pin badge|supporters? club|supporters|fan club|souvenir|main stand|side view|stadium|shirt|jersey|poster|sticker|key ?ring|medal|collection|toy|window|photograph|photo|mural|building|signboard|shopfront|on window|crossed out|xmas|christmas|festive|defaced|satirical|parody|unofficial|fan art|geograph|graffiti|stadio|club monaco|fashion|apparel|clothing|retail|department store|sportswear|boutique|designer label)\b", re.I)
 HISTORIC_ARTWORK_RE = re.compile(r"\b(old|original|historic|historical|vintage|antique|retro|altes|alte|alter)\b|\b(?:18\d{2}|19\d{2})\b", re.I)
 CLUB_CLUE_RE = re.compile(
     r"\b(football|soccer|club|olympique|racing|athletic|sporting|futbol|fútbol|fc|afc|sc|ac|cf)\b|"
     r"\b(?:f\.c\.|a\.f\.c\.|c\.f\.|s\.c\.|a\.c\.)\b",
     re.I,
 )
-SEARCH_POLICY_VERSION = 5
+SEARCH_POLICY_VERSION = 6
 ALIASES = {
     # National teams and common club/provider-name variants.
     "france": ("France national football team", "France national soccer team"),

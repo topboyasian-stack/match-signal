@@ -70,6 +70,10 @@ class ClubLogoRegistryTests(unittest.TestCase):
         self.assertFalse(_candidate_title_matches("Liverpool FC", "Liverpool FC crest, Main Stand - side view.jpg"))
         self.assertFalse(_candidate_title_matches("Arsenal", "Arsenal FC old crest small.png"))
         self.assertFalse(_candidate_title_matches("Athletic Club", "Athletic Club crest 1901.png"))
+        self.assertFalse(_candidate_title_matches("Monaco", "Club Monaco Official Logo.png"))
+        self.assertFalse(_candidate_title_matches("Twente", "FC Twente logo's in graffiti.jpg"))
+        self.assertFalse(_candidate_title_matches("AC Milan", "AC Milan badge stadio Giuseppe Meazza.jpg"))
+        self.assertFalse(_candidate_title_matches("Southampton", "Southampton FC crest - geograph.org.uk - 1723706.jpg"))
         self.assertTrue(_candidate_title_matches("Athletic Club", "Athletic Club crest 2024.png"))
         self.assertTrue(_candidate_title_matches("Liverpool", "Logo Liverpool FC (2024).png"))
         self.assertTrue(_candidate_title_matches("Real Madrid", "Logo of Real Madrid CF.svg"))
@@ -112,6 +116,14 @@ class ClubLogoRegistryTests(unittest.TestCase):
         self.assertFalse(_existing_entry_is_safe("real madrid", crossed_out))
         self.assertFalse(_existing_entry_is_safe("juventus", festive))
         self.assertFalse(_existing_entry_is_safe("paris", paris))
+        photo_entries = [
+            ("monaco", {"name":"Monaco","title":"File:Club Monaco Official Logo.png","path":"/assets/club-logos/monaco.png"}),
+            ("twente", {"name":"Twente","title":"File:FC Twente logo's in graffiti.jpg","path":"/assets/club-logos/twente.jpg"}),
+            ("milan", {"name":"AC Milan","title":"File:AC Milan badge stadio Giuseppe Meazza.jpg","path":"/assets/club-logos/milan.jpg"}),
+            ("southampton", {"name":"Southampton","title":"File:Southampton FC crest - geograph.org.uk - 1723706.jpg","path":"/assets/club-logos/southampton.jpg"}),
+        ]
+        for key, entry in photo_entries:
+            self.assertFalse(_existing_entry_is_safe(key, entry), f"unsafe photo/commercial logo retained for {key}")
         good = {
             "name": "Boca Juniors",
             "title": "File:Club Atlético Boca Juniors logo (70 stars).png",
@@ -120,10 +132,10 @@ class ClubLogoRegistryTests(unittest.TestCase):
         self.assertTrue(_existing_entry_is_safe("boca juniors", good))
 
     def test_policy_change_retries_previous_misses_immediately(self):
-        registry = {"search_policy_version": 4}
+        registry = {"search_policy_version": 5}
         misses = {"arsenal": {"retry_after": "2099-01-01T00:00:00+00:00"}}
         clear_misses_for_policy_change(registry, misses)
-        self.assertEqual(registry["search_policy_version"], 5)
+        self.assertEqual(registry["search_policy_version"], 6)
         self.assertEqual(misses, {})
 
     def test_downloaded_image_signature_is_checked(self):
