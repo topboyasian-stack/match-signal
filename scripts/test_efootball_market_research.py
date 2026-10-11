@@ -61,6 +61,28 @@ def test_settlement_and_summary():
  s=mod.summary(a,now);assert s["summary_by_product_market"]["efootball_gt|match_winner"]["settled"]==1
  assert s["summary_by_product_market"]["efootball_gt|btts"]["settled"]==1
  assert s["production_qualification_enabled"] is False and s["odds_builder_eligible"] is False
+
+def test_settlement_accepts_provider_final_set_score():
+ now=datetime(2026,10,11,11,0,tzinfo=timezone.utc)
+ archive={"observations":[
+  {"sample_id":"score-winner","event_id":"finished-1","market_type":"match_winner",
+   "odds":{"home":1.8,"draw":3.4,"away":4.5},
+   "market_probabilities_no_vig":{"home":.55,"draw":.29,"away":.16},
+   "market_favourite":"home","favourite_odds":1.8,"settlement_status":"PENDING"},
+  {"sample_id":"score-btts","event_id":"finished-1","market_type":"btts",
+   "odds":{"yes":1.7,"no":2.1},"market_probabilities_no_vig":{"yes":.55,"no":.45},
+   "market_favourite":"yes","favourite_odds":1.7,"settlement_status":"PENDING"}
+ ]}
+ assert mod.settle(archive,[{"eventId":"finished-1","matchStatus":"End","setScore":"2:1"}],now)==2
+ assert all(x["settlement_status"]=="SETTLED" for x in archive["observations"])
+ assert archive["observations"][0]["actual_outcome"]=="home"
+ assert archive["observations"][1]["actual_outcome"]=="yes"
+ # A non-final event's in-play score must not be treated as a settled result.
+ pending={"observations":[{"event_id":"inplay-1","market_type":"match_winner",
+   "odds":{"home":1.8,"away":2.0},"market_probabilities_no_vig":{"home":.52,"away":.48},
+   "market_favourite":"home","favourite_odds":1.8,"settlement_status":"PENDING"}]}
+ assert mod.settle(pending,[{"eventId":"inplay-1","matchStatus":"Live","setScore":"2:1"}],now)==0
+ assert pending["observations"][0]["settlement_status"]=="PENDING"
 def test_legacy_missing_scope_uses_bounded_discovery():
  now=datetime(2026,10,11,10,30,tzinfo=timezone.utc)
  payload={"events":[{"eventId":"legacy-e","homeScore":"2","awayScore":"1"}]}
@@ -112,7 +134,7 @@ def test_scoped_result_lookup_retries_without_time_filters():
   second=get.call_args_list[1].kwargs["params"]
   assert "startTime" in first and "endTime" in first,first
   assert "startTime" not in second and "endTime" not in second,second
-  assert first["pageSize"]==5 and second["pageSize"]==5,(first,second)
+  assert first["pageSize"]==100 and second["pageSize"]==100,(first,second)
   assert second["categoryId"]=="cat-1" and second["tournamentId"]=="tour-1"
 
 def test_legacy_scope_discovery_retries_without_time_filters():
@@ -128,7 +150,7 @@ def test_legacy_scope_discovery_retries_without_time_filters():
   assert get.call_count==2
   second=get.call_args_list[1].kwargs["params"]
   assert second["source"]=="efootball" and "startTime" not in second and "endTime" not in second,second
-  assert second["pageSize"]==5,second
+  assert second["pageSize"]==100,second
 
 def test_result_proxy_upstream_errors_are_preserved():
  now=datetime(2026,10,11,10,17,tzinfo=timezone.utc)
@@ -142,5 +164,5 @@ def test_result_proxy_upstream_errors_are_preserved():
   assert get.call_count==2
 
 if __name__=="__main__":
- test_live_feed_compaction_preserves_scope_ids();test_markets();test_capture();test_live_market_coverage_reports_actual_btts_availability();test_settlement_and_summary();test_legacy_missing_scope_uses_bounded_discovery();test_draw_and_append_only_merge();test_settlement_due_uses_elapsed_time_not_exact_minute();test_scoped_result_lookup_retries_without_time_filters();test_legacy_scope_discovery_retries_without_time_filters();test_result_proxy_upstream_errors_are_preserved()
- print("eFootball winner/BTTS research tests: PASS (11 groups)")
+ test_live_feed_compaction_preserves_scope_ids();test_markets();test_capture();test_live_market_coverage_reports_actual_btts_availability();test_settlement_and_summary();test_settlement_accepts_provider_final_set_score();test_legacy_missing_scope_uses_bounded_discovery();test_draw_and_append_only_merge();test_settlement_due_uses_elapsed_time_not_exact_minute();test_scoped_result_lookup_retries_without_time_filters();test_legacy_scope_discovery_retries_without_time_filters();test_result_proxy_upstream_errors_are_preserved()
+ print("eFootball winner/BTTS research tests: PASS (12 groups)")
