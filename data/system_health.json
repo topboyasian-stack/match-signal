@@ -1,26 +1,26 @@
 {
-  "generated_at": "2026-10-11T19:33:15.751275+00:00",
+  "generated_at": "2026-10-11T19:34:33.163319+00:00",
   "status": "FAIL",
-  "critical_issues": 3,
+  "critical_issues": 2,
   "warning_issues": 1,
   "info_issues": 0,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
       "status": "STALE",
-      "age_hours": 4.64,
+      "age_hours": 4.66,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.37,
+      "age_hours": 0.39,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
-      "status": "STALE",
-      "age_hours": 4.45,
+      "status": "PASS",
+      "age_hours": 0.02,
       "threshold_hours": 4
     },
     {
@@ -38,13 +38,13 @@
     {
       "engine": "tennis_forward_discovery",
       "status": "PASS",
-      "age_hours": 4.6,
+      "age_hours": 4.63,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 1.41,
+      "age_hours": 1.43,
       "threshold_hours": 0.5,
       "heartbeat_source": "unified_live_refresh"
     },
@@ -71,12 +71,7 @@
     {
       "code": "STALE_CORE_PREDICTION_PIPELINE",
       "severity": "critical",
-      "detail": "updated_at age 4.64h exceeds 4h"
-    },
-    {
-      "code": "STALE_EXPANSION",
-      "severity": "critical",
-      "detail": "updated_at age 4.45h exceeds 4h"
+      "detail": "updated_at age 4.66h exceeds 4h"
     },
     {
       "code": "TENNIS_CORE_FEED_EMPTY",
@@ -86,13 +81,13 @@
     {
       "code": "PIPELINE_STALE",
       "severity": "critical",
-      "detail": "pipeline_status age 4.64h exceeds 4h"
+      "detail": "pipeline_status age 4.66h exceeds 4h"
     }
   ],
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
   "paper_only": true,
   "prediction_desk_filters": {
-    "past_kickoff_rows_hidden": 10,
+    "past_kickoff_rows_hidden": 9,
     "stale_live_flags_hidden": 0,
     "expired_settled_rows_hidden": 0
   }
