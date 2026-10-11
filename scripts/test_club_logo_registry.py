@@ -59,6 +59,12 @@ class ClubLogoRegistryTests(unittest.TestCase):
         self.assertFalse(_candidate_title_matches("Arsenal", "Arsenal FC old crest small.png"))
         self.assertFalse(_candidate_title_matches("Athletic Club", "Athletic Club crest 1901.png"))
         self.assertTrue(_candidate_title_matches("Athletic Club", "Athletic Club crest 2024.png"))
+        self.assertTrue(_candidate_title_matches("Liverpool", "Logo Liverpool FC (2024).png"))
+        self.assertTrue(_candidate_title_matches("Real Madrid", "Logo of Real Madrid CF.svg"))
+        self.assertTrue(_candidate_title_matches("Manchester United", "Crest of Manchester United Football Club.png"))
+        self.assertFalse(_candidate_title_matches("Liverpool", "Logo Liverpool FC old crest.png"))
+        self.assertFalse(_candidate_title_matches("Liverpool", "Logo Liverpool FC Main Stand photo.jpg"))
+        self.assertFalse(_candidate_title_matches("Arsenal", "Logo Arsenal FC (1996).svg"))
         self.assertFalse(_candidate_title_matches("Barcelona", "FC Barcelona original crest (1899-1910).png"))
 
     def test_identity_phrase_before_artwork_must_match_the_complete_team(self):
