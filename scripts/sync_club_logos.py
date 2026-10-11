@@ -433,14 +433,28 @@ def sync_registry(max_new=80):
     discoveries = collect_clubs()
     now = datetime.now(timezone.utc)
     attempts = []
+    removed_invalid_entries = 0
+
+    # Purge previously accepted but ambiguous/historical media before looking
+    # for replacements. This avoids reusing a technically licensed but wrong
+    # club image forever from the shared registry.
+    for key, entry in list(teams.items()):
+        local_path = ROOT / str((entry or {}).get("path") or "").lstrip("/")
+        if not local_path.exists() or not _existing_entry_is_safe(key, entry):
+            teams.pop(key, None)
+            misses.pop(key, None)
+            removed_invalid_entries += 1
+
     for item in discoveries:
         key = item["key"]
         entry = teams.get(key)
         if entry:
             local_path = ROOT / str(entry.get("path") or "").lstrip("/")
-            if local_path.exists():
+            if local_path.exists() and _existing_entry_is_safe(key, entry):
                 continue
             teams.pop(key, None)
+            misses.pop(key, None)
+            removed_invalid_entries += 1
         miss = misses.get(key) or {}
         if miss and not _retry_due(miss.get("retry_after"), now):
             continue
@@ -519,8 +533,22 @@ def sync_registry(max_new=80):
                 }
                 print(f"Logo fallback retained for {item['name']}: {misses[key]['reason']}")
 
+    # Remove files no longer referenced by any approved registry entry.
+    referenced_paths = {
+        str((ROOT / str(entry.get("path") or "").lstrip("/")).resolve())
+        for entry in teams.values()
+        if isinstance(entry, dict) and entry.get("path")
+    }
+    removed_orphan_files = 0
+    if ASSET_DIR.exists():
+        for path in ASSET_DIR.iterdir():
+            if path.is_file() and str(path.resolve()) not in referenced_paths:
+                path.unlink()
+                removed_orphan_files += 1
+
     registry["schema_version"] = 1
     registry["search_policy_version"] = SEARCH_POLICY_VERSION
+    registry["quality_audit"] = {"invalid_entries_removed": removed_invalid_entries, "orphan_assets_removed": removed_orphan_files}
     registry["generated_at"] = now_iso()
     registry["source_policy"] = "Local raster assets are copied only from verified CC0, Public Domain, CC BY, or CC BY-SA Wikimedia Commons previews; source, license, and attribution metadata are retained."
     registry["scan_summary"] = {
@@ -529,6 +557,8 @@ def sync_registry(max_new=80):
         "registered_names": len(teams),
         "unresolved_names": len(misses),
         "new_assets_this_run": changes,
+        "invalid_entries_removed": removed_invalid_entries,
+        "orphan_assets_removed": removed_orphan_files,
         "last_scan_at": now_iso(),
     }
     REGISTRY_PATH.parent.mkdir(parents=True, exist_ok=True)
