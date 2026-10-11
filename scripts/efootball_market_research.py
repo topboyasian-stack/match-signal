@@ -256,48 +256,52 @@ def fetch_results(pending,now):
         try:
             r=requests.get(BASE+"/api/sportybet-virtual-results",params=params,timeout=timeout)
             r.raise_for_status()
-            return settlement_events(r.json()),None
+            payload=r.json()
+            rows=settlement_events(payload)
+            proxy_errors=payload.get("errors",[]) if isinstance(payload,dict) else []
+            error_note=None
+            if proxy_errors:
+                brief=json.dumps(proxy_errors[:3],ensure_ascii=False,default=str) if isinstance(proxy_errors,list) else str(proxy_errors)
+                error_note=f"{label}: result proxy reported upstream errors: {brief[:1200]}"
+            return rows,error_note
         except Exception as exc:
             return [],f"{label}: {exc}"
 
-    # Some SportyBet result scopes return an empty list when a startTime/endTime
-    # filter is supplied, while the same endpoint returns completed events for
-    # the scope without those optional filters. Try both, but still settle only
-    # when the exact archived event ID is present in a returned result.
+    # Use the same small page size validated by the production result-proxy
+    # smoke check. If optional time filters produce no rows, retry unfiltered.
     if missing:
         dates=[dt(s.get("start_time")) for s in missing];dates=[d for d in dates if d]
-        base={"source":"efootball","pageSize":100,"pageNum":1}
+        base={"source":"efootball","pageSize":5,"pageNum":1}
         filtered=dict(base)
         if dates:
             filtered["startTime"]=int((min(dates)-timedelta(days=1)).timestamp()*1000)
             filtered["endTime"]=int((now+timedelta(minutes=2)).timestamp()*1000)
         rows,err=request_rows(filtered,45,"broad eFootball scope discovery")
+        if err:errors.append(err)
         if rows:
             events.extend(rows)
         else:
             fallback,err2=request_rows(base,45,"unfiltered broad eFootball scope discovery")
+            if err2:errors.append(err2)
             if fallback:events.extend(fallback)
-            else:
-                if err:errors.append(err)
-                if err2:errors.append(err2)
-                if not err and not err2:errors.append("broad eFootball result endpoint returned no rows with or without time filters")
+            elif not err and not err2:errors.append("broad eFootball result endpoint returned no rows with or without time filters")
 
     ordered=sorted(scopes.items(),key=lambda x:min(dt(s.get("start_time")) or now for s in x[1]))
     for (cat,tour),samples in ordered[:12]:
         dates=[dt(s.get("start_time")) for s in samples];dates=[d for d in dates if d]
-        base={"source":"efootball","categoryId":cat,"tournamentId":tour,"pageSize":100,"pageNum":1}
+        base={"source":"efootball","categoryId":cat,"tournamentId":tour,"pageSize":5,"pageNum":1}
         filtered=dict(base)
         if dates:
             filtered["startTime"]=int((min(dates)-timedelta(days=1)).timestamp()*1000)
             filtered["endTime"]=int((now+timedelta(minutes=2)).timestamp()*1000)
         rows,err=request_rows(filtered,35,f"{cat}/{tour} date-filtered result lookup")
+        if err:errors.append(err)
         if rows:
             events.extend(rows);continue
         fallback,err2=request_rows(base,35,f"{cat}/{tour} unfiltered result lookup")
+        if err2:errors.append(err2)
         if fallback:
             events.extend(fallback);continue
-        if err:errors.append(err)
-        if err2:errors.append(err2)
         if not err and not err2:
             errors.append(f"{cat}/{tour}: no result rows with or without time filters")
 
@@ -310,7 +314,6 @@ def fetch_results(pending,now):
             errors.append(f"result endpoint returned {len(events)} rows but none matched the {len(pending_ids)} pending exact event IDs; no scores were inferred")
         elif not errors:
             errors.append(f"no result rows returned for {len(pending)} pending observations")
-    # Deduplicate API rows by exact event ID before the caller settles samples.
     dedup={}
     for e in events:
         event_id=str(e.get("eventId") or e.get("event_id") or "")
