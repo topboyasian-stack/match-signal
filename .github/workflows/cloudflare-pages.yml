@@ -176,6 +176,21 @@ jobs:
           fi
           echo "project=$PROJECT" >> "$GITHUB_OUTPUT"
 
+          # A disconnected Git integration can leave the configured production
+          # branch different from the repository's current default branch. Read
+          # Pages' authoritative setting instead of assuming it is always main.
+          PROJECT_INFO=$(curl -fsSL \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$PROJECT")
+          PRODUCTION_BRANCH=$(printf '%s' "$PROJECT_INFO" | python -c 'import json,sys; d=json.load(sys.stdin); print((d.get("result") or {}).get("production_branch") or "")')
+          if [ -z "$PRODUCTION_BRANCH" ]; then
+            echo "Cloudflare Pages did not report a configured production branch."
+            exit 1
+          fi
+          echo "production_branch=$PRODUCTION_BRANCH" >> "$GITHUB_OUTPUT"
+          echo "Configured Cloudflare Pages production branch: $PRODUCTION_BRANCH"
+
       - name: Install Pages Function dependencies
         run: npm install --no-audit --no-fund
 
@@ -230,7 +245,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           PROJECT: ${{ steps.project.outputs.project }}
         run: |
-          npx wrangler@latest pages deploy .pages-deploy --project-name="$PROJECT" --branch=main --commit-hash="${{ steps.source.outputs.sha }}"
+          npx wrangler@latest pages deploy .pages-deploy --project-name="$PROJECT" --branch="${{ steps.project.outputs.production_branch }}" --commit-hash="${{ steps.source.outputs.sha }}"
 
       - name: Run production HTTP and asset smoke tests
         timeout-minutes: 3
