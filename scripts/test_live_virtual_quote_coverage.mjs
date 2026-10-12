@@ -148,8 +148,8 @@ async function verifyDeployedRenderer() {
     throw new Error("production HTML still references the stale pre-fix renderer cache key");
   }
   const deployedRenderer = await fetchCoverageText("/sport-hubs.js?v=" + encodeURIComponent(homeVersion));
-  if (!deployedRenderer.includes("const requiredQuoteRows=virtualCandidates;")) {
-    throw new Error("the deployed versioned renderer still lets non-candidate board rows block snapshot completeness");
+  if (!/const requiredQuoteRows=virtualCandidates\.filter\(row=>isRequiredVirtualQuoteRow\(row,Date\.now\(\)\)\)/.test(deployedRenderer)) {
+    throw new Error("the deployed versioned renderer is not restricting snapshot completeness to model-qualified candidates inside the live seven-day window");
   }
   if (!deployedRenderer.includes("api/sportybet-virtual?sources=efootball&pageSize=100&pageNum=")) {
     throw new Error("the deployed versioned renderer is not using the active eFootball-only quote feed");
