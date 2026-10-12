@@ -1,29 +1,29 @@
 {
   "version": 4,
-  "updated_at": "2026-10-12T20:03:24.904220+00:00",
+  "updated_at": "2026-10-12T20:17:55.710704+00:00",
   "mode": "PAPER_ONLY",
   "summary": {
     "tracked_tickets": 138,
-    "pending": 67,
-    "won": 14,
+    "pending": 64,
+    "won": 17,
     "lost": 57,
     "active_with_loss": 14,
-    "legs_won": 118,
+    "legs_won": 121,
     "legs_lost": 72,
-    "legs_pending": 171,
+    "legs_pending": 167,
     "pending_legs_by_product": {
-      "efootball_gt": 171
+      "efootball_gt": 167
     },
-    "settled_tickets": 71,
+    "settled_tickets": 74,
     "by_leg_count": {
       "2": {
-        "tracked": 46,
-        "won": 10,
+        "tracked": 49,
+        "won": 13,
         "lost": 36,
-        "settled": 46,
-        "accuracy": 0.217391,
-        "avg_combined_odds": 4.310565,
-        "avg_model_rating": 53.665
+        "settled": 49,
+        "accuracy": 0.265306,
+        "avg_combined_odds": 4.246776,
+        "avg_model_rating": 53.823265
       },
       "4": {
         "tracked": 25,
@@ -37,13 +37,13 @@
     },
     "by_primary_lane": {
       "efootball_exact_evidence_value": {
-        "tracked": 36,
-        "won": 10,
+        "tracked": 39,
+        "won": 13,
         "lost": 26,
-        "settled": 36,
-        "accuracy": 0.277778,
-        "avg_combined_odds": 4.170611,
-        "avg_model_rating": 51.346667
+        "settled": 39,
+        "accuracy": 0.333333,
+        "avg_combined_odds": 4.101231,
+        "avg_model_rating": 51.723846
       },
       "high_confidence_research": {
         "tracked": 6,
@@ -96,7 +96,7 @@
       "shape_comparison": "Use by_leg_count to compare 2–7-leg accuracy, average odds, and average model rating.",
       "lane_comparison": "Use by_primary_lane to compare construction-lane performance."
     },
-    "active_pending": 5,
+    "active_pending": 2,
     "archived_pending": 62,
     "visible_tickets": 76,
     "archived_tickets": 62
@@ -499,8 +499,8 @@
       "batch_id": "BATCH-01",
       "created_at": "2026-10-12T18:31:35.312231+00:00",
       "last_seen_at": "2026-10-12T18:31:35.312231+00:00",
-      "last_settled_at": "2026-10-12T20:03:24.904220+00:00",
-      "status": "PENDING",
+      "last_settled_at": "2026-10-12T20:17:55.710704+00:00",
+      "status": "WON",
       "combined_odds": 3.386,
       "combined_odds_source": "builder_batch_snapshot",
       "odds_snapshot_complete": true,
@@ -516,8 +516,8 @@
       "primary_lane": "efootball_exact_evidence_value",
       "odds_locked_at": "2026-10-12T18:31:35.312231+00:00",
       "leg_count": 2,
-      "settled_leg_count": 1,
-      "pending_leg_count": 1,
+      "settled_leg_count": 2,
+      "pending_leg_count": 0,
       "legs": [
         {
           "sport": "virtual",
@@ -732,7 +732,7 @@
           "builder_eligible": true,
           "real_money_eligible": false,
           "paper_only": true,
-          "status": "PENDING",
+          "status": "WON",
           "source": "Exact-line evidence calibration · eFootball value lane",
           "market_source": "SportyBet NG",
           "recent_evidence": {
@@ -837,17 +837,20 @@
           "sportybet_outcome_name": "Under 4",
           "fixture_key": "efootball_gt|roma virtual 5 v juventus virtual 1",
           "bookmaker_odds_snapshot": 1.85,
-          "correct": null,
-          "settled_at": null,
-          "result": null,
-          "final_score": null
+          "correct": true,
+          "settled_at": "2026-10-12T20:17:55.710704+00:00",
+          "result": "U4",
+          "final_score": [
+            1.0,
+            2.0
+          ]
         }
       ],
       "leg_counts": {
-        "won": 0,
+        "won": 1,
         "lost": 0,
         "void": 1,
-        "pending": 1
+        "pending": 0
       },
       "construction_snapshot": {
         "batch_id": "BATCH-01",
@@ -881,9 +884,37 @@
         },
         "recorded_at": "2026-10-12T18:31:35.331582+00:00"
       },
-      "settlement_diagnostics": null,
+      "settlement_diagnostics": {
+        "diagnostic_version": 1,
+        "ticket_outcome": "WON",
+        "diagnostic_label": "ALL_SETTLED_LEGS_WON",
+        "leg_count": 2,
+        "settled_leg_count": 2,
+        "won_leg_count": 1,
+        "lost_leg_count": 0,
+        "void_leg_count": 1,
+        "pending_leg_count": 0,
+        "leg_hit_rate_excluding_voids": 1.0,
+        "average_settled_leg_model_probability": 0.75,
+        "weakest_ticket_leg_model_probability": 0.75,
+        "high_confidence_loss_count": 0,
+        "high_confidence_loss_events": [],
+        "losses_by_product": {},
+        "losses_by_direction": {},
+        "loss_details": [],
+        "improvement_keys": {
+          "shape": "2_leg",
+          "primary_lane": "efootball_exact_evidence_value",
+          "combined_odds": 3.386,
+          "combined_model_rating": 56.25,
+          "combined_model_probability": 0.5625,
+          "avg_model_probability": 75.0,
+          "avg_model_edge_percent": 25.42
+        }
+      },
       "paper_only": true,
-      "real_money_execution": false
+      "real_money_execution": false,
+      "won_at": "2026-10-12T20:17:55.710704+00:00"
     },
     {
       "version": 3,
@@ -892,8 +923,8 @@
       "batch_id": "BATCH-01",
       "created_at": "2026-10-12T17:48:33.931732+00:00",
       "last_seen_at": "2026-10-12T17:48:33.931732+00:00",
-      "last_settled_at": "2026-10-12T18:31:35.312231+00:00",
-      "status": "PENDING",
+      "last_settled_at": "2026-10-12T20:17:55.710704+00:00",
+      "status": "WON",
       "combined_odds": 3.33,
       "combined_odds_source": "builder_batch_snapshot",
       "odds_snapshot_complete": true,
@@ -909,8 +940,8 @@
       "primary_lane": "efootball_exact_evidence_value",
       "odds_locked_at": "2026-10-12T17:48:33.931732+00:00",
       "leg_count": 2,
-      "settled_leg_count": 1,
-      "pending_leg_count": 1,
+      "settled_leg_count": 2,
+      "pending_leg_count": 0,
       "legs": [
         {
           "sport": "virtual",
@@ -1125,7 +1156,7 @@
           "builder_eligible": true,
           "real_money_eligible": false,
           "paper_only": true,
-          "status": "PENDING",
+          "status": "WON",
           "source": "Exact-line evidence calibration · eFootball value lane",
           "market_source": "SportyBet NG",
           "recent_evidence": {
@@ -1230,17 +1261,20 @@
           "sportybet_outcome_name": "Under 4",
           "fixture_key": "efootball_gt|roma virtual 5 v juventus virtual 1",
           "bookmaker_odds_snapshot": 1.85,
-          "correct": null,
-          "settled_at": null,
-          "result": null,
-          "final_score": null
+          "correct": true,
+          "settled_at": "2026-10-12T20:17:55.710704+00:00",
+          "result": "U4",
+          "final_score": [
+            1.0,
+            2.0
+          ]
         }
       ],
       "leg_counts": {
-        "won": 1,
+        "won": 2,
         "lost": 0,
         "void": 0,
-        "pending": 1
+        "pending": 0
       },
       "construction_snapshot": {
         "batch_id": "BATCH-01",
@@ -1274,9 +1308,37 @@
         },
         "recorded_at": "2026-10-12T17:48:33.952386+00:00"
       },
-      "settlement_diagnostics": null,
+      "settlement_diagnostics": {
+        "diagnostic_version": 1,
+        "ticket_outcome": "WON",
+        "diagnostic_label": "ALL_SETTLED_LEGS_WON",
+        "leg_count": 2,
+        "settled_leg_count": 2,
+        "won_leg_count": 2,
+        "lost_leg_count": 0,
+        "void_leg_count": 0,
+        "pending_leg_count": 0,
+        "leg_hit_rate_excluding_voids": 1.0,
+        "average_settled_leg_model_probability": 0.75,
+        "weakest_ticket_leg_model_probability": 0.75,
+        "high_confidence_loss_count": 0,
+        "high_confidence_loss_events": [],
+        "losses_by_product": {},
+        "losses_by_direction": {},
+        "loss_details": [],
+        "improvement_keys": {
+          "shape": "2_leg",
+          "primary_lane": "efootball_exact_evidence_value",
+          "combined_odds": 3.33,
+          "combined_model_rating": 56.25,
+          "combined_model_probability": 0.5625,
+          "avg_model_probability": 75.0,
+          "avg_model_edge_percent": 25.0
+        }
+      },
       "paper_only": true,
-      "real_money_execution": false
+      "real_money_execution": false,
+      "won_at": "2026-10-12T20:17:55.710704+00:00"
     },
     {
       "version": 3,
@@ -1285,8 +1347,8 @@
       "batch_id": "BATCH-01",
       "created_at": "2026-10-12T17:28:22.774744+00:00",
       "last_seen_at": "2026-10-12T17:28:22.774744+00:00",
-      "last_settled_at": "2026-10-12T18:31:35.312231+00:00",
-      "status": "PENDING",
+      "last_settled_at": "2026-10-12T20:17:55.710704+00:00",
+      "status": "WON",
       "combined_odds": 3.09,
       "combined_odds_source": "builder_batch_snapshot",
       "odds_snapshot_complete": true,
@@ -1302,8 +1364,8 @@
       "primary_lane": "efootball_exact_evidence_value",
       "odds_locked_at": "2026-10-12T17:28:22.774744+00:00",
       "leg_count": 2,
-      "settled_leg_count": 1,
-      "pending_leg_count": 1,
+      "settled_leg_count": 2,
+      "pending_leg_count": 0,
       "legs": [
         {
           "sport": "virtual",
@@ -1518,7 +1580,7 @@
           "builder_eligible": true,
           "real_money_eligible": false,
           "paper_only": true,
-          "status": "PENDING",
+          "status": "WON",
           "source": "Exact-line evidence calibration · eFootball value lane",
           "market_source": "SportyBet NG",
           "recent_evidence": {
@@ -1623,17 +1685,20 @@
           "sportybet_outcome_name": "Under 4",
           "fixture_key": "efootball_gt|roma virtual 5 v juventus virtual 1",
           "bookmaker_odds_snapshot": 1.85,
-          "correct": null,
-          "settled_at": null,
-          "result": null,
-          "final_score": null
+          "correct": true,
+          "settled_at": "2026-10-12T20:17:55.710704+00:00",
+          "result": "U4",
+          "final_score": [
+            1.0,
+            2.0
+          ]
         }
       ],
       "leg_counts": {
-        "won": 1,
+        "won": 2,
         "lost": 0,
         "void": 0,
-        "pending": 1
+        "pending": 0
       },
       "construction_snapshot": {
         "batch_id": "BATCH-01",
@@ -1667,9 +1732,37 @@
         },
         "recorded_at": "2026-10-12T17:28:22.794120+00:00"
       },
-      "settlement_diagnostics": null,
+      "settlement_diagnostics": {
+        "diagnostic_version": 1,
+        "ticket_outcome": "WON",
+        "diagnostic_label": "ALL_SETTLED_LEGS_WON",
+        "leg_count": 2,
+        "settled_leg_count": 2,
+        "won_leg_count": 2,
+        "lost_leg_count": 0,
+        "void_leg_count": 0,
+        "pending_leg_count": 0,
+        "leg_hit_rate_excluding_voids": 1.0,
+        "average_settled_leg_model_probability": 0.75,
+        "weakest_ticket_leg_model_probability": 0.75,
+        "high_confidence_loss_count": 0,
+        "high_confidence_loss_events": [],
+        "losses_by_product": {},
+        "losses_by_direction": {},
+        "loss_details": [],
+        "improvement_keys": {
+          "shape": "2_leg",
+          "primary_lane": "efootball_exact_evidence_value",
+          "combined_odds": 3.09,
+          "combined_model_rating": 56.25,
+          "combined_model_probability": 0.5625,
+          "avg_model_probability": 75.0,
+          "avg_model_edge_percent": 23.07
+        }
+      },
       "paper_only": true,
-      "real_money_execution": false
+      "real_money_execution": false,
+      "won_at": "2026-10-12T20:17:55.710704+00:00"
     },
     {
       "version": 3,
@@ -2116,7 +2209,7 @@
       "batch_id": "BATCH-01",
       "created_at": "2026-10-12T09:18:52.428390+00:00",
       "last_seen_at": "2026-10-12T09:18:52.428390+00:00",
-      "last_settled_at": null,
+      "last_settled_at": "2026-10-12T20:17:55.710704+00:00",
       "status": "PENDING",
       "combined_odds": 3.423,
       "combined_odds_source": "builder_batch_snapshot",
@@ -2133,8 +2226,8 @@
       "primary_lane": "efootball_exact_evidence_value",
       "odds_locked_at": "2026-10-12T09:18:52.428390+00:00",
       "leg_count": 2,
-      "settled_leg_count": 0,
-      "pending_leg_count": 2,
+      "settled_leg_count": 1,
+      "pending_leg_count": 1,
       "legs": [
         {
           "sport": "virtual",
@@ -2346,7 +2439,7 @@
           "builder_eligible": true,
           "real_money_eligible": false,
           "paper_only": true,
-          "status": "PENDING",
+          "status": "VOID",
           "source": "Exact-line evidence calibration · eFootball value lane",
           "market_source": "SportyBet NG",
           "recent_evidence": {
@@ -2452,16 +2545,19 @@
           "fixture_key": "efootball_gt|england virtual 10 v italy virtual 11",
           "bookmaker_odds_snapshot": 1.85,
           "correct": null,
-          "settled_at": null,
-          "result": null,
-          "final_score": null
+          "settled_at": "2026-10-12T20:17:55.710704+00:00",
+          "result": "PUSH",
+          "final_score": [
+            3.0,
+            1.0
+          ]
         }
       ],
       "leg_counts": {
         "won": 0,
         "lost": 0,
-        "void": 0,
-        "pending": 2
+        "void": 1,
+        "pending": 1
       },
       "construction_snapshot": {
         "batch_id": "BATCH-01",
