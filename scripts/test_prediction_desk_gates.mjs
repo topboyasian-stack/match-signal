@@ -10,6 +10,9 @@ assert.match(source,/snapshot-level qualified fixtures/,"empty Qualified Best ex
 assert.match(source,/refreshVirtualQuoteData\(\)\.then\(snapshot=>/,"the redraw is driven by quote snapshot completeness");
 assert.match(source,/function isRequiredVirtualQuoteRow\(row,now=Date\.now\(\)\)/,"snapshot completeness has a distinct shortlist-eligibility predicate");
 assert.match(source,/filter\(row=>isRequiredVirtualQuoteRow\(row,quoteNow\)\)/,"only required shortlist rows can block snapshot completion");
+assert.match(source,/const requiredQuoteRows=virtualCandidates;/,"the completeness check uses the same candidate pool as Qualified Best");
+assert.doesNotMatch(source,/const requiredQuoteRows=\[\.\.\.all,\.\.\.virtualCandidates\]/,"unified-board research rows cannot block Qualified Best snapshot completeness");
+assert.match(source,/api\/sportybet-virtual\?sources=efootball&pageSize=100&pageNum=/,"Upcoming quote refresh queries only active eFootball markets");
 
 const start = source.indexOf("function isOverUnderPrediction(x){");
 const end = source.indexOf("function ladderAnchor(rows){", start);
@@ -109,6 +112,14 @@ assert.equal(isRequiredVirtualQuoteRow(outsideLiveWindow, scopeNow), false, "a c
 
 const inactiveVirtualProduct = { ...requiredVirtual, product: "vfootball" };
 assert.equal(isRequiredVirtualQuoteRow(inactiveVirtualProduct, scopeNow), false, "inactive VFootball research cannot block active eFootball snapshot completion");
+
+const missingProbability = {
+  ...requiredVirtual,
+  probability: null,
+  model_probability: null,
+  confidence: null
+};
+assert.equal(isRequiredVirtualQuoteRow(missingProbability, scopeNow), false, "a row without a usable model probability cannot block quote snapshot completion");
 
 const valid = row();
 assert.equal(qualificationState(valid).currentPricePass, true, "fresh exact-line value can pass");
