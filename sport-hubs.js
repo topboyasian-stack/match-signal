@@ -148,6 +148,20 @@ function isVirtualDeskCandidate(row){
     isActiveVirtualProduct(product)&&Number.isFinite(probability)&&
     (probability>=0.80||upstreamQualified)&&Number.isFinite(start);
 }
+
+// Only rows that can actually enter the Qualified Best shortlist are required
+// to prove snapshot completeness. Keep the request horizon aligned with the
+// live SportyBet feed's timeline=168 window; high-probability research rows,
+// inactive virtual products, and rows beyond that window cannot hold the
+// qualified shortlist in a permanent "incomplete" state.
+function isRequiredVirtualQuoteRow(row,now=Date.now()){
+  if(!row||String(row?.sport||"").toLowerCase()!=="virtual"||!String(row?.event_id||""))return false;
+  const product=String(row?.product||"").toLowerCase();
+  if(!isActiveVirtualProduct(product)||!isOverUnderPrediction(row))return false;
+  const start=virtualStartTimestamp(row);
+  return start!=null&&start>=now&&start<=now+7*24*60*60*1000&&
+    qualificationState(row).modelQualified===true;
+}
 function rowFixtureKey(x){
   const norm=s=>String(s||"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
   const sport=String(x.sport||"").toLowerCase();
@@ -688,11 +702,7 @@ async function renderUnifiedBoard(){
       const byEvent={};
       const status={byEvent,snapshotAvailable:false,snapshotComplete:false,successfulPages:0,failureReason:null};
       const quoteNow=Date.now();
-      const required=(Array.isArray(requiredRows)?requiredRows:[]).filter(row=>{
-        if(!row||String(row?.sport||"").toLowerCase()!=="virtual"||!isOverUnderPrediction(row)||!String(row?.event_id||""))return false;
-        const start=virtualStartTimestamp(row);
-        return start!=null&&start>=quoteNow;
-      });
+      const required=(Array.isArray(requiredRows)?requiredRows:[]).filter(row=>isRequiredVirtualQuoteRow(row,quoteNow));
       if(!required.length){
         status.snapshotAvailable=true;
         status.snapshotComplete=true;
