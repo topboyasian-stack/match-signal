@@ -345,7 +345,7 @@ jobs:
                   const generated=Date.parse(String(parsed.generated_at||''));
                   const age=Date.now()-generated;
                   if (!Number.isFinite(generated) || age < -120000 || age > 30*60*1000)
-                    failures.push(path+' generated_at is missing, future-dated or older than the 30-minute Prediction Desk freshness guard');
+                    failures.push(path+' generated_at is missing, future-dated or older than the 30-minute Prediction Desk freshness guard (status='+String(parsed.status||'unset')+', value='+String(parsed.generated_at||'missing')+', age_ms='+(Number.isFinite(generated)?String(age):'invalid')+')');
                 }
                 if (path==='/data/prediction_desk_health.json') {
                   if (!['GENERATED','NOT_GENERATED'].includes(parsed.status)) failures.push(path+' has an invalid status');
@@ -354,7 +354,7 @@ jobs:
                     const generated=Date.parse(String(parsed.generated_at||''));
                     const age=Date.now()-generated;
                     if (!Number.isFinite(generated) || age < -120000 || age > 30*60*1000)
-                      failures.push(path+' generated_at is missing, future-dated or older than the 30-minute Prediction Desk freshness guard');
+                      failures.push(path+' generated_at is missing, future-dated or older than the 30-minute Prediction Desk freshness guard (status='+String(parsed.status||'unset')+', value='+String(parsed.generated_at||'missing')+', age_ms='+(Number.isFinite(generated)?String(age):'invalid')+')');
                   }
                 }
               }
