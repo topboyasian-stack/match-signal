@@ -1,50 +1,50 @@
 {
-  "generated_at": "2026-10-12T09:46:44.404098+00:00",
-  "status": "HEALTHY",
-  "critical_issues": 0,
-  "warning_issues": 0,
+  "generated_at": "2026-10-12T15:31:19.859601+00:00",
+  "status": "FAIL",
+  "critical_issues": 4,
+  "warning_issues": 3,
   "info_issues": 0,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
-      "status": "PASS",
-      "age_hours": 3.92,
+      "status": "STALE",
+      "age_hours": 9.66,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.03,
+      "age_hours": 5.72,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
-      "status": "PASS",
-      "age_hours": 0.02,
+      "status": "STALE",
+      "age_hours": 5.76,
       "threshold_hours": 4
     },
     {
       "engine": "unified_upcoming",
-      "status": "PASS",
-      "age_hours": 0.0,
+      "status": "STALE",
+      "age_hours": 5.75,
       "threshold_hours": 2
     },
     {
       "engine": "prediction_desk_health",
-      "status": "PASS",
-      "age_hours": 0.01,
+      "status": "STALE",
+      "age_hours": 5.75,
       "threshold_hours": 2
     },
     {
       "engine": "tennis_forward_discovery",
-      "status": "PASS",
-      "age_hours": 3.4,
+      "status": "STALE",
+      "age_hours": 9.14,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 2.36,
+      "age_hours": 0.0,
       "threshold_hours": 0.5,
       "heartbeat_source": "unified_live_refresh"
     },
@@ -54,11 +54,11 @@
       "lanes": {
         "darts_x": {
           "status": "RETIRED",
-          "artifact_at": "2026-10-12T07:25:40.658912+00:00"
+          "artifact_at": "2026-10-12T11:09:53.090033+00:00"
         },
         "table_tennis_x": {
           "status": "RETIRED",
-          "artifact_at": "2026-10-12T07:25:50.554555+00:00"
+          "artifact_at": "2026-10-12T10:17:23.624762+00:00"
         },
         "basketball": {
           "status": "RETIRED",
@@ -67,7 +67,43 @@
       }
     }
   ],
-  "issues": [],
+  "issues": [
+    {
+      "code": "STALE_CORE_PREDICTION_PIPELINE",
+      "severity": "critical",
+      "detail": "updated_at age 9.66h exceeds 4h"
+    },
+    {
+      "code": "STALE_EXPANSION",
+      "severity": "critical",
+      "detail": "updated_at age 5.76h exceeds 4h"
+    },
+    {
+      "code": "STALE_UNIFIED_UPCOMING",
+      "severity": "critical",
+      "detail": "generated_at age 5.75h exceeds 2h"
+    },
+    {
+      "code": "PREDICTION_DESK_HEALTH_STALE",
+      "severity": "warning",
+      "detail": "Prediction Desk health sidecar age 5.75h exceeds 2h"
+    },
+    {
+      "code": "TENNIS_FORWARD_DISCOVERY_STALE",
+      "severity": "warning",
+      "detail": "tennis_forward_status age 9.14h exceeds the 8h threshold; the discovery result is too old to confirm current fixture coverage"
+    },
+    {
+      "code": "PIPELINE_STALE",
+      "severity": "critical",
+      "detail": "pipeline_status age 9.66h exceeds 4h"
+    },
+    {
+      "code": "UNIFIED_BOARD_STALE",
+      "severity": "warning",
+      "detail": "unified board age 5.75h exceeds 2h"
+    }
+  ],
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
   "paper_only": true,
   "prediction_desk_filters": {
