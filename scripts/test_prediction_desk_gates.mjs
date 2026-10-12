@@ -21,7 +21,7 @@ assert.match(source,/snapshot-level qualified fixtures/,"empty Qualified Best ex
 assert.match(source,/refreshVirtualQuoteData\(\)\.then\(snapshot=>/,"the redraw is driven by quote snapshot completeness");
 assert.match(source,/function isRequiredVirtualQuoteRow\(row,now=Date\.now\(\)\)/,"snapshot completeness has a distinct shortlist-eligibility predicate");
 assert.match(source,/filter\(row=>isRequiredVirtualQuoteRow\(row,quoteNow\)\)/,"only required shortlist rows can block snapshot completion");
-assert.match(source,/const requiredQuoteRows=virtualCandidates;/,"the completeness check uses the same candidate pool as Qualified Best");
+assert.match(source,/const requiredQuoteRows=virtualCandidates\.filter\(row=>isRequiredVirtualQuoteRow\(row,Date\.now\(\)\)\)/,"the completeness check uses only model-qualified candidates inside the live quote window");
 assert.doesNotMatch(source,/const requiredQuoteRows=\[\.\.\.all,\.\.\.virtualCandidates\]/,"unified-board research rows cannot block Qualified Best snapshot completeness");
 assert.match(source,/api\/sportybet-virtual\?sources=efootball&pageSize=100&pageNum=/,"Upcoming quote refresh queries only active eFootball markets");
 assert.match(source,/let lastVerifiedVirtualQuoteSnapshot=null/,"the last complete snapshot persists across board rerenders");
