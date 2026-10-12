@@ -165,6 +165,21 @@ function isRequiredVirtualQuoteRow(row,now=Date.now()){
   return start!=null&&start>=now&&start<=now+7*24*60*60*1000&&
     qualificationState(row).modelQualified===true;
 }
+
+/*
+ * The Upcoming board re-renders every two minutes. A transient failure partway
+ * through a paged quote fetch must not erase a just-verified Qualified Best set.
+ * Keep the last complete event snapshot in this page session, but only reuse it
+ * while its verification is at most 15 minutes old. exactSportyBetQuote still
+ * checks each row's own observed timestamp, exact line/side and value gates.
+ */
+let lastVerifiedVirtualQuoteSnapshot=null;
+function lastVerifiedVirtualSnapshotUsable(snapshot,now=Date.now()){
+  if(snapshot?.snapshotAvailable!==true||snapshot?.snapshotComplete!==true)return false;
+  const verifiedAt=Number(snapshot?.verifiedAt);
+  return Number.isFinite(verifiedAt)&&verifiedAt<=now+2*60*1000&&
+    now-verifiedAt<=15*60*1000&&Object.keys(snapshot?.byEvent||{}).length>0;
+}
 function rowFixtureKey(x){
   const norm=s=>String(s||"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
   const sport=String(x.sport||"").toLowerCase();
@@ -700,6 +715,7 @@ async function renderUnifiedBoard(){
     // Track the saved-pool baseline for diagnosis only; it is not a live qualification.
     const virtualSnapshotQualifiedFixtureCount=qualifiedBestSelections(virtualCandidates,Date.now()).rows.length;
     let virtualQuoteRefreshState="pending";
+    let virtualQuoteLastVerifiedAt=null;
 
     async function freshVirtualQuoteMap(requiredRows=[]){
       const byEvent={};
@@ -910,20 +926,58 @@ async function renderUnifiedBoard(){
     };
     all=all.map(annotate);
     const refreshVirtualQuoteData=async()=>{
-    let quoteSnapshot={snapshotAvailable:false,snapshotComplete:false};
+    let quoteSnapshot={snapshotAvailable:false,snapshotComplete:false,byEvent:{}};
+    let requiredCount=0;
     try{
-      // Only the selection-candidate pool is required to resolve before Qualified Best can render.
-      // The broader unified board may contain historical/research rows not eligible for this shortlist.
-      const requiredQuoteRows=virtualCandidates;
-      quoteSnapshot=await freshVirtualQuoteMap(requiredQuoteRows);
-      const quoteMap=quoteSnapshot.byEvent;
+      // Only model-qualified, in-window rows from the actual candidate pool are required.
+      const requiredQuoteRows=virtualCandidates.filter(row=>isRequiredVirtualQuoteRow(row,Date.now()));
+      requiredCount=requiredQuoteRows.length;
+      const fetchedSnapshot=await freshVirtualQuoteMap(requiredQuoteRows);
+      quoteSnapshot=fetchedSnapshot;
+      const fetchedEvents=Object.keys(fetchedSnapshot?.byEvent||{}).length>0;
+      if(requiredCount>0&&fetchedSnapshot?.snapshotAvailable===true&&fetchedSnapshot?.snapshotComplete===true&&fetchedEvents){
+        lastVerifiedVirtualQuoteSnapshot={
+          snapshotAvailable:true,
+          snapshotComplete:true,
+          verifiedAt:Date.now(),
+          byEvent:fetchedSnapshot.byEvent
+        };
+        quoteSnapshot={...fetchedSnapshot,usedLastGoodSnapshot:false,lastVerifiedAt:lastVerifiedVirtualQuoteSnapshot.verifiedAt};
+      }else if(requiredCount>0&&lastVerifiedVirtualSnapshotUsable(lastVerifiedVirtualQuoteSnapshot,Date.now())){
+        // Reuse one coherent, last-complete event snapshot after a transient fetch failure.
+        // Original per-event retrieval timestamps are retained, and the normal
+        // 15-minute quote freshness/value gates still decide every row.
+        quoteSnapshot={
+          ...fetchedSnapshot,
+          byEvent:lastVerifiedVirtualQuoteSnapshot.byEvent,
+          snapshotAvailable:true,
+          snapshotComplete:true,
+          usedLastGoodSnapshot:true,
+          lastVerifiedAt:lastVerifiedVirtualQuoteSnapshot.verifiedAt
+        };
+      }
+    }catch(_){
+      // An unexpected fetch-side error can still use the last complete snapshot,
+      // provided it remains within the standard 15-minute freshness window.
+      if(requiredCount>0&&lastVerifiedVirtualSnapshotUsable(lastVerifiedVirtualQuoteSnapshot,Date.now())){
+        quoteSnapshot={
+          snapshotAvailable:true,
+          snapshotComplete:true,
+          byEvent:lastVerifiedVirtualQuoteSnapshot.byEvent,
+          usedLastGoodSnapshot:true,
+          lastVerifiedAt:lastVerifiedVirtualQuoteSnapshot.verifiedAt
+        };
+      }
+    }
+    // Reconcile rows separately from the fetch so an exception during data shaping
+    // cannot change a failed refresh into an apparently valid cached result.
+    try{
+      const quoteMap=quoteSnapshot.byEvent||{};
       all=all.map(row=>{
         if(String(row?.sport||"").toLowerCase()!=="virtual"||!isOverUnderPrediction(row))return row;
         const candidates=quoteMap[String(row?.event_id||"")]||[];
         const current=Array.isArray(candidates)?candidates.find(event=>sameVirtualEvent(row,event)):null;
         if(current)return freshVirtualQuoteFields(row,current);
-        // Partial API snapshots are not proof that a fixture vanished. Preserve
-        // the quote's timestamp; the strict 15-minute freshness check remains.
         return unmatchedVirtualQuoteUpdate(row,quoteSnapshot);
       });
       const virtualDeskRows=virtualCandidateDeskRows(virtualCandidates,quoteMap);
@@ -935,16 +989,17 @@ async function renderUnifiedBoard(){
             all.push(annotate(row));
             existingKeys.add(key);
           }else{
-            // Keep any existing unified event row, but add the richer eFootball
-            // candidate into its fixture group when it represents a distinct
-            // O/U line/side. This preserves the canonical event while exposing
-            // the evidence-backed market prediction.
             all.push(row);
           }
         }
       }
     }catch(_){}
-      return {snapshotAvailable:Boolean(quoteSnapshot?.snapshotAvailable),snapshotComplete:Boolean(quoteSnapshot?.snapshotComplete)};
+    return {
+      snapshotAvailable:Boolean(quoteSnapshot?.snapshotAvailable),
+      snapshotComplete:Boolean(quoteSnapshot?.snapshotComplete),
+      usedLastGoodSnapshot:Boolean(quoteSnapshot?.usedLastGoodSnapshot),
+      lastVerifiedAt:quoteSnapshot?.lastVerifiedAt||lastVerifiedVirtualQuoteSnapshot?.verifiedAt||null
+    };
     };
     const sport=Q('#upSport'), date=Q('#upDate'), search=Q('#upSearch');
     const setOptions=(el,vals)=>{if(!el||el.dataset.ready)return;el.innerHTML=vals.map(v=>'<option value="'+E(v.value)+'">'+E(v.label)+'</option>').join('');el.dataset.ready="1";};
@@ -993,39 +1048,47 @@ async function renderUnifiedBoard(){
       const virtualViewActive=!sport?.value||sport.value==="all"||sport.value==="virtual";
       const virtualRowsInView=filteredRows.some(isVirtualQualificationRow);
       const virtualQuotePending=virtualQuoteRefreshState==="pending"&&virtualViewActive&&virtualCandidates.length>0;
-      // Until reconciliation completes, never count saved Virtual/eFootball quotes as live-qualified.
-      // For a partial snapshot, only rows marked exact by this refresh can qualify.
+      // A partial snapshot only admits exact rows observed on that attempt.
+      // A cached snapshot only admits rows from the last complete snapshot, and
+      // exactSportyBetQuote still enforces each row's strict 15-minute age limit.
       const qualificationRows=filteredRows.filter(x=>{
         if(!isVirtualQualificationRow(x))return true;
         if(virtualQuoteRefreshState==="complete")return true;
-        return virtualQuoteRefreshState==="partial"&&x.desk_quote_refresh==="fresh_exact_event_line_side";
+        return (virtualQuoteRefreshState==="partial"||virtualQuoteRefreshState==="cached")&&
+          x.desk_quote_refresh==="fresh_exact_event_line_side";
       });
       const groups=fixtureGroups(filteredRows);
       const best=qualifiedBestSelections(qualificationRows,now.getTime());
       const blockerText=Object.entries(best.diagnostics.blockerCounts)
         .sort((a,b)=>b[1]-a[1]).slice(0,3)
         .map(([reason,count])=>qualificationBlockerLabel(reason)+" ("+count+")").join(" · ");
+      const quoteSnapshotAgeMinutes=virtualQuoteLastVerifiedAt==null?null:Math.max(0,Math.floor((Date.now()-virtualQuoteLastVerifiedAt)/60000));
       const noQualifiedMessage=virtualQuotePending
         ?"Verifying current SportyBet event identity, exact line/side, quote freshness and value gates. Saved Virtual/eFootball candidates are withheld until verification finishes."
-        :virtualViewActive&&virtualQuoteRefreshState==="unavailable"&&virtualSnapshotQualifiedFixtureCount>0
-          ?"Live SportyBet verification is unavailable. "+virtualSnapshotQualifiedFixtureCount+" snapshot-level qualified fixtures are being held back; stale prices are not being shown as current."
-          :virtualViewActive&&virtualQuoteRefreshState==="partial"
-            ?"Live SportyBet snapshot is incomplete. Only candidates with an exact line/side from this refresh are eligible; unverified snapshot rows are held back."
-            :virtualViewActive&&virtualQuoteRefreshState==="complete"&&virtualSnapshotQualifiedFixtureCount>0&&virtualRowsInView
-              ?"0 currently qualified picks after live verification. The saved snapshot had "+virtualSnapshotQualifiedFixtureCount+" snapshot-level qualified fixtures, but none currently pass every exact-line, model-scope, freshness, edge and expected-return gate. Stale prices are not retained."
-              :(best.diagnostics.futureCandidateMarkets===0
-                ?"No future candidate markets in this filtered view."
-                :"Zero qualified picks from "+best.diagnostics.futureCandidateMarkets+" future market candidates. Blockers: "+E(blockerText||"No current candidate passed every gate")+". No pick was forced.");
+        :virtualViewActive&&virtualQuoteRefreshState==="cached"
+          ?"The latest SportyBet refresh was incomplete. Using the last complete snapshot from "+(quoteSnapshotAgeMinutes==null?"a few":quoteSnapshotAgeMinutes)+" minute(s) ago; each price must still pass the 15-minute freshness and value gates."
+          :virtualViewActive&&virtualQuoteRefreshState==="unavailable"&&virtualSnapshotQualifiedFixtureCount>0
+            ?"Live SportyBet verification is unavailable. "+virtualSnapshotQualifiedFixtureCount+" snapshot-level qualified fixtures are being held back; stale prices are not being shown as current."
+            :virtualViewActive&&virtualQuoteRefreshState==="partial"
+              ?"Live SportyBet snapshot is incomplete. Only candidates with an exact line/side from this refresh are eligible; unverified snapshot rows are held back."
+              :virtualViewActive&&virtualQuoteRefreshState==="complete"&&virtualSnapshotQualifiedFixtureCount>0&&virtualRowsInView
+                ?"0 currently qualified picks after live verification. The saved snapshot had "+virtualSnapshotQualifiedFixtureCount+" snapshot-level qualified fixtures, but none currently pass every exact-line, model-scope, freshness, edge and expected-return gate. Stale prices are not retained."
+                :(best.diagnostics.futureCandidateMarkets===0
+                  ?"No future candidate markets in this filtered view."
+                  :"Zero qualified picks from "+best.diagnostics.futureCandidateMarkets+" future market candidates. Blockers: "+E(blockerText||"No current candidate passed every gate")+". No pick was forced.");
+      const holdVerifiedBoardDuringRefresh=virtualViewActive&&virtualQuoteRefreshState==="pending"&&
+        lastVerifiedVirtualSnapshotUsable(lastVerifiedVirtualQuoteSnapshot,Date.now())&&
+        Boolean(Q('#qualifiedBestBoard')?.querySelector('.ms-qualified-best-row'));
       const bestBoard=Q('#qualifiedBestBoard');
-      if(bestBoard){
+      if(bestBoard&&!holdVerifiedBoardDuringRefresh){
         bestBoard.innerHTML=best.rows.length
           ?best.rows.slice(0,12).map(qualifiedBestRow).join("")
           :'<div class="ms-qualified-best-empty">'+E(noQualifiedMessage)+'</div>';
       }
       const bestSummary=Q('#qualifiedBestSummary');
-      if(bestSummary){
+      if(bestSummary&&!holdVerifiedBoardDuringRefresh){
         bestSummary.innerHTML=best.rows.length
-          ?'<span><b>'+best.rows.length+'</b> qualified fixture'+(best.rows.length===1?'':'s')+' · exact SportyBet market/line/side · quote ≤15 min · market edge ≥+2% after margin removal and expected return ≥+2% at offered odds'+(best.rows.length>12?' · showing top 12 by expected return':'')+(virtualQuoteRefreshState==="partial"?' · partial live snapshot; only exact current quotes counted':'')+'</span>'
+          ?'<span><b>'+best.rows.length+'</b> qualified fixture'+(best.rows.length===1?'s':'')+' · exact SportyBet market/line/side · quote ≤15 min · market edge ≥+2% after margin removal and expected return ≥+2% at offered odds'+(best.rows.length>12?' · showing top 12 by expected return':'')+(virtualQuoteRefreshState==="partial"?' · partial live snapshot; only exact current quotes counted':'')+(virtualQuoteRefreshState==="cached"?' · refresh incomplete; last complete snapshot '+(quoteSnapshotAgeMinutes==null?'recently':quoteSnapshotAgeMinutes+' min ago')+'; 15-minute quote freshness still enforced':'')+'</span>'
           :'<span><b>'+(virtualQuotePending?'Checking current exact prices.':'0 qualified picks.')+'</b> '+E(noQualifiedMessage)+'</span>';
       }
       const byDay=new Map();
@@ -1043,7 +1106,7 @@ async function renderUnifiedBoard(){
       }).length;
       Q('#upCount').textContent=groups.length;
       const sEl=Q('#upStrong'); if(sEl)sEl.textContent=strong;
-      const qEl=Q('#upQualified'); if(qEl)qEl.textContent=qualified;
+      const qEl=Q('#upQualified'); if(qEl&&!holdVerifiedBoardDuringRefresh)qEl.textContent=qualified;
     };
     if(!root.dataset.bound){
       sport.addEventListener('change',draw);
@@ -1056,9 +1119,18 @@ async function renderUnifiedBoard(){
     // same view so only fresh exact event/line/side matches can qualify.
     draw();
     refreshVirtualQuoteData().then(snapshot=>{
-      virtualQuoteRefreshState=!snapshot?.snapshotAvailable?"unavailable":snapshot.snapshotComplete?"complete":"partial";
+      virtualQuoteLastVerifiedAt=Number.isFinite(Number(snapshot?.lastVerifiedAt))?Number(snapshot.lastVerifiedAt):null;
+      virtualQuoteRefreshState=snapshot?.usedLastGoodSnapshot?"cached":!snapshot?.snapshotAvailable?"unavailable":snapshot.snapshotComplete?"complete":"partial";
       draw();
-    }).catch(()=>{virtualQuoteRefreshState="unavailable";draw();});
+    }).catch(()=>{
+      if(lastVerifiedVirtualSnapshotUsable(lastVerifiedVirtualQuoteSnapshot,Date.now())){
+        virtualQuoteLastVerifiedAt=lastVerifiedVirtualQuoteSnapshot.verifiedAt;
+        virtualQuoteRefreshState="cached";
+      }else{
+        virtualQuoteRefreshState="unavailable";
+      }
+      draw();
+    });
   }catch(e){
     root.innerHTML='<div class="ms-empty">Unified upcoming feed unavailable: '+E(e.message)+'</div>';
   }
