@@ -76,11 +76,46 @@ function sameEvent(row, live) {
 
 const byEvent = new Map();
 const pages = [];
+let scanComplete = false;
+let scanStopReason = "maximum_pages_reached";
+const REQUEST_TIMEOUT_MS = 18_000;
+
+async function fetchCoveragePage(url, page) {
+  const controller = new AbortController();
+  let timeoutId;
+  const request = (async () => {
+    const response = await fetch(url, {
+      cache: "no-store",
+      headers: { "Cache-Control": "no-cache" },
+      signal: controller.signal
+    });
+    if (!response.ok) throw new Error("Live quote source returned HTTP " + response.status + " on page " + page);
+    return await response.json();
+  })();
+  const hardTimeout = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => {
+      controller.abort();
+      reject(new Error("Live quote page " + page + " timed out after " + REQUEST_TIMEOUT_MS + "ms"));
+    }, REQUEST_TIMEOUT_MS);
+  });
+  try {
+    return await Promise.race([request, hardTimeout]);
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 for (let page = 1; page <= MAX_PAGES; page++) {
   const url = BASE + "/api/sportybet-virtual?sources=efootball&pageSize=100&pageNum=" + page + "&timeline=168&deskCoverage=" + Date.now();
-  const response = await fetch(url, { cache: "no-store", headers: { "Cache-Control": "no-cache" }, signal: AbortSignal.timeout(25_000) });
-  if (!response.ok) throw new Error("Live quote source returned HTTP " + response.status + " on page " + page);
-  const payload = await response.json();
+  let payload;
+  try {
+    payload = await fetchCoveragePage(url, page);
+  } catch (error) {
+    scanComplete = false;
+    scanStopReason = String(error?.message || error);
+    console.error("Live eFootball coverage scan incomplete: " + scanStopReason);
+    break;
+  }
   const events = Array.isArray(payload?.events) ? payload.events : [];
   const fetchedAt = payload?.updated_at || payload?.server_time || null;
   pages.push({ page, count: events.length, fetched_at: fetchedAt, status: payload?.status || null });
@@ -100,7 +135,20 @@ for (let page = 1; page <= MAX_PAGES; page++) {
     seen_unique_events: byEvent.size
   }));
   const allResolved = matchedNow === virtualCandidates.length;
-  if (allResolved || events.length < 100) break;
+  if (allResolved) {
+    scanComplete = true;
+    scanStopReason = "all_model_qualified_candidates_matched";
+    break;
+  }
+  if (events.length < 100) {
+    scanComplete = true;
+    scanStopReason = "feed_page_exhausted";
+    break;
+  }
+  if (page === MAX_PAGES) {
+    scanComplete = false;
+    scanStopReason = "maximum_pages_reached";
+  }
 }
 
 let matchedEvents = 0, exactLineRows = 0, exactSideRows = 0, timestampsPresent = 0;
@@ -172,7 +220,9 @@ for (const row of virtualCandidates) {
 const liveGate = qualifiedBestSelections(currentRows, Date.now());
 const output = {
   verified_at: new Date().toISOString(),
-  status: "DIAGNOSTIC",
+  status: scanComplete ? "DIAGNOSTIC" : "INCOMPLETE",
+  scan_complete: scanComplete,
+  scan_stop_reason: scanStopReason,
   paper_only: true,
   candidate_artifact_rows: rows.length,
   virtual_candidate_rows_in_next_7_days: virtualCandidates.length,
@@ -207,6 +257,6 @@ await writeFile(
 // If the snapshot has qualified picks but absolutely none of those active
 // eFootball candidate events can be matched to production's live feed, this is
 // a broken data bridge, not a reason to loosen qualification thresholds.
-if (poolGate.rows.length > 0 && matchedEvents === 0) {
-  throw new Error("Qualified snapshot candidates exist, but the live eFootball quote bridge matched zero candidate events.");
+if (scanComplete && poolGate.rows.length > 0 && matchedEvents === 0) {
+  throw new Error("Qualified snapshot candidates exist, but the completed live eFootball quote scan matched zero candidate events.");
 }
