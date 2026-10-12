@@ -67,15 +67,18 @@ function isOverUnderPrediction(x){
     ((side==="over"||side==="under")&&x?.line!=null);
 }
 function exactVirtualMarketLine(market){
-  if(market?.line!=null){
-    const direct=Number(market.line);
-    if(Number.isFinite(direct))return direct;
-  }
+  // SportyBet's numeric "line" may be the integer base (for example 9)
+  // while its explicit total specifier carries the actual half-goal market
+  // (for example total=9.5). The explicit total/line specifier is canonical.
   const specifier=String(market?.specifier??market?.specifiers??market?.marketSpecifier??"");
   const match=specifier.match(/(?:^|[,\s;|&])(?:total|line)\s*=\s*(-?\d+(?:\.\d+)?)(?=$|[,\s;|&])/i);
   if(match){
     const parsed=Number(match[1]);
     if(Number.isFinite(parsed))return parsed;
+  }
+  if(market?.line!=null){
+    const direct=Number(market.line);
+    if(Number.isFinite(direct))return direct;
   }
   return null;
 }
