@@ -154,7 +154,19 @@ async function verifyDeployedRenderer() {
   if (!deployedRenderer.includes("api/sportybet-virtual?sources=efootball&pageSize=100&pageNum=")) {
     throw new Error("the deployed versioned renderer is not using the active eFootball-only quote feed");
   }
-  console.log("Production Upcoming renderer verified: root + /upcoming.html share cache key " + homeVersion + "; candidate-pool scope and eFootball-only quote request are live.");
+  if (!deployedRenderer.includes("let lastVerifiedVirtualQuoteSnapshot=null;")) {
+    throw new Error("the deployed versioned renderer does not retain a last-complete quote snapshot between refreshes");
+  }
+  if (!deployedRenderer.includes("usedLastGoodSnapshot:true")) {
+    throw new Error("the deployed versioned renderer does not fall back on transient incomplete refreshes");
+  }
+  if (!deployedRenderer.includes("now-verifiedAt<=15*60*1000")) {
+    throw new Error("the deployed versioned renderer is missing the strict 15-minute last-snapshot reuse limit");
+  }
+  if (!deployedRenderer.includes('virtualQuoteRefreshState==="cached"')) {
+    throw new Error("the deployed versioned renderer does not expose its cached-verified state");
+  }
+  console.log("Production Upcoming renderer verified: shared cache key " + homeVersion + ", eFootball-only quote request, and 15-minute last-good snapshot fallback.");
 }
 
 await verifyDeployedRenderer();
