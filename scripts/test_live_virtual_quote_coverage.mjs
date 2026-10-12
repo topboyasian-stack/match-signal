@@ -112,6 +112,53 @@ async function fetchCoveragePage(url, page) {
   }
 }
 
+async function fetchCoverageText(path) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetch(BASE + path, {
+      cache: "no-store",
+      headers: { "Cache-Control": "no-cache" },
+      signal: controller.signal
+    });
+    if (!response.ok) throw new Error("Production renderer asset returned HTTP " + response.status + " for " + path);
+    return await response.text();
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+// Confirm the actual Cloudflare HTML references the updated renderer, and
+// that this exact versioned asset contains the current candidate-pool refresh.
+// A 200 for an unversioned JS URL alone cannot detect a stale browser bundle.
+async function verifyDeployedRenderer() {
+  const [homeHtml, upcomingHtml] = await Promise.all([
+    fetchCoverageText("/?rendererCheck=" + Date.now()),
+    fetchCoverageText("/upcoming.html?rendererCheck=" + Date.now())
+  ]);
+  const getVersion = (html, label) => {
+    const match = html.match(/<script src=["']\\.\\/sport-hubs\\.js\\?v=([^"']+)["']/);
+    if (!match) throw new Error(label + " does not reference a versioned sport-hubs.js renderer");
+    return match[1];
+  };
+  const homeVersion = getVersion(homeHtml, "root page");
+  const upcomingVersion = getVersion(upcomingHtml, "Upcoming page");
+  if (homeVersion !== upcomingVersion) throw new Error("root and /upcoming.html reference different renderer versions");
+  if (homeVersion === "20261012-qualified-candidate-status-fix1") {
+    throw new Error("production HTML still references the stale pre-fix renderer cache key");
+  }
+  const deployedRenderer = await fetchCoverageText("/sport-hubs.js?v=" + encodeURIComponent(homeVersion));
+  if (!deployedRenderer.includes("const requiredQuoteRows=virtualCandidates;")) {
+    throw new Error("the deployed versioned renderer still lets non-candidate board rows block snapshot completeness");
+  }
+  if (!deployedRenderer.includes("api/sportybet-virtual?sources=efootball&pageSize=100&pageNum=")) {
+    throw new Error("the deployed versioned renderer is not using the active eFootball-only quote feed");
+  }
+  console.log("Production Upcoming renderer verified: root + /upcoming.html share cache key " + homeVersion + "; candidate-pool scope and eFootball-only quote request are live.");
+}
+
+await verifyDeployedRenderer();
+
 console.log("[coverage] beginning live source scan; maxPages=" + MAX_PAGES + "; requestTimeoutMs=" + REQUEST_TIMEOUT_MS);
 for (let page = 1; page <= MAX_PAGES; page++) {
   const url = BASE + "/api/sportybet-virtual?sources=efootball&pageSize=100&pageNum=" + page + "&timeline=168&deskCoverage=" + Date.now();
