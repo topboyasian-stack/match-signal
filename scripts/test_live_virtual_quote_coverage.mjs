@@ -200,7 +200,7 @@ const output = {
 console.log(JSON.stringify(output, null, 2));
 await writeFile(
   new URL("../LIVE-PRODUCTION-CHECK.json", import.meta.url),
-  JSON.stringify(output, null, 2) + "\\n",
+  JSON.stringify(output, null, 2) + "\n",
   "utf8"
 );
 
