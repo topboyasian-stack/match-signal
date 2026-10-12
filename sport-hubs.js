@@ -8,7 +8,7 @@ function workspaceEntityLabel(value,kind){
   const safeAttr=v=>String(v??'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   return '<span class="ws-entity-label"><a class="ws-media-slot" data-ws-media-kind="'+kind+'" data-ws-media-name="'+safeAttr(raw)+'" title="'+safeAttr(cleanName)+'">'+E(initials)+'</a><span class="ws-entity-name">'+E(raw)+'</span></span>';
 }
-async function get(path){const sep=String(path).includes('?')?'&':'?';const r=await fetch(path+sep+'v='+Date.now(),{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);return r.json()}function mergeRows(base,pdl){const out=new Map();[...(Array.isArray(base)?base:[]),...(Array.isArray(pdl)?pdl:[])].forEach(row=>{if(!row||!row.event_id)return;out.set(String(row.event_id),row)});return [...out.values()]}const nav=()=>'<nav class="ms-nav"><a class="ms-brand ms-brand-link" href="./index.html" aria-label="Return to Match Signal main desk"><div class="ms-mark" aria-hidden="true"><svg viewBox="0 0 48 48" width="32" height="32" fill="none"><path d="M9 28.5a15 15 0 0 1 30 0" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/><path d="M14 29a10 10 0 0 1 20 0M19 29a5 5 0 0 1 10 0" stroke="#42e59a" stroke-width="2.4" stroke-linecap="round"/><path d="M24 29l9-11" stroke="#eef7fb" stroke-width="3" stroke-linecap="round"/><circle cx="24" cy="29" r="3.2" fill="#37e7ff"/><path d="M8 35h32" stroke="#7c6cff" stroke-width="1.8" stroke-linecap="round"/></svg></div><div><h1>Match Signal</h1><p>Real-data, market-calibrated sports prediction desk</p></div></a><div class="ms-tabs"><a class="ms-btn" href="./index.html">📅 Upcoming</a><a class="ms-btn" href="./football.html">⚽ Football</a><a class="ms-btn" href="./tennis.html">🎾 Tennis</a><a class="ms-btn" href="./live.html">🔴 Live</a><a class="ms-btn" href="./reports.html">📊 Reports</a><a class="ms-btn" href="./odds-builder.html">🧮 Odds Builder</a><a class="ms-btn" href="./virtual-lab/">🧪 Lab</a><a class="ms-btn" href="./analyst.html">✦ AI Analyst <small>Private</small></a></div></nav>';function injectNav(){const n=Q('#msNav');if(n)n.innerHTML=nav()}function footballLeagues(rows){const base=['La Liga','Bundesliga','Ligue 1','Champions League'];return [...new Set([...base,...rows.filter(x=>x.sport==='football').map(x=>x.league).filter(Boolean)])]}function leagueCard(name,rows,sport,meta={}){const count=rows.filter(x=>x.sport===sport&&x.league===name).length;const calculating=meta.calculating===true&&count===0;const desc=sport==='football'&&name.includes('Professional Development')?'U21 academy competition · historical results + dedicated forward fixture model':sport==='tennis'?name+' tour · tournament-level fixtures and model signals':name+' · 22-day forward planning when fixtures are available';const badge=calculating?'Calculating':count===0?'Pending':count+' predictions';return '<article class="ms-league"><div class="ms-league-top"><h3>'+E(name)+'</h3><span class="ms-badge '+(calculating?'':'')+'">'+badge+'</span></div><p>'+E(desc)+'</p><a href="./league.html?sport='+encodeURIComponent(sport)+'&league='+encodeURIComponent(name)+'">Open league page →</a></article>'}function workspaceEntityLabel(name,kind){
+async function get(path){const sep=String(path).includes('?')?'&':'?';const r=await fetch(path+sep+'v='+Date.now(),{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);return r.json()}function mergeRows(base,pdl){const out=new Map();[...(Array.isArray(base)?base:[]),...(Array.isArray(pdl)?pdl:[])].forEach(row=>{if(!row||!row.event_id)return;out.set(String(row.event_id),row)});return [...out.values()]}const nav=()=>'<nav class="ms-nav"><a class="ms-brand ms-brand-link" href="./index.html" aria-label="Return to Match Signal main desk"><div class="ms-mark" aria-hidden="true"><svg viewBox="0 0 48 48" width="32" height="32" fill="none"><path d="M9 28.5a15 15 0 0 1 30 0" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/><path d="M14 29a10 10 0 0 1 20 0M19 29a5 5 0 0 1 10 0" stroke="#42e59a" stroke-width="2.4" stroke-linecap="round"/><path d="M24 29l9-11" stroke="#eef7fb" stroke-width="3" stroke-linecap="round"/><circle cx="24" cy="29" r="3.2" fill="#37e7ff"/><path d="M8 35h32" stroke="#7c6cff" stroke-width="1.8" stroke-linecap="round"/></svg></div><div><h1>Match Signal</h1><p>Real-data, market-calibrated sports prediction desk</p></div></a><div class="ms-tabs"><a class="ms-btn" href="./index.html">📅 Upcoming</a><a class="ms-btn" href="./qualified-best.html">✅ Qualified Best</a><a class="ms-btn" href="./football.html">⚽ Football</a><a class="ms-btn" href="./tennis.html">🎾 Tennis</a><a class="ms-btn" href="./live.html">🔴 Live</a><a class="ms-btn" href="./reports.html">📊 Reports</a><a class="ms-btn" href="./odds-builder.html">🧮 Odds Builder</a><a class="ms-btn" href="./virtual-lab/">🧪 Lab</a><a class="ms-btn" href="./analyst.html">✦ AI Analyst <small>Private</small></a></div></nav>';function injectNav(){const n=Q('#msNav');if(n)n.innerHTML=nav()}function footballLeagues(rows){const base=['La Liga','Bundesliga','Ligue 1','Champions League'];return [...new Set([...base,...rows.filter(x=>x.sport==='football').map(x=>x.league).filter(Boolean)])]}function leagueCard(name,rows,sport,meta={}){const count=rows.filter(x=>x.sport===sport&&x.league===name).length;const calculating=meta.calculating===true&&count===0;const desc=sport==='football'&&name.includes('Professional Development')?'U21 academy competition · historical results + dedicated forward fixture model':sport==='tennis'?name+' tour · tournament-level fixtures and model signals':name+' · 22-day forward planning when fixtures are available';const badge=calculating?'Calculating':count===0?'Pending':count+' predictions';return '<article class="ms-league"><div class="ms-league-top"><h3>'+E(name)+'</h3><span class="ms-badge '+(calculating?'':'')+'">'+badge+'</span></div><p>'+E(desc)+'</p><a href="./league.html?sport='+encodeURIComponent(sport)+'&league='+encodeURIComponent(name)+'">Open league page →</a></article>'}function workspaceEntityLabel(name,kind){
   const raw=String(name||"Unknown").trim();if(!kind)return E(raw);
   const clean=kind==="team"?raw.replace(/\s*\([^()]+\)\s*$/,"").trim():raw,words=clean.split(/\s+/).filter(Boolean);
   const initials=(words.length>1?words[0][0]+words[1][0]:(words[0]||"MS").slice(0,2)).toUpperCase();
@@ -372,6 +372,47 @@ function unifiedMarketLine(x){
     '<span>Expected return at offered odds <b>'+E(expectedReturn==null?"—":((expectedReturn>=0?"+":"")+(expectedReturn*100).toFixed(1)+"%"))+'</b></span>'+
   '</div>';
 }
+const QUALIFIED_BEST_LAST_SEEN_STORAGE_KEY="match-signal-qualified-best-last-seen-v1";
+const QUALIFIED_BEST_LAST_SEEN_MAX_AGE_MS=24*60*60*1000;
+function qualifiedBestSourceIsFresh(generatedAt,now=Date.now()){
+  const stamp=typeof generatedAt==="number"?generatedAt:Date.parse(String(generatedAt||""));
+  return Number.isFinite(stamp)&&now-stamp>=-2*60*1000&&now-stamp<=30*60*1000;
+}
+function qualifiedBestSnapshotRowKey(row){
+  return [rowFixtureKey(row),isOverUnderPrediction(row)?"over_under":String(row?.market||"winner"),
+    row?.line==null?"":String(row.line),String(row?.pick||row?.selection||"").toLowerCase()].join("|");
+}
+function qualifiedBestLastSeenSnapshotUsable(snapshot,now=Date.now()){
+  if(!snapshot||!Array.isArray(snapshot.rows)||!snapshot.rows.length)return false;
+  const savedAt=Number(snapshot.savedAt);
+  return Number.isFinite(savedAt)&&savedAt<=now+2*60*1000&&now-savedAt>=0&&
+    now-savedAt<=QUALIFIED_BEST_LAST_SEEN_MAX_AGE_MS;
+}
+function qualifiedBestLastSeenRows(snapshot,now=Date.now(),currentRows=[]){
+  if(!qualifiedBestLastSeenSnapshotUsable(snapshot,now))return [];
+  const horizon=now+7*24*60*60*1000;
+  const current=new Set((Array.isArray(currentRows)?currentRows:[]).map(qualifiedBestSnapshotRowKey));
+  return snapshot.rows.filter(row=>{
+    const kickoff=Date.parse(String(row?.start_time||""));
+    const seenAt=Date.parse(String(row?.last_seen_at||snapshot.savedAt||""));
+    if(!Number.isFinite(kickoff)||kickoff<=now||kickoff>horizon)return false;
+    if(!Number.isFinite(seenAt)||seenAt>now+2*60*1000||now-seenAt>QUALIFIED_BEST_LAST_SEEN_MAX_AGE_MS)return false;
+    return !current.has(qualifiedBestSnapshotRowKey(row));
+  }).sort((a,b)=>Date.parse(String(b?.last_seen_at||0))-Date.parse(String(a?.last_seen_at||0))).slice(0,40);
+}
+function qualifiedBestLastSeenRow(x){
+  const kickoff=Date.parse(String(x?.start_time||""));
+  const quoteAt=Date.parse(String(x?.market_odds_timestamp||x?.odds_timestamp||x?.quote_timestamp||""));
+  const quoteText=Number.isFinite(quoteAt)?new Date(quoteAt).toLocaleString():"timestamp unavailable";
+  const odds=Number(x?.sportybet_odds??x?.bookmaker_odds);
+  const market=isOverUnderPrediction(x)?"O/U "+String(x?.pick||x?.selection||"").toUpperCase()+" "+String(x?.line??""):marketLabel(x);
+  return '<article class="ms-up-row ms-fixture-card ms-qualified-best-lastseen-row">'+
+    '<div class="ms-up-time"><b>'+E(Number.isFinite(kickoff)?DT(x.start_time):"Kickoff unavailable")+'</b><span>'+E(String(x?.start_time||"").slice(0,10))+'</span></div>'+
+    '<div class="ms-up-event"><div class="ms-up-meta"><span class="ms-sport-pill">'+sportIcon(x?.sport)+' '+E(x?.sport||"Sport")+'</span><span>'+E(x?.league||x?.competition||"Unclassified")+'</span></div>'+
+    '<div class="ms-up-match">'+E(x?.player_1||x?.home||"Participant 1")+' <span>vs</span> '+E(x?.player_2||x?.away||"Participant 2")+'</div>'+
+    '<div class="ms-market-stack"><div class="ms-market-row"><span class="ms-market-name"><b>'+E(market)+'</b></span><span>Last recorded SportyBet price <b>'+(Number.isFinite(odds)&&odds>1?odds.toFixed(2):"unavailable")+'</b></span><span>Last quote timestamp <b>'+E(quoteText)+'</b></span></div></div>'+
+    '<div class="ms-fixture-foot"><span class="ms-qualified-lastseen-badge">LAST SEEN · NOT CURRENT</span><span>Display-only record. It is not a current qualification and must pass the live gates again before appearing above.</span></div></div></article>';
+}
 function qualifiedBestRow(x){
   const when=DT(x.start_time);
   const status=qualificationState(x);
@@ -629,7 +670,8 @@ function unifiedRow(group){
 }
 async function renderUnifiedBoard(){
   const root=Q('#unifiedBoard');
-  if(!root)return;
+  const qualifiedOnly=document.body.dataset.page==='qualified-best';
+  if(!root&&!qualifiedOnly)return;
   try{
     let payload={events:[],generated_at:null};
     let selectedRows=[];
@@ -692,6 +734,19 @@ async function renderUnifiedBoard(){
     }
     const generatedAt=Date.parse(String(payload?.generated_at||""));
     const generatedEl=Q('#upLast');
+    const dataStatusEl=Q('#qualifiedBestDataStatus');
+    if(dataStatusEl){
+      const ageMs=Number.isFinite(generatedAt)?Date.now()-generatedAt:NaN;
+      const ageMinutes=Number.isFinite(ageMs)?Math.floor(ageMs/60000):null;
+      if(ageMinutes==null||ageMinutes>30||ageMs< -2*60*1000){
+        const age=ageMinutes==null?"unknown":ageMinutes<60?ageMinutes+" minute(s)":Math.floor(ageMinutes/60)+"h "+(ageMinutes%60)+"m";
+        dataStatusEl.className="ms-qualified-data-status ms-qualified-data-status-stale";
+        dataStatusEl.textContent="SOURCE DATA STALE · last published "+(payload?.generated_at||"timestamp unavailable")+" ("+age+" old). Current picks cannot be certified from stale source data.";
+      }else{
+        dataStatusEl.className="ms-qualified-data-status";
+        dataStatusEl.textContent="Source board refreshed "+ageMinutes+" minute(s) ago · exact current quote checks still apply.";
+      }
+    }
     if(generatedEl){
       if(Number.isFinite(generatedAt)){
         generatedEl.textContent=new Date(generatedAt).toLocaleString([], {month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
@@ -1048,22 +1103,61 @@ async function renderUnifiedBoard(){
       const virtualViewActive=!sport?.value||sport.value==="all"||sport.value==="virtual";
       const virtualRowsInView=filteredRows.some(isVirtualQualificationRow);
       const virtualQuotePending=virtualQuoteRefreshState==="pending"&&virtualViewActive&&virtualCandidates.length>0;
+      // Never certify a current pick from a stale/missing source-board artifact.
+      // The source-freshness banner below explains the failure; last-seen rows remain separate.
+      const sourceDataFresh=qualifiedBestSourceIsFresh(generatedAt,now.getTime());
       // A partial snapshot only admits exact rows observed on that attempt.
       // A cached snapshot only admits rows from the last complete snapshot, and
       // exactSportyBetQuote still enforces each row's strict 15-minute age limit.
-      const qualificationRows=filteredRows.filter(x=>{
+      const qualificationRows=sourceDataFresh?filteredRows.filter(x=>{
         if(!isVirtualQualificationRow(x))return true;
         if(virtualQuoteRefreshState==="complete")return true;
         return (virtualQuoteRefreshState==="partial"||virtualQuoteRefreshState==="cached")&&
           x.desk_quote_refresh==="fresh_exact_event_line_side";
-      });
+      }):[];
       const groups=fixtureGroups(filteredRows);
       const best=qualifiedBestSelections(qualificationRows,now.getTime());
+      if(best.rows.length&&virtualQuoteRefreshState!=="pending"){
+        try{
+          const stamp=Date.now();
+          let prior=null;
+          try{prior=JSON.parse(localStorage.getItem(QUALIFIED_BEST_LAST_SEEN_STORAGE_KEY)||"null");}catch(_){}
+          const previous=qualifiedBestLastSeenSnapshotUsable(prior,stamp)?prior.rows:[];
+          const current=best.rows.slice(0,40).map(row=>({...row,last_seen_at:new Date(stamp).toISOString()}));
+          const merged=new Map();
+          for(const row of previous)merged.set(qualifiedBestSnapshotRowKey(row),row);
+          for(const row of current)merged.set(qualifiedBestSnapshotRowKey(row),row);
+          const rows=[...merged.values()].filter(row=>{
+            const kick=Date.parse(String(row?.start_time||""));
+            const seen=Date.parse(String(row?.last_seen_at||""));
+            return Number.isFinite(kick)&&kick>stamp&&kick<=stamp+7*24*60*60*1000&&
+              Number.isFinite(seen)&&seen<=stamp&&stamp-seen<=QUALIFIED_BEST_LAST_SEEN_MAX_AGE_MS;
+          }).slice(-40);
+          localStorage.setItem(QUALIFIED_BEST_LAST_SEEN_STORAGE_KEY,JSON.stringify({savedAt:stamp,rows}));
+        }catch(_){}
+      }
+      let lastSeenSnapshot=null;
+      try{lastSeenSnapshot=JSON.parse(localStorage.getItem(QUALIFIED_BEST_LAST_SEEN_STORAGE_KEY)||"null");}catch(_){}
+      const lastSeenRows=qualifiedBestLastSeenRows(lastSeenSnapshot,now.getTime(),best.rows);
+      const lastSeenBoard=Q('#qualifiedBestLastSeenBoard');
+      if(lastSeenBoard)lastSeenBoard.innerHTML=lastSeenRows.length?lastSeenRows.slice(0,12).map(qualifiedBestLastSeenRow).join(""):
+        '<div class="ms-qualified-best-empty">No recent last-seen shortlist is stored in this browser yet. When a selection passes the live gates, its record will remain here for up to 24 hours or until kickoff.</div>';
+      const lastSeenSummary=Q('#qualifiedBestLastSeenSummary');
+      if(lastSeenSummary){
+        const savedAt=Date.parse(String(lastSeenSnapshot?.savedAt||""));
+        lastSeenSummary.textContent=lastSeenRows.length?lastSeenRows.length+" last-seen fixture(s) · snapshot saved "+(Number.isFinite(savedAt)?new Date(savedAt).toLocaleString():"at an unknown time")+" · NOT current qualification":"No retained last-seen fixtures are available.";
+      }
+      const lastSeenCount=Q('#qualifiedBestLastSeenCount');if(lastSeenCount)lastSeenCount.textContent=String(lastSeenRows.length);
       const blockerText=Object.entries(best.diagnostics.blockerCounts)
         .sort((a,b)=>b[1]-a[1]).slice(0,3)
         .map(([reason,count])=>qualificationBlockerLabel(reason)+" ("+count+")").join(" · ");
       const quoteSnapshotAgeMinutes=virtualQuoteLastVerifiedAt==null?null:Math.max(0,Math.floor((Date.now()-virtualQuoteLastVerifiedAt)/60000));
-      const noQualifiedMessage=virtualQuotePending
+      const feedAgeMs=Number.isFinite(generatedAt)?Date.now()-generatedAt:NaN;
+      const feedAgeMinutes=Number.isFinite(feedAgeMs)?Math.floor(feedAgeMs/60000):null;
+      const sourceStale=!qualifiedBestSourceIsFresh(generatedAt,Date.now());
+      const noQualifiedMessage=sourceStale
+        ?"Published source data is stale ("+(feedAgeMinutes==null?"unknown age":feedAgeMinutes<60?feedAgeMinutes+" minutes":Math.floor(feedAgeMinutes/60)+"h "+(feedAgeMinutes%60)+"m")+"). The collector must refresh before new picks can be certified. Recent last-seen records are separate and NOT current."
+        :virtualQuotePending
         ?"Verifying current SportyBet event identity, exact line/side, quote freshness and value gates. Saved Virtual/eFootball candidates are withheld until verification finishes."
         :virtualViewActive&&virtualQuoteRefreshState==="cached"
           ?"The latest SportyBet refresh was incomplete. Using the last complete snapshot from "+(quoteSnapshotAgeMinutes==null?"a few":quoteSnapshotAgeMinutes)+" minute(s) ago; each price must still pass the 15-minute freshness and value gates."
@@ -1093,7 +1187,7 @@ async function renderUnifiedBoard(){
       }
       const byDay=new Map();
       for(const group of groups){const day=String(group.rows[0].start_time).slice(0,10);if(!byDay.has(day))byDay.set(day,[]);byDay.get(day).push(group);}
-      root.innerHTML=groups.length?[...byDay.entries()].map(([day,groupsForDay])=>{
+      if(root)root.innerHTML=groups.length?[...byDay.entries()].map(([day,groupsForDay])=>{
         const label=new Date(day+"T00:00:00Z").toLocaleDateString([], {weekday:"long",month:"short",day:"numeric"});
         return '<section class="ms-up-day"><div class="ms-up-day-head"><h3>'+E(label)+'</h3><span>'+groupsForDay.length+' fixtures</span></div>'+groupsForDay.map(unifiedRow).join("")+'</section>';
       }).join(""):'<div class="ms-empty">No future fixtures match these filters. The engines remain active and the board will refresh with the next generated window.</div>';
@@ -1104,14 +1198,14 @@ async function renderUnifiedBoard(){
         const row=primaryPrediction(group.rows);
         return Boolean(row&&Number(probabilityValue(row))>=0.80);
       }).length;
-      Q('#upCount').textContent=groups.length;
+      const countEl=Q('#upCount');if(countEl)countEl.textContent=groups.length;
       const sEl=Q('#upStrong'); if(sEl)sEl.textContent=strong;
       const qEl=Q('#upQualified'); if(qEl&&!holdVerifiedBoardDuringRefresh)qEl.textContent=qualified;
     };
-    if(!root.dataset.bound){
-      sport.addEventListener('change',draw);
-      date.addEventListener('change',draw);
-      search.addEventListener('input',draw);
+    if(root&&!root.dataset.bound){
+      if(sport)sport.addEventListener('change',draw);
+      if(date)date.addEventListener('change',draw);
+      if(search)search.addEventListener('input',draw);
       root.dataset.bound='1';
     }
     // Paint the canonical fixture board before slower exact live-quote reconciliation.
@@ -1132,10 +1226,12 @@ async function renderUnifiedBoard(){
       draw();
     });
   }catch(e){
-    root.innerHTML='<div class="ms-empty">Unified upcoming feed unavailable: '+E(e.message)+'</div>';
+    if(root)root.innerHTML='<div class="ms-empty">Unified upcoming feed unavailable: '+E(e.message)+'</div>';
+    const summary=Q('#qualifiedBestSummary');if(summary)summary.innerHTML='<span>Qualified Best could not load current source data: '+E(e.message)+'. Any last-seen records remain labelled as not current.</span>';
+    const status=Q('#qualifiedBestDataStatus');if(status){status.className='ms-qualified-data-status ms-qualified-data-status-stale';status.textContent='SOURCE CHECK FAILED · '+String(e.message||e);}
   }
 }
-async function renderHub(){const sport=document.body.dataset.sport;const [base,pdl,status,readiness]=await Promise.all([get('./data/predictions.json'),get('./data/pdl_predictions.json').catch(()=>[]),get('./data/pdl_status.json').catch(()=>null),get('./data/football_forward_readiness.json').catch(()=>null)]);const rows=mergeRows(base,pdl);const sportRows=rows.filter(x=>x.sport===sport);Q('#count').textContent=sportRows.length;Q('#upcoming').textContent=sportRows.filter(x=>{const d=new Date(x.start_time);return !isNaN(d)&&d>=new Date()}).length;Q('#leagues').textContent=[...new Set(sportRows.map(x=>x.league).filter(Boolean))].length;if(sport==='football'){const stateMap=new Map((readiness?.statuses||[]).map(x=>[x.league,x]));Q('#leagueGrid').innerHTML=footballLeagues(rows).map(x=>{const state=stateMap.get(x)||{};return leagueCard(x,rows,sport,{calculating:['CALCULATING','CALCULATING_PENDING_PUBLICATION','PROVISIONAL'].includes(state.status)});}).join('')}else if(sport==='tennis'){const tours=['ATP','WTA'];Q('#leagueGrid').innerHTML=tours.map(x=>leagueCard(x,rows,sport)).join('')}else{const leagues=['NBA','WNBA','NCAAM','NCAAW','Euroleague','ACB','BBL','BSL'];Q('#leagueGrid').innerHTML=leagues.map(x=>leagueCard(x,rows,sport)).join('')}}async function card(p){const pr=p.probabilities||{},isT=p.sport==='tennis',ou=isT?(p.analytics||{}).total_games:(p.markets||{}).over_under;const total=ou?('O/U '+(ou.line??'—')+' · '+(ou.pick||'—')+' '+P(ou[ou.pick==='under'?'under':'over'])):null;const wo=p.sportybet_winner_odds||{};const book=wo?.p1&&wo?.p2?'SportyBet 1X2: '+wo.p1+' / '+(wo.draw??'—')+' / '+wo.p2:'';const mi=p.market_insights||{};const edge=mi.winner_model_edge_vs_market;const ti=mi.total;let marketNote='';if(mi.available){marketNote='SportyBet live baseline'+(edge!=null?' · model vs market edge '+P(edge):'');if(ti?.line!=null&&ti.book_odds!=null)marketNote+=' · O/U '+ti.line+' '+String(ti.pick||'').toUpperCase()+' @ '+Number(ti.book_odds).toFixed(2)+(ti.model_edge_vs_market!=null?' · total edge '+P(ti.model_edge_vs_market):'');}else marketNote='SportyBet market snapshot unavailable this run';const absEdge=edge==null?0:Math.max(-.2,Math.min(.2,Number(edge)));const edgeWidth=Math.round(Math.abs(absEdge)*500);const edgeLabel=edge==null?'—':(edge>=0?'+':'')+P(edge);return '<article class="ms-pred"><div class="ms-pred-meta"><span>'+E(p.league||p.sport)+'</span><span>'+E(DT(p.start_time))+'</span></div><div class="ms-match">'+workspaceEntityLabel(p.player_1,p.sport==='football'?'team':p.sport==='tennis'?'player':null)+' <span class="ms-muted">vs</span> '+workspaceEntityLabel(p.player_2,p.sport==='football'?'team':p.sport==='tennis'?'player':null)+'</div><div class="ms-probs">'+(p.sport==='football'?'<div class="ms-prob"><small>Home</small><b>'+P(pr.p1)+'</b></div><div class="ms-prob"><small>Draw</small><b>'+P(pr.draw)+'</b></div><div class="ms-prob"><small>Away</small><b>'+P(pr.p2)+'</b></div>':'<div class="ms-prob"><small>P1</small><b>'+P(pr.p1)+'</b></div><div class="ms-prob"><small>P2</small><b>'+P(pr.p2)+'</b></div><div class="ms-prob"><small>Confidence</small><b>'+P(p.confidence)+'</b></div>')+'</div><div class="ms-signal">Model pick: <b>'+E(p.pick==='p1'?p.player_1:p.pick==='p2'?p.player_2:(p.pick||'—'))+'</b> · model fair '+E(OD(p.confidence))+(total?'<br><span class="ms-muted">'+E(total)+'</span>':'')+'</div><div class="ms-market-strip"><span class="ms-market-status '+(mi.available?'live':'stale')+'">'+(mi.available?'SPORTYBET LIVE':'MARKET FALLBACK')+'</span><span>'+E(marketNote)+'</span></div><div class="ms-edge"><div><span>Model ↔ market edge</span><b>'+edgeLabel+'</b></div><div class="ms-edge-track"><i style="width:'+edgeWidth+'%"></i></div></div>'+(book?'<div class="ms-note">'+E(book)+'</div>':'')+'<div class="ms-note">Model: '+E(p.model||p.model_version||'Match Signal')+' · '+E(p.decision||p.prediction_status||'PAPER ONLY')+'</div></article>'}async function renderLeague(){const params=new URLSearchParams(location.search),sport=params.get('sport')||'football',league=params.get('league')||'';Q('#leagueName').textContent=league||'League';Q('#leagueSport').textContent=sport.toUpperCase();const [base,pdl]=await Promise.all([get('./data/predictions.json'),get('./data/pdl_predictions.json').catch(()=>[])]);const rows=mergeRows(base,pdl).filter(p=>p.sport===sport&&p.league===league);Q('#count').textContent=rows.length;Q('#upcoming').textContent=rows.filter(x=>new Date(x.start_time)>=new Date()).length;const dates=[...new Set(rows.map(x=>String(x.start_time||'').slice(0,10)).filter(Boolean))];Q('#dateRange').textContent=dates.length?dates.slice(0,1)[0]+' → '+dates.slice(-1)[0]:'No current feed';const search=Q('#search'),sort=Q('#sort'),list=Q('#predictions');const draw=async()=>{let a=rows.filter(p=>{const q=(search.value||'').toLowerCase();return !q||String(p.player_1+' '+p.player_2+' '+(p.tournament||'')).toLowerCase().includes(q)});if(sort.value==='confidence')a.sort((x,y)=>(y.confidence||0)-(x.confidence||0));else a.sort((x,y)=>new Date(x.start_time)-new Date(y.start_time));list.innerHTML=a.length?(await Promise.all(a.map(card))).join(''):'<div class="ms-empty">No prediction rows are currently published for this league. The page remains active and will populate when the engine publishes the competition.</div>'};search.addEventListener('input',draw);sort.addEventListener('change',draw);await draw()}async function renderReports(){const [a,fp,tp,bp]=await Promise.allSettled([get('./data/accuracy.json'),get('./data/football_performance.json'),get('./data/tennis_performance.json'),get('./data/basketball_accuracy.json')]);const acc=a.status==='fulfilled'?a.value:null;const summary=acc?.summary||acc||{};Q('#settled').textContent=summary.settled??summary.total_settled??'—';Q('#accuracy').textContent=summary.accuracy!=null?P(summary.accuracy):'—';Q('#brier').textContent=summary.brier_score!=null?Number(summary.brier_score).toFixed(4):'—';const boxes=[['Football',fp],['Tennis',tp]];const links={'Football':'./league.html?sport=football&league=La%20Liga','Tennis':'./league.html?sport=tennis&league=ATP'};Q('#reportGrid').innerHTML=boxes.map(([name,x])=>{const d=x.status==='fulfilled'?x.value:null;return '<article class="ms-card"><h3>'+name+'</h3><p>'+E(JSON.stringify(d?.summary||d||{status:'No artifact'},null,2).slice(0,900))+'</p><a class="ms-link" href="'+links[name]+'">Open '+name+' desk →</a></article>'}).join('')}function boot(){injectNav();const page=document.body.dataset.page;if(page==='home'||page==='upcoming'||page==='unified'){renderUnifiedBoard();window.setInterval(renderUnifiedBoard,120000);}if(page==='hub')renderHub().catch(e=>{Q('#leagueGrid').innerHTML='<div class="ms-empty">Feed error: '+E(e.message)+'</div>'});if(page==='league')renderLeague().catch(e=>{Q('#predictions').innerHTML='<div class="ms-empty">Feed error: '+E(e.message)+'</div>'});if(page==='reports')renderReports().catch(e=>{Q('#reportGrid').innerHTML='<div class="ms-empty">Report error: '+E(e.message)+'</div>'})}document.addEventListener('DOMContentLoaded',boot)
+async function renderHub(){const sport=document.body.dataset.sport;const [base,pdl,status,readiness]=await Promise.all([get('./data/predictions.json'),get('./data/pdl_predictions.json').catch(()=>[]),get('./data/pdl_status.json').catch(()=>null),get('./data/football_forward_readiness.json').catch(()=>null)]);const rows=mergeRows(base,pdl);const sportRows=rows.filter(x=>x.sport===sport);Q('#count').textContent=sportRows.length;Q('#upcoming').textContent=sportRows.filter(x=>{const d=new Date(x.start_time);return !isNaN(d)&&d>=new Date()}).length;Q('#leagues').textContent=[...new Set(sportRows.map(x=>x.league).filter(Boolean))].length;if(sport==='football'){const stateMap=new Map((readiness?.statuses||[]).map(x=>[x.league,x]));Q('#leagueGrid').innerHTML=footballLeagues(rows).map(x=>{const state=stateMap.get(x)||{};return leagueCard(x,rows,sport,{calculating:['CALCULATING','CALCULATING_PENDING_PUBLICATION','PROVISIONAL'].includes(state.status)});}).join('')}else if(sport==='tennis'){const tours=['ATP','WTA'];Q('#leagueGrid').innerHTML=tours.map(x=>leagueCard(x,rows,sport)).join('')}else{const leagues=['NBA','WNBA','NCAAM','NCAAW','Euroleague','ACB','BBL','BSL'];Q('#leagueGrid').innerHTML=leagues.map(x=>leagueCard(x,rows,sport)).join('')}}async function card(p){const pr=p.probabilities||{},isT=p.sport==='tennis',ou=isT?(p.analytics||{}).total_games:(p.markets||{}).over_under;const total=ou?('O/U '+(ou.line??'—')+' · '+(ou.pick||'—')+' '+P(ou[ou.pick==='under'?'under':'over'])):null;const wo=p.sportybet_winner_odds||{};const book=wo?.p1&&wo?.p2?'SportyBet 1X2: '+wo.p1+' / '+(wo.draw??'—')+' / '+wo.p2:'';const mi=p.market_insights||{};const edge=mi.winner_model_edge_vs_market;const ti=mi.total;let marketNote='';if(mi.available){marketNote='SportyBet live baseline'+(edge!=null?' · model vs market edge '+P(edge):'');if(ti?.line!=null&&ti.book_odds!=null)marketNote+=' · O/U '+ti.line+' '+String(ti.pick||'').toUpperCase()+' @ '+Number(ti.book_odds).toFixed(2)+(ti.model_edge_vs_market!=null?' · total edge '+P(ti.model_edge_vs_market):'');}else marketNote='SportyBet market snapshot unavailable this run';const absEdge=edge==null?0:Math.max(-.2,Math.min(.2,Number(edge)));const edgeWidth=Math.round(Math.abs(absEdge)*500);const edgeLabel=edge==null?'—':(edge>=0?'+':'')+P(edge);return '<article class="ms-pred"><div class="ms-pred-meta"><span>'+E(p.league||p.sport)+'</span><span>'+E(DT(p.start_time))+'</span></div><div class="ms-match">'+workspaceEntityLabel(p.player_1,p.sport==='football'?'team':p.sport==='tennis'?'player':null)+' <span class="ms-muted">vs</span> '+workspaceEntityLabel(p.player_2,p.sport==='football'?'team':p.sport==='tennis'?'player':null)+'</div><div class="ms-probs">'+(p.sport==='football'?'<div class="ms-prob"><small>Home</small><b>'+P(pr.p1)+'</b></div><div class="ms-prob"><small>Draw</small><b>'+P(pr.draw)+'</b></div><div class="ms-prob"><small>Away</small><b>'+P(pr.p2)+'</b></div>':'<div class="ms-prob"><small>P1</small><b>'+P(pr.p1)+'</b></div><div class="ms-prob"><small>P2</small><b>'+P(pr.p2)+'</b></div><div class="ms-prob"><small>Confidence</small><b>'+P(p.confidence)+'</b></div>')+'</div><div class="ms-signal">Model pick: <b>'+E(p.pick==='p1'?p.player_1:p.pick==='p2'?p.player_2:(p.pick||'—'))+'</b> · model fair '+E(OD(p.confidence))+(total?'<br><span class="ms-muted">'+E(total)+'</span>':'')+'</div><div class="ms-market-strip"><span class="ms-market-status '+(mi.available?'live':'stale')+'">'+(mi.available?'SPORTYBET LIVE':'MARKET FALLBACK')+'</span><span>'+E(marketNote)+'</span></div><div class="ms-edge"><div><span>Model ↔ market edge</span><b>'+edgeLabel+'</b></div><div class="ms-edge-track"><i style="width:'+edgeWidth+'%"></i></div></div>'+(book?'<div class="ms-note">'+E(book)+'</div>':'')+'<div class="ms-note">Model: '+E(p.model||p.model_version||'Match Signal')+' · '+E(p.decision||p.prediction_status||'PAPER ONLY')+'</div></article>'}async function renderLeague(){const params=new URLSearchParams(location.search),sport=params.get('sport')||'football',league=params.get('league')||'';Q('#leagueName').textContent=league||'League';Q('#leagueSport').textContent=sport.toUpperCase();const [base,pdl]=await Promise.all([get('./data/predictions.json'),get('./data/pdl_predictions.json').catch(()=>[])]);const rows=mergeRows(base,pdl).filter(p=>p.sport===sport&&p.league===league);Q('#count').textContent=rows.length;Q('#upcoming').textContent=rows.filter(x=>new Date(x.start_time)>=new Date()).length;const dates=[...new Set(rows.map(x=>String(x.start_time||'').slice(0,10)).filter(Boolean))];Q('#dateRange').textContent=dates.length?dates.slice(0,1)[0]+' → '+dates.slice(-1)[0]:'No current feed';const search=Q('#search'),sort=Q('#sort'),list=Q('#predictions');const draw=async()=>{let a=rows.filter(p=>{const q=(search.value||'').toLowerCase();return !q||String(p.player_1+' '+p.player_2+' '+(p.tournament||'')).toLowerCase().includes(q)});if(sort.value==='confidence')a.sort((x,y)=>(y.confidence||0)-(x.confidence||0));else a.sort((x,y)=>new Date(x.start_time)-new Date(y.start_time));list.innerHTML=a.length?(await Promise.all(a.map(card))).join(''):'<div class="ms-empty">No prediction rows are currently published for this league. The page remains active and will populate when the engine publishes the competition.</div>'};search.addEventListener('input',draw);sort.addEventListener('change',draw);await draw()}async function renderReports(){const [a,fp,tp,bp]=await Promise.allSettled([get('./data/accuracy.json'),get('./data/football_performance.json'),get('./data/tennis_performance.json'),get('./data/basketball_accuracy.json')]);const acc=a.status==='fulfilled'?a.value:null;const summary=acc?.summary||acc||{};Q('#settled').textContent=summary.settled??summary.total_settled??'—';Q('#accuracy').textContent=summary.accuracy!=null?P(summary.accuracy):'—';Q('#brier').textContent=summary.brier_score!=null?Number(summary.brier_score).toFixed(4):'—';const boxes=[['Football',fp],['Tennis',tp]];const links={'Football':'./league.html?sport=football&league=La%20Liga','Tennis':'./league.html?sport=tennis&league=ATP'};Q('#reportGrid').innerHTML=boxes.map(([name,x])=>{const d=x.status==='fulfilled'?x.value:null;return '<article class="ms-card"><h3>'+name+'</h3><p>'+E(JSON.stringify(d?.summary||d||{status:'No artifact'},null,2).slice(0,900))+'</p><a class="ms-link" href="'+links[name]+'">Open '+name+' desk →</a></article>'}).join('')}function boot(){injectNav();const page=document.body.dataset.page;if(page==='home'||page==='upcoming'||page==='unified'||page==='qualified-best'){renderUnifiedBoard();window.setInterval(renderUnifiedBoard,120000);}if(page==='hub')renderHub().catch(e=>{Q('#leagueGrid').innerHTML='<div class="ms-empty">Feed error: '+E(e.message)+'</div>'});if(page==='league')renderLeague().catch(e=>{Q('#predictions').innerHTML='<div class="ms-empty">Feed error: '+E(e.message)+'</div>'});if(page==='reports')renderReports().catch(e=>{Q('#reportGrid').innerHTML='<div class="ms-empty">Report error: '+E(e.message)+'</div>'})}document.addEventListener('DOMContentLoaded',boot)
 /* Load the shared navigation/media resolver after this renderer has mounted #msNav.
    This keeps team crests and verified player headshots working on legacy desk pages. */
 if(!window.__MATCH_SIGNAL_WORKSPACE_UI__){

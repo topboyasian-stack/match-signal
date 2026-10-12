@@ -3,16 +3,20 @@ import { readFile } from "node:fs/promises";
 import vm from "node:vm";
 
 const source = await readFile(new URL("../sport-hubs.js", import.meta.url), "utf8");
-const entryPages = await Promise.all(["../index.html", "../upcoming.html"].map(path =>
+const entryPages = await Promise.all(["../index.html", "../upcoming.html", "../qualified-best.html"].map(path =>
   readFile(new URL(path, import.meta.url), "utf8")
 ));
 const headerRules = await readFile(new URL("../_headers", import.meta.url), "utf8");
 assert.match(headerRules,/\/upcoming\.html\s*\n\s*Cache-Control:\s*no-store, no-cache, must-revalidate, max-age=0/,"the Upcoming entry HTML must not remain cached after a renderer deployment");
+assert.match(headerRules,/\/qualified-best\.html\s*\n\s*Cache-Control:\s*no-store, no-cache, must-revalidate, max-age=0/,"the standalone Qualified Best HTML must not remain cached after a renderer deployment");
 const rendererVersions = entryPages.map(html =>
   html.match(/<script src=["']\.\/sport-hubs\.js\?v=([^"']+)["']/)?.[1] || null
 );
 assert.ok(rendererVersions.every(Boolean), "both Upcoming entry pages must load a versioned Prediction Desk renderer");
 assert.equal(rendererVersions[0], rendererVersions[1], "root and /upcoming.html must use the same renderer cache key");
+assert.ok(rendererVersions.every(version=>version===rendererVersions[0]), "the dedicated Qualified Best page must use the shared renderer cache key");
+assert.match(entryPages[2],/data-page="qualified-best"/,"Qualified Best has a dedicated rendering mode");
+assert.match(entryPages[2],/id="qualifiedBestLastSeenBoard"/,"the dedicated page exposes its last-seen, not-current section");
 assert.notEqual(rendererVersions[0], "20261012-qualified-candidate-status-fix1", "the script cache key must change when the renderer fix changes");
 assert.notEqual(rendererVersions[0], "20261012-qualified-best-snapshot-scope2", "the script cache key must change when last-good snapshot behavior changes");
 assert.match(source,/let virtualQuoteRefreshState="pending"/,"Virtual/eFootball starts in an explicit verification state");
@@ -38,11 +42,11 @@ const sandbox = { Date, Number, String, Math, Array, Boolean, Object, Map, Set, 
 vm.createContext(sandbox);
 vm.runInContext(
   source.slice(start, end) +
-    "\n;globalThis.__deskTestApi={exactVirtualMarketLine,exactSportyBetQuote,exactMarketEdge,exactMarketExpectedReturn,qualificationState,primaryPrediction,qualifiedBestSelections,unmatchedVirtualQuoteUpdate,rawProbabilityValue,probabilityCalibrationInfo,probabilityValue,displayedFairOddsValue,isVirtualDeskCandidate,isRequiredVirtualQuoteRow,lastVerifiedVirtualSnapshotUsable,virtualCandidateStatus,sameVirtualEvent,virtualSnapshotHasCompleteFirstPage};",
+    "\n;globalThis.__deskTestApi={exactVirtualMarketLine,exactSportyBetQuote,exactMarketEdge,exactMarketExpectedReturn,qualificationState,primaryPrediction,qualifiedBestSelections,unmatchedVirtualQuoteUpdate,rawProbabilityValue,probabilityCalibrationInfo,probabilityValue,displayedFairOddsValue,isVirtualDeskCandidate,isRequiredVirtualQuoteRow,lastVerifiedVirtualSnapshotUsable,qualifiedBestSourceIsFresh,qualifiedBestLastSeenSnapshotUsable,qualifiedBestLastSeenRows,virtualCandidateStatus,sameVirtualEvent,virtualSnapshotHasCompleteFirstPage};",
   sandbox,
   { filename: "sport-hubs.js#prediction-desk-gates" }
 );
-const { exactVirtualMarketLine, exactMarketEdge, qualificationState, primaryPrediction, qualifiedBestSelections, unmatchedVirtualQuoteUpdate, rawProbabilityValue, probabilityCalibrationInfo, probabilityValue, displayedFairOddsValue, exactMarketExpectedReturn, isVirtualDeskCandidate, isRequiredVirtualQuoteRow, lastVerifiedVirtualSnapshotUsable, virtualCandidateStatus, sameVirtualEvent, virtualSnapshotHasCompleteFirstPage } = sandbox.__deskTestApi;
+const { exactVirtualMarketLine, exactMarketEdge, qualificationState, primaryPrediction, qualifiedBestSelections, unmatchedVirtualQuoteUpdate, rawProbabilityValue, probabilityCalibrationInfo, probabilityValue, displayedFairOddsValue, exactMarketExpectedReturn, isVirtualDeskCandidate, isRequiredVirtualQuoteRow, lastVerifiedVirtualSnapshotUsable, qualifiedBestSourceIsFresh, qualifiedBestLastSeenSnapshotUsable, qualifiedBestLastSeenRows, virtualCandidateStatus, sameVirtualEvent, virtualSnapshotHasCompleteFirstPage } = sandbox.__deskTestApi;
 
 const lastKnownQuote = {
   event_id: "virtual-keep-last-quote",
@@ -161,6 +165,27 @@ assert.equal(lastVerifiedVirtualSnapshotUsable({
   ...recentCompleteSnapshot,
   verifiedAt: cacheNow + 3 * 60 * 1000
 }, cacheNow), false, "a future-dated verification cannot be reused");
+const sourceNow=Date.now();
+assert.equal(qualifiedBestSourceIsFresh(new Date(sourceNow-29*60*1000).toISOString(),sourceNow),true,"a source artifact under 30 minutes can be evaluated for current picks");
+assert.equal(qualifiedBestSourceIsFresh(new Date(sourceNow-31*60*1000).toISOString(),sourceNow),false,"stale source artifacts cannot certify current picks");
+assert.equal(qualifiedBestSourceIsFresh(null,sourceNow),false,"missing source timestamps fail closed");
+assert.equal(qualifiedBestSourceIsFresh(new Date(sourceNow+5*60*1000).toISOString(),sourceNow),false,"future-skewed source timestamps fail closed");
+assert.match(source,/const sourceDataFresh=qualifiedBestSourceIsFresh\(generatedAt,now\.getTime\(\)\);\s*\/\/ A partial snapshot/ ,"source freshness must gate the current qualification list before it is evaluated");
+const lastSeenNow=Date.now();
+const futureLastSeen=row({
+  event_id:"last-seen-future-event",
+  start_time:new Date(lastSeenNow+3*60*60*1000).toISOString(),
+  sport:"virtual",product:"efootball_gt",player_1:"Gamer One",player_2:"Gamer Two",
+  market_odds_timestamp:new Date(lastSeenNow-25*60*1000).toISOString(),
+  last_seen_at:new Date(lastSeenNow-25*60*1000).toISOString()
+});
+const pastLastSeen={...futureLastSeen,event_id:"last-seen-past-event",start_time:new Date(lastSeenNow-1*60*1000).toISOString()};
+const lastSeenSnapshot={savedAt:lastSeenNow-25*60*1000,rows:[futureLastSeen,pastLastSeen]};
+assert.equal(qualifiedBestLastSeenSnapshotUsable(lastSeenSnapshot,lastSeenNow),true,"a recent display-only snapshot survives beyond the 15-minute live-quote limit");
+assert.equal(qualifiedBestLastSeenSnapshotUsable({...lastSeenSnapshot,savedAt:lastSeenNow-25*60*60*1000},lastSeenNow),false,"a last-seen snapshot expires after 24 hours");
+assert.equal(qualifiedBestLastSeenRows(lastSeenSnapshot,lastSeenNow,[]).length,1,"last-seen output retains future fixtures but removes fixtures whose kickoff has passed");
+assert.equal(qualifiedBestLastSeenRows(lastSeenSnapshot,lastSeenNow,[futureLastSeen]).length,0,"a currently qualified row is not duplicated in the last-seen panel");
+
 const valid = row();
 assert.equal(qualificationState(valid).currentPricePass, true, "fresh exact-line value can pass");
 
