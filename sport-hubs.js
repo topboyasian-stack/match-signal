@@ -253,7 +253,7 @@ function qualificationVetoReason(x){
     ...(Array.isArray(gate?.reasons)?gate.reasons:[])
   ].filter(value=>value!=null&&String(value).trim()).map(value=>String(value).trim());
   if(x?.watch_projection===true||x?.forward_watch===true||x?.research_only===true)return "EXPLICIT_QUALIFICATION_VETO";
-  return fields.some(value=>/(?:NOT[\s_-]*QUALIFIED|UNQUALIFIED|WATCH|RESEARCH|PROJECTION_ONLY|EVIDENCE[\s_-]*GATE[\s_-]*PENDING|PENDING[\s_-]*EVIDENCE|(?:[\\w]+[\s_-]+)*GATE[\s_-]*PENDING)/i.test(value))
+  return fields.some(value=>/(?:NOT[\s_-]*QUALIFIED|UNQUALIFIED|WATCH|RESEARCH|PROJECTION_ONLY|EVIDENCE[\s_-]*GATE[\s_-]*PENDING|PENDING[\s_-]*EVIDENCE|(?:[A-Z0-9_-]+[\s_-]*)*GATE[\s_-]*PENDING)/i.test(value))
     ?"EXPLICIT_QUALIFICATION_VETO":null;
 }
 function exactMarketExpectedReturn(x,quote){
