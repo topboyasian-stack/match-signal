@@ -64,7 +64,8 @@ function sameEvent(row, live) {
   if (!rowA || !rowB || !liveA || !liveB) return false;
   if ([rowA, rowB].sort().join("|") !== [liveA, liveB].sort().join("|")) return false;
   const rowTime = startTimestamp(row), liveTime = startTimestamp(live);
-  return rowTime != null && liveTime != null && Math.abs(rowTime - liveTime) <= 90 * 1000;
+  // Match sport-hubs.js: event ID, product and both participant identities are still required; allow ten minutes for kickoff normalization drift.
+  return rowTime != null && liveTime != null && Math.abs(rowTime - liveTime) <= 10 * 60 * 1000;
 }
 
 const byEvent = new Map();
