@@ -3,6 +3,15 @@ import { readFile } from "node:fs/promises";
 import vm from "node:vm";
 
 const source = await readFile(new URL("../sport-hubs.js", import.meta.url), "utf8");
+const entryPages = await Promise.all(["../index.html", "../upcoming.html"].map(path =>
+  readFile(new URL(path, import.meta.url), "utf8")
+));
+const rendererVersions = entryPages.map(html =>
+  html.match(/<script src=["']\.\/sport-hubs\.js\?v=([^"']+)["']/)?.[1] || null
+);
+assert.ok(rendererVersions.every(Boolean), "both Upcoming entry pages must load a versioned Prediction Desk renderer");
+assert.equal(rendererVersions[0], rendererVersions[1], "root and /upcoming.html must use the same renderer cache key");
+assert.notEqual(rendererVersions[0], "20261012-qualified-candidate-status-fix1", "the script cache key must change when the renderer fix changes");
 assert.match(source,/let virtualQuoteRefreshState="pending"/,"Virtual/eFootball starts in an explicit verification state");
 assert.match(source,/virtualQuoteRefreshState==="complete"\)return true/,"only a complete snapshot can admit all Virtual/eFootball rows");
 assert.match(source,/virtualQuoteRefreshState==="partial"&&x\.desk_quote_refresh==="fresh_exact_event_line_side"/,"partial snapshots only admit candidates tagged exact by this refresh");
