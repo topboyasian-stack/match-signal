@@ -532,6 +532,17 @@ function unmatchedVirtualQuoteUpdate(row,snapshot){
       :"live_quote_feed_unavailable_previous_quote_preserved"
   };
 }
+function virtualCandidateStatus(row){
+  // A candidate group describes provenance, not qualification. If the row is
+  // explicitly model-qualified but has no candidate_status, preserve its
+  // qualified status rather than manufacturing a veto-triggering MODEL_RESEARCH.
+  const explicit=String(row?.candidate_status||"").trim();
+  if(explicit)return explicit;
+  const status=String(row?.qualification_status||"").trim();
+  const flagged=Boolean(row?.betting_qualified)||Boolean(row?.qualified_for_builder);
+  if(flagged&&status.startsWith("BETTING_QUALIFIED"))return status;
+  return String(row?.candidate_group||"MODEL_RESEARCH");
+}
 function ladderAnchor(rows){
   const candidates=(rows||[]).filter(x=>x&&x.market==="over_under"&&Number.isFinite(Number(x.line))&&Number.isFinite(Number(probabilityValue(x)))&&Number(probabilityValue(x))>=0.80);
   return [...candidates].sort((a,b)=>{
@@ -814,7 +825,7 @@ async function renderUnifiedBoard(){
         const p=Number(row?.model_probability);
         const fair=Number(row?.model_fair_odds);
         const edge=Number(row?.model_edge_vs_market);
-        const candidateStatus=String(row?.candidate_status||row?.candidate_group||"MODEL_RESEARCH");
+        const candidateStatus=virtualCandidateStatus(row);
         const qual=Boolean(row?.betting_qualified)||Boolean(row?.qualified_for_builder)||
           String(row?.qualification_status||"").startsWith("BETTING_QUALIFIED");
 
