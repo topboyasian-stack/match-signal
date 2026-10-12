@@ -1,52 +1,52 @@
 {
-  "generated_at": "2026-10-12T15:31:19.859601+00:00",
+  "generated_at": "2026-10-12T15:32:09.316782+00:00",
   "status": "FAIL",
-  "critical_issues": 4,
-  "warning_issues": 3,
+  "critical_issues": 3,
+  "warning_issues": 1,
   "info_issues": 0,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
       "status": "STALE",
-      "age_hours": 9.66,
+      "age_hours": 9.68,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 5.72,
+      "age_hours": 5.74,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "STALE",
-      "age_hours": 5.76,
+      "age_hours": 5.78,
       "threshold_hours": 4
     },
     {
       "engine": "unified_upcoming",
-      "status": "STALE",
-      "age_hours": 5.75,
+      "status": "PASS",
+      "age_hours": 0.0,
       "threshold_hours": 2
     },
     {
       "engine": "prediction_desk_health",
-      "status": "STALE",
-      "age_hours": 5.75,
+      "status": "PASS",
+      "age_hours": 0.0,
       "threshold_hours": 2
     },
     {
       "engine": "tennis_forward_discovery",
       "status": "STALE",
-      "age_hours": 9.14,
+      "age_hours": 9.16,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 0.0,
+      "age_hours": 0.02,
       "threshold_hours": 0.5,
-      "heartbeat_source": "unified_live_refresh"
+      "heartbeat_source": "virtual_lab_live.json"
     },
     {
       "engine": "retired_engines",
@@ -71,43 +71,28 @@
     {
       "code": "STALE_CORE_PREDICTION_PIPELINE",
       "severity": "critical",
-      "detail": "updated_at age 9.66h exceeds 4h"
+      "detail": "updated_at age 9.68h exceeds 4h"
     },
     {
       "code": "STALE_EXPANSION",
       "severity": "critical",
-      "detail": "updated_at age 5.76h exceeds 4h"
-    },
-    {
-      "code": "STALE_UNIFIED_UPCOMING",
-      "severity": "critical",
-      "detail": "generated_at age 5.75h exceeds 2h"
-    },
-    {
-      "code": "PREDICTION_DESK_HEALTH_STALE",
-      "severity": "warning",
-      "detail": "Prediction Desk health sidecar age 5.75h exceeds 2h"
+      "detail": "updated_at age 5.78h exceeds 4h"
     },
     {
       "code": "TENNIS_FORWARD_DISCOVERY_STALE",
       "severity": "warning",
-      "detail": "tennis_forward_status age 9.14h exceeds the 8h threshold; the discovery result is too old to confirm current fixture coverage"
+      "detail": "tennis_forward_status age 9.16h exceeds the 8h threshold; the discovery result is too old to confirm current fixture coverage"
     },
     {
       "code": "PIPELINE_STALE",
       "severity": "critical",
-      "detail": "pipeline_status age 9.66h exceeds 4h"
-    },
-    {
-      "code": "UNIFIED_BOARD_STALE",
-      "severity": "warning",
-      "detail": "unified board age 5.75h exceeds 2h"
+      "detail": "pipeline_status age 9.68h exceeds 4h"
     }
   ],
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
   "paper_only": true,
   "prediction_desk_filters": {
-    "past_kickoff_rows_hidden": 6,
+    "past_kickoff_rows_hidden": 8,
     "stale_live_flags_hidden": 0,
     "expired_settled_rows_hidden": 0
   }
