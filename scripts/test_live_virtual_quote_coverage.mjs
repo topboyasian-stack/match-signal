@@ -8,8 +8,10 @@ import { readFile, writeFile } from "node:fs/promises";
 import vm from "node:vm";
 
 const BASE = (process.env.MATCH_SIGNAL_PUBLIC_BASE || "https://match-signal.pages.dev").replace(/\/+$/, "");
+console.log("[coverage] start; base=" + BASE);
 const MAX_PAGES = 3; // Keep this deployment diagnostic bounded; it is not a full feed crawler.
 const source = await readFile(new URL("../sport-hubs.js", import.meta.url), "utf8");
+console.log("[coverage] loaded desk source bytes=" + source.length);
 const sourceStart = source.indexOf("function isOverUnderPrediction(x){");
 const sourceEnd = source.indexOf("function ladderAnchor(rows){", sourceStart);
 if (sourceStart < 0 || sourceEnd <= sourceStart) throw new Error("Production desk gate functions could not be extracted");
@@ -24,7 +26,10 @@ vm.runInContext(
 );
 const { isVirtualDeskCandidate, qualificationState, exactVirtualMarketLine, qualifiedBestSelections } = sandbox.__desk;
 
-const rows = JSON.parse(await readFile(new URL("../data/selection_candidates.json", import.meta.url), "utf8"));
+const candidateRaw = await readFile(new URL("../data/selection_candidates.json", import.meta.url), "utf8");
+console.log("[coverage] read candidate artifact bytes=" + candidateRaw.length);
+const rows = JSON.parse(candidateRaw);
+console.log("[coverage] parsed candidate rows=" + rows.length);
 const now = Date.now();
 // Qualified Best can only promote rows that pass the model gate. High-probability
 // research projections and explicitly pending rows are intentionally excluded;
@@ -36,7 +41,9 @@ const virtualCandidates = rows.filter(isVirtualDeskCandidate).filter(row => {
     Number.isFinite(kickoff) && kickoff > now && kickoff <= now + 7 * 24 * 60 * 60 * 1000 &&
     qualificationState(row).modelQualified === true;
 });
+console.log("[coverage] model-qualified eFootball candidate rows=" + virtualCandidates.length);
 const poolGate = qualifiedBestSelections(virtualCandidates, now);
+console.log("[coverage] pre-refresh gate diagnostics computed");
 
 function identity(row, keys) {
   let value = "";
@@ -105,6 +112,7 @@ async function fetchCoveragePage(url, page) {
   }
 }
 
+console.log("[coverage] beginning live source scan; maxPages=" + MAX_PAGES + "; requestTimeoutMs=" + REQUEST_TIMEOUT_MS);
 for (let page = 1; page <= MAX_PAGES; page++) {
   const url = BASE + "/api/sportybet-virtual?sources=efootball&pageSize=100&pageNum=" + page + "&timeline=168&deskCoverage=" + Date.now();
   let payload;
