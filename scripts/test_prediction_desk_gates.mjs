@@ -7,7 +7,7 @@ const entryPages = await Promise.all(["../index.html", "../upcoming.html"].map(p
   readFile(new URL(path, import.meta.url), "utf8")
 ));
 const headerRules = await readFile(new URL("../_headers", import.meta.url), "utf8");
-assert.match(headerRules,/\\/upcoming\\.html\\s*\\n\\s*Cache-Control:\\s*no-store, no-cache, must-revalidate, max-age=0/,"the Upcoming entry HTML must not remain cached after a renderer deployment");
+assert.match(headerRules,/\/upcoming\.html\s*\n\s*Cache-Control:\s*no-store, no-cache, must-revalidate, max-age=0/,"the Upcoming entry HTML must not remain cached after a renderer deployment");
 const rendererVersions = entryPages.map(html =>
   html.match(/<script src=["']\.\/sport-hubs\.js\?v=([^"']+)["']/)?.[1] || null
 );
