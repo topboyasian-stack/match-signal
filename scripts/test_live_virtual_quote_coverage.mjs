@@ -160,8 +160,11 @@ for (let page = 1; page <= MAX_PAGES; page++) {
 }
 
 let matchedEvents = 0, exactLineRows = 0, exactSideRows = 0, timestampsPresent = 0;
+let matchedEventsWithMarkets = 0, observedMarketRows = 0, exactLineMetadataMatches = 0;
+const marketIdNameCounts = {};
 const currentRows = [];
 const missed = [];
+const matchedMarketSamples = [];
 for (const row of virtualCandidates) {
   const eventMatches = (byEvent.get(String(row?.event_id || "")) || []).filter(live => sameEvent(row, live));
   const live = eventMatches[0];
@@ -172,9 +175,50 @@ for (const row of virtualCandidates) {
   matchedEvents++;
   const line = Number(row?.line);
   const side = String(row?.pick || row?.selection || "").toLowerCase();
+  const liveMarkets = Array.isArray(live?.markets) ? live.markets : [];
+  observedMarketRows += liveMarkets.length;
+  if (liveMarkets.length) matchedEventsWithMarkets++;
+  for (const market of liveMarkets) {
+    const key = String(market?.id || "NO_ID") + "|" + String(market?.name || "NO_NAME");
+    marketIdNameCounts[key] = (marketIdNameCounts[key] || 0) + 1;
+    const marketLine = exactVirtualMarketLine(market);
+    const id = String(market?.id || "");
+    const name = String(market?.name || "").toLowerCase();
+    const isTotalsMarket = ["18", "189"].includes(id) || name.includes("total") || name.includes("over/under") || name.includes("over under");
+    if (isTotalsMarket && Number.isFinite(line) && Number.isFinite(marketLine) && Math.abs(marketLine - line) <= 1e-9) {
+      exactLineMetadataMatches++;
+    }
+  }
+  if (matchedMarketSamples.length < 8) {
+    const summarized = liveMarkets.map(market => ({
+      id: String(market?.id || ""),
+      name: String(market?.name || ""),
+      line: exactVirtualMarketLine(market),
+      specifier: String(market?.specifier || ""),
+      outcomes: (Array.isArray(market?.outcomes) ? market.outcomes : []).slice(0, 6).map(outcome => ({
+        name: String(outcome?.name || ""),
+        odds: outcome?.odds == null ? null : Number(outcome.odds),
+        active: outcome?.active !== false
+      }))
+    }));
+    const isTotals = m => ["18", "189"].includes(m.id) || /total|over\/under|over under/i.test(m.name);
+    const relevant = summarized.filter(isTotals);
+    const marketPreview = (relevant.length ? relevant.slice(0, 10) : summarized.slice(0, 10));
+    matchedMarketSamples.push({
+      event_id: String(row?.event_id || ""),
+      product: String(row?.product || ""),
+      participants: [row?.player_1 || row?.participant_1 || "", row?.player_2 || row?.participant_2 || ""],
+      candidate_line: Number.isFinite(line) ? line : null,
+      candidate_side: side,
+      start_time: row?.start_time || null,
+      live_market_count: liveMarkets.length,
+      totals_market_count: relevant.length,
+      shown_markets: marketPreview
+    });
+  }
   if (!Number.isFinite(line) || (side !== "over" && side !== "under")) continue;
   let over = null, under = null, matchedMarket = null;
-  for (const market of Array.isArray(live?.markets) ? live.markets : []) {
+  for (const market of liveMarkets) {
     const marketLine = exactVirtualMarketLine(market);
     const id = String(market?.id || "");
     const name = String(market?.name || "").toLowerCase();
@@ -244,6 +288,13 @@ const output = {
   rows_with_quote_timestamp: timestampsPresent,
   live_gate_qualified_fixtures: liveGate.rows.length,
   live_gate_diagnostics: liveGate.diagnostics,
+  matched_event_market_inventory: {
+    candidate_rows_with_any_live_markets: matchedEventsWithMarkets,
+    observed_market_rows: observedMarketRows,
+    candidate_exact_line_totals_market_metadata_matches: exactLineMetadataMatches,
+    market_id_name_counts: marketIdNameCounts
+  },
+  matched_market_samples: matchedMarketSamples,
   unmatched_samples: missed.slice(0, 8),
   qualified_examples: liveGate.rows.slice(0, 5).map(row => ({
     event_id: row.event_id,
