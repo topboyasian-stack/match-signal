@@ -1140,7 +1140,8 @@ async function renderUnifiedBoard(){
       try{lastSeenSnapshot=JSON.parse(localStorage.getItem(QUALIFIED_BEST_LAST_SEEN_STORAGE_KEY)||"null");}catch(_){}
       const lastSeenRows=qualifiedBestLastSeenRows(lastSeenSnapshot,now.getTime(),best.rows);
       const lastSeenBoard=Q('#qualifiedBestLastSeenBoard');
-      if(lastSeenBoard)lastSeenBoard.innerHTML=lastSeenRows.length?lastSeenRows.slice(0,12).map(qualifiedBestLastSeenRow).join(""):
+      const lastSeenDisplayLimit=qualifiedOnly?40:12;
+      if(lastSeenBoard)lastSeenBoard.innerHTML=lastSeenRows.length?lastSeenRows.slice(0,lastSeenDisplayLimit).map(qualifiedBestLastSeenRow).join(""):
         '<div class="ms-qualified-best-empty">No recent last-seen shortlist is stored in this browser yet. When a selection passes the live gates, its record will remain here for up to 24 hours or until kickoff.</div>';
       const lastSeenSummary=Q('#qualifiedBestLastSeenSummary');
       if(lastSeenSummary){
@@ -1174,15 +1175,16 @@ async function renderUnifiedBoard(){
         lastVerifiedVirtualSnapshotUsable(lastVerifiedVirtualQuoteSnapshot,Date.now())&&
         Boolean(Q('#qualifiedBestBoard')?.querySelector('.ms-qualified-best-row'));
       const bestBoard=Q('#qualifiedBestBoard');
+      const qualifiedBestDisplayLimit=qualifiedOnly?40:12;
       if(bestBoard&&!holdVerifiedBoardDuringRefresh){
         bestBoard.innerHTML=best.rows.length
-          ?best.rows.slice(0,12).map(qualifiedBestRow).join("")
+          ?best.rows.slice(0,qualifiedBestDisplayLimit).map(qualifiedBestRow).join("")
           :'<div class="ms-qualified-best-empty">'+E(noQualifiedMessage)+'</div>';
       }
       const bestSummary=Q('#qualifiedBestSummary');
       if(bestSummary&&!holdVerifiedBoardDuringRefresh){
         bestSummary.innerHTML=best.rows.length
-          ?'<span><b>'+best.rows.length+'</b> qualified fixture'+(best.rows.length===1?'s':'')+' · exact SportyBet market/line/side · quote ≤15 min · market edge ≥+2% after margin removal and expected return ≥+2% at offered odds'+(best.rows.length>12?' · showing top 12 by expected return':'')+(virtualQuoteRefreshState==="partial"?' · partial live snapshot; only exact current quotes counted':'')+(virtualQuoteRefreshState==="cached"?' · refresh incomplete; last complete snapshot '+(quoteSnapshotAgeMinutes==null?'recently':quoteSnapshotAgeMinutes+' min ago')+'; 15-minute quote freshness still enforced':'')+'</span>'
+          ?'<span><b>'+best.rows.length+'</b> qualified fixture'+(best.rows.length===1?'s':'')+' · exact SportyBet market/line/side · quote ≤15 min · market edge ≥+2% after margin removal and expected return ≥+2% at offered odds'+(best.rows.length?(qualifiedOnly?(best.rows.length>qualifiedBestDisplayLimit?' · showing top '+qualifiedBestDisplayLimit+' by expected return':' · full qualified shortlist shown'):' · open Qualified Best for the full list'):'')+(virtualQuoteRefreshState==="partial"?' · partial live snapshot; only exact current quotes counted':'')+(virtualQuoteRefreshState==="cached"?' · refresh incomplete; last complete snapshot '+(quoteSnapshotAgeMinutes==null?'recently':quoteSnapshotAgeMinutes+' min ago')+'; 15-minute quote freshness still enforced':'')+'</span>'
           :'<span><b>'+(virtualQuotePending?'Checking current exact prices.':'0 qualified picks.')+'</b> '+E(noQualifiedMessage)+'</span>';
       }
       const byDay=new Map();
