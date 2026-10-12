@@ -118,7 +118,7 @@ for (const pendingStatus of ["DIRECTIONAL_LINE_VALIDATION_GATE_PENDING", "MODEL_
   });
   assert.equal(qualificationState(contradictoryPending).modelQualified, false, pendingStatus + " must veto conflicting qualified flags");
   assert.equal(qualificationState(contradictoryPending).currentPricePass, false, pendingStatus + " must not pass the exact-price gate");
-  assert.equal(qualificationState(contradictoryPending).reason, "EXPLICIT_QUALIFICATION_VETO", pendingStatus + " should be reported as a blocker");
+  assert.equal(qualificationState(contradictoryPending).reason, pendingStatus, pendingStatus + " should preserve the actionable blocker label");
   assert.equal(qualifiedBestSelections([contradictoryPending], Date.now()).rows.length, 0, pendingStatus + " must never enter Qualified Best");
 }
 
