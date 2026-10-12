@@ -657,15 +657,20 @@ jobs:
           b=Path('/tmp/booking-production-check.json')
           if b.exists():
               booking=json.loads(b.read_text())
+          coverage_complete = live.get('scan_complete') is True
+          checks = ['core_pages','prediction_desk_qualification_gates','research_virtual_lab','live_virtual_proxy','virtual_lab_live_snapshot','live_production_data','booking_api_post']
+          checks.append('qualified_best_shortlist' if coverage_complete else 'qualified_best_live_quote_diagnostic_incomplete')
           Path('DEPLOY-VERIFY-CLOUDFLARE.json').write_text(json.dumps({
-            'status':'VERIFIED',
+            'status':'VERIFIED' if coverage_complete else 'VERIFIED_WITH_DIAGNOSTIC_INCOMPLETE',
+            'core_pages_status':'VERIFIED',
+            'qualified_best_quote_coverage_status':'COMPLETE' if coverage_complete else 'INCOMPLETE',
             'provider':'Cloudflare Pages',
             'source_commit':os.environ['DEPLOY_SOURCE_COMMIT'],
             'verified_at':datetime.now(timezone.utc).isoformat(),
             'live_virtual_feed':live,
             'booking_api':booking,
-            'checks':['core_pages','prediction_desk_qualification_gates','qualified_best_shortlist','research_virtual_lab','live_virtual_proxy','virtual_lab_live_snapshot','live_production_data','booking_api_post']
-          },indent=2)+'\n')
+            'checks':checks
+          },indent=2)+'\\n')
           PY
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
