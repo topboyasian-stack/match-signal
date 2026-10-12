@@ -162,6 +162,7 @@ for (let page = 1; page <= MAX_PAGES; page++) {
 let matchedEvents = 0, exactLineRows = 0, exactSideRows = 0, timestampsPresent = 0;
 const currentRows = [];
 const missed = [];
+const matchedEventMarketSamples = [];
 for (const row of virtualCandidates) {
   const eventMatches = (byEvent.get(String(row?.event_id || "")) || []).filter(live => sameEvent(row, live));
   const live = eventMatches[0];
@@ -170,6 +171,31 @@ for (const row of virtualCandidates) {
     continue;
   }
   matchedEvents++;
+  // Capture a few raw normalized market shapes so a failed exact-line join
+  // reveals whether the proxy omitted totals, exposed a different market ID,
+  // or supplied the line/specifier/outcome labels in an unexpected shape.
+  if (matchedEventMarketSamples.length < 5) {
+    const availableMarkets = Array.isArray(live?.markets) ? live.markets : [];
+    matchedEventMarketSamples.push({
+      event_id: String(row?.event_id || ""),
+      product: String(row?.product || ""),
+      participants: [row?.player_1 || row?.team_1 || null, row?.player_2 || row?.team_2 || null],
+      start_time: row?.start_time || null,
+      live_market_count: availableMarkets.length,
+      markets: availableMarkets.slice(0, 20).map(market => ({
+        id: String(market?.id || ""),
+        name: String(market?.name || ""),
+        specifier: String(market?.specifier || ""),
+        raw_line: market?.line ?? null,
+        parsed_line: exactVirtualMarketLine(market),
+        outcomes: (Array.isArray(market?.outcomes) ? market.outcomes : []).slice(0, 6).map(outcome => ({
+          name: String(outcome?.name || ""),
+          odds: outcome?.odds ?? null,
+          active: outcome?.active !== false
+        }))
+      }))
+    });
+  }
   const line = Number(row?.line);
   const side = String(row?.pick || row?.selection || "").toLowerCase();
   if (!Number.isFinite(line) || (side !== "over" && side !== "under")) continue;
@@ -242,6 +268,7 @@ const output = {
   exact_line_market_rows: exactLineRows,
   exact_side_price_rows: exactSideRows,
   rows_with_quote_timestamp: timestampsPresent,
+  matched_event_market_samples: matchedEventMarketSamples,
   live_gate_qualified_fixtures: liveGate.rows.length,
   live_gate_diagnostics: liveGate.diagnostics,
   unmatched_samples: missed.slice(0, 8),
