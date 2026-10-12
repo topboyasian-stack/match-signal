@@ -275,7 +275,7 @@ function qualificationState(x){
     const modelReason=raw.includes("DIRECTIONAL_LINE_VALIDATION_GATE_PENDING")?"DIRECTIONAL_LINE_VALIDATION_GATE_PENDING":
       raw.includes("MODEL_LINE_SCOPE_GATE_PENDING")?"MODEL_LINE_SCOPE_GATE_PENDING":
       raw.includes("HIGH_LINE_UNDER_EVIDENCE_GATE_PENDING")?"HIGH_LINE_UNDER_EVIDENCE_GATE_PENDING":"MODEL_GATE_NOT_PASSED";
-    return {modelQualified:false,currentPricePass:false,label:"NOT QUALIFIED · "+detail,reason:veto||modelReason};
+    return {modelQualified:false,currentPricePass:false,label:"NOT QUALIFIED · "+detail,reason:modelReason!=="MODEL_GATE_NOT_PASSED"?modelReason:(veto||modelReason)};
   }
   const quote=exactSportyBetQuote(x);
   if(quote.odds==null){
