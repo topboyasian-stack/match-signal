@@ -4,11 +4,11 @@
  * Uses the exact qualification functions from sport-hubs.js and mirrors the
  * browser's event/participant/kickoff/exact-line matching. PAPER ONLY.
  */
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import vm from "node:vm";
 
 const BASE = (process.env.MATCH_SIGNAL_PUBLIC_BASE || "https://match-signal.pages.dev").replace(/\/+$/, "");
-const MAX_PAGES = 5;
+const MAX_PAGES = 3; // Keep this deployment diagnostic bounded; it is not a full feed crawler.
 const source = await readFile(new URL("../sport-hubs.js", import.meta.url), "utf8");
 const sourceStart = source.indexOf("function isOverUnderPrediction(x){");
 const sourceEnd = source.indexOf("function ladderAnchor(rows){", sourceStart);
@@ -90,9 +90,16 @@ for (let page = 1; page <= MAX_PAGES; page++) {
     if (!byEvent.has(id)) byEvent.set(id, []);
     byEvent.get(id).push({ ...event, __quote_fetched_at: fetchedAt });
   }
-  const allResolved = virtualCandidates.every(row =>
+  const matchedNow = virtualCandidates.filter(row =>
     (byEvent.get(String(row?.event_id || "")) || []).some(live => sameEvent(row, live))
-  );
+  ).length;
+  console.log("Live eFootball coverage page " + page + ": " + JSON.stringify({
+    returned_events: events.length,
+    model_qualified_candidates: virtualCandidates.length,
+    matched_candidate_rows: matchedNow,
+    seen_unique_events: byEvent.size
+  }));
+  const allResolved = matchedNow === virtualCandidates.length;
   if (allResolved || events.length < 100) break;
 }
 
@@ -191,6 +198,11 @@ const output = {
   }))
 };
 console.log(JSON.stringify(output, null, 2));
+await writeFile(
+  new URL("../LIVE-PRODUCTION-CHECK.json", import.meta.url),
+  JSON.stringify(output, null, 2) + "\\n",
+  "utf8"
+);
 
 // If the snapshot has qualified picks but absolutely none of those active
 // eFootball candidate events can be matched to production's live feed, this is
