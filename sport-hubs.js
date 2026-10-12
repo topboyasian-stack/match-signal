@@ -155,7 +155,10 @@ function isVirtualDeskCandidate(row){
 // inactive virtual products, and rows beyond that window cannot hold the
 // qualified shortlist in a permanent "incomplete" state.
 function isRequiredVirtualQuoteRow(row,now=Date.now()){
-  if(!row||String(row?.sport||"").toLowerCase()!=="virtual"||!String(row?.event_id||""))return false;
+  // Match the actual candidate collector used by Qualified Best; stale or
+  // model-qualified-looking board rows without a usable probability must not
+  // hold the live snapshot open.
+  if(!isVirtualDeskCandidate(row)||!String(row?.event_id||""))return false;
   const product=String(row?.product||"").toLowerCase();
   if(!isActiveVirtualProduct(product)||!isOverUnderPrediction(row))return false;
   const start=virtualStartTimestamp(row);
@@ -711,7 +714,7 @@ async function renderUnifiedBoard(){
       for(let page=1;page<=5;page++){
         let feed;
         try{
-          feed=await get('./api/sportybet-virtual?sources=efootball,vfootball&pageSize=100&pageNum='+page+'&timeline=168');
+          feed=await get('./api/sportybet-virtual?sources=efootball&pageSize=100&pageNum='+page+'&timeline=168');
         }catch(error){
           status.failureReason=String(error?.message||error||"live quote fetch failed");
           break;
@@ -909,9 +912,9 @@ async function renderUnifiedBoard(){
     const refreshVirtualQuoteData=async()=>{
     let quoteSnapshot={snapshotAvailable:false,snapshotComplete:false};
     try{
-      const requiredQuoteRows=[...all,...virtualCandidates].filter(row=>
-        String(row?.sport||"").toLowerCase()==="virtual"&&isOverUnderPrediction(row)&&virtualStartTimestamp(row)>=Date.now()
-      );
+      // Only the selection-candidate pool is required to resolve before Qualified Best can render.
+      // The broader unified board may contain historical/research rows not eligible for this shortlist.
+      const requiredQuoteRows=virtualCandidates;
       quoteSnapshot=await freshVirtualQuoteMap(requiredQuoteRows);
       const quoteMap=quoteSnapshot.byEvent;
       all=all.map(row=>{
