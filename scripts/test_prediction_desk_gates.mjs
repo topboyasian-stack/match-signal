@@ -16,7 +16,7 @@ assert.equal(rendererVersions[0], rendererVersions[1], "root and /upcoming.html 
 assert.notEqual(rendererVersions[0], "20261012-qualified-candidate-status-fix1", "the script cache key must change when the renderer fix changes");
 assert.match(source,/let virtualQuoteRefreshState="pending"/,"Virtual/eFootball starts in an explicit verification state");
 assert.match(source,/virtualQuoteRefreshState==="complete"\)return true/,"only a complete snapshot can admit all Virtual/eFootball rows");
-assert.match(source,/virtualQuoteRefreshState==="partial"&&x\.desk_quote_refresh==="fresh_exact_event_line_side"/,"partial snapshots only admit candidates tagged exact by this refresh");
+assert.match(source,/\(virtualQuoteRefreshState==="partial"\|\|virtualQuoteRefreshState==="cached"\)&&\s*x\.desk_quote_refresh==="fresh_exact_event_line_side"/,"partial or reused snapshots only admit rows with exact verified event/line/side quotes");
 assert.match(source,/snapshot-level qualified fixtures/,"empty Qualified Best explains when saved snapshot rows fail current verification");
 assert.match(source,/refreshVirtualQuoteData\(\)\.then\(snapshot=>/,"the redraw is driven by quote snapshot completeness");
 assert.match(source,/function isRequiredVirtualQuoteRow\(row,now=Date\.now\(\)\)/,"snapshot completeness has a distinct shortlist-eligibility predicate");
@@ -24,6 +24,10 @@ assert.match(source,/filter\(row=>isRequiredVirtualQuoteRow\(row,quoteNow\)\)/,"
 assert.match(source,/const requiredQuoteRows=virtualCandidates;/,"the completeness check uses the same candidate pool as Qualified Best");
 assert.doesNotMatch(source,/const requiredQuoteRows=\[\.\.\.all,\.\.\.virtualCandidates\]/,"unified-board research rows cannot block Qualified Best snapshot completeness");
 assert.match(source,/api\/sportybet-virtual\?sources=efootball&pageSize=100&pageNum=/,"Upcoming quote refresh queries only active eFootball markets");
+assert.match(source,/let lastVerifiedVirtualQuoteSnapshot=null/,"the last complete snapshot persists across board rerenders");
+assert.match(source,/usedLastGoodSnapshot:true/,"a partial refresh can reuse the last complete verified snapshot");
+assert.match(source,/holdVerifiedBoardDuringRefresh/,"the previously verified shortlist remains visible while the next refresh is pending");
+assert.match(source,/lastVerifiedVirtualSnapshotUsable\(lastVerifiedVirtualQuoteSnapshot,Date\.now\(\)\)/,"the cache reuse path is guarded by the last-snapshot freshness limit");
 
 const start = source.indexOf("function isOverUnderPrediction(x){");
 const end = source.indexOf("function ladderAnchor(rows){", start);
@@ -33,11 +37,11 @@ const sandbox = { Date, Number, String, Math, Array, Boolean, Object, Map, Set, 
 vm.createContext(sandbox);
 vm.runInContext(
   source.slice(start, end) +
-    "\n;globalThis.__deskTestApi={exactVirtualMarketLine,exactSportyBetQuote,exactMarketEdge,exactMarketExpectedReturn,qualificationState,primaryPrediction,qualifiedBestSelections,unmatchedVirtualQuoteUpdate,rawProbabilityValue,probabilityCalibrationInfo,probabilityValue,displayedFairOddsValue,isVirtualDeskCandidate,isRequiredVirtualQuoteRow,virtualCandidateStatus,sameVirtualEvent,virtualSnapshotHasCompleteFirstPage};",
+    "\n;globalThis.__deskTestApi={exactVirtualMarketLine,exactSportyBetQuote,exactMarketEdge,exactMarketExpectedReturn,qualificationState,primaryPrediction,qualifiedBestSelections,unmatchedVirtualQuoteUpdate,rawProbabilityValue,probabilityCalibrationInfo,probabilityValue,displayedFairOddsValue,isVirtualDeskCandidate,isRequiredVirtualQuoteRow,lastVerifiedVirtualSnapshotUsable,virtualCandidateStatus,sameVirtualEvent,virtualSnapshotHasCompleteFirstPage};",
   sandbox,
   { filename: "sport-hubs.js#prediction-desk-gates" }
 );
-const { exactVirtualMarketLine, exactMarketEdge, qualificationState, primaryPrediction, qualifiedBestSelections, unmatchedVirtualQuoteUpdate, rawProbabilityValue, probabilityCalibrationInfo, probabilityValue, displayedFairOddsValue, exactMarketExpectedReturn, isVirtualDeskCandidate, isRequiredVirtualQuoteRow, virtualCandidateStatus, sameVirtualEvent, virtualSnapshotHasCompleteFirstPage } = sandbox.__deskTestApi;
+const { exactVirtualMarketLine, exactMarketEdge, qualificationState, primaryPrediction, qualifiedBestSelections, unmatchedVirtualQuoteUpdate, rawProbabilityValue, probabilityCalibrationInfo, probabilityValue, displayedFairOddsValue, exactMarketExpectedReturn, isVirtualDeskCandidate, isRequiredVirtualQuoteRow, lastVerifiedVirtualSnapshotUsable, virtualCandidateStatus, sameVirtualEvent, virtualSnapshotHasCompleteFirstPage } = sandbox.__deskTestApi;
 
 const lastKnownQuote = {
   event_id: "virtual-keep-last-quote",
@@ -132,6 +136,30 @@ const missingProbability = {
 };
 assert.equal(isRequiredVirtualQuoteRow(missingProbability, scopeNow), false, "a row without a usable model probability cannot block quote snapshot completion");
 
+const cacheNow = Date.now();
+const recentCompleteSnapshot = {
+  snapshotAvailable: true,
+  snapshotComplete: true,
+  verifiedAt: cacheNow - 4 * 60 * 1000,
+  byEvent: { "efootball-event": [{ event_id: "efootball-event" }] }
+};
+assert.equal(lastVerifiedVirtualSnapshotUsable(recentCompleteSnapshot, cacheNow), true, "a complete prior snapshot can bridge a transient refresh while within 15 minutes");
+assert.equal(lastVerifiedVirtualSnapshotUsable({
+  ...recentCompleteSnapshot,
+  verifiedAt: cacheNow - 16 * 60 * 1000
+}, cacheNow), false, "a prior snapshot older than 15 minutes can never keep picks qualified");
+assert.equal(lastVerifiedVirtualSnapshotUsable({
+  ...recentCompleteSnapshot,
+  snapshotComplete: false
+}, cacheNow), false, "an incomplete snapshot can never become the reusable last-good snapshot");
+assert.equal(lastVerifiedVirtualSnapshotUsable({
+  ...recentCompleteSnapshot,
+  byEvent: {}
+}, cacheNow), false, "an empty event map is not a reusable verified snapshot");
+assert.equal(lastVerifiedVirtualSnapshotUsable({
+  ...recentCompleteSnapshot,
+  verifiedAt: cacheNow + 3 * 60 * 1000
+}, cacheNow), false, "a future-dated verification cannot be reused");
 const valid = row();
 assert.equal(qualificationState(valid).currentPricePass, true, "fresh exact-line value can pass");
 
