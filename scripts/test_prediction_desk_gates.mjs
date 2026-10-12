@@ -216,9 +216,11 @@ const pendingDirectional = {
 assert.equal(qualificationState(pendingDirectional).currentPricePass, false, "calibration never bypasses an upstream directional validation gate");
 assert.equal(qualificationState(pendingDirectional).reason, "DIRECTIONAL_LINE_VALIDATION_GATE_PENDING", "the Desk should explain the actual blocker instead of a generic model gate");
 
-// Parse only an explicit total/line provider specifier when market.line is absent.
+// Prefer the explicit total/line specifier: SportyBet may expose line: 9 alongside specifier: total=9.5.
 assert.equal(exactVirtualMarketLine({ specifier: "total=7.5" }), 7.5, "provider total specifier is recognized");
-assert.equal(exactVirtualMarketLine({ specifier: "total=7.5", line: 8.5 }), 8.5, "explicit market.line takes precedence");
+assert.equal(exactVirtualMarketLine({ specifier: "total=7.5", line: 8.5 }), 7.5, "explicit total specifier takes precedence over a conflicting numeric line");
+assert.equal(exactVirtualMarketLine({ specifier: "total=9.5", line: 9 }), 9.5, "SportyBet integer base line cannot override the actual half-goal specifier");
+assert.equal(exactVirtualMarketLine({ line: 8.5 }), 8.5, "numeric market.line remains a fallback when no total specifier exists");
 assert.equal(exactVirtualMarketLine({ specifier: "period=1" }), null, "unrelated specifier is not treated as a totals line");
 
 
