@@ -137,7 +137,7 @@ async function verifyDeployedRenderer() {
     fetchCoverageText("/upcoming.html?rendererCheck=" + Date.now())
   ]);
   const getVersion = (html, label) => {
-    const match = html.match(/<script src=["']\\.\\/sport-hubs\\.js\\?v=([^"']+)["']/);
+    const match = html.match(/<script src=["']\.\/sport-hubs\.js\?v=([^"']+)["']/);
     if (!match) throw new Error(label + " does not reference a versioned sport-hubs.js renderer");
     return match[1];
   };
