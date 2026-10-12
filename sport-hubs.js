@@ -1048,8 +1048,9 @@ async function renderUnifiedBoard(){
       const virtualViewActive=!sport?.value||sport.value==="all"||sport.value==="virtual";
       const virtualRowsInView=filteredRows.some(isVirtualQualificationRow);
       const virtualQuotePending=virtualQuoteRefreshState==="pending"&&virtualViewActive&&virtualCandidates.length>0;
-      // Until reconciliation completes, never count saved Virtual/eFootball quotes as live-qualified.
-      // For a partial snapshot, only rows marked exact by this refresh can qualify.
+      // A partial snapshot only admits exact rows observed on that attempt.
+      // A cached snapshot only admits rows from the last complete snapshot, and
+      // exactSportyBetQuote still enforces each row's strict 15-minute age limit.
       const qualificationRows=filteredRows.filter(x=>{
         if(!isVirtualQualificationRow(x))return true;
         if(virtualQuoteRefreshState==="complete")return true;
