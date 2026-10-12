@@ -144,8 +144,8 @@ async function verifyDeployedRenderer() {
   const homeVersion = getVersion(homeHtml, "root page");
   const upcomingVersion = getVersion(upcomingHtml, "Upcoming page");
   if (homeVersion !== upcomingVersion) throw new Error("root and /upcoming.html reference different renderer versions");
-  if (homeVersion === "20261012-qualified-candidate-status-fix1") {
-    throw new Error("production HTML still references the stale pre-fix renderer cache key");
+  if (["20261012-qualified-candidate-status-fix1","20261012-qualified-best-snapshot-scope2"].includes(homeVersion)) {
+    throw new Error("production HTML still references a renderer cache key predating the current Qualified Best refresh fixes");
   }
   const deployedRenderer = await fetchCoverageText("/sport-hubs.js?v=" + encodeURIComponent(homeVersion));
   if (!/const requiredQuoteRows=virtualCandidates\.filter\(row=>isRequiredVirtualQuoteRow\(row,Date\.now\(\)\)\)/.test(deployedRenderer)) {
