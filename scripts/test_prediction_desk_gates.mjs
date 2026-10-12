@@ -107,6 +107,15 @@ assert.equal(qualificationState(watchOnly).modelQualified, false, "watch status 
 assert.equal(qualificationState(watchOnly).currentPricePass, false, "watch status cannot enter the qualified list");
 assert.equal(qualificationState(watchOnly).reason, "EXPLICIT_QUALIFICATION_VETO");
 
+// Long ordinary status strings must not trigger catastrophic backtracking in the veto detector.
+const longHarmlessStatus = row({
+  qualification_status: "BETTING_QUALIFIED_PAPER",
+  candidate_status: "CANDIDATE_".repeat(80) + "READY",
+  betting_qualified: true,
+  qualified_for_builder: true
+});
+assert.equal(qualificationState(longHarmlessStatus).modelQualified, true, "long non-pending status text must not veto a genuinely qualified model row");
+
 // Any explicit gate-pending label must veto contradictory upstream qualified booleans.
 for (const pendingStatus of ["DIRECTIONAL_LINE_VALIDATION_GATE_PENDING", "MODEL_LINE_SCOPE_GATE_PENDING"]) {
   const contradictoryPending = row({
