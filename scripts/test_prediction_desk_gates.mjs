@@ -8,6 +8,9 @@ assert.match(source,/virtualQuoteRefreshState==="complete"\)return true/,"only a
 assert.match(source,/virtualQuoteRefreshState==="partial"&&x\.desk_quote_refresh==="fresh_exact_event_line_side"/,"partial snapshots only admit candidates tagged exact by this refresh");
 assert.match(source,/snapshot-level qualified fixtures/,"empty Qualified Best explains when saved snapshot rows fail current verification");
 assert.match(source,/refreshVirtualQuoteData\(\)\.then\(snapshot=>/,"the redraw is driven by quote snapshot completeness");
+assert.match(source,/function isRequiredVirtualQuoteRow\(row,now=Date\.now\(\)\)/,"snapshot completeness has a distinct shortlist-eligibility predicate");
+assert.match(source,/filter\(row=>isRequiredVirtualQuoteRow\(row,quoteNow\)\)/,"only required shortlist rows can block snapshot completion");
+
 const start = source.indexOf("function isOverUnderPrediction(x){");
 const end = source.indexOf("function ladderAnchor(rows){", start);
 assert.ok(start >= 0 && end > start, "production desk gate functions are extractable");
@@ -16,11 +19,11 @@ const sandbox = { Date, Number, String, Math, Array, Boolean, Object, Map, Set, 
 vm.createContext(sandbox);
 vm.runInContext(
   source.slice(start, end) +
-    "\n;globalThis.__deskTestApi={exactVirtualMarketLine,exactSportyBetQuote,exactMarketEdge,exactMarketExpectedReturn,qualificationState,primaryPrediction,qualifiedBestSelections,unmatchedVirtualQuoteUpdate,rawProbabilityValue,probabilityCalibrationInfo,probabilityValue,displayedFairOddsValue,isVirtualDeskCandidate,virtualCandidateStatus,sameVirtualEvent,virtualSnapshotHasCompleteFirstPage};",
+    "\n;globalThis.__deskTestApi={exactVirtualMarketLine,exactSportyBetQuote,exactMarketEdge,exactMarketExpectedReturn,qualificationState,primaryPrediction,qualifiedBestSelections,unmatchedVirtualQuoteUpdate,rawProbabilityValue,probabilityCalibrationInfo,probabilityValue,displayedFairOddsValue,isVirtualDeskCandidate,isRequiredVirtualQuoteRow,virtualCandidateStatus,sameVirtualEvent,virtualSnapshotHasCompleteFirstPage};",
   sandbox,
   { filename: "sport-hubs.js#prediction-desk-gates" }
 );
-const { exactVirtualMarketLine, exactMarketEdge, qualificationState, primaryPrediction, qualifiedBestSelections, unmatchedVirtualQuoteUpdate, rawProbabilityValue, probabilityCalibrationInfo, probabilityValue, displayedFairOddsValue, exactMarketExpectedReturn, isVirtualDeskCandidate, virtualCandidateStatus, sameVirtualEvent, virtualSnapshotHasCompleteFirstPage } = sandbox.__deskTestApi;
+const { exactVirtualMarketLine, exactMarketEdge, qualificationState, primaryPrediction, qualifiedBestSelections, unmatchedVirtualQuoteUpdate, rawProbabilityValue, probabilityCalibrationInfo, probabilityValue, displayedFairOddsValue, exactMarketExpectedReturn, isVirtualDeskCandidate, isRequiredVirtualQuoteRow, virtualCandidateStatus, sameVirtualEvent, virtualSnapshotHasCompleteFirstPage } = sandbox.__deskTestApi;
 
 const lastKnownQuote = {
   event_id: "virtual-keep-last-quote",
@@ -64,6 +67,48 @@ function row(overrides = {}) {
     ...overrides
   };
 }
+
+
+// Snapshot completeness must mirror the live qualified-shortlist scope, not
+// demand exact matches for every high-probability research projection.
+const scopeNow = Date.now();
+const requiredVirtual = row({
+  sport: "virtual",
+  product: "efootball_gt",
+  event_id: "efootball-qualified-required",
+  start_time: new Date(scopeNow + 2 * 60 * 60 * 1000).toISOString(),
+  line: 7.5,
+  pick: "under",
+  qualification_status: "BETTING_QUALIFIED_PAPER",
+  betting_qualified: true,
+  qualified_for_builder: true
+});
+assert.equal(isRequiredVirtualQuoteRow(requiredVirtual, scopeNow), true, "a model-qualified active eFootball row inside the seven-day feed window is required");
+
+const highEstimateResearch = {
+  ...requiredVirtual,
+  qualification_status: "MODEL_90_PLUS",
+  candidate_status: "MODEL_90_PLUS",
+  betting_qualified: false,
+  qualified_for_builder: false
+};
+assert.equal(isRequiredVirtualQuoteRow(highEstimateResearch, scopeNow), false, "a high-probability research row cannot hold Qualified Best snapshot completeness");
+
+const pendingQualifiedFlag = {
+  ...requiredVirtual,
+  qualification_status: "DIRECTIONAL_LINE_VALIDATION_GATE_PENDING",
+  candidate_status: "BETTING_QUALIFIED_PAPER"
+};
+assert.equal(isRequiredVirtualQuoteRow(pendingQualifiedFlag, scopeNow), false, "a pending model gate remains excluded even when upstream flags conflict");
+
+const outsideLiveWindow = {
+  ...requiredVirtual,
+  start_time: new Date(scopeNow + 8 * 24 * 60 * 60 * 1000).toISOString()
+};
+assert.equal(isRequiredVirtualQuoteRow(outsideLiveWindow, scopeNow), false, "a candidate outside the SportyBet 168-hour feed window cannot block completion");
+
+const inactiveVirtualProduct = { ...requiredVirtual, product: "vfootball" };
+assert.equal(isRequiredVirtualQuoteRow(inactiveVirtualProduct, scopeNow), false, "inactive VFootball research cannot block active eFootball snapshot completion");
 
 const valid = row();
 assert.equal(qualificationState(valid).currentPricePass, true, "fresh exact-line value can pass");
