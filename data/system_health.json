@@ -1,26 +1,26 @@
 {
-  "generated_at": "2026-10-12T15:46:17.210868+00:00",
+  "generated_at": "2026-10-12T15:57:56.610262+00:00",
   "status": "FAIL",
   "critical_issues": 3,
-  "warning_issues": 1,
+  "warning_issues": 0,
   "info_issues": 0,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
       "status": "STALE",
-      "age_hours": 9.91,
+      "age_hours": 10.1,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.22,
+      "age_hours": 0.19,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "STALE",
-      "age_hours": 6.01,
+      "age_hours": 6.21,
       "threshold_hours": 4
     },
     {
@@ -37,14 +37,14 @@
     },
     {
       "engine": "tennis_forward_discovery",
-      "status": "STALE",
-      "age_hours": 9.39,
+      "status": "PASS",
+      "age_hours": 0.02,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 0.25,
+      "age_hours": 0.45,
       "threshold_hours": 0.5,
       "heartbeat_source": "unified_live_refresh"
     },
@@ -71,22 +71,17 @@
     {
       "code": "STALE_CORE_PREDICTION_PIPELINE",
       "severity": "critical",
-      "detail": "updated_at age 9.91h exceeds 4h"
+      "detail": "updated_at age 10.10h exceeds 4h"
     },
     {
       "code": "STALE_EXPANSION",
       "severity": "critical",
-      "detail": "updated_at age 6.01h exceeds 4h"
-    },
-    {
-      "code": "TENNIS_FORWARD_DISCOVERY_STALE",
-      "severity": "warning",
-      "detail": "tennis_forward_status age 9.39h exceeds the 8h threshold; the discovery result is too old to confirm current fixture coverage"
+      "detail": "updated_at age 6.21h exceeds 4h"
     },
     {
       "code": "PIPELINE_STALE",
       "severity": "critical",
-      "detail": "pipeline_status age 9.91h exceeds 4h"
+      "detail": "pipeline_status age 10.10h exceeds 4h"
     }
   ],
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
