@@ -956,6 +956,22 @@ async function renderUnifiedBoard(){
           lastVerifiedAt:lastVerifiedVirtualQuoteSnapshot.verifiedAt
         };
       }
+    }catch(_){
+      // An unexpected fetch-side error can still use the last complete snapshot,
+      // provided it remains within the standard 15-minute freshness window.
+      if(requiredCount>0&&lastVerifiedVirtualSnapshotUsable(lastVerifiedVirtualQuoteSnapshot,Date.now())){
+        quoteSnapshot={
+          snapshotAvailable:true,
+          snapshotComplete:true,
+          byEvent:lastVerifiedVirtualQuoteSnapshot.byEvent,
+          usedLastGoodSnapshot:true,
+          lastVerifiedAt:lastVerifiedVirtualQuoteSnapshot.verifiedAt
+        };
+      }
+    }
+    // Reconcile rows separately from the fetch so an exception during data shaping
+    // cannot change a failed refresh into an apparently valid cached result.
+    try{
       const quoteMap=quoteSnapshot.byEvent||{};
       all=all.map(row=>{
         if(String(row?.sport||"").toLowerCase()!=="virtual"||!isOverUnderPrediction(row))return row;
@@ -977,18 +993,7 @@ async function renderUnifiedBoard(){
           }
         }
       }
-    }catch(_){
-      // Do not let an unexpected client-side error wipe a recent verified set.
-      if(requiredCount>0&&lastVerifiedVirtualSnapshotUsable(lastVerifiedVirtualQuoteSnapshot,Date.now())){
-        quoteSnapshot={
-          snapshotAvailable:true,
-          snapshotComplete:true,
-          byEvent:lastVerifiedVirtualQuoteSnapshot.byEvent,
-          usedLastGoodSnapshot:true,
-          lastVerifiedAt:lastVerifiedVirtualQuoteSnapshot.verifiedAt
-        };
-      }
-    }
+    }catch(_){}
     return {
       snapshotAvailable:Boolean(quoteSnapshot?.snapshotAvailable),
       snapshotComplete:Boolean(quoteSnapshot?.snapshotComplete),
