@@ -18,17 +18,23 @@ const sandbox = { Date, Number, String, Math, Array, Boolean, Object, Map, Set, 
 vm.createContext(sandbox);
 vm.runInContext(
   source.slice(sourceStart, sourceEnd) +
-    "\n;globalThis.__desk={isVirtualDeskCandidate,exactVirtualMarketLine,qualifiedBestSelections};",
+    "\n;globalThis.__desk={isVirtualDeskCandidate,qualificationState,exactVirtualMarketLine,qualifiedBestSelections};",
   sandbox,
   { filename: "sport-hubs.js#live-quote-coverage" }
 );
-const { isVirtualDeskCandidate, exactVirtualMarketLine, qualifiedBestSelections } = sandbox.__desk;
+const { isVirtualDeskCandidate, qualificationState, exactVirtualMarketLine, qualifiedBestSelections } = sandbox.__desk;
 
 const rows = JSON.parse(await readFile(new URL("../data/selection_candidates.json", import.meta.url), "utf8"));
 const now = Date.now();
+// Qualified Best can only promote rows that pass the model gate. High-probability
+// research projections and explicitly pending rows are intentionally excluded;
+// otherwise this checker paginates the whole research pool and can time out.
 const virtualCandidates = rows.filter(isVirtualDeskCandidate).filter(row => {
+  const product = String(row?.product || "").toLowerCase();
   const kickoff = Date.parse(String(row?.start_time || ""));
-  return Number.isFinite(kickoff) && kickoff > now && kickoff <= now + 7 * 24 * 60 * 60 * 1000;
+  return ["efootball_gt", "efootball_adriatic"].includes(product) &&
+    Number.isFinite(kickoff) && kickoff > now && kickoff <= now + 7 * 24 * 60 * 60 * 1000 &&
+    qualificationState(row).modelQualified === true;
 });
 const poolGate = qualifiedBestSelections(virtualCandidates, now);
 
@@ -64,14 +70,15 @@ function sameEvent(row, live) {
   if (!rowA || !rowB || !liveA || !liveB) return false;
   if ([rowA, rowB].sort().join("|") !== [liveA, liveB].sort().join("|")) return false;
   const rowTime = startTimestamp(row), liveTime = startTimestamp(live);
-  return rowTime != null && liveTime != null && Math.abs(rowTime - liveTime) <= 90 * 1000;
+  // Match sport-hubs.js: event ID, product and both participant identities are still required; allow ten minutes for kickoff normalization drift.
+  return rowTime != null && liveTime != null && Math.abs(rowTime - liveTime) <= 10 * 60 * 1000;
 }
 
 const byEvent = new Map();
 const pages = [];
 for (let page = 1; page <= MAX_PAGES; page++) {
-  const url = BASE + "/api/sportybet-virtual?sources=efootball,vfootball&pageSize=100&pageNum=" + page + "&timeline=168&deskCoverage=" + Date.now();
-  const response = await fetch(url, { cache: "no-store", headers: { "Cache-Control": "no-cache" } });
+  const url = BASE + "/api/sportybet-virtual?sources=efootball&pageSize=100&pageNum=" + page + "&timeline=168&deskCoverage=" + Date.now();
+  const response = await fetch(url, { cache: "no-store", headers: { "Cache-Control": "no-cache" }, signal: AbortSignal.timeout(25_000) });
   if (!response.ok) throw new Error("Live quote source returned HTTP " + response.status + " on page " + page);
   const payload = await response.json();
   const events = Array.isArray(payload?.events) ? payload.events : [];
