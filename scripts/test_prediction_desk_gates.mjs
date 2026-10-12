@@ -30,6 +30,9 @@ assert.match(source,/const requiredQuoteRows=virtualCandidates\.filter\(row=>isR
 assert.doesNotMatch(source,/const requiredQuoteRows=\[\.\.\.all,\.\.\.virtualCandidates\]/,"unified-board research rows cannot block Qualified Best snapshot completeness");
 assert.match(source,/api\/sportybet-virtual\?sources=efootball&pageSize=100&pageNum=/,"Upcoming quote refresh queries only active eFootball markets");
 assert.match(source,/let lastVerifiedVirtualQuoteSnapshot=null/,"the last complete snapshot persists across board rerenders");
+assert.match(source,/const qualifiedBestDisplayLimit=qualifiedOnly\?40:12/,"the dedicated page must show the full qualified shortlist while Upcoming remains compact");
+assert.match(source,/const lastSeenDisplayLimit=qualifiedOnly\?40:12/,"the dedicated last-seen page must show the full retained shortlist");
+
 assert.match(source,/usedLastGoodSnapshot:true/,"a partial refresh can reuse the last complete verified snapshot");
 assert.match(source,/holdVerifiedBoardDuringRefresh/,"the previously verified shortlist remains visible while the next refresh is pending");
 assert.match(source,/lastVerifiedVirtualSnapshotUsable\(lastVerifiedVirtualQuoteSnapshot,Date\.now\(\)\)/,"the cache reuse path is guarded by the last-snapshot freshness limit");
