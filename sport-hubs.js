@@ -253,7 +253,7 @@ function qualificationVetoReason(x){
     ...(Array.isArray(gate?.reasons)?gate.reasons:[])
   ].filter(value=>value!=null&&String(value).trim()).map(value=>String(value).trim());
   if(x?.watch_projection===true||x?.forward_watch===true||x?.research_only===true)return "EXPLICIT_QUALIFICATION_VETO";
-  return fields.some(value=>/(?:NOT[\s_-]*QUALIFIED|UNQUALIFIED|WATCH|RESEARCH|PROJECTION_ONLY|EVIDENCE[\s_-]*GATE[\s_-]*PENDING|PENDING[\s_-]*EVIDENCE)/i.test(value))
+  return fields.some(value=>/(?:NOT[\s_-]*QUALIFIED|UNQUALIFIED|WATCH|RESEARCH|PROJECTION_ONLY|EVIDENCE[\s_-]*GATE[\s_-]*PENDING|PENDING[\s_-]*EVIDENCE|(?:[A-Z0-9_-]+[\s_-]*)*GATE[\s_-]*PENDING)/i.test(value))
     ?"EXPLICIT_QUALIFICATION_VETO":null;
 }
 function exactMarketExpectedReturn(x,quote){
@@ -275,7 +275,7 @@ function qualificationState(x){
     const modelReason=raw.includes("DIRECTIONAL_LINE_VALIDATION_GATE_PENDING")?"DIRECTIONAL_LINE_VALIDATION_GATE_PENDING":
       raw.includes("MODEL_LINE_SCOPE_GATE_PENDING")?"MODEL_LINE_SCOPE_GATE_PENDING":
       raw.includes("HIGH_LINE_UNDER_EVIDENCE_GATE_PENDING")?"HIGH_LINE_UNDER_EVIDENCE_GATE_PENDING":"MODEL_GATE_NOT_PASSED";
-    return {modelQualified:false,currentPricePass:false,label:"NOT QUALIFIED · "+detail,reason:veto||modelReason};
+    return {modelQualified:false,currentPricePass:false,label:"NOT QUALIFIED · "+detail,reason:modelReason!=="MODEL_GATE_NOT_PASSED"?modelReason:(veto||modelReason)};
   }
   const quote=exactSportyBetQuote(x);
   if(quote.odds==null){

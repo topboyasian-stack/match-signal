@@ -107,6 +107,21 @@ assert.equal(qualificationState(watchOnly).modelQualified, false, "watch status 
 assert.equal(qualificationState(watchOnly).currentPricePass, false, "watch status cannot enter the qualified list");
 assert.equal(qualificationState(watchOnly).reason, "EXPLICIT_QUALIFICATION_VETO");
 
+// Any explicit gate-pending label must veto contradictory upstream qualified booleans.
+for (const pendingStatus of ["DIRECTIONAL_LINE_VALIDATION_GATE_PENDING", "MODEL_LINE_SCOPE_GATE_PENDING"]) {
+  const contradictoryPending = row({
+    qualification_status: pendingStatus,
+    candidate_status: "BETTING_QUALIFIED_PAPER",
+    prediction_status: "BETTING_QUALIFIED_PAPER",
+    betting_qualified: true,
+    qualified_for_builder: true
+  });
+  assert.equal(qualificationState(contradictoryPending).modelQualified, false, pendingStatus + " must veto conflicting qualified flags");
+  assert.equal(qualificationState(contradictoryPending).currentPricePass, false, pendingStatus + " must not pass the exact-price gate");
+  assert.equal(qualificationState(contradictoryPending).reason, pendingStatus, pendingStatus + " should preserve the actionable blocker label");
+  assert.equal(qualifiedBestSelections([contradictoryPending], Date.now()).rows.length, 0, pendingStatus + " must never enter Qualified Best");
+}
+
 // Model estimate bands alone do not qualify a row.
 const estimateOnly = row({
   qualification_status: "MODEL_90_PLUS",

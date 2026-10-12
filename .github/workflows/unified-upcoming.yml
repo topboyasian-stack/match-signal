@@ -10,6 +10,9 @@ on:
       - "Match Signal Virtual Lab Collector"
       - "Match Signal Virtual Lab Live Sync"
       - "Match Signal Live Expansion"
+      - "Match Signal Odds Ticket Tracker"
+      - "Match Signal Odds Builder"
+      - "Match Signal ML EV Engine"
     types: [completed]
   schedule:
     # Keep the unified desk live around the clock, including overnight eFootball sessions.
@@ -27,7 +30,7 @@ on:
       - 'scripts/unified_upcoming_cleanup.py'
       - 'scripts/system_health_audit.py'
       - 'data/virtual_lab_participant_lifecycle.json'
-      # Ticket settlement updates feed the desk health summary; refresh the board on each tracker publication.
+      # Keep push-path coverage for manual tracker edits; workflow_run also catches ticket-tracker publications made by Actions.
       - 'data/odds_ticket_tracker.json'
       - 'index.html'
       - 'upcoming.html'
