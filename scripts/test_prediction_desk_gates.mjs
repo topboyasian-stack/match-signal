@@ -16,11 +16,11 @@ const sandbox = { Date, Number, String, Math, Array, Boolean, Object, Map, Set, 
 vm.createContext(sandbox);
 vm.runInContext(
   source.slice(start, end) +
-    "\n;globalThis.__deskTestApi={exactVirtualMarketLine,exactSportyBetQuote,exactMarketEdge,exactMarketExpectedReturn,qualificationState,primaryPrediction,qualifiedBestSelections,unmatchedVirtualQuoteUpdate,rawProbabilityValue,probabilityCalibrationInfo,probabilityValue,displayedFairOddsValue,isVirtualDeskCandidate,sameVirtualEvent,virtualSnapshotHasCompleteFirstPage};",
+    "\n;globalThis.__deskTestApi={exactVirtualMarketLine,exactSportyBetQuote,exactMarketEdge,exactMarketExpectedReturn,qualificationState,primaryPrediction,qualifiedBestSelections,unmatchedVirtualQuoteUpdate,rawProbabilityValue,probabilityCalibrationInfo,probabilityValue,displayedFairOddsValue,isVirtualDeskCandidate,virtualCandidateStatus,sameVirtualEvent,virtualSnapshotHasCompleteFirstPage};",
   sandbox,
   { filename: "sport-hubs.js#prediction-desk-gates" }
 );
-const { exactVirtualMarketLine, exactMarketEdge, qualificationState, primaryPrediction, qualifiedBestSelections, unmatchedVirtualQuoteUpdate, rawProbabilityValue, probabilityCalibrationInfo, probabilityValue, displayedFairOddsValue, exactMarketExpectedReturn, isVirtualDeskCandidate, sameVirtualEvent, virtualSnapshotHasCompleteFirstPage } = sandbox.__deskTestApi;
+const { exactVirtualMarketLine, exactMarketEdge, qualificationState, primaryPrediction, qualifiedBestSelections, unmatchedVirtualQuoteUpdate, rawProbabilityValue, probabilityCalibrationInfo, probabilityValue, displayedFairOddsValue, exactMarketExpectedReturn, isVirtualDeskCandidate, virtualCandidateStatus, sameVirtualEvent, virtualSnapshotHasCompleteFirstPage } = sandbox.__deskTestApi;
 
 const lastKnownQuote = {
   event_id: "virtual-keep-last-quote",
@@ -115,6 +115,32 @@ const longHarmlessStatus = row({
   qualified_for_builder: true
 });
 assert.equal(qualificationState(longHarmlessStatus).modelQualified, true, "long non-pending status text must not veto a genuinely qualified model row");
+
+// A qualified row without candidate_status must not become "MODEL_RESEARCH"
+ // simply because its candidate_group describes research provenance.
+assert.equal(
+  virtualCandidateStatus({
+    candidate_group: "efootball_exact_research",
+    qualification_status: "BETTING_QUALIFIED_PAPER",
+    betting_qualified: true
+  }),
+  "BETTING_QUALIFIED_PAPER",
+  "a qualified status beats a group/provenance label when candidate_status is absent"
+);
+assert.equal(
+  virtualCandidateStatus({
+    candidate_status: "MODEL_RESEARCH",
+    qualification_status: "BETTING_QUALIFIED_PAPER",
+    betting_qualified: true
+  }),
+  "MODEL_RESEARCH",
+  "an explicit research status remains a veto even if a qualified flag conflicts"
+);
+assert.equal(
+  virtualCandidateStatus({ qualification_status: "MODEL_RESEARCH" }),
+  "MODEL_RESEARCH",
+  "unqualified rows retain the conservative research fallback"
+);
 
 // Any explicit gate-pending label must veto contradictory upstream qualified booleans.
 for (const pendingStatus of ["DIRECTIONAL_LINE_VALIDATION_GATE_PENDING", "MODEL_LINE_SCOPE_GATE_PENDING"]) {
