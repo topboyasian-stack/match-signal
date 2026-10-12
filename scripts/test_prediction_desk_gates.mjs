@@ -14,6 +14,7 @@ const rendererVersions = entryPages.map(html =>
 assert.ok(rendererVersions.every(Boolean), "both Upcoming entry pages must load a versioned Prediction Desk renderer");
 assert.equal(rendererVersions[0], rendererVersions[1], "root and /upcoming.html must use the same renderer cache key");
 assert.notEqual(rendererVersions[0], "20261012-qualified-candidate-status-fix1", "the script cache key must change when the renderer fix changes");
+assert.notEqual(rendererVersions[0], "20261012-qualified-best-snapshot-scope2", "the script cache key must change when last-good snapshot behavior changes");
 assert.match(source,/let virtualQuoteRefreshState="pending"/,"Virtual/eFootball starts in an explicit verification state");
 assert.match(source,/virtualQuoteRefreshState==="complete"\)return true/,"only a complete snapshot can admit all Virtual/eFootball rows");
 assert.match(source,/\(virtualQuoteRefreshState==="partial"\|\|virtualQuoteRefreshState==="cached"\)&&\s*x\.desk_quote_refresh==="fresh_exact_event_line_side"/,"partial or reused snapshots only admit rows with exact verified event/line/side quotes");
