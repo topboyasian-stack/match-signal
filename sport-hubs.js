@@ -374,6 +374,10 @@ function unifiedMarketLine(x){
 }
 const QUALIFIED_BEST_LAST_SEEN_STORAGE_KEY="match-signal-qualified-best-last-seen-v1";
 const QUALIFIED_BEST_LAST_SEEN_MAX_AGE_MS=24*60*60*1000;
+function qualifiedBestSourceIsFresh(generatedAt,now=Date.now()){
+  const stamp=typeof generatedAt==="number"?generatedAt:Date.parse(String(generatedAt||""));
+  return Number.isFinite(stamp)&&now-stamp>=-2*60*1000&&now-stamp<=30*60*1000;
+}
 function qualifiedBestSnapshotRowKey(row){
   return [rowFixtureKey(row),isOverUnderPrediction(row)?"over_under":String(row?.market||"winner"),
     row?.line==null?"":String(row.line),String(row?.pick||row?.selection||"").toLowerCase()].join("|");
@@ -1099,15 +1103,18 @@ async function renderUnifiedBoard(){
       const virtualViewActive=!sport?.value||sport.value==="all"||sport.value==="virtual";
       const virtualRowsInView=filteredRows.some(isVirtualQualificationRow);
       const virtualQuotePending=virtualQuoteRefreshState==="pending"&&virtualViewActive&&virtualCandidates.length>0;
+      // Never certify a current pick from a stale/missing source-board artifact.
+      // The source-freshness banner below explains the failure; last-seen rows remain separate.
+      const sourceDataFresh=qualifiedBestSourceIsFresh(generatedAt,now.getTime());
       // A partial snapshot only admits exact rows observed on that attempt.
       // A cached snapshot only admits rows from the last complete snapshot, and
       // exactSportyBetQuote still enforces each row's strict 15-minute age limit.
-      const qualificationRows=filteredRows.filter(x=>{
+      const qualificationRows=sourceDataFresh?filteredRows.filter(x=>{
         if(!isVirtualQualificationRow(x))return true;
         if(virtualQuoteRefreshState==="complete")return true;
         return (virtualQuoteRefreshState==="partial"||virtualQuoteRefreshState==="cached")&&
           x.desk_quote_refresh==="fresh_exact_event_line_side";
-      });
+      }):[];
       const groups=fixtureGroups(filteredRows);
       const best=qualifiedBestSelections(qualificationRows,now.getTime());
       if(best.rows.length&&virtualQuoteRefreshState!=="pending"){
@@ -1147,7 +1154,7 @@ async function renderUnifiedBoard(){
       const quoteSnapshotAgeMinutes=virtualQuoteLastVerifiedAt==null?null:Math.max(0,Math.floor((Date.now()-virtualQuoteLastVerifiedAt)/60000));
       const feedAgeMs=Number.isFinite(generatedAt)?Date.now()-generatedAt:NaN;
       const feedAgeMinutes=Number.isFinite(feedAgeMs)?Math.floor(feedAgeMs/60000):null;
-      const sourceStale=feedAgeMinutes==null||feedAgeMinutes>30||feedAgeMs< -2*60*1000;
+      const sourceStale=!qualifiedBestSourceIsFresh(generatedAt,Date.now());
       const noQualifiedMessage=sourceStale
         ?"Published source data is stale ("+(feedAgeMinutes==null?"unknown age":feedAgeMinutes<60?feedAgeMinutes+" minutes":Math.floor(feedAgeMinutes/60)+"h "+(feedAgeMinutes%60)+"m")+"). The collector must refresh before new picks can be certified. Recent last-seen records are separate and NOT current."
         :virtualQuotePending
