@@ -27,8 +27,10 @@ const { isVirtualDeskCandidate, exactVirtualMarketLine, qualifiedBestSelections 
 const rows = JSON.parse(await readFile(new URL("../data/selection_candidates.json", import.meta.url), "utf8"));
 const now = Date.now();
 const virtualCandidates = rows.filter(isVirtualDeskCandidate).filter(row => {
+  const product = String(row?.product || "").toLowerCase();
   const kickoff = Date.parse(String(row?.start_time || ""));
-  return Number.isFinite(kickoff) && kickoff > now && kickoff <= now + 7 * 24 * 60 * 60 * 1000;
+  return ["efootball_gt", "efootball_adriatic"].includes(product) &&
+    Number.isFinite(kickoff) && kickoff > now && kickoff <= now + 7 * 24 * 60 * 60 * 1000;
 });
 const poolGate = qualifiedBestSelections(virtualCandidates, now);
 
@@ -71,8 +73,8 @@ function sameEvent(row, live) {
 const byEvent = new Map();
 const pages = [];
 for (let page = 1; page <= MAX_PAGES; page++) {
-  const url = BASE + "/api/sportybet-virtual?sources=efootball,vfootball&pageSize=100&pageNum=" + page + "&timeline=168&deskCoverage=" + Date.now();
-  const response = await fetch(url, { cache: "no-store", headers: { "Cache-Control": "no-cache" } });
+  const url = BASE + "/api/sportybet-virtual?sources=efootball&pageSize=100&pageNum=" + page + "&timeline=168&deskCoverage=" + Date.now();
+  const response = await fetch(url, { cache: "no-store", headers: { "Cache-Control": "no-cache" }, signal: AbortSignal.timeout(25_000) });
   if (!response.ok) throw new Error("Live quote source returned HTTP " + response.status + " on page " + page);
   const payload = await response.json();
   const events = Array.isArray(payload?.events) ? payload.events : [];
