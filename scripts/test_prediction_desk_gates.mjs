@@ -42,11 +42,11 @@ const sandbox = { Date, Number, String, Math, Array, Boolean, Object, Map, Set, 
 vm.createContext(sandbox);
 vm.runInContext(
   source.slice(start, end) +
-    "\n;globalThis.__deskTestApi={exactVirtualMarketLine,exactSportyBetQuote,exactMarketEdge,exactMarketExpectedReturn,qualificationState,primaryPrediction,qualifiedBestSelections,unmatchedVirtualQuoteUpdate,rawProbabilityValue,probabilityCalibrationInfo,probabilityValue,displayedFairOddsValue,isVirtualDeskCandidate,isRequiredVirtualQuoteRow,lastVerifiedVirtualSnapshotUsable,qualifiedBestLastSeenSnapshotUsable,qualifiedBestLastSeenRows,virtualCandidateStatus,sameVirtualEvent,virtualSnapshotHasCompleteFirstPage};",
+    "\n;globalThis.__deskTestApi={exactVirtualMarketLine,exactSportyBetQuote,exactMarketEdge,exactMarketExpectedReturn,qualificationState,primaryPrediction,qualifiedBestSelections,unmatchedVirtualQuoteUpdate,rawProbabilityValue,probabilityCalibrationInfo,probabilityValue,displayedFairOddsValue,isVirtualDeskCandidate,isRequiredVirtualQuoteRow,lastVerifiedVirtualSnapshotUsable,qualifiedBestSourceIsFresh,qualifiedBestLastSeenSnapshotUsable,qualifiedBestLastSeenRows,virtualCandidateStatus,sameVirtualEvent,virtualSnapshotHasCompleteFirstPage};",
   sandbox,
   { filename: "sport-hubs.js#prediction-desk-gates" }
 );
-const { exactVirtualMarketLine, exactMarketEdge, qualificationState, primaryPrediction, qualifiedBestSelections, unmatchedVirtualQuoteUpdate, rawProbabilityValue, probabilityCalibrationInfo, probabilityValue, displayedFairOddsValue, exactMarketExpectedReturn, isVirtualDeskCandidate, isRequiredVirtualQuoteRow, lastVerifiedVirtualSnapshotUsable, qualifiedBestLastSeenSnapshotUsable, qualifiedBestLastSeenRows, virtualCandidateStatus, sameVirtualEvent, virtualSnapshotHasCompleteFirstPage } = sandbox.__deskTestApi;
+const { exactVirtualMarketLine, exactMarketEdge, qualificationState, primaryPrediction, qualifiedBestSelections, unmatchedVirtualQuoteUpdate, rawProbabilityValue, probabilityCalibrationInfo, probabilityValue, displayedFairOddsValue, exactMarketExpectedReturn, isVirtualDeskCandidate, isRequiredVirtualQuoteRow, lastVerifiedVirtualSnapshotUsable, qualifiedBestSourceIsFresh, qualifiedBestLastSeenSnapshotUsable, qualifiedBestLastSeenRows, virtualCandidateStatus, sameVirtualEvent, virtualSnapshotHasCompleteFirstPage } = sandbox.__deskTestApi;
 
 const lastKnownQuote = {
   event_id: "virtual-keep-last-quote",
@@ -165,6 +165,12 @@ assert.equal(lastVerifiedVirtualSnapshotUsable({
   ...recentCompleteSnapshot,
   verifiedAt: cacheNow + 3 * 60 * 1000
 }, cacheNow), false, "a future-dated verification cannot be reused");
+const sourceNow=Date.now();
+assert.equal(qualifiedBestSourceIsFresh(new Date(sourceNow-29*60*1000).toISOString(),sourceNow),true,"a source artifact under 30 minutes can be evaluated for current picks");
+assert.equal(qualifiedBestSourceIsFresh(new Date(sourceNow-31*60*1000).toISOString(),sourceNow),false,"stale source artifacts cannot certify current picks");
+assert.equal(qualifiedBestSourceIsFresh(null,sourceNow),false,"missing source timestamps fail closed");
+assert.equal(qualifiedBestSourceIsFresh(new Date(sourceNow+5*60*1000).toISOString(),sourceNow),false,"future-skewed source timestamps fail closed");
+assert.match(source,/const sourceDataFresh=qualifiedBestSourceIsFresh\(generatedAt,now\.getTime\(\)\);\s*\/\/ A partial snapshot/ ,"source freshness must gate the current qualification list before it is evaluated");
 const lastSeenNow=Date.now();
 const futureLastSeen=row({
   event_id:"last-seen-future-event",
