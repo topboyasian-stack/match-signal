@@ -18,19 +18,23 @@ const sandbox = { Date, Number, String, Math, Array, Boolean, Object, Map, Set, 
 vm.createContext(sandbox);
 vm.runInContext(
   source.slice(sourceStart, sourceEnd) +
-    "\n;globalThis.__desk={isVirtualDeskCandidate,exactVirtualMarketLine,qualifiedBestSelections};",
+    "\n;globalThis.__desk={isVirtualDeskCandidate,qualificationState,exactVirtualMarketLine,qualifiedBestSelections};",
   sandbox,
   { filename: "sport-hubs.js#live-quote-coverage" }
 );
-const { isVirtualDeskCandidate, exactVirtualMarketLine, qualifiedBestSelections } = sandbox.__desk;
+const { isVirtualDeskCandidate, qualificationState, exactVirtualMarketLine, qualifiedBestSelections } = sandbox.__desk;
 
 const rows = JSON.parse(await readFile(new URL("../data/selection_candidates.json", import.meta.url), "utf8"));
 const now = Date.now();
+// Qualified Best can only promote rows that pass the model gate. High-probability
+// research projections and explicitly pending rows are intentionally excluded;
+// otherwise this checker paginates the whole research pool and can time out.
 const virtualCandidates = rows.filter(isVirtualDeskCandidate).filter(row => {
   const product = String(row?.product || "").toLowerCase();
   const kickoff = Date.parse(String(row?.start_time || ""));
   return ["efootball_gt", "efootball_adriatic"].includes(product) &&
-    Number.isFinite(kickoff) && kickoff > now && kickoff <= now + 7 * 24 * 60 * 60 * 1000;
+    Number.isFinite(kickoff) && kickoff > now && kickoff <= now + 7 * 24 * 60 * 60 * 1000 &&
+    qualificationState(row).modelQualified === true;
 });
 const poolGate = qualifiedBestSelections(virtualCandidates, now);
 
