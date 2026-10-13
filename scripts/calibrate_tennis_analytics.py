@@ -20,7 +20,16 @@ def main():
         analytics = prediction.get("analytics") or {}
         games = analytics.get("total_games") or {}
         if games:
-            if quality < 3:
+            if str(games.get("market_alignment_status") or "") in {
+                "NO_EXACT_SPORTYBET_TOTAL_LINE",
+                "NO_EXACT_LINE_PROBABILITY",
+                "SPORTYBET_EVENT_UNMATCHED",
+            }:
+                games["line"] = None
+                games["over"] = None
+                games["under"] = None
+                games["pick"] = None
+            elif quality < 3:
                 games["over"] = 0.5
                 games["under"] = 0.5
                 games["pick"] = None
