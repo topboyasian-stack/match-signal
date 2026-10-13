@@ -278,6 +278,10 @@ jobs:
               if (!r.ok) failures.push(path+' HTTP '+r.status);
               if (!body.includes('<html') && path.endsWith('.html')) failures.push(path+' did not return HTML');
               if(path==='/reports.html'&&(!body.includes('id="workspace-nav"')||!body.includes('researchLabSummary'))) failures.push(path+' missing shared Reports workspace UI');
+              if (path==='/odds-builder.html' || path==='/reports.html' || path==='/virtual-lab/' || path==='/virtual-lab') {
+                const cacheControl=String(r.headers.get('cache-control')||'').toLowerCase();
+                if (!cacheControl.includes('no-store') || !cacheControl.includes('no-cache')) failures.push(path+' missing workspace no-cache header: '+cacheControl);
+              }
               if(path==='/reports.html') for (const marker of ['MS-REPORTS-2026.10.14-TERMINAL2','reports-design.css?v=20261014-terminal2']) if (!body.includes(marker)) failures.push(path+' missing Reports terminal design marker: '+marker);
               if(path==='/analyst.html'&&(!body.includes('noindex,nofollow')||!body.includes('data-active="analyst"'))) failures.push(path+' missing private Analyst workspace contract');
               if(path==='/virtual-lab/'&&(!body.includes('data-active="lab"')||!body.includes('value="efootball" selected'))) failures.push(path+' missing eFootball-first Lab workspace UI');
