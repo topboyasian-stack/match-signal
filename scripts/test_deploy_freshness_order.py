@@ -59,6 +59,21 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         missing = sorted(required_inputs - board_paths)
         self.assertEqual(missing, [], f"Deployable inputs bypass the Unified board workflow: {missing}")
 
+    def test_feeder_workflows_cannot_bypass_the_board_refresh(self):
+        bypasses = []
+        workflow_dir = ROOT / ".github/workflows"
+        for workflow_path in sorted(workflow_dir.glob("*.yml")):
+            if workflow_path.name == "cloudflare-pages.yml":
+                continue
+            source = workflow_path.read_text(encoding="utf-8")
+            if "gh workflow run cloudflare-pages.yml --ref main" in source:
+                bypasses.append(str(workflow_path.relative_to(ROOT)))
+        self.assertEqual(
+            bypasses,
+            [],
+            "Feeder workflows must hand off through Unified Upcoming before Pages deployment",
+        )
+
     def test_board_owned_outputs_do_not_trigger_a_self_refresh_loop(self):
         paths = workflow_push_paths(BOARD_WORKFLOW)
         for output in (
