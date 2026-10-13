@@ -48,7 +48,9 @@ export function classifyQualifiedBestMonitor(snapshot, options = {}) {
     warnings.push("MONITOR_SCHEDULE_GAP_COULD_NOT_BE_VERIFIED");
   }
 
-  const rawQualifiedCount = Number(snapshot.current_qualified_count);
+  const rawQualifiedValue = snapshot.current_qualified_count;
+  const rawQualifiedCount = rawQualifiedValue === null || rawQualifiedValue === undefined || rawQualifiedValue === ""
+    ? Number.NaN : Number(rawQualifiedValue);
   const qualifiedCount = Number.isFinite(rawQualifiedCount) && rawQualifiedCount >= 0
     ? Math.floor(rawQualifiedCount) : null;
   if (qualifiedCount === null) problems.push("QUALIFIED_COUNT_MISSING_OR_INVALID");
