@@ -70,6 +70,16 @@ def calibrate(row, model):
     analytics = row.setdefault("analytics", {})
     total = analytics.setdefault("total_games", {})
     if not total: return False
+    if str(total.get("market_alignment_status") or "") in {
+        "NO_EXACT_SPORTYBET_TOTAL_LINE",
+        "NO_EXACT_LINE_PROBABILITY",
+        "SPORTYBET_EVENT_UNMATCHED",
+    }:
+        total["line"] = None
+        total["over"] = None
+        total["under"] = None
+        total["pick"] = None
+        return False
     line = round(float(total.get("line") or 22.5) * 2) / 2
     three = float(analytics.get("three_sets") or 0.5)
     confidence = float(row.get("confidence") or 0.5)
@@ -98,7 +108,9 @@ def calibrate(row, model):
     # That was what made the visible feed look like the same 30/70 everywhere.
     prior = float(total.get("base_model_over", total.get("over", 0.5)) or 0.5)
     over = prior if empirical is None else (1.0 - EMPIRICAL_WEIGHT) * prior + EMPIRICAL_WEIGHT * float(empirical)
-    if abs(line - 22.5) > 0.001:
+    # Exact-line market alignment already recalculates V5.1 at the observed
+    # bookmaker line; do not apply the legacy offset to that probability again.
+    if abs(line - 22.5) > 0.001 and not str(total.get("market_alignment_status") or "").startswith("EXACT_SPORTYBET_TOTAL_LINE_"):
         over -= 0.025 * (line - 22.5)
     over = max(0.05, min(0.95, over))
     total["base_model_over"] = round(prior, 4)
