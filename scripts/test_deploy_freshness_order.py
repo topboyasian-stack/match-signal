@@ -32,19 +32,32 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn("    types: [completed]", events)
         self.assertIn("  workflow_dispatch:", events)
 
-    def test_all_pages_source_and_data_inputs_route_through_board_workflow(self):
-        pages_paths = workflow_push_paths(PAGES_WORKFLOW)
+    def test_pages_inputs_route_through_board_workflow(self):
         board_paths = workflow_push_paths(BOARD_WORKFLOW)
-        self.assertTrue(pages_paths, "Cloudflare workflow should list push-path inputs for contract comparison")
         self.assertTrue(board_paths, "Unified workflow should trigger on publishable source/data paths")
-        outputs_owned_by_board = {
-            "data/unified_upcoming.json",
-            "data/prediction_desk_health.json",
-            "data/selection_candidates.json",
-            "data/system_health.json",
+        required_inputs = {
+            "index.html",
+            "upcoming.html",
+            "qualified-best.html",
+            "sport-hubs.js",
+            "sport-hubs.css",
+            "workspace-ui.js",
+            "league.html",
+            "functions/**",
+            "data/predictions.json",
+            "data/odds_builder.json",
+            "data/odds_ticket_tracker.json",
+            "data/virtual_lab_live.json",
+            "data/darts_*.json",
+            "data/table_tennis_*.json",
+            "data/pdl_predictions.json",
+            "data/tennis_forward_status.json",
+            "data/club-logo-registry.json",
+            "assets/club-logos/**",
+            ".github/workflows/cloudflare-pages.yml",
         }
-        missing = sorted((pages_paths - outputs_owned_by_board) - board_paths)
-        self.assertEqual(missing, [], f"Pages inputs bypass the Unified board workflow: {missing}")
+        missing = sorted(required_inputs - board_paths)
+        self.assertEqual(missing, [], f"Deployable inputs bypass the Unified board workflow: {missing}")
 
     def test_board_owned_outputs_do_not_trigger_a_self_refresh_loop(self):
         paths = workflow_push_paths(BOARD_WORKFLOW)
