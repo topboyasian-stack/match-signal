@@ -19,7 +19,9 @@ on:
       - 'index.html'
       - 'upcoming.html'
       - 'qualified-best.html'
+      - 'functions/api/sportybet-virtual.js'
       - 'scripts/test_prediction_desk_gates.mjs'
+      - 'scripts/test_sportybet_virtual_upcoming_mode.mjs'
       - 'scripts/qualified_best_monitor.mjs'
       - '.github/workflows/unified-upcoming.yml'
       - 'scripts/test_qualified_best_monitor.mjs'
@@ -52,8 +54,12 @@ jobs:
           node --check scripts/qualified_best_monitor.mjs
           node --check scripts/qualified_best_monitor_lib.mjs
           node --check scripts/test_qualified_best_monitor.mjs
+          node --check functions/api/sportybet-virtual.js
+          node --check scripts/test_sportybet_virtual_upcoming_mode.mjs
       - name: Test existing Prediction Desk gates
         run: node scripts/test_prediction_desk_gates.mjs
+      - name: Test upcoming-only SportyBet proxy mode
+        run: node scripts/test_sportybet_virtual_upcoming_mode.mjs
       - name: Test production monitor classifications
         run: node scripts/test_qualified_best_monitor.mjs
 
