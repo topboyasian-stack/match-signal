@@ -278,7 +278,11 @@ jobs:
               if (!r.ok) failures.push(path+' HTTP '+r.status);
               if (!body.includes('<html') && path.endsWith('.html')) failures.push(path+' did not return HTML');
               if(path==='/reports.html'&&(!body.includes('id="workspace-nav"')||!body.includes('researchLabSummary'))) failures.push(path+' missing shared Reports workspace UI');
-              if(path==='/reports.html') for (const marker of ['MS-REPORTS-2026.10.13-TERMINAL1','reports-design.css?v=20261013-terminal1']) if (!body.includes(marker)) failures.push(path+' missing Reports terminal design marker: '+marker);
+              if (path==='/odds-builder.html' || path==='/reports.html' || path==='/virtual-lab/' || path==='/virtual-lab') {
+                const cacheControl=String(r.headers.get('cache-control')||'').toLowerCase();
+                if (!cacheControl.includes('no-store') || !cacheControl.includes('no-cache')) failures.push(path+' missing workspace no-cache header: '+cacheControl);
+              }
+              if(path==='/reports.html') for (const marker of ['MS-REPORTS-2026.10.14-TERMINAL2','reports-design.css?v=20261014-terminal2']) if (!body.includes(marker)) failures.push(path+' missing Reports terminal design marker: '+marker);
               if(path==='/analyst.html'&&(!body.includes('noindex,nofollow')||!body.includes('data-active="analyst"'))) failures.push(path+' missing private Analyst workspace contract');
               if(path==='/virtual-lab/'&&(!body.includes('data-active="lab"')||!body.includes('value="efootball" selected'))) failures.push(path+' missing eFootball-first Lab workspace UI');
               if (path==='/expansion.html') {
@@ -308,7 +312,7 @@ jobs:
                   failures.push(path+' contains retired line-ladder clutter or misleading Builder target');
               }
               if (path==='/odds-builder.html') {
-                for (const marker of ['Live Odds Builder — Standard 2.70x+ / Compact eFootball 2.00x+','Compact eFootball lane: 4–5 eFootball GT/Adriatic legs at 2.00x+','80% model floor','expansion-odds-builder.js?v=20261011-efootball65-evidence1','MS-ODDS-BUILDER-2026.10.13-TERMINAL1','odds-builder-design.css?v=20261013-terminal1'])
+                for (const marker of ['Live Odds Builder — Standard 2.70x+ / Compact eFootball 2.00x+','Compact eFootball lane: 4–5 eFootball GT/Adriatic legs at 2.00x+','80% model floor','expansion-odds-builder.js?v=20261011-efootball65-evidence1','MS-ODDS-BUILDER-2026.10.14-TERMINAL2','odds-builder-design.css?v=20261014-terminal2'])
                   if (!body.includes(marker)) failures.push(path+' missing '+marker);
               }
               if (path==='/football.html' || path==='/tennis.html' || path==='/basketball.html') {
@@ -334,7 +338,7 @@ jobs:
                   if (!body.includes(marker)) failures.push(path+' missing '+marker);
               }
               if (path==='/virtual-lab/' || path==='/virtual-lab') {
-                for (const marker of ['Virtual Lab','virtual-lab-app.js','predictionDesk','oddsBuilder','How to use the Lab / what to select','Research conclusion','/virtual-lab/','data-page="virtual-lab"','MS-VIRTUAL-LAB-V1-2026.10.13-TERMINAL1','../virtual-lab-terminal.css?v=20261013-terminal1'])
+                for (const marker of ['Virtual Lab','virtual-lab-app.js','predictionDesk','oddsBuilder','How to use the Lab / what to select','Research conclusion','/virtual-lab/','data-page="virtual-lab"','MS-VIRTUAL-LAB-V1-2026.10.14-TERMINAL2','../virtual-lab-terminal.css?v=20261014-terminal2'])
                   if (!body.includes(marker)) failures.push(path+' missing '+marker);
               }
               if (path==='/research.html' || path==='/virtual-lab.html') {
@@ -343,6 +347,18 @@ jobs:
               }
             } catch(e) { failures.push(path+' '+e.message); }
           }
+
+          // Verify the shipped visual layer itself, not only that URLs return non-empty bytes.
+          for (const [path, marker] of [
+            ['/odds-builder-design.css', 'MATCH-SIGNAL-DESIGN-V2: ODDS BUILDER HIGH-CONTRAST VISUAL DELTA'],
+            ['/reports-design.css', 'MATCH-SIGNAL-DESIGN-V2: REPORTS HIGH-CONTRAST ANALYTICS VISUAL DELTA'],
+            ['/virtual-lab-terminal.css', 'MATCH-SIGNAL-DESIGN-V2: VIRTUAL LAB HIGH-CONTRAST RESEARCH VISUAL DELTA']
+          ]) {
+            const {r,body}=await get(path);
+            if (!r.ok) failures.push(path+' HTTP '+r.status);
+            if (!body.includes(marker)) failures.push(path+' did not serve the current V2 visual layer');
+          }
+
           for (const path of assets) {
             try {
               const {r,body}=await get(path);
