@@ -1,23 +1,23 @@
 {
-  "updated_at": "2026-10-13T03:53:28.378699+00:00",
+  "updated_at": "2026-10-13T11:40:08.801869+00:00",
   "automation_status": "SELF_HEALING_ENABLED",
-  "pipeline_last_update": "2026-10-13T02:01:22.220732+00:00",
-  "pipeline_age_hours": 1.87,
-  "odds_builder_last_update": "2026-10-13T03:10:16.948039+00:00",
-  "odds_builder_age_hours": 0.72,
-  "expansion_last_update": "2026-10-13T02:04:38.854122+00:00",
-  "expansion_age_hours": 1.81,
-  "virtual_lab_last_update": "2026-10-13T03:53:22.844271+00:00",
+  "pipeline_last_update": "2026-10-13T06:28:55.746560+00:00",
+  "pipeline_age_hours": 5.19,
+  "odds_builder_last_update": "2026-10-13T11:29:16.319298+00:00",
+  "odds_builder_age_hours": 0.18,
+  "expansion_last_update": "2026-10-13T08:26:16.823095+00:00",
+  "expansion_age_hours": 3.23,
+  "virtual_lab_last_update": "2026-10-13T11:39:55.447354+00:00",
   "virtual_lab_age_hours": 0.0,
-  "virtual_lab_status_age_hours": 2.78,
-  "darts_age_hours": 1.74,
-  "table_tennis_age_hours": 2.0,
-  "unified_upcoming_age_hours": 0.73,
-  "virtual_lab_events": 449,
+  "virtual_lab_status_age_hours": 4.02,
+  "darts_age_hours": 2.05,
+  "table_tennis_age_hours": 2.67,
+  "unified_upcoming_age_hours": 0.19,
+  "virtual_lab_events": 658,
   "virtual_lab_products": {
-    "vfootball": 173,
-    "efootball_gt": 264,
-    "efootball_adriatic": 12
+    "efootball_gt": 221,
+    "vfootball": 423,
+    "efootball_adriatic": 14
   },
   "thresholds": {
     "pipeline_hours": 4,
@@ -35,6 +35,30 @@
       "action": "dispatch",
       "status": "requested",
       "detail": "Virtual Lab research-ledger self-heal"
+    },
+    {
+      "workflow": "tennis_pipeline.yml",
+      "action": "dispatch",
+      "status": "requested",
+      "detail": "core prediction pipeline self-heal"
+    },
+    {
+      "workflow": "darts-x.yml",
+      "action": "dispatch",
+      "status": "requested",
+      "detail": "Darts-X self-heal"
+    },
+    {
+      "workflow": "table-tennis-x.yml",
+      "action": "dispatch",
+      "status": "requested",
+      "detail": "Table Tennis-X self-heal"
+    },
+    {
+      "workflow": "unified-upcoming.yml",
+      "action": "dispatch",
+      "status": "requested",
+      "detail": "Unified board refresh after newer Virtual Lab snapshot"
     }
   ],
   "policy": "Watchdog proactively self-heals stale engines and force-restarts the actual core Live Prediction Pipeline; health publication is retried across concurrent data writers."
