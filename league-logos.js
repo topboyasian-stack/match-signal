@@ -26,9 +26,10 @@
     "primeira liga": 94,
     "liga portugal": 94,
     "portuguese primeira liga": 94,
-    "england amateur u21 professional development league": 703,
-    "england u21 professional development league": 703,
-    "professional development league": 703,
+    // API-Football's official coverage list identifies the Professional Development League as ID 614.
+    "england amateur u21 professional development league": 614,
+    "england u21 professional development league": 614,
+    "professional development league": 614,
     "saudi pro league": 307,
     "saudi professional league": 307,
     "eredivisie": 88,
