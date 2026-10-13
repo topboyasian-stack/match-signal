@@ -164,10 +164,27 @@ def over_probability(target, history, line):
     return result
 
 
-def recommend_total_line(target, history, minimum_probability=0.60):
-    """Choose a SportyBet-compatible WTA/ATP total line from the empirical distribution."""
+def recommend_total_line(target, history, minimum_probability=0.60, available_lines=None):
+    """Choose a total line from the tour ladder or an exact observed bookmaker ladder.
+
+    When available_lines is supplied, it is authoritative: never recommend a
+    line which is absent from the current event's exact SportyBet full-match
+    Total Games market. An empty supplied ladder yields no recommendation rather
+    than falling back to generic ATP/WTA lines.
+    """
     tour = _tour(target)
-    lines = WTA_LINES if tour == "WTA" else ATP_LINES
+    if available_lines is None:
+        lines = WTA_LINES if tour == "WTA" else ATP_LINES
+    else:
+        normalized_lines = set()
+        for value in available_lines:
+            try:
+                line = float(value)
+            except (TypeError, ValueError):
+                continue
+            if math.isfinite(line) and line > 0:
+                normalized_lines.add(round(line * 2) / 2)
+        lines = sorted(normalized_lines)
     candidates = []
     for line in lines:
         result = over_probability(target, history, line)
