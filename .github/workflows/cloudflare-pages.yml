@@ -16,6 +16,8 @@ on:
       - 'index.html'
       - 'upcoming.html'
       - 'qualified-best.html'
+      - 'qualified-best-design.css'
+      - 'scripts/test_qualified_best_design.mjs'
       - 'football.html'
       - 'sport-hubs.css'
       - 'ms-design-system.css'
@@ -60,7 +62,7 @@ jobs:
           changed="$(gh api "repos/${GITHUB_REPOSITORY}/compare/${BEFORE_SHA}...${PUSH_SHA}" --jq '.files[].filename')"
           test -n "$changed" || { echo "Direct promotion has no inspectable changed-file list." >&2; exit 1; }
           printf 'Direct promotion changed files:\n%s\n' "$changed"
-          allowed='|_headers|index.html|upcoming.html|qualified-best.html|football.html|sport-hubs.css|ms-design-system.css|league-logos.js|scripts/test_league_logos.mjs|.github/workflows/cloudflare-pages.yml|.github/workflows/qualified-best-monitor.yml|scripts/test_deploy_freshness_order.py|scripts/test_prediction_desk_gates.mjs|'
+          allowed='|_headers|index.html|upcoming.html|qualified-best.html|qualified-best-design.css|scripts/test_qualified_best_design.mjs|football.html|sport-hubs.css|ms-design-system.css|league-logos.js|scripts/test_league_logos.mjs|.github/workflows/cloudflare-pages.yml|.github/workflows/qualified-best-monitor.yml|scripts/test_deploy_freshness_order.py|scripts/test_prediction_desk_gates.mjs|'
           while IFS= read -r path; do
             [ -n "$path" ] || continue
             case "$allowed" in
@@ -86,6 +88,7 @@ jobs:
           test -s live-data-worker.js
           test -s football.html
           test -s ms-design-system.css
+          test -s qualified-best-design.css
           test -s league-logos.js
           test -s data/predictions.json
           test -s workspace-ui.css
@@ -202,7 +205,9 @@ jobs:
           echo "Cloudflare Pages staging passed the 25 MiB single-file limit."
 
       - name: Regression-test Prediction Desk qualification and best-line selection
-        run: node scripts/test_prediction_desk_gates.mjs
+        run: |
+          node scripts/test_prediction_desk_gates.mjs
+          node scripts/test_qualified_best_design.mjs
 
       - name: Deploy to Cloudflare Pages
         env:
@@ -219,7 +224,7 @@ jobs:
           import { writeFileSync } from 'node:fs';
           const base = 'https://match-signal.pages.dev';
           const pages = ['/', '/upcoming.html', '/qualified-best', '/qualified-best.html', '/odds-builder.html', '/football.html', '/tennis.html', '/basketball.html', '/darts.html', '/table-tennis.html', '/league.html?sport=football&league=England%20Amateur%20-%20U21%20Professional%20Development%20League', '/reports.html', '/live.html', '/expansion.html', '/virtual-lab/', '/virtual-lab', '/research.html', '/virtual-lab.html', '/analyst.html'];
-          const assets = ['/api/sportybet-virtual','/api/sportybet-darts','/api/sportybet-table-tennis','/api/virtual-lab-history','/expansion.js', '/expansion-odds-builder.js', '/live-analysis.js', '/live-data-worker.js', '/virtual-lab-app.js', '/virtual-lab-confirmed-watch.js', '/virtual-lab.css', '/_redirects', '/data/predictions.json', '/data/unified_upcoming.json', '/data/selection_candidates.json', '/data/expansion_status.json', '/data/odds_builder.json', '/data/odds_ticket_tracker.json', '/data/system_health.json', '/data/tennis_forward_status.json', '/data/prediction_desk_health.json', '/data/results_first_evidence_report.json', '/data/virtual_lab_live.json','/data/virtual_lab_model_eval.json','/data/virtual_lab_eligibility.json','/data/virtual_lab_participants/registry.json','/data/virtual_lab_participant_lifecycle.json','/data/virtual_lab_participants/efootball_confirmed_watch.json','/data/efootball_desk_prediction_history.json.gz','/sport-hubs.js','/league-logos.js','/sport-hubs.css','/ms-design-system.css','/workspace-ui.js','/workspace-ui.css','/analyst.js'];
+          const assets = ['/api/sportybet-virtual','/api/sportybet-darts','/api/sportybet-table-tennis','/api/virtual-lab-history','/expansion.js', '/expansion-odds-builder.js', '/live-analysis.js', '/live-data-worker.js', '/virtual-lab-app.js', '/virtual-lab-confirmed-watch.js', '/virtual-lab.css', '/_redirects', '/data/predictions.json', '/data/unified_upcoming.json', '/data/selection_candidates.json', '/data/expansion_status.json', '/data/odds_builder.json', '/data/odds_ticket_tracker.json', '/data/system_health.json', '/data/tennis_forward_status.json', '/data/prediction_desk_health.json', '/data/results_first_evidence_report.json', '/data/virtual_lab_live.json','/data/virtual_lab_model_eval.json','/data/virtual_lab_eligibility.json','/data/virtual_lab_participants/registry.json','/data/virtual_lab_participant_lifecycle.json','/data/virtual_lab_participants/efootball_confirmed_watch.json','/data/efootball_desk_prediction_history.json.gz','/sport-hubs.js','/league-logos.js','/sport-hubs.css','/ms-design-system.css','/qualified-best-design.css','/workspace-ui.js','/workspace-ui.css','/analyst.js'];
           const failures = [];
           async function get(path) {
             const r = await fetch(base + path + (path.includes('?') ? '&' : '?') + 'smoke=' + Date.now(), {cache:'no-store'});
@@ -262,7 +267,7 @@ jobs:
                 const forcedRevalidation=cacheControl.includes('max-age=0')&&cacheControl.includes('must-revalidate');
                 if(path==='/qualified-best'&&!noStoreHeader&&!forcedRevalidation) failures.push(path+' missing no-store or forced revalidation header: '+cacheControl);
                 if(path==='/qualified-best.html'&&!noStoreHeader) failures.push(path+' missing no-store/no-cache header: '+cacheControl);
-                for (const marker of ['data-page="qualified-best"','id="qualifiedBestBoard"','id="qualifiedBestLastSeenBoard"','id="qualifiedBestDataStatus"','sport-hubs.js?v=20261013-qualified-best-live-coverage-retry1'])
+                for (const marker of ['data-page="qualified-best"','MS-UNIFIED-2026.10.13.5-DESIGN-PILOT2','qualified-best-design.css?v=20261013-premium-terminal2','id="qualifiedBestBoard"','id="qualifiedBestLastSeenBoard"','id="qualifiedBestDataStatus"','sport-hubs.js?v=20261013-qualified-best-live-coverage-retry1'])
                   if (!body.includes(marker)) failures.push(path+' missing '+marker);
               }
               if (path==='/upcoming.html') {
