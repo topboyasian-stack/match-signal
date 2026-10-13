@@ -1,29 +1,29 @@
 {
   "version": 4,
-  "updated_at": "2026-10-13T11:47:29.739954+00:00",
+  "updated_at": "2026-10-13T12:06:06.790994+00:00",
   "mode": "PAPER_ONLY",
   "summary": {
     "tracked_tickets": 145,
-    "pending": 68,
+    "pending": 67,
     "won": 18,
-    "lost": 59,
-    "active_with_loss": 15,
+    "lost": 60,
+    "active_with_loss": 16,
     "legs_won": 124,
-    "legs_lost": 75,
-    "legs_pending": 175,
+    "legs_lost": 76,
+    "legs_pending": 174,
     "pending_legs_by_product": {
-      "efootball_gt": 175
+      "efootball_gt": 174
     },
-    "settled_tickets": 77,
+    "settled_tickets": 78,
     "by_leg_count": {
       "2": {
-        "tracked": 52,
+        "tracked": 53,
         "won": 14,
-        "lost": 38,
-        "settled": 52,
-        "accuracy": 0.269231,
-        "avg_combined_odds": 4.183038,
-        "avg_model_rating": 54.258654
+        "lost": 39,
+        "settled": 53,
+        "accuracy": 0.264151,
+        "avg_combined_odds": 4.163453,
+        "avg_model_rating": 54.296226
       },
       "4": {
         "tracked": 25,
@@ -37,13 +37,13 @@
     },
     "by_primary_lane": {
       "efootball_exact_evidence_value": {
-        "tracked": 42,
+        "tracked": 43,
         "won": 14,
-        "lost": 28,
-        "settled": 42,
-        "accuracy": 0.333333,
-        "avg_combined_odds": 4.032714,
-        "avg_model_rating": 52.412857
+        "lost": 29,
+        "settled": 43,
+        "accuracy": 0.325581,
+        "avg_combined_odds": 4.01207,
+        "avg_model_rating": 52.502093
       },
       "high_confidence_research": {
         "tracked": 6,
@@ -86,17 +86,17 @@
       "high_confidence_loss_tickets": 17,
       "high_confidence_loss_legs": 23,
       "losses_by_product": {
-        "efootball_gt": 52,
+        "efootball_gt": 53,
         "vfootball": 23
       },
       "losses_by_direction": {
-        "under": 62,
+        "under": 63,
         "over": 13
       },
       "shape_comparison": "Use by_leg_count to compare 2–7-leg accuracy, average odds, and average model rating.",
       "lane_comparison": "Use by_primary_lane to compare construction-lane performance."
     },
-    "active_pending": 5,
+    "active_pending": 4,
     "archived_pending": 63,
     "visible_tickets": 82,
     "archived_tickets": 63
@@ -2619,8 +2619,8 @@
       "batch_id": "BATCH-01",
       "created_at": "2026-10-13T01:12:38.059674+00:00",
       "last_seen_at": "2026-10-13T01:12:38.059674+00:00",
-      "last_settled_at": null,
-      "status": "PENDING",
+      "last_settled_at": "2026-10-13T12:06:06.790994+00:00",
+      "status": "LOST",
       "combined_odds": 3.145,
       "combined_odds_source": "builder_batch_snapshot",
       "odds_snapshot_complete": true,
@@ -2636,8 +2636,8 @@
       "primary_lane": "efootball_exact_evidence_value",
       "odds_locked_at": "2026-10-13T01:12:38.059674+00:00",
       "leg_count": 2,
-      "settled_leg_count": 0,
-      "pending_leg_count": 2,
+      "settled_leg_count": 1,
+      "pending_leg_count": 1,
       "legs": [
         {
           "sport": "virtual",
@@ -2689,7 +2689,7 @@
           "builder_eligible": true,
           "real_money_eligible": false,
           "paper_only": true,
-          "status": "PENDING",
+          "status": "LOST",
           "source": "Exact-line evidence calibration · eFootball value lane",
           "market_source": "SportyBet NG",
           "recent_evidence": {
@@ -2794,10 +2794,13 @@
           "sportybet_outcome_name": "Under 4",
           "fixture_key": "efootball_gt|bayern munchen virtual 10 v leverkusen virtual 11",
           "bookmaker_odds_snapshot": 1.7,
-          "correct": null,
-          "settled_at": null,
-          "result": null,
-          "final_score": null
+          "correct": false,
+          "settled_at": "2026-10-13T12:06:06.790994+00:00",
+          "result": "O4",
+          "final_score": [
+            2.0,
+            5.0
+          ]
         },
         {
           "sport": "virtual",
@@ -2962,9 +2965,9 @@
       ],
       "leg_counts": {
         "won": 0,
-        "lost": 0,
+        "lost": 1,
         "void": 0,
-        "pending": 2
+        "pending": 1
       },
       "construction_snapshot": {
         "batch_id": "BATCH-01",
@@ -2998,9 +3001,61 @@
         },
         "recorded_at": "2026-10-13T01:12:38.078721+00:00"
       },
-      "settlement_diagnostics": null,
+      "settlement_diagnostics": {
+        "diagnostic_version": 1,
+        "ticket_outcome": "LOST",
+        "diagnostic_label": "TICKET_LOST_1_OF_2_LEGS",
+        "leg_count": 2,
+        "settled_leg_count": 1,
+        "won_leg_count": 0,
+        "lost_leg_count": 1,
+        "void_leg_count": 0,
+        "pending_leg_count": 1,
+        "leg_hit_rate_excluding_voids": 0.0,
+        "average_settled_leg_model_probability": 0.75,
+        "weakest_ticket_leg_model_probability": 0.75,
+        "high_confidence_loss_count": 0,
+        "high_confidence_loss_events": [],
+        "losses_by_product": {
+          "efootball_gt": 1
+        },
+        "losses_by_direction": {
+          "under": 1
+        },
+        "loss_details": [
+          {
+            "event_id": "sr:match:BAaEpIVBIfdqZdbsr0RE7sw",
+            "match": "Bayern Munchen (Virtual_10) vs Leverkusen (Virtual_11)",
+            "product": "efootball_gt",
+            "pick": "Bayern Munchen (Virtual_10) vs Leverkusen (Virtual_11) — O/U under 4.0",
+            "line": 4.0,
+            "model_probability": 0.75,
+            "model_edge": 0.203333,
+            "bookmaker_odds": 1.7,
+            "evidence_score": 0.659325,
+            "recent_evidence_n": 8,
+            "recent_evidence_hit_rate": 0.875,
+            "result": "O4",
+            "final_score": [
+              2.0,
+              5.0
+            ],
+            "settled_at": "2026-10-13T12:06:06.790994+00:00"
+          }
+        ],
+        "improvement_keys": {
+          "shape": "2_leg",
+          "primary_lane": "efootball_exact_evidence_value",
+          "combined_odds": 3.145,
+          "combined_model_rating": 56.25,
+          "combined_model_probability": 0.5625,
+          "avg_model_probability": 75.0,
+          "avg_model_edge_percent": 22.67
+        }
+      },
       "paper_only": true,
-      "real_money_execution": false
+      "real_money_execution": false,
+      "lost_at": "2026-10-13T12:06:06.790994+00:00"
     },
     {
       "version": 3,
