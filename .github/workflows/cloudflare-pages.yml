@@ -7,6 +7,15 @@ on:
     workflows:
       - "Match Signal Unified Upcoming Board"
     types: [completed]
+  # Static cache-revalidation promotions must not depend on a queued Unified Board run.
+  # Push promotions are guarded below and accept only the listed HTML/cache files.
+  push:
+    branches: [main]
+    paths:
+      - '_headers'
+      - 'index.html'
+      - 'upcoming.html'
+      - 'qualified-best.html'
   workflow_dispatch:
 
 permissions:
@@ -32,6 +41,27 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: main
+
+      - name: Guard cache-only direct promotion
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BEFORE_SHA: ${{ github.event.before }}
+          PUSH_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          test -n "$BEFORE_SHA" && test -n "$PUSH_SHA"
+          changed="$(gh api "repos/${GITHUB_REPOSITORY}/compare/${BEFORE_SHA}...${PUSH_SHA}" --jq '.files[].filename')"
+          test -n "$changed" || { echo "Direct promotion has no inspectable changed-file list." >&2; exit 1; }
+          printf 'Direct promotion changed files:\n%s\n' "$changed"
+          allowed='|_headers|index.html|upcoming.html|qualified-best.html|.github/workflows/cloudflare-pages.yml|scripts/test_deploy_freshness_order.py|scripts/test_prediction_desk_gates.mjs|'
+          while IFS= read -r path; do
+            [ -n "$path" ] || continue
+            case "$allowed" in
+              *"|$path|"*) ;;
+              *) echo "Direct cache promotion rejected; unrelated path changed: $path" >&2; exit 1 ;;
+            esac
+          done <<< "$changed"
 
       - name: Capture deployment source commit
         id: source
@@ -214,7 +244,7 @@ jobs:
               if (path==='/qualified-best' || path==='/qualified-best.html') {
                 const cacheControl=String(r.headers.get('cache-control')||'').toLowerCase();
                 if (!cacheControl.includes('no-store') || !cacheControl.includes('no-cache')) failures.push(path+' missing no-store/no-cache header: '+cacheControl);
-                for (const marker of ['data-page="qualified-best"','id="qualifiedBestBoard"','id="qualifiedBestLastSeenBoard"','id="qualifiedBestDataStatus"','sport-hubs.js?v=20261013-qualified-best-live-verification-cachefix2'])
+                for (const marker of ['data-page="qualified-best"','id="qualifiedBestBoard"','id="qualifiedBestLastSeenBoard"','id="qualifiedBestDataStatus"','sport-hubs.js?v=20261013-qualified-best-live-verification-cachefix3'])
                   if (!body.includes(marker)) failures.push(path+' missing '+marker);
               }
               if (path==='/upcoming.html') {
