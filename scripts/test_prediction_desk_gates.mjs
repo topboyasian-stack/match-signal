@@ -28,6 +28,7 @@ assert.notEqual(rendererVersions[0], "20261012-qualified-best-snapshot-scope2", 
 assert.notEqual(rendererVersions[0], "20261013-qualified-best-kickoff-sort1", "the script cache key must change when live qualification diagnostics are added");
 assert.notEqual(rendererVersions[0], "20261013-qualified-best-live-monitor1", "the script cache key must change when transient refresh recovery changes the renderer");
 assert.notEqual(rendererVersions[0], "20261013-qualified-best-upcoming-only1", "the shared renderer cache key must change when the live-verification client needs a forced refresh");
+assert.notEqual(rendererVersions[0], "20261013-qualified-best-live-verification-cachefix2", "the renderer cache key must change after clean-route cache policy changes");
 assert.match(source,/window\.__MATCH_SIGNAL_QUALIFIED_BEST_MONITOR__=\{/, "the real desk gate must emit structured monitor diagnostics");
 assert.match(source,/stage:virtualQuoteRefreshState==="pending"\?"checking":"completed"/, "the monitor must distinguish a still-running quote check from a completed check");
 assert.match(source,/source_fallback_used:sourceFallbackUsed/, "synthetic source-fallback timestamps cannot certify production health");
