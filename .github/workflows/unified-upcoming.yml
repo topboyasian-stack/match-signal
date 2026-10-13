@@ -14,8 +14,9 @@ on:
     types: [completed]
   schedule:
     # Keep the unified desk live around the clock, including overnight eFootball sessions.
-    # Run one minute after the virtual quote sync's :01/:06/:11... cadence.
-    - cron: '*/5 * * * *'
+    # Virtual quote sync runs at :01/:06/:11...; publish the board one minute later.
+    # Offset away from :00 to reduce the chance of GitHub's scheduled-run load delays.
+    - cron: '2-59/5 * * * *'
   push:
     branches: [main]
     paths:
