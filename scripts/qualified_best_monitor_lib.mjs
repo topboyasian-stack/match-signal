@@ -52,8 +52,12 @@ export function classifyQualifiedBestMonitor(snapshot, options = {}) {
 
   const gap = Number(snapshot.schedule_gap_minutes);
   if (Number.isFinite(gap) && gap > maxScheduleGapMinutes) {
-    problems.push("MONITOR_SCHEDULE_GAP_EXCEEDED");
-  } else if (snapshot.schedule_gap_status === "unknown" || snapshot.schedule_gap_status === "unavailable") {
+    problems.push(snapshot.schedule_gap_status === "missing"
+      ? "MONITOR_SCHEDULE_NEVER_OBSERVED"
+      : "MONITOR_SCHEDULE_GAP_EXCEEDED");
+  } else if (snapshot.schedule_gap_status === "unknown" ||
+             snapshot.schedule_gap_status === "unavailable" ||
+             snapshot.schedule_gap_status === "missing") {
     warnings.push("MONITOR_SCHEDULE_GAP_COULD_NOT_BE_VERIFIED");
   }
 
