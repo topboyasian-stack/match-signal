@@ -849,7 +849,7 @@ async function renderUnifiedBoard(){
         // whole desk in the incomplete-snapshot state for another two-minute cycle.
         for(let attempt=1;attempt<=2;attempt++){
           try{
-            const candidate=await get('./api/sportybet-virtual?sources=efootball&pageSize=100&pageNum='+page+'&timeline=168');
+            const candidate=await get('./api/sportybet-virtual?sources=efootball&pageSize=100&pageNum='+page+'&timeline=168&includeLive=false');
             if(!candidate||candidate.ok===false||!Array.isArray(candidate.events)){
               lastPageError="live quote response is not a usable event snapshot";
             }else{
