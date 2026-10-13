@@ -37,6 +37,13 @@ on:
       - 'scripts/test_independent_sports_design.mjs'
       - 'darts.html'
       - 'table-tennis.html'
+      - 'odds-builder.html'
+      - 'odds-builder-design.css'
+      - 'reports.html'
+      - 'reports-design.css'
+      - 'virtual-lab/index.html'
+      - 'virtual-lab-terminal.css'
+      - 'scripts/test_workspace_terminal_design.mjs'
       - '.github/workflows/qualified-best-live-monitor.yml'
       - '.github/workflows/cloudflare-pages.yml'
 permissions:
@@ -67,6 +74,7 @@ jobs:
           node --check league-logos.js
           node scripts/test_league_logos.mjs
           node --check scripts/test_independent_sports_design.mjs
+          node --check scripts/test_workspace_terminal_design.mjs
           node --check scripts/qualified_best_monitor.mjs
           node --check scripts/qualified_best_monitor_lib.mjs
           node --check scripts/test_qualified_best_monitor.mjs
@@ -77,6 +85,8 @@ jobs:
         run: node scripts/test_sport_hub_design.mjs
       - name: Test independent sport page design
         run: node scripts/test_independent_sports_design.mjs
+      - name: Test remaining workspace terminal design
+        run: node scripts/test_workspace_terminal_design.mjs
       - name: Test existing Prediction Desk gates
         run: node scripts/test_prediction_desk_gates.mjs
       - name: Test upcoming-only SportyBet proxy mode
