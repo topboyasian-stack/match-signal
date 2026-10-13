@@ -100,6 +100,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "scripts/test_deploy_freshness_order.py",
             "scripts/test_prediction_desk_gates.mjs",
             "scripts/qualified_best_monitor.mjs",
+            "scripts/qualified_best_monitor_lib.mjs",
             "scripts/test_qualified_best_monitor.mjs",
             ".github/workflows/qualified-best-live-monitor.yml",
         ):
