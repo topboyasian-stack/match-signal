@@ -1,0 +1,244 @@
+/* Match Signal — Premium Analytics Terminal
+   Independent engine pages only; keep the engine-specific accent per sport. */
+body[data-page="independent-sport"] {
+  --sport-accent: #70d7cc;
+  --sport-accent-soft: rgba(112,215,204,.08);
+  --sport-accent-border: rgba(112,215,204,.28);
+  background:
+    radial-gradient(860px 340px at 50% -180px, rgba(82,171,178,.12), transparent 76%),
+    linear-gradient(180deg, #0b131c 0%, #0a1017 55%, #080e14 100%);
+  color: #edf3f8;
+  line-height: 1.55;
+}
+body[data-page="independent-sport"][data-sport="darts-x"] {
+  --sport-accent: #e8c17b;
+  --sport-accent-soft: rgba(232,193,123,.07);
+  --sport-accent-border: rgba(232,193,123,.25);
+}
+body[data-page="independent-sport"] .wrap {
+  width: min(100%, 1380px);
+  padding: 22px clamp(14px, 2.2vw, 30px) 64px;
+}
+body[data-page="independent-sport"] .back {
+  gap: 8px;
+  align-items: center;
+  min-height: 38px;
+  margin-bottom: 16px;
+  padding: 8px 12px;
+  border-color: #2a3b4b;
+  border-radius: 10px;
+  background: rgba(16,26,37,.9);
+  color: #aabac8;
+  font-size: 11px;
+  font-weight: 750;
+  transition: border-color .16s ease, color .16s ease, background .16s ease;
+}
+body[data-page="independent-sport"] .back:hover {
+  border-color: var(--sport-accent-border);
+  background: var(--sport-accent-soft);
+  color: #e9f3f6;
+}
+body[data-page="independent-sport"] .hero,
+body[data-page="independent-sport"] .panel,
+body[data-page="independent-sport"] .metrics > div {
+  border: 1px solid #293b4b;
+  border-radius: 16px;
+  background: linear-gradient(145deg, rgba(18,30,42,.98), rgba(11,19,28,.98));
+  box-shadow: 0 12px 30px rgba(0,0,0,.16);
+}
+body[data-page="independent-sport"] .hero {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(21px, 3vw, 32px);
+  border-color: #2c4654;
+  background: linear-gradient(110deg, rgba(18,34,46,.98), rgba(13,22,32,.98) 68%, rgba(17,24,37,.98));
+}
+body[data-page="independent-sport"] .eyebrow {
+  color: var(--sport-accent);
+  font-size: 10px;
+  letter-spacing: .13em;
+}
+body[data-page="independent-sport"] h1 {
+  margin: 10px 0 12px;
+  font-size: clamp(30px, 4.2vw, 48px);
+  line-height: 1.05;
+  letter-spacing: -.04em;
+  text-wrap: balance;
+}
+body[data-page="independent-sport"] p {
+  max-width: 850px;
+  color: #afbdca;
+  font-size: 12px;
+  line-height: 1.7;
+}
+body[data-page="independent-sport"] .badges {
+  gap: 7px;
+  margin-top: 17px;
+}
+body[data-page="independent-sport"] .badges span {
+  padding: 5px 8px;
+  border-color: var(--sport-accent-border);
+  border-radius: 999px;
+  background: var(--sport-accent-soft);
+  color: var(--sport-accent);
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: .055em;
+}
+body[data-page="independent-sport"] .grid.metrics {
+  gap: 11px;
+  margin: 15px 0;
+}
+body[data-page="independent-sport"] .metrics > div {
+  min-width: 0;
+  padding: 15px 16px;
+  box-shadow: none;
+}
+body[data-page="independent-sport"] .metrics small {
+  color: #97aaba;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .08em;
+}
+body[data-page="independent-sport"] .metrics strong {
+  margin-top: 7px;
+  color: #f0f5f8;
+  font-size: clamp(19px, 2.1vw, 25px);
+  line-height: 1.22;
+  letter-spacing: -.025em;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+body[data-page="independent-sport"] .panel {
+  margin-top: 14px;
+  padding: clamp(13px, 1.8vw, 20px);
+  box-shadow: 0 10px 24px rgba(0,0,0,.12);
+}
+body[data-page="independent-sport"] .panelHead {
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(154,171,186,.14);
+}
+body[data-page="independent-sport"] .panelHead h2 {
+  color: #d0dce5;
+  font-size: 11px;
+  letter-spacing: .09em;
+}
+body[data-page="independent-sport"] .btn {
+  min-height: 36px;
+  padding: 8px 11px;
+  border-color: #2b3d4e;
+  border-radius: 9px;
+  background: #121e2a;
+  color: #e8f1f6;
+  font-size: 11px;
+  transition: border-color .16s ease, background .16s ease;
+}
+body[data-page="independent-sport"] .btn:hover {
+  border-color: var(--sport-accent-border);
+  background: var(--sport-accent-soft);
+}
+body[data-page="independent-sport"] .meta {
+  color: #93a6b5;
+  font-size: 10px;
+  line-height: 1.6;
+}
+body[data-page="independent-sport"] .gate {
+  border-color: #2b3e4f;
+  border-radius: 11px;
+  background: rgba(7,15,23,.55);
+  color: #aab9c6;
+  font-size: 12px;
+  line-height: 1.65;
+}
+body[data-page="independent-sport"] .gate.good {
+  border-color: rgba(104,217,167,.3);
+  background: rgba(104,217,167,.055);
+  color: #bcebd4;
+}
+body[data-page="independent-sport"] .gate.warn {
+  border-color: rgba(240,200,117,.3);
+  background: rgba(240,200,117,.05);
+  color: #e7d19f;
+}
+body[data-page="independent-sport"] .gate.bad {
+  border-color: rgba(255,116,116,.3);
+  background: rgba(255,116,116,.05);
+  color: #ffc0c0;
+}
+body[data-page="independent-sport"] .cards {
+  gap: 11px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 310px), 1fr));
+}
+body[data-page="independent-sport"] .card {
+  min-width: 0;
+  padding: 14px;
+  border-color: #293c4c;
+  border-radius: 12px;
+  background: linear-gradient(145deg, rgba(18,30,42,.9), rgba(9,17,25,.97));
+}
+body[data-page="independent-sport"] .cardTop {
+  gap: 8px;
+  color: #93a6b5;
+  line-height: 1.5;
+}
+body[data-page="independent-sport"] .match {
+  color: #edf4f8;
+  font-size: 15px;
+  line-height: 1.35;
+  letter-spacing: -.015em;
+  overflow-wrap: anywhere;
+}
+body[data-page="independent-sport"] .pick {
+  border-color: var(--sport-accent-border);
+  border-radius: 10px;
+  background: var(--sport-accent-soft);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+body[data-page="independent-sport"] .pick b { color: #78d9ad; }
+body[data-page="independent-sport"] .stats { gap: 7px; }
+body[data-page="independent-sport"] .stat {
+  min-width: 0;
+  padding: 8px;
+  border-color: #293b4b;
+  border-radius: 8px;
+  background: rgba(5,12,19,.35);
+}
+body[data-page="independent-sport"] .stat small {
+  font-size: 8px;
+  line-height: 1.4;
+}
+body[data-page="independent-sport"] .stat b {
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+body[data-page="independent-sport"] .contract p {
+  font-size: 11px;
+}
+body[data-page="independent-sport"] a:focus-visible,
+body[data-page="independent-sport"] button:focus-visible {
+  outline: 2px solid var(--sport-accent);
+  outline-offset: 3px;
+}
+@media (max-width: 760px) {
+  body[data-page="independent-sport"] .grid.metrics { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  body[data-page="independent-sport"] .cards { grid-template-columns: 1fr; }
+  body[data-page="independent-sport"] .hero { padding: 20px 17px; }
+  body[data-page="independent-sport"] .panel { padding: 13px; }
+}
+@media (max-width: 420px) {
+  body[data-page="independent-sport"] .panelHead { align-items: flex-start; }
+  body[data-page="independent-sport"] .panelHead .btn { width: 100%; }
+  body[data-page="independent-sport"] .stats { grid-template-columns: repeat(2, minmax(0,1fr)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  body[data-page="independent-sport"] *,
+  body[data-page="independent-sport"] *::before,
+  body[data-page="independent-sport"] *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
