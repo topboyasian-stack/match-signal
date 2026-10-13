@@ -1,0 +1,80 @@
+import assert from "node:assert/strict";
+import { classifyQualifiedBestMonitor } from "./qualified_best_monitor_lib.mjs";
+
+const now = Date.parse("2026-10-13T12:00:00.000Z");
+const healthyZero = {
+  stage: "completed",
+  board_payload_loaded: true,
+  selection_candidates_loaded: true,
+  source_fresh: true,
+  source_fallback_used: false,
+  live_quote_refresh_state: "complete",
+  required_quote_rows: 0,
+  live_quote_last_verified_at: null,
+  current_qualified_count: 0,
+  schedule_gap_status: "ok",
+  schedule_gap_minutes: 20,
+  page_errors: []
+};
+const zeroResult = classifyQualifiedBestMonitor(healthyZero, { nowMs: now });
+assert.equal(zeroResult.status, "healthy");
+assert.equal(zeroResult.exit_code, 0, "zero qualified picks is not itself a monitor failure");
+assert.equal(zeroResult.classification, "valid_zero_qualified");
+
+const healthyPicks = classifyQualifiedBestMonitor({
+  ...healthyZero,
+  current_qualified_count: 3
+}, { nowMs: now });
+assert.equal(healthyPicks.status, "healthy");
+assert.equal(healthyPicks.classification, "qualified_fixtures_present");
+
+for (const [label, patch, reason] of [
+  ["renderer exception", { stage: "failed" }, "QUALIFICATION_RENDER_FAILED"],
+  ["check still pending", { stage: "checking" }, "QUALIFICATION_CHECK_INCOMPLETE"],
+  ["board source failure", { board_payload_loaded: false }, "CANONICAL_BOARD_FETCH_FAILED"],
+  ["candidate source failure", { selection_candidates_loaded: false }, "SELECTION_CANDIDATES_FETCH_FAILED"],
+  ["stale board timestamp", { source_fresh: false }, "SOURCE_DATA_STALE_OR_TIMESTAMP_INVALID"],
+  ["synthetic fallback timestamp", { source_fallback_used: true }, "CANONICAL_BOARD_EMPTY_OR_UNAVAILABLE_FALLBACK_USED"],
+  ["partial quote response", { live_quote_refresh_state: "partial" }, "LIVE_QUOTE_REFRESH_PARTIAL"],
+  ["unavailable quote response", { live_quote_refresh_state: "unavailable" }, "LIVE_QUOTE_REFRESH_UNAVAILABLE"],
+  ["cached rather than refreshed quote snapshot", { live_quote_refresh_state: "cached" }, "LIVE_QUOTE_REFRESH_CACHED"],
+  ["missing qualified count", { current_qualified_count: null }, "QUALIFIED_COUNT_MISSING_OR_INVALID"],
+  ["long monitoring gap", { schedule_gap_minutes: 40 }, "MONITOR_SCHEDULE_GAP_EXCEEDED"],
+  ["browser runtime exception", { page_errors: ["TypeError: test"] }, "BROWSER_RUNTIME_ERRORS"]
+]) {
+  const result = classifyQualifiedBestMonitor({ ...healthyZero, ...patch }, { nowMs: now });
+  assert.equal(result.status, "failed", label + " must not be reported as healthy");
+  assert.ok(result.reasons.includes(reason), label + " exposes an actionable reason");
+}
+
+const freshRequiredQuote = classifyQualifiedBestMonitor({
+  ...healthyZero,
+  required_quote_rows: 2,
+  live_quote_last_verified_at: new Date(now - 5 * 60 * 1000).toISOString(),
+  current_qualified_count: 0
+}, { nowMs: now });
+assert.equal(freshRequiredQuote.status, "healthy", "freshly verified exact quotes can validly produce zero qualified selections");
+
+const staleRequiredQuote = classifyQualifiedBestMonitor({
+  ...healthyZero,
+  required_quote_rows: 2,
+  live_quote_last_verified_at: new Date(now - 16 * 60 * 1000).toISOString()
+}, { nowMs: now });
+assert.ok(staleRequiredQuote.reasons.includes("LIVE_QUOTE_VERIFICATION_TIMESTAMP_STALE_OR_FUTURE"));
+
+const futureRequiredQuote = classifyQualifiedBestMonitor({
+  ...healthyZero,
+  required_quote_rows: 1,
+  live_quote_last_verified_at: new Date(now + 4 * 60 * 1000).toISOString()
+}, { nowMs: now });
+assert.ok(futureRequiredQuote.reasons.includes("LIVE_QUOTE_VERIFICATION_TIMESTAMP_STALE_OR_FUTURE"));
+
+const noScheduleApi = classifyQualifiedBestMonitor({
+  ...healthyZero,
+  schedule_gap_status: "unknown",
+  schedule_gap_minutes: null
+}, { nowMs: now });
+assert.equal(noScheduleApi.status, "healthy");
+assert.ok(noScheduleApi.warnings.includes("MONITOR_SCHEDULE_GAP_COULD_NOT_BE_VERIFIED"));
+
+console.log("Qualified Best monitor tests passed: valid zero vs failed check, source freshness, fallback detection, exact quote verification freshness, browser exceptions, and schedule-gap alerting.");
