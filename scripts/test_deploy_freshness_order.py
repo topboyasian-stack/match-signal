@@ -40,12 +40,12 @@ def workflow_schedule_crons(source: str) -> list[str]:
 class FreshnessDeployOrderingTests(unittest.TestCase):
     def test_board_schedule_is_offset_from_hour_boundary(self):
         crons = workflow_schedule_crons(BOARD_WORKFLOW)
-        self.assertIn("2-59/5 * * * *", crons)
+        self.assertIn("3-59/5 * * * *", crons)
         self.assertNotIn("*/5 * * * *", crons)
 
     def test_monitor_schedule_is_staggered_and_deployment_trigger_is_preserved(self):
         crons = workflow_schedule_crons(MONITOR_WORKFLOW)
-        self.assertIn("6-59/5 * * * *", crons)
+        self.assertIn("1-59/5 * * * *", crons)
         self.assertNotIn("*/5 * * * *", crons)
         events_end = MONITOR_WORKFLOW.find("\npermissions:")
         self.assertGreater(events_end, 0)
