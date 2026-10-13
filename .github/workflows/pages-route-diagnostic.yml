@@ -29,6 +29,14 @@ jobs:
       - name: Install browser monitor dependency
         run: npm install --no-save playwright
 
+      - name: Restore Chromium cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: qualified-best-chromium-${{ runner.os }}-v1
+          restore-keys: |
+            qualified-best-chromium-${{ runner.os }}-
+
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
@@ -46,6 +54,61 @@ jobs:
           path: qualified-best-monitor-result.json
           if-no-files-found: warn
           retention-days: 7
+
+      - name: Verify Football league images render in the production browser
+        run: |
+          node --input-type=module <<'NODE'
+          import { chromium } from 'playwright';
+          const browser = await chromium.launch({ headless: true });
+          const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+          const pageErrors = [];
+          page.on('pageerror', error => pageErrors.push(String(error.message || error)));
+          const response = await page.goto('https://match-signal.pages.dev/football.html?logoCheck=' + Date.now(), {
+            waitUntil: 'domcontentloaded',
+            timeout: 25000
+          });
+          if (!response || !response.ok()) throw new Error('Football page HTTP ' + (response?.status() ?? 'no response'));
+          await page.waitForSelector('#leagueGrid .ms-league', { timeout: 20000 });
+          await page.waitForFunction(() => {
+            const cards = [...document.querySelectorAll('#leagueGrid .ms-league')];
+            const names = cards.map(card => card.querySelector('h3')?.textContent.trim());
+            const needed = ['La Liga', 'Champions League'];
+            return needed.every(name => names.includes(name)) &&
+              cards.every(card => card.querySelector('.ms-competition-logo, .ms-competition-logo-fallback'));
+          }, { timeout: 20000 });
+          await page.evaluate(() => {
+            document.querySelectorAll('#leagueGrid .ms-competition-logo').forEach(img => { img.loading = 'eager'; });
+          });
+          await page.waitForFunction(() => {
+            return [...document.querySelectorAll('#leagueGrid .ms-competition-logo')].every(img => img.complete);
+          }, { timeout: 15000 }).catch(() => {});
+          const result = await page.evaluate(() => {
+            const cards = [...document.querySelectorAll('#leagueGrid .ms-league')];
+            return {
+              page_title: document.title,
+              card_count: cards.length,
+              cards: cards.map(card => {
+                const name = card.querySelector('h3')?.textContent.trim() || '';
+                const img = card.querySelector('.ms-competition-logo');
+                const fallback = card.querySelector('.ms-competition-logo-fallback');
+                return {
+                  league: name,
+                  logo_url: img?.getAttribute('src') || null,
+                  logo_loaded: Boolean(img && img.complete && img.naturalWidth > 0),
+                  fallback_label: fallback?.textContent || null
+                };
+              })
+            };
+          });
+          const required = ['La Liga', 'Champions League'];
+          const missing = required.filter(name => !result.cards.some(card => card.league === name && card.logo_loaded));
+          result.page_errors = pageErrors;
+          result.required_examples_loaded = missing.length === 0;
+          console.log('FOOTBALL_LOGO_BROWSER_RESULT ' + JSON.stringify(result));
+          await browser.close();
+          if (missing.length) throw new Error('Required competition logos did not load as images: ' + missing.join(', '));
+          if (pageErrors.length) throw new Error('Football page runtime errors: ' + pageErrors.join('; '));
+          NODE
 
       - name: Compare production alias, latest deployment URL, and last known successful deployment
         run: |
