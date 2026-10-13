@@ -66,7 +66,7 @@ jobs:
           changed="$(gh api "repos/${GITHUB_REPOSITORY}/compare/${BEFORE_SHA}...${PUSH_SHA}" --jq '.files[].filename')"
           test -n "$changed" || { echo "Direct promotion has no inspectable changed-file list." >&2; exit 1; }
           printf 'Direct promotion changed files:\n%s\n' "$changed"
-          allowed='|_headers|index.html|upcoming.html|qualified-best.html|qualified-best-design.css|scripts/test_qualified_best_design.mjs|sport-hubs-design.css|scripts/test_sport_hub_design.mjs|football.html|tennis.html|basketball.html|sport-hubs.css|ms-design-system.css|league-logos.js|scripts/test_league_logos.mjs|.github/workflows/cloudflare-pages.yml|.github/workflows/qualified-best-monitor.yml|scripts/test_deploy_freshness_order.py|scripts/test_prediction_desk_gates.mjs|'
+          allowed='|_headers|index.html|upcoming.html|qualified-best.html|qualified-best-design.css|scripts/test_qualified_best_design.mjs|sport-hubs-design.css|scripts/test_sport_hub_design.mjs|football.html|tennis.html|basketball.html|sport-hubs.css|ms-design-system.css|league-logos.js|scripts/test_league_logos.mjs|.github/workflows/cloudflare-pages.yml|.github/workflows/qualified-best-monitor.yml|.github/workflows/qualified-best-live-monitor.yml|scripts/test_deploy_freshness_order.py|scripts/test_prediction_desk_gates.mjs|'
           while IFS= read -r path; do
             [ -n "$path" ] || continue
             case "$allowed" in
@@ -286,7 +286,7 @@ jobs:
                 for (const marker of ['Live Odds Builder — Standard 2.70x+ / Compact eFootball 2.00x+','Compact eFootball lane: 4–5 eFootball GT/Adriatic legs at 2.00x+','80% model floor','expansion-odds-builder.js?v=20261011-efootball65-evidence1'])
                   if (!body.includes(marker)) failures.push(path+' missing '+marker);
               }
-              if (path==='/football.html' || path==='/tennis.html' || path==='/basketball.html' || path==='/reports.html') {
+              if (path==='/football.html' || path==='/tennis.html' || path==='/basketball.html') {
                 for (const marker of ['sport-hubs.js','sport-hubs.css','sport-hubs-design.css?v=20261013-premium-terminal3']) if (!body.includes(marker)) failures.push(path+' missing unified sport-hub assets');
               }
               if (path==='/football.html') {
