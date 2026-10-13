@@ -48,7 +48,7 @@ assert.ok(logos.fallbackLabel("Unknown Cup"), "unknown competitions must still r
 assert.equal(logos.logoUrlForCompetition("Unknown Cup"), null, "unknown competitions must not request the wrong logo");
 assert.equal(logos.logoIdForCompetition("UEFA Europa League"), 3, "Europa League remains separate from Champions League");
 assert.equal(logos.logoIdForCompetition("UEFA Conference League"), 848, "Conference League must have its own logo");
-assert.equal(logos.logoIdForCompetition("England Amateur - U21 Professional Development League"), 614, "the specific PDL card resolves to API-Football v3 league 703");
+assert.equal(logos.logoIdForCompetition("England Amateur - U21 Professional Development League"), 703, "the specific PDL card resolves to API-Football v3 league 703");
 
 const page = readFileSync("football.html", "utf8");
 assert.match(page, /sport-hubs\.css\?v=20261013-competition-logos1/, "the Football page must bust the logo styling cache");
