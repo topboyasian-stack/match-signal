@@ -678,6 +678,8 @@ async function renderUnifiedBoard(){
   try{
     let payload={events:[],generated_at:null};
     let selectedRows=[];
+    let selectionCandidatesLoaded=false;
+    let selectionCandidatesError=null;
     let riskGate=null;
     try{
       const [sel,rg]=await Promise.all([
@@ -685,15 +687,25 @@ async function renderUnifiedBoard(){
         get('./data/risk_gate.json')
       ]);
       selectedRows=Array.isArray(sel)?sel:[];
+      selectionCandidatesLoaded=Array.isArray(sel);
       riskGate=rg;
-    }catch(_){}
+    }catch(error){
+      selectionCandidatesError=String(error?.message||error||"candidate source unavailable");
+    }
+    let boardPayloadLoaded=false;
+    let boardPayloadError=null;
+    let sourceFallbackUsed=false;
+    let fallbackRowsLoaded=0;
     try{
       payload=await get('./data/unified_upcoming.json');
-    }catch(_){
+      boardPayloadLoaded=true;
+    }catch(error){
+      boardPayloadError=String(error?.message||error||"board source unavailable");
       payload={events:[],generated_at:null};
     }
     let all=Array.isArray(payload?.events)?payload.events:[];
     if(!all.length){
+      sourceFallbackUsed=true;
       const sources=[
         './data/predictions.json',
         './data/pdl_predictions.json',
@@ -733,6 +745,9 @@ async function renderUnifiedBoard(){
       };
       const labels=['football_tennis','football','football'];
       all=chunks.flatMap((rows,i)=>rows.map(r=>normalize(r,labels[i]))).filter(x=>x.start_time);
+      fallbackRowsLoaded=all.length;
+      // The fallback keeps the UI usable, but its synthetic timestamp must not
+      // be mistaken for proof that the canonical board was freshly published.
       payload.generated_at=new Date().toISOString();
     }
     const generatedAt=Date.parse(String(payload?.generated_at||""));
@@ -774,6 +789,7 @@ async function renderUnifiedBoard(){
     const virtualSnapshotQualifiedFixtureCount=qualifiedBestSelections(virtualCandidates,Date.now()).rows.length;
     let virtualQuoteRefreshState="pending";
     let virtualQuoteLastVerifiedAt=null;
+    let virtualRequiredQuoteCount=0;
 
     async function freshVirtualQuoteMap(requiredRows=[]){
       const byEvent={};
@@ -990,6 +1006,7 @@ async function renderUnifiedBoard(){
       // Only model-qualified, in-window rows from the actual candidate pool are required.
       const requiredQuoteRows=virtualCandidates.filter(row=>isRequiredVirtualQuoteRow(row,Date.now()));
       requiredCount=requiredQuoteRows.length;
+      virtualRequiredQuoteCount=requiredCount;
       const fetchedSnapshot=await freshVirtualQuoteMap(requiredQuoteRows);
       quoteSnapshot=fetchedSnapshot;
       const fetchedEvents=Object.keys(fetchedSnapshot?.byEvent||{}).length>0;
@@ -1159,6 +1176,36 @@ async function renderUnifiedBoard(){
       const feedAgeMs=Number.isFinite(generatedAt)?Date.now()-generatedAt:NaN;
       const feedAgeMinutes=Number.isFinite(feedAgeMs)?Math.floor(feedAgeMs/60000):null;
       const sourceStale=!qualifiedBestSourceIsFresh(generatedAt,Date.now());
+      // Structured production diagnostics are emitted by the same computation
+      // that drives the visible shortlist. Monitoring therefore cannot drift
+      // into a second, independently implemented qualification rule.
+      window.__MATCH_SIGNAL_QUALIFIED_BEST_MONITOR__={
+        schema_version:1,
+        stage:virtualQuoteRefreshState==="pending"?"checking":"completed",
+        emitted_at:new Date().toISOString(),
+        page_mode:document.body.dataset.page||"unknown",
+        board_generated_at:payload?.generated_at||null,
+        board_age_seconds:Number.isFinite(feedAgeMs)?Math.floor(feedAgeMs/1000):null,
+        source_fresh:!sourceStale,
+        board_payload_loaded:boardPayloadLoaded,
+        board_payload_error:boardPayloadError,
+        selection_candidates_loaded:selectionCandidatesLoaded,
+        selection_candidates_error:selectionCandidatesError,
+        source_fallback_used:sourceFallbackUsed,
+        fallback_rows_loaded:fallbackRowsLoaded,
+        rows_loaded:all.length,
+        rows_in_filtered_view:filteredRows.length,
+        active_virtual_candidate_count:virtualCandidates.length,
+        required_quote_rows:virtualRequiredQuoteCount,
+        virtual_snapshot_qualified_fixture_count:virtualSnapshotQualifiedFixtureCount,
+        live_quote_refresh_state:virtualQuoteRefreshState,
+        live_quote_last_verified_at:virtualQuoteLastVerifiedAt==null?null:new Date(virtualQuoteLastVerifiedAt).toISOString(),
+        live_quote_last_verified_age_seconds:virtualQuoteLastVerifiedAt==null?null:Math.floor((Date.now()-virtualQuoteLastVerifiedAt)/1000),
+        qualification_rows_count:qualificationRows.length,
+        future_candidate_markets:best.diagnostics.futureCandidateMarkets,
+        current_qualified_count:best.rows.length,
+        blocker_counts:{...best.diagnostics.blockerCounts}
+      };
       const noQualifiedMessage=sourceStale
         ?"Published source data is stale ("+(feedAgeMinutes==null?"unknown age":feedAgeMinutes<60?feedAgeMinutes+" minutes":Math.floor(feedAgeMinutes/60)+"h "+(feedAgeMinutes%60)+"m")+"). The collector must refresh before new picks can be certified. Recent last-seen records are separate and NOT current."
         :virtualQuotePending
@@ -1231,6 +1278,13 @@ async function renderUnifiedBoard(){
       draw();
     });
   }catch(e){
+    window.__MATCH_SIGNAL_QUALIFIED_BEST_MONITOR__={
+      schema_version:1,
+      stage:"failed",
+      emitted_at:new Date().toISOString(),
+      page_mode:document.body.dataset.page||"unknown",
+      error:String(e?.message||e||"unknown renderer failure")
+    };
     if(root)root.innerHTML='<div class="ms-empty">Unified upcoming feed unavailable: '+E(e.message)+'</div>';
     const summary=Q('#qualifiedBestSummary');if(summary)summary.innerHTML='<span>Qualified Best could not load current source data: '+E(e.message)+'. Any last-seen records remain labelled as not current.</span>';
     const status=Q('#qualifiedBestDataStatus');if(status){status.className='ms-qualified-data-status ms-qualified-data-status-stale';status.textContent='SOURCE CHECK FAILED · '+String(e.message||e);}
