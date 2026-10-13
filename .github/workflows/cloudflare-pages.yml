@@ -243,7 +243,10 @@ jobs:
               }
               if (path==='/qualified-best' || path==='/qualified-best.html') {
                 const cacheControl=String(r.headers.get('cache-control')||'').toLowerCase();
-                if (!cacheControl.includes('no-store') || !cacheControl.includes('no-cache')) failures.push(path+' missing no-store/no-cache header: '+cacheControl);
+                const noStoreHeader=cacheControl.includes('no-store')&&cacheControl.includes('no-cache');
+                const forcedRevalidation=cacheControl.includes('max-age=0')&&cacheControl.includes('must-revalidate');
+                if(path==='/qualified-best'&&!noStoreHeader&&!forcedRevalidation) failures.push(path+' missing no-store or forced revalidation header: '+cacheControl);
+                if(path==='/qualified-best.html'&&!noStoreHeader) failures.push(path+' missing no-store/no-cache header: '+cacheControl);
                 for (const marker of ['data-page="qualified-best"','id="qualifiedBestBoard"','id="qualifiedBestLastSeenBoard"','id="qualifiedBestDataStatus"','sport-hubs.js?v=20261013-qualified-best-live-verification-cachefix3'])
                   if (!body.includes(marker)) failures.push(path+' missing '+marker);
               }

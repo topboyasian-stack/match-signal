@@ -68,6 +68,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn("name: Guard cache-only direct promotion", PAGES_WORKFLOW)
         self.assertIn("if: github.event_name == 'push'", PAGES_WORKFLOW)
         self.assertIn("compare/${BEFORE_SHA}...${PUSH_SHA}", PAGES_WORKFLOW)
+        self.assertIn("const forcedRevalidation=cacheControl.includes('max-age=0')&&cacheControl.includes('must-revalidate')", PAGES_WORKFLOW)
         for allowed_path in (
             "_headers", "index.html", "upcoming.html", "qualified-best.html",
             ".github/workflows/cloudflare-pages.yml",
