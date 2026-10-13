@@ -19,6 +19,8 @@ TRACKER=DATA/"odds_ticket_tracker.json"
 OUTPUT=DATA/"ticket_calibration_experiment.json"
 
 GRID=[i/20 for i in range(21)]
+GAMMA_GRID=[0.5+i*0.1 for i in range(46)]
+SHRINK_GRID=[i/20 for i in range(21)]
 WARMUP=8
 
 def load(p, default):
@@ -71,7 +73,7 @@ def logit(p): return math.log(p/(1-p))
 def invlogit(z): return 1/(1+math.exp(-max(-30,min(30,z))))
 
 def calibrate(rows, model_key="combined_model_probability"):
-    rows=sorted(rows,key=lambda t:str(t.get("settled_at") or ""))
+    rows=sorted(rows,key=lambda t:str(t.get("last_settled_at") or t.get("settled_at") or t.get("updated_at") or ""))
     usable=[t for t in rows if prob(t,model_key) is not None and market(t) is not None]
     predictions=[]
     for i,t in enumerate(usable):
@@ -81,8 +83,14 @@ def calibrate(rows, model_key="combined_model_probability"):
             return brier(prior,lambda x:blend(prob(x,model_key),market(x),a))
         def score_logit(a):
             return brier(prior,lambda x:invlogit(a*logit(prob(x,model_key))+(1-a)*logit(market(x))))
+        def score_power(g):
+            return brier(prior,lambda x:max(.0005,min(.9995,prob(x,model_key)**g)))
+        def score_shrink(a):
+            return brier(prior,lambda x:.5+a*(prob(x,model_key)-.5))
         best_a=min(GRID,key=score_linear)
         best_l=min(GRID,key=score_logit)
+        best_g=min(GAMMA_GRID,key=score_power)
+        best_s=min(SHRINK_GRID,key=score_shrink)
         m=prob(t,model_key); q=market(t)
         predictions.append({
             "ticket_id":t.get("ticket_id"),
@@ -95,6 +103,10 @@ def calibrate(rows, model_key="combined_model_probability"):
             "linear_probability":blend(m,q,best_a),
             "logit_alpha":best_l,
             "logit_probability":invlogit(best_l*logit(m)+(1-best_l)*logit(q)),
+            "power_gamma":best_g,
+            "power_probability":max(.0005,min(.9995,m**best_g)),
+            "shrink_alpha":best_s,
+            "shrink_probability":max(.0005,min(.9995,.5+best_s*(m-.5))),
         })
     def pred(fn): return metrics(predictions,fn)
     return predictions,{
@@ -103,8 +115,12 @@ def calibrate(rows, model_key="combined_model_probability"):
         "market":pred(lambda x:x["market_probability"]),
         "linear_blend":pred(lambda x:x["linear_probability"]),
         "logit_blend":pred(lambda x:x["logit_probability"]),
+        "power_calibration":pred(lambda x:x["power_probability"]),
+        "shrink_to_half":pred(lambda x:x["shrink_probability"]),
         "mean_linear_alpha":sum(x["linear_alpha"] for x in predictions)/len(predictions) if predictions else None,
         "mean_logit_alpha":sum(x["logit_alpha"] for x in predictions)/len(predictions) if predictions else None,
+        "mean_power_gamma":sum(x["power_gamma"] for x in predictions)/len(predictions) if predictions else None,
+        "mean_shrink_alpha":sum(x["shrink_alpha"] for x in predictions)/len(predictions) if predictions else None,
     }
 
 def main():
@@ -121,6 +137,8 @@ def main():
         "method":"strict chronological ticket-level walk-forward; each calibration weight uses only earlier settled tickets",
         "warmup_tickets":WARMUP,
         "grid":GRID,
+        "gamma_grid":GAMMA_GRID,
+        "shrink_grid":SHRINK_GRID,
         "samples":{"all_settled":len(settled),"modern_2_to_4":len(modern)},
         "all_settled":all_metrics,
         "modern_2_to_4":modern_metrics,
