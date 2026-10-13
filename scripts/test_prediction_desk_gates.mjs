@@ -19,6 +19,12 @@ assert.match(entryPages[2],/data-page="qualified-best"/,"Qualified Best has a de
 assert.match(entryPages[2],/id="qualifiedBestLastSeenBoard"/,"the dedicated page exposes its last-seen, not-current section");
 assert.notEqual(rendererVersions[0], "20261013-qualified-best-standalone-lastseen2-full-list", "the script cache key must change when the renderer fix changes");
 assert.notEqual(rendererVersions[0], "20261012-qualified-best-snapshot-scope2", "the script cache key must change when last-good snapshot behavior changes");
+assert.notEqual(rendererVersions[0], "20261013-qualified-best-kickoff-sort1", "the script cache key must change when live qualification diagnostics are added");
+assert.match(source,/window\\.__MATCH_SIGNAL_QUALIFIED_BEST_MONITOR__=\\{/, "the real desk gate must emit structured monitor diagnostics");
+assert.match(source,/stage:virtualQuoteRefreshState===\\"pending\\"\?\\"checking\\":\\"completed\\"/, "the monitor must distinguish a still-running quote check from a completed check");
+assert.match(source,/source_fallback_used:sourceFallbackUsed/, "synthetic source-fallback timestamps cannot certify production health");
+assert.match(source,/current_qualified_count:best\\.rows\\.length/, "monitor counts must come from the actual Qualified Best output");
+assert.match(source,/stage:\\"failed\\"/, "renderer exceptions must be reported as monitor failures");
 assert.match(source,/let virtualQuoteRefreshState="pending"/,"Virtual/eFootball starts in an explicit verification state");
 assert.match(source,/virtualQuoteRefreshState==="complete"\)return true/,"only a complete snapshot can admit all Virtual/eFootball rows");
 assert.match(source,/\(virtualQuoteRefreshState==="partial"\|\|virtualQuoteRefreshState==="cached"\)&&\s*x\.desk_quote_refresh==="fresh_exact_event_line_side"/,"partial or reused snapshots only admit rows with exact verified event/line/side quotes");
