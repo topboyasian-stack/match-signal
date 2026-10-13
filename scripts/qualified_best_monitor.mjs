@@ -29,21 +29,35 @@ async function fetchScheduleGap() {
     const payload = await response.json();
     const runs = Array.isArray(payload?.workflow_runs) ? payload.workflow_runs : [];
     const current = runs.find(run => String(run.id) === String(runId));
-    const currentStart = Date.parse(String(current?.created_at || current?.run_started_at || ""));
-    const referenceTime = Number.isFinite(currentStart) ? currentStart : Date.now();
-    const previous = runs
-      .filter(run => String(run.id) !== String(runId))
-      .map(run => ({ run, stamp: Date.parse(String(run.created_at || run.run_started_at || "")) }))
-      .filter(item => Number.isFinite(item.stamp) && item.stamp < referenceTime)
-      .sort((a, b) => b.stamp - a.stamp)[0];
+    const eventName = String(process.env.GITHUB_EVENT_NAME || current?.event || "unknown");
+    const currentStart = Date.parse(String(current?.run_started_at || current?.created_at || ""));
+    const scheduled = runs
+      .filter(run => run.event === "schedule" && String(run.id) !== String(runId))
+      .map(run => ({ run, stamp: Date.parse(String(run.run_started_at || run.created_at || "")) }))
+      .filter(item => Number.isFinite(item.stamp))
+      .sort((a, b) => b.stamp - a.stamp);
+    const previous = scheduled.find(item => !Number.isFinite(currentStart) || item.stamp < currentStart);
+
     if (!previous) {
-      return { schedule_gap_status: "ok", schedule_gap_minutes: null, schedule_gap_note: "No earlier monitor run is available yet; a baseline is being established." };
+      return {
+        schedule_gap_status: "unknown",
+        schedule_gap_minutes: null,
+        schedule_gap_note: "No earlier cron-triggered monitor run is available yet; the baseline will be established by the first scheduled run."
+      };
     }
+
+    // Scheduled invocations compare cron-to-cron. Deploy-triggered and manual
+    // invocations report the age of the last scheduled check, so frequent
+    // deployments cannot mask a stalled 20-minute schedule.
+    const referenceTime = eventName === "schedule" && Number.isFinite(currentStart)
+      ? currentStart : Date.now();
     const gapMinutes = Math.round((referenceTime - previous.stamp) / 6000) / 10;
     return {
       schedule_gap_status: "ok",
       schedule_gap_minutes: gapMinutes,
-      schedule_gap_note: `Previous run ${previous.run.run_number ?? previous.run.id} started ${gapMinutes} minute(s) before this run.`,
+      schedule_gap_note: eventName === "schedule"
+        ? `Previous scheduled run ${previous.run.run_number ?? previous.run.id} started ${gapMinutes} minute(s) before this scheduled run.`
+        : `The last scheduled run (${previous.run.run_number ?? previous.run.id}) was ${gapMinutes} minute(s) ago.`,
       previous_run_id: previous.run.id,
       previous_run_created_at: previous.run.created_at || null
     };
@@ -51,7 +65,6 @@ async function fetchScheduleGap() {
     return { schedule_gap_status: "unavailable", schedule_gap_minutes: null, schedule_gap_note: String(error?.message || error || "Schedule-gap API check failed.") };
   }
 }
-
 function diagnosticFromPage(pageErrors, snapshot) {
   const dom = snapshot && typeof snapshot === "object" ? snapshot : {};
   return {
@@ -162,6 +175,11 @@ async function run() {
   Object.assign(finalSnapshot, schedule);
   finalSnapshot.page_errors = Array.isArray(finalSnapshot.page_errors) ? finalSnapshot.page_errors : [];
   const result = classifyQualifiedBestMonitor(finalSnapshot, { nowMs: Date.now() });
+  const recoveredAfterRetry = result.status === "healthy" &&
+    attempts.length > 1 && attempts.slice(0, -1).some(attempt => attempt.status === "failed");
+  if (recoveredAfterRetry && !result.warnings.includes("PRODUCTION_CHECK_RECOVERED_AFTER_RETRY")) {
+    result.warnings.push("PRODUCTION_CHECK_RECOVERED_AFTER_RETRY");
+  }
   const output = {
     monitor: "Match Signal Qualified Best production monitor",
     version: 1,
@@ -205,6 +223,9 @@ async function run() {
       "",
       "### Warnings",
       warnings,
+      "",
+      "### Attempt history",
+      attempts.length ? attempts.map(attempt => `- Attempt ${attempt.attempt}: ${attempt.status} (${attempt.classification}); ${(attempt.reasons || []).join("; ") || "no errors"}`).join("\\n") : "- No attempts recorded.",
       "",
       "### Candidate rejection reasons",
       "```json",
