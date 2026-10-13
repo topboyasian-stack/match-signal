@@ -398,7 +398,7 @@ function qualifiedBestLastSeenRows(snapshot,now=Date.now(),currentRows=[]){
     if(!Number.isFinite(kickoff)||kickoff<=now||kickoff>horizon)return false;
     if(!Number.isFinite(seenAt)||seenAt>now+2*60*1000||now-seenAt>QUALIFIED_BEST_LAST_SEEN_MAX_AGE_MS)return false;
     return !current.has(qualifiedBestSnapshotRowKey(row));
-  }).sort((a,b)=>Date.parse(String(b?.last_seen_at||0))-Date.parse(String(a?.last_seen_at||0))).slice(0,40);
+  }).sort((a,b)=>Date.parse(String(a?.start_time||""))-Date.parse(String(b?.start_time||""))).slice(0,40);
 }
 function qualifiedBestLastSeenRow(x){
   const kickoff=Date.parse(String(x?.start_time||""));
@@ -574,15 +574,18 @@ function qualifiedBestSelections(rows,now=Date.now()){
       if(a[0]>b[0]||(a[0]===b[0]&&(a[1]>b[1]||(a[1]===b[1]&&(a[2]>b[2]||(a[2]===b[2]&&a[3]>b[3]))))))bestByFixture.set(fixture,row);
     }
   }
+  // Show qualified picks in actual kickoff order. Qualification and best-per-fixture
+  // selection above still use the exact same market, price and evidence gates.
   const selected=[...bestByFixture.values()].sort((a,b)=>{
+    const kickoffA=Date.parse(String(a?.start_time||""));
+    const kickoffB=Date.parse(String(b?.start_time||""));
+    if(kickoffA!==kickoffB)return kickoffA-kickoffB;
     const ga=qualificationState(a),gb=qualificationState(b);
     const eva=Number.isFinite(ga.expectedReturn)?ga.expectedReturn:-999,evb=Number.isFinite(gb.expectedReturn)?gb.expectedReturn:-999;
     if(eva!==evb)return evb-eva;
     const ea=Number.isFinite(ga.edge)?ga.edge:-999,eb=Number.isFinite(gb.edge)?gb.edge:-999;
     if(ea!==eb)return eb-ea;
-    const pa=Number(probabilityValue(a)||0),pb=Number(probabilityValue(b)||0);
-    if(pa!==pb)return pb-pa;
-    return Date.parse(String(a.start_time||""))-Date.parse(String(b.start_time||""));
+    return String(a?.event_id||"").localeCompare(String(b?.event_id||""));
   });
   return {rows:selected,diagnostics:{
     futureCandidateMarkets:exactMarkets.size,
