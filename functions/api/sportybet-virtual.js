@@ -134,6 +134,9 @@ export async function onRequestGet(context){
   const pageSize=Math.min(Math.max(Number(u.searchParams.get('pageSize')||100),1),100);
   const pageNum=Math.max(Number(u.searchParams.get('pageNum')||1),1);
   const timeline=Math.min(Math.max(Number(u.searchParams.get('timeline')||168),12),720);
+  // Upcoming qualification checks can opt out of the separate live-event source;
+  // its transient errors must not make an otherwise usable upcoming snapshot incomplete.
+  const includeLive=u.searchParams.get('includeLive')!=='false';
   const requested=new Set((u.searchParams.get('sources')||'efootball,vfootball').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean));
   const out=[];
   const errors=[];
@@ -165,7 +168,7 @@ export async function onRequestGet(context){
   }
 
   async function collectLive(label,sportId,path,extra={}){
-    if(!requested.has(label)) return;
+    if(!requested.has(label)||!includeLive) return;
     const t0=Date.now();
     try{
       let data=await upstream(path,{sportId,pageSize,pageNum,todayGames:'false',timeline,_t:Date.now(),...extra});
