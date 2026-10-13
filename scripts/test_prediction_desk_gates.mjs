@@ -17,7 +17,7 @@ assert.equal(rendererVersions[0], rendererVersions[1], "root and /upcoming.html 
 assert.ok(rendererVersions.every(version=>version===rendererVersions[0]), "the dedicated Qualified Best page must use the shared renderer cache key");
 assert.match(entryPages[2],/data-page="qualified-best"/,"Qualified Best has a dedicated rendering mode");
 assert.match(entryPages[2],/id="qualifiedBestLastSeenBoard"/,"the dedicated page exposes its last-seen, not-current section");
-assert.notEqual(rendererVersions[0], "20261013-qualified-best-kickoff-sort1", "the script cache key must change when the renderer fix changes");
+assert.notEqual(rendererVersions[0], "20261013-qualified-best-standalone-lastseen2-full-list", "the script cache key must change when the renderer fix changes");
 assert.notEqual(rendererVersions[0], "20261012-qualified-best-snapshot-scope2", "the script cache key must change when last-good snapshot behavior changes");
 assert.match(source,/let virtualQuoteRefreshState="pending"/,"Virtual/eFootball starts in an explicit verification state");
 assert.match(source,/virtualQuoteRefreshState==="complete"\)return true/,"only a complete snapshot can admit all Virtual/eFootball rows");
