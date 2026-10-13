@@ -1,0 +1,393 @@
+/* Match Signal — Premium Analytics Terminal
+   Stage 2: Qualified Best page only. Keep every selector scoped to its page. */
+
+body[data-page="qualified-best"] {
+  --ms-bg: #0a1017;
+  --ms-panel: #101a25;
+  --ms-panel2: #142130;
+  --ms-border: #2a3a4b;
+  --ms-text: #edf3f8;
+  --ms-muted: #9aabba;
+  --ms-cyan: #70d7cc;
+  --ms-green: #68d9a7;
+  --ms-violet: #a19af6;
+  --ms-amber: #f0c875;
+  --ms-red: #f17d8b;
+  background:
+    radial-gradient(820px 360px at 50% -160px, rgba(79,169,174,.11), transparent 75%),
+    linear-gradient(180deg, #0c131c 0%, #0a1017 48%, #090f15 100%);
+  color: var(--ms-text);
+  line-height: 1.55;
+}
+body[data-page="qualified-best"] .ms-wrap {
+  width: min(100%, 1440px);
+  padding: 22px clamp(14px, 2.2vw, 30px) 64px;
+}
+body[data-page="qualified-best"] .ms-wrap:before { display: none; }
+
+/* Shared navigation and quiet, consistent page header. */
+body[data-page="qualified-best"] .ms-nav {
+  position: sticky;
+  top: 8px;
+  z-index: 40;
+  gap: 14px;
+  padding: 10px 12px;
+  margin: 0 0 22px;
+  border: 1px solid #2b3d4e;
+  border-radius: 15px;
+  background: rgba(11,18,27,.94);
+  box-shadow: 0 10px 28px rgba(0,0,0,.22);
+  backdrop-filter: blur(14px);
+}
+body[data-page="qualified-best"] .ms-mark {
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  border-color: rgba(112,215,204,.38);
+  background: #13242b;
+  box-shadow: none;
+}
+body[data-page="qualified-best"] .ms-mark:after { display: none; }
+body[data-page="qualified-best"] .ms-brand { filter: none; }
+body[data-page="qualified-best"] .ms-brand h1 { font-size: 18px; letter-spacing: -.025em; }
+body[data-page="qualified-best"] .ms-brand p { margin-top: 1px; font-size: 10px; }
+body[data-page="qualified-best"] .ms-tabs { gap: 5px; }
+body[data-page="qualified-best"] .ms-btn {
+  min-height: 36px;
+  padding: 8px 11px;
+  border: 1px solid #2a3b4b;
+  border-radius: 9px;
+  background: #111b26;
+  font-size: 11px;
+  box-shadow: none;
+  transition: background .16s ease, border-color .16s ease, color .16s ease;
+}
+body[data-page="qualified-best"] .ms-btn:hover,
+body[data-page="qualified-best"] .ms-btn.active {
+  transform: none;
+  border-color: rgba(112,215,204,.6);
+  background: rgba(112,215,204,.09);
+  box-shadow: none;
+}
+
+/* Hero and metrics establish a clear scan order. */
+body[data-page="qualified-best"] .ms-hero {
+  margin-bottom: 16px;
+  padding: clamp(22px, 3vw, 34px);
+  border: 1px solid #2c4654;
+  border-radius: 18px;
+  background: linear-gradient(110deg, rgba(18,34,46,.98), rgba(13,22,32,.98) 65%, rgba(17,24,37,.98));
+  box-shadow: 0 14px 36px rgba(0,0,0,.20);
+}
+body[data-page="qualified-best"] .ms-hero:after { display: none; }
+body[data-page="qualified-best"] .ms-eyebrow {
+  color: var(--ms-cyan);
+  font-size: 10px;
+  letter-spacing: .13em;
+}
+body[data-page="qualified-best"] .ms-hero h2 {
+  max-width: 880px;
+  margin: 10px 0 11px;
+  font-size: clamp(28px, 3.7vw, 44px);
+  line-height: 1.08;
+  letter-spacing: -.04em;
+  text-wrap: balance;
+}
+body[data-page="qualified-best"] .ms-hero p {
+  max-width: 800px;
+  color: #afbdca;
+  font-size: 13px;
+  line-height: 1.65;
+}
+body[data-page="qualified-best"] .ms-metrics {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 11px;
+  margin-bottom: 16px;
+}
+body[data-page="qualified-best"] .ms-metric {
+  min-width: 0;
+  padding: 15px 16px;
+  border: 1px solid var(--ms-border);
+  border-radius: 14px;
+  background: linear-gradient(145deg, #121e2a, #0e1721);
+  box-shadow: none;
+}
+body[data-page="qualified-best"] .ms-metric:after { display: none; }
+body[data-page="qualified-best"] .ms-metric small {
+  display: block;
+  color: var(--ms-muted);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .075em;
+  line-height: 1.4;
+}
+body[data-page="qualified-best"] .ms-metric strong {
+  margin-top: 7px;
+  font-size: clamp(20px, 2vw, 26px);
+  line-height: 1.2;
+  letter-spacing: -.025em;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+/* The current shortlist is the main task surface. */
+body[data-page="qualified-best"] .ms-panel {
+  padding: clamp(14px, 1.8vw, 22px);
+  margin-bottom: 16px;
+  border: 1px solid var(--ms-border);
+  border-radius: 18px;
+  background: rgba(14,22,32,.96);
+  box-shadow: 0 12px 32px rgba(0,0,0,.17);
+}
+body[data-page="qualified-best"] .ms-panel-head {
+  align-items: center;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(154,171,186,.13);
+}
+body[data-page="qualified-best"] .ms-panel-head h2 {
+  color: #d7e3ed;
+  font-size: 12px;
+  letter-spacing: .09em;
+}
+body[data-page="qualified-best"] .ms-status {
+  padding: 5px 8px;
+  border: 1px solid rgba(104,217,167,.20);
+  border-radius: 999px;
+  background: rgba(104,217,167,.05);
+  color: #b3c4ce;
+  font-size: 10px;
+}
+body[data-page="qualified-best"] .ms-dot {
+  width: 7px;
+  height: 7px;
+  background: var(--ms-green);
+  box-shadow: none;
+}
+body[data-page="qualified-best"] .ms-note {
+  max-width: 1000px;
+  margin: 12px 0;
+  color: var(--ms-muted);
+  font-size: 11px;
+  line-height: 1.65;
+}
+body[data-page="qualified-best"] .ms-qualified-data-status {
+  margin: 12px 0;
+  padding: 11px 13px;
+  border: 1px solid rgba(112,215,204,.20);
+  border-radius: 10px;
+  background: rgba(112,215,204,.045);
+  color: #c6d5de;
+  font-size: 11px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+body[data-page="qualified-best"] .ms-qualified-data-status-stale {
+  border-color: rgba(240,200,117,.35);
+  background: rgba(240,200,117,.055);
+  color: #f0d8a0;
+}
+
+/* A qualified row shows event context first, then the market/value evidence. */
+body[data-page="qualified-best"] .ms-qualified-best-summary {
+  gap: 8px;
+  margin: 12px 0;
+  color: var(--ms-muted);
+  font-size: 11px;
+}
+body[data-page="qualified-best"] .ms-qualified-best-summary b { color: var(--ms-text); }
+body[data-page="qualified-best"] .ms-qualified-best-board {
+  display: grid;
+  gap: 10px;
+}
+body[data-page="qualified-best"] .ms-qualified-best-row {
+  grid-template-columns: 112px minmax(0,1fr) 144px;
+  gap: 14px;
+  align-items: start;
+  padding: 15px;
+  border: 1px solid rgba(104,217,167,.24);
+  border-radius: 14px;
+  background: linear-gradient(110deg, rgba(104,217,167,.045), rgba(16,26,37,.94) 45%);
+  box-shadow: none;
+}
+body[data-page="qualified-best"] .ms-up-time {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  color: #d7e3ed;
+  font-size: 11px;
+}
+body[data-page="qualified-best"] .ms-up-time b {
+  font-size: 12px;
+  font-weight: 850;
+  font-variant-numeric: tabular-nums;
+}
+body[data-page="qualified-best"] .ms-up-time span {
+  color: var(--ms-muted);
+  font-size: 10px;
+}
+body[data-page="qualified-best"] .ms-up-event { min-width: 0; }
+body[data-page="qualified-best"] .ms-up-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 9px;
+  margin-bottom: 7px;
+  color: var(--ms-muted);
+  font-size: 10px;
+}
+body[data-page="qualified-best"] .ms-sport-pill {
+  padding: 3px 7px;
+  border: 1px solid rgba(112,215,204,.22);
+  border-radius: 999px;
+  background: rgba(112,215,204,.05);
+  color: #c0d4da;
+  font-weight: 750;
+}
+body[data-page="qualified-best"] .ms-up-match {
+  margin: 5px 0 11px;
+  color: #f0f5f9;
+  font-size: clamp(15px, 1.6vw, 19px);
+  font-weight: 850;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+body[data-page="qualified-best"] .ms-up-match span {
+  color: var(--ms-muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+body[data-page="qualified-best"] .ms-market-stack { display: grid; gap: 7px; min-width: 0; }
+body[data-page="qualified-best"] .ms-market-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(154,171,186,.15);
+  border-radius: 10px;
+  background: rgba(4,10,16,.38);
+  color: var(--ms-muted);
+  font-size: 10px;
+}
+body[data-page="qualified-best"] .ms-market-row > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+body[data-page="qualified-best"] .ms-market-name {
+  color: var(--ms-text);
+  font-weight: 850;
+}
+body[data-page="qualified-best"] .ms-market-row b {
+  color: #e2edf5;
+  font-variant-numeric: tabular-nums;
+}
+body[data-page="qualified-best"] .ms-fixture-foot {
+  display: flex;
+  align-items: center;
+  gap: 7px 10px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  color: var(--ms-muted);
+  font-size: 10px;
+  line-height: 1.55;
+}
+body[data-page="qualified-best"] .ms-qualified-gate-badge,
+body[data-page="qualified-best"] .ms-up-status-badge.deep {
+  border: 1px solid rgba(104,217,167,.24);
+  border-radius: 999px;
+  background: rgba(104,217,167,.07);
+  color: #93e2bd;
+  padding: 5px 8px;
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: .035em;
+}
+body[data-page="qualified-best"] .ms-up-status {
+  justify-self: end;
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  min-width: 0;
+}
+body[data-page="qualified-best"] .ms-up-status-badge { white-space: normal; text-align: center; }
+
+/* Historical records are intentionally quieter and unmistakably not current. */
+body[data-page="qualified-best"] .ms-qualified-lastseen-panel {
+  border-color: rgba(154,171,186,.20);
+  background: rgba(11,17,25,.85);
+}
+body[data-page="qualified-best"] .ms-qualified-lastseen-panel .ms-panel-head h2 { color: #aab8c5; }
+body[data-page="qualified-best"] .ms-qualified-best-lastseen-row {
+  grid-template-columns: 112px minmax(0,1fr);
+  gap: 14px;
+  padding: 13px 15px;
+  border: 1px solid rgba(154,171,186,.20);
+  border-radius: 13px;
+  background: rgba(154,171,186,.035);
+  box-shadow: none;
+}
+body[data-page="qualified-best"] .ms-qualified-lastseen-badge {
+  display: inline-flex;
+  padding: 4px 7px;
+  border: 1px solid rgba(154,171,186,.24);
+  border-radius: 999px;
+  background: rgba(154,171,186,.06);
+  color: #aab8c5;
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: .04em;
+}
+body[data-page="qualified-best"] .ms-qualified-best-empty {
+  padding: 18px;
+  border: 1px dashed #334557;
+  border-radius: 11px;
+  color: #a2b0bf;
+  background: rgba(4,10,16,.25);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+/* Visible keyboard focus and motion-safe transitions. */
+body[data-page="qualified-best"] a:focus-visible,
+body[data-page="qualified-best"] button:focus-visible,
+body[data-page="qualified-best"] input:focus-visible,
+body[data-page="qualified-best"] select:focus-visible {
+  outline: 2px solid #70d7cc;
+  outline-offset: 3px;
+}
+@media (max-width: 1050px) {
+  body[data-page="qualified-best"] .ms-qualified-best-row {
+    grid-template-columns: 100px minmax(0,1fr);
+  }
+  body[data-page="qualified-best"] .ms-qualified-best-row .ms-up-status {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
+@media (max-width: 760px) {
+  body[data-page="qualified-best"] .ms-nav { position: relative; top: auto; }
+  body[data-page="qualified-best"] .ms-metrics { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  body[data-page="qualified-best"] .ms-qualified-best-row,
+  body[data-page="qualified-best"] .ms-qualified-best-lastseen-row { grid-template-columns: 1fr; }
+  body[data-page="qualified-best"] .ms-qualified-best-row .ms-up-status { grid-column: auto; }
+  body[data-page="qualified-best"] .ms-up-status { justify-self: start; }
+  body[data-page="qualified-best"] .ms-market-row { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+@media (max-width: 480px) {
+  body[data-page="qualified-best"] .ms-hero { padding: 20px 17px; }
+  body[data-page="qualified-best"] .ms-hero h2 { font-size: 30px; }
+  body[data-page="qualified-best"] .ms-metric { padding: 12px; }
+  body[data-page="qualified-best"] .ms-metric strong { font-size: 19px; }
+  body[data-page="qualified-best"] .ms-market-row { grid-template-columns: 1fr; }
+  body[data-page="qualified-best"] .ms-qualified-best-row,
+  body[data-page="qualified-best"] .ms-qualified-best-lastseen-row { padding: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  body[data-page="qualified-best"] *,
+  body[data-page="qualified-best"] *::before,
+  body[data-page="qualified-best"] *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
