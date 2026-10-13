@@ -54,7 +54,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn("    types: [completed]", events)
 
     def test_pages_deploy_is_board_driven_with_guarded_cache_only_promotion(self):
-        events_end = PAGES_WORKFLOW.find("\\npermissions:")
+        events_end = PAGES_WORKFLOW.find("\npermissions:")
         self.assertGreater(events_end, 0)
         events = PAGES_WORKFLOW[:events_end]
         self.assertIn('      - "Match Signal Unified Upcoming Board"', events)
