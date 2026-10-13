@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 
 const root = new URL("../", import.meta.url);
 const read = path => readFile(new URL(path, root), "utf8");
+const cloudflareWorkflow = await read(".github/workflows/cloudflare-pages.yml");
 const [css, football, tennis, basketball] = await Promise.all([
   read("sport-hubs-design.css"),
   read("football.html"),
@@ -42,3 +43,6 @@ assert.doesNotMatch(await read("index.html"), /sport-hubs-design\.css/, "the hub
 assert.doesNotMatch(await read("qualified-best.html"), /sport-hubs-design\.css/, "the hub stylesheet must not be loaded on Qualified Best");
 
 console.log("Sport hub design checks passed: scoped selectors, versioned page markers, responsive/accessibility rules, renderer mounts and existing Football logo wiring.");
+
+assert.ok(cloudflareWorkflow.includes("if (path===\'/football.html\' || path===\'/tennis.html\' || path===\'/basketball.html\') {"), "only sport hub routes should use the shared hub asset check");
+assert.ok(!cloudflareWorkflow.includes("if (path===\'/football.html\' || path===\'/tennis.html\' || path===\'/basketball.html\' || path===\'/reports.html\') {"), "Reports is a workspace page, not a sport hub");
