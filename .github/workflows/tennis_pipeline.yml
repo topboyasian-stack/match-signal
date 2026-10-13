@@ -15,6 +15,7 @@ on:
       - 'scripts/settle_same_day.py'
       - 'scripts/enrich_market_snapshot.py'
       - 'scripts/enrich_sportybet_odds.py'
+      - 'scripts/test_enrich_sportybet_odds.py'
       - 'scripts/calibrate_tennis_analytics.py'
       - 'scripts/build_football_performance.py'
       - 'scripts/calibrate_models.py'
@@ -68,6 +69,8 @@ jobs:
         run: |
           git fetch origin main
           git reset --hard origin/main
+      - name: Test exact-line tennis SportyBet alignment
+        run: python scripts/test_enrich_sportybet_odds.py
       - name: Normalize NBA 2026 team gamelog into competitive game-level history
         run: |
           python - <<'PY'
