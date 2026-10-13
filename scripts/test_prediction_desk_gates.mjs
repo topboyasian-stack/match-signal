@@ -48,7 +48,8 @@ assert.match(source,/holdVerifiedBoardDuringRefresh/,"the previously verified sh
 assert.match(source,/lastVerifiedVirtualSnapshotUsable\(lastVerifiedVirtualQuoteSnapshot,Date\.now\(\)\)/,"the cache reuse path is guarded by the last-snapshot freshness limit");
 assert.match(source,/loadLastVerifiedVirtualQuoteSnapshot\(window\.localStorage,Date\.now\(\)\)/,"a still-fresh complete snapshot can survive a page reload in the same browser storage");
 assert.match(source,/persistLastVerifiedVirtualQuoteSnapshot\(lastVerifiedVirtualQuoteSnapshot\)/,"only successfully complete snapshots are persisted");
-assert.match(source,/for\(let attempt=1;attempt<=2;attempt\+\+\)/,"an individual transient quote-page failure is retried once before the refresh is marked incomplete");
+assert.match(source,/for\(let attempt=1;attempt<=3;attempt\+\+\)/,"transport failures and empty upstream pages receive bounded retries before an incomplete refresh");
+assert.match(source,/isEmptyVirtualQuotePageResponse\(candidate\)/,"an empty successful HTTP response is retried rather than treated as a usable page");
 assert.match(source,/live_quote_missing_required_rows:virtualQuoteMissingRequiredRows/,"monitor diagnostics expose unmatched required quote rows");
 assert.match(source,/live_quote_retried_pages:virtualQuoteRetriedPages/,"monitor diagnostics expose which pages needed a retry");
 
@@ -98,11 +99,11 @@ const sandbox = { Date, Number, String, Math, Array, Boolean, Object, Map, Set, 
 vm.createContext(sandbox);
 vm.runInContext(
   source.slice(start, end) +
-    "\n;globalThis.__deskTestApi={exactVirtualMarketLine,exactSportyBetQuote,exactMarketEdge,exactMarketExpectedReturn,qualificationState,primaryPrediction,qualifiedBestSelections,unmatchedVirtualQuoteUpdate,rawProbabilityValue,probabilityCalibrationInfo,probabilityValue,displayedFairOddsValue,isVirtualDeskCandidate,isRequiredVirtualQuoteRow,lastVerifiedVirtualSnapshotUsable,qualifiedBestSourceIsFresh,qualifiedBestLastSeenSnapshotUsable,qualifiedBestLastSeenRows,virtualCandidateStatus,sameVirtualEvent,virtualSnapshotHasCompleteFirstPage};",
+    "\n;globalThis.__deskTestApi={exactVirtualMarketLine,exactSportyBetQuote,exactMarketEdge,exactMarketExpectedReturn,qualificationState,primaryPrediction,qualifiedBestSelections,unmatchedVirtualQuoteUpdate,rawProbabilityValue,probabilityCalibrationInfo,probabilityValue,displayedFairOddsValue,isVirtualDeskCandidate,isRequiredVirtualQuoteRow,lastVerifiedVirtualSnapshotUsable,qualifiedBestSourceIsFresh,qualifiedBestLastSeenSnapshotUsable,qualifiedBestLastSeenRows,virtualCandidateStatus,sameVirtualEvent,virtualSnapshotHasCompleteFirstPage,isEmptyVirtualQuotePageResponse};",
   sandbox,
   { filename: "sport-hubs.js#prediction-desk-gates" }
 );
-const { exactVirtualMarketLine, exactMarketEdge, qualificationState, primaryPrediction, qualifiedBestSelections, unmatchedVirtualQuoteUpdate, rawProbabilityValue, probabilityCalibrationInfo, probabilityValue, displayedFairOddsValue, exactMarketExpectedReturn, isVirtualDeskCandidate, isRequiredVirtualQuoteRow, lastVerifiedVirtualSnapshotUsable, qualifiedBestSourceIsFresh, qualifiedBestLastSeenSnapshotUsable, qualifiedBestLastSeenRows, virtualCandidateStatus, sameVirtualEvent, virtualSnapshotHasCompleteFirstPage } = sandbox.__deskTestApi;
+const { exactVirtualMarketLine, exactMarketEdge, qualificationState, primaryPrediction, qualifiedBestSelections, unmatchedVirtualQuoteUpdate, rawProbabilityValue, probabilityCalibrationInfo, probabilityValue, displayedFairOddsValue, exactMarketExpectedReturn, isVirtualDeskCandidate, isRequiredVirtualQuoteRow, lastVerifiedVirtualSnapshotUsable, qualifiedBestSourceIsFresh, qualifiedBestLastSeenSnapshotUsable, qualifiedBestLastSeenRows, virtualCandidateStatus, sameVirtualEvent, virtualSnapshotHasCompleteFirstPage, isEmptyVirtualQuotePageResponse } = sandbox.__deskTestApi;
 
 const lastKnownQuote = {
   event_id: "virtual-keep-last-quote",
@@ -469,5 +470,7 @@ assert.equal(sameVirtualEvent(virtualDeskFixture, { ...virtualLiveQuote, product
 assert.equal(virtualSnapshotHasCompleteFirstPage({status:"LIVE"}, 0, false, false), false, "empty snapshot does not invalidate prior quotes");
 assert.equal(virtualSnapshotHasCompleteFirstPage({status:"LIVE"}, 24, false, false), true, "healthy non-empty short snapshot can be complete");
 assert.equal(virtualSnapshotHasCompleteFirstPage({status:"LIVE"}, 24, true, false), false, "source errors prevent snapshot completion");
+assert.equal(isEmptyVirtualQuotePageResponse({ok:true,status:"UPSTREAM_EMPTY",events:[],source_status:{efootball:{status:"EMPTY"}}}),true,"an HTTP-success empty upstream page must trigger retry instead of ending the scan");
+assert.equal(isEmptyVirtualQuotePageResponse({ok:true,status:"LIVE",events:[{event_id:"match-1"}],source_status:{efootball:{status:"LIVE",events:1}}}),false,"a non-empty eFootball quote page remains usable");
 
 console.log("Prediction Desk gate regressions passed: explicit status veto, probability-band separation, exact line/side, 15-minute freshness, qualified-first ranking, future-only shortlist, active virtual scope, and provider specifier normalization.");
