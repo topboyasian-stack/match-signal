@@ -221,3 +221,128 @@ body[data-page="odds-builder"] select:focus-visible {
     transition-duration: .01ms !important;
   }
 }
+
+
+/* MATCH-SIGNAL-DESIGN-V2: ODDS BUILDER HIGH-CONTRAST VISUAL DELTA */
+body[data-page="odds-builder"] {
+  --ob-accent: #c4b5fd;
+  --ob-accent-soft: rgba(167,139,250,.15);
+  --ob-accent-border: rgba(196,181,253,.7);
+  background:
+    radial-gradient(980px 480px at 88% 4%, rgba(124,92,255,.21), transparent 63%),
+    radial-gradient(760px 430px at 8% 0%, rgba(45,212,191,.10), transparent 66%),
+    linear-gradient(180deg, #080914 0%, #090d18 52%, #060812 100%);
+}
+body[data-page="odds-builder"] .ms-wrap::before {
+  content: "";
+  position: fixed;
+  z-index: 100;
+  inset: 0 0 auto;
+  height: 4px;
+  pointer-events: none;
+  background: linear-gradient(90deg, #9b87ff 0%, #6ee7d4 52%, #c4b5fd 100%);
+  box-shadow: 0 0 24px rgba(155,135,255,.36);
+}
+body[data-page="odds-builder"] .ms-nav {
+  padding: 10px 12px;
+  border: 1px solid rgba(167,139,250,.28);
+  border-radius: 16px;
+  background: rgba(10,13,28,.86);
+  box-shadow: 0 12px 36px rgba(0,0,0,.28);
+}
+body[data-page="odds-builder"] .ms-hero {
+  position: relative;
+  overflow: hidden;
+  border-left: 5px solid #a78bfa;
+  border-color: rgba(167,139,250,.52);
+  background:
+    radial-gradient(420px 220px at 92% 0%, rgba(167,139,250,.21), transparent 72%),
+    linear-gradient(115deg, rgba(24,24,52,.99), rgba(12,19,34,.98) 62%, rgba(12,28,38,.98));
+  box-shadow: 0 22px 65px rgba(25,16,72,.25), inset 0 1px rgba(255,255,255,.035);
+}
+body[data-page="odds-builder"] .ms-hero::after {
+  content: "PAPER MODE  /  EXACT-QUOTE GATES";
+  position: absolute;
+  top: 21px;
+  right: 22px;
+  padding: 7px 10px;
+  border: 1px solid rgba(196,181,253,.42);
+  border-radius: 999px;
+  background: rgba(8,9,24,.72);
+  color: #d9d1ff;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .09em;
+}
+body[data-page="odds-builder"] .ms-hero h2 {
+  max-width: 870px;
+  font-size: clamp(30px, 4.3vw, 50px);
+}
+body[data-page="odds-builder"] .ms-panel {
+  border-color: rgba(167,139,250,.26);
+  background: linear-gradient(145deg, rgba(15,19,38,.98), rgba(8,13,24,.99));
+  box-shadow: 0 22px 56px rgba(0,0,0,.24);
+}
+body[data-page="odds-builder"] .builder-console {
+  border-color: rgba(167,139,250,.4);
+  background:
+    linear-gradient(rgba(167,139,250,.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(167,139,250,.028) 1px, transparent 1px),
+    linear-gradient(145deg, rgba(18,23,43,.98), rgba(8,13,24,.98));
+  background-size: 28px 28px, 28px 28px, auto;
+}
+body[data-page="odds-builder"] .builder-console-head {
+  border-bottom-color: rgba(167,139,250,.28);
+}
+body[data-page="odds-builder"] .builder-console-head h3 {
+  font-size: clamp(23px, 3vw, 34px);
+}
+body[data-page="odds-builder"] .batch-card,
+body[data-page="odds-builder"] .ticket-card {
+  position: relative;
+  border-color: rgba(125,145,180,.34);
+  background: linear-gradient(135deg, rgba(26,30,55,.96), rgba(9,15,29,.99));
+  box-shadow: 0 10px 28px rgba(0,0,0,.18);
+  transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+body[data-page="odds-builder"] .batch-card::before,
+body[data-page="odds-builder"] .ticket-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: linear-gradient(180deg, #a78bfa, #5eead4);
+  opacity: .95;
+  pointer-events: none;
+}
+body[data-page="odds-builder"] .batch-card:hover,
+body[data-page="odds-builder"] .ticket-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(196,181,253,.72);
+  box-shadow: 0 16px 34px rgba(49,37,103,.24);
+}
+body[data-page="odds-builder"] .batch-summary,
+body[data-page="odds-builder"] .ticket-card-summary {
+  padding-left: 19px;
+}
+body[data-page="odds-builder"] .batch-odds,
+body[data-page="odds-builder"] .ticket-card-odds strong {
+  color: #7df3d4;
+  text-shadow: 0 0 20px rgba(125,243,212,.12);
+}
+body[data-page="odds-builder"] .ms-btn,
+body[data-page="odds-builder"] .booking-btn {
+  border-color: rgba(167,139,250,.44);
+  background: linear-gradient(135deg, rgba(124,92,255,.19), rgba(15,30,43,.95));
+}
+body[data-page="odds-builder"] .ms-btn:hover,
+body[data-page="odds-builder"] .booking-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: #c4b5fd;
+  background: rgba(124,92,255,.2);
+}
+@media (max-width: 760px) {
+  body[data-page="odds-builder"] .ms-hero::after { display: none; }
+  body[data-page="odds-builder"] .ms-nav { padding: 9px; }
+  body[data-page="odds-builder"] .ms-hero { border-left-width: 4px; }
+}
