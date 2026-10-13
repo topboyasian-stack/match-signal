@@ -39,19 +39,48 @@ async function fetchScheduleGap() {
       .sort((a, b) => b.stamp - a.stamp);
     const previous = scheduled.find(item => !Number.isFinite(currentStart) || item.stamp < currentStart);
 
+    const referenceTime = eventName === "schedule" && Number.isFinite(currentStart)
+      ? currentStart : Date.now();
+
     if (!previous) {
+      // The first scheduled invocation establishes the baseline. Before that
+      // happens, allow a short startup grace period after the workflow first
+      // appears on main, then fail closed if cron events never arrive.
+      if (eventName === "schedule" && Number.isFinite(currentStart)) {
+        return {
+          schedule_gap_status: "ok",
+          schedule_gap_minutes: 0,
+          schedule_gap_note: "The first scheduled monitor run established the schedule-liveness baseline.",
+          baseline_run_id: current?.id || runId,
+          baseline_run_created_at: current?.created_at || null
+        };
+      }
+
+      const firstMainRun = runs
+        .filter(run => run.head_branch === "main" && run.event !== "pull_request")
+        .map(run => ({ run, stamp: Date.parse(String(run.run_started_at || run.created_at || "")) }))
+        .filter(item => Number.isFinite(item.stamp))
+        .sort((a, b) => a.stamp - b.stamp)[0];
+      if (!firstMainRun) {
+        return {
+          schedule_gap_status: "unknown",
+          schedule_gap_minutes: null,
+          schedule_gap_note: "No main-branch monitor run is available to anchor the first schedule check."
+        };
+      }
+      const startupAgeMinutes = Math.max(0, Math.round((referenceTime - firstMainRun.stamp) / 6000) / 10);
       return {
-        schedule_gap_status: "unknown",
-        schedule_gap_minutes: null,
-        schedule_gap_note: "No earlier cron-triggered monitor run is available yet; the baseline will be established by the first scheduled run."
+        schedule_gap_status: "missing",
+        schedule_gap_minutes: startupAgeMinutes,
+        schedule_gap_note: `No scheduled monitor run has been observed since the workflow's first main-branch run ${startupAgeMinutes} minute(s) ago.`,
+        first_main_run_id: firstMainRun.run.id,
+        first_main_run_created_at: firstMainRun.run.created_at || null
       };
     }
 
     // Scheduled invocations compare cron-to-cron. Deploy-triggered and manual
     // invocations report the age of the last scheduled check, so frequent
-    // deployments cannot mask a stalled 20-minute schedule.
-    const referenceTime = eventName === "schedule" && Number.isFinite(currentStart)
-      ? currentStart : Date.now();
+    // deployments cannot mask a stalled schedule.
     const gapMinutes = Math.round((referenceTime - previous.stamp) / 6000) / 10;
     return {
       schedule_gap_status: "ok",
