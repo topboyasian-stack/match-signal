@@ -9,6 +9,7 @@ import json, os, re
 from difflib import SequenceMatcher
 from datetime import datetime, timezone
 from pathlib import Path
+from tennis_total_model import over_probability, recommend_total_line
 import requests
 try:
     from curl_cffi import requests as curl_requests
@@ -47,7 +48,7 @@ def number(v):
 
 
 def line_from_specifier(spec):
-    m=re.search(r'(?:total|line)=([0-9]+(?:\\.[0-9]+)?)',str(spec or ''),re.I)
+    m=re.search(r'(?:total|line)=([0-9]+(?:\.[0-9]+)?)',str(spec or ''),re.I)
     return float(m.group(1)) if m else None
 
 
@@ -169,8 +170,117 @@ def extract_markets(pred,event):
     return winner,totals
 
 
+
+def available_tennis_total_lines(totals):
+    """Return only full-match Total Games lines with both current quote sides."""
+    sides_by_line = {}
+    for item in totals or []:
+        if not isinstance(item, dict) or str(item.get("market_id") or "") != "189":
+            continue
+        specifier = str(item.get("specifier") or "")
+        if re.search(r"(?:^|[|])setnr=", specifier, re.I):
+            continue
+        line = number(item.get("line"))
+        side = str(item.get("side") or "").lower()
+        odds = number(item.get("odds"))
+        if line is None or side not in {"over", "under"} or odds is None or odds <= 1:
+            continue
+        sides_by_line.setdefault(round(line * 2) / 2, set()).add(side)
+    return sorted(line for line, sides in sides_by_line.items() if sides == {"over", "under"})
+
+
+def align_tennis_total_prediction(prediction, totals, history, missing_status=None, updated_at=None):
+    """Recalculate published tennis totals on an exact, observed SportyBet line.
+
+    The prior model line is retained for research traceability, but it is never
+    exposed as the live line when the current event does not offer that market.
+    """
+    if prediction.get("sport") != "tennis":
+        return False
+    analytics = prediction.setdefault("analytics", {})
+    total = analytics.get("total_games")
+    if not isinstance(total, dict):
+        total = {}
+    original_line = number(total.get("model_line_before_market_alignment"))
+    if original_line is None:
+        original_line = number(total.get("line"))
+    if original_line is not None:
+        total["model_line_before_market_alignment"] = original_line
+
+    available_lines = available_tennis_total_lines(totals)
+    target = {
+        "sport": "tennis",
+        "league": prediction.get("league"),
+        "player_1": prediction.get("player_1"),
+        "player_2": prediction.get("player_2"),
+        "start_time": prediction.get("start_time"),
+        "probabilities": prediction.get("probabilities") or {},
+        "rankings": prediction.get("rankings") or {},
+        "form": prediction.get("form") or {},
+    }
+
+    selected = recommend_total_line(target, history, minimum_probability=0.60, available_lines=available_lines) if available_lines else None
+    status = "EXACT_SPORTYBET_TOTAL_LINE_RECALCULATED"
+    if selected is None and available_lines:
+        # Do not reuse the probability from a different line. If no side reaches
+        # the model's 60% research threshold, keep the closest available line
+        # as research-only and calculate its own probability from the same model.
+        anchor = original_line if original_line is not None else 22.5
+        fallback_line = min(available_lines, key=lambda line: (abs(line - anchor), line))
+        selected = over_probability(target, history, fallback_line)
+        if selected is not None:
+            selected["recommended_line"] = fallback_line
+            selected["recommended_pick"] = selected["pick"]
+            selected["recommended_probability"] = selected[selected["pick"]]
+            status = "EXACT_SPORTYBET_TOTAL_LINE_RESEARCH_ONLY"
+
+    if selected is None or number(selected.get("recommended_line", selected.get("line"))) is None:
+        total.update({
+            "line": None,
+            "pick": None,
+            "over": None,
+            "under": None,
+            "market_alignment_status": missing_status or ("NO_EXACT_LINE_PROBABILITY" if available_lines else "NO_EXACT_SPORTYBET_TOTAL_LINE"),
+            "market_available_lines": available_lines,
+            "market_alignment_updated_at": updated_at,
+        })
+        analytics["total_games"] = total
+        prediction["analytics"] = analytics
+        return False
+
+    selected_line = float(selected.get("recommended_line", selected.get("line")))
+    selected_side = str(selected.get("recommended_pick") or selected.get("pick") or "").lower()
+    if selected_side not in {"over", "under"}:
+        total.update({"line": None, "pick": None, "over": None, "under": None,
+                      "market_alignment_status": "NO_EXACT_LINE_PROBABILITY",
+                      "market_available_lines": available_lines,
+                      "market_alignment_updated_at": updated_at})
+        analytics["total_games"] = total
+        prediction["analytics"] = analytics
+        return False
+
+    total.update({
+        "line": selected_line,
+        "over": round(float(selected["over"]), 6),
+        "under": round(float(selected["under"]), 6),
+        "pick": selected_side,
+        "base_model_over": round(float(selected["over"]), 6),
+        "base_model_under": round(float(selected["under"]), 6),
+        "expected_total": selected.get("expected_total", total.get("expected_total")),
+        "model": selected.get("model", total.get("model")),
+        "market_alignment_status": status,
+        "market_line_source": "SportyBet NG full-match Total Games market 189",
+        "market_available_lines": available_lines,
+        "market_alignment_updated_at": updated_at,
+        "confidence_floor_met": status == "EXACT_SPORTYBET_TOTAL_LINE_RECALCULATED",
+    })
+    analytics["total_games"] = total
+    prediction["analytics"] = analytics
+    return True
+
 def main():
     predictions=load(DATA/'predictions.json',[])
+    tennis_history=load(DATA/'tennis_prediction_archive.json',[])
     fetched_at=datetime.now(timezone.utc).isoformat()
     all_events=[]; errors=[]; diagnostics={'sportybet_samples':{},'prediction_samples':{}}
     for sport in ('football','tennis'):
@@ -196,8 +306,13 @@ def main():
         sport=p.get('sport')
         if sport not in SPORT_IDS:continue
         event,match_type=find_event(p,[e for s,e in all_events if s==sport])
-        if not event:continue
+        if not event:
+            if sport=='tennis':
+                align_tennis_total_prediction(p,[],tennis_history,missing_status='SPORTYBET_EVENT_UNMATCHED',updated_at=fetched_at)
+            continue
         winner,totals=extract_markets(p,event)
+        if sport=='tennis':
+            align_tennis_total_prediction(p,totals,tennis_history,updated_at=fetched_at)
         snap={'source':'SportyBet NG web API via Cloudflare proxy','fetched_at':fetched_at,'match_type':match_type,'sportybet_event_id':event.get('eventId'),'league':event.get('_league'),'sportybet_start_time':event.get('estimateStartTime')}
         if winner:
             snap['winner']=winner; winner_prices+=1
