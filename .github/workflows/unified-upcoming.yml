@@ -25,6 +25,7 @@ on:
       - 'scripts/efootball_desk_learning.py'
       - 'scripts/test_upcoming_settlement_retention.py'
       - 'scripts/test_prediction_desk_gates.mjs'
+      - 'scripts/test_deploy_freshness_order.py'
       - 'scripts/unified_upcoming_cleanup.py'
       - 'scripts/system_health_audit.py'
       - 'data/virtual_lab_participant_lifecycle.json'
@@ -35,6 +36,73 @@ on:
       - 'qualified-best.html'
       - 'sport-hubs.js'
       - '.github/workflows/unified-upcoming.yml'
+      - 'sport-hubs.css'
+      - 'workspace-ui.css'
+      - 'workspace-ui.js'
+      - 'league.html'
+      - 'reports.html'
+      - '_redirects'
+      - '_headers'
+      - 'expansion.html'
+      - 'performance.html'
+      - 'basketball.html'
+      - 'tennis.html'
+      - 'darts.html'
+      - 'darts-app.js'
+      - 'darts.css'
+      - 'table-tennis.html'
+      - 'table-tennis-app.js'
+      - 'table-tennis.css'
+      - 'live.html'
+      - 'live-analysis.js'
+      - 'live-data-worker.js'
+      - 'live-timer.js'
+      - 'metrics-fix.js'
+      - 'functions/**'
+      - 'expansion.js'
+      - 'expansion-tennis-ou.js'
+      - 'expansion-odds-builder.js'
+      - 'live-model-trace.js'
+      - 'virtual-lab.html'
+      - 'research.html'
+      - 'virtual-lab-app.js'
+      - 'virtual-lab-confirmed-watch.js'
+      - 'virtual-lab.css'
+      - 'virtual-lab/**'
+      - 'data/odds_builder.json'
+      - 'data/odds_ticket_tracker.json'
+      - 'data/virtual_lab_history.json'
+      - 'data/virtual_lab_live.json'
+      - 'data/virtual_lab_model_eval.json'
+      - 'data/virtual_lab_eligibility.json'
+      - 'data/virtual_lab_participant_profiles.json'
+      - 'data/virtual_lab_confirmed_participants.json'
+      - 'data/virtual_lab_confirmed_participant_results.json'
+      - 'data/virtual_lab_participants/**'
+      - 'data/darts_*.json'
+      - 'data/table_tennis_*.json'
+      - 'data/predictions.json'
+      - 'data/prediction_history.json'
+      - 'data/prediction_pool.json'
+      - 'data/selection_gate.json'
+      - 'data/accuracy.json'
+      - 'data/football_performance.json'
+      - 'data/football_forward_readiness.json'
+      - 'data/football_team_history.json'
+      - 'data/football_model_council.json'
+      - 'data/pdl_predictions.json'
+      - 'data/pdl_status.json'
+      - 'data/pipeline_status.json'
+      - 'data/tennis_forward_status.json'
+      - 'scripts/test_live_virtual_quote_coverage.mjs'
+      - 'data/results_first_evidence_report.json'
+      - 'data/club-logo-registry.json'
+      - 'assets/club-logos/**'
+      - 'PRECISION-SPORTS-UPGRADE.md'
+      - 'VIRTUAL-LAB-*.md'
+      - 'functions/api/virtual-lab-history.js'
+      - 'functions/api/sportybet-virtual-results.js'
+      - '.github/workflows/cloudflare-pages.yml'
   workflow_dispatch:
 
 permissions:
@@ -43,7 +111,7 @@ permissions:
 
 concurrency:
   group: match-signal-unified-upcoming
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   unified:
@@ -68,6 +136,8 @@ jobs:
           git reset --hard origin/main
       - name: Compile unified engines
         run: python -m py_compile scripts/unified_upcoming.py scripts/unified_upcoming_cleanup.py scripts/selection_candidate_collector.py scripts/test_selection_candidate_collector.py scripts/efootball_desk_learning.py scripts/test_upcoming_settlement_retention.py scripts/system_health_audit.py scripts/predict_today.py
+      - name: Validate freshness deployment ordering
+        run: python scripts/test_deploy_freshness_order.py
       - name: Test settled expiry and eFootball reconciliation
         run: python scripts/test_upcoming_settlement_retention.py
       - name: Regression-test Prediction Desk qualification and best-line selection
@@ -99,12 +169,7 @@ jobs:
           git commit -m "🤖 Refresh unified upcoming board"
           for attempt in 1 2 3 4 5 6; do
             if git push origin main; then
-              # The data push already triggers the production workflow. Dispatch
-              # it explicitly as a belt-and-suspenders step, but do not convert
-              # a successful publication into a failed run if dispatch is denied.
-              if ! GH_TOKEN="${{ github.token }}" gh workflow run cloudflare-pages.yml --ref main; then
-                echo "Explicit deploy dispatch failed; the data push remains published and its push trigger can deploy it."
-              fi
+              echo "Unified board and health published; Cloudflare deployment will start after this workflow completes."
               exit 0
             fi
 
