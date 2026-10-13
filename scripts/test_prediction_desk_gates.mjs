@@ -479,4 +479,19 @@ assert.equal(virtualSnapshotHasCompleteFirstPage({status:"LIVE"}, 24, true, fals
 assert.equal(isEmptyVirtualQuotePageResponse({ok:true,status:"UPSTREAM_EMPTY",events:[],source_status:{efootball:{status:"EMPTY"}}}),true,"an HTTP-success empty upstream page must trigger retry instead of ending the scan");
 assert.equal(isEmptyVirtualQuotePageResponse({ok:true,status:"LIVE",events:[{event_id:"match-1"}],source_status:{efootball:{status:"LIVE",events:1}}}),false,"a non-empty eFootball quote page remains usable");
 
+const retryHelperStart = source.indexOf("function shouldRetryVirtualQuoteSnapshot(");
+const retryHelperEnd = source.indexOf("\nfunction primaryPrediction(", retryHelperStart);
+assert.ok(retryHelperStart >= 0 && retryHelperEnd > retryHelperStart, "whole-snapshot retry policy is available for unit tests");
+const retrySandbox = { Number };
+vm.createContext(retrySandbox);
+vm.runInContext(source.slice(retryHelperStart, retryHelperEnd), retrySandbox, { filename: "sport-hubs.js#quote-snapshot-retry" });
+assert.equal(retrySandbox.shouldRetryVirtualQuoteSnapshot({ snapshotAvailable: true, snapshotComplete: true, requiredQuoteRows: 25, missingRequiredQuoteRows: 1 }, 1), true, "one missing required event triggers a bounded full-snapshot retry");
+assert.equal(retrySandbox.shouldRetryVirtualQuoteSnapshot({ snapshotAvailable: false, snapshotComplete: false, requiredQuoteRows: 25, missingRequiredQuoteRows: 25 }, 1), true, "an unavailable first snapshot gets one more fetch attempt");
+assert.equal(retrySandbox.shouldRetryVirtualQuoteSnapshot({ snapshotAvailable: true, snapshotComplete: true, requiredQuoteRows: 25, missingRequiredQuoteRows: 0 }, 1), false, "complete exact coverage does not create unnecessary extra traffic");
+assert.equal(retrySandbox.shouldRetryVirtualQuoteSnapshot({ snapshotAvailable: true, snapshotComplete: true, requiredQuoteRows: 25, missingRequiredQuoteRows: 1 }, 2), false, "the complete-snapshot retry is strictly bounded to two passes");
+assert.match(source,/for\(let snapshotAttempt=1;snapshotAttempt<=2;snapshotAttempt\+\+\)/,"live quote refresh retries one complete scan, not only individual HTTP requests");
+assert.match(source,/live_quote_snapshot_attempts:virtualQuoteSnapshotAttempts/,"the monitor records how many full snapshot passes were needed");
+assert.notEqual(rendererVersions[0], "20261013-qualified-best-live-verification-cachefix3", "a live coverage retry changes the shared renderer cache key");
+
+
 console.log("Prediction Desk gate regressions passed: explicit status veto, probability-band separation, exact line/side, 15-minute freshness, qualified-first ranking, future-only shortlist, active virtual scope, and provider specifier normalization.");
