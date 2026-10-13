@@ -4,8 +4,9 @@ on:
   schedule:
     # Independent production verification, separate from the board builder.
     # The main pipeline can appear healthy while browser-side qualification is broken.
-    # Check often enough to catch repeated live-refresh failures before they persist unnoticed.
-    - cron: '*/5 * * * *'
+    # Check every five minutes after the board's :02/:07/:12... cadence has time to deploy.
+    # Offset away from :00 to reduce the chance of GitHub's scheduled-run load delays.
+    - cron: '6-59/5 * * * *'
   workflow_dispatch:
   workflow_run:
     # Start browser verification only after Cloudflare confirms its deployment.
