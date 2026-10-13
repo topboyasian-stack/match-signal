@@ -57,8 +57,7 @@ function diagnosticFromPage(pageErrors, snapshot) {
   return {
     ...dom,
     page_errors: pageErrors,
-    dom_qualified_count: null,
-    page_url: target
+    page_url: dom.page_url || target
   };
 }
 
