@@ -149,24 +149,39 @@ export async function onRequestGet(context){
   async function collectPc(label,sportId){
     if(!requested.has(label)) return;
     const t0=Date.now();
-    try{
-      const data=await upstream('/api/ng/factsCenter/pcUpcomingEvents',{
-        sportId,marketId:'1,18,10,29,11,26,36,14,60100,186,189,202,204,210',
-        pageSize,pageNum,todayGames:'false',timeline,_t:Date.now()
-      });
-      let n=0;
-      for(const t of tournaments(data)){
-        for(const e of (t.events||[])){
-          out.push(normalize(t,e,label,sportId)); n++;
-        }
+    const endpoint='/api/ng/factsCenter/pcUpcomingEvents';
+    let data=null,lastError=null,attempts=0;
+    // SportyBet occasionally answers HTTP 200 with an empty tournament array.
+    // An empty first response is transient until a retry confirms otherwise.
+    for(let attempt=1;attempt<=2;attempt++){
+      attempts=attempt;
+      try{
+        const candidate=await upstream(endpoint,{
+          sportId,marketId:'1,18,10,29,11,26,36,14,60100,186,189,202,204,210',
+          pageSize,pageNum,todayGames:'false',timeline,_t:Date.now()
+        });
+        const count=tournaments(candidate).reduce((sum,t)=>sum+(Array.isArray(t?.events)?t.events.length:0),0);
+        data=candidate;
+        if(count>0){lastError=null;break;}
+        lastError='upstream upcoming feed returned no tournaments/events';
+      }catch(e){
+        lastError=String(e.message||e||'upstream upcoming feed failed');
       }
-      sourceStatus[label]={status:n?'LIVE':'EMPTY',events:n,latency_ms:Date.now()-t0};
-    }catch(e){
-      sourceStatus[label]={status:'ERROR',events:0,latency_ms:Date.now()-t0,error:String(e.message||e)};
-      errors.push(label+': '+String(e.message||e));
+      if(attempt<2)await new Promise(resolve=>setTimeout(resolve,250));
     }
+    let n=0;
+    for(const t of tournaments(data)){
+      for(const e of (t.events||[])){
+        out.push(normalize(t,e,label,sportId)); n++;
+      }
+    }
+    const status=n?'LIVE':(data?'EMPTY':'ERROR');
+    sourceStatus[label]={
+      status,events:n,attempts,retried:attempts>1,latency_ms:Date.now()-t0,
+      ...(n?{}:{error:String(lastError||'upstream upcoming feed returned no events')})
+    };
+    if(!n)errors.push(label+': '+String(lastError||'upstream upcoming feed returned no events'));
   }
-
   async function collectLive(label,sportId,path,extra={}){
     if(!requested.has(label)||!includeLive) return;
     const t0=Date.now();
