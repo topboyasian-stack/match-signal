@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PAGES_WORKFLOW = (ROOT / ".github/workflows/cloudflare-pages.yml").read_text(encoding="utf-8")
 BOARD_WORKFLOW = (ROOT / ".github/workflows/unified-upcoming.yml").read_text(encoding="utf-8")
 MONITOR_WORKFLOW = (ROOT / ".github/workflows/qualified-best-monitor.yml").read_text(encoding="utf-8")
+WATCHDOG_WORKFLOW = (ROOT / ".github/workflows/automation_watchdog.yml").read_text(encoding="utf-8")
 
 
 def workflow_push_paths(source: str) -> set[str]:
@@ -40,18 +41,24 @@ def workflow_schedule_crons(source: str) -> list[str]:
 class FreshnessDeployOrderingTests(unittest.TestCase):
     def test_board_schedule_is_offset_from_hour_boundary(self):
         crons = workflow_schedule_crons(BOARD_WORKFLOW)
-        self.assertIn("3-59/5 * * * *", crons)
+        self.assertIn("4-59/5 * * * *", crons)
         self.assertNotIn("*/5 * * * *", crons)
 
     def test_monitor_schedule_is_staggered_and_deployment_trigger_is_preserved(self):
         crons = workflow_schedule_crons(MONITOR_WORKFLOW)
-        self.assertIn("1-59/5 * * * *", crons)
+        self.assertIn("7-59/5 * * * *", crons)
         self.assertNotIn("*/5 * * * *", crons)
         events_end = MONITOR_WORKFLOW.find("\npermissions:")
         self.assertGreater(events_end, 0)
         events = MONITOR_WORKFLOW[:events_end]
         self.assertIn('      - "Deploy Match Signal to Cloudflare Pages"', events)
         self.assertIn("    types: [completed]", events)
+
+    def test_watchdog_schedule_is_rearmed_and_stale_board_self_heals_quickly(self):
+        crons = workflow_schedule_crons(WATCHDOG_WORKFLOW)
+        self.assertIn("1,11,21,31,41,51 * * * *", crons)
+        self.assertIn("if unified_age > 0.5 and not active('unified-upcoming.yml'):", WATCHDOG_WORKFLOW)
+        self.assertIn("'unified_upcoming_hours': 0.5", WATCHDOG_WORKFLOW)
 
     def test_pages_deploy_is_board_driven_with_guarded_cache_only_promotion(self):
         events_end = PAGES_WORKFLOW.find("\npermissions:")

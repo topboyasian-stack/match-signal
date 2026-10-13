@@ -11,8 +11,8 @@ on:
       - '.github/workflows/automation_watchdog.yml'
   schedule:
     # Frequent, off-hour heartbeat so stale live feeds are repaired before the next day.
-    # Changing this cron also re-enables a previously disabled scheduled workflow.
-    - cron: '3,13,23,33,43,53 * * * *'
+    # Change the registered cron to re-arm schedule delivery; keep runs off minute zero.
+    - cron: '1,11,21,31,41,51 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -133,7 +133,7 @@ jobs:
               r = subprocess.run(['gh', 'workflow', 'run', 'unified-upcoming.yml', '--ref', 'main'], text=True, capture_output=True)
               actions.append({'workflow':'unified-upcoming.yml','action':'dispatch','status':'requested' if r.returncode == 0 else 'failed','detail':(r.stderr.strip() if r.returncode else 'Unified board refresh after newer Virtual Lab snapshot')})
 
-          if unified_age > 2 and not active('unified-upcoming.yml'):
+          if unified_age > 0.5 and not active('unified-upcoming.yml'):
               r = subprocess.run(['gh', 'workflow', 'run', 'unified-upcoming.yml', '--ref', 'main'], text=True, capture_output=True)
               actions.append({'workflow':'unified-upcoming.yml','action':'dispatch','status':'requested' if r.returncode == 0 else 'failed','detail':(r.stderr.strip() if r.returncode else 'Unified board self-heal')})
 
@@ -158,7 +158,7 @@ jobs:
               'unified_upcoming_age_hours': round(unified_age, 2),
               'virtual_lab_events': virtual.get('events_count', 0),
               'virtual_lab_products': virtual.get('product_counts', {}),
-              'thresholds': {'pipeline_hours': 4, 'odds_builder_hours': 8, 'expansion_hours': 4, 'virtual_lab_hours': 1, 'virtual_lab_status_hours': 1, 'darts_hours': 2, 'table_tennis_hours': 2, 'unified_upcoming_hours': 2},
+              'thresholds': {'pipeline_hours': 4, 'odds_builder_hours': 8, 'expansion_hours': 4, 'virtual_lab_hours': 1, 'virtual_lab_status_hours': 1, 'darts_hours': 2, 'table_tennis_hours': 2, 'unified_upcoming_hours': 0.5},
               'actions': actions,
               'policy': 'Watchdog proactively self-heals stale engines and force-restarts the actual core Live Prediction Pipeline; health publication is retried across concurrent data writers.'
           }
