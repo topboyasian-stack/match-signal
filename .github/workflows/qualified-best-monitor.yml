@@ -6,6 +6,17 @@ on:
     # The main pipeline can appear healthy while browser-side qualification is broken.
     - cron: '*/20 * * * *'
   workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'sport-hubs.js'
+      - 'index.html'
+      - 'upcoming.html'
+      - 'qualified-best.html'
+      - 'scripts/test_prediction_desk_gates.mjs'
+      - 'scripts/test_qualified_best_monitor.mjs'
+      - 'scripts/qualified_best_monitor_lib.mjs'
+      - '.github/workflows/qualified-best-monitor.yml'
   push:
     branches: [main]
     paths:
@@ -29,7 +40,30 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  regression-tests:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Check out proposed changes
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Check JavaScript syntax
+        run: |
+          node --check sport-hubs.js
+          node --check scripts/qualified_best_monitor.mjs
+          node --check scripts/qualified_best_monitor_lib.mjs
+          node --check scripts/test_qualified_best_monitor.mjs
+      - name: Test existing Prediction Desk gates
+        run: node scripts/test_prediction_desk_gates.mjs
+      - name: Test production monitor classifications
+        run: node scripts/test_qualified_best_monitor.mjs
+
   production-monitor:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
