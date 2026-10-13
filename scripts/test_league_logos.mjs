@@ -52,6 +52,6 @@ assert.equal(logos.logoIdForCompetition("England Amateur - U21 Professional Deve
 
 const page = readFileSync("football.html", "utf8");
 assert.match(page, /sport-hubs\.css\?v=20261013-competition-logos1/, "the Football page must bust the logo styling cache");
-assert.match(page, /league-logos\.js\?v=20261013-competition-logos1/, "the Football page must load the competition logo enhancer");
+assert.match(page, /league-logos\.js\?v=20261013-competition-logos2/, "the Football page must load the competition logo enhancer");
 
 console.log("Football competition logo regressions passed: league IDs and aliases, separate UEFA competitions, PDL mapping, wrong-logo fail-closed behavior, and page asset wiring.");
