@@ -500,6 +500,11 @@ function virtualSnapshotHasCompleteFirstPage(feed,eventCount,sourceErrors,feedEr
   // Empty replies, even if labelled LIVE, do not prove that all old events vanished.
   return Boolean(feed&&feed.status==="LIVE"&&eventCount>0&&eventCount<100&&!sourceErrors&&!feedErrors);
 }
+function isEmptyVirtualQuotePageResponse(feed){
+  if(!feed||feed.ok===false||!Array.isArray(feed.events))return true;
+  const sourceState=String(feed?.source_status?.efootball?.status||"").toUpperCase();
+  return feed.events.length===0||feed.status==="UPSTREAM_EMPTY"||sourceState==="EMPTY"||sourceState==="ERROR";
+}
 function primaryPrediction(rows){
   const rank=x=>{
     const gate=qualificationState(x);
@@ -847,11 +852,16 @@ async function renderUnifiedBoard(){
         let lastPageError=null;
         // Retry a failed page once. A single dropped request should not leave the
         // whole desk in the incomplete-snapshot state for another two-minute cycle.
-        for(let attempt=1;attempt<=2;attempt++){
+        for(let attempt=1;attempt<=3;attempt++){
           try{
             const candidate=await get('./api/sportybet-virtual?sources=efootball&pageSize=100&pageNum='+page+'&timeline=168&includeLive=false');
             if(!candidate||candidate.ok===false||!Array.isArray(candidate.events)){
               lastPageError="live quote response is not a usable event snapshot";
+            }else if(isEmptyVirtualQuotePageResponse(candidate)){
+              const detail=Array.isArray(candidate.errors)&&candidate.errors.length
+                ?String(candidate.errors[0])
+                :String(candidate?.source_status?.efootball?.error||"upstream SportyBet snapshot was empty");
+              lastPageError="empty/upstream-error quote page (attempt "+attempt+"/3): "+detail;
             }else{
               feed=candidate;
               if(attempt>1)status.retriedPages.push(page);
@@ -860,10 +870,10 @@ async function renderUnifiedBoard(){
           }catch(error){
             lastPageError=String(error?.message||error||"live quote fetch failed");
           }
-          if(attempt<2)await new Promise(resolve=>window.setTimeout(resolve,350));
+          if(attempt<3)await new Promise(resolve=>window.setTimeout(resolve,attempt===1?350:700));
         }
         if(!feed){
-          status.failureReason="page "+page+" failed after one retry: "+String(lastPageError||"unknown live quote error");
+          status.failureReason="page "+page+" failed after three attempts: "+String(lastPageError||"unknown live quote error");
           status.failedPage=page;
           break;
         }
