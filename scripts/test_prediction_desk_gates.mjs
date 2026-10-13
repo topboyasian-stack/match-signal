@@ -317,6 +317,23 @@ assert.equal(primaryPrediction([staleHigh, passingLowerEstimate]).pick, "over", 
 const best = qualifiedBestSelections([staleHigh, passingLowerEstimate], Date.now());
 assert.equal(best.rows.length, 1, "one best qualified selection per fixture");
 assert.equal(best.rows[0].pick, "over", "qualified shortlist selects the current-price pass");
+// Qualified Best display order must follow kickoff time, not expected-return ranking.
+const kickoffSortNow=Date.now();
+const earlyKickoff=row({
+  event_id:"kickoff-order-early",
+  start_time:new Date(kickoffSortNow+20*60*1000).toISOString(),
+  probability:0.65
+});
+const laterHighReturnKickoff=row({
+  event_id:"kickoff-order-late",
+  start_time:new Date(kickoffSortNow+90*60*1000).toISOString(),
+  probability:0.90
+});
+const kickoffSorted=qualifiedBestSelections([laterHighReturnKickoff,earlyKickoff],kickoffSortNow);
+assert.equal(kickoffSorted.rows.length,2,"both independently qualified fixtures remain visible");
+assert.equal(kickoffSorted.rows[0].event_id,"kickoff-order-early","the earlier kickoff appears first even when the later fixture has higher expected return");
+assert.ok(Date.parse(kickoffSorted.rows[0].start_time)<Date.parse(kickoffSorted.rows[1].start_time),"all Qualified Best rows are ordered by increasing kickoff time");
+
 const past = row({ start_time: new Date(Date.now() - 60 * 1000).toISOString() });
 assert.equal(qualifiedBestSelections([past], Date.now()).rows.length, 0, "past-kickoff rows never enter Qualified Best");
 const vfootball = row({ sport: "virtual", product: "vfootball", event_id: "vfb-1" });
