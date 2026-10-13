@@ -24,10 +24,10 @@ def workflow_push_paths(source: str) -> set[str]:
 
 
 def workflow_schedule_crons(source: str) -> list[str]:
-    start = source.find("  schedule:\\n")
+    start = source.find("  schedule:\n")
     if start < 0:
         return []
-    end = source.find("\\n  workflow_dispatch:", start)
+    end = source.find("\n  workflow_dispatch:", start)
     if end < 0:
         return []
     return [
@@ -47,7 +47,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         crons = workflow_schedule_crons(MONITOR_WORKFLOW)
         self.assertIn("6-59/5 * * * *", crons)
         self.assertNotIn("*/5 * * * *", crons)
-        events_end = MONITOR_WORKFLOW.find("\\npermissions:")
+        events_end = MONITOR_WORKFLOW.find("\npermissions:")
         self.assertGreater(events_end, 0)
         events = MONITOR_WORKFLOW[:events_end]
         self.assertIn('      - "Deploy Match Signal to Cloudflare Pages"', events)
