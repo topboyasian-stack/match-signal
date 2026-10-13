@@ -36,9 +36,9 @@ for (const [name, css, scope] of scopes) {
 }
 
 for (const [name, html, scope, href, marker] of [
-  ["Odds Builder", oddsHtml, 'data-page="odds-builder"', "odds-builder-design.css?v=20261013-terminal1", "MS-ODDS-BUILDER-2026.10.13-TERMINAL1"],
-  ["Reports", reportsHtml, 'data-page="reports"', "reports-design.css?v=20261013-terminal1", "MS-REPORTS-2026.10.13-TERMINAL1"],
-  ["Virtual Lab", labHtml, 'data-page="virtual-lab"', "../virtual-lab-terminal.css?v=20261013-terminal1", "MS-VIRTUAL-LAB-V1-2026.10.13-TERMINAL1"]
+  ["Odds Builder", oddsHtml, 'data-page="odds-builder"', "odds-builder-design.css?v=20261014-terminal2", "MS-ODDS-BUILDER-2026.10.14-TERMINAL2"],
+  ["Reports", reportsHtml, 'data-page="reports"', "reports-design.css?v=20261014-terminal2", "MS-REPORTS-2026.10.14-TERMINAL2"],
+  ["Virtual Lab", labHtml, 'data-page="virtual-lab"', "../virtual-lab-terminal.css?v=20261014-terminal2", "MS-VIRTUAL-LAB-V1-2026.10.14-TERMINAL2"]
 ]) {
   assert.ok(html.includes(scope), name + " must carry its page scope");
   assert.ok(html.includes(href), name + " must load the versioned design layer");
@@ -66,11 +66,21 @@ for (const path of directPaths) {
 }
 assert.ok(deploy.includes("node scripts/test_workspace_terminal_design.mjs"), "production promotion must run workspace visual regressions");
 for (const marker of [
-  "odds-builder-design.css?v=20261013-terminal1",
-  "reports-design.css?v=20261013-terminal1",
-  "../virtual-lab-terminal.css?v=20261013-terminal1"
+  "odds-builder-design.css?v=20261014-terminal2",
+  "reports-design.css?v=20261014-terminal2",
+  "../virtual-lab-terminal.css?v=20261014-terminal2"
 ]) {
   assert.ok(deploy.includes(marker), "production smoke tests must verify asset wiring: " + marker);
 }
+
+
+for (const [name, css, marker] of [
+  ["Odds Builder", oddsCss, "MATCH-SIGNAL-DESIGN-V2: ODDS BUILDER HIGH-CONTRAST VISUAL DELTA"],
+  ["Reports", reportsCss, "MATCH-SIGNAL-DESIGN-V2: REPORTS HIGH-CONTRAST ANALYTICS VISUAL DELTA"],
+  ["Virtual Lab", labCss, "MATCH-SIGNAL-DESIGN-V2: VIRTUAL LAB HIGH-CONTRAST RESEARCH VISUAL DELTA"]
+]) assert.ok(css.includes(marker), name + " must ship the distinct V2 visual treatment");
+assert.ok(oddsCss.includes('"PAPER MODE  /  EXACT-QUOTE GATES"'), "Odds Builder must show its mode ribbon");
+assert.ok(reportsCss.includes('"READ-ONLY  /  EVIDENCE & TRACK RECORD"'), "Reports must show its evidence ribbon");
+assert.ok(labCss.includes(".labJump button"), "Virtual Lab must show the new navigation treatment");
 
 console.log("Workspace terminal design regressions passed: page-scoped styles, responsive/accessibility behavior, unchanged mounts/scripts, and guarded promotion wiring.");
