@@ -7,6 +7,7 @@ const entryPages = await Promise.all(["../index.html", "../upcoming.html", "../q
   readFile(new URL(path, import.meta.url), "utf8")
 ));
 const headerRules = await readFile(new URL("../_headers", import.meta.url), "utf8");
+const deployWorkflow = await readFile(new URL("../.github/workflows/cloudflare-pages.yml", import.meta.url), "utf8");
 assert.match(headerRules,/\/upcoming\.html\s*\n\s*Cache-Control:\s*no-store, no-cache, must-revalidate, max-age=0/,"the Upcoming entry HTML must not remain cached after a renderer deployment");
 assert.match(headerRules,/\/qualified-best\.html\s*\n\s*Cache-Control:\s*no-store, no-cache, must-revalidate, max-age=0/,"the standalone Qualified Best HTML must not remain cached after a renderer deployment");
 const rendererVersions = entryPages.map(html =>
@@ -15,6 +16,7 @@ const rendererVersions = entryPages.map(html =>
 assert.ok(rendererVersions.every(Boolean), "both Upcoming entry pages must load a versioned Prediction Desk renderer");
 assert.equal(rendererVersions[0], rendererVersions[1], "root and /upcoming.html must use the same renderer cache key");
 assert.ok(rendererVersions.every(version=>version===rendererVersions[0]), "the dedicated Qualified Best page must use the shared renderer cache key");
+assert.ok(deployWorkflow.includes("sport-hubs.js?v="+rendererVersions[0]), "Cloudflare production smoke tests must expect the active shared renderer cache key");
 assert.match(entryPages[2],/data-page="qualified-best"/,"Qualified Best has a dedicated rendering mode");
 assert.match(entryPages[2],/id="qualifiedBestLastSeenBoard"/,"the dedicated page exposes its last-seen, not-current section");
 assert.notEqual(rendererVersions[0], "20261013-qualified-best-standalone-lastseen2-full-list", "the script cache key must change when the renderer fix changes");
