@@ -5,8 +5,8 @@ on:
     # Independent production verification, separate from the board builder.
     # The main pipeline can appear healthy while browser-side qualification is broken.
     # Use this new workflow path to re-register the cron; keep the strict cadence guard.
-    # Run before the board's :04/:09/:14... cadence, off minute zero, and every five minutes.
-    - cron: '3-59/5 * * * *'
+    # Explicit staggered minute list avoids minute zero and the board's :04/:09/:14... cadence.
+    - cron: '2,7,12,17,22,27,32,37,42,47,52,57 * * * *'
   workflow_dispatch:
   workflow_run:
     # Start browser verification only after Cloudflare confirms its deployment.
