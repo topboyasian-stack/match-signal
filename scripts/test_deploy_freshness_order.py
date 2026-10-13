@@ -53,14 +53,28 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn('      - "Deploy Match Signal to Cloudflare Pages"', events)
         self.assertIn("    types: [completed]", events)
 
-    def test_pages_deploy_is_triggered_only_after_successful_unified_board(self):
-        events_end = PAGES_WORKFLOW.find("\npermissions:")
+    def test_pages_deploy_is_board_driven_with_guarded_cache_only_promotion(self):
+        events_end = PAGES_WORKFLOW.find("\\npermissions:")
         self.assertGreater(events_end, 0)
         events = PAGES_WORKFLOW[:events_end]
-        self.assertNotRegex(events, r"(?m)^  push:")
         self.assertIn('      - "Match Signal Unified Upcoming Board"', events)
         self.assertIn("    types: [completed]", events)
         self.assertIn("  workflow_dispatch:", events)
+
+        # Only cache/static entry files can trigger direct promotion; the workflow
+        # also checks the actual commit file list before it deploys that push.
+        direct_paths = workflow_push_paths(PAGES_WORKFLOW)
+        self.assertEqual(direct_paths, {"_headers", "index.html", "upcoming.html", "qualified-best.html"})
+        self.assertIn("name: Guard cache-only direct promotion", PAGES_WORKFLOW)
+        self.assertIn("if: github.event_name == 'push'", PAGES_WORKFLOW)
+        self.assertIn("compare/${BEFORE_SHA}...${PUSH_SHA}", PAGES_WORKFLOW)
+        for allowed_path in (
+            "_headers", "index.html", "upcoming.html", "qualified-best.html",
+            ".github/workflows/cloudflare-pages.yml",
+            "scripts/test_deploy_freshness_order.py",
+            "scripts/test_prediction_desk_gates.mjs",
+        ):
+            self.assertIn(allowed_path, PAGES_WORKFLOW)
 
     def test_pages_inputs_route_through_board_workflow(self):
         board_paths = workflow_push_paths(BOARD_WORKFLOW)
