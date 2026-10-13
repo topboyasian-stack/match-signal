@@ -1,0 +1,76 @@
+name: Temporary Cloudflare Pages Route Diagnostic
+
+on:
+  push:
+    branches:
+      - diagnostics/pages-route-check-20261013
+    paths:
+      - ".github/workflows/pages-route-diagnostic.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Compare production alias, latest deployment URL, and last known successful deployment
+        run: |
+          node --input-type=module <<'NODE'
+          const bases = [
+            { label: 'production-domain', url: 'https://match-signal.pages.dev' },
+            { label: 'latest-deployment-preview', url: 'https://9f81093f.match-signal.pages.dev' },
+            { label: 'previous-successful-deployment-preview', url: 'https://1990e345.match-signal.pages.dev' }
+          ];
+          const paths = [
+            '/',
+            '/football.html',
+            '/qualified-best.html',
+            '/league-logos.js?diagnostic=20261013',
+            '/sport-hubs.css?diagnostic=20261013',
+            '/data/unified_upcoming.json'
+          ];
+          const results = [];
+          for (const base of bases) {
+            for (const path of paths) {
+              const url = base.url + path;
+              try {
+                const response = await fetch(url, {
+                  redirect: 'follow',
+                  signal: AbortSignal.timeout(12000),
+                  headers: { 'user-agent': 'Match-Signal-Pages-Diagnostic/1.0', 'cache-control': 'no-cache' }
+                });
+                const body = await response.text();
+                const item = {
+                  host: base.label,
+                  path,
+                  status: response.status,
+                  ok: response.ok,
+                  content_type: response.headers.get('content-type'),
+                  server: response.headers.get('server'),
+                  cf_ray: response.headers.get('cf-ray'),
+                  location: response.headers.get('location'),
+                  body_prefix: body.replace(/\\s+/g, ' ').slice(0, 260)
+                };
+                results.push(item);
+                console.log(JSON.stringify(item));
+              } catch (error) {
+                const item = { host: base.label, path, error: String(error?.message || error) };
+                results.push(item);
+                console.log(JSON.stringify(item));
+              }
+            }
+          }
+          const summary = bases.map(base => {
+            const rows = results.filter(row => row.host === base.label);
+            return {
+              host: base.label,
+              total: rows.length,
+              http_200: rows.filter(row => row.status === 200).length,
+              http_5xx: rows.filter(row => row.status >= 500).length,
+              network_errors: rows.filter(row => row.error).length
+            };
+          });
+          console.log('DIAGNOSTIC_SUMMARY ' + JSON.stringify(summary));
+          NODE
