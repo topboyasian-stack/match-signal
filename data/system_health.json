@@ -1,26 +1,26 @@
 {
-  "generated_at": "2026-10-13T15:20:03.872042+00:00",
-  "status": "HEALTHY",
-  "critical_issues": 0,
+  "generated_at": "2026-10-13T16:23:20.331185+00:00",
+  "status": "FAIL",
+  "critical_issues": 3,
   "warning_issues": 0,
   "info_issues": 0,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
-      "status": "PASS",
-      "age_hours": 3.57,
+      "status": "STALE",
+      "age_hours": 4.63,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.12,
+      "age_hours": 1.05,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
-      "status": "PASS",
-      "age_hours": 3.52,
+      "status": "STALE",
+      "age_hours": 4.57,
       "threshold_hours": 4
     },
     {
@@ -38,13 +38,13 @@
     {
       "engine": "tennis_forward_discovery",
       "status": "PASS",
-      "age_hours": 0.83,
+      "age_hours": 1.88,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 1.31,
+      "age_hours": 2.36,
       "threshold_hours": 0.5,
       "heartbeat_source": "unified_live_refresh"
     },
@@ -67,7 +67,23 @@
       }
     }
   ],
-  "issues": [],
+  "issues": [
+    {
+      "code": "STALE_CORE_PREDICTION_PIPELINE",
+      "severity": "critical",
+      "detail": "updated_at age 4.63h exceeds 4h"
+    },
+    {
+      "code": "STALE_EXPANSION",
+      "severity": "critical",
+      "detail": "updated_at age 4.57h exceeds 4h"
+    },
+    {
+      "code": "PIPELINE_STALE",
+      "severity": "critical",
+      "detail": "pipeline_status age 4.63h exceeds 4h"
+    }
+  ],
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
   "paper_only": true,
   "prediction_desk_filters": {
