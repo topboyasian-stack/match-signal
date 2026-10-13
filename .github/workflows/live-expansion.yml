@@ -115,7 +115,6 @@ jobs:
             fi
             git commit -m "🤖 Refresh isolated live experimental NBA and Eredivisie signals"
             if git push origin main; then
-              GH_TOKEN="${{ github.token }}" gh workflow run cloudflare-pages.yml --ref main
               exit 0
             fi
             echo "Concurrent main update rejected the push; retrying ($attempt/8)."
