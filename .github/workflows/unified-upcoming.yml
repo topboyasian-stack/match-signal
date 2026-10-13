@@ -14,9 +14,9 @@ on:
     types: [completed]
   schedule:
     # Keep the unified desk live around the clock, including overnight eFootball sessions.
-    # Virtual Lab sync runs at :02/:07/:12...; publish the board one minute later.
-    # Offset away from :00 to reduce the chance of GitHub's scheduled-run load delays.
-    - cron: '3-59/5 * * * *'
+    # Virtual Lab sync runs at :02/:07/:12...; publish the board two minutes later.
+    # Change the registered cron to re-arm schedule delivery; avoid minute zero.
+    - cron: '4-59/5 * * * *'
   push:
     branches: [main]
     paths:
