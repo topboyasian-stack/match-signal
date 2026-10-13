@@ -43,6 +43,8 @@ for (const [name, id] of expected) {
 }
 
 assert.equal(logos.logoIdForCompetition("Unknown Cup"), null, "unknown competitions must not be assigned an unrelated league logo");
+assert.equal(logos.fallbackLabel("England Amateur - U21 Professional Development League"), "PDL", "PDL has a truthful initials fallback if the external image is unavailable");
+assert.ok(logos.fallbackLabel("Unknown Cup"), "unknown competitions must still receive a stable initials fallback");
 assert.equal(logos.logoUrlForCompetition("Unknown Cup"), null, "unknown competitions must not request the wrong logo");
 assert.equal(logos.logoIdForCompetition("UEFA Europa League"), 3, "Europa League remains separate from Champions League");
 assert.equal(logos.logoIdForCompetition("UEFA Conference League"), 848, "Conference League must have its own logo");
