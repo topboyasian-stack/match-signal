@@ -10,6 +10,7 @@ const headerRules = await readFile(new URL("../_headers", import.meta.url), "utf
 const deployWorkflow = await readFile(new URL("../.github/workflows/cloudflare-pages.yml", import.meta.url), "utf8");
 assert.match(headerRules,/\/upcoming\.html\s*\n\s*Cache-Control:\s*no-store, no-cache, must-revalidate, max-age=0/,"the Upcoming entry HTML must not remain cached after a renderer deployment");
 assert.match(headerRules,/\/qualified-best\.html\s*\n\s*Cache-Control:\s*no-store, no-cache, must-revalidate, max-age=0/,"the standalone Qualified Best HTML must not remain cached after a renderer deployment");
+assert.match(headerRules,/\/sport-hubs\.js\s*\n\s*Cache-Control:\s*no-store, no-cache, must-revalidate, max-age=0/,"the shared Prediction Desk renderer must revalidate after deployments");
 const rendererVersions = entryPages.map(html =>
   html.match(/<script src=["']\.\/sport-hubs\.js\?v=([^"']+)["']/)?.[1] || null
 );
@@ -23,6 +24,7 @@ assert.notEqual(rendererVersions[0], "20261013-qualified-best-standalone-lastsee
 assert.notEqual(rendererVersions[0], "20261012-qualified-best-snapshot-scope2", "the script cache key must change when last-good snapshot behavior changes");
 assert.notEqual(rendererVersions[0], "20261013-qualified-best-kickoff-sort1", "the script cache key must change when live qualification diagnostics are added");
 assert.notEqual(rendererVersions[0], "20261013-qualified-best-live-monitor1", "the script cache key must change when transient refresh recovery changes the renderer");
+assert.notEqual(rendererVersions[0], "20261013-qualified-best-upcoming-only1", "the shared renderer cache key must change when the live-verification client needs a forced refresh");
 assert.match(source,/window\.__MATCH_SIGNAL_QUALIFIED_BEST_MONITOR__=\{/, "the real desk gate must emit structured monitor diagnostics");
 assert.match(source,/stage:virtualQuoteRefreshState==="pending"\?"checking":"completed"/, "the monitor must distinguish a still-running quote check from a completed check");
 assert.match(source,/source_fallback_used:sourceFallbackUsed/, "synthetic source-fallback timestamps cannot certify production health");
