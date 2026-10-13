@@ -46,7 +46,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
 
     def test_monitor_schedule_is_staggered_and_deployment_trigger_is_preserved(self):
         crons = workflow_schedule_crons(MONITOR_WORKFLOW)
-        self.assertIn("3-59/5 * * * *", crons)
+        self.assertIn("2,7,12,17,22,27,32,37,42,47,52,57 * * * *", crons)
         self.assertNotIn("*/5 * * * *", crons)
         events_end = MONITOR_WORKFLOW.find("\npermissions:")
         self.assertGreater(events_end, 0)
