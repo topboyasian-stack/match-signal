@@ -69,6 +69,29 @@
     return id ? "https://media.api-sports.io/football/leagues/" + id + ".png" : null;
   }
 
+  function fallbackLabel(name) {
+    const normalized = normalizeCompetitionName(name);
+    if (normalized.includes("professional development league")) return "PDL";
+    const ignored = new Set(["the", "of", "and", "football", "league", "division", "england", "english"]);
+    const words = normalized.split(" ").filter(function (word) {
+      return word && !ignored.has(word);
+    });
+    const label = words.length
+      ? words.slice(0, 3).map(function (word) { return word.replace(/[^a-z0-9]/g, "").slice(0, 1); }).join("")
+      : "FC";
+    return label.toUpperCase().slice(0, 3) || "FC";
+  }
+
+  function fallbackBadge(name) {
+    const badge = document.createElement("span");
+    badge.className = "ms-competition-logo-fallback";
+    badge.textContent = fallbackLabel(name);
+    badge.title = name + " — verified competition image unavailable; initials shown";
+    badge.setAttribute("role", "img");
+    badge.setAttribute("aria-label", badge.title);
+    return badge;
+  }
+
   function enhanceCards(grid) {
     if (!grid || !grid.querySelectorAll) return;
     grid.querySelectorAll(".ms-league").forEach(function (card) {
@@ -80,8 +103,9 @@
       const url = logoUrlForCompetition(name);
 
       if (!url) {
-        // Do not substitute a different league's badge when an alias is unknown.
-        card.dataset.competitionLogoApplied = "unmapped";
+        // Unknown leagues receive their own initials, never another league's logo.
+        header.insertBefore(fallbackBadge(name), title);
+        card.dataset.competitionLogoApplied = "fallback";
         return;
       }
 
@@ -94,8 +118,8 @@
       img.referrerPolicy = "no-referrer";
       img.src = url;
       img.addEventListener("error", function () {
-        // Keep the league name visible and remove broken-image chrome.
-        img.remove();
+        // No broken image: fall back to this competition's initials, not a guessed crest.
+        if (img.isConnected) img.replaceWith(fallbackBadge(name));
       }, { once: true });
       header.insertBefore(img, title);
       card.dataset.competitionLogoApplied = "true";
@@ -105,7 +129,8 @@
   root.MatchSignalLeagueLogos = Object.freeze({
     logoIdForCompetition: logoIdForCompetition,
     logoUrlForCompetition: logoUrlForCompetition,
-    normalizeCompetitionName: normalizeCompetitionName
+    normalizeCompetitionName: normalizeCompetitionName,
+    fallbackLabel: fallbackLabel
   });
 
   function boot() {
