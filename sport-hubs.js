@@ -505,6 +505,12 @@ function isEmptyVirtualQuotePageResponse(feed){
   const sourceState=String(feed?.source_status?.efootball?.status||"").toUpperCase();
   return feed.events.length===0||feed.status==="UPSTREAM_EMPTY"||sourceState==="EMPTY"||sourceState==="ERROR";
 }
+function shouldRetryVirtualQuoteSnapshot(status,attempt,maxAttempts=2){
+  if(Number(attempt)>=Number(maxAttempts))return false;
+  return status?.snapshotAvailable!==true||
+    status?.snapshotComplete!==true||
+    Number(status?.missingRequiredQuoteRows||0)>0;
+}
 function primaryPrediction(rows){
   const rank=x=>{
     const gate=qualificationState(x);
@@ -827,10 +833,12 @@ async function renderUnifiedBoard(){
     let virtualQuoteRetriedPages=[];
     let virtualQuoteMatchedRequiredRows=0;
     let virtualQuoteMissingRequiredRows=0;
+    let virtualQuoteSnapshotAttempts=0;
+    let virtualQuoteFullSnapshotRetry=false;
 
     async function freshVirtualQuoteMap(requiredRows=[]){
       const byEvent={};
-      const status={byEvent,snapshotAvailable:false,snapshotComplete:false,successfulPages:0,retriedPages:[],failureReason:null,requiredQuoteRows:0,matchedRequiredQuoteRows:0,missingRequiredQuoteRows:0};
+      const status={byEvent,snapshotAvailable:false,snapshotComplete:false,successfulPages:0,retriedPages:[],failureReason:null,requiredQuoteRows:0,matchedRequiredQuoteRows:0,missingRequiredQuoteRows:0,snapshotAttempts:0,fullSnapshotRetryAttempted:false};
       const quoteNow=Date.now();
       const required=(Array.isArray(requiredRows)?requiredRows:[]).filter(row=>isRequiredVirtualQuoteRow(row,quoteNow));
       status.requiredQuoteRows=required.length;
@@ -847,7 +855,16 @@ async function renderUnifiedBoard(){
         status.snapshotComplete=true;
         return finish();
       }
-      for(let page=1;page<=5;page++){
+      for(let snapshotAttempt=1;snapshotAttempt<=2;snapshotAttempt++){
+        status.snapshotAttempts=snapshotAttempt;
+        if(snapshotAttempt>1){
+          // A valid HTTP response can still omit a candidate while upstream pages shift.
+          // Re-scan from page 1 once, keeping only provider-observed quotes and their original timestamps.
+          status.failureReason=null;
+          status.failedPage=undefined;
+          status.fullSnapshotRetryAttempted=true;
+        }
+        for(let page=1;page<=5;page++){
         let feed=null;
         let lastPageError=null;
         // Retry a failed page once. A single dropped request should not leave the
@@ -908,6 +925,10 @@ async function renderUnifiedBoard(){
           break;
         }
         if(page===5)status.failureReason="page limit reached before every requested event was found";
+        }
+        finish();
+        if(!shouldRetryVirtualQuoteSnapshot(status,snapshotAttempt,2))break;
+        if(snapshotAttempt<2)await new Promise(resolve=>window.setTimeout(resolve,450));
       }
       return finish();
     }
@@ -1078,6 +1099,8 @@ async function renderUnifiedBoard(){
       virtualQuoteRetriedPages=Array.isArray(fetchedSnapshot?.retriedPages)?fetchedSnapshot.retriedPages:[];
       virtualQuoteMatchedRequiredRows=Number(fetchedSnapshot?.matchedRequiredQuoteRows||0);
       virtualQuoteMissingRequiredRows=Number(fetchedSnapshot?.missingRequiredQuoteRows||0);
+      virtualQuoteSnapshotAttempts=Number(fetchedSnapshot?.snapshotAttempts||0);
+      virtualQuoteFullSnapshotRetry=Boolean(fetchedSnapshot?.fullSnapshotRetryAttempted);
       quoteSnapshot=fetchedSnapshot;
       const fetchedEvents=Object.keys(fetchedSnapshot?.byEvent||{}).length>0;
       if(requiredCount>0&&fetchedSnapshot?.snapshotAvailable===true&&fetchedSnapshot?.snapshotComplete===true&&fetchedEvents){
@@ -1275,6 +1298,8 @@ async function renderUnifiedBoard(){
         live_quote_retried_pages:virtualQuoteRetriedPages,
         live_quote_matched_required_rows:virtualQuoteMatchedRequiredRows,
         live_quote_missing_required_rows:virtualQuoteMissingRequiredRows,
+        live_quote_snapshot_attempts:virtualQuoteSnapshotAttempts,
+        live_quote_full_snapshot_retry:virtualQuoteFullSnapshotRetry,
         live_quote_last_verified_at:virtualQuoteLastVerifiedAt==null?null:new Date(virtualQuoteLastVerifiedAt).toISOString(),
         live_quote_last_verified_age_seconds:virtualQuoteLastVerifiedAt==null?null:Math.floor((Date.now()-virtualQuoteLastVerifiedAt)/1000),
         qualification_rows_count:qualificationRows.length,
