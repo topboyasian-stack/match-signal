@@ -68,17 +68,31 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn("    types: [completed]", events)
         self.assertIn("  workflow_dispatch:", events)
 
-        # Only cache/static entry files can trigger direct promotion; the workflow
-        # also checks the actual commit file list before it deploys that push.
+        # Direct promotion is limited to explicit static page/assets plus their
+        # regression/workflow files. Every changed path is still checked against
+        # the allowlist in the deployment workflow before any production upload.
         direct_paths = workflow_push_paths(PAGES_WORKFLOW)
-        self.assertEqual(direct_paths, {"_headers", "index.html", "upcoming.html", "qualified-best.html"})
+        expected_direct_paths = {
+            "_headers",
+            "index.html",
+            "upcoming.html",
+            "qualified-best.html",
+            "qualified-best-design.css",
+            "scripts/test_qualified_best_design.mjs",
+            "football.html",
+            "sport-hubs.css",
+            "ms-design-system.css",
+            "league-logos.js",
+            "scripts/test_league_logos.mjs",
+            ".github/workflows/cloudflare-pages.yml",
+        }
+        self.assertEqual(direct_paths, expected_direct_paths)
         self.assertIn("name: Guard cache-only direct promotion", PAGES_WORKFLOW)
         self.assertIn("if: github.event_name == 'push'", PAGES_WORKFLOW)
         self.assertIn("compare/${BEFORE_SHA}...${PUSH_SHA}", PAGES_WORKFLOW)
         self.assertIn("const forcedRevalidation=cacheControl.includes('max-age=0')&&cacheControl.includes('must-revalidate')", PAGES_WORKFLOW)
         for allowed_path in (
-            "_headers", "index.html", "upcoming.html", "qualified-best.html",
-            ".github/workflows/cloudflare-pages.yml",
+            *expected_direct_paths,
             "scripts/test_deploy_freshness_order.py",
             "scripts/test_prediction_desk_gates.mjs",
         ):
