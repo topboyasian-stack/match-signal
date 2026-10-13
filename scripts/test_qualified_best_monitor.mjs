@@ -62,6 +62,8 @@ for (const [label, patch, reason] of [
 const freshRequiredQuote = classifyQualifiedBestMonitor({
   ...healthyZero,
   required_quote_rows: 2,
+  live_quote_matched_required_rows: 2,
+  live_quote_missing_required_rows: 0,
   live_quote_last_verified_at: new Date(now - 5 * 60 * 1000).toISOString(),
   current_qualified_count: 0
 }, { nowMs: now });
