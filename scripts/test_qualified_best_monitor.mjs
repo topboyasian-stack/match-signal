@@ -10,6 +10,8 @@ assert.doesNotMatch(workflow, /\n  push:/, "the production browser monitor must 
 assert.match(workflow, /github\.event\.workflow_run\.conclusion == 'success'/, "failed deployments must not trigger a production monitor");
 assert.match(monitorSource, /QUALIFIED_BEST_MONITOR_WORKFLOW_FILE/, "the monitor must query the re-registered workflow path");
 assert.match(monitorSource, /run\.event === "schedule"/, "schedule-gap calculations must compare cron-triggered runs, not deployment-triggered runs");
+assert.match(monitorSource, /firstMainRun/, "an absent first cron must be measured from main-branch workflow activation");
+assert.match(monitorSource, /MONITOR_SCHEDULE_NEVER_OBSERVED|schedule_gap_status: "missing"/, "an unobserved schedule must become a health failure after the startup grace period");
 assert.match(monitorSource, /PRODUCTION_CHECK_RECOVERED_AFTER_RETRY/, "a retry recovery must stay visible as a warning");
 
 
@@ -51,6 +53,7 @@ for (const [label, patch, reason] of [
   ["unavailable quote response", { live_quote_refresh_state: "unavailable" }, "LIVE_QUOTE_REFRESH_UNAVAILABLE"],
   ["cached rather than refreshed quote snapshot", { live_quote_refresh_state: "cached" }, "LIVE_QUOTE_REFRESH_CACHED"],
   ["missing qualified count", { current_qualified_count: null }, "QUALIFIED_COUNT_MISSING_OR_INVALID"],
+  ["first scheduled run never arrives", { schedule_gap_status: "missing", schedule_gap_minutes: 16 }, "MONITOR_SCHEDULE_NEVER_OBSERVED"],
   ["three missed five-minute checks", { schedule_gap_minutes: 16 }, "MONITOR_SCHEDULE_GAP_EXCEEDED"],
   ["long monitoring gap", { schedule_gap_minutes: 40 }, "MONITOR_SCHEDULE_GAP_EXCEEDED"],
   ["browser runtime exception", { page_errors: ["TypeError: test"] }, "BROWSER_RUNTIME_ERRORS"]
@@ -110,6 +113,22 @@ const completeCoverage = classifyQualifiedBestMonitor({
 }, { nowMs: now });
 assert.equal(completeCoverage.status, "healthy", "fully matched exact quote rows preserve valid-zero semantics");
 
+const awaitingFirstScheduleWithinGrace = classifyQualifiedBestMonitor({
+  ...healthyZero,
+  schedule_gap_status: "missing",
+  schedule_gap_minutes: 12
+}, { nowMs: now });
+assert.equal(awaitingFirstScheduleWithinGrace.status, "healthy", "a new monitor gets a short startup grace before its first cron run");
+assert.ok(awaitingFirstScheduleWithinGrace.warnings.includes("MONITOR_SCHEDULE_GAP_COULD_NOT_BE_VERIFIED"));
+
+const firstScheduledBaseline = classifyQualifiedBestMonitor({
+  ...healthyZero,
+  schedule_gap_status: "ok",
+  schedule_gap_minutes: 0
+}, { nowMs: now });
+assert.equal(firstScheduledBaseline.status, "healthy", "the first cron invocation establishes the baseline without false alarm");
+assert.deepEqual(firstScheduledBaseline.warnings, []);
+
 const noScheduleApi = classifyQualifiedBestMonitor({
   ...healthyZero,
   schedule_gap_status: "unknown",
@@ -118,4 +137,4 @@ const noScheduleApi = classifyQualifiedBestMonitor({
 assert.equal(noScheduleApi.status, "healthy");
 assert.ok(noScheduleApi.warnings.includes("MONITOR_SCHEDULE_GAP_COULD_NOT_BE_VERIFIED"));
 
-console.log("Qualified Best monitor tests passed: valid zero vs failed check, source freshness, fallback detection, exact quote verification freshness, browser exceptions, and schedule-gap alerting.");
+console.log("Qualified Best monitor tests passed: valid zero vs failed check, source freshness, fallback detection, exact quote verification freshness, browser exceptions, startup grace, first-cron baseline, and schedule-gap alerting.");
