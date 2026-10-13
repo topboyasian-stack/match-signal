@@ -72,7 +72,7 @@
   function enhanceCards(grid) {
     if (!grid || !grid.querySelectorAll) return;
     grid.querySelectorAll(".ms-league").forEach(function (card) {
-      if (card.dataset.competitionLogoApplied === "true") return;
+      if (card.dataset.competitionLogoApplied) return;
       const header = card.querySelector(".ms-league-top");
       const title = header && header.querySelector("h3");
       if (!header || !title) return;
