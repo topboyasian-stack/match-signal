@@ -9,6 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PAGES_WORKFLOW = (ROOT / ".github/workflows/cloudflare-pages.yml").read_text(encoding="utf-8")
 BOARD_WORKFLOW = (ROOT / ".github/workflows/unified-upcoming.yml").read_text(encoding="utf-8")
+MONITOR_WORKFLOW = (ROOT / ".github/workflows/qualified-best-monitor.yml").read_text(encoding="utf-8")
 
 
 def workflow_push_paths(source: str) -> set[str]:
@@ -22,7 +23,36 @@ def workflow_push_paths(source: str) -> set[str]:
     return set(re.findall(r"^      - '([^']+)'$", source[paths_start:paths_end], re.MULTILINE))
 
 
+def workflow_schedule_crons(source: str) -> list[str]:
+    start = source.find("  schedule:\n")
+    if start < 0:
+        return []
+    body_start = start + len("  schedule:\n")
+    next_event = re.search(r"(?m)^  [A-Za-z_][A-Za-z0-9_-]*:", source[body_start:])
+    end = body_start + next_event.start() if next_event else len(source)
+    return [
+        line.strip().split("'")[1]
+        for line in source[start:end].splitlines()
+        if "- cron: '" in line
+    ]
+
+
 class FreshnessDeployOrderingTests(unittest.TestCase):
+    def test_board_schedule_is_offset_from_hour_boundary(self):
+        crons = workflow_schedule_crons(BOARD_WORKFLOW)
+        self.assertIn("3-59/5 * * * *", crons)
+        self.assertNotIn("*/5 * * * *", crons)
+
+    def test_monitor_schedule_is_staggered_and_deployment_trigger_is_preserved(self):
+        crons = workflow_schedule_crons(MONITOR_WORKFLOW)
+        self.assertIn("1-59/5 * * * *", crons)
+        self.assertNotIn("*/5 * * * *", crons)
+        events_end = MONITOR_WORKFLOW.find("\npermissions:")
+        self.assertGreater(events_end, 0)
+        events = MONITOR_WORKFLOW[:events_end]
+        self.assertIn('      - "Deploy Match Signal to Cloudflare Pages"', events)
+        self.assertIn("    types: [completed]", events)
+
     def test_pages_deploy_is_triggered_only_after_successful_unified_board(self):
         events_end = PAGES_WORKFLOW.find("\npermissions:")
         self.assertGreater(events_end, 0)

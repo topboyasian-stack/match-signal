@@ -4,8 +4,9 @@ on:
   schedule:
     # Independent production verification, separate from the board builder.
     # The main pipeline can appear healthy while browser-side qualification is broken.
-    # Check often enough to catch repeated live-refresh failures before they persist unnoticed.
-    - cron: '*/5 * * * *'
+    # Check every five minutes, staggered between board promotions; the deploy-triggered check remains authoritative.
+    # Offset away from :00 to reduce the chance of GitHub's scheduled-run load delays.
+    - cron: '1-59/5 * * * *'
   workflow_dispatch:
   workflow_run:
     # Start browser verification only after Cloudflare confirms its deployment.
@@ -26,6 +27,7 @@ on:
       - '.github/workflows/unified-upcoming.yml'
       - 'scripts/test_qualified_best_monitor.mjs'
       - 'scripts/qualified_best_monitor_lib.mjs'
+      - 'scripts/test_deploy_freshness_order.py'
       - '.github/workflows/qualified-best-monitor.yml'
       - '.github/workflows/cloudflare-pages.yml'
 permissions:
@@ -48,6 +50,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+      - name: Test freshness-safe scheduled refresh cadence
+        run: python scripts/test_deploy_freshness_order.py
       - name: Check JavaScript syntax
         run: |
           node --check sport-hubs.js
