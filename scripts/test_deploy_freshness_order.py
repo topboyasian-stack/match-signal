@@ -27,9 +27,9 @@ def workflow_schedule_crons(source: str) -> list[str]:
     start = source.find("  schedule:\n")
     if start < 0:
         return []
-    end = source.find("\n  workflow_dispatch:", start)
-    if end < 0:
-        return []
+    body_start = start + len("  schedule:\n")
+    next_event = re.search(r"(?m)^  [A-Za-z_][A-Za-z0-9_-]*:", source[body_start:])
+    end = body_start + next_event.start() if next_event else len(source)
     return [
         line.strip().split("'")[1]
         for line in source[start:end].splitlines()
