@@ -25,6 +25,10 @@ on:
       - 'scripts/efootball_desk_learning.py'
       - 'scripts/test_upcoming_settlement_retention.py'
       - 'scripts/test_prediction_desk_gates.mjs'
+      - 'scripts/qualified_best_monitor.mjs'
+      - 'scripts/qualified_best_monitor_lib.mjs'
+      - 'scripts/test_qualified_best_monitor.mjs'
+      - '.github/workflows/qualified-best-monitor.yml'
       - 'scripts/test_deploy_freshness_order.py'
       - 'scripts/unified_upcoming_cleanup.py'
       - 'scripts/system_health_audit.py'
@@ -150,6 +154,8 @@ jobs:
         run: python scripts/test_upcoming_settlement_retention.py
       - name: Regression-test Prediction Desk qualification and best-line selection
         run: node scripts/test_prediction_desk_gates.mjs
+      - name: Test Qualified Best production monitor outcomes
+        run: node scripts/test_qualified_best_monitor.mjs
       - name: Learn from prior eFootball desk forecasts before rebuilding the board
         run: python scripts/efootball_desk_learning.py
       - name: Build unified upcoming board
