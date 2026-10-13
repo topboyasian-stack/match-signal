@@ -17,6 +17,10 @@ on:
     branches: [main]
     paths:
       - 'sport-hubs.js'
+      - 'football.html'
+      - 'sport-hubs.css'
+      - 'league-logos.js'
+      - 'scripts/test_league_logos.mjs'
       - 'index.html'
       - 'upcoming.html'
       - 'qualified-best.html'
@@ -55,6 +59,8 @@ jobs:
       - name: Check JavaScript syntax
         run: |
           node --check sport-hubs.js
+          node --check league-logos.js
+          node scripts/test_league_logos.mjs
           node --check scripts/qualified_best_monitor.mjs
           node --check scripts/qualified_best_monitor_lib.mjs
           node --check scripts/test_qualified_best_monitor.mjs
