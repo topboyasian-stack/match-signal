@@ -4,7 +4,7 @@ import { classifyQualifiedBestMonitor } from "./qualified_best_monitor_lib.mjs";
 
 const workflow = await readFile(new URL("../.github/workflows/qualified-best-monitor.yml", import.meta.url), "utf8");
 const monitorSource = await readFile(new URL("./qualified_best_monitor.mjs", import.meta.url), "utf8");
-assert.match(workflow, /cron: '\*\/20 \* \* \* \*'/, "the independent monitor keeps a 20-minute cron schedule");
+assert.match(workflow, /cron: '\*\/20 \* \* \* \*'/, "the independent monitor checks production every five minutes");
 assert.match(workflow, /workflow_run:[\s\S]*?workflows:\s*\n\s*- "Deploy Match Signal to Cloudflare Pages"/, "production monitoring starts after the Cloudflare deploy workflow");
 assert.doesNotMatch(workflow, /\n  push:/, "the production browser monitor must not race the Cloudflare deployment on main pushes");
 assert.match(workflow, /github\.event\.workflow_run\.conclusion == 'success'/, "failed deployments must not trigger a production monitor");
@@ -24,7 +24,7 @@ const healthyZero = {
   live_quote_last_verified_at: null,
   current_qualified_count: 0,
   schedule_gap_status: "ok",
-  schedule_gap_minutes: 20,
+  schedule_gap_minutes: 5,
   page_errors: []
 };
 const zeroResult = classifyQualifiedBestMonitor(healthyZero, { nowMs: now });
@@ -50,6 +50,7 @@ for (const [label, patch, reason] of [
   ["unavailable quote response", { live_quote_refresh_state: "unavailable" }, "LIVE_QUOTE_REFRESH_UNAVAILABLE"],
   ["cached rather than refreshed quote snapshot", { live_quote_refresh_state: "cached" }, "LIVE_QUOTE_REFRESH_CACHED"],
   ["missing qualified count", { current_qualified_count: null }, "QUALIFIED_COUNT_MISSING_OR_INVALID"],
+  ["three missed five-minute checks", { schedule_gap_minutes: 16 }, "MONITOR_SCHEDULE_GAP_EXCEEDED"],
   ["long monitoring gap", { schedule_gap_minutes: 40 }, "MONITOR_SCHEDULE_GAP_EXCEEDED"],
   ["browser runtime exception", { page_errors: ["TypeError: test"] }, "BROWSER_RUNTIME_ERRORS"]
 ]) {
@@ -79,6 +80,32 @@ const futureRequiredQuote = classifyQualifiedBestMonitor({
   live_quote_last_verified_at: new Date(now + 4 * 60 * 1000).toISOString()
 }, { nowMs: now });
 assert.ok(futureRequiredQuote.reasons.includes("LIVE_QUOTE_VERIFICATION_TIMESTAMP_STALE_OR_FUTURE"));
+
+
+const incompleteCoverage = classifyQualifiedBestMonitor({
+  ...healthyZero,
+  required_quote_rows: 25,
+  live_quote_matched_required_rows: 24,
+  live_quote_missing_required_rows: 1,
+  live_quote_last_verified_at: new Date(now - 30 * 1000).toISOString()
+}, { nowMs: now });
+assert.ok(incompleteCoverage.reasons.includes("REQUIRED_QUOTE_COVERAGE_INCOMPLETE"), "a nominally complete refresh must fail if required candidate quotes remain missing");
+
+const missingCoverageDiagnostics = classifyQualifiedBestMonitor({
+  ...healthyZero,
+  required_quote_rows: 25,
+  live_quote_last_verified_at: new Date(now - 30 * 1000).toISOString()
+}, { nowMs: now });
+assert.ok(missingCoverageDiagnostics.reasons.includes("REQUIRED_QUOTE_COVERAGE_DIAGNOSTICS_MISSING"), "production monitor requires explicit required-row coverage counts");
+
+const completeCoverage = classifyQualifiedBestMonitor({
+  ...healthyZero,
+  required_quote_rows: 25,
+  live_quote_matched_required_rows: 25,
+  live_quote_missing_required_rows: 0,
+  live_quote_last_verified_at: new Date(now - 30 * 1000).toISOString()
+}, { nowMs: now });
+assert.equal(completeCoverage.status, "healthy", "fully matched exact quote rows preserve valid-zero semantics");
 
 const noScheduleApi = classifyQualifiedBestMonitor({
   ...healthyZero,
