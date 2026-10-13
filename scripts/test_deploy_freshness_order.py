@@ -99,6 +99,9 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             *expected_direct_paths,
             "scripts/test_deploy_freshness_order.py",
             "scripts/test_prediction_desk_gates.mjs",
+            "scripts/qualified_best_monitor.mjs",
+            "scripts/test_qualified_best_monitor.mjs",
+            ".github/workflows/qualified-best-live-monitor.yml",
         ):
             self.assertIn(allowed_path, PAGES_WORKFLOW)
 
