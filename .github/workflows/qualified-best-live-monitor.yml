@@ -32,6 +32,7 @@ on:
       - 'scripts/test_qualified_best_monitor.mjs'
       - 'scripts/qualified_best_monitor_lib.mjs'
       - 'scripts/test_deploy_freshness_order.py'
+      - 'scripts/test_sport_hub_design.mjs'
       - '.github/workflows/qualified-best-live-monitor.yml'
       - '.github/workflows/cloudflare-pages.yml'
 permissions:
@@ -66,6 +67,9 @@ jobs:
           node --check scripts/test_qualified_best_monitor.mjs
           node --check functions/api/sportybet-virtual.js
           node --check scripts/test_sportybet_virtual_upcoming_mode.mjs
+          node --check scripts/test_sport_hub_design.mjs
+      - name: Test the sport-hub smoke-test route scope
+        run: node scripts/test_sport_hub_design.mjs
       - name: Test existing Prediction Desk gates
         run: node scripts/test_prediction_desk_gates.mjs
       - name: Test upcoming-only SportyBet proxy mode
