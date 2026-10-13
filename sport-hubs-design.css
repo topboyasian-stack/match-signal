@@ -1,0 +1,297 @@
+/* Match Signal — Premium Analytics Terminal
+   Stage 3: sport hub pages only. This file must remain scoped to data-page="hub". */
+
+body[data-page="hub"] {
+  --ms-bg: #0a1017;
+  --ms-panel: #101a25;
+  --ms-panel2: #142130;
+  --ms-border: #2a3a4b;
+  --ms-text: #edf3f8;
+  --ms-muted: #9aabba;
+  --ms-cyan: #70d7cc;
+  --ms-green: #68d9a7;
+  --ms-amber: #f0c875;
+  background:
+    radial-gradient(820px 360px at 50% -160px, rgba(79,169,174,.11), transparent 75%),
+    linear-gradient(180deg, #0c131c 0%, #0a1017 48%, #090f15 100%);
+  color: var(--ms-text);
+  line-height: 1.55;
+}
+body[data-page="hub"] .ms-wrap {
+  width: min(100%, 1440px);
+  padding: 22px clamp(14px, 2.2vw, 30px) 64px;
+}
+body[data-page="hub"] .ms-wrap:before { display: none; }
+
+/* Shared desk navigation. */
+body[data-page="hub"] .ms-nav {
+  position: sticky;
+  top: 8px;
+  z-index: 40;
+  gap: 14px;
+  padding: 10px 12px;
+  margin: 0 0 22px;
+  border: 1px solid #2b3d4e;
+  border-radius: 15px;
+  background: rgba(11,18,27,.94);
+  box-shadow: 0 10px 28px rgba(0,0,0,.22);
+  backdrop-filter: blur(14px);
+}
+body[data-page="hub"] .ms-mark {
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  border-color: rgba(112,215,204,.38);
+  background: #13242b;
+  box-shadow: none;
+}
+body[data-page="hub"] .ms-mark:after { display: none; }
+body[data-page="hub"] .ms-brand { filter: none; }
+body[data-page="hub"] .ms-brand h1 { font-size: 18px; letter-spacing: -.025em; }
+body[data-page="hub"] .ms-brand p { margin-top: 1px; font-size: 10px; }
+body[data-page="hub"] .ms-tabs { gap: 5px; }
+body[data-page="hub"] .ms-btn {
+  min-height: 36px;
+  padding: 8px 11px;
+  border: 1px solid #2a3b4b;
+  border-radius: 9px;
+  background: #111b26;
+  color: #edf3f8;
+  font-size: 11px;
+  box-shadow: none;
+  transition: background .16s ease, border-color .16s ease;
+}
+body[data-page="hub"] .ms-btn:hover,
+body[data-page="hub"] .ms-btn.active {
+  transform: none;
+  border-color: rgba(112,215,204,.6);
+  background: rgba(112,215,204,.09);
+  box-shadow: none;
+}
+
+/* Page header and metric strip. */
+body[data-page="hub"] .ms-hero {
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 16px;
+  padding: clamp(22px, 3vw, 34px);
+  border: 1px solid #2c4654;
+  border-radius: 18px;
+  background: linear-gradient(110deg, rgba(18,34,46,.98), rgba(13,22,32,.98) 65%, rgba(17,24,37,.98));
+  box-shadow: 0 14px 36px rgba(0,0,0,.20);
+}
+body[data-page="hub"] .ms-hero:after { display: none; }
+body[data-page="hub"] .ms-eyebrow {
+  color: var(--ms-cyan);
+  font-size: 10px;
+  letter-spacing: .13em;
+}
+body[data-page="hub"] .ms-hero h2 {
+  max-width: 900px;
+  margin: 10px 0 11px;
+  font-size: clamp(28px, 3.7vw, 44px);
+  line-height: 1.08;
+  letter-spacing: -.04em;
+  text-wrap: balance;
+}
+body[data-page="hub"] .ms-hero p {
+  max-width: 800px;
+  margin: 0;
+  color: #afbdca;
+  font-size: 13px;
+  line-height: 1.65;
+}
+body[data-page="hub"] .ms-metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 11px;
+  margin-bottom: 16px;
+}
+body[data-page="hub"] .ms-metric {
+  min-width: 0;
+  padding: 15px 16px;
+  border: 1px solid var(--ms-border);
+  border-radius: 14px;
+  background: linear-gradient(145deg, #121e2a, #0e1721);
+  box-shadow: none;
+}
+body[data-page="hub"] .ms-metric:after { display: none; }
+body[data-page="hub"] .ms-metric small {
+  display: block;
+  color: var(--ms-muted);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .075em;
+  line-height: 1.4;
+}
+body[data-page="hub"] .ms-metric strong {
+  margin-top: 7px;
+  font-size: clamp(20px, 2vw, 26px);
+  line-height: 1.2;
+  letter-spacing: -.025em;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+/* Competition cards are the primary navigation, with restrained depth. */
+body[data-page="hub"] .ms-panel {
+  padding: clamp(14px, 1.8vw, 22px);
+  margin-bottom: 16px;
+  border: 1px solid var(--ms-border);
+  border-radius: 18px;
+  background: rgba(14,22,32,.96);
+  box-shadow: 0 12px 32px rgba(0,0,0,.17);
+}
+body[data-page="hub"] .ms-panel-head {
+  align-items: center;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(154,171,186,.13);
+  margin-bottom: 15px;
+}
+body[data-page="hub"] .ms-panel-head h2 {
+  color: #d7e3ed;
+  font-size: 12px;
+  letter-spacing: .09em;
+}
+body[data-page="hub"] .ms-status {
+  padding: 5px 8px;
+  border: 1px solid rgba(104,217,167,.20);
+  border-radius: 999px;
+  background: rgba(104,217,167,.05);
+  color: #b3c4ce;
+  font-size: 10px;
+}
+body[data-page="hub"] .ms-dot {
+  width: 7px;
+  height: 7px;
+  background: var(--ms-green);
+  box-shadow: none;
+}
+body[data-page="hub"] .ms-league-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr));
+  gap: 12px;
+}
+body[data-page="hub"] .ms-league {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid #293b4b;
+  border-radius: 14px;
+  background: linear-gradient(145deg, rgba(18,30,42,.96), rgba(12,20,29,.98));
+  box-shadow: none;
+  transition: border-color .16s ease, background .16s ease, transform .16s ease;
+}
+body[data-page="hub"] .ms-league:hover {
+  transform: translateY(-1px);
+  border-color: rgba(112,215,204,.44);
+  background: linear-gradient(145deg, rgba(20,36,48,.98), rgba(12,20,29,.99));
+}
+body[data-page="hub"] .ms-league-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+body[data-page="hub"] .ms-league h3 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  color: #e6eef5;
+  font-size: 15px;
+  line-height: 1.35;
+  letter-spacing: -.015em;
+  overflow-wrap: anywhere;
+}
+body[data-page="hub"] .ms-badge {
+  flex-shrink: 0;
+  padding: 4px 7px;
+  border: 1px solid rgba(112,215,204,.22);
+  border-radius: 999px;
+  background: rgba(112,215,204,.055);
+  color: #a8dfd8;
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: .035em;
+  text-transform: uppercase;
+}
+body[data-page="hub"] .ms-badge.pending {
+  border-color: rgba(240,200,117,.23);
+  background: rgba(240,200,117,.055);
+  color: #e5cb91;
+}
+body[data-page="hub"] .ms-league p {
+  min-height: 38px;
+  margin: 10px 0 13px;
+  color: var(--ms-muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+body[data-page="hub"] .ms-league a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 38px;
+  padding: 9px 11px;
+  border: 1px solid rgba(112,215,204,.20);
+  border-radius: 9px;
+  background: rgba(112,215,204,.055);
+  color: #d7f0ed;
+  text-align: left;
+  text-decoration: none;
+  font-size: 11px;
+  font-weight: 850;
+  transition: border-color .16s ease, background .16s ease;
+}
+body[data-page="hub"] .ms-league a:hover {
+  border-color: rgba(112,215,204,.48);
+  background: rgba(112,215,204,.10);
+}
+body[data-page="hub"] .ms-note {
+  max-width: 1000px;
+  margin: 12px auto 0;
+  color: var(--ms-muted);
+  font-size: 10px;
+  line-height: 1.65;
+}
+body[data-page="hub"] .ms-empty {
+  padding: 24px;
+  border: 1px dashed #334557;
+  border-radius: 11px;
+  color: #a2b0bf;
+  background: rgba(4,10,16,.25);
+  font-size: 12px;
+  line-height: 1.65;
+  text-align: center;
+}
+body[data-page="hub"] a:focus-visible,
+body[data-page="hub"] button:focus-visible,
+body[data-page="hub"] input:focus-visible,
+body[data-page="hub"] select:focus-visible {
+  outline: 2px solid #70d7cc;
+  outline-offset: 3px;
+}
+
+@media (max-width: 900px) {
+  body[data-page="hub"] .ms-nav { position: relative; top: auto; }
+  body[data-page="hub"] .ms-metrics { grid-template-columns: repeat(3, minmax(0,1fr)); }
+  body[data-page="hub"] .ms-league-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%,260px),1fr)); }
+}
+@media (max-width: 640px) {
+  body[data-page="hub"] .ms-nav { align-items: flex-start; }
+  body[data-page="hub"] .ms-metrics { grid-template-columns: 1fr; }
+  body[data-page="hub"] .ms-hero { padding: 20px 17px; }
+  body[data-page="hub"] .ms-hero h2 { font-size: 30px; }
+  body[data-page="hub"] .ms-league-grid { grid-template-columns: 1fr; }
+  body[data-page="hub"] .ms-league p { min-height: 0; }
+  body[data-page="hub"] .ms-league-top { align-items: flex-start; }
+  body[data-page="hub"] .ms-league-top .ms-competition-logo { flex: 0 0 38px; width: 38px; height: 38px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  body[data-page="hub"] *,
+  body[data-page="hub"] *::before,
+  body[data-page="hub"] *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
