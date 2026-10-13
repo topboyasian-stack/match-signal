@@ -4,7 +4,8 @@ on:
   schedule:
     # Independent production verification, separate from the board builder.
     # The main pipeline can appear healthy while browser-side qualification is broken.
-    - cron: '*/20 * * * *'
+    # Check often enough to catch repeated live-refresh failures before they persist unnoticed.
+    - cron: '*/5 * * * *'
   workflow_dispatch:
   workflow_run:
     # Start browser verification only after Cloudflare confirms its deployment.

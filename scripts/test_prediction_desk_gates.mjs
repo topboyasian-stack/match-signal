@@ -42,6 +42,49 @@ assert.match(source,/const lastSeenDisplayLimit=qualifiedOnly\?40:12/,"the dedic
 assert.match(source,/usedLastGoodSnapshot:true/,"a partial refresh can reuse the last complete verified snapshot");
 assert.match(source,/holdVerifiedBoardDuringRefresh/,"the previously verified shortlist remains visible while the next refresh is pending");
 assert.match(source,/lastVerifiedVirtualSnapshotUsable\(lastVerifiedVirtualQuoteSnapshot,Date\.now\(\)\)/,"the cache reuse path is guarded by the last-snapshot freshness limit");
+assert.match(source,/loadLastVerifiedVirtualQuoteSnapshot\(window\.localStorage,Date\.now\(\)\)/,"a still-fresh complete snapshot can survive a page reload in the same browser storage");
+assert.match(source,/persistLastVerifiedVirtualQuoteSnapshot\(lastVerifiedVirtualQuoteSnapshot\)/,"only successfully complete snapshots are persisted");
+assert.match(source,/for\(let attempt=1;attempt<=2;attempt\+\+\)/,"an individual transient quote-page failure is retried once before the refresh is marked incomplete");
+assert.match(source,/live_quote_missing_required_rows:virtualQuoteMissingRequiredRows/,"monitor diagnostics expose unmatched required quote rows");
+assert.match(source,/live_quote_retried_pages:virtualQuoteRetriedPages/,"monitor diagnostics expose which pages needed a retry");
+
+// Persisted last-good quote snapshots may bridge a reload, but the same 15-minute
+// verification ceiling applies and incomplete snapshots are never cached as good.
+const cacheStart = source.indexOf("const QUALIFIED_BEST_LAST_GOOD_QUOTES_STORAGE_KEY=");
+const cacheEnd = source.indexOf("function rowFixtureKey(", cacheStart);
+assert.ok(cacheStart >= 0 && cacheEnd > cacheStart, "last-good snapshot persistence helpers are extractable");
+const stored = new Map();
+const mockStorage = {
+  getItem: key => stored.has(key) ? stored.get(key) : null,
+  setItem: (key, value) => stored.set(key, String(value)),
+  removeItem: key => stored.delete(key)
+};
+const cacheSandbox = { Date, JSON, Object, Number, Math, window: { localStorage: mockStorage } };
+vm.createContext(cacheSandbox);
+vm.runInContext(
+  source.slice(cacheStart, cacheEnd) +
+    "\n;globalThis.__quoteCacheApi={QUALIFIED_BEST_LAST_GOOD_QUOTES_STORAGE_KEY,loadLastVerifiedVirtualQuoteSnapshot,persistLastVerifiedVirtualQuoteSnapshot,lastVerifiedVirtualSnapshotUsable};",
+  cacheSandbox,
+  { filename: "sport-hubs.js#last-good-quote-storage" }
+);
+const quoteCacheApi = cacheSandbox.__quoteCacheApi;
+const quoteCacheNow = Date.now();
+const verifiedCache = {
+  snapshotAvailable: true,
+  snapshotComplete: true,
+  verifiedAt: quoteCacheNow,
+  byEvent: { "quote-cache-event": [{ event_id: "quote-cache-event", __quote_fetched_at: new Date(quoteCacheNow).toISOString() }] }
+};
+assert.equal(quoteCacheApi.persistLastVerifiedVirtualQuoteSnapshot(verifiedCache, mockStorage), true, "complete fresh snapshots can be persisted");
+const loadedCache = quoteCacheApi.loadLastVerifiedVirtualQuoteSnapshot(mockStorage, quoteCacheNow);
+assert.equal(loadedCache.verifiedAt, quoteCacheNow, "a page reload can restore the still-fresh snapshot");
+assert.equal(quoteCacheApi.persistLastVerifiedVirtualQuoteSnapshot({ ...verifiedCache, snapshotComplete: false }, mockStorage), false, "partial snapshots are never persisted as last-good");
+mockStorage.setItem(quoteCacheApi.QUALIFIED_BEST_LAST_GOOD_QUOTES_STORAGE_KEY, JSON.stringify({
+  ...verifiedCache,
+  verifiedAt: quoteCacheNow - 16 * 60 * 1000
+}));
+assert.equal(quoteCacheApi.loadLastVerifiedVirtualQuoteSnapshot(mockStorage, quoteCacheNow), null, "snapshots older than 15 minutes are purged");
+assert.equal(mockStorage.getItem(quoteCacheApi.QUALIFIED_BEST_LAST_GOOD_QUOTES_STORAGE_KEY), null, "expired snapshot storage is removed");
 
 const start = source.indexOf("function isOverUnderPrediction(x){");
 const end = source.indexOf("function ladderAnchor(rows){", start);

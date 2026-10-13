@@ -173,13 +173,40 @@ function isRequiredVirtualQuoteRow(row,now=Date.now()){
  * while its verification is at most 15 minutes old. exactSportyBetQuote still
  * checks each row's own observed timestamp, exact line/side and value gates.
  */
-let lastVerifiedVirtualQuoteSnapshot=null;
+const QUALIFIED_BEST_LAST_GOOD_QUOTES_STORAGE_KEY="match-signal-qualified-best-live-quotes-v1";
 function lastVerifiedVirtualSnapshotUsable(snapshot,now=Date.now()){
   if(snapshot?.snapshotAvailable!==true||snapshot?.snapshotComplete!==true)return false;
   const verifiedAt=Number(snapshot?.verifiedAt);
   return Number.isFinite(verifiedAt)&&verifiedAt<=now+2*60*1000&&
     now-verifiedAt<=15*60*1000&&Object.keys(snapshot?.byEvent||{}).length>0;
 }
+function loadLastVerifiedVirtualQuoteSnapshot(storage,now=Date.now()){
+  try{
+    const raw=storage?.getItem(QUALIFIED_BEST_LAST_GOOD_QUOTES_STORAGE_KEY);
+    if(!raw)return null;
+    const snapshot=JSON.parse(raw);
+    if(!lastVerifiedVirtualSnapshotUsable(snapshot,now)){
+      try{storage.removeItem(QUALIFIED_BEST_LAST_GOOD_QUOTES_STORAGE_KEY);}catch(_){}
+      return null;
+    }
+    return snapshot;
+  }catch(_){return null;}
+}
+function persistLastVerifiedVirtualQuoteSnapshot(snapshot,storage){
+  if(!lastVerifiedVirtualSnapshotUsable(snapshot,Date.now()))return false;
+  try{
+    const targetStorage=storage||(typeof window!=="undefined"?window.localStorage:null);
+    if(!targetStorage)return false;
+    targetStorage.setItem(QUALIFIED_BEST_LAST_GOOD_QUOTES_STORAGE_KEY,JSON.stringify(snapshot));
+    return true;
+  }catch(_){return false;}
+}
+let lastVerifiedVirtualQuoteSnapshot=null;
+try{
+  // Bridge full-page reloads only with a previously complete snapshot. Each row
+  // still has to pass the exact event/line/side and 15-minute price gates below.
+  lastVerifiedVirtualQuoteSnapshot=loadLastVerifiedVirtualQuoteSnapshot(window.localStorage,Date.now());
+}catch(_){}
 function rowFixtureKey(x){
   const norm=s=>String(s||"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
   const sport=String(x.sport||"").toLowerCase();
@@ -790,27 +817,54 @@ async function renderUnifiedBoard(){
     let virtualQuoteRefreshState="pending";
     let virtualQuoteLastVerifiedAt=null;
     let virtualRequiredQuoteCount=0;
+    let virtualQuoteFailureReason=null;
+    let virtualQuoteSuccessfulPages=0;
+    let virtualQuoteRetriedPages=[];
+    let virtualQuoteMatchedRequiredRows=0;
+    let virtualQuoteMissingRequiredRows=0;
 
     async function freshVirtualQuoteMap(requiredRows=[]){
       const byEvent={};
-      const status={byEvent,snapshotAvailable:false,snapshotComplete:false,successfulPages:0,failureReason:null};
+      const status={byEvent,snapshotAvailable:false,snapshotComplete:false,successfulPages:0,retriedPages:[],failureReason:null,requiredQuoteRows:0,matchedRequiredQuoteRows:0,missingRequiredQuoteRows:0};
       const quoteNow=Date.now();
       const required=(Array.isArray(requiredRows)?requiredRows:[]).filter(row=>isRequiredVirtualQuoteRow(row,quoteNow));
+      status.requiredQuoteRows=required.length;
+      const countMatched=()=>required.filter(row=>
+        (byEvent[String(row?.event_id||"")]||[]).some(event=>sameVirtualEvent(row,event))
+      ).length;
+      const finish=()=>{
+        status.matchedRequiredQuoteRows=countMatched();
+        status.missingRequiredQuoteRows=Math.max(0,status.requiredQuoteRows-status.matchedRequiredQuoteRows);
+        return status;
+      };
       if(!required.length){
         status.snapshotAvailable=true;
         status.snapshotComplete=true;
-        return status;
+        return finish();
       }
       for(let page=1;page<=5;page++){
-        let feed;
-        try{
-          feed=await get('./api/sportybet-virtual?sources=efootball&pageSize=100&pageNum='+page+'&timeline=168');
-        }catch(error){
-          status.failureReason=String(error?.message||error||"live quote fetch failed");
-          break;
+        let feed=null;
+        let lastPageError=null;
+        // Retry a failed page once. A single dropped request should not leave the
+        // whole desk in the incomplete-snapshot state for another two-minute cycle.
+        for(let attempt=1;attempt<=2;attempt++){
+          try{
+            const candidate=await get('./api/sportybet-virtual?sources=efootball&pageSize=100&pageNum='+page+'&timeline=168');
+            if(!candidate||candidate.ok===false||!Array.isArray(candidate.events)){
+              lastPageError="live quote response is not a usable event snapshot";
+            }else{
+              feed=candidate;
+              if(attempt>1)status.retriedPages.push(page);
+              break;
+            }
+          }catch(error){
+            lastPageError=String(error?.message||error||"live quote fetch failed");
+          }
+          if(attempt<2)await new Promise(resolve=>window.setTimeout(resolve,350));
         }
-        if(!feed||feed.ok===false||!Array.isArray(feed.events)){
-          status.failureReason="live quote response is not a usable event snapshot";
+        if(!feed){
+          status.failureReason="page "+page+" failed after one retry: "+String(lastPageError||"unknown live quote error");
+          status.failedPage=page;
           break;
         }
         status.snapshotAvailable=true;
@@ -833,18 +887,19 @@ async function renderUnifiedBoard(){
         }
         const sourceErrors=Object.values(feed.source_status||{}).some(item=>String(item?.status||"").toUpperCase()==="ERROR");
         const feedErrors=Array.isArray(feed.errors)&&feed.errors.length>0;
-        // Empty/upstream-error responses cannot prove an old event disappeared.
+        // Empty/upstream-error responses cannot prove that an old event disappeared.
         if(virtualSnapshotHasCompleteFirstPage(feed,events.length,sourceErrors,feedErrors)){
           status.snapshotComplete=true;
           break;
         }
         if(events.length===0||feed.status==="UPSTREAM_EMPTY"){
           status.failureReason=sourceErrors||feedErrors?"upstream feed reported an error or empty source":"upstream snapshot contained no events";
+          status.failedPage=page;
           break;
         }
         if(page===5)status.failureReason="page limit reached before every requested event was found";
       }
-      return status;
+      return finish();
     }
     function freshVirtualQuoteFields(row,live){
       if(!row||!live||String(row?.market||"").toLowerCase()!=="over_under")return row;
@@ -1008,6 +1063,11 @@ async function renderUnifiedBoard(){
       requiredCount=requiredQuoteRows.length;
       virtualRequiredQuoteCount=requiredCount;
       const fetchedSnapshot=await freshVirtualQuoteMap(requiredQuoteRows);
+      virtualQuoteFailureReason=fetchedSnapshot?.failureReason||null;
+      virtualQuoteSuccessfulPages=Number(fetchedSnapshot?.successfulPages||0);
+      virtualQuoteRetriedPages=Array.isArray(fetchedSnapshot?.retriedPages)?fetchedSnapshot.retriedPages:[];
+      virtualQuoteMatchedRequiredRows=Number(fetchedSnapshot?.matchedRequiredQuoteRows||0);
+      virtualQuoteMissingRequiredRows=Number(fetchedSnapshot?.missingRequiredQuoteRows||0);
       quoteSnapshot=fetchedSnapshot;
       const fetchedEvents=Object.keys(fetchedSnapshot?.byEvent||{}).length>0;
       if(requiredCount>0&&fetchedSnapshot?.snapshotAvailable===true&&fetchedSnapshot?.snapshotComplete===true&&fetchedEvents){
@@ -1017,6 +1077,7 @@ async function renderUnifiedBoard(){
           verifiedAt:Date.now(),
           byEvent:fetchedSnapshot.byEvent
         };
+        persistLastVerifiedVirtualQuoteSnapshot(lastVerifiedVirtualQuoteSnapshot);
         quoteSnapshot={...fetchedSnapshot,usedLastGoodSnapshot:false,lastVerifiedAt:lastVerifiedVirtualQuoteSnapshot.verifiedAt};
       }else if(requiredCount>0&&lastVerifiedVirtualSnapshotUsable(lastVerifiedVirtualQuoteSnapshot,Date.now())){
         // Reuse one coherent, last-complete event snapshot after a transient fetch failure.
@@ -1199,6 +1260,11 @@ async function renderUnifiedBoard(){
         required_quote_rows:virtualRequiredQuoteCount,
         virtual_snapshot_qualified_fixture_count:virtualSnapshotQualifiedFixtureCount,
         live_quote_refresh_state:virtualQuoteRefreshState,
+        live_quote_failure_reason:virtualQuoteFailureReason,
+        live_quote_successful_pages:virtualQuoteSuccessfulPages,
+        live_quote_retried_pages:virtualQuoteRetriedPages,
+        live_quote_matched_required_rows:virtualQuoteMatchedRequiredRows,
+        live_quote_missing_required_rows:virtualQuoteMissingRequiredRows,
         live_quote_last_verified_at:virtualQuoteLastVerifiedAt==null?null:new Date(virtualQuoteLastVerifiedAt).toISOString(),
         live_quote_last_verified_age_seconds:virtualQuoteLastVerifiedAt==null?null:Math.floor((Date.now()-virtualQuoteLastVerifiedAt)/1000),
         qualification_rows_count:qualificationRows.length,
@@ -1215,7 +1281,7 @@ async function renderUnifiedBoard(){
           :virtualViewActive&&virtualQuoteRefreshState==="unavailable"&&virtualSnapshotQualifiedFixtureCount>0
             ?"Live SportyBet verification is unavailable. "+virtualSnapshotQualifiedFixtureCount+" snapshot-level qualified fixtures are being held back; stale prices are not being shown as current."
             :virtualViewActive&&virtualQuoteRefreshState==="partial"
-              ?"Live SportyBet snapshot is incomplete. Only candidates with an exact line/side from this refresh are eligible; unverified snapshot rows are held back."
+              ?"Live SportyBet snapshot is incomplete ("+virtualQuoteMatchedRequiredRows+"/"+virtualRequiredQuoteCount+" required events matched; "+virtualQuoteSuccessfulPages+" page(s) loaded"+(virtualQuoteRetriedPages.length?"; retried page(s) "+virtualQuoteRetriedPages.join(", "):"")+(virtualQuoteFailureReason?"; last issue: "+virtualQuoteFailureReason:"")+"). The desk will retry automatically. Only verified exact-line/side prices can qualify; unverified rows stay held back."
               :virtualViewActive&&virtualQuoteRefreshState==="complete"&&virtualSnapshotQualifiedFixtureCount>0&&virtualRowsInView
                 ?"0 currently qualified picks after live verification. The saved snapshot had "+virtualSnapshotQualifiedFixtureCount+" snapshot-level qualified fixtures, but none currently pass every exact-line, model-scope, freshness, edge and expected-return gate. Stale prices are not retained."
                 :(best.diagnostics.futureCandidateMarkets===0
@@ -1268,7 +1334,8 @@ async function renderUnifiedBoard(){
       virtualQuoteLastVerifiedAt=Number.isFinite(Number(snapshot?.lastVerifiedAt))?Number(snapshot.lastVerifiedAt):null;
       virtualQuoteRefreshState=snapshot?.usedLastGoodSnapshot?"cached":!snapshot?.snapshotAvailable?"unavailable":snapshot.snapshotComplete?"complete":"partial";
       draw();
-    }).catch(()=>{
+    }).catch(error=>{
+      virtualQuoteFailureReason=String(error?.message||error||"unexpected live quote refresh failure");
       if(lastVerifiedVirtualSnapshotUsable(lastVerifiedVirtualQuoteSnapshot,Date.now())){
         virtualQuoteLastVerifiedAt=lastVerifiedVirtualQuoteSnapshot.verifiedAt;
         virtualQuoteRefreshState="cached";

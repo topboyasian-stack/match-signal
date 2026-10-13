@@ -1,7 +1,7 @@
 export function classifyQualifiedBestMonitor(snapshot, options = {}) {
   const nowMs = Number.isFinite(options.nowMs) ? options.nowMs : Date.now();
   const maxScheduleGapMinutes = Number.isFinite(options.maxScheduleGapMinutes)
-    ? options.maxScheduleGapMinutes : 35;
+    ? options.maxScheduleGapMinutes : 15;
   const problems = [];
   const warnings = [];
 
@@ -35,6 +35,15 @@ export function classifyQualifiedBestMonitor(snapshot, options = {}) {
       if (ageSeconds < -120 || ageSeconds > 15 * 60) {
         problems.push("LIVE_QUOTE_VERIFICATION_TIMESTAMP_STALE_OR_FUTURE");
       }
+    }
+    const matchedRaw = snapshot.live_quote_matched_required_rows;
+    const missingRaw = snapshot.live_quote_missing_required_rows;
+    const matched = matchedRaw === null || matchedRaw === undefined || matchedRaw === "" ? NaN : Number(matchedRaw);
+    const missing = missingRaw === null || missingRaw === undefined || missingRaw === "" ? NaN : Number(missingRaw);
+    if (!Number.isFinite(matched) || !Number.isFinite(missing)) {
+      problems.push("REQUIRED_QUOTE_COVERAGE_DIAGNOSTICS_MISSING");
+    } else if (matched < requiredQuoteRows || missing !== 0) {
+      problems.push("REQUIRED_QUOTE_COVERAGE_INCOMPLETE");
     }
   }
 
