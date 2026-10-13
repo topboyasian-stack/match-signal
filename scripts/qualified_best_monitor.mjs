@@ -245,6 +245,7 @@ async function run() {
       `- **Board timestamp:** ${finalSnapshot.board_generated_at || "unavailable"}`,
       `- **Last quote verification:** ${finalSnapshot.live_quote_last_verified_at || "not required / unavailable"}`,
       `- **Scheduled-run gap:** ${schedule.schedule_gap_minutes ?? "not available"} minute(s)`,
+      `- **Schedule health detail:** ${schedule.schedule_gap_note || "not available"}`,
       "",
       zeroMessage,
       "",
@@ -273,7 +274,9 @@ async function run() {
     qualified_count: result.qualified_count,
     reasons: result.reasons,
     warnings: result.warnings,
+    schedule_gap_status: schedule.schedule_gap_status,
     schedule_gap_minutes: schedule.schedule_gap_minutes,
+    schedule_gap_note: schedule.schedule_gap_note,
     output: outputPath
   }, null, 2));
   if (result.exit_code !== 0) process.exitCode = 1;
