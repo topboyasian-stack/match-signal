@@ -36,6 +36,7 @@ assert.match(source,/filter\(row=>isRequiredVirtualQuoteRow\(row,quoteNow\)\)/,"
 assert.match(source,/const requiredQuoteRows=virtualCandidates\.filter\(row=>isRequiredVirtualQuoteRow\(row,Date\.now\(\)\)\)/,"the completeness check uses only model-qualified candidates inside the live quote window");
 assert.doesNotMatch(source,/const requiredQuoteRows=\[\.\.\.all,\.\.\.virtualCandidates\]/,"unified-board research rows cannot block Qualified Best snapshot completeness");
 assert.match(source,/api\/sportybet-virtual\?sources=efootball&pageSize=100&pageNum=/,"Upcoming quote refresh queries only active eFootball markets");
+assert.ok(source.includes("pageNum='+page+'&timeline=168&includeLive=false'"),"Qualified Best quote verification skips the unrelated live-event source");
 assert.match(source,/let lastVerifiedVirtualQuoteSnapshot=null/,"the last complete snapshot persists across board rerenders");
 assert.match(source,/const qualifiedBestDisplayLimit=qualifiedOnly\?40:12/,"the dedicated page must show the full qualified shortlist while Upcoming remains compact");
 assert.match(source,/const lastSeenDisplayLimit=qualifiedOnly\?40:12/,"the dedicated last-seen page must show the full retained shortlist");
