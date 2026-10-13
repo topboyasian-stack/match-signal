@@ -27,6 +27,7 @@ on:
       - '.github/workflows/unified-upcoming.yml'
       - 'scripts/test_qualified_best_monitor.mjs'
       - 'scripts/qualified_best_monitor_lib.mjs'
+      - 'scripts/test_deploy_freshness_order.py'
       - '.github/workflows/qualified-best-monitor.yml'
       - '.github/workflows/cloudflare-pages.yml'
 permissions:
@@ -49,6 +50,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+      - name: Test freshness-safe scheduled refresh cadence
+        run: python scripts/test_deploy_freshness_order.py
       - name: Check JavaScript syntax
         run: |
           node --check sport-hubs.js
