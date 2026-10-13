@@ -8,6 +8,7 @@ on:
       - ".github/workflows/pages-route-diagnostic.yml"
 
 permissions:
+  actions: read
   contents: read
 
 jobs:
@@ -15,6 +16,37 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
+      - name: Check out current production-monitor code
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install browser monitor dependency
+        run: npm install --no-save playwright
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Re-check Qualified Best in a real browser
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          QUALIFIED_BEST_URL: https://match-signal.pages.dev/qualified-best.html
+        run: node scripts/qualified_best_monitor.mjs
+
+      - name: Save browser diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qualified-best-recheck-${{ github.run_id }}
+          path: qualified-best-monitor-result.json
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Compare production alias, latest deployment URL, and last known successful deployment
         run: |
           node --input-type=module <<'NODE'
