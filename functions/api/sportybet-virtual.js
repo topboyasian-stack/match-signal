@@ -30,6 +30,61 @@ async function upstream(path, params){
   return data;
 }
 
+function edgeInfo(request){
+  const cf=request?.cf||{};
+  return {
+    colo:typeof cf.colo==='string'?cf.colo:null,
+    country:typeof cf.country==='string'?cf.country:null,
+    region:typeof cf.region==='string'?cf.region:null
+  };
+}
+
+async function inspectSportyBetEndpoint(path,params){
+  const url=new URL(ORIGIN+path);
+  for(const [key,value] of Object.entries(params)) url.searchParams.set(key,String(value));
+  const started=Date.now();
+  try{
+    const response=await fetch(url.toString(),{
+      headers:BROWSER_HEADERS,
+      cache:'no-store',
+      signal:AbortSignal.timeout(8000)
+    });
+    const contentType=response.headers.get('content-type')||'unknown';
+    const body=await response.text();
+    let parsed=false,bizCode=null,tournamentCount=null,eventCount=null;
+    try{
+      const data=JSON.parse(body);
+      parsed=true;
+      bizCode=data?.bizCode??null;
+      const rows=Array.isArray(data?.data?.tournaments)?data.data.tournaments:[];
+      tournamentCount=rows.length;
+      eventCount=rows.reduce((total,t)=>total+(Array.isArray(t?.events)?t.events.length:0),0);
+    }catch(_){}
+    return {
+      endpoint:path,
+      status:response.status,
+      ok:response.ok,
+      content_type:contentType,
+      is_json:parsed,
+      biz_code:bizCode,
+      tournament_count:tournamentCount,
+      event_count:eventCount,
+      body_prefix:body.replace(/\\s+/g,' ').slice(0,200),
+      elapsed_ms:Date.now()-started
+    };
+  }catch(error){
+    return {
+      endpoint:path,
+      status:null,
+      ok:false,
+      content_type:null,
+      is_json:false,
+      error:String(error?.message||error||'request failed').slice(0,200),
+      elapsed_ms:Date.now()-started
+    };
+  }
+}
+
 function tournaments(body){
   return Array.isArray(body?.data?.tournaments)?body.data.tournaments:[];
 }
@@ -190,6 +245,38 @@ async function readLastGoodEfootballSnapshot(requestUrl, pageSize, pageNum, time
 
 export async function onRequestGet(context){
   const u=new URL(context.request.url);
+  const edge=edgeInfo(context.request);
+  if(u.searchParams.get('debug')==='1'){
+    const params={
+      sportId:'sr:sport:137',
+      pageSize:1,
+      pageNum:1,
+      todayGames:'false',
+      timeline:168,
+      _t:Date.now()
+    };
+    const [primary,fallback]=await Promise.all([
+      inspectSportyBetEndpoint('/api/ng/factsCenter/pcUpcomingEvents',{
+        ...params,
+        marketId:'1,18,10,29,11,26,36,14,60100,186,189,202,204,210'
+      }),
+      inspectSportyBetEndpoint('/api/ng/factsCenter/wapConfigurableUpcomingEvents',params)
+    ]);
+    return new Response(JSON.stringify({
+      ok:true,
+      diagnostic:'sportybet-upstream-edge-probe-v1',
+      edge,
+      probes:[primary,fallback]
+    },null,2),{
+      status:200,
+      headers:{
+        ...headers(),
+        'Cache-Control':'no-store',
+        'X-Match-Signal-Edge-Colo':edge.colo||'unknown',
+        'X-Match-Signal-Edge-Country':edge.country||'unknown'
+      }
+    });
+  }
   const pageSize=Math.min(Math.max(Number(u.searchParams.get('pageSize')||100),1),100);
   const pageNum=Math.max(Number(u.searchParams.get('pageNum')||1),1);
   const timeline=Math.min(Math.max(Number(u.searchParams.get('timeline')||168),12),720);
@@ -397,6 +484,7 @@ export async function onRequestGet(context){
 
   const payload={
     ok:true,
+    edge,
     feed_contract:'virtual-lab-v2',
     excluded_products:['srl'],
     status:filtered.length?'LIVE':'UPSTREAM_EMPTY',
