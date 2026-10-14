@@ -1,6 +1,6 @@
 {
   "version": 4,
-  "updated_at": "2026-10-14T10:43:11.071717+00:00",
+  "updated_at": "2026-10-14T10:46:22.636309+00:00",
   "mode": "PAPER_ONLY",
   "summary": {
     "tracked_tickets": 179,
@@ -9,10 +9,10 @@
     "lost": 76,
     "active_with_loss": 20,
     "legs_won": 165,
-    "legs_lost": 97,
-    "legs_pending": 213,
+    "legs_lost": 98,
+    "legs_pending": 212,
     "pending_legs_by_product": {
-      "efootball_gt": 213
+      "efootball_gt": 212
     },
     "settled_tickets": 102,
     "by_leg_count": {
@@ -95,11 +95,11 @@
       "high_confidence_loss_tickets": 18,
       "high_confidence_loss_legs": 24,
       "losses_by_product": {
-        "efootball_gt": 74,
+        "efootball_gt": 75,
         "vfootball": 23
       },
       "losses_by_direction": {
-        "under": 84,
+        "under": 85,
         "over": 13
       },
       "shape_comparison": "Use by_leg_count to compare 2–7-leg accuracy, average odds, and average model rating.",
@@ -1385,7 +1385,7 @@
       "batch_id": "BATCH-01",
       "created_at": "2026-10-14T10:05:45.953969+00:00",
       "last_seen_at": "2026-10-14T10:05:45.953969+00:00",
-      "last_settled_at": "2026-10-14T10:43:11.071717+00:00",
+      "last_settled_at": "2026-10-14T10:46:22.636309+00:00",
       "status": "LOST",
       "combined_odds": 6.76,
       "combined_odds_source": "builder_batch_snapshot",
@@ -1402,8 +1402,8 @@
       "primary_lane": "high_confidence_research",
       "odds_locked_at": "2026-10-14T10:05:45.953969+00:00",
       "leg_count": 4,
-      "settled_leg_count": 1,
-      "pending_leg_count": 3,
+      "settled_leg_count": 2,
+      "pending_leg_count": 2,
       "legs": [
         {
           "sport": "virtual",
@@ -1618,7 +1618,7 @@
           "builder_eligible": true,
           "real_money_eligible": false,
           "paper_only": true,
-          "status": "PENDING",
+          "status": "LOST",
           "source": "Exact-line evidence calibration · eFootball value lane",
           "market_source": "SportyBet NG",
           "recent_evidence": {
@@ -1723,10 +1723,13 @@
           "sportybet_outcome_name": "Under 4",
           "fixture_key": "efootball_gt|real madrid dusan v lille osc david",
           "bookmaker_odds_snapshot": 1.88,
-          "correct": null,
-          "settled_at": null,
-          "result": null,
-          "final_score": null
+          "correct": false,
+          "settled_at": "2026-10-14T10:46:22.636309+00:00",
+          "result": "O4",
+          "final_score": [
+            3.0,
+            6.0
+          ]
         },
         {
           "sport": "virtual",
@@ -2058,9 +2061,9 @@
       ],
       "leg_counts": {
         "won": 0,
-        "lost": 1,
+        "lost": 2,
         "void": 0,
-        "pending": 3
+        "pending": 2
       },
       "construction_snapshot": {
         "batch_id": "BATCH-01",
@@ -2097,23 +2100,23 @@
       "settlement_diagnostics": {
         "diagnostic_version": 1,
         "ticket_outcome": "LOST",
-        "diagnostic_label": "TICKET_LOST_1_OF_4_LEGS",
+        "diagnostic_label": "TICKET_LOST_2_OF_4_LEGS",
         "leg_count": 4,
-        "settled_leg_count": 1,
+        "settled_leg_count": 2,
         "won_leg_count": 0,
-        "lost_leg_count": 1,
+        "lost_leg_count": 2,
         "void_leg_count": 0,
-        "pending_leg_count": 3,
+        "pending_leg_count": 2,
         "leg_hit_rate_excluding_voids": 0.0,
         "average_settled_leg_model_probability": 0.8,
         "weakest_ticket_leg_model_probability": 0.8,
         "high_confidence_loss_count": 0,
         "high_confidence_loss_events": [],
         "losses_by_product": {
-          "efootball_gt": 1
+          "efootball_gt": 2
         },
         "losses_by_direction": {
-          "under": 1
+          "under": 2
         },
         "loss_details": [
           {
@@ -2134,6 +2137,25 @@
               2.0
             ],
             "settled_at": "2026-10-14T10:43:11.071717+00:00"
+          },
+          {
+            "event_id": "sr:match:75562078",
+            "match": "Real Madrid (Dusan) vs Lille OSC (David)",
+            "product": "efootball_gt",
+            "pick": "Real Madrid (Dusan) vs Lille OSC (David) — O/U under 4.0",
+            "line": 4.0,
+            "model_probability": 0.8,
+            "model_edge": 0.320776,
+            "bookmaker_odds": 1.88,
+            "evidence_score": 0.721106,
+            "recent_evidence_n": 11,
+            "recent_evidence_hit_rate": 0.9091,
+            "result": "O4",
+            "final_score": [
+              3.0,
+              6.0
+            ],
+            "settled_at": "2026-10-14T10:46:22.636309+00:00"
           }
         ],
         "improvement_keys": {
