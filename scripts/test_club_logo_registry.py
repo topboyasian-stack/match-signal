@@ -13,6 +13,7 @@ from scripts.sync_club_logos import (
     is_football_product,
     license_allowed,
     normalize_team,
+    SEARCH_POLICY_VERSION,
     split_fixture,
 )
 
@@ -132,6 +133,13 @@ class ClubLogoRegistryTests(unittest.TestCase):
             "path": "/assets/club-logos/boca-juniors.png",
         }
         self.assertTrue(_existing_entry_is_safe("boca juniors", good))
+
+    def test_efootball_club_names_have_exact_safe_aliases(self):
+        self.assertIn("FC Barcelona", ALIASES["barcelona"])
+        self.assertIn("FC Internazionale Milano", ALIASES["inter milano"])
+        self.assertIn("Paris Saint-Germain FC", ALIASES["paris saint germain"])
+        self.assertIn("LOSC Lille", ALIASES["lille osc"])
+        self.assertEqual(SEARCH_POLICY_VERSION, 8)
 
     def test_svg_dataset_selection_requires_one_exact_name_match(self):
         paths = [
