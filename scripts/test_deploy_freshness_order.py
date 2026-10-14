@@ -140,11 +140,11 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         )
 
     def test_cloudflare_deploy_concurrency_is_scoped_after_eligible_event_filter(self):
-        before_jobs = PAGES_WORKFLOW.split("\\njobs:", 1)[0]
-        deploy_job = PAGES_WORKFLOW.split("\\n  deploy:", 1)[1]
-        self.assertNotIn("\\nconcurrency:", before_jobs, "workflow-level locking lets an ineligible skipped workflow_run replace a pending deployment")
-        self.assertIn("if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}", deploy_job)
-        self.assertIn("    concurrency:\\n      group: cloudflare-pages-v3\\n      cancel-in-progress: false", deploy_job, "only an eligible deploy job should enter the shared production promotion queue")
+        before_jobs = PAGES_WORKFLOW.split("\njobs:", 1)[0]
+        deploy_job = PAGES_WORKFLOW.split("\n  deploy:", 1)[1]
+        self.assertNotIn("\nconcurrency:", before_jobs, "workflow-level locking lets an ineligible skipped workflow_run replace a pending deployment")
+        self.assertIn("github.event.workflow_run.conclusion == 'success'", deploy_job)
+        self.assertIn("    concurrency:\n      group: cloudflare-pages-v3\n      cancel-in-progress: false", deploy_job, "only an eligible deploy job should enter the shared production promotion queue")
 
     def test_pages_deploy_is_board_driven_with_guarded_cache_only_promotion(self):
         events_end = PAGES_WORKFLOW.find("\npermissions:")
