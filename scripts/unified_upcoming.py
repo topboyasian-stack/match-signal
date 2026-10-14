@@ -59,6 +59,7 @@ DESK_FILTER_STATS={
     "past_kickoff_rows_hidden":0,
     "stale_live_flags_hidden":0,
     "expired_settled_rows_hidden":0,
+    "virtual_market_rows_held_for_kickoff_window":0,
 }
 
 def load(name, default):
@@ -940,6 +941,8 @@ def build_virtual_events(history, lifecycle, eligibility):
 
             pre_window_qualification_status=qualification_status
             qualification_status=apply_virtual_kickoff_window_gate(qualification_status,start,NOW)
+            if pre_window_qualification_status in QUALIFIED_VIRTUAL_STATUSES and qualification_status=="KICKOFF_WINDOW_PENDING":
+                DESK_FILTER_STATS["virtual_market_rows_held_for_kickoff_window"]+=1
             qualified=qualification_status in QUALIFIED_VIRTUAL_STATUSES
             kickoff_minutes_remaining=virtual_kickoff_window_minutes(start,NOW)
             kickoff_window_pass=bool(kickoff_minutes_remaining is not None and 0 < kickoff_minutes_remaining <= QUALIFIED_VIRTUAL_KICKOFF_WINDOW_MINUTES)
@@ -1171,7 +1174,9 @@ def main():
         "pending_settlement_count":pending_settlement,
         "publication_filters":dict(DESK_FILTER_STATS),
         "high_line_under_evidence":list(high_line_under.values()),
-        "policy":"Past kickoff rows are removed from Upcoming unless still credibly live or inside the two-hour settlement-result grace. Archived evidence is not deleted. High VFootball Under lines require their own exact-line chronological sample before betting qualification.",
+        "qualified_virtual_kickoff_window_minutes":QUALIFIED_VIRTUAL_KICKOFF_WINDOW_MINUTES,
+        "virtual_market_rows_held_for_kickoff_window":DESK_FILTER_STATS["virtual_market_rows_held_for_kickoff_window"],
+        "policy":"Virtual picks outside the next 60 minutes remain visible as research but cannot be currently qualified; the rolling board re-scores as settled results arrive. Past kickoff rows are removed from Upcoming unless still credibly live or inside the two-hour settlement-result grace. Archived evidence is not deleted. High VFootball Under lines require their own exact-line chronological sample before betting qualification.",
     }
     (DATA/"prediction_desk_health.json").write_text(json.dumps(desk_health,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
     print(json.dumps(result["summary"],indent=2))
