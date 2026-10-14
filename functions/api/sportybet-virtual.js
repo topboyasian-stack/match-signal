@@ -137,6 +137,57 @@ function normalize(t, event, source, sportId){
   };
 }
 
+const LAST_GOOD_EFOOTBALL_CACHE_TTL_MS = 15 * 60 * 1000;
+
+function lastGoodEfootballCacheKey(requestUrl, pageSize, pageNum, timeline) {
+  const key = new URL('/__match-signal-internal-cache__/sportybet-virtual', requestUrl.origin);
+  key.searchParams.set('sources', 'efootball');
+  key.searchParams.set('pageSize', String(pageSize));
+  key.searchParams.set('pageNum', String(pageNum));
+  key.searchParams.set('timeline', String(timeline));
+  key.searchParams.set('includeLive', 'false');
+  return new Request(key.toString(), { method: 'GET' });
+}
+
+function lastGoodEfootballCacheStore() {
+  try { return globalThis.caches?.default || null; } catch (_) { return null; }
+}
+
+async function storeLastGoodEfootballSnapshot(requestUrl, pageSize, pageNum, timeline, payload) {
+  try {
+    const cache = lastGoodEfootballCacheStore();
+    if (!cache) return;
+    await cache.put(lastGoodEfootballCacheKey(requestUrl, pageSize, pageNum, timeline), new Response(JSON.stringify(payload), {
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Cache-Control': 'public, max-age=900, s-maxage=900'
+      }
+    }));
+  } catch (_) {
+    // Best-effort resilience only; cache failures must never block a live response.
+  }
+}
+
+async function readLastGoodEfootballSnapshot(requestUrl, pageSize, pageNum, timeline) {
+  try {
+    const cache = lastGoodEfootballCacheStore();
+    if (!cache) return null;
+    const response = await cache.match(lastGoodEfootballCacheKey(requestUrl, pageSize, pageNum, timeline));
+    if (!response) return null;
+    const payload = await response.json();
+    const observedAt = Date.parse(String(payload?.updated_at || payload?.server_time || ''));
+    const ageMs = Date.now() - observedAt;
+    if (payload?.status !== 'LIVE' ||
+        !Array.isArray(payload?.events) || payload.events.length === 0 ||
+        payload?.source_status?.efootball?.status !== 'LIVE' ||
+        !Number.isFinite(ageMs) || ageMs < -120000 ||
+        ageMs >= LAST_GOOD_EFOOTBALL_CACHE_TTL_MS) return null;
+    return { payload, ageMs: Math.max(0, ageMs) };
+  } catch (_) {
+    return null;
+  }
+}
+
 export async function onRequestGet(context){
   const u=new URL(context.request.url);
   const pageSize=Math.min(Math.max(Number(u.searchParams.get('pageSize')||100),1),100);
@@ -146,6 +197,7 @@ export async function onRequestGet(context){
   // its transient errors must not make an otherwise usable upcoming snapshot incomplete.
   const includeLive=u.searchParams.get('includeLive')!=='false';
   const requested=new Set((u.searchParams.get('sources')||'efootball,vfootball').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean));
+  const edgeCacheEligible=!includeLive&&requested.size===1&&requested.has('efootball');
   const out=[];
   const errors=[];
   const sourceStatus={};
@@ -333,7 +385,7 @@ export async function onRequestGet(context){
     counts[key]=(counts[key]||0)+1;
   }
 
-  return new Response(JSON.stringify({
+  const payload={
     ok:true,
     feed_contract:'virtual-lab-v2',
     excluded_products:['srl'],
@@ -349,5 +401,40 @@ export async function onRequestGet(context){
     source_status:sourceStatus,
     errors,
     events:filtered
-  }),{status:200,headers:headers()});
+  };
+
+  if(edgeCacheEligible){
+    const source=payload.source_status?.efootball;
+    const liveSuccess=source?.status==='LIVE'&&payload.status==='LIVE'&&payload.events.length>0&&payload.errors.length===0;
+    if(liveSuccess){
+      await storeLastGoodEfootballSnapshot(u,pageSize,pageNum,timeline,payload);
+    }else if(source?.status==='ERROR'){
+      // Reuse only an actual recent provider success after an upstream failure.
+      // Keep its original timestamp; an empty provider response never resurrects old events.
+      const cached=await readLastGoodEfootballSnapshot(u,pageSize,pageNum,timeline);
+      if(cached){
+        const ageSeconds=Math.floor(cached.ageMs/1000);
+        const failure=String(source?.error||'SportyBet upstream request failed');
+        return new Response(JSON.stringify({
+          ...cached.payload,
+          cache_fallback_used:true,
+          cache_age_seconds:ageSeconds,
+          cache_fallback_reason:failure,
+          source_status:{
+            ...cached.payload.source_status,
+            efootball:{
+              ...cached.payload.source_status.efootball,
+              status:'CACHED',
+              cache_fallback_used:true,
+              cache_age_seconds:ageSeconds,
+              last_refresh_error:failure
+            }
+          },
+          errors:[]
+        }),{status:200,headers:{...headers(),'Cache-Control':'no-store','X-Match-Signal-Quote-Cache':'STALE-IF-ERROR'}});
+      }
+    }
+  }
+
+  return new Response(JSON.stringify(payload),{status:200,headers:headers()});
 }
