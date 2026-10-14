@@ -7,8 +7,7 @@ const workflowFiles = fs.readdirSync(workflowsDir).filter((name) => /\.(?:yml|ya
 const publisherWorkflows = workflowFiles.filter((name) => {
   const source = fs.readFileSync(path.join(workflowsDir, name), "utf8");
   return /uses:\s*actions\/deploy-pages@/i.test(source)
-    || /(^|\n)\s*pages:\s*write\b/i.test(source)
-    || (/name:\s*github-pages\b/i.test(source) && /environment:/i.test(source));
+    || /uses:\s*(?:peaceiris\/actions-gh-pages|JamesIves\/github-pages-deploy-action|crazy-max\/ghaction-github-pages)@/i.test(source);
 });
 
 assert.deepEqual(
