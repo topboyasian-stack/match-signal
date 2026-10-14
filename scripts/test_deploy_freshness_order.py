@@ -134,6 +134,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "tennis.html",
             "basketball.html",
             "sport-hubs.css",
+            "sport-hubs.js",
             "ms-design-system.css",
             "core-workspaces-design.css",
             "scripts/test_core_workspaces_design.mjs",
