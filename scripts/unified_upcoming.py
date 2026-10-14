@@ -39,6 +39,14 @@ EFOOTBALL_DIRECTION_RECENT_WINDOW=50
 SETTLED_DESK_RETENTION_HOURS=2
 EFOOTBALL_DESK_LEARNING_MIN_CALIBRATION_N=30
 EFOOTBALL_DESK_EXACT_MIN_N=12
+# Forecasts outside this near-term window stay visible as research, not as
+# currently qualified virtual picks. This matches the compact eFootball lane.
+QUALIFIED_VIRTUAL_KICKOFF_WINDOW_MINUTES=60
+QUALIFIED_VIRTUAL_STATUSES={
+    "BETTING_QUALIFIED_PAPER",
+    "BETTING_QUALIFIED_PAPER_BOOTSTRAP",
+    "BETTING_QUALIFIED_PAPER_DIRECTIONAL",
+}
 EFOOTBALL_DESK_LEARNING_PATH="efootball_desk_learning.json"
 # A high Under line can look almost certain from the Poisson tail even when the
 # exact line/direction has too little out-of-sample evidence. Keep it visible as
@@ -72,6 +80,21 @@ def num(v):
         x=float(v)
         return x if math.isfinite(x) else None
     except (TypeError,ValueError):return None
+
+def apply_virtual_kickoff_window_gate(qualification_status, start, now=NOW):
+    """Keep a virtual pick research-only until it is within 60 minutes of kickoff."""
+    status=str(qualification_status or "")
+    if status not in QUALIFIED_VIRTUAL_STATUSES:
+        return status
+    kickoff=dt(start)
+    if kickoff is None or kickoff <= now or kickoff > now + timedelta(minutes=QUALIFIED_VIRTUAL_KICKOFF_WINDOW_MINUTES):
+        return "KICKOFF_WINDOW_PENDING"
+    return status
+
+def virtual_kickoff_window_minutes(start, now=NOW):
+    """Return minutes until kickoff, or None when the source time is invalid."""
+    kickoff=dt(start)
+    return round((kickoff-now).total_seconds()/60,1) if kickoff else None
 
 def clamp(p):
     return max(.0005,min(.9995,float(p)))
@@ -915,13 +938,21 @@ def build_virtual_events(history, lifecycle, eligibility):
             else:
                 qualification_status="RESEARCH_PROJECTION"
 
-            qualified=qualification_status in {"BETTING_QUALIFIED_PAPER","BETTING_QUALIFIED_PAPER_BOOTSTRAP","BETTING_QUALIFIED_PAPER_DIRECTIONAL"}
+            pre_window_qualification_status=qualification_status
+            qualification_status=apply_virtual_kickoff_window_gate(qualification_status,start,NOW)
+            qualified=qualification_status in QUALIFIED_VIRTUAL_STATUSES
+            kickoff_minutes_remaining=virtual_kickoff_window_minutes(start,NOW)
+            kickoff_window_pass=bool(kickoff_minutes_remaining is not None and 0 < kickoff_minutes_remaining <= QUALIFIED_VIRTUAL_KICKOFF_WINDOW_MINUTES)
             add(out,{
                 "sport":"virtual",
                 "product":product,
                 "league":competition,
                 "event_id":str(e.get("event_id") or ""),
                 "start_time":start.isoformat(),
+                "kickoff_minutes_remaining":kickoff_minutes_remaining,
+                "qualified_kickoff_window_minutes":QUALIFIED_VIRTUAL_KICKOFF_WINDOW_MINUTES,
+                "kickoff_window_gate_pass":kickoff_window_pass,
+                "pre_kickoff_window_qualification_status":pre_window_qualification_status,
                 "player_1":home,
                 "player_2":away,
                 "market":"over_under",
@@ -994,7 +1025,7 @@ def build_virtual_events(history, lifecycle, eligibility):
                 "qualification_status":qualification_status,
                 "betting_qualified":qualified,
                 "qualified_for_builder":qualified,
-                "qualification_engine":"Virtual Lab base walk-forward gate + model-qualified line + current SportyBet edge + competition evidence OR validated product-bootstrap evidence OR exact line/direction holdout + recent evidence",
+                "qualification_engine":"Virtual Lab base walk-forward gate + model-qualified line + current SportyBet edge + model evidence + fresh exact quote + kickoff within 60 minutes",
                 "model":"Virtual Lab walk-forward eFootball participant model",
                 "model_version":"VL-EFOOTBALL-WF-3.0",
                 "paper_only":True,

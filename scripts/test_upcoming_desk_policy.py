@@ -30,6 +30,19 @@ class UpcomingDeskPolicyTests(unittest.TestCase):
         row.update(extra)
         return row
 
+    def test_virtual_qualified_picks_wait_until_the_next_60_minute_window(self):
+        gate = ns["apply_virtual_kickoff_window_gate"]
+        now = self.now
+        qualified = "BETTING_QUALIFIED_PAPER"
+        self.assertEqual(gate(qualified, now + timedelta(hours=5), now), "KICKOFF_WINDOW_PENDING")
+        self.assertEqual(gate(qualified, now + timedelta(minutes=61), now), "KICKOFF_WINDOW_PENDING")
+        self.assertEqual(gate(qualified, now + timedelta(minutes=60), now), qualified)
+        self.assertEqual(gate(qualified, now + timedelta(minutes=1), now), qualified)
+        self.assertEqual(gate(qualified, now, now), "KICKOFF_WINDOW_PENDING")
+        self.assertEqual(gate(qualified, now - timedelta(seconds=1), now), "KICKOFF_WINDOW_PENDING")
+        self.assertEqual(gate("EDGE_BELOW_2PCT", now + timedelta(hours=5), now), "EDGE_BELOW_2PCT")
+        self.assertEqual(ns["virtual_kickoff_window_minutes"](now + timedelta(hours=5), now), 300.0)
+
     def test_stale_live_flags_are_capped_per_sport_family(self):
         stale_live_flag = ns["stale_live_flag"]
         limit_hours = ns["live_age_limit_hours"]

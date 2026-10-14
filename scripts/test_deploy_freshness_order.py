@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import re
+import runpy
 import textwrap
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -42,6 +44,20 @@ def workflow_schedule_crons(source: str) -> list[str]:
 
 
 class FreshnessDeployOrderingTests(unittest.TestCase):
+    def test_virtual_qualified_rows_wait_for_the_next_60_minute_window(self):
+        upcoming = runpy.run_path(str(ROOT / "scripts" / "unified_upcoming.py"))
+        gate = upcoming["apply_virtual_kickoff_window_gate"]
+        now = datetime(2026, 10, 14, 22, 0, tzinfo=timezone.utc)
+        qualified = "BETTING_QUALIFIED_PAPER"
+        self.assertEqual(gate(qualified, now + timedelta(hours=5), now), "KICKOFF_WINDOW_PENDING")
+        self.assertEqual(gate(qualified, now + timedelta(minutes=61), now), "KICKOFF_WINDOW_PENDING")
+        self.assertEqual(gate(qualified, now + timedelta(minutes=60), now), qualified)
+        self.assertEqual(gate(qualified, now + timedelta(minutes=1), now), qualified)
+        self.assertEqual(gate(qualified, now, now), "KICKOFF_WINDOW_PENDING")
+        self.assertEqual(gate(qualified, now - timedelta(seconds=1), now), "KICKOFF_WINDOW_PENDING")
+        # Existing model/value blockers must remain the reported blocker.
+        self.assertEqual(gate("EDGE_BELOW_2PCT", now + timedelta(hours=5), now), "EDGE_BELOW_2PCT")
+
     def test_logo_registry_refreshes_after_live_team_feeds(self):
         events_end = LOGO_WORKFLOW.find("\npermissions:")
         self.assertGreater(events_end, 0)
