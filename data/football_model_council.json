@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-10-14T18:37:48.270730+00:00",
+  "updated_at": "2026-10-14T20:17:23.911302+00:00",
   "mode": "PAPER_RESEARCH_ONLY",
   "model_version": "FOOTBALL-STAT-COUNCIL-V1",
   "method": "venue-aware recency-weighted team attack/defence + league scoring baseline + Poisson/Dixon-Coles",
@@ -7,7 +7,7 @@
   "production_pick_unchanged": true,
   "builder_eligibility_unchanged": true,
   "history_source": "football_team_history",
-  "history_rows_available": 1164,
+  "history_rows_available": 1166,
   "history_leagues": [
     "Bundesliga",
     "Champions League",
@@ -15,14 +15,14 @@
     "Ligue 1"
   ],
   "overall": {
-    "settled_evaluated": 107,
+    "settled_evaluated": 109,
     "skipped": 0,
     "excluded_no_history": 177,
-    "published_accuracy": 0.6168,
-    "independent_accuracy": 0.5607,
-    "published_brier": 0.5342,
-    "independent_brier": 0.5656,
-    "pick_agreement_rate": 0.7664,
+    "published_accuracy": 0.6147,
+    "independent_accuracy": 0.5596,
+    "published_brier": 0.5321,
+    "independent_brier": 0.5667,
+    "pick_agreement_rate": 0.7523,
     "independent_beats_published_accuracy": false,
     "independent_beats_published_brier": false
   },
@@ -36,12 +36,12 @@
       "pick_agreement_rate": 0.7407
     },
     "Champions League": {
-      "settled_evaluated": 19,
-      "published_accuracy": 0.7368,
-      "independent_accuracy": 0.6842,
-      "published_brier": 0.5145,
-      "independent_brier": 0.4984,
-      "pick_agreement_rate": 0.7895
+      "settled_evaluated": 21,
+      "published_accuracy": 0.7143,
+      "independent_accuracy": 0.6667,
+      "published_brier": 0.5055,
+      "independent_brier": 0.5107,
+      "pick_agreement_rate": 0.7143
     },
     "La Liga": {
       "settled_evaluated": 34,
@@ -93,8 +93,8 @@
     },
     {
       "label": "75-80%",
-      "settled": 3,
-      "correct": 3,
+      "settled": 4,
+      "correct": 4,
       "accuracy": 1.0
     },
     {
@@ -149,42 +149,6 @@
     }
   ],
   "latest_evaluated": [
-    {
-      "league": "Ligue 1",
-      "event_id": "401876454",
-      "start_time": "2026-09-19T18:45Z",
-      "published_prob": 0.4375,
-      "independent_prob": 0.423406,
-      "published_pick": "p1",
-      "independent_pick": "p1",
-      "actual": "p1",
-      "published_correct": true,
-      "independent_correct": true,
-      "published_brier": 0.476901,
-      "independent_brier": 0.503821,
-      "independent_effective_sample": 4.857,
-      "independent_xg_home": 1.7642,
-      "independent_xg_away": 1.5627,
-      "agreement": true
-    },
-    {
-      "league": "Ligue 1",
-      "event_id": "401876450",
-      "start_time": "2026-09-19T18:45Z",
-      "published_prob": 0.57,
-      "independent_prob": 0.368645,
-      "published_pick": "p1",
-      "independent_pick": "p1",
-      "actual": "p1",
-      "published_correct": true,
-      "independent_correct": true,
-      "published_brier": 0.278071,
-      "independent_brier": 0.598343,
-      "independent_effective_sample": 4.932,
-      "independent_xg_home": 1.1586,
-      "independent_xg_away": 1.0819,
-      "agreement": true
-    },
     {
       "league": "La Liga",
       "event_id": "401882859",
@@ -1048,6 +1012,42 @@
       "independent_xg_home": 2.1592,
       "independent_xg_away": 1.2782,
       "agreement": true
+    },
+    {
+      "league": "Champions League",
+      "event_id": "401915416",
+      "start_time": "2026-10-14T16:45Z",
+      "published_prob": 0.454,
+      "independent_prob": 0.415039,
+      "published_pick": "p2",
+      "independent_pick": "p1",
+      "actual": "p1",
+      "published_correct": false,
+      "independent_correct": true,
+      "published_brier": 0.75347,
+      "independent_brier": 0.526353,
+      "independent_effective_sample": 0.0,
+      "independent_xg_home": 1.97,
+      "independent_xg_away": 1.864,
+      "agreement": false
+    },
+    {
+      "league": "Champions League",
+      "event_id": "401915415",
+      "start_time": "2026-10-14T16:45Z",
+      "published_prob": 0.7619,
+      "independent_prob": 0.450169,
+      "published_pick": "p2",
+      "independent_pick": "p1",
+      "actual": "p2",
+      "published_correct": true,
+      "independent_correct": false,
+      "published_brier": 0.086819,
+      "independent_brier": 0.728942,
+      "independent_effective_sample": 0.0,
+      "independent_xg_home": 1.702,
+      "independent_xg_away": 1.387,
+      "agreement": false
     }
   ],
   "promotion_policy": "Do not let the independent model override production or Builder qualification until it demonstrates a stable walk-forward advantage on accuracy/Brier across multiple settled windows."
