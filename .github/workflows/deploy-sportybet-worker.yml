@@ -48,6 +48,7 @@ jobs:
           echo "Regional Worker URL: $worker_url"
 
       - name: Verify health and probe SportyBet from the Worker
+        timeout-minutes: 2
         env:
           WORKER_URL: ${{ steps.deploy.outputs.worker_url }}
         run: |
@@ -56,15 +57,45 @@ jobs:
           if (!base.startsWith('https://') || !base.endsWith('.workers.dev')) {
             throw new Error('The deploy step did not produce a valid workers.dev URL.');
           }
-          const healthResponse = await fetch(base + '/health', { signal: AbortSignal.timeout(10000) });
-          const health = await healthResponse.json();
-          console.log('Worker health:', JSON.stringify(health));
-          if (!healthResponse.ok || health.ok !== true) throw new Error('Regional Worker health check failed.');
 
-          const diagnosticResponse = await fetch(base + '/__diagnostics', { signal: AbortSignal.timeout(25000) });
-          const diagnostics = await diagnosticResponse.json();
-          console.log('SportyBet diagnostics:', JSON.stringify(diagnostics, null, 2));
-          if (!diagnosticResponse.ok || diagnostics.diagnostic !== 'sportybet-region-worker-v1' || !Array.isArray(diagnostics.probes) || diagnostics.probes.length !== 2) {
+          let health = null;
+          for (let attempt = 1; attempt <= 8; attempt++) {
+            try {
+              const response = await fetch(base + '/health?probe=' + Date.now(), {
+                cache: 'no-store',
+                signal: AbortSignal.timeout(10000)
+              });
+              const text = await response.text();
+              let payload = null;
+              try { payload = JSON.parse(text); } catch (_) {}
+              console.log('Worker health attempt ' + attempt + ': status=' + response.status +
+                ', content-type=' + (response.headers.get('content-type') || 'unknown') +
+                ', body=' + text.replace(/\s+/g, ' ').slice(0, 200));
+              if (response.ok && payload?.ok === true) {
+                health = payload;
+                break;
+              }
+            } catch (error) {
+              console.log('Worker health attempt ' + attempt + ' fetch error: ' + String(error?.message || error));
+            }
+            if (attempt < 8) await new Promise(resolve => setTimeout(resolve, 2000));
+          }
+          if (!health) throw new Error('Regional Worker health endpoint did not return JSON after 8 attempts.');
+          console.log('Worker health verified:', JSON.stringify(health));
+
+          const diagnosticResponse = await fetch(base + '/__diagnostics?probe=' + Date.now(), {
+            cache: 'no-store',
+            signal: AbortSignal.timeout(30000)
+          });
+          const diagnosticText = await diagnosticResponse.text();
+          let diagnostics = null;
+          try { diagnostics = JSON.parse(diagnosticText); } catch (_) {}
+          console.log('Worker diagnostic HTTP:', diagnosticResponse.status,
+            'content-type=' + (diagnosticResponse.headers.get('content-type') || 'unknown'),
+            'body=' + diagnosticText.replace(/\s+/g, ' ').slice(0, 200));
+          if (!diagnosticResponse.ok || diagnostics?.diagnostic !== 'sportybet-region-worker-v1' ||
+              !Array.isArray(diagnostics.probes) || diagnostics.probes.length !== 2) {
             throw new Error('Regional Worker diagnostic response was invalid.');
           }
+          console.log('SportyBet diagnostics:', JSON.stringify(diagnostics, null, 2));
           NODE
