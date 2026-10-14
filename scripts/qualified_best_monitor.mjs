@@ -14,7 +14,7 @@ async function fetchScheduleGap() {
     return { schedule_gap_status: "unknown", schedule_gap_minutes: null, schedule_gap_note: "GitHub run metadata is unavailable in this environment." };
   }
   try {
-    const monitorWorkflowFile = process.env.QUALIFIED_BEST_MONITOR_WORKFLOW_FILE || "qualified-best-live-monitor.yml";
+    const monitorWorkflowFile = process.env.QUALIFIED_BEST_MONITOR_WORKFLOW_FILE || "qualified-best-watch.yml";
     const response = await fetch(`https://api.github.com/repos/${repoName}/actions/workflows/${encodeURIComponent(monitorWorkflowFile)}/runs?per_page=100`, {
       headers: {
         Authorization: `Bearer ${token}`,
