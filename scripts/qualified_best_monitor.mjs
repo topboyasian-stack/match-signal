@@ -49,7 +49,7 @@ async function fetchScheduleGap() {
 
     // Scheduled invocations compare cron-to-cron. Deploy-triggered and manual
     // invocations report the age of the last scheduled check, so frequent
-    // deployments cannot mask a stalled 20-minute schedule.
+    // deployments cannot mask a stalled ten-minute monitor schedule.
     const referenceTime = eventName === "schedule" && Number.isFinite(currentStart)
       ? currentStart : Date.now();
     const gapMinutes = Math.round((referenceTime - previous.stamp) / 6000) / 10;
