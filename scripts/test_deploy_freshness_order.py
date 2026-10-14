@@ -62,6 +62,8 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
 
     def test_watchdog_has_event_driven_monitoring_and_bounded_failure_recovery(self):
         self.assertIn('  workflow_run:\n    workflows:\n      - "Match Signal Unified Upcoming Board"\n      - "Deploy Match Signal to Cloudflare Pages"', WATCHDOG_WORKFLOW)
+        self.assertIn("github.event.workflow_run.conclusion != 'success'", WATCHDOG_WORKFLOW, "successful board completions should be checked after deployment, not before it")
+        self.assertIn("if: github.event_name != 'workflow_run'\n        run: python -m pip install --upgrade requests", WATCHDOG_WORKFLOW, "event-driven health checks must not reinstall the feed-sync dependency")
         self.assertIn("if: github.event_name != 'workflow_run'", WATCHDOG_WORKFLOW)
         self.assertIn("WATCHDOG_SOURCE_WORKFLOW_CONCLUSION", WATCHDOG_WORKFLOW)
         self.assertIn("source_workflow_conclusion != 'success'", WATCHDOG_WORKFLOW)
