@@ -139,7 +139,26 @@ class ClubLogoRegistryTests(unittest.TestCase):
         self.assertIn("FC Internazionale Milano", ALIASES["inter milano"])
         self.assertIn("Paris Saint-Germain FC", ALIASES["paris saint germain"])
         self.assertIn("LOSC Lille", ALIASES["lille osc"])
-        self.assertEqual(SEARCH_POLICY_VERSION, 8)
+        self.assertEqual(SEARCH_POLICY_VERSION, 9)
+
+    def test_common_provider_shorthand_has_safe_exact_aliases(self):
+        expected = {
+            "stuttgart": "VfB Stuttgart",
+            "leipzig": "RB Leipzig",
+            "frankfurt": "Eintracht Frankfurt",
+            "los angeles": "Los Angeles FC",
+            "new": "Newcastle United",
+            "mci": "Manchester City",
+            "ast": "Aston Villa",
+            "bmu": "Bayern Munich",
+            "che": "Chelsea FC",
+            "cry": "Crystal Palace FC",
+            "vfb": "VfB Stuttgart",
+        }
+        for key, alias in expected.items():
+            with self.subTest(key=key):
+                self.assertIn(alias, ALIASES[key])
+        self.assertEqual(SEARCH_POLICY_VERSION, 9)
 
     def test_svg_dataset_selection_requires_one_exact_name_match(self):
         paths = [
@@ -173,7 +192,7 @@ class ClubLogoRegistryTests(unittest.TestCase):
         registry = {"search_policy_version": 5}
         misses = {"arsenal": {"retry_after": "2099-01-01T00:00:00+00:00"}}
         clear_misses_for_policy_change(registry, misses)
-        self.assertEqual(registry["search_policy_version"], 8)
+        self.assertEqual(registry["search_policy_version"], 9)
         self.assertEqual(misses, {})
 
     def test_downloaded_image_signature_is_checked(self):
