@@ -173,7 +173,7 @@ class ClubLogoRegistryTests(unittest.TestCase):
         registry = {"search_policy_version": 5}
         misses = {"arsenal": {"retry_after": "2099-01-01T00:00:00+00:00"}}
         clear_misses_for_policy_change(registry, misses)
-        self.assertEqual(registry["search_policy_version"], 7)
+        self.assertEqual(registry["search_policy_version"], 8)
         self.assertEqual(misses, {})
 
     def test_downloaded_image_signature_is_checked(self):
