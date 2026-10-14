@@ -201,6 +201,8 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             *expected_direct_paths,
             "scripts/test_deploy_freshness_order.py",
             "scripts/test_prediction_desk_gates.mjs",
+            "scripts/test_upcoming_desk_policy.py",
+            "docs/PREDICTION_DESK_POLICY.md",
             "scripts/qualified_best_monitor.mjs",
             "scripts/test_qualified_best_monitor.mjs",
             ".github/workflows/qualified-best-watch.yml",  # historical delete path for this schedule migration
