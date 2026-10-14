@@ -248,12 +248,13 @@ jobs:
         run: |
           set -euo pipefail
           output="$(npx wrangler@latest pages deploy .pages-deploy --project-name="$PROJECT" --branch="${{ steps.project.outputs.production_branch }}" --commit-hash="${{ steps.source.outputs.sha }}" 2>&1)" || {
-            printf '%s\\n' "$output"
+            printf '%s\n' "$output"
             exit 1
           }
-          printf '%s\\n' "$output"
-          deployment_line="$(printf '%s\\n' "$output" | grep 'Deployment complete!' | tail -n 1 || true)"
-          deployment_url="$(printf '%s\\n' "$deployment_line" | sed -E 's/.*over at (https:\\/\\/[^[:space:]]+).*/\\1/')"
+          printf '%s\n' "$output"
+          deployment_line="$(printf '%s\n' "$output" | grep 'Deployment complete!' | tail -n 1 || true)"
+          deployment_url="${deployment_line##*over at }"
+          deployment_url="${deployment_url%%[[:space:]]*}"
           case "$deployment_url" in
             https://*.pages.dev) ;;
             *) echo "Could not resolve immutable Cloudflare Pages deployment URL from Wrangler output." >&2; exit 1 ;;
