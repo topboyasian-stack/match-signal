@@ -17,6 +17,7 @@ assert.match(css, /@media \(max-width: 680px\)/);
 assert.match(css, /@media \(max-width: 420px\)/);
 assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
 assert.match(css, /:focus-visible/, "interactive controls must expose keyboard focus");
+assert.match(css, /body\[data-page="hub"\] \.cd-rail-card\s*\{/, "Football/Tennis side rails need the same card hierarchy");
 const normalizedCss = css.replace(/\/\*[\s\S]*?\*\//g, "");
 const selectors = [...normalizedCss.matchAll(/(?:^|})\s*([^{}]+)\{/g)]
   .map(match => match[1].trim())
@@ -62,6 +63,8 @@ assert.match(tennis, /MS-SPORT-HUBS-2026\.10\.13-DESIGN1/);
 assert.ok(workflow.includes("'core-workspaces-design.css'"), "promotion allowlist must include the new stylesheet");
 assert.ok(workflow.includes("node scripts/test_core_workspaces_design.mjs"), "deployment must execute this regression suite");
 assert.ok(workflow.includes("MATCH-SIGNAL-FULL-RECOMPOSITION-V1: CORE DESK / FOOTBALL / TENNIS"), "production smoke must verify the live design asset marker");
+assert.ok(workflow.includes("getFrom(base, contract.css)"), "the primary production hostname must re-fetch the CSS for each redesigned workspace");
+assert.ok(workflow.includes("cssBody.includes(contract.cssMarker)"), "the primary production hostname must verify the stylesheet marker, not just HTTP 200");
 assert.ok(workflow.includes("MS-DESK-2026.10.14-V1"), "production smoke must verify the main Desk");
 assert.ok(workflow.includes("MS-FOOTBALL-DESK-2026.10.14-V1"), "production smoke must verify Football");
 assert.ok(workflow.includes("MS-TENNIS-DESK-2026.10.14-V1"), "production smoke must verify Tennis");
