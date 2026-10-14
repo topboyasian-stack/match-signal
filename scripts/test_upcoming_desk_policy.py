@@ -32,6 +32,7 @@ class UpcomingDeskPolicyTests(unittest.TestCase):
 
     def test_virtual_qualified_picks_wait_until_the_next_60_minute_window(self):
         gate = ns["apply_virtual_kickoff_window_gate"]
+        self.assertEqual(ns["QUALIFIED_VIRTUAL_KICKOFF_WINDOW_MINUTES"], 60)
         now = self.now
         qualified = "BETTING_QUALIFIED_PAPER"
         self.assertEqual(gate(qualified, now + timedelta(hours=5), now), "KICKOFF_WINDOW_PENDING")
