@@ -150,11 +150,13 @@ jobs:
           git fetch origin main
           git reset --hard origin/main
       - name: Compile unified engines
-        run: python -m py_compile scripts/unified_upcoming.py scripts/unified_upcoming_cleanup.py scripts/selection_candidate_collector.py scripts/test_selection_candidate_collector.py scripts/efootball_desk_learning.py scripts/test_upcoming_settlement_retention.py scripts/system_health_audit.py scripts/predict_today.py
+        run: python -m py_compile scripts/unified_upcoming.py scripts/unified_upcoming_cleanup.py scripts/selection_candidate_collector.py scripts/test_selection_candidate_collector.py scripts/efootball_desk_learning.py scripts/test_upcoming_settlement_retention.py scripts/test_upcoming_desk_policy.py scripts/system_health_audit.py scripts/predict_today.py
       - name: Validate freshness deployment ordering
         run: python scripts/test_deploy_freshness_order.py
       - name: Test settled expiry and eFootball reconciliation
         run: python scripts/test_upcoming_settlement_retention.py
+      - name: Test virtual near-term qualification window
+        run: python scripts/test_upcoming_desk_policy.py
       - name: Regression-test Prediction Desk qualification and best-line selection
         run: node scripts/test_prediction_desk_gates.mjs
       - name: Test Qualified Best production monitor outcomes
