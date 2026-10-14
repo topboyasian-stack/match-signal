@@ -57,7 +57,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
 
     def test_monitor_schedule_is_rearmed_and_deployment_trigger_is_preserved(self):
         crons = workflow_schedule_crons(MONITOR_WORKFLOW)
-        self.assertIn("*/10 * * * *", crons)
+        self.assertIn("3,13,23,33,43,53 * * * *", crons)
         self.assertNotIn("*/5 * * * *", crons)
         events_end = MONITOR_WORKFLOW.find("\npermissions:")
         self.assertGreater(events_end, 0)
@@ -175,6 +175,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "scripts/test_prediction_desk_gates.mjs",
             "scripts/qualified_best_monitor.mjs",
             "scripts/test_qualified_best_monitor.mjs",
+            ".github/workflows/qualified-best-watch.yml",  # historical delete path for this schedule migration
             ".github/workflows/qualified-best-production-watch.yml",
             ".github/workflows/qualified-best-live-monitor.yml",  # historical delete path for this schedule migration
             ".github/workflows/unified-upcoming.yml",
