@@ -5,8 +5,8 @@ on:
     # Independent production verification, separate from the board builder.
     # The main pipeline can appear healthy while browser-side qualification is broken.
     # Re-register the monitor under a fresh workflow identity after the confirmed multi-hour schedule gap.
-    # A ten-minute cadence remains inside the 15-minute quote gate and avoids minute zero.
-    - cron: '3,13,23,33,43,53 * * * *'
+    # Re-register on a different ten-minute cadence after the confirmed missing schedule; remain inside the 15-minute quote gate.
+    - cron: '5,15,25,35,45,55 * * * *'
   workflow_dispatch:
   workflow_run:
     # Start browser verification only after Cloudflare confirms its deployment.
