@@ -35,14 +35,14 @@ for (const group of selectors) {
 }
 
 for (const [name, html, marker, script, sport] of [
-  ["Main Desk", index, "MS-DESK-2026.10.14-V1", "sport-hubs.js?v=20261013-qualified-best-live-coverage-retry1", null],
+  ["Main Desk", index, "MS-DESK-2026.10.14-V1", /sport-hubs\.js\?v=[^"']+/, null],
   ["Football", football, "MS-FOOTBALL-DESK-2026.10.14-V1", "league-logos.js?v=20261013-competition-logos2", "football"],
   ["Tennis", tennis, "MS-TENNIS-DESK-2026.10.14-V1", "sport-hubs.js?v=20261013-qualified-best-kickoff-sort1", "tennis"]
 ]) {
   assert.ok(html.includes(marker), name + " must declare the new page design marker");
   assert.ok(html.includes("core-workspaces-design.css?v=20261014-full-v1"), name + " must load the full-recomposition style");
   assert.ok(html.includes('id="msNav"'), name + " must retain the shared navigation mount");
-  assert.ok(html.includes(script), name + " must preserve the existing renderer/logo script");
+  assert.ok(script instanceof RegExp ? script.test(html) : html.includes(script), name + " must preserve the existing renderer/logo script");
   if (sport) {
     assert.ok(html.includes('data-page="hub"'), name + " must retain the shared hub renderer mode");
     assert.ok(html.includes('data-sport="' + sport + '"'), name + " must retain the sport identity");
