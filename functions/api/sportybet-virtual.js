@@ -22,8 +22,8 @@ async function upstream(path, params){
     data=JSON.parse(body);
   }catch(error){
     const contentType=r.headers.get('content-type')||'unknown content-type';
-    const sample=body.replace(/\\s+/g,' ').slice(0,120);
-    const format=/text\\/html/i.test(contentType)||/<(?:!doctype|html|head|body)\\b/i.test(body.slice(0,300))?'HTML':'non-JSON';
+    const sample=body.replace(/\s+/g,' ').slice(0,120);
+    const format=/text\/html/i.test(contentType)||/<(?:!doctype|html|head|body)\b/i.test(body.slice(0,300))?'HTML':'non-JSON';
     throw new Error(path+' returned '+format+' response ('+contentType+'): '+sample);
   }
   if(data?.bizCode!==undefined && data.bizCode!==10000) throw new Error(path+' bizCode '+data.bizCode);
