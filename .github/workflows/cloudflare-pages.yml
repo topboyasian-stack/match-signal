@@ -314,7 +314,11 @@ jobs:
             const body = await r.text();
             return {r,body};
           }
-          const get = path => getFrom(base, path);
+          let verifiedProductionBoard = null;
+          const get = async path => {
+            if (path === '/data/unified_upcoming.json' && verifiedProductionBoard) return verifiedProductionBoard;
+            return getFrom(base, path);
+          };
 
           // Verify the immutable deployment itself first, then give Cloudflare's production
           // hostname a bounded propagation window. A successful upload alone is not proof
@@ -471,6 +475,54 @@ jobs:
             const {r,body}=await get(path);
             if (!r.ok) failures.push(path+' HTTP '+r.status);
             if (!body.includes(marker)) failures.push(path+' did not serve the current V2 visual layer');
+          }
+
+          // Static UI and data can propagate at different times on the production hostname.
+          // First verify the exact immutable deployment board, then require the aliased
+          // production hostname to serve that same fresh board before smoke-testing assets.
+          let immutableBoardGeneratedAt = null;
+          try {
+            const {r,body}=await getFrom(deploymentBase, '/data/unified_upcoming.json');
+            if (!r.ok) {
+              failures.push('Immutable Cloudflare deployment /data/unified_upcoming.json HTTP '+r.status);
+            } else {
+              const deployedBoard=JSON.parse(body);
+              immutableBoardGeneratedAt=Date.parse(String(deployedBoard.generated_at||''));
+              const age=Date.now()-immutableBoardGeneratedAt;
+              if (!Array.isArray(deployedBoard.events)) failures.push('Immutable Cloudflare deployment board is missing events');
+              if (!Number.isFinite(immutableBoardGeneratedAt) || age < -120000 || age > 30*60*1000) {
+                failures.push('Immutable Cloudflare deployment board is stale or has an invalid generated_at: '+String(deployedBoard.generated_at||'missing')+' age_ms='+(Number.isFinite(age)?age:'invalid'));
+              } else {
+                console.log('Immutable Cloudflare deployment board is fresh: '+deployedBoard.generated_at+' ('+deployedBoard.events.length+' rows).');
+              }
+            }
+          } catch(e) {
+            failures.push('Immutable Cloudflare deployment board check '+String(e.message||e));
+          }
+
+          if (Number.isFinite(immutableBoardGeneratedAt)) {
+            for (let attempt=1; attempt<=10; attempt++) {
+              try {
+                const snapshot=await getFrom(base, '/data/unified_upcoming.json');
+                const deployed=JSON.parse(snapshot.body);
+                const generated=Date.parse(String(deployed.generated_at||''));
+                const age=Date.now()-generated;
+                const sameDeploymentBoard=Number.isFinite(generated) && generated >= immutableBoardGeneratedAt-15000;
+                const fresh=age >= -120000 && age <= 30*60*1000;
+                if (snapshot.r.ok && Array.isArray(deployed.events) && sameDeploymentBoard && fresh) {
+                  verifiedProductionBoard=snapshot;
+                  console.log('Cloudflare production hostname now serves the freshly deployed Prediction Desk board (attempt '+attempt+'): '+deployed.generated_at+'.');
+                  break;
+                }
+                console.log('Waiting for Cloudflare production board propagation (attempt '+attempt+'/10): deployed='+String(deployed.generated_at||'missing')+', expected_at_or_after='+new Date(immutableBoardGeneratedAt-15000).toISOString()+', age_ms='+(Number.isFinite(age)?age:'invalid')+'.');
+              } catch(e) {
+                console.log('Waiting for Cloudflare production board propagation (attempt '+attempt+'/10): '+String(e.message||e));
+              }
+              if (attempt<10) await new Promise(resolve=>setTimeout(resolve,5000));
+            }
+            if (!verifiedProductionBoard) {
+              failures.push('Cloudflare production hostname did not begin serving the freshly deployed Prediction Desk board within 50 seconds; stale board timestamps cannot pass deployment verification.');
+            }
           }
 
           for (const path of assets) {
