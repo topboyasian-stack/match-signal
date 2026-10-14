@@ -75,6 +75,8 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn("workflow', 'run', 'qualified-best-watch.yml'", WATCHDOG_WORKFLOW)
         self.assertIn("monitor_schedule_fallback_needed = monitor_schedule_status in {'STALE', 'MISSING_SCHEDULED_RUN'}", WATCHDOG_WORKFLOW)
         self.assertIn("monitor_dispatch_age_minutes < 10", WATCHDOG_WORKFLOW, "a stale/missing schedule should auto-repair even when a recent deployment-triggered check exists, but fallback dispatches need a cooldown")
+        self.assertIn("elif active('qualified-best-watch.yml') and not monitor_schedule_fallback_needed:", WATCHDOG_WORKFLOW, "an active deploy-triggered monitor must not suppress fallback when cron is stale or missing")
+        self.assertIn("A deployment-triggered monitor is active; the fallback is queued behind it.", WATCHDOG_WORKFLOW, "record that the fallback is queued behind the active deployment check")
         self.assertIn("monitor_fallback_allowed = watchdog_event_name in {'schedule', 'workflow_dispatch', 'push'} or cloudflare_success_event", WATCHDOG_WORKFLOW)
         self.assertIn("and source_workflow_conclusion == 'success'", WATCHDOG_WORKFLOW, "the event-driven browser fallback must run only after Cloudflare deployment succeeds")
         self.assertIn("MISSING_SCHEDULED_RUN", WATCHDOG_WORKFLOW, "flag when a newly registered monitor workflow still has no scheduled invocation after its 15-minute startup grace")
