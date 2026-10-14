@@ -96,7 +96,13 @@ async function run() {
         });
         page.on("pageerror", error => pageErrors.push(String(error?.message || error)));
         const separator = target.includes("?") ? "&" : "?";
-        await page.goto(`${target}${separator}monitor_run=${encodeURIComponent(String(runId || "manual"))}_${attempt}`, {
+        // Attempt 1 is the exact unmodified URL a user opens. Only the retry gets
+        // a unique query string, so cache-busting cannot hide a stale normal route.
+        const checkUrl = attempt === 1
+          ? target
+          : `${target}${separator}monitor_run=${encodeURIComponent(String(runId || "manual"))}_${attempt}`;
+        let screenshotCaptured = false;
+        await page.goto(checkUrl, {
           waitUntil: "domcontentloaded",
           timeout: 30000
         });
@@ -141,17 +147,17 @@ async function run() {
             dom_first_row_height: firstRowRect ? Math.round(firstRowRect.height) : null,
             dom_summary: document.querySelector("#qualifiedBestSummary")?.innerText || null,
             dom_source_status: document.querySelector("#qualifiedBestDataStatus")?.innerText || null,
+            check_mode: location.search.includes("monitor_run=") ? "cache_busted_retry" : "normal_user_url",
             page_url: location.href
           };
         });
-        // Capture the real production rendering. DOM row counts alone must not
-        // be treated as proof that the shortlist is visible to users.
+        // Capture both the unmodified user URL and any cache-busted retry.
         await page.screenshot({
-          path: "qualified-best-production.png",
+          path: `qualified-best-production-attempt-${attempt}.png`,
           fullPage: true,
           animations: "disabled",
           timeout: 15000
-        }).catch(error => {
+        }).then(() => { screenshotCaptured = true; }).catch(error => {
           attempts.push({
             attempt,
             observed_at: new Date().toISOString(),
@@ -170,8 +176,21 @@ async function run() {
           reasons: provisional.reasons,
           diagnostic: finalSnapshot
         });
-        if (provisional.status === "healthy") break;
+        const needsPlainUrlComparison = attempt === 1 && (
+          provisional.status !== "healthy" ||
+          Number(finalSnapshot.current_qualified_count || 0) <= 0 ||
+          Number(finalSnapshot.dom_qualified_visible_count || 0) <= 0
+        );
+        if (provisional.status === "healthy" && !needsPlainUrlComparison) break;
       } catch (error) {
+        if (page && !screenshotCaptured) {
+          await page.screenshot({
+            path: `qualified-best-production-attempt-${attempt}.png`,
+            fullPage: true,
+            animations: "disabled",
+            timeout: 15000
+          }).catch(() => {});
+        }
         attempts.push({
           attempt,
           observed_at: new Date().toISOString(),
@@ -196,6 +215,30 @@ async function run() {
     });
   } finally {
     if (browser) await browser.close().catch(() => {});
+  }
+
+  // If a cache-busted retry shows picks but the normal user URL did not, expose
+  // the difference as a production failure instead of quietly accepting retry.
+  const plainAttempt = attempts.find(item => item.attempt === 1);
+  const retryAttempt = attempts.find(item => item.attempt === 2);
+  const plainDiagnostic = plainAttempt?.diagnostic || null;
+  const retryDiagnostic = retryAttempt?.diagnostic || null;
+  const plainHasVisiblePicks = plainAttempt?.status === "healthy" &&
+    Number(plainDiagnostic?.current_qualified_count || 0) > 0 &&
+    Number(plainDiagnostic?.dom_qualified_visible_count || 0) > 0;
+  const retryHasVisiblePicks = retryAttempt?.status === "healthy" &&
+    Number(retryDiagnostic?.current_qualified_count || 0) > 0 &&
+    Number(retryDiagnostic?.dom_qualified_visible_count || 0) > 0;
+  if (plainAttempt && retryAttempt && !plainHasVisiblePicks && retryHasVisiblePicks) {
+    finalSnapshot = {
+      ...retryDiagnostic,
+      plain_url_display_mismatch: true,
+      plain_url_status: plainAttempt.status,
+      plain_url_qualified_count: plainDiagnostic?.current_qualified_count ?? null,
+      plain_url_visible_count: plainDiagnostic?.dom_qualified_visible_count ?? null,
+      cache_busted_url_qualified_count: retryDiagnostic?.current_qualified_count ?? null,
+      cache_busted_url_visible_count: retryDiagnostic?.dom_qualified_visible_count ?? null
+    };
   }
 
   const schedule = await fetchScheduleGap();
