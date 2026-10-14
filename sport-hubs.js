@@ -331,6 +331,25 @@ function qualificationState(x){
   const raw=String(x?.qualification_status||"").trim();
   const veto=qualificationVetoReason(x);
   const modelQualified=!veto&&(Boolean(x?.betting_qualified)||Boolean(x?.qualified_for_builder)||raw.startsWith("BETTING_QUALIFIED"));
+  const product=String(x?.product||"").toLowerCase();
+  const exactLineCalibration=probabilityCalibrationInfo(x);
+  // Once an active eFootball O/U row has enough chronological exact-line
+  // evidence to calibrate its displayed/value probability, that same
+  // conservative probability must clear the existing 65% qualification floor.
+  // Do not let an upstream raw-model pass override a calibrated estimate below
+  // the floor; show it as research instead of a current Qualified Best pick.
+  if(modelQualified&&["efootball_gt","efootball_adriatic"].includes(product)&&
+     exactLineCalibration&&exactLineCalibration.probability<0.65){
+    return {
+      modelQualified:false,
+      currentPricePass:false,
+      label:"NOT QUALIFIED · DESK-CALIBRATED MODEL BELOW 65%",
+      reason:"CALIBRATED_MODEL_PROBABILITY_BELOW_65_PERCENT",
+      calibratedProbability:exactLineCalibration.probability,
+      rawProbability:exactLineCalibration.raw,
+      calibrationN:exactLineCalibration.n
+    };
+  }
   if(!modelQualified){
     const detail=veto
       ?String(raw||x?.candidate_status||x?.model_candidate_status||"explicit watch/research gate").replaceAll("_"," ")
