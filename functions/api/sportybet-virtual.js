@@ -1,6 +1,7 @@
 function headers(){return {'Content-Type':'application/json; charset=utf-8','Cache-Control':'public, max-age=15, s-maxage=15, stale-while-revalidate=15','Access-Control-Allow-Origin':'*','Access-Control-Allow-Methods':'GET,OPTIONS'}}
 
 const ORIGIN='https://www.sportybet.com';
+const REGIONAL_WORKER_BASE='https://match-signal-sportybet-proxy.topboyasian.workers.dev';
 const BROWSER_HEADERS={
   'Accept':'application/json, text/plain, */*',
   'Content-Type':'application/json',
@@ -11,9 +12,9 @@ const BROWSER_HEADERS={
 };
 
 async function upstream(path, params){
-  const url=new URL(ORIGIN+path);
+  const url=new URL(REGIONAL_WORKER_BASE+path);
   for(const [k,v] of Object.entries(params)) url.searchParams.set(k,String(v));
-  const r=await fetch(url.toString(),{headers:BROWSER_HEADERS,cache:'no-store',signal:AbortSignal.timeout(10000)});
+  const r=await fetch(url.toString(),{headers:{'Accept':'application/json, text/plain, */*'},cache:'no-store',signal:AbortSignal.timeout(15000)});
   const body=await r.text();
   if(!r.ok) throw new Error(path+' HTTP '+r.status+' '+body.slice(0,180));
   if(!body.trim()) throw new Error(path+' empty response');
