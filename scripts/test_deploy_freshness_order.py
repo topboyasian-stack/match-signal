@@ -69,6 +69,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn("qualified_best_monitor_last_run_age_minutes", WATCHDOG_WORKFLOW)
         self.assertIn("qualified_best_monitor_last_scheduled_run_age_minutes", WATCHDOG_WORKFLOW)
         self.assertIn("workflow', 'run', 'qualified-best-watch.yml'", WATCHDOG_WORKFLOW)
+        self.assertIn("and not workflow_run_event:", WATCHDOG_WORKFLOW, "do not run the browser check against the pre-deployment page while a board retry/deploy event is in flight")
 
     def test_pages_deploy_is_board_driven_with_guarded_cache_only_promotion(self):
         events_end = PAGES_WORKFLOW.find("\npermissions:")
