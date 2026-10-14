@@ -138,6 +138,7 @@ jobs:
           monitor_runs, monitor_history_error = recent_runs('qualified-best-watch.yml', 100)
           monitor_last_age_minutes = None
           monitor_scheduled_age_minutes = None
+          monitor_dispatch_age_minutes = None
           monitor_schedule_status = 'UNKNOWN'
           monitor_workflow_age_minutes = None
           monitor_workflow_metadata_error = None
@@ -159,6 +160,9 @@ jobs:
               if valid_monitor_runs:
                   monitor_last_age_minutes = min(minutes_since(r.get('createdAt')) for r in valid_monitor_runs)
               scheduled_monitor_runs = [r for r in valid_monitor_runs if r.get('event') == 'schedule']
+              dispatch_monitor_runs = [r for r in valid_monitor_runs if r.get('event') == 'workflow_dispatch']
+              if dispatch_monitor_runs:
+                  monitor_dispatch_age_minutes = min(minutes_since(r.get('createdAt')) for r in dispatch_monitor_runs)
               if scheduled_monitor_runs:
                   monitor_scheduled_age_minutes = min(minutes_since(r.get('createdAt')) for r in scheduled_monitor_runs)
                   monitor_schedule_status = 'STALE' if monitor_scheduled_age_minutes > 15 else 'ON_CADENCE'
@@ -203,21 +207,27 @@ jobs:
                   r = subprocess.run(['gh', 'workflow', 'run', failed_source_workflow, '--ref', 'main'], text=True, capture_output=True)
                   actions.append({'workflow':failed_source_workflow,'action':'failure_recovery_dispatch','status':'requested' if r.returncode == 0 else 'failed','detail':(r.stderr.strip() if r.returncode else 'Automatic retry after failed '+source_workflow_name+' completion; cooldown prevents repeated failure loops.')})
 
-          # Deployment-triggered browser checks remain primary. If no monitor run
-          # of any kind completes for 15 minutes, schedule/manual watchdog runs
-          # dispatch one check as a failsafe; this does not certify the cron itself.
+          # Check freshness of both the monitor itself and its scheduled trigger history.
+          # Frequent deployment-triggered checks must not hide a missing cron. When
+          # the cron is stale/missing, dispatch a fallback check even if a recent
+          # deployment-triggered run passed. A 10-minute dispatch cooldown bounds retries.
           cloudflare_success_event = (
               watchdog_event_name == 'workflow_run'
               and source_workflow_name == 'Deploy Match Signal to Cloudflare Pages'
               and source_workflow_conclusion == 'success'
           )
-          monitor_fallback_allowed = watchdog_event_name in {'schedule', 'workflow_dispatch'} or cloudflare_success_event
-          if monitor_runs is not None and (monitor_last_age_minutes is None or monitor_last_age_minutes > 15) and monitor_fallback_allowed:
-              if not active('qualified-best-watch.yml'):
-                  r = subprocess.run(['gh', 'workflow', 'run', 'qualified-best-watch.yml', '--ref', 'main'], text=True, capture_output=True)
-                  actions.append({'workflow':'qualified-best-watch.yml','action':'monitor_failsafe_dispatch','status':'requested' if r.returncode == 0 else 'failed','detail':(r.stderr.strip() if r.returncode else 'No Qualified Best browser check in the last 15 minutes; fallback monitor dispatched.')})
-              else:
+          monitor_fallback_allowed = watchdog_event_name in {'schedule', 'workflow_dispatch', 'push'} or cloudflare_success_event
+          monitor_schedule_fallback_needed = monitor_schedule_status in {'STALE', 'MISSING_SCHEDULED_RUN'}
+          monitor_check_fallback_needed = monitor_last_age_minutes is None or monitor_last_age_minutes > 15
+          if monitor_runs is not None and monitor_fallback_allowed and (monitor_schedule_fallback_needed or monitor_check_fallback_needed):
+              if active('qualified-best-watch.yml'):
                   actions.append({'workflow':'qualified-best-watch.yml','action':'monitor_failsafe_dispatch','status':'suppressed_active_run','detail':'Monitor already queued or active.'})
+              elif monitor_dispatch_age_minutes is not None and monitor_dispatch_age_minutes < 10:
+                  actions.append({'workflow':'qualified-best-watch.yml','action':'monitor_failsafe_dispatch','status':'suppressed_cooldown','detail':'A fallback monitor was dispatched '+str(monitor_dispatch_age_minutes)+' minute(s) ago; monitor fallback cooldown is 10 minutes.'})
+              else:
+                  detail = ('Scheduled monitor run is '+monitor_schedule_status+'; dispatching a fallback despite recent deployment checks.' if monitor_schedule_fallback_needed else 'No Qualified Best browser check in the last 15 minutes; fallback monitor dispatched.')
+                  r = subprocess.run(['gh', 'workflow', 'run', 'qualified-best-watch.yml', '--ref', 'main'], text=True, capture_output=True)
+                  actions.append({'workflow':'qualified-best-watch.yml','action':'monitor_failsafe_dispatch','status':'requested' if r.returncode == 0 else 'failed','detail':(r.stderr.strip() if r.returncode else detail)})
           if virtual_status_age > 1 and not active('virtual-lab-collector.yml'):
               r = subprocess.run(['gh', 'workflow', 'run', 'virtual-lab-collector.yml', '--ref', 'main'], text=True, capture_output=True)
               actions.append({'workflow':'virtual-lab-collector.yml','action':'dispatch','status':'requested' if r.returncode == 0 else 'failed','detail':(r.stderr.strip() if r.returncode else 'Virtual Lab research-ledger self-heal')})
@@ -271,13 +281,14 @@ jobs:
               'unified_upcoming_age_hours': round(unified_age, 2),
               'qualified_best_monitor_last_run_age_minutes': monitor_last_age_minutes,
               'qualified_best_monitor_last_scheduled_run_age_minutes': monitor_scheduled_age_minutes,
+              'qualified_best_monitor_last_fallback_dispatch_age_minutes': monitor_dispatch_age_minutes,
               'qualified_best_monitor_schedule_status': monitor_schedule_status,
               'qualified_best_monitor_workflow_age_minutes': monitor_workflow_age_minutes,
               'virtual_lab_events': virtual.get('events_count', 0),
               'virtual_lab_products': virtual.get('product_counts', {}),
               'thresholds': {'pipeline_hours': 4, 'odds_builder_hours': 8, 'expansion_hours': 4, 'virtual_lab_hours': 1, 'virtual_lab_status_hours': 1, 'darts_hours': 2, 'table_tennis_hours': 2, 'unified_upcoming_hours': 0.5, 'qualified_best_monitor_minutes': 15},
               'actions': actions,
-              'policy': 'Watchdog self-heals stale engines, records Qualified Best scheduled/actual monitor age, and retries failed board/deploy runs once per 20-minute cooldown; workflow_run checks do not rewrite feed data to avoid downstream loops. Health publication is retried across concurrent data writers.'
+              'policy': 'Watchdog self-heals stale engines, records Qualified Best scheduled/actual monitor age, dispatches a fallback when the scheduled monitor is missing/stale even if deployment checks are recent (10-minute cooldown), and retries failed board/deploy runs once per 20-minute cooldown. Workflow_run checks do not rewrite feed data to avoid downstream loops. Health publication is retried across concurrent data writers.'
           }
           Path('data/automation_health.json').write_text(json.dumps(health, indent=2) + '\n')
           print(json.dumps(health, indent=2))
