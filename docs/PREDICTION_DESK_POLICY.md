@@ -13,6 +13,7 @@ This policy is a safety and correctness contract for the public Prediction Desk,
 
 - The public Qualified Best shortlist contains future fixtures only and publishes at most one passing selection per fixture.
 - For virtual forecasts, the published schedule may show fixtures up to seven days ahead, but a fixture is not "currently qualified" until kickoff is within the next 60 minutes. Farther fixtures remain forecasts/research and are promoted only after a fresh rebuild re-evaluates them against the newly settled history and current exact SportyBet quote.
+- When an active eFootball GT/Adriatic totals row has enough exact-line walk-forward history to produce a desk-calibrated probability, the calibrated value must itself clear the existing **65% Qualified Best floor**. A higher raw probability or upstream qualified flag cannot override a lower calibrated estimate; that row remains research-only.
 - Rank a selection that passes the complete current exact-price gate ahead of any higher model-probability row that is stale, mismatched, watch-only, or otherwise unqualified.
 - An explicit watch/research/not-qualified status vetoes contradictory upstream qualification flags. A probability band or candidate-pool label is never a qualification decision.
 - The empty state must show zero and the leading gate blockers; never weaken a gate to fill the shortlist.
