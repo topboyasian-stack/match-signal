@@ -113,13 +113,52 @@ async function run() {
         const snapshot = await page.evaluate(() => {
           const source = window.__MATCH_SIGNAL_QUALIFIED_BEST_MONITOR__;
           if (!source) return null;
+          const board = document.querySelector("#qualifiedBestBoard");
+          const rows = Array.from(document.querySelectorAll("#qualifiedBestBoard .ms-qualified-best-row"));
+          const visibleRows = rows.filter(element => {
+            const style = getComputedStyle(element);
+            const rect = element.getBoundingClientRect();
+            return style.display !== "none" && style.visibility !== "hidden" &&
+              Number(style.opacity) > 0 && rect.width > 0 && rect.height > 0;
+          });
+          const boardStyle = board ? getComputedStyle(board) : null;
+          const boardRect = board ? board.getBoundingClientRect() : null;
+          const firstRow = rows[0] || null;
+          const firstRowStyle = firstRow ? getComputedStyle(firstRow) : null;
+          const firstRowRect = firstRow ? firstRow.getBoundingClientRect() : null;
           return {
             ...source,
-            dom_qualified_count: document.querySelectorAll("#qualifiedBestBoard .ms-qualified-best-row").length,
+            dom_qualified_count: rows.length,
+            dom_qualified_visible_count: visibleRows.length,
+            dom_first_qualified_text: firstRow?.innerText?.slice(0, 1200) || null,
+            dom_board_display: boardStyle?.display || null,
+            dom_board_visibility: boardStyle?.visibility || null,
+            dom_board_height: boardRect ? Math.round(boardRect.height) : null,
+            dom_first_row_display: firstRowStyle?.display || null,
+            dom_first_row_visibility: firstRowStyle?.visibility || null,
+            dom_first_row_opacity: firstRowStyle?.opacity || null,
+            dom_first_row_width: firstRowRect ? Math.round(firstRowRect.width) : null,
+            dom_first_row_height: firstRowRect ? Math.round(firstRowRect.height) : null,
             dom_summary: document.querySelector("#qualifiedBestSummary")?.innerText || null,
             dom_source_status: document.querySelector("#qualifiedBestDataStatus")?.innerText || null,
             page_url: location.href
           };
+        });
+        // Capture the real production rendering. DOM row counts alone must not
+        // be treated as proof that the shortlist is visible to users.
+        await page.screenshot({
+          path: "qualified-best-production.png",
+          fullPage: true,
+          animations: "disabled",
+          timeout: 15000
+        }).catch(error => {
+          attempts.push({
+            attempt,
+            observed_at: new Date().toISOString(),
+            status: "warning",
+            classification: "screenshot_capture_failed",
+            reasons: [String(error?.message || error || "Production screenshot failed.")]
+          });
         });
         finalSnapshot = diagnosticFromPage(pageErrors, snapshot);
         const provisional = classifyQualifiedBestMonitor(finalSnapshot, { nowMs: Date.now() });
