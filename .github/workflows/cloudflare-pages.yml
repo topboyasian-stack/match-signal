@@ -240,27 +240,96 @@ jobs:
           node scripts/test_workspace_terminal_design.mjs
 
       - name: Deploy to Cloudflare Pages
+        id: pages-deployment
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           PROJECT: ${{ steps.project.outputs.project }}
         run: |
-          npx wrangler@latest pages deploy .pages-deploy --project-name="$PROJECT" --branch="${{ steps.project.outputs.production_branch }}" --commit-hash="${{ steps.source.outputs.sha }}"
+          set -euo pipefail
+          output="$(npx wrangler@latest pages deploy .pages-deploy --project-name="$PROJECT" --branch="${{ steps.project.outputs.production_branch }}" --commit-hash="${{ steps.source.outputs.sha }}" 2>&1)" || {
+            printf '%s\n' "$output"
+            exit 1
+          }
+          printf '%s\n' "$output"
+          deployment_line="$(printf '%s\n' "$output" | grep 'Deployment complete!' | tail -n 1 || true)"
+          deployment_url="${deployment_line##*over at }"
+          deployment_url="${deployment_url%%[[:space:]]*}"
+          case "$deployment_url" in
+            https://*.pages.dev) ;;
+            *) echo "Could not resolve immutable Cloudflare Pages deployment URL from Wrangler output." >&2; exit 1 ;;
+          esac
+          echo "url=$deployment_url" >> "$GITHUB_OUTPUT"
+          echo "Immutable Cloudflare deployment URL: $deployment_url"
 
       - name: Run production HTTP and asset smoke tests
         timeout-minutes: 3
+        env:
+          CLOUDFLARE_DEPLOYMENT_URL: ${{ steps.pages-deployment.outputs.url }}
         run: |
           node --input-type=module <<'NODE'
           import { writeFileSync } from 'node:fs';
           const base = 'https://match-signal.pages.dev';
+          const deploymentBase = String(process.env.CLOUDFLARE_DEPLOYMENT_URL || '').replace(/\\/+$/, '');
           const pages = ['/', '/upcoming.html', '/qualified-best', '/qualified-best.html', '/odds-builder.html', '/football.html', '/tennis.html', '/basketball.html', '/darts.html', '/table-tennis.html', '/league.html?sport=football&league=England%20Amateur%20-%20U21%20Professional%20Development%20League', '/reports.html', '/live.html', '/expansion.html', '/virtual-lab/', '/virtual-lab', '/research.html', '/virtual-lab.html', '/analyst.html'];
           const assets = ['/api/sportybet-virtual','/api/sportybet-darts','/api/sportybet-table-tennis','/api/virtual-lab-history','/expansion.js', '/expansion-odds-builder.js', '/live-analysis.js', '/live-data-worker.js', '/virtual-lab-app.js', '/virtual-lab-confirmed-watch.js', '/virtual-lab.css', '/_redirects', '/data/predictions.json', '/data/unified_upcoming.json', '/data/selection_candidates.json', '/data/expansion_status.json', '/data/odds_builder.json', '/data/odds_ticket_tracker.json', '/data/system_health.json', '/data/tennis_forward_status.json', '/data/prediction_desk_health.json', '/data/results_first_evidence_report.json', '/data/virtual_lab_live.json','/data/virtual_lab_model_eval.json','/data/virtual_lab_eligibility.json','/data/virtual_lab_participants/registry.json','/data/virtual_lab_participant_lifecycle.json','/data/virtual_lab_participants/efootball_confirmed_watch.json','/data/efootball_desk_prediction_history.json.gz','/sport-hubs.js','/league-logos.js','/sport-hubs.css','/ms-design-system.css','/qualified-best-design.css','/sport-hubs-design.css','/independent-sport-design.css','/odds-builder-design.css','/reports-design.css','/virtual-lab-terminal.css','/workspace-ui.js','/workspace-ui.css','/analyst.js'];
           const failures = [];
-          async function get(path) {
-            const r = await fetch(base + path + (path.includes('?') ? '&' : '?') + 'smoke=' + Date.now(), {cache:'no-store'});
+          async function getFrom(origin, path) {
+            const r = await fetch(origin + path + (path.includes('?') ? '&' : '?') + 'smoke=' + Date.now(), {cache:'no-store'});
             const body = await r.text();
             return {r,body};
           }
+          const get = path => getFrom(base, path);
+
+          // Verify the immutable deployment itself first, then give Cloudflare's production
+          // hostname a bounded propagation window. A successful upload alone is not proof
+          // that the primary hostname is serving the uploaded HTML/CSS yet.
+          const workspaceContracts = [
+            {path:'/odds-builder.html', css:'/odds-builder-design.css', markers:['MS-ODDS-BUILDER-2026.10.14-V3','odds-builder-design.css?v=20261014-full-v3','class="ob-page-header"','class="ob-section-nav"','class="ob-guide-grid"'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V3: ODDS BUILDER PAGE LAYOUT'},
+            {path:'/reports.html', css:'/reports-design.css', markers:['MS-REPORTS-2026.10.14-V3','reports-design.css?v=20261014-full-v3','class="rp-dashboard-grid"','id="report-scoreboard"','id="researchLabSummary"'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V3: REPORTS PAGE LAYOUT'},
+            {path:'/virtual-lab/', css:'/virtual-lab-terminal.css', markers:['MS-VIRTUAL-LAB-V1-2026.10.14-V3','../virtual-lab-terminal.css?v=20261014-full-v3','class="vl-command-grid"','class="vl-command-rail"','class="vl-insights-grid"'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V3: VIRTUAL LAB PAGE LAYOUT'}
+          ];
+          if (!deploymentBase.startsWith('https://') || !deploymentBase.endsWith('.pages.dev')) {
+            failures.push('Cloudflare deployment step did not publish an immutable Pages URL.');
+          } else {
+            for (const contract of workspaceContracts) {
+              try {
+                const [{r:pageResponse,body:pageBody},{r:cssResponse,body:cssBody}] = await Promise.all([
+                  getFrom(deploymentBase, contract.path),
+                  getFrom(deploymentBase, contract.css)
+                ]);
+                if (!pageResponse.ok) failures.push('Immutable deployment '+contract.path+' HTTP '+pageResponse.status);
+                for (const marker of contract.markers) if (!pageBody.includes(marker)) failures.push('Immutable deployment '+contract.path+' missing '+marker);
+                if (!cssResponse.ok) failures.push('Immutable deployment '+contract.css+' HTTP '+cssResponse.status);
+                if (!cssBody.includes(contract.cssMarker)) failures.push('Immutable deployment '+contract.css+' missing V3 stylesheet marker');
+              } catch(e) { failures.push('Immutable deployment verification '+contract.path+' '+e.message); }
+            }
+          }
+
+          const workspaceSnapshots = new Map();
+          let primaryHostV3Ready = false;
+          for (let attempt = 1; attempt <= 6; attempt++) {
+            const observations = await Promise.all(workspaceContracts.map(async contract => {
+              try {
+                const result = await get(contract.path);
+                const ready = result.r.ok && contract.markers.every(marker => result.body.includes(marker));
+                return {contract, result, ready};
+              } catch(e) { return {contract, result:null, ready:false, error:String(e.message||e)}; }
+            }));
+            if (observations.every(x => x.ready)) {
+              for (const x of observations) workspaceSnapshots.set(x.contract.path, x.result);
+              primaryHostV3Ready = true;
+              console.log('Cloudflare production hostname serves all three V3 workspace pages (attempt '+attempt+').');
+              break;
+            }
+            const stale = observations.filter(x => !x.ready).map(x => x.contract.path).join(', ');
+            console.log('Cloudflare production hostname is not on the V3 workspace yet (attempt '+attempt+'/6): '+stale);
+            if (attempt < 6) await new Promise(resolve => setTimeout(resolve, 8000));
+          }
+          if (!primaryHostV3Ready) {
+            failures.push('Cloudflare production hostname did not serve all V3 workspace pages after 6 checks; immutable deployment: '+(deploymentBase||'unavailable'));
+          }
+
           // Canonical route assertions: root is the only public desk entrypoint.
           for (const legacyPath of ['/index.html','/index-tight','/index-tight.html']) {
             try {
@@ -272,7 +341,8 @@ jobs:
 
           for (const path of pages) {
             try {
-              const {r,body}=await get(path);
+              const snapshot=workspaceSnapshots.get(path);
+              const {r,body}=snapshot || await get(path);
               if ((path==='/' || path==='/index.html') && (body.includes('index-tight') || body.includes('nav-fix.js') || body.includes('⌂ Home'))) failures.push(path+' contains retired root/navigation behavior');
               if (path==='/live.html' && (body.includes('nav-fix.js') || body.includes('?sport=football'))) failures.push(path+' contains retired navigation behavior');
               if (!r.ok) failures.push(path+' HTTP '+r.status);
