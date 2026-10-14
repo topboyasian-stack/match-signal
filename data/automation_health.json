@@ -1,26 +1,26 @@
 {
-  "updated_at": "2026-10-14T15:18:50.842655+00:00",
+  "updated_at": "2026-10-14T15:24:27.769769+00:00",
   "automation_status": "SELF_HEALING_ENABLED",
   "pipeline_last_update": "2026-10-14T13:41:41.469486+00:00",
-  "pipeline_age_hours": 1.62,
-  "odds_builder_last_update": "2026-10-14T15:15:48.517481+00:00",
-  "odds_builder_age_hours": 0.05,
+  "pipeline_age_hours": 1.71,
+  "odds_builder_last_update": "2026-10-14T15:22:07.962501+00:00",
+  "odds_builder_age_hours": 0.04,
   "expansion_last_update": "2026-10-14T13:44:04.460221+00:00",
-  "expansion_age_hours": 1.58,
-  "virtual_lab_last_update": "2026-10-14T13:04:03.791231+00:00",
-  "virtual_lab_age_hours": 2.25,
-  "virtual_lab_status_age_hours": 2.1,
-  "darts_age_hours": 2.22,
-  "table_tennis_age_hours": 2.01,
-  "unified_upcoming_age_hours": 0.04,
-  "qualified_best_monitor_last_run_age_minutes": 0.3,
+  "expansion_age_hours": 1.67,
+  "virtual_lab_last_update": "2026-10-14T15:21:23.815174+00:00",
+  "virtual_lab_age_hours": 0.05,
+  "virtual_lab_status_age_hours": 2.2,
+  "darts_age_hours": 2.32,
+  "table_tennis_age_hours": 2.1,
+  "unified_upcoming_age_hours": 0.03,
+  "qualified_best_monitor_last_run_age_minutes": 0.2,
   "qualified_best_monitor_last_scheduled_run_age_minutes": null,
-  "qualified_best_monitor_last_fallback_dispatch_age_minutes": 121.0,
+  "qualified_best_monitor_last_fallback_dispatch_age_minutes": 126.7,
   "qualified_best_monitor_schedule_status": "MISSING_SCHEDULED_RUN",
-  "qualified_best_monitor_workflow_age_minutes": 362.1,
-  "virtual_lab_events": 625,
+  "qualified_best_monitor_workflow_age_minutes": 367.7,
+  "virtual_lab_events": 737,
   "virtual_lab_products": {
-    "efootball_gt": 182,
+    "efootball_gt": 294,
     "vfootball": 433,
     "efootball_adriatic": 10
   },
@@ -40,31 +40,25 @@
       "workflow": "qualified-best-watch.yml",
       "action": "schedule_gap_alert",
       "status": "warning",
-      "detail": "Qualified Best monitor schedule status=MISSING_SCHEDULED_RUN; last scheduled run age=none minute(s); workflow age=362.1 minute(s)."
+      "detail": "Qualified Best monitor schedule status=MISSING_SCHEDULED_RUN; last scheduled run age=none minute(s); workflow age=367.7 minute(s)."
     },
     {
-      "workflow": "cloudflare-pages.yml",
-      "action": "failure_recovery",
-      "status": "suppressed_active_run",
-      "detail": "A run is already queued or active; duplicate retry avoided."
-    },
-    {
-      "workflow": "virtual-lab-collector.yml",
-      "action": "dispatch",
+      "workflow": "qualified-best-watch.yml",
+      "action": "monitor_failsafe_dispatch",
       "status": "requested",
-      "detail": "Virtual Lab research-ledger self-heal"
+      "detail": "Scheduled monitor run is MISSING_SCHEDULED_RUN; dispatching a fallback despite recent deployment checks. A deployment-triggered monitor is active; the fallback is queued behind it."
     },
     {
       "workflow": "darts-x.yml",
       "action": "dispatch",
-      "status": "failed",
-      "detail": "could not create workflow dispatch event: HTTP 500 (https://api.github.com/repos/topboyasian-stack/match-signal/actions/workflows/366290049/dispatches)"
+      "status": "requested",
+      "detail": "Darts-X self-heal"
     },
     {
       "workflow": "table-tennis-x.yml",
       "action": "dispatch",
-      "status": "failed",
-      "detail": "could not create workflow dispatch event: HTTP 500 (https://api.github.com/repos/topboyasian-stack/match-signal/actions/workflows/366290074/dispatches)"
+      "status": "requested",
+      "detail": "Table Tennis-X self-heal"
     }
   ],
   "policy": "Watchdog self-heals stale engines, records Qualified Best scheduled/actual monitor age, dispatches a fallback when the scheduled monitor is missing/stale even if deployment checks are recent (10-minute cooldown), and retries failed board/deploy runs once per 20-minute cooldown. Workflow_run checks do not rewrite feed data to avoid downstream loops. Health publication is retried across concurrent data writers."
