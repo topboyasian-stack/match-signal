@@ -48,7 +48,7 @@ function createResponseCache() {
   };
 }
 
-async function runQuery(query, responseSequence = [feed], responseCache = null) {
+async function runQuery(query, responseSequence = [feed], responseCache = null, requestCf = null) {
   const requestedPaths = [];
   const mockFetch = async input => {
     requestedPaths.push(new URL(String(input)).pathname);
@@ -76,14 +76,43 @@ async function runQuery(query, responseSequence = [feed], responseCache = null) 
   vm.runInContext(executable, sandbox, { filename: "sportybet-virtual.js", timeout: 5000 });
 
   const response = await sandbox.__handler({
-    request: { url: "https://match-signal.pages.dev/api/sportybet-virtual?" + query }
+    request: { url: "https://match-signal.pages.dev/api/sportybet-virtual?" + query, cf: requestCf || undefined }
   });
   return { response, payload: await response.json(), requestedPaths };
 }
 
+const diagnostic = await runQuery("debug=1", [feed, feed], null, {
+  colo: "LHR",
+  country: "GB",
+  region: "England"
+});
+assert.equal(diagnostic.response.status, 200);
+assert.deepEqual(JSON.parse(JSON.stringify(diagnostic.payload.edge)), {
+  colo: "LHR",
+  country: "GB",
+  region: "England"
+});
+assert.equal(diagnostic.payload.diagnostic, "sportybet-upstream-edge-probe-v1");
+assert.equal(diagnostic.payload.probes.length, 2, "debug mode must make exactly two bounded provider probes");
+assert.equal(diagnostic.payload.probes[0].endpoint, "/api/ng/factsCenter/pcUpcomingEvents");
+assert.equal(diagnostic.payload.probes[1].endpoint, "/api/ng/factsCenter/wapConfigurableUpcomingEvents");
+for (const probe of diagnostic.payload.probes) {
+  assert.equal(probe.status, 200);
+  assert.equal(probe.is_json, true);
+  assert.equal(typeof probe.body_prefix, "string");
+  assert.ok(probe.body_prefix.length <= 200, "diagnostics must cap provider response samples at 200 characters");
+}
+assert.deepEqual(diagnostic.requestedPaths, [
+  "/api/ng/factsCenter/pcUpcomingEvents",
+  "/api/ng/factsCenter/wapConfigurableUpcomingEvents"
+], "debug mode must not run the full collection pipeline");
+
 const upcomingOnly = await runQuery("sources=efootball&pageSize=100&pageNum=1&timeline=168&includeLive=false");
 assert.equal(upcomingOnly.response.status, 200);
 assert.equal(upcomingOnly.payload.ok, true);
+assert.deepEqual(JSON.parse(JSON.stringify(upcomingOnly.payload.edge)), {
+  colo: null, country: null, region: null
+}, "edge metadata is included on normal responses even when unavailable in the test harness");
 assert.equal(upcomingOnly.payload.status, "LIVE");
 assert.equal(upcomingOnly.payload.events.length, 1, "upcoming eFootball events remain available");
 assert.equal(upcomingOnly.payload.source_status.efootball.status, "LIVE");
