@@ -1,0 +1,36 @@
+name: Match Signal SportyBet Regional Worker Tests
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'sportybet-worker/**'
+      - 'scripts/test_sportybet_region_worker.mjs'
+      - '.github/workflows/sportybet-worker-tests.yml'
+      - '.github/workflows/deploy-sportybet-worker.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'sportybet-worker/**'
+      - 'scripts/test_sportybet_region_worker.mjs'
+      - '.github/workflows/sportybet-worker-tests.yml'
+      - '.github/workflows/deploy-sportybet-worker.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Check Worker syntax
+        run: node --check sportybet-worker/src/index.js
+      - name: Test regional proxy contract
+        run: node scripts/test_sportybet_region_worker.mjs
