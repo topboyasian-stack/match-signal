@@ -13,6 +13,11 @@ on:
     # Frequent, off-hour heartbeat so stale live feeds are repaired before the next day.
     # Change the registered cron to re-arm schedule delivery; keep runs off minute zero.
     - cron: '1,11,21,31,41,51 * * * *'
+  workflow_run:
+    workflows:
+      - "Match Signal Unified Upcoming Board"
+      - "Deploy Match Signal to Cloudflare Pages"
+    types: [completed]
   workflow_dispatch:
 
 permissions:
@@ -25,6 +30,8 @@ concurrency:
 
 jobs:
   watchdog:
+    # Run after failed board publication or any Cloudflare completion; skip the successful-board event because its following deployment will trigger this check.
+    if: ${{ github.event_name != 'workflow_run' || (github.event.workflow_run.name == 'Match Signal Unified Upcoming Board' && github.event.workflow_run.conclusion != 'success') || github.event.workflow_run.name == 'Deploy Match Signal to Cloudflare Pages' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -39,9 +46,12 @@ jobs:
           python-version: '3.12'
 
       - name: Install Virtual Lab live-feed dependency
+        if: github.event_name != 'workflow_run'
         run: python -m pip install --upgrade requests
 
       - name: Refresh Virtual Lab live snapshot
+        # Event-driven freshness checks must not rewrite feed artifacts and trigger a board/watchdog loop.
+        if: github.event_name != 'workflow_run'
         run: |
           python scripts/virtual_lab_sync.py
           cp data/virtual_lab_live.json /tmp/virtual_lab_live_candidate.json
@@ -49,10 +59,13 @@ jobs:
       - name: Check freshness and self-heal stale workflows
         env:
           GH_TOKEN: ${{ github.token }}
+          WATCHDOG_EVENT_NAME: ${{ github.event_name }}
+          WATCHDOG_SOURCE_WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
+          WATCHDOG_SOURCE_WORKFLOW_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
         shell: bash
         run: |
           python - <<'PY'
-          import json, subprocess
+          import json, os, subprocess
           from datetime import datetime, timezone
           from pathlib import Path
 
@@ -90,21 +103,116 @@ jobs:
           table_tennis_age = age_hours(table_tennis.get('updated_at'))
           unified_age = age_hours(unified.get('generated_at'))
 
-          def active(workflow):
+          def recent_runs(workflow, limit=100):
               p = subprocess.run(
-                  ['gh', 'run', 'list', '--workflow', workflow, '--json', 'databaseId,status', '--limit', '10'],
+                  ['gh', 'run', 'list', '--workflow', workflow, '--branch', 'main',
+                   '--json', 'databaseId,status,event,createdAt,conclusion', '--limit', str(limit)],
                   text=True, capture_output=True
               )
               if p.returncode != 0:
-                  print(f'WARN unable to inspect {workflow}: {p.stderr.strip()}')
-                  return False
+                  return None, p.stderr.strip() or f'gh run list failed for {workflow}'
               try:
-                  runs = json.loads(p.stdout)
-                  return any(r.get('status') in {'queued', 'in_progress', 'waiting', 'pending'} for r in runs)
+                  value = json.loads(p.stdout)
+                  if not isinstance(value, list):
+                      return None, f'Unexpected run-history response for {workflow}'
+                  return value, None
+              except Exception as exc:
+                  return None, f'Could not parse run history for {workflow}: {exc}'
+
+          def minutes_since(value):
+              if not value:
+                  return None
+              try:
+                  stamp = datetime.fromisoformat(str(value).replace('Z', '+00:00'))
+                  return round(max(0.0, (now - stamp).total_seconds()) / 60, 1)
               except Exception:
+                  return None
+
+          def active(workflow):
+              runs, error = recent_runs(workflow, 10)
+              if runs is None:
+                  print(f'WARN unable to inspect {workflow}: {error}')
                   return False
+              return any(r.get('status') in {'queued', 'in_progress', 'waiting', 'pending'} for r in runs)
+
+          monitor_runs, monitor_history_error = recent_runs('qualified-best-watch.yml', 100)
+          monitor_last_age_minutes = None
+          monitor_scheduled_age_minutes = None
+          monitor_schedule_status = 'UNKNOWN'
+          monitor_workflow_age_minutes = None
+          monitor_workflow_metadata_error = None
+          repo_name = os.environ.get('GITHUB_REPOSITORY', '')
+          if repo_name:
+              meta = subprocess.run(
+                  ['gh', 'api', f'repos/{repo_name}/actions/workflows/qualified-best-watch.yml', '--jq', '.created_at'],
+                  text=True, capture_output=True
+              )
+              if meta.returncode == 0:
+                  monitor_workflow_age_minutes = minutes_since(meta.stdout.strip())
+              else:
+                  monitor_workflow_metadata_error = meta.stderr.strip() or 'Workflow metadata lookup failed'
+          else:
+              monitor_workflow_metadata_error = 'GITHUB_REPOSITORY is unavailable'
+
+          if monitor_runs is not None:
+              valid_monitor_runs = [r for r in monitor_runs if minutes_since(r.get('createdAt')) is not None]
+              if valid_monitor_runs:
+                  monitor_last_age_minutes = min(minutes_since(r.get('createdAt')) for r in valid_monitor_runs)
+              scheduled_monitor_runs = [r for r in valid_monitor_runs if r.get('event') == 'schedule']
+              if scheduled_monitor_runs:
+                  monitor_scheduled_age_minutes = min(minutes_since(r.get('createdAt')) for r in scheduled_monitor_runs)
+                  monitor_schedule_status = 'STALE' if monitor_scheduled_age_minutes > 15 else 'ON_CADENCE'
+              elif monitor_workflow_age_minutes is not None and monitor_workflow_age_minutes > 15:
+                  monitor_schedule_status = 'MISSING_SCHEDULED_RUN'
+              elif monitor_workflow_metadata_error:
+                  monitor_schedule_status = 'UNKNOWN'
+              else:
+                  monitor_schedule_status = 'AWAITING_FIRST_SCHEDULED_RUN'
 
           actions = []
+          if monitor_runs is None:
+              actions.append({'workflow':'qualified-best-watch.yml','action':'inspect_schedule','status':'failed','detail':monitor_history_error})
+          elif monitor_schedule_status in {'STALE', 'MISSING_SCHEDULED_RUN'}:
+              actions.append({'workflow':'qualified-best-watch.yml','action':'schedule_gap_alert','status':'warning','detail':'Qualified Best monitor schedule status='+monitor_schedule_status+'; last scheduled run age='+(str(monitor_scheduled_age_minutes) if monitor_scheduled_age_minutes is not None else 'none')+' minute(s); workflow age='+(str(monitor_workflow_age_minutes) if monitor_workflow_age_minutes is not None else 'unknown')+' minute(s).'})
+
+          # A failed board/deploy run is an event-driven recovery signal even if
+          # the last published artifact has not aged past its normal freshness guard.
+          # A 20-minute dispatch cooldown bounds retries and prevents failure loops.
+          watchdog_event_name = os.environ.get('WATCHDOG_EVENT_NAME', '')
+          source_workflow_name = os.environ.get('WATCHDOG_SOURCE_WORKFLOW_NAME', '')
+          source_workflow_conclusion = os.environ.get('WATCHDOG_SOURCE_WORKFLOW_CONCLUSION', '')
+          failed_source_workflow = None
+          if watchdog_event_name == 'workflow_run' and source_workflow_conclusion != 'success':
+              if source_workflow_name == 'Match Signal Unified Upcoming Board':
+                  failed_source_workflow = 'unified-upcoming.yml'
+              elif source_workflow_name == 'Deploy Match Signal to Cloudflare Pages':
+                  failed_source_workflow = 'cloudflare-pages.yml'
+
+          if failed_source_workflow:
+              prior_runs, prior_error = recent_runs(failed_source_workflow, 30)
+              retry_age = None
+              if prior_runs is not None:
+                  retry_ages = [minutes_since(r.get('createdAt')) for r in prior_runs if r.get('event') == 'workflow_dispatch' and minutes_since(r.get('createdAt')) is not None]
+                  if retry_ages:
+                      retry_age = min(retry_ages)
+              if active(failed_source_workflow):
+                  actions.append({'workflow':failed_source_workflow,'action':'failure_recovery','status':'suppressed_active_run','detail':'A run is already queued or active; duplicate retry avoided.'})
+              elif retry_age is not None and retry_age < 20:
+                  actions.append({'workflow':failed_source_workflow,'action':'failure_recovery','status':'suppressed_cooldown','detail':'A manual retry was dispatched '+str(retry_age)+' minute(s) ago; retry cooldown is 20 minutes.'})
+              else:
+                  r = subprocess.run(['gh', 'workflow', 'run', failed_source_workflow, '--ref', 'main'], text=True, capture_output=True)
+                  actions.append({'workflow':failed_source_workflow,'action':'failure_recovery_dispatch','status':'requested' if r.returncode == 0 else 'failed','detail':(r.stderr.strip() if r.returncode else 'Automatic retry after failed '+source_workflow_name+' completion; cooldown prevents repeated failure loops.')})
+
+          # Deployment-triggered browser checks remain primary. If no monitor run
+          # of any kind completes for 15 minutes, schedule/manual watchdog runs
+          # dispatch one check as a failsafe; this does not certify the cron itself.
+          workflow_run_event = watchdog_event_name == 'workflow_run'
+          if monitor_runs is not None and (monitor_last_age_minutes is None or monitor_last_age_minutes > 15) and watchdog_event_name in {'schedule', 'workflow_dispatch'}:
+              if not active('qualified-best-watch.yml'):
+                  r = subprocess.run(['gh', 'workflow', 'run', 'qualified-best-watch.yml', '--ref', 'main'], text=True, capture_output=True)
+                  actions.append({'workflow':'qualified-best-watch.yml','action':'monitor_failsafe_dispatch','status':'requested' if r.returncode == 0 else 'failed','detail':(r.stderr.strip() if r.returncode else 'No Qualified Best browser check in the last 15 minutes; fallback monitor dispatched.')})
+              else:
+                  actions.append({'workflow':'qualified-best-watch.yml','action':'monitor_failsafe_dispatch','status':'suppressed_active_run','detail':'Monitor already queued or active.'})
           if virtual_status_age > 1 and not active('virtual-lab-collector.yml'):
               r = subprocess.run(['gh', 'workflow', 'run', 'virtual-lab-collector.yml', '--ref', 'main'], text=True, capture_output=True)
               actions.append({'workflow':'virtual-lab-collector.yml','action':'dispatch','status':'requested' if r.returncode == 0 else 'failed','detail':(r.stderr.strip() if r.returncode else 'Virtual Lab research-ledger self-heal')})
@@ -156,11 +264,15 @@ jobs:
               'darts_age_hours': round(darts_age, 2),
               'table_tennis_age_hours': round(table_tennis_age, 2),
               'unified_upcoming_age_hours': round(unified_age, 2),
+              'qualified_best_monitor_last_run_age_minutes': monitor_last_age_minutes,
+              'qualified_best_monitor_last_scheduled_run_age_minutes': monitor_scheduled_age_minutes,
+              'qualified_best_monitor_schedule_status': monitor_schedule_status,
+              'qualified_best_monitor_workflow_age_minutes': monitor_workflow_age_minutes,
               'virtual_lab_events': virtual.get('events_count', 0),
               'virtual_lab_products': virtual.get('product_counts', {}),
-              'thresholds': {'pipeline_hours': 4, 'odds_builder_hours': 8, 'expansion_hours': 4, 'virtual_lab_hours': 1, 'virtual_lab_status_hours': 1, 'darts_hours': 2, 'table_tennis_hours': 2, 'unified_upcoming_hours': 0.5},
+              'thresholds': {'pipeline_hours': 4, 'odds_builder_hours': 8, 'expansion_hours': 4, 'virtual_lab_hours': 1, 'virtual_lab_status_hours': 1, 'darts_hours': 2, 'table_tennis_hours': 2, 'unified_upcoming_hours': 0.5, 'qualified_best_monitor_minutes': 15},
               'actions': actions,
-              'policy': 'Watchdog proactively self-heals stale engines and force-restarts the actual core Live Prediction Pipeline; health publication is retried across concurrent data writers.'
+              'policy': 'Watchdog self-heals stale engines, records Qualified Best scheduled/actual monitor age, and retries failed board/deploy runs once per 20-minute cooldown; workflow_run checks do not rewrite feed data to avoid downstream loops. Health publication is retried across concurrent data writers.'
           }
           Path('data/automation_health.json').write_text(json.dumps(health, indent=2) + '\n')
           print(json.dumps(health, indent=2))

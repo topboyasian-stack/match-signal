@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import textwrap
 import unittest
 from pathlib import Path
 
@@ -59,6 +60,26 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn("1,11,21,31,41,51 * * * *", crons)
         self.assertIn("if unified_age > 0.5 and not active('unified-upcoming.yml'):", WATCHDOG_WORKFLOW)
         self.assertIn("'unified_upcoming_hours': 0.5", WATCHDOG_WORKFLOW)
+
+    def test_watchdog_has_event_driven_monitoring_and_bounded_failure_recovery(self):
+        self.assertIn('  workflow_run:\n    workflows:\n      - "Match Signal Unified Upcoming Board"\n      - "Deploy Match Signal to Cloudflare Pages"', WATCHDOG_WORKFLOW)
+        self.assertIn("github.event.workflow_run.conclusion != 'success'", WATCHDOG_WORKFLOW, "successful board completions should be checked after deployment, not before it")
+        self.assertIn("if: github.event_name != 'workflow_run'\n        run: python -m pip install --upgrade requests", WATCHDOG_WORKFLOW, "event-driven health checks must not reinstall the feed-sync dependency")
+        self.assertIn("if: github.event_name != 'workflow_run'", WATCHDOG_WORKFLOW)
+        self.assertIn("WATCHDOG_SOURCE_WORKFLOW_CONCLUSION", WATCHDOG_WORKFLOW)
+        self.assertIn("source_workflow_conclusion != 'success'", WATCHDOG_WORKFLOW)
+        self.assertIn("retry_age < 20", WATCHDOG_WORKFLOW)
+        self.assertIn("qualified_best_monitor_last_run_age_minutes", WATCHDOG_WORKFLOW)
+        self.assertIn("qualified_best_monitor_last_scheduled_run_age_minutes", WATCHDOG_WORKFLOW)
+        self.assertIn("workflow', 'run', 'qualified-best-watch.yml'", WATCHDOG_WORKFLOW)
+        self.assertIn("and watchdog_event_name in {'schedule', 'workflow_dispatch'}:", WATCHDOG_WORKFLOW, "do not run the browser check against the pre-deployment page while a board retry/deploy event is in flight")
+        self.assertIn("MISSING_SCHEDULED_RUN", WATCHDOG_WORKFLOW, "flag when a newly registered monitor workflow still has no scheduled invocation after its 15-minute startup grace")
+        self.assertIn("actions/workflows/qualified-best-watch.yml", WATCHDOG_WORKFLOW, "derive the startup grace from the workflow registration date")
+        step_start = WATCHDOG_WORKFLOW.index("      - name: Check freshness and self-heal stale workflows")
+        heredoc_start = WATCHDOG_WORKFLOW.index("          python - <<'PY'\n", step_start) + len("          python - <<'PY'\n")
+        heredoc_end = WATCHDOG_WORKFLOW.index("\n          PY", heredoc_start)
+        embedded_python = textwrap.dedent(WATCHDOG_WORKFLOW[heredoc_start:heredoc_end])
+        compile(embedded_python, ".github/workflows/automation_watchdog.yml:embedded-check", "exec")
 
     def test_pages_deploy_is_board_driven_with_guarded_cache_only_promotion(self):
         events_end = PAGES_WORKFLOW.find("\npermissions:")
