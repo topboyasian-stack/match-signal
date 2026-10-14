@@ -64,7 +64,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn("1,11,21,31,41,51 * * * *", crons)
         self.assertNotIn("5,15,25,35,45,55 * * * *", crons, "schedule must move to a fresh workflow identity")
         self.assertNotIn("*/5 * * * *", crons)
-        events_end = MONITOR_WORKFLOW.find("\\npermissions:")
+        events_end = MONITOR_WORKFLOW.find("\npermissions:")
         self.assertGreater(events_end, 0)
         events = MONITOR_WORKFLOW[:events_end]
         self.assertIn('      - "Deploy Match Signal to Cloudflare Pages"', events)
