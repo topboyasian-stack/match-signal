@@ -97,6 +97,8 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "basketball.html",
             "sport-hubs.css",
             "ms-design-system.css",
+            "core-workspaces-design.css",
+            "scripts/test_core_workspaces_design.mjs",
             "league-logos.js",
             "scripts/test_league_logos.mjs",
             ".github/workflows/cloudflare-pages.yml",
