@@ -4,8 +4,7 @@ import path from "node:path";
 
 const workflowsDir = ".github/workflows";
 const workflowFiles = fs.readdirSync(workflowsDir).filter((name) => /\.(?:yml|yaml)$/i.test(name));
-
-const duplicatePublishers = workflowFiles.filter((name) => {
+const publisherWorkflows = workflowFiles.filter((name) => {
   const source = fs.readFileSync(path.join(workflowsDir, name), "utf8");
   return /uses:\s*actions\/deploy-pages@/i.test(source)
     || /(^|\n)\s*pages:\s*write\b/i.test(source)
@@ -13,19 +12,42 @@ const duplicatePublishers = workflowFiles.filter((name) => {
 });
 
 assert.deepEqual(
-  duplicatePublishers,
-  [],
-  `Cloudflare Pages must be the only production site publisher; found legacy GitHub Pages workflow(s): ${duplicatePublishers.join(", ")}`,
+  publisherWorkflows,
+  ["deploy-pages.yml"],
+  "Cloudflare must publish the application; GitHub Pages may only serve the legacy redirect.",
 );
-assert.equal(
-  fs.existsSync(path.join(workflowsDir, "deploy-pages.yml")),
-  false,
-  "The retired GitHub Pages publisher must not be reintroduced under its old filename.",
+
+const legacyWorkflowPath = path.join(workflowsDir, "deploy-pages.yml");
+assert.equal(fs.existsSync(legacyWorkflowPath), true, "Keep the one-time legacy redirect workflow.");
+const legacyWorkflow = fs.readFileSync(legacyWorkflowPath, "utf8");
+assert.match(legacyWorkflow, /name:\s*Retire legacy GitHub Pages mirror \(Cloudflare redirect only\)/);
+assert.doesNotMatch(legacyWorkflow, /workflow_run:/, "The legacy host must not redeploy on other workflow completions.");
+assert.doesNotMatch(legacyWorkflow, /['"]data\/\*\*['"]/, "Sports data changes must never trigger a secondary site deployment.");
+assert.match(
+  legacyWorkflow,
+  /paths:\s*\n\s*-\s*['"]\.github\/workflows\/deploy-pages\.yml['"]/,
+  "The legacy redirect may publish only when its own workflow changes or is manually dispatched.",
 );
+assert.match(legacyWorkflow, /Prepare redirect-only artifact/);
+assert.match(legacyWorkflow, /cp public\/index\.html public\/404\.html/);
+assert.match(legacyWorkflow, /https:\/\/match-signal\.pages\.dev/);
+assert.doesNotMatch(legacyWorkflow, /DEPLOY-VERIFY-GITHUB-PAGES\.json/, "Do not write a competing production verification marker.");
 assert.equal(
   fs.existsSync("DEPLOY-VERIFY-GITHUB-PAGES.json"),
   false,
-  "Do not publish a stale/competing GitHub Pages production verification record.",
+  "Remove the old GitHub Pages production verification marker.",
+);
+
+const otherLegacyHostReferences = workflowFiles.filter((name) => {
+  if (name === "deploy-pages.yml") return false;
+  return /topboyasian-stack\.github\.io\/match-signal/i.test(
+    fs.readFileSync(path.join(workflowsDir, name), "utf8"),
+  );
+});
+assert.deepEqual(
+  otherLegacyHostReferences,
+  [],
+  "No other workflow should treat the retired GitHub Pages mirror as a production host.",
 );
 
 const cloudflare = fs.readFileSync(path.join(workflowsDir, "cloudflare-pages.yml"), "utf8");
@@ -44,4 +66,4 @@ assert.doesNotMatch(
   "The production browser monitor must not use the legacy GitHub Pages mirror.",
 );
 
-console.log("Cloudflare-only production hosting checks passed.");
+console.log("Cloudflare production hosting checks passed; legacy GitHub Pages is redirect-only.");
