@@ -6,6 +6,7 @@ on:
   workflow_run:
     workflows:
       - "Match Signal Unified Upcoming Board"
+      - "Match Signal Persistent Club Logo Registry"
     types: [completed]
   # Small static presentation promotions must not depend on a queued Unified Board run.
   # Push promotions are guarded below and accept only allowlisted static UI and verification files.
@@ -40,6 +41,12 @@ on:
       - 'scripts/test_core_workspaces_design.mjs'
       - 'league-logos.js'
       - 'scripts/test_league_logos.mjs'
+      - 'workspace-ui.js'
+      - 'data/club-logo-registry.json'
+      - 'assets/club-logos/**'
+      - 'data/licenses/**'
+      - 'scripts/sync_club_logos.py'
+      - 'scripts/test_club_logo_registry.py'
       - '.github/workflows/cloudflare-pages.yml'
   workflow_dispatch:
 
@@ -79,12 +86,17 @@ jobs:
           changed="$(gh api "repos/${GITHUB_REPOSITORY}/compare/${BEFORE_SHA}...${PUSH_SHA}" --jq '.files[].filename')"
           test -n "$changed" || { echo "Direct promotion has no inspectable changed-file list." >&2; exit 1; }
           printf 'Direct promotion changed files:\n%s\n' "$changed"
-          allowed='|_headers|index.html|upcoming.html|qualified-best.html|qualified-best-design.css|scripts/test_qualified_best_design.mjs|sport-hubs-design.css|scripts/test_sport_hub_design.mjs|independent-sport-design.css|scripts/test_independent_sports_design.mjs|darts.html|table-tennis.html|odds-builder.html|odds-builder-design.css|reports.html|reports-design.css|virtual-lab/index.html|virtual-lab-terminal.css|scripts/test_workspace_terminal_design.mjs|football.html|tennis.html|basketball.html|sport-hubs.css|ms-design-system.css|core-workspaces-design.css|scripts/test_core_workspaces_design.mjs|league-logos.js|scripts/test_league_logos.mjs|scripts/qualified_best_monitor.mjs|scripts/test_qualified_best_monitor.mjs|.github/workflows/cloudflare-pages.yml|.github/workflows/qualified-best-live-monitor.yml|.github/workflows/qualified-best-watch.yml|.github/workflows/unified-upcoming.yml|scripts/test_deploy_freshness_order.py|scripts/test_prediction_desk_gates.mjs|'
+          allowed='|_headers|index.html|upcoming.html|qualified-best.html|qualified-best-design.css|scripts/test_qualified_best_design.mjs|sport-hubs-design.css|scripts/test_sport_hub_design.mjs|independent-sport-design.css|scripts/test_independent_sports_design.mjs|darts.html|table-tennis.html|odds-builder.html|odds-builder-design.css|reports.html|reports-design.css|virtual-lab/index.html|virtual-lab-terminal.css|scripts/test_workspace_terminal_design.mjs|football.html|tennis.html|basketball.html|sport-hubs.css|ms-design-system.css|core-workspaces-design.css|scripts/test_core_workspaces_design.mjs|league-logos.js|scripts/test_league_logos.mjs|workspace-ui.js|data/club-logo-registry.json|scripts/sync_club_logos.py|scripts/test_club_logo_registry.py|scripts/qualified_best_monitor.mjs|scripts/test_qualified_best_monitor.mjs|.github/workflows/cloudflare-pages.yml|.github/workflows/qualified-best-live-monitor.yml|.github/workflows/qualified-best-watch.yml|.github/workflows/unified-upcoming.yml|scripts/test_deploy_freshness_order.py|scripts/test_prediction_desk_gates.mjs|'
           while IFS= read -r path; do
             [ -n "$path" ] || continue
-            case "$allowed" in
-              *"|$path|"*) ;;
-              *) echo "Direct static promotion rejected; unrelated path changed: $path" >&2; exit 1 ;;
+            case "$path" in
+              assets/club-logos/*|data/licenses/*) ;;
+              *)
+                case "$allowed" in
+                  *"|$path|"*) ;;
+                  *) echo "Direct static promotion rejected; unrelated path changed: $path" >&2; exit 1 ;;
+                esac
+                ;;
             esac
           done <<< "$changed"
 
@@ -120,6 +132,23 @@ jobs:
           test -s darts.html
           test -s table-tennis.html
           test -s league-logos.js
+          test -s workspace-ui.js
+          test -s data/club-logo-registry.json
+          test -d assets/club-logos
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          registry=json.loads(Path('data/club-logo-registry.json').read_text())
+          teams=registry.get('teams') or {}
+          assert teams, 'club-logo registry has no registered teams'
+          paths={entry.get('path') for entry in teams.values() if isinstance(entry,dict)}
+          assert None not in paths, 'club-logo registry entry has no path'
+          for url_path in paths:
+              assert url_path.startswith('/assets/club-logos/'), f'unexpected logo asset path: {url_path}'
+              asset=Path(url_path.lstrip('/'))
+              assert asset.is_file() and asset.stat().st_size>0, f'missing or empty registered logo asset: {url_path}'
+          print(f'Club-logo registry validated: {len(teams)} names, {len(paths)} permanent assets')
+          PY
           test -s data/predictions.json
           test -s workspace-ui.css
           test -s workspace-ui.js
@@ -277,7 +306,7 @@ jobs:
           const base = 'https://match-signal.pages.dev';
           const deploymentBase = String(process.env.CLOUDFLARE_DEPLOYMENT_URL || '').replace(/\/+$/, '');
           const pages = ['/', '/upcoming.html', '/qualified-best', '/qualified-best.html', '/odds-builder.html', '/football.html', '/tennis.html', '/basketball.html', '/darts.html', '/table-tennis.html', '/league.html?sport=football&league=England%20Amateur%20-%20U21%20Professional%20Development%20League', '/reports.html', '/live.html', '/expansion.html', '/virtual-lab/', '/virtual-lab', '/research.html', '/virtual-lab.html', '/analyst.html'];
-          const assets = ['/api/sportybet-virtual','/api/sportybet-darts','/api/sportybet-table-tennis','/api/virtual-lab-history','/expansion.js', '/expansion-odds-builder.js', '/live-analysis.js', '/live-data-worker.js', '/virtual-lab-app.js', '/virtual-lab-confirmed-watch.js', '/virtual-lab.css', '/_redirects', '/data/predictions.json', '/data/unified_upcoming.json', '/data/selection_candidates.json', '/data/expansion_status.json', '/data/odds_builder.json', '/data/odds_ticket_tracker.json', '/data/system_health.json', '/data/tennis_forward_status.json', '/data/prediction_desk_health.json', '/data/results_first_evidence_report.json', '/data/virtual_lab_live.json','/data/virtual_lab_model_eval.json','/data/virtual_lab_eligibility.json','/data/virtual_lab_participants/registry.json','/data/virtual_lab_participant_lifecycle.json','/data/virtual_lab_participants/efootball_confirmed_watch.json','/data/efootball_desk_prediction_history.json.gz','/sport-hubs.js','/league-logos.js','/sport-hubs.css','/ms-design-system.css','/core-workspaces-design.css','/qualified-best-design.css','/sport-hubs-design.css','/independent-sport-design.css','/odds-builder-design.css','/reports-design.css','/virtual-lab-terminal.css','/workspace-ui.js','/workspace-ui.css','/analyst.js'];
+          const assets = ['/api/sportybet-virtual','/api/sportybet-darts','/api/sportybet-table-tennis','/api/virtual-lab-history','/expansion.js', '/expansion-odds-builder.js', '/live-analysis.js', '/live-data-worker.js', '/virtual-lab-app.js', '/virtual-lab-confirmed-watch.js', '/virtual-lab.css', '/_redirects', '/data/predictions.json', '/data/unified_upcoming.json', '/data/selection_candidates.json', '/data/expansion_status.json', '/data/odds_builder.json', '/data/odds_ticket_tracker.json', '/data/system_health.json', '/data/tennis_forward_status.json', '/data/prediction_desk_health.json', '/data/results_first_evidence_report.json', '/data/virtual_lab_live.json','/data/virtual_lab_model_eval.json','/data/virtual_lab_eligibility.json','/data/virtual_lab_participants/registry.json','/data/virtual_lab_participant_lifecycle.json','/data/virtual_lab_participants/efootball_confirmed_watch.json','/data/efootball_desk_prediction_history.json.gz','/data/club-logo-registry.json','/sport-hubs.js','/league-logos.js','/sport-hubs.css','/ms-design-system.css','/core-workspaces-design.css','/qualified-best-design.css','/sport-hubs-design.css','/independent-sport-design.css','/odds-builder-design.css','/reports-design.css','/virtual-lab-terminal.css','/workspace-ui.js','/workspace-ui.css','/analyst.js'];
           const failures = [];
           async function getFrom(origin, path) {
             const r = await fetch(origin + path + (path.includes('?') ? '&' : '?') + 'smoke=' + Date.now(), {cache:'no-store'});
@@ -509,6 +538,26 @@ jobs:
               console.log('AI Analyst protected API passed: unauthenticated request rejected with HTTP 401.');
             }
           } catch(e) { failures.push('/api/analyst/records auth check '+e.message); }
+
+          // Verify every persistent logo referenced by the production registry is deployed.
+          try {
+            const {r,body}=await get('/data/club-logo-registry.json');
+            if (!r.ok) throw new Error('registry HTTP '+r.status);
+            const registry=JSON.parse(body);
+            const uniquePaths=[...new Set(Object.values(registry.teams||{}).map(entry=>entry&&entry.path).filter(Boolean))];
+            if (!uniquePaths.length) throw new Error('registry contains no logo paths');
+            let checked=0;
+            for(let i=0;i<uniquePaths.length;i+=12){
+              const batch=uniquePaths.slice(i,i+12);
+              const results=await Promise.all(batch.map(async path=>({path,...await get(path)})));
+              for(const item of results){
+                checked++;
+                if(!item.r.ok) failures.push('registered club logo '+item.path+' HTTP '+item.r.status);
+                if(!item.body.length) failures.push('registered club logo '+item.path+' has empty response');
+              }
+            }
+            console.log('Cloudflare persistent club logos passed: '+checked+' unique registry assets checked.');
+          } catch(e) { failures.push('club-logo registry production check '+e.message); }
 
           for (const path of ['/data/darts_model.json','/data/darts_status.json','/data/darts_upcoming.json','/data/darts_candidates.json','/data/table_tennis_model.json','/data/table_tennis_status.json','/data/table_tennis_upcoming.json','/data/table_tennis_candidates.json']) {
             try {
