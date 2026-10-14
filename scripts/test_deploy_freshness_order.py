@@ -60,6 +60,16 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn("if unified_age > 0.5 and not active('unified-upcoming.yml'):", WATCHDOG_WORKFLOW)
         self.assertIn("'unified_upcoming_hours': 0.5", WATCHDOG_WORKFLOW)
 
+    def test_watchdog_has_event_driven_monitoring_and_bounded_failure_recovery(self):
+        self.assertIn('  workflow_run:\n    workflows:\n      - "Match Signal Unified Upcoming Board"\n      - "Deploy Match Signal to Cloudflare Pages"', WATCHDOG_WORKFLOW)
+        self.assertIn("if: github.event_name != 'workflow_run'", WATCHDOG_WORKFLOW)
+        self.assertIn("WATCHDOG_SOURCE_WORKFLOW_CONCLUSION", WATCHDOG_WORKFLOW)
+        self.assertIn("source_workflow_conclusion != 'success'", WATCHDOG_WORKFLOW)
+        self.assertIn("retry_age < 20", WATCHDOG_WORKFLOW)
+        self.assertIn("qualified_best_monitor_last_run_age_minutes", WATCHDOG_WORKFLOW)
+        self.assertIn("qualified_best_monitor_last_scheduled_run_age_minutes", WATCHDOG_WORKFLOW)
+        self.assertIn("workflow', 'run', 'qualified-best-watch.yml'", WATCHDOG_WORKFLOW)
+
     def test_pages_deploy_is_board_driven_with_guarded_cache_only_promotion(self):
         events_end = PAGES_WORKFLOW.find("\npermissions:")
         self.assertGreater(events_end, 0)
