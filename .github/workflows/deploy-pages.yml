@@ -52,7 +52,7 @@ jobs:
             <p>Match Signal has moved to <a id="destination" href="https://match-signal.pages.dev/">Cloudflare Pages</a>.</p>
             <script>
               (() => {
-                const path = window.location.pathname.replace(/^\\/match-signal(?=\\/|$)/, "") || "/";
+                const path = window.location.pathname.replace(/^\/match-signal(?=\/|$)/, "") || "/";
                 const target = new URL(path + window.location.search + window.location.hash, "https://match-signal.pages.dev/");
                 document.getElementById("destination").href = target.href;
                 window.location.replace(target.href);
