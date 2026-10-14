@@ -50,8 +50,11 @@ function createResponseCache() {
 
 async function runQuery(query, responseSequence = [feed], responseCache = null, requestCf = null) {
   const requestedPaths = [];
+  const requestedOrigins = [];
   const mockFetch = async input => {
-    requestedPaths.push(new URL(String(input)).pathname);
+    const requestUrl = new URL(String(input));
+    requestedPaths.push(requestUrl.pathname);
+    requestedOrigins.push(requestUrl.origin);
     const index = Math.min(requestedPaths.length - 1, responseSequence.length - 1);
     const payload = responseSequence[index] ?? feed;
     if (payload && typeof payload === "object" && Object.hasOwn(payload, "rawBody")) {
@@ -78,7 +81,7 @@ async function runQuery(query, responseSequence = [feed], responseCache = null, 
   const response = await sandbox.__handler({
     request: { url: "https://match-signal.pages.dev/api/sportybet-virtual?" + query, cf: requestCf || undefined }
   });
-  return { response, payload: await response.json(), requestedPaths };
+  return { response, payload: await response.json(), requestedPaths, requestedOrigins };
 }
 
 const diagnostic = await runQuery("debug=1", [feed, feed], null, {
@@ -120,6 +123,8 @@ assert.equal(Object.hasOwn(upcomingOnly.payload.source_status, "efootball_live")
   "upcoming-only mode does not add live-endpoint status/errors to quote completeness diagnostics");
 assert.deepEqual(upcomingOnly.requestedPaths, ["/api/ng/factsCenter/pcUpcomingEvents"],
   "upcoming-only mode should request only the upcoming event endpoint");
+assert.deepEqual(upcomingOnly.requestedOrigins, ["https://match-signal-sportybet-proxy.topboyasian.workers.dev"],
+  "normal upcoming quote collection must use the regional Worker, not call SportyBet from the visitor-local Pages edge");
 
 const emptyFeed = { bizCode: 10000, data: { tournaments: [] } };
 const recovered = await runQuery(
@@ -132,6 +137,8 @@ assert.equal(recovered.payload.source_status.efootball.status, "LIVE");
 assert.equal(recovered.payload.source_status.efootball.attempts, 2);
 assert.equal(recovered.payload.source_status.efootball.retried, true);
 assert.equal(recovered.requestedPaths.length, 2, "the eFootball upcoming endpoint is retried once after an empty upstream response");
+assert.ok(recovered.requestedOrigins.every(origin => origin === "https://match-signal-sportybet-proxy.topboyasian.workers.dev"),
+  "retries must continue to use the same regional Worker path");
 
 const htmlError = {
   rawBody: "<!doctype html><html><body>temporary upstream error</body></html>",
@@ -154,6 +161,8 @@ assert.deepEqual(fallbackRecovered.requestedPaths, [
   "/api/ng/factsCenter/pcUpcomingEvents",
   "/api/ng/factsCenter/wapConfigurableUpcomingEvents"
 ], "fallback should be bounded to one separate official endpoint call after the two primary attempts");
+assert.ok(fallbackRecovered.requestedOrigins.every(origin => origin === "https://match-signal-sportybet-proxy.topboyasian.workers.dev"),
+  "the provider fallback must also stay on the regional Worker path");
 
 const stillHtml = await runQuery(
   "sources=efootball&pageSize=100&pageNum=1&timeline=168&includeLive=false",
