@@ -17,6 +17,7 @@ on:
     workflows:
       - "Match Signal Unified Upcoming Board"
       - "Deploy Match Signal to Cloudflare Pages"
+      - "Match Signal Odds Ticket Tracker"
     types: [completed]
   workflow_dispatch:
 
@@ -30,8 +31,8 @@ concurrency:
 
 jobs:
   watchdog:
-    # Run after failed board publication or any Cloudflare completion; skip the successful-board event because its following deployment will trigger this check.
-    if: ${{ github.event_name != 'workflow_run' || (github.event.workflow_run.name == 'Match Signal Unified Upcoming Board' && github.event.workflow_run.conclusion != 'success') || github.event.workflow_run.name == 'Deploy Match Signal to Cloudflare Pages' }}
+    # Use successful Odds Ticket Tracker completions as an event-driven heartbeat when GitHub cron delivery stalls.
+    if: ${{ github.event_name != 'workflow_run' || (github.event.workflow_run.name == 'Match Signal Unified Upcoming Board' && github.event.workflow_run.conclusion != 'success') || github.event.workflow_run.name == 'Deploy Match Signal to Cloudflare Pages' || (github.event.workflow_run.name == 'Match Signal Odds Ticket Tracker' && github.event.workflow_run.conclusion == 'success') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -221,7 +222,8 @@ jobs:
               and source_workflow_name == 'Deploy Match Signal to Cloudflare Pages'
               and source_workflow_conclusion == 'success'
           )
-          monitor_fallback_allowed = watchdog_event_name in {'schedule', 'workflow_dispatch', 'push'} or cloudflare_success_event
+          tracker_signal_event = (watchdog_event_name == 'workflow_run' and source_workflow_name == 'Match Signal Odds Ticket Tracker' and source_workflow_conclusion == 'success')
+          monitor_fallback_allowed = watchdog_event_name in {'schedule', 'workflow_dispatch', 'push'} or cloudflare_success_event or tracker_signal_event
           monitor_schedule_fallback_needed = monitor_schedule_status in {'STALE', 'MISSING_SCHEDULED_RUN'}
           monitor_check_fallback_needed = monitor_last_age_minutes is None or monitor_last_age_minutes > 15
           if monitor_runs is not None and monitor_fallback_allowed and (monitor_schedule_fallback_needed or monitor_check_fallback_needed):
@@ -265,7 +267,7 @@ jobs:
               r = subprocess.run(['gh', 'workflow', 'run', 'unified-upcoming.yml', '--ref', 'main'], text=True, capture_output=True)
               actions.append({'workflow':'unified-upcoming.yml','action':'dispatch','status':'requested' if r.returncode == 0 else 'failed','detail':(r.stderr.strip() if r.returncode else 'Unified board refresh after newer Virtual Lab snapshot')})
 
-          if unified_age > 0.5 and not active('unified-upcoming.yml'):
+          if unified_age > 0.2 and not active('unified-upcoming.yml'): 
               r = subprocess.run(['gh', 'workflow', 'run', 'unified-upcoming.yml', '--ref', 'main'], text=True, capture_output=True)
               actions.append({'workflow':'unified-upcoming.yml','action':'dispatch','status':'requested' if r.returncode == 0 else 'failed','detail':(r.stderr.strip() if r.returncode else 'Unified board self-heal')})
 
@@ -295,7 +297,7 @@ jobs:
               'qualified_best_monitor_workflow_age_minutes': monitor_workflow_age_minutes,
               'virtual_lab_events': virtual.get('events_count', 0),
               'virtual_lab_products': virtual.get('product_counts', {}),
-              'thresholds': {'pipeline_hours': 4, 'odds_builder_hours': 8, 'expansion_hours': 4, 'virtual_lab_hours': 1, 'virtual_lab_status_hours': 1, 'darts_hours': 2, 'table_tennis_hours': 2, 'unified_upcoming_hours': 0.5, 'qualified_best_monitor_minutes': 15},
+              'thresholds': {'pipeline_hours': 4, 'odds_builder_hours': 8, 'expansion_hours': 4, 'virtual_lab_hours': 1, 'virtual_lab_status_hours': 1, 'darts_hours': 2, 'table_tennis_hours': 2, 'unified_upcoming_hours': 0.2, 'qualified_best_monitor_minutes': 15},
               'actions': actions,
               'policy': 'Watchdog self-heals stale engines, records Qualified Best scheduled/actual monitor age, dispatches a fallback when the scheduled monitor is missing/stale even if deployment checks are recent (10-minute cooldown), and retries failed board/deploy runs once per 20-minute cooldown. Workflow_run checks do not rewrite feed data to avoid downstream loops. Health publication is retried across concurrent data writers.'
           }
