@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import textwrap
 import unittest
 from pathlib import Path
 
@@ -74,6 +75,11 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn("and watchdog_event_name in {'schedule', 'workflow_dispatch'}:", WATCHDOG_WORKFLOW, "do not run the browser check against the pre-deployment page while a board retry/deploy event is in flight")
         self.assertIn("MISSING_SCHEDULED_RUN", WATCHDOG_WORKFLOW, "flag when a newly registered monitor workflow still has no scheduled invocation after its 15-minute startup grace")
         self.assertIn("actions/workflows/qualified-best-watch.yml", WATCHDOG_WORKFLOW, "derive the startup grace from the workflow registration date")
+        step_start = WATCHDOG_WORKFLOW.index("      - name: Check freshness and self-heal stale workflows")
+        heredoc_start = WATCHDOG_WORKFLOW.index("          python - <<'PY'\n", step_start) + len("          python - <<'PY'\n")
+        heredoc_end = WATCHDOG_WORKFLOW.index("\n          PY", heredoc_start)
+        embedded_python = textwrap.dedent(WATCHDOG_WORKFLOW[heredoc_start:heredoc_end])
+        compile(embedded_python, ".github/workflows/automation_watchdog.yml:embedded-check", "exec")
 
     def test_pages_deploy_is_board_driven_with_guarded_cache_only_promotion(self):
         events_end = PAGES_WORKFLOW.find("\npermissions:")
