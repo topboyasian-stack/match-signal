@@ -1,0 +1,103 @@
+name: Retire legacy GitHub Pages mirror (Cloudflare redirect only)
+
+on:
+  # Publish the redirect once when this retirement workflow changes on main.
+  # Do not rebuild the old mirror when sports data or other workflows update.
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/deploy-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: legacy-github-pages-redirect
+  cancel-in-progress: false
+
+jobs:
+  redirect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Check out the retirement workflow source
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Prepare redirect-only artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p public
+          cat > public/index.html <<'HTML'
+          <!doctype html>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <meta name="robots" content="noindex">
+            <title>Match Signal has moved</title>
+          </head>
+          <body>
+            <p>Match Signal has moved to <a id="destination" href="https://match-signal.pages.dev/">Cloudflare Pages</a>.</p>
+            <script>
+              (() => {
+                const path = window.location.pathname.replace(/^\\/match-signal(?=\\/|$)/, "") || "/";
+                const target = new URL(path + window.location.search + window.location.hash, "https://match-signal.pages.dev/");
+                document.getElementById("destination").href = target.href;
+                window.location.replace(target.href);
+              })();
+            </script>
+          </body>
+          </html>
+          HTML
+          cp public/index.html public/404.html
+          test -s public/index.html
+          test -s public/404.html
+          test "$(find public -maxdepth 1 -type f | wc -l)" -eq 2
+          grep -q 'https://match-signal.pages.dev/' public/index.html
+          grep -q 'location.replace' public/index.html
+          echo "Prepared exactly two redirect documents; no application or data assets are published to GitHub Pages."
+
+      - name: Upload redirect-only Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: public
+
+      - name: Deploy the legacy URL redirect
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Verify legacy URLs now point to Cloudflare
+        timeout-minutes: 2
+        run: |
+          node --input-type=module <<'NODE'
+          const base = 'https://topboyasian-stack.github.io/match-signal';
+          for (const route of ['/', '/qualified-best.html', '/research.html']) {
+            let passed = false;
+            let last = '';
+            for (let attempt = 0; attempt < 12; attempt++) {
+              const url = base + route + '?redirect_check=' + Date.now() + '_' + attempt;
+              const response = await fetch(url, { cache: 'no-store' });
+              const body = await response.text();
+              last = 'HTTP ' + response.status + ', bytes=' + body.length;
+              if (body.includes('https://match-signal.pages.dev/') && body.includes('location.replace')) {
+                passed = true;
+                console.log('Legacy redirect verified:', route, last);
+                break;
+              }
+              await new Promise(resolve => setTimeout(resolve, 5000));
+            }
+            if (!passed) throw new Error('Legacy GitHub Pages route did not serve the Cloudflare redirect: ' + route + ' (' + last + ')');
+          }
+          NODE
