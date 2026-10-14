@@ -139,7 +139,7 @@ class ClubLogoRegistryTests(unittest.TestCase):
         self.assertIn("FC Internazionale Milano", ALIASES["inter milano"])
         self.assertIn("Paris Saint-Germain FC", ALIASES["paris saint germain"])
         self.assertIn("LOSC Lille", ALIASES["lille osc"])
-        self.assertEqual(SEARCH_POLICY_VERSION, 8)
+        self.assertEqual(SEARCH_POLICY_VERSION, 9)
 
     def test_common_provider_shorthand_has_safe_exact_aliases(self):
         expected = {
