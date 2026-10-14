@@ -136,6 +136,21 @@ jobs:
           monitor_last_age_minutes = None
           monitor_scheduled_age_minutes = None
           monitor_schedule_status = 'UNKNOWN'
+          monitor_workflow_age_minutes = None
+          monitor_workflow_metadata_error = None
+          repo_name = os.environ.get('GITHUB_REPOSITORY', '')
+          if repo_name:
+              meta = subprocess.run(
+                  ['gh', 'api', f'repos/{repo_name}/actions/workflows/qualified-best-watch.yml', '--jq', '.created_at'],
+                  text=True, capture_output=True
+              )
+              if meta.returncode == 0:
+                  monitor_workflow_age_minutes = minutes_since(meta.stdout.strip())
+              else:
+                  monitor_workflow_metadata_error = meta.stderr.strip() or 'Workflow metadata lookup failed'
+          else:
+              monitor_workflow_metadata_error = 'GITHUB_REPOSITORY is unavailable'
+
           if monitor_runs is not None:
               valid_monitor_runs = [r for r in monitor_runs if minutes_since(r.get('createdAt')) is not None]
               if valid_monitor_runs:
@@ -144,14 +159,18 @@ jobs:
               if scheduled_monitor_runs:
                   monitor_scheduled_age_minutes = min(minutes_since(r.get('createdAt')) for r in scheduled_monitor_runs)
                   monitor_schedule_status = 'STALE' if monitor_scheduled_age_minutes > 15 else 'ON_CADENCE'
+              elif monitor_workflow_age_minutes is not None and monitor_workflow_age_minutes > 15:
+                  monitor_schedule_status = 'MISSING_SCHEDULED_RUN'
+              elif monitor_workflow_metadata_error:
+                  monitor_schedule_status = 'UNKNOWN'
               else:
                   monitor_schedule_status = 'AWAITING_FIRST_SCHEDULED_RUN'
 
           actions = []
           if monitor_runs is None:
               actions.append({'workflow':'qualified-best-watch.yml','action':'inspect_schedule','status':'failed','detail':monitor_history_error})
-          elif monitor_schedule_status == 'STALE':
-              actions.append({'workflow':'qualified-best-watch.yml','action':'schedule_gap_alert','status':'warning','detail':'Last scheduled Qualified Best monitor was '+str(monitor_scheduled_age_minutes)+' minute(s) ago; target cadence is 10 minutes and warning threshold is 15 minutes.'})
+          elif monitor_schedule_status in {'STALE', 'MISSING_SCHEDULED_RUN'}:
+              actions.append({'workflow':'qualified-best-watch.yml','action':'schedule_gap_alert','status':'warning','detail':'Qualified Best monitor schedule status='+monitor_schedule_status+'; last scheduled run age='+(str(monitor_scheduled_age_minutes) if monitor_scheduled_age_minutes is not None else 'none')+' minute(s); workflow age='+(str(monitor_workflow_age_minutes) if monitor_workflow_age_minutes is not None else 'unknown')+' minute(s).'})
 
           # A failed board/deploy run is an event-driven recovery signal even if
           # the last published artifact has not aged past its normal freshness guard.
@@ -185,7 +204,7 @@ jobs:
           # of any kind completes for 15 minutes, schedule/manual watchdog runs
           # dispatch one check as a failsafe; this does not certify the cron itself.
           workflow_run_event = watchdog_event_name == 'workflow_run'
-          if monitor_runs is not None and (monitor_last_age_minutes is None or monitor_last_age_minutes > 15) and not workflow_run_event:
+          if monitor_runs is not None and (monitor_last_age_minutes is None or monitor_last_age_minutes > 15) and watchdog_event_name in {'schedule', 'workflow_dispatch'}:
               if not active('qualified-best-watch.yml'):
                   r = subprocess.run(['gh', 'workflow', 'run', 'qualified-best-watch.yml', '--ref', 'main'], text=True, capture_output=True)
                   actions.append({'workflow':'qualified-best-watch.yml','action':'monitor_failsafe_dispatch','status':'requested' if r.returncode == 0 else 'failed','detail':(r.stderr.strip() if r.returncode else 'No Qualified Best browser check in the last 15 minutes; fallback monitor dispatched.')})
@@ -245,6 +264,7 @@ jobs:
               'qualified_best_monitor_last_run_age_minutes': monitor_last_age_minutes,
               'qualified_best_monitor_last_scheduled_run_age_minutes': monitor_scheduled_age_minutes,
               'qualified_best_monitor_schedule_status': monitor_schedule_status,
+              'qualified_best_monitor_workflow_age_minutes': monitor_workflow_age_minutes,
               'virtual_lab_events': virtual.get('events_count', 0),
               'virtual_lab_products': virtual.get('product_counts', {}),
               'thresholds': {'pipeline_hours': 4, 'odds_builder_hours': 8, 'expansion_hours': 4, 'virtual_lab_hours': 1, 'virtual_lab_status_hours': 1, 'darts_hours': 2, 'table_tennis_hours': 2, 'unified_upcoming_hours': 0.5, 'qualified_best_monitor_minutes': 15},
