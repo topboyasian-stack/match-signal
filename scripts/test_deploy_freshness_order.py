@@ -92,6 +92,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertGreater(events_end, 0)
         events = PAGES_WORKFLOW[:events_end]
         self.assertIn('      - "Match Signal Unified Upcoming Board"', events)
+        self.assertIn('      - "Match Signal Persistent Club Logo Registry"', events)
         self.assertIn("    types: [completed]", events)
         self.assertIn("  workflow_dispatch:", events)
 
@@ -128,6 +129,10 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "scripts/test_core_workspaces_design.mjs",
             "league-logos.js",
             "scripts/test_league_logos.mjs",
+            "workspace-ui.js",
+            "data/club-logo-registry.json",
+            "scripts/sync_club_logos.py",
+            "scripts/test_club_logo_registry.py",
             ".github/workflows/cloudflare-pages.yml",
         }
         self.assertEqual(direct_paths, expected_direct_paths)
