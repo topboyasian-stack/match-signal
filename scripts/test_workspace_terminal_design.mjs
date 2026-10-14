@@ -3,13 +3,14 @@ import { readFile } from "node:fs/promises";
 
 const root = new URL("../", import.meta.url);
 const read = path => readFile(new URL(path, root), "utf8");
-const [oddsCss, reportsCss, labCss, oddsHtml, reportsHtml, labHtml, deploy] = await Promise.all([
+const [oddsCss, reportsCss, labCss, oddsHtml, reportsHtml, labHtml, builderJs, deploy] = await Promise.all([
   read("odds-builder-design.css"),
   read("reports-design.css"),
   read("virtual-lab-terminal.css"),
   read("odds-builder.html"),
   read("reports.html"),
   read("virtual-lab/index.html"),
+  read("expansion-odds-builder.js"),
   read(".github/workflows/cloudflare-pages.yml")
 ]);
 
@@ -36,9 +37,9 @@ for (const [name, css, scope] of scopes) {
 }
 
 for (const [name, html, scope, href, marker] of [
-  ["Odds Builder", oddsHtml, 'data-page="odds-builder"', "odds-builder-design.css?v=20261014-terminal2", "MS-ODDS-BUILDER-2026.10.14-TERMINAL2"],
-  ["Reports", reportsHtml, 'data-page="reports"', "reports-design.css?v=20261014-terminal2", "MS-REPORTS-2026.10.14-TERMINAL2"],
-  ["Virtual Lab", labHtml, 'data-page="virtual-lab"', "../virtual-lab-terminal.css?v=20261014-terminal2", "MS-VIRTUAL-LAB-V1-2026.10.14-TERMINAL2"]
+  ["Odds Builder", oddsHtml, 'data-page="odds-builder"', "odds-builder-design.css?v=20261014-full-v3", "MS-ODDS-BUILDER-2026.10.14-V3"],
+  ["Reports", reportsHtml, 'data-page="reports"', "reports-design.css?v=20261014-full-v3", "MS-REPORTS-2026.10.14-V3"],
+  ["Virtual Lab", labHtml, 'data-page="virtual-lab"', "../virtual-lab-terminal.css?v=20261014-full-v3", "MS-VIRTUAL-LAB-V1-2026.10.14-V3"]
 ]) {
   assert.ok(html.includes(scope), name + " must carry its page scope");
   assert.ok(html.includes(href), name + " must load the versioned design layer");
@@ -54,6 +55,20 @@ for (const mount of ['id="predictionDesk"', 'id="nearQualifiedRadar"', 'id="odds
 assert.ok(labHtml.includes("../virtual-lab-app.js?v=20261011-redesign3"), "Virtual Lab engine script must remain");
 assert.ok(labHtml.includes("../virtual-lab-confirmed-watch.js?v=20261011-annotate-fix1"), "Virtual Lab participant monitor must remain");
 
+assert.ok(oddsHtml.includes('class="ob-page-header"') && oddsHtml.includes('class="ob-section-nav"') && oddsHtml.includes('class="ob-guide-grid"'), "Odds Builder must use the reorganized page hierarchy");
+assert.ok(reportsHtml.includes('class="rp-dashboard-grid"') && reportsHtml.includes('id="report-scoreboard"') && reportsHtml.includes('class="rp-side-column"'), "Reports must use the new scoreboard/main/side-rail composition");
+assert.ok(labHtml.includes('class="vl-command-grid"') && labHtml.includes('class="vl-command-rail"') && labHtml.includes('class="vl-insights-grid"'), "Virtual Lab must use the feed/control/evidence composition");
+for (const id of ['predictionDesk','nearQualifiedRadar','oddsBuilder','product','market','split','fileInput','rounds','winRate','oosRate','roi','seqDelta','fingerprint','signalGate','sequence','oos','participantLab','modelLab','labDiagnostics','researchConclusion','schema']) {
+  assert.ok(labHtml.includes('id="' + id + '"'), "Virtual Lab must preserve existing mount/control: " + id);
+}
+for (const id of ['builder-overview','builder-active','builder-gate-summary','builder-qualification','paper-ticket-ledger']) {
+  assert.ok(builderJs.includes('id="' + id + '"'), "Odds Builder renderer must provide the navigation target: " + id);
+}
+assert.ok(builderJs.includes('class="ob-builder-layout"'), "Odds Builder renderer must preserve the new structured composition");
+assert.ok(builderJs.includes('ACTIVE_VIRTUAL_MIN_PROBABILITY = 0.80'), "Odds Builder active-leg qualification floor must remain");
+assert.ok(builderJs.includes('function isActiveVirtualBatch(batch)'), "Odds Builder active batch filter must remain");
+assert.ok(builderJs.includes('ensureBookingCodes(activeBatches)'), "Odds Builder booking-code path must remain");
+
 const directPaths = [
   "odds-builder.html", "odds-builder-design.css",
   "reports.html", "reports-design.css",
@@ -66,18 +81,18 @@ for (const path of directPaths) {
 }
 assert.ok(deploy.includes("node scripts/test_workspace_terminal_design.mjs"), "production promotion must run workspace visual regressions");
 for (const marker of [
-  "odds-builder-design.css?v=20261014-terminal2",
-  "reports-design.css?v=20261014-terminal2",
-  "../virtual-lab-terminal.css?v=20261014-terminal2"
+  "odds-builder-design.css?v=20261014-full-v3",
+  "reports-design.css?v=20261014-full-v3",
+  "../virtual-lab-terminal.css?v=20261014-full-v3"
 ]) {
   assert.ok(deploy.includes(marker), "production smoke tests must verify asset wiring: " + marker);
 }
 
 
 for (const [name, css, marker] of [
-  ["Odds Builder", oddsCss, "MATCH-SIGNAL-DESIGN-V2: ODDS BUILDER HIGH-CONTRAST VISUAL DELTA"],
-  ["Reports", reportsCss, "MATCH-SIGNAL-DESIGN-V2: REPORTS HIGH-CONTRAST ANALYTICS VISUAL DELTA"],
-  ["Virtual Lab", labCss, "MATCH-SIGNAL-DESIGN-V2: VIRTUAL LAB HIGH-CONTRAST RESEARCH VISUAL DELTA"]
+  ["Odds Builder", oddsCss, "MATCH-SIGNAL-FULL-RECOMPOSITION-V3: ODDS BUILDER PAGE LAYOUT"],
+  ["Reports", reportsCss, "MATCH-SIGNAL-FULL-RECOMPOSITION-V3: REPORTS PAGE LAYOUT"],
+  ["Virtual Lab", labCss, "MATCH-SIGNAL-FULL-RECOMPOSITION-V3: VIRTUAL LAB PAGE LAYOUT"]
 ]) assert.ok(css.includes(marker), name + " must ship the distinct V2 visual treatment");
 assert.ok(oddsCss.includes('"PAPER MODE  /  EXACT-QUOTE GATES"'), "Odds Builder must show its mode ribbon");
 assert.ok(reportsCss.includes('"READ-ONLY  /  EVIDENCE & TRACK RECORD"'), "Reports must show its evidence ribbon");
