@@ -114,8 +114,10 @@ const stillHtml = await runQuery(
   "sources=efootball&pageSize=100&pageNum=1&timeline=168&includeLive=false",
   [htmlError]
 );
-assert.equal(stillHtml.payload.status, "ERROR",
-  "persistent non-JSON upstream failures must remain unavailable");
+assert.equal(stillHtml.payload.status, "UPSTREAM_EMPTY",
+  "persistent non-JSON upstream failures must remain explicitly unavailable without inventing event rows");
+assert.equal(stillHtml.payload.source_status.efootball.status, "ERROR",
+  "the detailed eFootball source status must identify the persistent upstream failure");
 assert.equal(stillHtml.payload.source_status.efootball.fallback_used, false);
 assert.match(stillHtml.payload.source_status.efootball.error, /HTML response/);
 assert.equal(stillHtml.payload.events.length, 0, "HTML must never be interpreted as event data");
