@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: '17 3 * * *'
   workflow_dispatch:
+  workflow_run:
+    workflows:
+      - "Match Signal Odds Builder"
+      - "Match Signal Virtual Lab Live Sync"
+    types: [completed]
   push:
     branches: [main]
     paths:
@@ -22,6 +27,7 @@ concurrency:
 
 jobs:
   sync:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

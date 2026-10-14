@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PAGES_WORKFLOW = (ROOT / ".github/workflows/cloudflare-pages.yml").read_text(encoding="utf-8")
 BOARD_WORKFLOW = (ROOT / ".github/workflows/unified-upcoming.yml").read_text(encoding="utf-8")
 MONITOR_WORKFLOW = (ROOT / ".github/workflows/qualified-best-watch.yml").read_text(encoding="utf-8")
+LOGO_WORKFLOW = (ROOT / ".github/workflows/sync-club-logos.yml").read_text(encoding="utf-8")
 WATCHDOG_WORKFLOW = (ROOT / ".github/workflows/automation_watchdog.yml").read_text(encoding="utf-8")
 
 
@@ -40,6 +41,15 @@ def workflow_schedule_crons(source: str) -> list[str]:
 
 
 class FreshnessDeployOrderingTests(unittest.TestCase):
+    def test_logo_registry_refreshes_after_live_team_feeds(self):
+        events_end = LOGO_WORKFLOW.find("\npermissions:")
+        self.assertGreater(events_end, 0)
+        events = LOGO_WORKFLOW[:events_end]
+        self.assertIn('      - "Match Signal Odds Builder"', events)
+        self.assertIn('      - "Match Signal Virtual Lab Live Sync"', events)
+        self.assertIn("    types: [completed]", events)
+        self.assertIn("github.event.workflow_run.conclusion == 'success'", LOGO_WORKFLOW)
+
     def test_board_schedule_is_offset_from_hour_boundary(self):
         crons = workflow_schedule_crons(BOARD_WORKFLOW)
         self.assertIn("4-59/5 * * * *", crons)
