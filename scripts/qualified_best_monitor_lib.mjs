@@ -68,6 +68,17 @@ export function classifyQualifiedBestMonitor(snapshot, options = {}) {
     ? Math.floor(rawQualifiedCount) : null;
   if (qualifiedCount === null) problems.push("QUALIFIED_COUNT_MISSING_OR_INVALID");
 
+  // Internal gate counts are not enough: the shortlist must be visibly rendered.
+  const domRowsRaw = snapshot.dom_qualified_count === null || snapshot.dom_qualified_count === undefined || snapshot.dom_qualified_count === ""
+    ? Number.NaN : Number(snapshot.dom_qualified_count);
+  const visibleRowsRaw = snapshot.dom_qualified_visible_count === null || snapshot.dom_qualified_visible_count === undefined || snapshot.dom_qualified_visible_count === ""
+    ? Number.NaN : Number(snapshot.dom_qualified_visible_count);
+  if (qualifiedCount !== null && qualifiedCount > 0 &&
+      Number.isFinite(domRowsRaw) && Number.isFinite(visibleRowsRaw) &&
+      (domRowsRaw <= 0 || visibleRowsRaw <= 0)) {
+    problems.push("QUALIFIED_ROWS_NOT_VISIBLY_RENDERED");
+  }
+
   const status = problems.length ? "failed" : "healthy";
   return {
     status,

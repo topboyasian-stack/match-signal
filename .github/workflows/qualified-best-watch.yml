@@ -141,6 +141,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: qualified-best-production-monitor-${{ github.run_id }}
-          path: qualified-best-monitor-result.json
+          path: |
+            qualified-best-monitor-result.json
+            qualified-best-production.png
           if-no-files-found: warn
           retention-days: 30
