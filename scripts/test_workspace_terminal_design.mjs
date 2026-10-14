@@ -61,10 +61,17 @@ assert.ok(labHtml.includes('class="vl-command-grid"') && labHtml.includes('class
 for (const id of ['predictionDesk','nearQualifiedRadar','oddsBuilder','product','market','split','fileInput','rounds','winRate','oosRate','roi','seqDelta','fingerprint','signalGate','sequence','oos','participantLab','modelLab','labDiagnostics','researchConclusion','schema']) {
   assert.ok(labHtml.includes('id="' + id + '"'), "Virtual Lab must preserve existing mount/control: " + id);
 }
-for (const id of ['builder-overview','builder-active','builder-gate-summary','builder-qualification','paper-ticket-ledger']) {
-  assert.ok(builderJs.includes('id="' + id + '"'), "Odds Builder renderer must provide the navigation target: " + id);
+assert.ok(builderJs.includes('target.innerHTML=pushNotificationHtml()'), "Odds Builder must retain its original render entry point");
+for (const selector of [
+  '#oddsBuilder > .builder-console',
+  '#oddsBuilder > .builder-batch-panel:nth-of-type(2)',
+  '#oddsBuilder > .push-notify-panel',
+  '#oddsBuilder > .builder-batch-panel:nth-of-type(3)',
+  '#oddsBuilder > .ticket-track'
+]) assert.ok(oddsCss.includes(selector), "Odds Builder layout must reflow existing renderer element: " + selector);
+for (const anchor of ['id="builder-overview"', 'href="#oddsBuilder"', 'id="ob-guide-title"', 'id="ob-page-footer"']) {
+  assert.ok(oddsHtml.includes(anchor), "Odds Builder navigation must target an existing page anchor: " + anchor);
 }
-assert.ok(builderJs.includes('class="ob-builder-layout"'), "Odds Builder renderer must preserve the new structured composition");
 assert.ok(builderJs.includes('ACTIVE_VIRTUAL_MIN_PROBABILITY = 0.80'), "Odds Builder active-leg qualification floor must remain");
 assert.ok(builderJs.includes('function isActiveVirtualBatch(batch)'), "Odds Builder active batch filter must remain");
 assert.ok(builderJs.includes('ensureBookingCodes(activeBatches)'), "Odds Builder booking-code path must remain");
@@ -93,7 +100,7 @@ for (const [name, css, marker] of [
   ["Odds Builder", oddsCss, "MATCH-SIGNAL-FULL-RECOMPOSITION-V3: ODDS BUILDER PAGE LAYOUT"],
   ["Reports", reportsCss, "MATCH-SIGNAL-FULL-RECOMPOSITION-V3: REPORTS PAGE LAYOUT"],
   ["Virtual Lab", labCss, "MATCH-SIGNAL-FULL-RECOMPOSITION-V3: VIRTUAL LAB PAGE LAYOUT"]
-]) assert.ok(css.includes(marker), name + " must ship the distinct V2 visual treatment");
+]) assert.ok(css.includes(marker), name + " must ship the full V3 page re-composition");
 assert.ok(oddsCss.includes('"PAPER MODE  /  EXACT-QUOTE GATES"'), "Odds Builder must show its mode ribbon");
 assert.ok(reportsCss.includes('"READ-ONLY  /  EVIDENCE & TRACK RECORD"'), "Reports must show its evidence ribbon");
 assert.ok(labCss.includes(".labJump button"), "Virtual Lab must show the new navigation treatment");
