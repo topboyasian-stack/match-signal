@@ -131,6 +131,8 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "scripts/test_league_logos.mjs",
             "workspace-ui.js",
             "data/club-logo-registry.json",
+            "assets/club-logos/**",
+            "data/licenses/**",
             "scripts/sync_club_logos.py",
             "scripts/test_club_logo_registry.py",
             ".github/workflows/cloudflare-pages.yml",
