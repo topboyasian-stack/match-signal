@@ -50,11 +50,16 @@ jobs:
         run: python -m pip install --upgrade requests
 
       - name: Refresh Virtual Lab live snapshot
-        # Event-driven freshness checks must not rewrite feed artifacts and trigger a board/watchdog loop.
+        # Keep feed collection best-effort: a SportyBet outage must not block independent freshness checks.
+        # Event-driven workflow_run checks still avoid rewriting feed artifacts and triggering loops.
         if: github.event_name != 'workflow_run'
+        shell: bash
         run: |
-          python scripts/virtual_lab_sync.py
-          cp data/virtual_lab_live.json /tmp/virtual_lab_live_candidate.json
+          if python scripts/virtual_lab_sync.py; then
+            cp data/virtual_lab_live.json /tmp/virtual_lab_live_candidate.json
+          else
+            echo "::warning::Virtual Lab live sync failed. Continuing into freshness checks and stale-board recovery."
+          fi
 
       - name: Check freshness and self-heal stale workflows
         env:
