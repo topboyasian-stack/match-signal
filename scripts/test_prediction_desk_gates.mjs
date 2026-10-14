@@ -436,6 +436,41 @@ assert.ok(probabilityValue(overconfidentUnder) < 0.70, "a 96% raw estimate with 
 assert.ok(probabilityValue(overconfidentUnder) < rawProbabilityValue(overconfidentUnder), "poor exact-line outcomes must pull the Desk estimate down");
 assert.equal(calibration.n, 69, "calibration labels retain their evidence sample size");
 assert.ok(Math.abs(displayedFairOddsValue(overconfidentUnder)-(1/probabilityValue(overconfidentUnder)))<1e-9, "fair odds must agree with the calibrated Desk estimate");
+const overconfidentQualified = {
+  ...row({
+    sport: "virtual",
+    product: "efootball_gt",
+    probability: 0.67,
+    line: 4.5,
+    pick: "over",
+    event_id: "efootball-calibration-below-floor",
+    qualification_status: "BETTING_QUALIFIED_PAPER",
+    betting_qualified: true,
+    qualified_for_builder: true,
+    sportybet_odds: 2.15,
+    bookmaker_odds: 2.15,
+    sportybet_odds_line: 4.5,
+    sportybet_odds_side: "over",
+    sportybet_over_odds: 2.15,
+    sportybet_under_odds: 1.8
+  }),
+  walkforward_exact_line_n: 396,
+  walkforward_exact_line_hit_rate: 0.55
+};
+assert.ok(probabilityValue(overconfidentQualified) < 0.65, "the historical exact-line hit rate calibrates the displayed probability below the qualification floor");
+assert.equal(qualificationState(overconfidentQualified).modelQualified, false, "a raw upstream pass cannot override the calibrated probability floor");
+assert.equal(qualificationState(overconfidentQualified).currentPricePass, false, "a sub-65% calibrated eFootball estimate is not currently qualified");
+assert.equal(qualificationState(overconfidentQualified).reason, "CALIBRATED_MODEL_PROBABILITY_BELOW_65_PERCENT");
+assert.equal(qualifiedBestSelections([overconfidentQualified], Date.now()).rows.length, 0, "the qualified shortlist excludes a row whose calibrated probability falls below the existing 65% floor");
+
+const calibratedStillPasses = {
+  ...overconfidentQualified,
+  event_id: "efootball-calibration-above-floor",
+  probability: 0.84,
+  walkforward_exact_line_hit_rate: 0.80
+};
+assert.ok(probabilityValue(calibratedStillPasses) >= 0.65, "strong exact-line evidence can retain a calibrated estimate above the floor");
+assert.equal(qualificationState(calibratedStillPasses).currentPricePass, true, "calibration above the floor still proceeds through the existing exact-price and value gates");
 assert.equal(probabilityCalibrationInfo({ ...overconfidentUnder, walkforward_exact_line_hit_rate: null }), null, "a null hit rate is not treated as 0% evidence");
 assert.equal(probabilityCalibrationInfo({ ...overconfidentUnder, walkforward_exact_line_n: null }), null, "a null sample count cannot unlock calibration");
 assert.equal(probabilityCalibrationInfo({ ...overconfidentUnder, line: null }), null, "a missing exact O/U line cannot unlock line-specific calibration");
