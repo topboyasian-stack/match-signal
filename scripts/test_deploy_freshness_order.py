@@ -52,12 +52,14 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
 
     def test_board_schedule_is_offset_from_hour_boundary(self):
         crons = workflow_schedule_crons(BOARD_WORKFLOW)
-        self.assertIn("4-59/5 * * * *", crons)
+        self.assertIn("2-59/5 * * * *", crons)
+        self.assertNotIn("4-59/5 * * * *", crons, "cron must change to re-arm the missing scheduled board publisher")
         self.assertNotIn("*/5 * * * *", crons)
 
     def test_monitor_schedule_is_rearmed_and_deployment_trigger_is_preserved(self):
         crons = workflow_schedule_crons(MONITOR_WORKFLOW)
-        self.assertIn("3,13,23,33,43,53 * * * *", crons)
+        self.assertIn("5,15,25,35,45,55 * * * *", crons)
+        self.assertNotIn("3,13,23,33,43,53 * * * *", crons, "cron must change to re-arm the missing scheduled browser monitor")
         self.assertNotIn("*/5 * * * *", crons)
         events_end = MONITOR_WORKFLOW.find("\npermissions:")
         self.assertGreater(events_end, 0)
@@ -67,7 +69,8 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
 
     def test_watchdog_schedule_is_rearmed_and_stale_board_self_heals_quickly(self):
         crons = workflow_schedule_crons(WATCHDOG_WORKFLOW)
-        self.assertIn("1,11,21,31,41,51 * * * *", crons)
+        self.assertIn("9,19,29,39,49,59 * * * *", crons)
+        self.assertNotIn("1,11,21,31,41,51 * * * *", crons, "cron must change to re-arm the missing scheduled watchdog")
         self.assertIn("if unified_age > 0.2 and not active('unified-upcoming.yml'):", WATCHDOG_WORKFLOW)
         self.assertIn("'unified_upcoming_hours': 0.2", WATCHDOG_WORKFLOW)
 
