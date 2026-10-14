@@ -419,7 +419,7 @@ jobs:
                 const forcedRevalidation=cacheControl.includes('max-age=0')&&cacheControl.includes('must-revalidate');
                 if(path==='/qualified-best'&&!noStoreHeader&&!forcedRevalidation) failures.push(path+' missing no-store or forced revalidation header: '+cacheControl);
                 if(path==='/qualified-best.html'&&!noStoreHeader) failures.push(path+' missing no-store/no-cache header: '+cacheControl);
-                for (const marker of ['data-page="qualified-best"','MS-UNIFIED-2026.10.13.5-DESIGN-PILOT2','qualified-best-design.css?v=20261013-premium-terminal2','id="qualifiedBestBoard"','id="qualifiedBestLastSeenBoard"','id="qualifiedBestDataStatus"','sport-hubs.js?v=20261014-virtual-kickoff-window1'])
+                for (const marker of ['data-page="qualified-best"','MS-UNIFIED-2026.10.13.5-DESIGN-PILOT2','qualified-best-design.css?v=20261013-premium-terminal2','id="qualifiedBestBoard"','id="qualifiedBestLastSeenBoard"','id="qualifiedBestDataStatus"','sport-hubs.js?v=20261015-virtual-calibrated-floor1'])
                   if (!body.includes(marker)) failures.push(path+' missing '+marker);
               }
               if (path==='/upcoming.html') {
