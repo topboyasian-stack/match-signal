@@ -183,6 +183,13 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         ):
             self.assertIn(allowed_path, PAGES_WORKFLOW)
 
+    def test_pages_wait_for_the_exact_fresh_board_to_reach_production(self):
+        self.assertIn("getFrom(deploymentBase, '/data/unified_upcoming.json')", PAGES_WORKFLOW)
+        self.assertIn("immutableBoardGeneratedAt", PAGES_WORKFLOW)
+        self.assertIn("attempt<=10", PAGES_WORKFLOW)
+        self.assertIn("verifiedProductionBoard=snapshot", PAGES_WORKFLOW)
+        self.assertIn("stale board timestamps cannot pass deployment verification", PAGES_WORKFLOW)
+
     def test_pages_inputs_route_through_board_workflow(self):
         board_paths = workflow_push_paths(BOARD_WORKFLOW)
         self.assertTrue(board_paths, "Unified workflow should trigger on publishable source/data paths")
