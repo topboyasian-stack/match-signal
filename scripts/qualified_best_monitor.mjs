@@ -95,8 +95,8 @@ async function run() {
           reducedMotion: "reduce"
         });
         page.on("pageerror", error => pageErrors.push(String(error?.message || error)));
-        const separator = target.includes("?") ? "&" : "?";
-        await page.goto(`${target}${separator}monitor_run=${encodeURIComponent(String(runId || "manual"))}_${attempt}`, {
+        // Verify the same unmodified URL that a user opens; do not make a cache-busting query hide a route/cache problem.
+        await page.goto(target, {
           waitUntil: "domcontentloaded",
           timeout: 30000
         });
