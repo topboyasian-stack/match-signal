@@ -184,8 +184,8 @@ jobs:
           # Deployment-triggered browser checks remain primary. If no monitor run
           # of any kind completes for 15 minutes, schedule/manual watchdog runs
           # dispatch one check as a failsafe; this does not certify the cron itself.
-          deployment_event = watchdog_event_name == 'workflow_run' and source_workflow_conclusion == 'success' and source_workflow_name in {'Match Signal Unified Upcoming Board', 'Deploy Match Signal to Cloudflare Pages'}
-          if monitor_runs is not None and (monitor_last_age_minutes is None or monitor_last_age_minutes > 15) and not deployment_event:
+          workflow_run_event = watchdog_event_name == 'workflow_run'
+          if monitor_runs is not None and (monitor_last_age_minutes is None or monitor_last_age_minutes > 15) and not workflow_run_event:
               if not active('qualified-best-watch.yml'):
                   r = subprocess.run(['gh', 'workflow', 'run', 'qualified-best-watch.yml', '--ref', 'main'], text=True, capture_output=True)
                   actions.append({'workflow':'qualified-best-watch.yml','action':'monitor_failsafe_dispatch','status':'requested' if r.returncode == 0 else 'failed','detail':(r.stderr.strip() if r.returncode else 'No Qualified Best browser check in the last 15 minutes; fallback monitor dispatched.')})
