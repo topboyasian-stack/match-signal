@@ -33,7 +33,22 @@ const feed = {
   }
 };
 
-async function runQuery(query, responseSequence = [feed]) {
+function createResponseCache() {
+  const entries = new Map();
+  const keyOf = key => String(key?.url || key);
+  return {
+    entries,
+    async match(key) {
+      const response = entries.get(keyOf(key));
+      return response ? response.clone() : null;
+    },
+    async put(key, response) {
+      entries.set(keyOf(key), response.clone());
+    }
+  };
+}
+
+async function runQuery(query, responseSequence = [feed], responseCache = null) {
   const requestedPaths = [];
   const mockFetch = async input => {
     requestedPaths.push(new URL(String(input)).pathname);
@@ -51,8 +66,9 @@ async function runQuery(query, responseSequence = [feed]) {
     });
   };
   const sandbox = {
-    URL, Set, Date, Math, JSON, Number, String, Object, Array, Boolean,
-    Response, AbortSignal, fetch: mockFetch, setTimeout
+    URL, Request, Set, Date, Math, JSON, Number, String, Object, Array, Boolean,
+    Response, AbortSignal, fetch: mockFetch, setTimeout,
+    ...(responseCache ? { caches: { default: responseCache } } : {})
   };
   vm.createContext(sandbox);
   const executable = source.replace(exportDeclaration, "async function onRequestGet(context){") +
@@ -136,6 +152,40 @@ assert.equal(stillEmpty.payload.source_status.efootball.fallback_used, false,
   "the alternate endpoint must not be reported as used when it returns no events");
 assert.equal(stillEmpty.requestedPaths.length, 3,
   "persistently empty upstream response is bounded to two primary attempts plus one fallback");
+
+
+const cacheQuery = "sources=efootball&pageSize=100&pageNum=1&timeline=168&includeLive=false";
+const responseCache = createResponseCache();
+const seededSnapshot = await runQuery(cacheQuery, [feed], responseCache);
+assert.equal(seededSnapshot.payload.status, "LIVE");
+assert.ok(responseCache.entries.size > 0, "a successful provider snapshot should seed the edge cache");
+const originalObservationTime = seededSnapshot.payload.updated_at;
+
+const cachedAfterHtmlFailure = await runQuery(cacheQuery, [htmlError], responseCache);
+assert.equal(cachedAfterHtmlFailure.payload.status, "LIVE",
+  "a recent successful edge snapshot can bridge a temporary HTML provider failure");
+assert.equal(cachedAfterHtmlFailure.payload.cache_fallback_used, true,
+  "edge fallback must be visible in the API response");
+assert.equal(cachedAfterHtmlFailure.payload.updated_at, originalObservationTime,
+  "cache fallback must preserve the original provider observation timestamp");
+assert.equal(cachedAfterHtmlFailure.payload.source_status.efootball.status, "CACHED");
+assert.equal(cachedAfterHtmlFailure.payload.errors.length, 0);
+assert.match(cachedAfterHtmlFailure.payload.cache_fallback_reason, /returned HTML response/);
+
+const expiredResponseCache = createResponseCache();
+await runQuery(cacheQuery, [feed], expiredResponseCache);
+const [cachedKey, cachedResponse] = [...expiredResponseCache.entries.entries()][0];
+const expiredPayload = await cachedResponse.clone().json();
+expiredPayload.updated_at = new Date(Date.now() - 16 * 60 * 1000).toISOString();
+expiredPayload.server_time = expiredPayload.updated_at;
+expiredResponseCache.entries.set(cachedKey, new Response(JSON.stringify(expiredPayload), {
+  headers: cachedResponse.headers
+}));
+const expiredCacheRejected = await runQuery(cacheQuery, [htmlError], expiredResponseCache);
+assert.equal(expiredCacheRejected.payload.status, "UPSTREAM_EMPTY",
+  "an edge snapshot older than the 15-minute quote gate must remain unavailable");
+assert.notEqual(expiredCacheRejected.payload.cache_fallback_used, true,
+  "expired cached odds must never be served as current data");
 
 const combined = await runQuery("sources=efootball&pageSize=100&pageNum=1&timeline=168");
 assert.equal(combined.response.status, 200);

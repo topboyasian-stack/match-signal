@@ -840,7 +840,7 @@ async function renderUnifiedBoard(){
 
     async function freshVirtualQuoteMap(requiredRows=[]){
       const byEvent={};
-      const status={byEvent,snapshotAvailable:false,snapshotComplete:false,successfulPages:0,retriedPages:[],failureReason:null,requiredQuoteRows:0,matchedRequiredQuoteRows:0,missingRequiredQuoteRows:0,snapshotAttempts:0,fullSnapshotRetryAttempted:false};
+      const status={byEvent,snapshotAvailable:false,snapshotComplete:false,successfulPages:0,retriedPages:[],failureReason:null,requiredQuoteRows:0,matchedRequiredQuoteRows:0,missingRequiredQuoteRows:0,snapshotAttempts:0,fullSnapshotRetryAttempted:false,usedLastGoodSnapshot:false,lastVerifiedAt:null,hardProviderFailure:false};
       const quoteNow=Date.now();
       const required=(Array.isArray(requiredRows)?requiredRows:[]).filter(row=>isRequiredVirtualQuoteRow(row,quoteNow));
       status.requiredQuoteRows=required.length;
@@ -871,7 +871,9 @@ async function renderUnifiedBoard(){
         let lastPageError=null;
         // Retry a failed page once. A single dropped request should not leave the
         // whole desk in the incomplete-snapshot state for another two-minute cycle.
-        for(let attempt=1;attempt<=3;attempt++){
+        let pageAttempts=0;
+        for(let attempt=1;attempt<=2;attempt++){
+          pageAttempts=attempt;
           try{
             const candidate=await get('./api/sportybet-virtual?sources=efootball&pageSize=100&pageNum='+page+'&timeline=168&includeLive=false');
             if(!candidate||candidate.ok===false||!Array.isArray(candidate.events)){
@@ -880,8 +882,13 @@ async function renderUnifiedBoard(){
               const detail=Array.isArray(candidate.errors)&&candidate.errors.length
                 ?String(candidate.errors[0])
                 :String(candidate?.source_status?.efootball?.error||"upstream SportyBet snapshot was empty");
-              lastPageError="empty/upstream-error quote page (attempt "+attempt+"/3): "+detail;
+              lastPageError="empty/upstream-error quote page (attempt "+attempt+"/2): "+detail;
             }else{
+              if(candidate.cache_fallback_used===true){
+                status.usedLastGoodSnapshot=true;
+                const observedAt=Date.parse(String(candidate.updated_at||candidate.server_time||""));
+                if(Number.isFinite(observedAt))status.lastVerifiedAt=status.lastVerifiedAt==null?observedAt:Math.min(status.lastVerifiedAt,observedAt);
+              }
               feed=candidate;
               if(attempt>1)status.retriedPages.push(page);
               break;
@@ -889,10 +896,12 @@ async function renderUnifiedBoard(){
           }catch(error){
             lastPageError=String(error?.message||error||"live quote fetch failed");
           }
-          if(attempt<3)await new Promise(resolve=>window.setTimeout(resolve,attempt===1?350:700));
+          const hardProviderFailure=/returned (?:HTML|non-JSON) response|HTTP 4\d\d|bizCode \d+/i.test(String(lastPageError||""));
+          if(hardProviderFailure){status.hardProviderFailure=true;break;}
+          if(attempt<2)await new Promise(resolve=>window.setTimeout(resolve,attempt===1?350:700));
         }
         if(!feed){
-          status.failureReason="page "+page+" failed after three attempts: "+String(lastPageError||"unknown live quote error");
+          status.failureReason="page "+page+" failed after "+pageAttempts+" "+(pageAttempts===1?"attempt":"attempts")+": "+String(lastPageError||"unknown live quote error");
           status.failedPage=page;
           break;
         }
@@ -929,7 +938,7 @@ async function renderUnifiedBoard(){
         if(page===5)status.failureReason="page limit reached before every requested event was found";
         }
         finish();
-        if(!shouldRetryVirtualQuoteSnapshot(status,snapshotAttempt,2))break;
+        if(status.hardProviderFailure||!shouldRetryVirtualQuoteSnapshot(status,snapshotAttempt,2))break;
         if(snapshotAttempt<2)await new Promise(resolve=>window.setTimeout(resolve,450));
       }
       return finish();
@@ -1106,14 +1115,17 @@ async function renderUnifiedBoard(){
       quoteSnapshot=fetchedSnapshot;
       const fetchedEvents=Object.keys(fetchedSnapshot?.byEvent||{}).length>0;
       if(requiredCount>0&&fetchedSnapshot?.snapshotAvailable===true&&fetchedSnapshot?.snapshotComplete===true&&fetchedEvents){
+        const edgeCacheUsed=fetchedSnapshot?.usedLastGoodSnapshot===true;
+        const sourceObservedAt=Number.isFinite(Number(fetchedSnapshot?.lastVerifiedAt))?Number(fetchedSnapshot.lastVerifiedAt):null;
+        const verifiedAt=edgeCacheUsed&&sourceObservedAt!=null?sourceObservedAt:Date.now();
         lastVerifiedVirtualQuoteSnapshot={
           snapshotAvailable:true,
           snapshotComplete:true,
-          verifiedAt:Date.now(),
+          verifiedAt,
           byEvent:fetchedSnapshot.byEvent
         };
         persistLastVerifiedVirtualQuoteSnapshot(lastVerifiedVirtualQuoteSnapshot);
-        quoteSnapshot={...fetchedSnapshot,usedLastGoodSnapshot:false,lastVerifiedAt:lastVerifiedVirtualQuoteSnapshot.verifiedAt};
+        quoteSnapshot={...fetchedSnapshot,usedLastGoodSnapshot:edgeCacheUsed,lastVerifiedAt:verifiedAt};
       }else if(requiredCount>0&&lastVerifiedVirtualSnapshotUsable(lastVerifiedVirtualQuoteSnapshot,Date.now())){
         // Reuse one coherent, last-complete event snapshot after a transient fetch failure.
         // Original per-event retrieval timestamps are retained, and the normal

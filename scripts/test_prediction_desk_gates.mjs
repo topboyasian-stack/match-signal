@@ -59,7 +59,9 @@ assert.match(source,/holdVerifiedBoardDuringRefresh/,"the previously verified sh
 assert.match(source,/lastVerifiedVirtualSnapshotUsable\(lastVerifiedVirtualQuoteSnapshot,Date\.now\(\)\)/,"the cache reuse path is guarded by the last-snapshot freshness limit");
 assert.match(source,/loadLastVerifiedVirtualQuoteSnapshot\(window\.localStorage,Date\.now\(\)\)/,"a still-fresh complete snapshot can survive a page reload in the same browser storage");
 assert.match(source,/persistLastVerifiedVirtualQuoteSnapshot\(lastVerifiedVirtualQuoteSnapshot\)/,"only successfully complete snapshots are persisted");
-assert.match(source,/for\(let attempt=1;attempt<=3;attempt\+\+\)/,"transport failures and empty upstream pages receive bounded retries before an incomplete refresh");
+assert.match(source,/for\(let attempt=1;attempt<=2;attempt\+\+\)/,"browser retries are bounded because the API proxy already tries the primary and fallback endpoints");
+assert.match(source,/status\.hardProviderFailure/,"explicit HTML and HTTP provider failures stop multiplying full snapshot retries");
+assert.match(source,/candidate\.cache_fallback_used===true/,"the UI can use only a recent edge-cached snapshot while preserving its original timestamp");
 assert.match(source,/isEmptyVirtualQuotePageResponse\(candidate\)/,"an empty successful HTTP response is retried rather than treated as a usable page");
 assert.match(source,/live_quote_missing_required_rows:virtualQuoteMissingRequiredRows/,"monitor diagnostics expose unmatched required quote rows");
 assert.match(source,/live_quote_retried_pages:virtualQuoteRetriedPages/,"monitor diagnostics expose which pages needed a retry");
