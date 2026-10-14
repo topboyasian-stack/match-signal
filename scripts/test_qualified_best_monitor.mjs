@@ -41,6 +41,24 @@ const healthyPicks = classifyQualifiedBestMonitor({
 assert.equal(healthyPicks.status, "healthy");
 assert.equal(healthyPicks.classification, "qualified_fixtures_present");
 
+const visiblyRenderedPicks = classifyQualifiedBestMonitor({
+  ...healthyZero,
+  current_qualified_count: 3,
+  dom_qualified_count: 3,
+  dom_qualified_visible_count: 3
+}, { nowMs: now });
+assert.equal(visiblyRenderedPicks.status, "healthy");
+assert.equal(visiblyRenderedPicks.classification, "qualified_fixtures_present");
+
+const invisiblePicks = classifyQualifiedBestMonitor({
+  ...healthyZero,
+  current_qualified_count: 3,
+  dom_qualified_count: 3,
+  dom_qualified_visible_count: 0
+}, { nowMs: now });
+assert.equal(invisiblePicks.status, "failed", "hidden shortlist rows must not be reported as a healthy visible desk");
+assert.ok(invisiblePicks.reasons.includes("QUALIFIED_ROWS_NOT_VISIBLY_RENDERED"));
+
 for (const [label, patch, reason] of [
   ["renderer exception", { stage: "failed" }, "QUALIFICATION_RENDER_FAILED"],
   ["check still pending", { stage: "checking" }, "QUALIFICATION_CHECK_INCOMPLETE"],
