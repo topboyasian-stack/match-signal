@@ -97,6 +97,22 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         embedded_python = textwrap.dedent(WATCHDOG_WORKFLOW[heredoc_start:heredoc_end])
         compile(embedded_python, ".github/workflows/automation_watchdog.yml:embedded-check", "exec")
 
+    def test_watchdog_continues_self_heal_when_virtual_feed_fails(self):
+        sync_step = re.search(
+            r"(?ms)^      - name: Refresh Virtual Lab live snapshot\n(.*?)(?=^      - name: )",
+            WATCHDOG_WORKFLOW,
+        )
+        self.assertIsNotNone(sync_step, "Watchdog must have a dedicated Virtual Lab sync step")
+        self.assertIn(
+            "if python scripts/virtual_lab_sync.py; then",
+            sync_step.group(0),
+            "Virtual Lab upstream outage must not abort the watchdog before stale-board recovery",
+        )
+        self.assertIn(
+            "Continuing into freshness checks and stale-board recovery.",
+            sync_step.group(0),
+        )
+
     def test_pages_deploy_is_board_driven_with_guarded_cache_only_promotion(self):
         events_end = PAGES_WORKFLOW.find("\npermissions:")
         self.assertGreater(events_end, 0)
