@@ -853,3 +853,116 @@ body[data-page="odds-builder"] select:focus-visible {
   body[data-page="odds-builder"] .ob-ticket-ledger .ticket-list { grid-template-columns: minmax(0,1fr); }
   body[data-page="odds-builder"] .ob-page-footer { flex-direction: column; }
 }
+
+
+/* Keep the renderer JavaScript unchanged: rearrange its existing direct children in CSS Grid. */
+body[data-page="odds-builder"] #oddsBuilder {
+  display: grid;
+  grid-template-columns: minmax(0,1.55fr) minmax(290px,.78fr);
+  grid-template-rows: auto auto auto auto auto;
+  align-items: start;
+  gap: 14px;
+}
+body[data-page="odds-builder"] #oddsBuilder > .builder-console {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  width: 100%;
+}
+body[data-page="odds-builder"] #oddsBuilder > .builder-batch-panel:nth-of-type(2) {
+  grid-column: 1;
+  grid-row: 2;
+  min-width: 0;
+}
+body[data-page="odds-builder"] #oddsBuilder > .push-notify-panel {
+  grid-column: 2;
+  grid-row: 2;
+  min-width: 0;
+}
+body[data-page="odds-builder"] #oddsBuilder > .builder-batch-panel:nth-of-type(3) {
+  grid-column: 2;
+  grid-row: 3;
+  min-width: 0;
+  margin-top: 0 !important;
+  padding: 14px !important;
+  border-radius: 16px;
+}
+body[data-page="odds-builder"] #oddsBuilder > .builder-batch-panel:nth-of-type(3) .builder-section-note {
+  display: none;
+}
+body[data-page="odds-builder"] #oddsBuilder > .builder-batch-panel:nth-of-type(3) .builder-section-head {
+  display: block;
+}
+body[data-page="odds-builder"] #oddsBuilder > .builder-batch-panel:nth-of-type(3) .grid {
+  grid-template-columns: minmax(0,1fr);
+}
+body[data-page="odds-builder"] #oddsBuilder > .ticket-track {
+  grid-column: 1 / -1;
+  grid-row: 4;
+  width: 100%;
+  margin-top: 0;
+  padding: clamp(15px,2vw,22px);
+  border-color: rgba(110,231,212,.22);
+  border-radius: 19px;
+  background: linear-gradient(145deg, #0b1c26, #09111b 65%, #101329);
+}
+body[data-page="odds-builder"] #oddsBuilder > .ticket-track .ticket-track-head {
+  gap: 18px;
+  align-items: flex-start;
+  padding-bottom: 15px;
+  border-bottom: 1px solid rgba(110,231,212,.15);
+}
+body[data-page="odds-builder"] #oddsBuilder > .ticket-track .ticket-track-head > div:first-child {
+  max-width: 680px;
+}
+body[data-page="odds-builder"] #oddsBuilder > .ticket-track .ticket-track-head b {
+  display: block;
+  margin-top: 5px;
+  color: #eefaf8;
+  font-size: 20px;
+}
+body[data-page="odds-builder"] #oddsBuilder > .ticket-track .ticket-list {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 9px;
+}
+body[data-page="odds-builder"] #oddsBuilder > .ticket-track .ticket-card {
+  border-color: rgba(110,231,212,.16);
+  border-radius: 13px;
+  background: linear-gradient(140deg, rgba(13,35,43,.98), rgba(9,18,29,.98));
+}
+body[data-page="odds-builder"] #oddsBuilder > .builder-note {
+  grid-column: 1 / -1;
+  grid-row: 5;
+}
+body[data-page="odds-builder"] #builder-overview,
+body[data-page="odds-builder"] #oddsBuilder,
+body[data-page="odds-builder"] #ob-guide-title,
+body[data-page="odds-builder"] #ob-page-footer {
+  scroll-margin-top: 88px;
+}
+@media (max-width: 1100px) {
+  body[data-page="odds-builder"] #oddsBuilder {
+    grid-template-columns: minmax(0,1fr);
+    grid-template-rows: auto;
+  }
+  body[data-page="odds-builder"] #oddsBuilder > .builder-console,
+  body[data-page="odds-builder"] #oddsBuilder > .push-notify-panel,
+  body[data-page="odds-builder"] #oddsBuilder > .builder-batch-panel:nth-of-type(2),
+  body[data-page="odds-builder"] #oddsBuilder > .builder-batch-panel:nth-of-type(3),
+  body[data-page="odds-builder"] #oddsBuilder > .ticket-track,
+  body[data-page="odds-builder"] #oddsBuilder > .builder-note {
+    grid-column: 1;
+    grid-row: auto;
+  }
+  body[data-page="odds-builder"] #oddsBuilder > .push-notify-panel { order: 1; }
+  body[data-page="odds-builder"] #oddsBuilder > .builder-console { order: 0; }
+  body[data-page="odds-builder"] #oddsBuilder > .builder-batch-panel:nth-of-type(2) { order: 2; }
+  body[data-page="odds-builder"] #oddsBuilder > .builder-batch-panel:nth-of-type(3) { order: 3; }
+  body[data-page="odds-builder"] #oddsBuilder > .ticket-track { order: 4; }
+  body[data-page="odds-builder"] #oddsBuilder > .builder-note { order: 5; }
+}
+@media (max-width: 760px) {
+  body[data-page="odds-builder"] #oddsBuilder > .ticket-track .ticket-list {
+    grid-template-columns: minmax(0,1fr);
+  }
+}
