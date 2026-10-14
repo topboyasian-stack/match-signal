@@ -142,7 +142,7 @@ jobs:
                   return False
               return any(r.get('status') in {'queued', 'in_progress', 'waiting', 'pending'} for r in runs)
 
-          monitor_runs, monitor_history_error = recent_runs('qualified-best-production-watch.yml', 100)
+          monitor_runs, monitor_history_error = recent_runs('qualified-best-schedule-watch.yml', 100)
           monitor_last_age_minutes = None
           monitor_scheduled_age_minutes = None
           monitor_dispatch_age_minutes = None
@@ -152,7 +152,7 @@ jobs:
           repo_name = os.environ.get('GITHUB_REPOSITORY', '')
           if repo_name:
               meta = subprocess.run(
-                  ['gh', 'api', f'repos/{repo_name}/actions/workflows/qualified-best-production-watch.yml', '--jq', '.created_at'],
+                  ['gh', 'api', f'repos/{repo_name}/actions/workflows/qualified-best-schedule-watch.yml', '--jq', '.created_at'],
                   text=True, capture_output=True
               )
               if meta.returncode == 0:
@@ -182,9 +182,9 @@ jobs:
 
           actions = []
           if monitor_runs is None:
-              actions.append({'workflow':'qualified-best-production-watch.yml','action':'inspect_schedule','status':'failed','detail':monitor_history_error})
+              actions.append({'workflow':'qualified-best-schedule-watch.yml','action':'inspect_schedule','status':'failed','detail':monitor_history_error})
           elif monitor_schedule_status in {'STALE', 'MISSING_SCHEDULED_RUN'}:
-              actions.append({'workflow':'qualified-best-production-watch.yml','action':'schedule_gap_alert','status':'warning','detail':'Qualified Best monitor schedule status='+monitor_schedule_status+'; last scheduled run age='+(str(monitor_scheduled_age_minutes) if monitor_scheduled_age_minutes is not None else 'none')+' minute(s); workflow age='+(str(monitor_workflow_age_minutes) if monitor_workflow_age_minutes is not None else 'unknown')+' minute(s).'})
+              actions.append({'workflow':'qualified-best-schedule-watch.yml','action':'schedule_gap_alert','status':'warning','detail':'Qualified Best monitor schedule status='+monitor_schedule_status+'; last scheduled run age='+(str(monitor_scheduled_age_minutes) if monitor_scheduled_age_minutes is not None else 'none')+' minute(s); workflow age='+(str(monitor_workflow_age_minutes) if monitor_workflow_age_minutes is not None else 'unknown')+' minute(s).'})
 
           # A failed board/deploy run is an event-driven recovery signal even if
           # the last published artifact has not aged past its normal freshness guard.
@@ -232,14 +232,14 @@ jobs:
               # often starts in parallel with this watchdog; when cron is missing, queue one explicit
               # workflow_dispatch behind it instead of suppressing recovery just because it's active.
               if monitor_dispatch_age_minutes is not None and monitor_dispatch_age_minutes < 10:
-                  actions.append({'workflow':'qualified-best-production-watch.yml','action':'monitor_failsafe_dispatch','status':'suppressed_cooldown','detail':'A fallback monitor was dispatched '+str(monitor_dispatch_age_minutes)+' minute(s) ago; monitor fallback cooldown is 10 minutes.'})
+                  actions.append({'workflow':'qualified-best-schedule-watch.yml','action':'monitor_failsafe_dispatch','status':'suppressed_cooldown','detail':'A fallback monitor was dispatched '+str(monitor_dispatch_age_minutes)+' minute(s) ago; monitor fallback cooldown is 10 minutes.'})
               elif active('qualified-best-production-watch.yml') and not monitor_schedule_fallback_needed:
-                  actions.append({'workflow':'qualified-best-production-watch.yml','action':'monitor_failsafe_dispatch','status':'suppressed_active_run','detail':'Monitor already queued or active and the scheduled cadence is not stale.'})
+                  actions.append({'workflow':'qualified-best-schedule-watch.yml','action':'monitor_failsafe_dispatch','status':'suppressed_active_run','detail':'Monitor already queued or active and the scheduled cadence is not stale.'})
               else:
                   active_note = ' A deployment-triggered monitor is active; the fallback is queued behind it.' if active('qualified-best-production-watch.yml') else ''
                   detail = ('Scheduled monitor run is '+monitor_schedule_status+'; dispatching a fallback despite recent deployment checks.' if monitor_schedule_fallback_needed else 'No Qualified Best browser check in the last 15 minutes; fallback monitor dispatched.') + active_note
-                  r = subprocess.run(['gh', 'workflow', 'run', 'qualified-best-production-watch.yml', '--ref', 'main'], text=True, capture_output=True)
-                  actions.append({'workflow':'qualified-best-production-watch.yml','action':'monitor_failsafe_dispatch','status':'requested' if r.returncode == 0 else 'failed','detail':(r.stderr.strip() if r.returncode else detail)})
+                  r = subprocess.run(['gh', 'workflow', 'run', 'qualified-best-schedule-watch.yml', '--ref', 'main'], text=True, capture_output=True)
+                  actions.append({'workflow':'qualified-best-schedule-watch.yml','action':'monitor_failsafe_dispatch','status':'requested' if r.returncode == 0 else 'failed','detail':(r.stderr.strip() if r.returncode else detail)})
           if virtual_status_age > 1 and not active('virtual-lab-collector.yml'):
               r = subprocess.run(['gh', 'workflow', 'run', 'virtual-lab-collector.yml', '--ref', 'main'], text=True, capture_output=True)
               actions.append({'workflow':'virtual-lab-collector.yml','action':'dispatch','status':'requested' if r.returncode == 0 else 'failed','detail':(r.stderr.strip() if r.returncode else 'Virtual Lab research-ledger self-heal')})
