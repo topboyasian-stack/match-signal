@@ -1,23 +1,23 @@
 {
-  "updated_at": "2026-10-14T19:30:01.653314+00:00",
+  "updated_at": "2026-10-14T19:30:27.928882+00:00",
   "automation_status": "SELF_HEALING_ENABLED",
   "pipeline_last_update": "2026-10-14T17:46:56.119109+00:00",
-  "pipeline_age_hours": 1.72,
+  "pipeline_age_hours": 1.73,
   "odds_builder_last_update": "2026-10-14T19:22:01.745002+00:00",
-  "odds_builder_age_hours": 0.13,
+  "odds_builder_age_hours": 0.14,
   "expansion_last_update": "2026-10-14T15:29:08.573951+00:00",
-  "expansion_age_hours": 4.01,
+  "expansion_age_hours": 4.02,
   "virtual_lab_last_update": "2026-10-14T19:20:46.157534+00:00",
-  "virtual_lab_age_hours": 0.15,
-  "virtual_lab_status_age_hours": 1.4,
-  "darts_age_hours": 1.74,
-  "table_tennis_age_hours": 1.52,
+  "virtual_lab_age_hours": 0.16,
+  "virtual_lab_status_age_hours": 1.41,
+  "darts_age_hours": 1.75,
+  "table_tennis_age_hours": 1.53,
   "unified_upcoming_age_hours": 0.02,
-  "qualified_best_monitor_last_run_age_minutes": 0.1,
+  "qualified_best_monitor_last_run_age_minutes": 0.5,
   "qualified_best_monitor_last_scheduled_run_age_minutes": null,
-  "qualified_best_monitor_last_fallback_dispatch_age_minutes": 9.0,
+  "qualified_best_monitor_last_fallback_dispatch_age_minutes": 9.4,
   "qualified_best_monitor_schedule_status": "MISSING_SCHEDULED_RUN",
-  "qualified_best_monitor_workflow_age_minutes": 81.9,
+  "qualified_best_monitor_workflow_age_minutes": 82.4,
   "virtual_lab_events": 746,
   "virtual_lab_products": {
     "efootball_gt": 289,
@@ -40,13 +40,13 @@
       "workflow": "qualified-best-production-watch.yml",
       "action": "schedule_gap_alert",
       "status": "warning",
-      "detail": "Qualified Best monitor schedule status=MISSING_SCHEDULED_RUN; last scheduled run age=none minute(s); workflow age=81.9 minute(s)."
+      "detail": "Qualified Best monitor schedule status=MISSING_SCHEDULED_RUN; last scheduled run age=none minute(s); workflow age=82.4 minute(s)."
     },
     {
       "workflow": "cloudflare-pages.yml",
       "action": "failure_recovery",
       "status": "suppressed_cooldown",
-      "detail": "A manual retry was dispatched 6.3 minute(s) ago; retry cooldown is 20 minutes."
+      "detail": "A manual retry was dispatched 6.7 minute(s) ago; retry cooldown is 20 minutes."
     }
   ],
   "policy": "Watchdog self-heals stale engines, records Qualified Best scheduled/actual monitor age, dispatches a fallback when the scheduled monitor is missing/stale even if deployment checks are recent (10-minute cooldown), and retries failed board/deploy runs once per 20-minute cooldown. Workflow_run checks do not rewrite feed data to avoid downstream loops. Health publication is retried across concurrent data writers."
