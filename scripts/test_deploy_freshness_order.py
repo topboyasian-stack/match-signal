@@ -42,7 +42,7 @@ def workflow_schedule_crons(source: str) -> list[str]:
 
 class FreshnessDeployOrderingTests(unittest.TestCase):
     def test_logo_registry_refreshes_after_live_team_feeds(self):
-        events_end = LOGO_WORKFLOW.find("\\npermissions:")
+        events_end = LOGO_WORKFLOW.find("\npermissions:")
         self.assertGreater(events_end, 0)
         events = LOGO_WORKFLOW[:events_end]
         self.assertIn('      - "Match Signal Odds Builder"', events)
