@@ -9,7 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PAGES_WORKFLOW = (ROOT / ".github/workflows/cloudflare-pages.yml").read_text(encoding="utf-8")
 BOARD_WORKFLOW = (ROOT / ".github/workflows/unified-upcoming.yml").read_text(encoding="utf-8")
-MONITOR_WORKFLOW = (ROOT / ".github/workflows/qualified-best-live-monitor.yml").read_text(encoding="utf-8")
+MONITOR_WORKFLOW = (ROOT / ".github/workflows/qualified-best-watch.yml").read_text(encoding="utf-8")
 WATCHDOG_WORKFLOW = (ROOT / ".github/workflows/automation_watchdog.yml").read_text(encoding="utf-8")
 
 
@@ -44,9 +44,9 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn("4-59/5 * * * *", crons)
         self.assertNotIn("*/5 * * * *", crons)
 
-    def test_monitor_schedule_is_staggered_and_deployment_trigger_is_preserved(self):
+    def test_monitor_schedule_is_rearmed_and_deployment_trigger_is_preserved(self):
         crons = workflow_schedule_crons(MONITOR_WORKFLOW)
-        self.assertIn("2,7,12,17,22,27,32,37,42,47,52,57 * * * *", crons)
+        self.assertIn("3,13,23,33,43,53 * * * *", crons)
         self.assertNotIn("*/5 * * * *", crons)
         events_end = MONITOR_WORKFLOW.find("\npermissions:")
         self.assertGreater(events_end, 0)
@@ -114,7 +114,9 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "scripts/test_prediction_desk_gates.mjs",
             "scripts/qualified_best_monitor.mjs",
             "scripts/test_qualified_best_monitor.mjs",
-            ".github/workflows/qualified-best-live-monitor.yml",
+            ".github/workflows/qualified-best-watch.yml",
+            ".github/workflows/qualified-best-live-monitor.yml",  # historical delete path for this schedule migration
+            ".github/workflows/unified-upcoming.yml",
         ):
             self.assertIn(allowed_path, PAGES_WORKFLOW)
 

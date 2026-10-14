@@ -4,9 +4,9 @@ on:
   schedule:
     # Independent production verification, separate from the board builder.
     # The main pipeline can appear healthy while browser-side qualification is broken.
-    # Use this new workflow path to re-register the cron; keep the strict cadence guard.
-    # Explicit staggered minute list avoids minute zero and the board's :04/:09/:14... cadence.
-    - cron: '2,7,12,17,22,27,32,37,42,47,52,57 * * * *'
+    # Re-register the monitor under a fresh workflow identity after the confirmed multi-hour schedule gap.
+    # A ten-minute cadence remains inside the 15-minute quote gate and avoids minute zero.
+    - cron: '3,13,23,33,43,53 * * * *'
   workflow_dispatch:
   workflow_run:
     # Start browser verification only after Cloudflare confirms its deployment.
@@ -44,7 +44,7 @@ on:
       - 'virtual-lab/index.html'
       - 'virtual-lab-terminal.css'
       - 'scripts/test_workspace_terminal_design.mjs'
-      - '.github/workflows/qualified-best-live-monitor.yml'
+      - '.github/workflows/qualified-best-watch.yml'
       - '.github/workflows/cloudflare-pages.yml'
 permissions:
   actions: read
@@ -101,7 +101,7 @@ jobs:
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       QUALIFIED_BEST_URL: https://match-signal.pages.dev/qualified-best.html
-      QUALIFIED_BEST_MONITOR_WORKFLOW_FILE: qualified-best-live-monitor.yml
+      QUALIFIED_BEST_MONITOR_WORKFLOW_FILE: qualified-best-watch.yml
     steps:
       - name: Check out monitor source
         uses: actions/checkout@v4

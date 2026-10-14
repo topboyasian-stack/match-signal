@@ -14,7 +14,7 @@ async function fetchScheduleGap() {
     return { schedule_gap_status: "unknown", schedule_gap_minutes: null, schedule_gap_note: "GitHub run metadata is unavailable in this environment." };
   }
   try {
-    const monitorWorkflowFile = process.env.QUALIFIED_BEST_MONITOR_WORKFLOW_FILE || "qualified-best-live-monitor.yml";
+    const monitorWorkflowFile = process.env.QUALIFIED_BEST_MONITOR_WORKFLOW_FILE || "qualified-best-watch.yml";
     const response = await fetch(`https://api.github.com/repos/${repoName}/actions/workflows/${encodeURIComponent(monitorWorkflowFile)}/runs?per_page=100`, {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -49,7 +49,7 @@ async function fetchScheduleGap() {
 
     // Scheduled invocations compare cron-to-cron. Deploy-triggered and manual
     // invocations report the age of the last scheduled check, so frequent
-    // deployments cannot mask a stalled 20-minute schedule.
+    // deployments cannot mask a stalled ten-minute monitor schedule.
     const referenceTime = eventName === "schedule" && Number.isFinite(currentStart)
       ? currentStart : Date.now();
     const gapMinutes = Math.round((referenceTime - previous.stamp) / 6000) / 10;
