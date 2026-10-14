@@ -315,6 +315,7 @@ function qualificationVetoReason(x){
     ...(Array.isArray(gate?.reasons)?gate.reasons:[])
   ].filter(value=>value!=null&&String(value).trim()).map(value=>String(value).trim());
   if(x?.watch_projection===true||x?.forward_watch===true||x?.research_only===true)return "EXPLICIT_QUALIFICATION_VETO";
+  if(fields.some(value=>/KICKOFF_WINDOW_PENDING/i.test(value)))return "KICKOFF_WINDOW_PENDING";
   return fields.some(value=>/(?:NOT[\s_-]*QUALIFIED|UNQUALIFIED|WATCH|RESEARCH|PROJECTION_ONLY|PENDING[\s_-]*EVIDENCE|GATE[\s_-]*PENDING)/i.test(value))
     ?"EXPLICIT_QUALIFICATION_VETO":null;
 }
@@ -334,7 +335,8 @@ function qualificationState(x){
     const detail=veto
       ?String(raw||x?.candidate_status||x?.model_candidate_status||"explicit watch/research gate").replaceAll("_"," ")
       :(raw&&raw!=="MODEL_RESEARCH"&&raw!=="RESEARCH_PROJECTION"?raw.replaceAll("_"," "):"RESEARCH ONLY");
-    const modelReason=raw.includes("DIRECTIONAL_LINE_VALIDATION_GATE_PENDING")?"DIRECTIONAL_LINE_VALIDATION_GATE_PENDING":
+    const modelReason=raw.includes("KICKOFF_WINDOW_PENDING")||veto==="KICKOFF_WINDOW_PENDING"?"KICKOFF_WINDOW_PENDING":
+      raw.includes("DIRECTIONAL_LINE_VALIDATION_GATE_PENDING")?"DIRECTIONAL_LINE_VALIDATION_GATE_PENDING":
       raw.includes("MODEL_LINE_SCOPE_GATE_PENDING")?"MODEL_LINE_SCOPE_GATE_PENDING":
       raw.includes("HIGH_LINE_UNDER_EVIDENCE_GATE_PENDING")?"HIGH_LINE_UNDER_EVIDENCE_GATE_PENDING":"MODEL_GATE_NOT_PASSED";
     return {modelQualified:false,currentPricePass:false,label:"NOT QUALIFIED · "+detail,reason:modelReason!=="MODEL_GATE_NOT_PASSED"?modelReason:(veto||modelReason)};
