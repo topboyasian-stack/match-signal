@@ -231,7 +231,7 @@ export async function onRequestGet(context){
         lastError='upstream upcoming feed returned no tournaments/events';
       }catch(e){
         lastError=String(e.message||e||'upstream upcoming feed failed');
-        primaryHardFailure=/returned (?:HTML|non-JSON) response| HTTP \\d{3}|bizCode \\d+|empty response/i.test(lastError);
+        primaryHardFailure=/returned (?:HTML|non-JSON) response| HTTP \d{3}|bizCode \d+|empty response/i.test(lastError);
       }
       if(attempt<2)await new Promise(resolve=>setTimeout(resolve,250));
     }
