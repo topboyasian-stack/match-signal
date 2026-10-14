@@ -32,6 +32,11 @@ on:
       - 'scripts/test_qualified_best_monitor.mjs'
       - 'scripts/qualified_best_monitor_lib.mjs'
       - 'scripts/test_deploy_freshness_order.py'
+      - 'scripts/test_cloudflare_only_deploy.mjs'
+      - '.github/workflows/deploy-pages.yml'
+      - '.github/workflows/settle-results.yml'
+      - '.github/workflows/tennis_pipeline.yml'
+      - '.github/workflows/telegram-publish-v3.yml'
       - 'scripts/test_sport_hub_design.mjs'
       - 'independent-sport-design.css'
       - 'scripts/test_independent_sports_design.mjs'
@@ -69,6 +74,8 @@ jobs:
           node-version: '20'
       - name: Test freshness-safe scheduled refresh cadence
         run: python scripts/test_deploy_freshness_order.py
+      - name: Enforce Cloudflare-only production hosting
+        run: node scripts/test_cloudflare_only_deploy.mjs
       - name: Check JavaScript syntax
         run: |
           node --check sport-hubs.js

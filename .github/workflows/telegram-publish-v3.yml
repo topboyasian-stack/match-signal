@@ -49,7 +49,7 @@ jobs:
               sport=str(p.get('sport','')).lower(); pick=p.get('pick') or p.get('selection') or p.get('prediction')
               if sport=='tennis': pick=p.get('player_1') if pick=='p1' else p.get('player_2') if pick=='p2' else pick
               blocks.append(f"{'🎾' if sport=='tennis' else '🏀' if sport=='basketball' else '⚽'} <b>{esc(p.get('player_1'))} vs {esc(p.get('player_2'))}</b>\nPick: <b>{esc(pick)}</b> — {float(p.get('confidence') or 0)*100:.1f}%")
-          blocks.append('\n<a href="https://topboyasian-stack.github.io/match-signal/">Open Match Signal →</a>')
+          blocks.append('\n<a href="https://match-signal.pages.dev/">Open Match Signal →</a>')
           payload=json.dumps({'chat_id':chat,'text':'\n\n'.join(blocks),'parse_mode':'HTML','disable_web_page_preview':True}).encode()
           req=urllib.request.Request(f'https://api.telegram.org/bot{token}/sendMessage',data=payload,headers={'Content-Type':'application/json'},method='POST')
           with urllib.request.urlopen(req,timeout=20) as r: result=json.loads(r.read().decode())
