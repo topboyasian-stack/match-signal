@@ -1,12 +1,6 @@
 name: Match Signal Qualified Best Production Monitor
 
 on:
-  schedule:
-    # Independent production verification, separate from the board builder.
-    # The main pipeline can appear healthy while browser-side qualification is broken.
-    # Re-register the monitor under a fresh workflow identity after the confirmed multi-hour schedule gap.
-    # Re-register on a different ten-minute cadence after the confirmed missing schedule; remain inside the 15-minute quote gate.
-    - cron: '5,15,25,35,45,55 * * * *'
   workflow_dispatch:
   workflow_run:
     # Start browser verification only after Cloudflare confirms its deployment.
@@ -51,6 +45,7 @@ on:
       - 'scripts/test_workspace_terminal_design.mjs'
       - 'scripts/test_core_workspaces_design.mjs'
       - '.github/workflows/qualified-best-production-watch.yml'
+      - '.github/workflows/qualified-best-schedule-watch.yml'
       - '.github/workflows/cloudflare-pages.yml'
 permissions:
   actions: read
@@ -111,7 +106,7 @@ jobs:
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       QUALIFIED_BEST_URL: https://match-signal.pages.dev/qualified-best.html
-      QUALIFIED_BEST_MONITOR_WORKFLOW_FILE: qualified-best-production-watch.yml
+      QUALIFIED_BEST_MONITOR_WORKFLOW_FILE: qualified-best-schedule-watch.yml
     steps:
       - name: Check out monitor source
         uses: actions/checkout@v4

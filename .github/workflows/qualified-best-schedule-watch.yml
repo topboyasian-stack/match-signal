@@ -1,0 +1,69 @@
+name: Match Signal Qualified Best Scheduled Health Watch
+
+on:
+  # New workflow identity to re-register the independent 10-minute production schedule.
+  schedule:
+    - cron: '1,11,21,31,41,51 * * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/qualified-best-schedule-watch.yml'
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: qualified-best-scheduled-health-watch
+  cancel-in-progress: false
+
+jobs:
+  production-monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      QUALIFIED_BEST_URL: https://match-signal.pages.dev/qualified-best.html
+      QUALIFIED_BEST_MONITOR_WORKFLOW_FILE: qualified-best-schedule-watch.yml
+    steps:
+      - name: Check out monitor source
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Restore Chromium cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: qualified-best-chromium-${{ runner.os }}-v1
+          restore-keys: |
+            qualified-best-chromium-${{ runner.os }}-
+
+      - name: Install browser monitor dependency
+        run: npm install --no-save playwright
+
+      - name: Install Chromium and system dependencies
+        run: npx playwright install --with-deps chromium
+
+      - name: Test monitor health and schedule-gap classifications
+        run: node scripts/test_qualified_best_monitor.mjs
+
+      - name: Inspect production Qualified Best through the real browser gate
+        run: node scripts/qualified_best_monitor.mjs
+
+      - name: Upload timestamped production diagnostics and screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qualified-best-scheduled-watch-${{ github.run_id }}
+          path: |
+            qualified-best-monitor-result.json
+            qualified-best-production.png
+          if-no-files-found: warn
+          retention-days: 30
