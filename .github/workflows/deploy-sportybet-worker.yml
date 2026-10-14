@@ -26,6 +26,7 @@ jobs:
           ref: main
 
       - name: Deploy regional Worker
+        id: deploy
         working-directory: sportybet-worker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
