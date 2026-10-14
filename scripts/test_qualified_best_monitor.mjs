@@ -2,12 +2,13 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { classifyQualifiedBestMonitor } from "./qualified_best_monitor_lib.mjs";
 
-const workflow = await readFile(new URL("../.github/workflows/qualified-best-watch.yml", import.meta.url), "utf8");
+const workflow = await readFile(new URL("../.github/workflows/qualified-best-production-watch.yml", import.meta.url), "utf8");
 const monitorSource = await readFile(new URL("./qualified_best_monitor.mjs", import.meta.url), "utf8");
-assert.ok(workflow.includes("cron: '*/10 * * * *'"), "the re-armed monitor checks production at ten-minute intervals, inside the 15-minute quote gate");
+assert.ok(workflow.includes("cron: '3,13,23,33,43,53 * * * *'"), "the fresh monitor workflow checks production every ten minutes inside the 15-minute quote gate, offset away from minute zero");
 assert.match(workflow, /workflow_run:[\s\S]*?workflows:\s*\n\s*- "Deploy Match Signal to Cloudflare Pages"/, "production monitoring starts after the Cloudflare deploy workflow");
 assert.doesNotMatch(workflow, /\n  push:/, "the production browser monitor must not race the Cloudflare deployment on main pushes");
 assert.match(workflow, /github\.event\.workflow_run\.conclusion == 'success'/, "failed deployments must not trigger a production monitor");
+assert.match(workflow, /QUALIFIED_BEST_MONITOR_WORKFLOW_FILE:\s*qualified-best-production-watch\.yml/, "schedule history checks must target the fresh workflow identity");
 assert.match(monitorSource, /QUALIFIED_BEST_MONITOR_WORKFLOW_FILE/, "the monitor must query the re-registered workflow path");
 assert.match(monitorSource, /run\.event === "schedule"/, "schedule-gap calculations must compare cron-triggered runs, not deployment-triggered runs");
 assert.match(monitorSource, /schedule_gap_enforced: eventName === "schedule"/, "only actual scheduled invocations should fail solely for an overdue cron; fallback browser checks should report the gap as a warning");
