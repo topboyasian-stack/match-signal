@@ -1,0 +1,69 @@
+name: Deploy Match Signal SportyBet Regional Proxy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'sportybet-worker/**'
+      - '.github/workflows/deploy-sportybet-worker.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: match-signal-sportybet-regional-proxy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Deploy regional Worker
+        working-directory: sportybet-worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          output="$(npx wrangler@latest deploy 2>&1)" || {
+            printf '%s\n' "$output"
+            exit 1
+          }
+          printf '%s\n' "$output"
+          worker_url="$(printf '%s\n' "$output" | grep -Eo 'https://match-signal-sportybet-proxy\.[^[:space:]]+\.workers\.dev' | tail -1 || true)"
+          if [ -z "$worker_url" ]; then
+            echo "Could not resolve the deployed Worker URL from Wrangler output." >&2
+            exit 1
+          fi
+          echo "worker_url=$worker_url" >> "$GITHUB_OUTPUT"
+          echo "worker_url=$worker_url" >> "$GITHUB_ENV"
+          echo "Regional Worker URL: $worker_url"
+
+      - name: Verify health and probe SportyBet from the Worker
+        env:
+          WORKER_URL: ${{ steps.deploy.outputs.worker_url }}
+        run: |
+          node --input-type=module <<'NODE'
+          const base = String(process.env.WORKER_URL || '').replace(/\/+$/, '');
+          if (!base.startsWith('https://') || !base.endsWith('.workers.dev')) {
+            throw new Error('The deploy step did not produce a valid workers.dev URL.');
+          }
+          const healthResponse = await fetch(base + '/health', { signal: AbortSignal.timeout(10000) });
+          const health = await healthResponse.json();
+          console.log('Worker health:', JSON.stringify(health));
+          if (!healthResponse.ok || health.ok !== true) throw new Error('Regional Worker health check failed.');
+
+          const diagnosticResponse = await fetch(base + '/__diagnostics', { signal: AbortSignal.timeout(25000) });
+          const diagnostics = await diagnosticResponse.json();
+          console.log('SportyBet diagnostics:', JSON.stringify(diagnostics, null, 2));
+          if (!diagnosticResponse.ok || diagnostics.diagnostic !== 'sportybet-region-worker-v1' || !Array.isArray(diagnostics.probes) || diagnostics.probes.length !== 2) {
+            throw new Error('Regional Worker diagnostic response was invalid.');
+          }
+          NODE
