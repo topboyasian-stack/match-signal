@@ -29,6 +29,11 @@ assert.notEqual(rendererVersions[0], "20261013-qualified-best-kickoff-sort1", "t
 assert.notEqual(rendererVersions[0], "20261013-qualified-best-live-monitor1", "the script cache key must change when transient refresh recovery changes the renderer");
 assert.notEqual(rendererVersions[0], "20261013-qualified-best-upcoming-only1", "the shared renderer cache key must change when the live-verification client needs a forced refresh");
 assert.notEqual(rendererVersions[0], "20261013-qualified-best-live-verification-cachefix2", "the renderer cache key must change after clean-route cache policy changes");
+assert.notEqual(rendererVersions[0], "20261013-qualified-best-live-coverage-retry1", "the script cache key must change when bounded automatic live recovery changes");
+assert.match(source,/virtualQuoteRecoveryAttempted/, "a failed live scan gets at most one browser-level recovery attempt");
+assert.match(source,/virtualQuoteRecoveryPending/, "the board labels the automatic recovery while holding unverified picks");
+assert.match(source,/const scheduleVirtualQuoteRecovery=\(\)=>/, "the recovery retry is explicit and bounded");
+assert.match(source,/still unavailable after an automatic retry/, "a failed recovery exposes the blocker instead of implying the candidate pool is empty");
 assert.match(source,/window\.__MATCH_SIGNAL_QUALIFIED_BEST_MONITOR__=\{/, "the real desk gate must emit structured monitor diagnostics");
 assert.match(source,/stage:virtualQuoteRefreshState==="pending"\?"checking":"completed"/, "the monitor must distinguish a still-running quote check from a completed check");
 assert.match(source,/source_fallback_used:sourceFallbackUsed/, "synthetic source-fallback timestamps cannot certify production health");
