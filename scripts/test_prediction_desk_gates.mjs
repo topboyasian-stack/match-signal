@@ -334,7 +334,7 @@ assert.equal(
 );
 
 // Any explicit gate-pending label must veto contradictory upstream qualified booleans.
-for (const pendingStatus of ["DIRECTIONAL_LINE_VALIDATION_GATE_PENDING", "MODEL_LINE_SCOPE_GATE_PENDING"]) {
+for (const pendingStatus of ["DIRECTIONAL_LINE_VALIDATION_GATE_PENDING", "MODEL_LINE_SCOPE_GATE_PENDING", "KICKOFF_WINDOW_PENDING"]) {
   const contradictoryPending = row({
     qualification_status: pendingStatus,
     candidate_status: "BETTING_QUALIFIED_PAPER",
