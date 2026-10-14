@@ -1,10 +1,114 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Match Signal — Reports</title><link rel="stylesheet" href="./sport-hubs.css?v=20261011-redesign2"><link rel="stylesheet" href="./reports-design.css?v=20261014-terminal2"><meta name="match-signal-build" content="MS-REPORTS-2026.10.14-TERMINAL2"><link rel="icon" type="image/png" sizes="96x96" href="./favicon.png"></head><body data-page="reports"><div class="ms-wrap"><div id="workspace-nav" data-active="reports"></div><section class="ms-hero"><div class="ms-eyebrow">SYSTEM REPORTS</div><h2>Track record across the whole system.</h2><p>One reporting surface for model history, settled outcomes and sport-level artifacts. This page reads the existing records; it does not rewrite or retrain them.</p></section>
-<section class="ws-research-overview ws-report-roles" aria-label="Match Signal workspace responsibilities">
-  <div class="ws-overview-head"><div><div class="ws-overview-eyebrow">ONE SYSTEM · THREE RESPONSIBILITIES</div><h3>Investigate. Measure. Explain.</h3><p>These workspaces share one navigation and data lineage, but each has a distinct job. Research experiments do not silently become production selections.</p></div><div class="ws-overview-actions"><a class="ws-action" href="./virtual-lab/">Open Virtual Lab →</a><a class="ws-action" href="./analyst.html">Open private Analyst →</a></div></div>
-  <div class="ws-overview-grid">
-    <article class="ws-metric-card ws-role-card"><small>Investigate</small><strong>Virtual Lab</strong><p>Live eFootball observations, participant evidence, walk-forward tests and research-only market monitoring.</p><a href="./virtual-lab/">Enter the Lab →</a></article>
-    <article class="ws-metric-card ws-role-card"><small>Measure · current page</small><strong>Reports</strong><p>Read settled outcomes, model diagnostics and artifact freshness across the system.</p><a href="#researchLabSummary">View current reports ↓</a></article>
-    <article class="ws-metric-card ws-role-card"><small>Explain</small><strong>AI Analyst</strong><p>Private, evidence-grounded Q&amp;A and a separate ticket ledger; no automatic model changes.</p><a href="./analyst.html">Open Analyst →</a></article>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Match Signal — System Reports</title>
+<link rel="stylesheet" href="./sport-hubs.css?v=20261011-redesign2">
+<link rel="stylesheet" href="./reports-design.css?v=20261014-full-v3">
+<meta name="match-signal-build" content="MS-REPORTS-2026.10.14-V3">
+<link rel="icon" type="image/png" sizes="96x96" href="./favicon.png">
+</head>
+<body data-page="reports">
+<div class="ms-wrap rp-shell">
+  <div id="workspace-nav" data-active="reports"></div>
+
+  <header class="rp-page-header">
+    <div>
+      <div class="rp-eyebrow">MATCH SIGNAL / SYSTEM INTELLIGENCE</div>
+      <h1>Reports &amp; performance</h1>
+      <p>One place to review published outcomes, sport-level artifacts and research status. These reports read the current records; they do not retrain or silently change any prediction gate.</p>
+    </div>
+    <div class="rp-header-status">
+      <span class="rp-readonly-mark"><i></i> READ-ONLY ANALYTICS</span>
+      <strong>Measure the system.<br>Keep the evidence honest.</strong>
+      <div class="rp-header-links">
+        <a href="./virtual-lab/">Virtual Lab <span>↗</span></a>
+        <a href="./odds-builder.html">Odds Builder <span>↗</span></a>
+      </div>
+    </div>
+  </header>
+
+  <nav class="rp-section-nav" aria-label="Reports sections">
+    <a href="#report-scoreboard"><span>01</span> Scoreboard</a>
+    <a href="#researchLabSummary"><span>02</span> Research status</a>
+    <a href="#report-grid-section"><span>03</span> Sport reports</a>
+    <a href="#report-boundary"><span>04</span> Data boundaries</a>
+  </nav>
+
+  <div class="rp-dashboard-grid">
+    <main class="rp-main-column">
+      <section id="report-scoreboard" class="rp-scoreboard">
+        <div class="rp-block-heading">
+          <div><span class="rp-section-kicker">SYSTEM SCOREBOARD</span><h2>Published track record</h2></div>
+          <span class="rp-section-caption">Values come from the currently published accuracy artifact</span>
+        </div>
+        <div class="ms-metrics rp-metrics">
+          <div class="ms-metric"><small>Settled picks</small><strong id="settled">—</strong><span>Recorded outcomes</span></div>
+          <div class="ms-metric"><small>Accuracy</small><strong id="accuracy">—</strong><span>Historical aggregate</span></div>
+          <div class="ms-metric"><small>Brier score</small><strong id="brier">—</strong><span>Lower is better</span></div>
+        </div>
+      </section>
+
+      <section id="report-grid-section" class="ms-panel rp-reports-panel">
+        <div class="ms-panel-head rp-panel-head">
+          <div><span class="rp-section-kicker">SPORT-BY-SPORT</span><h2>Performance reports</h2></div>
+          <span class="ms-status"><i class="ms-dot"></i> Published artifacts</span>
+        </div>
+        <div id="reportGrid" class="ms-grid rp-report-grid"><div class="ms-empty">Loading reports…</div></div>
+      </section>
+
+      <section id="report-boundary" class="ms-panel rp-boundary-panel">
+        <div class="rp-boundary-icon">i</div>
+        <div>
+          <div class="rp-section-kicker">DATA BOUNDARY</div>
+          <h2>History is not a qualification decision</h2>
+          <p class="ms-note">This reporting layer keeps historical results, model predictions, market snapshots and research-only experiments separate. A historical win rate or aggregate accuracy does not, on its own, make a market eligible for the production desk.</p>
+        </div>
+      </section>
+    </main>
+
+    <aside class="rp-side-column" aria-label="Research state and workspace navigation">
+      <section id="researchLabSummary" class="ws-research-overview rp-research-summary" aria-live="polite">
+        <div class="ws-overview-head">
+          <div>
+            <div class="ws-overview-eyebrow">RESEARCH &amp; INTELLIGENCE</div>
+            <h3>Virtual Lab status</h3>
+            <p>Loading published model validation, freshness and eFootball side-market evidence…</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="rp-workspace-roles">
+        <div class="rp-side-heading">
+          <span class="rp-section-kicker">WORKSPACE MAP</span>
+          <h2>Three separate jobs</h2>
+          <p>Research, track record and explanation share navigation—not a single qualification gate.</p>
+        </div>
+        <article class="rp-role-card rp-role-lab">
+          <span>01 / INVESTIGATE</span><h3>Virtual Lab</h3>
+          <p>Observe virtual products, track participants and evaluate out-of-sample evidence.</p>
+          <a href="./virtual-lab/">Enter the Lab →</a>
+        </article>
+        <article class="rp-role-card rp-role-reports">
+          <span>02 / MEASURE</span><h3>Reports</h3>
+          <p>Review recorded outcomes, published accuracy and sport-specific artifacts.</p>
+          <a href="#report-scoreboard">View scoreboard →</a>
+        </article>
+        <article class="rp-role-card rp-role-analyst">
+          <span>03 / EXPLAIN</span><h3>AI Analyst</h3>
+          <p>Ask evidence-grounded questions without silently changing any model or market gate.</p>
+          <a href="./analyst.html">Open Analyst →</a>
+        </article>
+      </section>
+    </aside>
   </div>
-</section>
-<section id="researchLabSummary" class="ws-research-overview" aria-live="polite"><div class="ws-overview-head"><div><div class="ws-overview-eyebrow">Research &amp; Intelligence</div><h3>Virtual Lab status</h3><p>Loading published model validation, freshness and eFootball side-market evidence…</p></div></div></section><section class="ms-metrics"><div class="ms-metric"><small>Settled picks</small><strong id="settled">—</strong></div><div class="ms-metric"><small>Accuracy</small><strong id="accuracy">—</strong></div><div class="ms-metric"><small>Brier score</small><strong id="brier">—</strong></div></section><section class="ms-panel"><div class="ms-panel-head"><h2>Sport reports</h2><span class="ms-status"><i class="ms-dot"></i> Read-only analytics</span></div><div id="reportGrid" class="ms-grid"><div class="ms-empty">Loading reports…</div></div></section><section class="ms-panel"><div class="ms-panel-head"><h2>System boundary</h2></div><p class="ms-note">The report layer preserves the distinction between historical results, model predictions, market snapshots and research-only experiments. No historical dataset is migrated into the new navigation layer.</p></section></div><script src="./workspace-ui.js?v=20261011-logo-qualified-fix1"></script><script src="./sport-hubs.js?v=20261013-qualified-best-kickoff-sort1"></script></body></html>
+
+  <footer class="rp-page-footer">
+    <span>Match Signal · Reports workspace</span>
+    <span>Published artifacts · Research stays isolated until validation earns promotion</span>
+  </footer>
+</div>
+<script src="./workspace-ui.js?v=20261011-logo-qualified-fix1"></script><script src="./sport-hubs.js?v=20261013-qualified-best-kickoff-sort1"></script></body></html>
+</body>
+</html>
