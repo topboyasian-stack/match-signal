@@ -63,7 +63,7 @@ CLUB_CLUE_RE = re.compile(
     r"\b(?:f\.c\.|a\.f\.c\.|c\.f\.|s\.c\.|a\.c\.)\b",
     re.I,
 )
-SEARCH_POLICY_VERSION = 7
+SEARCH_POLICY_VERSION = 8
 ALIASES = {
     # National teams and common club/provider-name variants.
     "france": ("France national football team", "France national soccer team"),
@@ -128,12 +128,15 @@ ALIASES = {
     "bayern munchen": ("Bayern Munich", "FC Bayern Munich"),
     "barca": ("Barcelona", "FC Barcelona", "Barcelona FC"),
     "barcelona": ("FC Barcelona", "Barcelona FC", "Barca"),
-    "psg": ("Paris Saint-Germain", "Paris Saint-Germain FC"),
-    "paris sg": ("Paris Saint-Germain", "PSG"),
+    "psg": ("Paris Saint-Germain", "Paris Saint-Germain FC", "Paris Saint Germain"),
+    "paris sg": ("Paris Saint-Germain", "Paris Saint Germain", "PSG"),
+    "paris saint germain": ("Paris SG", "Paris Saint-Germain FC", "PSG"),
+    "lille osc": ("LOSC Lille", "Lille", "Lille Olympique Sporting Club"),
     "juve": ("Juventus", "Juventus FC"),
     "juventus": ("Juventus FC",),
-    "inter": ("Inter Milan", "FC Internazionale Milano"),
-    "inter milan": ("Inter", "FC Internazionale Milano"),
+    "inter": ("Inter Milan", "FC Internazionale Milano", "FC Inter Milano"),
+    "inter milan": ("Inter", "FC Internazionale Milano", "FC Inter Milano"),
+    "inter milano": ("Inter Milan", "FC Internazionale Milano", "Inter"),
     "napoli": ("SSC Napoli", "Napoli FC"),
     "roma": ("AS Roma", "Roma FC"),
     "fiorentina": ("ACF Fiorentina", "Fiorentina FC"),
