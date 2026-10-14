@@ -211,6 +211,10 @@ export async function onRequestGet(context){
     const t0=Date.now();
     const endpoint='/api/ng/factsCenter/pcUpcomingEvents';
     let data=null,lastError=null,attempts=0;
+    // Distinguish a hard primary-endpoint failure from a valid empty feed.
+    // If the alternate endpoint also returns no events after HTML/HTTP failure,
+    // the bounded recent-snapshot fallback may run; valid empty responses alone never trigger it.
+    let primaryHardFailure=false;
     // SportyBet can return an HTML error/challenge page with HTTP 200, or a
     // temporarily empty JSON page. Retry the normal upcoming endpoint first.
     for(let attempt=1;attempt<=2;attempt++){
@@ -220,12 +224,14 @@ export async function onRequestGet(context){
           sportId,marketId:'1,18,10,29,11,26,36,14,60100,186,189,202,204,210',
           pageSize,pageNum,todayGames:'false',timeline,_t:Date.now()
         });
+        primaryHardFailure=false; // Parsed provider responses, including valid empty pages, are not hard transport/format failures.
         const count=tournaments(candidate).reduce((sum,t)=>sum+(Array.isArray(t?.events)?t.events.length:0),0);
         data=candidate;
         if(count>0){lastError=null;break;}
         lastError='upstream upcoming feed returned no tournaments/events';
       }catch(e){
         lastError=String(e.message||e||'upstream upcoming feed failed');
+        primaryHardFailure=/returned (?:HTML|non-JSON) response| HTTP \\d{3}|bizCode \\d+|empty response/i.test(lastError);
       }
       if(attempt<2)await new Promise(resolve=>setTimeout(resolve,250));
     }
@@ -267,7 +273,11 @@ export async function onRequestGet(context){
         out.push(normalize(t,e,label,sportId)); n++;
       }
     }
-    const status=n?'LIVE':(data?'EMPTY':'ERROR');
+    // A valid empty response is not an outage. But if the final primary attempt
+    // failed at the transport/format layer, a blank alternate endpoint must not
+    // mask that failure as EMPTY: it should permit only the existing <15-minute
+    // last-good cache fallback, which preserves original quote timestamps.
+    const status=n?'LIVE':(primaryHardFailure?'ERROR':(data?'EMPTY':'ERROR'));
     sourceStatus[label]={
       status,events:n,attempts,retried:attempts>1,latency_ms:Date.now()-t0,
       endpoint:selectedEndpoint,primary_endpoint:endpoint,
