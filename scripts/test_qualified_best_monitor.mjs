@@ -10,6 +10,7 @@ assert.doesNotMatch(workflow, /\n  push:/, "the production browser monitor must 
 assert.match(workflow, /github\.event\.workflow_run\.conclusion == 'success'/, "failed deployments must not trigger a production monitor");
 assert.match(monitorSource, /QUALIFIED_BEST_MONITOR_WORKFLOW_FILE/, "the monitor must query the re-registered workflow path");
 assert.match(monitorSource, /run\.event === "schedule"/, "schedule-gap calculations must compare cron-triggered runs, not deployment-triggered runs");
+assert.match(monitorSource, /schedule_gap_enforced: eventName === "schedule"/, "only actual scheduled invocations should fail solely for an overdue cron; fallback browser checks should report the gap as a warning");
 assert.match(monitorSource, /PRODUCTION_CHECK_RECOVERED_AFTER_RETRY/, "a retry recovery must stay visible as a warning");
 
 
@@ -117,5 +118,23 @@ const noScheduleApi = classifyQualifiedBestMonitor({
 }, { nowMs: now });
 assert.equal(noScheduleApi.status, "healthy");
 assert.ok(noScheduleApi.warnings.includes("MONITOR_SCHEDULE_GAP_COULD_NOT_BE_VERIFIED"));
+
+const fallbackWithLateCron = classifyQualifiedBestMonitor({
+  ...healthyZero,
+  schedule_gap_status: "ok",
+  schedule_gap_minutes: 36,
+  schedule_gap_enforced: false
+}, { nowMs: now });
+assert.equal(fallbackWithLateCron.status, "healthy", "a healthy deployment/fallback browser check should not fail solely because the cron is overdue");
+assert.ok(fallbackWithLateCron.warnings.includes("MONITOR_SCHEDULE_GAP_EXCEEDED"), "the overdue schedule must remain visible as a warning");
+
+const scheduledInvocationWithLateCron = classifyQualifiedBestMonitor({
+  ...healthyZero,
+  schedule_gap_status: "ok",
+  schedule_gap_minutes: 36,
+  schedule_gap_enforced: true
+}, { nowMs: now });
+assert.equal(scheduledInvocationWithLateCron.status, "failed", "an actual scheduled invocation must still fail when cron-to-cron spacing exceeds the limit");
+assert.ok(scheduledInvocationWithLateCron.reasons.includes("MONITOR_SCHEDULE_GAP_EXCEEDED"));
 
 console.log("Qualified Best monitor tests passed: valid zero vs failed check, source freshness, fallback detection, exact quote verification freshness, browser exceptions, and schedule-gap alerting.");
