@@ -201,7 +201,7 @@ async function enqueue(node){
   await registryReady;
   if(!node.isConnected||node.dataset.wsMediaResolved==='true')return;
   if(kind==='team'){
-    const registryAliases={'inter milano':'inter milan','paris saint germain':'paris sg','paris saint germain fc':'paris sg','fc inter milano':'inter milan','stuttgart':'vfb stuttgart','vfb':'vfb stuttgart','leipzig':'rb leipzig','spurs':'tottenham hotspur','new':'newcastle united','che':'chelsea','mci':'manchester city','ast':'aston villa','bmu':'bayern munich','cry':'crystal palace'};
+    const registryAliases={'inter milano':'inter milan','paris saint germain':'paris sg','paris saint germain fc':'paris sg','fc inter milano':'inter milan','stuttgart':'vfb stuttgart','vfb':'vfb stuttgart','leipzig':'rb leipzig','spurs':'tottenham hotspur','new':'newcastle united','che':'chelsea','mci':'manchester city','ast':'aston villa','bmu':'bayern munich','cry':'crystal palace','bayer 04 leverkusen':'leverkusen','fenerbahce istanbul':'fenerbahce','olympique marseille':'marseille','bvb':'borussia dortmund','mun':'manchester united','ars':'arsenal','liv':'liverpool','lil':'lille','lev':'leverkusen','tot':'tottenham','tsg':'tsg 1899 hoffenheim'};
     const fixed=teamRegistry[registryAliases[n]||n];
     if(fixed&&fixed.path&&fixed.source_url){
       paint({nodes:[node]},{
