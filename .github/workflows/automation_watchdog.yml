@@ -220,12 +220,16 @@ jobs:
           monitor_schedule_fallback_needed = monitor_schedule_status in {'STALE', 'MISSING_SCHEDULED_RUN'}
           monitor_check_fallback_needed = monitor_last_age_minutes is None or monitor_last_age_minutes > 15
           if monitor_runs is not None and monitor_fallback_allowed and (monitor_schedule_fallback_needed or monitor_check_fallback_needed):
-              if active('qualified-best-watch.yml'):
-                  actions.append({'workflow':'qualified-best-watch.yml','action':'monitor_failsafe_dispatch','status':'suppressed_active_run','detail':'Monitor already queued or active.'})
-              elif monitor_dispatch_age_minutes is not None and monitor_dispatch_age_minutes < 10:
+              # Honour the fallback cooldown before checking active jobs. A deploy-triggered monitor
+              # often starts in parallel with this watchdog; when cron is missing, queue one explicit
+              # workflow_dispatch behind it instead of suppressing recovery just because it's active.
+              if monitor_dispatch_age_minutes is not None and monitor_dispatch_age_minutes < 10:
                   actions.append({'workflow':'qualified-best-watch.yml','action':'monitor_failsafe_dispatch','status':'suppressed_cooldown','detail':'A fallback monitor was dispatched '+str(monitor_dispatch_age_minutes)+' minute(s) ago; monitor fallback cooldown is 10 minutes.'})
+              elif active('qualified-best-watch.yml') and not monitor_schedule_fallback_needed:
+                  actions.append({'workflow':'qualified-best-watch.yml','action':'monitor_failsafe_dispatch','status':'suppressed_active_run','detail':'Monitor already queued or active and the scheduled cadence is not stale.'})
               else:
-                  detail = ('Scheduled monitor run is '+monitor_schedule_status+'; dispatching a fallback despite recent deployment checks.' if monitor_schedule_fallback_needed else 'No Qualified Best browser check in the last 15 minutes; fallback monitor dispatched.')
+                  active_note = ' A deployment-triggered monitor is active; the fallback is queued behind it.' if active('qualified-best-watch.yml') else ''
+                  detail = ('Scheduled monitor run is '+monitor_schedule_status+'; dispatching a fallback despite recent deployment checks.' if monitor_schedule_fallback_needed else 'No Qualified Best browser check in the last 15 minutes; fallback monitor dispatched.') + active_note
                   r = subprocess.run(['gh', 'workflow', 'run', 'qualified-best-watch.yml', '--ref', 'main'], text=True, capture_output=True)
                   actions.append({'workflow':'qualified-best-watch.yml','action':'monitor_failsafe_dispatch','status':'requested' if r.returncode == 0 else 'failed','detail':(r.stderr.strip() if r.returncode else detail)})
           if virtual_status_age > 1 and not active('virtual-lab-collector.yml'):
