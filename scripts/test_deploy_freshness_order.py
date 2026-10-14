@@ -68,11 +68,11 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
     def test_watchdog_schedule_is_rearmed_and_stale_board_self_heals_quickly(self):
         crons = workflow_schedule_crons(WATCHDOG_WORKFLOW)
         self.assertIn("1,11,21,31,41,51 * * * *", crons)
-        self.assertIn("if unified_age > 0.5 and not active('unified-upcoming.yml'):", WATCHDOG_WORKFLOW)
-        self.assertIn("'unified_upcoming_hours': 0.5", WATCHDOG_WORKFLOW)
+        self.assertIn("if unified_age > 0.2 and not active('unified-upcoming.yml'):", WATCHDOG_WORKFLOW)
+        self.assertIn("'unified_upcoming_hours': 0.2", WATCHDOG_WORKFLOW)
 
     def test_watchdog_has_event_driven_monitoring_and_bounded_failure_recovery(self):
-        self.assertIn('  workflow_run:\n    workflows:\n      - "Match Signal Unified Upcoming Board"\n      - "Deploy Match Signal to Cloudflare Pages"', WATCHDOG_WORKFLOW)
+        self.assertIn('  workflow_run:\n    workflows:\n      - "Match Signal Unified Upcoming Board"\n      - "Deploy Match Signal to Cloudflare Pages"\n      - "Match Signal Odds Ticket Tracker"', WATCHDOG_WORKFLOW)
         self.assertIn("github.event.workflow_run.conclusion != 'success'", WATCHDOG_WORKFLOW, "successful board completions should be checked after deployment, not before it")
         self.assertIn("if: github.event_name != 'workflow_run'\n        run: python -m pip install --upgrade requests", WATCHDOG_WORKFLOW, "event-driven health checks must not reinstall the feed-sync dependency")
         self.assertIn("if: github.event_name != 'workflow_run'", WATCHDOG_WORKFLOW)
@@ -87,7 +87,8 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn("monitor_dispatch_age_minutes < 10", WATCHDOG_WORKFLOW, "a stale/missing schedule should auto-repair even when a recent deployment-triggered check exists, but fallback dispatches need a cooldown")
         self.assertIn("elif active('qualified-best-production-watch.yml') and not monitor_schedule_fallback_needed:", WATCHDOG_WORKFLOW, "an active deploy-triggered monitor must not suppress fallback when cron is stale or missing")
         self.assertIn("A deployment-triggered monitor is active; the fallback is queued behind it.", WATCHDOG_WORKFLOW, "record that the fallback is queued behind the active deployment check")
-        self.assertIn("monitor_fallback_allowed = watchdog_event_name in {'schedule', 'workflow_dispatch', 'push'} or cloudflare_success_event", WATCHDOG_WORKFLOW)
+        self.assertIn("or cloudflare_success_event or tracker_signal_event", WATCHDOG_WORKFLOW)
+        self.assertIn("source_workflow_name == 'Match Signal Odds Ticket Tracker'", WATCHDOG_WORKFLOW)
         self.assertIn("and source_workflow_conclusion == 'success'", WATCHDOG_WORKFLOW, "the event-driven browser fallback must run only after Cloudflare deployment succeeds")
         self.assertIn("MISSING_SCHEDULED_RUN", WATCHDOG_WORKFLOW, "flag when a newly registered monitor workflow still has no scheduled invocation after its 15-minute startup grace")
         self.assertIn("actions/workflows/qualified-best-production-watch.yml", WATCHDOG_WORKFLOW, "derive the startup grace from the workflow registration date")
