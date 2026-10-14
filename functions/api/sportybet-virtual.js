@@ -17,7 +17,15 @@ async function upstream(path, params){
   const body=await r.text();
   if(!r.ok) throw new Error(path+' HTTP '+r.status+' '+body.slice(0,180));
   if(!body.trim()) throw new Error(path+' empty response');
-  const data=JSON.parse(body);
+  let data;
+  try{
+    data=JSON.parse(body);
+  }catch(error){
+    const contentType=r.headers.get('content-type')||'unknown content-type';
+    const sample=body.replace(/\s+/g,' ').slice(0,120);
+    const format=/text\/html/i.test(contentType)||/<(?:!doctype|html|head|body)\b/i.test(body.slice(0,300))?'HTML':'non-JSON';
+    throw new Error(path+' returned '+format+' response ('+contentType+'): '+sample);
+  }
   if(data?.bizCode!==undefined && data.bizCode!==10000) throw new Error(path+' bizCode '+data.bizCode);
   return data;
 }
@@ -151,8 +159,8 @@ export async function onRequestGet(context){
     const t0=Date.now();
     const endpoint='/api/ng/factsCenter/pcUpcomingEvents';
     let data=null,lastError=null,attempts=0;
-    // SportyBet occasionally answers HTTP 200 with an empty tournament array.
-    // An empty first response is transient until a retry confirms otherwise.
+    // SportyBet can return an HTML error/challenge page with HTTP 200, or a
+    // temporarily empty JSON page. Retry the normal upcoming endpoint first.
     for(let attempt=1;attempt<=2;attempt++){
       attempts=attempt;
       try{
@@ -169,6 +177,38 @@ export async function onRequestGet(context){
       }
       if(attempt<2)await new Promise(resolve=>setTimeout(resolve,250));
     }
+
+    const primaryError=lastError;
+    const primaryCount=tournaments(data).reduce((sum,t)=>sum+(Array.isArray(t?.events)?t.events.length:0),0);
+    let fallbackAttempted=false;
+    let fallbackUsed=false;
+    const fallbackEndpoint='/api/ng/factsCenter/wapConfigurableUpcomingEvents';
+    let selectedEndpoint=endpoint;
+    // Separate official SportyBet upcoming endpoint: use it only if the primary
+    // endpoint produced no events. No synthetic fixtures or cached odds are inserted.
+    if(primaryCount===0){
+      fallbackAttempted=true;
+      try{
+        const fallback=await upstream(fallbackEndpoint,{
+          sportId,pageSize,pageNum,todayGames:'false',timeline,_t:Date.now()
+        });
+        data=fallback;
+        const fallbackCount=tournaments(fallback).reduce((sum,t)=>sum+(Array.isArray(t?.events)?t.events.length:0),0);
+        if(fallbackCount>0){
+          fallbackUsed=true;
+          selectedEndpoint=fallbackEndpoint;
+          lastError=null;
+        }else{
+          lastError=[primaryError?'primary '+endpoint+' failed or was empty: '+primaryError:null,
+            'fallback '+fallbackEndpoint+' returned no tournaments/events'].filter(Boolean).join('; ');
+        }
+      }catch(e){
+        const fallbackError=String(e.message||e||'fallback upcoming feed failed');
+        lastError=[primaryError?'primary '+endpoint+' failed or was empty: '+primaryError:null,
+          'fallback '+fallbackEndpoint+' failed: '+fallbackError].filter(Boolean).join('; ');
+      }
+    }
+
     let n=0;
     for(const t of tournaments(data)){
       for(const e of (t.events||[])){
@@ -178,6 +218,8 @@ export async function onRequestGet(context){
     const status=n?'LIVE':(data?'EMPTY':'ERROR');
     sourceStatus[label]={
       status,events:n,attempts,retried:attempts>1,latency_ms:Date.now()-t0,
+      endpoint:selectedEndpoint,primary_endpoint:endpoint,
+      ...(fallbackAttempted?{fallback_attempted:true,fallback_used:fallbackUsed,fallback_endpoint:fallbackEndpoint}:{}),
       ...(n?{}:{error:String(lastError||'upstream upcoming feed returned no events')})
     };
     if(!n)errors.push(label+': '+String(lastError||'upstream upcoming feed returned no events'));
