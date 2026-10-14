@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Offline regression tests for permanent licensed club-logo discovery."""
 import unittest
+from pathlib import Path
 
 from scripts.sync_club_logos import (
     ALIASES,
@@ -159,6 +160,25 @@ class ClubLogoRegistryTests(unittest.TestCase):
             with self.subTest(key=key):
                 self.assertIn(alias, ALIASES[key])
         self.assertEqual(SEARCH_POLICY_VERSION, 9)
+
+    def test_ui_provider_aliases_point_to_verified_registry_keys(self):
+        ui = Path("workspace-ui.js").read_text()
+        expected = [
+            "'bayer 04 leverkusen':'leverkusen'",
+            "'fenerbahce istanbul':'fenerbahce'",
+            "'olympique marseille':'marseille'",
+            "'bvb':'borussia dortmund'",
+            "'mun':'manchester united'",
+            "'ars':'arsenal'",
+            "'liv':'liverpool'",
+            "'lil':'lille'",
+            "'lev':'leverkusen'",
+            "'tot':'tottenham'",
+            "'tsg':'tsg 1899 hoffenheim'",
+        ]
+        for alias in expected:
+            with self.subTest(alias=alias):
+                self.assertIn(alias, ui)
 
     def test_svg_dataset_selection_requires_one_exact_name_match(self):
         paths = [
