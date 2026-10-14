@@ -58,17 +58,14 @@ permissions:
   deployments: write
 
 # Production promotion guard: always deploy the latest main artifact set.
-concurrency:
-  # Versioned away from the stuck v2 run whose post-deploy quote-coverage step stopped responding.
-  # The old run has already deployed and passed page/asset smoke tests; fresh promotions use an independent group.
-  group: cloudflare-pages-v3
-  # Do not cancel a production promotion because another upstream workflow
-  # completed on the same main SHA. Each run checks out the latest main.
-  cancel-in-progress: false
-
+# Serialization lives on the eligible deploy job below, after its event condition,
+# so an irrelevant workflow_run that will be skipped cannot replace a pending deploy.
 jobs:
   deploy:
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    concurrency:
+      group: cloudflare-pages-v3
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
