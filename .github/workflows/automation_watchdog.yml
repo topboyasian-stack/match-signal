@@ -18,6 +18,7 @@ on:
       - "Match Signal Unified Upcoming Board"
       - "Deploy Match Signal to Cloudflare Pages"
       - "Match Signal Odds Ticket Tracker"
+      - "Match Signal Virtual Lab Live Sync"
     types: [completed]
   workflow_dispatch:
 
@@ -32,7 +33,7 @@ concurrency:
 jobs:
   watchdog:
     # Use successful Odds Ticket Tracker completions as an event-driven heartbeat when GitHub cron delivery stalls.
-    if: ${{ github.event_name != 'workflow_run' || (github.event.workflow_run.name == 'Match Signal Unified Upcoming Board' && github.event.workflow_run.conclusion != 'success') || github.event.workflow_run.name == 'Deploy Match Signal to Cloudflare Pages' || (github.event.workflow_run.name == 'Match Signal Odds Ticket Tracker' && github.event.workflow_run.conclusion == 'success') }}
+    if: ${{ github.event_name != 'workflow_run' || (github.event.workflow_run.name == 'Match Signal Unified Upcoming Board' && github.event.workflow_run.conclusion != 'success') || github.event.workflow_run.name == 'Deploy Match Signal to Cloudflare Pages' || (github.event.workflow_run.name == 'Match Signal Odds Ticket Tracker' && github.event.workflow_run.conclusion == 'success') || (github.event.workflow_run.name == 'Match Signal Virtual Lab Live Sync' && github.event.workflow_run.conclusion == 'success') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -222,8 +223,8 @@ jobs:
               and source_workflow_name == 'Deploy Match Signal to Cloudflare Pages'
               and source_workflow_conclusion == 'success'
           )
-          tracker_signal_event = (watchdog_event_name == 'workflow_run' and source_workflow_name == 'Match Signal Odds Ticket Tracker' and source_workflow_conclusion == 'success')
-          monitor_fallback_allowed = watchdog_event_name in {'schedule', 'workflow_dispatch', 'push'} or cloudflare_success_event or tracker_signal_event
+          heartbeat_signal_event = (watchdog_event_name == 'workflow_run' and source_workflow_name in {'Match Signal Odds Ticket Tracker', 'Match Signal Virtual Lab Live Sync'} and source_workflow_conclusion == 'success')
+          monitor_fallback_allowed = watchdog_event_name in {'schedule', 'workflow_dispatch', 'push'} or cloudflare_success_event or heartbeat_signal_event
           monitor_schedule_fallback_needed = monitor_schedule_status in {'STALE', 'MISSING_SCHEDULED_RUN'}
           monitor_check_fallback_needed = monitor_last_age_minutes is None or monitor_last_age_minutes > 15
           if monitor_runs is not None and monitor_fallback_allowed and (monitor_schedule_fallback_needed or monitor_check_fallback_needed):
