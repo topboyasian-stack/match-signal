@@ -319,10 +319,14 @@ jobs:
           for (let attempt = 1; attempt <= 6; attempt++) {
             const observations = await Promise.all(workspaceContracts.map(async contract => {
               try {
-                const result = await get(contract.path);
-                const ready = result.r.ok && contract.markers.every(marker => result.body.includes(marker));
-                return {contract, result, ready};
-              } catch(e) { return {contract, result:null, ready:false, error:String(e.message||e)}; }
+                const [{r:pageResponse,body:pageBody},{r:cssResponse,body:cssBody}] = await Promise.all([
+                  getFrom(base, contract.path),
+                  getFrom(base, contract.css)
+                ]);
+                const pageReady = pageResponse.ok && contract.markers.every(marker => pageBody.includes(marker));
+                const cssReady = cssResponse.ok && cssBody.includes(contract.cssMarker);
+                return {contract, result:{r:pageResponse,body:pageBody}, ready:pageReady && cssReady, pageReady, cssReady};
+              } catch(e) { return {contract, result:null, ready:false, pageReady:false, cssReady:false, error:String(e.message||e)}; }
             }));
             if (observations.every(x => x.ready)) {
               for (const x of observations) workspaceSnapshots.set(x.contract.path, x.result);
@@ -330,7 +334,7 @@ jobs:
               console.log('Cloudflare production hostname serves all six redesigned Desk/workspace pages (attempt '+attempt+').');
               break;
             }
-            const stale = observations.filter(x => !x.ready).map(x => x.contract.path).join(', ');
+            const stale = observations.filter(x => !x.ready).map(x => x.contract.path + (!x.pageReady ? ' (page marker missing)' : '') + (!x.cssReady ? ' (CSS marker missing: '+x.contract.css+')' : '')).join(', ');
             console.log('Cloudflare production hostname is not on the redesigned Desk/workspace UI yet (attempt '+attempt+'/6): '+stale);
             if (attempt < 6) await new Promise(resolve => setTimeout(resolve, 8000));
           }
