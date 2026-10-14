@@ -1,51 +1,16 @@
-name: Deploy Match Signal to GitHub Pages
+name: Retire legacy GitHub Pages mirror (Cloudflare redirect only)
 
 on:
+  # Publish the redirect once when this retirement workflow changes on main.
+  # Do not rebuild the old mirror when sports data or other workflows update.
   push:
     branches: [main]
     paths:
-      - 'index.html'
-      - 'expansion.html'
-      - 'performance.html'
-      - 'basketball.html'
-      - 'tennis.html'
-      - 'darts.html'
-      - 'darts-app.js'
-      - 'darts.css'
-      - 'table-tennis.html'
-      - 'table-tennis-app.js'
-      - 'table-tennis.css'
-      - 'live.html'
-      - 'research.html'
-      - 'workspace-ui.css'
-      - 'workspace-ui.js'
-      - 'virtual-lab/**'
-      - 'live-analysis.js'
-      - 'live-data-worker.js'
-      - 'live-timer.js'
-      - 'metrics-fix.js'
-      - 'data/**'
       - '.github/workflows/deploy-pages.yml'
-      - '.github/workflows/tennis_pipeline.yml'
-      - 'scripts/virtual_lab_sync.py'
-      - '.github/workflows/virtual-lab-sync.yml'
-      - 'assets/club-logos/**'
-      - 'data/club-logo-registry.json'
-      - '.github/workflows/sync-club-logos.yml'
-  workflow_run:
-    workflows:
-      - "Match Signal Autopilot Refresh"
-      - "Match Signal Live Expansion"
-      - "Match Signal Post-Pipeline Live Feed Reconcile"
-      - "Match Signal Saudi Pro League Live Experimental"
-      - "Match Signal Odds Builder"
-      - "Match Signal Virtual Lab Live Sync"
-      - "Match Signal Persistent Club Logo Registry"
-    types: [completed]
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
   pages: write
   id-token: write
 
@@ -53,146 +18,86 @@ concurrency:
   group: github-pages
   cancel-in-progress: true
 
-env:
-  MATCH_SIGNAL_DEPLOY_REV: "2026-09-15-live-coverage-v3"
-
 jobs:
-  deploy:
-    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+  redirect:
     runs-on: ubuntu-latest
+    timeout-minutes: 6
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Checkout latest main
-        uses: actions/checkout@v6
+      - name: Check out the retirement workflow source
+        uses: actions/checkout@v4
         with:
           ref: main
-      - name: Setup Pages
+
+      - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
-      - name: Verify site entrypoint and data
-        run: |
-          test -s index.html
-          test -s expansion.html
-          test -s basketball.html
-          test -s darts.html
-          test -s table-tennis.html
-          test -s performance.html
-          test -s live.html
-          test -s research.html
-          test -s live-analysis.js
-          test -s live-data-worker.js
-          test -s virtual-lab.js
-          test -s virtual-lab.css
-          test -s workspace-ui.css
-          test -s workspace-ui.js
-          test -s data/predictions.json
-          test -s data/virtual_lab_live.json
-          test -s data/virtual_lab_participant_lifecycle.json
-          node --check workspace-ui.js
-          python -m py_compile scripts/darts_pipeline.py scripts/table_tennis_pipeline.py
-          python - <<'PY'
-          import json
-          from pathlib import Path
-          lifecycle=json.loads(Path('data/virtual_lab_participant_lifecycle.json').read_text())
-          assert lifecycle.get('discovery_mode')=='feed_driven', 'participant lifecycle is not feed-driven'
-          assert int(lifecycle.get('active_count',0))+int(lifecycle.get('live_count',0))+int(lifecycle.get('upcoming_count',0))>0, 'participant lifecycle has no active identities'
-          rows=json.loads(Path('data/predictions.json').read_text())
-          assert isinstance(rows,list) and rows, 'prediction feed is empty'
-          leagues=sorted({str(r.get('league')) for r in rows if r.get('league')})
-          print(f'Prediction rows: {len(rows)}')
-          print(f'Leagues: {leagues}')
-          assert any(r.get('sport')=='football' for r in rows), 'no football rows in deploy artifact'
-          assert any(r.get('sport')=='tennis' for r in rows), 'no tennis rows in deploy artifact'
-          PY
-          echo "Live page present: $(wc -c < live.html) bytes"
-          echo "Prediction feed present: $(wc -c < data/predictions.json) bytes"
-          echo "Virtual Lab live snapshot present: $(wc -c < data/virtual_lab_live.json) bytes"
-          python - <<'PY'
-          import json
-          from pathlib import Path
-          d=json.loads(Path('data/virtual_lab_live.json').read_text())
-          assert d.get('status') == 'LIVE', f"virtual lab snapshot status={d.get('status')}"
-          assert int(d.get('events_count',0)) > 0, "virtual lab snapshot is empty"
-          print(f"Virtual Lab snapshot: {d.get('events_count')} events / {d.get('product_counts')}")
-          PY
-      - name: Upload site artifact
-        uses: actions/upload-pages-artifact@v4
-        with:
-          path: '.'
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
 
-      - name: Smoke test live Virtual Lab source and deployed page
-        timeout-minutes: 3
-        run: |
-          node --input-type=module <<'NODE'
-          for (const [page,markers] of [
-            ['/darts.html',['Darts-X','darts-app.js']],
-            ['/table-tennis.html',['Table Tennis-X','table-tennis-app.js']]
-          ]) {
-            const p=await fetch('https://match-signal.pages.dev'+page+'?smoke='+Date.now(),{cache:'no-store'});
-            const b=await p.text();
-            if(!p.ok) throw new Error('Cloudflare '+page+' HTTP '+p.status);
-            for(const m of markers) if(!b.includes(m)) throw new Error('Cloudflare '+page+' missing '+m);
-          }
-          for (const apiPath of ['/api/sportybet-darts','/api/sportybet-table-tennis']) {
-            const p=await fetch('https://match-signal.pages.dev'+apiPath+'?pageSize=5&pageNum=1&timeline=24&_t='+Date.now(),{cache:'no-store'});
-            if(!p.ok) throw new Error('Cloudflare '+apiPath+' HTTP '+p.status);
-            const body=await p.json();
-            if(body?.ok!==true) throw new Error(apiPath+' returned ok!=true');
-          }
-          const api='https://match-signal.pages.dev/api/sportybet-virtual';
-          const qs=new URLSearchParams({
-            pageSize:'100',
-            pageNum:'1',
-            timeline:'168',
-            sources:'efootball,vfootball',
-            _t:String(Date.now())
-          });
-          const apiResponse=await fetch(api+'?'+qs.toString(),{cache:'no-store'});
-          if(!apiResponse.ok) throw new Error('Cloudflare virtual proxy HTTP '+apiResponse.status);
-          const payload=await apiResponse.json();
-          const virtual=Array.isArray(payload?.events)?payload.events:[];
-          if(payload?.ok!==true) throw new Error('Cloudflare virtual proxy did not return ok=true');
-          if(!virtual.length) throw new Error('Cloudflare virtual proxy returned no virtual/eFootball/SRL events');
-          console.log('Cloudflare live source OK:',virtual.length,'events:',payload.product_counts||{});
-          const page=await fetch('https://topboyasian-stack.github.io/match-signal/virtual-lab/?smoke='+Date.now(),{cache:'no-store'});
-          const body=await page.text();
-          if(!page.ok) throw new Error('GitHub Pages Virtual Lab HTTP '+page.status);
-          for(const marker of ['Virtual Lab','liveGrid','virtual-lab-app.js','predictionDesk']) if(!body.includes(marker)) throw new Error('GitHub Pages research page missing '+marker);
-          console.log('GitHub Pages Virtual Lab page OK');
-          NODE
-
-      - name: Record GitHub Pages production verification
+      - name: Prepare redirect-only artifact
         shell: bash
         run: |
           set -euo pipefail
-          for attempt in 1 2 3 4 5; do
-            git fetch origin main
-            git reset --hard origin/main
-            python - <<'PY'
-          import json, os
-          from datetime import datetime, timezone
-          from pathlib import Path
-          Path('DEPLOY-VERIFY-GITHUB-PAGES.json').write_text(json.dumps({
-            'status':'VERIFIED',
-            'provider':'GitHub Pages',
-            'source_commit':os.environ.get('GITHUB_SHA'),
-            'verified_at':datetime.now(timezone.utc).isoformat(),
-            'checks':['core_pages','research_virtual_lab','live_virtual_proxy','virtual_lab_live_snapshot','precision_sports_pages']
-          },indent=2)+'\n')
-          PY
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add DEPLOY-VERIFY-GITHUB-PAGES.json
-            git commit -m "✅ Record GitHub Pages production verification" || true
-            if git push origin main; then
-              echo "GitHub Pages verification recorded on attempt \${attempt}."
-              exit 0
-            fi
-            sleep $((attempt * 2))
-          done
-          echo "Could not publish GitHub Pages verification after retries."
-          exit 1
+          mkdir -p public
+          cat > public/index.html <<'HTML'
+          <!doctype html>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <meta name="robots" content="noindex">
+            <title>Match Signal has moved</title>
+          </head>
+          <body>
+            <p>Match Signal has moved to <a id="destination" href="https://match-signal.pages.dev/">Cloudflare Pages</a>.</p>
+            <script>
+              (() => {
+                const path = window.location.pathname.replace(/^\/match-signal(?=\/|$)/, "") || "/";
+                const target = new URL(path + window.location.search + window.location.hash, "https://match-signal.pages.dev/");
+                document.getElementById("destination").href = target.href;
+                window.location.replace(target.href);
+              })();
+            </script>
+          </body>
+          </html>
+          HTML
+          cp public/index.html public/404.html
+          test -s public/index.html
+          test -s public/404.html
+          test "$(find public -maxdepth 1 -type f | wc -l)" -eq 2
+          grep -q 'https://match-signal.pages.dev/' public/index.html
+          grep -q 'location.replace' public/index.html
+          echo "Prepared exactly two redirect documents; no application or data assets are published to GitHub Pages."
+
+      - name: Upload redirect-only Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: public
+
+      - name: Deploy the legacy URL redirect
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Verify legacy URLs now point to Cloudflare
+        timeout-minutes: 2
+        run: |
+          node --input-type=module <<'NODE'
+          const base = 'https://topboyasian-stack.github.io/match-signal';
+          for (const route of ['/', '/qualified-best.html', '/research.html']) {
+            let passed = false;
+            let last = '';
+            for (let attempt = 0; attempt < 12; attempt++) {
+              const url = base + route + '?redirect_check=' + Date.now() + '_' + attempt;
+              const response = await fetch(url, { cache: 'no-store' });
+              const body = await response.text();
+              last = 'HTTP ' + response.status + ', bytes=' + body.length;
+              if (body.includes('https://match-signal.pages.dev/') && body.includes('location.replace')) {
+                passed = true;
+                console.log('Legacy redirect verified:', route, last);
+                break;
+              }
+              await new Promise(resolve => setTimeout(resolve, 5000));
+            }
+            if (!passed) throw new Error('Legacy GitHub Pages route did not serve the Cloudflare redirect: ' + route + ' (' + last + ')');
+          }
+          NODE
