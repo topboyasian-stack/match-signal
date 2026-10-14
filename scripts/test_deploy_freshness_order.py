@@ -115,6 +115,8 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "scripts/qualified_best_monitor.mjs",
             "scripts/test_qualified_best_monitor.mjs",
             ".github/workflows/qualified-best-watch.yml",
+            ".github/workflows/qualified-best-live-monitor.yml",  # historical delete path for this schedule migration
+            ".github/workflows/unified-upcoming.yml",
         ):
             self.assertIn(allowed_path, PAGES_WORKFLOW)
 
