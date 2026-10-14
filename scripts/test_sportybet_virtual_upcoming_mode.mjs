@@ -172,6 +172,27 @@ assert.equal(cachedAfterHtmlFailure.payload.source_status.efootball.status, "CAC
 assert.equal(cachedAfterHtmlFailure.payload.errors.length, 0);
 assert.match(cachedAfterHtmlFailure.payload.cache_fallback_reason, /returned HTML response/);
 
+const cachedAfterHtmlThenEmptyFallback = await runQuery(
+  cacheQuery,
+  [htmlError, htmlError, emptyFeed],
+  responseCache
+);
+assert.equal(cachedAfterHtmlThenEmptyFallback.payload.status, "LIVE",
+  "a hard primary HTML failure must remain an error when the alternate endpoint returns an empty response, allowing only a still-fresh last-good snapshot to bridge the outage");
+assert.equal(cachedAfterHtmlThenEmptyFallback.payload.cache_fallback_used, true,
+  "a failed primary endpoint plus an empty alternate endpoint must use a recent cached provider snapshot");
+assert.equal(cachedAfterHtmlThenEmptyFallback.payload.updated_at, originalObservationTime,
+  "the mixed-failure recovery must preserve the real observation timestamp");
+assert.equal(cachedAfterHtmlThenEmptyFallback.payload.source_status.efootball.status, "CACHED");
+assert.equal(cachedAfterHtmlThenEmptyFallback.payload.events.length, 1,
+  "mixed upstream failure recovery must reuse only the previously observed event");
+
+const emptyWithAvailableCache = await runQuery(cacheQuery, [emptyFeed], responseCache);
+assert.equal(emptyWithAvailableCache.payload.source_status.efootball.status, "EMPTY",
+  "genuinely valid empty primary and alternate responses remain classified as EMPTY");
+assert.notEqual(emptyWithAvailableCache.payload.cache_fallback_used, true,
+  "valid empty provider responses alone must never resurrect cached events");
+
 const expiredResponseCache = createResponseCache();
 await runQuery(cacheQuery, [feed], expiredResponseCache);
 const [cachedKey, cachedResponse] = [...expiredResponseCache.entries.entries()][0];
