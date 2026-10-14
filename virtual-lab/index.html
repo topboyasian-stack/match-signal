@@ -4,15 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="match-signal-owner" content="Diddy">
-<meta name="match-signal-build" content="MS-VIRTUAL-LAB-V1-2026.10.14-TERMINAL2">
+<meta name="match-signal-build" content="MS-VIRTUAL-LAB-V1-2026.10.14-V3">
 <meta name="match-signal-engine-build" content="VL-V1-20260924-EFDIST">
 <link rel="canonical" href="/virtual-lab/">
 <title>Virtual Lab — Match Signal</title>
 <link rel="stylesheet" href="./../virtual-lab.css?v=20261011-redesign2"><link rel="stylesheet" href="../workspace-ui.css?v=20261011-workspace-media5">
-<style>.hotParticipantTag{display:inline-block;margin-right:8px;padding:3px 7px;border-radius:999px;font-size:.72rem;font-weight:800;letter-spacing:.04em;background:#ffedd5;color:#9a3412}.hotParticipantTag + span{margin-left:2px}.confirmedWatchTag{display:inline-block;margin-right:6px;padding:3px 7px;border-radius:999px;font-size:.7rem;font-weight:900;letter-spacing:.04em;background:#dcfce7;color:#166534}.confirmedWatchPanel{margin-bottom:14px;padding:14px;border:1px solid rgba(55,231,255,.24);border-radius:12px;background:linear-gradient(145deg,#0b141e,#091019);color:var(--text)}.confirmedWatchPanel>div:first-child{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}.confirmedWatchPanel>div:first-child span{color:var(--muted);font-size:.82rem}.confirmedWatchList{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}.confirmedWatchItem{padding:5px 8px;border-radius:999px;background:#0a121b;border:1px solid var(--border);color:var(--text);font-size:.78rem}</style><link rel="stylesheet" href="../virtual-lab-terminal.css?v=20261014-terminal2"><link rel="icon" type="image/png" sizes="96x96" href="../favicon.png"></head>
-<body data-page="virtual-lab"><div id="workspace-nav" data-active="lab"></div>
-<div class="shell">
-  <header class="hero">
+<style>.hotParticipantTag{display:inline-block;margin-right:8px;padding:3px 7px;border-radius:999px;font-size:.72rem;font-weight:800;letter-spacing:.04em;background:#ffedd5;color:#9a3412}.hotParticipantTag + span{margin-left:2px}.confirmedWatchTag{display:inline-block;margin-right:6px;padding:3px 7px;border-radius:999px;font-size:.7rem;font-weight:900;letter-spacing:.04em;background:#dcfce7;color:#166534}.confirmedWatchPanel{margin-bottom:14px;padding:14px;border:1px solid rgba(55,231,255,.24);border-radius:12px;background:linear-gradient(145deg,#0b141e,#091019);color:var(--text)}.confirmedWatchPanel>div:first-child{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}.confirmedWatchPanel>div:first-child span{color:var(--muted);font-size:.82rem}.confirmedWatchList{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}.confirmedWatchItem{padding:5px 8px;border-radius:999px;background:#0a121b;border:1px solid var(--border);color:var(--text);font-size:.78rem}</style><link rel="stylesheet" href="../virtual-lab-terminal.css?v=20261014-full-v3"><link rel="icon" type="image/png" sizes="96x96" href="../favicon.png"></head>
+<body data-page="virtual-lab">
+<div id="workspace-nav" data-active="lab"></div>
+<div class="shell vl-shell">
+  <header class="hero vl-page-hero">
     <div>
       <div class="eyebrow">INDEPENDENT RESEARCH ENVIRONMENT</div>
       <h1>Virtual Lab</h1>
@@ -25,7 +26,6 @@
       <span>Build: MS-VIRTUAL-LAB-V1-2026.10.13-TERMINAL1 · LIVE FEED v1 · Product-scoped participant research engine</span>
     </div>
   </header>
-
   <section class="ws-research-overview ws-lab-priority" aria-labelledby="lab-priority-title">
     <div class="ws-overview-head">
       <div>
@@ -46,7 +46,6 @@
       <article class="ws-metric-card"><small>Execution boundary</small><strong>Paper only</strong><p>Read-only market data and research. No live betting automation.</p></article>
     </div>
   </section>
-
   <section class="labPulse">
     <div class="pulseMain">
       <div class="pulseLabel">LAB PULSE</div>
@@ -61,7 +60,6 @@
       <div class="pulseStat"><small>Model regime</small><b id="pulseModel">—</b></div>
     </div>
   </section>
-
   <nav class="labJump" aria-label="Virtual Lab sections">
     <button data-jump="#predictionDeskPanel">Predictions</button>
     <button data-jump="#oddsBuilder">Builder</button>
@@ -70,12 +68,9 @@
     <button data-jump="#labDiagnosticsPanel">Health</button>
   </nav>
 
-  <section class="notice">
-    <strong>Research boundary</strong>
-    <span>This lab analyzes legitimately observed/publicly available results and published market information. It does not bypass RNGs, bookmaker security, private endpoints, or account controls.</span>
-  </section>
-
-  <section class="panel livePanel">
+  <div class="vl-command-grid">
+    <main class="vl-command-main" aria-label="Current feed and paper selection workspace">
+      <section class="panel livePanel">
     <div class="panelHead">
       <h2>Upcoming SportyBet fixtures</h2>
       <span class="liveBadge">SPORTYBET NG · READ-ONLY</span>
@@ -94,8 +89,7 @@
     <div id="liveEmpty" class="liveEmpty empty" hidden>No current virtual/eFootball events were returned. The feed will retry automatically.</div>
     <div class="liveNote">eFootball is the default research view. VFootball and Zoom remain available as secondary observation lanes. Winner and GG/NG monitoring remains separate from validated Lab O/U eligibility.</div>
   </section>
-
-  <section class="panel predictionDeskPanel" id="predictionDeskPanel">
+      <section class="panel predictionDeskPanel" id="predictionDeskPanel">
     <div class="panelHead">
       <h2>Upcoming prediction desk</h2>
       <span class="deskActions"><b id="predictionCount">0</b> upcoming priced fixtures <button id="predictionRefresh" class="btn">↻ Refresh predictions</button> <button id="buildFromPredictions" class="btn primary">⚡ Build qualified picks</button></span>
@@ -104,8 +98,7 @@
     <div id="predictionDiagnostics" class="liveMeta">Not checked yet.</div>
     <div id="predictionDesk" class="predictionDesk"><div class="empty">Waiting for live upcoming fixtures…</div></div>
   </section>
-
-  <section class="panel nearQualifiedPanel" id="nearQualifiedPanel">
+      <section class="panel nearQualifiedPanel" id="nearQualifiedPanel">
     <div class="panelHead">
       <h2>Near-Qualified Radar</h2>
       <span><b id="nearQualifiedCount">0</b> monitored candidates · not promoted</span>
@@ -113,8 +106,7 @@
     <div class="radarIntro">The strongest upcoming raw-evidence candidates that are close to the research desk, but still blocked by a specific evidence/model condition. These cards never enter the Odds Builder until promotion is earned.</div>
     <div id="nearQualifiedRadar" class="nearQualifiedRadar"><div class="radarEmpty"><strong>Waiting for current evidence.</strong><span>Upcoming raw-evidence candidates will appear here after the live feed and model state load.</span></div></div>
   </section>
-
-  <section class="panel oddsBuilderPanel" id="oddsBuilder">
+      <section class="panel oddsBuilderPanel" id="oddsBuilder">
     <div class="panelHead">
       <h2>Odds Builder</h2>
       <span>2–4 legs · current prices</span>
@@ -128,8 +120,10 @@
     <div id="builderSummary" class="builderSummary"><span>0 legs</span></div>
     <div class="builderNote">The builder uses the live SportyBet price attached to each displayed prediction. It does not place a bet or guarantee an outcome.</div>
   </section>
-
-  <section class="panel controls">
+    </main>
+    <aside class="vl-command-rail" aria-label="Research controls and health">
+      <div class="vl-rail-heading"><span class="vl-section-kicker">CONTROL ROOM</span><h2>Research controls</h2><p>Change scope before comparing evidence. Product families are kept separate.</p></div>
+      <section class="panel controls">
     <div class="control">
       <label for="product">Product</label>
       <select id="product">
@@ -166,21 +160,29 @@
       <button id="clear" class="btn">Clear dataset</button>
     </div>
   </section>
-
-  <section class="panel historyPanel">
-    <div class="panelHead"><h2>Automatic research history</h2><span id="historyStatus">CONNECTING…</span></div>
-    <div id="historyMeta" class="liveNote">The Lab is loading its automatically collected settled observations.</div>
-  </section>
-
-  <section class="metrics">
+      <section class="metrics">
     <div class="metric"><small>Observed rounds</small><strong id="rounds">0</strong></div>
     <div class="metric"><small>Win rate</small><strong id="winRate">—</strong></div>
     <div class="metric"><small>OOS win rate</small><strong id="oosRate">—</strong></div>
     <div class="metric"><small>Paper ROI</small><strong id="roi">—</strong></div>
     <div class="metric"><small>Sequence delta</small><strong id="seqDelta">—</strong></div>
   </section>
+      <section class="panel historyPanel">
+    <div class="panelHead"><h2>Automatic research history</h2><span id="historyStatus">CONNECTING…</span></div>
+    <div id="historyMeta" class="liveNote">The Lab is loading its automatically collected settled observations.</div>
+  </section>
+      <section class="notice">
+    <strong>Research boundary</strong>
+    <span>This lab analyzes legitimately observed/publicly available results and published market information. It does not bypass RNGs, bookmaker security, private endpoints, or account controls.</span>
+  </section>
+    </aside>
+  </div>
 
-  <section class="grid2">
+  <div class="vl-insights-grid">
+    <main class="vl-insights-main" aria-label="Model evidence and diagnostics">
+      <section class="vl-analysis-section">
+        <div class="vl-analysis-heading"><span class="vl-section-kicker">EVIDENCE SUMMARY</span><h2>Product fingerprints &amp; signal gate</h2><p>These panels summarise the selected product scope and its current research boundary.</p></div>
+        <section class="grid2">
     <div class="panel">
       <div class="panelHead"><h2>Product fingerprint</h2><span id="fingerprintStatus">No data</span></div>
       <div id="fingerprint" class="tableWrap empty">Load an observed dataset to compare product families.</div>
@@ -193,8 +195,10 @@
       </div>
     </div>
   </section>
-
-  <section class="grid2">
+      </section>
+      <section class="vl-analysis-section">
+        <div class="vl-analysis-heading"><span class="vl-section-kicker">VALIDATION</span><h2>Sequence checks &amp; unseen results</h2><p>Exploration and out-of-sample evidence must remain separate.</p></div>
+        <section class="grid2">
     <div class="panel">
       <div class="panelHead"><h2>Sequence / dependence tests</h2><span>Lag-1</span></div>
       <div id="sequence" class="tableWrap empty">Waiting for data.</div>
@@ -204,20 +208,17 @@
       <div id="oos" class="tableWrap empty">Waiting for data.</div>
     </div>
   </section>
-
-  <section class="panel">
-    <div class="panelHead"><h2>How to use the Lab / what to select</h2><span>Prediction → builder</span></div>
-    <div class="guideGrid">
-      <div><b>1 — Pick the exact product</b><p>Match the bookmaker screen to GT eFootball, eAdriatic, Virtual Football or Zoom/Turbo. Never mix their statistics.</p></div>
-      <div><b>2 — Pick one market</b><p>Use the exact market and line shown by the bookmaker. A signal for 1X2 is not a signal for a different market or total line.</p></div>
-      <div><b>3 — Wait for a research-qualified candidate</b><p>The engine must have enough settled history, an untouched test period, stable results and positive paper economics. Raw win rate alone never qualifies.</p></div>
-      <div><b>4 — Match today's price</b><p>A historical signal can disappear at a worse price. Current odds must satisfy the candidate's validated price condition.</p></div>
-      <div><b>5 — Select only the displayed candidate</b><p>When the Lab shows <strong>RESEARCH-QUALIFIED</strong>, the card identifies the exact product, market and selection. Otherwise the instruction is <strong>NO SIGNAL</strong>.</p></div>
-      <div><b>6 — One daily paper signal</b><p>The workflow is capped at one paper signal per day. There is no automatic wagering or forced selection.</p></div>
-    </div>
+      </section>
+      <section class="panel participantDeskPanel" id="participantLabPanel">
+    <div class="panelHead"><h2>Participant / player-team recurrence desk</h2><span>Exact-line evidence · time-safe</span></div>
+    <div id="participantLab" class="vl-participant-host"> <div class="empty">Loading recurring participant evidence…</div></div>
   </section>
-
-  <section class="panel">
+      <section class="panel" id="modelLabPanel">
+    <div class="panelHead"><h2>Product-specific O/U model</h2><span>Walk-forward scoring</span></div>
+    <div id="modelLab"><div class="empty">Loading line-ladder model evaluation…</div></div>
+  </section>
+      <section class="panel" id="labDiagnosticsPanel"><div class="panelHead"><h2>Lab trace / health</h2><span>V1 pipeline</span></div><div id="labDiagnostics" class="labDiagnostics"><div class="empty">Waiting for the Virtual Lab v1 renderer…</div></div></section>
+      <section class="panel">
     <div class="panelHead"><h2>Candidate strategy laboratory</h2><span>Discovery → freeze → unseen test</span></div>
     <div class="strategy">
       <div class="strategyCard">
@@ -229,25 +230,24 @@
       <div id="strategyResult" class="strategyResult empty">No strategy test has been run.</div>
     </div>
   </section>
-
-  <section class="panel" id="labDiagnosticsPanel"><div class="panelHead"><h2>Lab trace / health</h2><span>V1 pipeline</span></div><div id="labDiagnostics" class="labDiagnostics"><div class="empty">Waiting for the Virtual Lab v1 renderer…</div></div></section>
-
-  <section class="panel participantDeskPanel" id="participantLabPanel" style="background:#0b141e !important;color:#eef7fb !important;border:1px solid #26384a !important;overflow:visible !important;content-visibility:visible !important;">
-    <div class="panelHead"><h2>Participant / player-team recurrence desk</h2><span>Exact-line evidence · time-safe</span></div>
-    <div id="participantLab" style="display:block !important;visibility:visible !important;opacity:1 !important;background:#091019 !important;color:#eef7fb !important;min-height:120px;border-radius:12px;"> <div class="empty" style="background:#091019 !important;color:#8ea2b5 !important;">Loading recurring participant evidence…</div></div>
-  </section>
-
-  <section class="panel" id="modelLabPanel">
-    <div class="panelHead"><h2>Product-specific O/U model</h2><span>Walk-forward scoring</span></div>
-    <div id="modelLab"><div class="empty">Loading line-ladder model evaluation…</div></div>
-  </section>
-
-  <section class="panel">
+    </main>
+    <aside class="vl-insights-side" aria-label="Research decision and guidance">
+      <section class="panel">
     <div class="panelHead"><h2>Research conclusion</h2><span>Do not force a pick</span></div>
     <div id="researchConclusion" class="conclusion empty">Load data to generate a selection instruction.</div>
   </section>
-
-  <section class="panel">
+      <section class="panel">
+    <div class="panelHead"><h2>How to use the Lab / what to select</h2><span>Prediction → builder</span></div>
+    <div class="guideGrid">
+      <div><b>1 — Pick the exact product</b><p>Match the bookmaker screen to GT eFootball, eAdriatic, Virtual Football or Zoom/Turbo. Never mix their statistics.</p></div>
+      <div><b>2 — Pick one market</b><p>Use the exact market and line shown by the bookmaker. A signal for 1X2 is not a signal for a different market or total line.</p></div>
+      <div><b>3 — Wait for a research-qualified candidate</b><p>The engine must have enough settled history, an untouched test period, stable results and positive paper economics. Raw win rate alone never qualifies.</p></div>
+      <div><b>4 — Match today's price</b><p>A historical signal can disappear at a worse price. Current odds must satisfy the candidate's validated price condition.</p></div>
+      <div><b>5 — Select only the displayed candidate</b><p>When the Lab shows <strong>RESEARCH-QUALIFIED</strong>, the card identifies the exact product, market and selection. Otherwise the instruction is <strong>NO SIGNAL</strong>.</p></div>
+      <div><b>6 — One daily paper signal</b><p>The workflow is capped at one paper signal per day. There is no automatic wagering or forced selection.</p></div>
+    </div>
+  </section>
+      <section class="panel">
     <div class="panelHead"><h2>Dataset contract</h2><span>Real-data only</span></div>
     <details>
       <summary>Required fields</summary>
@@ -255,6 +255,8 @@
       <p class="muted">For reliable settlement, each row should represent a completed event/market observation and carry the actual outcome. Do not mix discovery and test data manually.</p>
     </details>
   </section>
+    </aside>
+  </div>
 
   <footer>
     <div><strong>Match Signal Virtual Lab</strong> · Public owner: Diddy · © 2026 Diddy. All rights reserved.</div>
