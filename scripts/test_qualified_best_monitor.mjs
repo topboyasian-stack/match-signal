@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { classifyQualifiedBestMonitor } from "./qualified_best_monitor_lib.mjs";
 
-const workflow = await readFile(new URL("../.github/workflows/qualified-best-live-monitor.yml", import.meta.url), "utf8");
+const workflow = await readFile(new URL("../.github/workflows/qualified-best-watch.yml", import.meta.url), "utf8");
 const monitorSource = await readFile(new URL("./qualified_best_monitor.mjs", import.meta.url), "utf8");
-assert.ok(workflow.includes("cron: '2,7,12,17,22,27,32,37,42,47,52,57 * * * *'"), "the independent monitor checks production at explicit five-minute intervals, staggered away from minute zero");
+assert.ok(workflow.includes("cron: '3,13,23,33,43,53 * * * *'"), "the re-armed monitor checks production at ten-minute intervals, inside the 15-minute quote gate");
 assert.match(workflow, /workflow_run:[\s\S]*?workflows:\s*\n\s*- "Deploy Match Signal to Cloudflare Pages"/, "production monitoring starts after the Cloudflare deploy workflow");
 assert.doesNotMatch(workflow, /\n  push:/, "the production browser monitor must not race the Cloudflare deployment on main pushes");
 assert.match(workflow, /github\.event\.workflow_run\.conclusion == 'success'/, "failed deployments must not trigger a production monitor");
