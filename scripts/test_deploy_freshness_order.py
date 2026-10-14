@@ -165,8 +165,6 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "scripts/sync_club_logos.py",
             "scripts/test_club_logo_registry.py",
             ".github/workflows/cloudflare-pages.yml",
-            ".github/workflows/deploy-pages.yml",
-            "scripts/test_cloudflare_only_deploy.mjs",
         }
         self.assertEqual(direct_paths, expected_direct_paths)
         self.assertIn("name: Guard cache-only direct promotion", PAGES_WORKFLOW)
