@@ -11,7 +11,7 @@ const outputPath = "qualified-best-monitor-result.json";
 
 async function fetchScheduleGap() {
   if (!token || !repoName || !runId) {
-    return { schedule_gap_status: "unknown", schedule_gap_minutes: null, schedule_gap_note: "GitHub run metadata is unavailable in this environment." };
+    return { schedule_gap_status: "unknown", schedule_gap_minutes: null, schedule_gap_enforced: process.env.GITHUB_EVENT_NAME === "schedule", schedule_gap_note: "GitHub run metadata is unavailable in this environment." };
   }
   try {
     const monitorWorkflowFile = process.env.QUALIFIED_BEST_MONITOR_WORKFLOW_FILE || "qualified-best-watch.yml";
@@ -25,7 +25,7 @@ async function fetchScheduleGap() {
       signal: AbortSignal.timeout(15000)
     });
     if (!response.ok) {
-      return { schedule_gap_status: "unavailable", schedule_gap_minutes: null, schedule_gap_note: `GitHub Actions run history returned HTTP ${response.status}.` };
+      return { schedule_gap_status: "unavailable", schedule_gap_minutes: null, schedule_gap_enforced: process.env.GITHUB_EVENT_NAME === "schedule", schedule_gap_note: `GitHub Actions run history returned HTTP ${response.status}.` };
     }
     const payload = await response.json();
     const runs = Array.isArray(payload?.workflow_runs) ? payload.workflow_runs : [];
@@ -43,6 +43,7 @@ async function fetchScheduleGap() {
       return {
         schedule_gap_status: "unknown",
         schedule_gap_minutes: null,
+        schedule_gap_enforced: eventName === "schedule",
         schedule_gap_note: "No earlier cron-triggered monitor run is available yet; the baseline will be established by the first scheduled run."
       };
     }
@@ -56,6 +57,7 @@ async function fetchScheduleGap() {
     return {
       schedule_gap_status: "ok",
       schedule_gap_minutes: gapMinutes,
+      schedule_gap_enforced: eventName === "schedule",
       schedule_gap_note: eventName === "schedule"
         ? `Previous scheduled run ${previous.run.run_number ?? previous.run.id} started ${gapMinutes} minute(s) before this scheduled run.`
         : `The last scheduled run (${previous.run.run_number ?? previous.run.id}) was ${gapMinutes} minute(s) ago.`,
@@ -63,7 +65,7 @@ async function fetchScheduleGap() {
       previous_run_created_at: previous.run.created_at || null
     };
   } catch (error) {
-    return { schedule_gap_status: "unavailable", schedule_gap_minutes: null, schedule_gap_note: String(error?.message || error || "Schedule-gap API check failed.") };
+    return { schedule_gap_status: "unavailable", schedule_gap_minutes: null, schedule_gap_enforced: process.env.GITHUB_EVENT_NAME === "schedule", schedule_gap_note: String(error?.message || error || "Schedule-gap API check failed.") };
   }
 }
 function diagnosticFromPage(pageErrors, snapshot) {
