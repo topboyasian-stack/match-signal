@@ -10,7 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PAGES_WORKFLOW = (ROOT / ".github/workflows/cloudflare-pages.yml").read_text(encoding="utf-8")
 BOARD_WORKFLOW = (ROOT / ".github/workflows/unified-upcoming.yml").read_text(encoding="utf-8")
-MONITOR_WORKFLOW = (ROOT / ".github/workflows/qualified-best-watch.yml").read_text(encoding="utf-8")
+MONITOR_WORKFLOW = (ROOT / ".github/workflows/qualified-best-production-watch.yml").read_text(encoding="utf-8")
 LOGO_WORKFLOW = (ROOT / ".github/workflows/sync-club-logos.yml").read_text(encoding="utf-8")
 WATCHDOG_WORKFLOW = (ROOT / ".github/workflows/automation_watchdog.yml").read_text(encoding="utf-8")
 
@@ -82,15 +82,15 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn("qualified_best_monitor_last_run_age_minutes", WATCHDOG_WORKFLOW)
         self.assertIn("qualified_best_monitor_last_scheduled_run_age_minutes", WATCHDOG_WORKFLOW)
         self.assertIn("qualified_best_monitor_last_fallback_dispatch_age_minutes", WATCHDOG_WORKFLOW)
-        self.assertIn("workflow', 'run', 'qualified-best-watch.yml'", WATCHDOG_WORKFLOW)
+        self.assertIn("workflow', 'run', 'qualified-best-production-watch.yml'", WATCHDOG_WORKFLOW)
         self.assertIn("monitor_schedule_fallback_needed = monitor_schedule_status in {'STALE', 'MISSING_SCHEDULED_RUN'}", WATCHDOG_WORKFLOW)
         self.assertIn("monitor_dispatch_age_minutes < 10", WATCHDOG_WORKFLOW, "a stale/missing schedule should auto-repair even when a recent deployment-triggered check exists, but fallback dispatches need a cooldown")
-        self.assertIn("elif active('qualified-best-watch.yml') and not monitor_schedule_fallback_needed:", WATCHDOG_WORKFLOW, "an active deploy-triggered monitor must not suppress fallback when cron is stale or missing")
+        self.assertIn("elif active('qualified-best-production-watch.yml') and not monitor_schedule_fallback_needed:", WATCHDOG_WORKFLOW, "an active deploy-triggered monitor must not suppress fallback when cron is stale or missing")
         self.assertIn("A deployment-triggered monitor is active; the fallback is queued behind it.", WATCHDOG_WORKFLOW, "record that the fallback is queued behind the active deployment check")
         self.assertIn("monitor_fallback_allowed = watchdog_event_name in {'schedule', 'workflow_dispatch', 'push'} or cloudflare_success_event", WATCHDOG_WORKFLOW)
         self.assertIn("and source_workflow_conclusion == 'success'", WATCHDOG_WORKFLOW, "the event-driven browser fallback must run only after Cloudflare deployment succeeds")
         self.assertIn("MISSING_SCHEDULED_RUN", WATCHDOG_WORKFLOW, "flag when a newly registered monitor workflow still has no scheduled invocation after its 15-minute startup grace")
-        self.assertIn("actions/workflows/qualified-best-watch.yml", WATCHDOG_WORKFLOW, "derive the startup grace from the workflow registration date")
+        self.assertIn("actions/workflows/qualified-best-production-watch.yml", WATCHDOG_WORKFLOW, "derive the startup grace from the workflow registration date")
         step_start = WATCHDOG_WORKFLOW.index("      - name: Check freshness and self-heal stale workflows")
         heredoc_start = WATCHDOG_WORKFLOW.index("          python - <<'PY'\n", step_start) + len("          python - <<'PY'\n")
         heredoc_end = WATCHDOG_WORKFLOW.index("\n          PY", heredoc_start)
@@ -175,7 +175,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "scripts/test_prediction_desk_gates.mjs",
             "scripts/qualified_best_monitor.mjs",
             "scripts/test_qualified_best_monitor.mjs",
-            ".github/workflows/qualified-best-watch.yml",
+            ".github/workflows/qualified-best-production-watch.yml",
             ".github/workflows/qualified-best-live-monitor.yml",  # historical delete path for this schedule migration
             ".github/workflows/unified-upcoming.yml",
         ):
