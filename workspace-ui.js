@@ -201,7 +201,8 @@ async function enqueue(node){
   await registryReady;
   if(!node.isConnected||node.dataset.wsMediaResolved==='true')return;
   if(kind==='team'){
-    const fixed=teamRegistry[n];
+    const registryAliases={'inter milano':'inter milan','paris saint germain':'paris sg','paris saint germain fc':'paris sg','fc inter milano':'inter milan'};
+    const fixed=teamRegistry[registryAliases[n]||n];
     if(fixed&&fixed.path&&fixed.source_url){
       paint({nodes:[node]},{
         url:route(fixed.path),
