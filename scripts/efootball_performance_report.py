@@ -558,16 +558,17 @@ def _shadow_pick(row: dict[str, Any], probs: dict[str, float], actual: str) -> d
         if price is not None and price > 1.0:
             offers.append((probability * price - 1.0, outcome, price))
     if not offers:
-        return {"picked_side": None, "picked_odds": None, "expected_return": None,
-                "pick_correct": None, "net_units": None}
+        return {"picked_side": None, "picked_odds": None, "picked_probability": None,
+                "expected_return": None, "pick_correct": None, "net_units": None}
     expected_return, side, price = max(offers, key=lambda item: item[0])
     if expected_return < SHADOW_MIN_EXPECTED_RETURN:
-        return {"picked_side": None, "picked_odds": None, "expected_return": rounded(expected_return),
-                "pick_correct": None, "net_units": None}
+        return {"picked_side": None, "picked_odds": None, "picked_probability": rounded(probs[side]),
+                "expected_return": rounded(expected_return), "pick_correct": None, "net_units": None}
     correct = side == actual
     return {
         "picked_side": side,
         "picked_odds": price,
+        "picked_probability": rounded(probs[side]),
         "expected_return": rounded(expected_return),
         "pick_correct": correct,
         "net_units": rounded(price - 1.0 if correct else -1.0),
@@ -579,16 +580,21 @@ def _shadow_value_stats(rows: list[dict[str, Any]]) -> dict[str, Any]:
     returns = [float(r.get("net_units") or 0.0) for r in picks]
     wins = sum(bool(r["pick_correct"]) for r in picks)
     losses = len(picks) - wins
+    hit_rate = wins / len(picks) if picks else None
+    mean_expected = mean([float(r["expected_return"]) for r in picks if number(r.get("expected_return")) is not None])
     return {
         "selected_picks": len(picks),
         "wins": wins,
         "losses": losses,
-        "hit_rate": rounded(wins / len(picks)) if picks else None,
+        "hit_rate": rounded(hit_rate),
         "flat_stake_net_units": rounded(sum(returns)),
         "flat_stake_roi": rounded(mean(returns)),
         "flat_stake_roi_95_approx": mean_interval(returns),
         "mean_selected_odds": rounded(mean([float(r["picked_odds"]) for r in picks if number(r.get("picked_odds")) is not None])),
-        "mean_estimated_expected_return": rounded(mean([float(r["expected_return"]) for r in picks if number(r.get("expected_return")) is not None])),
+        "mean_selected_probability": rounded(mean([float(r["picked_probability"]) for r in picks if number(r.get("picked_probability")) is not None])),
+        "selected_probability_minus_hit_rate": rounded(mean([float(r["picked_probability"]) for r in picks if number(r.get("picked_probability")) is not None]) - hit_rate) if picks and hit_rate is not None and any(number(r.get("picked_probability")) is not None for r in picks) else None,
+        "mean_estimated_expected_return": rounded(mean_expected),
+        "estimated_return_minus_realised_roi": rounded(mean_expected - mean(returns)) if mean_expected is not None and returns else None,
     }
 
 
@@ -611,6 +617,58 @@ def _shadow_probability_stats(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "model_minus_market_log_loss": rounded(ml - ql) if ml is not None and ql is not None else None,
         "value_picks": _shadow_value_stats(rows),
     }
+
+
+def _shadow_review_status(forecast_count: int, selected_count: int,
+                          overall_brier_delta: float | None, overall_logloss_delta: float | None,
+                          latest_brier_delta: float | None, latest_logloss_delta: float | None,
+                          latest_roi: float | None) -> str:
+    """Rule-based decision support; never enables production or auto-promotes a lane."""
+    if forecast_count < 100:
+        return "COLLECT_AND_MONITOR"
+    consistently_worse = all(
+        value is not None and value > 0
+        for value in (overall_brier_delta, overall_logloss_delta, latest_brier_delta, latest_logloss_delta)
+    )
+    if consistently_worse:
+        return "REJECT_CURRENT_SHADOW_MODEL_VS_MARKET"
+    if selected_count < 30:
+        return "REVIEW_NOW_LOW_ACTIONABLE_PICK_COUNT"
+    if latest_roi is not None and latest_roi < 0:
+        return "REVIEW_NOW_LATEST_30_PERCENT_NEGATIVE"
+    consistently_better = all(
+        value is not None and value < 0
+        for value in (overall_brier_delta, overall_logloss_delta, latest_brier_delta, latest_logloss_delta)
+    )
+    if consistently_better and latest_roi is not None and latest_roi > 0:
+        return "ELIGIBLE_FOR_PAPER_PROMOTION_REVIEW"
+    return "PRELIMINARY_REVIEW_INCONCLUSIVE"
+
+
+def _shadow_diagnostic_findings(stats: dict[str, Any], latest: dict[str, Any],
+                                participant_tiers: list[dict[str, Any]]) -> list[str]:
+    findings: list[str] = []
+    brier_delta = stats.get("model_minus_market_brier")
+    logloss_delta = stats.get("model_minus_market_log_loss")
+    latest_brier_delta = latest.get("model_minus_market_brier")
+    latest_logloss_delta = latest.get("model_minus_market_log_loss")
+    value = stats.get("value_picks") or {}
+    roi = value.get("flat_stake_roi")
+    mean_ev = value.get("mean_estimated_expected_return")
+    if brier_delta is not None and logloss_delta is not None and brier_delta > 0 and logloss_delta > 0:
+        findings.append("The shadow probability forecast scores worse than the same-sample no-vig market baseline on both Brier score and log loss.")
+    if latest_brier_delta is not None and latest_logloss_delta is not None and latest_brier_delta > 0 and latest_logloss_delta > 0:
+        findings.append("The latest chronological 30% repeats the probability-score weakness; this is not just an early-history-only result.")
+    if mean_ev is not None and roi is not None and mean_ev > 0 and roi < 0:
+        gap = value.get("estimated_return_minus_realised_roi")
+        findings.append(f"The selected paper picks estimated {mean_ev:.1%} average return but realised {roi:.1%} ROI" + (f" (estimate-to-result gap {gap:.1%});" if gap is not None else ";") + " treat the model's edge estimate as overconfident.")
+    total = int(stats.get("forecasted_observations") or 0)
+    established = next((int(t.get("forecasted_observations") or 0) for t in participant_tiers if t.get("tier") == "both_3plus_prior_games"), 0)
+    if total and established / total < 0.10:
+        findings.append(f"Only {established}/{total} forecasts ({established / total:.1%}) had 3+ prior matches for both participants, so most results rely heavily on a product-level scoring prior rather than established participant form.")
+    if not findings:
+        findings.append("No single diagnosis clears the report's descriptive screen; keep the lane in paper research and inspect the chronological/segment breakdown before any promotion review.")
+    return findings
 
 
 def build_independent_market_shadow(archive: dict[str, Any]) -> dict[str, Any]:
@@ -715,22 +773,35 @@ def build_independent_market_shadow(archive: dict[str, Any]) -> dict[str, Any]:
         latest_stats = _shadow_probability_stats(latest)
         selected_n = stats["value_picks"]["selected_picks"]
         latest_roi = latest_stats["value_picks"]["flat_stake_roi"]
-        brier_delta = stats["model_minus_market_brier"]
-        if len(ordered) < 100:
-            readiness = "COLLECT_AND_MONITOR"
-        elif selected_n < 30:
-            readiness = "REVIEW_NOW_LOW_ACTIONABLE_PICK_COUNT"
-        elif latest_roi is not None and latest_roi < 0:
-            readiness = "REVIEW_NOW_LATEST_30_PERCENT_NEGATIVE"
-        elif brier_delta is not None and brier_delta < 0 and latest_roi is not None and latest_roi > 0:
-            readiness = "ELIGIBLE_FOR_PAPER_PROMOTION_REVIEW"
-        else:
-            readiness = "PRELIMINARY_REVIEW_INCONCLUSIVE"
+        readiness = _shadow_review_status(
+            len(ordered), selected_n,
+            stats.get("model_minus_market_brier"), stats.get("model_minus_market_log_loss"),
+            latest_stats.get("model_minus_market_brier"), latest_stats.get("model_minus_market_log_loss"),
+            latest_roi,
+        )
 
         participant_tier_groups = []
         for tier, segment in group_rows(ordered, lambda r: r.get("participant_history_tier")).items():
-            participant_tier_groups.append({"tier": tier, **_shadow_probability_stats(segment)})
+            tier_ordered = sorted(segment, key=lambda r: (r["start_time"], r["sample_id"]))
+            tier_cut = int(len(tier_ordered) * 0.70)
+            participant_tier_groups.append({
+                "tier": tier,
+                **_shadow_probability_stats(tier_ordered),
+                "chronological_split": {
+                    "method": "Sort within this participant-history tier by scheduled kickoff; earliest 70% versus latest 30%.",
+                    "first_70_percent": _shadow_probability_stats(tier_ordered[:tier_cut]),
+                    "latest_30_percent": _shadow_probability_stats(tier_ordered[tier_cut:]),
+                },
+            })
         selected_rows = [r for r in ordered if r.get("picked_side")]
+        side_groups = [
+            {"side": name, **_shadow_value_stats(segment)}
+            for name, segment in group_rows(selected_rows, lambda r: r.get("picked_side")).items()
+        ]
+        odds_groups = [
+            {"odds_band": name, **_shadow_value_stats(segment)}
+            for name, segment in group_rows(selected_rows, lambda r: odds_bucket(r.get("picked_odds"))).items()
+        ]
         competition_groups = []
         for name, segment in group_rows(selected_rows, lambda r: r.get("competition")).items():
             summary = _shadow_value_stats(segment)
@@ -749,13 +820,16 @@ def build_independent_market_shadow(archive: dict[str, Any]) -> dict[str, Any]:
                 "latest_30_percent": latest_stats,
             },
             "by_participant_history_tier": participant_tier_groups,
+            "by_picked_side_value_picks": side_groups,
+            "by_selected_odds_band_value_picks": odds_groups,
             "by_competition_value_picks": competition_groups,
             "by_kickoff_time_value_picks": time_groups,
+            "diagnostic_findings": _shadow_diagnostic_findings(stats, latest_stats, participant_tier_groups),
             "promotion_review": {
                 "status": readiness,
                 "automatic_promotion": False,
                 "production_qualification_enabled": False,
-                "decision": "Preliminary review begins at 100 forecasted observations; fewer than 30 edge-selected paper picks is not enough to judge the value-selection rule. Production remains blocked until independent probabilities are calibrated, post-margin value is positive, and chronological holdout evidence supports the candidate.",
+                "decision": "Review starts at 100 forecasts, not an arbitrary 300. Reject this specific shadow-model configuration when its probabilities score worse than the no-vig baseline overall and in the latest chronological 30%. A better subsegment is only a research candidate until its own chronological holdout, calibrated probability and positive post-margin value are demonstrated. No output changes the regular Qualified Best gate.",
             },
         }
     return {
