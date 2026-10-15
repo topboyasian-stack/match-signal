@@ -16,8 +16,6 @@ on:
       - 'scripts/test_efootball_market_research.py'
       - 'scripts/efootball_performance_report.py'
       - 'scripts/test_efootball_performance_report.py'
-      - 'scripts/efootball_performance_report.py'
-      - 'scripts/test_efootball_performance_report.py'
       - 'scripts/virtual_lab_sync.py'
       - 'functions/api/sportybet-virtual.js'
       - '.github/workflows/efootball-market-research.yml'
@@ -26,6 +24,8 @@ on:
     paths:
       - 'scripts/efootball_market_research.py'
       - 'scripts/test_efootball_market_research.py'
+      - 'scripts/efootball_performance_report.py'
+      - 'scripts/test_efootball_performance_report.py'
       - 'scripts/virtual_lab_sync.py'
       - 'functions/api/sportybet-virtual.js'
       - '.github/workflows/efootball-market-research.yml'
@@ -51,8 +51,9 @@ jobs:
         run: python -m pip install --upgrade requests
       - name: Compile and run offline research regression tests
         run: |
-          python -m py_compile scripts/efootball_market_research.py scripts/virtual_lab_sync.py scripts/test_efootball_market_research.py
+          python -m py_compile scripts/efootball_market_research.py scripts/virtual_lab_sync.py scripts/test_efootball_market_research.py scripts/efootball_performance_report.py scripts/test_efootball_performance_report.py
           python scripts/test_efootball_market_research.py
+          python scripts/test_efootball_performance_report.py
 
   research:
     if: ${{ github.event_name != 'pull_request' && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success') }}
