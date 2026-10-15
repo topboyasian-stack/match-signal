@@ -375,6 +375,373 @@ def summarize_market_archive(archive: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+
+
+SHADOW_MIN_HISTORY_MATCHES = 30
+SHADOW_MIN_PARTICIPANT_MATCHES = 3
+SHADOW_PRIOR_STRENGTH = 5.0
+SHADOW_MIN_EXPECTED_RETURN = 0.02
+
+
+def _shadow_participant(value: Any) -> str:
+    return " ".join(str(value or "").strip().casefold().split())
+
+
+def _shadow_score(row: dict[str, Any]) -> tuple[int, int] | None:
+    raw = row.get("final_score")
+    if not isinstance(raw, list) or len(raw) != 2:
+        return None
+    a, b = number(raw[0]), number(raw[1])
+    if a is None or b is None or a < 0 or b < 0 or not a.is_integer() or not b.is_integer():
+        return None
+    return int(a), int(b)
+
+
+def _shadow_event_key(row: dict[str, Any]) -> tuple[str, str, str, str, str] | None:
+    start = parse_time(row.get("start_time"))
+    p1, p2 = _shadow_participant(row.get("participant_1")), _shadow_participant(row.get("participant_2"))
+    product = str(row.get("product") or "").strip()
+    event_id = str(row.get("event_id") or "").strip()
+    if not start or not product or not p1 or not p2 or p1 == p2:
+        return None
+    return product, event_id, start.isoformat(), p1, p2
+
+
+def _shadow_settled_events(rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], int]:
+    """Deduplicate scored games; conflicting scores are excluded rather than guessed."""
+    chosen: dict[tuple[str, str, str, str, str], dict[str, Any]] = {}
+    conflicting: set[tuple[str, str, str, str, str]] = set()
+    for row in rows:
+        if str(row.get("settlement_status") or "").upper() != "SETTLED":
+            continue
+        score = _shadow_score(row)
+        start = parse_time(row.get("start_time"))
+        settled_at = parse_time(row.get("settled_at"))
+        key = _shadow_event_key(row)
+        if score is None or start is None or settled_at is None or key is None:
+            continue
+        if key in chosen and chosen[key]["score"] != score:
+            conflicting.add(key)
+            continue
+        previous = chosen.get(key)
+        candidate = {
+            "key": key,
+            "product": key[0],
+            "event_id": str(row.get("event_id") or "").strip(),
+            "start_at": start,
+            "settled_at": settled_at,
+            "participant_1": key[3],
+            "participant_2": key[4],
+            "score": score,
+        }
+        if previous is None or settled_at < previous["settled_at"]:
+            chosen[key] = candidate
+    events = [v for k, v in chosen.items() if k not in conflicting]
+    events.sort(key=lambda e: (e["start_at"], e["settled_at"], e["event_id"]))
+    return events, len(conflicting)
+
+
+def _shadow_poisson(lam: float, max_goals: int = 15) -> list[float]:
+    lam = min(8.0, max(0.05, float(lam)))
+    values = [math.exp(-lam)]
+    for k in range(1, max_goals + 1):
+        values.append(values[-1] * lam / k)
+    total = sum(values)
+    return [v / total for v in values] if total > 0 else [1.0] + [0.0] * max_goals
+
+
+def _shadow_score_probabilities(history: list[dict[str, Any]], p1: str, p2: str,
+                                market_type: str) -> dict[str, float] | None:
+    """Participant-form Poisson shadow model; no bookmaker odds enter the forecast."""
+    if len(history) < SHADOW_MIN_HISTORY_MATCHES:
+        return None
+    n1 = {"played": 0, "for": 0, "against": 0}
+    n2 = {"played": 0, "for": 0, "against": 0}
+    participants: dict[str, dict[str, float]] = {}
+    total_p1 = total_p2 = 0.0
+    for event in history:
+        g1, g2 = event["score"]
+        total_p1 += g1
+        total_p2 += g2
+        for name, scored, conceded in (
+            (event["participant_1"], g1, g2),
+            (event["participant_2"], g2, g1),
+        ):
+            stats = participants.setdefault(name, {"played": 0, "for": 0.0, "against": 0.0})
+            stats["played"] += 1
+            stats["for"] += scored
+            stats["against"] += conceded
+    s1, s2 = participants.get(p1), participants.get(p2)
+    if not s1 or not s2 or s1["played"] < SHADOW_MIN_PARTICIPANT_MATCHES or s2["played"] < SHADOW_MIN_PARTICIPANT_MATCHES:
+        return None
+
+    global_side_mean = (total_p1 + total_p2) / (2 * len(history))
+    home_mean, away_mean = total_p1 / len(history), total_p2 / len(history)
+    if global_side_mean <= 0:
+        return None
+
+    k = SHADOW_PRIOR_STRENGTH
+    def shrunk(stat: dict[str, float], field: str) -> float:
+        return (float(stat[field]) + k * global_side_mean) / (float(stat["played"]) + k)
+
+    attack1, concede1 = shrunk(s1, "for"), shrunk(s1, "against")
+    attack2, concede2 = shrunk(s2, "for"), shrunk(s2, "against")
+    lam_home = home_mean * (attack1 / global_side_mean) * (concede2 / global_side_mean)
+    lam_away = away_mean * (attack2 / global_side_mean) * (concede1 / global_side_mean)
+    ph, pa = _shadow_poisson(lam_home), _shadow_poisson(lam_away)
+
+    home = draw = away = 0.0
+    for i, pi in enumerate(ph):
+        for j, pj in enumerate(pa):
+            mass = pi * pj
+            if i > j:
+                home += mass
+            elif i == j:
+                draw += mass
+            else:
+                away += mass
+    total = home + draw + away
+    if total <= 0:
+        return None
+    if market_type == "match_winner":
+        return {"home": home / total, "draw": draw / total, "away": away / total}
+    if market_type == "btts":
+        yes = (1.0 - ph[0]) * (1.0 - pa[0])
+        return {"yes": yes, "no": 1.0 - yes}
+    return None
+
+
+def _shadow_vector(raw: Any, outcomes: list[str]) -> dict[str, float] | None:
+    if not isinstance(raw, dict):
+        return None
+    values: dict[str, float] = {}
+    for outcome in outcomes:
+        p = number(raw.get(outcome))
+        if p is None or p < 0 or p > 1:
+            return None
+        values[outcome] = p
+    total = sum(values.values())
+    if total <= 0 or abs(total - 1.0) > 0.12:
+        return None
+    return {k: v / total for k, v in values.items()}
+
+
+def _shadow_brier(probs: dict[str, float] | None, actual: str) -> float | None:
+    if not probs or actual not in probs:
+        return None
+    return sum((p - (1.0 if outcome == actual else 0.0)) ** 2 for outcome, p in probs.items())
+
+
+def _shadow_log_loss(probs: dict[str, float] | None, actual: str) -> float | None:
+    if not probs or actual not in probs:
+        return None
+    return -math.log(max(1e-15, probs[actual]))
+
+
+def _shadow_pick(row: dict[str, Any], probs: dict[str, float], actual: str) -> dict[str, Any]:
+    odds_raw = row.get("odds")
+    odds = odds_raw if isinstance(odds_raw, dict) else {}
+    offers = []
+    for outcome, probability in probs.items():
+        price = number(odds.get(outcome))
+        if price is not None and price > 1.0:
+            offers.append((probability * price - 1.0, outcome, price))
+    if not offers:
+        return {"picked_side": None, "picked_odds": None, "expected_return": None,
+                "pick_correct": None, "net_units": None}
+    expected_return, side, price = max(offers, key=lambda item: item[0])
+    if expected_return < SHADOW_MIN_EXPECTED_RETURN:
+        return {"picked_side": None, "picked_odds": None, "expected_return": rounded(expected_return),
+                "pick_correct": None, "net_units": None}
+    correct = side == actual
+    return {
+        "picked_side": side,
+        "picked_odds": price,
+        "expected_return": rounded(expected_return),
+        "pick_correct": correct,
+        "net_units": rounded(price - 1.0 if correct else -1.0),
+    }
+
+
+def _shadow_value_stats(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    picks = [r for r in rows if r.get("picked_side") and isinstance(r.get("pick_correct"), bool)]
+    returns = [float(r.get("net_units") or 0.0) for r in picks]
+    wins = sum(bool(r["pick_correct"]) for r in picks)
+    losses = len(picks) - wins
+    return {
+        "selected_picks": len(picks),
+        "wins": wins,
+        "losses": losses,
+        "hit_rate": rounded(wins / len(picks)) if picks else None,
+        "flat_stake_net_units": rounded(sum(returns)),
+        "flat_stake_roi": rounded(mean(returns)),
+        "flat_stake_roi_95_approx": mean_interval(returns),
+        "mean_selected_odds": rounded(mean([float(r["picked_odds"]) for r in picks if number(r.get("picked_odds")) is not None])),
+        "mean_estimated_expected_return": rounded(mean([float(r["expected_return"]) for r in picks if number(r.get("expected_return")) is not None])),
+    }
+
+
+def _shadow_probability_stats(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    model_brier = [float(r["model_brier"]) for r in rows if number(r.get("model_brier")) is not None]
+    market_brier = [float(r["market_brier"]) for r in rows if number(r.get("market_brier")) is not None]
+    model_log = [float(r["model_log_loss"]) for r in rows if number(r.get("model_log_loss")) is not None]
+    market_log = [float(r["market_log_loss"]) for r in rows if number(r.get("market_log_loss")) is not None]
+    mb, qb = mean(model_brier), mean(market_brier)
+    ml, ql = mean(model_log), mean(market_log)
+    return {
+        "forecasted_observations": len(rows),
+        "unique_events": len({str(r.get("event_id") or r.get("sample_id") or "") for r in rows}),
+        "mean_training_matches": rounded(mean([float(r["training_matches"]) for r in rows if number(r.get("training_matches")) is not None])),
+        "model_mean_brier": rounded(mb),
+        "market_mean_brier_same_forecasts": rounded(qb),
+        "model_minus_market_brier": rounded(mb - qb) if mb is not None and qb is not None else None,
+        "model_mean_log_loss": rounded(ml),
+        "market_mean_log_loss_same_forecasts": rounded(ql),
+        "model_minus_market_log_loss": rounded(ml - ql) if ml is not None and ql is not None else None,
+        "value_picks": _shadow_value_stats(rows),
+    }
+
+
+def build_independent_market_shadow(archive: dict[str, Any]) -> dict[str, Any]:
+    """Chronological independent score-form research; never feeds production selection."""
+    rows = [r for r in archive.get("observations", []) if isinstance(r, dict)]
+    events, conflicting_events = _shadow_settled_events(rows)
+    forecasts: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    skipped = {"unsettled_or_invalid_target": 0, "not_pre_kickoff": 0,
+               "insufficient_global_history": 0, "insufficient_participant_history": 0,
+               "invalid_outcome_or_market": 0}
+    for target in rows:
+        product = str(target.get("product") or "")
+        kind = str(target.get("market_type") or "")
+        if product not in {"efootball_gt", "efootball_adriatic"} or kind not in {"match_winner", "btts"}:
+            continue
+        if str(target.get("settlement_status") or "").upper() != "SETTLED":
+            skipped["unsettled_or_invalid_target"] += 1
+            continue
+        start = parse_time(target.get("start_time"))
+        captured = parse_time(target.get("captured_at"))
+        score = _shadow_score(target)
+        if start is None or captured is None or score is None:
+            skipped["unsettled_or_invalid_target"] += 1
+            continue
+        if captured >= start:
+            skipped["not_pre_kickoff"] += 1
+            continue
+        p1, p2 = _shadow_participant(target.get("participant_1")), _shadow_participant(target.get("participant_2"))
+        actual = ("home" if score[0] > score[1] else "away" if score[0] < score[1] else "draw") if kind == "match_winner" else ("yes" if score[0] > 0 and score[1] > 0 else "no")
+        recorded = str(target.get("actual_outcome") or "").strip().lower()
+        if kind == "match_winner" and actual not in {"home", "away", "draw"}:
+            skipped["invalid_outcome_or_market"] += 1
+            continue
+        if kind == "btts" and actual not in {"yes", "no"}:
+            skipped["invalid_outcome_or_market"] += 1
+            continue
+        if recorded and recorded != actual:
+            skipped["invalid_outcome_or_market"] += 1
+            continue
+        outcomes = ["home", "draw", "away"] if kind == "match_winner" else ["yes", "no"]
+        event_id = str(target.get("event_id") or "").strip()
+        history = [
+            event for event in events
+            if event["product"] == product
+            and event["start_at"] < start
+            and event["settled_at"] <= captured
+            and not (event_id and event["event_id"] == event_id)
+        ]
+        if len(history) < SHADOW_MIN_HISTORY_MATCHES:
+            skipped["insufficient_global_history"] += 1
+            continue
+        probs = _shadow_score_probabilities(history, p1, p2, kind)
+        if probs is None:
+            skipped["insufficient_participant_history"] += 1
+            continue
+        probs = _shadow_vector(probs, outcomes)
+        market_probs = _shadow_vector(target.get("market_probabilities_no_vig"), outcomes)
+        row = {
+            "sample_id": str(target.get("sample_id") or ""),
+            "event_id": event_id,
+            "product": product,
+            "market_type": kind,
+            "competition": str(target.get("competition") or "unknown"),
+            "start_time": start.isoformat(),
+            "captured_at": captured.isoformat(),
+            "actual_outcome": actual,
+            "training_matches": len(history),
+            "model_probabilities": probs,
+            "market_probabilities_no_vig": market_probs,
+            "model_brier": _shadow_brier(probs, actual),
+            "market_brier": _shadow_brier(market_probs, actual),
+            "model_log_loss": _shadow_log_loss(probs, actual),
+            "market_log_loss": _shadow_log_loss(market_probs, actual),
+        }
+        row.update(_shadow_pick(target, probs or {}, actual))
+        forecasts[f"{product}|{kind}"].append(row)
+
+    lane_report: dict[str, Any] = {}
+    for key, lane_rows in sorted(forecasts.items()):
+        ordered = sorted(lane_rows, key=lambda r: (r["start_time"], r["sample_id"]))
+        cut = int(len(ordered) * 0.70)
+        first = ordered[:cut]
+        latest = ordered[cut:]
+        stats = _shadow_probability_stats(ordered)
+        latest_stats = _shadow_probability_stats(latest)
+        selected_n = stats["value_picks"]["selected_picks"]
+        latest_roi = latest_stats["value_picks"]["flat_stake_roi"]
+        brier_delta = stats["model_minus_market_brier"]
+        if len(ordered) < 100:
+            readiness = "COLLECT_AND_MONITOR"
+        elif selected_n < 30:
+            readiness = "REVIEW_NOW_LOW_ACTIONABLE_PICK_COUNT"
+        elif latest_roi is not None and latest_roi < 0:
+            readiness = "REVIEW_NOW_LATEST_30_PERCENT_NEGATIVE"
+        elif brier_delta is not None and brier_delta < 0 and latest_roi is not None and latest_roi > 0:
+            readiness = "ELIGIBLE_FOR_PAPER_PROMOTION_REVIEW"
+        else:
+            readiness = "PRELIMINARY_REVIEW_INCONCLUSIVE"
+
+        selected_rows = [r for r in ordered if r.get("picked_side")]
+        competition_groups = []
+        for name, segment in group_rows(selected_rows, lambda r: r.get("competition")).items():
+            summary = _shadow_value_stats(segment)
+            competition_groups.append({"group": name, **summary})
+        competition_groups.sort(key=lambda s: (s.get("flat_stake_roi") if s.get("flat_stake_roi") is not None else -999, s.get("selected_picks", 0)))
+        time_groups = []
+        for name, segment in group_rows(selected_rows, lambda r: time_bucket(r.get("start_time"))).items():
+            time_groups.append({"group": name, **_shadow_value_stats(segment)})
+        time_groups.sort(key=lambda s: s.get("group", ""))
+        lane_report[key] = {
+            **stats,
+            "method": "Participant-form Poisson goals model using only unique earlier same-product games settled by each target's captured_at; minimum 30 prior matches and 3 matches per participant; probabilities do not use bookmaker odds.",
+            "chronological_split": {
+                "method": "Sort forecasted observations by scheduled kickoff; earliest 70% versus latest 30%.",
+                "first_70_percent": _shadow_probability_stats(first),
+                "latest_30_percent": latest_stats,
+            },
+            "by_competition_value_picks": competition_groups,
+            "by_kickoff_time_value_picks": time_groups,
+            "promotion_review": {
+                "status": readiness,
+                "automatic_promotion": False,
+                "production_qualification_enabled": False,
+                "decision": "Preliminary review begins at 100 forecasted observations; fewer than 30 edge-selected paper picks is not enough to judge the value-selection rule. Production remains blocked until independent probabilities are calibrated, post-margin value is positive, and chronological holdout evidence supports the candidate.",
+            },
+        }
+    return {
+        "mode": "PAPER_SHADOW_ONLY",
+        "automatic_promotion": False,
+        "production_qualification_enabled": False,
+        "minimum_prior_matches": SHADOW_MIN_HISTORY_MATCHES,
+        "minimum_matches_per_participant": SHADOW_MIN_PARTICIPANT_MATCHES,
+        "minimum_estimated_expected_return_for_shadow_pick": SHADOW_MIN_EXPECTED_RETURN,
+        "scored_unique_history_events": len(events),
+        "conflicting_history_events_excluded": conflicting_events,
+        "skipped_target_counts": skipped,
+        "lanes": lane_report,
+        "limitations": "Exploratory model, not an approved predictor. Results can be dependent because participants recur; the walk-forward split and probability-score comparison are informative screens, not proof of durable profit. No forecast from this report is sent to Qualified Best or Odds Builder.",
+    }
+
+
+
 def _ticket_scope(ticket: dict[str, Any]) -> str:
     products = ticket.get("products")
     if not isinstance(products, list):
@@ -462,6 +829,7 @@ def build_report(ou_rows: list[dict[str, Any]], market_archive: dict[str, Any],
     gt_coverage = product_coverage.get("efootball_gt") or {}
     adriatic_coverage = product_coverage.get("efootball_adriatic") or {}
     research_summary = summarize_market_archive(market_archive)
+    independent_shadow = build_independent_market_shadow(market_archive)
     gt_winner = research_summary["summary_by_product_market"].get("efootball_gt|match_winner") or {}
     gt_btts = research_summary["summary_by_product_market"].get("efootball_gt|btts") or {}
     adriatic_winner = research_summary["summary_by_product_market"].get("efootball_adriatic|match_winner") or {}
@@ -509,6 +877,7 @@ def build_report(ou_rows: list[dict[str, Any]], market_archive: dict[str, Any],
         },
         "qualified_best_ou_single_picks": build_ou_report(ou_rows),
         "winner_and_gg_ng_market_baselines": research_summary,
+        "independent_winner_ggng_shadow": independent_shadow,
         "ticket_performance": build_ticket_report(tracker),
         "walk_forward_ou_model_evaluation": model_eval,
         "market_review_status": market_status,
@@ -554,6 +923,7 @@ def main() -> None:
         "paper_only": True,
         "ou_settled": report["qualified_best_ou_single_picks"]["metrics"]["settled"],
         "market_lanes": {k: v.get("settled", 0) for k, v in report["winner_and_gg_ng_market_baselines"]["summary_by_product_market"].items()},
+        "independent_shadow_lanes": {k: {"forecasts": v.get("forecasted_observations", 0), "promotion_review": v.get("promotion_review", {}).get("status")} for k, v in report["independent_winner_ggng_shadow"]["lanes"].items()},
         "efootball_related_tickets": report["ticket_performance"]["efootball_related_ticket_count"],
         "collector_stale_over_30_minutes": report["source_freshness"]["collector_stale_over_30_minutes"],
         "automatic_promotion": False,

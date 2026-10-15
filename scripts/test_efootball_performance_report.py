@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Offline tests for the paper-only eFootball performance report."""
 import importlib.util
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 spec = importlib.util.spec_from_file_location(
@@ -104,3 +104,124 @@ def test_empty_archive_fails_closed_and_age_warning():
     assert report["source_freshness"]["collector_stale_over_30_minutes"] is True
     assert report["mode"] == "PAPER_RESEARCH_ONLY"
     assert report["automatic_promotion"] if "automatic_promotion" in report else report["promotion_policy"]["automatic_promotion"] is False
+
+
+def shadow_market_row(event_id, product, start, settle, p1, p2, score,
+                      market_type="match_winner", capture_offset_minutes=-10):
+    start_dt = datetime.fromisoformat(start.replace("Z", "+00:00"))
+    captured_dt = start_dt + timedelta(minutes=capture_offset_minutes)
+    settle_dt = datetime.fromisoformat(settle.replace("Z", "+00:00"))
+    home, away = int(score[0]), int(score[1])
+    if market_type == "match_winner":
+        actual = "home" if home > away else "away" if home < away else "draw"
+        probs = {"home": 0.40, "draw": 0.28, "away": 0.32}
+        odds = {"home": 2.30, "draw": 3.50, "away": 2.80}
+    else:
+        actual = "yes" if home > 0 and away > 0 else "no"
+        probs = {"yes": 0.57, "no": 0.43}
+        odds = {"yes": 1.80, "no": 2.10}
+    fave = max(probs, key=probs.get)
+    return {
+        "sample_id": f"{event_id}-{market_type}",
+        "event_id": event_id,
+        "product": product,
+        "competition": "Synthetic Test League",
+        "participant_1": p1,
+        "participant_2": p2,
+        "start_time": start_dt.isoformat(),
+        "captured_at": captured_dt.isoformat(),
+        "settled_at": settle_dt.isoformat(),
+        "market_type": market_type,
+        "market_id": "1" if market_type == "match_winner" else "29",
+        "odds": odds,
+        "market_probabilities_no_vig": probs,
+        "market_favourite": fave,
+        "favourite_odds": odds[fave],
+        "favourite_correct": fave == actual,
+        "favourite_net_units": odds[fave] - 1 if fave == actual else -1,
+        "settlement_status": "SETTLED",
+        "final_score": [float(home), float(away)],
+        "actual_outcome": actual,
+    }
+
+
+def shadow_history(product="efootball_gt", extreme=False):
+    teams = ["Alpha", "Beta", "Gamma", "Delta", "Epsilon", "Zeta", "Eta", "Theta"]
+    rows = []
+    base = datetime(2026, 10, 1, 0, 0, tzinfo=timezone.utc)
+    for i in range(40):
+        start = base + timedelta(hours=i)
+        settle = start + timedelta(minutes=5)
+        p1 = teams[i % len(teams)]
+        p2 = teams[(i * 3 + 1) % len(teams)]
+        score = (7, 0) if extreme else (i % 4, (i * 2 + 1) % 3)
+        row = shadow_market_row(
+            f"{product}-history-{i}", product, start.isoformat(), settle.isoformat(),
+            p1, p2, score, "match_winner", capture_offset_minutes=1,
+        )
+        rows.append(row)
+        # A second market row for some matches must not count as a second training game.
+        if i % 5 == 0:
+            rows.append(shadow_market_row(
+                f"{product}-history-{i}", product, start.isoformat(), settle.isoformat(),
+                p1, p2, score, "btts", capture_offset_minutes=1,
+            ))
+    return rows
+
+
+def shadow_target_rows(product="efootball_gt"):
+    start = datetime(2026, 10, 4, 12, 0, tzinfo=timezone.utc)
+    settle = start + timedelta(minutes=10)
+    # Same event, two target markets: it must be one unique match in the score history.
+    return [
+        shadow_market_row("target-event", product, start.isoformat(), settle.isoformat(),
+                          "Alpha", "Beta", (3, 1), "match_winner", -10),
+        shadow_market_row("target-event", product, start.isoformat(), settle.isoformat(),
+                          "Alpha", "Beta", (3, 1), "btts", -10),
+    ]
+
+
+def test_independent_shadow_is_time_safe_and_deduplicates_events():
+    rows = shadow_history()
+    # This game kicked off before the target, but its result was not settled when the target quote was captured.
+    late_start = datetime(2026, 10, 3, 10, 0, tzinfo=timezone.utc)
+    late_settle = datetime(2026, 10, 4, 11, 55, tzinfo=timezone.utc)
+    rows.append(shadow_market_row(
+        "late-settlement-event", "efootball_gt", late_start.isoformat(), late_settle.isoformat(),
+        "Alpha", "Beta", (0, 6), "match_winner", 1,
+    ))
+    rows.extend(shadow_target_rows())
+    report = mod.build_independent_market_shadow({"observations": rows})
+    winner = report["lanes"]["efootball_gt|match_winner"]
+    btts = report["lanes"]["efootball_gt|btts"]
+
+    assert report["mode"] == "PAPER_SHADOW_ONLY"
+    assert report["automatic_promotion"] is False
+    assert report["production_qualification_enabled"] is False
+    assert report["conflicting_history_events_excluded"] == 0
+    assert report["scored_unique_history_events"] == 42  # 40 history + late result + target game
+    assert winner["forecasted_observations"] == 1
+    assert btts["forecasted_observations"] == 1
+    assert winner["mean_training_matches"] == 40  # duplicate markets and unsettled-at-capture game excluded
+    assert btts["mean_training_matches"] == 40
+    assert winner["model_mean_brier"] is not None
+    assert winner["market_mean_brier_same_forecasts"] is not None
+    assert winner["model_minus_market_brier"] is not None
+    assert winner["promotion_review"]["automatic_promotion"] is False
+    assert btts["promotion_review"]["production_qualification_enabled"] is False
+
+
+def test_independent_shadow_keeps_gt_and_adriatic_histories_separate():
+    gt_rows = shadow_history("efootball_gt")
+    target = shadow_target_rows("efootball_gt")
+    gt_only = mod.build_independent_market_shadow({"observations": gt_rows + target})
+    mixed_products = mod.build_independent_market_shadow({
+        "observations": gt_rows + target + shadow_history("efootball_adriatic", extreme=True)
+    })
+    a = gt_only["lanes"]["efootball_gt|match_winner"]
+    b = mixed_products["lanes"]["efootball_gt|match_winner"]
+    assert a["forecasted_observations"] == b["forecasted_observations"] == 1
+    assert a["mean_training_matches"] == b["mean_training_matches"] == 40
+    assert a["model_mean_brier"] == b["model_mean_brier"]
+    assert "efootball_adriatic|match_winner" not in gt_only["lanes"]
+    assert "efootball_gt|match_winner" in mixed_products["lanes"]
