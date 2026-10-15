@@ -69,8 +69,9 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
 
     def test_board_schedule_is_offset_from_hour_boundary(self):
         crons = workflow_schedule_crons(BOARD_WORKFLOW)
-        self.assertIn("2-59/5 * * * *", crons)
-        self.assertNotIn("4-59/5 * * * *", crons, "cron must change to re-arm the missing scheduled board publisher")
+        self.assertIn("3-59/5 * * * *", crons)
+        self.assertNotIn("2-59/5 * * * *", crons, "cron must change to re-arm the missing scheduled board publisher")
+        self.assertNotIn("4-59/5 * * * *", crons)
         self.assertNotIn("*/5 * * * *", crons)
 
     def test_monitor_schedule_is_rearmed_and_deployment_trigger_is_preserved(self):

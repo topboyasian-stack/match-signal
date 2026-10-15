@@ -15,8 +15,8 @@ on:
   schedule:
     # Keep the unified desk live around the clock, including overnight eFootball sessions.
     # Virtual Lab sync runs at :02/:07/:12...; keep board publication offset from minute zero. Re-register the cron after the confirmed delivery gap.
-    # Change the registered cron to re-arm schedule delivery; avoid minute zero.
-    - cron: '2-59/5 * * * *'
+    # Re-arm scheduled delivery after the board publication gap; stay clear of minute zero and the Virtual Lab sync minute.
+    - cron: '3-59/5 * * * *'
   push:
     branches: [main]
     paths:
