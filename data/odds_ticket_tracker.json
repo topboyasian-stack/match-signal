@@ -1,20 +1,20 @@
 {
   "version": 4,
-  "updated_at": "2026-10-15T00:49:46.403092+00:00",
+  "updated_at": "2026-10-15T01:02:53.312758+00:00",
   "mode": "PAPER_ONLY",
   "summary": {
     "tracked_tickets": 201,
-    "pending": 71,
+    "pending": 70,
     "won": 39,
-    "lost": 91,
-    "active_with_loss": 16,
+    "lost": 92,
+    "active_with_loss": 17,
     "legs_won": 216,
-    "legs_lost": 118,
-    "legs_pending": 196,
+    "legs_lost": 119,
+    "legs_pending": 195,
     "pending_legs_by_product": {
-      "efootball_gt": 196
+      "efootball_gt": 195
     },
-    "settled_tickets": 130,
+    "settled_tickets": 131,
     "by_leg_count": {
       "2": {
         "tracked": 75,
@@ -35,24 +35,24 @@
         "avg_model_rating": 51.606667
       },
       "4": {
-        "tracked": 49,
+        "tracked": 50,
         "won": 12,
-        "lost": 37,
-        "settled": 49,
-        "accuracy": 0.244898,
-        "avg_combined_odds": 4.589857,
-        "avg_model_rating": 54.003878
+        "lost": 38,
+        "settled": 50,
+        "accuracy": 0.24,
+        "avg_combined_odds": 4.58816,
+        "avg_model_rating": 54.0034
       }
     },
     "by_primary_lane": {
       "high_confidence_research": {
-        "tracked": 38,
+        "tracked": 39,
         "won": 11,
-        "lost": 27,
-        "settled": 38,
-        "accuracy": 0.289474,
-        "avg_combined_odds": 5.113,
-        "avg_model_rating": 55.410789
+        "lost": 28,
+        "settled": 39,
+        "accuracy": 0.282051,
+        "avg_combined_odds": 5.09741,
+        "avg_model_rating": 55.374103
       },
       "efootball_exact_evidence_value": {
         "tracked": 63,
@@ -95,17 +95,17 @@
       "high_confidence_loss_tickets": 19,
       "high_confidence_loss_legs": 25,
       "losses_by_product": {
-        "efootball_gt": 95,
+        "efootball_gt": 96,
         "vfootball": 23
       },
       "losses_by_direction": {
-        "over": 21,
+        "over": 22,
         "under": 97
       },
       "shape_comparison": "Use by_leg_count to compare 2–7-leg accuracy, average odds, and average model rating.",
       "lane_comparison": "Use by_primary_lane to compare construction-lane performance."
     },
-    "active_pending": 7,
+    "active_pending": 6,
     "archived_pending": 64,
     "visible_tickets": 100,
     "archived_tickets": 101
@@ -828,8 +828,8 @@
       "batch_id": "BATCH-01",
       "created_at": "2026-10-15T00:19:59.834548+00:00",
       "last_seen_at": "2026-10-15T00:19:59.834548+00:00",
-      "last_settled_at": null,
-      "status": "PENDING",
+      "last_settled_at": "2026-10-15T01:02:53.312758+00:00",
+      "status": "LOST",
       "combined_odds": 4.505,
       "combined_odds_source": "builder_batch_snapshot",
       "odds_snapshot_complete": true,
@@ -845,8 +845,8 @@
       "primary_lane": "high_confidence_research",
       "odds_locked_at": "2026-10-15T00:19:59.834548+00:00",
       "leg_count": 4,
-      "settled_leg_count": 0,
-      "pending_leg_count": 4,
+      "settled_leg_count": 1,
+      "pending_leg_count": 3,
       "legs": [
         {
           "sport": "virtual",
@@ -898,7 +898,7 @@
           "builder_eligible": true,
           "real_money_eligible": false,
           "paper_only": true,
-          "status": "PENDING",
+          "status": "LOST",
           "source": "Exact-line evidence calibration · eFootball value lane",
           "market_source": "SportyBet NG",
           "recent_evidence": {
@@ -1003,10 +1003,13 @@
           "sportybet_outcome_name": "Over 1.5",
           "fixture_key": "efootball_gt|brighton and hove albion delpiero v as monaco scorpion",
           "bookmaker_odds_snapshot": 1.68,
-          "correct": null,
-          "settled_at": null,
-          "result": null,
-          "final_score": null
+          "correct": false,
+          "settled_at": "2026-10-15T01:02:53.312758+00:00",
+          "result": "U1.5",
+          "final_score": [
+            0.0,
+            1.0
+          ]
         },
         {
           "sport": "virtual",
@@ -1491,9 +1494,9 @@
       ],
       "leg_counts": {
         "won": 0,
-        "lost": 0,
+        "lost": 1,
         "void": 0,
-        "pending": 4
+        "pending": 3
       },
       "construction_snapshot": {
         "batch_id": "BATCH-01",
@@ -1527,9 +1530,61 @@
         },
         "recorded_at": "2026-10-15T00:19:59.865410+00:00"
       },
-      "settlement_diagnostics": null,
+      "settlement_diagnostics": {
+        "diagnostic_version": 1,
+        "ticket_outcome": "LOST",
+        "diagnostic_label": "TICKET_LOST_1_OF_4_LEGS",
+        "leg_count": 4,
+        "settled_leg_count": 1,
+        "won_leg_count": 0,
+        "lost_leg_count": 1,
+        "void_leg_count": 0,
+        "pending_leg_count": 3,
+        "leg_hit_rate_excluding_voids": 0.0,
+        "average_settled_leg_model_probability": 0.857143,
+        "weakest_ticket_leg_model_probability": 0.857143,
+        "high_confidence_loss_count": 0,
+        "high_confidence_loss_events": [],
+        "losses_by_product": {
+          "efootball_gt": 1
+        },
+        "losses_by_direction": {
+          "over": 1
+        },
+        "loss_details": [
+          {
+            "event_id": "sr:match:75562056",
+            "match": "Brighton And Hove Albion (Delpiero) vs AS Monaco (Scorpion)",
+            "product": "efootball_gt",
+            "pick": "Brighton And Hove Albion (Delpiero) vs AS Monaco (Scorpion) — O/U over 1.5",
+            "line": 1.5,
+            "model_probability": 0.857143,
+            "model_edge": 0.321231,
+            "bookmaker_odds": 1.68,
+            "evidence_score": 0.766575,
+            "recent_evidence_n": 10,
+            "recent_evidence_hit_rate": 1.0,
+            "result": "U1.5",
+            "final_score": [
+              0.0,
+              1.0
+            ],
+            "settled_at": "2026-10-15T01:02:53.312758+00:00"
+          }
+        ],
+        "improvement_keys": {
+          "shape": "4_leg",
+          "primary_lane": "high_confidence_research",
+          "combined_odds": 4.505,
+          "combined_model_rating": 53.98,
+          "combined_model_probability": 0.539775,
+          "avg_model_probability": 85.71,
+          "avg_model_edge_percent": 22.19
+        }
+      },
       "paper_only": true,
-      "real_money_execution": false
+      "real_money_execution": false,
+      "lost_at": "2026-10-15T01:02:53.312758+00:00"
     },
     {
       "version": 3,
