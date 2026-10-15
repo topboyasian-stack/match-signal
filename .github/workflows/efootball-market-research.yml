@@ -14,6 +14,8 @@ on:
     paths:
       - 'scripts/efootball_market_research.py'
       - 'scripts/test_efootball_market_research.py'
+      - 'scripts/efootball_performance_report.py'
+      - 'scripts/test_efootball_performance_report.py'
       - 'scripts/virtual_lab_sync.py'
       - 'functions/api/sportybet-virtual.js'
       - '.github/workflows/efootball-market-research.yml'
@@ -22,6 +24,8 @@ on:
     paths:
       - 'scripts/efootball_market_research.py'
       - 'scripts/test_efootball_market_research.py'
+      - 'scripts/efootball_performance_report.py'
+      - 'scripts/test_efootball_performance_report.py'
       - 'scripts/virtual_lab_sync.py'
       - 'functions/api/sportybet-virtual.js'
       - '.github/workflows/efootball-market-research.yml'
@@ -47,8 +51,9 @@ jobs:
         run: python -m pip install --upgrade requests
       - name: Compile and run offline research regression tests
         run: |
-          python -m py_compile scripts/efootball_market_research.py scripts/virtual_lab_sync.py scripts/test_efootball_market_research.py
+          python -m py_compile scripts/efootball_market_research.py scripts/virtual_lab_sync.py scripts/test_efootball_market_research.py scripts/efootball_performance_report.py scripts/test_efootball_performance_report.py
           python scripts/test_efootball_market_research.py
+          python scripts/test_efootball_performance_report.py
 
   research:
     if: ${{ github.event_name != 'pull_request' && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success') }}
@@ -81,6 +86,11 @@ jobs:
           # Non-scheduled runs force an immediate settlement pass; scheduled runs honor the collector's five-minute settlement interval.
           EFOOTBALL_RESEARCH_FORCE_SETTLE: ${{ github.event_name != 'schedule' && '1' || '0' }}
         run: python scripts/efootball_market_research.py
+      - name: Build and test the cross-market eFootball performance report
+        run: |
+          python -m py_compile scripts/efootball_performance_report.py scripts/test_efootball_performance_report.py
+          python scripts/test_efootball_performance_report.py
+          python scripts/efootball_performance_report.py
       - name: Validate isolated archive contract
         run: |
           python - <<'PY'
@@ -109,7 +119,7 @@ jobs:
           cp data/efootball_market_research.json /tmp/efootball_market_research_candidate.json
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/efootball_market_research.json
+          git add data/efootball_market_research.json data/efootball_performance_report.json
           if git diff --cached --quiet; then
             echo "Research archive unchanged; nothing to publish."
             exit 0
@@ -124,7 +134,8 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
             python scripts/efootball_market_research.py --merge-candidate /tmp/efootball_market_research_candidate.json
-            git add data/efootball_market_research.json
+            python scripts/efootball_performance_report.py
+            git add data/efootball_market_research.json data/efootball_performance_report.json
             if git diff --cached --quiet; then
               echo "Remote archive already contains this candidate."
               exit 0
