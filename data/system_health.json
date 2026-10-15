@@ -1,50 +1,50 @@
 {
-  "generated_at": "2026-10-15T09:38:50.927726+00:00",
+  "generated_at": "2026-10-15T09:59:49.938336+00:00",
   "status": "FAIL",
-  "critical_issues": 2,
+  "critical_issues": 3,
   "warning_issues": 0,
   "info_issues": 1,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
       "status": "STALE",
-      "age_hours": 5.09,
+      "age_hours": 5.44,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 2.86,
+      "age_hours": 0.34,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
-      "status": "PASS",
-      "age_hours": 3.75,
+      "status": "STALE",
+      "age_hours": 4.1,
       "threshold_hours": 4
     },
     {
       "engine": "unified_upcoming",
       "status": "PASS",
-      "age_hours": 0.01,
+      "age_hours": 0.36,
       "threshold_hours": 2
     },
     {
       "engine": "prediction_desk_health",
       "status": "PASS",
-      "age_hours": 0.01,
+      "age_hours": 0.36,
       "threshold_hours": 2
     },
     {
       "engine": "tennis_forward_discovery",
       "status": "PASS",
-      "age_hours": 4.6,
+      "age_hours": 4.95,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 3.13,
+      "age_hours": 0.01,
       "threshold_hours": 0.5,
       "heartbeat_source": "unified_live_refresh"
     },
@@ -71,7 +71,12 @@
     {
       "code": "STALE_CORE_PREDICTION_PIPELINE",
       "severity": "critical",
-      "detail": "updated_at age 5.09h exceeds 4h"
+      "detail": "updated_at age 5.44h exceeds 4h"
+    },
+    {
+      "code": "STALE_EXPANSION",
+      "severity": "critical",
+      "detail": "updated_at age 4.10h exceeds 4h"
     },
     {
       "code": "SELECTION_GATE_EMPTY",
@@ -81,7 +86,7 @@
     {
       "code": "PIPELINE_STALE",
       "severity": "critical",
-      "detail": "pipeline_status age 5.09h exceeds 4h"
+      "detail": "pipeline_status age 5.44h exceeds 4h"
     }
   ],
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
