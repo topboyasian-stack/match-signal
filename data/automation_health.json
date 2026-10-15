@@ -1,23 +1,23 @@
 {
-  "updated_at": "2026-10-15T10:02:57.952537+00:00",
+  "updated_at": "2026-10-15T10:05:03.193530+00:00",
   "automation_status": "SELF_HEALING_ENABLED",
-  "pipeline_last_update": "2026-10-15T04:33:33.884475+00:00",
-  "pipeline_age_hours": 5.49,
-  "odds_builder_last_update": "2026-10-15T10:00:14.929737+00:00",
+  "pipeline_last_update": "2026-10-15T10:02:05.067969+00:00",
+  "pipeline_age_hours": 0.05,
+  "odds_builder_last_update": "2026-10-15T10:01:56.595087+00:00",
   "odds_builder_age_hours": 0.05,
   "expansion_last_update": "2026-10-15T10:01:28.681071+00:00",
-  "expansion_age_hours": 0.02,
+  "expansion_age_hours": 0.06,
   "virtual_lab_last_update": "2026-10-15T09:59:29.164846+00:00",
-  "virtual_lab_age_hours": 0.06,
-  "virtual_lab_status_age_hours": 1.55,
-  "darts_age_hours": 1.6,
-  "table_tennis_age_hours": 0.03,
-  "unified_upcoming_age_hours": 0.04,
-  "qualified_best_monitor_last_run_age_minutes": 9.1,
-  "qualified_best_monitor_last_scheduled_run_age_minutes": 9.1,
-  "qualified_best_monitor_last_fallback_dispatch_age_minutes": 195.0,
+  "virtual_lab_age_hours": 0.09,
+  "virtual_lab_status_age_hours": 1.59,
+  "darts_age_hours": 1.64,
+  "table_tennis_age_hours": 0.06,
+  "unified_upcoming_age_hours": 0.07,
+  "qualified_best_monitor_last_run_age_minutes": 11.2,
+  "qualified_best_monitor_last_scheduled_run_age_minutes": 11.2,
+  "qualified_best_monitor_last_fallback_dispatch_age_minutes": 197.1,
   "qualified_best_monitor_schedule_status": "ON_CADENCE",
-  "qualified_best_monitor_workflow_age_minutes": 712.7,
+  "qualified_best_monitor_workflow_age_minutes": 714.8,
   "virtual_lab_events": 717,
   "virtual_lab_products": {
     "efootball_adriatic": 14,
@@ -35,6 +35,13 @@
     "unified_upcoming_hours": 0.2,
     "qualified_best_monitor_minutes": 15
   },
-  "actions": [],
+  "actions": [
+    {
+      "workflow": "unified-upcoming.yml",
+      "action": "failure_recovery_dispatch",
+      "status": "requested",
+      "detail": "Automatic retry after failed Match Signal Unified Upcoming Board completion; cooldown prevents repeated failure loops."
+    }
+  ],
   "policy": "Watchdog self-heals stale engines, records Qualified Best scheduled/actual monitor age, dispatches a fallback when the scheduled monitor is missing/stale even if deployment checks are recent (10-minute cooldown), and retries failed board/deploy runs once per 20-minute cooldown. Workflow_run checks do not rewrite feed data to avoid downstream loops. Health publication is retried across concurrent data writers."
 }
