@@ -5,6 +5,10 @@ on:
     paths:
       - 'scripts/efootball_market_research.py'
       - 'scripts/test_efootball_market_research.py'
+      - 'scripts/efootball_performance_report.py'
+      - 'scripts/test_efootball_performance_report.py'
+      - 'scripts/efootball_performance_report.py'
+      - 'scripts/test_efootball_performance_report.py'
       - 'scripts/virtual_lab_sync.py'
       - 'functions/api/sportybet-virtual.js'
       - 'functions/api/sportybet-virtual-results.js'
@@ -34,8 +38,9 @@ jobs:
         run: python -m pip install --upgrade requests
       - name: Compile and run isolated market tests
         run: |
-          python -m py_compile scripts/efootball_market_research.py scripts/test_efootball_market_research.py
+          python -m py_compile scripts/efootball_market_research.py scripts/test_efootball_market_research.py scripts/efootball_performance_report.py scripts/test_efootball_performance_report.py
           python scripts/test_efootball_market_research.py
+          python scripts/test_efootball_performance_report.py
       - name: Check that production qualification remains disabled
         run: |
           python - <<'PY'
