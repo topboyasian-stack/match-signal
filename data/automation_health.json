@@ -1,23 +1,23 @@
 {
-  "updated_at": "2026-10-15T15:47:50.595216+00:00",
+  "updated_at": "2026-10-15T16:10:13.872815+00:00",
   "automation_status": "SELF_HEALING_ENABLED",
   "pipeline_last_update": "2026-10-15T13:24:13.536225+00:00",
-  "pipeline_age_hours": 2.39,
-  "odds_builder_last_update": "2026-10-15T15:45:28.757285+00:00",
-  "odds_builder_age_hours": 0.04,
+  "pipeline_age_hours": 2.77,
+  "odds_builder_last_update": "2026-10-15T15:47:06.344541+00:00",
+  "odds_builder_age_hours": 0.39,
   "expansion_last_update": "2026-10-15T15:44:18.862030+00:00",
-  "expansion_age_hours": 0.06,
+  "expansion_age_hours": 0.43,
   "virtual_lab_last_update": "2026-10-15T14:42:37.892773+00:00",
-  "virtual_lab_age_hours": 1.09,
-  "virtual_lab_status_age_hours": 2.2,
-  "darts_age_hours": 1.07,
-  "table_tennis_age_hours": 0.99,
+  "virtual_lab_age_hours": 1.46,
+  "virtual_lab_status_age_hours": 0.11,
+  "darts_age_hours": 0.19,
+  "table_tennis_age_hours": 1.37,
   "unified_upcoming_age_hours": 0.03,
-  "qualified_best_monitor_last_run_age_minutes": 63.7,
-  "qualified_best_monitor_last_scheduled_run_age_minutes": 63.7,
-  "qualified_best_monitor_last_fallback_dispatch_age_minutes": 64.4,
+  "qualified_best_monitor_last_run_age_minutes": 22.3,
+  "qualified_best_monitor_last_scheduled_run_age_minutes": 86.1,
+  "qualified_best_monitor_last_fallback_dispatch_age_minutes": 22.3,
   "qualified_best_monitor_schedule_status": "STALE",
-  "qualified_best_monitor_workflow_age_minutes": 1057.6,
+  "qualified_best_monitor_workflow_age_minutes": 1080.0,
   "virtual_lab_events": 739,
   "virtual_lab_products": {
     "efootball_adriatic": 12,
@@ -40,19 +40,13 @@
       "workflow": "qualified-best-schedule-watch.yml",
       "action": "schedule_gap_alert",
       "status": "warning",
-      "detail": "Qualified Best monitor schedule status=STALE; last scheduled run age=63.7 minute(s); workflow age=1057.6 minute(s)."
+      "detail": "Qualified Best monitor schedule status=STALE; last scheduled run age=86.1 minute(s); workflow age=1080.0 minute(s)."
     },
     {
       "workflow": "qualified-best-schedule-watch.yml",
       "action": "monitor_failsafe_dispatch",
       "status": "requested",
-      "detail": "Scheduled monitor run is STALE; dispatching a fallback despite recent deployment checks. A deployment-triggered monitor is active; the fallback is queued behind it."
-    },
-    {
-      "workflow": "virtual-lab-collector.yml",
-      "action": "dispatch",
-      "status": "requested",
-      "detail": "Virtual Lab research-ledger self-heal"
+      "detail": "Scheduled monitor run is STALE; dispatching a fallback despite recent deployment checks."
     }
   ],
   "policy": "Watchdog self-heals stale engines, records Qualified Best scheduled/actual monitor age, dispatches a fallback when the scheduled monitor is missing/stale even if deployment checks are recent (10-minute cooldown), and retries failed board/deploy runs once per 20-minute cooldown. Workflow_run checks do not rewrite feed data to avoid downstream loops. Health publication is retried across concurrent data writers."
