@@ -103,6 +103,8 @@ def test_empty_archive_fails_closed_and_age_warning():
     )
     assert report["source_freshness"]["collector_stale_over_30_minutes"] is True
     assert report["mode"] == "PAPER_RESEARCH_ONLY"
+    assert report["independent_winner_ggng_shadow"]["mode"] == "PAPER_SHADOW_ONLY"
+    assert report["independent_winner_ggng_shadow"]["production_qualification_enabled"] is False
     assert report["automatic_promotion"] if "automatic_promotion" in report else report["promotion_policy"]["automatic_promotion"] is False
 
 
@@ -225,3 +227,20 @@ def test_independent_shadow_keeps_gt_and_adriatic_histories_separate():
     assert a["model_mean_brier"] == b["model_mean_brier"]
     assert "efootball_adriatic|match_winner" not in gt_only["lanes"]
     assert "efootball_gt|match_winner" in mixed_products["lanes"]
+
+
+def test_independent_shadow_falls_back_for_unseen_participants_and_reports_tier():
+    rows = shadow_history()
+    # Same-product history exists, but neither target participant has appeared before.
+    for row in rows:
+        row["participant_1"] = "Historical " + row["participant_1"]
+        row["participant_2"] = "Historical " + row["participant_2"]
+    rows.extend(shadow_target_rows())
+    report = mod.build_independent_market_shadow({"observations": rows})
+    lane = report["lanes"]["efootball_gt|match_winner"]
+    assert lane["forecasted_observations"] == 1
+    assert lane["mean_training_matches"] == 40
+    assert lane["by_participant_history_tier"][0]["tier"] == "neither_participant_seen"
+    assert lane["by_participant_history_tier"][0]["model_mean_brier"] is not None
+    assert report["forecasts_by_participant_history_tier"]["neither_participant_seen"] == 2
+    assert report["skipped_target_counts"]["insufficient_global_history"] == 0

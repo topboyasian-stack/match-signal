@@ -450,13 +450,23 @@ def _shadow_poisson(lam: float, max_goals: int = 15) -> list[float]:
     return [v / total for v in values] if total > 0 else [1.0] + [0.0] * max_goals
 
 
+def _shadow_participant_counts(history: list[dict[str, Any]], p1: str, p2: str) -> tuple[int, int]:
+    """Number of unique prior games for each participant in the already-deduplicated history."""
+    n1 = n2 = 0
+    for event in history:
+        names = {event["participant_1"], event["participant_2"]}
+        if p1 in names:
+            n1 += 1
+        if p2 in names:
+            n2 += 1
+    return n1, n2
+
+
 def _shadow_score_probabilities(history: list[dict[str, Any]], p1: str, p2: str,
                                 market_type: str) -> dict[str, float] | None:
-    """Participant-form Poisson shadow model; no bookmaker odds enter the forecast."""
-    if len(history) < SHADOW_MIN_HISTORY_MATCHES:
+    """Participant-form Poisson shadow model with a league-prior fallback; odds never enter its forecast."""
+    if len(history) < SHADOW_MIN_HISTORY_MATCHES or not p1 or not p2 or p1 == p2:
         return None
-    n1 = {"played": 0, "for": 0, "against": 0}
-    n2 = {"played": 0, "for": 0, "against": 0}
     participants: dict[str, dict[str, float]] = {}
     total_p1 = total_p2 = 0.0
     for event in history:
@@ -471,9 +481,10 @@ def _shadow_score_probabilities(history: list[dict[str, Any]], p1: str, p2: str,
             stats["played"] += 1
             stats["for"] += scored
             stats["against"] += conceded
-    s1, s2 = participants.get(p1), participants.get(p2)
-    if not s1 or not s2 or s1["played"] < SHADOW_MIN_PARTICIPANT_MATCHES or s2["played"] < SHADOW_MIN_PARTICIPANT_MATCHES:
-        return None
+    # A participant with little/no history falls back toward the same-product scoring prior.
+    # Their forecast is still evaluated, but the report tags its history coverage separately.
+    empty_stats = {"played": 0, "for": 0.0, "against": 0.0}
+    s1, s2 = participants.get(p1, empty_stats), participants.get(p2, empty_stats)
 
     global_side_mean = (total_p1 + total_p2) / (2 * len(history))
     home_mean, away_mean = total_p1 / len(history), total_p2 / len(history)
@@ -608,8 +619,9 @@ def build_independent_market_shadow(archive: dict[str, Any]) -> dict[str, Any]:
     events, conflicting_events = _shadow_settled_events(rows)
     forecasts: dict[str, list[dict[str, Any]]] = defaultdict(list)
     skipped = {"unsettled_or_invalid_target": 0, "not_pre_kickoff": 0,
-               "insufficient_global_history": 0, "insufficient_participant_history": 0,
+               "insufficient_global_history": 0, "invalid_participant_identity": 0,
                "invalid_outcome_or_market": 0}
+    participant_history_tier_counts: dict[str, int] = defaultdict(int)
     for target in rows:
         product = str(target.get("product") or "")
         kind = str(target.get("market_type") or "")
@@ -628,6 +640,9 @@ def build_independent_market_shadow(archive: dict[str, Any]) -> dict[str, Any]:
             skipped["not_pre_kickoff"] += 1
             continue
         p1, p2 = _shadow_participant(target.get("participant_1")), _shadow_participant(target.get("participant_2"))
+        if not p1 or not p2 or p1 == p2:
+            skipped["invalid_participant_identity"] += 1
+            continue
         actual = ("home" if score[0] > score[1] else "away" if score[0] < score[1] else "draw") if kind == "match_winner" else ("yes" if score[0] > 0 and score[1] > 0 else "no")
         recorded = str(target.get("actual_outcome") or "").strip().lower()
         if kind == "match_winner" and actual not in {"home", "away", "draw"}:
@@ -653,8 +668,18 @@ def build_independent_market_shadow(archive: dict[str, Any]) -> dict[str, Any]:
             continue
         probs = _shadow_score_probabilities(history, p1, p2, kind)
         if probs is None:
-            skipped["insufficient_participant_history"] += 1
+            skipped["insufficient_global_history"] += 1
             continue
+        p1_prior_games, p2_prior_games = _shadow_participant_counts(history, p1, p2)
+        if p1_prior_games >= SHADOW_MIN_PARTICIPANT_MATCHES and p2_prior_games >= SHADOW_MIN_PARTICIPANT_MATCHES:
+            participant_tier = "both_3plus_prior_games"
+        elif p1_prior_games > 0 and p2_prior_games > 0:
+            participant_tier = "both_seen_under_3_or_one_under_3"
+        elif p1_prior_games > 0 or p2_prior_games > 0:
+            participant_tier = "one_participant_unseen_or_low_history"
+        else:
+            participant_tier = "neither_participant_seen"
+        participant_history_tier_counts[participant_tier] += 1
         probs = _shadow_vector(probs, outcomes)
         market_probs = _shadow_vector(target.get("market_probabilities_no_vig"), outcomes)
         row = {
@@ -667,6 +692,9 @@ def build_independent_market_shadow(archive: dict[str, Any]) -> dict[str, Any]:
             "captured_at": captured.isoformat(),
             "actual_outcome": actual,
             "training_matches": len(history),
+            "participant_1_prior_games": p1_prior_games,
+            "participant_2_prior_games": p2_prior_games,
+            "participant_history_tier": participant_tier,
             "model_probabilities": probs,
             "market_probabilities_no_vig": market_probs,
             "model_brier": _shadow_brier(probs, actual),
@@ -699,6 +727,9 @@ def build_independent_market_shadow(archive: dict[str, Any]) -> dict[str, Any]:
         else:
             readiness = "PRELIMINARY_REVIEW_INCONCLUSIVE"
 
+        participant_tier_groups = []
+        for tier, segment in group_rows(ordered, lambda r: r.get("participant_history_tier")).items():
+            participant_tier_groups.append({"tier": tier, **_shadow_probability_stats(segment)})
         selected_rows = [r for r in ordered if r.get("picked_side")]
         competition_groups = []
         for name, segment in group_rows(selected_rows, lambda r: r.get("competition")).items():
@@ -711,12 +742,13 @@ def build_independent_market_shadow(archive: dict[str, Any]) -> dict[str, Any]:
         time_groups.sort(key=lambda s: s.get("group", ""))
         lane_report[key] = {
             **stats,
-            "method": "Participant-form Poisson goals model using only unique earlier same-product games settled by each target's captured_at; minimum 30 prior matches and 3 matches per participant; probabilities do not use bookmaker odds.",
+            "method": "Participant-form Poisson goals model using only unique earlier same-product games settled by each target's captured_at; requires 30 prior matches globally, shrinks participants with limited history toward that product's scoring prior, and reports performance by participant-history tier; probabilities do not use bookmaker odds.",
             "chronological_split": {
                 "method": "Sort forecasted observations by scheduled kickoff; earliest 70% versus latest 30%.",
                 "first_70_percent": _shadow_probability_stats(first),
                 "latest_30_percent": latest_stats,
             },
+            "by_participant_history_tier": participant_tier_groups,
             "by_competition_value_picks": competition_groups,
             "by_kickoff_time_value_picks": time_groups,
             "promotion_review": {
@@ -736,6 +768,7 @@ def build_independent_market_shadow(archive: dict[str, Any]) -> dict[str, Any]:
         "scored_unique_history_events": len(events),
         "conflicting_history_events_excluded": conflicting_events,
         "skipped_target_counts": skipped,
+        "forecasts_by_participant_history_tier": dict(sorted(participant_history_tier_counts.items())),
         "lanes": lane_report,
         "limitations": "Exploratory model, not an approved predictor. Results can be dependent because participants recur; the walk-forward split and probability-score comparison are informative screens, not proof of durable profit. No forecast from this report is sent to Qualified Best or Odds Builder.",
     }
