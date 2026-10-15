@@ -829,6 +829,7 @@ def build_report(ou_rows: list[dict[str, Any]], market_archive: dict[str, Any],
     gt_coverage = product_coverage.get("efootball_gt") or {}
     adriatic_coverage = product_coverage.get("efootball_adriatic") or {}
     research_summary = summarize_market_archive(market_archive)
+    independent_shadow = build_independent_market_shadow(market_archive)
     gt_winner = research_summary["summary_by_product_market"].get("efootball_gt|match_winner") or {}
     gt_btts = research_summary["summary_by_product_market"].get("efootball_gt|btts") or {}
     adriatic_winner = research_summary["summary_by_product_market"].get("efootball_adriatic|match_winner") or {}
@@ -876,6 +877,7 @@ def build_report(ou_rows: list[dict[str, Any]], market_archive: dict[str, Any],
         },
         "qualified_best_ou_single_picks": build_ou_report(ou_rows),
         "winner_and_gg_ng_market_baselines": research_summary,
+        "independent_winner_ggng_shadow": independent_shadow,
         "ticket_performance": build_ticket_report(tracker),
         "walk_forward_ou_model_evaluation": model_eval,
         "market_review_status": market_status,
@@ -921,6 +923,7 @@ def main() -> None:
         "paper_only": True,
         "ou_settled": report["qualified_best_ou_single_picks"]["metrics"]["settled"],
         "market_lanes": {k: v.get("settled", 0) for k, v in report["winner_and_gg_ng_market_baselines"]["summary_by_product_market"].items()},
+        "independent_shadow_lanes": {k: {"forecasts": v.get("forecasted_observations", 0), "promotion_review": v.get("promotion_review", {}).get("status")} for k, v in report["independent_winner_ggng_shadow"]["lanes"].items()},
         "efootball_related_tickets": report["ticket_performance"]["efootball_related_ticket_count"],
         "collector_stale_over_30_minutes": report["source_freshness"]["collector_stale_over_30_minutes"],
         "automatic_promotion": False,
