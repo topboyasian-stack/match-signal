@@ -242,5 +242,25 @@ def test_independent_shadow_falls_back_for_unseen_participants_and_reports_tier(
     assert lane["mean_training_matches"] == 40
     assert lane["by_participant_history_tier"][0]["tier"] == "neither_participant_seen"
     assert lane["by_participant_history_tier"][0]["model_mean_brier"] is not None
+    assert "chronological_split" in lane["by_participant_history_tier"][0]
+    assert "by_picked_side_value_picks" in lane
+    assert "by_selected_odds_band_value_picks" in lane
+    assert lane["diagnostic_findings"]
     assert report["forecasts_by_participant_history_tier"]["neither_participant_seen"] == 2
     assert report["skipped_target_counts"]["insufficient_global_history"] == 0
+
+
+def test_shadow_review_rejects_a_configuration_that_loses_to_market_in_both_periods():
+    assert mod._shadow_review_status(
+        795, 621, 0.0291, 0.0367, 0.0331, 0.0417, -0.2190,
+    ) == "REJECT_CURRENT_SHADOW_MODEL_VS_MARKET"
+    # A positive latest flat-stake ROI cannot override worse probability scores in both periods.
+    assert mod._shadow_review_status(
+        119, 83, 0.0256, 0.0315, 0.0127, 0.0233, 0.0532,
+    ) == "REJECT_CURRENT_SHADOW_MODEL_VS_MARKET"
+    assert mod._shadow_review_status(
+        120, 80, -0.02, -0.03, -0.01, -0.02, 0.03,
+    ) == "ELIGIBLE_FOR_PAPER_PROMOTION_REVIEW"
+    assert mod._shadow_review_status(
+        99, 80, -0.02, -0.03, -0.01, -0.02, 0.03,
+    ) == "COLLECT_AND_MONITOR"
