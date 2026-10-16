@@ -2814,7 +2814,13 @@ def _construct_model_first_batch(
             and str(x.get("product") or "").startswith("efootball_")
             for x in rows
         )
-        calibrated=raw if all_efootball_evidence else _calibrated_ticket_probability(raw)
+        if all_efootball_evidence:
+            calibration=_efootball_exact_evidence_ticket_gamma()
+            if not calibration.get("promotion_allowed"):
+                continue
+            calibrated=max(0.0005,min(0.9995,raw**float(calibration.get("gamma") or 1.0)))
+        else:
+            calibrated=_calibrated_ticket_probability(raw)
         if (calibrated*odds)-1.0 < RESULTS_FIRST_MIN_EXPECTED_ROI:
             continue
         valid.append((rows,calibrated,odds))
