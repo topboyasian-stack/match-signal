@@ -2529,8 +2529,9 @@ def _construct_efootball_compact_batch(pool):
 
     Only already Builder-eligible, exact-evidence eFootball GT/Adriatic rows are
     considered. Each leg clears the lane's 65% floor and positive single-leg EV;
-    the ticket reaches 2.00x and at least +2% modelled EV. Joint probability is
-    an independence proxy, not settled ticket proof.
+    the ticket reaches 2.00x and at least +2% modelled EV. The raw leg product is
+    an independence baseline; a batch is held until lane-specific chronological
+    calibration improves future Brier. That still is not profitability proof.
     """
     rows=[
         x for x in pool
@@ -2638,7 +2639,7 @@ def _construct_efootball_compact_batch(pool):
         "expected_roi":round(float(best[5]),6),
         "span_minutes":round(float(best[4]),1),
         "reason":"qualified_compact_efootball_combination",
-        "probability_method":"exact-evidence per-leg probabilities multiplied as an independence proxy; not settled-ticket performance proof"
+        "probability_method":"raw leg product adjusted by lane-specific chronological gamma only after out-of-sample Brier improves; not profitability proof"
     })
     return selected,diag
 
