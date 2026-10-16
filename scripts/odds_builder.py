@@ -18,6 +18,7 @@ from __future__ import annotations
 import json, math, urllib.parse, urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
+from ticket_history import settled_ticket_history
 
 ROOT=Path(__file__).resolve().parents[1]
 DATA=ROOT/"data"
@@ -2130,19 +2131,22 @@ def _ticket_calibration_gamma():
     if _TICKET_CALIBRATION_CACHE is not None:
         return _TICKET_CALIBRATION_CACHE
     raw=load(DATA/"odds_ticket_tracker.json",{})
-    tickets=raw.get("tickets") if isinstance(raw,dict) else []
+    # The tracker keeps only a rolling active window in "tickets"; settled
+    # history beyond that window lives in "archived_tickets". Recombine and
+    # deduplicate before learning so the calibration does not silently lose most
+    # of its chronological sample when records roll off the visible desk.
+    tickets=settled_ticket_history(raw,min_legs=2,max_legs=7)
     rows=[]
-    for ticket in tickets if isinstance(tickets,list) else []:
+    for ticket in tickets:
         if str(ticket.get("status") or "").upper() not in {"WON","LOST"}:
             continue
         try:
-            leg_count=int(ticket.get("leg_count") or len(ticket.get("legs") or []))
             raw_p=float(ticket.get("combined_model_probability"))
         except (TypeError,ValueError):
             continue
-        if not 2<=leg_count<=7 or not 0<raw_p<1:
+        if not 0<raw_p<1:
             continue
-        stamp=ticket.get("last_settled_at") or ticket.get("settled_at") or ticket.get("updated_at")
+        stamp=ticket.get("_calibration_stamp")
         if not stamp:
             continue
         rows.append((str(stamp),raw_p,1.0 if str(ticket.get("status") or "").upper()=="WON" else 0.0))
@@ -4034,6 +4038,14 @@ def main():
     result={
         "generated_at":now.isoformat(),"engine_version":"V6.1-RESEARCH-GATED",
         "mode":"PAPER_ONLY","target_legs":f"standard 2–4 legs at {odds_gate['floor']:.2f}x active minimum / {odds_gate['preferred_target']:.2f}x preferred; compact eFootball 4–5 legs at {COMPACT_EFOOTBALL_MIN_COMBINED_ODDS:.2f}x+ when all gates pass","sports_supported":["football","tennis","virtual"],
+        "ticket_calibration_diagnostics":{
+            "historical_settled_ticket_gamma":_ticket_calibration_gamma(),
+            "efootball_exact_evidence_lane":{
+                "mode":"efootball_exact_evidence_independence_proxy",
+                "historical_gamma_applied":False,
+                "reason":"eFootball exact-evidence tickets remain on a separate paper-only independence proxy until an eFootball-only chronological ticket calibration demonstrates improvement."
+            }
+        },
         "research_gate":{
             "selection_gate_status":gate_status,
             "combined_odds_gate":odds_gate,
