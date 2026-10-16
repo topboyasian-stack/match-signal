@@ -12,6 +12,7 @@ from __future__ import annotations
 import json, math
 from datetime import datetime, timezone
 from pathlib import Path
+from ticket_history import merge_ticket_history, settled_ticket_history
 
 ROOT=Path(__file__).resolve().parents[1]
 DATA=ROOT/"data"
@@ -70,8 +71,8 @@ def blend(m,q,a): return a*m+(1-a)*q
 def logit(p): return math.log(p/(1-p))
 def invlogit(z): return 1/(1+math.exp(-max(-30,min(30,z))))
 
-def calibrate(rows, model_key="combined_model_probability"):
-    rows=sorted(rows,key=lambda t:str(t.get("settled_at") or ""))
+def calibrate(rows, model_key="raw_combined_model_probability"):
+    rows=sorted(rows,key=lambda t:str(t.get("_calibration_stamp") or t.get("last_settled_at") or t.get("settled_at") or t.get("updated_at") or ""))
     usable=[t for t in rows if prob(t,model_key) is not None and market(t) is not None]
     predictions=[]
     for i,t in enumerate(usable):
@@ -86,7 +87,7 @@ def calibrate(rows, model_key="combined_model_probability"):
         m=prob(t,model_key); q=market(t)
         predictions.append({
             "ticket_id":t.get("ticket_id"),
-            "settled_at":t.get("settled_at"),
+            "settled_at":t.get("_calibration_stamp") or t.get("last_settled_at") or t.get("settled_at") or t.get("updated_at"),
             "leg_count":int(t.get("leg_count") or len(t.get("legs") or [])),
             "status":t.get("status"),
             "model_probability":m,
@@ -109,25 +110,66 @@ def calibrate(rows, model_key="combined_model_probability"):
 
 def main():
     raw=load(TRACKER,{})
-    tickets=raw.get("tickets") if isinstance(raw,dict) else []
-    settled=[t for t in tickets if str(t.get("status") or "").upper() in {"WON","LOST"}]
+    unique_tickets,history_diagnostics=merge_ticket_history(raw)
+    settled=settled_ticket_history(raw,min_legs=2,max_legs=7)
     modern=[t for t in settled if 2<=int(t.get("leg_count") or len(t.get("legs") or []))<=4]
-    all_pred,all_metrics=calibrate(settled)
-    modern_pred,modern_metrics=calibrate(modern)
+    all_raw=[t for t in settled if prob(t,"raw_combined_model_probability") is not None and market(t) is not None]
+    modern_raw=[t for t in modern if prob(t,"raw_combined_model_probability") is not None and market(t) is not None]
+    all_pred,all_metrics=calibrate(all_raw)
+    modern_pred,modern_metrics=calibrate(modern_raw)
+
+    # Keep calibration diagnostics segmented by the original Builder lane. An
+    # aggregate can hide large differences between exact-evidence eFootball,
+    # high-confidence research, and older mixed construction lanes. Only rows
+    # with the uncalibrated joint product are scored; legacy probability fields
+    # are too ambiguous to train a second correction from.
+    by_primary_lane={}
+    lane_names=sorted({str(t.get("primary_lane") or "unknown") for t in settled})
+    for lane in lane_names:
+        lane_tickets=[t for t in settled if str(t.get("primary_lane") or "unknown")==lane]
+        lane_raw=[t for t in lane_tickets if prob(t,"raw_combined_model_probability") is not None and market(t) is not None]
+        if len(lane_raw)<WARMUP+2:
+            continue
+        _,lane_metrics=calibrate(lane_raw)
+        by_primary_lane[lane]={
+            "settled_sample":len(lane_tickets),
+            "raw_joint_probability_sample":len(lane_raw),
+            "scored_holdout_sample":lane_metrics.get("n",0),
+            **lane_metrics,
+        }
+
     out={
         "generated_at":datetime.now(timezone.utc).isoformat(),
         "mode":"PAPER_ONLY_DIAGNOSTIC",
         "production_selection_changed":False,
-        "method":"strict chronological ticket-level walk-forward; each calibration weight uses only earlier settled tickets",
+        "method":"strict chronological ticket-level walk-forward on the stored raw joint product; each calibration weight uses only earlier settled tickets",
+        "history_scope":"Deduplicated union of tickets and archived_tickets; current ticket rows take precedence when ticket IDs overlap.",
+        "history_diagnostics":{
+            **history_diagnostics,
+            "unique_ticket_rows":len(unique_tickets),
+            "settled_calibration_rows":len(settled),
+        },
         "warmup_tickets":WARMUP,
         "grid":GRID,
-        "samples":{"all_settled":len(settled),"modern_2_to_4":len(modern)},
+        "samples":{
+            "active_rows":history_diagnostics.get("current_rows",0),
+            "archived_rows":history_diagnostics.get("archived_rows",0),
+            "unique_rows":history_diagnostics.get("unique_rows",0),
+            "duplicate_rows_collapsed":history_diagnostics.get("duplicate_rows_collapsed",0),
+            "all_settled":len(settled),
+            "modern_2_to_4":len(modern),
+            "raw_joint_probability_rows":len(all_raw),
+            "modern_2_to_4_raw_joint_probability_rows":len(modern_raw),
+        },
+        "probability_source":"raw_combined_model_probability (uncalibrated joint probability); legacy rows without this field are excluded from probability scoring.",
+        "calibration_status":"INSUFFICIENT_COMPATIBLE_RAW_JOINT_HISTORY" if len(modern_raw)<WARMUP+3 else "PAPER_DIAGNOSTIC_READY_FOR_REVIEW",
         "all_settled":all_metrics,
         "modern_2_to_4":modern_metrics,
+        "by_primary_lane":by_primary_lane,
         "decision":{
             "promotion_allowed":False,
             "reason":"Calibration experiment must be independently reviewed before production use.",
-            "note":"A lower Brier/log-loss on the held-forward rows is evidence for calibration, not evidence of future profitability."
+            "note":"A lower Brier/log-loss on held-forward rows is evidence for calibration, not evidence of future profitability. Do not use this report to lower production gates automatically."
         },
         "modern_predictions":modern_pred,
     }
