@@ -17,7 +17,8 @@ def make_ticket(index, *, status=None, stamp=None, ticket_id=None, lane="efootba
         "last_settled_at": stamp or f"2026-10-{min(index + 1, 28):02d}T12:00:00+00:00",
         "leg_count": 2,
         "combined_odds": 3.4,
-        "combined_model_probability": 0.80,
+        "combined_model_probability": 0.60,
+        "raw_combined_model_probability": 0.80,
         "primary_lane": lane,
         "products": ["efootball_gt"],
         "legs": [
@@ -60,6 +61,8 @@ class TicketCalibrationHistoryTests(unittest.TestCase):
         self.assertEqual(len(predictions), 4)
         self.assertTrue(all(row["settled_at"] for row in predictions))
         self.assertEqual(predictions[0]["ticket_id"], rows[8]["ticket_id"])
+        self.assertAlmostEqual(predictions[0]["model_probability"], 0.80)
+        self.assertEqual(experiment.calibrate(rows)[1]["naive"]["avg_probability"], 0.80)
 
     def test_builder_gamma_uses_archived_settlements_and_deduplicates(self):
         old_cache = builder._TICKET_CALIBRATION_CACHE
@@ -72,6 +75,20 @@ class TicketCalibrationHistoryTests(unittest.TestCase):
         self.assertEqual(result["sample"], 12)
         self.assertTrue(result["trained"])
         self.assertEqual(result["gamma_observations"], 4)
+
+    def test_legacy_rows_without_raw_joint_probability_do_not_train_gamma(self):
+        raw = ledger_fixture()
+        for ticket in raw["archived_tickets"]:
+            ticket.pop("raw_combined_model_probability", None)
+        old_cache = builder._TICKET_CALIBRATION_CACHE
+        builder._TICKET_CALIBRATION_CACHE = None
+        try:
+            with patch.object(builder, "load", return_value=raw):
+                result = builder._ticket_calibration_gamma()
+        finally:
+            builder._TICKET_CALIBRATION_CACHE = old_cache
+        self.assertEqual(result["sample"], 3, "only distinct current rows with raw joint probabilities may train")
+        self.assertFalse(result["trained"])
 
     def test_efootball_ticket_lane_does_not_inherit_unrelated_general_gamma(self):
         legs = [
