@@ -166,36 +166,59 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          # Bound publication retries so a stalled push cannot occupy the collector queue indefinitely.
-          for attempt in 1 2 3; do
+          # Artifact generation is expensive. When unrelated automation advances main,
+          # rebase the already-generated collector commit instead of recalculating every
+          # model/profile artifact after each non-fast-forward rejection.
+          for attempt in 1 2 3 4 5; do
             git add data/virtual_lab_pending.json data/virtual_lab_history.json data/virtual_lab_status.json data/virtual_lab_eligibility.json data/virtual_lab_model_eval.json data/virtual_lab_participant_profiles.json data/virtual_lab_participant_h2h.json data/virtual_lab_external_h2h.json data/virtual_lab_confirmed_participant_results.json data/virtual_lab_participants/registry.json data/virtual_lab_participant_lifecycle.json data/virtual_lab_archive/settlements data/system_health.json
 
-            if git diff --cached --quiet; then
-              echo "Virtual Lab collector produced no data changes."
+            if ! git diff --cached --quiet; then
+              git commit -m "🤖 Collect and settle Virtual Lab observations"
+            fi
+
+            ahead="$(git rev-list --count origin/main..HEAD)"
+            if [ "$ahead" -eq 0 ]; then
+              echo "Virtual Lab collector produced no publishable data changes."
               exit 0
             fi
 
-            git commit -m "🤖 Collect and settle Virtual Lab observations"
-
-            # Keep the remote write non-interactive and time-bounded. A successful
-            # server-side update remains safe if the client times out after the push.
-            if timeout --signal=TERM --kill-after=10s 90s env GIT_TERMINAL_PROMPT=0 git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 push origin main; then
+            # Keep network writes non-interactive and time-bounded.
+            if timeout --signal=TERM --kill-after=10s 45s env GIT_TERMINAL_PROMPT=0 git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=30 push origin HEAD:main; then
               echo "Virtual Lab collector publication succeeded on attempt $attempt."
               exit 0
             fi
 
-            echo "Collector publication attempt $attempt failed or timed out; reconciling with latest main before a bounded retry."
-            sleep $((attempt * 5))
-            timeout --signal=TERM --kill-after=10s 60s env GIT_TERMINAL_PROMPT=0 git fetch origin main
-            git reset --hard origin/main
-            python scripts/virtual_lab_collector.py
-            python scripts/virtual_lab_model_eval.py
-            python scripts/virtual_lab_participant_profiles.py
-            python scripts/virtual_lab_h2h_enricher.py
-            python scripts/virtual_lab_confirmed_participants.py
-            python scripts/virtual_lab_eligibility.py
-            python scripts/system_health_audit.py
+            if [ "$attempt" -eq 5 ]; then
+              break
+            fi
+
+            echo "Publication attempt $attempt lost a race with another main writer; rebasing the existing collector commit first."
+            sleep $((attempt * 2))
+            timeout --signal=TERM --kill-after=10s 45s env GIT_TERMINAL_PROMPT=0 git fetch origin main
+
+            if git rebase origin/main; then
+              # Health is derived from the just-refreshed artifacts and can be
+              # recomputed cheaply after rebasing. Preserve the expensive model work.
+              python scripts/system_health_audit.py
+              git add data/system_health.json
+              if ! git diff --cached --quiet; then
+                git commit --amend --no-edit
+              fi
+            else
+              # A true same-file conflict needs a fresh collector snapshot. Do this
+              # only after rebase fails, not for unrelated commits elsewhere in main.
+              echo "Collector artifact overlap detected; refreshing collector data from latest main."
+              git rebase --abort || true
+              git reset --hard origin/main
+              python scripts/virtual_lab_collector.py
+              python scripts/virtual_lab_model_eval.py
+              python scripts/virtual_lab_participant_profiles.py
+              python scripts/virtual_lab_h2h_enricher.py
+              python scripts/virtual_lab_confirmed_participants.py
+              python scripts/virtual_lab_eligibility.py
+              python scripts/system_health_audit.py
+            fi
           done
 
-          echo "Virtual Lab collector could not publish after retries."
+          echo "Virtual Lab collector could not publish after bounded rebase attempts."
           exit 1
