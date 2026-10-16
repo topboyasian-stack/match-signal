@@ -2172,6 +2172,157 @@ def _ticket_calibration_gamma():
     return result
 
 
+_EFOOTBALL_TICKET_CALIBRATION_CACHE=None
+
+
+def _fit_efootball_ticket_gamma(rows, warmup=8, minimum_oos=12):
+    """Fit a lane-only shrinkage exponent and require better chronological OOS Brier."""
+    rows=sorted(rows,key=lambda row:row[0])
+    if not rows:
+        return {
+            "gamma":1.0,"sample":0,"warmup":warmup,"trained":False,
+            "source":"insufficient_efootball_exact_evidence_ticket_history",
+            "oos_sample":0,"raw_oos_brier":None,"calibrated_oos_brier":None,
+            "oos_brier_improved":False,"promotion_allowed":False
+        }
+
+    grid=[0.5+i*0.1 for i in range(46)]
+    timestamps=sorted({row[0] for row in rows})
+    selected_gammas=[]
+    oos=[]
+    for stamp in timestamps:
+        prior=[row for row in rows if row[0] < stamp]
+        current=[row for row in rows if row[0] == stamp]
+        if len(prior)<warmup or not current:
+            continue
+
+        def score_gamma(gamma):
+            return sum((y-max(0.0005,min(0.9995,p**gamma)))**2 for _,p,y in prior)/len(prior)
+
+        chosen=min(grid,key=lambda gamma:(score_gamma(gamma),abs(gamma-1.0)))
+        selected_gammas.append(chosen)
+        for _,p,y in current:
+            oos.append((p,y,max(0.0005,min(0.9995,p**chosen))))
+
+    raw_brier=sum((y-p)**2 for p,y,_ in oos)/len(oos) if oos else None
+    calibrated_brier=sum((y-calibrated)**2 for _,y,calibrated in oos)/len(oos) if oos else None
+    improved=(
+        len(oos)>=minimum_oos and raw_brier is not None and calibrated_brier is not None
+        and calibrated_brier < raw_brier-1e-6
+    )
+    if len(selected_gammas)<3 or not improved:
+        return {
+            "gamma":1.0,"sample":len(rows),"warmup":warmup,"trained":False,
+            "source":"efootball_exact_evidence_chronological_calibration_not_validated",
+            "gamma_observations":len(selected_gammas),"oos_sample":len(oos),
+            "raw_oos_brier":round(raw_brier,6) if raw_brier is not None else None,
+            "calibrated_oos_brier":round(calibrated_brier,6) if calibrated_brier is not None else None,
+            "oos_brier_improved":False,"promotion_allowed":False
+        }
+
+    gamma=max(1.0,min(4.0,sum(selected_gammas)/len(selected_gammas)))
+    return {
+        "gamma":round(gamma,4),"sample":len(rows),"warmup":warmup,"trained":True,
+        "source":"efootball_exact_evidence_chronological_ticket_brier_calibration",
+        "gamma_observations":len(selected_gammas),"oos_sample":len(oos),
+        "raw_oos_brier":round(raw_brier,6),"calibrated_oos_brier":round(calibrated_brier,6),
+        "oos_brier_improved":True,"promotion_allowed":True,
+        "dependent_ticket_rows_warning":"Settled tickets can reuse legs/events; OOS calibration is a risk-control signal, not independent profitability proof."
+    }
+
+
+def _efootball_exact_evidence_ticket_gamma():
+    """Validate lane-specific joint-probability calibration and observed ticket returns."""
+    global _EFOOTBALL_TICKET_CALIBRATION_CACHE
+    if _EFOOTBALL_TICKET_CALIBRATION_CACHE is not None:
+        return _EFOOTBALL_TICKET_CALIBRATION_CACHE
+
+    tracker=load(DATA/"odds_ticket_tracker.json",{})
+    tickets=settled_ticket_history(tracker,min_legs=2,max_legs=7)
+    lane_tickets=[]
+    rows=[]
+    profit_rows=[]
+    missing_raw=0
+    for ticket in tickets:
+        primary_lane=str(ticket.get("primary_lane") or ticket.get("construction_lane") or "").strip()
+        legs=ticket.get("legs") if isinstance(ticket.get("legs"),list) else []
+        if primary_lane:
+            is_lane_ticket=primary_lane=="efootball_exact_evidence_value"
+        else:
+            is_lane_ticket=bool(legs) and all(
+                isinstance(leg,dict)
+                and str(leg.get("product") or "").startswith("efootball_")
+                and str(leg.get("qualification_lane") or "")=="efootball_exact_evidence_value"
+                for leg in legs
+            )
+        if not is_lane_ticket:
+            continue
+        lane_tickets.append(ticket)
+        status=str(ticket.get("status") or "").upper()
+        stamp=str(ticket.get("_calibration_stamp") or "")
+        if status not in {"WON","LOST"}:
+            continue
+        try:
+            odds=float(ticket.get("combined_odds"))
+        except (TypeError,ValueError):
+            odds=None
+        if odds is not None and odds>1.0:
+            won=status=="WON"
+            profit_rows.append({
+                "stamp":stamp,
+                "won":won,
+                "net_units":odds-1.0 if won else -1.0
+            })
+        try:
+            raw_probability=float(ticket.get("raw_combined_model_probability"))
+        except (TypeError,ValueError):
+            missing_raw+=1
+            continue
+        if not stamp or not 0<raw_probability<1:
+            missing_raw+=1
+            continue
+        rows.append((stamp,raw_probability,1.0 if status=="WON" else 0.0))
+
+    result=_fit_efootball_ticket_gamma(rows)
+    lane_wins=sum(1 for row in profit_rows if row["won"])
+    lane_losses=sum(1 for row in profit_rows if not row["won"])
+    lane_profit=sum(row["net_units"] for row in profit_rows)
+    lane_profit_n=len(profit_rows)
+    lane_roi=lane_profit/lane_profit_n if lane_profit_n else None
+    brier_promotion_allowed=result.get("promotion_allowed") is True
+    profit_sample_sufficient=lane_profit_n>=30
+    profitability_promotion_allowed=profit_sample_sufficient and lane_roi is not None and lane_roi>0.0
+    promotion_allowed=brier_promotion_allowed and profitability_promotion_allowed
+    hold_reason=None
+    if not brier_promotion_allowed:
+        hold_reason="chronological_oos_brier_not_improved"
+    elif not profit_sample_sufficient:
+        hold_reason="insufficient_settled_lane_roi_sample"
+    elif not profitability_promotion_allowed:
+        hold_reason="settled_lane_roi_not_positive"
+
+    result.update({
+        "lane":"efootball_exact_evidence_value",
+        "settled_lane_ticket_count":len(lane_tickets),
+        "missing_raw_joint_probability_count":missing_raw,
+        "source_field":"raw_combined_model_probability",
+        "brier_promotion_allowed":brier_promotion_allowed,
+        "profitability_promotion_allowed":profitability_promotion_allowed,
+        "settled_lane_profit_ticket_count":lane_profit_n,
+        "settled_lane_wins":lane_wins,
+        "settled_lane_losses":lane_losses,
+        "settled_lane_net_units":round(lane_profit,6),
+        "settled_lane_flat_stake_roi":round(lane_roi,6) if lane_roi is not None else None,
+        "profitability_minimum_settled_tickets":30,
+        "promotion_allowed":promotion_allowed,
+        "promotion_hold_reason":hold_reason,
+        "active_batch_policy":"require improved chronological OOS Brier and positive settled lane ROI on at least 30 tickets",
+        "dependent_ticket_rows_warning":"Settled tickets can reuse legs/events; OOS calibration and ROI are risk controls, not independent profitability proof."
+    })
+    _EFOOTBALL_TICKET_CALIBRATION_CACHE=result
+    return result
+
+
 def _calibrated_ticket_probability(raw_probability):
     try:
         p=max(.0005,min(.9995,float(raw_probability)))
@@ -2209,46 +2360,32 @@ def _batch_metrics(legs):
     probs=[max(0.0005,min(0.9995,float(x.get("model_probability") or 0.0))) for x in legs if float(x.get("model_probability") or 0.0)>0]
     edges=[float(x.get("model_edge") or 0.0) for x in legs]
     if not probs:
-        return {
-            "model_rating":0.0,
-            "raw_model_rating":0.0,
-            "combined_model_probability":0.0,
-            "raw_combined_model_probability":0.0,
-            "ticket_calibration_gamma":float(_ticket_calibration_gamma().get("gamma") or 1.0),
-            "leg_strength_rating":0.0,
-            "avg_model_probability":0.0,
-            "avg_model_edge_percent":0.0
-        }
+        return {"model_rating":0.0,"raw_model_rating":0.0,"combined_model_probability":0.0,
+                "raw_combined_model_probability":0.0,"ticket_calibration_gamma":1.0,
+                "ticket_calibration_mode":"no_eligible_probability","ticket_calibration_ready":False,
+                "leg_strength_rating":0.0,"avg_model_probability":0.0,"avg_model_edge_percent":0.0}
     raw_combined=math.prod(probs)
-    all_vfootball_holdout=all(
-        str(x.get("qualification_lane") or "")=="vfootball_event_holdout_value"
-        and str(x.get("product") or "")=="vfootball"
-        for x in legs
-    )
+    all_vfootball_holdout=all(str(x.get("qualification_lane") or "")=="vfootball_event_holdout_value" and str(x.get("product") or "")=="vfootball" for x in legs)
+    all_efootball_evidence=all(str(x.get("qualification_lane") or "")=="efootball_exact_evidence_value" and str(x.get("product") or "").startswith("efootball_") for x in legs)
     ticket_calibration_mode="historical_settled_ticket_gamma"
     ticket_gamma=float(_ticket_calibration_gamma().get("gamma") or 1.0)
-    all_efootball_evidence=all(
-        str(x.get("qualification_lane") or "")=="efootball_exact_evidence_value"
-        and str(x.get("product") or "").startswith("efootball_")
-        for x in legs
-    )
+    ticket_calibration_ready=True
+    lane_calibration=None
     if all_efootball_evidence:
-        # Do not apply the historical VFootball ticket gamma to eFootball.
-        # eFootball has no adequate settled-ticket calibration sample yet;
-        # each leg already uses exact-line/side evidence calibration.
-        calibrated=raw_combined
-        ticket_calibration_mode="efootball_exact_evidence_independence_proxy"
-        ticket_gamma=1.0
+        lane_calibration=_efootball_exact_evidence_ticket_gamma()
+        if lane_calibration.get("trained") is True and lane_calibration.get("promotion_allowed") is True:
+            ticket_gamma=float(lane_calibration.get("gamma") or 1.0)
+            calibrated=max(0.0005,min(0.9995,raw_combined**ticket_gamma))
+            ticket_calibration_mode="efootball_exact_evidence_chronological_gamma"
+        else:
+            calibrated=0.0005
+            ticket_gamma=1.0
+            ticket_calibration_mode="efootball_exact_evidence_calibration_hold"
+            ticket_calibration_ready=False
     elif all_vfootball_holdout:
         lower_bounds=[_vfootball_holdout_lower_bound(x,confidence=0.95) for x in legs]
         if all(v is not None for v in lower_bounds):
-            # Preserve a common-model-error cushion while avoiding the unrelated
-            # historical ticket gamma for this distinct event-holdout evidence regime.
-            calibrated=max(
-                0.0005,
-                min(raw_combined,
-                    math.prod(lower_bounds)*ACCURACY_PRESERVATION_RATIO)
-            )
+            calibrated=max(0.0005,min(raw_combined,math.prod(lower_bounds)*ACCURACY_PRESERVATION_RATIO))
             ticket_calibration_mode="vfootball_event_holdout_wilson_lower_bound"
             ticket_gamma=1.0
         else:
@@ -2257,12 +2394,12 @@ def _batch_metrics(legs):
         calibrated=_calibrated_ticket_probability(raw_combined)
     geometric=math.exp(sum(math.log(p) for p in probs)/len(probs))
     return {
-        "model_rating":round(calibrated*100.0,2),
-        "raw_model_rating":round(raw_combined*100.0,2),
-        "combined_model_probability":round(calibrated,6),
-        "raw_combined_model_probability":round(raw_combined,6),
-        "ticket_calibration_gamma":round(ticket_gamma,4),
-        "ticket_calibration_mode":ticket_calibration_mode,
+        "model_rating":round(calibrated*100.0,2),"raw_model_rating":round(raw_combined*100.0,2),
+        "combined_model_probability":round(calibrated,6),"raw_combined_model_probability":round(raw_combined,6),
+        "ticket_calibration_gamma":round(ticket_gamma,4),"ticket_calibration_mode":ticket_calibration_mode,
+        "ticket_calibration_ready":ticket_calibration_ready,
+        "ticket_calibration_oos_brier":lane_calibration.get("calibrated_oos_brier") if lane_calibration else None,
+        "ticket_calibration_baseline_brier":lane_calibration.get("raw_oos_brier") if lane_calibration else None,
         "leg_strength_rating":round(geometric*100.0,2),
         "avg_model_probability":round(sum(probs)/len(probs)*100.0,2),
         "avg_model_edge_percent":round(sum(edges)/len(edges)*100.0,2) if edges else 0.0,
@@ -2358,6 +2495,21 @@ def _construct_efootball_value_batch(pool, min_odds=None, max_legs=RESULTS_FIRST
         -float(x.get("bookmaker_odds") or 1.0),
         _kickoff_timestamp(x) if _kickoff_timestamp(x) is not None else float("inf")
     ))
+    lane_calibration=_efootball_exact_evidence_ticket_gamma()
+    if lane_calibration.get("trained") is not True or lane_calibration.get("promotion_allowed") is not True:
+        return [],{
+            "shape":None,"candidate_count":len(rows),"combined_odds":None,
+            "combined_probability":None,"roi":None,"span_minutes":None,
+            "search_mode":"blocked_unvalidated_ticket_calibration",
+            "reason":"efootball_ticket_calibration_did_not_beat_raw_oos_baseline",
+            "ticket_calibration":{
+                key:lane_calibration.get(key) for key in (
+                    "sample","settled_lane_ticket_count","missing_raw_joint_probability_count",
+                    "gamma","trained","oos_sample","raw_oos_brier","calibrated_oos_brier",
+                    "oos_brier_improved","brier_promotion_allowed","profitability_promotion_allowed","settled_lane_profit_ticket_count","settled_lane_wins","settled_lane_losses","settled_lane_net_units","settled_lane_flat_stake_roi","profitability_minimum_settled_tickets","promotion_allowed","promotion_hold_reason"
+                )
+            }
+        }
     import itertools
     for shape in range(2,min(RESULTS_FIRST_MAX_LEGS,int(max_legs))+1):
         # Pair scan is exhaustive. Larger shapes use a bounded high-quality
@@ -2418,8 +2570,9 @@ def _construct_efootball_compact_batch(pool):
 
     Only already Builder-eligible, exact-evidence eFootball GT/Adriatic rows are
     considered. Each leg clears the lane's 65% floor and positive single-leg EV;
-    the ticket reaches 2.00x and at least +2% modelled EV. Joint probability is
-    an independence proxy, not settled ticket proof.
+    the ticket reaches 2.00x and at least +2% modelled EV. The raw leg product is
+    an independence baseline; a batch is held until lane-specific chronological
+    calibration improves future Brier. That still is not profitability proof.
     """
     rows=[
         x for x in pool
@@ -2464,6 +2617,17 @@ def _construct_efootball_compact_batch(pool):
         "expected_roi":None,
         "reason":"not_enough_eligible_efootball_legs" if len(frontier)<COMPACT_EFOOTBALL_MIN_LEGS else "no_compact_combination_passed_all_gates"
     }
+    lane_calibration=_efootball_exact_evidence_ticket_gamma()
+    diag["ticket_calibration"]={
+        key:lane_calibration.get(key) for key in (
+            "sample","settled_lane_ticket_count","missing_raw_joint_probability_count",
+            "gamma","trained","oos_sample","raw_oos_brier","calibrated_oos_brier",
+            "oos_brier_improved","brier_promotion_allowed","profitability_promotion_allowed","settled_lane_profit_ticket_count","settled_lane_wins","settled_lane_losses","settled_lane_net_units","settled_lane_flat_stake_roi","profitability_minimum_settled_tickets","promotion_allowed","promotion_hold_reason"
+        )
+    }
+    if lane_calibration.get("trained") is not True or lane_calibration.get("promotion_allowed") is not True:
+        diag["reason"]="efootball_ticket_calibration_did_not_beat_raw_oos_baseline"
+        return [],diag
     if len(frontier)<COMPACT_EFOOTBALL_MIN_LEGS:
         return [],diag
     import itertools
@@ -2516,7 +2680,7 @@ def _construct_efootball_compact_batch(pool):
         "expected_roi":round(float(best[5]),6),
         "span_minutes":round(float(best[4]),1),
         "reason":"qualified_compact_efootball_combination",
-        "probability_method":"exact-evidence per-leg probabilities multiplied as an independence proxy; not settled-ticket performance proof"
+        "probability_method":"raw leg product adjusted by lane-specific chronological gamma only after out-of-sample Brier improves; not profitability proof"
     })
     return selected,diag
 
@@ -2692,7 +2856,13 @@ def _construct_model_first_batch(
             and str(x.get("product") or "").startswith("efootball_")
             for x in rows
         )
-        calibrated=raw if all_efootball_evidence else _calibrated_ticket_probability(raw)
+        if all_efootball_evidence:
+            calibration=_efootball_exact_evidence_ticket_gamma()
+            if not calibration.get("promotion_allowed"):
+                continue
+            calibrated=max(0.0005,min(0.9995,raw**float(calibration.get("gamma") or 1.0)))
+        else:
+            calibrated=_calibrated_ticket_probability(raw)
         if (calibrated*odds)-1.0 < RESULTS_FIRST_MIN_EXPECTED_ROI:
             continue
         valid.append((rows,calibrated,odds))
@@ -3832,9 +4002,13 @@ def build_value_batches(candidates):
                     "secondary_efootball_compact_lane":secondary_lane=="efootball_compact_2x",
                     "secondary_efootball_compact_diagnostics":compact_efootball_diag,
                     "secondary_ticket_calibration_mode":(
-                        "efootball_exact_evidence_independence_proxy"
-                        if secondary_lane=="efootball_exact_evidence_value"
-                        else "historical_settled_ticket_gamma"
+                        "efootball_exact_evidence_chronological_gamma"
+                        if secondary_lane=="efootball_exact_evidence_value" and _efootball_exact_evidence_ticket_gamma().get("promotion_allowed") is True
+                        else (
+                            "efootball_exact_evidence_calibration_hold"
+                            if secondary_lane=="efootball_exact_evidence_value"
+                            else "historical_settled_ticket_gamma"
+                        )
                     ),
                     "capacity":_batch_capacity_diagnostic(secondary_pool),
                     "construction_shape_diagnostics":construction_shapes,
@@ -4045,11 +4219,7 @@ def main():
         "mode":"PAPER_ONLY","target_legs":f"standard 2–4 legs at {odds_gate['floor']:.2f}x active minimum / {odds_gate['preferred_target']:.2f}x preferred; compact eFootball 4–5 legs at {COMPACT_EFOOTBALL_MIN_COMBINED_ODDS:.2f}x+ when all gates pass","sports_supported":["football","tennis","virtual"],
         "ticket_calibration_diagnostics":{
             "historical_settled_ticket_gamma":_ticket_calibration_gamma(),
-            "efootball_exact_evidence_lane":{
-                "mode":"efootball_exact_evidence_independence_proxy",
-                "historical_gamma_applied":False,
-                "reason":"eFootball exact-evidence tickets remain on a separate paper-only independence proxy until an eFootball-only chronological ticket calibration demonstrates improvement."
-            }
+            "efootball_exact_evidence_lane":_efootball_exact_evidence_ticket_gamma()
         },
         "research_gate":{
             "selection_gate_status":gate_status,

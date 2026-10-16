@@ -3,6 +3,7 @@
 from datetime import datetime, timedelta, timezone
 import math
 import unittest
+from unittest.mock import patch
 import odds_builder as builder
 
 
@@ -25,8 +26,16 @@ class CompactEfootballBuilderTests(unittest.TestCase):
     def setUp(self):
         self.original_span=builder.COMPACT_EFOOTBALL_MAX_KICKOFF_SPAN_MINUTES
         builder.COMPACT_EFOOTBALL_MAX_KICKOFF_SPAN_MINUTES=60
+        self.calibration_patch=patch.object(builder,"_efootball_exact_evidence_ticket_gamma",return_value={
+            "gamma":1.0,"sample":40,"settled_lane_ticket_count":40,
+            "missing_raw_joint_probability_count":0,"trained":True,
+            "oos_sample":20,"raw_oos_brier":0.25,"calibrated_oos_brier":0.24,
+            "oos_brier_improved":True,"promotion_allowed":True
+        })
+        self.calibration_patch.start()
 
     def tearDown(self):
+        self.calibration_patch.stop()
         builder.COMPACT_EFOOTBALL_MAX_KICKOFF_SPAN_MINUTES=self.original_span
 
     def test_five_short_price_legs_can_reach_two_x_without_weakening_leg_floor(self):
@@ -125,6 +134,72 @@ class CompactEfootballBuilderTests(unittest.TestCase):
         selected,diag=builder._construct_efootball_compact_batch(far_apart)
         self.assertEqual(selected,[])
         self.assertGreater(diag["rejected_kickoff_span"],0)
+
+
+    def test_chronological_ticket_calibration_must_improve_future_brier(self):
+        origin=datetime(2026,1,1,tzinfo=timezone.utc)
+        rows=[
+            ((origin+timedelta(days=i)).isoformat(),0.56,1.0 if i%4==0 else 0.0)
+            for i in range(60)
+        ]
+        result=builder._fit_efootball_ticket_gamma(rows)
+        self.assertTrue(result["trained"])
+        self.assertTrue(result["promotion_allowed"])
+        self.assertGreaterEqual(result["oos_sample"],12)
+        self.assertLess(result["calibrated_oos_brier"],result["raw_oos_brier"])
+
+    def test_chronological_ticket_calibration_stays_held_when_raw_is_calibrated(self):
+        origin=datetime(2026,1,1,tzinfo=timezone.utc)
+        rows=[
+            ((origin+timedelta(days=i)).isoformat(),0.50,1.0 if i%2==0 else 0.0)
+            for i in range(60)
+        ]
+        result=builder._fit_efootball_ticket_gamma(rows)
+        self.assertFalse(result["trained"])
+        self.assertFalse(result["promotion_allowed"])
+        self.assertFalse(result["oos_brier_improved"])
+        self.assertGreaterEqual(result["calibrated_oos_brier"],result["raw_oos_brier"])
+
+
+    def test_batch_metrics_uses_lane_specific_chronological_gamma(self):
+        lane_result={
+            "gamma":2.0,"sample":40,"settled_lane_ticket_count":40,
+            "missing_raw_joint_probability_count":0,"trained":True,
+            "oos_sample":20,"raw_oos_brier":0.25,"calibrated_oos_brier":0.23,
+            "oos_brier_improved":True,"promotion_allowed":True
+        }
+        rows=[leg(0,odds=2.0,probability=0.70),leg(1,odds=2.0,probability=0.70)]
+        with patch.object(builder,"_efootball_exact_evidence_ticket_gamma",return_value=lane_result), patch.object(builder,"_ticket_calibration_gamma",return_value={"gamma":4.0}):
+            metrics=builder._batch_metrics(rows)
+        self.assertEqual(metrics["ticket_calibration_mode"],"efootball_exact_evidence_chronological_gamma")
+        self.assertEqual(metrics["ticket_calibration_gamma"],2.0)
+        self.assertAlmostEqual(metrics["raw_combined_model_probability"],0.49)
+        self.assertAlmostEqual(metrics["combined_model_probability"],0.49**2,places=5)
+        self.assertTrue(metrics["ticket_calibration_ready"])
+
+
+    def test_efootball_pair_constructor_holds_without_validated_lane_calibration(self):
+        rows=[
+            leg(0,odds=2.35,probability=0.70,expected_value=0.645,minute=0),
+            leg(1,odds=2.35,probability=0.70,expected_value=0.645,minute=5)
+        ]
+        held={"trained":False,"promotion_allowed":False,"sample":40,"oos_sample":16,
+              "raw_oos_brier":0.24,"calibrated_oos_brier":0.25,"oos_brier_improved":False}
+        with patch.object(builder,"_efootball_exact_evidence_ticket_gamma",return_value=held):
+            selected,diag=builder._construct_efootball_value_batch(rows,min_odds=2.70,max_legs=4)
+        self.assertEqual(selected,[])
+        self.assertEqual(diag["reason"],"efootball_ticket_calibration_did_not_beat_raw_oos_baseline")
+        self.assertEqual(diag["candidate_count"],2)
+
+    def test_compact_efootball_constructor_holds_without_validated_lane_calibration(self):
+        rows=[leg(i,odds=1.20,probability=0.90) for i in range(4)]
+        held={"trained":False,"promotion_allowed":False,"sample":40,"oos_sample":16,
+              "raw_oos_brier":0.24,"calibrated_oos_brier":0.25,"oos_brier_improved":False}
+        with patch.object(builder,"_efootball_exact_evidence_ticket_gamma",return_value=held):
+            selected,diag=builder._construct_efootball_compact_batch(rows)
+        self.assertEqual(selected,[])
+        self.assertEqual(diag["reason"],"efootball_ticket_calibration_did_not_beat_raw_oos_baseline")
+        self.assertEqual(diag["candidate_count"],4)
 
 
 if __name__=="__main__":
