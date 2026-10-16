@@ -4173,11 +4173,7 @@ def main():
         "mode":"PAPER_ONLY","target_legs":f"standard 2–4 legs at {odds_gate['floor']:.2f}x active minimum / {odds_gate['preferred_target']:.2f}x preferred; compact eFootball 4–5 legs at {COMPACT_EFOOTBALL_MIN_COMBINED_ODDS:.2f}x+ when all gates pass","sports_supported":["football","tennis","virtual"],
         "ticket_calibration_diagnostics":{
             "historical_settled_ticket_gamma":_ticket_calibration_gamma(),
-            "efootball_exact_evidence_lane":{
-                "mode":"efootball_exact_evidence_independence_proxy",
-                "historical_gamma_applied":False,
-                "reason":"eFootball exact-evidence tickets remain on a separate paper-only independence proxy until an eFootball-only chronological ticket calibration demonstrates improvement."
-            }
+            "efootball_exact_evidence_lane":_efootball_exact_evidence_ticket_gamma()
         },
         "research_gate":{
             "selection_gate_status":gate_status,
