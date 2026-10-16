@@ -178,5 +178,29 @@ class CompactEfootballBuilderTests(unittest.TestCase):
         self.assertTrue(metrics["ticket_calibration_ready"])
 
 
+    def test_efootball_pair_constructor_holds_without_validated_lane_calibration(self):
+        rows=[
+            leg(0,odds=2.35,probability=0.70,expected_value=0.645,minute=0),
+            leg(1,odds=2.35,probability=0.70,expected_value=0.645,minute=5)
+        ]
+        held={"trained":False,"promotion_allowed":False,"sample":40,"oos_sample":16,
+              "raw_oos_brier":0.24,"calibrated_oos_brier":0.25,"oos_brier_improved":False}
+        with patch.object(builder,"_efootball_exact_evidence_ticket_gamma",return_value=held):
+            selected,diag=builder._construct_efootball_value_batch(rows,min_odds=2.70,max_legs=4)
+        self.assertEqual(selected,[])
+        self.assertEqual(diag["reason"],"efootball_ticket_calibration_did_not_beat_raw_oos_baseline")
+        self.assertEqual(diag["candidate_count"],2)
+
+    def test_compact_efootball_constructor_holds_without_validated_lane_calibration(self):
+        rows=[leg(i,odds=1.20,probability=0.90) for i in range(4)]
+        held={"trained":False,"promotion_allowed":False,"sample":40,"oos_sample":16,
+              "raw_oos_brier":0.24,"calibrated_oos_brier":0.25,"oos_brier_improved":False}
+        with patch.object(builder,"_efootball_exact_evidence_ticket_gamma",return_value=held):
+            selected,diag=builder._construct_efootball_compact_batch(rows)
+        self.assertEqual(selected,[])
+        self.assertEqual(diag["reason"],"efootball_ticket_calibration_did_not_beat_raw_oos_baseline")
+        self.assertEqual(diag["candidate_count"],4)
+
+
 if __name__=="__main__":
     unittest.main()
