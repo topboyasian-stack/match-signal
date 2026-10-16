@@ -2454,6 +2454,21 @@ def _construct_efootball_value_batch(pool, min_odds=None, max_legs=RESULTS_FIRST
         -float(x.get("bookmaker_odds") or 1.0),
         _kickoff_timestamp(x) if _kickoff_timestamp(x) is not None else float("inf")
     ))
+    lane_calibration=_efootball_exact_evidence_ticket_gamma()
+    if lane_calibration.get("trained") is not True or lane_calibration.get("promotion_allowed") is not True:
+        return [],{
+            "shape":None,"candidate_count":len(rows),"combined_odds":None,
+            "combined_probability":None,"roi":None,"span_minutes":None,
+            "search_mode":"blocked_unvalidated_ticket_calibration",
+            "reason":"efootball_ticket_calibration_did_not_beat_raw_oos_baseline",
+            "ticket_calibration":{
+                key:lane_calibration.get(key) for key in (
+                    "sample","settled_lane_ticket_count","missing_raw_joint_probability_count",
+                    "gamma","trained","oos_sample","raw_oos_brier","calibrated_oos_brier",
+                    "oos_brier_improved","promotion_allowed"
+                )
+            }
+        }
     import itertools
     for shape in range(2,min(RESULTS_FIRST_MAX_LEGS,int(max_legs))+1):
         # Pair scan is exhaustive. Larger shapes use a bounded high-quality
@@ -2560,6 +2575,17 @@ def _construct_efootball_compact_batch(pool):
         "expected_roi":None,
         "reason":"not_enough_eligible_efootball_legs" if len(frontier)<COMPACT_EFOOTBALL_MIN_LEGS else "no_compact_combination_passed_all_gates"
     }
+    lane_calibration=_efootball_exact_evidence_ticket_gamma()
+    diag["ticket_calibration"]={
+        key:lane_calibration.get(key) for key in (
+            "sample","settled_lane_ticket_count","missing_raw_joint_probability_count",
+            "gamma","trained","oos_sample","raw_oos_brier","calibrated_oos_brier",
+            "oos_brier_improved","promotion_allowed"
+        )
+    }
+    if lane_calibration.get("trained") is not True or lane_calibration.get("promotion_allowed") is not True:
+        diag["reason"]="efootball_ticket_calibration_did_not_beat_raw_oos_baseline"
+        return [],diag
     if len(frontier)<COMPACT_EFOOTBALL_MIN_LEGS:
         return [],diag
     import itertools
