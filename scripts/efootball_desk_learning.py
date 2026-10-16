@@ -749,7 +749,7 @@ def main():
             if recent else None
         )
         by_product[product] = {
-            "active": bucket_active or exact_active,
+            "active": bucket_active or raw_bucket_active or exact_active,
             "settled_predictions": len(product_settled),
             "pending_forecasts": sum(
                 1 for r in trace
