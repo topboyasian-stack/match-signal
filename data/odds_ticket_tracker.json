@@ -1,29 +1,29 @@
 {
   "version": 4,
-  "updated_at": "2026-10-16T07:35:46.381902+00:00",
+  "updated_at": "2026-10-16T07:56:15.596321+00:00",
   "mode": "PAPER_ONLY",
   "summary": {
     "tracked_tickets": 233,
-    "pending": 65,
+    "pending": 63,
     "won": 53,
-    "lost": 115,
-    "active_with_loss": 15,
+    "lost": 117,
+    "active_with_loss": 16,
     "legs_won": 288,
-    "legs_lost": 152,
-    "legs_pending": 170,
+    "legs_lost": 155,
+    "legs_pending": 167,
     "pending_legs_by_product": {
-      "efootball_gt": 170
+      "efootball_gt": 167
     },
-    "settled_tickets": 168,
+    "settled_tickets": 170,
     "by_leg_count": {
       "2": {
-        "tracked": 98,
+        "tracked": 100,
         "won": 28,
-        "lost": 70,
-        "settled": 98,
-        "accuracy": 0.285714,
-        "avg_combined_odds": 4.901276,
-        "avg_model_rating": 57.967551
+        "lost": 72,
+        "settled": 100,
+        "accuracy": 0.28,
+        "avg_combined_odds": 5.0388,
+        "avg_model_rating": 57.9493
       },
       "3": {
         "tracked": 6,
@@ -46,13 +46,13 @@
     },
     "by_primary_lane": {
       "efootball_exact_evidence_value": {
-        "tracked": 86,
+        "tracked": 88,
         "won": 28,
-        "lost": 58,
-        "settled": 86,
-        "accuracy": 0.325581,
-        "avg_combined_odds": 4.959919,
-        "avg_model_rating": 57.310116
+        "lost": 60,
+        "settled": 88,
+        "accuracy": 0.318182,
+        "avg_combined_odds": 5.114864,
+        "avg_model_rating": 57.304318
       },
       "high_confidence_research": {
         "tracked": 53,
@@ -95,17 +95,17 @@
       "high_confidence_loss_tickets": 21,
       "high_confidence_loss_legs": 27,
       "losses_by_product": {
-        "efootball_gt": 129,
+        "efootball_gt": 132,
         "vfootball": 23
       },
       "losses_by_direction": {
-        "over": 54,
+        "over": 57,
         "under": 98
       },
       "shape_comparison": "Use by_leg_count to compare 2–7-leg accuracy, average odds, and average model rating.",
       "lane_comparison": "Use by_primary_lane to compare construction-lane performance."
     },
-    "active_pending": 2,
+    "active_pending": 0,
     "archived_pending": 63,
     "visible_tickets": 100,
     "archived_tickets": 133
@@ -118,8 +118,8 @@
       "batch_id": "BATCH-01",
       "created_at": "2026-10-16T07:35:46.381902+00:00",
       "last_seen_at": "2026-10-16T07:35:46.381902+00:00",
-      "last_settled_at": null,
-      "status": "PENDING",
+      "last_settled_at": "2026-10-16T07:56:15.596321+00:00",
+      "status": "LOST",
       "combined_odds": 4.806,
       "combined_odds_source": "builder_batch_snapshot",
       "odds_snapshot_complete": true,
@@ -135,8 +135,8 @@
       "primary_lane": "efootball_exact_evidence_value",
       "odds_locked_at": "2026-10-16T07:35:46.381902+00:00",
       "leg_count": 2,
-      "settled_leg_count": 0,
-      "pending_leg_count": 2,
+      "settled_leg_count": 1,
+      "pending_leg_count": 1,
       "legs": [
         {
           "sport": "virtual",
@@ -190,7 +190,7 @@
           "builder_eligible": true,
           "real_money_eligible": false,
           "paper_only": true,
-          "status": "PENDING",
+          "status": "LOST",
           "source": "Exact-line evidence calibration · eFootball value lane",
           "market_source": "SportyBet NG",
           "recent_evidence": {
@@ -302,10 +302,13 @@
           "sportybet_outcome_name": "Over 3.5",
           "fixture_key": "efootball_gt|liverpool instinct v barcelona radical",
           "bookmaker_odds_snapshot": 4.33,
-          "correct": null,
-          "settled_at": null,
-          "result": null,
-          "final_score": null
+          "correct": false,
+          "settled_at": "2026-10-16T07:56:15.596321+00:00",
+          "result": "U3.5",
+          "final_score": [
+            1.0,
+            0.0
+          ]
         },
         {
           "sport": "virtual",
@@ -477,9 +480,9 @@
       ],
       "leg_counts": {
         "won": 0,
-        "lost": 0,
+        "lost": 1,
         "void": 0,
-        "pending": 2
+        "pending": 1
       },
       "construction_snapshot": {
         "batch_id": "BATCH-01",
@@ -513,9 +516,61 @@
         },
         "recorded_at": "2026-10-16T07:35:46.402061+00:00"
       },
-      "settlement_diagnostics": null,
+      "settlement_diagnostics": {
+        "diagnostic_version": 1,
+        "ticket_outcome": "LOST",
+        "diagnostic_label": "TICKET_LOST_1_OF_2_LEGS",
+        "leg_count": 2,
+        "settled_leg_count": 1,
+        "won_leg_count": 0,
+        "lost_leg_count": 1,
+        "void_leg_count": 0,
+        "pending_leg_count": 1,
+        "leg_hit_rate_excluding_voids": 0.0,
+        "average_settled_leg_model_probability": 0.689655,
+        "weakest_ticket_leg_model_probability": 0.689655,
+        "high_confidence_loss_count": 0,
+        "high_confidence_loss_events": [],
+        "losses_by_product": {
+          "efootball_gt": 1
+        },
+        "losses_by_direction": {
+          "over": 1
+        },
+        "loss_details": [
+          {
+            "event_id": "sr:match:D120161026",
+            "match": "Liverpool (INSTINCT) vs Barcelona (RADICAL)",
+            "product": "efootball_gt",
+            "pick": "Liverpool (INSTINCT) vs Barcelona (RADICAL) — O/U over 3.5",
+            "line": 3.5,
+            "model_probability": 0.689655,
+            "model_edge": 0.472657,
+            "bookmaker_odds": 4.33,
+            "evidence_score": 0.689655,
+            "recent_evidence_n": 83,
+            "recent_evidence_hit_rate": 0.6988,
+            "result": "U3.5",
+            "final_score": [
+              1.0,
+              0.0
+            ],
+            "settled_at": "2026-10-16T07:56:15.596321+00:00"
+          }
+        ],
+        "improvement_keys": {
+          "shape": "2_leg",
+          "primary_lane": "efootball_exact_evidence_value",
+          "combined_odds": 4.806,
+          "combined_model_rating": 67.04,
+          "combined_model_probability": 0.670425,
+          "avg_model_probability": 83.09,
+          "avg_model_edge_percent": 29.53
+        }
+      },
       "paper_only": true,
-      "real_money_execution": false
+      "real_money_execution": false,
+      "lost_at": "2026-10-16T07:56:15.596321+00:00"
     },
     {
       "version": 3,
@@ -524,8 +579,8 @@
       "batch_id": "BATCH-01",
       "created_at": "2026-10-16T06:29:44.120173+00:00",
       "last_seen_at": "2026-10-16T06:29:44.120173+00:00",
-      "last_settled_at": null,
-      "status": "PENDING",
+      "last_settled_at": "2026-10-16T07:56:15.596321+00:00",
+      "status": "LOST",
       "combined_odds": 18.749,
       "combined_odds_source": "builder_batch_snapshot",
       "odds_snapshot_complete": true,
@@ -541,8 +596,8 @@
       "primary_lane": "efootball_exact_evidence_value",
       "odds_locked_at": "2026-10-16T06:29:44.120173+00:00",
       "leg_count": 2,
-      "settled_leg_count": 0,
-      "pending_leg_count": 2,
+      "settled_leg_count": 2,
+      "pending_leg_count": 0,
       "legs": [
         {
           "sport": "virtual",
@@ -596,7 +651,7 @@
           "builder_eligible": true,
           "real_money_eligible": false,
           "paper_only": true,
-          "status": "PENDING",
+          "status": "LOST",
           "source": "Exact-line evidence calibration · eFootball value lane",
           "market_source": "SportyBet NG",
           "recent_evidence": {
@@ -708,10 +763,13 @@
           "sportybet_outcome_name": "Over 3.5",
           "fixture_key": "efootball_gt|liverpool instinct v barcelona radical",
           "bookmaker_odds_snapshot": 4.33,
-          "correct": null,
-          "settled_at": null,
-          "result": null,
-          "final_score": null
+          "correct": false,
+          "settled_at": "2026-10-16T07:56:15.596321+00:00",
+          "result": "U3.5",
+          "final_score": [
+            1.0,
+            0.0
+          ]
         },
         {
           "sport": "virtual",
@@ -763,7 +821,7 @@
           "builder_eligible": true,
           "real_money_eligible": false,
           "paper_only": true,
-          "status": "PENDING",
+          "status": "LOST",
           "source": "Exact-line evidence calibration · eFootball value lane",
           "market_source": "SportyBet NG",
           "recent_evidence": {
@@ -875,17 +933,20 @@
           "sportybet_outcome_name": "Over 3.5",
           "fixture_key": "efootball_gt|real madrid ambush v fc bayern munchen havoc",
           "bookmaker_odds_snapshot": 4.33,
-          "correct": null,
-          "settled_at": null,
-          "result": null,
-          "final_score": null
+          "correct": false,
+          "settled_at": "2026-10-16T07:56:15.596321+00:00",
+          "result": "U3.5",
+          "final_score": [
+            0.0,
+            1.0
+          ]
         }
       ],
       "leg_counts": {
         "won": 0,
-        "lost": 0,
+        "lost": 2,
         "void": 0,
-        "pending": 2
+        "pending": 0
       },
       "construction_snapshot": {
         "batch_id": "BATCH-01",
@@ -919,9 +980,80 @@
         },
         "recorded_at": "2026-10-16T06:29:44.156153+00:00"
       },
-      "settlement_diagnostics": null,
+      "settlement_diagnostics": {
+        "diagnostic_version": 1,
+        "ticket_outcome": "LOST",
+        "diagnostic_label": "TICKET_LOST_2_OF_2_LEGS",
+        "leg_count": 2,
+        "settled_leg_count": 2,
+        "won_leg_count": 0,
+        "lost_leg_count": 2,
+        "void_leg_count": 0,
+        "pending_leg_count": 0,
+        "leg_hit_rate_excluding_voids": 0.0,
+        "average_settled_leg_model_probability": 0.686047,
+        "weakest_ticket_leg_model_probability": 0.686047,
+        "high_confidence_loss_count": 0,
+        "high_confidence_loss_events": [],
+        "losses_by_product": {
+          "efootball_gt": 2
+        },
+        "losses_by_direction": {
+          "over": 2
+        },
+        "loss_details": [
+          {
+            "event_id": "sr:match:D120161026",
+            "match": "Liverpool (INSTINCT) vs Barcelona (RADICAL)",
+            "product": "efootball_gt",
+            "pick": "Liverpool (INSTINCT) vs Barcelona (RADICAL) — O/U over 3.5",
+            "line": 3.5,
+            "model_probability": 0.686047,
+            "model_edge": 0.469049,
+            "bookmaker_odds": 4.33,
+            "evidence_score": 0.686047,
+            "recent_evidence_n": 82,
+            "recent_evidence_hit_rate": 0.6951,
+            "result": "U3.5",
+            "final_score": [
+              1.0,
+              0.0
+            ],
+            "settled_at": "2026-10-16T07:56:15.596321+00:00"
+          },
+          {
+            "event_id": "sr:match:D121161026",
+            "match": "Real Madrid (AMBUSH) vs FC Bayern Munchen (HAVOC)",
+            "product": "efootball_gt",
+            "pick": "Real Madrid (AMBUSH) vs FC Bayern Munchen (HAVOC) — O/U over 3.5",
+            "line": 3.5,
+            "model_probability": 0.686047,
+            "model_edge": 0.469049,
+            "bookmaker_odds": 4.33,
+            "evidence_score": 0.686047,
+            "recent_evidence_n": 82,
+            "recent_evidence_hit_rate": 0.6951,
+            "result": "U3.5",
+            "final_score": [
+              0.0,
+              1.0
+            ],
+            "settled_at": "2026-10-16T07:56:15.596321+00:00"
+          }
+        ],
+        "improvement_keys": {
+          "shape": "2_leg",
+          "primary_lane": "efootball_exact_evidence_value",
+          "combined_odds": 18.749,
+          "combined_model_rating": 47.07,
+          "combined_model_probability": 0.47066,
+          "avg_model_probability": 68.6,
+          "avg_model_edge_percent": 46.9
+        }
+      },
       "paper_only": true,
-      "real_money_execution": false
+      "real_money_execution": false,
+      "lost_at": "2026-10-16T07:56:15.596321+00:00"
     },
     {
       "version": 3,
