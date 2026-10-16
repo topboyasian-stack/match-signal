@@ -1,0 +1,146 @@
+name: Isolated eFootball Winner and BTTS Market Research
+
+on:
+  schedule:
+    # Fresh workflow identity and offset cadence restore the isolated research schedule if workflow_run chaining is delayed.
+    - cron: '10,25,40,55 * * * *'
+  workflow_dispatch:
+  workflow_run:
+    workflows:
+      - "Match Signal Virtual Lab Live Sync"
+      - "Diagnose SportyBet eFootball Result API"
+    types: [completed]
+  pull_request:
+    paths:
+      - 'scripts/efootball_market_research.py'
+      - 'scripts/test_efootball_market_research.py'
+      - 'scripts/efootball_performance_report.py'
+      - 'scripts/test_efootball_performance_report.py'
+      - 'scripts/virtual_lab_sync.py'
+      - 'functions/api/sportybet-virtual.js'
+      - '.github/workflows/efootball-market-research-schedule.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/efootball_market_research.py'
+      - 'scripts/test_efootball_market_research.py'
+      - 'scripts/efootball_performance_report.py'
+      - 'scripts/test_efootball_performance_report.py'
+      - 'scripts/virtual_lab_sync.py'
+      - 'functions/api/sportybet-virtual.js'
+      - '.github/workflows/efootball-market-research-schedule.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: match-signal-efootball-market-research
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install research HTTP dependency
+        run: python -m pip install --upgrade requests
+      - name: Compile and run offline research regression tests
+        run: |
+          python -m py_compile scripts/efootball_market_research.py scripts/virtual_lab_sync.py scripts/test_efootball_market_research.py scripts/efootball_performance_report.py scripts/test_efootball_performance_report.py
+          python scripts/test_efootball_market_research.py
+          python scripts/test_efootball_performance_report.py
+
+  research:
+    if: ${{ github.event_name != 'pull_request' && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 2
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install research HTTP dependency
+        run: python -m pip install --upgrade requests
+      - name: Refresh live snapshot before research (best effort; settlement can continue)
+        continue-on-error: true
+        env:
+          MATCH_SIGNAL_PUBLIC_BASE: https://match-signal.pages.dev
+        run: python scripts/virtual_lab_sync.py
+      - name: Test isolated market logic
+        run: |
+          python -m py_compile scripts/efootball_market_research.py scripts/test_efootball_market_research.py
+          python scripts/test_efootball_market_research.py
+      - name: Capture and settle paper-only market observations
+        env:
+          MATCH_SIGNAL_PUBLIC_BASE: https://match-signal.pages.dev
+          # Non-scheduled runs force an immediate settlement pass; scheduled runs honor the collector's five-minute settlement interval.
+          EFOOTBALL_RESEARCH_FORCE_SETTLE: ${{ github.event_name != 'schedule' && '1' || '0' }}
+        run: python scripts/efootball_market_research.py
+      - name: Build and test the cross-market eFootball performance report
+        run: |
+          python -m py_compile scripts/efootball_performance_report.py scripts/test_efootball_performance_report.py
+          python scripts/test_efootball_performance_report.py
+          python scripts/efootball_performance_report.py
+      - name: Validate isolated archive contract
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('data/efootball_market_research.json')
+          d=json.loads(p.read_text())
+          assert d.get('mode') == 'PAPER_RESEARCH_ONLY'
+          assert d.get('live_trading_approved') is False
+          assert d.get('production_qualification_enabled') is False
+          assert d.get('odds_builder_eligible') is False
+          assert isinstance(d.get('observations'), list)
+          assert isinstance(d.get('market_coverage'), dict), 'missing live market-coverage audit'
+          assert all(x.get('product') in {'efootball_gt','efootball_adriatic'} for x in d['observations'])
+          assert all(x.get('market_type') in {'match_winner','btts'} for x in d['observations'])
+          for product, stats in d['market_coverage'].get('products', {}).items():
+              print(product, 'market ID 29 rows=', stats.get('market_id_29_rows'),
+                    'usable upcoming quotes=', stats.get('usable_two_way_quote_rows'),
+                    'near-kickoff usable quotes=', stats.get('near_kickoff_usable_quote_rows'))
+          print('Research archive contract passed:', len(d['observations']), 'rows')
+          PY
+      - name: Publish research archive without clobbering concurrent observations
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp data/efootball_market_research.json /tmp/efootball_market_research_candidate.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/efootball_market_research.json data/efootball_performance_report.json
+          if git diff --cached --quiet; then
+            echo "Research archive unchanged; nothing to publish."
+            exit 0
+          fi
+          git commit -m "🤖 Update isolated eFootball winner/BTTS market research"
+          for attempt in 1 2 3 4 5; do
+            if git push origin main; then
+              echo "Research archive published on attempt $attempt."
+              exit 0
+            fi
+            echo "Concurrent main update; merge frozen samples on attempt $attempt."
+            git fetch origin main
+            git reset --hard origin/main
+            python scripts/efootball_market_research.py --merge-candidate /tmp/efootball_market_research_candidate.json
+            python scripts/efootball_performance_report.py
+            git add data/efootball_market_research.json data/efootball_performance_report.json
+            if git diff --cached --quiet; then
+              echo "Remote archive already contains this candidate."
+              exit 0
+            fi
+            git commit -m "🤖 Merge isolated eFootball market research samples"
+            sleep $((attempt * 2))
+          done
+          exit 1
