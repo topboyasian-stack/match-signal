@@ -65,7 +65,8 @@ def dt(v):
 
 def bucket_key(p):
     p = max(0.0, min(0.9999, float(p)))
-    lo = math.floor(p / BUCKET_WIDTH) * BUCKET_WIDTH
+    # Tiny epsilon prevents exact values like 0.60 and 0.80 from falling into the prior bin due to binary floating-point representation.
+    lo = math.floor((p + 1e-9) / BUCKET_WIDTH) * BUCKET_WIDTH
     return f"{lo:.2f}".rstrip("0").rstrip(".")
 
 
