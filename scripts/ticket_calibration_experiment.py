@@ -87,7 +87,7 @@ def calibrate(rows, model_key="combined_model_probability"):
         m=prob(t,model_key); q=market(t)
         predictions.append({
             "ticket_id":t.get("ticket_id"),
-            "settled_at":t.get("settled_at"),
+            "settled_at":t.get("_calibration_stamp") or t.get("last_settled_at") or t.get("settled_at") or t.get("updated_at"),
             "leg_count":int(t.get("leg_count") or len(t.get("legs") or [])),
             "status":t.get("status"),
             "model_probability":m,
