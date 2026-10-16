@@ -25,7 +25,10 @@ on:
       - 'data/virtual_lab_external_h2h.json'
       - 'data/virtual_lab_archive/**'
   schedule:
-    - cron: '*/5 * * * *'
+    # This full settlement/evaluation pass recently took about 12 minutes. Keep it
+    # on a 15-minute cadence; the separate live-feed sync and Unified Upcoming board
+    # retain their faster schedules for current fixtures and SportyBet prices.
+    - cron: '4,19,34,49 * * * *'
   workflow_dispatch:
   # Touch-triggered self-check: this workflow must be runnable immediately after remediation.
 
@@ -163,7 +166,8 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          for attempt in 1 2 3 4 5 6 7 8; do
+          # Bound publication retries so a stalled push cannot occupy the collector queue indefinitely.
+          for attempt in 1 2 3; do
             git add data/virtual_lab_pending.json data/virtual_lab_history.json data/virtual_lab_status.json data/virtual_lab_eligibility.json data/virtual_lab_model_eval.json data/virtual_lab_participant_profiles.json data/virtual_lab_participant_h2h.json data/virtual_lab_external_h2h.json data/virtual_lab_confirmed_participant_results.json data/virtual_lab_participants/registry.json data/virtual_lab_participant_lifecycle.json data/virtual_lab_archive/settlements data/system_health.json
 
             if git diff --cached --quiet; then
@@ -173,14 +177,16 @@ jobs:
 
             git commit -m "🤖 Collect and settle Virtual Lab observations"
 
-            if git push origin main; then
+            # Keep the remote write non-interactive and time-bounded. A successful
+            # server-side update remains safe if the client times out after the push.
+            if timeout --signal=TERM --kill-after=10s 90s env GIT_TERMINAL_PROMPT=0 git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 push origin main; then
               echo "Virtual Lab collector publication succeeded on attempt $attempt."
               exit 0
             fi
 
-            echo "Concurrent main update detected; retrying safely from latest main (attempt $attempt/8)."
+            echo "Collector publication attempt $attempt failed or timed out; reconciling with latest main before a bounded retry."
             sleep $((attempt * 5))
-            git fetch origin main
+            timeout --signal=TERM --kill-after=10s 60s env GIT_TERMINAL_PROMPT=0 git fetch origin main
             git reset --hard origin/main
             python scripts/virtual_lab_collector.py
             python scripts/virtual_lab_model_eval.py
