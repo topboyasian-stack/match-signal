@@ -11,6 +11,8 @@ on:
       - 'functions/api/sportybet-virtual.js'
       - 'functions/api/sportybet-virtual-results.js'
       - '.github/workflows/efootball-market-research-tests.yml'
+      - '.github/workflows/efootball-market-research-schedule.yml'
+      - '.github/workflows/virtual-lab-live-sync-heartbeat.yml'
   push:
     branches: [main]
     paths:
@@ -21,6 +23,8 @@ on:
       - 'scripts/virtual_lab_sync.py'
       - 'functions/api/sportybet-virtual.js'
       - '.github/workflows/efootball-market-research-tests.yml'
+      - '.github/workflows/efootball-market-research-schedule.yml'
+      - '.github/workflows/virtual-lab-live-sync-heartbeat.yml'
 
 permissions:
   contents: read
@@ -41,6 +45,34 @@ jobs:
           python -m py_compile scripts/efootball_market_research.py scripts/test_efootball_market_research.py scripts/efootball_performance_report.py scripts/test_efootball_performance_report.py
           python scripts/test_efootball_market_research.py
           python scripts/test_efootball_performance_report.py
+      - name: Verify re-registered live sync and research schedule linkage
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          sync_path = Path('.github/workflows/virtual-lab-live-sync-heartbeat.yml')
+          research_path = Path('.github/workflows/efootball-market-research-schedule.yml')
+          board_path = Path('.github/workflows/unified-upcoming.yml')
+          watchdog_path = Path('.github/workflows/automation_watchdog.yml')
+
+          assert sync_path.exists() and not Path('.github/workflows/virtual-lab-sync.yml').exists()
+          assert research_path.exists() and not Path('.github/workflows/efootball-market-research.yml').exists()
+          sync = sync_path.read_text()
+          research = research_path.read_text()
+          board = board_path.read_text()
+          watchdog = watchdog_path.read_text()
+          assert "name: Match Signal Virtual Lab Live Sync" in sync
+          assert "cron: '1-59/5 * * * *'" in sync
+          assert ".github/workflows/virtual-lab-live-sync-heartbeat.yml" in sync
+          assert "name: Isolated eFootball Winner and BTTS Market Research" in research
+          assert "cron: '10,25,40,55 * * * *'" in research
+          assert ".github/workflows/efootball-market-research-schedule.yml" in research
+          assert '"Match Signal Virtual Lab Live Sync"' in research
+          assert '"Match Signal Virtual Lab Live Sync"' in board
+          assert '"Match Signal Virtual Lab Live Sync"' in watchdog
+          print("Re-registered schedules, downstream workflow names and paper-only research linkage verified.")
+          PY
       - name: Check that production qualification remains disabled
         run: |
           python - <<'PY'
