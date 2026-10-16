@@ -3,6 +3,7 @@
 from datetime import datetime, timedelta, timezone
 import math
 import unittest
+from unittest.mock import patch
 import odds_builder as builder
 
 
@@ -25,8 +26,16 @@ class CompactEfootballBuilderTests(unittest.TestCase):
     def setUp(self):
         self.original_span=builder.COMPACT_EFOOTBALL_MAX_KICKOFF_SPAN_MINUTES
         builder.COMPACT_EFOOTBALL_MAX_KICKOFF_SPAN_MINUTES=60
+        self.calibration_patch=patch.object(builder,"_efootball_exact_evidence_ticket_gamma",return_value={
+            "gamma":1.0,"sample":40,"settled_lane_ticket_count":40,
+            "missing_raw_joint_probability_count":0,"trained":True,
+            "oos_sample":20,"raw_oos_brier":0.25,"calibrated_oos_brier":0.24,
+            "oos_brier_improved":True,"promotion_allowed":True
+        })
+        self.calibration_patch.start()
 
     def tearDown(self):
+        self.calibration_patch.stop()
         builder.COMPACT_EFOOTBALL_MAX_KICKOFF_SPAN_MINUTES=self.original_span
 
     def test_five_short_price_legs_can_reach_two_x_without_weakening_leg_floor(self):
