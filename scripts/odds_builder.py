@@ -3960,9 +3960,13 @@ def build_value_batches(candidates):
                     "secondary_efootball_compact_lane":secondary_lane=="efootball_compact_2x",
                     "secondary_efootball_compact_diagnostics":compact_efootball_diag,
                     "secondary_ticket_calibration_mode":(
-                        "efootball_exact_evidence_independence_proxy"
-                        if secondary_lane=="efootball_exact_evidence_value"
-                        else "historical_settled_ticket_gamma"
+                        "efootball_exact_evidence_chronological_gamma"
+                        if secondary_lane=="efootball_exact_evidence_value" and _efootball_exact_evidence_ticket_gamma().get("trained") is True
+                        else (
+                            "efootball_exact_evidence_calibration_hold"
+                            if secondary_lane=="efootball_exact_evidence_value"
+                            else "historical_settled_ticket_gamma"
+                        )
                     ),
                     "capacity":_batch_capacity_diagnostic(secondary_pool),
                     "construction_shape_diagnostics":construction_shapes,
