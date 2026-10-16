@@ -99,13 +99,22 @@ class TicketCalibrationHistoryTests(unittest.TestCase):
             {"product": "efootball_gt", "qualification_lane": "efootball_exact_evidence_value",
              "model_probability": 0.70, "model_edge": 0.05},
         ]
+        lane_calibration = {
+            "gamma": 2.0, "sample": 40, "settled_lane_ticket_count": 40,
+            "missing_raw_joint_probability_count": 0, "trained": True,
+            "oos_sample": 20, "raw_oos_brier": 0.25, "calibrated_oos_brier": 0.23,
+            "oos_brier_improved": True, "promotion_allowed": True
+        }
         with patch.object(builder, "_ticket_calibration_gamma",
-                          return_value={"gamma": 3.0, "sample": 200, "trained": True}):
+                          return_value={"gamma": 3.0, "sample": 200, "trained": True}), \
+             patch.object(builder, "_efootball_exact_evidence_ticket_gamma",
+                          return_value=lane_calibration):
             metrics = builder._batch_metrics(legs)
-        self.assertEqual(metrics["ticket_calibration_mode"], "efootball_exact_evidence_independence_proxy")
-        self.assertEqual(metrics["ticket_calibration_gamma"], 1.0)
+        self.assertEqual(metrics["ticket_calibration_mode"], "efootball_exact_evidence_chronological_gamma")
+        self.assertEqual(metrics["ticket_calibration_gamma"], 2.0)
         self.assertAlmostEqual(metrics["raw_combined_model_probability"], 0.49)
-        self.assertAlmostEqual(metrics["combined_model_probability"], 0.49)
+        self.assertAlmostEqual(metrics["combined_model_probability"], 0.49 ** 2)
+        self.assertTrue(metrics["ticket_calibration_ready"])
 
 
 if __name__ == "__main__":
