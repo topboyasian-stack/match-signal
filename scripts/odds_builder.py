@@ -2319,46 +2319,32 @@ def _batch_metrics(legs):
     probs=[max(0.0005,min(0.9995,float(x.get("model_probability") or 0.0))) for x in legs if float(x.get("model_probability") or 0.0)>0]
     edges=[float(x.get("model_edge") or 0.0) for x in legs]
     if not probs:
-        return {
-            "model_rating":0.0,
-            "raw_model_rating":0.0,
-            "combined_model_probability":0.0,
-            "raw_combined_model_probability":0.0,
-            "ticket_calibration_gamma":float(_ticket_calibration_gamma().get("gamma") or 1.0),
-            "leg_strength_rating":0.0,
-            "avg_model_probability":0.0,
-            "avg_model_edge_percent":0.0
-        }
+        return {"model_rating":0.0,"raw_model_rating":0.0,"combined_model_probability":0.0,
+                "raw_combined_model_probability":0.0,"ticket_calibration_gamma":1.0,
+                "ticket_calibration_mode":"no_eligible_probability","ticket_calibration_ready":False,
+                "leg_strength_rating":0.0,"avg_model_probability":0.0,"avg_model_edge_percent":0.0}
     raw_combined=math.prod(probs)
-    all_vfootball_holdout=all(
-        str(x.get("qualification_lane") or "")=="vfootball_event_holdout_value"
-        and str(x.get("product") or "")=="vfootball"
-        for x in legs
-    )
+    all_vfootball_holdout=all(str(x.get("qualification_lane") or "")=="vfootball_event_holdout_value" and str(x.get("product") or "")=="vfootball" for x in legs)
+    all_efootball_evidence=all(str(x.get("qualification_lane") or "")=="efootball_exact_evidence_value" and str(x.get("product") or "").startswith("efootball_") for x in legs)
     ticket_calibration_mode="historical_settled_ticket_gamma"
     ticket_gamma=float(_ticket_calibration_gamma().get("gamma") or 1.0)
-    all_efootball_evidence=all(
-        str(x.get("qualification_lane") or "")=="efootball_exact_evidence_value"
-        and str(x.get("product") or "").startswith("efootball_")
-        for x in legs
-    )
+    ticket_calibration_ready=True
+    lane_calibration=None
     if all_efootball_evidence:
-        # Do not apply the historical VFootball ticket gamma to eFootball.
-        # eFootball has no adequate settled-ticket calibration sample yet;
-        # each leg already uses exact-line/side evidence calibration.
-        calibrated=raw_combined
-        ticket_calibration_mode="efootball_exact_evidence_independence_proxy"
-        ticket_gamma=1.0
+        lane_calibration=_efootball_exact_evidence_ticket_gamma()
+        if lane_calibration.get("trained") is True and lane_calibration.get("promotion_allowed") is True:
+            ticket_gamma=float(lane_calibration.get("gamma") or 1.0)
+            calibrated=max(0.0005,min(0.9995,raw_combined**ticket_gamma))
+            ticket_calibration_mode="efootball_exact_evidence_chronological_gamma"
+        else:
+            calibrated=0.0005
+            ticket_gamma=1.0
+            ticket_calibration_mode="efootball_exact_evidence_calibration_hold"
+            ticket_calibration_ready=False
     elif all_vfootball_holdout:
         lower_bounds=[_vfootball_holdout_lower_bound(x,confidence=0.95) for x in legs]
         if all(v is not None for v in lower_bounds):
-            # Preserve a common-model-error cushion while avoiding the unrelated
-            # historical ticket gamma for this distinct event-holdout evidence regime.
-            calibrated=max(
-                0.0005,
-                min(raw_combined,
-                    math.prod(lower_bounds)*ACCURACY_PRESERVATION_RATIO)
-            )
+            calibrated=max(0.0005,min(raw_combined,math.prod(lower_bounds)*ACCURACY_PRESERVATION_RATIO))
             ticket_calibration_mode="vfootball_event_holdout_wilson_lower_bound"
             ticket_gamma=1.0
         else:
@@ -2367,12 +2353,12 @@ def _batch_metrics(legs):
         calibrated=_calibrated_ticket_probability(raw_combined)
     geometric=math.exp(sum(math.log(p) for p in probs)/len(probs))
     return {
-        "model_rating":round(calibrated*100.0,2),
-        "raw_model_rating":round(raw_combined*100.0,2),
-        "combined_model_probability":round(calibrated,6),
-        "raw_combined_model_probability":round(raw_combined,6),
-        "ticket_calibration_gamma":round(ticket_gamma,4),
-        "ticket_calibration_mode":ticket_calibration_mode,
+        "model_rating":round(calibrated*100.0,2),"raw_model_rating":round(raw_combined*100.0,2),
+        "combined_model_probability":round(calibrated,6),"raw_combined_model_probability":round(raw_combined,6),
+        "ticket_calibration_gamma":round(ticket_gamma,4),"ticket_calibration_mode":ticket_calibration_mode,
+        "ticket_calibration_ready":ticket_calibration_ready,
+        "ticket_calibration_oos_brier":lane_calibration.get("calibrated_oos_brier") if lane_calibration else None,
+        "ticket_calibration_baseline_brier":lane_calibration.get("raw_oos_brier") if lane_calibration else None,
         "leg_strength_rating":round(geometric*100.0,2),
         "avg_model_probability":round(sum(probs)/len(probs)*100.0,2),
         "avg_model_edge_percent":round(sum(edges)/len(edges)*100.0,2) if edges else 0.0,
