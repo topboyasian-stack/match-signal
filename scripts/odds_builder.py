@@ -2506,7 +2506,7 @@ def _construct_efootball_value_batch(pool, min_odds=None, max_legs=RESULTS_FIRST
                 key:lane_calibration.get(key) for key in (
                     "sample","settled_lane_ticket_count","missing_raw_joint_probability_count",
                     "gamma","trained","oos_sample","raw_oos_brier","calibrated_oos_brier",
-                    "oos_brier_improved","promotion_allowed"
+                    "oos_brier_improved","brier_promotion_allowed","profitability_promotion_allowed","settled_lane_profit_ticket_count","settled_lane_wins","settled_lane_losses","settled_lane_net_units","settled_lane_flat_stake_roi","profitability_minimum_settled_tickets","promotion_allowed","promotion_hold_reason"
                 )
             }
         }
@@ -2622,7 +2622,7 @@ def _construct_efootball_compact_batch(pool):
         key:lane_calibration.get(key) for key in (
             "sample","settled_lane_ticket_count","missing_raw_joint_probability_count",
             "gamma","trained","oos_sample","raw_oos_brier","calibrated_oos_brier",
-            "oos_brier_improved","promotion_allowed"
+            "oos_brier_improved","brier_promotion_allowed","profitability_promotion_allowed","settled_lane_profit_ticket_count","settled_lane_wins","settled_lane_losses","settled_lane_net_units","settled_lane_flat_stake_roi","profitability_minimum_settled_tickets","promotion_allowed","promotion_hold_reason"
         )
     }
     if lane_calibration.get("trained") is not True or lane_calibration.get("promotion_allowed") is not True:
@@ -4003,7 +4003,7 @@ def build_value_batches(candidates):
                     "secondary_efootball_compact_diagnostics":compact_efootball_diag,
                     "secondary_ticket_calibration_mode":(
                         "efootball_exact_evidence_chronological_gamma"
-                        if secondary_lane=="efootball_exact_evidence_value" and _efootball_exact_evidence_ticket_gamma().get("trained") is True
+                        if secondary_lane=="efootball_exact_evidence_value" and _efootball_exact_evidence_ticket_gamma().get("promotion_allowed") is True
                         else (
                             "efootball_exact_evidence_calibration_hold"
                             if secondary_lane=="efootball_exact_evidence_value"
