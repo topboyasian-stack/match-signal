@@ -12,6 +12,7 @@ from __future__ import annotations
 import json, math
 from datetime import datetime, timezone
 from pathlib import Path
+from ticket_history import merge_ticket_history, settled_ticket_history
 
 ROOT=Path(__file__).resolve().parents[1]
 DATA=ROOT/"data"
@@ -71,7 +72,7 @@ def logit(p): return math.log(p/(1-p))
 def invlogit(z): return 1/(1+math.exp(-max(-30,min(30,z))))
 
 def calibrate(rows, model_key="combined_model_probability"):
-    rows=sorted(rows,key=lambda t:str(t.get("settled_at") or ""))
+    rows=sorted(rows,key=lambda t:str(t.get("_calibration_stamp") or t.get("last_settled_at") or t.get("settled_at") or t.get("updated_at") or ""))
     usable=[t for t in rows if prob(t,model_key) is not None and market(t) is not None]
     predictions=[]
     for i,t in enumerate(usable):
@@ -109,25 +110,57 @@ def calibrate(rows, model_key="combined_model_probability"):
 
 def main():
     raw=load(TRACKER,{})
-    tickets=raw.get("tickets") if isinstance(raw,dict) else []
-    settled=[t for t in tickets if str(t.get("status") or "").upper() in {"WON","LOST"}]
+    unique_tickets,history_diagnostics=merge_ticket_history(raw)
+    settled=settled_ticket_history(raw,min_legs=2,max_legs=7)
     modern=[t for t in settled if 2<=int(t.get("leg_count") or len(t.get("legs") or []))<=4]
     all_pred,all_metrics=calibrate(settled)
     modern_pred,modern_metrics=calibrate(modern)
+
+    # Keep calibration diagnostics segmented by the original Builder lane. An
+    # aggregate can hide large differences between exact-evidence eFootball,
+    # high-confidence research, and older mixed construction lanes. Every lane
+    # remains diagnostic-only until a separate chronological holdout is reviewed.
+    by_primary_lane={}
+    lane_names=sorted({str(t.get("primary_lane") or "unknown") for t in settled})
+    for lane in lane_names:
+        lane_tickets=[t for t in settled if str(t.get("primary_lane") or "unknown")==lane]
+        if len(lane_tickets)<WARMUP+2:
+            continue
+        _,lane_metrics=calibrate(lane_tickets)
+        by_primary_lane[lane]={
+            "settled_sample":len(lane_tickets),
+            "scored_holdout_sample":lane_metrics.get("n",0),
+            **lane_metrics,
+        }
+
     out={
         "generated_at":datetime.now(timezone.utc).isoformat(),
         "mode":"PAPER_ONLY_DIAGNOSTIC",
         "production_selection_changed":False,
         "method":"strict chronological ticket-level walk-forward; each calibration weight uses only earlier settled tickets",
+        "history_scope":"Deduplicated union of tickets and archived_tickets; current ticket rows take precedence when ticket IDs overlap.",
+        "history_diagnostics":{
+            **history_diagnostics,
+            "unique_ticket_rows":len(unique_tickets),
+            "settled_calibration_rows":len(settled),
+        },
         "warmup_tickets":WARMUP,
         "grid":GRID,
-        "samples":{"all_settled":len(settled),"modern_2_to_4":len(modern)},
+        "samples":{
+            "active_rows":history_diagnostics.get("current_rows",0),
+            "archived_rows":history_diagnostics.get("archived_rows",0),
+            "unique_rows":history_diagnostics.get("unique_rows",0),
+            "duplicate_rows_collapsed":history_diagnostics.get("duplicate_rows_collapsed",0),
+            "all_settled":len(settled),
+            "modern_2_to_4":len(modern),
+        },
         "all_settled":all_metrics,
         "modern_2_to_4":modern_metrics,
+        "by_primary_lane":by_primary_lane,
         "decision":{
             "promotion_allowed":False,
             "reason":"Calibration experiment must be independently reviewed before production use.",
-            "note":"A lower Brier/log-loss on the held-forward rows is evidence for calibration, not evidence of future profitability."
+            "note":"A lower Brier/log-loss on held-forward rows is evidence for calibration, not evidence of future profitability. Do not use this report to lower production gates automatically."
         },
         "modern_predictions":modern_pred,
     }
