@@ -7,6 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ns = runpy.run_path(str(ROOT / "scripts" / "unified_upcoming.py"))
+learning_ns = runpy.run_path(str(ROOT / "scripts" / "efootball_desk_learning.py"))
 tennis_ns = runpy.run_path(str(ROOT / "scripts" / "predict_today.py"))
 UTC = timezone.utc
 
@@ -175,6 +176,62 @@ class UpcomingDeskPolicyTests(unittest.TestCase):
         self.assertFalse(requires("vfootball", 6.5, "under", {"n": 0, "hit_rate": None}))
         self.assertFalse(requires("efootball_gt", 8.5, "under", {"n": 0, "hit_rate": None}))
         self.assertFalse(requires("vfootball", 8.5, "over", {"n": 0, "hit_rate": None}))
+
+
+    def test_exact_line_calibration_uses_raw_probability_as_its_adjustment_basis(self):
+        forecasts = [
+            {
+                "product": "efootball_gt",
+                "line": 6.5,
+                "pick": "under",
+                "model_probability": 0.60,
+                "raw_model_probability": 0.80,
+                "win": index < 15,
+            }
+            for index in range(20)
+        ]
+        profile = learning_ns["exact_profiles"](forecasts)["efootball_gt"]["6.5|under"]
+        posterior = (15 + 4.0) / (20 + 8.0)
+        self.assertAlmostEqual(profile["mean_model_probability"], 0.60)
+        self.assertAlmostEqual(profile["mean_raw_model_probability"], 0.80)
+        self.assertAlmostEqual(profile["calibration_offset"], posterior - 0.60)
+        self.assertAlmostEqual(profile["raw_calibration_offset"], posterior - 0.80)
+
+        report = {"exact_selection": {"6.5|under": profile}}
+        actual, source, _ = ns["calibrate_desk_probability"](0.80, 6.5, "under", report)
+        expected = ns["clamp"](0.80 + profile["raw_calibration_offset"] * profile["calibration_weight"])
+        self.assertEqual(source, "EXACT_LINE_DIRECTION")
+        self.assertAlmostEqual(actual, expected)
+        self.assertLess(actual, 0.80, "raw estimate must be corrected using the raw-scale residual")
+
+    def test_probability_bucket_fallback_is_keyed_and_calibrated_on_raw_scores(self):
+        forecasts = [
+            {
+                "product": "efootball_gt",
+                "line": 4.5,
+                "pick": "over",
+                "model_probability": 0.60,
+                "raw_model_probability": 0.80,
+                "win": index < 15,
+            }
+            for index in range(30)
+        ]
+        displayed_buckets = learning_ns["calibration"](forecasts)
+        raw_buckets = learning_ns["calibration"](forecasts, probability_field="raw_model_probability")
+        self.assertIn("0.6", displayed_buckets)
+        self.assertIn("0.8", raw_buckets)
+        self.assertAlmostEqual(displayed_buckets["0.6"]["mean_model_probability"], 0.60)
+        self.assertAlmostEqual(raw_buckets["0.8"]["mean_model_probability"], 0.80)
+
+        report = {
+            "exact_selection": {},
+            "raw_probability_calibration": {"active": True, "buckets": raw_buckets},
+        }
+        actual, source, _ = ns["calibrate_desk_probability"](0.80, 4.5, "over", report)
+        expected = ns["clamp"](0.80 + raw_buckets["0.8"]["calibration_offset"] * raw_buckets["0.8"]["calibration_weight"])
+        self.assertEqual(source, "PROBABILITY_BUCKET")
+        self.assertAlmostEqual(actual, expected)
+        self.assertAlmostEqual(actual, 0.65)
 
 
 if __name__ == "__main__":
