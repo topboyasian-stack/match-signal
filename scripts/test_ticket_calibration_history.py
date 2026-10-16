@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Regression tests for complete, time-safe ticket calibration history."""
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 import unittest
 
@@ -115,6 +115,33 @@ class TicketCalibrationHistoryTests(unittest.TestCase):
         self.assertAlmostEqual(metrics["raw_combined_model_probability"], 0.49)
         self.assertAlmostEqual(metrics["combined_model_probability"], 0.49 ** 2)
         self.assertTrue(metrics["ticket_calibration_ready"])
+
+
+    def test_brier_improvement_does_not_promote_lane_with_negative_settled_roi(self):
+        origin = datetime(2026, 10, 1, tzinfo=timezone.utc)
+        lane_tickets = []
+        for index in range(40):
+            status = "WON" if index % 5 == 0 else "LOST"
+            stamp = (origin + timedelta(days=index)).isoformat()
+            row = make_ticket(index, status=status, stamp=stamp, ticket_id=f"ROI-{index:03d}")
+            row["combined_odds"] = 3.4
+            row["raw_combined_model_probability"] = 0.56
+            lane_tickets.append(row)
+
+        old_cache = builder._EFOOTBALL_TICKET_CALIBRATION_CACHE
+        builder._EFOOTBALL_TICKET_CALIBRATION_CACHE = None
+        try:
+            with patch.object(builder, "load", return_value={"tickets": lane_tickets, "archived_tickets": []}):
+                result = builder._efootball_exact_evidence_ticket_gamma()
+        finally:
+            builder._EFOOTBALL_TICKET_CALIBRATION_CACHE = old_cache
+
+        self.assertTrue(result["brier_promotion_allowed"], "chronological calibration should improve against an overconfident raw score")
+        self.assertFalse(result["profitability_promotion_allowed"], "8 wins at 3.4x and 32 losses are negative flat-stake ROI")
+        self.assertFalse(result["promotion_allowed"], "calibration quality is not the same as ticket profitability")
+        self.assertEqual(result["settled_lane_profit_ticket_count"], 40)
+        self.assertAlmostEqual(result["settled_lane_flat_stake_roi"], -0.32)
+        self.assertEqual(result["promotion_hold_reason"], "settled_lane_roi_not_positive")
 
 
 if __name__ == "__main__":
