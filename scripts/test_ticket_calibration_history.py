@@ -87,7 +87,9 @@ class TicketCalibrationHistoryTests(unittest.TestCase):
                 result = builder._ticket_calibration_gamma()
         finally:
             builder._TICKET_CALIBRATION_CACHE = old_cache
-        self.assertEqual(result["sample"], 3, "only distinct current rows with raw joint probabilities may train")
+        self.assertEqual(result["sample"], 4, "only current rows with raw joint probabilities may train")
+        self.assertEqual(result["available_settled_tickets"], 12)
+        self.assertEqual(result["missing_raw_joint_probability_count"], 8)
         self.assertFalse(result["trained"])
 
     def test_efootball_ticket_lane_does_not_inherit_unrelated_general_gamma(self):
