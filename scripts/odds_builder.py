@@ -2141,7 +2141,7 @@ def _ticket_calibration_gamma():
         if str(ticket.get("status") or "").upper() not in {"WON","LOST"}:
             continue
         try:
-            raw_p=float(ticket.get("combined_model_probability"))
+            raw_p=float(ticket.get("raw_combined_model_probability"))
         except (TypeError,ValueError):
             continue
         if not 0<raw_p<1:
