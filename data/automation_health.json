@@ -1,23 +1,23 @@
 {
-  "updated_at": "2026-10-16T07:57:49.099113+00:00",
+  "updated_at": "2026-10-16T08:18:04.379535+00:00",
   "automation_status": "SELF_HEALING_ENABLED",
   "pipeline_last_update": "2026-10-16T04:27:29.301967+00:00",
-  "pipeline_age_hours": 3.51,
+  "pipeline_age_hours": 3.84,
   "odds_builder_last_update": "2026-10-16T07:32:59.927580+00:00",
-  "odds_builder_age_hours": 0.41,
+  "odds_builder_age_hours": 0.75,
   "expansion_last_update": "2026-10-16T05:03:03.495073+00:00",
-  "expansion_age_hours": 2.91,
+  "expansion_age_hours": 3.25,
   "virtual_lab_last_update": "2026-10-16T06:24:54.067693+00:00",
-  "virtual_lab_age_hours": 1.55,
-  "virtual_lab_status_age_hours": 1.39,
-  "darts_age_hours": 2.53,
-  "table_tennis_age_hours": 2.09,
-  "unified_upcoming_age_hours": 0.43,
-  "qualified_best_monitor_last_run_age_minutes": 92.3,
-  "qualified_best_monitor_last_scheduled_run_age_minutes": 234.9,
-  "qualified_best_monitor_last_fallback_dispatch_age_minutes": 92.3,
+  "virtual_lab_age_hours": 1.89,
+  "virtual_lab_status_age_hours": 0.12,
+  "darts_age_hours": 0.23,
+  "table_tennis_age_hours": 0.17,
+  "unified_upcoming_age_hours": 0.32,
+  "qualified_best_monitor_last_run_age_minutes": 20.1,
+  "qualified_best_monitor_last_scheduled_run_age_minutes": 255.1,
+  "qualified_best_monitor_last_fallback_dispatch_age_minutes": 20.1,
   "qualified_best_monitor_schedule_status": "STALE",
-  "qualified_best_monitor_workflow_age_minutes": 2027.6,
+  "qualified_best_monitor_workflow_age_minutes": 2047.8,
   "virtual_lab_events": 470,
   "virtual_lab_products": {
     "efootball_gt": 225,
@@ -40,31 +40,13 @@
       "workflow": "qualified-best-schedule-watch.yml",
       "action": "schedule_gap_alert",
       "status": "warning",
-      "detail": "Qualified Best monitor schedule status=STALE; last scheduled run age=234.9 minute(s); workflow age=2027.6 minute(s)."
+      "detail": "Qualified Best monitor schedule status=STALE; last scheduled run age=255.1 minute(s); workflow age=2047.8 minute(s)."
     },
     {
       "workflow": "qualified-best-schedule-watch.yml",
       "action": "monitor_failsafe_dispatch",
       "status": "requested",
-      "detail": "Scheduled monitor run is STALE; dispatching a fallback despite recent deployment checks."
-    },
-    {
-      "workflow": "virtual-lab-collector.yml",
-      "action": "dispatch",
-      "status": "requested",
-      "detail": "Virtual Lab research-ledger self-heal"
-    },
-    {
-      "workflow": "darts-x.yml",
-      "action": "dispatch",
-      "status": "requested",
-      "detail": "Darts-X self-heal"
-    },
-    {
-      "workflow": "table-tennis-x.yml",
-      "action": "dispatch",
-      "status": "requested",
-      "detail": "Table Tennis-X self-heal"
+      "detail": "Scheduled monitor run is STALE; dispatching a fallback despite recent deployment checks. A deployment-triggered monitor is active; the fallback is queued behind it."
     },
     {
       "workflow": "unified-upcoming.yml",
