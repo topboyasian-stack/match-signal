@@ -603,10 +603,14 @@ def settled_forecasts(trace):
     return rows
 
 
-def calibration(forecasts):
+def calibration(forecasts, probability_field="model_probability"):
+    """Summarize a probability scale separately for monitoring or raw-score calibration."""
     buckets = {}
     for row in forecasts:
-        p = num(row.get("model_probability"))
+        p = num(row.get(probability_field))
+        if p is None and probability_field != "model_probability":
+            # Legacy observations may not contain raw_model_probability.
+            p = num(row.get("model_probability"))
         if p is None:
             continue
         key = bucket_key(p)
@@ -633,6 +637,7 @@ def calibration(forecasts):
         b["avg_brier"] = b["brier"] / n if n else None
         b["posterior_probability"] = empirical
         b["mean_model_probability"] = mean_model
+        b["probability_field"] = probability_field
         b["calibration_weight"] = weight
         b["calibration_offset"] = empirical - mean_model
         b["calibrated_probability"] = max(0.01, min(0.99, calibrated))
@@ -641,8 +646,8 @@ def calibration(forecasts):
 
 
 def exact_profiles(forecasts):
-    # Never pool products: eFootball GT and VFootball have different score
-    # distributions and each needs its own line/direction evidence.
+    # Preserve diagnostics on the displayed probability, but compute a distinct
+    # correction offset from the raw model score used by the next forecast.
     products = {}
     for row in forecasts:
         line = num(row.get("line"))
@@ -652,13 +657,23 @@ def exact_profiles(forecasts):
         product = str(row.get("product") or "efootball_gt").strip().lower()
         key = f"{line:g}|{side}"
         by_line = products.setdefault(product, {})
-        g = by_line.setdefault(key, {"n": 0, "wins": 0, "model_probability_sum": 0.0, "model_probability_n": 0})
+        g = by_line.setdefault(key, {
+            "n": 0, "wins": 0,
+            "model_probability_sum": 0.0, "model_probability_n": 0,
+            "raw_model_probability_sum": 0.0, "raw_model_probability_n": 0,
+        })
         g["n"] += 1
         g["wins"] += 1 if row.get("win") else 0
         p = num(row.get("model_probability"))
         if p is not None:
             g["model_probability_sum"] += p
             g["model_probability_n"] += 1
+        raw_p = num(row.get("raw_model_probability"))
+        if raw_p is None:
+            raw_p = p
+        if raw_p is not None:
+            g["raw_model_probability_sum"] += raw_p
+            g["raw_model_probability_n"] += 1
 
     for by_line in products.values():
         for g in by_line.values():
@@ -667,14 +682,22 @@ def exact_profiles(forecasts):
             posterior = (wins + 4.0) / (n + 8.0) if n else None
             p_n = int(g.pop("model_probability_n"))
             p_sum = float(g.pop("model_probability_sum"))
+            raw_p_n = int(g.pop("raw_model_probability_n"))
+            raw_p_sum = float(g.pop("raw_model_probability_sum"))
             mean_p = p_sum / p_n if p_n else None
+            mean_raw_p = raw_p_sum / raw_p_n if raw_p_n else mean_p
             weight = n / (n + 30.0) if n else 0.0
             g["accuracy"] = wins / n if n else 0.0
             g["posterior_probability"] = posterior
             g["mean_model_probability"] = mean_p
+            g["mean_raw_model_probability"] = mean_raw_p
             g["calibration_weight"] = weight
+            # Kept for the existing report: residual versus displayed scores.
             g["calibration_offset"] = (posterior - mean_p) if posterior is not None and mean_p is not None else 0.0
+            # Consumed by the forecaster: residual versus raw input probabilities.
+            g["raw_calibration_offset"] = (posterior - mean_raw_p) if posterior is not None and mean_raw_p is not None else 0.0
     return products
+
 
 def main():
     board = load(UNIFIED, {})
@@ -707,8 +730,10 @@ def main():
         product_settled = [r for r in settled if str(r.get("product") or "efootball_gt").strip().lower() == product]
         recent = product_settled[-RECENT_WINDOW:]
         buckets = calibration(product_settled)
+        raw_buckets = calibration(product_settled, probability_field="raw_model_probability")
         exact = exact_profiles(product_settled).get(product, {})
         bucket_active = any(int(b.get("n") or 0) >= MIN_CALIBRATION_N for b in buckets.values())
+        raw_bucket_active = any(int(b.get("n") or 0) >= MIN_CALIBRATION_N for b in raw_buckets.values())
         exact_active = any(int(x.get("n") or 0) >= EXACT_MIN_N for x in exact.values())
         recent_accuracy = (
             sum(1 for r in recent if r.get("win")) / len(recent)
@@ -739,7 +764,14 @@ def main():
             "calibration": {
                 "active": bucket_active,
                 "minimum_bucket_predictions": MIN_CALIBRATION_N,
+                "probability_field": "model_probability (displayed desk probability)",
                 "buckets": buckets,
+            },
+            "raw_probability_calibration": {
+                "active": raw_bucket_active,
+                "minimum_bucket_predictions": MIN_CALIBRATION_N,
+                "probability_field": "raw_model_probability (legacy rows fall back to model_probability)",
+                "buckets": raw_buckets,
             },
             "exact_selection_active": exact_active,
             "exact_selection": exact,
@@ -749,6 +781,7 @@ def main():
     # they describe eFootball GT only. New readers should use by_product.
     gt = by_product.get("efootball_gt", {})
     gt_calibration = gt.get("calibration") or {"active": False, "buckets": {}}
+    gt_raw_probability_calibration = gt.get("raw_probability_calibration") or {"active": False, "buckets": {}}
     gt_exact = gt.get("exact_selection") or {}
     active = bool(gt.get("active"))
     report = {
@@ -770,6 +803,10 @@ def main():
         "recent_window": gt.get("recent_window") or {"n": 0, "accuracy": 0.0, "brier": None},
         "calibration": {
             **gt_calibration,
+            "settled_predictions": int(gt.get("settled_predictions") or 0),
+        },
+        "raw_probability_calibration": {
+            **gt_raw_probability_calibration,
             "settled_predictions": int(gt.get("settled_predictions") or 0),
         },
         "exact_selection": gt_exact,
