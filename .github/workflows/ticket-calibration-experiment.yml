@@ -18,6 +18,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: {python-version: '3.12'}
+      - name: Test archive-aware ticket calibration history
+        run: python scripts/test_ticket_calibration_history.py
       - name: Run calibration experiment
         run: python scripts/ticket_calibration_experiment.py
       - name: Validate diagnostic artifact
@@ -28,7 +30,7 @@ jobs:
           assert d['mode']=='PAPER_ONLY_DIAGNOSTIC'
           assert d['production_selection_changed'] is False
           assert d['samples']['modern_2_to_4'] >= 10
-          print(json.dumps(d['modern_2_to_4'],indent=2))
+          print(json.dumps({'samples': d['samples'], 'history_diagnostics': d['history_diagnostics'], 'modern_2_to_4': d['modern_2_to_4'], 'by_primary_lane': d.get('by_primary_lane', {})},indent=2))
           PY
       - name: Install Builder runtime dependency
         run: python -m pip install --upgrade requests
