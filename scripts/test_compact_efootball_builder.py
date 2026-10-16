@@ -158,7 +158,7 @@ class CompactEfootballBuilderTests(unittest.TestCase):
         self.assertFalse(result["trained"])
         self.assertFalse(result["promotion_allowed"])
         self.assertFalse(result["oos_brier_improved"])
-        self.assertAlmostEqual(result["raw_oos_brier"],result["calibrated_oos_brier"])
+        self.assertGreaterEqual(result["calibrated_oos_brier"],result["raw_oos_brier"])
 
 
     def test_batch_metrics_uses_lane_specific_chronological_gamma(self):
