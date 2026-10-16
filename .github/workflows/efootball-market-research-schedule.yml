@@ -2,8 +2,8 @@ name: Isolated eFootball Winner and BTTS Market Research
 
 on:
   schedule:
-    # Offset fallback if workflow_run chaining is delayed; cron change re-registers the scheduled workflow.
-    - cron: '9,24,39,54 * * * *'
+    # Fresh workflow identity and offset cadence restore the isolated research schedule if workflow_run chaining is delayed.
+    - cron: '10,25,40,55 * * * *'
   workflow_dispatch:
   workflow_run:
     workflows:
@@ -18,7 +18,7 @@ on:
       - 'scripts/test_efootball_performance_report.py'
       - 'scripts/virtual_lab_sync.py'
       - 'functions/api/sportybet-virtual.js'
-      - '.github/workflows/efootball-market-research.yml'
+      - '.github/workflows/efootball-market-research-schedule.yml'
   push:
     branches: [main]
     paths:
@@ -28,7 +28,7 @@ on:
       - 'scripts/test_efootball_performance_report.py'
       - 'scripts/virtual_lab_sync.py'
       - 'functions/api/sportybet-virtual.js'
-      - '.github/workflows/efootball-market-research.yml'
+      - '.github/workflows/efootball-market-research-schedule.yml'
 
 permissions:
   contents: write
