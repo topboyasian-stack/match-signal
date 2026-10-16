@@ -1,23 +1,23 @@
 {
-  "updated_at": "2026-10-16T22:54:50.825977+00:00",
+  "updated_at": "2026-10-16T22:58:11.016189+00:00",
   "automation_status": "SELF_HEALING_ENABLED",
   "pipeline_last_update": "2026-10-16T22:50:37.022365+00:00",
-  "pipeline_age_hours": 0.07,
-  "odds_builder_last_update": "2026-10-16T22:24:42.166417+00:00",
-  "odds_builder_age_hours": 0.5,
+  "pipeline_age_hours": 0.13,
+  "odds_builder_last_update": "2026-10-16T22:55:27.275974+00:00",
+  "odds_builder_age_hours": 0.05,
   "expansion_last_update": "2026-10-16T22:53:29.241853+00:00",
-  "expansion_age_hours": 0.02,
+  "expansion_age_hours": 0.08,
   "virtual_lab_last_update": "2026-10-16T21:55:32.003865+00:00",
-  "virtual_lab_age_hours": 0.99,
-  "virtual_lab_status_age_hours": 1.19,
-  "darts_age_hours": 1.07,
-  "table_tennis_age_hours": 0.25,
-  "unified_upcoming_age_hours": 0.24,
-  "qualified_best_monitor_last_run_age_minutes": 2.9,
-  "qualified_best_monitor_last_scheduled_run_age_minutes": 2.9,
-  "qualified_best_monitor_last_fallback_dispatch_age_minutes": 15.5,
+  "virtual_lab_age_hours": 1.04,
+  "virtual_lab_status_age_hours": 1.24,
+  "darts_age_hours": 1.13,
+  "table_tennis_age_hours": 0.31,
+  "unified_upcoming_age_hours": 0.01,
+  "qualified_best_monitor_last_run_age_minutes": 6.3,
+  "qualified_best_monitor_last_scheduled_run_age_minutes": 6.3,
+  "qualified_best_monitor_last_fallback_dispatch_age_minutes": 18.8,
   "qualified_best_monitor_schedule_status": "ON_CADENCE",
-  "qualified_best_monitor_workflow_age_minutes": 2924.6,
+  "qualified_best_monitor_workflow_age_minutes": 2927.9,
   "virtual_lab_events": 740,
   "virtual_lab_products": {
     "efootball_gt": 283,
@@ -35,19 +35,6 @@
     "unified_upcoming_hours": 0.2,
     "qualified_best_monitor_minutes": 15
   },
-  "actions": [
-    {
-      "workflow": "unified-upcoming.yml",
-      "action": "failure_recovery",
-      "status": "suppressed_active_run",
-      "detail": "A run is already queued or active; duplicate retry avoided."
-    },
-    {
-      "workflow": "virtual-lab-collector.yml",
-      "action": "dispatch",
-      "status": "requested",
-      "detail": "Virtual Lab research-ledger self-heal"
-    }
-  ],
+  "actions": [],
   "policy": "Watchdog self-heals stale engines, records Qualified Best scheduled/actual monitor age, dispatches a fallback when the scheduled monitor is missing/stale even if deployment checks are recent (10-minute cooldown), and retries failed board/deploy runs once per 20-minute cooldown. Workflow_run checks do not rewrite feed data to avoid downstream loops. Health publication is retried across concurrent data writers."
 }
