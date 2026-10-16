@@ -2172,6 +2172,116 @@ def _ticket_calibration_gamma():
     return result
 
 
+_EFOOTBALL_TICKET_CALIBRATION_CACHE=None
+
+
+def _fit_efootball_ticket_gamma(rows, warmup=8, minimum_oos=12):
+    """Fit a lane-only shrinkage exponent and require better chronological OOS Brier."""
+    rows=sorted(rows,key=lambda row:row[0])
+    if not rows:
+        return {
+            "gamma":1.0,"sample":0,"warmup":warmup,"trained":False,
+            "source":"insufficient_efootball_exact_evidence_ticket_history",
+            "oos_sample":0,"raw_oos_brier":None,"calibrated_oos_brier":None,
+            "oos_brier_improved":False,"promotion_allowed":False
+        }
+
+    grid=[0.5+i*0.1 for i in range(46)]
+    timestamps=sorted({row[0] for row in rows})
+    selected_gammas=[]
+    oos=[]
+    for stamp in timestamps:
+        prior=[row for row in rows if row[0] < stamp]
+        current=[row for row in rows if row[0] == stamp]
+        if len(prior)<warmup or not current:
+            continue
+
+        def score_gamma(gamma):
+            return sum((y-max(0.0005,min(0.9995,p**gamma)))**2 for _,p,y in prior)/len(prior)
+
+        chosen=min(grid,key=lambda gamma:(score_gamma(gamma),abs(gamma-1.0)))
+        selected_gammas.append(chosen)
+        for _,p,y in current:
+            oos.append((p,y,max(0.0005,min(0.9995,p**chosen))))
+
+    raw_brier=sum((y-p)**2 for p,y,_ in oos)/len(oos) if oos else None
+    calibrated_brier=sum((y-calibrated)**2 for _,y,calibrated in oos)/len(oos) if oos else None
+    improved=(
+        len(oos)>=minimum_oos and raw_brier is not None and calibrated_brier is not None
+        and calibrated_brier < raw_brier-1e-6
+    )
+    if len(selected_gammas)<3 or not improved:
+        return {
+            "gamma":1.0,"sample":len(rows),"warmup":warmup,"trained":False,
+            "source":"efootball_exact_evidence_chronological_calibration_not_validated",
+            "gamma_observations":len(selected_gammas),"oos_sample":len(oos),
+            "raw_oos_brier":round(raw_brier,6) if raw_brier is not None else None,
+            "calibrated_oos_brier":round(calibrated_brier,6) if calibrated_brier is not None else None,
+            "oos_brier_improved":False,"promotion_allowed":False
+        }
+
+    gamma=max(1.0,min(4.0,sum(selected_gammas)/len(selected_gammas)))
+    return {
+        "gamma":round(gamma,4),"sample":len(rows),"warmup":warmup,"trained":True,
+        "source":"efootball_exact_evidence_chronological_ticket_brier_calibration",
+        "gamma_observations":len(selected_gammas),"oos_sample":len(oos),
+        "raw_oos_brier":round(raw_brier,6),"calibrated_oos_brier":round(calibrated_brier,6),
+        "oos_brier_improved":True,"promotion_allowed":True,
+        "dependent_ticket_rows_warning":"Settled tickets can reuse legs/events; OOS calibration is a risk-control signal, not independent profitability proof."
+    }
+
+
+def _efootball_exact_evidence_ticket_gamma():
+    """Calibrate eFootball exact-evidence joint probabilities on that lane's own history."""
+    global _EFOOTBALL_TICKET_CALIBRATION_CACHE
+    if _EFOOTBALL_TICKET_CALIBRATION_CACHE is not None:
+        return _EFOOTBALL_TICKET_CALIBRATION_CACHE
+
+    tracker=load(DATA/"odds_ticket_tracker.json",{})
+    tickets=settled_ticket_history(tracker,min_legs=2,max_legs=7)
+    lane_tickets=[]
+    rows=[]
+    missing_raw=0
+    for ticket in tickets:
+        primary_lane=str(ticket.get("primary_lane") or ticket.get("construction_lane") or "").strip()
+        legs=ticket.get("legs") if isinstance(ticket.get("legs"),list) else []
+        if primary_lane:
+            is_lane_ticket=primary_lane=="efootball_exact_evidence_value"
+        else:
+            is_lane_ticket=bool(legs) and all(
+                isinstance(leg,dict)
+                and str(leg.get("product") or "").startswith("efootball_")
+                and str(leg.get("qualification_lane") or "")=="efootball_exact_evidence_value"
+                for leg in legs
+            )
+        if not is_lane_ticket:
+            continue
+        lane_tickets.append(ticket)
+        if str(ticket.get("status") or "").upper() not in {"WON","LOST"}:
+            continue
+        try:
+            raw_probability=float(ticket.get("raw_combined_model_probability"))
+        except (TypeError,ValueError):
+            missing_raw+=1
+            continue
+        stamp=str(ticket.get("_calibration_stamp") or "")
+        if not stamp or not 0<raw_probability<1:
+            missing_raw+=1
+            continue
+        outcome=1.0 if str(ticket.get("status") or "").upper()=="WON" else 0.0
+        rows.append((stamp,raw_probability,outcome))
+
+    result=_fit_efootball_ticket_gamma(rows)
+    result.update({
+        "lane":"efootball_exact_evidence_value",
+        "settled_lane_ticket_count":len(lane_tickets),
+        "missing_raw_joint_probability_count":missing_raw,
+        "source_field":"raw_combined_model_probability",
+        "active_batch_policy":"hold ticket construction unless chronological OOS Brier improves over the raw independence proxy"
+    })
+    _EFOOTBALL_TICKET_CALIBRATION_CACHE=result
+    return result
+
 def _calibrated_ticket_probability(raw_probability):
     try:
         p=max(.0005,min(.9995,float(raw_probability)))
