@@ -2232,7 +2232,7 @@ def _fit_efootball_ticket_gamma(rows, warmup=8, minimum_oos=12):
 
 
 def _efootball_exact_evidence_ticket_gamma():
-    """Calibrate eFootball exact-evidence joint probabilities on that lane's own history."""
+    """Validate lane-specific joint-probability calibration and observed ticket returns."""
     global _EFOOTBALL_TICKET_CALIBRATION_CACHE
     if _EFOOTBALL_TICKET_CALIBRATION_CACHE is not None:
         return _EFOOTBALL_TICKET_CALIBRATION_CACHE
@@ -2241,6 +2241,7 @@ def _efootball_exact_evidence_ticket_gamma():
     tickets=settled_ticket_history(tracker,min_legs=2,max_legs=7)
     lane_tickets=[]
     rows=[]
+    profit_rows=[]
     missing_raw=0
     for ticket in tickets:
         primary_lane=str(ticket.get("primary_lane") or ticket.get("construction_lane") or "").strip()
@@ -2257,30 +2258,70 @@ def _efootball_exact_evidence_ticket_gamma():
         if not is_lane_ticket:
             continue
         lane_tickets.append(ticket)
-        if str(ticket.get("status") or "").upper() not in {"WON","LOST"}:
+        status=str(ticket.get("status") or "").upper()
+        stamp=str(ticket.get("_calibration_stamp") or "")
+        if status not in {"WON","LOST"}:
             continue
+        try:
+            odds=float(ticket.get("combined_odds"))
+        except (TypeError,ValueError):
+            odds=None
+        if odds is not None and odds>1.0:
+            won=status=="WON"
+            profit_rows.append({
+                "stamp":stamp,
+                "won":won,
+                "net_units":odds-1.0 if won else -1.0
+            })
         try:
             raw_probability=float(ticket.get("raw_combined_model_probability"))
         except (TypeError,ValueError):
             missing_raw+=1
             continue
-        stamp=str(ticket.get("_calibration_stamp") or "")
         if not stamp or not 0<raw_probability<1:
             missing_raw+=1
             continue
-        outcome=1.0 if str(ticket.get("status") or "").upper()=="WON" else 0.0
-        rows.append((stamp,raw_probability,outcome))
+        rows.append((stamp,raw_probability,1.0 if status=="WON" else 0.0))
 
     result=_fit_efootball_ticket_gamma(rows)
+    lane_wins=sum(1 for row in profit_rows if row["won"])
+    lane_losses=sum(1 for row in profit_rows if not row["won"])
+    lane_profit=sum(row["net_units"] for row in profit_rows)
+    lane_profit_n=len(profit_rows)
+    lane_roi=lane_profit/lane_profit_n if lane_profit_n else None
+    brier_promotion_allowed=result.get("promotion_allowed") is True
+    profit_sample_sufficient=lane_profit_n>=30
+    profitability_promotion_allowed=profit_sample_sufficient and lane_roi is not None and lane_roi>0.0
+    promotion_allowed=brier_promotion_allowed and profitability_promotion_allowed
+    hold_reason=None
+    if not brier_promotion_allowed:
+        hold_reason="chronological_oos_brier_not_improved"
+    elif not profit_sample_sufficient:
+        hold_reason="insufficient_settled_lane_roi_sample"
+    elif not profitability_promotion_allowed:
+        hold_reason="settled_lane_roi_not_positive"
+
     result.update({
         "lane":"efootball_exact_evidence_value",
         "settled_lane_ticket_count":len(lane_tickets),
         "missing_raw_joint_probability_count":missing_raw,
         "source_field":"raw_combined_model_probability",
-        "active_batch_policy":"hold ticket construction unless chronological OOS Brier improves over the raw independence proxy"
+        "brier_promotion_allowed":brier_promotion_allowed,
+        "profitability_promotion_allowed":profitability_promotion_allowed,
+        "settled_lane_profit_ticket_count":lane_profit_n,
+        "settled_lane_wins":lane_wins,
+        "settled_lane_losses":lane_losses,
+        "settled_lane_net_units":round(lane_profit,6),
+        "settled_lane_flat_stake_roi":round(lane_roi,6) if lane_roi is not None else None,
+        "profitability_minimum_settled_tickets":30,
+        "promotion_allowed":promotion_allowed,
+        "promotion_hold_reason":hold_reason,
+        "active_batch_policy":"require improved chronological OOS Brier and positive settled lane ROI on at least 30 tickets",
+        "dependent_ticket_rows_warning":"Settled tickets can reuse legs/events; OOS calibration and ROI are risk controls, not independent profitability proof."
     })
     _EFOOTBALL_TICKET_CALIBRATION_CACHE=result
     return result
+
 
 def _calibrated_ticket_probability(raw_probability):
     try:
