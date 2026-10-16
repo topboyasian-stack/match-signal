@@ -2119,32 +2119,29 @@ def _participants(leg):
 _TICKET_CALIBRATION_CACHE=None
 
 def _ticket_calibration_gamma():
-    """Estimate a time-safe ticket-probability shrinkage exponent.
-
-    Individual VFootball probabilities are strong, but the old ticket layer
-    multiplied them into systematically overconfident joint probabilities.
-    This estimator learns a conservative exponent only from earlier settled
-    2–7-leg tickets, using a rolling Brier-minimization procedure. It never
-    uses pending/current tickets as training rows.
-    """
+    """Fit a conservative shrinkage exponent from raw joint ticket probabilities only."""
     global _TICKET_CALIBRATION_CACHE
     if _TICKET_CALIBRATION_CACHE is not None:
         return _TICKET_CALIBRATION_CACHE
     raw=load(DATA/"odds_ticket_tracker.json",{})
     # The tracker keeps only a rolling active window in "tickets"; settled
     # history beyond that window lives in "archived_tickets". Recombine and
-    # deduplicate before learning so the calibration does not silently lose most
-    # of its chronological sample when records roll off the visible desk.
+    # deduplicate before calibration, but never train on an already-corrected
+    # combined_model_probability when its raw joint probability is unavailable.
     tickets=settled_ticket_history(raw,min_legs=2,max_legs=7)
+    settled_count=len(tickets)
     rows=[]
+    missing_raw=0
     for ticket in tickets:
         if str(ticket.get("status") or "").upper() not in {"WON","LOST"}:
             continue
         try:
             raw_p=float(ticket.get("raw_combined_model_probability"))
         except (TypeError,ValueError):
+            missing_raw+=1
             continue
         if not 0<raw_p<1:
+            missing_raw+=1
             continue
         stamp=ticket.get("_calibration_stamp")
         if not stamp:
@@ -2158,14 +2155,22 @@ def _ticket_calibration_gamma():
         prior=rows[:i]
         best=min(gammas,key=lambda g:sum((y-max(.0005,min(.9995,p**g)))**2 for _,p,y in prior)/len(prior))
         chosen.append(best)
+    diagnostics={
+        "available_settled_tickets":settled_count,
+        "missing_raw_joint_probability_count":missing_raw,
+        "source_field":"raw_combined_model_probability",
+    }
     if len(chosen)<3:
-        result={"gamma":1.0,"sample":len(rows),"warmup":warmup,"trained":False,"source":"insufficient_settled_2_to_7_ticket_history"}
+        result={"gamma":1.0,"sample":len(rows),"warmup":warmup,"trained":False,
+                "source":"insufficient_settled_raw_joint_probability_history",**diagnostics}
     else:
         gamma=max(1.0,min(4.0,sum(chosen)/len(chosen)))
         result={"gamma":round(gamma,4),"sample":len(rows),"warmup":warmup,"trained":True,
-                "source":"chronological_2_to_7_ticket_brier_calibration","gamma_observations":len(chosen)}
+                "source":"chronological_raw_joint_probability_brier_calibration",
+                "gamma_observations":len(chosen),**diagnostics}
     _TICKET_CALIBRATION_CACHE=result
     return result
+
 
 def _calibrated_ticket_probability(raw_probability):
     try:
