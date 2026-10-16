@@ -25,7 +25,10 @@ on:
       - 'data/virtual_lab_external_h2h.json'
       - 'data/virtual_lab_archive/**'
   schedule:
-    - cron: '*/5 * * * *'
+    # This full settlement/evaluation pass recently took about 12 minutes. Keep it
+    # on a 15-minute cadence; the separate live-feed sync and Unified Upcoming board
+    # retain their faster schedules for current fixtures and SportyBet prices.
+    - cron: '4,19,34,49 * * * *'
   workflow_dispatch:
   # Touch-triggered self-check: this workflow must be runnable immediately after remediation.
 
