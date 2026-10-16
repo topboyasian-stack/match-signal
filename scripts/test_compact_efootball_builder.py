@@ -136,5 +136,30 @@ class CompactEfootballBuilderTests(unittest.TestCase):
         self.assertGreater(diag["rejected_kickoff_span"],0)
 
 
+    def test_chronological_ticket_calibration_must_improve_future_brier(self):
+        origin=datetime(2026,1,1,tzinfo=timezone.utc)
+        rows=[
+            ((origin+timedelta(days=i)).isoformat(),0.56,1.0 if i%4==0 else 0.0)
+            for i in range(60)
+        ]
+        result=builder._fit_efootball_ticket_gamma(rows)
+        self.assertTrue(result["trained"])
+        self.assertTrue(result["promotion_allowed"])
+        self.assertGreaterEqual(result["oos_sample"],12)
+        self.assertLess(result["calibrated_oos_brier"],result["raw_oos_brier"])
+
+    def test_chronological_ticket_calibration_stays_held_when_raw_is_calibrated(self):
+        origin=datetime(2026,1,1,tzinfo=timezone.utc)
+        rows=[
+            ((origin+timedelta(days=i)).isoformat(),0.50,1.0 if i%2==0 else 0.0)
+            for i in range(60)
+        ]
+        result=builder._fit_efootball_ticket_gamma(rows)
+        self.assertFalse(result["trained"])
+        self.assertFalse(result["promotion_allowed"])
+        self.assertFalse(result["oos_brier_improved"])
+        self.assertAlmostEqual(result["raw_oos_brier"],result["calibrated_oos_brier"])
+
+
 if __name__=="__main__":
     unittest.main()
