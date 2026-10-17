@@ -184,22 +184,58 @@ class CompactEfootballBuilderTests(unittest.TestCase):
             leg(1,odds=2.35,probability=0.70,expected_value=0.645,minute=5)
         ]
         held={"trained":False,"promotion_allowed":False,"sample":40,"oos_sample":16,
-              "raw_oos_brier":0.24,"calibrated_oos_brier":0.25,"oos_brier_improved":False}
+              "raw_oos_brier":0.24,"calibrated_oos_brier":0.25,"oos_brier_improved":False,
+              "brier_promotion_allowed":False,"profitability_promotion_allowed":False,
+              "promotion_hold_reason":"chronological_oos_brier_not_improved"}
         with patch.object(builder,"_efootball_exact_evidence_ticket_gamma",return_value=held):
             selected,diag=builder._construct_efootball_value_batch(rows,min_odds=2.70,max_legs=4)
         self.assertEqual(selected,[])
-        self.assertEqual(diag["reason"],"efootball_ticket_calibration_did_not_beat_raw_oos_baseline")
+        self.assertEqual(diag["reason"],"efootball_ticket_calibration_oos_brier_not_improved")
         self.assertEqual(diag["candidate_count"],2)
 
     def test_compact_efootball_constructor_holds_without_validated_lane_calibration(self):
         rows=[leg(i,odds=1.20,probability=0.90) for i in range(4)]
         held={"trained":False,"promotion_allowed":False,"sample":40,"oos_sample":16,
-              "raw_oos_brier":0.24,"calibrated_oos_brier":0.25,"oos_brier_improved":False}
+              "raw_oos_brier":0.24,"calibrated_oos_brier":0.25,"oos_brier_improved":False,
+              "brier_promotion_allowed":False,"profitability_promotion_allowed":False,
+              "promotion_hold_reason":"chronological_oos_brier_not_improved"}
         with patch.object(builder,"_efootball_exact_evidence_ticket_gamma",return_value=held):
             selected,diag=builder._construct_efootball_compact_batch(rows)
         self.assertEqual(selected,[])
-        self.assertEqual(diag["reason"],"efootball_ticket_calibration_did_not_beat_raw_oos_baseline")
+        self.assertEqual(diag["reason"],"efootball_ticket_calibration_oos_brier_not_improved")
         self.assertEqual(diag["candidate_count"],4)
+
+    def test_ticket_constructors_report_profitability_hold_when_brier_improves(self):
+        held={
+            "trained":True,"promotion_allowed":False,"sample":107,
+            "settled_lane_ticket_count":107,"missing_raw_joint_probability_count":0,
+            "gamma":1.8621,"oos_sample":99,"raw_oos_brier":0.269469,
+            "calibrated_oos_brier":0.183544,"oos_brier_improved":True,
+            "brier_promotion_allowed":True,"profitability_promotion_allowed":False,
+            "settled_lane_profit_ticket_count":107,"settled_lane_wins":28,
+            "settled_lane_losses":79,"settled_lane_net_units":-3.042,
+            "settled_lane_flat_stake_roi":-0.02843,
+            "profitability_minimum_settled_tickets":30,
+            "promotion_hold_reason":"settled_lane_roi_not_positive"
+        }
+        pair=[
+            leg(0,odds=2.35,probability=0.70,expected_value=0.645,minute=0),
+            leg(1,odds=2.35,probability=0.70,expected_value=0.645,minute=5)
+        ]
+        compact=[leg(i,odds=1.20,probability=0.90) for i in range(4)]
+        with patch.object(builder,"_efootball_exact_evidence_ticket_gamma",return_value=held):
+            pair_selected,pair_diag=builder._construct_efootball_value_batch(pair,min_odds=2.70,max_legs=4)
+            compact_selected,compact_diag=builder._construct_efootball_compact_batch(compact)
+
+        expected_reason="efootball_ticket_calibration_settled_roi_not_positive"
+        self.assertEqual(pair_selected,[])
+        self.assertEqual(compact_selected,[])
+        self.assertEqual(pair_diag["reason"],expected_reason)
+        self.assertEqual(compact_diag["reason"],expected_reason)
+        self.assertTrue(pair_diag["ticket_calibration"]["oos_brier_improved"])
+        self.assertTrue(compact_diag["ticket_calibration"]["oos_brier_improved"])
+        self.assertLess(pair_diag["ticket_calibration"]["settled_lane_flat_stake_roi"],0)
+        self.assertLess(compact_diag["ticket_calibration"]["settled_lane_flat_stake_roi"],0)
 
 
 if __name__=="__main__":
