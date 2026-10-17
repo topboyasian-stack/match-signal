@@ -2323,6 +2323,34 @@ def _efootball_exact_evidence_ticket_gamma():
     return result
 
 
+def _efootball_ticket_calibration_hold_label(calibration):
+    """Report the actual promotion blocker; calibration and profitability are separate gates."""
+    if not isinstance(calibration, dict):
+        return "efootball_ticket_calibration_not_promoted"
+    reason=str(calibration.get("promotion_hold_reason") or "").strip()
+    labels={
+        "chronological_oos_brier_not_improved":
+            "efootball_ticket_calibration_oos_brier_not_improved",
+        "insufficient_settled_lane_roi_sample":
+            "efootball_ticket_calibration_insufficient_settled_roi_sample",
+        "settled_lane_roi_not_positive":
+            "efootball_ticket_calibration_settled_roi_not_positive",
+    }
+    if reason in labels:
+        return labels[reason]
+    if calibration.get("trained") is not True:
+        return "efootball_ticket_calibration_not_trained"
+    if calibration.get("brier_promotion_allowed") is not True:
+        return "efootball_ticket_calibration_oos_brier_not_improved"
+    if calibration.get("profitability_promotion_allowed") is not True:
+        n=int(calibration.get("settled_lane_profit_ticket_count") or 0)
+        minimum=int(calibration.get("profitability_minimum_settled_tickets") or 30)
+        if n < minimum:
+            return "efootball_ticket_calibration_insufficient_settled_roi_sample"
+        return "efootball_ticket_calibration_settled_roi_not_positive"
+    return "efootball_ticket_calibration_not_promoted"
+
+
 def _calibrated_ticket_probability(raw_probability):
     try:
         p=max(.0005,min(.9995,float(raw_probability)))
@@ -2501,7 +2529,7 @@ def _construct_efootball_value_batch(pool, min_odds=None, max_legs=RESULTS_FIRST
             "shape":None,"candidate_count":len(rows),"combined_odds":None,
             "combined_probability":None,"roi":None,"span_minutes":None,
             "search_mode":"blocked_unvalidated_ticket_calibration",
-            "reason":"efootball_ticket_calibration_did_not_beat_raw_oos_baseline",
+            "reason":_efootball_ticket_calibration_hold_label(lane_calibration),
             "ticket_calibration":{
                 key:lane_calibration.get(key) for key in (
                     "sample","settled_lane_ticket_count","missing_raw_joint_probability_count",
@@ -2626,7 +2654,7 @@ def _construct_efootball_compact_batch(pool):
         )
     }
     if lane_calibration.get("trained") is not True or lane_calibration.get("promotion_allowed") is not True:
-        diag["reason"]="efootball_ticket_calibration_did_not_beat_raw_oos_baseline"
+        diag["reason"]=_efootball_ticket_calibration_hold_label(lane_calibration)
         return [],diag
     if len(frontier)<COMPACT_EFOOTBALL_MIN_LEGS:
         return [],diag
