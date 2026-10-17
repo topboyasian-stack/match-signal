@@ -69,8 +69,8 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
 
     def test_board_schedule_is_offset_from_hour_boundary(self):
         crons = workflow_schedule_crons(BOARD_WORKFLOW)
-        self.assertIn("3-59/5 * * * *", crons)
-        self.assertNotIn("2-59/5 * * * *", crons, "cron must change to re-arm the missing scheduled board publisher")
+        self.assertIn("2-59/5 * * * *", crons)
+        self.assertNotIn("3-59/5 * * * *", crons, "cron must change to re-arm the missing scheduled board publisher")
         self.assertNotIn("4-59/5 * * * *", crons)
         self.assertNotIn("*/5 * * * *", crons)
 
@@ -78,8 +78,8 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         # Keep deployment-triggered monitoring separate from the newly registered cron identity.
         self.assertEqual(workflow_schedule_crons(MONITOR_WORKFLOW), [])
         crons = workflow_schedule_crons(SCHEDULE_MONITOR_WORKFLOW)
-        self.assertIn("1,11,21,31,41,51 * * * *", crons)
-        self.assertNotIn("5,15,25,35,45,55 * * * *", crons, "schedule must move to a fresh workflow identity")
+        self.assertIn("3,13,23,33,43,53 * * * *", crons)
+        self.assertNotIn("1,11,21,31,41,51 * * * *", crons, "schedule must move to a fresh workflow identity")
         self.assertNotIn("*/5 * * * *", crons)
         events_end = MONITOR_WORKFLOW.find("\npermissions:")
         self.assertGreater(events_end, 0)
