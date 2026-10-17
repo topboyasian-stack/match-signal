@@ -308,7 +308,7 @@ def select_validated_virtual_model_variant(eval_art,product,participant_enabled=
         fallback_candidates=[
             (name,holdout.get(name))
             for name in variants
-            if metrics_passes(holdout.get(name),market,MIN_HOLDOUT_ROWS)
+            if metrics_passes(holdout.get(name),market,30)
         ]
         if fallback_candidates:
             chosen_name,chosen_baseline=min(
