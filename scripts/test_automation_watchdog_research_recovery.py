@@ -1,4 +1,6 @@
 from pathlib import Path
+import re
+import textwrap
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -23,6 +25,14 @@ class EfootballResearchRecoveryTests(unittest.TestCase):
     def test_watchdog_contract_is_run_by_research_pr_validation(self):
         self.assertIn("scripts/test_automation_watchdog_research_recovery.py", RESEARCH)
         self.assertIn("python scripts/test_automation_watchdog_research_recovery.py", RESEARCH)
+
+    def test_inline_watchdog_recovery_script_is_valid_python(self):
+        match = re.search(
+            r"(?m)^          python - <<'PY'\\n(?P<script>[\\s\\S]*?)^          PY$",
+            WATCHDOG,
+        )
+        self.assertIsNotNone(match, "watchdog inline Python script must remain extractable")
+        compile(textwrap.dedent(match.group("script")), "automation_watchdog_inline.py", "exec")
 
 
 if __name__ == "__main__":
