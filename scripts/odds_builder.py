@@ -3530,7 +3530,47 @@ def _construct_vfootball_holdout_batches(pool,max_batches=4,max_legs=MIXED_RESEA
 
 
 def _secondary_efootball_diagnostics(pool, min_odds=None):
-    """Explain exact-evidence eFootball pair opportunities without disguising calibration holds as ROI failures."""
+    """Explain exact-evidence eFootball pairs, keeping calibration-held ideas shadow-only."""
+    import re
+
+    def line_side(row):
+        history=row.get("participant_history") if isinstance(row.get("participant_history"),dict) else {}
+        evidence=row.get("recent_evidence") if isinstance(row.get("recent_evidence"),dict) else {}
+        line=history.get("line")
+        if line is None:
+            line=evidence.get("line",row.get("line"))
+        side=str(history.get("side") or evidence.get("side") or row.get("side") or "").strip().lower()
+        # The normalized candidates store O/U direction in participant_history,
+        # while the display label in "pick" also carries a usable fallback.
+        label=str(row.get("pick") or "")
+        match=re.search(r"\b(over|under)\s+(\d+(?:\.\d+)?)\b",label,re.I)
+        if match:
+            if side not in {"over","under"}:
+                side=match.group(1).lower()
+            if line is None:
+                line=match.group(2)
+        try:
+            line=float(line) if line is not None else None
+            if line is not None and not math.isfinite(line):
+                line=None
+        except (TypeError,ValueError):
+            line=None
+        return {"line":line,"side":side if side in {"over","under"} else None}
+
+    def market_fields(row):
+        info=line_side(row)
+        return {
+            "match":row.get("match"),
+            "event_id":row.get("event_id"),
+            "product":row.get("product"),
+            "market":row.get("market"),
+            "line":info["line"],
+            "side":info["side"],
+            "p":float(row.get("model_probability") or 0.0),
+            "odds":float(row.get("bookmaker_odds") or 0.0),
+            "start":row.get("start_time")
+        }
+
     if min_odds is None:
         min_odds=active_min_combined_odds()
     rows=[
@@ -3556,20 +3596,20 @@ def _secondary_efootball_diagnostics(pool, min_odds=None):
     for i in range(len(rows)):
         for j in range(i+1,len(rows)):
             pair_total+=1
-            a,b=rows[i],rows[j]
-            odds=float(a.get("bookmaker_odds") or 1.0)*float(b.get("bookmaker_odds") or 1.0)
+            leg_a,leg_b=rows[i],rows[j]
+            odds=float(leg_a.get("bookmaker_odds") or 1.0)*float(leg_b.get("bookmaker_odds") or 1.0)
             if odds < min_odds:
                 continue
             pair_odds+=1
-            pa=set(_participants(a)); pb=set(_participants(b))
-            if pa & pb or str(a.get("event_id") or "")==str(b.get("event_id") or ""):
+            pa=set(_participants(leg_a)); pb=set(_participants(leg_b))
+            if pa & pb or str(leg_a.get("event_id") or "")==str(leg_b.get("event_id") or ""):
                 pair_correlation+=1
                 continue
-            span=_batch_kickoff_span_minutes([a,b])
+            span=_batch_kickoff_span_minutes([leg_a,leg_b])
             if span > MODEL_FIRST_MAX_KICKOFF_SPAN_MINUTES:
                 pair_span+=1
                 continue
-            pair_metrics=_batch_metrics([a,b])
+            pair_metrics=_batch_metrics([leg_a,leg_b])
             raw_probability=float(pair_metrics.get("raw_combined_model_probability") or 0.0)
             raw_roi=raw_probability*odds-1.0
             calibrated_probability=float(pair_metrics.get("combined_model_probability") or 0.0)
@@ -3577,21 +3617,11 @@ def _secondary_efootball_diagnostics(pool, min_odds=None):
             calibration_ready=pair_metrics.get("ticket_calibration_ready") is not False
             if not calibration_ready:
                 # A held calibration deliberately returns a near-zero approved
-                # probability. That is a promotion hold, not evidence that the
-                # individual pair failed the calibrated expected-ROI test.
+                # probability. That is a promotion hold, not a measured ROI failure.
                 pair_calibration_hold+=1
                 if raw_roi >= RESULTS_FIRST_MIN_EXPECTED_ROI:
                     raw_shadow_candidates.append({
-                        "legs":[
-                            {"match":a.get("match"),"event_id":a.get("event_id"),
-                             "product":a.get("product"),"line":a.get("line"),"side":a.get("pick"),
-                             "p":float(a.get("model_probability") or 0.0),"odds":float(a.get("bookmaker_odds") or 0.0),
-                             "start":a.get("start_time")},
-                            {"match":b.get("match"),"event_id":b.get("event_id"),
-                             "product":b.get("product"),"line":b.get("line"),"side":b.get("pick"),
-                             "p":float(b.get("model_probability") or 0.0),"odds":float(b.get("bookmaker_odds") or 0.0),
-                             "start":b.get("start_time")}
-                        ],
+                        "legs":[market_fields(leg_a),market_fields(leg_b)],
                         "combined_odds":round(odds,3),
                         "raw_independence_probability":round(raw_probability,6),
                         "raw_independence_expected_roi":round(raw_roi,6),
@@ -3606,10 +3636,7 @@ def _secondary_efootball_diagnostics(pool, min_odds=None):
                 pair_roi+=1
                 continue
             qualified.append({
-                "legs":[
-                    {"match":a.get("match"),"p":float(a.get("model_probability") or 0.0),"odds":float(a.get("bookmaker_odds") or 0.0),"start":a.get("start_time")},
-                    {"match":b.get("match"),"p":float(b.get("model_probability") or 0.0),"odds":float(b.get("bookmaker_odds") or 0.0),"start":b.get("start_time")}
-                ],
+                "legs":[market_fields(leg_a),market_fields(leg_b)],
                 "combined_odds":round(odds,3),
                 "combined_probability":calibrated_probability,
                 "roi":round(calibrated_roi,6),
@@ -3624,7 +3651,10 @@ def _secondary_efootball_diagnostics(pool, min_odds=None):
     return {
         "pool_size":len(rows),
         "top_legs":[
-            {"match":x.get("match"),"p":float(x.get("model_probability") or 0.0),"odds":float(x.get("bookmaker_odds") or 0.0),"ev":float(x.get("expected_value") or 0.0),"start":x.get("start_time")}
+            {
+                **market_fields(x),
+                "ev":float(x.get("expected_value") or 0.0)
+            }
             for x in rows[:20]
         ],
         "pair_scan":{
@@ -3641,6 +3671,7 @@ def _secondary_efootball_diagnostics(pool, min_odds=None):
         "shadow_only_candidates":raw_shadow_candidates[:5],
         "shadow_only_policy":"Diagnostic-only combinations with raw independence ROI above the floor while lane calibration is held. Never eligible for BATCH-01 or the settled ticket ledger."
     }
+
 
 def build_value_batches(candidates):
     """Build one results-first paper ticket using the best proven 2–7-leg shape.
