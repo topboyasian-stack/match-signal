@@ -234,5 +234,103 @@ class UpcomingDeskPolicyTests(unittest.TestCase):
         self.assertAlmostEqual(actual, 0.65)
 
 
+    def test_virtual_current_quote_ladder_deduplicates_and_requires_two_sided_totals(self):
+        event = {"markets": [
+            {"id": "18", "name": "Total Goals", "line": 2.5,
+             "outcomes": [{"name": "Over 2.5", "odds": 1.8}, {"name": "Under 2.5", "odds": 2.0}]},
+            {"id": "18", "name": "Total Goals", "specifier": "total=3.5",
+             "outcomes": [{"name": "Over 3.5", "odds": 2.1}, {"name": "Under 3.5", "odds": 1.7}]},
+            {"id": "18", "name": "Total Goals", "specifier": "total=4.5",
+             "outcomes": [{"name": "Over 4.5", "odds": 3.2}, {"name": "Under 4.5", "odds": 1.3}]},
+            {"id": "18", "name": "Total Goals", "line": 3.5,
+             "outcomes": [{"name": "Over 3.5", "odds": 2.0}, {"name": "Under 3.5", "odds": 1.8}]},
+            {"id": "1", "name": "Match Winner", "line": 0.5,
+             "outcomes": [{"name": "Over", "odds": 1.8}, {"name": "Under", "odds": 2.0}]},
+            {"id": "18", "name": "Total Goals", "line": 5.5,
+             "outcomes": [{"name": "Over 5.5", "odds": 1.8}]},
+        ]}
+        points = ns["virtual_market_ladder_points"](event)
+        self.assertEqual([line for line, _ in points], [2.5, 3.5, 4.5])
+        self.assertEqual(len(points), len({line for line, _ in points}))
+        self.assertAlmostEqual(points[0][1], (1 / 1.8) / ((1 / 1.8) + (1 / 2.0)))
+        self.assertAlmostEqual(points[1][1], (
+            (1 / 2.1) / ((1 / 2.1) + (1 / 1.7)) +
+            (1 / 2.0) / ((1 / 2.0) + (1 / 1.8))
+        ) / 2)
+
+    def test_virtual_target_lambda_is_fit_without_the_target_market_line(self):
+        calls = []
+        def fake_fit(points):
+            calls.append(list(points))
+            return 3.25
+        points = [(2.5, 0.70), (3.5, 0.51), (4.5, 0.29)]
+        fitted, meta = ns["fit_virtual_target_lambda"](points, 3.5, fake_fit, 2.7)
+        self.assertEqual(fitted, 3.25)
+        self.assertEqual(calls, [[(2.5, 0.70), (4.5, 0.29)]])
+        self.assertEqual(meta["source"], "current_market_ladder_leave_one_line_out")
+        self.assertTrue(meta["target_line_excluded"])
+
+    def test_virtual_target_lambda_uses_historical_fallback_when_ladder_is_too_thin(self):
+        calls = []
+        fitted, meta = ns["fit_virtual_target_lambda"](
+            [(2.5, 0.70), (3.5, 0.50)],
+            3.5,
+            lambda points: calls.append(list(points)) or 9.0,
+            2.8,
+        )
+        self.assertEqual(fitted, 2.8)
+        self.assertEqual(calls, [])
+        self.assertEqual(meta["source"], "historical_product_lambda_fallback")
+
+    def test_efootball_model_variant_uses_product_holdout_and_does_not_force_participant_overlay(self):
+        def metrics(n, brier, log_loss, ece, hit_rate=0.60):
+            return {"n": n, "brier": brier, "log_loss": log_loss, "ece": ece, "hit_rate": hit_rate}
+        report = {
+            "by_product": {"efootball_gt": {
+                "market": metrics(3432, .26075, .71526, .09980),
+                "poisson": metrics(3432, .24022, .67320, .00526),
+                "poisson_prior": metrics(3432, .24219, .67734, .01917),
+                "efootball_shape": metrics(3432, .24647, .68641, .05849),
+                "participant_model": metrics(3432, .24408, .68129, .04916),
+            }},
+            "holdout_metrics": {
+                "market": metrics(5639, .32967, .93964, .22249),
+                "poisson": metrics(5639, .19446, .56169, .00862),
+                "poisson_prior": metrics(5639, .19582, .56438, .01937),
+                "efootball_shape": metrics(5639, .19826, .56974, .03702),
+            },
+        }
+        selector = ns["select_validated_virtual_model_variant"]
+        self.assertEqual(selector(report, "efootball_gt", participant_enabled=False), "poisson")
+        # Even if a stale artifact says the participant gate passed, the overlay
+        # must not override a better product-specific base holdout.
+        self.assertEqual(selector(report, "efootball_gt", participant_enabled=True), "poisson")
+
+        report["by_product"]["efootball_gt"]["participant_model"] = metrics(3432, .230, .650, .020)
+        self.assertEqual(selector(report, "efootball_gt", participant_enabled=True), "participant_model")
+
+    def test_under_forecast_is_complement_of_the_selected_over_probability(self):
+        result = (0.55, 0.31, 0.33, 0.32, 0.29, 20, 0.35, 30, 0.5)
+        probability = ns["virtual_model_side_probability"]
+        self.assertAlmostEqual(probability(result, "poisson", "over"), 0.31)
+        self.assertAlmostEqual(probability(result, "poisson", "under"), 0.69)
+        self.assertAlmostEqual(probability(result, "poisson_prior", "under"), 0.67)
+        self.assertAlmostEqual(probability(result, "efootball_shape", "under"), 0.65)
+        self.assertAlmostEqual(probability(result, "participant_model", "under"), 0.71)
+        self.assertIsNone(probability(result, "unknown_variant", "under"))
+
+    def test_exact_line_direction_lookup_reads_nested_product_selection_artifact(self):
+        artifact = {"by_product_selection": {"efootball_gt": {
+            "u7.5": {"7.5": {
+                "poisson": {"n": 255, "hit_rate": .6039, "brier": .2361},
+                "participant_model": {"n": 255, "hit_rate": .6039, "brier": .2337},
+            }}
+        }}}
+        result = ns["exact_line_direction_oos"](artifact, "efootball_gt", 7.5, "under")
+        self.assertEqual(result["n"], 255)
+        self.assertAlmostEqual(result["hit_rate"], .6039)
+        self.assertAlmostEqual(result["brier"], .2337)
+        self.assertEqual(result["variant"], "participant_model")
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
