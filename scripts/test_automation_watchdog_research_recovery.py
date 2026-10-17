@@ -26,9 +26,10 @@ class EfootballResearchRecoveryTests(unittest.TestCase):
         self.assertIn("python scripts/test_automation_watchdog_research_recovery.py", RESEARCH)
 
     def test_inline_watchdog_recovery_script_is_valid_python(self):
-        marker = "          python - <<'PY'\\n"
+        marker = "          python - <<'PY'"
         start = WATCHDOG.index(marker) + len(marker)
-        end = WATCHDOG.index("\\n          PY", start)
+        start = WATCHDOG.index(chr(10), start) + 1
+        end = WATCHDOG.index("          PY", start)
         script = textwrap.dedent(WATCHDOG[start:end])
         compile(script, "automation_watchdog_inline.py", "exec")
 
