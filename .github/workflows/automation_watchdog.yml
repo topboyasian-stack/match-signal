@@ -19,6 +19,7 @@ on:
       - "Deploy Match Signal to Cloudflare Pages"
       - "Match Signal Odds Ticket Tracker"
       - "Match Signal Virtual Lab Live Sync"
+      - "Isolated eFootball Winner and BTTS Market Research"
     types: [completed]
   workflow_dispatch:
 
@@ -33,7 +34,7 @@ concurrency:
 jobs:
   watchdog:
     # Use successful Odds Ticket Tracker completions as an event-driven heartbeat when GitHub cron delivery stalls.
-    if: ${{ github.event_name != 'workflow_run' || (github.event.workflow_run.name == 'Match Signal Unified Upcoming Board' && github.event.workflow_run.conclusion != 'success') || github.event.workflow_run.name == 'Deploy Match Signal to Cloudflare Pages' || (github.event.workflow_run.name == 'Match Signal Odds Ticket Tracker' && github.event.workflow_run.conclusion == 'success') || (github.event.workflow_run.name == 'Match Signal Virtual Lab Live Sync' && github.event.workflow_run.conclusion == 'success') }}
+    if: ${{ github.event_name != 'workflow_run' || (github.event.workflow_run.name == 'Match Signal Unified Upcoming Board' && github.event.workflow_run.conclusion != 'success') || github.event.workflow_run.name == 'Deploy Match Signal to Cloudflare Pages' || (github.event.workflow_run.name == 'Match Signal Odds Ticket Tracker' && github.event.workflow_run.conclusion == 'success') || (github.event.workflow_run.name == 'Match Signal Virtual Lab Live Sync' && github.event.workflow_run.conclusion == 'success') || (github.event.workflow_run.name == 'Isolated eFootball Winner and BTTS Market Research' && github.event.workflow_run.conclusion == 'success') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -91,6 +92,7 @@ jobs:
           darts = load('data/darts_status.json')
           table_tennis = load('data/table_tennis_status.json')
           unified = load('data/unified_upcoming.json')
+          efootball_report = load('data/efootball_performance_report.json')
 
           def age_hours(value):
               if not value:
@@ -141,6 +143,77 @@ jobs:
                   print(f'WARN unable to inspect {workflow}: {error}')
                   return False
               return any(r.get('status') in {'queued', 'in_progress', 'waiting', 'pending'} for r in runs)
+
+          # Independent eFootball winner/GG-NG archive freshness is monitored separately
+          # from the live desk. A stale shadow archive should trigger research recovery,
+          # never block Qualified Best or change production selection.
+          efootball_source_freshness = efootball_report.get('source_freshness') or {}
+          efootball_market_archive_updated_at = (
+              efootball_source_freshness.get('market_archive_updated_at')
+              or efootball_report.get('generated_at')
+          )
+          efootball_collector_last_capture_at = efootball_source_freshness.get('collector_last_capture_at')
+          efootball_market_archive_age_minutes = minutes_since(efootball_market_archive_updated_at)
+          efootball_collector_age_minutes = minutes_since(efootball_collector_last_capture_at)
+          EFOOTBALL_RESEARCH_MAX_AGE_MINUTES = 30
+          EFOOTBALL_RESEARCH_DISPATCH_COOLDOWN_MINUTES = 15
+          efootball_research_runs, efootball_research_history_error = recent_runs(
+              'efootball-market-research-schedule.yml', 30
+          )
+          efootball_research_last_run_age_minutes = None
+          efootball_research_last_success_age_minutes = None
+          efootball_research_scheduled_age_minutes = None
+          efootball_research_dispatch_age_minutes = None
+          efootball_research_workflow_age_minutes = None
+          efootball_research_schedule_status = 'UNKNOWN'
+          efootball_repo_name = os.environ.get('GITHUB_REPOSITORY', '')
+          if efootball_repo_name:
+              efootball_workflow_meta = subprocess.run(
+                  ['gh', 'api', f'repos/{efootball_repo_name}/actions/workflows/efootball-market-research-schedule.yml', '--jq', '.created_at'],
+                  text=True, capture_output=True
+              )
+              if efootball_workflow_meta.returncode == 0:
+                  efootball_research_workflow_age_minutes = minutes_since(efootball_workflow_meta.stdout.strip())
+          if efootball_research_runs is not None:
+              valid_efootball_runs = [
+                  r for r in efootball_research_runs
+                  if minutes_since(r.get('createdAt')) is not None
+              ]
+              if valid_efootball_runs:
+                  efootball_research_last_run_age_minutes = min(
+                      minutes_since(r.get('createdAt')) for r in valid_efootball_runs
+                  )
+              successful_efootball_runs = [
+                  r for r in valid_efootball_runs
+                  if r.get('status') == 'completed' and r.get('conclusion') == 'success'
+              ]
+              if successful_efootball_runs:
+                  efootball_research_last_success_age_minutes = min(
+                      minutes_since(r.get('createdAt')) for r in successful_efootball_runs
+                  )
+              scheduled_efootball_runs = [
+                  r for r in valid_efootball_runs if r.get('event') == 'schedule'
+              ]
+              dispatch_efootball_runs = [
+                  r for r in valid_efootball_runs if r.get('event') == 'workflow_dispatch'
+              ]
+              if dispatch_efootball_runs:
+                  efootball_research_dispatch_age_minutes = min(
+                      minutes_since(r.get('createdAt')) for r in dispatch_efootball_runs
+                  )
+              if scheduled_efootball_runs:
+                  efootball_research_scheduled_age_minutes = min(
+                      minutes_since(r.get('createdAt')) for r in scheduled_efootball_runs
+                  )
+                  efootball_research_schedule_status = (
+                      'STALE' if efootball_research_scheduled_age_minutes > EFOOTBALL_RESEARCH_MAX_AGE_MINUTES else 'ON_CADENCE'
+                  )
+              elif efootball_research_workflow_age_minutes is not None and efootball_research_workflow_age_minutes > EFOOTBALL_RESEARCH_MAX_AGE_MINUTES:
+                  efootball_research_schedule_status = 'MISSING_SCHEDULED_RUN'
+              elif efootball_research_history_error:
+                  efootball_research_schedule_status = 'UNKNOWN'
+              else:
+                  efootball_research_schedule_status = 'AWAITING_FIRST_SCHEDULED_RUN'
 
           monitor_runs, monitor_history_error = recent_runs('qualified-best-schedule-watch.yml', 100)
           monitor_last_age_minutes = None
@@ -240,6 +313,77 @@ jobs:
                   detail = ('Scheduled monitor run is '+monitor_schedule_status+'; dispatching a fallback despite recent deployment checks.' if monitor_schedule_fallback_needed else 'No Qualified Best browser check in the last 15 minutes; fallback monitor dispatched.') + active_note
                   r = subprocess.run(['gh', 'workflow', 'run', 'qualified-best-schedule-watch.yml', '--ref', 'main'], text=True, capture_output=True)
                   actions.append({'workflow':'qualified-best-schedule-watch.yml','action':'monitor_failsafe_dispatch','status':'requested' if r.returncode == 0 else 'failed','detail':(r.stderr.strip() if r.returncode else detail)})
+          efootball_research_archive_stale = (
+              efootball_market_archive_age_minutes is None
+              or efootball_market_archive_age_minutes > EFOOTBALL_RESEARCH_MAX_AGE_MINUTES
+              or efootball_collector_age_minutes is None
+              or efootball_collector_age_minutes > EFOOTBALL_RESEARCH_MAX_AGE_MINUTES
+          )
+          efootball_research_schedule_fallback_needed = (
+              efootball_research_schedule_status in {'STALE', 'MISSING_SCHEDULED_RUN'}
+          )
+          efootball_research_recovery_needed = (
+              efootball_research_archive_stale or efootball_research_schedule_fallback_needed
+          )
+          if efootball_research_runs is None:
+              actions.append({
+                  'workflow':'efootball-market-research-schedule.yml',
+                  'action':'inspect_research_freshness',
+                  'status':'failed',
+                  'detail':efootball_research_history_error
+              })
+          elif efootball_research_recovery_needed:
+              research_active = active('efootball-market-research-schedule.yml')
+              if research_active:
+                  research_action_status = 'suppressed_active_run'
+                  research_detail = 'The isolated eFootball market research workflow is already queued or active.'
+              elif (
+                  not efootball_research_archive_stale
+                  and efootball_research_last_success_age_minutes is not None
+                  and efootball_research_last_success_age_minutes < EFOOTBALL_RESEARCH_DISPATCH_COOLDOWN_MINUTES
+              ):
+                  research_action_status = 'suppressed_recent_success'
+                  research_detail = (
+                      'The last successful isolated eFootball research run completed '
+                      + str(efootball_research_last_success_age_minutes)
+                      + ' minute(s) ago and its archive is fresh; avoiding a redundant fallback dispatch.'
+                  )
+              elif (
+                  efootball_research_dispatch_age_minutes is not None
+                  and efootball_research_dispatch_age_minutes < EFOOTBALL_RESEARCH_DISPATCH_COOLDOWN_MINUTES
+              ):
+                  research_action_status = 'suppressed_cooldown'
+                  research_detail = (
+                      'Research fallback dispatched '
+                      + str(efootball_research_dispatch_age_minutes)
+                      + ' minute(s) ago; cooldown is '
+                      + str(EFOOTBALL_RESEARCH_DISPATCH_COOLDOWN_MINUTES)
+                      + ' minutes.'
+                  )
+              else:
+                  dispatch_result = subprocess.run(
+                      ['gh', 'workflow', 'run', 'efootball-market-research-schedule.yml', '--ref', 'main'],
+                      text=True, capture_output=True
+                  )
+                  research_action_status = 'requested' if dispatch_result.returncode == 0 else 'failed'
+                  recovery_reasons = []
+                  if efootball_research_archive_stale:
+                      recovery_reasons.append('market archive or collector capture exceeded the 30-minute freshness limit')
+                  if efootball_research_schedule_fallback_needed:
+                      recovery_reasons.append('scheduled research run is '+efootball_research_schedule_status.lower().replace('_', ' '))
+                  research_reason = '; '.join(recovery_reasons) or 'research refresh required'
+                  research_detail = (
+                      dispatch_result.stderr.strip()
+                      if dispatch_result.returncode
+                      else 'Dispatched isolated eFootball market research because '+research_reason+'.'
+                  )
+              actions.append({
+                  'workflow':'efootball-market-research-schedule.yml',
+                  'action':'efootball_market_research_failsafe_dispatch',
+                  'status':research_action_status,
+                  'detail':research_detail
+              })
+
           if virtual_status_age > 1 and not active('virtual-lab-collector.yml'):
               r = subprocess.run(['gh', 'workflow', 'run', 'virtual-lab-collector.yml', '--ref', 'main'], text=True, capture_output=True)
               actions.append({'workflow':'virtual-lab-collector.yml','action':'dispatch','status':'requested' if r.returncode == 0 else 'failed','detail':(r.stderr.strip() if r.returncode else 'Virtual Lab research-ledger self-heal')})
@@ -296,11 +440,23 @@ jobs:
               'qualified_best_monitor_last_fallback_dispatch_age_minutes': monitor_dispatch_age_minutes,
               'qualified_best_monitor_schedule_status': monitor_schedule_status,
               'qualified_best_monitor_workflow_age_minutes': monitor_workflow_age_minutes,
+              'efootball_market_archive_updated_at': efootball_market_archive_updated_at,
+              'efootball_market_archive_age_minutes': efootball_market_archive_age_minutes,
+              'efootball_market_collector_last_capture_at': efootball_collector_last_capture_at,
+              'efootball_market_collector_age_minutes': efootball_collector_age_minutes,
+              'efootball_market_research_last_run_age_minutes': efootball_research_last_run_age_minutes,
+              'efootball_market_research_last_success_age_minutes': efootball_research_last_success_age_minutes,
+              'efootball_market_research_scheduled_run_age_minutes': efootball_research_scheduled_age_minutes,
+              'efootball_market_research_workflow_age_minutes': efootball_research_workflow_age_minutes,
+              'efootball_market_research_schedule_status': efootball_research_schedule_status,
+              'efootball_market_research_freshness_status': (
+                  'STALE' if efootball_research_archive_stale else 'FRESH'
+              ),
               'virtual_lab_events': virtual.get('events_count', 0),
               'virtual_lab_products': virtual.get('product_counts', {}),
-              'thresholds': {'pipeline_hours': 4, 'odds_builder_hours': 8, 'expansion_hours': 4, 'virtual_lab_hours': 1, 'virtual_lab_status_hours': 1, 'darts_hours': 2, 'table_tennis_hours': 2, 'unified_upcoming_hours': 0.2, 'qualified_best_monitor_minutes': 15},
+              'thresholds': {'pipeline_hours': 4, 'odds_builder_hours': 8, 'expansion_hours': 4, 'virtual_lab_hours': 1, 'virtual_lab_status_hours': 1, 'darts_hours': 2, 'table_tennis_hours': 2, 'unified_upcoming_hours': 0.2, 'qualified_best_monitor_minutes': 15, 'efootball_market_research_minutes': EFOOTBALL_RESEARCH_MAX_AGE_MINUTES, 'efootball_market_research_dispatch_cooldown_minutes': EFOOTBALL_RESEARCH_DISPATCH_COOLDOWN_MINUTES},
               'actions': actions,
-              'policy': 'Watchdog self-heals stale engines, records Qualified Best scheduled/actual monitor age, dispatches a fallback when the scheduled monitor is missing/stale even if deployment checks are recent (10-minute cooldown), and retries failed board/deploy runs once per 20-minute cooldown. Workflow_run checks do not rewrite feed data to avoid downstream loops. Health publication is retried across concurrent data writers.'
+              'policy': 'Watchdog self-heals stale engines, records Qualified Best scheduled/actual monitor age, dispatches a fallback when the scheduled monitor is missing/stale even if deployment checks are recent (10-minute cooldown), retries failed board/deploy runs once per 20-minute cooldown, and dispatches isolated eFootball winner/GG-NG research when its market archive or collector capture is over 30 minutes stale (15-minute cooldown). The eFootball research workflow is shadow-only and never gates Qualified Best or Odds Builder. Workflow_run checks do not rewrite feed data to avoid downstream loops. Health publication is retried across concurrent data writers.'
           }
           Path('data/automation_health.json').write_text(json.dumps(health, indent=2) + '\n')
           print(json.dumps(health, indent=2))
