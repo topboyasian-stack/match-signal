@@ -316,6 +316,27 @@ class UpcomingDeskPolicyTests(unittest.TestCase):
         report["by_product"]["efootball_gt"]["participant_model"] = metrics(3432, .230, .650, .020)
         self.assertEqual(selector(report, "efootball_gt", participant_enabled=True), "participant_model")
 
+    def test_live_virtual_event_context_has_no_undefined_market_rows(self):
+        start = datetime(2026, 10, 17, 10, 0, tzinfo=UTC)
+        context = ns["virtual_live_event_context"](
+            {"event_id": "live-event-1"},
+            start,
+            "efootball_gt",
+            "Test League",
+            "Alpha",
+            "Beta",
+            3.5,
+            4.2,
+        )
+        self.assertEqual(context["event_id"], "live-event-1")
+        self.assertEqual(context["timestamp"], start.isoformat())
+        self.assertEqual(context["product"], "efootball_gt")
+        self.assertEqual(context["home"], "Alpha")
+        self.assertEqual(context["away"], "Beta")
+        self.assertEqual(context["rows"], [])
+        self.assertIsNone(context["total"])
+        self.assertEqual(context["lambda"], 4.2)
+
     def test_under_forecast_is_complement_of_the_selected_over_probability(self):
         result = (0.55, 0.31, 0.33, 0.32, 0.29, 20, 0.35, 30, 0.5)
         probability = ns["virtual_model_side_probability"]
