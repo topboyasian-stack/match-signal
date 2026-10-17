@@ -2173,6 +2173,7 @@ def _ticket_calibration_gamma():
 
 
 _EFOOTBALL_TICKET_CALIBRATION_CACHE=None
+_EFOOTBALL_HIGH_CONFIDENCE_TICKET_CALIBRATION_CACHE=None
 
 
 def _fit_efootball_ticket_gamma(rows, warmup=8, minimum_oos=12):
@@ -2323,6 +2324,133 @@ def _efootball_exact_evidence_ticket_gamma():
     return result
 
 
+def _efootball_high_confidence_ticket_gamma():
+    """Validate the >=80% per-leg eFootball construction lane independently.
+
+    Only settled history labelled high_confidence_research with 2–4 active
+    eFootball GT/Adriatic legs is comparable. Mixed VFootball/other-sport tickets,
+    weak legs, missing raw joint probabilities, and unsettled rows do not train
+    this lane's probability correction.
+    """
+    global _EFOOTBALL_HIGH_CONFIDENCE_TICKET_CALIBRATION_CACHE
+    if _EFOOTBALL_HIGH_CONFIDENCE_TICKET_CALIBRATION_CACHE is not None:
+        return _EFOOTBALL_HIGH_CONFIDENCE_TICKET_CALIBRATION_CACHE
+
+    tracker=load(DATA/"odds_ticket_tracker.json",{})
+    tickets=settled_ticket_history(tracker,min_legs=2,max_legs=4)
+    tagged=0
+    comparable=[]
+    profit_rows=[]
+    rows=[]
+    missing_raw=0
+    excluded_products=0
+    excluded_weak_legs=0
+    excluded_shapes=0
+    for ticket in tickets:
+        primary_lane=str(ticket.get("primary_lane") or ticket.get("construction_lane") or "").strip()
+        if primary_lane!="high_confidence_research":
+            continue
+        tagged+=1
+        legs=ticket.get("legs") if isinstance(ticket.get("legs"),list) else []
+        if not 2<=len(legs)<=4:
+            excluded_shapes+=1
+            continue
+        products=[str(leg.get("product") or "").strip().lower() for leg in legs if isinstance(leg,dict)]
+        if len(products)!=len(legs) or not products or any(product not in ACTIVE_VIRTUAL_PRODUCTS for product in products):
+            excluded_products+=1
+            continue
+        if any(
+            str(leg.get("qualification_lane") or "").strip() not in {"","efootball_exact_evidence_value"}
+            for leg in legs
+        ):
+            excluded_products+=1
+            continue
+        probabilities=[]
+        for leg in legs:
+            try:
+                probabilities.append(float(leg.get("model_probability")))
+            except (TypeError,ValueError):
+                probabilities.append(0.0)
+        if any(probability < MIN_SAFE_LEG_MODEL_PROBABILITY or probability > 1.0 for probability in probabilities):
+            excluded_weak_legs+=1
+            continue
+        comparable.append(ticket)
+        status=str(ticket.get("status") or "").upper()
+        if status not in {"WON","LOST"}:
+            continue
+        stamp=str(ticket.get("_calibration_stamp") or ticket.get("last_settled_at") or ticket.get("settled_at") or "")
+        try:
+            odds=float(ticket.get("combined_odds"))
+        except (TypeError,ValueError):
+            odds=None
+        if odds is not None and odds>1.0:
+            won=status=="WON"
+            profit_rows.append({
+                "stamp":stamp,
+                "won":won,
+                "net_units":odds-1.0 if won else -1.0,
+            })
+        try:
+            raw_probability=float(ticket.get("raw_combined_model_probability"))
+        except (TypeError,ValueError):
+            missing_raw+=1
+            continue
+        if not stamp or not 0<raw_probability<1:
+            missing_raw+=1
+            continue
+        rows.append((stamp,raw_probability,1.0 if status=="WON" else 0.0))
+
+    result=_fit_efootball_ticket_gamma(rows)
+    lane_wins=sum(1 for row in profit_rows if row["won"])
+    lane_losses=sum(1 for row in profit_rows if not row["won"])
+    lane_profit=sum(row["net_units"] for row in profit_rows)
+    profit_n=len(profit_rows)
+    lane_roi=lane_profit/profit_n if profit_n else None
+    calibration_sample_sufficient=len(rows)>=30
+    brier_promotion_allowed=result.get("promotion_allowed") is True
+    profit_sample_sufficient=profit_n>=30
+    profitability_promotion_allowed=(
+        calibration_sample_sufficient and profit_sample_sufficient
+        and lane_roi is not None and lane_roi>0.0
+    )
+    promotion_allowed=brier_promotion_allowed and profitability_promotion_allowed
+    if not brier_promotion_allowed:
+        hold_reason="chronological_oos_brier_not_improved"
+    elif not calibration_sample_sufficient or not profit_sample_sufficient:
+        hold_reason="insufficient_settled_lane_roi_sample"
+    elif not profitability_promotion_allowed:
+        hold_reason="settled_lane_roi_not_positive"
+    else:
+        hold_reason=None
+
+    result.update({
+        "lane":"high_confidence_research",
+        "tagged_lane_ticket_count":tagged,
+        "settled_lane_ticket_count":len(comparable),
+        "comparable_raw_probability_sample":len(rows),
+        "missing_raw_joint_probability_count":missing_raw,
+        "excluded_product_scope_tickets":excluded_products,
+        "excluded_weak_leg_tickets":excluded_weak_legs,
+        "excluded_ticket_shapes":excluded_shapes,
+        "source_field":"raw_combined_model_probability",
+        "brier_promotion_allowed":brier_promotion_allowed,
+        "calibration_sample_sufficient":calibration_sample_sufficient,
+        "profitability_promotion_allowed":profitability_promotion_allowed,
+        "settled_lane_profit_ticket_count":profit_n,
+        "settled_lane_wins":lane_wins,
+        "settled_lane_losses":lane_losses,
+        "settled_lane_net_units":round(lane_profit,6),
+        "settled_lane_flat_stake_roi":round(lane_roi,6) if lane_roi is not None else None,
+        "profitability_minimum_settled_tickets":30,
+        "promotion_allowed":promotion_allowed,
+        "promotion_hold_reason":hold_reason,
+        "active_batch_policy":"require improved chronological OOS Brier, at least 30 comparable raw-probability observations, and positive settled ROI on at least 30 pure active-eFootball high-confidence tickets",
+        "dependent_ticket_rows_warning":"Historical tickets can reuse events/participants; the lane remains paper-only and requires independent monitoring after construction changes.",
+    })
+    _EFOOTBALL_HIGH_CONFIDENCE_TICKET_CALIBRATION_CACHE=result
+    return result
+
+
 def _efootball_ticket_calibration_hold_label(calibration):
     """Report the actual promotion blocker; calibration and profitability are separate gates."""
     if not isinstance(calibration, dict):
@@ -2384,7 +2512,7 @@ def _vfootball_holdout_lower_bound(leg,confidence=0.95):
     except (TypeError,ValueError,AttributeError):
         return None
 
-def _batch_metrics(legs):
+def _batch_metrics(legs,calibration_lane=None):
     probs=[max(0.0005,min(0.9995,float(x.get("model_probability") or 0.0))) for x in legs if float(x.get("model_probability") or 0.0)>0]
     edges=[float(x.get("model_edge") or 0.0) for x in legs]
     if not probs:
@@ -2399,7 +2527,18 @@ def _batch_metrics(legs):
     ticket_gamma=float(_ticket_calibration_gamma().get("gamma") or 1.0)
     ticket_calibration_ready=True
     lane_calibration=None
-    if all_efootball_evidence:
+    if all_efootball_evidence and calibration_lane=="high_confidence_research":
+        lane_calibration=_efootball_high_confidence_ticket_gamma()
+        if lane_calibration.get("trained") is True and lane_calibration.get("promotion_allowed") is True:
+            ticket_gamma=float(lane_calibration.get("gamma") or 1.0)
+            calibrated=max(0.0005,min(0.9995,raw_combined**ticket_gamma))
+            ticket_calibration_mode="efootball_high_confidence_chronological_gamma"
+        else:
+            calibrated=0.0005
+            ticket_gamma=1.0
+            ticket_calibration_mode="efootball_high_confidence_calibration_hold"
+            ticket_calibration_ready=False
+    elif all_efootball_evidence:
         lane_calibration=_efootball_exact_evidence_ticket_gamma()
         if lane_calibration.get("trained") is True and lane_calibration.get("promotion_allowed") is True:
             ticket_gamma=float(lane_calibration.get("gamma") or 1.0)
@@ -2426,6 +2565,8 @@ def _batch_metrics(legs):
         "combined_model_probability":round(calibrated,6),"raw_combined_model_probability":round(raw_combined,6),
         "ticket_calibration_gamma":round(ticket_gamma,4),"ticket_calibration_mode":ticket_calibration_mode,
         "ticket_calibration_ready":ticket_calibration_ready,
+        "ticket_calibration_lane":calibration_lane or (lane_calibration.get("lane") if lane_calibration else None),
+        "ticket_calibration_hold_reason":lane_calibration.get("promotion_hold_reason") if lane_calibration else None,
         "ticket_calibration_oos_brier":lane_calibration.get("calibrated_oos_brier") if lane_calibration else None,
         "ticket_calibration_baseline_brier":lane_calibration.get("raw_oos_brier") if lane_calibration else None,
         "leg_strength_rating":round(geometric*100.0,2),
@@ -3110,12 +3251,45 @@ def _construct_high_confidence_value_batches(pool,max_batches=4,max_legs=MIXED_R
         min_odds=active_min_combined_odds()
     eligible=[
         x for x in pool
-        if str(x.get("qualification_lane") or "") in {
-            "vfootball_exact_evidence_value","vfootball_event_holdout_value","efootball_exact_evidence_value"
-        }
+        if str(x.get("product") or "") in ACTIVE_VIRTUAL_PRODUCTS
+        and str(x.get("qualification_lane") or "")=="efootball_exact_evidence_value"
         and float(x.get("model_probability") or 0.0)>=MIN_SAFE_LEG_MODEL_PROBABILITY
         and float(x.get("expected_value") or 0.0)>=0.0
+        and x.get("builder_eligible") is True
     ]
+    lane_calibration=_efootball_high_confidence_ticket_gamma()
+    calibration_fields=(
+        "lane","tagged_lane_ticket_count","settled_lane_ticket_count",
+        "comparable_raw_probability_sample","missing_raw_joint_probability_count",
+        "excluded_product_scope_tickets","excluded_weak_leg_tickets","excluded_ticket_shapes",
+        "gamma","trained","oos_sample","raw_oos_brier","calibrated_oos_brier",
+        "oos_brier_improved","brier_promotion_allowed","calibration_sample_sufficient",
+        "profitability_promotion_allowed","settled_lane_profit_ticket_count",
+        "settled_lane_wins","settled_lane_losses","settled_lane_net_units",
+        "settled_lane_flat_stake_roi","profitability_minimum_settled_tickets",
+        "promotion_allowed","promotion_hold_reason"
+    )
+    calibration_summary={key:lane_calibration.get(key) for key in calibration_fields}
+    if not eligible:
+        return [],{
+            "eligible_legs":0,"candidate_combinations":0,"batches_selected":0,
+            "max_batches":max_batches,"min_combined_odds":min_odds,
+            "min_per_leg_model_probability":MIN_SAFE_LEG_MODEL_PROBABILITY,
+            "preferred_per_leg_model_probability":PREFERRED_LEG_MODEL_PROBABILITY,
+            "batch_leg_counts":[],"combined_odds":[],"expected_rois":[],"kickoff_spans":[],
+            "products":[],"ticket_calibration":calibration_summary,
+            "reason":"no_active_efootball_high_confidence_legs"
+        }
+    if lane_calibration.get("trained") is not True or lane_calibration.get("promotion_allowed") is not True:
+        return [],{
+            "eligible_legs":len(eligible),"candidate_combinations":0,"batches_selected":0,
+            "max_batches":max_batches,"min_combined_odds":min_odds,
+            "min_per_leg_model_probability":MIN_SAFE_LEG_MODEL_PROBABILITY,
+            "preferred_per_leg_model_probability":PREFERRED_LEG_MODEL_PROBABILITY,
+            "batch_leg_counts":[],"combined_odds":[],"expected_rois":[],"kickoff_spans":[],
+            "products":[],"ticket_calibration":calibration_summary,
+            "reason":_efootball_ticket_calibration_hold_label(lane_calibration)
+        }
     # Keep enough diversity for four disjoint batches while bounding the search.
     model_rank=sorted(eligible,key=lambda x:(
         -float(x.get("model_probability") or 0.0),
@@ -3162,7 +3336,7 @@ def _construct_high_confidence_value_batches(pool,max_batches=4,max_legs=MIXED_R
             odds=math.prod(float(x.get("bookmaker_odds") or 1.0) for x in combo)
             if odds<min_odds:
                 continue
-            metrics=_batch_metrics(list(combo))
+            metrics=_batch_metrics(list(combo),calibration_lane="high_confidence_research")
             avg_prob=float(metrics.get("avg_model_probability") or 0.0)
             roi=(float(metrics.get("combined_model_probability") or 0.0)*odds)-1.0
             if avg_prob<MIN_SAFE_LEG_MODEL_PROBABILITY or roi<RESULTS_FIRST_MIN_EXPECTED_ROI:
@@ -3216,6 +3390,7 @@ def _construct_high_confidence_value_batches(pool,max_batches=4,max_legs=MIXED_R
         "expected_rois":[round(float(x["roi"]),6) for x in selected],
         "kickoff_spans":[round(float(x["span"]),1) for x in selected],
         "products":[sorted({str(row.get("product") or "") for row in x["rows"]}) for x in selected],
+        "ticket_calibration":calibration_summary,
         "reason":None if selected else "no_high_confidence_combination_reached_all_gates"
     }
 
