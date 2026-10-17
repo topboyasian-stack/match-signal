@@ -146,23 +146,30 @@ class UpcomingDeskPolicyTests(unittest.TestCase):
         }
         self.assertEqual(quality(paired_name), (False, "non-singles competitor"))
 
-    def test_exact_line_walk_forward_evidence_is_not_inferred_from_neighboring_lines(self):
+    def test_exact_line_walk_forward_evidence_uses_selected_model_and_not_neighboring_lines(self):
+        def metric(n, brier, log_loss, ece):
+            return {"n": n, "brier": brier, "log_loss": log_loss, "ece": ece}
         evaluation = {
+            "by_product": {"vfootball": {
+                "market": metric(1000, .40, .90, .20),
+                "poisson": metric(1000, .20, .50, .02),
+                "poisson_prior": metric(1000, .22, .55, .03),
+                "efootball_shape": metric(1000, .21, .53, .04),
+                "participant_model": metric(1000, .25, .62, .06),
+            }},
             "by_product_selection": {
                 "vfootball": {
                     "u7.5": {
-                        "participant_model": {
-                            "n": 10,
-                            "hit_rate": 1.0,
-                            "brier": 0.0006,
-                        }
+                        "poisson": {"n": 10, "hit_rate": .70, "brier": .10},
+                        "participant_model": {"n": 10, "hit_rate": 1.0, "brier": .0006},
                     }
                 }
             }
         }
         evidence = ns["exact_line_direction_oos"](evaluation, "vfootball", 7.5, "under")
         self.assertEqual(evidence["n"], 10)
-        self.assertEqual(evidence["hit_rate"], 1.0)
+        self.assertAlmostEqual(evidence["hit_rate"], .70)
+        self.assertEqual(evidence["variant"], "poisson")
         missing = ns["exact_line_direction_oos"](evaluation, "vfootball", 8.5, "under")
         self.assertEqual(missing["n"], 0)
         self.assertIsNone(missing["hit_rate"])
@@ -320,17 +327,73 @@ class UpcomingDeskPolicyTests(unittest.TestCase):
         self.assertIsNone(probability(result, "unknown_variant", "under"))
 
     def test_exact_line_direction_lookup_reads_nested_product_selection_artifact(self):
-        artifact = {"by_product_selection": {"efootball_gt": {
-            "u7.5": {"7.5": {
-                "poisson": {"n": 255, "hit_rate": .6039, "brier": .2361},
-                "participant_model": {"n": 255, "hit_rate": .6039, "brier": .2337},
+        def metric(n, brier, log_loss, ece):
+            return {"n": n, "brier": brier, "log_loss": log_loss, "ece": ece}
+        artifact = {
+            "by_product": {"efootball_gt": {
+                "market": metric(1000, .30, .80, .10),
+                "poisson": metric(1000, .20, .50, .02),
+                "poisson_prior": metric(1000, .22, .55, .03),
+                "efootball_shape": metric(1000, .23, .57, .04),
+                "participant_model": metric(1000, .24, .59, .05),
+            }},
+            "by_product_selection": {"efootball_gt": {
+                "u7.5": {"7.5": {
+                    "poisson": {"n": 255, "hit_rate": .6039, "brier": .2361},
+                    "participant_model": {"n": 255, "hit_rate": .6039, "brier": .2337},
+                }}
             }}
-        }}}
+        }
         result = ns["exact_line_direction_oos"](artifact, "efootball_gt", 7.5, "under")
         self.assertEqual(result["n"], 255)
         self.assertAlmostEqual(result["hit_rate"], .6039)
-        self.assertAlmostEqual(result["brier"], .2337)
-        self.assertEqual(result["variant"], "participant_model")
+        self.assertAlmostEqual(result["brier"], .2361)
+        self.assertEqual(result["variant"], "poisson")
+
+    def test_directional_gate_uses_the_same_model_variant_as_live_forecast(self):
+        def metric(n, brier, log_loss, ece):
+            return {"n": n, "brier": brier, "log_loss": log_loss, "ece": ece}
+        artifact = {
+            "participant_feature_gate": {"pass": True},
+            "by_product": {"efootball_gt": {
+                "market": metric(1000, .30, .80, .10),
+                "poisson": metric(1000, .20, .50, .02),
+                "poisson_prior": metric(1000, .22, .55, .03),
+                "efootball_shape": metric(1000, .23, .57, .04),
+                "participant_model": metric(1000, .24, .59, .05),
+            }},
+            "holdout_metrics": {
+                "market": metric(1000, .30, .80, .10),
+                "poisson": metric(1000, .20, .50, .02),
+                "poisson_prior": metric(1000, .22, .55, .03),
+                "efootball_shape": metric(1000, .23, .57, .04),
+                "participant_model": metric(1000, .24, .59, .05),
+            },
+            "efootball_gt_diagnostics": {"selection": {"u7.5": {"7.5": {
+                "poisson": {"n": 100, "hit_rate": .60, "brier": .24},
+                "participant_model": {"n": 100, "hit_rate": .99, "brier": .10},
+            }}}}
+        }
+        history = []
+        for i in range(40):
+            stamp = self.now - timedelta(minutes=40-i)
+            history.append({
+                "product": "efootball_gt",
+                "market": "ou",
+                "line": 7.5,
+                "selection": "under",
+                "win": True,
+                "score": "2:2",
+                "timestamp": stamp.isoformat(),
+                "settled_at": stamp.isoformat(),
+                "start_time": stamp.isoformat(),
+                "participant_1": f"Alpha{i} (player-a{i})",
+                "participant_2": f"Beta{i} (player-b{i})",
+            })
+        result = ns["build_efootball_directional_gate"](artifact, history)[(7.5, "under")]
+        self.assertEqual(result["holdout_n"], 100)
+        self.assertAlmostEqual(result["holdout_hit_rate"], .60)
+        self.assertFalse(result["pass"])
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
