@@ -43,6 +43,7 @@ on:
       - 'index.html'
       - 'analyst.html'
       - '.github/workflows/autopilot-refresh.yml'
+      - 'scripts/test_workflow_trigger_boundaries.py'
   push:
     branches: [main, ai-analyst-foundation]
     paths:
@@ -101,6 +102,8 @@ jobs:
           python-version: '3.12'
       - name: Validate JSON Schema syntax
         run: python -m json.tool schemas/user-ticket-review.schema.json > /dev/null
+      - name: Test Match Signal workflow trigger boundaries
+        run: python scripts/test_workflow_trigger_boundaries.py
       - name: Run O/U line and evidence tests
         run: python scripts/test_user_ticket_review.py
       - name: Install test dependencies
