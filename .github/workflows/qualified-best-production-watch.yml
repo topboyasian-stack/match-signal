@@ -26,6 +26,8 @@ on:
       - 'scripts/test_qualified_best_monitor.mjs'
       - 'scripts/qualified_best_monitor_lib.mjs'
       - 'scripts/test_deploy_freshness_order.py'
+      - 'scripts/ensure_odds_builder_refresh.py'
+      - 'scripts/test_ensure_odds_builder_refresh.py'
       - 'scripts/test_cloudflare_only_deploy.mjs'
       - '.github/workflows/deploy-pages.yml'
       - '.github/workflows/settle-results.yml'
@@ -69,6 +71,8 @@ jobs:
           node-version: '20'
       - name: Test freshness-safe scheduled refresh cadence
         run: python scripts/test_deploy_freshness_order.py
+      - name: Test board-to-Builder refresh recovery
+        run: python scripts/test_ensure_odds_builder_refresh.py
       - name: Enforce Cloudflare-only production hosting
         run: node scripts/test_cloudflare_only_deploy.mjs
       - name: Check JavaScript syntax

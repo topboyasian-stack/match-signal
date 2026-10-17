@@ -41,6 +41,8 @@ on:
       - 'qualified-best.html'
       - 'sport-hubs.js'
       - '.github/workflows/unified-upcoming.yml'
+      - 'scripts/ensure_odds_builder_refresh.py'
+      - 'scripts/test_ensure_odds_builder_refresh.py'
       - 'sport-hubs.css'
       - 'league-logos.js'
       - 'scripts/test_league_logos.mjs'
@@ -149,6 +151,8 @@ jobs:
         run: |
           git fetch origin main
           git reset --hard origin/main
+      - name: Test Odds Builder refresh recovery decision
+        run: python scripts/test_ensure_odds_builder_refresh.py
       - name: Compile unified engines
         run: python -m py_compile scripts/unified_upcoming.py scripts/unified_upcoming_cleanup.py scripts/selection_candidate_collector.py scripts/test_selection_candidate_collector.py scripts/efootball_desk_learning.py scripts/test_upcoming_settlement_retention.py scripts/test_upcoming_desk_policy.py scripts/system_health_audit.py scripts/predict_today.py
       - name: Validate freshness deployment ordering
@@ -221,3 +225,8 @@ jobs:
           done
           echo "Failed to publish generated Prediction Desk data after six synchronized attempts."
           exit 1
+      - name: Ensure Odds Builder refresh follows board publication
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/ensure_odds_builder_refresh.py
