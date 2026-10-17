@@ -1,5 +1,4 @@
 from pathlib import Path
-import re
 import textwrap
 import unittest
 
@@ -27,12 +26,11 @@ class EfootballResearchRecoveryTests(unittest.TestCase):
         self.assertIn("python scripts/test_automation_watchdog_research_recovery.py", RESEARCH)
 
     def test_inline_watchdog_recovery_script_is_valid_python(self):
-        match = re.search(
-            r"(?m)^          python - <<'PY'\\n(?P<script>[\\s\\S]*?)^          PY$",
-            WATCHDOG,
-        )
-        self.assertIsNotNone(match, "watchdog inline Python script must remain extractable")
-        compile(textwrap.dedent(match.group("script")), "automation_watchdog_inline.py", "exec")
+        marker = "          python - <<'PY'\\n"
+        start = WATCHDOG.index(marker) + len(marker)
+        end = WATCHDOG.index("\\n          PY", start)
+        script = textwrap.dedent(WATCHDOG[start:end])
+        compile(script, "automation_watchdog_inline.py", "exec")
 
 
 if __name__ == "__main__":
