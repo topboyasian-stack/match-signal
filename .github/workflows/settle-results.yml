@@ -65,6 +65,50 @@ jobs:
             exit 0
           fi
           git commit -m "🤖 Record completed Match Signal results"
-          git push origin main
-          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+          # Several independent workflows publish data to main. Preserve settlement
+          # results when another writer wins the race instead of abandoning this run.
+          for attempt in 1 2 3 4 5; do
+            if timeout --signal=TERM --kill-after=10s 60s env GIT_TERMINAL_PROMPT=0 git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=30 push origin HEAD:main; then
+              echo "Settled results published on attempt $attempt."
+              echo "changed=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            if [ "$attempt" -eq 5 ]; then
+              break
+            fi
+
+            echo "main advanced during settlement publication attempt $attempt; fetching latest main."
+            sleep $((attempt * 2))
+            timeout --signal=TERM --kill-after=10s 60s env GIT_TERMINAL_PROMPT=0 git fetch origin main
+
+            # Unrelated commits can be rebased without re-running result collection.
+            # If the append-only history overlaps, abort and regenerate from latest main.
+            if git rebase origin/main; then
+              PYTHONPATH=. python scripts/current_performance.py
+              PYTHONPATH=. python scripts/verify_performance_ledger.py
+              git add data/prediction_history.json data/accuracy.json data/tennis_performance.json data/current_performance.json
+              if ! git diff --cached --quiet; then
+                git commit --amend --no-edit
+              fi
+            else
+              echo "Settlement history overlap detected; rebuilding settlement artifacts from latest main."
+              git rebase --abort || true
+              git reset --hard origin/main
+              python scripts/settle_same_day.py
+              PYTHONPATH=. python scripts/current_performance.py
+              PYTHONPATH=. python scripts/verify_performance_ledger.py
+              git add data/prediction_history.json data/accuracy.json data/tennis_performance.json data/current_performance.json
+              if git diff --cached --quiet; then
+                echo "Latest main already contains all newly settled outcomes."
+                echo "changed=false" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+              git commit -m "🤖 Record completed Match Signal results"
+            fi
+          done
+
+          echo "Failed to publish settled results after five synchronized attempts."
+          exit 1
 
