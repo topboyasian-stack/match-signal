@@ -416,6 +416,10 @@ class CompactEfootballBuilderTests(unittest.TestCase):
             leg(0,odds=2.35,probability=0.70,expected_value=0.645,minute=0),
             leg(1,odds=2.35,probability=0.70,expected_value=0.645,minute=5),
         ]
+        rows[0]["pick"] = f'{rows[0]["match"]} — O/U over 2.5'
+        rows[0]["participant_history"] = {"line": "2.5", "side": "over"}
+        # The fallback must also recover the line and direction from the displayed pick.
+        rows[1]["pick"] = f'{rows[1]["match"]} — O/U under 3.5'
         held={
             "trained":True,"promotion_allowed":False,"gamma":1.8701,"sample":108,
             "oos_sample":100,"raw_oos_brier":0.268647,"calibrated_oos_brier":0.181888,
@@ -437,8 +441,13 @@ class CompactEfootballBuilderTests(unittest.TestCase):
         self.assertEqual(scan["roi_rejections"],0,"a near-zero placeholder during a calibration hold is not an ROI test result")
         self.assertEqual(scan["fully_qualified_pairs"],0,"shadow pairs must never be active-qualified pairs")
         self.assertEqual(diag["best_pair"],[])
+        self.assertEqual(len(diag["top_legs"]),2)
+        self.assertEqual((diag["top_legs"][0]["line"],diag["top_legs"][0]["side"]),(2.5,"over"))
+        self.assertEqual((diag["top_legs"][1]["line"],diag["top_legs"][1]["side"]),(3.5,"under"))
         self.assertEqual(len(diag["shadow_only_candidates"]),1)
         candidate=diag["shadow_only_candidates"][0]
+        self.assertEqual((candidate["legs"][0]["line"],candidate["legs"][0]["side"]),(2.5,"over"))
+        self.assertEqual((candidate["legs"][1]["line"],candidate["legs"][1]["side"]),(3.5,"under"))
         self.assertEqual(candidate["qualification_status"],"SHADOW_ONLY_NOT_QUALIFIED")
         self.assertFalse(candidate["ticket_calibration_ready"])
         self.assertEqual(candidate["blocking_reason"],"settled_lane_roi_not_positive")
