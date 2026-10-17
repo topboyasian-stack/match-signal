@@ -141,6 +141,10 @@ def exact_line_direction_oos(eval_art, product, line, side):
         return {"n":0,"hit_rate":None,"brier":None,"variant":None}
     product_rows=((eval_art.get("by_product_selection") or {}).get(str(product)) or {})
     selection_rows=product_rows.get(line_key) if isinstance(product_rows,dict) else None
+    participant_enabled=bool((eval_art.get("participant_feature_gate") or {}).get("pass"))
+    selected_variant=select_validated_virtual_model_variant(
+        eval_art, str(product), participant_enabled=participant_enabled
+    )
     if not isinstance(selection_rows,dict):
         return {"n":0,"hit_rate":None,"brier":None,"variant":None}
     # Current holdout diagnostics nest product/selection metrics under a numeric
@@ -157,19 +161,21 @@ def exact_line_direction_oos(eval_art, product, line, side):
             record=selection_rows.get(str(numeric_line))
     if not isinstance(record,dict):
         return {"n":0,"hit_rate":None,"brier":None,"variant":None}
-    for variant in ("participant_model","poisson_prior","poisson","efootball_shape"):
-        stats=record.get(variant)
-        if isinstance(stats,dict):
-            try:
-                return {
-                    "n":int(stats.get("n") or 0),
-                    "hit_rate":num(stats.get("hit_rate")),
-                    "brier":num(stats.get("brier")),
-                    "variant":variant,
-                }
-            except (TypeError,ValueError):
-                pass
-    return {"n":0,"hit_rate":None,"brier":None,"variant":None}
+    # Evidence used to qualify a line must come from the same model family as
+    # the production probability. Never let a disabled participant overlay grant
+    # directional eligibility to a different (Poisson) forecast.
+    stats=record.get(selected_variant)
+    if isinstance(stats,dict):
+        try:
+            return {
+                "n":int(stats.get("n") or 0),
+                "hit_rate":num(stats.get("hit_rate")),
+                "brier":num(stats.get("brier")),
+                "variant":selected_variant,
+            }
+        except (TypeError,ValueError):
+            pass
+    return {"n":0,"hit_rate":None,"brier":None,"variant":selected_variant}
 
 
 def virtual_market_line(market):
@@ -745,13 +751,14 @@ def build_efootball_directional_gate(eval_art, history):
         except (TypeError,ValueError):
             continue
         report=(line_map or {}).get(str(line)) if isinstance(line_map,dict) else None
-        # Prefer participant-aware holdout when available. This is independent
-        # of the recent settled ledger and keeps the existing OOS threshold.
-        poisson=(report or {}).get("participant_model") if isinstance(report,dict) else None
-        if not isinstance(poisson,dict):
-            poisson=(report or {}).get("efootball_shape") if isinstance(report,dict) else None
-        if not isinstance(poisson,dict):
-            poisson=(report or {}).get("poisson") if isinstance(report,dict) else None
+        # Directional qualification must use the same model family selected for
+        # the live probability; a stronger-looking participant metric cannot
+        # qualify a line while the participant overlay is held out of production.
+        participant_enabled=bool((eval_art.get("participant_feature_gate") or {}).get("pass"))
+        selected_variant=select_validated_virtual_model_variant(
+            eval_art, "efootball_gt", participant_enabled=participant_enabled
+        )
+        poisson=(report or {}).get(selected_variant) if isinstance(report,dict) else None
         if not isinstance(poisson,dict):
             continue
 
