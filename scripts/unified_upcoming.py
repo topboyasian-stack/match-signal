@@ -143,9 +143,13 @@ def exact_line_direction_oos(eval_art, product, line, side):
     selection_rows=product_rows.get(line_key) if isinstance(product_rows,dict) else None
     if not isinstance(selection_rows,dict):
         return {"n":0,"hit_rate":None,"brier":None,"variant":None}
-    # Current evaluation artifacts nest each product/selection row under its
-    # numeric line. Accept the older flat shape only for backward compatibility.
-    if any(k in selection_rows for k in ("n","brier","log_loss","hit_rate")):
+    # Current holdout diagnostics nest product/selection metrics under a numeric
+    # line; legacy walk-forward diagnostics stored the variant metrics directly
+    # under product/selection. Support both shapes, but never borrow a neighbor.
+    variants=("participant_model","poisson_prior","poisson","efootball_shape")
+    if any(isinstance(selection_rows.get(name),dict) for name in variants):
+        record=selection_rows
+    elif any(k in selection_rows for k in ("n","brier","log_loss","hit_rate")):
         record=selection_rows
     else:
         record=selection_rows.get(numeric_line_key)
