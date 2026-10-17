@@ -26,6 +26,10 @@ on:
       - 'scripts/test_qualified_best_monitor.mjs'
       - 'scripts/qualified_best_monitor_lib.mjs'
       - 'scripts/test_deploy_freshness_order.py'
+      - 'scripts/unified_upcoming.py'
+      - 'scripts/test_upcoming_desk_policy.py'
+      - 'scripts/virtual_lab_model_eval.py'
+      - 'scripts/test_virtual_lab_model_eval.py'
       - 'scripts/ensure_odds_builder_refresh.py'
       - 'scripts/test_ensure_odds_builder_refresh.py'
       - 'scripts/test_cloudflare_only_deploy.mjs'
@@ -65,6 +69,12 @@ jobs:
     steps:
       - name: Check out proposed changes
         uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install upcoming-model test dependency
+        run: python -m pip install --upgrade requests
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -73,6 +83,10 @@ jobs:
         run: python scripts/test_deploy_freshness_order.py
       - name: Test board-to-Builder refresh recovery
         run: python scripts/test_ensure_odds_builder_refresh.py
+      - name: Test eFootball forecast model and side-probability accuracy safeguards
+        run: |
+          python scripts/test_upcoming_desk_policy.py
+          python scripts/test_virtual_lab_model_eval.py
       - name: Enforce Cloudflare-only production hosting
         run: node scripts/test_cloudflare_only_deploy.mjs
       - name: Check JavaScript syntax
