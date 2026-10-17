@@ -147,9 +147,9 @@ def exact_line_direction_oos(eval_art, product, line, side):
     )
     if not isinstance(selection_rows,dict):
         return {"n":0,"hit_rate":None,"brier":None,"variant":None}
-    # Current holdout diagnostics nest product/selection metrics under a numeric
-    # line; legacy walk-forward diagnostics stored the variant metrics directly
-    # under product/selection. Support both shapes, but never borrow a neighbor.
+    # The key includes both side and line (for example, u7.5). Some evaluator
+    # versions place an additional numeric-line nesting below it; accept both
+    # shapes, but never borrow evidence from a neighboring line.
     variants=("participant_model","poisson_prior","poisson","efootball_shape")
     if any(isinstance(selection_rows.get(name),dict) for name in variants):
         record=selection_rows
