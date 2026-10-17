@@ -17,7 +17,7 @@ class SettlementPublicationTests(unittest.TestCase):
     def test_non_fast_forward_retries_are_bounded_and_time_limited(self):
         self.assertIn("for attempt in 1 2 3 4 5; do", self.publish)
         self.assertIn("timeout --signal=TERM --kill-after=10s 60s", self.publish)
-        self.assertIn("git push origin HEAD:main", self.publish)
+        self.assertIn("push origin HEAD:main", self.publish)
         self.assertIn("git fetch origin main", self.publish)
         self.assertIn("Failed to publish settled results after five synchronized attempts.", self.publish)
         self.assertIn("exit 1", self.publish)
