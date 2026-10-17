@@ -2414,10 +2414,10 @@ def _efootball_high_confidence_ticket_gamma():
         and lane_roi is not None and lane_roi>0.0
     )
     promotion_allowed=brier_promotion_allowed and profitability_promotion_allowed
-    if not brier_promotion_allowed:
-        hold_reason="chronological_oos_brier_not_improved"
-    elif not calibration_sample_sufficient or not profit_sample_sufficient:
+    if not calibration_sample_sufficient or not profit_sample_sufficient:
         hold_reason="insufficient_settled_lane_roi_sample"
+    elif not brier_promotion_allowed:
+        hold_reason="chronological_oos_brier_not_improved"
     elif not profitability_promotion_allowed:
         hold_reason="settled_lane_roi_not_positive"
     else:
