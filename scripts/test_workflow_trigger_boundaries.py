@@ -64,7 +64,7 @@ def main():
     assert "- cron: '*/15 * * * *'" in builder, (
         "The 15-minute Builder refresh must remain active."
     )
-    assert "- cron: '*/5 * * * *'" in board, (
+    assert "- cron: '2-59/5 * * * *'" in board, (
         "The five-minute Unified Upcoming refresh must remain active."
     )
     assert '"Match Signal Live Prediction Pipeline"' in board
@@ -74,7 +74,7 @@ def main():
     # Tracker is still refreshed from Builder / settlement / collector outputs,
     # and its own five-minute safety schedule remains enabled.
     assert "- cron: '*/5 * * * *'" in tracker
-    assert "- cron: '*/10 * * * *'" in watch
+    assert "- cron: '3,13,23,33,43,53 * * * *'" in watch
     assert '"Match Signal Odds Builder"' in tracker
     assert '"Match Signal Result Settlement"' in tracker
     assert '"Match Signal Virtual Lab Collector"' in tracker
