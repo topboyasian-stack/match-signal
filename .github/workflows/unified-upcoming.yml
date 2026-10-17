@@ -34,6 +34,8 @@ on:
       - 'scripts/unified_upcoming_cleanup.py'
       - 'scripts/system_health_audit.py'
       - 'data/virtual_lab_participant_lifecycle.json'
+      # Keep push-path coverage for manual tracker edits; the Tracker is downstream of the Builder, so it is deliberately not a board trigger.
+      - 'data/odds_ticket_tracker.json'
       - 'index.html'
       - 'upcoming.html'
       - 'qualified-best.html'
@@ -74,6 +76,8 @@ on:
       - 'virtual-lab-confirmed-watch.js'
       - 'virtual-lab.css'
       - 'virtual-lab/**'
+      - 'data/odds_builder.json'
+      - 'data/odds_ticket_tracker.json'
       - 'data/virtual_lab_history.json'
       - 'data/virtual_lab_live.json'
       - 'data/virtual_lab_model_eval.json'
