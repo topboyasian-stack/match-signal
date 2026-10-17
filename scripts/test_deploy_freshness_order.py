@@ -199,6 +199,8 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             ".github/workflows/cloudflare-pages.yml",
             ".github/workflows/qualified-best-schedule-watch.yml",
             ".github/workflows/automation_watchdog.yml",
+            ".github/workflows/efootball-market-research-schedule.yml",
+            "scripts/test_automation_watchdog_research_recovery.py",
         }
         self.assertEqual(direct_paths, expected_direct_paths)
         self.assertIn("name: Guard cache-only direct promotion", PAGES_WORKFLOW)
