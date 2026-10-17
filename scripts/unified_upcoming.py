@@ -131,14 +131,26 @@ def calibrate_desk_probability(raw_probability, line, side, product_report):
     return clamp(raw_probability), "NONE", exact_profile
 
 def exact_line_direction_oos(eval_art, product, line, side):
-    """Return the exact product/line/side chronological OOS result, without treating it as qualification."""
+    """Return exact product/side/line OOS metrics from the nested evaluation artifact."""
     side_key="o" if str(side).lower()=="over" else "u"
     try:
-        line_key=f"{side_key}{float(line):g}"
+        numeric_line=float(line)
+        line_key=f"{side_key}{numeric_line:g}"
+        numeric_line_key=f"{numeric_line:g}"
     except (TypeError,ValueError):
         return {"n":0,"hit_rate":None,"brier":None,"variant":None}
     product_rows=((eval_art.get("by_product_selection") or {}).get(str(product)) or {})
-    record=product_rows.get(line_key) if isinstance(product_rows,dict) else None
+    selection_rows=product_rows.get(line_key) if isinstance(product_rows,dict) else None
+    if not isinstance(selection_rows,dict):
+        return {"n":0,"hit_rate":None,"brier":None,"variant":None}
+    # Current evaluation artifacts nest each product/selection row under its
+    # numeric line. Accept the older flat shape only for backward compatibility.
+    if any(k in selection_rows for k in ("n","brier","log_loss","hit_rate")):
+        record=selection_rows
+    else:
+        record=selection_rows.get(numeric_line_key)
+        if record is None:
+            record=selection_rows.get(str(numeric_line))
     if not isinstance(record,dict):
         return {"n":0,"hit_rate":None,"brier":None,"variant":None}
     for variant in ("participant_model","poisson_prior","poisson","efootball_shape"):
@@ -154,6 +166,198 @@ def exact_line_direction_oos(eval_art, product, line, side):
             except (TypeError,ValueError):
                 pass
     return {"n":0,"hit_rate":None,"brier":None,"variant":None}
+
+
+def virtual_market_line(market):
+    """Parse a current SportyBet O/U total line without inventing neighboring lines."""
+    line=num((market or {}).get("line"))
+    if line is not None:
+        return line
+    spec=str((market or {}).get("specifier") or (market or {}).get("specifiers") or "")
+    lowered=spec.lower()
+    for key in ("total=","line="):
+        if key not in lowered:
+            continue
+        value=spec[lowered.index(key)+len(key):]
+        for sep in ("&",",",";","|"):
+            value=value.split(sep,1)[0]
+        parsed=num(value)
+        if parsed is not None:
+            return parsed
+    return None
+
+
+def virtual_market_over_probability(market):
+    """Return (line, de-vigged over probability) only for a complete two-sided total."""
+    market=market if isinstance(market,dict) else {}
+    name=str(market.get("name") or "").lower()
+    mid=str(market.get("id") or "")
+    if mid not in {"18","189"} and "total" not in name and "over/under" not in name:
+        return None
+    line=virtual_market_line(market)
+    if line is None:
+        return None
+    outcomes=market.get("outcomes") or []
+    over_odds=next((num(o.get("odds")) for o in outcomes
+        if str(o.get("name") or "").lower().startswith("over")
+        and num(o.get("odds")) is not None and num(o.get("odds"))>1),None)
+    under_odds=next((num(o.get("odds")) for o in outcomes
+        if str(o.get("name") or "").lower().startswith("under")
+        and num(o.get("odds")) is not None and num(o.get("odds"))>1),None)
+    if over_odds is None or under_odds is None:
+        return None
+    inv_over,inv_under=1.0/over_odds,1.0/under_odds
+    total=inv_over+inv_under
+    if not math.isfinite(total) or total<=0:
+        return None
+    return float(line),clamp(inv_over/total)
+
+
+def virtual_market_ladder_points(event):
+    """Deduplicate same-line quotes and return the complete current O/U price ladder."""
+    grouped={}
+    for market in (event or {}).get("markets") or []:
+        point=virtual_market_over_probability(market)
+        if point is None:
+            continue
+        line,probability=point
+        grouped.setdefault(float(line),[]).append(float(probability))
+    return [
+        (line,sum(values)/len(values))
+        for line,values in sorted(grouped.items())
+        if values
+    ]
+
+
+def fit_virtual_target_lambda(ladder_points,target_line,fit_lambda,fallback_lambda=None):
+    """Fit the Poisson anchor to other market lines, leaving the priced line out."""
+    try:
+        target=float(target_line)
+    except (TypeError,ValueError):
+        target=float("nan")
+    other=[
+        (float(line),float(prob))
+        for line,prob in (ladder_points or [])
+        if math.isfinite(float(line)) and math.isfinite(float(prob))
+        and math.isfinite(target) and abs(float(line)-target)>1e-9
+    ]
+    if len(other)>=2 and callable(fit_lambda):
+        try:
+            fitted=fit_lambda(other)
+        except Exception:
+            fitted=None
+        if fitted is not None and math.isfinite(float(fitted)) and float(fitted)>0:
+            return float(fitted),{
+                "source":"current_market_ladder_leave_one_line_out",
+                "fit_points":len(other),
+                "target_line_excluded":True,
+            }
+    if fallback_lambda is not None:
+        try:
+            fallback=float(fallback_lambda)
+            if math.isfinite(fallback) and fallback>0:
+                return fallback,{
+                    "source":"historical_product_lambda_fallback",
+                    "fit_points":len(other),
+                    "target_line_excluded":True,
+                }
+        except (TypeError,ValueError):
+            pass
+    return None,{
+        "source":"no_independent_ladder_fit",
+        "fit_points":len(other),
+        "target_line_excluded":True,
+    }
+
+
+def select_validated_virtual_model_variant(eval_art,product,participant_enabled=False):
+    """Select a model variant from untouched product holdout metrics, not hard-coded preference."""
+    eval_art=eval_art if isinstance(eval_art,dict) else {}
+    by_product=(eval_art.get("by_product") or {}).get(str(product)) or {}
+    holdout=(eval_art.get("holdout_metrics") or {})
+    minimum_product_n=300
+    variants=("poisson","poisson_prior","efootball_shape")
+
+    def metrics_passes(candidate,market,min_n):
+        if not isinstance(candidate,dict) or not isinstance(market,dict):
+            return False
+        try:
+            n=int(candidate.get("n") or 0)
+            brier=float(candidate["brier"]); log_loss=float(candidate["log_loss"]); ece=float(candidate["ece"])
+            market_brier=float(market["brier"]); market_loss=float(market["log_loss"]); market_ece=float(market["ece"])
+        except (KeyError,TypeError,ValueError):
+            return False
+        if not all(math.isfinite(v) for v in (brier,log_loss,ece,market_brier,market_loss,market_ece)):
+            return False
+        return n>=min_n and brier<market_brier and log_loss<market_loss and ece<=market_ece+0.02
+
+    product_market=by_product.get("market") if isinstance(by_product,dict) else None
+    product_candidates=[
+        (name,by_product.get(name))
+        for name in variants
+        if metrics_passes(by_product.get(name),product_market,minimum_product_n)
+    ] if isinstance(by_product,dict) else []
+    if product_candidates:
+        chosen_name,chosen_metrics=min(
+            product_candidates,
+            key=lambda item:(float(item[1]["brier"]),float(item[1]["log_loss"]))
+        )
+        chosen_baseline=chosen_metrics
+    else:
+        market=holdout.get("market")
+        fallback_candidates=[
+            (name,holdout.get(name))
+            for name in variants
+            if metrics_passes(holdout.get(name),market,MIN_HOLDOUT_ROWS)
+        ]
+        if fallback_candidates:
+            chosen_name,chosen_baseline=min(
+                fallback_candidates,
+                key=lambda item:(float(item[1]["brier"]),float(item[1]["log_loss"]))
+            )
+        else:
+            chosen_name,chosen_baseline="poisson",None
+
+    if participant_enabled:
+        participant_metrics=by_product.get("participant_model") if isinstance(by_product,dict) else None
+        participant_market=product_market
+        if participant_metrics is None:
+            participant_metrics=holdout.get("participant_model")
+            participant_market=holdout.get("market")
+        minimum_n=minimum_product_n if participant_market is product_market and participant_market is not None else MIN_HOLDOUT_ROWS
+        # It must improve on the chosen base model on this same product/scope too.
+        participant_passes=metrics_passes(participant_metrics,participant_market,minimum_n)
+        if participant_passes and isinstance(chosen_baseline,dict):
+            try:
+                participant_passes=(
+                    float(participant_metrics["brier"])<float(chosen_baseline["brier"])
+                    and float(participant_metrics["log_loss"])<float(chosen_baseline["log_loss"])
+                    and float(participant_metrics["ece"])<=float(chosen_baseline["ece"])+0.02
+                )
+            except (KeyError,TypeError,ValueError):
+                participant_passes=False
+        if participant_passes:
+            return "participant_model"
+    return chosen_name
+
+
+def virtual_model_side_probability(result,variant,side):
+    """Convert the chosen model's over probability to the requested O/U side."""
+    indices={"poisson":1,"poisson_prior":2,"efootball_shape":6,"participant_model":4}
+    index=indices.get(str(variant))
+    if index is None or not isinstance(result,(tuple,list)) or len(result)<=index:
+        return None
+    try:
+        over_probability=float(result[index])
+    except (TypeError,ValueError):
+        return None
+    if not math.isfinite(over_probability):
+        return None
+    over_probability=max(0.0005,min(0.9995,over_probability))
+    if str(side).lower().startswith("under"):
+        return max(0.0005,min(0.9995,1.0-over_probability))
+    return over_probability
+
 
 def live_age_limit_hours(row):
     sport=str((row or {}).get("sport") or "").lower()
