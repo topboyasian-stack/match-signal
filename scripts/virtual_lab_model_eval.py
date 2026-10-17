@@ -252,6 +252,75 @@ def grouped(rows, field):
     for r in rows:out.setdefault(r[field],[]).append(r)
     return out
 
+def evaluate_participant_feature_gate(participant_metrics, holdout_rows, participant_rows):
+    """Promote participant recurrence only when it beats the strongest base variant.
+
+    Metrics must be computed on the same untouched participant-active holdout rows.
+    Comparing against the market alone is insufficient: a participant overlay can
+    beat that weak baseline while still degrading the validated Poisson model.
+    """
+    required_rows = (
+        int(holdout_rows or 0) >= MIN_HOLDOUT_ROWS
+        and int(participant_rows or 0) >= MIN_PARTICIPANT_HOLDOUT
+    )
+    participant = (participant_metrics or {}).get("participant_model")
+    baselines = {}
+    for name in ("poisson", "poisson_prior", "efootball_shape"):
+        item = (participant_metrics or {}).get(name)
+        if not isinstance(item, dict):
+            continue
+        try:
+            n = int(item.get("n") or 0)
+            brier = float(item["brier"])
+            log_loss = float(item["log_loss"])
+            ece = float(item["ece"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if n >= MIN_HOLDOUT_ROWS and all(math.isfinite(v) for v in (brier, log_loss, ece)):
+            baselines[name] = {"n": n, "brier": brier, "log_loss": log_loss, "ece": ece}
+    try:
+        pmetrics = {
+            "n": int(participant.get("n") or 0),
+            "brier": float(participant["brier"]),
+            "log_loss": float(participant["log_loss"]),
+            "ece": float(participant["ece"]),
+        } if isinstance(participant, dict) else None
+    except (KeyError, TypeError, ValueError):
+        pmetrics = None
+    baselines = {k: v for k, v in baselines.items() if all(math.isfinite(vv) for vv in (v["brier"], v["log_loss"], v["ece"]))}
+    if not required_rows or pmetrics is None or pmetrics["n"] < MIN_PARTICIPANT_HOLDOUT or not baselines:
+        return {
+            "pass": False,
+            "baseline_variant": None,
+            "baseline_metrics": None,
+            "participant_metrics": pmetrics,
+            "reason": "insufficient untouched participant holdout or valid baseline metrics",
+        }
+    baseline_name, baseline = min(baselines.items(), key=lambda item: (item[1]["brier"], item[1]["log_loss"]))
+    improves_brier = pmetrics["brier"] < baseline["brier"]
+    improves_log_loss = pmetrics["log_loss"] < baseline["log_loss"]
+    calibrated = pmetrics["ece"] <= baseline["ece"] + 0.02
+    passed = improves_brier and improves_log_loss and calibrated
+    return {
+        "pass": passed,
+        "baseline_variant": baseline_name,
+        "baseline_metrics": baseline,
+        "participant_metrics": pmetrics,
+        "thresholds": {
+            "brier_must_improve": True,
+            "log_loss_must_improve": True,
+            "maximum_ece_increase": 0.02,
+            "minimum_untouched_holdout_rows": MIN_HOLDOUT_ROWS,
+            "minimum_untouched_participant_rows": MIN_PARTICIPANT_HOLDOUT,
+        },
+        "reason": (
+            "participant model improves both Brier and log loss over the strongest base variant"
+            if passed else
+            "participant feature does not improve both losses over the strongest base variant, or worsens calibration"
+        ),
+    }
+
+
 def main():
     history=json.loads(HISTORY.read_text()) if HISTORY.exists() else []
     rows=[r for r in history if isinstance(r,dict) and r.get("market")=="ou" and r.get("win") is not None]
@@ -286,13 +355,13 @@ def main():
                 bucket[str(secondary)]={k:metrics(rows2,k) for k in variants}
             out[str(primary)]=bucket
         return out
-    # Only promote a participant feature when it has a meaningful untouched holdout
-    # and improves both probability losses without materially worsening calibration.
-    ph=hold_metrics.get("participant_model"); mh=hold_metrics.get("market")
-    participant_pass=bool(
-        ph and mh and len(participant_hold)>=MIN_PARTICIPANT_HOLDOUT and len(hold)>=MIN_HOLDOUT_ROWS and
-        ph["brier"]<mh["brier"] and ph["log_loss"]<mh["log_loss"] and ph["ece"]<=mh["ece"]+.02
+    # Compare the participant overlay to the strongest pre-declared base model
+    # on the same untouched participant-active holdout rows, not to the weaker
+    # all-row market baseline.
+    participant_gate = evaluate_participant_feature_gate(
+        part_metrics, len(hold), len(participant_hold)
     )
+    participant_pass = bool(participant_gate["pass"])
     line_reports={}
     for line in evaluation_lines:
         subset=[r for r in hold if r["line"]==line]
@@ -328,8 +397,7 @@ def main():
         "minimum_exact_line_history":MIN_EVENT_HISTORY,
         "minimum_untouched_participant_rows":MIN_PARTICIPANT_HOLDOUT,
         "minimum_untouched_rows":MIN_HOLDOUT_ROWS,
-        "pass":participant_pass,
-        "reason":"passes both Brier and log loss with calibration tolerance" if participant_pass else "insufficient untouched participant evidence or no dual-loss improvement"
+        **participant_gate,
       },
       "line_scope_policy":{"mode":"observed_history_lines","default_lines":list(DEFAULT_LINES),"current_feed_lines_are_not_promoted_without_settled_history":True},
       "paper_only":True

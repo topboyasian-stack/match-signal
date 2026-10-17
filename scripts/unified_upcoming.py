@@ -131,14 +131,30 @@ def calibrate_desk_probability(raw_probability, line, side, product_report):
     return clamp(raw_probability), "NONE", exact_profile
 
 def exact_line_direction_oos(eval_art, product, line, side):
-    """Return the exact product/line/side chronological OOS result, without treating it as qualification."""
+    """Return exact product/side/line OOS metrics from the nested evaluation artifact."""
     side_key="o" if str(side).lower()=="over" else "u"
     try:
-        line_key=f"{side_key}{float(line):g}"
+        numeric_line=float(line)
+        line_key=f"{side_key}{numeric_line:g}"
+        numeric_line_key=f"{numeric_line:g}"
     except (TypeError,ValueError):
         return {"n":0,"hit_rate":None,"brier":None,"variant":None}
     product_rows=((eval_art.get("by_product_selection") or {}).get(str(product)) or {})
-    record=product_rows.get(line_key) if isinstance(product_rows,dict) else None
+    selection_rows=product_rows.get(line_key) if isinstance(product_rows,dict) else None
+    if not isinstance(selection_rows,dict):
+        return {"n":0,"hit_rate":None,"brier":None,"variant":None}
+    # Current holdout diagnostics nest product/selection metrics under a numeric
+    # line; legacy walk-forward diagnostics stored the variant metrics directly
+    # under product/selection. Support both shapes, but never borrow a neighbor.
+    variants=("participant_model","poisson_prior","poisson","efootball_shape")
+    if any(isinstance(selection_rows.get(name),dict) for name in variants):
+        record=selection_rows
+    elif any(k in selection_rows for k in ("n","brier","log_loss","hit_rate")):
+        record=selection_rows
+    else:
+        record=selection_rows.get(numeric_line_key)
+        if record is None:
+            record=selection_rows.get(str(numeric_line))
     if not isinstance(record,dict):
         return {"n":0,"hit_rate":None,"brier":None,"variant":None}
     for variant in ("participant_model","poisson_prior","poisson","efootball_shape"):
@@ -154,6 +170,198 @@ def exact_line_direction_oos(eval_art, product, line, side):
             except (TypeError,ValueError):
                 pass
     return {"n":0,"hit_rate":None,"brier":None,"variant":None}
+
+
+def virtual_market_line(market):
+    """Parse a current SportyBet O/U total line without inventing neighboring lines."""
+    line=num((market or {}).get("line"))
+    if line is not None:
+        return line
+    spec=str((market or {}).get("specifier") or (market or {}).get("specifiers") or "")
+    lowered=spec.lower()
+    for key in ("total=","line="):
+        if key not in lowered:
+            continue
+        value=spec[lowered.index(key)+len(key):]
+        for sep in ("&",",",";","|"):
+            value=value.split(sep,1)[0]
+        parsed=num(value)
+        if parsed is not None:
+            return parsed
+    return None
+
+
+def virtual_market_over_probability(market):
+    """Return (line, de-vigged over probability) only for a complete two-sided total."""
+    market=market if isinstance(market,dict) else {}
+    name=str(market.get("name") or "").lower()
+    mid=str(market.get("id") or "")
+    if mid not in {"18","189"} and "total" not in name and "over/under" not in name:
+        return None
+    line=virtual_market_line(market)
+    if line is None:
+        return None
+    outcomes=market.get("outcomes") or []
+    over_odds=next((num(o.get("odds")) for o in outcomes
+        if str(o.get("name") or "").lower().startswith("over")
+        and num(o.get("odds")) is not None and num(o.get("odds"))>1),None)
+    under_odds=next((num(o.get("odds")) for o in outcomes
+        if str(o.get("name") or "").lower().startswith("under")
+        and num(o.get("odds")) is not None and num(o.get("odds"))>1),None)
+    if over_odds is None or under_odds is None:
+        return None
+    inv_over,inv_under=1.0/over_odds,1.0/under_odds
+    total=inv_over+inv_under
+    if not math.isfinite(total) or total<=0:
+        return None
+    return float(line),clamp(inv_over/total)
+
+
+def virtual_market_ladder_points(event):
+    """Deduplicate same-line quotes and return the complete current O/U price ladder."""
+    grouped={}
+    for market in (event or {}).get("markets") or []:
+        point=virtual_market_over_probability(market)
+        if point is None:
+            continue
+        line,probability=point
+        grouped.setdefault(float(line),[]).append(float(probability))
+    return [
+        (line,sum(values)/len(values))
+        for line,values in sorted(grouped.items())
+        if values
+    ]
+
+
+def fit_virtual_target_lambda(ladder_points,target_line,fit_lambda,fallback_lambda=None):
+    """Fit the Poisson anchor to other market lines, leaving the priced line out."""
+    try:
+        target=float(target_line)
+    except (TypeError,ValueError):
+        target=float("nan")
+    other=[
+        (float(line),float(prob))
+        for line,prob in (ladder_points or [])
+        if math.isfinite(float(line)) and math.isfinite(float(prob))
+        and math.isfinite(target) and abs(float(line)-target)>1e-9
+    ]
+    if len(other)>=2 and callable(fit_lambda):
+        try:
+            fitted=fit_lambda(other)
+        except Exception:
+            fitted=None
+        if fitted is not None and math.isfinite(float(fitted)) and float(fitted)>0:
+            return float(fitted),{
+                "source":"current_market_ladder_leave_one_line_out",
+                "fit_points":len(other),
+                "target_line_excluded":True,
+            }
+    if fallback_lambda is not None:
+        try:
+            fallback=float(fallback_lambda)
+            if math.isfinite(fallback) and fallback>0:
+                return fallback,{
+                    "source":"historical_product_lambda_fallback",
+                    "fit_points":len(other),
+                    "target_line_excluded":True,
+                }
+        except (TypeError,ValueError):
+            pass
+    return None,{
+        "source":"no_independent_ladder_fit",
+        "fit_points":len(other),
+        "target_line_excluded":True,
+    }
+
+
+def select_validated_virtual_model_variant(eval_art,product,participant_enabled=False):
+    """Select a model variant from untouched product holdout metrics, not hard-coded preference."""
+    eval_art=eval_art if isinstance(eval_art,dict) else {}
+    by_product=(eval_art.get("by_product") or {}).get(str(product)) or {}
+    holdout=(eval_art.get("holdout_metrics") or {})
+    minimum_product_n=300
+    variants=("poisson","poisson_prior","efootball_shape")
+
+    def metrics_passes(candidate,market,min_n):
+        if not isinstance(candidate,dict) or not isinstance(market,dict):
+            return False
+        try:
+            n=int(candidate.get("n") or 0)
+            brier=float(candidate["brier"]); log_loss=float(candidate["log_loss"]); ece=float(candidate["ece"])
+            market_brier=float(market["brier"]); market_loss=float(market["log_loss"]); market_ece=float(market["ece"])
+        except (KeyError,TypeError,ValueError):
+            return False
+        if not all(math.isfinite(v) for v in (brier,log_loss,ece,market_brier,market_loss,market_ece)):
+            return False
+        return n>=min_n and brier<market_brier and log_loss<market_loss and ece<=market_ece+0.02
+
+    product_market=by_product.get("market") if isinstance(by_product,dict) else None
+    product_candidates=[
+        (name,by_product.get(name))
+        for name in variants
+        if metrics_passes(by_product.get(name),product_market,minimum_product_n)
+    ] if isinstance(by_product,dict) else []
+    if product_candidates:
+        chosen_name,chosen_metrics=min(
+            product_candidates,
+            key=lambda item:(float(item[1]["brier"]),float(item[1]["log_loss"]))
+        )
+        chosen_baseline=chosen_metrics
+    else:
+        market=holdout.get("market")
+        fallback_candidates=[
+            (name,holdout.get(name))
+            for name in variants
+            if metrics_passes(holdout.get(name),market,30)
+        ]
+        if fallback_candidates:
+            chosen_name,chosen_baseline=min(
+                fallback_candidates,
+                key=lambda item:(float(item[1]["brier"]),float(item[1]["log_loss"]))
+            )
+        else:
+            chosen_name,chosen_baseline="poisson",None
+
+    if participant_enabled:
+        participant_metrics=by_product.get("participant_model") if isinstance(by_product,dict) else None
+        participant_market=product_market
+        if participant_metrics is None:
+            participant_metrics=holdout.get("participant_model")
+            participant_market=holdout.get("market")
+        minimum_n=minimum_product_n if participant_market is product_market and participant_market is not None else 30
+        # It must improve on the chosen base model on this same product/scope too.
+        participant_passes=metrics_passes(participant_metrics,participant_market,minimum_n)
+        if participant_passes and isinstance(chosen_baseline,dict):
+            try:
+                participant_passes=(
+                    float(participant_metrics["brier"])<float(chosen_baseline["brier"])
+                    and float(participant_metrics["log_loss"])<float(chosen_baseline["log_loss"])
+                    and float(participant_metrics["ece"])<=float(chosen_baseline["ece"])+0.02
+                )
+            except (KeyError,TypeError,ValueError):
+                participant_passes=False
+        if participant_passes:
+            return "participant_model"
+    return chosen_name
+
+
+def virtual_model_side_probability(result,variant,side):
+    """Convert the chosen model's over probability to the requested O/U side."""
+    indices={"poisson":1,"poisson_prior":2,"efootball_shape":6,"participant_model":4}
+    index=indices.get(str(variant))
+    if index is None or not isinstance(result,(tuple,list)) or len(result)<=index:
+        return None
+    try:
+        over_probability=float(result[index])
+    except (TypeError,ValueError):
+        return None
+    if not math.isfinite(over_probability):
+        return None
+    over_probability=max(0.0005,min(0.9995,over_probability))
+    if str(side).lower().startswith("under"):
+        return max(0.0005,min(0.9995,1.0-over_probability))
+    return over_probability
+
 
 def live_age_limit_hours(row):
     sport=str((row or {}).get("sport") or "").lower()
@@ -767,17 +975,19 @@ def build_virtual_events(history, lifecycle, eligibility):
         participant_history=max(int((p1_profile or {}).get("settled_matches") or 0),int((p2_profile or {}).get("settled_matches") or 0))
         participant_hot=any((p or {}).get("monitor_grade")=="HOT_WATCH" for p in (p1_profile,p2_profile) if isinstance(p,dict))
         participant_status="PARTICIPANT_HOT_WATCH" if participant_hot else ("PARTICIPANT_TRACKED" if participant_history>=3 else "PARTICIPANT_NEW")
+        # Pick a base model from untouched holdout metrics for this product.
+        # The participant overlay can only run when its independent gate passes
+        # and it also beats this product's selected base model.
+        selected_model_variant=select_validated_virtual_model_variant(
+            eval_art, product, participant_enabled=participant_gate
+        )
+        live_ladder_points=virtual_market_ladder_points(e)
         for market in e.get("markets") or []:
             name=str(market.get("name") or "").lower()
             mid=str(market.get("id") or "")
             if mid not in {"18","189"} and "total" not in name and "over/under" not in name:
                 continue
-            line=num(market.get("line"))
-            if line is None:
-                spec=str(market.get("specifier") or "")
-                for key in ("total=","line="):
-                    if key in spec:
-                        line=num(spec.split(key,1)[1].split("&",1)[0]); break
+            line=virtual_market_line(market)
             if line is None:
                 continue
 
@@ -803,16 +1013,18 @@ def build_virtual_events(history, lifecycle, eligibility):
                 if validated_vl_probs is None or validated_fit_lambda is None:
                     raise RuntimeError("validated walk-forward model helpers unavailable")
                 prior_events=[h_event for h_event in validated_history_events if ts(h_event.get("timestamp")) < start.timestamp()]
-                market_rows=[]
-                if market_over is not None:
-                    market_rows.append({"line":float(line),"model_prob":float(market_over),"selection":"over","win":None})
-                if market_under is not None:
-                    market_rows.append({"line":float(line),"model_prob":float(market_under),"selection":"under","win":None})
-                current_lambda=validated_fit_lambda([
-                    (float(line), float(market_over))
-                ]) if market_over is not None else None
+                # Fit against the rest of the current O/U ladder and leave the
+                # target line out. Fitting lambda to this line's own odds makes
+                # the model circular and invalidates its advertised value edge.
+                current_lambda,lambda_fit_meta=fit_virtual_target_lambda(
+                    live_ladder_points,
+                    line,
+                    validated_fit_lambda,
+                    product_lambdas.get(product,2.5),
+                )
                 if current_lambda is None:
                     current_lambda=float(product_lambdas.get(product,2.5))
+                    lambda_fit_meta={"source":"default_product_lambda_fallback","fit_points":0,"target_line_excluded":True}
                 current_event={
                     "key":f"desk|{e.get('event_id')}|{line}",
                     "event_id":str(e.get("event_id") or ""),
@@ -830,19 +1042,27 @@ def build_virtual_events(history, lifecycle, eligibility):
                         continue
                     row={"line":float(line),"model_prob":float(mp),"selection":side,"win":None}
                     result=validated_vl_probs(prior_events,current_event,row)
+                    side_probability=virtual_model_side_probability(
+                        result, selected_model_variant, side
+                    )
+                    if side_probability is None:
+                        continue
                     if side=="over":
-                        validated_over=float(result[4])
+                        validated_over=side_probability
                     else:
-                        validated_under=float(result[4])
+                        validated_under=side_probability
                     validated_meta[side]={
-                        "market_probability":result[0],
-                        "poisson_probability":result[1],
-                        "product_prior_probability":result[2],
-                        "efootball_shape_probability":result[6],
-                        "participant_model_probability":result[4],
+                        "market_side_probability":float(mp),
+                        "selected_model_variant":selected_model_variant,
+                        "selected_side_model_probability":side_probability,
+                        "poisson_over_probability":result[1],
+                        "product_prior_over_probability":result[2],
+                        "efootball_shape_over_probability":result[6],
+                        "participant_model_over_probability":result[4],
                         "participant_history_n":result[5],
                         "efootball_shape_n":result[7],
                         "efootball_shape_weight":result[8],
+                        "lambda_fit":lambda_fit_meta,
                     }
             except Exception as exc:
                 validated_meta={"error":str(exc)[:240]}
@@ -972,7 +1192,8 @@ def build_virtual_events(history, lifecycle, eligibility):
                 "probability":round(chosen_model,4),
                 "probabilities":{"over":round(over,4),"under":round(under,4)},
                 "raw_model_probability":round(raw_chosen_model,4),
-                "validated_model_family":"walk_forward_efootball_participant_model",
+                "validated_model_family":f"walk_forward_efootball_{selected_model_variant}",
+                "validated_model_variant":selected_model_variant,
                 "validated_model_over_probability":round(raw_over,4),
                 "validated_model_under_probability":round(raw_under,4),
                 "validated_model_components":validated_meta,
@@ -1010,10 +1231,10 @@ def build_virtual_events(history, lifecycle, eligibility):
                 "prediction_status":"betting_qualified_paper" if qualified else "research_projection",
                 "projection_tier":"deep_research_projection",
                 "evidence_depth":(
-                    "desk_calibrated_walk_forward_participant_model"
+                    f"desk_calibrated_walk_forward_{selected_model_variant}"
                     if (over_learning_source!="NONE" or under_learning_source!="NONE")
-                    else ("walk_forward_participant_model_plus_exact_direction" if directional.get("pass") else
-                          ("walk_forward_participant_model" if validated_meta else
+                    else (f"walk_forward_{selected_model_variant}_plus_exact_direction" if directional.get("pass") else
+                          (f"walk_forward_{selected_model_variant}" if validated_meta else
                            ("participant_lifecycle_plus_base_model" if participant_history>=3 else "feed_discovered_base_model")))
                 ),
                 "participant_status":participant_status,
@@ -1037,8 +1258,8 @@ def build_virtual_events(history, lifecycle, eligibility):
                 "betting_qualified":qualified,
                 "qualified_for_builder":qualified,
                 "qualification_engine":"Virtual Lab base walk-forward gate + model-qualified line + current SportyBet edge + model evidence + fresh exact quote + kickoff within 60 minutes",
-                "model":"Virtual Lab walk-forward eFootball participant model",
-                "model_version":"VL-EFOOTBALL-WF-3.0",
+                "model":f"Virtual Lab walk-forward eFootball {selected_model_variant.replace('_',' ')} model",
+                "model_version":f"VL-EFOOTBALL-{selected_model_variant.upper()}-WF-4.0",
                 "paper_only":True,
                 "identity_verified":bool(home and away),
             })
