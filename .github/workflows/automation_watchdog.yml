@@ -161,8 +161,18 @@ jobs:
               'efootball-market-research-schedule.yml', 30
           )
           efootball_research_last_run_age_minutes = None
+          efootball_research_scheduled_age_minutes = None
           efootball_research_dispatch_age_minutes = None
+          efootball_research_workflow_age_minutes = None
           efootball_research_schedule_status = 'UNKNOWN'
+          efootball_repo_name = os.environ.get('GITHUB_REPOSITORY', '')
+          if efootball_repo_name:
+              efootball_workflow_meta = subprocess.run(
+                  ['gh', 'api', f'repos/{efootball_repo_name}/actions/workflows/efootball-market-research-schedule.yml', '--jq', '.created_at'],
+                  text=True, capture_output=True
+              )
+              if efootball_workflow_meta.returncode == 0:
+                  efootball_research_workflow_age_minutes = minutes_since(efootball_workflow_meta.stdout.strip())
           if efootball_research_runs is not None:
               valid_efootball_runs = [
                   r for r in efootball_research_runs
@@ -183,14 +193,16 @@ jobs:
                       minutes_since(r.get('createdAt')) for r in dispatch_efootball_runs
                   )
               if scheduled_efootball_runs:
-                  last_schedule_age = min(
+                  efootball_research_scheduled_age_minutes = min(
                       minutes_since(r.get('createdAt')) for r in scheduled_efootball_runs
                   )
                   efootball_research_schedule_status = (
-                      'STALE' if last_schedule_age > EFOOTBALL_RESEARCH_MAX_AGE_MINUTES else 'ON_CADENCE'
+                      'STALE' if efootball_research_scheduled_age_minutes > EFOOTBALL_RESEARCH_MAX_AGE_MINUTES else 'ON_CADENCE'
                   )
-              elif efootball_research_last_run_age_minutes is None or efootball_research_last_run_age_minutes > EFOOTBALL_RESEARCH_MAX_AGE_MINUTES:
+              elif efootball_research_workflow_age_minutes is not None and efootball_research_workflow_age_minutes > EFOOTBALL_RESEARCH_MAX_AGE_MINUTES:
                   efootball_research_schedule_status = 'MISSING_SCHEDULED_RUN'
+              elif efootball_research_history_error:
+                  efootball_research_schedule_status = 'UNKNOWN'
               else:
                   efootball_research_schedule_status = 'AWAITING_FIRST_SCHEDULED_RUN'
 
@@ -298,6 +310,12 @@ jobs:
               or efootball_collector_age_minutes is None
               or efootball_collector_age_minutes > EFOOTBALL_RESEARCH_MAX_AGE_MINUTES
           )
+          efootball_research_schedule_fallback_needed = (
+              efootball_research_schedule_status in {'STALE', 'MISSING_SCHEDULED_RUN'}
+          )
+          efootball_research_recovery_needed = (
+              efootball_research_archive_stale or efootball_research_schedule_fallback_needed
+          )
           if efootball_research_runs is None:
               actions.append({
                   'workflow':'efootball-market-research-schedule.yml',
@@ -305,7 +323,7 @@ jobs:
                   'status':'failed',
                   'detail':efootball_research_history_error
               })
-          elif efootball_research_archive_stale:
+          elif efootball_research_recovery_needed:
               research_active = active('efootball-market-research-schedule.yml')
               if research_active:
                   research_action_status = 'suppressed_active_run'
@@ -328,10 +346,16 @@ jobs:
                       text=True, capture_output=True
                   )
                   research_action_status = 'requested' if dispatch_result.returncode == 0 else 'failed'
+                  recovery_reasons = []
+                  if efootball_research_archive_stale:
+                      recovery_reasons.append('market archive or collector capture exceeded the 30-minute freshness limit')
+                  if efootball_research_schedule_fallback_needed:
+                      recovery_reasons.append('scheduled research run is '+efootball_research_schedule_status.lower().replace('_', ' '))
+                  research_reason = '; '.join(recovery_reasons) or 'research refresh required'
                   research_detail = (
                       dispatch_result.stderr.strip()
                       if dispatch_result.returncode
-                      else 'Dispatched isolated eFootball market research because the source archive or collector capture exceeded the 30-minute freshness limit.'
+                      else 'Dispatched isolated eFootball market research because '+research_reason+'.'
                   )
               actions.append({
                   'workflow':'efootball-market-research-schedule.yml',
@@ -401,6 +425,8 @@ jobs:
               'efootball_market_collector_last_capture_at': efootball_collector_last_capture_at,
               'efootball_market_collector_age_minutes': efootball_collector_age_minutes,
               'efootball_market_research_last_run_age_minutes': efootball_research_last_run_age_minutes,
+              'efootball_market_research_scheduled_run_age_minutes': efootball_research_scheduled_age_minutes,
+              'efootball_market_research_workflow_age_minutes': efootball_research_workflow_age_minutes,
               'efootball_market_research_schedule_status': efootball_research_schedule_status,
               'efootball_market_research_freshness_status': (
                   'STALE' if efootball_research_archive_stale else 'FRESH'
