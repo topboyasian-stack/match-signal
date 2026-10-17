@@ -3530,7 +3530,7 @@ def _construct_vfootball_holdout_batches(pool,max_batches=4,max_legs=MIXED_RESEA
 
 
 def _secondary_efootball_diagnostics(pool, min_odds=None):
-    """Explain whether an exact-evidence eFootball pair can satisfy the live constructor."""
+    """Explain exact-evidence eFootball pair opportunities without disguising calibration holds as ROI failures."""
     if min_odds is None:
         min_odds=active_min_combined_odds()
     rows=[
@@ -3550,7 +3550,9 @@ def _secondary_efootball_diagnostics(pool, min_odds=None):
     pair_correlation=0
     pair_span=0
     pair_roi=0
+    pair_calibration_hold=0
     qualified=[]
+    raw_shadow_candidates=[]
     for i in range(len(rows)):
         for j in range(i+1,len(rows)):
             pair_total+=1
@@ -3568,8 +3570,39 @@ def _secondary_efootball_diagnostics(pool, min_odds=None):
                 pair_span+=1
                 continue
             pair_metrics=_batch_metrics([a,b])
-            roi=float(pair_metrics.get("combined_model_probability") or 0.0)*odds-1.0
-            if roi < RESULTS_FIRST_MIN_EXPECTED_ROI:
+            raw_probability=float(pair_metrics.get("raw_combined_model_probability") or 0.0)
+            raw_roi=raw_probability*odds-1.0
+            calibrated_probability=float(pair_metrics.get("combined_model_probability") or 0.0)
+            calibrated_roi=calibrated_probability*odds-1.0
+            calibration_ready=pair_metrics.get("ticket_calibration_ready") is not False
+            if not calibration_ready:
+                # A held calibration deliberately returns a near-zero approved
+                # probability. That is a promotion hold, not evidence that the
+                # individual pair failed the calibrated expected-ROI test.
+                pair_calibration_hold+=1
+                if raw_roi >= RESULTS_FIRST_MIN_EXPECTED_ROI:
+                    raw_shadow_candidates.append({
+                        "legs":[
+                            {"match":a.get("match"),"event_id":a.get("event_id"),
+                             "product":a.get("product"),"line":a.get("line"),"side":a.get("pick"),
+                             "p":float(a.get("model_probability") or 0.0),"odds":float(a.get("bookmaker_odds") or 0.0),
+                             "start":a.get("start_time")},
+                            {"match":b.get("match"),"event_id":b.get("event_id"),
+                             "product":b.get("product"),"line":b.get("line"),"side":b.get("pick"),
+                             "p":float(b.get("model_probability") or 0.0),"odds":float(b.get("bookmaker_odds") or 0.0),
+                             "start":b.get("start_time")}
+                        ],
+                        "combined_odds":round(odds,3),
+                        "raw_independence_probability":round(raw_probability,6),
+                        "raw_independence_expected_roi":round(raw_roi,6),
+                        "span_minutes":round(span,1),
+                        "qualification_status":"SHADOW_ONLY_NOT_QUALIFIED",
+                        "ticket_calibration_ready":False,
+                        "blocking_reason":pair_metrics.get("ticket_calibration_hold_reason") or "ticket_calibration_not_promoted",
+                        "warning":"Raw independence estimate is diagnostic only; it does not qualify a ticket or establish profitability."
+                    })
+                continue
+            if calibrated_roi < RESULTS_FIRST_MIN_EXPECTED_ROI:
                 pair_roi+=1
                 continue
             qualified.append({
@@ -3578,11 +3611,16 @@ def _secondary_efootball_diagnostics(pool, min_odds=None):
                     {"match":b.get("match"),"p":float(b.get("model_probability") or 0.0),"odds":float(b.get("bookmaker_odds") or 0.0),"start":b.get("start_time")}
                 ],
                 "combined_odds":round(odds,3),
-                "combined_probability":pair_metrics.get("combined_model_probability"),
-                "roi":round(roi,6),
+                "combined_probability":calibrated_probability,
+                "roi":round(calibrated_roi,6),
                 "span_minutes":round(span,1)
             })
     qualified.sort(key=lambda x:(-float(x.get("roi") or 0.0),-float(x.get("combined_probability") or 0.0),-float(x.get("combined_odds") or 0.0)))
+    raw_shadow_candidates.sort(key=lambda x:(
+        -float(x.get("raw_independence_expected_roi") or -999.0),
+        -float(x.get("raw_independence_probability") or 0.0),
+        -float(x.get("combined_odds") or 0.0)
+    ))
     return {
         "pool_size":len(rows),
         "top_legs":[
@@ -3594,10 +3632,14 @@ def _secondary_efootball_diagnostics(pool, min_odds=None):
             "odds_reach_pairs":pair_odds,
             "correlation_rejections":pair_correlation,
             "kickoff_span_rejections":pair_span,
+            "calibration_hold_rejections":pair_calibration_hold,
+            "calibration_held_pairs_with_positive_raw_independence_roi":len(raw_shadow_candidates),
             "roi_rejections":pair_roi,
             "fully_qualified_pairs":len(qualified)
         },
-        "best_pair":qualified[:5]
+        "best_pair":qualified[:5],
+        "shadow_only_candidates":raw_shadow_candidates[:5],
+        "shadow_only_policy":"Diagnostic-only combinations with raw independence ROI above the floor while lane calibration is held. Never eligible for BATCH-01 or the settled ticket ledger."
     }
 
 def build_value_batches(candidates):
