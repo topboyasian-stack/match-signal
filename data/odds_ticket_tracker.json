@@ -1,29 +1,29 @@
 {
   "version": 4,
-  "updated_at": "2026-10-17T00:13:13.257555+00:00",
+  "updated_at": "2026-10-17T00:45:56.368416+00:00",
   "mode": "PAPER_ONLY",
   "summary": {
     "tracked_tickets": 255,
-    "pending": 66,
+    "pending": 65,
     "won": 53,
-    "lost": 136,
+    "lost": 137,
     "active_with_loss": 14,
-    "legs_won": 298,
-    "legs_lost": 185,
-    "legs_pending": 171,
+    "legs_won": 299,
+    "legs_lost": 186,
+    "legs_pending": 169,
     "pending_legs_by_product": {
-      "efootball_gt": 171
+      "efootball_gt": 169
     },
-    "settled_tickets": 189,
+    "settled_tickets": 190,
     "by_leg_count": {
       "2": {
-        "tracked": 119,
+        "tracked": 120,
         "won": 28,
-        "lost": 91,
-        "settled": 119,
-        "accuracy": 0.235294,
-        "avg_combined_odds": 5.644437,
-        "avg_model_rating": 56.642857
+        "lost": 92,
+        "settled": 120,
+        "accuracy": 0.233333,
+        "avg_combined_odds": 5.651025,
+        "avg_model_rating": 56.5315
       },
       "3": {
         "tracked": 6,
@@ -46,13 +46,13 @@
     },
     "by_primary_lane": {
       "efootball_exact_evidence_value": {
-        "tracked": 107,
+        "tracked": 108,
         "won": 28,
-        "lost": 79,
-        "settled": 107,
-        "accuracy": 0.261682,
-        "avg_combined_odds": 5.774916,
-        "avg_model_rating": 55.965888
+        "lost": 80,
+        "settled": 108,
+        "accuracy": 0.259259,
+        "avg_combined_odds": 5.781028,
+        "avg_model_rating": 55.848426
       },
       "high_confidence_research": {
         "tracked": 53,
@@ -95,17 +95,17 @@
       "high_confidence_loss_tickets": 24,
       "high_confidence_loss_legs": 30,
       "losses_by_product": {
-        "efootball_gt": 162,
+        "efootball_gt": 163,
         "vfootball": 23
       },
       "losses_by_direction": {
-        "over": 87,
+        "over": 88,
         "under": 98
       },
       "shape_comparison": "Use by_leg_count to compare 2–7-leg accuracy, average odds, and average model rating.",
       "lane_comparison": "Use by_primary_lane to compare construction-lane performance."
     },
-    "active_pending": 3,
+    "active_pending": 2,
     "archived_pending": 63,
     "visible_tickets": 100,
     "archived_tickets": 155
@@ -118,8 +118,8 @@
       "batch_id": "BATCH-01",
       "created_at": "2026-10-16T23:46:57.687901+00:00",
       "last_seen_at": "2026-10-16T23:46:57.687901+00:00",
-      "last_settled_at": null,
-      "status": "PENDING",
+      "last_settled_at": "2026-10-17T00:45:56.368416+00:00",
+      "status": "LOST",
       "combined_odds": 6.435,
       "combined_odds_source": "builder_batch_snapshot",
       "odds_snapshot_complete": true,
@@ -135,8 +135,8 @@
       "primary_lane": "efootball_exact_evidence_value",
       "odds_locked_at": "2026-10-16T23:46:57.687901+00:00",
       "leg_count": 2,
-      "settled_leg_count": 0,
-      "pending_leg_count": 2,
+      "settled_leg_count": 2,
+      "pending_leg_count": 0,
       "legs": [
         {
           "sport": "virtual",
@@ -188,7 +188,7 @@
           "builder_eligible": true,
           "real_money_eligible": false,
           "paper_only": true,
-          "status": "PENDING",
+          "status": "LOST",
           "source": "Exact-line evidence calibration · eFootball value lane",
           "market_source": "SportyBet NG",
           "recent_evidence": {
@@ -300,10 +300,13 @@
           "sportybet_outcome_name": "Over 2.5",
           "fixture_key": "efootball_gt|ssc napoli vito v manchester city fc professor",
           "bookmaker_odds_snapshot": 1.95,
-          "correct": null,
-          "settled_at": null,
-          "result": null,
-          "final_score": null
+          "correct": false,
+          "settled_at": "2026-10-17T00:45:56.368416+00:00",
+          "result": "U2.5",
+          "final_score": [
+            0.0,
+            1.0
+          ]
         },
         {
           "sport": "virtual",
@@ -355,7 +358,7 @@
           "builder_eligible": true,
           "real_money_eligible": false,
           "paper_only": true,
-          "status": "PENDING",
+          "status": "WON",
           "source": "Exact-line evidence calibration · eFootball value lane",
           "market_source": "SportyBet NG",
           "recent_evidence": {
@@ -467,17 +470,20 @@
           "sportybet_outcome_name": "Over 2.5",
           "fixture_key": "efootball_gt|manchester city vibe v fc bayern munchen crown",
           "bookmaker_odds_snapshot": 3.3,
-          "correct": null,
-          "settled_at": null,
-          "result": null,
-          "final_score": null
+          "correct": true,
+          "settled_at": "2026-10-17T00:45:56.368416+00:00",
+          "result": "O2.5",
+          "final_score": [
+            3.0,
+            3.0
+          ]
         }
       ],
       "leg_counts": {
-        "won": 0,
-        "lost": 0,
+        "won": 1,
+        "lost": 1,
         "void": 0,
-        "pending": 2
+        "pending": 0
       },
       "construction_snapshot": {
         "batch_id": "BATCH-01",
@@ -511,9 +517,61 @@
         },
         "recorded_at": "2026-10-16T23:46:57.717531+00:00"
       },
-      "settlement_diagnostics": null,
+      "settlement_diagnostics": {
+        "diagnostic_version": 1,
+        "ticket_outcome": "LOST",
+        "diagnostic_label": "TICKET_LOST_1_OF_2_LEGS",
+        "leg_count": 2,
+        "settled_leg_count": 2,
+        "won_leg_count": 1,
+        "lost_leg_count": 1,
+        "void_leg_count": 0,
+        "pending_leg_count": 0,
+        "leg_hit_rate_excluding_voids": 0.5,
+        "average_settled_leg_model_probability": 0.657895,
+        "weakest_ticket_leg_model_probability": 0.657895,
+        "high_confidence_loss_count": 0,
+        "high_confidence_loss_events": [],
+        "losses_by_product": {
+          "efootball_gt": 1
+        },
+        "losses_by_direction": {
+          "over": 1
+        },
+        "loss_details": [
+          {
+            "event_id": "sr:match:75624294",
+            "match": "SSC Napoli (Vito) vs Manchester City FC (Professor)",
+            "product": "efootball_gt",
+            "pick": "SSC Napoli (Vito) vs Manchester City FC (Professor) — O/U over 2.5",
+            "line": 2.5,
+            "model_probability": 0.657895,
+            "model_edge": 0.195085,
+            "bookmaker_odds": 1.95,
+            "evidence_score": 0.657895,
+            "recent_evidence_n": 34,
+            "recent_evidence_hit_rate": 0.6765,
+            "result": "U2.5",
+            "final_score": [
+              0.0,
+              1.0
+            ],
+            "settled_at": "2026-10-17T00:45:56.368416+00:00"
+          }
+        ],
+        "improvement_keys": {
+          "shape": "2_leg",
+          "primary_lane": "efootball_exact_evidence_value",
+          "combined_odds": 6.435,
+          "combined_model_rating": 43.28,
+          "combined_model_probability": 0.432826,
+          "avg_model_probability": 65.79,
+          "avg_model_edge_percent": 28.52
+        }
+      },
       "paper_only": true,
-      "real_money_execution": false
+      "real_money_execution": false,
+      "lost_at": "2026-10-17T00:45:56.368416+00:00"
     },
     {
       "version": 3,
