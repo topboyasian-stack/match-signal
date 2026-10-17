@@ -271,6 +271,16 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "Feeder workflows must hand off through Unified Upcoming before Pages deployment",
         )
 
+    def test_board_dispatches_odds_builder_when_builder_artifact_is_stale(self):
+        self.assertIn("name: Refresh Odds Builder when board publication outlives the Builder cadence", BOARD_WORKFLOW)
+        self.assertIn("MAX_AGE_MINUTES = 18", BOARD_WORKFLOW)
+        self.assertIn("RUN_START_COOLDOWN_MINUTES = 5", BOARD_WORKFLOW)
+        self.assertIn("gh", BOARD_WORKFLOW)
+        self.assertIn("'run', 'list', '--workflow', 'odds_builder.yml', '--branch', 'main'", BOARD_WORKFLOW)
+        self.assertIn("if active:", BOARD_WORKFLOW)
+        self.assertIn("['gh', 'workflow', 'run', 'odds_builder.yml', '--ref', 'main']", BOARD_WORKFLOW)
+        self.assertIn("actions: write", BOARD_WORKFLOW)
+
     def test_board_owned_outputs_do_not_trigger_a_self_refresh_loop(self):
         paths = workflow_push_paths(BOARD_WORKFLOW)
         for output in (
