@@ -324,7 +324,7 @@ def select_validated_virtual_model_variant(eval_art,product,participant_enabled=
         if participant_metrics is None:
             participant_metrics=holdout.get("participant_model")
             participant_market=holdout.get("market")
-        minimum_n=minimum_product_n if participant_market is product_market and participant_market is not None else MIN_HOLDOUT_ROWS
+        minimum_n=minimum_product_n if participant_market is product_market and participant_market is not None else 30
         # It must improve on the chosen base model on this same product/scope too.
         participant_passes=metrics_passes(participant_metrics,participant_market,minimum_n)
         if participant_passes and isinstance(chosen_baseline,dict):
