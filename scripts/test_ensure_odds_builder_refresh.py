@@ -10,13 +10,13 @@ from ensure_odds_builder_refresh import BUILDER_RUN_MAX_AGE_MINUTES, evaluate_ru
 NOW = datetime(2026, 10, 17, 9, 30, tzinfo=timezone.utc)
 
 
-def run(age_minutes: int, status: str = "completed", run_id: int = 123) -> dict:
+def run(age_minutes: int, status: str = "completed", run_id: int = 123, conclusion: str = "success") -> dict:
     stamp = NOW - timedelta(minutes=age_minutes)
     return {
         "databaseId": run_id,
         "status": status,
         "createdAt": stamp.isoformat().replace("+00:00", "Z"),
-        "conclusion": "success" if status == "completed" else None,
+        "conclusion": conclusion if status == "completed" else None,
     }
 
 
@@ -56,7 +56,7 @@ class BuilderRefreshDecisionTests(unittest.TestCase):
         self.assertEqual(result["age_minutes"], 0.0)
 
     def test_failed_recent_run_still_obeys_cooldown(self):
-        result = evaluate_runs([run(5, "completed")], NOW)
+        result = evaluate_runs([run(5, "completed", conclusion="failure")], NOW)
         self.assertFalse(result["dispatch"])
 
 
