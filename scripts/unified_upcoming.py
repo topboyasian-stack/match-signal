@@ -971,17 +971,19 @@ def build_virtual_events(history, lifecycle, eligibility):
         participant_history=max(int((p1_profile or {}).get("settled_matches") or 0),int((p2_profile or {}).get("settled_matches") or 0))
         participant_hot=any((p or {}).get("monitor_grade")=="HOT_WATCH" for p in (p1_profile,p2_profile) if isinstance(p,dict))
         participant_status="PARTICIPANT_HOT_WATCH" if participant_hot else ("PARTICIPANT_TRACKED" if participant_history>=3 else "PARTICIPANT_NEW")
+        # Pick a base model from untouched holdout metrics for this product.
+        # The participant overlay can only run when its independent gate passes
+        # and it also beats this product's selected base model.
+        selected_model_variant=select_validated_virtual_model_variant(
+            eval_art, product, participant_enabled=participant_gate
+        )
+        live_ladder_points=virtual_market_ladder_points(e)
         for market in e.get("markets") or []:
             name=str(market.get("name") or "").lower()
             mid=str(market.get("id") or "")
             if mid not in {"18","189"} and "total" not in name and "over/under" not in name:
                 continue
-            line=num(market.get("line"))
-            if line is None:
-                spec=str(market.get("specifier") or "")
-                for key in ("total=","line="):
-                    if key in spec:
-                        line=num(spec.split(key,1)[1].split("&",1)[0]); break
+            line=virtual_market_line(market)
             if line is None:
                 continue
 
@@ -1007,16 +1009,18 @@ def build_virtual_events(history, lifecycle, eligibility):
                 if validated_vl_probs is None or validated_fit_lambda is None:
                     raise RuntimeError("validated walk-forward model helpers unavailable")
                 prior_events=[h_event for h_event in validated_history_events if ts(h_event.get("timestamp")) < start.timestamp()]
-                market_rows=[]
-                if market_over is not None:
-                    market_rows.append({"line":float(line),"model_prob":float(market_over),"selection":"over","win":None})
-                if market_under is not None:
-                    market_rows.append({"line":float(line),"model_prob":float(market_under),"selection":"under","win":None})
-                current_lambda=validated_fit_lambda([
-                    (float(line), float(market_over))
-                ]) if market_over is not None else None
+                # Fit against the rest of the current O/U ladder and leave the
+                # target line out. Fitting lambda to this line's own odds makes
+                # the model circular and invalidates its advertised value edge.
+                current_lambda,lambda_fit_meta=fit_virtual_target_lambda(
+                    live_ladder_points,
+                    line,
+                    validated_fit_lambda,
+                    product_lambdas.get(product,2.5),
+                )
                 if current_lambda is None:
                     current_lambda=float(product_lambdas.get(product,2.5))
+                    lambda_fit_meta={"source":"default_product_lambda_fallback","fit_points":0,"target_line_excluded":True}
                 current_event={
                     "key":f"desk|{e.get('event_id')}|{line}",
                     "event_id":str(e.get("event_id") or ""),
@@ -1034,19 +1038,27 @@ def build_virtual_events(history, lifecycle, eligibility):
                         continue
                     row={"line":float(line),"model_prob":float(mp),"selection":side,"win":None}
                     result=validated_vl_probs(prior_events,current_event,row)
+                    side_probability=virtual_model_side_probability(
+                        result, selected_model_variant, side
+                    )
+                    if side_probability is None:
+                        continue
                     if side=="over":
-                        validated_over=float(result[4])
+                        validated_over=side_probability
                     else:
-                        validated_under=float(result[4])
+                        validated_under=side_probability
                     validated_meta[side]={
-                        "market_probability":result[0],
-                        "poisson_probability":result[1],
-                        "product_prior_probability":result[2],
-                        "efootball_shape_probability":result[6],
-                        "participant_model_probability":result[4],
+                        "market_side_probability":float(mp),
+                        "selected_model_variant":selected_model_variant,
+                        "selected_side_model_probability":side_probability,
+                        "poisson_over_probability":result[1],
+                        "product_prior_over_probability":result[2],
+                        "efootball_shape_over_probability":result[6],
+                        "participant_model_over_probability":result[4],
                         "participant_history_n":result[5],
                         "efootball_shape_n":result[7],
                         "efootball_shape_weight":result[8],
+                        "lambda_fit":lambda_fit_meta,
                     }
             except Exception as exc:
                 validated_meta={"error":str(exc)[:240]}
@@ -1176,7 +1188,8 @@ def build_virtual_events(history, lifecycle, eligibility):
                 "probability":round(chosen_model,4),
                 "probabilities":{"over":round(over,4),"under":round(under,4)},
                 "raw_model_probability":round(raw_chosen_model,4),
-                "validated_model_family":"walk_forward_efootball_participant_model",
+                "validated_model_family":f"walk_forward_efootball_{selected_model_variant}",
+                "validated_model_variant":selected_model_variant,
                 "validated_model_over_probability":round(raw_over,4),
                 "validated_model_under_probability":round(raw_under,4),
                 "validated_model_components":validated_meta,
@@ -1214,10 +1227,10 @@ def build_virtual_events(history, lifecycle, eligibility):
                 "prediction_status":"betting_qualified_paper" if qualified else "research_projection",
                 "projection_tier":"deep_research_projection",
                 "evidence_depth":(
-                    "desk_calibrated_walk_forward_participant_model"
+                    f"desk_calibrated_walk_forward_{selected_model_variant}"
                     if (over_learning_source!="NONE" or under_learning_source!="NONE")
-                    else ("walk_forward_participant_model_plus_exact_direction" if directional.get("pass") else
-                          ("walk_forward_participant_model" if validated_meta else
+                    else (f"walk_forward_{selected_model_variant}_plus_exact_direction" if directional.get("pass") else
+                          (f"walk_forward_{selected_model_variant}" if validated_meta else
                            ("participant_lifecycle_plus_base_model" if participant_history>=3 else "feed_discovered_base_model")))
                 ),
                 "participant_status":participant_status,
@@ -1241,8 +1254,8 @@ def build_virtual_events(history, lifecycle, eligibility):
                 "betting_qualified":qualified,
                 "qualified_for_builder":qualified,
                 "qualification_engine":"Virtual Lab base walk-forward gate + model-qualified line + current SportyBet edge + model evidence + fresh exact quote + kickoff within 60 minutes",
-                "model":"Virtual Lab walk-forward eFootball participant model",
-                "model_version":"VL-EFOOTBALL-WF-3.0",
+                "model":f"Virtual Lab walk-forward eFootball {selected_model_variant.replace('_',' ')} model",
+                "model_version":f"VL-EFOOTBALL-{selected_model_variant.upper()}-WF-4.0",
                 "paper_only":True,
                 "identity_verified":bool(home and away),
             })
