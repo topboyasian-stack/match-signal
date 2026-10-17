@@ -1,40 +1,40 @@
 {
-  "updated_at": "2026-10-17T08:59:41.646022+00:00",
+  "updated_at": "2026-10-17T09:00:12.191252+00:00",
   "automation_status": "SELF_HEALING_ENABLED",
   "pipeline_last_update": "2026-10-17T08:48:16.740412+00:00",
-  "pipeline_age_hours": 0.19,
+  "pipeline_age_hours": 0.2,
   "odds_builder_last_update": "2026-10-17T08:44:22.908705+00:00",
   "odds_builder_age_hours": 0.26,
-  "odds_builder_age_minutes": 15.3,
+  "odds_builder_age_minutes": 15.8,
   "odds_builder_max_age_minutes": 25,
   "expansion_last_update": "2026-10-17T06:11:59.906836+00:00",
-  "expansion_age_hours": 2.79,
-  "virtual_lab_last_update": "2026-10-17T08:59:23.376886+00:00",
-  "virtual_lab_age_hours": 0.01,
-  "virtual_lab_status_age_hours": 0.99,
+  "expansion_age_hours": 2.8,
+  "virtual_lab_last_update": "2026-10-17T08:48:07.449034+00:00",
+  "virtual_lab_age_hours": 0.2,
+  "virtual_lab_status_age_hours": 1.0,
   "darts_age_hours": 0.06,
-  "table_tennis_age_hours": 1.06,
-  "unified_upcoming_age_hours": 0.17,
-  "qualified_best_monitor_last_run_age_minutes": 13.5,
-  "qualified_best_monitor_last_scheduled_run_age_minutes": 115.4,
-  "qualified_best_monitor_last_fallback_dispatch_age_minutes": 13.5,
+  "table_tennis_age_hours": 1.07,
+  "unified_upcoming_age_hours": 0.18,
+  "qualified_best_monitor_last_run_age_minutes": 0.4,
+  "qualified_best_monitor_last_scheduled_run_age_minutes": 115.9,
+  "qualified_best_monitor_last_fallback_dispatch_age_minutes": 0.4,
   "qualified_best_monitor_schedule_status": "STALE",
-  "qualified_best_monitor_workflow_age_minutes": 3529.4,
-  "efootball_market_archive_updated_at": "2026-10-17T08:46:59.054262+00:00",
-  "efootball_market_archive_age_minutes": 12.7,
-  "efootball_market_collector_last_capture_at": "2026-10-17T08:46:48.632559+00:00",
-  "efootball_market_collector_age_minutes": 12.9,
-  "efootball_market_research_last_run_age_minutes": 0.6,
-  "efootball_market_research_last_success_age_minutes": 13.5,
-  "efootball_market_research_scheduled_run_age_minutes": 175.0,
-  "efootball_market_research_workflow_age_minutes": 571.2,
+  "qualified_best_monitor_workflow_age_minutes": 3529.9,
+  "efootball_market_archive_updated_at": "2026-10-17T08:59:36.815939+00:00",
+  "efootball_market_archive_age_minutes": 0.6,
+  "efootball_market_collector_last_capture_at": "2026-10-17T08:59:36.815939+00:00",
+  "efootball_market_collector_age_minutes": 0.6,
+  "efootball_market_research_last_run_age_minutes": 1.1,
+  "efootball_market_research_last_success_age_minutes": 1.1,
+  "efootball_market_research_scheduled_run_age_minutes": 175.5,
+  "efootball_market_research_workflow_age_minutes": 571.7,
   "efootball_market_research_schedule_status": "STALE",
   "efootball_market_research_freshness_status": "FRESH",
-  "virtual_lab_events": 709,
+  "virtual_lab_events": 727,
   "virtual_lab_products": {
-    "efootball_adriatic": 14,
-    "efootball_gt": 261,
-    "vfootball": 434
+    "efootball_adriatic": 16,
+    "efootball_gt": 258,
+    "vfootball": 453
   },
   "thresholds": {
     "pipeline_hours": 4,
@@ -54,25 +54,19 @@
       "workflow": "qualified-best-schedule-watch.yml",
       "action": "schedule_gap_alert",
       "status": "warning",
-      "detail": "Qualified Best monitor schedule status=STALE; last scheduled run age=115.4 minute(s); workflow age=3529.4 minute(s)."
-    },
-    {
-      "workflow": "qualified-best-schedule-watch.yml",
-      "action": "monitor_failsafe_dispatch",
-      "status": "requested",
-      "detail": "Scheduled monitor run is STALE; dispatching a fallback despite recent deployment checks."
+      "detail": "Qualified Best monitor schedule status=STALE; last scheduled run age=115.9 minute(s); workflow age=3529.9 minute(s)."
     },
     {
       "workflow": "efootball-market-research-schedule.yml",
       "action": "efootball_market_research_failsafe_dispatch",
       "status": "suppressed_recent_success",
-      "detail": "The last successful isolated eFootball research run completed 13.5 minute(s) ago and its archive is fresh; avoiding a redundant fallback dispatch."
+      "detail": "The last successful isolated eFootball research run completed 1.1 minute(s) ago and its archive is fresh; avoiding a redundant fallback dispatch."
     },
     {
-      "workflow": "unified-upcoming.yml",
+      "workflow": "virtual-lab-collector.yml",
       "action": "dispatch",
       "status": "requested",
-      "detail": "Unified board refresh after newer Virtual Lab snapshot"
+      "detail": "Virtual Lab research-ledger self-heal"
     }
   ],
   "policy": "Watchdog self-heals stale engines, records Qualified Best scheduled/actual monitor age, dispatches a fallback when the scheduled monitor is missing/stale even if deployment checks are recent (10-minute cooldown), retries failed board/deploy runs once per 20-minute cooldown, and dispatches isolated eFootball winner/GG-NG research when its market archive or collector capture is over 30 minutes stale (15-minute cooldown). The eFootball research workflow is shadow-only and never gates Qualified Best or Odds Builder. Workflow_run checks do not rewrite feed data to avoid downstream loops. Health publication is retried across concurrent data writers."
