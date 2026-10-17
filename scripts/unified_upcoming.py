@@ -369,6 +369,27 @@ def virtual_model_side_probability(result,variant,side):
     return over_probability
 
 
+def virtual_live_event_context(event, start, product, competition, home, away, line, current_lambda):
+    """Build an in-flight prediction context without pretending it has settled rows.
+
+    The target row is supplied separately to the walk-forward probability function;
+    this context holds only event identity, timestamp, participants and the lambda
+    fitted from non-target current market lines.
+    """
+    return {
+        "key": f"desk|{(event or {}).get('event_id')}|{line}",
+        "event_id": str((event or {}).get("event_id") or ""),
+        "timestamp": start.isoformat(),
+        "product": product,
+        "competition": competition,
+        "home": home,
+        "away": away,
+        "rows": [],
+        "total": None,
+        "lambda": current_lambda,
+    }
+
+
 def live_age_limit_hours(row):
     sport=str((row or {}).get("sport") or "").lower()
     product=str((row or {}).get("product") or "").lower()
@@ -1032,18 +1053,9 @@ def build_virtual_events(history, lifecycle, eligibility):
                 if current_lambda is None:
                     current_lambda=float(product_lambdas.get(product,2.5))
                     lambda_fit_meta={"source":"default_product_lambda_fallback","fit_points":0,"target_line_excluded":True}
-                current_event={
-                    "key":f"desk|{e.get('event_id')}|{line}",
-                    "event_id":str(e.get("event_id") or ""),
-                    "timestamp":start.isoformat(),
-                    "product":product,
-                    "competition":competition,
-                    "home":home,
-                    "away":away,
-                    "rows":market_rows,
-                    "total":None,
-                    "lambda":current_lambda,
-                }
+                current_event=virtual_live_event_context(
+                    e,start,product,competition,home,away,line,current_lambda
+                )
                 for side,mp in (("over",market_over),("under",market_under)):
                     if mp is None:
                         continue
