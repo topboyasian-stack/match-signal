@@ -404,9 +404,21 @@ def check_half_line_directional_gate_uses_unique_scores_and_excludes_conflicts()
             conflict["win"] = False
             history.append(conflict)  # conflicting final score at same settlement time is excluded
 
-    eval_art = {"efootball_gt_diagnostics": {"selection": {
-        "u7.5": {"7.5": {"participant_model": {"n": 30, "hit_rate": 0.70}}}
-    }}}
+    def metric(n, brier, log_loss, ece):
+        return {"n": n, "brier": brier, "log_loss": log_loss, "ece": ece}
+    eval_art = {
+        "participant_feature_gate": {"pass": True},
+        "by_product": {"efootball_gt": {
+            "market": metric(1000, .40, .90, .20),
+            "poisson": metric(1000, .24, .60, .04),
+            "poisson_prior": metric(1000, .23, .58, .035),
+            "efootball_shape": metric(1000, .22, .56, .04),
+            "participant_model": metric(1000, .20, .50, .04),
+        }},
+        "efootball_gt_diagnostics": {"selection": {
+            "u7.5": {"7.5": {"participant_model": {"n": 30, "hit_rate": 0.70}}}
+        }},
+    }
     gate = upcoming.build_efootball_directional_gate(eval_art, history)[(7.5, "under")]
     assert gate["recent_evidence_source"] == "UNIQUE_SETTLED_SCORE_REPLAY"
     assert gate["recent_n"] == 31, "32 unique events minus one conflicting event; duplicate rows must not count"
