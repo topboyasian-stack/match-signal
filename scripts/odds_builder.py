@@ -3616,10 +3616,14 @@ def build_value_batches(candidates):
         "min_combined_odds":COMPACT_EFOOTBALL_MIN_COMBINED_ODDS,
         "reason":"not_reached_before_existing_lanes"
     }
-    # Diagnostic-only snapshot of the settled 2–4-leg construction lane.
-    # This does not alter eligibility or selection; it only exposes why a shape
-    # cannot currently be promoted when the Builder returns NO_BET.
-    construction_shapes=construction_shape_diagnostics("vfootball")
+    # Diagnostic-only settled-shape report for active eFootball products.
+    # VFootball remains archived/research-only and must not be described as the
+    # priority product when the current active Virtual scope is GT/Adriatic.
+    active_efootball_construction_shapes={
+        product:construction_shape_diagnostics(product)
+        for product in sorted(ACTIVE_VIRTUAL_PRODUCTS)
+    }
+    construction_shapes=active_efootball_construction_shapes.get("efootball_gt",[])
     eligible_all=[x for x in built if x.get("builder_eligible")]
     eligible_results=[
         x for x in eligible_all
@@ -4226,7 +4230,7 @@ def build_value_batches(candidates):
         "target_combined_odds":TARGET_COMBINED_ODDS,
         "accuracy_preservation_ratio":ACCURACY_PRESERVATION_RATIO,
         "construction_priority":"settled_results_first",
-        "priority_product":"vfootball",
+        "priority_product":"active_qualified_pool",
         "max_legs":RESULTS_FIRST_MAX_LEGS,
         "construction_shapes_considered":list(RESULTS_FIRST_CONSTRUCTION_LEG_COUNTS),
         "promoted_construction_leg_count":promoted_shape,
@@ -4237,6 +4241,9 @@ def build_value_batches(candidates):
         "capacity":_batch_capacity_diagnostic(eligible_results),
         "ranking_metric":"settled exact-line/side hit rate first; calibrated probability second; odds only tie-breaker",
         "construction_shape_diagnostics":construction_shapes,
+        "active_efootball_construction_shape_diagnostics":active_efootball_construction_shapes,
+        "construction_shape_diagnostics_scope":"historical eFootball GT/Adriatic ticket shapes are diagnostics only and do not override live quote, probability, correlation, odds, ROI, or promotion gates",
+        "high_confidence_diagnostics":high_diag,
         "secondary_pool_eligible_legs":sum(1 for x in eligible_all if str(x.get("product") or "")!="vfootball" and (str(x.get("sport") or "") in {"football","tennis"} or str(x.get("product") or "").startswith("efootball_"))),
         "secondary_efootball_diagnostics":_secondary_efootball_diagnostics(
             secondary_pool,
