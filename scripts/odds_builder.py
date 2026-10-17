@@ -3608,7 +3608,7 @@ def _secondary_efootball_diagnostics(pool, min_odds=None):
             qualified.append({
                 "legs":[
                     {"match":a.get("match"),"p":float(a.get("model_probability") or 0.0),"odds":float(a.get("bookmaker_odds") or 0.0),"start":a.get("start_time")},
-                    {"match":b.get("match"),"p":float(b.get("model_probability") or 0.0),"odds":float(b.get("bookmaker_odds") or 0.0),"start":b.get("start_time)}
+                    {"match":b.get("match"),"p":float(b.get("model_probability") or 0.0),"odds":float(b.get("bookmaker_odds") or 0.0),"start":b.get("start_time")}
                 ],
                 "combined_odds":round(odds,3),
                 "combined_probability":calibrated_probability,
