@@ -278,7 +278,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn("gh", BOARD_WORKFLOW)
         self.assertIn("'run', 'list', '--workflow', 'odds_builder.yml', '--branch', 'main'", BOARD_WORKFLOW)
         self.assertIn("if active:", BOARD_WORKFLOW)
-        self.assertIn("gh workflow run odds_builder.yml --ref main", BOARD_WORKFLOW)
+        self.assertIn("['gh', 'workflow', 'run', 'odds_builder.yml', '--ref', 'main']", BOARD_WORKFLOW)
         self.assertIn("actions: write", BOARD_WORKFLOW)
 
     def test_board_owned_outputs_do_not_trigger_a_self_refresh_loop(self):
