@@ -335,6 +335,41 @@ class CompactEfootballBuilderTests(unittest.TestCase):
         self.assertTrue(diag["ticket_calibration"]["oos_brier_improved"])
         self.assertLess(diag["ticket_calibration"]["settled_lane_flat_stake_roi"],0)
 
+    def test_high_confidence_calibration_reports_insufficient_sample_before_brier_failure(self):
+        origin=datetime(2026,1,1,tzinfo=timezone.utc)
+        history=[]
+        for index in range(8):
+            stamp=(origin+timedelta(days=index)).isoformat()
+            status="WON" if index<3 else "LOST"
+            history.append({
+                "ticket_id":f"thin-high-confidence-{index}",
+                "primary_lane":"high_confidence_research","status":status,
+                "_calibration_stamp":stamp,"settled_at":stamp,
+                "combined_odds":3.0,"raw_combined_model_probability":0.5,
+                "legs":[{
+                    "product":"efootball_gt",
+                    "qualification_lane":"efootball_exact_evidence_value",
+                    "model_probability":0.85
+                } for _ in range(2)]
+            })
+        no_oos={
+            "gamma":1.0,"sample":8,"warmup":8,"trained":False,
+            "oos_sample":0,"raw_oos_brier":None,"calibrated_oos_brier":None,
+            "oos_brier_improved":False,"promotion_allowed":False
+        }
+        with (
+            patch.object(builder,"load",return_value={}),
+            patch.object(builder,"settled_ticket_history",return_value=history),
+            patch.object(builder,"_fit_efootball_ticket_gamma",return_value=no_oos),
+        ):
+            result=builder._efootball_high_confidence_ticket_gamma()
+        self.assertFalse(result["promotion_allowed"])
+        self.assertFalse(result["brier_promotion_allowed"])
+        self.assertFalse(result["calibration_sample_sufficient"])
+        self.assertEqual(result["promotion_hold_reason"],"insufficient_settled_lane_roi_sample")
+        self.assertEqual(result["tagged_lane_ticket_count"],8)
+        self.assertEqual(result["comparable_raw_probability_sample"],8)
+
 
 if __name__=="__main__":
     unittest.main()
