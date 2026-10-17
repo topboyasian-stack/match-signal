@@ -13,6 +13,9 @@ class EfootballResearchRecoveryTests(unittest.TestCase):
         self.assertIn("efootball_collector_age_minutes", WATCHDOG)
         self.assertIn("EFOOTBALL_RESEARCH_MAX_AGE_MINUTES = 30", WATCHDOG)
         self.assertIn("EFOOTBALL_RESEARCH_DISPATCH_COOLDOWN_MINUTES = 15", WATCHDOG)
+        self.assertIn("MISSING_SCHEDULED_RUN", WATCHDOG)
+        self.assertIn("efootball_research_schedule_fallback_needed", WATCHDOG)
+        self.assertIn("efootball_research_scheduled_age_minutes", WATCHDOG)
         self.assertIn("efootball_market_research_freshness_status", WATCHDOG)
 
     def test_watchdog_contract_is_run_by_research_pr_validation(self):
