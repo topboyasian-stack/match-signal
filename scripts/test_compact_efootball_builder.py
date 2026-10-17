@@ -411,5 +411,40 @@ class CompactEfootballBuilderTests(unittest.TestCase):
         self.assertEqual(diag["high_confidence_diagnostics"]["reason"],"efootball_ticket_calibration_settled_roi_not_positive")
 
 
+    def test_pair_diagnostics_reports_calibration_hold_separately_from_roi_and_shows_shadow_only_pairs(self):
+        rows=[
+            leg(0,odds=2.35,probability=0.70,expected_value=0.645,minute=0),
+            leg(1,odds=2.35,probability=0.70,expected_value=0.645,minute=5),
+        ]
+        held={
+            "trained":True,"promotion_allowed":False,"gamma":1.8701,"sample":108,
+            "oos_sample":100,"raw_oos_brier":0.268647,"calibrated_oos_brier":0.181888,
+            "oos_brier_improved":True,"brier_promotion_allowed":True,
+            "profitability_promotion_allowed":False,"settled_lane_profit_ticket_count":108,
+            "settled_lane_flat_stake_roi":-0.037426,
+            "promotion_hold_reason":"settled_lane_roi_not_positive"
+        }
+        with (
+            patch.object(builder,"_efootball_exact_evidence_ticket_gamma",return_value=held),
+            patch.object(builder,"_ticket_calibration_gamma",return_value={"gamma":2.4}),
+        ):
+            diag=builder._secondary_efootball_diagnostics(rows,min_odds=2.70)
+
+        scan=diag["pair_scan"]
+        self.assertEqual(scan["pairs_total"],1)
+        self.assertEqual(scan["odds_reach_pairs"],1)
+        self.assertEqual(scan["calibration_hold_rejections"],1)
+        self.assertEqual(scan["roi_rejections"],0,"a near-zero placeholder during a calibration hold is not an ROI test result")
+        self.assertEqual(scan["fully_qualified_pairs"],0,"shadow pairs must never be active-qualified pairs")
+        self.assertEqual(diag["best_pair"],[])
+        self.assertEqual(len(diag["shadow_only_candidates"]),1)
+        candidate=diag["shadow_only_candidates"][0]
+        self.assertEqual(candidate["qualification_status"],"SHADOW_ONLY_NOT_QUALIFIED")
+        self.assertFalse(candidate["ticket_calibration_ready"])
+        self.assertEqual(candidate["blocking_reason"],"settled_lane_roi_not_positive")
+        self.assertGreaterEqual(candidate["raw_independence_expected_roi"],0.02)
+        self.assertIn("Diagnostic-only",diag["shadow_only_policy"])
+
+
 if __name__=="__main__":
     unittest.main()
