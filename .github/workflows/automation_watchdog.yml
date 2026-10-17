@@ -105,6 +105,10 @@ jobs:
 
           pipeline_age = age_hours(pipeline.get('updated_at'))
           odds_age = age_hours(odds.get('generated_at'))
+          # Builder cadence is 15 minutes. Allow one missed cycle plus runner jitter,
+          # then self-heal before stale research output can sit for hours.
+          ODDS_BUILDER_MAX_AGE_MINUTES = 25
+          odds_age_minutes = round(odds_age * 60, 1)
           expansion_age = age_hours(expansion.get('updated_at'))
           virtual_age = age_hours(virtual.get('updated_at'))
           virtual_status_age = age_hours(virtual_status.get('updated_at'))
@@ -416,9 +420,12 @@ jobs:
               r = subprocess.run(['gh', 'workflow', 'run', 'unified-upcoming.yml', '--ref', 'main'], text=True, capture_output=True)
               actions.append({'workflow':'unified-upcoming.yml','action':'dispatch','status':'requested' if r.returncode == 0 else 'failed','detail':(r.stderr.strip() if r.returncode else 'Unified board self-heal')})
 
-          if odds_age > 8 and not active('odds_builder.yml'):
+          if odds_age_minutes > ODDS_BUILDER_MAX_AGE_MINUTES and not active('odds_builder.yml'):
               r = subprocess.run(['gh', 'workflow', 'run', 'odds_builder.yml', '--ref', 'main'], text=True, capture_output=True)
-              actions.append({'workflow':'odds_builder.yml','action':'dispatch','status':'requested' if r.returncode == 0 else 'failed','detail':(r.stderr.strip() if r.returncode else 'scheduled self-heal')})
+              detail = r.stderr.strip() if r.returncode else (
+                  'Builder artifact is '+str(odds_age_minutes)+' minutes old; triggered the 15-minute-cadence self-heal.'
+              )
+              actions.append({'workflow':'odds_builder.yml','action':'dispatch','status':'requested' if r.returncode == 0 else 'failed','detail':detail})
 
           health = {
               'updated_at': now.isoformat(),
@@ -427,6 +434,8 @@ jobs:
               'pipeline_age_hours': round(pipeline_age, 2),
               'odds_builder_last_update': odds.get('generated_at'),
               'odds_builder_age_hours': round(odds_age, 2),
+              'odds_builder_age_minutes': odds_age_minutes,
+              'odds_builder_max_age_minutes': ODDS_BUILDER_MAX_AGE_MINUTES,
               'expansion_last_update': expansion.get('updated_at'),
               'expansion_age_hours': round(expansion_age, 2),
               'virtual_lab_last_update': virtual.get('updated_at'),
