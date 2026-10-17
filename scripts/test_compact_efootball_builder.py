@@ -265,9 +265,11 @@ class CompactEfootballBuilderTests(unittest.TestCase):
             "oos_sample":32,"raw_oos_brier":0.25,"calibrated_oos_brier":0.21,
             "oos_brier_improved":True,"promotion_allowed":True
         }
-        with patch.object(builder,"load",return_value={}),
-             patch.object(builder,"settled_ticket_history",return_value=history),
-             patch.object(builder,"_fit_efootball_ticket_gamma",return_value=fit):
+        with (
+            patch.object(builder,"load",return_value={}),
+            patch.object(builder,"settled_ticket_history",return_value=history),
+            patch.object(builder,"_fit_efootball_ticket_gamma",return_value=fit),
+        ):
             result=builder._efootball_high_confidence_ticket_gamma()
         self.assertTrue(result["promotion_allowed"])
         self.assertEqual(result["tagged_lane_ticket_count"],43)
@@ -300,8 +302,10 @@ class CompactEfootballBuilderTests(unittest.TestCase):
             "settled_lane_flat_stake_roi":-0.02843,"profitability_minimum_settled_tickets":30,
             "promotion_hold_reason":"settled_lane_roi_not_positive"
         }
-        with patch.object(builder,"_efootball_high_confidence_ticket_gamma",return_value=high),
-             patch.object(builder,"_efootball_exact_evidence_ticket_gamma",return_value=blocked_value):
+        with (
+            patch.object(builder,"_efootball_high_confidence_ticket_gamma",return_value=high),
+            patch.object(builder,"_efootball_exact_evidence_ticket_gamma",return_value=blocked_value),
+        ):
             options,diag=builder._construct_high_confidence_value_batches(rows,max_batches=1,max_legs=4,min_odds=2.70)
         self.assertTrue(options)
         self.assertEqual(diag["batches_selected"],1)
