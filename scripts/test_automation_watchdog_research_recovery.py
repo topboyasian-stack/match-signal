@@ -16,6 +16,8 @@ class EfootballResearchRecoveryTests(unittest.TestCase):
         self.assertIn("MISSING_SCHEDULED_RUN", WATCHDOG)
         self.assertIn("efootball_research_schedule_fallback_needed", WATCHDOG)
         self.assertIn("efootball_research_scheduled_age_minutes", WATCHDOG)
+        self.assertIn("efootball_research_last_success_age_minutes", WATCHDOG)
+        self.assertIn("suppressed_recent_success", WATCHDOG)
         self.assertIn("efootball_market_research_freshness_status", WATCHDOG)
 
     def test_watchdog_contract_is_run_by_research_pr_validation(self):
