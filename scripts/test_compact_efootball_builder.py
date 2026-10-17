@@ -370,6 +370,46 @@ class CompactEfootballBuilderTests(unittest.TestCase):
         self.assertEqual(result["tagged_lane_ticket_count"],8)
         self.assertEqual(result["comparable_raw_probability_sample"],8)
 
+    def test_no_bet_summary_exposes_high_confidence_hold_and_active_product_scope(self):
+        high_diag={
+            "eligible_legs":12,
+            "candidate_combinations":0,
+            "batches_selected":0,
+            "ticket_calibration":{
+                "lane":"high_confidence_research",
+                "trained":True,
+                "oos_brier_improved":True,
+                "brier_promotion_allowed":True,
+                "profitability_promotion_allowed":False,
+                "settled_lane_flat_stake_roi":-0.08,
+                "promotion_allowed":False,
+                "promotion_hold_reason":"settled_lane_roi_not_positive",
+            },
+            "reason":"efootball_ticket_calibration_settled_roi_not_positive",
+        }
+        def shape_diagnostics(product,idx=None):
+            return [{"product":product,"leg_count":2,"ticket_n":0,"qualifies":False}]
+
+        with (
+            patch.object(builder,"make_leg",return_value={"builder_eligible":False,"product":"efootball_gt"}),
+            patch.object(builder,"construction_shape_diagnostics",side_effect=shape_diagnostics),
+            patch.object(builder,"_construct_mixed_virtual_efootball_batches",return_value=([],{"reason":"no_mixed_combination_reached_all_gates"})),
+            patch.object(builder,"_construct_vfootball_holdout_batches",return_value=([],{"reason":"no_vfootball_holdout_combination_reached_all_gates"})),
+            patch.object(builder,"_construct_phase2_cyclical_loop_batches",return_value=([],{"reason":"no_phase2_combination_reached_all_gates"})),
+            patch.object(builder,"_construct_high_confidence_value_batches",return_value=([],high_diag)),
+            patch.object(builder,"_secondary_efootball_diagnostics",return_value={"pool_size":0,"pair_scan":{"fully_qualified_pairs":0},"best_pair":[]}),
+            patch.object(builder,"_batch_capacity_diagnostic",return_value={"eligible_legs":0,"active_floor_reachable_with_current_gates":False}),
+        ):
+            batches,built,diag=builder.build_value_batches([{}])
+
+        self.assertEqual(batches,[])
+        self.assertEqual(diag["priority_product"],"active_qualified_pool")
+        self.assertIn("efootball_gt",diag["active_efootball_construction_shape_diagnostics"])
+        self.assertIn("efootball_adriatic",diag["active_efootball_construction_shape_diagnostics"])
+        self.assertEqual(diag["construction_shape_diagnostics"][0]["product"],"efootball_gt")
+        self.assertEqual(diag["high_confidence_diagnostics"]["ticket_calibration"]["promotion_hold_reason"],"settled_lane_roi_not_positive")
+        self.assertEqual(diag["high_confidence_diagnostics"]["reason"],"efootball_ticket_calibration_settled_roi_not_positive")
+
 
 if __name__=="__main__":
     unittest.main()
