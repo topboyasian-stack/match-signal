@@ -1,26 +1,26 @@
 {
-  "generated_at": "2026-10-18T09:08:37.772717+00:00",
-  "status": "FAIL",
-  "critical_issues": 2,
+  "generated_at": "2026-10-18T09:15:47.848363+00:00",
+  "status": "HEALTHY",
+  "critical_issues": 0,
   "warning_issues": 0,
   "info_issues": 1,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
-      "status": "STALE",
-      "age_hours": 4.7,
+      "status": "PASS",
+      "age_hours": 0.1,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.98,
+      "age_hours": 0.1,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 2.56,
+      "age_hours": 2.68,
       "threshold_hours": 4
     },
     {
@@ -38,15 +38,15 @@
     {
       "engine": "tennis_forward_discovery",
       "status": "PASS",
-      "age_hours": 4.15,
+      "age_hours": 4.27,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 0.02,
+      "age_hours": 0.14,
       "threshold_hours": 0.5,
-      "heartbeat_source": "virtual_lab_live.json"
+      "heartbeat_source": "unified_live_refresh"
     },
     {
       "engine": "retired_engines",
@@ -54,7 +54,7 @@
       "lanes": {
         "darts_x": {
           "status": "RETIRED",
-          "artifact_at": "2026-10-18T06:10:42.363372+00:00"
+          "artifact_at": "2026-10-18T09:08:35.358458+00:00"
         },
         "table_tennis_x": {
           "status": "RETIRED",
@@ -69,27 +69,17 @@
   ],
   "issues": [
     {
-      "code": "STALE_CORE_PREDICTION_PIPELINE",
-      "severity": "critical",
-      "detail": "updated_at age 4.70h exceeds 4h"
-    },
-    {
       "code": "SELECTION_GATE_EMPTY",
       "severity": "info",
       "detail": "Current prediction feed exists but the selected-candidate layer returned zero qualified selections; no gate was weakened"
-    },
-    {
-      "code": "PIPELINE_STALE",
-      "severity": "critical",
-      "detail": "pipeline_status age 4.70h exceeds 4h"
     }
   ],
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
   "paper_only": true,
   "prediction_desk_filters": {
-    "past_kickoff_rows_hidden": 109,
+    "past_kickoff_rows_hidden": 1,
     "stale_live_flags_hidden": 0,
     "expired_settled_rows_hidden": 0,
-    "virtual_market_rows_held_for_kickoff_window": 757
+    "virtual_market_rows_held_for_kickoff_window": 786
   }
 }
