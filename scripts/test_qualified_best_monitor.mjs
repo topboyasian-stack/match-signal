@@ -5,7 +5,7 @@ import { classifyQualifiedBestMonitor } from "./qualified_best_monitor_lib.mjs";
 const workflow = await readFile(new URL("../.github/workflows/qualified-best-production-watch.yml", import.meta.url), "utf8");
 const scheduleWorkflow = await readFile(new URL("../.github/workflows/qualified-best-schedule-watch.yml", import.meta.url), "utf8");
 const monitorSource = await readFile(new URL("./qualified_best_monitor.mjs", import.meta.url), "utf8");
-assert.ok(scheduleWorkflow.includes("cron: '3,13,23,33,43,53 * * * *'"), "the dedicated scheduled monitor checks production every ten minutes inside the 15-minute quote gate, offset away from minute zero");
+assert.ok(scheduleWorkflow.includes("cron: '7,17,27,37,47,57 * * * *'"), "the dedicated scheduled monitor checks production every ten minutes inside the 15-minute quote gate, offset away from minute zero");
 assert.doesNotMatch(workflow, /cron:\s*'/, "deployment-triggered checks must not own a second cron schedule");
 assert.match(workflow, /workflow_run:[\s\S]*?workflows:\s*\n\s*- "Deploy Match Signal to Cloudflare Pages"/, "production monitoring starts after the Cloudflare deploy workflow");
 assert.doesNotMatch(workflow, /\n  push:/, "the production browser monitor must not race the Cloudflare deployment on main pushes");
