@@ -210,6 +210,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         for allowed_path in (
             *expected_direct_paths,
             "scripts/test_deploy_freshness_order.py",
+            "scripts/test_workflow_trigger_boundaries.py",
             "scripts/test_prediction_desk_gates.mjs",
             "scripts/test_upcoming_desk_policy.py",
             "docs/PREDICTION_DESK_POLICY.md",
