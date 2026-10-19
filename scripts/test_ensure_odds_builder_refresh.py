@@ -5,9 +5,13 @@ from __future__ import annotations
 import unittest
 from datetime import datetime, timedelta, timezone
 
-from ensure_odds_builder_refresh import BUILDER_RUN_MAX_AGE_MINUTES, evaluate_runs
+from ensure_odds_builder_refresh import (
+    BUILDER_ARTIFACT_MAX_AGE_MINUTES,
+    RECENT_RUN_COOLDOWN_MINUTES,
+    evaluate_runs,
+)
 
-NOW = datetime(2026, 10, 17, 9, 30, tzinfo=timezone.utc)
+NOW = datetime(2026, 10, 20, 0, 30, tzinfo=timezone.utc)
 
 
 def run(age_minutes: int, status: str = "completed", run_id: int = 123, conclusion: str = "success") -> dict:
@@ -20,44 +24,55 @@ def run(age_minutes: int, status: str = "completed", run_id: int = 123, conclusi
     }
 
 
+def artifact(age_minutes: int) -> str:
+    return (NOW - timedelta(minutes=age_minutes)).isoformat().replace("+00:00", "Z")
+
+
 class BuilderRefreshDecisionTests(unittest.TestCase):
-    def test_fresh_completed_run_does_not_dispatch(self):
-        result = evaluate_runs([run(BUILDER_RUN_MAX_AGE_MINUTES - 1)], NOW)
+    def test_fresh_artifact_skips_even_when_run_history_is_old(self):
+        result = evaluate_runs([run(60)], NOW, artifact_generated_at=artifact(BUILDER_ARTIFACT_MAX_AGE_MINUTES - 1))
         self.assertFalse(result["dispatch"])
-        self.assertEqual(result["reason"], "builder_run_recent")
+        self.assertEqual(result["reason"], "builder_artifact_fresh")
+        self.assertEqual(result["artifact_age_minutes"], BUILDER_ARTIFACT_MAX_AGE_MINUTES - 1)
 
-    def test_stale_completed_run_dispatches(self):
-        result = evaluate_runs([run(BUILDER_RUN_MAX_AGE_MINUTES)], NOW)
+    def test_stale_artifact_dispatches_even_when_a_completed_run_is_recent_but_outside_cooldown(self):
+        result = evaluate_runs([run(RECENT_RUN_COOLDOWN_MINUTES + 5)], NOW, artifact_generated_at=artifact(BUILDER_ARTIFACT_MAX_AGE_MINUTES + 4))
         self.assertTrue(result["dispatch"])
-        self.assertEqual(result["reason"], "builder_run_stale")
+        self.assertEqual(result["reason"], "builder_artifact_stale")
+        self.assertEqual(result["artifact_age_minutes"], BUILDER_ARTIFACT_MAX_AGE_MINUTES + 4)
 
-    def test_missing_history_dispatches(self):
-        result = evaluate_runs([], NOW)
-        self.assertTrue(result["dispatch"])
-        self.assertEqual(result["reason"], "no_valid_builder_run_history")
+    def test_stale_artifact_obeys_short_recent_run_cooldown(self):
+        result = evaluate_runs([run(RECENT_RUN_COOLDOWN_MINUTES - 1)], NOW, artifact_generated_at=artifact(BUILDER_ARTIFACT_MAX_AGE_MINUTES + 10))
+        self.assertFalse(result["dispatch"])
+        self.assertEqual(result["reason"], "recent_builder_run_cooldown")
 
-    def test_invalid_timestamp_history_dispatches(self):
-        result = evaluate_runs([{"databaseId": 1, "status": "completed", "createdAt": "not-a-date"}], NOW)
-        self.assertTrue(result["dispatch"])
-
-    def test_active_run_suppresses_duplicate_even_when_old(self):
-        result = evaluate_runs([run(90, "in_progress", 900)], NOW)
+    def test_stale_artifact_does_not_duplicate_active_run(self):
+        result = evaluate_runs([run(30, "in_progress", 900)], NOW, artifact_generated_at=artifact(BUILDER_ARTIFACT_MAX_AGE_MINUTES + 10))
         self.assertFalse(result["dispatch"])
         self.assertEqual(result["reason"], "active_builder_run")
         self.assertEqual(result["active_run_id"], 900)
 
-    def test_clock_skew_cannot_make_a_recent_run_look_stale(self):
-        result = evaluate_runs([{
-            "databaseId": 7,
-            "status": "completed",
-            "createdAt": (NOW + timedelta(minutes=2)).isoformat(),
-        }], NOW)
-        self.assertFalse(result["dispatch"])
-        self.assertEqual(result["age_minutes"], 0.0)
+    def test_missing_artifact_dispatches_when_no_recent_or_active_run_exists(self):
+        result = evaluate_runs([run(RECENT_RUN_COOLDOWN_MINUTES + 1)], NOW, artifact_generated_at=None)
+        self.assertTrue(result["dispatch"])
+        self.assertEqual(result["reason"], "builder_artifact_missing_or_invalid")
 
-    def test_failed_recent_run_still_obeys_cooldown(self):
-        result = evaluate_runs([run(5, "completed", conclusion="failure")], NOW)
+    def test_invalid_artifact_timestamp_is_treated_as_missing(self):
+        result = evaluate_runs([run(20)], NOW, artifact_generated_at="not-a-date")
+        self.assertTrue(result["dispatch"])
+        self.assertEqual(result["reason"], "builder_artifact_missing_or_invalid")
+
+    def test_clock_skew_cannot_make_artifact_look_stale(self):
+        future = (NOW + timedelta(minutes=3)).isoformat()
+        result = evaluate_runs([run(60)], NOW, artifact_generated_at=future)
         self.assertFalse(result["dispatch"])
+        self.assertEqual(result["reason"], "builder_artifact_fresh")
+        self.assertEqual(result["artifact_age_minutes"], 0.0)
+
+    def test_old_artifact_not_hidden_by_a_recent_failed_run(self):
+        result = evaluate_runs([run(12, conclusion="failure")], NOW, artifact_generated_at=artifact(BUILDER_ARTIFACT_MAX_AGE_MINUTES + 8))
+        self.assertTrue(result["dispatch"])
+        self.assertEqual(result["reason"], "builder_artifact_stale")
 
 
 if __name__ == "__main__":

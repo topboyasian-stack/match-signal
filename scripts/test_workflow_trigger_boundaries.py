@@ -35,7 +35,7 @@ def push_paths(filename):
 def main():
     builder = (WORKFLOWS / "odds_builder.yml").read_text(encoding="utf-8")
     board = (WORKFLOWS / "unified-upcoming.yml").read_text(encoding="utf-8")
-    watch = (WORKFLOWS / "qualified-best-schedule-watch.yml").read_text(encoding="utf-8")
+    watch = (WORKFLOWS / "qualified-best-health-watch-v2.yml").read_text(encoding="utf-8")
     tracker = (WORKFLOWS / "odds-ticket-tracker.yml").read_text(encoding="utf-8")
 
     builder_paths = push_paths("odds_builder.yml")
@@ -74,7 +74,7 @@ def main():
     # Tracker is still refreshed from Builder / settlement / collector outputs,
     # and its own five-minute safety schedule remains enabled.
     assert "- cron: '*/5 * * * *'" in tracker
-    assert "- cron: '3,13,23,33,43,53 * * * *'" in watch
+    assert "- cron: '7,17,27,37,47,57 * * * *'" in watch
     assert '"Match Signal Odds Builder"' in tracker
     assert '"Match Signal Result Settlement"' in tracker
     assert '"Match Signal Virtual Lab Collector"' in tracker
