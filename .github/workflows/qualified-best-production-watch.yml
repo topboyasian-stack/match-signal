@@ -51,7 +51,7 @@ on:
       - 'scripts/test_workspace_terminal_design.mjs'
       - 'scripts/test_core_workspaces_design.mjs'
       - '.github/workflows/qualified-best-production-watch.yml'
-      - '.github/workflows/qualified-best-schedule-watch.yml'
+      - '.github/workflows/qualified-best-health-watch-v2.yml'
       - '.github/workflows/cloudflare-pages.yml'
 permissions:
   actions: read
@@ -124,7 +124,7 @@ jobs:
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       QUALIFIED_BEST_URL: https://match-signal.pages.dev/qualified-best.html
-      QUALIFIED_BEST_MONITOR_WORKFLOW_FILE: qualified-best-schedule-watch.yml
+      QUALIFIED_BEST_MONITOR_WORKFLOW_FILE: qualified-best-health-watch-v2.yml
     steps:
       - name: Check out monitor source
         uses: actions/checkout@v4
