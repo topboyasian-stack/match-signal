@@ -13,7 +13,7 @@
     "rankings": {
       "p1": 34,
       "p2": 148,
-      "gap": 114.0
+      "gap": 114
     },
     "form": {
       "p1": 0.5,
@@ -22,11 +22,11 @@
       "p2_last10": "WLWW"
     },
     "probabilities": {
-      "p1": 0.7322,
-      "p2": 0.2678
+      "p1": 0.6943,
+      "p2": 0.3057
     },
     "pick": "p1",
-    "confidence": 0.7322,
+    "confidence": 0.6943,
     "analytics": {
       "set_win_prob": {
         "p1": 0.6603,
@@ -40,12 +40,12 @@
       "expected_sets": 2.45,
       "total_games": {
         "line": 19.5,
-        "over": 0.6846,
-        "under": 0.3154,
+        "over": 0.7461,
+        "under": 0.2539,
         "pick": "over",
-        "base_model_over": 0.746116,
-        "base_model_under": 0.253884,
-        "source": "V5.1 matchup-conditioned empirical total-games distribution",
+        "base_model_over": 0.7461,
+        "base_model_under": 0.2539,
+        "source": "continuous tennis model + walk-forward O/U calibration v4",
         "model_version": "5.2",
         "v51": {
           "distribution": {
@@ -116,21 +116,45 @@
           25.5
         ],
         "market_alignment_updated_at": "2026-10-19T15:35:21.062558+00:00",
-        "confidence_floor_met": true
+        "confidence_floor_met": true,
+        "calibration_status": "PAPER_RESEARCH",
+        "calibration_features": {
+          "line": 19.5,
+          "three_sets_bin": "low",
+          "confidence_bin": "high",
+          "tour": "ATP",
+          "empirical_over_rate": null,
+          "calibration_source": "upstream_only",
+          "empirical_weight": 0.0,
+          "prior_model_over": 0.7461,
+          "global_over_rate": 0.443
+        }
       },
       "games_handicap": {
         "estimated_margin_p1": 0.2,
         "pick": "p1"
-      }
+      },
+      "elo": {
+        "p1": 1499.2,
+        "p2": 1488.0,
+        "p1_win_prob": 0.5161,
+        "weight": 0.5
+      },
+      "walkforward_raw_p1": 0.6943,
+      "walkforward_calibrated_p1": 0.6943,
+      "ranking_probability": 0.8666
     },
-    "model": "ATP/WTA ranking + recent form",
+    "model": "ESPN + ranking/form base + walk-forward player Elo + current ATP/WTA rank + walk-forward probability calibration",
     "signal_quality": {
       "components": 4,
       "max_components": 5,
       "ranking_gap": 114.0,
       "form_gap": 0.25,
       "market_available": false,
-      "secondary_analytics_calibrated": true
+      "secondary_analytics_calibrated": true,
+      "elo_available": true,
+      "elo_gap": 11.2,
+      "ranking_available": true
     },
     "prediction_status": "qualified_candidate",
     "projection_tier": "deep_model",
@@ -1013,7 +1037,7 @@
       "empirical": 0.8011,
       "raw": 0.7738
     },
-    "model_version": "5.0 historical-calibrated",
+    "model_version": "2026-09-17-walkforward-calibrated",
     "calculated_at": "2026-10-19T15:35:14.845690+00:00",
     "sportybet_market_snapshot": {
       "source": "SportyBet NG web API via Cloudflare proxy",
@@ -1322,6 +1346,1350 @@
   {
     "sport": "tennis",
     "league": "ATP",
+    "event_id": "185100",
+    "start_time": "2026-10-20T13:30Z",
+    "player_1": "Benjamin Bonzi",
+    "player_2": "Cameron Norrie",
+    "venue": "Lyon, France",
+    "surface": "Unknown",
+    "tournament": "Grand Prix Auvergne-Rhône-Alpes",
+    "round": "Round 1",
+    "rankings": {
+      "p1": 100,
+      "p2": 40,
+      "gap": -60
+    },
+    "form": {
+      "p1": 0.667,
+      "p2": 0.2,
+      "p1_last10": "LWWWWLWWL",
+      "p2_last10": "WLLLL"
+    },
+    "probabilities": {
+      "p1": 0.3171,
+      "p2": 0.6829
+    },
+    "pick": "p2",
+    "confidence": 0.6829,
+    "analytics": {
+      "set_win_prob": {
+        "p1": 0.3992,
+        "p2": 0.6008
+      },
+      "straight_sets": {
+        "p1": 0.1594,
+        "p2": 0.361
+      },
+      "three_sets": 0.4797,
+      "expected_sets": 2.48,
+      "total_games": {
+        "line": 25.5,
+        "over": 0.351,
+        "under": 0.649,
+        "pick": "under",
+        "base_model_over": 0.351,
+        "base_model_under": 0.649,
+        "source": "continuous tennis model + walk-forward O/U calibration v4",
+        "model_version": "5.2",
+        "v51": {
+          "distribution": {
+            "12": 0.015899,
+            "13": 0.015899,
+            "14": 0.046466,
+            "15": 0.015899,
+            "16": 0.015899,
+            "17": 0.09551,
+            "18": 0.023186,
+            "19": 0.074786,
+            "20": 0.059222,
+            "21": 0.057177,
+            "22": 0.113619,
+            "23": 0.034827,
+            "24": 0.01684,
+            "25": 0.054286,
+            "26": 0.015899,
+            "27": 0.015899,
+            "28": 0.015899,
+            "29": 0.024338,
+            "30": 0.015899,
+            "31": 0.036618,
+            "32": 0.030741,
+            "33": 0.017717,
+            "34": 0.02179,
+            "35": 0.01704,
+            "36": 0.015899,
+            "37": 0.015899,
+            "38": 0.020094,
+            "39": 0.015899,
+            "40": 0.016038,
+            "41": 0.015899,
+            "42": 0.017126,
+            "43": 0.015899,
+            "44": 0.015899
+          },
+          "expected_total": 21.481,
+          "neighbors": 46,
+          "effective_sample": 1.495,
+          "model": "V5.1 matchup-conditioned empirical total-games distribution",
+          "line": 18.5,
+          "over": 0.771249,
+          "under": 0.228751,
+          "pick": "over",
+          "tour": "ATP",
+          "recommended_line": 18.5,
+          "recommended_pick": "over",
+          "recommended_probability": 0.771249
+        },
+        "line_strategy": "exact SportyBet market line when available; ladder fallback only without market line",
+        "raw_over": 0.7712,
+        "raw_under": 0.2288,
+        "calibrated_over": 0.7871,
+        "calibrated_under": 0.2129,
+        "model_line_before_market_alignment": 18.5,
+        "expected_total": 22.233,
+        "model": "V5.1 matchup-conditioned empirical total-games distribution",
+        "market_alignment_status": "EXACT_SPORTYBET_TOTAL_LINE_RECALCULATED",
+        "market_line_source": "SportyBet NG full-match Total Games market 189",
+        "market_available_lines": [
+          19.5,
+          20.5,
+          21.5,
+          22.5,
+          23.5,
+          24.5,
+          25.5
+        ],
+        "market_alignment_updated_at": "2026-10-19T15:35:21.062558+00:00",
+        "confidence_floor_met": true,
+        "calibration_status": "PAPER_RESEARCH",
+        "calibration_features": {
+          "line": 25.5,
+          "three_sets_bin": "mid",
+          "confidence_bin": "high",
+          "tour": "ATP",
+          "empirical_over_rate": null,
+          "calibration_source": "upstream_only",
+          "empirical_weight": 0.0,
+          "prior_model_over": 0.351,
+          "global_over_rate": 0.443
+        }
+      },
+      "games_handicap": {
+        "estimated_margin_p1": -0.12,
+        "pick": "p2"
+      },
+      "elo": {
+        "p1": 1500.0,
+        "p2": 1500.0,
+        "p1_win_prob": 0.5,
+        "weight": 0.5
+      },
+      "walkforward_raw_p1": 0.3171,
+      "walkforward_calibrated_p1": 0.3171,
+      "ranking_probability": 0.2384
+    },
+    "model": "ESPN + ranking/form base + walk-forward player Elo + current ATP/WTA rank + walk-forward probability calibration",
+    "signal_quality": {
+      "components": 4,
+      "max_components": 5,
+      "ranking_gap": 60.0,
+      "form_gap": 0.467,
+      "market_available": false,
+      "secondary_analytics_calibrated": true,
+      "elo_available": false,
+      "elo_gap": null,
+      "ranking_available": true
+    },
+    "prediction_status": "qualified_candidate",
+    "projection_tier": "deep_model",
+    "evidence_depth": "ranking_form_market_recent_form",
+    "qualification_status": "candidate",
+    "paper_only": true,
+    "sportybet_market": {
+      "provider": "SportyBet NG",
+      "event_id": "sr:match:75722438",
+      "tournament": "ATP Lyon, France Men Singles",
+      "category": "ATP",
+      "start_time": "2026-10-20T13:10:00+00:00",
+      "winner": {
+        "p1_book": 2.1,
+        "draw_book": null,
+        "p2_book": 1.79,
+        "p1_fair_prob": 0.4601542416452442,
+        "draw_fair_prob": null,
+        "p2_fair_prob": 0.5398457583547558,
+        "p1_fair_odds": 2.1731843575418996,
+        "draw_fair_odds": null,
+        "p2_fair_odds": 1.8523809523809525,
+        "market_id": "186",
+        "overround": 0.0348496940675711,
+        "raw_outcomes": [
+          {
+            "id": "4",
+            "name": "Home",
+            "book_odds": 2.1,
+            "implied": 0.47619047619047616,
+            "fair_prob": 0.4601542416452442,
+            "fair_odds": 2.1731843575418996
+          },
+          {
+            "id": "5",
+            "name": "Away",
+            "book_odds": 1.79,
+            "implied": 0.5586592178770949,
+            "fair_prob": 0.5398457583547558,
+            "fair_odds": 1.8523809523809525
+          }
+        ]
+      },
+      "totals": [
+        {
+          "line": 6.5,
+          "over": 1.01,
+          "under": 13.5,
+          "over_fair_prob": 0.9303928325292903,
+          "under_fair_prob": 0.06960716747070986,
+          "over_fair_odds": 1.0748148148148147,
+          "under_fair_odds": 14.366336633663366,
+          "overround": 0.06417308397506405,
+          "market_id": "204"
+        },
+        {
+          "line": 7.5,
+          "over": 1.06,
+          "under": 8.0,
+          "over_fair_prob": 0.8830022075055188,
+          "under_fair_prob": 0.11699779249448126,
+          "over_fair_odds": 1.1324999999999998,
+          "under_fair_odds": 8.547169811320753,
+          "overround": 0.06839622641509413,
+          "market_id": "204"
+        },
+        {
+          "line": 8.5,
+          "over": 1.22,
+          "under": 4.0,
+          "over_fair_prob": 0.7662835249042146,
+          "under_fair_prob": 0.23371647509578544,
+          "over_fair_odds": 1.305,
+          "under_fair_odds": 4.278688524590164,
+          "overround": 0.069672131147541,
+          "market_id": "204"
+        },
+        {
+          "line": 9.5,
+          "over": 1.71,
+          "under": 2.05,
+          "over_fair_prob": 0.5452127659574468,
+          "under_fair_prob": 0.4547872340425533,
+          "over_fair_odds": 1.8341463414634145,
+          "under_fair_odds": 2.1988304093567246,
+          "overround": 0.07260019968620735,
+          "market_id": "204"
+        },
+        {
+          "line": 10.5,
+          "over": 3.05,
+          "under": 1.35,
+          "over_fair_prob": 0.3068181818181818,
+          "under_fair_prob": 0.6931818181818181,
+          "over_fair_odds": 3.259259259259259,
+          "under_fair_odds": 1.4426229508196722,
+          "overround": 0.06860959319975724,
+          "market_id": "204"
+        },
+        {
+          "line": 12.5,
+          "over": 4.25,
+          "under": 1.2,
+          "over_fair_prob": 0.22018348623853212,
+          "under_fair_prob": 0.779816513761468,
+          "over_fair_odds": 4.541666666666666,
+          "under_fair_odds": 1.2823529411764705,
+          "overround": 0.06862745098039214,
+          "market_id": "204"
+        },
+        {
+          "line": 19.5,
+          "over": 1.35,
+          "under": 3.2,
+          "over_fair_prob": 0.7032967032967032,
+          "under_fair_prob": 0.2967032967032967,
+          "over_fair_odds": 1.4218750000000002,
+          "under_fair_odds": 3.3703703703703702,
+          "overround": 0.0532407407407407,
+          "market_id": "189"
+        },
+        {
+          "line": 20.5,
+          "over": 1.51,
+          "under": 2.55,
+          "over_fair_prob": 0.6280788177339901,
+          "under_fair_prob": 0.37192118226600984,
+          "over_fair_odds": 1.5921568627450982,
+          "under_fair_odds": 2.6887417218543046,
+          "overround": 0.054408518374237325,
+          "market_id": "189"
+        },
+        {
+          "line": 21.5,
+          "over": 1.65,
+          "under": 2.25,
+          "over_fair_prob": 0.5769230769230769,
+          "under_fair_prob": 0.423076923076923,
+          "over_fair_odds": 1.7333333333333334,
+          "under_fair_odds": 2.3636363636363638,
+          "overround": 0.05050505050505061,
+          "market_id": "189"
+        },
+        {
+          "line": 22.5,
+          "over": 1.9,
+          "under": 1.91,
+          "over_fair_prob": 0.5013123359580053,
+          "under_fair_prob": 0.49868766404199477,
+          "over_fair_odds": 1.994764397905759,
+          "under_fair_odds": 2.0052631578947366,
+          "overround": 0.04987599889776795,
+          "market_id": "189"
+        },
+        {
+          "line": 23.5,
+          "over": 2.15,
+          "under": 1.72,
+          "over_fair_prob": 0.4444444444444444,
+          "under_fair_prob": 0.5555555555555556,
+          "over_fair_odds": 2.25,
+          "under_fair_odds": 1.7999999999999998,
+          "overround": 0.04651162790697683,
+          "market_id": "189"
+        },
+        {
+          "line": 24.5,
+          "over": 2.2,
+          "under": 1.68,
+          "over_fair_prob": 0.4329896907216495,
+          "under_fair_prob": 0.5670103092783505,
+          "over_fair_odds": 2.3095238095238093,
+          "under_fair_odds": 1.7636363636363637,
+          "overround": 0.04978354978354971,
+          "market_id": "189"
+        },
+        {
+          "line": 25.5,
+          "over": 2.4,
+          "under": 1.58,
+          "over_fair_prob": 0.39698492462311563,
+          "under_fair_prob": 0.6030150753768844,
+          "over_fair_odds": 2.5189873417721516,
+          "under_fair_odds": 1.6583333333333334,
+          "overround": 0.04957805907172985,
+          "market_id": "189"
+        }
+      ],
+      "market_count": 16,
+      "markets": [
+        {
+          "id": "186",
+          "name": "Winner",
+          "line": null,
+          "overround": 0.03485,
+          "outcomes": [
+            {
+              "id": "4",
+              "name": "Home",
+              "book_odds": 2.1,
+              "implied": 0.47619047619047616,
+              "fair_prob": 0.4601542416452442,
+              "fair_odds": 2.1731843575418996
+            },
+            {
+              "id": "5",
+              "name": "Away",
+              "book_odds": 1.79,
+              "implied": 0.5586592178770949,
+              "fair_prob": 0.5398457583547558,
+              "fair_odds": 1.8523809523809525
+            }
+          ]
+        },
+        {
+          "id": "202",
+          "name": "1st set - winner",
+          "line": null,
+          "overround": 0.052486,
+          "outcomes": [
+            {
+              "id": "4",
+              "name": "Home",
+              "book_odds": 2.0,
+              "implied": 0.5,
+              "fair_prob": 0.4750656167979003,
+              "fair_odds": 2.1049723756906076
+            },
+            {
+              "id": "5",
+              "name": "Away",
+              "book_odds": 1.81,
+              "implied": 0.5524861878453039,
+              "fair_prob": 0.5249343832020998,
+              "fair_odds": 1.9049999999999996
+            }
+          ]
+        },
+        {
+          "id": "202",
+          "name": "2nd set - winner",
+          "line": null,
+          "overround": 0.052486,
+          "outcomes": [
+            {
+              "id": "4",
+              "name": "Home",
+              "book_odds": 2.0,
+              "implied": 0.5,
+              "fair_prob": 0.4750656167979003,
+              "fair_odds": 2.1049723756906076
+            },
+            {
+              "id": "5",
+              "name": "Away",
+              "book_odds": 1.81,
+              "implied": 0.5524861878453039,
+              "fair_prob": 0.5249343832020998,
+              "fair_odds": 1.9049999999999996
+            }
+          ]
+        },
+        {
+          "id": "189",
+          "name": "Total games 19.5",
+          "line": 19.5,
+          "overround": 0.053241,
+          "outcomes": [
+            {
+              "id": "12",
+              "name": "Over 19.5",
+              "book_odds": 1.35,
+              "implied": 0.7407407407407407,
+              "fair_prob": 0.7032967032967032,
+              "fair_odds": 1.4218750000000002
+            },
+            {
+              "id": "13",
+              "name": "Under 19.5",
+              "book_odds": 3.2,
+              "implied": 0.3125,
+              "fair_prob": 0.2967032967032967,
+              "fair_odds": 3.3703703703703702
+            }
+          ]
+        },
+        {
+          "id": "189",
+          "name": "Total games 20.5",
+          "line": 20.5,
+          "overround": 0.054409,
+          "outcomes": [
+            {
+              "id": "12",
+              "name": "Over 20.5",
+              "book_odds": 1.51,
+              "implied": 0.6622516556291391,
+              "fair_prob": 0.6280788177339901,
+              "fair_odds": 1.5921568627450982
+            },
+            {
+              "id": "13",
+              "name": "Under 20.5",
+              "book_odds": 2.55,
+              "implied": 0.3921568627450981,
+              "fair_prob": 0.37192118226600984,
+              "fair_odds": 2.6887417218543046
+            }
+          ]
+        },
+        {
+          "id": "189",
+          "name": "Total games 21.5",
+          "line": 21.5,
+          "overround": 0.050505,
+          "outcomes": [
+            {
+              "id": "12",
+              "name": "Over 21.5",
+              "book_odds": 1.65,
+              "implied": 0.6060606060606061,
+              "fair_prob": 0.5769230769230769,
+              "fair_odds": 1.7333333333333334
+            },
+            {
+              "id": "13",
+              "name": "Under 21.5",
+              "book_odds": 2.25,
+              "implied": 0.4444444444444444,
+              "fair_prob": 0.423076923076923,
+              "fair_odds": 2.3636363636363638
+            }
+          ]
+        },
+        {
+          "id": "189",
+          "name": "Total games 22.5",
+          "line": 22.5,
+          "overround": 0.049876,
+          "outcomes": [
+            {
+              "id": "12",
+              "name": "Over 22.5",
+              "book_odds": 1.9,
+              "implied": 0.5263157894736842,
+              "fair_prob": 0.5013123359580053,
+              "fair_odds": 1.994764397905759
+            },
+            {
+              "id": "13",
+              "name": "Under 22.5",
+              "book_odds": 1.91,
+              "implied": 0.5235602094240838,
+              "fair_prob": 0.49868766404199477,
+              "fair_odds": 2.0052631578947366
+            }
+          ]
+        },
+        {
+          "id": "189",
+          "name": "Total games 23.5",
+          "line": 23.5,
+          "overround": 0.046512,
+          "outcomes": [
+            {
+              "id": "12",
+              "name": "Over 23.5",
+              "book_odds": 2.15,
+              "implied": 0.46511627906976744,
+              "fair_prob": 0.4444444444444444,
+              "fair_odds": 2.25
+            },
+            {
+              "id": "13",
+              "name": "Under 23.5",
+              "book_odds": 1.72,
+              "implied": 0.5813953488372093,
+              "fair_prob": 0.5555555555555556,
+              "fair_odds": 1.7999999999999998
+            }
+          ]
+        },
+        {
+          "id": "189",
+          "name": "Total games 24.5",
+          "line": 24.5,
+          "overround": 0.049784,
+          "outcomes": [
+            {
+              "id": "12",
+              "name": "Over 24.5",
+              "book_odds": 2.2,
+              "implied": 0.45454545454545453,
+              "fair_prob": 0.4329896907216495,
+              "fair_odds": 2.3095238095238093
+            },
+            {
+              "id": "13",
+              "name": "Under 24.5",
+              "book_odds": 1.68,
+              "implied": 0.5952380952380952,
+              "fair_prob": 0.5670103092783505,
+              "fair_odds": 1.7636363636363637
+            }
+          ]
+        },
+        {
+          "id": "189",
+          "name": "Total games 25.5",
+          "line": 25.5,
+          "overround": 0.049578,
+          "outcomes": [
+            {
+              "id": "12",
+              "name": "Over 25.5",
+              "book_odds": 2.4,
+              "implied": 0.4166666666666667,
+              "fair_prob": 0.39698492462311563,
+              "fair_odds": 2.5189873417721516
+            },
+            {
+              "id": "13",
+              "name": "Under 25.5",
+              "book_odds": 1.58,
+              "implied": 0.6329113924050632,
+              "fair_prob": 0.6030150753768844,
+              "fair_odds": 1.6583333333333334
+            }
+          ]
+        },
+        {
+          "id": "204",
+          "name": "1st set - total games",
+          "line": 6.5,
+          "overround": 0.064173,
+          "outcomes": [
+            {
+              "id": "12",
+              "name": "Over 6.5",
+              "book_odds": 1.01,
+              "implied": 0.9900990099009901,
+              "fair_prob": 0.9303928325292903,
+              "fair_odds": 1.0748148148148147
+            },
+            {
+              "id": "13",
+              "name": "Under 6.5",
+              "book_odds": 13.5,
+              "implied": 0.07407407407407407,
+              "fair_prob": 0.06960716747070986,
+              "fair_odds": 14.366336633663366
+            }
+          ]
+        },
+        {
+          "id": "204",
+          "name": "1st set - total games",
+          "line": 7.5,
+          "overround": 0.068396,
+          "outcomes": [
+            {
+              "id": "12",
+              "name": "Over 7.5",
+              "book_odds": 1.06,
+              "implied": 0.9433962264150942,
+              "fair_prob": 0.8830022075055188,
+              "fair_odds": 1.1324999999999998
+            },
+            {
+              "id": "13",
+              "name": "Under 7.5",
+              "book_odds": 8.0,
+              "implied": 0.125,
+              "fair_prob": 0.11699779249448126,
+              "fair_odds": 8.547169811320753
+            }
+          ]
+        },
+        {
+          "id": "204",
+          "name": "1st set - total games",
+          "line": 8.5,
+          "overround": 0.069672,
+          "outcomes": [
+            {
+              "id": "12",
+              "name": "Over 8.5",
+              "book_odds": 1.22,
+              "implied": 0.819672131147541,
+              "fair_prob": 0.7662835249042146,
+              "fair_odds": 1.305
+            },
+            {
+              "id": "13",
+              "name": "Under 8.5",
+              "book_odds": 4.0,
+              "implied": 0.25,
+              "fair_prob": 0.23371647509578544,
+              "fair_odds": 4.278688524590164
+            }
+          ]
+        },
+        {
+          "id": "204",
+          "name": "1st set - total games",
+          "line": 9.5,
+          "overround": 0.0726,
+          "outcomes": [
+            {
+              "id": "12",
+              "name": "Over 9.5",
+              "book_odds": 1.71,
+              "implied": 0.5847953216374269,
+              "fair_prob": 0.5452127659574468,
+              "fair_odds": 1.8341463414634145
+            },
+            {
+              "id": "13",
+              "name": "Under 9.5",
+              "book_odds": 2.05,
+              "implied": 0.48780487804878053,
+              "fair_prob": 0.4547872340425533,
+              "fair_odds": 2.1988304093567246
+            }
+          ]
+        },
+        {
+          "id": "204",
+          "name": "1st set - total games",
+          "line": 10.5,
+          "overround": 0.06861,
+          "outcomes": [
+            {
+              "id": "12",
+              "name": "Over 10.5",
+              "book_odds": 3.05,
+              "implied": 0.3278688524590164,
+              "fair_prob": 0.3068181818181818,
+              "fair_odds": 3.259259259259259
+            },
+            {
+              "id": "13",
+              "name": "Under 10.5",
+              "book_odds": 1.35,
+              "implied": 0.7407407407407407,
+              "fair_prob": 0.6931818181818181,
+              "fair_odds": 1.4426229508196722
+            }
+          ]
+        },
+        {
+          "id": "204",
+          "name": "1st set - total games",
+          "line": 12.5,
+          "overround": 0.068627,
+          "outcomes": [
+            {
+              "id": "12",
+              "name": "Over 12.5",
+              "book_odds": 4.25,
+              "implied": 0.23529411764705882,
+              "fair_prob": 0.22018348623853212,
+              "fair_odds": 4.541666666666666
+            },
+            {
+              "id": "13",
+              "name": "Under 12.5",
+              "book_odds": 1.2,
+              "implied": 0.8333333333333334,
+              "fair_prob": 0.779816513761468,
+              "fair_odds": 1.2823529411764705
+            }
+          ]
+        }
+      ],
+      "fetched_at": "2026-10-19T15:34:53.208132+00:00",
+      "available": true,
+      "match": {
+        "score": 0.9036,
+        "method": "direct",
+        "name_direct": 0.8839,
+        "name_reverse": 0.2857
+      }
+    },
+    "sportybet_winner_odds": {
+      "p1": 2.1,
+      "p2": 1.79,
+      "market_id": "186",
+      "market": "Winner",
+      "lastOddsChangeTime": 1792423935000
+    },
+    "sportybet_market_id": "189",
+    "sportybet_outcome_id": "",
+    "sportybet_outcome_name": null,
+    "sportybet_total_market": {
+      "line": 19.5,
+      "pick": "over",
+      "book_odds": 1.35,
+      "fair_prob": 0.7032967032967032,
+      "fair_odds": 1.4218750000000002,
+      "model_prob": 0.7712,
+      "model_edge_vs_market": 0.067903,
+      "overround": 0.0532407407407407,
+      "market_id": "189"
+    },
+    "sportybet_total_games_odds": [
+      {
+        "line": 19.5,
+        "side": "over",
+        "odds": 1.35,
+        "outcome": "Over 19.5",
+        "market_id": "189",
+        "specifier": "total=19.5",
+        "lastOddsChangeTime": 1792423935000
+      },
+      {
+        "line": 19.5,
+        "side": "under",
+        "odds": 3.2,
+        "outcome": "Under 19.5",
+        "market_id": "189",
+        "specifier": "total=19.5",
+        "lastOddsChangeTime": 1792423935000
+      },
+      {
+        "line": 20.5,
+        "side": "over",
+        "odds": 1.51,
+        "outcome": "Over 20.5",
+        "market_id": "189",
+        "specifier": "total=20.5",
+        "lastOddsChangeTime": 1792423935000
+      },
+      {
+        "line": 20.5,
+        "side": "under",
+        "odds": 2.55,
+        "outcome": "Under 20.5",
+        "market_id": "189",
+        "specifier": "total=20.5",
+        "lastOddsChangeTime": 1792423935000
+      },
+      {
+        "line": 21.5,
+        "side": "over",
+        "odds": 1.65,
+        "outcome": "Over 21.5",
+        "market_id": "189",
+        "specifier": "total=21.5",
+        "lastOddsChangeTime": 1792423935000
+      },
+      {
+        "line": 21.5,
+        "side": "under",
+        "odds": 2.25,
+        "outcome": "Under 21.5",
+        "market_id": "189",
+        "specifier": "total=21.5",
+        "lastOddsChangeTime": 1792423935000
+      },
+      {
+        "line": 22.5,
+        "side": "over",
+        "odds": 1.9,
+        "outcome": "Over 22.5",
+        "market_id": "189",
+        "specifier": "total=22.5",
+        "lastOddsChangeTime": 1792423935000
+      },
+      {
+        "line": 22.5,
+        "side": "under",
+        "odds": 1.91,
+        "outcome": "Under 22.5",
+        "market_id": "189",
+        "specifier": "total=22.5",
+        "lastOddsChangeTime": 1792423935000
+      },
+      {
+        "line": 23.5,
+        "side": "over",
+        "odds": 2.15,
+        "outcome": "Over 23.5",
+        "market_id": "189",
+        "specifier": "total=23.5",
+        "lastOddsChangeTime": 1792423935000
+      },
+      {
+        "line": 23.5,
+        "side": "under",
+        "odds": 1.72,
+        "outcome": "Under 23.5",
+        "market_id": "189",
+        "specifier": "total=23.5",
+        "lastOddsChangeTime": 1792423935000
+      },
+      {
+        "line": 24.5,
+        "side": "over",
+        "odds": 2.2,
+        "outcome": "Over 24.5",
+        "market_id": "189",
+        "specifier": "total=24.5",
+        "lastOddsChangeTime": 1792423935000
+      },
+      {
+        "line": 24.5,
+        "side": "under",
+        "odds": 1.68,
+        "outcome": "Under 24.5",
+        "market_id": "189",
+        "specifier": "total=24.5",
+        "lastOddsChangeTime": 1792423935000
+      },
+      {
+        "line": 25.5,
+        "side": "over",
+        "odds": 2.4,
+        "outcome": "Over 25.5",
+        "market_id": "189",
+        "specifier": "total=25.5",
+        "lastOddsChangeTime": 1792423935000
+      },
+      {
+        "line": 25.5,
+        "side": "under",
+        "odds": 1.58,
+        "outcome": "Under 25.5",
+        "market_id": "189",
+        "specifier": "total=25.5",
+        "lastOddsChangeTime": 1792423935000
+      },
+      {
+        "line": 6.5,
+        "side": "over",
+        "odds": 1.01,
+        "outcome": "Over 6.5",
+        "market_id": "204",
+        "specifier": "setnr=1|total=6.5",
+        "lastOddsChangeTime": 1792423935000
+      },
+      {
+        "line": 6.5,
+        "side": "under",
+        "odds": 13.5,
+        "outcome": "Under 6.5",
+        "market_id": "204",
+        "specifier": "setnr=1|total=6.5",
+        "lastOddsChangeTime": 1792423935000
+      },
+      {
+        "line": 7.5,
+        "side": "over",
+        "odds": 1.06,
+        "outcome": "Over 7.5",
+        "market_id": "204",
+        "specifier": "setnr=1|total=7.5",
+        "lastOddsChangeTime": 1792423935000
+      },
+      {
+        "line": 7.5,
+        "side": "under",
+        "odds": 8.0,
+        "outcome": "Under 7.5",
+        "market_id": "204",
+        "specifier": "setnr=1|total=7.5",
+        "lastOddsChangeTime": 1792423935000
+      },
+      {
+        "line": 8.5,
+        "side": "over",
+        "odds": 1.22,
+        "outcome": "Over 8.5",
+        "market_id": "204",
+        "specifier": "setnr=1|total=8.5",
+        "lastOddsChangeTime": 1792423935000
+      },
+      {
+        "line": 8.5,
+        "side": "under",
+        "odds": 4.0,
+        "outcome": "Under 8.5",
+        "market_id": "204",
+        "specifier": "setnr=1|total=8.5",
+        "lastOddsChangeTime": 1792423935000
+      },
+      {
+        "line": 9.5,
+        "side": "over",
+        "odds": 1.71,
+        "outcome": "Over 9.5",
+        "market_id": "204",
+        "specifier": "setnr=1|total=9.5",
+        "lastOddsChangeTime": 1792423935000
+      },
+      {
+        "line": 9.5,
+        "side": "under",
+        "odds": 2.05,
+        "outcome": "Under 9.5",
+        "market_id": "204",
+        "specifier": "setnr=1|total=9.5",
+        "lastOddsChangeTime": 1792423935000
+      },
+      {
+        "line": 10.5,
+        "side": "over",
+        "odds": 3.05,
+        "outcome": "Over 10.5",
+        "market_id": "204",
+        "specifier": "setnr=1|total=10.5",
+        "lastOddsChangeTime": 1792423935000
+      },
+      {
+        "line": 10.5,
+        "side": "under",
+        "odds": 1.35,
+        "outcome": "Under 10.5",
+        "market_id": "204",
+        "specifier": "setnr=1|total=10.5",
+        "lastOddsChangeTime": 1792423935000
+      },
+      {
+        "line": 12.5,
+        "side": "over",
+        "odds": 4.25,
+        "outcome": "Over 12.5",
+        "market_id": "204",
+        "specifier": "setnr=1|total=12.5",
+        "lastOddsChangeTime": 1792423935000
+      },
+      {
+        "line": 12.5,
+        "side": "under",
+        "odds": 1.2,
+        "outcome": "Under 12.5",
+        "market_id": "204",
+        "specifier": "setnr=1|total=12.5",
+        "lastOddsChangeTime": 1792423935000
+      }
+    ],
+    "sportybet_specifier": "total=19.5",
+    "market_insights": {
+      "provider": "SportyBet NG",
+      "available": true,
+      "matched_event_id": "sr:match:75722438",
+      "match_score": 0.9036,
+      "winner_model_edge_vs_market": 0.109354,
+      "winner_model_pick": "p2",
+      "winner_market_fair_prob": 0.539846,
+      "total": {
+        "line": 25.5,
+        "pick": "under",
+        "model_probability": 0.6118,
+        "market_probability": 0.603015,
+        "model_edge_vs_market": 0.008785,
+        "expected_value": -0.033356,
+        "book_odds": 1.58,
+        "fair_odds": 1.6345,
+        "value_signal": false
+      },
+      "snapshot_at": "2026-10-19T15:35:21.062558+00:00",
+      "source": "SportyBet NG",
+      "winner_model_probability": 0.6492,
+      "winner_market_probability": 0.539846,
+      "winner_expected_value": 0.162068,
+      "winner_book_odds": 1.79,
+      "winner_fair_odds": 1.5404,
+      "winner_value_signal": true
+    },
+    "raw_confidence": 0.7712,
+    "calibrated_confidence": 0.7871,
+    "calibration": {
+      "market": "tennis:total_games:ATP:18.5",
+      "method": "tour_line_recency_empirical_bayes",
+      "tour": "ATP",
+      "line": 18.5,
+      "sample_size": 51,
+      "effective_sample": 34.02,
+      "empirical": 0.8011,
+      "raw": 0.7712
+    },
+    "model_version": "2026-09-17-walkforward-calibrated",
+    "calculated_at": "2026-10-19T15:35:14.845690+00:00",
+    "sportybet_market_snapshot": {
+      "source": "SportyBet NG web API via Cloudflare proxy",
+      "fetched_at": "2026-10-19T15:35:21.062558+00:00",
+      "match_type": "name_time",
+      "sportybet_event_id": "sr:match:75722438",
+      "league": "ATP Lyon, France Men Singles",
+      "sportybet_start_time": 1792501800000,
+      "winner": {
+        "p1": 2.1,
+        "p2": 1.79,
+        "market_id": "186",
+        "market": "Winner",
+        "lastOddsChangeTime": 1792423935000
+      },
+      "total_games": [
+        {
+          "line": 19.5,
+          "side": "over",
+          "odds": 1.35,
+          "outcome": "Over 19.5",
+          "market_id": "189",
+          "specifier": "total=19.5",
+          "lastOddsChangeTime": 1792423935000
+        },
+        {
+          "line": 19.5,
+          "side": "under",
+          "odds": 3.2,
+          "outcome": "Under 19.5",
+          "market_id": "189",
+          "specifier": "total=19.5",
+          "lastOddsChangeTime": 1792423935000
+        },
+        {
+          "line": 20.5,
+          "side": "over",
+          "odds": 1.51,
+          "outcome": "Over 20.5",
+          "market_id": "189",
+          "specifier": "total=20.5",
+          "lastOddsChangeTime": 1792423935000
+        },
+        {
+          "line": 20.5,
+          "side": "under",
+          "odds": 2.55,
+          "outcome": "Under 20.5",
+          "market_id": "189",
+          "specifier": "total=20.5",
+          "lastOddsChangeTime": 1792423935000
+        },
+        {
+          "line": 21.5,
+          "side": "over",
+          "odds": 1.65,
+          "outcome": "Over 21.5",
+          "market_id": "189",
+          "specifier": "total=21.5",
+          "lastOddsChangeTime": 1792423935000
+        },
+        {
+          "line": 21.5,
+          "side": "under",
+          "odds": 2.25,
+          "outcome": "Under 21.5",
+          "market_id": "189",
+          "specifier": "total=21.5",
+          "lastOddsChangeTime": 1792423935000
+        },
+        {
+          "line": 22.5,
+          "side": "over",
+          "odds": 1.9,
+          "outcome": "Over 22.5",
+          "market_id": "189",
+          "specifier": "total=22.5",
+          "lastOddsChangeTime": 1792423935000
+        },
+        {
+          "line": 22.5,
+          "side": "under",
+          "odds": 1.91,
+          "outcome": "Under 22.5",
+          "market_id": "189",
+          "specifier": "total=22.5",
+          "lastOddsChangeTime": 1792423935000
+        },
+        {
+          "line": 23.5,
+          "side": "over",
+          "odds": 2.15,
+          "outcome": "Over 23.5",
+          "market_id": "189",
+          "specifier": "total=23.5",
+          "lastOddsChangeTime": 1792423935000
+        },
+        {
+          "line": 23.5,
+          "side": "under",
+          "odds": 1.72,
+          "outcome": "Under 23.5",
+          "market_id": "189",
+          "specifier": "total=23.5",
+          "lastOddsChangeTime": 1792423935000
+        },
+        {
+          "line": 24.5,
+          "side": "over",
+          "odds": 2.2,
+          "outcome": "Over 24.5",
+          "market_id": "189",
+          "specifier": "total=24.5",
+          "lastOddsChangeTime": 1792423935000
+        },
+        {
+          "line": 24.5,
+          "side": "under",
+          "odds": 1.68,
+          "outcome": "Under 24.5",
+          "market_id": "189",
+          "specifier": "total=24.5",
+          "lastOddsChangeTime": 1792423935000
+        },
+        {
+          "line": 25.5,
+          "side": "over",
+          "odds": 2.4,
+          "outcome": "Over 25.5",
+          "market_id": "189",
+          "specifier": "total=25.5",
+          "lastOddsChangeTime": 1792423935000
+        },
+        {
+          "line": 25.5,
+          "side": "under",
+          "odds": 1.58,
+          "outcome": "Under 25.5",
+          "market_id": "189",
+          "specifier": "total=25.5",
+          "lastOddsChangeTime": 1792423935000
+        },
+        {
+          "line": 6.5,
+          "side": "over",
+          "odds": 1.01,
+          "outcome": "Over 6.5",
+          "market_id": "204",
+          "specifier": "setnr=1|total=6.5",
+          "lastOddsChangeTime": 1792423935000
+        },
+        {
+          "line": 6.5,
+          "side": "under",
+          "odds": 13.5,
+          "outcome": "Under 6.5",
+          "market_id": "204",
+          "specifier": "setnr=1|total=6.5",
+          "lastOddsChangeTime": 1792423935000
+        },
+        {
+          "line": 7.5,
+          "side": "over",
+          "odds": 1.06,
+          "outcome": "Over 7.5",
+          "market_id": "204",
+          "specifier": "setnr=1|total=7.5",
+          "lastOddsChangeTime": 1792423935000
+        },
+        {
+          "line": 7.5,
+          "side": "under",
+          "odds": 8.0,
+          "outcome": "Under 7.5",
+          "market_id": "204",
+          "specifier": "setnr=1|total=7.5",
+          "lastOddsChangeTime": 1792423935000
+        },
+        {
+          "line": 8.5,
+          "side": "over",
+          "odds": 1.22,
+          "outcome": "Over 8.5",
+          "market_id": "204",
+          "specifier": "setnr=1|total=8.5",
+          "lastOddsChangeTime": 1792423935000
+        },
+        {
+          "line": 8.5,
+          "side": "under",
+          "odds": 4.0,
+          "outcome": "Under 8.5",
+          "market_id": "204",
+          "specifier": "setnr=1|total=8.5",
+          "lastOddsChangeTime": 1792423935000
+        },
+        {
+          "line": 9.5,
+          "side": "over",
+          "odds": 1.71,
+          "outcome": "Over 9.5",
+          "market_id": "204",
+          "specifier": "setnr=1|total=9.5",
+          "lastOddsChangeTime": 1792423935000
+        },
+        {
+          "line": 9.5,
+          "side": "under",
+          "odds": 2.05,
+          "outcome": "Under 9.5",
+          "market_id": "204",
+          "specifier": "setnr=1|total=9.5",
+          "lastOddsChangeTime": 1792423935000
+        },
+        {
+          "line": 10.5,
+          "side": "over",
+          "odds": 3.05,
+          "outcome": "Over 10.5",
+          "market_id": "204",
+          "specifier": "setnr=1|total=10.5",
+          "lastOddsChangeTime": 1792423935000
+        },
+        {
+          "line": 10.5,
+          "side": "under",
+          "odds": 1.35,
+          "outcome": "Under 10.5",
+          "market_id": "204",
+          "specifier": "setnr=1|total=10.5",
+          "lastOddsChangeTime": 1792423935000
+        },
+        {
+          "line": 12.5,
+          "side": "over",
+          "odds": 4.25,
+          "outcome": "Over 12.5",
+          "market_id": "204",
+          "specifier": "setnr=1|total=12.5",
+          "lastOddsChangeTime": 1792423935000
+        },
+        {
+          "line": 12.5,
+          "side": "under",
+          "odds": 1.2,
+          "outcome": "Under 12.5",
+          "market_id": "204",
+          "specifier": "setnr=1|total=12.5",
+          "lastOddsChangeTime": 1792423935000
+        }
+      ]
+    },
+    "market_source": "SportyBet NG",
+    "odds_timestamp": "2026-10-19T15:35:21.062558+00:00",
+    "architecture": "independent statistical + market benchmark + calibration + value",
+    "decision": "PAPER ONLY",
+    "behavior_context": {
+      "version": "behavior-profiles-v2",
+      "matched": false,
+      "teams": {},
+      "source": "behavior_profiles.json",
+      "use": "context_only_unvalidated",
+      "probability_adjustment_applied": false
+    },
+    "individual_behavior_context": {
+      "p1": {
+        "sport": "tennis",
+        "name": "Benjamin Bonzi",
+        "observations": 0,
+        "provider_identity": false,
+        "note": "Awaiting provider athlete identity/statistics feed"
+      },
+      "p2": {
+        "sport": "tennis",
+        "name": "Cameron Norrie",
+        "observations": 0,
+        "provider_identity": false,
+        "note": "Awaiting provider athlete identity/statistics feed"
+      }
+    },
+    "live_eligible": false,
+    "testing_mode": "paper",
+    "candidate_status": "BETTING_QUALIFIED_PAPER",
+    "qualification_basis": {
+      "confidence_ok": true,
+      "value_ok": true,
+      "value_source": "current_sportybet_winner_edge_ev",
+      "evidence_tier": "GLOBAL_MODEL_ONLY",
+      "tournament_gate_non_blocking": true,
+      "selection_gate_non_blocking": true
+    },
+    "selection_gate": {
+      "status": "passed",
+      "sport": "tennis",
+      "tournament": "Grand Prix Auvergne-Rhône-Alpes",
+      "selection": "p2",
+      "confidence_threshold": 0.65,
+      "threshold_source": "walkforward_precision_gate",
+      "mode": "PAPER_ONLY",
+      "evidence_tier": "GLOBAL_MODEL_ONLY",
+      "tournament_gate_non_blocking": true,
+      "selection_gate_non_blocking": true,
+      "reasons": []
+    }
+  },
+  {
+    "sport": "tennis",
+    "league": "ATP",
     "event_id": "185001",
     "start_time": "2026-10-20T14:30Z",
     "player_1": "Rei Sakamoto",
@@ -1333,7 +2701,7 @@
     "rankings": {
       "p1": 124,
       "p2": 25,
-      "gap": 99.0
+      "gap": -99
     },
     "form": {
       "p1": 0.7,
@@ -1342,11 +2710,11 @@
       "p2_last10": "WWWLWWLWWL"
     },
     "probabilities": {
-      "p1": 0.2479,
-      "p2": 0.7521
+      "p1": 0.2973,
+      "p2": 0.7027
     },
     "pick": "p2",
-    "confidence": 0.7521,
+    "confidence": 0.7027,
     "analytics": {
       "set_win_prob": {
         "p1": 0.3247,
@@ -1360,12 +2728,12 @@
       "expected_sets": 2.44,
       "total_games": {
         "line": 26.5,
-        "over": 0.3384,
-        "under": 0.6616,
+        "over": 0.2845,
+        "under": 0.7155,
         "pick": "under",
-        "base_model_over": 0.28454,
-        "base_model_under": 0.71546,
-        "source": "V5.1 matchup-conditioned empirical total-games distribution",
+        "base_model_over": 0.2845,
+        "base_model_under": 0.7155,
+        "source": "continuous tennis model + walk-forward O/U calibration v4",
         "model_version": "5.2",
         "v51": {
           "distribution": {
@@ -1437,21 +2805,45 @@
           26.5
         ],
         "market_alignment_updated_at": "2026-10-19T15:35:21.062558+00:00",
-        "confidence_floor_met": true
+        "confidence_floor_met": true,
+        "calibration_status": "PAPER_RESEARCH",
+        "calibration_features": {
+          "line": 26.5,
+          "three_sets_bin": "low",
+          "confidence_bin": "high",
+          "tour": "ATP",
+          "empirical_over_rate": null,
+          "calibration_source": "upstream_only",
+          "empirical_weight": 0.0,
+          "prior_model_over": 0.2845,
+          "global_over_rate": 0.443
+        }
       },
       "games_handicap": {
         "estimated_margin_p1": -0.21,
         "pick": "p2"
-      }
+      },
+      "elo": {
+        "p1": 1499.2,
+        "p2": 1500.0,
+        "p1_win_prob": 0.4988,
+        "weight": 0.5
+      },
+      "walkforward_raw_p1": 0.2973,
+      "walkforward_calibrated_p1": 0.2973,
+      "ranking_probability": 0.1187
     },
-    "model": "ATP/WTA ranking + recent form",
+    "model": "ESPN + ranking/form base + walk-forward player Elo + current ATP/WTA rank + walk-forward probability calibration",
     "signal_quality": {
       "components": 4,
       "max_components": 5,
       "ranking_gap": 99.0,
       "form_gap": 0.0,
       "market_available": false,
-      "secondary_analytics_calibrated": true
+      "secondary_analytics_calibrated": true,
+      "elo_available": true,
+      "elo_gap": -0.8,
+      "ranking_available": true
     },
     "prediction_status": "qualified_candidate",
     "projection_tier": "deep_model",
@@ -2387,7 +3779,7 @@
       "empirical": 0.8011,
       "raw": 0.7945
     },
-    "model_version": "5.0 historical-calibrated",
+    "model_version": "2026-09-17-walkforward-calibrated",
     "calculated_at": "2026-10-19T15:35:14.845690+00:00",
     "sportybet_market_snapshot": {
       "source": "SportyBet NG web API via Cloudflare proxy",
@@ -2725,7 +4117,7 @@
     "rankings": {
       "p1": 73,
       "p2": 23,
-      "gap": 50.0
+      "gap": -50
     },
     "form": {
       "p1": 0.6,
@@ -2734,11 +4126,11 @@
       "p2_last10": "LWLWWWLWLL"
     },
     "probabilities": {
-      "p1": 0.3089,
-      "p2": 0.6911
+      "p1": 0.3487,
+      "p2": 0.6513
     },
     "pick": "p2",
-    "confidence": 0.6911,
+    "confidence": 0.6513,
     "analytics": {
       "set_win_prob": {
         "p1": 0.3697,
@@ -2752,12 +4144,12 @@
       "expected_sets": 2.47,
       "total_games": {
         "line": 20.5,
-        "over": 0.621,
-        "under": 0.379,
+        "over": 0.6613,
+        "under": 0.3387,
         "pick": "over",
-        "base_model_over": 0.661348,
-        "base_model_under": 0.338652,
-        "source": "V5.1 matchup-conditioned empirical total-games distribution",
+        "base_model_over": 0.6613,
+        "base_model_under": 0.3387,
+        "source": "continuous tennis model + walk-forward O/U calibration v4",
         "model_version": "5.2",
         "v51": {
           "distribution": {
@@ -2826,21 +4218,45 @@
           24.5
         ],
         "market_alignment_updated_at": "2026-10-19T15:35:21.062558+00:00",
-        "confidence_floor_met": true
+        "confidence_floor_met": true,
+        "calibration_status": "PAPER_RESEARCH",
+        "calibration_features": {
+          "line": 20.5,
+          "three_sets_bin": "mid",
+          "confidence_bin": "high",
+          "tour": "ATP",
+          "empirical_over_rate": null,
+          "calibration_source": "upstream_only",
+          "empirical_weight": 0.0,
+          "prior_model_over": 0.6613,
+          "global_over_rate": 0.443
+        }
       },
       "games_handicap": {
         "estimated_margin_p1": -0.16,
         "pick": "p2"
-      }
+      },
+      "elo": {
+        "p1": 1512.0,
+        "p2": 1500.0,
+        "p1_win_prob": 0.5173,
+        "weight": 0.5
+      },
+      "walkforward_raw_p1": 0.3487,
+      "walkforward_calibrated_p1": 0.3487,
+      "ranking_probability": 0.1955
     },
-    "model": "ATP/WTA ranking + recent form",
+    "model": "ESPN + ranking/form base + walk-forward player Elo + current ATP/WTA rank + walk-forward probability calibration",
     "signal_quality": {
       "components": 4,
       "max_components": 5,
       "ranking_gap": 50.0,
       "form_gap": 0.1,
       "market_available": false,
-      "secondary_analytics_calibrated": true
+      "secondary_analytics_calibrated": true,
+      "elo_available": true,
+      "elo_gap": 12.0,
+      "ranking_available": true
     },
     "prediction_status": "qualified_candidate",
     "projection_tier": "deep_model",
@@ -3617,7 +5033,7 @@
       "empirical": 0.8011,
       "raw": 0.7636
     },
-    "model_version": "5.0 historical-calibrated",
+    "model_version": "2026-09-17-walkforward-calibrated",
     "calculated_at": "2026-10-19T15:35:14.845690+00:00",
     "sportybet_market_snapshot": {
       "source": "SportyBet NG web API via Cloudflare proxy",
@@ -3901,7 +5317,7 @@
     "rankings": {
       "p1": 107,
       "p2": 21,
-      "gap": 86.0
+      "gap": -86
     },
     "form": {
       "p1": 0.4,
@@ -3910,11 +5326,11 @@
       "p2_last10": "LWWWLWWLWL"
     },
     "probabilities": {
-      "p1": 0.2403,
-      "p2": 0.7597
+      "p1": 0.3087,
+      "p2": 0.6913
     },
     "pick": "p2",
-    "confidence": 0.7597,
+    "confidence": 0.6913,
     "analytics": {
       "set_win_prob": {
         "p1": 0.319,
@@ -3928,12 +5344,12 @@
       "expected_sets": 2.43,
       "total_games": {
         "line": 25.5,
-        "over": 0.4047,
-        "under": 0.5953,
+        "over": 0.3729,
+        "under": 0.6271,
         "pick": "under",
-        "base_model_over": 0.372909,
-        "base_model_under": 0.627091,
-        "source": "V5.1 matchup-conditioned empirical total-games distribution",
+        "base_model_over": 0.3729,
+        "base_model_under": 0.6271,
+        "source": "continuous tennis model + walk-forward O/U calibration v4",
         "model_version": "5.2",
         "v51": {
           "distribution": {
@@ -4003,21 +5419,45 @@
           25.5
         ],
         "market_alignment_updated_at": "2026-10-19T15:35:21.062558+00:00",
-        "confidence_floor_met": true
+        "confidence_floor_met": true,
+        "calibration_status": "PAPER_RESEARCH",
+        "calibration_features": {
+          "line": 25.5,
+          "three_sets_bin": "low",
+          "confidence_bin": "high",
+          "tour": "ATP",
+          "empirical_over_rate": null,
+          "calibration_source": "upstream_only",
+          "empirical_weight": 0.0,
+          "prior_model_over": 0.3729,
+          "global_over_rate": 0.443
+        }
       },
       "games_handicap": {
         "estimated_margin_p1": -0.22,
         "pick": "p2"
-      }
+      },
+      "elo": {
+        "p1": 1534.8,
+        "p2": 1500.0,
+        "p1_win_prob": 0.5499,
+        "weight": 0.5
+      },
+      "walkforward_raw_p1": 0.3087,
+      "walkforward_calibrated_p1": 0.3087,
+      "ranking_probability": 0.1179
     },
-    "model": "ATP/WTA ranking + recent form",
+    "model": "ESPN + ranking/form base + walk-forward player Elo + current ATP/WTA rank + walk-forward probability calibration",
     "signal_quality": {
       "components": 4,
       "max_components": 5,
       "ranking_gap": 86.0,
       "form_gap": 0.2,
       "market_available": false,
-      "secondary_analytics_calibrated": true
+      "secondary_analytics_calibrated": true,
+      "elo_available": true,
+      "elo_gap": 34.8,
+      "ranking_available": true
     },
     "prediction_status": "qualified_candidate",
     "projection_tier": "deep_model",
@@ -4066,7 +5506,7 @@
       "empirical": 0.8011,
       "raw": 0.693
     },
-    "model_version": "5.0 historical-calibrated",
+    "model_version": "2026-09-17-walkforward-calibrated",
     "calculated_at": "2026-10-19T15:35:14.845690+00:00",
     "sportybet_market_snapshot": {
       "source": "SportyBet NG web API via Cloudflare proxy",
