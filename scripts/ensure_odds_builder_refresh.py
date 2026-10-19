@@ -1,21 +1,24 @@
 #!/usr/bin/env python3
-"""Dispatch Odds Builder from board runs when its regular cadence was missed.
+"""Dispatch Odds Builder when its published artifact is stale.
 
-GitHub can suppress downstream workflow triggers for workflows originally
-started with GITHUB_TOKEN. The board calls this helper after publishing, making
-the intended workflow_dispatch explicit while respecting the Builder's cadence.
+The artifact timestamp is the source of truth: a recent workflow run does not
+prove that a new data/odds_builder.json was published. Active runs and a short
+cooldown still prevent duplicate dispatches during normal workflow delivery.
 """
 from __future__ import annotations
 
+import base64
 import json
 import os
 import subprocess
 import sys
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 BUILDER_WORKFLOW = "odds_builder.yml"
-BUILDER_RUN_MAX_AGE_MINUTES = 14
+BUILDER_ARTIFACT_MAX_AGE_MINUTES = 18
+RECENT_RUN_COOLDOWN_MINUTES = 5
 ACTIVE_STATUSES = {"queued", "in_progress", "waiting", "pending", "requested"}
 
 
@@ -31,9 +34,30 @@ def parse_timestamp(value: Any) -> datetime | None:
     return parsed.astimezone(timezone.utc)
 
 
-def evaluate_runs(runs: list[dict[str, Any]], now: datetime | None = None) -> dict[str, Any]:
-    """Return whether to dispatch, never duplicating an active Builder run."""
+def evaluate_runs(
+    runs: list[dict[str, Any]],
+    now: datetime | None = None,
+    artifact_generated_at: Any = None,
+) -> dict[str, Any]:
+    """Use published artifact age first, without racing active/recent Builder runs."""
     now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    artifact_stamp = parse_timestamp(artifact_generated_at)
+    artifact_age = (
+        max(0.0, (now - artifact_stamp).total_seconds() / 60.0)
+        if artifact_stamp is not None
+        else None
+    )
+    artifact_fields = {
+        "artifact_age_minutes": round(artifact_age, 2) if artifact_age is not None else None,
+        "artifact_max_age_minutes": BUILDER_ARTIFACT_MAX_AGE_MINUTES,
+    }
+
+    if artifact_age is not None and artifact_age < BUILDER_ARTIFACT_MAX_AGE_MINUTES:
+        return {
+            "dispatch": False,
+            "reason": "builder_artifact_fresh",
+            **artifact_fields,
+        }
 
     active = [
         run for run in runs
@@ -50,6 +74,7 @@ def evaluate_runs(runs: list[dict[str, Any]], now: datetime | None = None) -> di
             "reason": "active_builder_run",
             "active_run_id": run.get("databaseId"),
             "active_status": run.get("status"),
+            **artifact_fields,
         }
 
     parsed_runs = [
@@ -57,24 +82,71 @@ def evaluate_runs(runs: list[dict[str, Any]], now: datetime | None = None) -> di
         for run in runs
     ]
     parsed_runs = [(stamp, run) for stamp, run in parsed_runs if stamp is not None]
-    if not parsed_runs:
-        return {
-            "dispatch": True,
-            "reason": "no_valid_builder_run_history",
-            "age_minutes": None,
-        }
+    if parsed_runs:
+        last_started_at, last_run = max(parsed_runs, key=lambda item: item[0])
+        run_age = max(0.0, (now - last_started_at).total_seconds() / 60.0)
+        if run_age < RECENT_RUN_COOLDOWN_MINUTES:
+            return {
+                "dispatch": False,
+                "reason": "recent_builder_run_cooldown",
+                "last_run_id": last_run.get("databaseId"),
+                "last_run_status": last_run.get("status"),
+                "run_age_minutes": round(run_age, 2),
+                **artifact_fields,
+            }
+    else:
+        last_run = None
+        run_age = None
 
-    last_started_at, last_run = max(parsed_runs, key=lambda item: item[0])
-    age_minutes = max(0.0, (now - last_started_at).total_seconds() / 60.0)
-    dispatch = age_minutes >= BUILDER_RUN_MAX_AGE_MINUTES
-    return {
-        "dispatch": dispatch,
-        "reason": "builder_run_stale" if dispatch else "builder_run_recent",
-        "age_minutes": round(age_minutes, 2),
-        "last_run_id": last_run.get("databaseId"),
-        "last_run_status": last_run.get("status"),
-        "max_age_minutes": BUILDER_RUN_MAX_AGE_MINUTES,
+    reason = "builder_artifact_stale" if artifact_stamp is not None else "builder_artifact_missing_or_invalid"
+    result: dict[str, Any] = {
+        "dispatch": True,
+        "reason": reason,
+        **artifact_fields,
     }
+    if last_run is not None:
+        result.update({
+            "last_run_id": last_run.get("databaseId"),
+            "last_run_status": last_run.get("status"),
+            "run_age_minutes": round(run_age, 2) if run_age is not None else None,
+        })
+    else:
+        result["run_history"] = "no_valid_builder_run_history"
+    return result
+
+
+def latest_artifact_generated_at(repo: str) -> str | None:
+    """Read the committed main-branch artifact, falling back to the checked-out copy."""
+    api = subprocess.run(
+        [
+            "gh", "api",
+            f"repos/{repo}/contents/data/odds_builder.json?ref=main",
+            "--jq", ".content",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if api.returncode == 0:
+        try:
+            decoded = base64.b64decode(api.stdout.strip()).decode("utf-8")
+            artifact = json.loads(decoded)
+            value = artifact.get("generated_at") if isinstance(artifact, dict) else None
+            if value:
+                return str(value)
+        except (ValueError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            print(f"::warning::Could not parse the latest committed Odds Builder artifact: {exc}", file=sys.stderr)
+    else:
+        detail = api.stderr.strip() or "GitHub contents API read failed"
+        print(f"::warning::Could not fetch the latest committed Odds Builder artifact: {detail}", file=sys.stderr)
+
+    try:
+        artifact = json.loads(Path("data/odds_builder.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"::warning::No readable local Odds Builder artifact fallback: {exc}", file=sys.stderr)
+        return None
+    value = artifact.get("generated_at") if isinstance(artifact, dict) else None
+    return str(value) if value else None
 
 
 def main() -> int:
@@ -107,10 +179,11 @@ def main() -> int:
         print("::error::Odds Builder run history was not a JSON list.", file=sys.stderr)
         return 1
 
-    decision = evaluate_runs(runs)
+    artifact_generated_at = latest_artifact_generated_at(repo)
+    decision = evaluate_runs(runs, artifact_generated_at=artifact_generated_at)
     print(json.dumps({"workflow": BUILDER_WORKFLOW, **decision}, sort_keys=True))
     if not decision["dispatch"]:
-        print("Odds Builder is active or ran within the 14-minute freshness guard; no additional run queued.")
+        print("Odds Builder artifact is fresh, a run is active, or the short recent-run cooldown is in effect.")
         return 0
 
     dispatch = subprocess.run(
@@ -122,7 +195,7 @@ def main() -> int:
     if dispatch.returncode != 0:
         print("::error::Odds Builder dispatch failed: " + (dispatch.stderr.strip() or "gh workflow run failed"), file=sys.stderr)
         return 1
-    print("Dispatched Odds Builder because no active run exists and its last run is stale.")
+    print("Dispatched Odds Builder because its published artifact is stale or missing and no run is active.")
     return 0
 
 
