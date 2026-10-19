@@ -1,50 +1,50 @@
 {
-  "generated_at": "2026-10-19T13:04:31.551771+00:00",
+  "generated_at": "2026-10-19T13:09:47.872033+00:00",
   "status": "FAIL",
   "critical_issues": 2,
-  "warning_issues": 0,
+  "warning_issues": 1,
   "info_issues": 0,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
       "status": "STALE",
-      "age_hours": 4.01,
+      "age_hours": 4.1,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 1.75,
+      "age_hours": 0.1,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 1.8,
+      "age_hours": 1.89,
       "threshold_hours": 4
     },
     {
       "engine": "unified_upcoming",
       "status": "PASS",
-      "age_hours": 0.0,
+      "age_hours": 0.09,
       "threshold_hours": 2
     },
     {
       "engine": "prediction_desk_health",
       "status": "PASS",
-      "age_hours": 0.01,
+      "age_hours": 0.1,
       "threshold_hours": 2
     },
     {
       "engine": "tennis_forward_discovery",
-      "status": "PASS",
-      "age_hours": 7.93,
+      "status": "STALE",
+      "age_hours": 8.02,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 1.96,
+      "age_hours": 2.05,
       "threshold_hours": 0.5,
       "heartbeat_source": "unified_live_refresh"
     },
@@ -54,7 +54,7 @@
       "lanes": {
         "darts_x": {
           "status": "RETIRED",
-          "artifact_at": "2026-10-19T10:34:36.766649+00:00"
+          "artifact_at": "2026-10-19T13:09:28.261406+00:00"
         },
         "table_tennis_x": {
           "status": "RETIRED",
@@ -71,12 +71,17 @@
     {
       "code": "STALE_CORE_PREDICTION_PIPELINE",
       "severity": "critical",
-      "detail": "updated_at age 4.01h exceeds 4h"
+      "detail": "updated_at age 4.10h exceeds 4h"
+    },
+    {
+      "code": "TENNIS_FORWARD_DISCOVERY_STALE",
+      "severity": "warning",
+      "detail": "tennis_forward_status age 8.02h exceeds the 8h threshold; the discovery result is too old to confirm current fixture coverage"
     },
     {
       "code": "PIPELINE_STALE",
       "severity": "critical",
-      "detail": "pipeline_status age 4.01h exceeds 4h"
+      "detail": "pipeline_status age 4.10h exceeds 4h"
     }
   ],
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
