@@ -397,7 +397,8 @@ async function handlePost(context) {
   try {
     const body = await context.request.json();
     const batchId = String(body?.batch_id || '').trim();
-    if (!/^BATCH-[0-9]{2}$/.test(batchId)) {
+    // Desk research batches are first-class Builder batches too; preserve the existing standard ID contract.
+    if (!/^(?:DESK-)?BATCH-[0-9]{2}$/.test(batchId)) {
       return json({ ok: false, error: 'INVALID_BATCH_ID' }, 400);
     }
 
