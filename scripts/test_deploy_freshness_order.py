@@ -17,6 +17,7 @@ SCHEDULE_MONITOR_WORKFLOW = (ROOT / ".github/workflows/qualified-best-health-wat
 LOGO_WORKFLOW = (ROOT / ".github/workflows/sync-club-logos.yml").read_text(encoding="utf-8")
 WATCHDOG_WORKFLOW = (ROOT / ".github/workflows/automation_watchdog.yml").read_text(encoding="utf-8")
 PROMOTION_WORKFLOW = (ROOT / ".github/workflows/builder-production-promotion.yml").read_text(encoding="utf-8")
+BUILDER_WORKFLOW = (ROOT / ".github/workflows/odds_builder.yml").read_text(encoding="utf-8")
 
 
 def workflow_push_paths(source: str) -> set[str]:
@@ -292,6 +293,25 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             PROMOTION_WORKFLOW.index("gh workflow run unified-upcoming.yml --ref main"),
             PROMOTION_WORKFLOW.index("gh workflow run cloudflare-pages.yml --ref main"),
             "Pages may only be dispatched after the board refresh has been awaited and checked",
+        )
+
+    def test_builder_explicitly_dispatches_promotion_after_artifact_publish(self):
+        publish_step = BUILDER_WORKFLOW.find("      - name: Commit generated accumulator artifact")
+        dispatch_step = BUILDER_WORKFLOW.find("      - name: Dispatch production promotion after Builder artifact publish")
+        self.assertGreaterEqual(publish_step, 0, "Builder must commit its generated artifact before promotion")
+        self.assertGreater(dispatch_step, publish_step, "promotion must happen after the artifact publication step")
+        self.assertIn("GH_TOKEN: ${{ github.token }}", BUILDER_WORKFLOW[dispatch_step:])
+        self.assertIn("gh workflow run builder-production-promotion.yml --ref main", BUILDER_WORKFLOW[dispatch_step:])
+        self.assertNotIn(
+            '  workflow_run:\\n    workflows: ["Match Signal Odds Builder"]',
+            PROMOTION_WORKFLOW,
+            "use explicit workflow_dispatch from the completed Builder instead of a possibly suppressed workflow_run event",
+        )
+        self.assertIn("  workflow_dispatch:", PROMOTION_WORKFLOW)
+        self.assertIn(
+            "concurrency:\\n  group: builder-production-promotion\\n  cancel-in-progress: false",
+            PROMOTION_WORKFLOW,
+            "serialize promotion runs; each must finish board refresh and deploy before the next begins",
         )
 
     def test_feeder_workflows_cannot_bypass_the_board_refresh(self):
