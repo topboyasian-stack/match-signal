@@ -751,7 +751,7 @@
     }
     return true;
   }
-  function isActiveVirtualBatch(batch, now){
+  function isActiveVirtualBatchAt(batch, now){
     if(!batch||typeof batch!=="object")return false;
     var products=Array.isArray(batch.products)?batch.products:[];
     if(products.some(function(p){var k=String(p||"").toLowerCase();return k==="vfootball"||k==="zoom";}))return false;
@@ -762,12 +762,15 @@
       return isActiveVirtualLeg(leg,lane)&&isCurrentBuilderLeg(leg,checkedAt);
     });
   }
+  function isActiveVirtualBatch(batch){
+    return isActiveVirtualBatchAt(batch,Date.now());
+  }
 
   function filterCurrentBuilderSnapshot(data, now) {
     var checkedAt=typeof now==="number"&&Number.isFinite(now)?now:Date.now();
     var freshness=builderArtifactFreshness(data,checkedAt);
     var batches=freshness.fresh&&Array.isArray(data&&data.batches)
-      ? data.batches.filter(function(batch){return isActiveVirtualBatch(batch,checkedAt);})
+      ? data.batches.filter(function(batch){return isActiveVirtualBatchAt(batch,checkedAt);})
       : [];
     var qualifiedLegs=freshness.fresh&&Array.isArray(data&&data.qualified_legs)
       ? data.qualified_legs.filter(function(leg){return isActiveVirtualLeg(leg)&&isCurrentBuilderLeg(leg,checkedAt);})
@@ -1030,7 +1033,7 @@
     load();window.setInterval(load,60000);window.setInterval(function(){var all=[];(window.__matchSignalOddsBuilderBatches||[]).forEach(function(b){all=all.concat(Array.isArray(b.legs)?b.legs:[]);});refreshVirtualLiveStatuses(all).then(updateLiveTrackers);},30000);window.setInterval(updateTimers,1000);
   }
   if(typeof window!=='undefined'&&window.__MATCH_SIGNAL_ODDS_BUILDER_TEST_MODE__){
-    window.__MATCH_SIGNAL_ODDS_BUILDER_TEST_HOOKS__={builderArtifactFreshness:builderArtifactFreshness,isCurrentBuilderLeg:isCurrentBuilderLeg,isActiveVirtualBatch:isActiveVirtualBatch,filterCurrentBuilderSnapshot:filterCurrentBuilderSnapshot,activeVirtualProbabilityFloor:activeVirtualProbabilityFloor};
+    window.__MATCH_SIGNAL_ODDS_BUILDER_TEST_HOOKS__={builderArtifactFreshness:builderArtifactFreshness,isCurrentBuilderLeg:isCurrentBuilderLeg,isActiveVirtualBatch:isActiveVirtualBatch,isActiveVirtualBatchAt:isActiveVirtualBatchAt,filterCurrentBuilderSnapshot:filterCurrentBuilderSnapshot,activeVirtualProbabilityFloor:activeVirtualProbabilityFloor};
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 })();
