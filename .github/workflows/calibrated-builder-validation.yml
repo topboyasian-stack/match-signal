@@ -5,6 +5,7 @@ on:
     paths:
       - 'scripts/odds_builder.py'
       - 'scripts/test_compact_efootball_builder.py'
+      - 'scripts/test_odds_builder_upcoming_desk_recent_losses.py'
       - 'scripts/predict_today.py'
       - 'scripts/independent_football_model.py'
       - 'scripts/football_model_council.py'
@@ -30,6 +31,8 @@ jobs:
       - run: python -m py_compile scripts/odds_builder.py scripts/predict_today.py scripts/independent_football_model.py scripts/football_model_council.py scripts/build_football_team_history.py
       - name: Test compact eFootball 2.00x ticket constructor
         run: python scripts/test_compact_efootball_builder.py
+      - name: Test Upcoming Desk repeat-loss circuit breaker
+        run: python scripts/test_odds_builder_upcoming_desk_recent_losses.py
       - run: python scripts/football_model_council.py
       - run: python scripts/odds_builder.py
       - name: Validate calibrated Builder output
