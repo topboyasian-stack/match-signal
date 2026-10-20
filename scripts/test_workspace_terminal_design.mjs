@@ -89,12 +89,16 @@ const directPaths = [
   "odds-builder.html", "odds-builder-design.css",
   "reports.html", "reports-design.css",
   "virtual-lab/index.html", "virtual-lab-terminal.css",
-  "scripts/test_workspace_terminal_design.mjs", ".github/workflows/cloudflare-pages.yml"
+  "scripts/test_workspace_terminal_design.mjs"
 ];
 for (const path of directPaths) {
   assert.ok(deploy.includes("'" + path + "'"), "Cloudflare push trigger must include " + path);
   assert.ok(deploy.includes("|" + path + "|"), "Cloudflare static promotion allowlist must include " + path);
 }
+assert.ok(!deploy.includes("      - '.github/workflows/cloudflare-pages.yml'"),
+  "Cloudflare workflow edits must wait for a successful Unified Upcoming refresh");
+assert.ok(!deploy.includes("|.github/workflows/cloudflare-pages.yml|"),
+  "Cloudflare workflow edits must not bypass the board-first promotion chain");
 assert.ok(deploy.includes("node scripts/test_workspace_terminal_design.mjs"), "production promotion must run workspace visual regressions");
 for (const marker of [
   "reports-design.css?v=20261014-full-v3",
