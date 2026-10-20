@@ -2,6 +2,7 @@
 """Regression tests for the Upcoming Desk exact line/side recent-loss hold."""
 from __future__ import annotations
 
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -89,6 +90,18 @@ class UpcomingDeskRecentLossGateTests(unittest.TestCase):
         self.assertFalse(_upcoming_desk_recent_result_guard("efootball_gt", 7.5, "over", tracker=tracker)["blocked"])
         self.assertFalse(_upcoming_desk_recent_result_guard("efootball_gt", 4.5, "under", tracker=tracker)["blocked"])
         self.assertFalse(_upcoming_desk_recent_result_guard("efootball_adriatic", 7.5, "under", tracker=tracker)["blocked"])
+
+
+    def test_live_ledger_smoke_reports_current_under_75_guard(self):
+        result = _upcoming_desk_recent_result_guard("efootball_gt", 7.5, "under")
+        self.assertIsInstance(result.get("blocked"), bool)
+        self.assertGreaterEqual(int(result.get("sample_n", 0)), int(result.get("consecutive_losses", 0)))
+        print("Live ledger eFootball GT Under 7.5 guard:", json.dumps({
+            "blocked": result.get("blocked"),
+            "consecutive_losses": result.get("consecutive_losses"),
+            "sample_n": result.get("sample_n"),
+            "recent_results": result.get("recent_results", []),
+        }, sort_keys=True))
 
     def test_pending_legs_are_not_results(self):
         pending = settled_leg("future-event", "PENDING", "2026-10-20T06:00:00+00:00")
