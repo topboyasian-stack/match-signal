@@ -581,7 +581,7 @@
         :archiveReason==='ACTIVE_TRACK_CAPACITY'
           ?'Retained outside the current track to keep the visible ticket list bounded. The original snapshot remains available here.'
           :'Latest kickoff is more than six hours old and official settlement is still unmatched. This snapshot is hidden from current ongoing tickets but remains here and will be rechecked for late settlement.';
-      return '<details class="ticket-card '+(status==='LOST'?'ticket-lost':status==='WON'?'ticket-won':'ticket-pending')+' ticket-archived">'+
+      return '<details class="ticket-card '+(status==='LOST'?'ticket-lost':status==='WON'?'ticket-won':'ticket-pending')+' ticket-archived" data-state-key="archived-ticket:'+esc2(t.ticket_id||idx)+'">'+
         '<summary class="ticket-card-summary">'+
           '<div class="ticket-card-title"><span class="ticket-kicker">ARCHIVED PAPER TICKET · '+esc2(t.ticket_id||'—')+'</span><strong>'+(t.batch_id?esc2(t.batch_id)+' · ':'')+label+'</strong><small>'+esc2(products)+' · Created '+esc2(created)+'</small></div>'+
           '<div class="ticket-card-odds"><strong>'+esc2(t.combined_odds==null?'—':Number(t.combined_odds).toFixed(3))+'x</strong><span>'+esc2(t.leg_count||legs.length)+' legs</span></div>'+
@@ -612,7 +612,7 @@
       var created=t.created_at?local(t.created_at):'Unknown';
       var lastSettled=t.last_settled_at?local(t.last_settled_at):'No legs settled yet';
       var headline=(t.batch_id?esc2(t.batch_id)+' · ':'')+ticketLabel(t);
-      return '<details class="ticket-card '+(t.status==='LOST'?'ticket-lost':t.status==='WON'?'ticket-won':'ticket-pending')+'" '+''+'>'+
+      return '<details class="ticket-card '+(t.status==='LOST'?'ticket-lost':t.status==='WON'?'ticket-won':'ticket-pending')+'" data-state-key="ticket:'+esc2(t.ticket_id||idx)+'">'+
         '<summary class="ticket-card-summary">'+
           '<div class="ticket-card-title"><span class="ticket-kicker">PAPER TICKET · '+esc2(t.ticket_id||'—')+'</span><strong>'+headline+'</strong><small>'+esc2(products)+' · Created '+esc2(created)+'</small></div>'+
           '<div class="ticket-card-odds"><strong>'+esc2(t.combined_odds==null?'—':Number(t.combined_odds).toFixed(3))+'x</strong><span>'+esc2(t.leg_count||total)+' legs</span></div>'+
@@ -649,11 +649,11 @@
     if(!cards) cards='<div class="empty">No unresolved paper tickets are currently awaiting results.</div>';
     var recentHistoryCards=settledTicketList.slice(0,8).map(renderTicketCard).join('');
     var historySection=settledTicketList.length
-      ?'<details class="ticket-history"><summary class="ticket-history-summary"><strong>Recent settled results ('+esc2(settledTicketList.length)+')</strong><span>Open to review the 8 latest completed tickets; older records remain in the archive.</span></summary><div class="ticket-list">'+recentHistoryCards+'</div>'+(settledTicketList.length>8?'<div class="sub">Showing the 8 most recent settled tickets.</div>':'')+'</details>'
+      ?'<details class="ticket-history" data-state-key="ticket-history"><summary class="ticket-history-summary"><strong>Recent settled results ('+esc2(settledTicketList.length)+')</strong><span>Open to review the 8 latest completed tickets; older records remain in the archive.</span></summary><div class="ticket-list">'+recentHistoryCards+'</div>'+(settledTicketList.length>8?'<div class="sub">Showing the 8 most recent settled tickets.</div>':'')+'</details>'
       :'';
     var archiveCards=archivedTickets.slice(0,100).map(archivedTicketHtml).join('');
     var archiveSection=archivedTickets.length
-      ?'<details class="ticket-archive"><summary class="ticket-archive-summary"><strong>Archived paper snapshots ('+esc2(archivedTickets.length)+')</strong><span>Older unresolved batches and overflow history are removed from the current list; their original legs and settlement state are preserved below.</span></summary><div class="ticket-list">'+archiveCards+'</div>'+(archivedTickets.length>100?'<div class="sub">Showing the 100 newest archived snapshots; older records remain in the saved paper ledger.</div>':'')+'</details>'
+      ?'<details class="ticket-archive" data-state-key="ticket-archive"><summary class="ticket-archive-summary"><strong>Archived paper snapshots ('+esc2(archivedTickets.length)+')</strong><span>Older unresolved batches and overflow history are removed from the current list; their original legs and settlement state are preserved below.</span></summary><div class="ticket-list">'+archiveCards+'</div>'+(archivedTickets.length>100?'<div class="sub">Showing the 100 newest archived snapshots; older records remain in the saved paper ledger.</div>':'')+'</details>'
       :'';
 
     return '<section class="ticket-track">'+
@@ -742,7 +742,7 @@
     var generated=dateOf(data&&data.generated_at);
     var ageMs=generated?checkedAt-generated.getTime():null;
     return {
-      fresh:!!generated&&ageMs>=-60*1000&&ageMs<=BUILDER_ARTIFACT_MAX_AGE_MS,
+      fresh:!!generated&&ageMs>=-5*60*1000&&ageMs<=BUILDER_ARTIFACT_MAX_AGE_MS,
       age_ms:ageMs,
       generated_at:generated?generated.toISOString():null,
       max_age_ms:BUILDER_ARTIFACT_MAX_AGE_MS
@@ -866,7 +866,7 @@
         '</div>';
     }).join('');
     var empty='<div class="empty">No current individual candidate passed all leg-level gates. The system will continue scanning; no ticket is forced.</div>';
-    return '<details class="builder-batch-panel ob-qualification-wrap">'+
+    return '<details class="builder-batch-panel ob-qualification-wrap" data-state-key="qualification-monitor">'+
       '<summary class="diagnostic-summary"><span class="section-kicker">OPTIONAL DIAGNOSTICS</span><b>Why no qualified batch?</b><span>Open only to inspect which checks blocked a ticket.</span></summary>'+
       '<div class="diagnostic-content">'+
       '<div class="sub" style="margin-bottom:10px">The Builder refreshes every 15 minutes. The eFootball exact-evidence research lane uses a 65% per-leg and average floor; the standard high-confidence lane retains its 80% floor. Neither lane can bypass exact-line evidence, fresh SportyBet price, correlation, odds and whole-ticket expected-return gates.</div>'+
@@ -929,14 +929,28 @@
       var evidenceHtml='';
       if(String(viewLeg.sport||'').toLowerCase()==='virtual'){
         var evidenceSource=String(viewLeg.evidence_source||'');
-        var evidenceLabel=evidenceSource==='settled_score_replay'?'Settled-score replay':'Direct exact-line/side settlements';
-        var evidenceN=viewLeg.evidence_sample_n==null?((viewLeg.recent_evidence||{}).n==null?'—':(viewLeg.recent_evidence||{}).n):viewLeg.evidence_sample_n;
-        var evidenceDetail=String(evidenceN)+' settled events';
-        if(evidenceSource==='settled_score_replay'){
-          var directN=viewLeg.direct_exact_sample_n==null?0:Number(viewLeg.direct_exact_sample_n);
-          evidenceDetail+=' · '+directN+' direct exact-line/side rows';
+        var lane=String(viewLeg.qualification_lane||'').toLowerCase();
+        var isDeskEvidence=evidenceSource==='upcoming_desk_exact_line_walkforward'||lane==='upcoming_desk_research_only';
+        var evidenceLabel=isDeskEvidence?'Exact-line walk-forward holdout':evidenceSource==='settled_score_replay'?'Settled-score replay':'Direct exact-line/side settlements';
+        var evidenceDetail='';
+        if(isDeskEvidence){
+          var walkN=Number(viewLeg.walkforward_exact_line_n||((viewLeg.recent_evidence||{}).n)||0);
+          var walkRate=Number(viewLeg.walkforward_exact_line_hit_rate!=null?viewLeg.walkforward_exact_line_hit_rate:((viewLeg.recent_evidence||{}).hit_rate));
+          evidenceDetail=walkN+' walk-forward observations';
+          if(Number.isFinite(walkRate))evidenceDetail+=' · '+pct(walkRate)+' historic holdout hit rate';
+          evidenceDetail+=' · '+Number(viewLeg.direct_exact_sample_n||0)+' direct settled-line rows';
+          var officialPass=viewLeg.desk_official_qualification_pass===true;
+          var officialStatus=String(viewLeg.desk_official_qualification_status||'RESEARCH-ONLY');
+          evidenceHtml='<div class="row"><span>Evidence basis</span><b>'+esc(evidenceLabel)+'</b></div><div class="row"><span>Evidence sample</span><b>'+esc(evidenceDetail)+'</b></div><div class="row"><span>Official Desk qualification</span><b>'+esc(officialPass?'Official gate passed':officialStatus.replace(/_/g,' '))+'</b></div>';
+        }else{
+          var evidenceN=viewLeg.evidence_sample_n==null?((viewLeg.recent_evidence||{}).n==null?'—':(viewLeg.recent_evidence||{}).n):viewLeg.evidence_sample_n;
+          evidenceDetail=String(evidenceN)+' settled events';
+          if(evidenceSource==='settled_score_replay'){
+            var directN=viewLeg.direct_exact_sample_n==null?0:Number(viewLeg.direct_exact_sample_n);
+            evidenceDetail+=' · '+directN+' direct exact-line/side rows';
+          }
+          evidenceHtml='<div class="row"><span>Evidence basis</span><b>'+esc(evidenceLabel)+'</b></div><div class="row"><span>Evidence sample</span><b>'+esc(evidenceDetail)+'</b></div>';
         }
-        evidenceHtml='<div class="row"><span>Evidence basis</span><b>'+esc(evidenceLabel)+'</b></div><div class="row"><span>Evidence sample</span><b>'+esc(evidenceDetail)+'</b></div>';
       }
       return '<article class="card '+(isSettled?'settled-card':'')+'"><div class="meta"><span>Leg '+(i+1)+' · '+esc(product)+' · '+esc(viewLeg.competition||'—')+'</span><span>'+(isSettled?'<b class="result-badge '+resultClass+'">'+resultText+'</b>':'SportyBet '+esc(viewLeg.bookmaker_odds==null?'—':viewLeg.bookmaker_odds))+'</span></div><div class="teams">'+esc(viewLeg.match||'—')+'</div><div class="pick">Selection: <b>'+esc(viewLeg.pick||'—')+'</b><span class="conf">Model '+pct(viewLeg.model_probability)+'</span></div>'+timer(viewLeg.start_time,viewLeg)+liveTrackerHtml(viewLeg)+'<div class="startTime">'+(isSettled?'Result confirmed'+(settled.result?' · '+esc(settled.result):'')+' · '+esc(local(viewLeg.start_time)):'Start: '+esc(local(viewLeg.start_time))+' <span>· your browser time</span>')+'</div><div class="section"><div class="row"><span>Market</span><b>'+esc(viewLeg.market||'—')+'</b></div><div class="row"><span>Model probability</span><b>'+pct(viewLeg.model_probability)+'</b></div><div class="row"><span>Model fair odds</span><b>'+esc(viewLeg.model_fair_odds==null?'—':viewLeg.model_fair_odds)+'</b></div><div class="row"><span>SportyBet price</span><b>'+esc(viewLeg.bookmaker_odds==null?'—':viewLeg.bookmaker_odds)+'</b></div><div class="row"><span>Model edge vs market</span><b>'+esc(viewLeg.model_edge==null?'—':pct(viewLeg.model_edge))+'</b></div><div class="row"><span>Market price age</span><b>'+esc(viewLeg.market_odds_age_seconds==null?'—':Math.round(Number(viewLeg.market_odds_age_seconds))+'s')+'</b></div>'+evidenceHtml+'<div class="row"><span>Result</span><b class="'+(isSettled?(settled.status==='VOID'?'void-text':settled.correct===true?'won-text':'lost-text'):'')+'">'+(isSettled?resultText:'Pending')+'</b></div></div></article>';
     }
@@ -952,12 +966,12 @@
         .map(function(x){return String(x||'').toUpperCase();})
         .filter(Boolean)
         .join(' + ') || 'VIRTUAL';
-      var laneText=b.primary_lane==='vfootball'?'vFootball Results-first lane':b.primary_lane==='model_first_value'?'Model-first paper value lane':b.primary_lane==='efootball_exact_evidence_value'?'eFootball exact-evidence value research lane':'paper research lane';
+      var laneText=b.primary_lane==='upcoming_desk_research'?'Upcoming Desk research-only lane':b.primary_lane==='vfootball'?'vFootball Results-first lane':b.primary_lane==='model_first_value'?'Model-first paper value lane':b.primary_lane==='efootball_exact_evidence_value'?'eFootball exact-evidence value research lane':'paper research lane';
       var batchNum=String(idx+1).padStart(2,'0');
       var body=legs.map(function(l,i){return legCard(l,i,idx);}).join('');
       var bookingPanel=bookingPanelHtml(b);
       return [
-        '<details class="batch-card">',
+        '<details class="batch-card" data-state-key="batch:'+esc(String(b.batch_id||('batch-'+idx))+'|'+legs.map(function(l){return [l.event_id||'',l.market||'',l.line==null?'':l.line,l.builder_pick||l.pick||''].join('|');}).join('||'))+'">',
         '<summary class="batch-summary">',
         '<div><span class="batch-kicker">Batch '+batchNum+'</span>',
         '<strong>'+esc(products)+' · Combined Model Rating '+esc(rating)+'</strong>',
@@ -1000,7 +1014,12 @@
       var compactDetail=compactDiag.reason
         ? ' Compact eFootball check: '+String(compactDiag.reason).replace(/_/g,' ')+'. '
         : ' The compact eFootball lane also checks 4–5 exact-evidence legs at 2.00x+. ';
-      gateNote='<div class="section warning"><b>Virtual lane evaluated, but no ticket survived all gates</b><div class="sub">The standard lane requires its 2.70x/2.80x target; the compact eFootball lane requires 4–5 exact-evidence legs, at least 2.00x and +2% expected ticket ROI. '+esc(compactDetail)+'No weak legs are added to reach an odds target.</div><div class="row"><span>Virtual candidates</span><b>'+esc(virtualCount)+'</b></div><div class="row"><span>Compact lane eligible legs</span><b>'+esc(compactDiag.candidate_count==null?'—':compactDiag.candidate_count)+'</b></div></div>';
+      var deskDiag=((data.candidate_diagnostics||{}).batch_diagnostics||{}).desk_research_diagnostics||{};
+      var deskResearchDiag=((data.candidate_diagnostics||{}).virtual_gate_diagnostics||{}).upcoming_desk_research||{};
+      var deskRejectReasons=deskResearchDiag.rejections||{};
+      var deskRejected=Number(deskRejectReasons.recent_settled_line_side_loss_streak||0)+Number(deskRejectReasons.recent_settled_line_side_loss_cluster||0);
+      var deskReason=deskRejected>0?' Upcoming Desk held '+deskRejected+' candidate row(s) because two of the latest three, three of the latest five, or two consecutive distinct settled outcomes lost on the same exact product, line and side. The side stays on hold until newer results clear the rule.':'';
+      gateNote='<div class="section warning"><b>No current batch cleared every gate</b><div class="sub">The standard lane requires its combined-odds and value gates; the compact eFootball lane requires 4–5 exact-evidence legs, at least 2.00x and +2% expected ticket ROI. '+esc(compactDetail)+esc(deskReason)+' No weaker leg is added to force an accumulator.</div><div class="row"><span>Virtual candidates scanned</span><b>'+esc(virtualCount)+'</b></div><div class="row"><span>Upcoming Desk candidates after gates</span><b>'+esc(deskDiag.candidate_count==null?'—':deskDiag.candidate_count)+'</b></div><div class="row"><span>Recent-loss holds</span><b>'+esc(deskRejected)+'</b></div></div>';
     } else if(gate.upstream_blocked){
       gateNote='<div class="section warning"><b>No current batch available</b><div class="sub">The core prediction gate is separate from Virtual and was not allowed to manufacture a slip.</div></div>';
     } else {
@@ -1009,15 +1028,39 @@
 
     var ticketTrack=ticketTrackHtml(tracker);
     var qualificationMonitor=qualificationMonitorHtml(data,batches.length);
-    target.innerHTML=pushNotificationHtml()+'<div class="builder-console"><div class="builder-console-head"><div><span class="builder-kicker">PAPER RESEARCH DESK</span><h3>Live '+floorLabel+' Builder</h3><p>Fresh SportyBet prices are qualified in-process. Batches stay paper-only and disjoint by event.</p></div><div class="builder-live-state"><span class="pulse-dot"></span><b>'+(staleBuilderData?'REFRESH REQUIRED':data.status==='LIVE_VALUE_SET'?'LIVE VALUE SET':batchCount?'PAPER VALUE SET':'NO ACTIVE SET')+'</b><small>'+esc(status)+'</small></div></div><div class="builder-stat-row"><div class="builder-stat builder-stat-main"><small>Active batches</small><strong>'+batchCount+'/6</strong><span>Automatically refreshed</span></div><div class="builder-stat"><small>Sport lanes</small><strong>'+esc(sports.length?sports.join(' · '):'—')+'</strong><span>Current batch set</span></div><div class="builder-stat"><small>Top model rating</small><strong>'+esc(topRating==null?'—':topRating.toFixed(1)+'/100')+'</strong><span>Batch strength proxy</span></div><div class="builder-stat"><small>Top combined odds</small><strong>'+esc(top&&top.combined_odds!=null?Number(top.combined_odds).toFixed(3):'—')+'x</strong><span>SportyBet snapshot</span></div></div></div><div class="builder-batch-panel builder-qualified-set"><div class="builder-section-head"><div><span class="section-kicker">QUALIFIED SET</span><b>'+floorLabel+' paper research batches</b><span>Expand a batch for its booking code, live quote details, timer and legs.</span></div><div class="builder-section-note"><b>'+esc(virtualCount)+'</b><span>virtual candidates evaluated</span></div></div><div class="batch-list">'+(cards||'<div class="empty">No qualified '+floorLabel+' batches are currently available.</div>')+'</div><div class="builder-feedbar"><span><b>SPORTYBET</b> live snapshot</span><span>Top joint proxy <b>'+esc(topJoint==null?'—':pct(topJoint))+'</b></span><span>Price freshness gate <b>&le; 15m</b></span><span>Paper only <b>Yes</b></span></div>'+gateNote+'</div>'+qualificationMonitor+ticketTrack+'<div class="builder-note">The Builder refreshes automatically. Opening a batch reveals its exact selections and current SportyBet booking code.</div>';
+    target.innerHTML=pushNotificationHtml()+'<div class="builder-console"><div class="builder-console-head"><div><span class="builder-kicker">PAPER RESEARCH DESK</span><h3>Live '+floorLabel+' Builder</h3><p>Fresh SportyBet prices are qualified in-process. Batches stay paper-only and disjoint by event.</p></div><div class="builder-live-state"><span class="pulse-dot"></span><b>'+(staleBuilderData?'REFRESH REQUIRED':data.status==='LIVE_VALUE_SET'?'LIVE VALUE SET':batchCount?'PAPER VALUE SET':'NO ACTIVE SET')+'</b><small>'+esc(status)+'</small><button type="button" class="booking-btn builder-refresh-btn" data-builder-refresh>Refresh now</button><span class="builder-refresh-status" data-builder-refresh-status>Updated '+esc(local(data.generated_at||''))+'</span></div></div><div class="builder-stat-row"><div class="builder-stat builder-stat-main"><small>Active batches</small><strong>'+batchCount+'/6</strong><span>Automatically refreshed</span></div><div class="builder-stat"><small>Sport lanes</small><strong>'+esc(sports.length?sports.join(' · '):'—')+'</strong><span>Current batch set</span></div><div class="builder-stat"><small>Top model rating</small><strong>'+esc(topRating==null?'—':topRating.toFixed(1)+'/100')+'</strong><span>Batch strength proxy</span></div><div class="builder-stat"><small>Top combined odds</small><strong>'+esc(top&&top.combined_odds!=null?Number(top.combined_odds).toFixed(3):'—')+'x</strong><span>SportyBet snapshot</span></div></div></div><div class="builder-batch-panel builder-qualified-set"><div class="builder-section-head"><div><span class="section-kicker">PAPER RESEARCH BATCHES</span><b>'+floorLabel+' evidence-gated batches</b><span>Research-only candidates. Open a batch for selections, booking-code status and evidence.</span></div><div class="builder-section-note"><b>'+esc(virtualCount)+'</b><span>virtual candidates evaluated</span></div></div><div class="batch-list">'+(cards||'<div class="empty">No qualified '+floorLabel+' batches are currently available.</div>')+'</div><div class="builder-feedbar"><span><b>SPORTYBET</b> live snapshot</span><span>Top joint proxy <b>'+esc(topJoint==null?'—':pct(topJoint))+'</b></span><span>Price freshness gate <b>&le; 15m</b></span><span>Paper only <b>Yes</b></span></div>'+gateNote+'</div>'+qualificationMonitor+ticketTrack+'<div class="builder-note">The Builder refreshes automatically. Opening a batch reveals its exact selections and current SportyBet booking code.</div>';
     updateTimers();
   }
+  var oddsBuilderHasRendered=false;
+  var oddsBuilderLoadInFlight=false;
+  var oddsBuilderRefreshQueued=false;
+
+  function builderExpandedState(target){
+    var state={};
+    if(!target)return state;
+    target.querySelectorAll('details[data-state-key]').forEach(function(el){
+      if(el.open)state[el.getAttribute('data-state-key')||'']=true;
+    });
+    return state;
+  }
+  function restoreBuilderExpandedState(target,state){
+    if(!target||!state)return;
+    target.querySelectorAll('details[data-state-key]').forEach(function(el){
+      var key=el.getAttribute('data-state-key')||'';
+      if(Object.prototype.hasOwnProperty.call(state,key))el.open=state[key]===true;
+    });
+  }
+
   function load(){
     var target=document.getElementById('oddsBuilder');if(!target)return;
-    target.innerHTML='<div class="empty">Loading Odds Builder data…</div>';
+    if(oddsBuilderLoadInFlight){oddsBuilderRefreshQueued=true;return;}
+    oddsBuilderLoadInFlight=true;
+    var expanded=builderExpandedState(target);
+    document.querySelectorAll('[data-builder-refresh]').forEach(function(btn){btn.disabled=true;btn.textContent='Refreshing…';});
+    if(!oddsBuilderHasRendered)target.innerHTML='<div class="empty">Loading Odds Builder data…</div>';
     Promise.all([
-      fetch('./data/odds_builder.json?v=20260929-odds-builder-'+Date.now(),{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('odds_builder.json HTTP '+r.status);return r.json();}),
-      fetch('./data/odds_ticket_tracker.json?v=20260930-ticket-track-'+Date.now(),{cache:'no-store'}).then(function(r){
+      fetch('./data/odds_builder.json?v=20261020-desk-guard-'+Date.now(),{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('odds_builder.json HTTP '+r.status);return r.json();}),
+      fetch('./data/odds_ticket_tracker.json?v=20261020-desk-guard-'+Date.now(),{cache:'no-store'}).then(function(r){
         if(!r.ok)return {tickets:[],summary:{},ledger_error:'HTTP '+r.status+' while reading the paper settlement ledger.'};
         return r.text().then(function(text){
           try{return text?JSON.parse(text):{tickets:[],summary:{},ledger_error:'The paper settlement ledger returned an empty response.'};}
@@ -1028,8 +1071,31 @@
       var data=results[0],tracker=results[1],current=filterCurrentBuilderSnapshot(data,Date.now());
       var activeBatches=current.batches,activeLegs=current.qualified_legs;
       var activeData=Object.assign({},data,{batches:activeBatches,qualified_legs:activeLegs,builder_freshness:current.freshness});
-      return refreshLiveStatuses(activeLegs).then(function(){return refreshVirtualLiveStatuses(activeBatches.reduce(function(all,b){return all.concat(Array.isArray(b.legs)?b.legs:[]);},[]));}).then(function(){render(activeData,tracker);}).then(function(){return ensureBookingCodes(activeBatches);});
-    }).catch(function(e){target.innerHTML='<div class="empty">Accumulator data unavailable: '+esc(e.message)+'</div>';});
+      return refreshLiveStatuses(activeLegs).then(function(){
+        return refreshVirtualLiveStatuses(activeBatches.reduce(function(all,b){return all.concat(Array.isArray(b.legs)?b.legs:[]);},[]));
+      }).then(function(){
+        render(activeData,tracker);
+        oddsBuilderHasRendered=true;
+        restoreBuilderExpandedState(target,expanded);
+        var stamp=target.querySelector('[data-builder-refresh-status]');
+        if(stamp)stamp.textContent='Updated '+local(data.generated_at||new Date().toISOString());
+      }).then(function(){return ensureBookingCodes(activeBatches);});
+    }).catch(function(e){
+      if(!oddsBuilderHasRendered){
+        target.innerHTML='<div class="empty">Accumulator data unavailable: '+esc(e.message)+'</div>';
+      }else{
+        var stamp=target.querySelector('[data-builder-refresh-status]');
+        if(stamp){stamp.textContent='Refresh failed · showing last saved snapshot';stamp.classList.add('is-error');}
+      }
+    }).finally(function(){
+      oddsBuilderLoadInFlight=false;
+      var buttons=document.querySelectorAll('[data-builder-refresh]');
+      buttons.forEach(function(btn){btn.disabled=false;btn.textContent='Refresh now';});
+      if(oddsBuilderRefreshQueued){
+        oddsBuilderRefreshQueued=false;
+        load();
+      }
+    });
   }
   function boot(){
     if(!document.getElementById('odds-builder-result-style')){
@@ -1044,6 +1110,17 @@
       document.addEventListener('click',function(e){
         var enable=e.target.closest&&e.target.closest('[data-push-enable]');
         if(enable){enablePushNotifications();}
+      });
+    }
+    if(!window.__matchSignalBuilderRefreshHandler){
+      window.__matchSignalBuilderRefreshHandler=true;
+      document.addEventListener('click',function(e){
+        var btn=e.target.closest&&e.target.closest('[data-builder-refresh]');
+        if(!btn)return;
+        e.preventDefault();
+        btn.disabled=true;
+        btn.textContent='Refreshing…';
+        load();
       });
     }
     if(!window.__matchSignalBookingHandlers){
