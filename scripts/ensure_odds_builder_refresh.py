@@ -19,6 +19,7 @@ from typing import Any
 BUILDER_WORKFLOW = "odds_builder.yml"
 BUILDER_ARTIFACT_MAX_AGE_MINUTES = 18
 RECENT_RUN_COOLDOWN_MINUTES = 5
+UPCOMING_BOARD_REFRESH_MIN_INTERVAL_MINUTES = 16
 ACTIVE_STATUSES = {"queued", "in_progress", "waiting", "pending", "requested"}
 
 
@@ -80,15 +81,35 @@ def evaluate_runs(
             **artifact_fields,
         }
 
-    # A fresh Builder artifact may still pre-date a newly published Desk board.
-    # That newer input justifies a refresh even inside the ordinary run cooldown.
-    if board_newer:
+    # If the only difference is a newer board timestamp, don't run the Builder
+    # more often than its 15-minute schedule. This is a recovery path when a
+    # scheduled Builder run was missed, not a trigger on every 5-minute board build.
+    if board_newer and artifact_age is not None and artifact_age < BUILDER_ARTIFACT_MAX_AGE_MINUTES:
+        recent_runs = [
+            (parse_timestamp(run.get("createdAt")), run)
+            for run in runs
+        ]
+        recent_runs = [(stamp, run) for stamp, run in recent_runs if stamp is not None]
+        if recent_runs:
+            last_started_at, last_run = max(recent_runs, key=lambda item: item[0])
+            last_run_age = max(0.0, (now - last_started_at).total_seconds() / 60.0)
+            if last_run_age < UPCOMING_BOARD_REFRESH_MIN_INTERVAL_MINUTES:
+                return {
+                    "dispatch": False,
+                    "reason": "upcoming_board_newer_but_builder_recent",
+                    "last_run_id": last_run.get("databaseId"),
+                    "last_run_status": last_run.get("status"),
+                    "run_age_minutes": round(last_run_age, 2),
+                    "upcoming_board_refresh_min_interval_minutes": UPCOMING_BOARD_REFRESH_MIN_INTERVAL_MINUTES,
+                    **artifact_fields,
+                }
         return {
             "dispatch": True,
             "reason": "upcoming_board_newer_than_builder_artifact",
             **artifact_fields,
         }
 
+    # An absent/stale output uses the established stale-artifact recovery path below.
     if artifact_age is not None and artifact_age < BUILDER_ARTIFACT_MAX_AGE_MINUTES:
         return {
             "dispatch": False,
