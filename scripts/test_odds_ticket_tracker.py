@@ -64,6 +64,16 @@ class StalePaperTicketArchiveTests(unittest.TestCase):
         self.assertEqual(repr(ticket), before)
 
 
+
+
+class TrackerSettlementRecoveryWorkflowTests(unittest.TestCase):
+    def test_tracker_workflow_does_not_cancel_active_backfill(self):
+        workflow = (ROOT / ".github" / "workflows" / "odds-ticket-tracker.yml").read_text(encoding="utf-8")
+        self.assertIn("group: match-signal-odds-ticket-tracker", workflow)
+        self.assertIn("cancel-in-progress: false", workflow)
+        self.assertNotIn("cancel-in-progress: true", workflow)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
 
