@@ -357,7 +357,7 @@ jobs:
             # cannot see the new batch without also seeing its pending event holds.
             # Re-run after every publication retry to preserve settlements that landed
             # on main while this Builder job was calculating.
-            python scripts/odds_ticket_tracker.py
+            python scripts/odds_ticket_tracker.py --register-only
 
             git add data/odds_builder.json data/odds_ticket_tracker.json data/tennis_total_research.json data/results_first_evidence_report.json data/line_ladder_research.json
 
