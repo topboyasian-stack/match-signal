@@ -40,8 +40,8 @@ jobs:
             # Accept the dispatched board run only if its SHA descends from source_sha.
             board_candidate="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/unified-upcoming.yml/runs?branch=main&event=workflow_dispatch&per_page=20" --jq ".workflow_runs[] | select(.created_at >= \"$dispatched_at\") | [.id, .head_sha] | @tsv" | head -n 1)"
             if [ -n "$board_candidate" ]; then
-              candidate_id="${board_candidate%%
-              candidate_sha="${board_candidate#*
+              candidate_id="$(printf '%s\n' "$board_candidate" | cut -f1)"
+              candidate_sha="$(printf '%s\n' "$board_candidate" | cut -f2)"
               merge_base="$(gh api "repos/$GITHUB_REPOSITORY/compare/$source_sha...$candidate_sha" --jq '.merge_base_commit.sha')"
               if [ "$merge_base" = "$source_sha" ]; then
                 board_run_id="$candidate_id"
