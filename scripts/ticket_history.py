@@ -101,3 +101,60 @@ def settled_ticket_history(tracker: Any, min_legs: int = 2, max_legs: int = 7):
 
     rows.sort(key=lambda ticket: ticket["_calibration_stamp"])
     return rows
+
+
+
+def independent_settled_ticket_history(tracker: Any, min_legs: int = 2, max_legs: int = 7):
+    """Return chronologically settled tickets with no event overlap.
+
+    A ticket is evidence for independent ticket-level evaluation only when every
+    leg has an event ID and none of those event IDs has appeared in an earlier
+    included settled ticket. Tickets that reuse an event are kept in the source
+    ledger but excluded from calibration and promotion sample counts.
+    """
+    rows = settled_ticket_history(tracker, min_legs=min_legs, max_legs=max_legs)
+    rows.sort(key=lambda ticket: (
+        str(ticket.get("_calibration_stamp") or ""),
+        str(ticket.get("ticket_id") or ""),
+    ))
+    independent = []
+    used_events = set()
+    overlapping_tickets = 0
+    overlapping_event_references = 0
+    incomplete_identity_tickets = 0
+    unique_events = 0
+
+    for ticket in rows:
+        legs = ticket.get("legs") if isinstance(ticket.get("legs"), list) else []
+        expected = int(ticket.get("leg_count") or len(legs) or 0)
+        event_ids = [
+            str(leg.get("event_id") or leg.get("eventId") or "").strip()
+            for leg in legs if isinstance(leg, dict)
+        ]
+        if not legs or expected != len(legs) or len(event_ids) != len(legs) or any(not event_id for event_id in event_ids):
+            incomplete_identity_tickets += 1
+            continue
+        ids = set(event_ids)
+        if len(ids) != len(event_ids):
+            overlapping_tickets += 1
+            overlapping_event_references += len(event_ids) - len(ids)
+            continue
+        overlap = ids & used_events
+        if overlap:
+            overlapping_tickets += 1
+            overlapping_event_references += len(overlap)
+            continue
+        independent.append(ticket)
+        used_events.update(ids)
+        unique_events += len(ids)
+
+    diagnostics = {
+        "settled_ticket_rows": len(rows),
+        "independent_ticket_rows": len(independent),
+        "overlapping_event_tickets_excluded": overlapping_tickets,
+        "overlapping_event_references_excluded": overlapping_event_references,
+        "tickets_missing_complete_event_identity": incomplete_identity_tickets,
+        "unique_events_in_independent_sample": unique_events,
+        "scope": "chronological event-disjoint settled tickets across active + archived tracker history",
+    }
+    return independent, diagnostics
