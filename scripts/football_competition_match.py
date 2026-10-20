@@ -32,6 +32,59 @@ _YOUTH_MARKER_RE = re.compile(
     re.IGNORECASE,
 )
 _TEAM_STOPWORDS = {"fc", "afc", "sc", "cf", "ac", "club", "the"}
+_IDENTITY_METADATA_KEYS = {
+    "league", "leaguename", "league_name",
+    "competition", "competitionname", "competition_name", "competitiondisplayname",
+    "tournament", "tournamentname", "tournament_name",
+    "category", "categoryname", "category_name",
+    "agegroup", "age_group", "agecategory", "age_category", "gender",
+    "stage", "stagename", "phase", "phasename", "round", "roundname",
+    "eventname", "event_name",
+}
+_IDENTITY_CONTAINER_KEYS = {
+    "competitions", "tournaments", "categoryinfo", "leagueinfo",
+    "competitioninfo", "tournamentinfo", "groups", "eventdetails", "metadata",
+}
+_IDENTITY_NAME_KEYS = {"name", "shortname", "displayname", "fullname", "slug", "label", "agegroup", "gender"}
+
+
+def football_market_identity_metadata(event, tournament=None, category=None):
+    """Extract event-specific league/cohort labels that a parent tournament can hide."""
+    values = []
+
+    def add(value):
+        if value is None or isinstance(value, (dict, list, tuple, set, bool)):
+            return
+        value = str(value).strip()
+        if value and value not in values:
+            values.append(value)
+
+    def visit(node, depth=0, identity_container=False):
+        if depth > 5:
+            return
+        if isinstance(node, dict):
+            for key, value in node.items():
+                normalized = re.sub(r"[^a-z0-9]+", "", str(key).lower())
+                if normalized in _IDENTITY_METADATA_KEYS:
+                    if isinstance(value, (dict, list)):
+                        visit(value, depth + 1, True)
+                    else:
+                        add(value)
+                elif normalized in _IDENTITY_CONTAINER_KEYS and isinstance(value, (dict, list)):
+                    visit(value, depth + 1, True)
+                elif identity_container and normalized in _IDENTITY_NAME_KEYS:
+                    if isinstance(value, (dict, list)):
+                        visit(value, depth + 1, True)
+                    else:
+                        add(value)
+        elif isinstance(node, (list, tuple)):
+            for value in node[:50]:
+                visit(value, depth + 1, identity_container)
+
+    add(tournament)
+    add(category)
+    visit(event)
+    return " | ".join(values)
 
 
 def competition_key(value):
@@ -58,9 +111,9 @@ def same_competition(prediction_competition, market_competition):
     return bool(left and right and left == right)
 
 
-def _cohort_profile(competition, category=None, teams=()):
-    """Extract explicit youth/age-group identity from provider metadata and teams."""
-    texts = [competition, category, *(teams or ())]
+def _cohort_profile(competition, category=None, teams=(), metadata=None):
+    """Extract explicit youth/age-group identity from all preserved provider metadata."""
+    texts = [competition, category, metadata, *(teams or ())]
     ages = set()
     youth = False
     for value in texts:
@@ -120,6 +173,7 @@ def football_market_identity_matches(
     market_category=None,
     prediction_teams=(),
     market_teams=(),
+    market_metadata=None,
 ):
     """Fail closed unless competition, cohort, age group, and both teams agree.
 
@@ -136,7 +190,10 @@ def football_market_identity_matches(
         prediction_competition, teams=prediction_teams
     )
     market_youth, market_ages = _cohort_profile(
-        market_competition, category=market_category, teams=market_teams
+        market_competition,
+        category=market_category,
+        teams=market_teams,
+        metadata=market_metadata,
     )
 
     if prediction_youth != market_youth:
