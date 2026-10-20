@@ -1,9 +1,9 @@
 name: Match Signal Qualified Best Scheduled Health Watch v2
 
 on:
-  # Re-register the independent ten-minute production schedule on a fresh, offset cadence.
+  # Re-register the independent ten-minute monitor on a shifted cadence after missed scheduled ticks.
   schedule:
-    - cron: '7,17,27,37,47,57 * * * *'
+    - cron: '6,16,26,36,46,56 * * * *'
   workflow_dispatch:
   push:
     branches: [main]

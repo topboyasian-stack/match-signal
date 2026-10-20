@@ -10,9 +10,8 @@ on:
     paths:
       - '.github/workflows/automation_watchdog.yml'
   schedule:
-    # Frequent, off-hour heartbeat so stale live feeds are repaired before the next day.
-    # Re-register on a new off-minute-zero cadence after the confirmed scheduled-run gap.
-    - cron: '9,19,29,39,49,59 * * * *'
+    # Re-register the heartbeat on a new offset cadence after confirmed missed scheduled ticks.
+    - cron: '8,18,28,38,48,58 * * * *'
   workflow_run:
     workflows:
       - "Match Signal Unified Upcoming Board"

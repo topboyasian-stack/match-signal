@@ -2,8 +2,8 @@ name: Isolated eFootball Winner and BTTS Market Research
 
 on:
   schedule:
-    # Fresh workflow identity and offset cadence restore the isolated research schedule if workflow_run chaining is delayed.
-    - cron: '10,25,40,55 * * * *'
+    # Shift this independent 15-minute research heartbeat too; watchdog fallback remains the recovery path if schedules stall.
+    - cron: '4,19,34,49 * * * *'
   workflow_dispatch:
   workflow_run:
     workflows:
