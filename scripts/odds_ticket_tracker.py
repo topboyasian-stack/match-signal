@@ -525,7 +525,6 @@ def backfill_virtual_results(tickets, now_iso_value, scope_index=None):
                 # IDs between sessions. Require full participants + kickoff.
                 if not virtual_result_fixture_matches(leg, event):
                     continue
-                    continue
                 pick, line = parse_virtual_pick(leg)
                 if pick not in {"over", "under"} or line is None:
                     continue
@@ -583,9 +582,9 @@ def replay_ou_leg_from_exact_event_score(leg, rows):
 
     Virtual Lab stores settlement rows for some O/U lines but Builder may select
     a different line for the same event. The score is event-level, so replaying
-    it is safe only when event ID + product match exactly, the row is explicitly
-    settled from the SportyBet result endpoint, and every qualifying score row
-    agrees. If the stored scores conflict or provenance is missing, do not settle.
+    it is safe only when full participant identities + kickoff + product match,
+    the row is explicitly settled from the SportyBet result endpoint, and every
+    qualifying score row agrees. If scores conflict or provenance is missing, do not settle.
     """
     event_id = str(leg.get("event_id") or "").strip()
     product = norm(leg.get("product") or leg.get("sport"))
@@ -596,8 +595,6 @@ def replay_ou_leg_from_exact_event_score(leg, rows):
     scores = {}
     for row in rows:
         if not isinstance(row, dict):
-            continue
-        if str(row.get("event_id") or "").strip() != event_id:
             continue
         if norm(row.get("product") or row.get("sport")) != product:
             continue
@@ -654,8 +651,6 @@ def settle_virtual_leg(leg, rows):
             continue
         # Only identity-verified source rows can settle a virtual leg. A matching
         # provider event ID never overrides a participant or kickoff mismatch.
-        if event_id and str(row.get("event_id") or "") != event_id:
-            continue
         if virtual_result_fixture_matches(leg, row):
             candidates.append(row)
 
