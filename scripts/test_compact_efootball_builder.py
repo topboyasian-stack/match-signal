@@ -532,6 +532,22 @@ class CompactEfootballBuilderTests(unittest.TestCase):
         self.assertEqual(candidate["desk_official_qualification_status"],"MODEL_PROBABILITY_BELOW_0_65")
         self.assertFalse(candidate["qualified_for_builder"],"research candidates must not flip the official Desk gate")
 
+    def test_upcoming_desk_research_can_use_mature_exact_line_outside_official_line_scope(self):
+        now=datetime.now(timezone.utc)
+        source=desk_source_row(now)
+        source["raw_line_eligible"]=False
+        source["model_line_qualified"]=False
+        source["qualified_for_builder"]=False
+        source["qualification_status"]="MODEL_LINE_SCOPE_GATE_PENDING"
+        candidate,reason=builder._upcoming_desk_research_candidate(source,now)
+        self.assertIsNone(reason)
+        self.assertIsNotNone(candidate)
+        self.assertEqual(candidate["qualification_lane"],"upcoming_desk_research_only")
+        self.assertFalse(candidate["desk_official_qualification_pass"])
+        self.assertEqual(candidate["desk_official_qualification_status"],"MODEL_LINE_SCOPE_GATE_PENDING")
+        self.assertFalse(candidate["qualified_for_builder"],"research lane must not change official qualification")
+
+
     def test_upcoming_desk_candidate_rejects_weak_or_unqualified_evidence(self):
         now=datetime.now(timezone.utc)
         cases=[

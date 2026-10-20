@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 from ensure_odds_builder_refresh import (
     BUILDER_ARTIFACT_MAX_AGE_MINUTES,
     RECENT_RUN_COOLDOWN_MINUTES,
+    UPCOMING_BOARD_REFRESH_MIN_INTERVAL_MINUTES,
     evaluate_runs,
 )
 
@@ -73,6 +74,51 @@ class BuilderRefreshDecisionTests(unittest.TestCase):
         result = evaluate_runs([run(12, conclusion="failure")], NOW, artifact_generated_at=artifact(BUILDER_ARTIFACT_MAX_AGE_MINUTES + 8))
         self.assertTrue(result["dispatch"])
         self.assertEqual(result["reason"], "builder_artifact_stale")
+
+
+    def test_newer_upcoming_board_dispatches_when_builder_cycle_was_missed(self):
+        result = evaluate_runs(
+            [run(UPCOMING_BOARD_REFRESH_MIN_INTERVAL_MINUTES + 1)],
+            NOW,
+            artifact_generated_at=artifact(1),
+            upstream_board_generated_at=NOW.isoformat().replace("+00:00", "Z"),
+        )
+        self.assertTrue(result["dispatch"])
+        self.assertEqual(result["reason"], "upcoming_board_newer_than_builder_artifact")
+        self.assertTrue(result["upcoming_board_newer_than_builder_artifact"])
+
+    def test_newer_upcoming_board_does_not_duplicate_recent_builder_cycle(self):
+        result = evaluate_runs(
+            [run(1)],
+            NOW,
+            artifact_generated_at=artifact(1),
+            upstream_board_generated_at=NOW.isoformat().replace("+00:00", "Z"),
+        )
+        self.assertFalse(result["dispatch"])
+        self.assertEqual(result["reason"], "upcoming_board_newer_but_builder_recent")
+        self.assertEqual(result["upcoming_board_refresh_min_interval_minutes"], UPCOMING_BOARD_REFRESH_MIN_INTERVAL_MINUTES)
+
+    def test_newer_upcoming_board_does_not_dispatch_while_builder_run_is_active(self):
+        result = evaluate_runs(
+            [run(1, "in_progress", run_id=901)],
+            NOW,
+            artifact_generated_at=artifact(10),
+            upstream_board_generated_at=artifact(1),
+        )
+        self.assertFalse(result["dispatch"])
+        self.assertEqual(result["reason"], "active_builder_run")
+        self.assertEqual(result["active_run_id"], 901)
+
+    def test_fresh_builder_artifact_still_skips_when_board_is_not_newer(self):
+        result = evaluate_runs(
+            [run(10)],
+            NOW,
+            artifact_generated_at=artifact(1),
+            upstream_board_generated_at=artifact(2),
+        )
+        self.assertFalse(result["dispatch"])
+        self.assertEqual(result["reason"], "builder_artifact_fresh")
+        self.assertFalse(result["upcoming_board_newer_than_builder_artifact"])
 
 
 if __name__ == "__main__":

@@ -1481,8 +1481,9 @@ def _upcoming_desk_research_candidate(event, now):
         return None,"outside_builder_horizon"
     if event.get("base_model_gate") is not True:
         return None,"base_model_gate_pending"
-    if event.get("raw_line_eligible") is not True:
-        return None,"raw_line_scope_pending"
+    # This paper-only lane may investigate an exact line outside the official
+    # model-line allowlist when its own walk-forward evidence is mature. It still
+    # requires a model-qualified competition and never changes the official gate.
     if event.get("model_competition_qualified") is not True:
         return None,"model_competition_not_qualified"
     source=str(event.get("desk_learning_adjustment_source") or "").upper()
@@ -1974,7 +1975,7 @@ def virtual_candidates(now):
         "max_combined_odds":UPCOMING_DESK_MAX_COMBINED_ODDS,
         "max_legs":UPCOMING_DESK_MAX_LEGS,
         "rejections":dict(sorted(desk_research_rejections.items(),key=lambda item:(-item[1],item[0]))[:12]),
-        "policy":"paper-only Desk lane; active model competition + raw active-line scope + active Desk calibration + >=100 exact-line walk-forward rows at >=60%; current SportyBet quote and standard Builder price/edge gates are mandatory",
+        "policy":"paper-only Desk lane; base model and model-qualified competition + active Desk calibration + >=100 exact-line walk-forward rows at >=60%; exact-line research can cross the official raw model-line allowlist without changing official qualification; current SportyBet quote and standard Builder price/edge gates remain mandatory",
     }
     diagnostics["quote_join"]=quote_diag
     diagnostics["stale_unified_prices_used"]=False

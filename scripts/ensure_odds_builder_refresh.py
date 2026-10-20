@@ -19,6 +19,7 @@ from typing import Any
 BUILDER_WORKFLOW = "odds_builder.yml"
 BUILDER_ARTIFACT_MAX_AGE_MINUTES = 18
 RECENT_RUN_COOLDOWN_MINUTES = 5
+UPCOMING_BOARD_REFRESH_MIN_INTERVAL_MINUTES = 16
 ACTIVE_STATUSES = {"queued", "in_progress", "waiting", "pending", "requested"}
 
 
@@ -38,26 +39,29 @@ def evaluate_runs(
     runs: list[dict[str, Any]],
     now: datetime | None = None,
     artifact_generated_at: Any = None,
+    upstream_board_generated_at: Any = None,
 ) -> dict[str, Any]:
-    """Use published artifact age first, without racing active/recent Builder runs."""
+    """Refresh after a newer board publish; otherwise use artifact-age and run guards."""
     now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     artifact_stamp = parse_timestamp(artifact_generated_at)
+    upstream_stamp = parse_timestamp(upstream_board_generated_at)
     artifact_age = (
         max(0.0, (now - artifact_stamp).total_seconds() / 60.0)
-        if artifact_stamp is not None
-        else None
+        if artifact_stamp is not None else None
     )
+    upstream_age = (
+        max(0.0, (now - upstream_stamp).total_seconds() / 60.0)
+        if upstream_stamp is not None else None
+    )
+    board_newer = bool(upstream_stamp and (artifact_stamp is None or upstream_stamp > artifact_stamp))
     artifact_fields = {
         "artifact_age_minutes": round(artifact_age, 2) if artifact_age is not None else None,
         "artifact_max_age_minutes": BUILDER_ARTIFACT_MAX_AGE_MINUTES,
+        "upcoming_board_age_minutes": round(upstream_age, 2) if upstream_age is not None else None,
+        "upcoming_board_generated_at": upstream_stamp.isoformat() if upstream_stamp else None,
+        "builder_artifact_generated_at": artifact_stamp.isoformat() if artifact_stamp else None,
+        "upcoming_board_newer_than_builder_artifact": board_newer,
     }
-
-    if artifact_age is not None and artifact_age < BUILDER_ARTIFACT_MAX_AGE_MINUTES:
-        return {
-            "dispatch": False,
-            "reason": "builder_artifact_fresh",
-            **artifact_fields,
-        }
 
     active = [
         run for run in runs
@@ -74,6 +78,42 @@ def evaluate_runs(
             "reason": "active_builder_run",
             "active_run_id": run.get("databaseId"),
             "active_status": run.get("status"),
+            **artifact_fields,
+        }
+
+    # If the only difference is a newer board timestamp, don't run the Builder
+    # more often than its 15-minute schedule. This is a recovery path when a
+    # scheduled Builder run was missed, not a trigger on every 5-minute board build.
+    if board_newer and artifact_age is not None and artifact_age < BUILDER_ARTIFACT_MAX_AGE_MINUTES:
+        recent_runs = [
+            (parse_timestamp(run.get("createdAt")), run)
+            for run in runs
+        ]
+        recent_runs = [(stamp, run) for stamp, run in recent_runs if stamp is not None]
+        if recent_runs:
+            last_started_at, last_run = max(recent_runs, key=lambda item: item[0])
+            last_run_age = max(0.0, (now - last_started_at).total_seconds() / 60.0)
+            if last_run_age < UPCOMING_BOARD_REFRESH_MIN_INTERVAL_MINUTES:
+                return {
+                    "dispatch": False,
+                    "reason": "upcoming_board_newer_but_builder_recent",
+                    "last_run_id": last_run.get("databaseId"),
+                    "last_run_status": last_run.get("status"),
+                    "run_age_minutes": round(last_run_age, 2),
+                    "upcoming_board_refresh_min_interval_minutes": UPCOMING_BOARD_REFRESH_MIN_INTERVAL_MINUTES,
+                    **artifact_fields,
+                }
+        return {
+            "dispatch": True,
+            "reason": "upcoming_board_newer_than_builder_artifact",
+            **artifact_fields,
+        }
+
+    # An absent/stale output uses the established stale-artifact recovery path below.
+    if artifact_age is not None and artifact_age < BUILDER_ARTIFACT_MAX_AGE_MINUTES:
+        return {
+            "dispatch": False,
+            "reason": "builder_artifact_fresh",
             **artifact_fields,
         }
 
@@ -149,6 +189,20 @@ def latest_artifact_generated_at(repo: str) -> str | None:
     return str(value) if value else None
 
 
+def latest_upcoming_board_generated_at() -> str | None:
+    """Read the board file built earlier in the same Unified Upcoming workflow."""
+    path = Path("data/unified_upcoming.json")
+    try:
+        artifact = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"::warning::Could not parse Unified Upcoming artifact: {exc}", file=sys.stderr)
+        return None
+    value = artifact.get("generated_at") if isinstance(artifact, dict) else None
+    if value is None and isinstance(artifact, dict):
+        value = artifact.get("updated_at")
+    return str(value) if value else None
+
+
 def main() -> int:
     repo = os.environ.get("GITHUB_REPOSITORY", "").strip()
     if not repo:
@@ -180,7 +234,12 @@ def main() -> int:
         return 1
 
     artifact_generated_at = latest_artifact_generated_at(repo)
-    decision = evaluate_runs(runs, artifact_generated_at=artifact_generated_at)
+    upcoming_board_generated_at = latest_upcoming_board_generated_at()
+    decision = evaluate_runs(
+        runs,
+        artifact_generated_at=artifact_generated_at,
+        upstream_board_generated_at=upcoming_board_generated_at,
+    )
     print(json.dumps({"workflow": BUILDER_WORKFLOW, **decision}, sort_keys=True))
     if not decision["dispatch"]:
         print("Odds Builder artifact is fresh, a run is active, or the short recent-run cooldown is in effect.")
