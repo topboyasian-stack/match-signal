@@ -279,7 +279,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
 
     def test_builder_promotion_rebuilds_from_a_fresh_desk_before_pages(self):
         self.assertIn("uses: actions/checkout@v4", PROMOTION_WORKFLOW)
-        self.assertIn("with:\\n          ref: main", PROMOTION_WORKFLOW)
+        self.assertIn("with:\n          ref: main", PROMOTION_WORKFLOW)
         self.assertIn("workflow_dispatch:", PROMOTION_WORKFLOW)
         self.assertIn('"Match Signal Unified Upcoming Board"', PAGES_WORKFLOW)
         self.assertIn("Refresh Unified Upcoming before rebuilding the Builder", PROMOTION_WORKFLOW)
@@ -289,9 +289,9 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn("gh workflow run unified-upcoming.yml --ref main", PROMOTION_WORKFLOW)
         self.assertIn("gh workflow run odds_builder.yml --ref main -f skip_promotion=true", PROMOTION_WORKFLOW)
         self.assertIn("event=workflow_run", PROMOTION_WORKFLOW)
-        self.assertIn("if [ \\"builder_conclusion\\" != \\"success\\" ]; then", PROMOTION_WORKFLOW)
-        self.assertIn("if [ \\"board_conclusion\\" != \\"success\\" ]; then", PROMOTION_WORKFLOW)
-        self.assertIn("if [ \\"deploy_conclusion\\" != \\"success\\" ]; then", PROMOTION_WORKFLOW)
+        self.assertIn('if [ "$builder_conclusion" != "success" ]; then', PROMOTION_WORKFLOW)
+        self.assertIn('if [ "$board_conclusion" != "success" ]; then', PROMOTION_WORKFLOW)
+        self.assertIn('if [ "$deploy_conclusion" != "success" ]; then', PROMOTION_WORKFLOW)
         self.assertNotIn("gh workflow run cloudflare-pages.yml --ref main", PROMOTION_WORKFLOW)
         board_before_builder = PROMOTION_WORKFLOW.index("gh workflow run unified-upcoming.yml --ref main")
         builder = PROMOTION_WORKFLOW.index("gh workflow run odds_builder.yml --ref main -f skip_promotion=true")
@@ -300,8 +300,8 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertLess(board_before_builder, builder)
         self.assertLess(builder, post_build_board)
         self.assertLess(post_build_board, cloudflare_wait)
-        self.assertIn('paths:\\n      - ".github/workflows/builder-production-promotion.yml"', PROMOTION_WORKFLOW)
-        self.assertNotIn('  workflow_run:\\n    workflows: ["Match Signal Odds Builder"]', PROMOTION_WORKFLOW)
+        self.assertIn('paths:\n      - ".github/workflows/builder-production-promotion.yml"', PROMOTION_WORKFLOW)
+        self.assertNotIn('  workflow_run:\n    workflows: ["Match Signal Odds Builder"]', PROMOTION_WORKFLOW)
 
     def test_builder_explicitly_dispatches_promotion_after_artifact_publish(self):
         publish_step = BUILDER_WORKFLOW.find("      - name: Commit generated accumulator artifact")
