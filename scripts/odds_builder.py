@@ -1545,13 +1545,13 @@ def _upcoming_desk_settled_result_index(tracker=None):
             try:
                 line=float(leg.get("line"))
             except (TypeError,ValueError):
-                match=re.search(r"\\b(over|under)\\s*([0-9]+(?:\\.[0-9]+)?)",str(leg.get("pick") or ""),re.I)
+                match=re.search(r"\b(over|under)\s*([0-9]+(?:\.[0-9]+)?)",str(leg.get("pick") or ""),re.I)
                 if not match:
                     continue
                 side=side if side in {"over","under"} else match.group(1).lower()
                 line=float(match.group(2))
             if side not in {"over","under"}:
-                match=re.search(r"\\b(over|under)\\s*([0-9]+(?:\\.[0-9]+)?)",str(leg.get("pick") or ""),re.I)
+                match=re.search(r"\b(over|under)\s*([0-9]+(?:\.[0-9]+)?)",str(leg.get("pick") or ""),re.I)
                 if match:
                     side=match.group(1).lower()
                     if leg.get("line") is None:
