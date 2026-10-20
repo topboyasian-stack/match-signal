@@ -278,17 +278,18 @@ jobs:
           test ! -e .pages-deploy/data/efootball_desk_settled_observations.json
           echo "Cloudflare Pages staging passed the 25 MiB single-file limit."
 
-      - name: Regression-test Prediction Desk qualification and best-line selection
+      - name: Regression-test Prediction Desk qualification and workspace designs
         run: |
           node scripts/test_prediction_desk_gates.mjs
-      - name: Regression-test Upcoming Desk repeated settled losses
-        run: python scripts/test_odds_builder_upcoming_desk_recent_losses.py
           node scripts/test_qualified_best_design.mjs
           node scripts/test_sport_hub_design.mjs
           node scripts/test_core_workspaces_design.mjs
           node scripts/test_independent_sports_design.mjs
           node --check scripts/test_workspace_terminal_design.mjs
           node scripts/test_workspace_terminal_design.mjs
+
+      - name: Regression-test Upcoming Desk repeated settled losses
+        run: python scripts/test_odds_builder_upcoming_desk_recent_losses.py
 
       - name: Deploy to Cloudflare Pages
         id: pages-deployment
@@ -343,7 +344,7 @@ jobs:
             {path:'/', css:'/core-workspaces-design.css', markers:['MS-DESK-2026.10.14-V1','core-workspaces-design.css?v=20261014-full-v1','class="cd-page-header"','class="cd-workspace-grid"','id="unifiedBoard"','id="qualifiedBestSummary"'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V1: CORE DESK / FOOTBALL / TENNIS'},
             {path:'/football.html', css:'/core-workspaces-design.css', markers:['MS-FOOTBALL-DESK-2026.10.14-V1','core-workspaces-design.css?v=20261014-full-v1','class="cd-page-header"','id="leagueGrid"','data-sport="football"','league-logos.js?v=20261013-competition-logos2'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V1: CORE DESK / FOOTBALL / TENNIS'},
             {path:'/tennis.html', css:'/core-workspaces-design.css', markers:['MS-TENNIS-DESK-2026.10.14-V1','core-workspaces-design.css?v=20261014-full-v1','class="cd-page-header"','id="leagueGrid"','data-sport="tennis"'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V1: CORE DESK / FOOTBALL / TENNIS'},
-            {path:'/odds-builder.html', css:'/odds-builder-design.css', markers:['MS-ODDS-BUILDER-2026.10.14-V3','odds-builder-design.css?v=20261014-full-v3','class="ob-page-header"','class="ob-section-nav"','class="ob-guide-grid"'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V3: ODDS BUILDER PAGE LAYOUT'},
+            {path:'/odds-builder.html', css:'/odds-builder-design.css', markers:['MS-ODDS-BUILDER-2026.10.20-DESK-FIX2','odds-builder-design.css?v=20261020-ledger-layout2','class="ob-page-header"','class="ob-section-nav"','class="ob-guide-grid"'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V3: ODDS BUILDER PAGE LAYOUT'},
             {path:'/reports.html', css:'/reports-design.css', markers:['MS-REPORTS-2026.10.14-V3','reports-design.css?v=20261014-full-v3','class="rp-dashboard-grid"','id="report-scoreboard"','id="researchLabSummary"'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V3: REPORTS PAGE LAYOUT'},
             {path:'/virtual-lab/', css:'/virtual-lab-terminal.css', markers:['MS-VIRTUAL-LAB-V1-2026.10.14-V3','../virtual-lab-terminal.css?v=20261014-full-v3','class="vl-command-grid"','class="vl-command-rail"','class="vl-insights-grid"'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V3: VIRTUAL LAB PAGE LAYOUT'}
           ];
