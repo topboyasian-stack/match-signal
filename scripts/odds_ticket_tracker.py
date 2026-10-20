@@ -510,6 +510,22 @@ def backfill_virtual_results(tickets, now_iso_value, scope_index=None):
             print(f"WARNING: {source} result backfill failed (mode={mode}, category={category_id or '-'}, tournament={tournament_id or '-'}):", exc)
             continue
 
+        # Conflicting final scores for the same verified fixture are ambiguous;
+        # quarantine that fixture instead of letting row order choose the winner.
+        fixture_scores = {}
+        for event in events:
+            if not isinstance(event, dict):
+                continue
+            event_score = result_event_score(event)
+            if event_score is None or not str(event.get("eventId") or event.get("event_id") or "").strip():
+                continue
+            for leg in pending:
+                if not virtual_result_fixture_matches(leg, event):
+                    continue
+                fixture_key = _virtual_fixture_key(leg)
+                if fixture_key:
+                    fixture_scores.setdefault(fixture_key, set()).add((float(event_score[0]), float(event_score[1])))
+
         matched_fixtures = set()
         for event in events:
             if not isinstance(event, dict):
@@ -533,7 +549,7 @@ def backfill_virtual_results(tickets, now_iso_value, scope_index=None):
                 actual = "O" + line_text if total > line else "U" + line_text if total < line else "PUSH"
                 selected = "O" + line_text if pick == "over" else "U" + line_text
                 fixture_key = _virtual_fixture_key(leg)
-                if not fixture_key:
+                if not fixture_key or len(fixture_scores.get(fixture_key, set())) != 1:
                     continue
                 record_id = f"{fixture_key}|ou|{line}|{selected}"
                 if record_id in seen_records:
@@ -661,6 +677,21 @@ def settle_virtual_leg(leg, rows):
         row_pick, parsed_line = normalize_selection(row.get("selection"))
         if row_pick == wanted_pick and (parsed_line is None or abs(parsed_line - wanted_line) <= 1e-9):
             matches.append(row)
+
+    if matches:
+        matched_scores = {
+            (float(score[0]), float(score[1]))
+            for row in matches
+            for score in [result_event_score(row)]
+            if score is not None
+        }
+        matched_verdicts = {
+            "PUSH" if str(row.get("actual_result") or row.get("result") or "").upper() == "PUSH"
+            else ("WON" if row.get("win") is True else "LOST" if row.get("win") is False else "")
+            for row in matches
+        } - {""}
+        if len(matched_scores) > 1 or len(matched_verdicts) > 1:
+            return None
 
     for row in reversed(matches):
         win = row.get("win")
