@@ -3,10 +3,10 @@
   "core_pages_status": "VERIFIED",
   "qualified_best_quote_coverage_status": "COMPLETE",
   "provider": "Cloudflare Pages",
-  "source_commit": "bf016bc2576a0a74fed913da6093f466d0ca3bf5",
-  "verified_at": "2026-10-20T18:47:06.241364+00:00",
+  "source_commit": "325681af92f7495ecb1aedf928ce7f4efb9e23b2",
+  "verified_at": "2026-10-20T18:49:57.923178+00:00",
   "live_virtual_feed": {
-    "verified_at": "2026-10-20T18:47:05.644Z",
+    "verified_at": "2026-10-20T18:49:55.706Z",
     "status": "DIAGNOSTIC",
     "scan_complete": true,
     "scan_stop_reason": "all_model_qualified_candidates_matched",
@@ -27,17 +27,23 @@
       {
         "page": 1,
         "count": 100,
-        "fetched_at": "2026-10-20T18:47:03.378Z",
+        "fetched_at": "2026-10-20T18:49:52.057Z",
         "status": "LIVE"
       },
       {
         "page": 2,
         "count": 100,
-        "fetched_at": "2026-10-20T18:47:05.618Z",
+        "fetched_at": "2026-10-20T18:49:53.882Z",
+        "status": "LIVE"
+      },
+      {
+        "page": 3,
+        "count": 100,
+        "fetched_at": "2026-10-20T18:49:55.682Z",
         "status": "LIVE"
       }
     ],
-    "unique_live_events_seen": 200,
+    "unique_live_events_seen": 300,
     "matched_candidate_market_rows": 1,
     "exact_line_market_rows": 1,
     "exact_side_price_rows": 1,
@@ -126,20 +132,35 @@
         "market": "O/U under 9.5",
         "odds": 1.88,
         "start_time": "2026-10-20T19:38:00+00:00",
-        "quote_time": "2026-10-20T18:47:05.618Z"
+        "quote_time": "2026-10-20T18:49:55.682Z"
       }
     ]
   },
   "booking_api": {
-    "verified_at": "2026-10-20T18:46:57.862Z",
-    "status": "NO_FUTURE_BATCH",
-    "http_status": null,
-    "ok": false,
-    "batch_id": null,
-    "selection_count": 0,
+    "verified_at": "2026-10-20T18:49:41.294Z",
+    "status": "VOLATILE_MARKET",
+    "http_status": 409,
+    "ok": true,
+    "batch_id": "DESK-BATCH-01",
+    "selection_count": 2,
     "booking_code_available": false,
-    "error": null,
-    "message": null
+    "error": "NO_AVAILABLE_SELECTIONS",
+    "message": "No Builder selections could be mapped to a currently open SportyBet event/market.",
+    "volatile_market": true,
+    "validation": [
+      {
+        "event_id": "sr:match:BAaFUBGyAfx2GTNsXvtYneg",
+        "ok": false,
+        "excluded": true,
+        "reason": "The exact SportyBet O/U line or selected side is no longer available."
+      },
+      {
+        "event_id": "sr:match:BAaFUB1DpcN6aKLLtgX4QGQ",
+        "ok": false,
+        "excluded": true,
+        "reason": "The exact SportyBet O/U line or selected side is no longer available."
+      }
+    ]
   },
   "checks": [
     "core_pages",
