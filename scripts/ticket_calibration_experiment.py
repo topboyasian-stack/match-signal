@@ -12,7 +12,7 @@ from __future__ import annotations
 import json, math
 from datetime import datetime, timezone
 from pathlib import Path
-from ticket_history import merge_ticket_history, settled_ticket_history
+from ticket_history import event_disjoint_tickets, merge_ticket_history, settled_ticket_history
 
 ROOT=Path(__file__).resolve().parents[1]
 DATA=ROOT/"data"
@@ -111,7 +111,8 @@ def calibrate(rows, model_key="raw_combined_model_probability"):
 def main():
     raw=load(TRACKER,{})
     unique_tickets,history_diagnostics=merge_ticket_history(raw)
-    settled=settled_ticket_history(raw,min_legs=2,max_legs=7)
+    observed_settled=settled_ticket_history(raw,min_legs=2,max_legs=7)
+    settled,global_overlap_diagnostics=event_disjoint_tickets(observed_settled)
     modern=[t for t in settled if 2<=int(t.get("leg_count") or len(t.get("legs") or []))<=4]
     all_raw=[t for t in settled if prob(t,"raw_combined_model_probability") is not None and market(t) is not None]
     modern_raw=[t for t in modern if prob(t,"raw_combined_model_probability") is not None and market(t) is not None]
@@ -124,14 +125,17 @@ def main():
     # with the uncalibrated joint product are scored; legacy probability fields
     # are too ambiguous to train a second correction from.
     by_primary_lane={}
-    lane_names=sorted({str(t.get("primary_lane") or "unknown") for t in settled})
+    lane_names=sorted({str(t.get("primary_lane") or "unknown") for t in observed_settled})
     for lane in lane_names:
-        lane_tickets=[t for t in settled if str(t.get("primary_lane") or "unknown")==lane]
+        lane_observed=[t for t in observed_settled if str(t.get("primary_lane") or "unknown")==lane]
+        lane_tickets,lane_overlap_diagnostics=event_disjoint_tickets(lane_observed)
         lane_raw=[t for t in lane_tickets if prob(t,"raw_combined_model_probability") is not None and market(t) is not None]
         if len(lane_raw)<WARMUP+2:
             continue
         _,lane_metrics=calibrate(lane_raw)
         by_primary_lane[lane]={
+            "observed_settled_sample":len(lane_observed),
+            "dependent_overlap_ticket_count":lane_overlap_diagnostics.get("dependent_overlap_ticket_count",0),
             "settled_sample":len(lane_tickets),
             "raw_joint_probability_sample":len(lane_raw),
             "scored_holdout_sample":lane_metrics.get("n",0),
@@ -143,11 +147,14 @@ def main():
         "mode":"PAPER_ONLY_DIAGNOSTIC",
         "production_selection_changed":False,
         "method":"strict chronological ticket-level walk-forward on the stored raw joint product; each calibration weight uses only earlier settled tickets",
-        "history_scope":"Deduplicated union of tickets and archived_tickets; current ticket rows take precedence when ticket IDs overlap.",
+        "history_scope":"Deduplicated union of tickets and archived_tickets; current ticket rows take precedence when ticket IDs overlap. Calibration observations are filtered chronologically to event-disjoint tickets.",
         "history_diagnostics":{
             **history_diagnostics,
             "unique_ticket_rows":len(unique_tickets),
             "settled_calibration_rows":len(settled),
+            "observed_settled_calibration_rows":len(observed_settled),
+            "dependent_overlap_tickets_excluded":global_overlap_diagnostics.get("dependent_overlap_ticket_count",0),
+            "independent_event_count":global_overlap_diagnostics.get("unique_event_count",0),
         },
         "warmup_tickets":WARMUP,
         "grid":GRID,
@@ -157,6 +164,8 @@ def main():
             "unique_rows":history_diagnostics.get("unique_rows",0),
             "duplicate_rows_collapsed":history_diagnostics.get("duplicate_rows_collapsed",0),
             "all_settled":len(settled),
+            "all_settled_observed":len(observed_settled),
+            "event_overlap_tickets_excluded":global_overlap_diagnostics.get("dependent_overlap_ticket_count",0),
             "modern_2_to_4":len(modern),
             "raw_joint_probability_rows":len(all_raw),
             "modern_2_to_4_raw_joint_probability_rows":len(modern_raw),
