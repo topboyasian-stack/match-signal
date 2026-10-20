@@ -18,7 +18,7 @@ from __future__ import annotations
 import json, math, urllib.parse, urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
-from ticket_history import merge_ticket_history, settled_ticket_history
+from ticket_history import event_disjoint_tickets, merge_ticket_history, settled_ticket_history
 
 ROOT=Path(__file__).resolve().parents[1]
 DATA=ROOT/"data"
@@ -2777,8 +2777,9 @@ def _ticket_calibration_gamma():
     # history beyond that window lives in "archived_tickets". Recombine and
     # deduplicate before calibration, but never train on an already-corrected
     # combined_model_probability when its raw joint probability is unavailable.
-    tickets=settled_ticket_history(raw,min_legs=2,max_legs=7)
-    settled_count=len(tickets)
+    observed_tickets=settled_ticket_history(raw,min_legs=2,max_legs=7)
+    tickets,overlap_diagnostics=event_disjoint_tickets(observed_tickets)
+    settled_count=len(observed_tickets)
     rows=[]
     missing_raw=0
     for ticket in tickets:
@@ -2806,8 +2807,12 @@ def _ticket_calibration_gamma():
         chosen.append(best)
     diagnostics={
         "available_settled_tickets":settled_count,
+        "independent_settled_ticket_count":len(tickets),
+        "dependent_overlap_ticket_count":overlap_diagnostics["dependent_overlap_ticket_count"],
+        "independent_event_count":overlap_diagnostics["unique_event_count"],
         "missing_raw_joint_probability_count":missing_raw,
         "source_field":"raw_combined_model_probability",
+        "calibration_history_policy":"chronological event-disjoint ticket sample; overlapping fixtures do not count as separate calibration observations",
     }
     if len(chosen)<3:
         result={"gamma":1.0,"sample":len(rows),"warmup":warmup,"trained":False,
