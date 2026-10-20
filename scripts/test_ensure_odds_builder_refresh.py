@@ -15,13 +15,20 @@ from ensure_odds_builder_refresh import (
 NOW = datetime(2026, 10, 20, 0, 30, tzinfo=timezone.utc)
 
 
-def run(age_minutes: int, status: str = "completed", run_id: int = 123, conclusion: str = "success") -> dict:
+def run(
+    age_minutes: float,
+    status: str = "completed",
+    run_id: int = 123,
+    conclusion: str = "success",
+    event: str = "schedule",
+) -> dict:
     stamp = NOW - timedelta(minutes=age_minutes)
     return {
         "databaseId": run_id,
         "status": status,
         "createdAt": stamp.isoformat().replace("+00:00", "Z"),
         "conclusion": conclusion if status == "completed" else None,
+        "event": event,
     }
 
 
@@ -87,16 +94,30 @@ class BuilderRefreshDecisionTests(unittest.TestCase):
         self.assertEqual(result["reason"], "upcoming_board_newer_than_builder_artifact")
         self.assertTrue(result["upcoming_board_newer_than_builder_artifact"])
 
-    def test_newer_upcoming_board_does_not_duplicate_recent_builder_cycle(self):
+    def test_newer_upcoming_board_does_not_duplicate_recent_recovery_dispatch(self):
         result = evaluate_runs(
-            [run(1)],
+            [run(0, event="workflow_dispatch")],
             NOW,
             artifact_generated_at=artifact(1),
             upstream_board_generated_at=NOW.isoformat().replace("+00:00", "Z"),
         )
         self.assertFalse(result["dispatch"])
         self.assertEqual(result["reason"], "upcoming_board_newer_but_builder_recent")
+        self.assertEqual(result["last_run_event"], "workflow_dispatch")
         self.assertEqual(result["upcoming_board_refresh_min_interval_minutes"], UPCOMING_BOARD_REFRESH_MIN_INTERVAL_MINUTES)
+
+    def test_recent_scheduled_builder_cycle_that_finished_before_board_queues_recovery(self):
+        result = evaluate_runs(
+            [run(2, run_id=903, event="schedule")],
+            NOW,
+            artifact_generated_at=artifact(1),
+            upstream_board_generated_at=NOW.isoformat().replace("+00:00", "Z"),
+        )
+        self.assertTrue(result["dispatch"])
+        self.assertEqual(result["reason"], "upcoming_board_published_after_recent_builder_cycle")
+        self.assertEqual(result["last_run_id"], 903)
+        self.assertEqual(result["last_run_event"], "schedule")
+        self.assertLess(result["run_age_minutes"], UPCOMING_BOARD_REFRESH_MIN_INTERVAL_MINUTES)
 
     def test_newer_upcoming_board_does_not_dispatch_while_builder_run_is_active(self):
         result = evaluate_runs(
