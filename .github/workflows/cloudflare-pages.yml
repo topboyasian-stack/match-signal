@@ -287,6 +287,8 @@ jobs:
           node scripts/test_independent_sports_design.mjs
           node --check scripts/test_workspace_terminal_design.mjs
           node scripts/test_workspace_terminal_design.mjs
+          python scripts/test_deploy_freshness_order.py
+          node scripts/test_cloudflare_only_deploy.mjs
 
       - name: Regression-test Upcoming Desk repeated settled losses
         run: python scripts/test_odds_builder_upcoming_desk_recent_losses.py
