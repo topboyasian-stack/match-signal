@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 import unittest
+from unittest import mock
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -145,6 +146,60 @@ class CompetitionSafeFootballMarketTests(unittest.TestCase):
         found, method = enrich_sportybet_odds.find_event(pred, [category_mislabeled, age_marked, senior])
         self.assertIs(found, senior)
         self.assertEqual(method, "name_time")
+
+    def test_event_level_youth_competition_cannot_hide_behind_parent_league_label(self):
+        pred = prediction()
+        # Some provider payloads expose a generic parent tournament while the
+        # individual event retains the true Youth League competition.
+        hidden_youth = sporty_event(
+            tournament="UEFA Champions League",
+            category="International Clubs",
+            event_id="sr:match:hidden-youth-competition",
+        )
+        hidden_youth["competitionName"] = "UEFA Youth League"
+        self.assertIsNone(predict_today._find_sportybet_match(pred, [hidden_youth])[0])
+        self.assertEqual(enrich_sportybet_odds.find_event(pred, [hidden_youth]), (None, None))
+
+        nested_youth = sporty_event(
+            tournament="UEFA Champions League",
+            category="International Clubs",
+            event_id="sr:match:nested-youth-competition",
+        )
+        nested_youth["competition"] = {"name": "UEFA Youth League", "ageGroup": "U19"}
+        self.assertIsNone(predict_today._find_sportybet_match(pred, [nested_youth])[0])
+        self.assertEqual(enrich_sportybet_odds.find_event(pred, [nested_youth]), (None, None))
+
+        senior = sporty_event(tournament="UEFA Champions League", event_id="sr:match:senior")
+        found, _ = predict_today._find_sportybet_match(pred, [hidden_youth, nested_youth, senior])
+        self.assertIs(found, senior)
+        found, method = enrich_sportybet_odds.find_event(pred, [hidden_youth, nested_youth, senior])
+        self.assertIs(found, senior)
+        self.assertEqual(method, "name_time")
+
+    def test_normalized_sportybet_events_preserve_event_level_identity_metadata(self):
+        raw_event = {
+            "eventId": "sr:match:raw-youth-metadata",
+            "homeTeamName": "Fenerbahce",
+            "awayTeamName": "Slavia Prague",
+            "estimateStartTime": KICKOFF_MS,
+            "competitionName": "UEFA Youth League",
+            "markets": [],
+        }
+        body = {
+            "data": {
+                "totalNum": 1,
+                "tournaments": [{
+                    "name": "UEFA Champions League",
+                    "categoryName": "International Clubs",
+                    "events": [raw_event],
+                }],
+            },
+        }
+        with mock.patch.object(predict_today, "_sportybet_get", return_value=body):
+            events = predict_today.fetch_sportybet_events("sr:sport:1", "1")
+        self.assertEqual(len(events), 1)
+        self.assertIn("youth league", events[0]["identity_metadata"].lower())
+        self.assertFalse(predict_today._football_market_fixture_valid(prediction(), events[0]))
 
     def test_age_group_must_match_on_both_sides(self):
         self.assertFalse(football_market_identity_matches(
