@@ -370,6 +370,13 @@ jobs:
           echo "::error::Could not publish Builder artifacts after four attempts."
           exit 1
 
+      - name: Dispatch production promotion after Builder artifact publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh workflow run builder-production-promotion.yml --ref main
+          echo "Builder artifact publication completed; production promotion was explicitly dispatched."
       - name: Notify subscribed devices about newly qualified Builder batches
         continue-on-error: true
         run: |
