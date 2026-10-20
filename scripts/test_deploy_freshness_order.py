@@ -283,7 +283,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn("workflow_dispatch:", PROMOTION_WORKFLOW)
         self.assertIn('paths:\n      - ".github/workflows/builder-production-promotion.yml"', PROMOTION_WORKFLOW)
         self.assertIn("github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'", PROMOTION_WORKFLOW)
-        self.assertIn("Wait for successful board refresh", PROMOTION_WORKFLOW)
+        self.assertIn("Dispatch Unified Upcoming and wait for successful board publication", PROMOTION_WORKFLOW)
         self.assertIn("gh workflow run cloudflare-pages.yml --ref main", PROMOTION_WORKFLOW)
         self.assertIn("gh api \"repos/$GITHUB_REPOSITORY/actions/workflows/unified-upcoming.yml/runs?branch=main&event=workflow_dispatch&per_page=20\"", PROMOTION_WORKFLOW)
         self.assertIn("if [ \"$board_conclusion\" != \"success\" ]; then", PROMOTION_WORKFLOW)
@@ -305,7 +305,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
                 if workflow_path.name != "builder-production-promotion.yml":
                     bypasses.append(str(workflow_path.relative_to(ROOT)))
                 else:
-                    wait_step = source.find("Wait for successful board refresh")
+                    wait_step = source.find("Dispatch Unified Upcoming and wait for successful board publication")
                     dispatch_step = source.find("gh workflow run cloudflare-pages.yml --ref main")
                     guard = source.find('if [ "$board_conclusion" != "success" ]; then')
                     if not (wait_step >= 0 and guard >= 0 and dispatch_step > guard):
