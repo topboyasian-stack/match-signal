@@ -197,6 +197,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "scripts/sync_club_logos.py",
             "scripts/test_club_logo_registry.py",
             ".github/workflows/cloudflare-pages.yml",
+            ".github/workflows/odds_builder.yml",
             ".github/workflows/qualified-best-health-watch-v2.yml",
             ".github/workflows/automation_watchdog.yml",
             ".github/workflows/efootball-market-research-schedule.yml",

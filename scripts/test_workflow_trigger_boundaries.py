@@ -42,8 +42,9 @@ def main():
     board_paths = push_paths("unified-upcoming.yml")
     tracker_paths = push_paths("odds-ticket-tracker.yml")
 
-    # These are output artifacts, not source inputs for their own/downstream
-    # consumers. The completed board workflow already triggers a Builder run.
+    # These are generated outputs, not Builder inputs. Keep the expensive Builder
+    # on its 15-minute schedule and use the post-publication stale-artifact helper
+    # for recovery, rather than running a full Builder on every five-minute board refresh.
     assert "data/unified_upcoming.json" not in builder_paths, (
         "Builder must rely on the Unified Upcoming workflow_run trigger, not both "
         "its artifact push and completion event."
@@ -58,9 +59,14 @@ def main():
     assert "data/odds_ticket_tracker.json" in board_paths
 
     # Verify that removing the output-to-consumer feedback does not stop updates.
-    assert '"Match Signal Unified Upcoming Board"' in builder, (
-        "Builder must still refresh after a successful Unified Upcoming run."
+    assert '"Match Signal Unified Upcoming Board"' not in builder, (
+        "Avoid starting the expensive Builder after every five-minute board refresh; use its 15-minute schedule plus artifact-age recovery."
     )
+    assert "Ensure Odds Builder refresh follows board publication" in board, (
+        "The board must retain its stale-artifact recovery step after publishing outputs."
+    )
+    refresh_helper = (ROOT / "scripts" / "ensure_odds_builder_refresh.py").read_text(encoding="utf-8")
+    assert "BUILDER_ARTIFACT_MAX_AGE_MINUTES = 18" in refresh_helper
     assert "- cron: '*/15 * * * *'" in builder, (
         "The 15-minute Builder refresh must remain active."
     )
