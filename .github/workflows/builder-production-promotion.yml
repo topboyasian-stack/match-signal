@@ -1,9 +1,6 @@
 name: Match Signal Builder Production Promotion
 
 on:
-  workflow_run:
-    workflows: ["Match Signal Odds Builder"]
-    types: [completed]
   push:
     branches: [main]
     paths:
@@ -14,9 +11,12 @@ permissions:
   actions: write
   contents: read
 
+concurrency:
+  group: builder-production-promotion
+  cancel-in-progress: false
+
 jobs:
   promote:
-    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
