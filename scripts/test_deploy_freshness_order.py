@@ -178,6 +178,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "scripts/test_odds_builder_ui_freshness.mjs",
             "scripts/test_desk_quote_contract.mjs",
             "functions/api/sportybet-booking.js",
+            "functions/api/odds-builder-data.js",
             "scripts/test_sportybet_booking_batch_ids.mjs",
             "odds-builder-design.css",
             "reports.html",
