@@ -10,7 +10,7 @@ from difflib import SequenceMatcher
 from datetime import datetime, timezone
 from pathlib import Path
 from tennis_total_model import over_probability, recommend_total_line
-from football_competition_match import same_competition
+from football_competition_match import football_market_identity_matches
 import requests
 try:
     from curl_cffi import requests as curl_requests
@@ -113,7 +113,13 @@ def _football_market_event_valid(pred, event, max_hours=3.0):
     """Fail closed unless a football market has the same competition and kickoff."""
     if str(pred.get('sport') or '').lower() != 'football':
         return True
-    if not same_competition(pred.get('league'), event.get('_league')):
+    if not football_market_identity_matches(
+        pred.get('league'),
+        event.get('_league'),
+        market_category=event.get('_category'),
+        prediction_teams=(pred.get('home_team') or pred.get('player_1'), pred.get('away_team') or pred.get('player_2')),
+        market_teams=(event.get('homeTeamName'), event.get('awayTeamName')),
+    ):
         return False
     pstart = pred.get('start_time')
     try:

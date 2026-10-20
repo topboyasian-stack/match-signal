@@ -1,0 +1,40 @@
+name: Football Market Identity Regression
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/football_competition_match.py'
+      - 'scripts/predict_today.py'
+      - 'scripts/enrich_sportybet_odds.py'
+      - 'scripts/test_predict_today_market_matching.py'
+      - 'scripts/model_upgrade.py'
+      - 'scripts/independent_football_model.py'
+      - 'scripts/value_decision.py'
+      - 'scripts/calibration.py'
+      - 'scripts/tennis_total_model.py'
+      - '.github/workflows/football-market-identity-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  football-market-identity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test dependency
+        run: python -m pip install --disable-pip-version-check requests
+      - name: Run Youth League fixture-identity regressions
+        run: python scripts/test_predict_today_market_matching.py
+      - name: Compile the changed identity and matcher modules
+        run: python -m py_compile scripts/football_competition_match.py scripts/predict_today.py scripts/enrich_sportybet_odds.py scripts/test_predict_today_market_matching.py
