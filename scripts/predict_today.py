@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import requests
-from football_competition_match import football_market_identity_matches
+from football_competition_match import football_market_identity_matches, football_market_identity_metadata
 
 from calibration import calibrate_prediction, calibrate_binary_market
 
@@ -149,6 +149,11 @@ def fetch_sportybet_events(sport_id, market_ids, timeline=720, max_pages=20):
                     "event_id": event_id,
                     "tournament": tournament_name,
                     "category": category_name,
+                    # Preserve event-level league/cohort details before normalizing
+                    # the provider row; the parent tournament label can be generic.
+                    "identity_metadata": football_market_identity_metadata(
+                        event, tournament=tournament_name, category=category_name
+                    ),
                     "home": str(event.get("homeTeamName") or ""),
                     "away": str(event.get("awayTeamName") or ""),
                     "start_time_ms": _sportybet_time_ms(event.get("estimateStartTime")),
@@ -372,6 +377,7 @@ def _football_market_fixture_valid(pred, event, max_hours=3.0):
         event.get("tournament"),
         market_category=event.get("category"),
         prediction_teams=(pred.get("player_1") or pred.get("home_team"), pred.get("player_2") or pred.get("away_team")),
+        market_metadata=event.get("identity_metadata") or football_market_identity_metadata(event),
         market_teams=(event.get("home"), event.get("away")),
     ):
         return False
