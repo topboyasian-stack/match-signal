@@ -369,5 +369,87 @@ class UpcomingDeskSettledPromotionGateTests(unittest.TestCase):
         self.assertNotIn("research-only-event", pending)
 
 
+
+
+class CompleteSettledLedgerIntegrityTests(unittest.TestCase):
+    def make_ticket(self, ticket_id, ticket_status, leg_status, event_id, *, stamp="2026-10-20T10:00:00+00:00"):
+        return {
+            "ticket_id": ticket_id,
+            "status": ticket_status,
+            "created_at": stamp,
+            "last_settled_at": stamp,
+            "primary_lane": "efootball_exact_evidence_value",
+            "leg_count": 2,
+            "combined_odds": 3.2,
+            "products": ["efootball_gt"],
+            "legs": [
+                {
+                    "product": "efootball_gt", "sport": "virtual", "line": 4.5,
+                    "builder_pick": "over", "pick": "Team A vs Team B — O/U over 4.5",
+                    "status": leg_status, "event_id": event_id,
+                    "qualification_lane": "efootball_exact_evidence_value",
+                },
+                {
+                    "product": "efootball_gt", "sport": "virtual", "line": 3.5,
+                    "builder_pick": "under", "pick": "Team C vs Team D — O/U under 3.5",
+                    "status": leg_status, "event_id": event_id + "-b",
+                    "qualification_lane": "efootball_exact_evidence_value",
+                },
+            ],
+        }
+
+    def test_archived_losses_feed_exact_performance_and_results_first_indexes_once(self):
+        archived = [
+            self.make_ticket(f"T-{i}", "LOST", "LOST", f"event-{i}")
+            for i in range(50)
+        ]
+        # The active copy is canonical and replaces its stale archived duplicate.
+        current = [self.make_ticket("T-0", "WON", "WON", "event-0")]
+        tracker = {"tickets": current, "archived_tickets": archived}
+
+        old_spoiler = builder._TICKET_SPOILER_CACHE
+        old_results = builder._RESULTS_FIRST_CACHE
+        builder._TICKET_SPOILER_CACHE = None
+        builder._RESULTS_FIRST_CACHE = None
+        try:
+            with mock.patch.object(builder, "load", return_value=tracker):
+                eligible, details = builder.ticket_performance_gate("efootball_gt", 4.5, "over")
+                results = builder._load_results_first_index()
+            self.assertFalse(eligible)
+            self.assertTrue(details["available"])
+            self.assertEqual(details["n"], 50)
+            self.assertEqual(details["wins"], 1)
+            self.assertEqual(details["losses"], 49)
+            exact = results["exact"][("efootball_gt", "4.5", "over")]
+            self.assertEqual(exact, {"n": 50, "wins": 1, "losses": 49})
+            self.assertEqual(results["product_tickets"]["efootball_gt"]["tickets"], 50)
+        finally:
+            builder._TICKET_SPOILER_CACHE = old_spoiler
+            builder._RESULTS_FIRST_CACHE = old_results
+
+    def test_current_ticket_result_overrides_stale_archived_copy_in_recent_guard(self):
+        current = self.make_ticket("DUP", "WON", "WON", "same-event")
+        archived = self.make_ticket("DUP", "LOST", "LOST", "same-event")
+        tracker = {"tickets": [current], "archived_tickets": [archived]}
+        old_cache = builder._UPCOMING_DESK_SETTLED_RESULT_INDEX_CACHE
+        builder._UPCOMING_DESK_SETTLED_RESULT_INDEX_CACHE = None
+        try:
+            index = builder._upcoming_desk_settled_result_index(tracker=tracker)
+            rows = index[("efootball_gt", "4.5", "over")]
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0]["status"], "WON")
+            self.assertEqual(rows[0]["event_id"], "same-event")
+        finally:
+            builder._UPCOMING_DESK_SETTLED_RESULT_INDEX_CACHE = old_cache
+
+    def test_current_settlement_removes_stale_archived_pending_event_hold(self):
+        current = self.make_ticket("DUP", "WON", "WON", "already-settled")
+        archived = self.make_ticket("DUP", "PENDING", "PENDING", "already-settled")
+        tracker = {"tickets": [current], "archived_tickets": [archived]}
+        pending = builder._upcoming_desk_pending_event_ids(tracker=tracker)
+        self.assertNotIn("already-settled", pending)
+        self.assertNotIn("already-settled-b", pending)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
