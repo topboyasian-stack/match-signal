@@ -36,8 +36,14 @@ for (const [name, css, scope] of scopes) {
   }
 }
 
+const builderMarker = oddsHtml.match(/<meta name="match-signal-build" content="([^"]+)"/)?.[1] || "";
+const builderCssHref = oddsHtml.match(/href="(\.\/odds-builder-design\.css\?v=[^"]+)"/)?.[1] || "";
+const builderEngineSrc = oddsHtml.match(/src="(\.\/expansion-odds-builder\.js\?v=[^"]+)"/)?.[1] || "";
+assert.ok(builderMarker.startsWith("MS-ODDS-BUILDER-"), "Odds Builder must expose a versioned production build marker");
+assert.ok(builderCssHref.startsWith("./odds-builder-design.css?v="), "Odds Builder must load its versioned design layer");
+assert.ok(builderEngineSrc.startsWith("./expansion-odds-builder.js?v="), "Odds Builder must load its versioned renderer");
+assert.ok(oddsHtml.includes('data-page="odds-builder"'), "Odds Builder must carry its page scope");
 for (const [name, html, scope, href, marker] of [
-  ["Odds Builder", oddsHtml, 'data-page="odds-builder"', "odds-builder-design.css?v=20261020-ledger-layout2", "MS-ODDS-BUILDER-2026.10.20-DESK-FIX2"],
   ["Reports", reportsHtml, 'data-page="reports"', "reports-design.css?v=20261014-full-v3", "MS-REPORTS-2026.10.14-V3"],
   ["Virtual Lab", labHtml, 'data-page="virtual-lab"', "../virtual-lab-terminal.css?v=20261014-full-v3", "MS-VIRTUAL-LAB-V1-2026.10.14-V3"]
 ]) {
@@ -46,7 +52,6 @@ for (const [name, html, scope, href, marker] of [
   assert.ok(html.includes(marker), name + " must expose a production-verifiable build marker");
 }
 assert.ok(oddsHtml.includes("sport-hubs.js?v=20261013-qualified-best-kickoff-sort1"), "Odds Builder must retain the shared renderer");
-assert.ok(oddsHtml.includes("expansion-odds-builder.js?v=20261020-desk-result-guard2"), "Odds Builder must retain the versioned current engine");
 assert.ok(oddsHtml.includes('id="oddsBuilder"'), "Odds Builder engine mount must remain");
 assert.ok(reportsHtml.includes('id="reportGrid"') && reportsHtml.includes('id="researchLabSummary"'), "Reports mounts must remain");
 for (const mount of ['id="predictionDesk"', 'id="nearQualifiedRadar"', 'id="oddsBuilder"', 'id="labDiagnostics"', 'id="researchConclusion"']) {
@@ -75,6 +80,8 @@ for (const anchor of ['id="builder-overview"', 'href="#oddsBuilder"', 'id="ob-gu
 assert.ok(builderJs.includes('ACTIVE_VIRTUAL_MIN_PROBABILITY = 0.80'), "Odds Builder active-leg qualification floor must remain");
 assert.ok(builderJs.includes('function isActiveVirtualBatch(batch)'), "Odds Builder active batch filter must remain");
 assert.ok(builderJs.includes('ensureBookingCodes(activeBatches)'), "Odds Builder booking-code path must remain");
+assert.ok(!builderJs.includes("var fallback=Array.isArray(data.qualified_legs)"), "A standalone leg must never render as a qualified accumulator when no batch survives");
+assert.ok(builderJs.includes("No qualified '+floorLabel+' batches are currently available."), "An empty qualified set must explain that no full batch passed");
 
 const directPaths = [
   "odds-builder.html", "odds-builder-design.css",
@@ -88,12 +95,14 @@ for (const path of directPaths) {
 }
 assert.ok(deploy.includes("node scripts/test_workspace_terminal_design.mjs"), "production promotion must run workspace visual regressions");
 for (const marker of [
-  "odds-builder-design.css?v=20261014-full-v3",
   "reports-design.css?v=20261014-full-v3",
   "../virtual-lab-terminal.css?v=20261014-full-v3"
 ]) {
   assert.ok(deploy.includes(marker), "production smoke tests must verify asset wiring: " + marker);
 }
+assert.ok(deploy.includes("currentBuilderBuildMarker"), "production smoke tests must follow the current checked-out Odds Builder build marker");
+assert.ok(deploy.includes("currentBuilderCssHref"), "production smoke tests must follow the current checked-out Builder CSS asset");
+assert.ok(deploy.includes("currentBuilderEngineSrc"), "production smoke tests must follow the current checked-out Builder engine asset");
 
 
 for (const [name, css, marker] of [
