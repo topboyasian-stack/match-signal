@@ -101,3 +101,54 @@ def settled_ticket_history(tracker: Any, min_legs: int = 2, max_legs: int = 7):
 
     rows.sort(key=lambda ticket: ticket["_calibration_stamp"])
     return rows
+
+def event_disjoint_tickets(tickets):
+    """Select a chronological ticket sample without reusing any settled event.
+
+    Multiple accumulators can share a leg, making their ticket-level outcomes
+    dependent. Keep the earliest settled use of each event and exclude any later
+    ticket whose event set intersects it. Rows without event IDs receive stable
+    per-ticket/per-leg fallback identities rather than being silently discarded.
+    """
+    rows = [ticket for ticket in (tickets or []) if isinstance(ticket, dict)]
+    rows = sorted(
+        rows,
+        key=lambda ticket: str(
+            ticket.get("_calibration_stamp")
+            or ticket.get("last_settled_at")
+            or ticket.get("settled_at")
+            or ticket.get("updated_at")
+            or ticket.get("created_at")
+            or ""
+        ),
+    )
+    selected = []
+    used_events = set()
+    dependent = 0
+    for index, ticket in enumerate(rows):
+        ticket_id = str(ticket.get("ticket_id") or ticket.get("created_at") or f"row-{index}")
+        events = set()
+        for leg_index, leg in enumerate(ticket.get("legs") or []):
+            if not isinstance(leg, dict):
+                continue
+            product = str(leg.get("product") or leg.get("sport") or "unknown").strip().lower()
+            event_id = str(leg.get("event_id") or leg.get("eventId") or "").strip()
+            if event_id:
+                events.add((product, event_id))
+            else:
+                events.add((product, f"legacy:{ticket_id}:{leg_index}"))
+        if not events:
+            events.add(("ticket", f"no-legs:{ticket_id}"))
+        if events & used_events:
+            dependent += 1
+            continue
+        selected.append(ticket)
+        used_events.update(events)
+    return selected, {
+        "input_ticket_count": len(rows),
+        "independent_ticket_count": len(selected),
+        "dependent_overlap_ticket_count": dependent,
+        "unique_event_count": len(used_events),
+        "method": "chronological_first-use, exact product + event ID; overlapping tickets excluded from calibration/promotion evidence",
+    }
+
