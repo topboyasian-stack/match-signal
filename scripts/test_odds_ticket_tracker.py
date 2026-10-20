@@ -101,7 +101,12 @@ class VirtualResultBackfillTests(unittest.TestCase):
                 def read(self):
                     return json.dumps({
                         "ok": True,
-                        "events": [{"eventId": event_id, "score": "5:2"}],
+                        "events": [{
+                            "eventId": event_id, "score": "5:2",
+                            "homeTeamName": "Liverpool (PlayerA)",
+                            "awayTeamName": "Tottenham (PlayerB)",
+                            "estimateStartTime": int(datetime.fromisoformat(tickets[0]["legs"][0]["start_time"]).timestamp() * 1000),
+                        }],
                         "errors": [],
                     }).encode("utf-8")
             query = urllib.parse.parse_qs(urllib.parse.urlparse(request.full_url).query)
@@ -120,10 +125,82 @@ class VirtualResultBackfillTests(unittest.TestCase):
         self.assertEqual(rows[0]["event_id"], event_id)
         self.assertEqual(rows[0]["result"], "O5.5")
         self.assertFalse(rows[0]["win"])
-        self.assertEqual(rows[0]["backfill_match_mode"], "event_id")
+        self.assertEqual(rows[0]["backfill_match_mode"], "verified_fixture_identity")
+        self.assertTrue(rows[0]["fixture_identity_verified"])
         settled = settle_virtual_leg(tickets[0]["legs"][0], rows)
         self.assertEqual(settled["status"], "LOST")
         self.assertEqual(settled["final_score"], [5.0, 2.0])
+
+    def test_backfill_rejects_conflicting_scores_for_one_verified_fixture(self):
+        ticket = self.ticket("efootball_gt", "sr:match:conflicting-session")
+        start_ms = int(datetime.fromisoformat(ticket["legs"][0]["start_time"]).timestamp() * 1000)
+        events = [
+            {"eventId": "sr:match:conflicting-session", "score": "5:2",
+             "homeTeamName": "Liverpool (PlayerA)", "awayTeamName": "Tottenham (PlayerB)",
+             "estimateStartTime": start_ms},
+            {"eventId": "sr:match:conflicting-session", "score": "8:0",
+             "homeTeamName": "Liverpool (PlayerA)", "awayTeamName": "Tottenham (PlayerB)",
+             "estimateStartTime": start_ms},
+        ]
+        def opener(request, timeout=60):
+            class Response:
+                def __enter__(self): return self
+                def __exit__(self, *args): return False
+                def read(self): return json.dumps({"ok": True, "events": events, "errors": []}).encode("utf-8")
+            return Response()
+        with patch("scripts.odds_ticket_tracker.urllib.request.urlopen", side_effect=opener):
+            rows = backfill_virtual_results([ticket], datetime.now(timezone.utc).isoformat(), scope_index={})
+        self.assertEqual(rows, [])
+
+    def test_reused_event_id_with_wrong_participants_is_not_settled(self):
+        ticket = self.ticket("efootball_gt", "sr:match:reused-id")
+        wrong_event = {
+            "eventId": "sr:match:reused-id", "score": "8:0",
+            "homeTeamName": "Real Madrid (OtherPlayer)",
+            "awayTeamName": "Juventus (AnotherPlayer)",
+            "estimateStartTime": int(datetime.fromisoformat(ticket["legs"][0]["start_time"]).timestamp() * 1000),
+        }
+        def opener(request, timeout=60):
+            class Response:
+                def __enter__(self): return self
+                def __exit__(self, *args): return False
+                def read(self): return json.dumps({"ok": True, "events": [wrong_event], "errors": []}).encode("utf-8")
+            return Response()
+        with patch("scripts.odds_ticket_tracker.urllib.request.urlopen", side_effect=opener):
+            rows = backfill_virtual_results([ticket], datetime.now(timezone.utc).isoformat(), scope_index={})
+        self.assertEqual(rows, [])
+        self.assertIsNone(settle_virtual_leg(ticket["legs"][0], [wrong_event]))
+
+    def test_reused_event_id_with_wrong_kickoff_is_not_settled(self):
+        ticket = self.ticket("efootball_gt", "sr:match:reused-id")
+        start_ms = int(datetime.fromisoformat(ticket["legs"][0]["start_time"]).timestamp() * 1000)
+        wrong_event = {
+            "eventId": "sr:match:reused-id", "score": "8:0",
+            "homeTeamName": "Liverpool (PlayerA)",
+            "awayTeamName": "Tottenham (PlayerB)",
+            "estimateStartTime": start_ms + 2 * 60 * 60 * 1000,
+        }
+        def opener(request, timeout=60):
+            class Response:
+                def __enter__(self): return self
+                def __exit__(self, *args): return False
+                def read(self): return json.dumps({"ok": True, "events": [wrong_event], "errors": []}).encode("utf-8")
+            return Response()
+        with patch("scripts.odds_ticket_tracker.urllib.request.urlopen", side_effect=opener):
+            rows = backfill_virtual_results([ticket], datetime.now(timezone.utc).isoformat(), scope_index={})
+        self.assertEqual(rows, [])
+
+    def test_identity_scope_index_drops_event_id_reused_across_scopes(self):
+        from scripts.odds_ticket_tracker import virtual_result_scope_index, VIRTUAL_PENDING, VIRTUAL_LIVE
+        duplicated = [
+            {"event_id": "reused", "product": "efootball_gt", "category_id": "cat-1", "tournament_id": "t-1"},
+            {"event_id": "reused", "product": "efootball_gt", "category_id": "cat-2", "tournament_id": "t-2"},
+        ]
+        def fake_load(path, default):
+            return duplicated if path in (VIRTUAL_PENDING, VIRTUAL_LIVE) else default
+        with patch("scripts.odds_ticket_tracker.load", side_effect=fake_load):
+            index = virtual_result_scope_index()
+        self.assertIsNone(index["reused"])
 
     def test_efootball_pending_leg_uses_efootball_result_source(self):
         self.run_backfill_for_product("efootball_gt", "efootball")
@@ -149,7 +226,12 @@ class VirtualResultBackfillTests(unittest.TestCase):
             ticket = self.ticket("efootball_gt", event_id)
             ticket["legs"][0]["start_time"] = (now - timedelta(hours=hours_ago)).isoformat()
             tickets.append(ticket)
-            event_rows.append({"eventId": event_id, "score": "5:2"})
+            event_rows.append({
+                "eventId": event_id, "score": "5:2",
+                "homeTeamName": "Liverpool (PlayerA)",
+                "awayTeamName": "Tottenham (PlayerB)",
+                "estimateStartTime": int(datetime.fromisoformat(ticket["legs"][0]["start_time"]).timestamp() * 1000),
+            })
 
         windows = []
         def opener(request, timeout=60):
@@ -202,6 +284,9 @@ class VirtualResultBackfillTests(unittest.TestCase):
             "score": score,
             "settled_at": "2026-10-10T11:00:00+00:00",
             "settlement_source": "SportyBet NG eventResultList via Match Signal proxy",
+            "homeTeamName": "Liverpool (PlayerA)",
+            "awayTeamName": "Tottenham (PlayerB)",
+            "estimateStartTime": int(datetime.fromisoformat("2026-10-10T10:00:00Z").timestamp() * 1000),
             "record_id": f"sr:match:score-replay|ou|{line}|U{line}",
         }
 
@@ -231,10 +316,25 @@ class VirtualResultBackfillTests(unittest.TestCase):
         row["settlement_source"] = "model estimated final score"
         self.assertIsNone(settle_virtual_leg(leg, [row]))
 
+    def test_direct_settlement_rejects_conflicting_verified_scores(self):
+        leg = self._score_replay_leg(line=5.5, pick="under")
+        first = self._authoritative_score_row(line=5.5, score="2:1")
+        second = self._authoritative_score_row(line=5.5, score="8:0")
+        second["win"] = False
+        second["result"] = "O5.5"
+        second["actual_result"] = "O5.5"
+        self.assertIsNone(settle_virtual_leg(leg, [first, second]))
+
     def test_score_replay_rejects_product_mismatch_and_conflicting_scores(self):
         leg = self._score_replay_leg()
         wrong_product = self._authoritative_score_row(product="efootball_adriatic")
         self.assertIsNone(settle_virtual_leg(leg, [wrong_product]))
+        wrong_participants = self._authoritative_score_row()
+        wrong_participants["homeTeamName"] = "Real Madrid (OtherPlayer)"
+        self.assertIsNone(settle_virtual_leg(leg, [wrong_participants]))
+        wrong_kickoff = self._authoritative_score_row()
+        wrong_kickoff["estimateStartTime"] += 2 * 60 * 60 * 1000
+        self.assertIsNone(settle_virtual_leg(leg, [wrong_kickoff]))
         one = self._authoritative_score_row(line=5.5, score="2:1")
         two = self._authoritative_score_row(line=6.5, score="4:2")
         self.assertIsNone(settle_virtual_leg(leg, [one, two]))

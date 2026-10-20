@@ -186,11 +186,39 @@ export async function onRequestGet(context){
     }
   }
 
-  const dedup=new Map();
-  for(const event of events){
-    const eventId=String(event?.eventId||event?.event_id||'');
-    if(eventId) dedup.set(eventId,event);
+  function identityPart(value){
+    return String(value||'').normalize('NFKC').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim().replace(/\s+/g,' ');
   }
+  function eventStartIdentity(event){
+    for(const key of ['startTime','estimateStartTime','start_time_ms','start_time','kickoff_time']){
+      const raw=event?.[key];
+      if(raw===undefined||raw===null||raw==='') continue;
+      const numeric=Number(raw);
+      if(Number.isFinite(numeric)&&numeric>0) return String(Math.round(numeric<100000000000?numeric*1000:numeric));
+      const parsed=Date.parse(String(raw));
+      if(Number.isFinite(parsed)) return String(parsed);
+    }
+    return '';
+  }
+  function eventParticipantIdentity(event){
+    const home=identityPart(event?.homeTeamName||event?.homeTeam||event?.team_1||event?.participant_1);
+    const away=identityPart(event?.awayTeamName||event?.awayTeam||event?.team_2||event?.participant_2);
+    return home&&away?home+'|'+away:'';
+  }
+  function eventIdentityKey(event,index){
+    const eventId=String(event?.eventId||event?.event_id||'').trim();
+    const scope=event?.__scope||{};
+    const scopeKey=String(scope.categoryId||'')+'|'+String(scope.tournamentId||'');
+    const kickoff=eventStartIdentity(event);
+    const participants=eventParticipantIdentity(event);
+    if(!eventId) return 'unidentified|'+scopeKey+'|'+kickoff+'|'+participants+'|row:'+index;
+    // Never collapse two rows on provider ID alone. If kickoff is missing,
+    // preserve the row individually so the tracker can reject missing identity.
+    if(!kickoff) return scopeKey+'|'+eventId+'|unverified-row:'+index;
+    return [scopeKey,eventId,kickoff,participants||'participants-unavailable'].join('|');
+  }
+  const dedup=new Map();
+  events.forEach((event,index)=>dedup.set(eventIdentityKey(event,index),event));
 
   return new Response(JSON.stringify({
     ok:true,
