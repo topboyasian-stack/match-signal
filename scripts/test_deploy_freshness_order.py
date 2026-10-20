@@ -280,6 +280,9 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn("uses: actions/checkout@v4", PROMOTION_WORKFLOW)
         self.assertIn("with:\n          ref: main", PROMOTION_WORKFLOW)
         self.assertIn("gh workflow run unified-upcoming.yml --ref main", PROMOTION_WORKFLOW)
+        self.assertIn("workflow_dispatch:", PROMOTION_WORKFLOW)
+        self.assertIn('paths:\n      - ".github/workflows/builder-production-promotion.yml"', PROMOTION_WORKFLOW)
+        self.assertIn("github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'", PROMOTION_WORKFLOW)
         self.assertNotIn("gh workflow run cloudflare-pages.yml", PROMOTION_WORKFLOW)
 
     def test_feeder_workflows_cannot_bypass_the_board_refresh(self):
