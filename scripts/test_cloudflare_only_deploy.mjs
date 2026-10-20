@@ -51,7 +51,9 @@ assert.ok(
   cloudflare.includes("|scripts/ensure_odds_builder_refresh.py|scripts/test_ensure_odds_builder_refresh.py|") &&
     cloudflare.includes("|scripts/test_workflow_trigger_boundaries.py|") &&
     cloudflare.includes("|scripts/test_cloudflare_only_deploy.mjs|") &&
-    cloudflare.includes("|functions/api/odds-builder-data.js|"),
+    cloudflare.includes("|functions/api/odds-builder-data.js|") &&
+    cloudflare.includes("|functions/api/sportybet-virtual-results.js|") &&
+    cloudflare.includes("      - 'functions/api/sportybet-virtual-results.js'"),
   "Builder refresh, the live odds-data endpoint, and deployment-guard regression paths must be explicitly approved by the direct-promotion guard.",
 );
 assert.ok(
