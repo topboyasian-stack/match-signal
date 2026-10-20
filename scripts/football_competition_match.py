@@ -22,11 +22,11 @@ _ALIASES = {
 }
 
 _AGE_GROUP_RE = re.compile(
-    r"\\b(?:u[\\s._-]?(1[5-9]|2[0-3])|under[\\s._-]?(1[5-9]|2[0-3]))\\b",
+    r"\b(?:u[\s._-]?(1[5-9]|2[0-3])|under[\s._-]?(1[5-9]|2[0-3]))\b",
     re.IGNORECASE,
 )
 _YOUTH_MARKER_RE = re.compile(
-    r"\\b(?:youth|junior|academy|reserves?|development league|boys|girls)\\b",
+    r"\b(?:youth|junior|academy|reserves?|development league|boys|girls)\b",
     re.IGNORECASE,
 )
 
@@ -40,7 +40,7 @@ def competition_key(value):
     if tokens and tokens[0] == "uefa":
         tokens = tokens[1:]
     # Providers sometimes append a season or "league phase" to tournament names.
-    while tokens and re.fullmatch(r"20\\d{2}", tokens[-1]):
+    while tokens and re.fullmatch(r"20\d{2}", tokens[-1]):
         tokens.pop()
     if len(tokens) >= 2 and tokens[-2:] == ["league", "phase"]:
         tokens = tokens[:-2]
