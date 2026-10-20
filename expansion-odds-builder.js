@@ -1105,7 +1105,7 @@
         return response.text();
       })
       .then(function(markup){
-        var match=String(markup||'').match(/<meta\s+name=["']match-signal-build["']\\s+content=["']([^"']+)["']/i);
+        var match=String(markup||'').match(/<meta[^>]*name=["']match-signal-build["'][^>]*content=["']([^"']+)["']/i);
         var liveMarker=match&&match[1]?match[1]:'';
         var currentMeta=document.querySelector('meta[name="match-signal-build"]');
         var currentMarker=currentMeta?String(currentMeta.getAttribute('content')||''):'';
