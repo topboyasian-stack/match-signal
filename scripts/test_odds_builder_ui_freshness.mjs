@@ -49,11 +49,13 @@ function snapshot(generatedOffsetMs = -60_000, batches = [deskBatch()], qualifie
   };
 }
 
-// The declared 15-minute artifact lifetime is inclusive; older/missing/far-future data is stale.
+// Allow a short future timestamp skew between GitHub runners and user browsers; the 15-minute maximum age remains inclusive.
 assert.equal(hooks.builderArtifactFreshness({ generated_at: iso(-15 * 60_000) }, now).fresh, true);
 assert.equal(hooks.builderArtifactFreshness({ generated_at: iso(-15 * 60_000 - 1) }, now).fresh, false);
 assert.equal(hooks.builderArtifactFreshness({ generated_at: iso(30_000) }, now).fresh, true);
-assert.equal(hooks.builderArtifactFreshness({ generated_at: iso(61_000) }, now).fresh, false);
+assert.equal(hooks.builderArtifactFreshness({ generated_at: iso(2 * 60_000) }, now).fresh, true);
+assert.equal(hooks.builderArtifactFreshness({ generated_at: iso(5 * 60_000) }, now).fresh, true);
+assert.equal(hooks.builderArtifactFreshness({ generated_at: iso(5 * 60_000 + 1) }, now).fresh, false);
 assert.equal(hooks.builderArtifactFreshness({}, now).fresh, false);
 
 // The intended 60%+ Desk lane is visible within its dedicated research lane, but the ordinary
@@ -116,3 +118,7 @@ assert.equal(hooks.isCurrentBuilderLeg(deskLeg({ market_odds_age_seconds: 6 * 60
 assert.equal(hooks.isCurrentBuilderLeg(deskLeg({ market_odds_age_seconds: 5 * 60 }), now, 10 * 60_000), true);
 
 console.log('Odds Builder UI freshness passed: desk-only 60% gate, artifact expiry, future kickoffs, and combined snapshot-plus-quote age.');
+
+assert.ok(source.includes('Exact-line walk-forward holdout'), 'Desk candidates must display the walk-forward evidence basis');
+assert.ok(source.includes('recent_settled_line_side_loss_streak'), 'No-batch explanation must reveal recent settled-loss holds');
+assert.ok(source.includes('data-builder-refresh'), 'Builder must include a usable manual refresh action');
