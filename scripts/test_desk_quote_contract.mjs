@@ -6,7 +6,7 @@ import vm from "node:vm";
 
 const source = fs.readFileSync("sport-hubs.js", "utf8");
 const css = fs.readFileSync("sport-hubs.css", "utf8");
-const builderSource = fs.readFileSync("scripts/odds_builder.py", "utf8");
+const builderSource = fs.readFileSync("scripts/odds_builder_core.py", "utf8");
 const candidateCollectorSource = fs.readFileSync("scripts/selection_candidate_collector.py", "utf8");
 const builderUiSource = fs.readFileSync("expansion-odds-builder.js", "utf8");
 const pushBatchSource = fs.readFileSync("functions/api/push-batch-available.js", "utf8");
