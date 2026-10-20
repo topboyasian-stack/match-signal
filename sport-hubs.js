@@ -412,7 +412,7 @@ function unifiedMarketLine(x){
   return '<div class="ms-market-row">'+
     '<span class="ms-market-name"><b>'+E(market)+'</b></span>'+
     '<span>'+(calibration?'Desk-calibrated estimate':'Model estimate')+' <b>'+(p==null?"—":P(p))+'</b></span>'+
-    (calibration?'<span>Raw model <b>'+P(calibration.raw)+'</b> · exact-line walk-forward '+P(calibration.hitRate)+' (n='+Math.round(calibration.n)+')</span>':'')+
+    (calibration?'<span>Raw model <b>'+P(calibration.raw)+'</b> · exact-line walk-forward '+(calibration.hitRate*100).toFixed(2)+'%'+' (n='+Math.round(calibration.n)+')</span>':'')+
     '<span>Model fair <b>'+E(fairLabel)+'</b></span>'+
     '<span>Evidence <b>'+E(String(evidence||"unavailable"))+'</b></span>'+
     '<span class="'+marketQuoteClass+'">'+E(marketReference)+'</span>'+

@@ -416,5 +416,54 @@ class UpcomingDeskPolicyTests(unittest.TestCase):
         self.assertAlmostEqual(result["holdout_hit_rate"], .60)
         self.assertFalse(result["pass"])
 
+
+    def test_product_bootstrap_cannot_bypass_exact_line_direction_validation(self):
+        resolve = ns["resolve_efootball_qualification_status"]
+        common = {
+            "base_model_gate": True,
+            "model_line": True,
+            "edge": 0.466,
+            "model_probability": 0.6803,
+            "active_comp": False,
+            "model_comp": False,
+            "product_bootstrap": True,
+            "directional_pass": False,
+        }
+        # A product-wide bootstrap is not evidence that this exact line and
+        # side passed its own chronological holdout and recent-settlement gates.
+        self.assertEqual(
+            resolve(**common),
+            "DIRECTIONAL_LINE_VALIDATION_GATE_PENDING",
+        )
+        # With the unchanged exact line/side gate passing, new competitions may
+        # still use the validated product bootstrap lane.
+        self.assertEqual(
+            resolve(**{**common, "directional_pass": True}),
+            "BETTING_QUALIFIED_PAPER_BOOTSTRAP",
+        )
+        self.assertEqual(
+            resolve(**{**common, "product_bootstrap": False, "directional_pass": True}),
+            "BETTING_QUALIFIED_PAPER_DIRECTIONAL",
+        )
+        # Preserve the existing validated competition + line route.
+        self.assertEqual(
+            resolve(**{**common, "active_comp": True, "model_comp": True}),
+            "BETTING_QUALIFIED_PAPER",
+        )
+        # The configured 65% floor is strict; the 64.97% O3.5 holdout must not
+        # pass merely because a UI rounds its displayed percentage to 65%.
+        self.assertEqual(
+            resolve(**{**common, "model_probability": 0.649717}),
+            "MODEL_PROBABILITY_BELOW_0_65",
+        )
+
+    def test_qualified_best_displays_exact_line_hit_rate_without_rounding_up_to_gate(self):
+        hub_script = (ROOT / "sport-hubs.js").read_text(encoding="utf-8")
+        self.assertIn(
+            "(calibration.hitRate*100).toFixed(2)",
+            hub_script,
+            "Do not display 64.97% as 65% when the qualification floor is 65%.",
+        )
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

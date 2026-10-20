@@ -820,6 +820,44 @@ def build_efootball_directional_gate(eval_art, history):
         }
     return out
 
+
+def resolve_efootball_qualification_status(
+    *,
+    base_model_gate,
+    model_line,
+    edge,
+    model_probability,
+    active_comp,
+    model_comp,
+    product_bootstrap,
+    directional_pass,
+):
+    """Apply the existing eFootball gates without letting product bootstrap bypass line evidence.
+
+    A product-wide model validation can support discovery in a new competition,
+    but cannot substitute for the exact line/side walk-forward plus recent
+    settlement gate. Existing competition-and-line qualification remains intact.
+    """
+    if not base_model_gate:
+        return "BASE_MODEL_GATE_PENDING"
+    if not model_line:
+        return "MODEL_LINE_SCOPE_GATE_PENDING"
+    edge_value = num(edge)
+    if edge_value is None:
+        return "MARKET_EDGE_PENDING"
+    if edge_value < 0.02:
+        return "EDGE_BELOW_2PCT"
+    probability = num(model_probability)
+    if probability is None or probability < 0.65:
+        return "MODEL_PROBABILITY_BELOW_0_65"
+    if active_comp and model_comp:
+        return "BETTING_QUALIFIED_PAPER"
+    if product_bootstrap and directional_pass:
+        return "BETTING_QUALIFIED_PAPER_BOOTSTRAP"
+    if directional_pass:
+        return "BETTING_QUALIFIED_PAPER_DIRECTIONAL"
+    return "DIRECTIONAL_LINE_VALIDATION_GATE_PENDING"
+
 def build_virtual_events(history, lifecycle, eligibility):
     """Forward Virtual/eFootball projections using the same base qualification policy
     as the Virtual Lab, without waiting for participant enhancement to pass.
@@ -1145,24 +1183,16 @@ def build_virtual_events(history, lifecycle, eligibility):
                 product,line,chosen_pick,exact_oos
             )
             if product.startswith("efootball"):
-                if not base_model_gate:
-                    qualification_status="BASE_MODEL_GATE_PENDING"
-                elif not model_line:
-                    qualification_status="MODEL_LINE_SCOPE_GATE_PENDING"
-                elif edge is None:
-                    qualification_status="MARKET_EDGE_PENDING"
-                elif edge<0.02:
-                    qualification_status="EDGE_BELOW_2PCT"
-                elif chosen_model<0.65:
-                    qualification_status="MODEL_PROBABILITY_BELOW_0_65"
-                elif active_comp and model_comp:
-                    qualification_status="BETTING_QUALIFIED_PAPER"
-                elif product_bootstrap_gate.get(product,False):
-                    qualification_status="BETTING_QUALIFIED_PAPER_BOOTSTRAP"
-                elif directional.get("pass"):
-                    qualification_status="BETTING_QUALIFIED_PAPER_DIRECTIONAL"
-                else:
-                    qualification_status="DIRECTIONAL_LINE_VALIDATION_GATE_PENDING"
+                qualification_status=resolve_efootball_qualification_status(
+                    base_model_gate=base_model_gate,
+                    model_line=model_line,
+                    edge=edge,
+                    model_probability=chosen_model,
+                    active_comp=active_comp,
+                    model_comp=model_comp,
+                    product_bootstrap=product_bootstrap_gate.get(product,False),
+                    directional_pass=bool(directional.get("pass")),
+                )
             elif product=="vfootball":
                 # A very high Under estimate is not enough on its own. Guard
                 # U7.5/U8.5 and higher until the exact direction has >=30
