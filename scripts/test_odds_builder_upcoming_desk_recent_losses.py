@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT / "scripts") not in sys.path:
     sys.path.insert(0, str(ROOT / "scripts"))
 
-from odds_builder import _upcoming_desk_recent_result_guard, _upcoming_desk_settled_performance_gate, _upcoming_desk_pending_event_ids
+from odds_builder import _upcoming_desk_recent_result_guard, _upcoming_desk_settled_performance_gate, _upcoming_desk_pending_event_ids, _settled_builder_lane_performance_gate
 
 
 def settled_leg(event_id, status, settled_at, *, line=7.5, side="under", product="efootball_gt"):
@@ -246,6 +246,33 @@ class UpcomingDeskSettledPromotionGateTests(unittest.TestCase):
         self.assertFalse(result["eligible"])
         self.assertEqual(result["settled_ticket_n"], 2)
         self.assertEqual(result["wins"], 2)
+
+    def test_negative_vfootball_lane_roi_is_not_overridden_by_old_event_holdout(self):
+        tracker = {
+            "tickets": [
+                *[desk_ticket(f"vf-win-{i}", "WON", odds=3.05, lane="vfootball_event_holdout_value") for i in range(3)],
+                *[desk_ticket(f"vf-loss-{i}", "LOST", odds=3.05, lane="vfootball_event_holdout_value") for i in range(17)],
+            ],
+            "archived_tickets": [],
+        }
+        result = _settled_builder_lane_performance_gate("vfootball_event_holdout_value", tracker=tracker)
+        self.assertFalse(result["eligible"])
+        self.assertEqual(result["settled_ticket_n"], 20)
+        self.assertLess(result["flat_stake_roi"], 0)
+        self.assertEqual(result["reason"], "settled_lane_ticket_roi_below_promotion_floor")
+
+    def test_high_confidence_lane_can_pass_its_own_settled_return_gate(self):
+        tracker = {
+            "tickets": [
+                *[desk_ticket(f"hc-win-{i}", "WON", odds=4.7, lane="high_confidence_research") for i in range(21)],
+                *[desk_ticket(f"hc-loss-{i}", "LOST", odds=4.7, lane="high_confidence_research") for i in range(32)],
+            ],
+            "archived_tickets": [],
+        }
+        result = _settled_builder_lane_performance_gate("high_confidence_research", tracker=tracker)
+        self.assertTrue(result["eligible"])
+        self.assertEqual(result["settled_ticket_n"], 53)
+        self.assertGreaterEqual(result["flat_stake_roi"], 0.02)
 
     def test_open_events_are_excluded_even_when_parent_ticket_already_lost(self):
         tracker = {
