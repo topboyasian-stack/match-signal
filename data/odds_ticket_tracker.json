@@ -1,29 +1,29 @@
 {
   "version": 4,
-  "updated_at": "2026-10-20T05:48:21.408744+00:00",
+  "updated_at": "2026-10-20T06:10:41.988816+00:00",
   "mode": "PAPER_ONLY",
   "summary": {
     "tracked_tickets": 264,
-    "pending": 68,
+    "pending": 65,
     "won": 55,
-    "lost": 141,
-    "active_with_loss": 15,
-    "legs_won": 307,
-    "legs_lost": 191,
-    "legs_pending": 174,
+    "lost": 144,
+    "active_with_loss": 14,
+    "legs_won": 308,
+    "legs_lost": 195,
+    "legs_pending": 169,
     "pending_legs_by_product": {
-      "efootball_gt": 174
+      "efootball_gt": 169
     },
-    "settled_tickets": 196,
+    "settled_tickets": 199,
     "by_leg_count": {
       "2": {
-        "tracked": 126,
+        "tracked": 129,
         "won": 30,
-        "lost": 96,
-        "settled": 126,
-        "accuracy": 0.238095,
-        "avg_combined_odds": 5.586762,
-        "avg_model_rating": 55.492619
+        "lost": 99,
+        "settled": 129,
+        "accuracy": 0.232558,
+        "avg_combined_odds": 5.540682,
+        "avg_model_rating": 54.906047
       },
       "3": {
         "tracked": 6,
@@ -46,13 +46,13 @@
     },
     "by_primary_lane": {
       "upcoming_desk_research": {
-        "tracked": 4,
+        "tracked": 7,
         "won": 2,
-        "lost": 2,
-        "settled": 4,
-        "accuracy": 0.5,
-        "avg_combined_odds": 3.63225,
-        "avg_model_rating": 30.4325
+        "lost": 5,
+        "settled": 7,
+        "accuracy": 0.285714,
+        "avg_combined_odds": 3.620714,
+        "avg_model_rating": 30.362857
       },
       "efootball_exact_evidence_value": {
         "tracked": 110,
@@ -104,17 +104,17 @@
       "high_confidence_loss_tickets": 24,
       "high_confidence_loss_legs": 30,
       "losses_by_product": {
-        "efootball_gt": 168,
+        "efootball_gt": 172,
         "vfootball": 23
       },
       "losses_by_direction": {
-        "under": 101,
+        "under": 105,
         "over": 90
       },
       "shape_comparison": "Use by_leg_count to compare 2–7-leg accuracy, average odds, and average model rating.",
       "lane_comparison": "Use by_primary_lane to compare construction-lane performance."
     },
-    "active_pending": 5,
+    "active_pending": 2,
     "archived_pending": 63,
     "visible_tickets": 100,
     "archived_tickets": 164
@@ -407,8 +407,8 @@
       "batch_id": "DESK-BATCH-01",
       "created_at": "2026-10-20T05:16:19.125120+00:00",
       "last_seen_at": "2026-10-20T05:16:19.125120+00:00",
-      "last_settled_at": null,
-      "status": "PENDING",
+      "last_settled_at": "2026-10-20T06:10:41.988816+00:00",
+      "status": "LOST",
       "combined_odds": 3.995,
       "combined_odds_source": "builder_batch_snapshot",
       "odds_snapshot_complete": true,
@@ -424,8 +424,8 @@
       "primary_lane": "upcoming_desk_research",
       "odds_locked_at": "2026-10-20T05:16:19.125120+00:00",
       "leg_count": 2,
-      "settled_leg_count": 0,
-      "pending_leg_count": 2,
+      "settled_leg_count": 2,
+      "pending_leg_count": 0,
       "legs": [
         {
           "sport": "virtual",
@@ -493,7 +493,7 @@
           "builder_eligible": true,
           "real_money_eligible": false,
           "paper_only": true,
-          "status": "PENDING",
+          "status": "LOST",
           "source": "Upcoming Desk desk-calibrated walk-forward estimate · research-only",
           "market_source": "SportyBet NG",
           "recent_evidence": {
@@ -529,10 +529,13 @@
           "sportybet_outcome_name": "Under 7.5",
           "fixture_key": "efootball_gt|man utd alosdvxl v brighton haiko",
           "bookmaker_odds_snapshot": 1.7,
-          "correct": null,
-          "settled_at": null,
-          "result": null,
-          "final_score": null
+          "correct": false,
+          "settled_at": "2026-10-20T06:10:41.988816+00:00",
+          "result": "O7.5",
+          "final_score": [
+            5.0,
+            5.0
+          ]
         },
         {
           "sport": "virtual",
@@ -600,7 +603,7 @@
           "builder_eligible": true,
           "real_money_eligible": false,
           "paper_only": true,
-          "status": "PENDING",
+          "status": "WON",
           "source": "Upcoming Desk desk-calibrated walk-forward estimate · research-only",
           "market_source": "SportyBet NG",
           "recent_evidence": {
@@ -636,17 +639,20 @@
           "sportybet_outcome_name": "Under 7.5",
           "fixture_key": "efootball_gt|liverpool why v tottenham frantsuz",
           "bookmaker_odds_snapshot": 2.35,
-          "correct": null,
-          "settled_at": null,
-          "result": null,
-          "final_score": null
+          "correct": true,
+          "settled_at": "2026-10-20T06:10:41.988816+00:00",
+          "result": "U7.5",
+          "final_score": [
+            2.0,
+            3.0
+          ]
         }
       ],
       "leg_counts": {
-        "won": 0,
-        "lost": 0,
+        "won": 1,
+        "lost": 1,
         "void": 0,
-        "pending": 2
+        "pending": 0
       },
       "construction_snapshot": {
         "batch_id": "DESK-BATCH-01",
@@ -680,9 +686,61 @@
         },
         "recorded_at": "2026-10-20T05:16:19.149436+00:00"
       },
-      "settlement_diagnostics": null,
+      "settlement_diagnostics": {
+        "diagnostic_version": 1,
+        "ticket_outcome": "LOST",
+        "diagnostic_label": "TICKET_LOST_1_OF_2_LEGS",
+        "leg_count": 2,
+        "settled_leg_count": 2,
+        "won_leg_count": 1,
+        "lost_leg_count": 1,
+        "void_leg_count": 0,
+        "pending_leg_count": 0,
+        "leg_hit_rate_excluding_voids": 0.5,
+        "average_settled_leg_model_probability": 0.6671,
+        "weakest_ticket_leg_model_probability": 0.6671,
+        "high_confidence_loss_count": 0,
+        "high_confidence_loss_events": [],
+        "losses_by_product": {
+          "efootball_gt": 1
+        },
+        "losses_by_direction": {
+          "under": 1
+        },
+        "loss_details": [
+          {
+            "event_id": "sr:match:BAaFTy0qWdyenYvVBuAFafg",
+            "match": "Man Utd (alosdvxl) vs Brighton (Haiko)",
+            "product": "efootball_gt",
+            "pick": "Man Utd (alosdvxl) vs Brighton (Haiko) — O/U under 7.5",
+            "line": 7.5,
+            "model_probability": 0.6671,
+            "model_edge": 0.120433,
+            "bookmaker_odds": 1.7,
+            "evidence_score": null,
+            "recent_evidence_n": 260,
+            "recent_evidence_hit_rate": 0.607692,
+            "result": "O7.5",
+            "final_score": [
+              5.0,
+              5.0
+            ],
+            "settled_at": "2026-10-20T06:10:41.988816+00:00"
+          }
+        ],
+        "improvement_keys": {
+          "shape": "2_leg",
+          "primary_lane": "upcoming_desk_research",
+          "combined_odds": 3.995,
+          "combined_model_rating": 29.94,
+          "combined_model_probability": 0.299414,
+          "avg_model_probability": 66.71,
+          "avg_model_edge_percent": 19.66
+        }
+      },
       "paper_only": true,
-      "real_money_execution": false
+      "real_money_execution": false,
+      "lost_at": "2026-10-20T06:10:41.988816+00:00"
     },
     {
       "version": 3,
@@ -691,8 +749,8 @@
       "batch_id": "DESK-BATCH-01",
       "created_at": "2026-10-20T05:09:42.864171+00:00",
       "last_seen_at": "2026-10-20T05:09:42.864171+00:00",
-      "last_settled_at": "2026-10-20T05:29:35.695423+00:00",
-      "status": "PENDING",
+      "last_settled_at": "2026-10-20T06:10:41.988816+00:00",
+      "status": "LOST",
       "combined_odds": 3.458,
       "combined_odds_source": "builder_batch_snapshot",
       "odds_snapshot_complete": true,
@@ -708,8 +766,8 @@
       "primary_lane": "upcoming_desk_research",
       "odds_locked_at": "2026-10-20T05:09:42.864171+00:00",
       "leg_count": 2,
-      "settled_leg_count": 1,
-      "pending_leg_count": 1,
+      "settled_leg_count": 2,
+      "pending_leg_count": 0,
       "legs": [
         {
           "sport": "virtual",
@@ -887,7 +945,7 @@
           "builder_eligible": true,
           "real_money_eligible": false,
           "paper_only": true,
-          "status": "PENDING",
+          "status": "LOST",
           "source": "Upcoming Desk desk-calibrated walk-forward estimate · research-only",
           "market_source": "SportyBet NG",
           "recent_evidence": {
@@ -923,17 +981,20 @@
           "sportybet_outcome_name": "Under 7.5",
           "fixture_key": "efootball_gt|brighton haiko v newcastle vladl3n",
           "bookmaker_odds_snapshot": 1.82,
-          "correct": null,
-          "settled_at": null,
-          "result": null,
-          "final_score": null
+          "correct": false,
+          "settled_at": "2026-10-20T06:10:41.988816+00:00",
+          "result": "O7.5",
+          "final_score": [
+            4.0,
+            5.0
+          ]
         }
       ],
       "leg_counts": {
         "won": 1,
-        "lost": 0,
+        "lost": 1,
         "void": 0,
-        "pending": 1
+        "pending": 0
       },
       "construction_snapshot": {
         "batch_id": "DESK-BATCH-01",
@@ -967,9 +1028,61 @@
         },
         "recorded_at": "2026-10-20T05:09:42.903778+00:00"
       },
-      "settlement_diagnostics": null,
+      "settlement_diagnostics": {
+        "diagnostic_version": 1,
+        "ticket_outcome": "LOST",
+        "diagnostic_label": "TICKET_LOST_1_OF_2_LEGS",
+        "leg_count": 2,
+        "settled_leg_count": 2,
+        "won_leg_count": 1,
+        "lost_leg_count": 1,
+        "void_leg_count": 0,
+        "pending_leg_count": 0,
+        "leg_hit_rate_excluding_voids": 0.5,
+        "average_settled_leg_model_probability": 0.6671,
+        "weakest_ticket_leg_model_probability": 0.6671,
+        "high_confidence_loss_count": 0,
+        "high_confidence_loss_events": [],
+        "losses_by_product": {
+          "efootball_gt": 1
+        },
+        "losses_by_direction": {
+          "under": 1
+        },
+        "loss_details": [
+          {
+            "event_id": "sr:match:BAaFTy1pTdCePLTXFqwB5Sw",
+            "match": "Brighton (Haiko) vs Newcastle (vladl3n)",
+            "product": "efootball_gt",
+            "pick": "Brighton (Haiko) vs Newcastle (vladl3n) — O/U under 7.5",
+            "line": 7.5,
+            "model_probability": 0.6671,
+            "model_edge": 0.158992,
+            "bookmaker_odds": 1.82,
+            "evidence_score": null,
+            "recent_evidence_n": 260,
+            "recent_evidence_hit_rate": 0.607692,
+            "result": "O7.5",
+            "final_score": [
+              4.0,
+              5.0
+            ],
+            "settled_at": "2026-10-20T06:10:41.988816+00:00"
+          }
+        ],
+        "improvement_keys": {
+          "shape": "2_leg",
+          "primary_lane": "upcoming_desk_research",
+          "combined_odds": 3.458,
+          "combined_model_rating": 29.94,
+          "combined_model_probability": 0.299414,
+          "avg_model_probability": 66.71,
+          "avg_model_edge_percent": 16.98
+        }
+      },
       "paper_only": true,
-      "real_money_execution": false
+      "real_money_execution": false,
+      "lost_at": "2026-10-20T06:10:41.988816+00:00"
     },
     {
       "version": 3,
@@ -978,7 +1091,7 @@
       "batch_id": "DESK-BATCH-01",
       "created_at": "2026-10-20T04:23:59.692031+00:00",
       "last_seen_at": "2026-10-20T04:23:59.692031+00:00",
-      "last_settled_at": "2026-10-20T05:29:35.695017+00:00",
+      "last_settled_at": "2026-10-20T06:10:41.988816+00:00",
       "status": "LOST",
       "combined_odds": 3.54,
       "combined_odds_source": "builder_batch_snapshot",
@@ -995,8 +1108,8 @@
       "primary_lane": "upcoming_desk_research",
       "odds_locked_at": "2026-10-20T04:23:59.692031+00:00",
       "leg_count": 2,
-      "settled_leg_count": 1,
-      "pending_leg_count": 1,
+      "settled_leg_count": 2,
+      "pending_leg_count": 0,
       "legs": [
         {
           "sport": "virtual",
@@ -1174,7 +1287,7 @@
           "builder_eligible": true,
           "real_money_eligible": false,
           "paper_only": true,
-          "status": "PENDING",
+          "status": "LOST",
           "source": "Upcoming Desk desk-calibrated walk-forward estimate · research-only",
           "market_source": "SportyBet NG",
           "recent_evidence": {
@@ -1210,17 +1323,20 @@
           "sportybet_outcome_name": "Under 7.5",
           "fixture_key": "efootball_gt|man utd alosdvxl v brighton haiko",
           "bookmaker_odds_snapshot": 1.77,
-          "correct": null,
-          "settled_at": null,
-          "result": null,
-          "final_score": null
+          "correct": false,
+          "settled_at": "2026-10-20T06:10:41.988816+00:00",
+          "result": "O7.5",
+          "final_score": [
+            5.0,
+            5.0
+          ]
         }
       ],
       "leg_counts": {
         "won": 0,
-        "lost": 1,
+        "lost": 2,
         "void": 0,
-        "pending": 1
+        "pending": 0
       },
       "construction_snapshot": {
         "batch_id": "DESK-BATCH-01",
@@ -1257,23 +1373,23 @@
       "settlement_diagnostics": {
         "diagnostic_version": 1,
         "ticket_outcome": "LOST",
-        "diagnostic_label": "TICKET_LOST_1_OF_2_LEGS",
+        "diagnostic_label": "TICKET_LOST_2_OF_2_LEGS",
         "leg_count": 2,
-        "settled_leg_count": 1,
+        "settled_leg_count": 2,
         "won_leg_count": 0,
-        "lost_leg_count": 1,
+        "lost_leg_count": 2,
         "void_leg_count": 0,
-        "pending_leg_count": 1,
+        "pending_leg_count": 0,
         "leg_hit_rate_excluding_voids": 0.0,
         "average_settled_leg_model_probability": 0.6671,
         "weakest_ticket_leg_model_probability": 0.6671,
         "high_confidence_loss_count": 0,
         "high_confidence_loss_events": [],
         "losses_by_product": {
-          "efootball_gt": 1
+          "efootball_gt": 2
         },
         "losses_by_direction": {
-          "under": 1
+          "under": 2
         },
         "loss_details": [
           {
@@ -1294,6 +1410,25 @@
               6.0
             ],
             "settled_at": "2026-10-20T05:29:35.695017+00:00"
+          },
+          {
+            "event_id": "sr:match:BAaFTy0qWdyenYvVBuAFafg",
+            "match": "Man Utd (alosdvxl) vs Brighton (Haiko)",
+            "product": "efootball_gt",
+            "pick": "Man Utd (alosdvxl) vs Brighton (Haiko) — O/U under 7.5",
+            "line": 7.5,
+            "model_probability": 0.6671,
+            "model_edge": 0.145478,
+            "bookmaker_odds": 1.77,
+            "evidence_score": null,
+            "recent_evidence_n": 260,
+            "recent_evidence_hit_rate": 0.607692,
+            "result": "O7.5",
+            "final_score": [
+              5.0,
+              5.0
+            ],
+            "settled_at": "2026-10-20T06:10:41.988816+00:00"
           }
         ],
         "improvement_keys": {
@@ -1982,296 +2117,9 @@
     },
     {
       "version": 3,
-      "ticket_id": "T-9A90EF9A65CB",
-      "snapshot_fingerprint": "9A90EF9A65CB",
-      "batch_id": "DESK-BATCH-02",
-      "created_at": "2026-10-20T02:09:46.399392+00:00",
-      "last_seen_at": "2026-10-20T02:09:46.399392+00:00",
-      "last_settled_at": "2026-10-20T05:29:35.695423+00:00",
-      "status": "PENDING",
-      "combined_odds": 3.363,
-      "combined_odds_source": "builder_batch_snapshot",
-      "odds_snapshot_complete": true,
-      "combined_model_rating": 30.93,
-      "combined_model_probability": 0.309346,
-      "raw_combined_model_probability": 0.445022,
-      "leg_strength_rating": 66.71,
-      "avg_model_probability": 66.71,
-      "avg_model_edge_percent": 16.3,
-      "products": [
-        "efootball_gt"
-      ],
-      "primary_lane": "upcoming_desk_research",
-      "odds_locked_at": "2026-10-20T02:09:46.399392+00:00",
-      "leg_count": 2,
-      "settled_leg_count": 1,
-      "pending_leg_count": 1,
-      "legs": [
-        {
-          "sport": "virtual",
-          "competition": "Premier League 2x6",
-          "event_id": "sr:match:BAaFUeAqvd525Q2VNe4I1QQ",
-          "start_time": "2026-10-20T05:12:00+00:00",
-          "match": "Liverpool (why) vs Man City (TikitakaMaster)",
-          "market": "virtual_total",
-          "pick": "Liverpool (why) vs Man City (TikitakaMaster) — O/U under 7.5",
-          "line": 7.5,
-          "builder_pick": "under",
-          "participant_1": "Liverpool (why)",
-          "participant_2": "Man City (TikitakaMaster)",
-          "model_probability": 0.6671,
-          "desk_calibrated_probability": 0.6671,
-          "raw_model_probability": 0.7301,
-          "walkforward_exact_line_n": 268,
-          "walkforward_exact_line_hit_rate": 0.6156716417910447,
-          "desk_learning_adjustment_source": "EXACT_LINE_DIRECTION",
-          "desk_official_qualification_pass": false,
-          "desk_official_qualification_status": "KICKOFF_WINDOW_PENDING",
-          "upcoming_desk_research_only": true,
-          "model_fair_odds": 1.499,
-          "bookmaker_odds": 1.9,
-          "market_implied_probability": 0.526316,
-          "de_vig_probability": 0.486486,
-          "model_edge": 0.180614,
-          "expected_value": 0.26749,
-          "participant_history": {
-            "available": true,
-            "score": 0.4019,
-            "participants": [
-              {
-                "participant": "why",
-                "n": 101,
-                "recent_n": 5,
-                "full_score": 0.4762,
-                "recent_score": 0.5556,
-                "score": 0.5278,
-                "available": true
-              },
-              {
-                "participant": "tikitakamaster",
-                "n": 145,
-                "recent_n": 5,
-                "full_score": 0.3758,
-                "recent_score": 0.2222,
-                "score": 0.276,
-                "available": true
-              }
-            ],
-            "line": "7.5",
-            "side": "under"
-          },
-          "participant_history_bonus": -0.035,
-          "evidence_score": null,
-          "selection_score": 0.145614,
-          "product": "efootball_gt",
-          "edge_percent": 18.06,
-          "odds_fresh": true,
-          "market_odds_age_seconds": 13.5,
-          "data_quality": 0.75,
-          "uncertainty": 0.058,
-          "market_complete": true,
-          "builder_eligible": true,
-          "real_money_eligible": false,
-          "paper_only": true,
-          "status": "WON",
-          "source": "Upcoming Desk desk-calibrated walk-forward estimate · research-only",
-          "market_source": "SportyBet NG",
-          "recent_evidence": {
-            "n": 268,
-            "hit_rate": 0.615672,
-            "source": "unified_upcoming.json",
-            "scope": "selected product + exact O/U line + selected side · walk-forward holdout"
-          },
-          "evidence_source": "upcoming_desk_exact_line_walkforward",
-          "score_derived_evidence": false,
-          "evidence_sample_n": 0,
-          "direct_exact_sample_n": 0,
-          "results_first": null,
-          "qualification_lane": "upcoming_desk_research_only",
-          "phase2_cyclical_loop": {
-            "enabled": true,
-            "flagged": false,
-            "confidence": 0.0,
-            "model_probability": 0.6671,
-            "evidence_posterior": null,
-            "cycle_break_posterior": null,
-            "current_streak_side": null,
-            "current_streak_length": 0,
-            "historical_break_observations": 0,
-            "historical_breaks": 0,
-            "reason": "model_probability_below_78_percent"
-          },
-          "market_odds_timestamp": "2026-10-20T02:05:50.952615+00:00",
-          "sportybet_event_id": "sr:match:BAaFUeAqvd525Q2VNe4I1QQ",
-          "sportybet_market_id": "18",
-          "sportybet_specifier": "total=7.5",
-          "sportybet_outcome_id": "13",
-          "sportybet_outcome_name": "Under 7.5",
-          "fixture_key": "efootball_gt|liverpool why v man city tikitakamaster",
-          "bookmaker_odds_snapshot": 1.9,
-          "correct": true,
-          "settled_at": "2026-10-20T05:29:35.695423+00:00",
-          "result": "U7.5",
-          "final_score": [
-            3.0,
-            3.0
-          ]
-        },
-        {
-          "sport": "virtual",
-          "competition": "Volta FA Cup",
-          "event_id": "sr:match:BAaFTy0qWdyenYvVBuAFafg",
-          "start_time": "2026-10-20T05:40:00+00:00",
-          "match": "Man Utd (alosdvxl) vs Brighton (Haiko)",
-          "market": "virtual_total",
-          "pick": "Man Utd (alosdvxl) vs Brighton (Haiko) — O/U under 7.5",
-          "line": 7.5,
-          "builder_pick": "under",
-          "participant_1": "Man Utd (alosdvxl)",
-          "participant_2": "Brighton (Haiko)",
-          "model_probability": 0.6671,
-          "desk_calibrated_probability": 0.6671,
-          "raw_model_probability": 0.7301,
-          "walkforward_exact_line_n": 268,
-          "walkforward_exact_line_hit_rate": 0.6156716417910447,
-          "desk_learning_adjustment_source": "EXACT_LINE_DIRECTION",
-          "desk_official_qualification_pass": false,
-          "desk_official_qualification_status": "DIRECTIONAL_LINE_VALIDATION_GATE_PENDING",
-          "upcoming_desk_research_only": true,
-          "model_fair_odds": 1.499,
-          "bookmaker_odds": 1.77,
-          "market_implied_probability": 0.564972,
-          "de_vig_probability": 0.521622,
-          "model_edge": 0.145478,
-          "expected_value": 0.180767,
-          "participant_history": {
-            "available": true,
-            "score": 0.4446,
-            "participants": [
-              {
-                "participant": "alosdvxl",
-                "n": 105,
-                "recent_n": 5,
-                "full_score": 0.4862,
-                "recent_score": 0.4444,
-                "score": 0.4591,
-                "available": true
-              },
-              {
-                "participant": "haiko",
-                "n": 114,
-                "recent_n": 5,
-                "full_score": 0.6102,
-                "recent_score": 0.3333,
-                "score": 0.4302,
-                "available": true
-              }
-            ],
-            "line": "7.5",
-            "side": "under"
-          },
-          "participant_history_bonus": -0.035,
-          "evidence_score": null,
-          "selection_score": 0.110478,
-          "product": "efootball_gt",
-          "edge_percent": 14.55,
-          "odds_fresh": true,
-          "market_odds_age_seconds": 13.5,
-          "data_quality": 0.75,
-          "uncertainty": 0.058,
-          "market_complete": true,
-          "builder_eligible": true,
-          "real_money_eligible": false,
-          "paper_only": true,
-          "status": "PENDING",
-          "source": "Upcoming Desk desk-calibrated walk-forward estimate · research-only",
-          "market_source": "SportyBet NG",
-          "recent_evidence": {
-            "n": 268,
-            "hit_rate": 0.615672,
-            "source": "unified_upcoming.json",
-            "scope": "selected product + exact O/U line + selected side · walk-forward holdout"
-          },
-          "evidence_source": "upcoming_desk_exact_line_walkforward",
-          "score_derived_evidence": false,
-          "evidence_sample_n": 0,
-          "direct_exact_sample_n": 0,
-          "results_first": null,
-          "qualification_lane": "upcoming_desk_research_only",
-          "phase2_cyclical_loop": {
-            "enabled": true,
-            "flagged": false,
-            "confidence": 0.0,
-            "model_probability": 0.6671,
-            "evidence_posterior": null,
-            "cycle_break_posterior": null,
-            "current_streak_side": null,
-            "current_streak_length": 0,
-            "historical_break_observations": 0,
-            "historical_breaks": 0,
-            "reason": "model_probability_below_78_percent"
-          },
-          "market_odds_timestamp": "2026-10-20T02:05:50.952615+00:00",
-          "sportybet_event_id": "sr:match:BAaFTy0qWdyenYvVBuAFafg",
-          "sportybet_market_id": "18",
-          "sportybet_specifier": "total=7.5",
-          "sportybet_outcome_id": "13",
-          "sportybet_outcome_name": "Under 7.5",
-          "fixture_key": "efootball_gt|man utd alosdvxl v brighton haiko",
-          "bookmaker_odds_snapshot": 1.77,
-          "correct": null,
-          "settled_at": null,
-          "result": null,
-          "final_score": null
-        }
-      ],
-      "leg_counts": {
-        "won": 1,
-        "lost": 0,
-        "void": 0,
-        "pending": 1
-      },
-      "construction_snapshot": {
-        "batch_id": "DESK-BATCH-02",
-        "primary_lane": "upcoming_desk_research",
-        "leg_count": 2,
-        "combined_odds": 3.363,
-        "combined_model_rating": 30.93,
-        "combined_model_probability": 0.309346,
-        "raw_combined_model_probability": 0.445022,
-        "leg_strength_rating": 66.71,
-        "avg_model_probability": 66.71,
-        "avg_model_edge_percent": 16.3,
-        "products": [
-          "efootball_gt"
-        ],
-        "policy": {
-          "minimum_combined_odds": 2.8,
-          "maximum_legs": 4,
-          "adaptive_leg_counts": [
-            2,
-            3,
-            4
-          ],
-          "per_leg_min_model_probability": {
-            "2": 0.6,
-            "3": 0.6,
-            "4": 0.6
-          },
-          "preferred_per_leg_model_probability": 0.9,
-          "mode": "PAPER_ONLY"
-        },
-        "recorded_at": "2026-10-20T02:09:46.438769+00:00"
-      },
-      "settlement_diagnostics": null,
-      "paper_only": true,
-      "real_money_execution": false
-    },
-    {
-      "version": 3,
       "ticket_id": "T-DBD2FCE24FDA",
       "snapshot_fingerprint": "DBD2FCE24FDA",
-      "batch_id": "DESK-BATCH-02",
+      "batch_id": "DESK-BATCH-01",
       "created_at": "2026-10-20T02:09:46.399392+00:00",
       "last_seen_at": "2026-10-20T02:09:46.399392+00:00",
       "last_settled_at": null,
@@ -2546,6 +2394,348 @@
       "settlement_diagnostics": null,
       "paper_only": true,
       "real_money_execution": false
+    },
+    {
+      "version": 3,
+      "ticket_id": "T-9A90EF9A65CB",
+      "snapshot_fingerprint": "9A90EF9A65CB",
+      "batch_id": "DESK-BATCH-02",
+      "created_at": "2026-10-20T02:09:46.399392+00:00",
+      "last_seen_at": "2026-10-20T02:09:46.399392+00:00",
+      "last_settled_at": "2026-10-20T06:10:41.988816+00:00",
+      "status": "LOST",
+      "combined_odds": 3.363,
+      "combined_odds_source": "builder_batch_snapshot",
+      "odds_snapshot_complete": true,
+      "combined_model_rating": 30.93,
+      "combined_model_probability": 0.309346,
+      "raw_combined_model_probability": 0.445022,
+      "leg_strength_rating": 66.71,
+      "avg_model_probability": 66.71,
+      "avg_model_edge_percent": 16.3,
+      "products": [
+        "efootball_gt"
+      ],
+      "primary_lane": "upcoming_desk_research",
+      "odds_locked_at": "2026-10-20T02:09:46.399392+00:00",
+      "leg_count": 2,
+      "settled_leg_count": 2,
+      "pending_leg_count": 0,
+      "legs": [
+        {
+          "sport": "virtual",
+          "competition": "Premier League 2x6",
+          "event_id": "sr:match:BAaFUeAqvd525Q2VNe4I1QQ",
+          "start_time": "2026-10-20T05:12:00+00:00",
+          "match": "Liverpool (why) vs Man City (TikitakaMaster)",
+          "market": "virtual_total",
+          "pick": "Liverpool (why) vs Man City (TikitakaMaster) — O/U under 7.5",
+          "line": 7.5,
+          "builder_pick": "under",
+          "participant_1": "Liverpool (why)",
+          "participant_2": "Man City (TikitakaMaster)",
+          "model_probability": 0.6671,
+          "desk_calibrated_probability": 0.6671,
+          "raw_model_probability": 0.7301,
+          "walkforward_exact_line_n": 268,
+          "walkforward_exact_line_hit_rate": 0.6156716417910447,
+          "desk_learning_adjustment_source": "EXACT_LINE_DIRECTION",
+          "desk_official_qualification_pass": false,
+          "desk_official_qualification_status": "KICKOFF_WINDOW_PENDING",
+          "upcoming_desk_research_only": true,
+          "model_fair_odds": 1.499,
+          "bookmaker_odds": 1.9,
+          "market_implied_probability": 0.526316,
+          "de_vig_probability": 0.486486,
+          "model_edge": 0.180614,
+          "expected_value": 0.26749,
+          "participant_history": {
+            "available": true,
+            "score": 0.4019,
+            "participants": [
+              {
+                "participant": "why",
+                "n": 101,
+                "recent_n": 5,
+                "full_score": 0.4762,
+                "recent_score": 0.5556,
+                "score": 0.5278,
+                "available": true
+              },
+              {
+                "participant": "tikitakamaster",
+                "n": 145,
+                "recent_n": 5,
+                "full_score": 0.3758,
+                "recent_score": 0.2222,
+                "score": 0.276,
+                "available": true
+              }
+            ],
+            "line": "7.5",
+            "side": "under"
+          },
+          "participant_history_bonus": -0.035,
+          "evidence_score": null,
+          "selection_score": 0.145614,
+          "product": "efootball_gt",
+          "edge_percent": 18.06,
+          "odds_fresh": true,
+          "market_odds_age_seconds": 13.5,
+          "data_quality": 0.75,
+          "uncertainty": 0.058,
+          "market_complete": true,
+          "builder_eligible": true,
+          "real_money_eligible": false,
+          "paper_only": true,
+          "status": "WON",
+          "source": "Upcoming Desk desk-calibrated walk-forward estimate · research-only",
+          "market_source": "SportyBet NG",
+          "recent_evidence": {
+            "n": 268,
+            "hit_rate": 0.615672,
+            "source": "unified_upcoming.json",
+            "scope": "selected product + exact O/U line + selected side · walk-forward holdout"
+          },
+          "evidence_source": "upcoming_desk_exact_line_walkforward",
+          "score_derived_evidence": false,
+          "evidence_sample_n": 0,
+          "direct_exact_sample_n": 0,
+          "results_first": null,
+          "qualification_lane": "upcoming_desk_research_only",
+          "phase2_cyclical_loop": {
+            "enabled": true,
+            "flagged": false,
+            "confidence": 0.0,
+            "model_probability": 0.6671,
+            "evidence_posterior": null,
+            "cycle_break_posterior": null,
+            "current_streak_side": null,
+            "current_streak_length": 0,
+            "historical_break_observations": 0,
+            "historical_breaks": 0,
+            "reason": "model_probability_below_78_percent"
+          },
+          "market_odds_timestamp": "2026-10-20T02:05:50.952615+00:00",
+          "sportybet_event_id": "sr:match:BAaFUeAqvd525Q2VNe4I1QQ",
+          "sportybet_market_id": "18",
+          "sportybet_specifier": "total=7.5",
+          "sportybet_outcome_id": "13",
+          "sportybet_outcome_name": "Under 7.5",
+          "fixture_key": "efootball_gt|liverpool why v man city tikitakamaster",
+          "bookmaker_odds_snapshot": 1.9,
+          "correct": true,
+          "settled_at": "2026-10-20T05:29:35.695423+00:00",
+          "result": "U7.5",
+          "final_score": [
+            3.0,
+            3.0
+          ]
+        },
+        {
+          "sport": "virtual",
+          "competition": "Volta FA Cup",
+          "event_id": "sr:match:BAaFTy0qWdyenYvVBuAFafg",
+          "start_time": "2026-10-20T05:40:00+00:00",
+          "match": "Man Utd (alosdvxl) vs Brighton (Haiko)",
+          "market": "virtual_total",
+          "pick": "Man Utd (alosdvxl) vs Brighton (Haiko) — O/U under 7.5",
+          "line": 7.5,
+          "builder_pick": "under",
+          "participant_1": "Man Utd (alosdvxl)",
+          "participant_2": "Brighton (Haiko)",
+          "model_probability": 0.6671,
+          "desk_calibrated_probability": 0.6671,
+          "raw_model_probability": 0.7301,
+          "walkforward_exact_line_n": 268,
+          "walkforward_exact_line_hit_rate": 0.6156716417910447,
+          "desk_learning_adjustment_source": "EXACT_LINE_DIRECTION",
+          "desk_official_qualification_pass": false,
+          "desk_official_qualification_status": "DIRECTIONAL_LINE_VALIDATION_GATE_PENDING",
+          "upcoming_desk_research_only": true,
+          "model_fair_odds": 1.499,
+          "bookmaker_odds": 1.77,
+          "market_implied_probability": 0.564972,
+          "de_vig_probability": 0.521622,
+          "model_edge": 0.145478,
+          "expected_value": 0.180767,
+          "participant_history": {
+            "available": true,
+            "score": 0.4446,
+            "participants": [
+              {
+                "participant": "alosdvxl",
+                "n": 105,
+                "recent_n": 5,
+                "full_score": 0.4862,
+                "recent_score": 0.4444,
+                "score": 0.4591,
+                "available": true
+              },
+              {
+                "participant": "haiko",
+                "n": 114,
+                "recent_n": 5,
+                "full_score": 0.6102,
+                "recent_score": 0.3333,
+                "score": 0.4302,
+                "available": true
+              }
+            ],
+            "line": "7.5",
+            "side": "under"
+          },
+          "participant_history_bonus": -0.035,
+          "evidence_score": null,
+          "selection_score": 0.110478,
+          "product": "efootball_gt",
+          "edge_percent": 14.55,
+          "odds_fresh": true,
+          "market_odds_age_seconds": 13.5,
+          "data_quality": 0.75,
+          "uncertainty": 0.058,
+          "market_complete": true,
+          "builder_eligible": true,
+          "real_money_eligible": false,
+          "paper_only": true,
+          "status": "LOST",
+          "source": "Upcoming Desk desk-calibrated walk-forward estimate · research-only",
+          "market_source": "SportyBet NG",
+          "recent_evidence": {
+            "n": 268,
+            "hit_rate": 0.615672,
+            "source": "unified_upcoming.json",
+            "scope": "selected product + exact O/U line + selected side · walk-forward holdout"
+          },
+          "evidence_source": "upcoming_desk_exact_line_walkforward",
+          "score_derived_evidence": false,
+          "evidence_sample_n": 0,
+          "direct_exact_sample_n": 0,
+          "results_first": null,
+          "qualification_lane": "upcoming_desk_research_only",
+          "phase2_cyclical_loop": {
+            "enabled": true,
+            "flagged": false,
+            "confidence": 0.0,
+            "model_probability": 0.6671,
+            "evidence_posterior": null,
+            "cycle_break_posterior": null,
+            "current_streak_side": null,
+            "current_streak_length": 0,
+            "historical_break_observations": 0,
+            "historical_breaks": 0,
+            "reason": "model_probability_below_78_percent"
+          },
+          "market_odds_timestamp": "2026-10-20T02:05:50.952615+00:00",
+          "sportybet_event_id": "sr:match:BAaFTy0qWdyenYvVBuAFafg",
+          "sportybet_market_id": "18",
+          "sportybet_specifier": "total=7.5",
+          "sportybet_outcome_id": "13",
+          "sportybet_outcome_name": "Under 7.5",
+          "fixture_key": "efootball_gt|man utd alosdvxl v brighton haiko",
+          "bookmaker_odds_snapshot": 1.77,
+          "correct": false,
+          "settled_at": "2026-10-20T06:10:41.988816+00:00",
+          "result": "O7.5",
+          "final_score": [
+            5.0,
+            5.0
+          ]
+        }
+      ],
+      "leg_counts": {
+        "won": 1,
+        "lost": 1,
+        "void": 0,
+        "pending": 0
+      },
+      "construction_snapshot": {
+        "batch_id": "DESK-BATCH-02",
+        "primary_lane": "upcoming_desk_research",
+        "leg_count": 2,
+        "combined_odds": 3.363,
+        "combined_model_rating": 30.93,
+        "combined_model_probability": 0.309346,
+        "raw_combined_model_probability": 0.445022,
+        "leg_strength_rating": 66.71,
+        "avg_model_probability": 66.71,
+        "avg_model_edge_percent": 16.3,
+        "products": [
+          "efootball_gt"
+        ],
+        "policy": {
+          "minimum_combined_odds": 2.8,
+          "maximum_legs": 4,
+          "adaptive_leg_counts": [
+            2,
+            3,
+            4
+          ],
+          "per_leg_min_model_probability": {
+            "2": 0.6,
+            "3": 0.6,
+            "4": 0.6
+          },
+          "preferred_per_leg_model_probability": 0.9,
+          "mode": "PAPER_ONLY"
+        },
+        "recorded_at": "2026-10-20T02:09:46.438769+00:00"
+      },
+      "settlement_diagnostics": {
+        "diagnostic_version": 1,
+        "ticket_outcome": "LOST",
+        "diagnostic_label": "TICKET_LOST_1_OF_2_LEGS",
+        "leg_count": 2,
+        "settled_leg_count": 2,
+        "won_leg_count": 1,
+        "lost_leg_count": 1,
+        "void_leg_count": 0,
+        "pending_leg_count": 0,
+        "leg_hit_rate_excluding_voids": 0.5,
+        "average_settled_leg_model_probability": 0.6671,
+        "weakest_ticket_leg_model_probability": 0.6671,
+        "high_confidence_loss_count": 0,
+        "high_confidence_loss_events": [],
+        "losses_by_product": {
+          "efootball_gt": 1
+        },
+        "losses_by_direction": {
+          "under": 1
+        },
+        "loss_details": [
+          {
+            "event_id": "sr:match:BAaFTy0qWdyenYvVBuAFafg",
+            "match": "Man Utd (alosdvxl) vs Brighton (Haiko)",
+            "product": "efootball_gt",
+            "pick": "Man Utd (alosdvxl) vs Brighton (Haiko) — O/U under 7.5",
+            "line": 7.5,
+            "model_probability": 0.6671,
+            "model_edge": 0.145478,
+            "bookmaker_odds": 1.77,
+            "evidence_score": null,
+            "recent_evidence_n": 268,
+            "recent_evidence_hit_rate": 0.615672,
+            "result": "O7.5",
+            "final_score": [
+              5.0,
+              5.0
+            ],
+            "settled_at": "2026-10-20T06:10:41.988816+00:00"
+          }
+        ],
+        "improvement_keys": {
+          "shape": "2_leg",
+          "primary_lane": "upcoming_desk_research",
+          "combined_odds": 3.363,
+          "combined_model_rating": 30.93,
+          "combined_model_probability": 0.309346,
+          "avg_model_probability": 66.71,
+          "avg_model_edge_percent": 16.3
+        }
+      },
+      "paper_only": true,
+      "real_money_execution": false,
+      "lost_at": "2026-10-20T06:10:41.988816+00:00"
     },
     {
       "version": 3,
