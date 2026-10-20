@@ -797,6 +797,17 @@ def results_first_gate(product,line,pick):
     # ledger permanently suppress a stronger event-evidence lane. Construction
     # still has to pass the live whole-ticket calibrated probability/odds gates.
     if not viable_shapes and product=="vfootball":
+        holdout_ticket_gate=_settled_builder_lane_performance_gate("vfootball_event_holdout_value")
+        if holdout_ticket_gate.get("eligible") is not True:
+            return False,{
+                "eligible":False,
+                "reason":holdout_ticket_gate.get("reason") or "vfootball_settled_ticket_performance_hold",
+                "settled_lane_performance_gate":holdout_ticket_gate,
+                "product":product,
+                "event_holdout_reference":{"rows":3295,"poisson_accuracy":0.8173,"participant_accuracy":0.8212},
+                "ticket_ledger_role":"promotion-blocking; event-level holdout no longer overrides the lane's poor settled-ticket ROI",
+                "source":"data/odds_ticket_tracker.json",
+            }
         return True,{
             "eligible":True,
             "reason":"vfootball_event_holdout_lane",
@@ -1471,6 +1482,182 @@ def _construct_phase2_cyclical_loop_batches(pool,max_batches=4,min_odds=None):
     }
 
 _UPCOMING_DESK_SETTLED_RESULT_INDEX_CACHE=None
+
+
+_SETTLED_BUILDER_LANE_PERFORMANCE_CACHE=None
+
+
+def _settled_builder_lane_performance_index(tracker=None):
+    """Summarize distinct, settled flat-stake returns once per actual Builder lane."""
+    global _SETTLED_BUILDER_LANE_PERFORMANCE_CACHE
+    cacheable=tracker is None
+    if cacheable and _SETTLED_BUILDER_LANE_PERFORMANCE_CACHE is not None:
+        return _SETTLED_BUILDER_LANE_PERFORMANCE_CACHE
+    payload=load(DATA/"odds_ticket_tracker.json",{}) if tracker is None else tracker
+    source_rows=[]
+    if isinstance(payload,dict):
+        source_rows.extend(("current",x) for x in payload.get("tickets",[]) if isinstance(x,dict))
+        source_rows.extend(("archive",x) for x in payload.get("archived_tickets",[]) if isinstance(x,dict))
+
+    unique={}
+    for source,ticket in source_rows:
+        lane=str(ticket.get("primary_lane") or ticket.get("construction_lane") or "").strip()
+        legs=ticket.get("legs") if isinstance(ticket.get("legs"),list) else []
+        if not lane and legs:
+            leg_lanes={str(leg.get("qualification_lane") or "").strip() for leg in legs if isinstance(leg,dict)}
+            if len(leg_lanes)==1:
+                only=next(iter(leg_lanes))
+                lane=UPCOMING_DESK_BATCH_LANE if only==UPCOMING_DESK_RESEARCH_LANE else only
+        if not lane:
+            continue
+        status=str(ticket.get("status") or "").upper()
+        if status not in {"WON","LOST"}:
+            continue
+        try:
+            odds=float(ticket.get("combined_odds"))
+        except (TypeError,ValueError):
+            continue
+        if not math.isfinite(odds) or odds<=1.0:
+            continue
+        ticket_id=str(ticket.get("ticket_id") or "").strip()
+        identity=ticket_id or "|".join((
+            lane,status,str(ticket.get("created_at") or ""),
+            str(ticket.get("last_settled_at") or ""),f"{odds:.6f}",
+        ))
+        # Prefer the current ticket row over its archived copy if both exist.
+        unique.setdefault((lane,identity),ticket)
+
+    grouped={}
+    for (lane,_),ticket in unique.items():
+        row=grouped.setdefault(lane,{"settled_ticket_n":0,"wins":0,"losses":0,"flat_stake_net_units":0.0,"combined_odds_sum":0.0})
+        odds=float(ticket["combined_odds"])
+        row["settled_ticket_n"]+=1
+        row["combined_odds_sum"]+=odds
+        if str(ticket.get("status") or "").upper()=="WON":
+            row["wins"]+=1
+            row["flat_stake_net_units"]+=odds-1.0
+        else:
+            row["losses"]+=1
+            row["flat_stake_net_units"]-=1.0
+    if cacheable:
+        _SETTLED_BUILDER_LANE_PERFORMANCE_CACHE=grouped
+    return grouped
+
+
+def _settled_builder_lane_performance_gate(lane,tracker=None,min_tickets=None,min_roi=None):
+    """Fail closed until this lane's own settled tickets demonstrate a positive return."""
+    lane=str(lane or "").strip()
+    minimum_n=max(1,int(min_tickets if min_tickets is not None else RESULTS_FIRST_MIN_CONSTRUCTION_TICKETS))
+    minimum_roi=float(min_roi if min_roi is not None else RESULTS_FIRST_MIN_EXPECTED_ROI)
+    indexed=_settled_builder_lane_performance_index(tracker=tracker)
+    row=indexed.get(lane,{})
+    n=int(row.get("settled_ticket_n") or 0)
+    wins=int(row.get("wins") or 0)
+    losses=int(row.get("losses") or 0)
+    net=float(row.get("flat_stake_net_units") or 0.0)
+    roi=(net/n) if n else None
+    hit_rate=(wins/n) if n else None
+    avg_odds=(float(row.get("combined_odds_sum") or 0.0)/n) if n else None
+    eligible=n>=minimum_n and roi is not None and roi>=minimum_roi
+    reason=(
+        None if eligible else
+        "insufficient_settled_lane_ticket_sample" if n<minimum_n else
+        "settled_lane_ticket_roi_below_promotion_floor"
+    )
+    return {
+        "lane":lane,
+        "eligible":bool(eligible),
+        "reason":reason,
+        "settled_ticket_n":n,
+        "wins":wins,
+        "losses":losses,
+        "hit_rate":round(hit_rate,6) if hit_rate is not None else None,
+        "average_combined_odds":round(avg_odds,6) if avg_odds is not None else None,
+        "flat_stake_net_units":round(net,6),
+        "flat_stake_roi":round(roi,6) if roi is not None else None,
+        "minimum_settled_ticket_n":minimum_n,
+        "minimum_flat_stake_roi":minimum_roi,
+        "source":"data/odds_ticket_tracker.json",
+        "policy":"No construction lane may become the primary batch unless its own settled ticket sample and realized flat-stake ROI pass the promotion gate.",
+    }
+
+
+def _upcoming_desk_settled_performance_gate(tracker=None,min_tickets=None,min_roi=None):
+    """Desk-specific alias retained for diagnostics and regression tests."""
+    return _settled_builder_lane_performance_gate(
+        UPCOMING_DESK_BATCH_LANE,tracker=tracker,min_tickets=min_tickets,min_roi=min_roi
+    )
+
+
+_UPCOMING_DESK_PENDING_EVENT_ID_CACHE=None
+
+
+_UPCOMING_DESK_PENDING_EVENT_ID_CACHE=None
+
+
+def _upcoming_desk_pending_event_ids(tracker=None):
+    """Return active eFootball events already sitting in any unsettled ticket leg.
+
+    Inspect each leg independently: a parent accumulator can be LOST while its
+    other leg is still pending. Repeated Builder refreshes must not issue another
+    ticket using that same unresolved event.
+    """
+    global _UPCOMING_DESK_PENDING_EVENT_ID_CACHE
+    cacheable=tracker is None
+    if cacheable and _UPCOMING_DESK_PENDING_EVENT_ID_CACHE is not None:
+        return _UPCOMING_DESK_PENDING_EVENT_ID_CACHE
+    payload=load(DATA/"odds_ticket_tracker.json",{}) if tracker is None else tracker
+    event_ids=set()
+    if not isinstance(payload,dict):
+        if cacheable:
+            _UPCOMING_DESK_PENDING_EVENT_ID_CACHE=event_ids
+        return event_ids
+    tickets=[]
+    tickets.extend(x for x in payload.get("tickets",[]) if isinstance(x,dict))
+    tickets.extend(x for x in payload.get("archived_tickets",[]) if isinstance(x,dict))
+    for ticket in tickets:
+        parent_status=str(ticket.get("status") or "").upper()
+        for leg in ticket.get("legs") or []:
+            if not isinstance(leg,dict):
+                continue
+            product=str(leg.get("product") or leg.get("sport") or "").lower()
+            if product not in ACTIVE_VIRTUAL_PRODUCTS:
+                continue
+            status=str(leg.get("status") or "").upper()
+            if status!="PENDING" and not (not status and parent_status=="PENDING"):
+                continue
+            event_id=str(leg.get("event_id") or leg.get("eventId") or "").strip()
+            if event_id:
+                event_ids.add(event_id)
+    if cacheable:
+        _UPCOMING_DESK_PENDING_EVENT_ID_CACHE=event_ids
+    return event_ids
+
+
+def _exclude_pending_virtual_ticket_events(rows,pending_event_ids=None):
+    """Remove Virtual legs already awaiting settlement in another paper ticket."""
+    pending=set(pending_event_ids if pending_event_ids is not None else _upcoming_desk_pending_event_ids())
+    rejected=0
+    out=[]
+    for row in rows if isinstance(rows,list) else []:
+        if not isinstance(row,dict):
+            continue
+        product=str(row.get("product") or "").lower()
+        event_id=str(row.get("event_id") or row.get("eventId") or "").strip()
+        if (
+            str(row.get("sport") or "").lower()=="virtual"
+            and product in ACTIVE_VIRTUAL_PRODUCTS
+            and event_id
+            and event_id in pending
+        ):
+            row["builder_eligible"]=False
+            row["status"]="REJECTED"
+            row["builder_rejection_reason"]="event_already_in_pending_ticket"
+            row["pending_ticket_event_hold"]=True
+            rejected+=1
+        out.append(row)
+    return out,rejected
+
 
 def _upcoming_desk_settled_result_index(tracker=None):
     """Index verified settled outcomes by eFootball product + exact line + side.
@@ -4021,10 +4208,15 @@ def _construct_upcoming_desk_research_batches(
     """Construct 2–4 total-odds Desk research tickets without legacy ticket-gamma calibration."""
     rows=[]
     rejection_counts={}
+    pending_event_ids=_upcoming_desk_pending_event_ids()
     def reject(reason):
         rejection_counts[reason]=rejection_counts.get(reason,0)+1
     for row in pool:
         if not isinstance(row,dict) or str(row.get("qualification_lane") or "")!=UPCOMING_DESK_RESEARCH_LANE:
+            continue
+        event_id=str(row.get("event_id") or "").strip()
+        if event_id and event_id in pending_event_ids:
+            reject("event_already_in_pending_ticket")
             continue
         try:
             probability=float(row.get("model_probability") or 0.0)
@@ -4084,6 +4276,7 @@ def _construct_upcoming_desk_research_batches(
         "min_legs":2,
         "max_legs":min(max_legs,UPCOMING_DESK_MAX_LEGS),
         "max_batches":max_batches,
+        "open_ticket_event_count":len(pending_event_ids),
         "combinations_checked":0,
         "rejected_correlated":0,
         "rejected_kickoff_span":0,
@@ -4166,6 +4359,7 @@ def build_value_batches(candidates):
     No extra leg is added merely to reach a target.
     """
     built=[make_leg(x) for x in candidates]
+    built,pending_ticket_event_holds=_exclude_pending_virtual_ticket_events(built)
     compact_efootball_diag={
         "enabled":True,
         "candidate_count":0,
@@ -4191,7 +4385,14 @@ def build_value_batches(candidates):
         max_odds=UPCOMING_DESK_MAX_COMBINED_ODDS,
         max_legs=UPCOMING_DESK_MAX_LEGS,
     )
-    if desk_options:
+    desk_performance_gate=_upcoming_desk_settled_performance_gate()
+    desk_diag["settled_performance_gate"]=desk_performance_gate
+    desk_diag["primary_lane_held"]=bool(desk_options) and desk_performance_gate.get("eligible") is not True
+    desk_diag["primary_lane_hold_reason"]=(
+        desk_performance_gate.get("reason")
+        if desk_diag["primary_lane_held"] else None
+    )
+    if desk_options and desk_performance_gate.get("eligible") is True:
         desk_options.sort(key=lambda option:min(
             _kickoff_timestamp(x) for x in option["rows"]
             if _kickoff_timestamp(x) is not None
@@ -4239,6 +4440,7 @@ def build_value_batches(candidates):
             "max_combined_odds":UPCOMING_DESK_MAX_COMBINED_ODDS,
             "target_combined_odds":3.50,
             "construction_priority":"upcoming_desk_research_first",
+            "desk_settled_performance_gate":desk_performance_gate,
             "priority_product":"active_efootball_upcoming_desk",
             "max_legs":UPCOMING_DESK_MAX_LEGS,
             "adaptive_leg_counts":[2,3,4],
@@ -4370,7 +4572,9 @@ def build_value_batches(candidates):
             max_legs=MIXED_RESEARCH_MAX_LEGS,
             min_odds=active_min_combined_odds()
         )
-        if mixed_options:
+        mixed_lane_gate=_settled_builder_lane_performance_gate("mixed_vfootball_efootball_value")
+        mixed_diag["settled_lane_performance_gate"]=mixed_lane_gate
+        if mixed_options and mixed_lane_gate.get("eligible") is True:
             mixed_batches=[]
             mixed_options.sort(
                 key=lambda option:min(
@@ -4467,7 +4671,9 @@ def build_value_batches(candidates):
             max_legs=RESULTS_FIRST_MAX_LEGS,
             min_odds=active_min_combined_odds()
         )
-        if vfootball_options:
+        vfootball_lane_gate=_settled_builder_lane_performance_gate("vfootball_event_holdout_value")
+        vfootball_diag["settled_lane_performance_gate"]=vfootball_lane_gate
+        if vfootball_options and vfootball_lane_gate.get("eligible") is True:
             vfootball_batches=[]
             vfootball_options.sort(
                 key=lambda option:min(
@@ -4539,7 +4745,9 @@ def build_value_batches(candidates):
             max_batches=min(4,MAX_BATCHES),
             min_odds=active_min_combined_odds()
         )
-        if phase2_options:
+        phase2_lane_gate=_settled_builder_lane_performance_gate("phase2_cyclical_loop")
+        phase2_diag["settled_lane_performance_gate"]=phase2_lane_gate
+        if phase2_options and phase2_lane_gate.get("eligible") is True:
             phase2_batches=[]
             for idx,option in enumerate(phase2_options,1):
                 rows=sorted(
@@ -4614,7 +4822,9 @@ def build_value_batches(candidates):
             max_legs=RESULTS_FIRST_MAX_LEGS,
             min_odds=active_min_combined_odds()
         )
-        if high_options:
+        high_lane_gate=_settled_builder_lane_performance_gate("high_confidence_research")
+        high_diag["settled_lane_performance_gate"]=high_lane_gate
+        if high_options and high_lane_gate.get("eligible") is True:
             high_batches=[]
             high_options.sort(
                 key=lambda option:min(
@@ -4704,7 +4914,9 @@ def build_value_batches(candidates):
         secondary_batch=[]
         secondary_lane="none"
         secondary_avg_threshold=MODEL_FIRST_MIN_AVG_PROBABILITY
-        if efootball_secondary_pool:
+        efootball_lane_gate=_settled_builder_lane_performance_gate("efootball_exact_evidence_value")
+        efootball_constructor_diag["settled_lane_performance_gate"]=efootball_lane_gate
+        if efootball_secondary_pool and efootball_lane_gate.get("eligible") is True:
             secondary_batch,efootball_constructor_diag=_construct_efootball_value_batch(
                 efootball_secondary_pool,
                 min_odds=active_min_combined_odds(),
@@ -4713,15 +4925,19 @@ def build_value_batches(candidates):
             if secondary_batch:
                 secondary_lane="efootball_exact_evidence_value"
                 secondary_avg_threshold=EFOOTBALL_VALUE_MIN_AVG_PROBABILITY
-        # Separate route for compact 4–5 leg tickets; all per-leg and value gates persist.
-        if not secondary_batch and efootball_secondary_pool:
+        # Compact tickets also need their own settled-ticket performance history;
+        # individual-leg evidence alone cannot promote this unproven joint ticket shape.
+        compact_lane_gate=_settled_builder_lane_performance_gate("efootball_compact_2x")
+        compact_efootball_diag={"shape":None,"candidate_count":0,"combined_odds":None,"combined_probability":None,"roi":None,"span_minutes":None,"search_mode":"held_by_settled_lane_gate","settled_lane_performance_gate":compact_lane_gate}
+        if not secondary_batch and efootball_secondary_pool and compact_lane_gate.get("eligible") is True:
             compact_batch,compact_efootball_diag=_construct_efootball_compact_batch(efootball_secondary_pool)
             if compact_batch:
                 secondary_batch=compact_batch
                 secondary_lane="efootball_compact_2x"
                 secondary_avg_threshold=EFOOTBALL_VALUE_MIN_AVG_PROBABILITY
-        # Only use the generic constructor for genuinely non-eFootball candidates.
-        if not secondary_batch and non_efootball_secondary_pool:
+        # Only use the generic constructor after its own ticket history qualifies.
+        model_first_lane_gate=_settled_builder_lane_performance_gate("model_first_value")
+        if not secondary_batch and non_efootball_secondary_pool and model_first_lane_gate.get("eligible") is True:
             secondary_batch=_construct_model_first_batch(
                 non_efootball_secondary_pool,
                 max_legs=RESULTS_FIRST_MAX_LEGS,
@@ -4857,6 +5073,9 @@ def build_value_batches(candidates):
         "target_combined_odds":TARGET_COMBINED_ODDS,
         "accuracy_preservation_ratio":ACCURACY_PRESERVATION_RATIO,
         "construction_priority":"settled_results_first",
+        "upcoming_desk_settled_performance_gate":desk_performance_gate,
+        "upcoming_desk_research_diagnostics":desk_diag,
+        "upcoming_desk_pending_open_event_count":len(_upcoming_desk_pending_event_ids()),
         "priority_product":"active_qualified_pool",
         "max_legs":RESULTS_FIRST_MAX_LEGS,
         "construction_shapes_considered":list(RESULTS_FIRST_CONSTRUCTION_LEG_COUNTS),
@@ -4975,6 +5194,31 @@ def main():
     core_pool=football+tennis
     upstream_blocked = market_refresh.get("status")!="ok"
     batches,built,batch_diag=build_value_batches(core_pool+virtual)
+    # Surface the promotion/anti-repeat checks even when Desk is held and a
+    # different lane wins, or when every construction lane correctly returns NO_BET.
+    desk_performance_gate=_upcoming_desk_settled_performance_gate()
+    pending_desk_events=_upcoming_desk_pending_event_ids()
+    settled_lane_gates={
+        lane:_settled_builder_lane_performance_gate(lane)
+        for lane in (
+            UPCOMING_DESK_BATCH_LANE,
+            "efootball_exact_evidence_value",
+            "vfootball_event_holdout_value",
+            "mixed_vfootball_efootball_value",
+            "phase2_cyclical_loop",
+            "high_confidence_research",
+            "efootball_compact_2x",
+            "model_first_value",
+            "vfootball",
+        )
+    }
+    if isinstance(batch_diag,dict):
+        batch_diag["upcoming_desk_settled_performance_gate"]=desk_performance_gate
+        batch_diag["settled_lane_performance_gates"]=settled_lane_gates
+        batch_diag["upcoming_desk_pending_open_event_count"]=len(pending_desk_events)
+        batch_diag["pending_virtual_candidate_event_holds"]=sum(1 for row in built if row.get("pending_ticket_event_hold") is True)
+        batch_diag["upcoming_desk_primary_promotion_allowed"]=desk_performance_gate.get("eligible") is True
+        batch_diag["upcoming_desk_primary_hold_reason"]=desk_performance_gate.get("reason")
     # Evaluate the isolated Phase 2 track independently of the baseline batch path.
     phase2_options,phase2_diag=_construct_phase2_cyclical_loop_batches(
         built,
@@ -5056,7 +5300,7 @@ def main():
     ]
     result={
         "generated_at":now.isoformat(),"engine_version":"V6.1-RESEARCH-GATED",
-        "mode":"PAPER_ONLY","target_legs":f"Upcoming Desk research first: 2–4 legs at {UPCOMING_DESK_MIN_COMBINED_ODDS:.2f}x–{UPCOMING_DESK_MAX_COMBINED_ODDS:.2f}x when exact-line walk-forward and fresh-price gates pass; fallback standard 2–4 legs at {odds_gate['floor']:.2f}x active minimum / {odds_gate['preferred_target']:.2f}x preferred; compact eFootball 4–5 legs at {COMPACT_EFOOTBALL_MIN_COMBINED_ODDS:.2f}x+ when all gates pass","sports_supported":["football","tennis","virtual"],
+        "mode":"PAPER_ONLY","target_legs":f"Upcoming Desk is primary only after its own settled-ticket sample (n≥{RESULTS_FIRST_MIN_CONSTRUCTION_TICKETS}) and realized flat-stake ROI ≥{RESULTS_FIRST_MIN_EXPECTED_ROI:.0%} pass; otherwise use a separately qualified fallback or NO_BET. Desk 2–4 legs target {UPCOMING_DESK_MIN_COMBINED_ODDS:.2f}x–{UPCOMING_DESK_MAX_COMBINED_ODDS:.2f}x with exact-line walk-forward and fresh-price gates; standard fallback {odds_gate['floor']:.2f}x minimum / {odds_gate['preferred_target']:.2f}x preferred; compact eFootball {COMPACT_EFOOTBALL_MIN_COMBINED_ODDS:.2f}x+ only when all gates pass","sports_supported":["football","tennis","virtual"],
         "ticket_calibration_diagnostics":{
             "historical_settled_ticket_gamma":_ticket_calibration_gamma(),
             "efootball_exact_evidence_lane":_efootball_exact_evidence_ticket_gamma()
@@ -5102,8 +5346,12 @@ def main():
             }
         },
         "selection_policy":{"min_calibrated_probability":MIN_PROB,"virtual_min_probability":VIRTUAL_MIN_PROB,"virtual_builder_lines":"all current O/U lines with exact-side evidence; no forced line list","minimum_combined_odds":active_min_combined_odds(),
-            "construction_priority":"upcoming_desk_research_first" if primary_lane==UPCOMING_DESK_BATCH_LANE else "settled_results_first",
+            "construction_priority":str((batch_diag or {}).get("construction_priority") or ("no_qualified_batch" if not primary_lane else "settled_results_first")),
             "upcoming_desk_research_lane":{
+                "settled_performance_gate":desk_performance_gate,
+                "all_lane_settled_performance_gates":settled_lane_gates,
+                "primary_promotion_allowed":desk_performance_gate.get("eligible") is True,
+                "open_ticket_events_excluded":len(pending_desk_events),
                 "enabled":True,
                 "batch_lane":UPCOMING_DESK_BATCH_LANE,
                 "min_desk_calibrated_probability":UPCOMING_DESK_MIN_PROBABILITY,
@@ -5142,7 +5390,7 @@ def main():
             "results_first_min_expected_roi":RESULTS_FIRST_MIN_EXPECTED_ROI,
             "target_combined_odds":TARGET_COMBINED_ODDS,
             "accuracy_preservation_ratio":ACCURACY_PRESERVATION_RATIO,
-            "construction_priority":"settled_results_first","min_model_edge":MIN_EDGE,
+            "min_model_edge":MIN_EDGE,
             "max_odds_age_seconds":MAX_ODDS_AGE_SECONDS,"max_uncertainty":MAX_UNCERTAINTY,
             "max_legs":MAX_LEGS,
             "active_construction_max_legs":RESULTS_FIRST_MAX_LEGS,
@@ -5219,7 +5467,10 @@ def main():
             "results_first_max_legs":RESULTS_FIRST_MAX_LEGS,
             "target_combined_odds":TARGET_COMBINED_ODDS,
             "accuracy_preservation_ratio":ACCURACY_PRESERVATION_RATIO,
-            "construction_priority":"upcoming_desk_research_first" if primary_lane==UPCOMING_DESK_BATCH_LANE else "settled_results_first",
+            "construction_priority":str((batch_diag or {}).get("construction_priority") or ("no_qualified_batch" if not primary_lane else "settled_results_first")),
+            "settled_lane_performance_gates":settled_lane_gates,
+            "upcoming_desk_primary_hold_reason":desk_performance_gate.get("reason"),
+            "pending_desk_open_event_count":len(pending_desk_events),
             "max_batches":MAX_BATCHES,
             "max_legs":MAX_LEGS,
             "compact_efootball_max_legs":COMPACT_EFOOTBALL_MAX_LEGS,

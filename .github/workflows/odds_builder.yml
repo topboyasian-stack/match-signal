@@ -132,7 +132,10 @@ jobs:
           policy = data.get('selection_policy', {})
           assert policy.get('requires_live_sportybet_price') is True
           assert policy.get('results_first') is True
-          assert policy.get('construction_priority') in {'settled_results_first', 'upcoming_desk_research_first'}
+          assert isinstance(policy.get('construction_priority'), str) and policy.get('construction_priority')
+          desk_gate = (data.get('candidate_diagnostics', {}).get('batch_diagnostics', {}) or {}).get('upcoming_desk_settled_performance_gate', {})
+          if policy.get('construction_priority') == 'upcoming_desk_research_first':
+              assert desk_gate.get('eligible') is True, 'Desk lane must not become primary before settled ticket sample/ROI promotion passes'
           assert float(policy.get('minimum_combined_odds', 0)) >= 2.70
           assert float(policy.get('results_first_min_expected_roi', 0)) >= 0.02
           assert float(policy.get('min_model_edge', 0)) >= 0.025
