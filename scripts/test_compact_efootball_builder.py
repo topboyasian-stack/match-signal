@@ -629,6 +629,8 @@ class CompactEfootballBuilderTests(unittest.TestCase):
         ):
             batches,built,diag=builder.build_value_batches(rows)
         self.assertTrue(batches)
+        self.assertRegex(batches[0]["batch_id"],r"^BATCH-[0-9]{2}$")
+        self.assertTrue(batches[0]["label"].startswith("Upcoming Desk Research"))
         self.assertEqual(batches[0]["primary_lane"],"upcoming_desk_research")
         self.assertEqual(diag["construction_priority"],"upcoming_desk_research_first")
         self.assertFalse(batches[0]["ticket_calibration_ready"])
