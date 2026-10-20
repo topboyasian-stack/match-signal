@@ -12,7 +12,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: builder-production-promotion
+  # A new queue identity lets the repaired promotion bypass jobs stuck in the old SHA matcher.
+  group: builder-production-promotion-v2
   cancel-in-progress: false
 
 jobs:
@@ -35,17 +36,27 @@ jobs:
           gh workflow run unified-upcoming.yml --ref main
           board_run_id=""
           for attempt in $(seq 1 60); do
-            board_run_id="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/unified-upcoming.yml/runs?branch=main&event=workflow_dispatch&per_page=20" --jq ".workflow_runs[] | select(.head_sha == \"$source_sha\" and .created_at >= \"$dispatched_at\") | .id" | head -n 1)"
-            if [ -n "$board_run_id" ]; then
-              board_status="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$board_run_id" --jq '.status')"
-              if [ "$board_status" = "completed" ]; then
-                board_conclusion="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$board_run_id" --jq '.conclusion')"
-                if [ "$board_conclusion" != "success" ]; then
-                  echo "Unified Upcoming run $board_run_id completed with conclusion=$board_conclusion; refusing to deploy a stale board." >&2
-                  exit 1
+            # Main may advance after checkout while refresh jobs commit their data.
+            # Accept the dispatched board run only if its SHA descends from source_sha.
+            board_candidate="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/unified-upcoming.yml/runs?branch=main&event=workflow_dispatch&per_page=20" --jq ".workflow_runs[] | select(.created_at >= \\"$dispatched_at\\") | [.id, .head_sha] | @tsv" | head -n 1)"
+            if [ -n "$board_candidate" ]; then
+              candidate_id="${board_candidate%%$'\\t'*}"
+              candidate_sha="${board_candidate#*$'\\t'}"
+              merge_base="$(gh api "repos/$GITHUB_REPOSITORY/compare/$source_sha...$candidate_sha" --jq '.merge_base_commit.sha')"
+              if [ "$merge_base" = "$source_sha" ]; then
+                board_run_id="$candidate_id"
+                board_status="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$board_run_id" --jq '.status')"
+                if [ "$board_status" = "completed" ]; then
+                  board_conclusion="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$board_run_id" --jq '.conclusion')"
+                  if [ "$board_conclusion" != "success" ]; then
+                    echo "Unified Upcoming run $board_run_id completed with conclusion=$board_conclusion; refusing to deploy a stale board." >&2
+                    exit 1
+                  fi
+                  echo "Unified Upcoming run $board_run_id (head $candidate_sha, based on $source_sha) completed successfully."
+                  break
                 fi
-                echo "Unified Upcoming run $board_run_id completed successfully."
-                break
+              else
+                echo "Ignoring board run $candidate_id because $candidate_sha is not based on $source_sha yet."
               fi
             fi
             if [ "$attempt" -eq 60 ]; then
