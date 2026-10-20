@@ -102,4 +102,17 @@ assert.equal(filtered.freshness.fresh, true);
 assert.equal(filtered.batches.length, 1);
 assert.equal(filtered.batches[0].batch_id, 'DESK-BATCH-01');
 
-console.log('Odds Builder UI freshness passed: desk-only 60% gate, 15-minute artifact limit, future kickoffs, and exact price freshness.');
+// Effective quote age is the original quote age plus the time elapsed since the
+// Builder snapshot was generated; separate "fresh" flags must not hide an old price.
+const combinedAgeFiltered = hooks.filterCurrentBuilderSnapshot(
+  snapshot(-10 * 60_000, [
+    deskBatch([deskLeg({ market_odds_age_seconds: 6 * 60 })], { batch_id: 'DESK-BATCH-OLD-QUOTE' })
+  ]),
+  now
+);
+assert.equal(combinedAgeFiltered.freshness.fresh, true);
+assert.equal(combinedAgeFiltered.batches.length, 0);
+assert.equal(hooks.isCurrentBuilderLeg(deskLeg({ market_odds_age_seconds: 6 * 60 }), now, 10 * 60_000), false);
+assert.equal(hooks.isCurrentBuilderLeg(deskLeg({ market_odds_age_seconds: 5 * 60 }), now, 10 * 60_000), true);
+
+console.log('Odds Builder UI freshness passed: desk-only 60% gate, artifact expiry, future kickoffs, and combined snapshot-plus-quote age.');
