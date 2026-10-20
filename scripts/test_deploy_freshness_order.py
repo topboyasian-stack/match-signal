@@ -156,9 +156,9 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn("    types: [completed]", events)
         self.assertIn("  workflow_dispatch:", events)
 
-        # Direct promotion is limited to explicit static page/assets, the scoped
-        # booking API and Builder freshness fixes, and their regression/workflow files. Every changed path is still checked against
-        # the allowlist in the deployment workflow before any production upload.
+        # Direct promotion is limited to UI/static assets and the scoped booking API.
+        # Builder outputs, Builder engines, and the Pages workflow itself must wait for
+        # Unified Upcoming to refresh and publish the board before production promotion.
         direct_paths = workflow_push_paths(PAGES_WORKFLOW)
         expected_direct_paths = {
             "_headers",
@@ -198,17 +198,10 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "scripts/test_league_logos.mjs",
             "workspace-ui.js",
             "data/club-logo-registry.json",
-            "data/odds_builder.json",
-            "scripts/odds_builder.py",
-            "scripts/odds_builder_core.py",
-            "scripts/test_odds_builder_score_replay.py",
-            "scripts/test_odds_builder_upcoming_desk_recent_losses.py",
             "assets/club-logos/**",
             "data/licenses/**",
             "scripts/sync_club_logos.py",
             "scripts/test_club_logo_registry.py",
-            ".github/workflows/cloudflare-pages.yml",
-            ".github/workflows/odds_builder.yml",
             ".github/workflows/qualified-best-health-watch-v2.yml",
             ".github/workflows/automation_watchdog.yml",
             ".github/workflows/efootball-market-research-schedule.yml",
@@ -217,6 +210,17 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "scripts/test_qualified_best_monitor.mjs",
         }
         self.assertEqual(direct_paths, expected_direct_paths)
+        builder_owned_paths = {
+            "data/odds_builder.json",
+            "scripts/odds_builder.py",
+            "scripts/odds_builder_core.py",
+            "scripts/test_odds_builder_score_replay.py",
+            "scripts/test_odds_builder_upcoming_desk_recent_losses.py",
+            ".github/workflows/odds_builder.yml",
+            ".github/workflows/cloudflare-pages.yml",
+        }
+        self.assertTrue(builder_owned_paths.isdisjoint(direct_paths),
+                        "Builder data/code and Pages workflow changes must deploy only after a fresh Unified Upcoming board")
         self.assertIn("name: Guard cache-only direct promotion", PAGES_WORKFLOW)
         self.assertIn("if: github.event_name == 'push'", PAGES_WORKFLOW)
         self.assertIn("compare/${BEFORE_SHA}...${PUSH_SHA}", PAGES_WORKFLOW)
