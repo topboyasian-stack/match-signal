@@ -320,6 +320,66 @@ class UpcomingDeskSettledPromotionGateTests(unittest.TestCase):
         self.assertEqual(result["overlapping_or_incomplete_ticket_n"], 12)
         self.assertEqual(result["reason"], "insufficient_event_independent_settled_lane_sample")
 
+    def test_held_desk_lane_can_collect_only_qualified_paper_research(self):
+        held_gate = {
+            "lane": "upcoming_desk_research",
+            "eligible": False,
+            "reason": "insufficient_event_independent_settled_lane_sample",
+            "settled_ticket_n": 16,
+            "event_independent_settled_ticket_n": 7,
+            "flat_stake_roi": 0.376,
+            "event_independent_flat_stake_roi": 0.039,
+        }
+        row_a = {
+            "sport": "virtual", "product": "efootball_gt", "event_id": "future-a",
+            "start_time": "2026-10-20T17:00:00+00:00",
+            "player_1": "Alpha", "player_2": "Bravo", "match": "Alpha vs Bravo",
+            "builder_pick": "over", "line": 4.5, "bookmaker_odds": 1.75,
+            "model_probability": 0.61, "model_edge": 0.08,
+            "qualification_lane": "upcoming_desk_research_only",
+            "upcoming_desk_research_only": True,
+        }
+        row_b = {
+            "sport": "virtual", "product": "efootball_gt", "event_id": "future-b",
+            "start_time": "2026-10-20T17:10:00+00:00",
+            "player_1": "Charlie", "player_2": "Delta", "match": "Charlie vs Delta",
+            "builder_pick": "over", "line": 4.5, "bookmaker_odds": 1.85,
+            "model_probability": 0.61, "model_edge": 0.09,
+            "qualification_lane": "upcoming_desk_research_only",
+            "upcoming_desk_research_only": True,
+        }
+        metrics = {
+            "model_rating": 32.0, "raw_model_rating": 37.0,
+            "combined_model_probability": 0.32, "raw_combined_model_probability": 0.37,
+            "ticket_calibration_gamma": 1.0,
+            "ticket_calibration_mode": "upcoming_desk_exact_line_wilson_lower_bound_independence_proxy",
+            "ticket_calibration_ready": False,
+            "leg_strength_rating": 61.0, "avg_model_probability": 61.0,
+            "avg_model_edge_percent": 8.5,
+        }
+        desk_diag = {"enabled": True, "ticket_probability_method": "Wilson lower-bound product"}
+        option = {
+            "rows": [row_a, row_b], "metrics": metrics, "odds": 3.2375,
+            "span": 10.0, "roi": 0.035, "score": (0.32,),
+        }
+        with (
+            mock.patch.object(builder, "make_leg", side_effect=lambda x: dict(x)),
+            mock.patch.object(builder, "_exclude_pending_virtual_ticket_events", return_value=([], 0)),
+            mock.patch.object(builder, "construction_shape_diagnostics", return_value=[]),
+            mock.patch.object(builder, "_construct_upcoming_desk_research_batches", return_value=([option], desk_diag)),
+            mock.patch.object(builder, "_upcoming_desk_settled_performance_gate", return_value=held_gate),
+        ):
+            batches, built, diagnostics = builder.build_value_batches([])
+        self.assertEqual(len(batches), 1, "the held lane must keep gathering valid paper-only research outcomes")
+        self.assertIs(batches[0]["promotion_allowed"], False)
+        self.assertTrue(batches[0]["research_only_promotion_held"])
+        self.assertEqual(diagnostics["construction_priority"], "upcoming_desk_research_observation_only")
+        self.assertTrue(diagnostics["upcoming_desk_research_diagnostics"]["primary_lane_held"])
+        self.assertEqual(
+            diagnostics["upcoming_desk_research_diagnostics"]["primary_lane_hold_reason"],
+            "insufficient_event_independent_settled_lane_sample",
+        )
+
     def test_pending_and_unrelated_tickets_are_not_settled_promotion_evidence(self):
         tracker = {
             "tickets": [
