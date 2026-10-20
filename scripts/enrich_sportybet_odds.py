@@ -122,7 +122,7 @@ def _football_market_event_valid(pred, event, max_hours=3.0):
         pt = None
     try:
         raw_start = float(event.get('estimateStartTime') or 0)
-        et = datetime.fromtimestamp(raw_start / 1000 if raw_start < 100000000000 else raw_start / 1000, tz=timezone.utc) if raw_start > 0 else None
+        et = datetime.fromtimestamp(raw_start if raw_start < 100000000000 else raw_start / 1000, tz=timezone.utc) if raw_start > 0 else None
     except (TypeError, ValueError, OverflowError):
         et = None
     if pt is None or et is None:

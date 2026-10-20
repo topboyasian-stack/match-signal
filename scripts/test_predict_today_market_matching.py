@@ -85,6 +85,15 @@ class CompetitionSafeFootballMarketTests(unittest.TestCase):
         self.assertIs(found, senior)
         self.assertEqual(method, "name_time")
 
+
+    def test_enrichment_matcher_accepts_second_based_kickoff_timestamp(self):
+        pred = prediction()
+        senior = sporty_event(tournament="UEFA Champions League", event_id="sr:match:seconds")
+        senior["estimateStartTime"] = int(KICKOFF_MS / 1000)
+        found, method = enrich_sportybet_odds.find_event(pred, [senior])
+        self.assertIs(found, senior)
+        self.assertEqual(method, "name_time")
+
     def test_enrichment_matcher_fails_closed_when_kickoff_is_too_far_away(self):
         pred = prediction()
         tomorrow = sporty_event(
