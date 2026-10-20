@@ -283,7 +283,16 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn("workflow_dispatch:", PROMOTION_WORKFLOW)
         self.assertIn('paths:\n      - ".github/workflows/builder-production-promotion.yml"', PROMOTION_WORKFLOW)
         self.assertIn("github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'", PROMOTION_WORKFLOW)
-        self.assertNotIn("gh workflow run cloudflare-pages.yml", PROMOTION_WORKFLOW)
+        self.assertIn("Wait for successful board refresh", PROMOTION_WORKFLOW)
+        self.assertIn("gh workflow run cloudflare-pages.yml --ref main", PROMOTION_WORKFLOW)
+        self.assertIn("gh api \"repos/$GITHUB_REPOSITORY/actions/workflows/unified-upcoming.yml/runs?branch=main&event=workflow_dispatch&per_page=20\"", PROMOTION_WORKFLOW)
+        self.assertIn("if [ \"$board_conclusion\" != \"success\" ]; then", PROMOTION_WORKFLOW)
+        self.assertIn("if [ \"$deploy_conclusion\" != \"success\" ]; then", PROMOTION_WORKFLOW)
+        self.assertLess(
+            PROMOTION_WORKFLOW.index("gh workflow run unified-upcoming.yml --ref main"),
+            PROMOTION_WORKFLOW.index("gh workflow run cloudflare-pages.yml --ref main"),
+            "Pages may only be dispatched after the board refresh has been awaited and checked",
+        )
 
     def test_feeder_workflows_cannot_bypass_the_board_refresh(self):
         bypasses = []
@@ -293,7 +302,14 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
                 continue
             source = workflow_path.read_text(encoding="utf-8")
             if "gh workflow run cloudflare-pages.yml --ref main" in source:
-                bypasses.append(str(workflow_path.relative_to(ROOT)))
+                if workflow_path.name != "builder-production-promotion.yml":
+                    bypasses.append(str(workflow_path.relative_to(ROOT)))
+                else:
+                    wait_step = source.find("Wait for successful board refresh")
+                    dispatch_step = source.find("gh workflow run cloudflare-pages.yml --ref main")
+                    guard = source.find('if [ "$board_conclusion" != "success" ]; then')
+                    if not (wait_step >= 0 and guard >= 0 and dispatch_step > guard):
+                        bypasses.append(str(workflow_path.relative_to(ROOT)))
         self.assertEqual(
             bypasses,
             [],
