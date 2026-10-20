@@ -291,6 +291,10 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn("Dispatch Unified Upcoming and wait for successful board publication", PROMOTION_WORKFLOW)
         self.assertIn("gh workflow run cloudflare-pages.yml --ref main", PROMOTION_WORKFLOW)
         self.assertIn("gh api \"repos/$GITHUB_REPOSITORY/actions/workflows/unified-upcoming.yml/runs?branch=main&event=workflow_dispatch&per_page=20\"", PROMOTION_WORKFLOW)
+        self.assertIn("| [.id, .head_sha] | @tsv", PROMOTION_WORKFLOW)
+        self.assertIn("compare/$source_sha...$candidate_sha", PROMOTION_WORKFLOW)
+        self.assertIn('if [ "$merge_base" = "$source_sha" ]; then', PROMOTION_WORKFLOW)
+        self.assertNotIn("select(.head_sha ==", PROMOTION_WORKFLOW, "automated commits may advance main during dispatch")
         self.assertIn("if [ \"$board_conclusion\" != \"success\" ]; then", PROMOTION_WORKFLOW)
         self.assertIn("if [ \"$deploy_conclusion\" != \"success\" ]; then", PROMOTION_WORKFLOW)
         self.assertLess(
@@ -308,7 +312,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn("gh workflow run builder-production-promotion.yml --ref main", BUILDER_WORKFLOW[dispatch_step:])
         self.assertIn("  workflow_dispatch:", PROMOTION_WORKFLOW)
         self.assertIn(
-            "concurrency:" + chr(10) + "  group: builder-production-promotion" + chr(10) + "  cancel-in-progress: false",
+            "concurrency:" + chr(10) + "  # A new queue identity lets the repaired promotion bypass jobs stuck in the old SHA matcher." + chr(10) + "  group: builder-production-promotion-v2" + chr(10) + "  cancel-in-progress: false",
             PROMOTION_WORKFLOW,
             "serialize promotion runs; each must finish board refresh and deploy before the next begins",
         )
