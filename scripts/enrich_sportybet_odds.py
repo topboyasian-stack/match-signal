@@ -10,6 +10,7 @@ from difflib import SequenceMatcher
 from datetime import datetime, timezone
 from pathlib import Path
 from tennis_total_model import over_probability, recommend_total_line
+from football_competition_match import same_competition
 import requests
 try:
     from curl_cffi import requests as curl_requests
@@ -108,11 +109,36 @@ def market_rows(event):
     return rows
 
 
+def _football_market_event_valid(pred, event, max_hours=3.0):
+    """Fail closed unless a football market has the same competition and kickoff."""
+    if str(pred.get('sport') or '').lower() != 'football':
+        return True
+    if not same_competition(pred.get('league'), event.get('_league')):
+        return False
+    pstart = pred.get('start_time')
+    try:
+        pt = datetime.fromisoformat(str(pstart).replace('Z', '+00:00')).astimezone(timezone.utc) if pstart else None
+    except (TypeError, ValueError):
+        pt = None
+    try:
+        raw_start = float(event.get('estimateStartTime') or 0)
+        et = datetime.fromtimestamp(raw_start / 1000 if raw_start < 100000000000 else raw_start / 1000, tz=timezone.utc) if raw_start > 0 else None
+    except (TypeError, ValueError, OverflowError):
+        et = None
+    if pt is None or et is None:
+        return False
+    return abs((et - pt).total_seconds()) <= max_hours * 3600
+
+
 def find_event(pred, events):
     pid=str(pred.get('event_id') or '')
     if pid:
         for e in events:
-            if str(e.get('eventId') or '')==pid:return e,'event_id'
+            if str(e.get('eventId') or '') == pid:
+                if _football_market_event_valid(pred, e):
+                    return e, 'event_id'
+                # Do not let an ID override a competition or kickoff mismatch.
+
     if pred.get('sport')=='football':
         home_name=pred.get('home_team') or pred.get('player_1')
         away_name=pred.get('away_team') or pred.get('player_2')
@@ -126,6 +152,8 @@ def find_event(pred, events):
     except ValueError:pt=None
     best=None
     for e in events:
+        if pred.get('sport')=='football' and not _football_market_event_valid(pred, e):
+            continue
         names=(person_key(e.get('homeTeamName')),person_key(e.get('awayTeamName'))) if pred.get('sport')=='tennis' else (norm(e.get('homeTeamName')),norm(e.get('awayTeamName')))
         def similarity(a,b):
             if a==b:return 1.0
@@ -138,11 +166,12 @@ def find_event(pred, events):
             if similarity(names[0],pnames[0])<0.84 or similarity(names[1],pnames[1])<0.84:continue
         est=e.get('estimateStartTime')
         try:et=datetime.fromtimestamp(float(est)/1000,tz=timezone.utc) if est else None
-        except (TypeError,ValueError):et=None
+        except (TypeError,ValueError,OverflowError):et=None
         delta=abs((et-pt).total_seconds()) if et and pt else 0
-        if delta<=72*3600 and (best is None or delta<best[0]):best=(delta,e)
+        max_seconds = 3 * 3600 if pred.get('sport') == 'football' else 72 * 3600
+        if (pred.get('sport') != 'football' or (et is not None and pt is not None)) and delta<=max_seconds and (best is None or delta<best[0]):
+            best=(delta,e)
     return (best[1],'name_time') if best else (None,None)
-
 
 def extract_markets(pred,event):
     p1=person_key(pred.get('player_1') or pred.get('home_team'))

@@ -78,6 +78,32 @@ def valid_market(row):
         return None
 
 
+def _apply_independent_probability_fields(row, independent, calibrated, calibration):
+    """Replace legacy probability metadata with values from the current model pass."""
+    keys = ("p1", "draw", "p2")
+    raw = {key: round(float(independent[key]), 4) for key in keys}
+    calibrated_values = {key: round(float(value), 4) for key, value in zip(keys, calibrated)}
+    row["independent_probabilities"] = {
+        key: round(float(independent[key]), 6) for key in keys
+    }
+    row["raw_probabilities"] = raw
+    row["raw_confidence"] = round(max(raw.values()), 4)
+    row["calibrated_probabilities"] = calibrated_values
+    row["probabilities"] = calibrated_values.copy()
+    row["pick"] = max(keys, key=lambda key: calibrated_values[key])
+    row["confidence"] = round(max(calibrated_values.values()), 4)
+    row["calibrated_confidence"] = row["confidence"]
+    temperature = calibration_temperature(calibration, "football")
+    row["calibration"] = {
+        "market": "football:1x2",
+        "method": "softmax_temperature",
+        "temperature": round(float(temperature), 4),
+        "raw": row["raw_confidence"],
+        "calibrated": row["calibrated_confidence"],
+        "version": calibration.get("version"),
+    }
+
+
 def main():
     pred_path = DATA / "predictions.json"
     history_path = DATA / "prediction_history.json"
@@ -120,11 +146,7 @@ def main():
             calibrated = softmax_temperature(raw, calibration_temperature(calibration, "football"))
             market = valid_market(row)
 
-            row["independent_probabilities"] = {"p1": independent["p1"], "draw": independent["draw"], "p2": independent["p2"]}
-            row["calibrated_probabilities"] = {"p1": round(calibrated[0], 4), "draw": round(calibrated[1], 4), "p2": round(calibrated[2], 4)}
-            row["probabilities"] = {"p1": round(calibrated[0], 4), "draw": round(calibrated[1], 4), "p2": round(calibrated[2], 4)}
-            row["pick"] = ["p1", "draw", "p2"][calibrated.index(max(calibrated))]
-            row["confidence"] = round(max(calibrated), 4)
+            _apply_independent_probability_fields(row, independent, calibrated, calibration)
             row["expected_goals"] = {"p1": independent["xg_home"], "p2": independent["xg_away"], "total": round(independent["xg_home"] + independent["xg_away"], 4)}
             row["architecture"] = "independent statistical + market benchmark + calibration + value"
             row["model"] = independent["method"]

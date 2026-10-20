@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import requests
+from football_competition_match import same_competition
 
 from calibration import calibrate_prediction, calibrate_binary_market
 
@@ -362,17 +363,39 @@ def _parse_dt(value):
         return None
 
 
+def _football_market_fixture_valid(pred, event, max_hours=3.0):
+    """Require the right football competition and a near-identical kickoff."""
+    if str(pred.get("sport") or "").lower() != "football":
+        return True
+    if not same_competition(pred.get("league"), event.get("tournament")):
+        return False
+    predicted_start = _parse_dt(pred.get("start_time"))
+    try:
+        market_start = (
+            datetime.fromtimestamp(float(event["start_time_ms"]) / 1000, tz=timezone.utc)
+            if event.get("start_time_ms") else None
+        )
+    except (TypeError, ValueError, OverflowError):
+        market_start = None
+    if predicted_start is None or market_start is None:
+        return False
+    return abs((predicted_start - market_start).total_seconds()) <= max_hours * 3600
+
+
 def _find_sportybet_match(pred, events):
     ranked = []
     for event in events:
+        # Never compare a senior fixture with a same-named Youth League fixture.
+        # Missing competition or kickoff metadata fails closed for football.
+        if not _football_market_fixture_valid(pred, event):
+            continue
         score, direct, reverse = _pair_match_score(pred, event)
         ranked.append((score, direct, reverse, event))
     ranked.sort(key=lambda x: x[0], reverse=True)
     if not ranked:
         return None, None
     score, direct, reverse, event = ranked[0]
-    # Exact or near-exact names can safely tolerate larger scheduling differences;
-    # fuzzy matches still require stronger name agreement.
+    # Exact or near-exact names still must pass the competition/time contract above.
     threshold = 0.78 if max(direct, reverse) >= 0.94 else 0.86
     if score < threshold:
         return None, None
