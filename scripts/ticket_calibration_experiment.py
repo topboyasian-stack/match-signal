@@ -12,7 +12,7 @@ from __future__ import annotations
 import json, math
 from datetime import datetime, timezone
 from pathlib import Path
-from ticket_history import merge_ticket_history, settled_ticket_history
+from ticket_history import merge_ticket_history, settled_ticket_history, independent_settled_ticket_history
 
 ROOT=Path(__file__).resolve().parents[1]
 DATA=ROOT/"data"
@@ -111,7 +111,8 @@ def calibrate(rows, model_key="raw_combined_model_probability"):
 def main():
     raw=load(TRACKER,{})
     unique_tickets,history_diagnostics=merge_ticket_history(raw)
-    settled=settled_ticket_history(raw,min_legs=2,max_legs=7)
+    all_settled=settled_ticket_history(raw,min_legs=2,max_legs=7)
+    settled,independence_diagnostics=independent_settled_ticket_history(raw,min_legs=2,max_legs=7)
     modern=[t for t in settled if 2<=int(t.get("leg_count") or len(t.get("legs") or []))<=4]
     all_raw=[t for t in settled if prob(t,"raw_combined_model_probability") is not None and market(t) is not None]
     modern_raw=[t for t in modern if prob(t,"raw_combined_model_probability") is not None and market(t) is not None]
@@ -142,11 +143,13 @@ def main():
         "generated_at":datetime.now(timezone.utc).isoformat(),
         "mode":"PAPER_ONLY_DIAGNOSTIC",
         "production_selection_changed":False,
-        "method":"strict chronological ticket-level walk-forward on the stored raw joint product; each calibration weight uses only earlier settled tickets",
+        "method":"strict chronological ticket-level walk-forward on the stored raw joint product; only event-disjoint settled tickets train or score calibration; each weight uses only earlier settled tickets",
         "history_scope":"Deduplicated union of tickets and archived_tickets; current ticket rows take precedence when ticket IDs overlap.",
         "history_diagnostics":{
             **history_diagnostics,
+            **independence_diagnostics,
             "unique_ticket_rows":len(unique_tickets),
+            "all_unique_settled_ticket_rows":len(all_settled),
             "settled_calibration_rows":len(settled),
         },
         "warmup_tickets":WARMUP,
@@ -156,7 +159,8 @@ def main():
             "archived_rows":history_diagnostics.get("archived_rows",0),
             "unique_rows":history_diagnostics.get("unique_rows",0),
             "duplicate_rows_collapsed":history_diagnostics.get("duplicate_rows_collapsed",0),
-            "all_settled":len(settled),
+            "all_unique_settled_before_overlap_filter":len(all_settled),
+            "event_disjoint_settled_for_calibration":len(settled),
             "modern_2_to_4":len(modern),
             "raw_joint_probability_rows":len(all_raw),
             "modern_2_to_4_raw_joint_probability_rows":len(modern_raw),
