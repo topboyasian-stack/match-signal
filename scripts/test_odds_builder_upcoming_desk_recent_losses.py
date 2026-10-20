@@ -5,12 +5,14 @@ from __future__ import annotations
 import json
 import sys
 import unittest
+from unittest import mock
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT / "scripts") not in sys.path:
     sys.path.insert(0, str(ROOT / "scripts"))
 
+import odds_builder as builder
 from odds_builder import _upcoming_desk_recent_result_guard, _upcoming_desk_settled_performance_gate, _upcoming_desk_pending_event_ids, _exclude_pending_virtual_ticket_events, _settled_builder_lane_performance_gate
 
 
@@ -42,6 +44,56 @@ def tracker_with(*legs):
         } for i, leg in enumerate(legs, 1)],
         "archived_tickets": [],
     }
+
+
+class SettledSideProbabilityCapTests(unittest.TestCase):
+    def test_short_odds_raw_model_edge_is_capped_by_losing_exact_line_history(self):
+        index = {"exact": {
+            ("efootball_gt", "0.5", "over"): {"n": 35, "wins": 29, "losses": 6},
+        }}
+        with (
+            unittest.mock.patch.object(builder, "_load_results_first_index", return_value=index),
+            unittest.mock.patch.object(builder, "selected_price_and_devig", return_value=(1.11, 1/1.11, 0.89, True)),
+            unittest.mock.patch.object(builder, "odds_age", return_value=10.0),
+            unittest.mock.patch.object(builder, "data_quality", return_value=1.0),
+            unittest.mock.patch.object(builder, "uncertainty", return_value=0.01),
+            unittest.mock.patch.object(builder, "participant_history_signal", return_value={"available": False, "score": 0.5, "participants": []}),
+            unittest.mock.patch.object(builder, "_phase2_cyclical_loop_signal", return_value={"enabled": False, "flagged": False, "confidence": 0.0, "reason": "test"}),
+        ):
+            leg = builder.make_leg({
+                "sport": "virtual", "product": "efootball_gt",
+                "line": 0.5, "builder_pick": "over", "builder_probability": 0.9887,
+                "raw_model_probability": 0.9978, "player_1": "Paris SG (BULLFROG)",
+                "player_2": "Manchester City (INSTINCT)", "builder_market": "virtual_total",
+                "event_id": "event-short-price",
+            })
+        self.assertAlmostEqual(leg["model_probability"], 31/39, places=5)
+        self.assertTrue(leg["settled_side_probability_cap"]["applied"])
+        self.assertEqual(leg["settled_side_probability_cap"]["settled_sample_n"], 35)
+        self.assertFalse(leg["builder_eligible"])
+        self.assertLess(leg["expected_value"], 0)
+
+    def test_supported_desk_line_remains_uncapped_when_settled_rate_is_stronger(self):
+        index = {"exact": {
+            ("efootball_gt", "4.5", "over"): {"n": 11, "wins": 7, "losses": 4},
+        }}
+        result = builder._settled_exact_line_probability_cap(
+            "efootball_gt", 4.5, "over", 0.60, index=index
+        )
+        self.assertFalse(result["applied"])
+        self.assertAlmostEqual(result["effective_probability"], 0.60, places=5)
+        self.assertEqual(result["settled_sample_n"], 11)
+
+    def test_missing_or_thin_history_does_not_invent_a_probability_cap(self):
+        index = {"exact": {
+            ("efootball_gt", "4.5", "over"): {"n": 3, "wins": 3, "losses": 0},
+        }}
+        result = builder._settled_exact_line_probability_cap(
+            "efootball_gt", 4.5, "over", 0.677, index=index
+        )
+        self.assertFalse(result["applied"])
+        self.assertAlmostEqual(result["effective_probability"], 0.677, places=5)
+        self.assertEqual(result["reason"], "insufficient_settled_exact_line_side_sample")
 
 
 class UpcomingDeskRecentLossGateTests(unittest.TestCase):
