@@ -16,6 +16,7 @@ MONITOR_WORKFLOW = (ROOT / ".github/workflows/qualified-best-production-watch.ym
 SCHEDULE_MONITOR_WORKFLOW = (ROOT / ".github/workflows/qualified-best-health-watch-v2.yml").read_text(encoding="utf-8")
 LOGO_WORKFLOW = (ROOT / ".github/workflows/sync-club-logos.yml").read_text(encoding="utf-8")
 WATCHDOG_WORKFLOW = (ROOT / ".github/workflows/automation_watchdog.yml").read_text(encoding="utf-8")
+PROMOTION_WORKFLOW = (ROOT / ".github/workflows/builder-production-promotion.yml").read_text(encoding="utf-8")
 
 
 def workflow_push_paths(source: str) -> set[str]:
@@ -274,6 +275,12 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         }
         missing = sorted(required_inputs - board_paths)
         self.assertEqual(missing, [], f"Deployable inputs bypass the Unified board workflow: {missing}")
+
+    def test_builder_promotion_checks_out_repo_and_dispatches_the_board(self):
+        self.assertIn("uses: actions/checkout@v4", PROMOTION_WORKFLOW)
+        self.assertIn("with:\n          ref: main", PROMOTION_WORKFLOW)
+        self.assertIn("gh workflow run unified-upcoming.yml --ref main", PROMOTION_WORKFLOW)
+        self.assertNotIn("gh workflow run cloudflare-pages.yml", PROMOTION_WORKFLOW)
 
     def test_feeder_workflows_cannot_bypass_the_board_refresh(self):
         bypasses = []
