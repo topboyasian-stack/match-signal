@@ -67,9 +67,10 @@ class CompetitionSafeFootballMarketTests(unittest.TestCase):
         self.assertFalse(same_competition("Champions League", ""))
 
     def test_prediction_market_matcher_ignores_same_named_youth_fixture(self):
+        # Keep kickoff identical so this test proves competition identity—not time—
+        # excludes the Youth League event.
         youth = sporty_event(
             tournament="UEFA Youth League",
-            start_ms=int(datetime(2026, 10, 20, 11, 0, tzinfo=timezone.utc).timestamp() * 1000),
             event_id="sr:match:youth",
         )
         senior = sporty_event(tournament="UEFA Champions League", event_id="sr:match:senior")
@@ -84,7 +85,6 @@ class CompetitionSafeFootballMarketTests(unittest.TestCase):
         pred = prediction()
         youth = sporty_event(
             tournament="UEFA Youth League",
-            start_ms=int(datetime(2026, 10, 20, 11, 0, tzinfo=timezone.utc).timestamp() * 1000),
             event_id="sr:match:youth",
         )
         self.assertEqual(enrich_sportybet_odds.find_event(pred, [youth]), (None, None))
@@ -94,7 +94,6 @@ class CompetitionSafeFootballMarketTests(unittest.TestCase):
         found, method = enrich_sportybet_odds.find_event(pred, [youth, senior])
         self.assertIs(found, senior)
         self.assertEqual(method, "name_time")
-
 
     def test_enrichment_matcher_accepts_second_based_kickoff_timestamp(self):
         pred = prediction()
@@ -115,9 +114,7 @@ class CompetitionSafeFootballMarketTests(unittest.TestCase):
 
     def test_youth_category_and_age_markers_override_a_mislabelled_tournament(self):
         pred = prediction()
-        # Real provider pattern: same club names and kickoff, but the category
-        # identifies this row as youth. A misleading senior tournament label
-        # must not permit attachment.
+        # Same competition label, teams, and kickoff; provider category is youth.
         category_mislabeled = sporty_event(
             tournament="UEFA Champions League",
             category="International Youth",
@@ -126,8 +123,8 @@ class CompetitionSafeFootballMarketTests(unittest.TestCase):
         self.assertIsNone(predict_today._find_sportybet_match(pred, [category_mislabeled])[0])
         self.assertEqual(enrich_sportybet_odds.find_event(pred, [category_mislabeled]), (None, None))
 
-        # A youth marker in either participant is also authoritative even when
-        # the tournament/category text looks senior.
+        # A youth marker in either participant is authoritative even if tournament
+        # and category text appear senior.
         age_marked = sporty_event(
             tournament="UEFA Champions League",
             category="International Clubs",
@@ -162,7 +159,49 @@ class CompetitionSafeFootballMarketTests(unittest.TestCase):
             "UEFA Champions League",
             market_category="International Clubs",
             prediction_teams=("Fenerbahce", "Slavia Prague"),
-            market_teams=("Fenerbahce Istanbul", "Slavia Prague"),
+            market_teams=("Fenerbahce", "Slavia Prague"),
+        ))
+
+    def test_both_participants_must_match_not_just_one_exact_club(self):
+        pred = prediction()
+        # This same-competition, same-kickoff row has one exact participant and a
+        # merely partial opponent label. The old aggregate score could accept it.
+        wrong_opponent = sporty_event(
+            tournament="UEFA Champions League",
+            category="International Clubs",
+            home="Fenerbahce",
+            away="Slavia",
+            event_id="sr:match:wrong-opponent",
+        )
+        self.assertIsNone(predict_today._find_sportybet_match(pred, [wrong_opponent])[0])
+        self.assertEqual(enrich_sportybet_odds.find_event(pred, [wrong_opponent]), (None, None))
+
+        real_fixture = sporty_event(
+            tournament="UEFA Champions League",
+            category="International Clubs",
+            event_id="sr:match:real-fixture",
+        )
+        found, match = predict_today._find_sportybet_match(pred, [wrong_opponent, real_fixture])
+        self.assertIs(found, real_fixture)
+        self.assertIsNotNone(match)
+        found, method = enrich_sportybet_odds.find_event(pred, [wrong_opponent, real_fixture])
+        self.assertIs(found, real_fixture)
+        self.assertEqual(method, "name_time")
+
+    def test_identity_check_rejects_missing_or_wrong_participants(self):
+        self.assertFalse(football_market_identity_matches(
+            "UEFA Champions League",
+            "UEFA Champions League",
+            market_category="International Clubs",
+            prediction_teams=("Fenerbahce", "Slavia Prague"),
+            market_teams=("Fenerbahce", ""),
+        ))
+        self.assertFalse(football_market_identity_matches(
+            "UEFA Champions League",
+            "UEFA Champions League",
+            market_category="International Clubs",
+            prediction_teams=("Fenerbahce", "Slavia Prague"),
+            market_teams=("Fenerbahce", "Club Brugge"),
         ))
 
     def test_model_upgrade_replaces_stale_confidence_metadata(self):
