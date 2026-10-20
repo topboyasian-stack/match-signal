@@ -3,8 +3,9 @@
 import odds_builder as builder
 
 
-def archive_row(event_id, total, *, product="efootball_gt", stamp="2026-10-01T00:00:00+00:00"):
-    return {
+def archive_row(event_id, total, *, product="efootball_gt", stamp="2026-10-01T00:00:00+00:00",
+                start_time=None, participant_1=None, participant_2=None):
+    row = {
         "product": product,
         "event_id": event_id,
         "market": "ou",
@@ -15,6 +16,13 @@ def archive_row(event_id, total, *, product="efootball_gt", stamp="2026-10-01T00
         "settled_at": stamp,
         "timestamp": stamp,
     }
+    if start_time:
+        row["start_time"] = start_time
+    if participant_1:
+        row["participant_1"] = participant_1
+    if participant_2:
+        row["participant_2"] = participant_2
+    return row
 
 
 def event_rows(totals, *, repeats=1, product="efootball_gt"):
@@ -73,6 +81,27 @@ def test_conflicting_scores_are_excluded_instead_of_guessed():
     assert diag["conflicting_score_events_skipped"] == 1
 
 
+def test_reused_provider_event_id_does_not_merge_distinct_virtual_sessions():
+    rows = [
+        archive_row(
+            "reused-provider-id", 3, stamp="2026-10-20T08:01:00+00:00",
+            start_time="2026-10-20T08:00:00+00:00",
+            participant_1="Boca Juniors (zaha)", participant_2="Chelsea (mika)",
+        ),
+        archive_row(
+            "reused-provider-id", 12, stamp="2026-10-20T10:01:00+00:00",
+            start_time="2026-10-20T10:00:00+00:00",
+            participant_1="Real Madrid (cira)", participant_2="Juventus (cappo)",
+        ),
+    ]
+    derived, diag = builder._derive_efootball_score_replay(rows, {})
+    over = derived[("efootball_gt", "1.5", "over")]
+    assert len(over) == 2
+    assert diag["unique_score_events"] == 2
+    assert diag["conflicting_score_events_skipped"] == 0
+    assert len({row["start_time"] for row in over}) == 2
+
+
 def test_eight_direct_observations_keep_priority_over_replay():
     direct = {
         ("efootball_gt", "1.5", "over"): [{"win": True} for _ in range(8)]
@@ -120,6 +149,7 @@ if __name__ == "__main__":
     test_reconstructs_both_sides_from_final_scores()
     test_repeated_lines_for_the_same_event_count_once()
     test_conflicting_scores_are_excluded_instead_of_guessed()
+    test_reused_provider_event_id_does_not_merge_distinct_virtual_sessions()
     test_eight_direct_observations_keep_priority_over_replay()
     test_score_replay_is_efootball_only()
     test_integer_lines_are_not_replayed_without_push_accounting()
