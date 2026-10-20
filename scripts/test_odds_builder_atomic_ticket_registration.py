@@ -46,7 +46,8 @@ class AtomicBuilderTicketRegistrationTests(unittest.TestCase):
     def test_workflow_explains_atomic_event_reservation_purpose(self):
         self.assertIn("Commit the tracker and batch artifact atomically", self.commit_step)
         self.assertIn("pending event holds", self.commit_step)
-        self.assertIn("preserve settlements that landed on main", self.commit_step)
+        self.assertIn("preserve settlements that landed", self.commit_step)
+        self.assertIn("on main while this Builder job was calculating", self.commit_step)
 
 
 if __name__ == "__main__":
