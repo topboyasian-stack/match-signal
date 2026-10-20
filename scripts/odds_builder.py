@@ -4032,7 +4032,7 @@ def build_value_batches(candidates):
             metrics=option["metrics"]
             odds=float(option["odds"])
             desk_batches.append({
-                "batch_id":f"DESK-BATCH-{idx:02d}",
+                "batch_id":f"BATCH-{idx:02d}",
                 "label":f"Upcoming Desk Research · {odds:.2f}x · {len(rows)} legs",
                 "rank_pending":False,
                 "rank":idx,
