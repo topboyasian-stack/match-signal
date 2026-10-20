@@ -5154,10 +5154,26 @@ def main():
     # different lane wins, or when every construction lane correctly returns NO_BET.
     desk_performance_gate=_upcoming_desk_settled_performance_gate()
     pending_desk_events=_upcoming_desk_pending_event_ids()
+    settled_lane_gates={
+        lane:_settled_builder_lane_performance_gate(lane)
+        for lane in (
+            UPCOMING_DESK_BATCH_LANE,
+            "efootball_exact_evidence_value",
+            "vfootball_event_holdout_value",
+            "mixed_vfootball_efootball_value",
+            "phase2_cyclical_loop",
+            "high_confidence_research",
+            "efootball_compact_2x",
+            "model_first_value",
+            "vfootball",
+        )
+    }
     if isinstance(batch_diag,dict):
         batch_diag["upcoming_desk_settled_performance_gate"]=desk_performance_gate
+        batch_diag["settled_lane_performance_gates"]=settled_lane_gates
         batch_diag["upcoming_desk_pending_open_event_count"]=len(pending_desk_events)
         batch_diag["upcoming_desk_primary_promotion_allowed"]=desk_performance_gate.get("eligible") is True
+        batch_diag["upcoming_desk_primary_hold_reason"]=desk_performance_gate.get("reason")
     # Evaluate the isolated Phase 2 track independently of the baseline batch path.
     phase2_options,phase2_diag=_construct_phase2_cyclical_loop_batches(
         built,
@@ -5288,6 +5304,7 @@ def main():
             "construction_priority":str((batch_diag or {}).get("construction_priority") or ("no_qualified_batch" if not primary_lane else "settled_results_first")),
             "upcoming_desk_research_lane":{
                 "settled_performance_gate":desk_performance_gate,
+                "all_lane_settled_performance_gates":settled_lane_gates,
                 "primary_promotion_allowed":desk_performance_gate.get("eligible") is True,
                 "open_ticket_events_excluded":len(pending_desk_events),
                 "enabled":True,
@@ -5328,7 +5345,7 @@ def main():
             "results_first_min_expected_roi":RESULTS_FIRST_MIN_EXPECTED_ROI,
             "target_combined_odds":TARGET_COMBINED_ODDS,
             "accuracy_preservation_ratio":ACCURACY_PRESERVATION_RATIO,
-            "construction_priority":"settled_results_first","min_model_edge":MIN_EDGE,
+            "min_model_edge":MIN_EDGE,
             "max_odds_age_seconds":MAX_ODDS_AGE_SECONDS,"max_uncertainty":MAX_UNCERTAINTY,
             "max_legs":MAX_LEGS,
             "active_construction_max_legs":RESULTS_FIRST_MAX_LEGS,
