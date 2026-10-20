@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import requests
-from football_competition_match import same_competition
+from football_competition_match import football_market_identity_matches
 
 from calibration import calibrate_prediction, calibrate_binary_market
 
@@ -367,7 +367,13 @@ def _football_market_fixture_valid(pred, event, max_hours=3.0):
     """Require the right football competition and a near-identical kickoff."""
     if str(pred.get("sport") or "").lower() != "football":
         return True
-    if not same_competition(pred.get("league"), event.get("tournament")):
+    if not football_market_identity_matches(
+        pred.get("league"),
+        event.get("tournament"),
+        market_category=event.get("category"),
+        prediction_teams=(pred.get("player_1") or pred.get("home_team"), pred.get("player_2") or pred.get("away_team")),
+        market_teams=(event.get("home"), event.get("away")),
+    ):
         return False
     predicted_start = _parse_dt(pred.get("start_time"))
     try:
