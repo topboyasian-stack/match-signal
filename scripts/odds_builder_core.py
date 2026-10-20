@@ -2471,8 +2471,87 @@ def participant_history_signal(x):
     return {"available":bool(available),"score":round(score,4),"participants":details,"line":line_key,"side":pick}
 
 
+def _settled_exact_line_probability_cap(product,line,side,model_probability,index=None,min_n=8):
+    """Cap eFootball model confidence at a shrunk rate from settled same-line/side tickets.
+
+    A high raw model probability must not manufacture value at short odds when
+    actual settled selections on the same product, exact line, and direction
+    have not hit often enough. The cap is conservative, fail-closed only when
+    usable settled evidence exists; thin or missing history does not fabricate
+    a probability estimate or alter non-eFootball products.
+    """
+    try:
+        model_p=float(model_probability)
+        line_key=f"{float(line):g}"
+    except (TypeError,ValueError):
+        return {
+            "applied":False,"reason":"invalid_probability_or_line",
+            "model_probability":None,"effective_probability":None,
+            "settled_sample_n":0,"settled_wins":0,
+        }
+    product=str(product or "").strip().lower()
+    side=str(side or "").strip().lower()
+    details={
+        "applied":False,
+        "reason":None,
+        "model_probability":round(model_p,6),
+        "effective_probability":round(model_p,6),
+        "settled_sample_n":0,
+        "settled_wins":0,
+        "settled_hit_rate":None,
+        "settled_posterior_probability":None,
+        "source":"data/odds_ticket_tracker.json",
+        "method":"Beta(2,2) shrinkage; exact product + line + side",
+    }
+    if not product.startswith("efootball_"):
+        details["reason"]="product_out_of_scope"
+        return details
+    indexed=index if isinstance(index,dict) else _load_results_first_index()
+    exact=(indexed.get("exact") or {}).get((product,line_key,side))
+    if not isinstance(exact,dict):
+        details["reason"]="no_settled_exact_line_side_sample"
+        return details
+    try:
+        n=int(exact.get("n") or 0)
+        wins=int(exact.get("wins") or 0)
+    except (TypeError,ValueError):
+        details["reason"]="invalid_settled_exact_line_side_sample"
+        return details
+    if n<max(1,int(min_n)):
+        details.update({
+            "reason":"insufficient_settled_exact_line_side_sample",
+            "settled_sample_n":n,"settled_wins":wins,
+            "settled_hit_rate":round(wins/n,6) if n else None,
+        })
+        return details
+    if wins<0 or wins>n or not math.isfinite(model_p) or not 0<model_p<1:
+        details["reason"]="invalid_settled_exact_line_side_values"
+        return details
+    hit=wins/n
+    posterior=(wins+2.0)/(n+4.0)
+    effective=min(model_p,posterior)
+    details.update({
+        "applied":effective < model_p-1e-9,
+        "reason":"settled_side_probability_capped" if effective < model_p-1e-9 else "settled_side_evidence_not_below_model",
+        "effective_probability":round(effective,6),
+        "settled_sample_n":n,
+        "settled_wins":wins,
+        "settled_hit_rate":round(hit,6),
+        "settled_posterior_probability":round(posterior,6),
+    })
+    return details
+
+
 def make_leg(x):
-    p=float(x["builder_probability"])
+    raw_p=float(x["builder_probability"])
+    settled_side_cap=_settled_exact_line_probability_cap(
+        x.get("product"),x.get("line"),x.get("builder_pick"),raw_p
+    ) if x.get("sport")=="virtual" else {
+        "applied":False,"reason":"product_out_of_scope",
+        "model_probability":round(raw_p,6),"effective_probability":round(raw_p,6),
+        "settled_sample_n":0,"settled_wins":0,
+    }
+    p=float(settled_side_cap.get("effective_probability") or raw_p)
     bookmaker,implied,devig,complete=selected_price_and_devig(x)
     age=odds_age(x)
     quality=data_quality(x)
@@ -2537,6 +2616,7 @@ def make_leg(x):
         "participant_1":x.get("participant_1") or x.get("player_1") or x.get("team_1"),
         "participant_2":x.get("participant_2") or x.get("player_2") or x.get("team_2"),
         "model_probability":round(p,6),"desk_calibrated_probability":x.get("desk_calibrated_probability"),
+        "settled_side_probability_cap":settled_side_cap,
         "raw_model_probability":x.get("raw_model_probability"),
         "walkforward_exact_line_n":x.get("walkforward_exact_line_n"),
         "walkforward_exact_line_hit_rate":x.get("walkforward_exact_line_hit_rate"),
