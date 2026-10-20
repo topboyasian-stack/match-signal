@@ -119,6 +119,14 @@ assert.equal(hooks.isCurrentBuilderLeg(deskLeg({ market_odds_age_seconds: 5 * 60
 
 console.log('Odds Builder UI freshness passed: desk-only 60% gate, artifact expiry, future kickoffs, and combined snapshot-plus-quote age.');
 
+const liveSourcePath = new URL('../functions/api/odds-builder-data.js', import.meta.url);
+const liveSource = readFileSync(fileURLToPath(liveSourcePath), 'utf8');
+assert.ok(source.includes("fetch('./api/odds-builder-data?v=20261020-live-source2-'"), 'Builder must request the latest committed artifact through the same-site API');
+assert.ok(source.includes("fetch('./data/odds_builder.json?v=20261020-desk-guard-'"), 'Static Builder JSON must remain as an outage fallback');
+assert.ok(liveSource.includes('raw.githubusercontent.com/topboyasian-stack/match-signal/main/data/odds_builder.json'), 'Live Builder API must read the canonical main-branch artifact');
+assert.ok(liveSource.includes("Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0'"), 'Live Builder API must not cache old snapshots');
+assert.ok(liveSource.includes("data.engine_version !== 'V6.1-RESEARCH-GATED'"), 'Live Builder API must validate the artifact contract');
+
 assert.ok(source.includes('Exact-line walk-forward holdout'), 'Desk candidates must display the walk-forward evidence basis');
 assert.ok(source.includes('recent_settled_line_side_loss_streak'), 'No-batch explanation must reveal recent settled-loss holds');
 assert.ok(source.includes('data-builder-refresh'), 'Builder must include a usable manual refresh action');

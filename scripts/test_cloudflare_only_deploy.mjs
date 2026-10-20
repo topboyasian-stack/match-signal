@@ -50,8 +50,13 @@ assert.match(cloudflare, /https:\/\/match-signal\.pages\.dev/);
 assert.ok(
   cloudflare.includes("|scripts/ensure_odds_builder_refresh.py|scripts/test_ensure_odds_builder_refresh.py|") &&
     cloudflare.includes("|scripts/test_workflow_trigger_boundaries.py|") &&
-    cloudflare.includes("|scripts/test_cloudflare_only_deploy.mjs|"),
-  "Builder refresh and deployment-guard regression paths must be explicitly approved by the direct-promotion guard.",
+    cloudflare.includes("|scripts/test_cloudflare_only_deploy.mjs|") &&
+    cloudflare.includes("|functions/api/odds-builder-data.js|"),
+  "Builder refresh, the live odds-data endpoint, and deployment-guard regression paths must be explicitly approved by the direct-promotion guard.",
+);
+assert.ok(
+  cloudflare.includes("      - 'functions/api/odds-builder-data.js'"),
+  "A change to the live Builder data endpoint must trigger a Cloudflare Pages deployment.",
 );
 
 const monitor = fs.readFileSync(path.join(workflowsDir, "qualified-best-production-watch.yml"), "utf8");

@@ -1057,7 +1057,14 @@
     document.querySelectorAll('[data-builder-refresh]').forEach(function(btn){btn.disabled=true;btn.textContent='Refreshing…';});
     if(!oddsBuilderHasRendered)target.innerHTML='<div class="empty">Loading Odds Builder data…</div>';
     Promise.all([
-      fetch('./data/odds_builder.json?v=20261020-desk-guard-'+Date.now(),{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('odds_builder.json HTTP '+r.status);return r.json();}),
+      // Read the latest committed artifact through the same-site Pages API; static JSON is outage fallback only.
+      fetch('./api/odds-builder-data?v=20261020-live-source2-'+Date.now(),{cache:'no-store'})
+        .then(function(r){if(!r.ok)throw new Error('live odds_builder API HTTP '+r.status);return r.json();})
+        .catch(function(liveError){
+          return fetch('./data/odds_builder.json?v=20261020-desk-guard-'+Date.now(),{cache:'no-store'})
+            .then(function(r){if(!r.ok)throw liveError;return r.json();})
+            .catch(function(){throw liveError;});
+        }),
       fetch('./data/odds_ticket_tracker.json?v=20261020-desk-guard-'+Date.now(),{cache:'no-store'}).then(function(r){
         if(!r.ok)return {tickets:[],summary:{},ledger_error:'HTTP '+r.status+' while reading the paper settlement ledger.'};
         return r.text().then(function(text){
