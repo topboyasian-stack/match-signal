@@ -621,19 +621,22 @@ class CompactEfootballBuilderTests(unittest.TestCase):
         # The constructor's final pool is empty once the stricter leg-level gates are applied.
         self.assertEqual(diag["candidate_count"],0)
 
-    def test_build_value_batches_prioritizes_upcoming_desk_lane_over_held_legacy_lane(self):
+    def test_build_value_batches_holds_desk_lane_when_settled_roi_gate_fails(self):
         rows=[desk_leg(0,minute=0),desk_leg(1,minute=5)]
         with (
             patch.object(builder,"make_leg",side_effect=lambda row:row),
             patch.object(builder,"construction_shape_diagnostics",return_value=[]),
+            patch.object(builder,"_upcoming_desk_settled_performance_gate",return_value={
+                "eligible":False,
+                "reason":"settled_lane_ticket_roi_below_promotion_floor",
+                "settled_ticket_n":12,
+                "flat_stake_roi":-0.10,
+            }),
         ):
             batches,built,diag=builder.build_value_batches(rows)
-        self.assertTrue(batches)
-        self.assertEqual(batches[0]["primary_lane"],"upcoming_desk_research")
-        self.assertEqual(diag["construction_priority"],"upcoming_desk_research_first")
-        self.assertFalse(batches[0]["ticket_calibration_ready"])
-        self.assertFalse(batches[0]["real_money_execution"])
-        self.assertTrue(batches[0]["paper_only"])
+        self.assertEqual(batches,[])
+        self.assertFalse(diag["upcoming_desk_settled_performance_gate"]["eligible"])
+        self.assertEqual(diag["upcoming_desk_settled_performance_gate"]["reason"],"settled_lane_ticket_roi_below_promotion_floor")
 
 
 
