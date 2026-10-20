@@ -119,6 +119,28 @@ class BuilderRefreshDecisionTests(unittest.TestCase):
         self.assertEqual(result["last_run_event"], "schedule")
         self.assertLess(result["run_age_minutes"], UPCOMING_BOARD_REFRESH_MIN_INTERVAL_MINUTES)
 
+    def test_recent_fallback_dispatch_that_predates_board_queues_follow_up_refresh(self):
+        result = evaluate_runs(
+            [run(2, run_id=904, event="workflow_dispatch")],
+            NOW,
+            artifact_generated_at=artifact(1),
+            upstream_board_generated_at=NOW.isoformat().replace("+00:00", "Z"),
+        )
+        self.assertTrue(result["dispatch"])
+        self.assertEqual(result["reason"], "upcoming_board_published_after_recent_builder_cycle")
+        self.assertEqual(result["last_run_id"], 904)
+        self.assertEqual(result["last_run_event"], "workflow_dispatch")
+
+    def test_fallback_dispatch_at_board_timestamp_does_not_duplicate_recovery(self):
+        result = evaluate_runs(
+            [run(0, run_id=905, event="workflow_dispatch")],
+            NOW,
+            artifact_generated_at=artifact(1),
+            upstream_board_generated_at=NOW.isoformat().replace("+00:00", "Z"),
+        )
+        self.assertFalse(result["dispatch"])
+        self.assertEqual(result["reason"], "upcoming_board_newer_but_builder_recent")
+
     def test_newer_upcoming_board_does_not_dispatch_while_builder_run_is_active(self):
         result = evaluate_runs(
             [run(1, "in_progress", run_id=901)],
