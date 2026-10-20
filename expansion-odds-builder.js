@@ -971,7 +971,7 @@
       var body=legs.map(function(l,i){return legCard(l,i,idx);}).join('');
       var bookingPanel=bookingPanelHtml(b);
       return [
-        '<details class="batch-card" data-state-key="batch:'+esc(b.batch_id||('batch-'+idx))+'">',
+        '<details class="batch-card" data-state-key="batch:'+esc(String(b.batch_id||('batch-'+idx))+'|'+legs.map(function(l){return [l.event_id||'',l.market||'',l.line==null?'':l.line,l.builder_pick||l.pick||''].join('|');}).join('||'))+'">',
         '<summary class="batch-summary">',
         '<div><span class="batch-kicker">Batch '+batchNum+'</span>',
         '<strong>'+esc(products)+' · Combined Model Rating '+esc(rating)+'</strong>',
@@ -1030,12 +1030,35 @@
     target.innerHTML=pushNotificationHtml()+'<div class="builder-console"><div class="builder-console-head"><div><span class="builder-kicker">PAPER RESEARCH DESK</span><h3>Live '+floorLabel+' Builder</h3><p>Fresh SportyBet prices are qualified in-process. Batches stay paper-only and disjoint by event.</p></div><div class="builder-live-state"><span class="pulse-dot"></span><b>'+(staleBuilderData?'REFRESH REQUIRED':data.status==='LIVE_VALUE_SET'?'LIVE VALUE SET':batchCount?'PAPER VALUE SET':'NO ACTIVE SET')+'</b><small>'+esc(status)+'</small></div></div><div class="builder-stat-row"><div class="builder-stat builder-stat-main"><small>Active batches</small><strong>'+batchCount+'/6</strong><span>Automatically refreshed</span></div><div class="builder-stat"><small>Sport lanes</small><strong>'+esc(sports.length?sports.join(' · '):'—')+'</strong><span>Current batch set</span></div><div class="builder-stat"><small>Top model rating</small><strong>'+esc(topRating==null?'—':topRating.toFixed(1)+'/100')+'</strong><span>Batch strength proxy</span></div><div class="builder-stat"><small>Top combined odds</small><strong>'+esc(top&&top.combined_odds!=null?Number(top.combined_odds).toFixed(3):'—')+'x</strong><span>SportyBet snapshot</span></div></div></div><div class="builder-batch-panel builder-qualified-set"><div class="builder-section-head"><div><span class="section-kicker">PAPER RESEARCH BATCHES</span><b>'+floorLabel+' evidence-gated batches</b><span>Research-only candidates. Open a batch for selections, booking-code status and evidence.</span></div><div class="builder-section-note"><b>'+esc(virtualCount)+'</b><span>virtual candidates evaluated</span></div></div><div class="batch-list">'+(cards||'<div class="empty">No qualified '+floorLabel+' batches are currently available.</div>')+'</div><div class="builder-feedbar"><span><b>SPORTYBET</b> live snapshot</span><span>Top joint proxy <b>'+esc(topJoint==null?'—':pct(topJoint))+'</b></span><span>Price freshness gate <b>&le; 15m</b></span><span>Paper only <b>Yes</b></span></div>'+gateNote+'</div>'+qualificationMonitor+ticketTrack+'<div class="builder-note">The Builder refreshes automatically. Opening a batch reveals its exact selections and current SportyBet booking code.</div>';
     updateTimers();
   }
+  var oddsBuilderHasRendered=false;
+  var oddsBuilderLoadInFlight=false;
+  var oddsBuilderRefreshQueued=false;
+
+  function builderExpandedState(target){
+    var state={};
+    if(!target)return state;
+    target.querySelectorAll('details[data-state-key]').forEach(function(el){
+      if(el.open)state[el.getAttribute('data-state-key')||'']=true;
+    });
+    return state;
+  }
+  function restoreBuilderExpandedState(target,state){
+    if(!target||!state)return;
+    target.querySelectorAll('details[data-state-key]').forEach(function(el){
+      var key=el.getAttribute('data-state-key')||'';
+      if(Object.prototype.hasOwnProperty.call(state,key))el.open=state[key]===true;
+    });
+  }
+
   function load(){
     var target=document.getElementById('oddsBuilder');if(!target)return;
-    target.innerHTML='<div class="empty">Loading Odds Builder data…</div>';
+    if(oddsBuilderLoadInFlight){oddsBuilderRefreshQueued=true;return;}
+    oddsBuilderLoadInFlight=true;
+    var expanded=builderExpandedState(target);
+    if(!oddsBuilderHasRendered)target.innerHTML='<div class="empty">Loading Odds Builder data…</div>';
     Promise.all([
-      fetch('./data/odds_builder.json?v=20260929-odds-builder-'+Date.now(),{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('odds_builder.json HTTP '+r.status);return r.json();}),
-      fetch('./data/odds_ticket_tracker.json?v=20260930-ticket-track-'+Date.now(),{cache:'no-store'}).then(function(r){
+      fetch('./data/odds_builder.json?v=20261020-desk-guard-'+Date.now(),{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('odds_builder.json HTTP '+r.status);return r.json();}),
+      fetch('./data/odds_ticket_tracker.json?v=20261020-desk-guard-'+Date.now(),{cache:'no-store'}).then(function(r){
         if(!r.ok)return {tickets:[],summary:{},ledger_error:'HTTP '+r.status+' while reading the paper settlement ledger.'};
         return r.text().then(function(text){
           try{return text?JSON.parse(text):{tickets:[],summary:{},ledger_error:'The paper settlement ledger returned an empty response.'};}
@@ -1046,8 +1069,31 @@
       var data=results[0],tracker=results[1],current=filterCurrentBuilderSnapshot(data,Date.now());
       var activeBatches=current.batches,activeLegs=current.qualified_legs;
       var activeData=Object.assign({},data,{batches:activeBatches,qualified_legs:activeLegs,builder_freshness:current.freshness});
-      return refreshLiveStatuses(activeLegs).then(function(){return refreshVirtualLiveStatuses(activeBatches.reduce(function(all,b){return all.concat(Array.isArray(b.legs)?b.legs:[]);},[]));}).then(function(){render(activeData,tracker);}).then(function(){return ensureBookingCodes(activeBatches);});
-    }).catch(function(e){target.innerHTML='<div class="empty">Accumulator data unavailable: '+esc(e.message)+'</div>';});
+      return refreshLiveStatuses(activeLegs).then(function(){
+        return refreshVirtualLiveStatuses(activeBatches.reduce(function(all,b){return all.concat(Array.isArray(b.legs)?b.legs:[]);},[]));
+      }).then(function(){
+        render(activeData,tracker);
+        oddsBuilderHasRendered=true;
+        restoreBuilderExpandedState(target,expanded);
+        var stamp=target.querySelector('[data-builder-refresh-status]');
+        if(stamp)stamp.textContent='Updated '+local(data.generated_at||new Date().toISOString());
+      }).then(function(){return ensureBookingCodes(activeBatches);});
+    }).catch(function(e){
+      if(!oddsBuilderHasRendered){
+        target.innerHTML='<div class="empty">Accumulator data unavailable: '+esc(e.message)+'</div>';
+      }else{
+        var stamp=target.querySelector('[data-builder-refresh-status]');
+        if(stamp){stamp.textContent='Refresh failed · showing last saved snapshot';stamp.classList.add('is-error');}
+      }
+    }).finally(function(){
+      oddsBuilderLoadInFlight=false;
+      var buttons=document.querySelectorAll('[data-builder-refresh]');
+      buttons.forEach(function(btn){btn.disabled=false;btn.textContent='Refresh now';});
+      if(oddsBuilderRefreshQueued){
+        oddsBuilderRefreshQueued=false;
+        load();
+      }
+    });
   }
   function boot(){
     if(!document.getElementById('odds-builder-result-style')){
