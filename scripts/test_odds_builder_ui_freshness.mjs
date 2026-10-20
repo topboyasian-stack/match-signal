@@ -59,12 +59,12 @@ assert.equal(hooks.builderArtifactFreshness({}, now).fresh, false);
 // The intended 60%+ Desk lane is visible within its dedicated research lane, but the ordinary
 // eFootball lane keeps its 80% floor.
 assert.equal(hooks.activeVirtualProbabilityFloor(deskLeg(), 'upcoming_desk_research'), 0.60);
-assert.equal(hooks.isActiveVirtualBatch(deskBatch(), now), true);
+assert.equal(hooks.isActiveVirtualBatchAt(deskBatch(), now), true);
 const ordinary = deskBatch([deskLeg({ qualification_lane: 'standard_efootball', model_probability: 0.79 })], {
   batch_id: 'BATCH-01',
   primary_lane: 'standard_efootball'
 });
-assert.equal(hooks.isActiveVirtualBatch(ordinary, now), false);
+assert.equal(hooks.isActiveVirtualBatchAt(ordinary, now), false);
 
 // Started and near-kickoff fixtures, invalid start times, stale quotes, and non-fresh prices
 // must remove the whole accumulator rather than displaying its stale odds.
@@ -75,7 +75,7 @@ assert.equal(hooks.isCurrentBuilderLeg(deskLeg({ start_time: 'not-a-date' }), no
 assert.equal(hooks.isCurrentBuilderLeg(deskLeg({ market_odds_age_seconds: 900 }), now), true);
 assert.equal(hooks.isCurrentBuilderLeg(deskLeg({ market_odds_age_seconds: 901 }), now), false);
 assert.equal(hooks.isCurrentBuilderLeg(deskLeg({ odds_fresh: false }), now), false);
-assert.equal(hooks.isActiveVirtualBatch(deskBatch([
+assert.equal(hooks.isActiveVirtualBatchAt(deskBatch([
   deskLeg(),
   deskLeg({ event_id: 'evt-desk-2', start_time: iso(-10) })
 ]), now), false);
