@@ -176,6 +176,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "odds-builder.html",
             "expansion-odds-builder.js",
             "scripts/test_odds_builder_ui_freshness.mjs",
+            "scripts/test_desk_quote_contract.mjs",
             "functions/api/sportybet-booking.js",
             "scripts/test_sportybet_booking_batch_ids.mjs",
             "odds-builder-design.css",
