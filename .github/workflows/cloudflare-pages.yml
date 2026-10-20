@@ -9,7 +9,7 @@ on:
       - "Match Signal Persistent Club Logo Registry"
     types: [completed]
   # Small static presentation promotions must not depend on a queued Unified Board run.
-  # Push promotions are guarded below and accept only allowlisted UI, verification, and the scoped booking-ID contract fix.
+  # Push promotions are guarded below and accept only allowlisted UI, verification, and the scoped booking-ID and Builder freshness fixes.
   push:
     branches: [main]
     paths:
@@ -26,6 +26,8 @@ on:
       - 'darts.html'
       - 'table-tennis.html'
       - 'odds-builder.html'
+      - 'expansion-odds-builder.js'
+      - 'scripts/test_odds_builder_ui_freshness.mjs'
       - 'functions/api/sportybet-booking.js'
       - 'scripts/test_sportybet_booking_batch_ids.mjs'
       - 'odds-builder-design.css'
@@ -91,7 +93,7 @@ jobs:
           changed="$(gh api "repos/${GITHUB_REPOSITORY}/compare/${BEFORE_SHA}...${PUSH_SHA}" --jq '.files[].filename')"
           test -n "$changed" || { echo "Direct promotion has no inspectable changed-file list." >&2; exit 1; }
           printf 'Direct promotion changed files:\n%s\n' "$changed"
-          allowed='|_headers|index.html|upcoming.html|qualified-best.html|qualified-best-design.css|scripts/test_qualified_best_design.mjs|functions/api/sportybet-booking.js|scripts/test_sportybet_booking_batch_ids.mjs|sport-hubs-design.css|scripts/test_sport_hub_design.mjs|independent-sport-design.css|scripts/test_independent_sports_design.mjs|darts.html|table-tennis.html|odds-builder.html|odds-builder-design.css|reports.html|reports-design.css|virtual-lab/index.html|virtual-lab-terminal.css|scripts/test_workspace_terminal_design.mjs|football.html|tennis.html|basketball.html|sport-hubs.css|sport-hubs.js|ms-design-system.css|core-workspaces-design.css|scripts/test_core_workspaces_design.mjs|league-logos.js|scripts/test_league_logos.mjs|workspace-ui.js|data/club-logo-registry.json|scripts/sync_club_logos.py|scripts/test_club_logo_registry.py|scripts/qualified_best_monitor.mjs|scripts/test_qualified_best_monitor.mjs|.github/workflows/cloudflare-pages.yml|.github/workflows/qualified-best-live-monitor.yml|.github/workflows/qualified-best-watch.yml|.github/workflows/qualified-best-production-watch.yml|.github/workflows/qualified-best-health-watch-v2.yml|.github/workflows/automation_watchdog.yml|.github/workflows/efootball-market-research-schedule.yml|scripts/test_automation_watchdog_research_recovery.py|.github/workflows/unified-upcoming.yml|scripts/ensure_odds_builder_refresh.py|scripts/test_ensure_odds_builder_refresh.py|scripts/test_workflow_trigger_boundaries.py|.github/workflows/odds_builder.yml|scripts/test_cloudflare_only_deploy.mjs|scripts/test_deploy_freshness_order.py|scripts/test_prediction_desk_gates.mjs|scripts/test_upcoming_desk_policy.py|docs/PREDICTION_DESK_POLICY.md|'
+          allowed='|_headers|index.html|upcoming.html|qualified-best.html|qualified-best-design.css|scripts/test_qualified_best_design.mjs|functions/api/sportybet-booking.js|scripts/test_sportybet_booking_batch_ids.mjs|expansion-odds-builder.js|scripts/test_odds_builder_ui_freshness.mjs|sport-hubs-design.css|scripts/test_sport_hub_design.mjs|independent-sport-design.css|scripts/test_independent_sports_design.mjs|darts.html|table-tennis.html|odds-builder.html|odds-builder-design.css|reports.html|reports-design.css|virtual-lab/index.html|virtual-lab-terminal.css|scripts/test_workspace_terminal_design.mjs|football.html|tennis.html|basketball.html|sport-hubs.css|sport-hubs.js|ms-design-system.css|core-workspaces-design.css|scripts/test_core_workspaces_design.mjs|league-logos.js|scripts/test_league_logos.mjs|workspace-ui.js|data/club-logo-registry.json|scripts/sync_club_logos.py|scripts/test_club_logo_registry.py|scripts/qualified_best_monitor.mjs|scripts/test_qualified_best_monitor.mjs|.github/workflows/cloudflare-pages.yml|.github/workflows/qualified-best-live-monitor.yml|.github/workflows/qualified-best-watch.yml|.github/workflows/qualified-best-production-watch.yml|.github/workflows/qualified-best-health-watch-v2.yml|.github/workflows/automation_watchdog.yml|.github/workflows/efootball-market-research-schedule.yml|scripts/test_automation_watchdog_research_recovery.py|.github/workflows/unified-upcoming.yml|scripts/ensure_odds_builder_refresh.py|scripts/test_ensure_odds_builder_refresh.py|scripts/test_workflow_trigger_boundaries.py|.github/workflows/odds_builder.yml|scripts/test_cloudflare_only_deploy.mjs|scripts/test_deploy_freshness_order.py|scripts/test_prediction_desk_gates.mjs|scripts/test_upcoming_desk_policy.py|docs/PREDICTION_DESK_POLICY.md|'
           while IFS= read -r path; do
             [ -n "$path" ] || continue
             case "$path" in
@@ -183,6 +185,7 @@ jobs:
           node --check league-logos.js
           node scripts/test_league_logos.mjs
           node --check expansion-odds-builder.js
+          node scripts/test_odds_builder_ui_freshness.mjs
           node --check functions/api/sportybet-booking.js
           node scripts/test_sportybet_booking_batch_ids.mjs
           node --check functions/api/sportybet-virtual.js
@@ -543,7 +546,7 @@ jobs:
               )) failures.push('/analyst.js missing deterministic facts or product-specific high-line Under qualification safeguards');
               if (path==='/sport-hubs.js' && (!body.includes('EXACT_MARKET_LINE_SIDE_FRESH') || !body.includes('HIGH_LINE_UNDER_EVIDENCE_GATE_PENDING') || !body.includes('MODEL ESTIMATE ≥90% · NOT QUALIFIED') || !body.includes('SportyBet last seen @') || !body.includes('NOT ACTIONABLE · PRICE STALE') || body.includes('MODEL GATE PASSED · PRICE STALE') || body.includes('class="ms-up-qual ') || body.includes('class="ms-market-q ') || !body.includes('VFOOTBALL_RESEARCH_ONLY') || !body.includes('isVirtual && !isActiveVirtualProduct(productKey)') || !body.includes('EXPLICIT_QUALIFICATION_VETO') || !body.includes('function qualifiedBestSelections') || !body.includes('function exactVirtualMarketLine') || !body.includes('gate.currentPricePass?1:0'))) failures.push('/sport-hubs.js missing qualified-first ranking, explicit watch-status veto, exact quote or virtual-line normalization safeguards');
               if (path==='/sport-hubs.css' && !body.includes('.ms-qualified-best-row')) failures.push('/sport-hubs.css missing Qualified Best presentation styles');
-              if (path==='/expansion-odds-builder.js' && (!/function isActiveVirtualLeg\(leg(?:,\s*batchLane)?\)/.test(body) || !body.includes('function isActiveVirtualBatch(batch)') || !body.includes('ACTIVE_VIRTUAL_MIN_PROBABILITY = 0.80') || !body.includes('ensureBookingCodes(activeBatches)') || !body.includes("primaryLane==='efootball_compact_2x'") || !body.includes('4–5 LEGS · 2.00+') || !body.includes('Compact eFootball ticket lane') || !body.includes('function qualificationMonitorHtml(data,visibleBatchCount)') || !body.includes('NOT QUALIFIED') || !body.includes('INDIVIDUAL GATES PASS') || !body.includes('EFOOTBALL_EXACT_EVIDENCE_MIN_PROBABILITY = 0.65') || !body.includes('function activeVirtualProbabilityFloor(leg,batchLane)'))) failures.push('/expansion-odds-builder.js missing active-scope, compact-lane or 80% stale-batch guard');
+              if (path==='/expansion-odds-builder.js' && (!/function isActiveVirtualLeg\(leg(?:,\s*batchLane)?\)/.test(body) || !body.includes('function isActiveVirtualBatch(batch)') || !body.includes('function isActiveVirtualBatchAt(batch, now)') || !body.includes('function builderArtifactFreshness(data, now)') || !body.includes('function isCurrentBuilderLeg(leg, now)') || !body.includes('UPCOMING_DESK_RESEARCH_MIN_PROBABILITY = 0.60') || !body.includes('ACTIVE_VIRTUAL_MIN_PROBABILITY = 0.80') || !body.includes('ensureBookingCodes(activeBatches)') || !body.includes("primaryLane==='efootball_compact_2x'") || !body.includes('4–5 LEGS · 2.00+') || !body.includes('Compact eFootball ticket lane') || !body.includes('function qualificationMonitorHtml(data,visibleBatchCount)') || !body.includes('NOT QUALIFIED') || !body.includes('INDIVIDUAL GATES PASS') || !body.includes('EFOOTBALL_EXACT_EVIDENCE_MIN_PROBABILITY = 0.65') || !body.includes('function activeVirtualProbabilityFloor(leg,batchLane)'))) failures.push('/expansion-odds-builder.js missing active-scope, compact-lane or 80% stale-batch guard');
               if (path.endsWith('.json')) {
                 const parsed=JSON.parse(body);
                 if (path==='/data/odds_ticket_tracker.json') {

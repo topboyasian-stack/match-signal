@@ -99,12 +99,19 @@ const builderBatchEnd = builderUiSource.indexOf("\n  }", builderBatchStart);
 assert.ok(builderLegStart >= 0 && builderBatchStart > builderLegStart && builderBatchEnd > builderBatchStart, "active Builder scope helpers must exist");
 const builderScopeContext = {};
 vm.runInNewContext(
+  "function dateOf(v){var d=v?new Date(v):null;return d&&!isNaN(d.getTime())?d:null;}\n" +
   builderUiSource.slice(builderScopeStart, builderBatchEnd + 4) +
   "\nthis.isActiveVirtualLeg=isActiveVirtualLeg;this.isActiveVirtualBatch=isActiveVirtualBatch;",
   builderScopeContext
 );
 const isActiveVirtualLeg = builderScopeContext.isActiveVirtualLeg;
 const isActiveVirtualBatch = builderScopeContext.isActiveVirtualBatch;
+const activeBatchLeg = (fields) => ({
+  start_time: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+  odds_fresh: true,
+  market_odds_age_seconds: 12,
+  ...fields
+});
 assert.equal(isActiveVirtualLeg({sport:"virtual",product:"efootball_gt",model_probability:0.83}), true);
 assert.equal(isActiveVirtualLeg({sport:"virtual",product:"efootball_adriatic",model_probability:0.83}), true);
 assert.equal(isActiveVirtualLeg({sport:"virtual",product:"efootball_gt",model_probability:0.754386}), false);
@@ -114,13 +121,15 @@ assert.equal(isActiveVirtualLeg({sport:"virtual",product:"efootball_adriatic",mo
 assert.equal(isActiveVirtualLeg({sport:"virtual",product:"vfootball"}), false);
 assert.equal(isActiveVirtualLeg({sport:"virtual",product:"zoom"}), false);
 assert.equal(isActiveVirtualLeg({sport:"football",product:"football"}), true);
-assert.equal(isActiveVirtualBatch({products:["efootball_gt"],legs:[{sport:"virtual",product:"efootball_gt",model_probability:0.83}]}), true);
-assert.equal(isActiveVirtualBatch({products:["efootball_gt"],primary_lane:"efootball_exact_evidence_value",legs:[{sport:"virtual",product:"efootball_gt",model_probability:0.70,qualification_lane:"efootball_exact_evidence_value"}]}), true);
-assert.equal(isActiveVirtualBatch({products:["efootball_gt"],primary_lane:"efootball_exact_evidence_value",legs:[{sport:"virtual",product:"efootball_gt",model_probability:0.64,qualification_lane:"efootball_exact_evidence_value"}]}), false);
-assert.equal(isActiveVirtualBatch({products:["efootball_gt"],primary_lane:"phase2_cyclical_loop",legs:[{sport:"virtual",product:"efootball_gt",model_probability:0.79,qualification_lane:"efootball_exact_evidence_value"}]}), true);
-assert.equal(isActiveVirtualBatch({products:["vfootball"],legs:[{sport:"virtual",product:"vfootball"}]}), false);
-assert.equal(isActiveVirtualBatch({products:["efootball_gt","vfootball"],legs:[{sport:"virtual",product:"efootball_gt",model_probability:0.83},{sport:"virtual",product:"vfootball"}]}), false);
-assert.equal(isActiveVirtualBatch({products:["zoom"],legs:[{sport:"virtual",product:"zoom"}]}), false);
+assert.equal(isActiveVirtualBatch({products:["efootball_gt"],legs:[activeBatchLeg({sport:"virtual",product:"efootball_gt",model_probability:0.83})]}), true);
+assert.equal(isActiveVirtualBatch({products:["efootball_gt"],primary_lane:"efootball_exact_evidence_value",legs:[activeBatchLeg({sport:"virtual",product:"efootball_gt",model_probability:0.70,qualification_lane:"efootball_exact_evidence_value"})]}), true);
+assert.equal(isActiveVirtualBatch({products:["efootball_gt"],primary_lane:"efootball_exact_evidence_value",legs:[activeBatchLeg({sport:"virtual",product:"efootball_gt",model_probability:0.64,qualification_lane:"efootball_exact_evidence_value"})]}), false);
+assert.equal(isActiveVirtualBatch({products:["efootball_gt"],primary_lane:"phase2_cyclical_loop",legs:[activeBatchLeg({sport:"virtual",product:"efootball_gt",model_probability:0.79,qualification_lane:"efootball_exact_evidence_value"})]}), true);
+assert.equal(isActiveVirtualBatch({products:["vfootball"],legs:[activeBatchLeg({sport:"virtual",product:"vfootball"})]}), false);
+assert.equal(isActiveVirtualBatch({products:["efootball_gt","vfootball"],legs:[activeBatchLeg({sport:"virtual",product:"efootball_gt",model_probability:0.83}),activeBatchLeg({sport:"virtual",product:"vfootball"})]}), false);
+assert.equal(isActiveVirtualBatch({products:["zoom"],legs:[activeBatchLeg({sport:"virtual",product:"zoom"})]}), false);
+assert.equal(isActiveVirtualLeg({sport:"virtual",product:"efootball_gt",model_probability:0.677,qualification_lane:"upcoming_desk_research_only"}, "upcoming_desk_research"), true);
+assert.equal(isActiveVirtualLeg({sport:"virtual",product:"efootball_gt",model_probability:0.59,qualification_lane:"upcoming_desk_research_only"}, "upcoming_desk_research"), false);
 assert.match(builderUiSource, /ACTIVE_VIRTUAL_MIN_PROBABILITY = 0\.80/);
 assert.match(builderUiSource, /EFOOTBALL_EXACT_EVIDENCE_MIN_PROBABILITY = 0\.65/);
 assert.match(builderUiSource, /function activeVirtualProbabilityFloor\(leg,batchLane\)/);
@@ -128,7 +137,10 @@ assert.match(builderUiSource, /primaryLane==='efootball_compact_2x'/);
 assert.match(builderUiSource, /4–5 LEGS · 2\.00\+/);
 assert.match(builderUiSource, /standard batches at 2\.70x\+ and compact eFootball batches at 2\.00x\+/);
 assert.match(builderUiSource, /Compact eFootball ticket lane/);
-assert.match(builderUiSource, /data\.batches\)\?data\.batches\.filter\(isActiveVirtualBatch\)/);
+assert.match(builderUiSource, /function filterCurrentBuilderSnapshot\(data, now\)/);
+assert.match(builderUiSource, /data\.batches\.filter\(function\(batch\)\{return isActiveVirtualBatchAt\(batch,checkedAt\);\}\)/);
+assert.match(builderUiSource, /function builderArtifactFreshness\(data, now\)/);
+assert.match(builderUiSource, /UPCOMING_DESK_RESEARCH_MIN_PROBABILITY = 0\.60/);
 assert.match(builderUiSource, /ensureBookingCodes\(activeBatches\)/);
 
 // Background alerts must honour the separate compact eFootball floor rather than
