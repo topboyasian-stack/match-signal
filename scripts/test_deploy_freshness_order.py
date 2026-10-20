@@ -78,7 +78,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         # Keep deployment-triggered monitoring separate from the newly registered cron identity.
         self.assertEqual(workflow_schedule_crons(MONITOR_WORKFLOW), [])
         crons = workflow_schedule_crons(SCHEDULE_MONITOR_WORKFLOW)
-        self.assertIn("7,17,27,37,47,57 * * * *", crons)
+        self.assertIn("6,16,26,36,46,56 * * * *", crons)
         self.assertNotIn("1,11,21,31,41,51 * * * *", crons, "schedule must move to a fresh workflow identity")
         self.assertNotIn("*/5 * * * *", crons)
         events_end = MONITOR_WORKFLOW.find("\npermissions:")
@@ -91,7 +91,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
 
     def test_watchdog_schedule_is_rearmed_and_stale_board_self_heals_quickly(self):
         crons = workflow_schedule_crons(WATCHDOG_WORKFLOW)
-        self.assertIn("9,19,29,39,49,59 * * * *", crons)
+        self.assertIn("8,18,28,38,48,58 * * * *", crons)
         self.assertNotIn("1,11,21,31,41,51 * * * *", crons, "cron must change to re-arm the missing scheduled watchdog")
         self.assertIn("if unified_age > 0.2 and not active('unified-upcoming.yml'):", WATCHDOG_WORKFLOW)
         self.assertIn("'unified_upcoming_hours': 0.2", WATCHDOG_WORKFLOW)
@@ -206,6 +206,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             ".github/workflows/qualified-best-health-watch-v2.yml",
             ".github/workflows/automation_watchdog.yml",
             ".github/workflows/efootball-market-research-schedule.yml",
+            ".github/workflows/efootball-market-research-tests.yml",
             "scripts/test_automation_watchdog_research_recovery.py",
             "scripts/test_qualified_best_monitor.mjs",
         }
