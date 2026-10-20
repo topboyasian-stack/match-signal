@@ -2984,28 +2984,24 @@ def _efootball_exact_evidence_ticket_gamma():
 
 
 def _efootball_high_confidence_ticket_gamma():
-    """Validate the >=80% per-leg eFootball construction lane independently.
+    """Validate >=80% per-leg eFootball calibration on event-disjoint ticket history.
 
     Only settled history labelled high_confidence_research with 2–4 active
-    eFootball GT/Adriatic legs is comparable. Mixed VFootball/other-sport tickets,
-    weak legs, missing raw joint probabilities, and unsettled rows do not train
-    this lane's probability correction.
+    eFootball GT/Adriatic legs is comparable. Mixed products, weak legs, and
+    overlapping fixture sets do not train this lane's probability correction.
     """
     global _EFOOTBALL_HIGH_CONFIDENCE_TICKET_CALIBRATION_CACHE
     if _EFOOTBALL_HIGH_CONFIDENCE_TICKET_CALIBRATION_CACHE is not None:
         return _EFOOTBALL_HIGH_CONFIDENCE_TICKET_CALIBRATION_CACHE
 
     tracker=load(DATA/"odds_ticket_tracker.json",{})
-    tickets=settled_ticket_history(tracker,min_legs=2,max_legs=4)
+    observed_tickets=settled_ticket_history(tracker,min_legs=2,max_legs=4)
     tagged=0
-    comparable=[]
-    profit_rows=[]
-    rows=[]
-    missing_raw=0
+    candidates=[]
     excluded_products=0
     excluded_weak_legs=0
     excluded_shapes=0
-    for ticket in tickets:
+    for ticket in observed_tickets:
         primary_lane=str(ticket.get("primary_lane") or ticket.get("construction_lane") or "").strip()
         if primary_lane!="high_confidence_research":
             continue
@@ -3033,11 +3029,17 @@ def _efootball_high_confidence_ticket_gamma():
         if any(probability < MIN_SAFE_LEG_MODEL_PROBABILITY or probability > 1.0 for probability in probabilities):
             excluded_weak_legs+=1
             continue
-        comparable.append(ticket)
+        candidates.append(ticket)
+
+    comparable,overlap_diagnostics=event_disjoint_tickets(candidates)
+    profit_rows=[]
+    rows=[]
+    missing_raw=0
+    for ticket in comparable:
         status=str(ticket.get("status") or "").upper()
+        stamp=str(ticket.get("_calibration_stamp") or ticket.get("last_settled_at") or ticket.get("settled_at") or "")
         if status not in {"WON","LOST"}:
             continue
-        stamp=str(ticket.get("_calibration_stamp") or ticket.get("last_settled_at") or ticket.get("settled_at") or "")
         try:
             odds=float(ticket.get("combined_odds"))
         except (TypeError,ValueError):
@@ -3086,6 +3088,9 @@ def _efootball_high_confidence_ticket_gamma():
         "lane":"high_confidence_research",
         "tagged_lane_ticket_count":tagged,
         "settled_lane_ticket_count":len(comparable),
+        "observed_comparable_settled_ticket_count":len(candidates),
+        "dependent_overlap_ticket_count":overlap_diagnostics["dependent_overlap_ticket_count"],
+        "independent_event_count":overlap_diagnostics["unique_event_count"],
         "comparable_raw_probability_sample":len(rows),
         "missing_raw_joint_probability_count":missing_raw,
         "excluded_product_scope_tickets":excluded_products,
@@ -3103,8 +3108,8 @@ def _efootball_high_confidence_ticket_gamma():
         "profitability_minimum_settled_tickets":30,
         "promotion_allowed":promotion_allowed,
         "promotion_hold_reason":hold_reason,
-        "active_batch_policy":"require improved chronological OOS Brier, at least 30 comparable raw-probability observations, and positive settled ROI on at least 30 pure active-eFootball high-confidence tickets",
-        "dependent_ticket_rows_warning":"Historical tickets can reuse events/participants; the lane remains paper-only and requires independent monitoring after construction changes.",
+        "active_batch_policy":"require improved chronological OOS Brier, at least 30 comparable raw-probability observations, and positive settled ROI on at least 30 event-disjoint high-confidence tickets",
+        "dependent_ticket_rows_warning":"Tickets reusing an event are excluded from calibration and promotion evidence; raw ledger returns remain unchanged.",
     })
     _EFOOTBALL_HIGH_CONFIDENCE_TICKET_CALIBRATION_CACHE=result
     return result
