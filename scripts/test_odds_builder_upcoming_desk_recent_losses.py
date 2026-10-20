@@ -45,16 +45,16 @@ def tracker_with(*legs):
 
 
 class UpcomingDeskRecentLossGateTests(unittest.TestCase):
-    def test_two_distinct_latest_losses_hold_exact_selection(self):
+    def test_two_distinct_latest_losses_do_not_hold_a_tiny_sample(self):
         tracker = tracker_with(
             settled_leg("event-old-loss", "LOST", "2026-10-20T05:08:00+00:00"),
             settled_leg("event-latest-loss", "LOST", "2026-10-20T05:09:00+00:00"),
         )
         result = _upcoming_desk_recent_result_guard("efootball_gt", 7.5, "under", tracker=tracker)
-        self.assertTrue(result["blocked"])
+        self.assertFalse(result["blocked"])
         self.assertEqual(result["consecutive_losses"], 2)
         self.assertEqual(result["sample_n"], 2)
-        self.assertEqual(result["reason"], "recent_settled_line_side_loss_streak")
+        self.assertIsNone(result["reason"])
 
     def test_duplicate_ticket_for_same_event_counts_once(self):
         first = settled_leg("event-same", "LOST", "2026-10-20T05:08:00+00:00")
@@ -65,19 +65,19 @@ class UpcomingDeskRecentLossGateTests(unittest.TestCase):
         self.assertFalse(result["blocked"])
         self.assertEqual(result["sample_n"], 1)
 
-    def test_latest_win_does_not_erase_two_losses_in_last_three(self):
+    def test_a_win_between_losses_does_not_trigger_a_tiny_sample_block(self):
         tracker = tracker_with(
             settled_leg("event-loss-1", "LOST", "2026-10-20T05:07:00+00:00"),
             settled_leg("event-loss-2", "LOST", "2026-10-20T05:08:00+00:00"),
             settled_leg("event-win", "WON", "2026-10-20T05:10:00+00:00"),
         )
         result = _upcoming_desk_recent_result_guard("efootball_gt", 7.5, "under", tracker=tracker)
-        self.assertTrue(result["blocked"])
+        self.assertFalse(result["blocked"])
         self.assertEqual(result["consecutive_losses"], 0)
         self.assertEqual(result["latest_three_losses"], 2)
-        self.assertEqual(result["reason"], "recent_settled_line_side_loss_cluster")
+        self.assertIsNone(result["reason"])
 
-    def test_interleaved_three_losses_in_last_five_are_held(self):
+    def test_interleaved_losses_in_last_five_do_not_block_without_a_mature_window(self):
         tracker = tracker_with(
             settled_leg("event-loss-1", "LOST", "2026-10-20T05:06:00+00:00"),
             settled_leg("event-loss-2", "LOST", "2026-10-20T05:07:00+00:00"),
@@ -86,28 +86,57 @@ class UpcomingDeskRecentLossGateTests(unittest.TestCase):
             settled_leg("event-win-2", "WON", "2026-10-20T05:10:00+00:00"),
         )
         result = _upcoming_desk_recent_result_guard("efootball_gt", 7.5, "under", tracker=tracker)
-        self.assertTrue(result["blocked"])
-        self.assertEqual(result["latest_three_losses"], 1)
+        self.assertFalse(result["blocked"])
         self.assertEqual(result["latest_five_losses"], 3)
-        self.assertEqual(result["reason"], "recent_settled_line_side_loss_cluster")
+        self.assertEqual(result["decisive_sample_n"], 5)
 
-    def test_two_newer_wins_release_an_older_two_loss_cluster(self):
-        tracker = tracker_with(
-            settled_leg("event-loss-1", "LOST", "2026-10-20T05:07:00+00:00"),
-            settled_leg("event-loss-2", "LOST", "2026-10-20T05:08:00+00:00"),
-            settled_leg("event-win-1", "WON", "2026-10-20T05:09:00+00:00"),
-            settled_leg("event-win-2", "WON", "2026-10-20T05:10:00+00:00"),
-        )
+    def test_four_consecutive_losses_hold_exact_selection(self):
+        tracker = tracker_with(*[
+            settled_leg(f"event-loss-{i}", "LOST", f"2026-10-20T05:{i:02d}:00+00:00")
+            for i in range(5, 9)
+        ])
+        result = _upcoming_desk_recent_result_guard("efootball_gt", 7.5, "under", tracker=tracker)
+        self.assertTrue(result["blocked"])
+        self.assertEqual(result["consecutive_losses"], 4)
+        self.assertEqual(result["reason"], "recent_settled_line_side_loss_streak")
+
+    def test_recent_last_ten_hit_rate_below_fifty_percent_holds(self):
+        # Four wins in the latest ten, with wins most recent so the rate test
+        # (not the streak guard) must explain the hold.
+        outcomes = ["LOST"] * 6 + ["WON"] * 4
+        tracker = tracker_with(*[
+            settled_leg(f"event-{i}", status, f"2026-10-20T05:{i:02d}:00+00:00")
+            for i, status in enumerate(outcomes)
+        ])
+        result = _upcoming_desk_recent_result_guard("efootball_gt", 7.5, "under", tracker=tracker)
+        self.assertTrue(result["blocked"])
+        self.assertEqual(result["latest10_n"], 10)
+        self.assertEqual(result["latest10_wins"], 4)
+        self.assertEqual(result["latest10_hit_rate"], 0.4)
+        self.assertEqual(result["reason"], "recent_settled_line_side_last10_below_0_50")
+
+    def test_recent_last_twenty_hit_rate_below_fifty_five_blocks_when_last_ten_passes(self):
+        outcomes = (["LOST"] * 5 + ["WON"] * 5) * 2
+        tracker = tracker_with(*[
+            settled_leg(f"event-{i}", status, f"2026-10-20T05:{i:02d}:00+00:00")
+            for i, status in enumerate(outcomes)
+        ])
+        result = _upcoming_desk_recent_result_guard("efootball_gt", 7.5, "under", tracker=tracker)
+        self.assertTrue(result["blocked"])
+        self.assertEqual(result["latest10_hit_rate"], 0.5)
+        self.assertEqual(result["latest20_hit_rate"], 0.5)
+        self.assertEqual(result["reason"], "recent_settled_line_side_last20_below_0_55")
+
+    def test_exactly_fifty_percent_in_latest_ten_passes_floor(self):
+        outcomes = ["LOST"] * 5 + ["WON"] * 5
+        tracker = tracker_with(*[
+            settled_leg(f"event-{i}", status, f"2026-10-20T05:{i:02d}:00+00:00")
+            for i, status in enumerate(outcomes)
+        ])
         result = _upcoming_desk_recent_result_guard("efootball_gt", 7.5, "under", tracker=tracker)
         self.assertFalse(result["blocked"])
-        self.assertEqual(result["latest_three_losses"], 1)
-
-    def test_single_loss_does_not_hold_line(self):
-        result = _upcoming_desk_recent_result_guard(
-            "efootball_gt", 7.5, "under",
-            tracker=tracker_with(settled_leg("event-one", "LOST", "2026-10-20T05:08:00+00:00"))
-        )
-        self.assertFalse(result["blocked"])
+        self.assertEqual(result["latest10_hit_rate"], 0.5)
+        self.assertIsNone(result["reason"])
 
     def test_guard_is_scoped_to_product_line_and_side(self):
         tracker = tracker_with(
@@ -118,7 +147,6 @@ class UpcomingDeskRecentLossGateTests(unittest.TestCase):
         self.assertFalse(_upcoming_desk_recent_result_guard("efootball_gt", 4.5, "under", tracker=tracker)["blocked"])
         self.assertFalse(_upcoming_desk_recent_result_guard("efootball_adriatic", 7.5, "under", tracker=tracker)["blocked"])
 
-
     def test_live_ledger_smoke_reports_current_under_75_guard(self):
         result = _upcoming_desk_recent_result_guard("efootball_gt", 7.5, "under")
         self.assertIsInstance(result.get("blocked"), bool)
@@ -127,8 +155,8 @@ class UpcomingDeskRecentLossGateTests(unittest.TestCase):
             "blocked": result.get("blocked"),
             "consecutive_losses": result.get("consecutive_losses"),
             "sample_n": result.get("sample_n"),
-            "latest_three_losses": result.get("latest_three_losses"),
-            "latest_five_losses": result.get("latest_five_losses"),
+            "latest10_hit_rate": result.get("latest10_hit_rate"),
+            "latest20_hit_rate": result.get("latest20_hit_rate"),
             "recent_results": result.get("recent_results", []),
         }, sort_keys=True))
 

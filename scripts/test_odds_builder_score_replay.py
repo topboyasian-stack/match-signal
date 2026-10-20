@@ -107,7 +107,7 @@ def test_builder_ui_labels_score_replay_and_still_displays_exact_quote():
     assert "Evidence basis" in ui
     assert "viewLeg.bookmaker_odds" in ui
     # Provenance must survive make_leg() serialization into the Builder artifact.
-    odds_builder_source = Path(__file__).resolve().parent / "odds_builder.py"
+    odds_builder_source = Path(__file__).resolve().parent / "odds_builder_core.py"
     python_code = odds_builder_source.read_text(encoding="utf-8")
     assert '"evidence_source":x.get("evidence_source")' in python_code
     assert '"score_derived_evidence":bool(x.get("score_derived_evidence"))' in python_code
