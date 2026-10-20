@@ -47,6 +47,39 @@ def tracker_with(*legs):
 
 
 class SettledSideProbabilityCapTests(unittest.TestCase):
+    def test_upcoming_desk_uses_its_walkforward_probability_and_lower_bound_policy(self):
+        index = {"exact": {
+            ("efootball_gt", "4.5", "over"): {"n": 22, "wins": 13, "losses": 9},
+        }}
+        with (
+            mock.patch.object(builder, "_load_results_first_index", return_value=index),
+            mock.patch.object(builder, "selected_price_and_devig", return_value=(2.75, 1/2.75, 0.35, True)),
+            mock.patch.object(builder, "odds_age", return_value=10.0),
+            mock.patch.object(builder, "data_quality", return_value=1.0),
+            mock.patch.object(builder, "uncertainty", return_value=0.01),
+            mock.patch.object(builder, "participant_history_signal", return_value={"available": False, "score": 0.5, "participants": []}),
+            mock.patch.object(builder, "_phase2_cyclical_loop_signal", return_value={"enabled": False, "flagged": False, "confidence": 0.0, "reason": "test"}),
+        ):
+            leg = builder.make_leg({
+                "sport": "virtual", "product": "efootball_gt", "league": "Test eComp",
+                "line": 4.5, "builder_pick": "over", "builder_probability": 0.677,
+                "desk_calibrated_probability": 0.677, "raw_model_probability": 0.7281,
+                "walkforward_exact_line_n": 433, "walkforward_exact_line_hit_rate": 0.625866,
+                "upcoming_desk_research_only": True,
+                "qualification_lane": builder.UPCOMING_DESK_RESEARCH_LANE,
+                "player_1": "France (Virtual_12)", "player_2": "Germany (Virtual_13)",
+                "builder_market": "virtual_total", "event_id": "desk-walkforward-cap-test",
+                "odds_timestamp": "2026-10-20T20:00:00+00:00",
+            })
+        self.assertAlmostEqual(leg["model_probability"], 0.677, places=5)
+        self.assertTrue(leg["builder_eligible"])
+        cap = leg["settled_side_probability_cap"]
+        self.assertFalse(cap["applied"])
+        self.assertTrue(cap["diagnostic_cap_would_apply"])
+        self.assertEqual(cap["reason"], "desk_lane_uses_exact_line_walkforward_gate")
+        self.assertEqual(cap["settled_sample_n"], 22)
+        self.assertAlmostEqual(leg["expected_value"], 0.677 * 2.75 - 1, places=5)
+
     def test_short_odds_raw_model_edge_is_capped_by_losing_exact_line_history(self):
         index = {"exact": {
             ("efootball_gt", "0.5", "over"): {"n": 35, "wins": 29, "losses": 6},

@@ -2577,13 +2577,33 @@ def _settled_exact_line_probability_cap(product,line,side,model_probability,inde
 
 def make_leg(x):
     raw_p=float(x["builder_probability"])
-    settled_side_cap=_settled_exact_line_probability_cap(
-        x.get("product"),x.get("line"),x.get("builder_pick"),raw_p
-    ) if x.get("sport")=="virtual" else {
-        "applied":False,"reason":"product_out_of_scope",
-        "model_probability":round(raw_p,6),"effective_probability":round(raw_p,6),
-        "settled_sample_n":0,"settled_wins":0,
-    }
+    upcoming_desk_lane=(
+        str(x.get("qualification_lane") or "")==UPCOMING_DESK_RESEARCH_LANE
+        and x.get("upcoming_desk_research_only") is True
+    )
+    if x.get("sport")=="virtual":
+        settled_side_cap=_settled_exact_line_probability_cap(
+            x.get("product"),x.get("line"),x.get("builder_pick"),raw_p
+        )
+        if upcoming_desk_lane:
+            # The Desk lane has its own exact-line walk-forward holdout gate and
+            # uses the 95% Wilson lower bound inside whole-ticket construction.
+            # Applying the generic settled-ticket side cap here double-counts a
+            # different evidence source and suppresses otherwise qualified Desk
+            # probabilities before the dedicated lane can evaluate them.
+            settled_side_cap={
+                **settled_side_cap,
+                "diagnostic_cap_would_apply":bool(settled_side_cap.get("applied")),
+                "applied":False,
+                "reason":"desk_lane_uses_exact_line_walkforward_gate",
+                "effective_probability":round(raw_p,6),
+            }
+    else:
+        settled_side_cap={
+            "applied":False,"reason":"product_out_of_scope",
+            "model_probability":round(raw_p,6),"effective_probability":round(raw_p,6),
+            "settled_sample_n":0,"settled_wins":0,
+        }
     p=float(settled_side_cap.get("effective_probability") or raw_p)
     bookmaker,implied,devig,complete=selected_price_and_devig(x)
     age=odds_age(x)
