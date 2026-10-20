@@ -73,6 +73,23 @@ def evaluate_runs(
             key=lambda item: parse_timestamp(item.get("createdAt"))
             or datetime.min.replace(tzinfo=timezone.utc),
         )
+        active_started_at = parse_timestamp(run.get("createdAt"))
+        # A Builder started before this board was published checked out an older
+        # main-branch snapshot. Queue one follow-up now; the Builder concurrency
+        # group keeps it pending until the active run finishes.
+        if (
+            board_newer
+            and upstream_stamp is not None
+            and active_started_at is not None
+            and active_started_at < upstream_stamp
+        ):
+            return {
+                "dispatch": True,
+                "reason": "upcoming_board_advanced_during_active_builder_run",
+                "active_run_id": run.get("databaseId"),
+                "active_status": run.get("status"),
+                **artifact_fields,
+            }
         return {
             "dispatch": False,
             "reason": "active_builder_run",
@@ -84,6 +101,7 @@ def evaluate_runs(
     # If the only difference is a newer board timestamp, don't run the Builder
     # more often than its 15-minute schedule. This is a recovery path when a
     # scheduled Builder run was missed, not a trigger on every 5-minute board build.
+    # The pre-board active-run race is handled above by queuing one pending refresh.
     if board_newer and artifact_age is not None and artifact_age < BUILDER_ARTIFACT_MAX_AGE_MINUTES:
         recent_runs = [
             (parse_timestamp(run.get("createdAt")), run)
@@ -254,7 +272,7 @@ def main() -> int:
     if dispatch.returncode != 0:
         print("::error::Odds Builder dispatch failed: " + (dispatch.stderr.strip() or "gh workflow run failed"), file=sys.stderr)
         return 1
-    print("Dispatched Odds Builder because its published artifact is stale or missing and no run is active.")
+    print("Dispatched Odds Builder because its artifact is stale/missing or a newer Upcoming Desk board postdates the active run.")
     return 0
 
 
