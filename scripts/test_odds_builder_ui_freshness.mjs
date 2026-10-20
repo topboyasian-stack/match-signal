@@ -122,3 +122,5 @@ console.log('Odds Builder UI freshness passed: desk-only 60% gate, artifact expi
 assert.ok(source.includes('Exact-line walk-forward holdout'), 'Desk candidates must display the walk-forward evidence basis');
 assert.ok(source.includes('recent_settled_line_side_loss_streak'), 'No-batch explanation must reveal recent settled-loss holds');
 assert.ok(source.includes('data-builder-refresh'), 'Builder must include a usable manual refresh action');
+assert.ok(source.includes('function checkBuilderBuildVersion'), 'Open Builder tabs must detect changed production build markers');
+assert.ok(source.includes('window.setInterval(checkBuilderBuildVersion,60000)'), 'Open Builder tabs must poll for renderer deployments automatically');
