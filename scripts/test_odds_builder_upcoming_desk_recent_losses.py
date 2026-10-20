@@ -52,13 +52,13 @@ class SettledSideProbabilityCapTests(unittest.TestCase):
             ("efootball_gt", "0.5", "over"): {"n": 35, "wins": 29, "losses": 6},
         }}
         with (
-            unittest.mock.patch.object(builder, "_load_results_first_index", return_value=index),
-            unittest.mock.patch.object(builder, "selected_price_and_devig", return_value=(1.11, 1/1.11, 0.89, True)),
-            unittest.mock.patch.object(builder, "odds_age", return_value=10.0),
-            unittest.mock.patch.object(builder, "data_quality", return_value=1.0),
-            unittest.mock.patch.object(builder, "uncertainty", return_value=0.01),
-            unittest.mock.patch.object(builder, "participant_history_signal", return_value={"available": False, "score": 0.5, "participants": []}),
-            unittest.mock.patch.object(builder, "_phase2_cyclical_loop_signal", return_value={"enabled": False, "flagged": False, "confidence": 0.0, "reason": "test"}),
+            mock.patch.object(builder, "_load_results_first_index", return_value=index),
+            mock.patch.object(builder, "selected_price_and_devig", return_value=(1.11, 1/1.11, 0.89, True)),
+            mock.patch.object(builder, "odds_age", return_value=10.0),
+            mock.patch.object(builder, "data_quality", return_value=1.0),
+            mock.patch.object(builder, "uncertainty", return_value=0.01),
+            mock.patch.object(builder, "participant_history_signal", return_value={"available": False, "score": 0.5, "participants": []}),
+            mock.patch.object(builder, "_phase2_cyclical_loop_signal", return_value={"enabled": False, "flagged": False, "confidence": 0.0, "reason": "test"}),
         ):
             leg = builder.make_leg({
                 "sport": "virtual", "product": "efootball_gt",
