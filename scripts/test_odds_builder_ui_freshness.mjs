@@ -99,6 +99,7 @@ const filtered = hooks.filterCurrentBuilderSnapshot(
   now
 );
 assert.equal(filtered.freshness.fresh, true);
-assert.deepEqual(filtered.batches.map((batch) => batch.batch_id), ['DESK-BATCH-01']);
+assert.equal(filtered.batches.length, 1);
+assert.equal(filtered.batches[0].batch_id, 'DESK-BATCH-01');
 
 console.log('Odds Builder UI freshness passed: desk-only 60% gate, 15-minute artifact limit, future kickoffs, and exact price freshness.');
