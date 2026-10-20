@@ -1666,9 +1666,6 @@ def _upcoming_desk_research_candidate(event, now):
     side=str(event.get("pick") or "").strip().lower()
     if side not in {"over","under"}:
         return None,"invalid_selected_side"
-    recent_guard=_upcoming_desk_recent_result_guard(product,line,side)
-    if recent_guard.get("blocked") is True:
-        return None,"recent_settled_line_side_loss_streak"
     if event.get("identity_verified") is not True:
         return None,"fixture_identity_not_verified"
     if str(event.get("bookmaker_source") or "")!="SportyBet NG":
@@ -1685,6 +1682,9 @@ def _upcoming_desk_research_candidate(event, now):
         age=None
     if age is None or age>MAX_ODDS_AGE_SECONDS:
         return None,"sportybet_quote_stale_or_untimestamped"
+    recent_guard=_upcoming_desk_recent_result_guard(product,line,side)
+    if recent_guard.get("blocked") is True:
+        return None,"recent_settled_line_side_loss_streak"
     candidate=dict(event)
     candidate["odds_timestamp"]=str(quote_stamp)
     candidate.update({
