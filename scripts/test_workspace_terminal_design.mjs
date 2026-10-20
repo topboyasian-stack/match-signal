@@ -37,7 +37,7 @@ for (const [name, css, scope] of scopes) {
 }
 
 for (const [name, html, scope, href, marker] of [
-  ["Odds Builder", oddsHtml, 'data-page="odds-builder"', "odds-builder-design.css?v=20261014-full-v3", "MS-ODDS-BUILDER-2026.10.14-V3"],
+  ["Odds Builder", oddsHtml, 'data-page="odds-builder"', "odds-builder-design.css?v=20261020-ledger-layout1", "MS-ODDS-BUILDER-2026.10.20-CLARITY1"],
   ["Reports", reportsHtml, 'data-page="reports"', "reports-design.css?v=20261014-full-v3", "MS-REPORTS-2026.10.14-V3"],
   ["Virtual Lab", labHtml, 'data-page="virtual-lab"', "../virtual-lab-terminal.css?v=20261014-full-v3", "MS-VIRTUAL-LAB-V1-2026.10.14-V3"]
 ]) {
@@ -46,7 +46,7 @@ for (const [name, html, scope, href, marker] of [
   assert.ok(html.includes(marker), name + " must expose a production-verifiable build marker");
 }
 assert.ok(oddsHtml.includes("sport-hubs.js?v=20261013-qualified-best-kickoff-sort1"), "Odds Builder must retain the shared renderer");
-assert.ok(oddsHtml.includes("expansion-odds-builder.js?v=20261011-efootball65-evidence1"), "Odds Builder must retain its existing engine");
+assert.ok(oddsHtml.includes("expansion-odds-builder.js?v=20261020-ticket-track-clarity1"), "Odds Builder must retain the versioned current engine");
 assert.ok(oddsHtml.includes('id="oddsBuilder"'), "Odds Builder engine mount must remain");
 assert.ok(reportsHtml.includes('id="reportGrid"') && reportsHtml.includes('id="researchLabSummary"'), "Reports mounts must remain");
 for (const mount of ['id="predictionDesk"', 'id="nearQualifiedRadar"', 'id="oddsBuilder"', 'id="labDiagnostics"', 'id="researchConclusion"']) {
