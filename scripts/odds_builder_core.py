@@ -1648,16 +1648,22 @@ def _settled_builder_lane_performance_gate(lane,tracker=None,min_tickets=None,mi
         "eligible":bool(eligible),
         "reason":reason,
         "settled_ticket_n":n,
+        "observed_settled_ticket_n":int(row.get("observed_settled_ticket_n") or 0),
+        "dependent_overlap_ticket_n":int(row.get("dependent_overlap_ticket_n") or 0),
+        "independent_event_count":int(row.get("independent_event_count") or 0),
         "wins":wins,
         "losses":losses,
         "hit_rate":round(hit_rate,6) if hit_rate is not None else None,
         "average_combined_odds":round(avg_odds,6) if avg_odds is not None else None,
         "flat_stake_net_units":round(net,6),
         "flat_stake_roi":round(roi,6) if roi is not None else None,
+        "observed_wins":int(row.get("observed_wins") or 0),
+        "observed_losses":int(row.get("observed_losses") or 0),
+        "observed_flat_stake_net_units":round(float(row.get("observed_flat_stake_net_units") or 0.0),6),
         "minimum_settled_ticket_n":minimum_n,
         "minimum_flat_stake_roi":minimum_roi,
         "source":"data/odds_ticket_tracker.json",
-        "policy":"No construction lane may become the primary batch unless its own settled ticket sample and realized flat-stake ROI pass the promotion gate.",
+        "policy":"Lane promotion uses an event-disjoint chronological settled-ticket sample; overlapping fixtures remain in the raw ledger but cannot inflate the promotion sample or its ROI.",
     }
 
 
