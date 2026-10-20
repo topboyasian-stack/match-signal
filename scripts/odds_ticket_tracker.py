@@ -214,6 +214,91 @@ def event_start_time(event):
     return None
 
 
+def _fixture_side_pair(row, *, allow_match=False):
+    """Return both full participant identities; never use shortened-name matches."""
+    if not isinstance(row, dict):
+        return "", ""
+    pairs = (
+        ("source_participant_1", "source_participant_2"),
+        ("participant_1", "participant_2"),
+        ("player_1", "player_2"),
+        ("team_1", "team_2"),
+        ("homeTeamName", "awayTeamName"),
+        ("homeTeam", "awayTeam"),
+        ("home_team", "away_team"),
+    )
+    for left, right in pairs:
+        a, b = normalize_fixture(row.get(left)), normalize_fixture(row.get(right))
+        if a and b:
+            return a, b
+    if allow_match:
+        return fixture_parts(row.get("match") or row.get("fixture"))
+    return "", ""
+
+
+def _fixture_start_ms(row):
+    """Return a fixture kickoff timestamp in milliseconds, not scrape/settled time."""
+    if not isinstance(row, dict):
+        return None
+    value = row.get("source_start_time")
+    if value in (None, ""):
+        for key in ("startTime", "estimateStartTime", "start_time_ms", "start_time", "kickoff_time", "kickoff"):
+            candidate = row.get(key)
+            if candidate not in (None, ""):
+                value = candidate
+                break
+    if value in (None, ""):
+        return None
+    numeric = num(value)
+    if numeric is not None:
+        if numeric <= 0:
+            return None
+        return numeric * 1000 if numeric < 100000000000 else numeric
+    try:
+        stamp = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        if stamp.tzinfo is None:
+            stamp = stamp.replace(tzinfo=timezone.utc)
+        return stamp.timestamp() * 1000
+    except (TypeError, ValueError, OverflowError):
+        return None
+
+
+def _virtual_fixture_key(leg):
+    """Stable per-session identity for deduplicating ticket evidence."""
+    if not isinstance(leg, dict):
+        return ""
+    product = norm(leg.get("product") or leg.get("sport"))
+    left, right = _fixture_side_pair(leg, allow_match=True)
+    start_ms = _fixture_start_ms(leg)
+    if not product or not left or not right or start_ms is None:
+        return ""
+    return f"{product}|{int(start_ms // 60000)}|{'|'.join(sorted((left, right)))}"
+
+
+def virtual_result_fixture_matches(leg, event, tolerance_seconds=15 * 60):
+    """Require exact participant identity and a close kickoff even if provider IDs match.
+
+    SportyBet virtual event IDs can recur across sessions. Missing names or time
+    therefore fails closed; ID equality alone is never settlement evidence.
+    """
+    if not isinstance(leg, dict) or not isinstance(event, dict):
+        return False
+    left, right = _fixture_side_pair(leg, allow_match=True)
+    event_left, event_right = _fixture_side_pair(event)
+    if not left or not right or not event_left or not event_right:
+        return False
+    same_pair = (left == event_left and right == event_right) or (
+        left == event_right and right == event_left
+    )
+    if not same_pair:
+        return False
+    leg_ms = _fixture_start_ms(leg)
+    event_ms = _fixture_start_ms(event)
+    if leg_ms is None or event_ms is None:
+        return False
+    return abs(leg_ms - event_ms) <= tolerance_seconds * 1000
+
+
 def legacy_fixture_matches(leg, event, tolerance_seconds=90 * 60):
     leg_home, leg_away = fixture_parts(leg.get("match"))
     event_home = event.get("team_1") or event.get("homeTeamName") or event.get("homeTeam") or event.get("participant_1")
@@ -306,11 +391,17 @@ def virtual_result_scope_index():
             product = row.get("product") or row.get("sport") or row.get("source") or ""
             source = result_source_for_product(product)
             if event_id and category_id and tournament_id and source:
-                index[event_id] = {
+                candidate = {
                     "source": source,
                     "category_id": category_id,
                     "tournament_id": tournament_id,
                 }
+                if event_id not in index:
+                    index[event_id] = candidate
+                elif index[event_id] != candidate:
+                    # The provider reused an ID across scopes; rediscover rather
+                    # than silently applying the last observed tournament.
+                    index[event_id] = None
     return index
 
 
@@ -430,9 +521,10 @@ def backfill_virtual_results(tickets, now_iso_value, scope_index=None):
                 continue
             for leg in pending:
                 ticket_event_id = str(leg.get("event_id") or "")
-                same_id = event_id in wanted_ids and event_id == ticket_event_id
-                same_fixture = not same_id and legacy_fixture_matches(leg, event)
-                if not (same_id or same_fixture):
+                # Exact event IDs are insufficient for virtual feeds that reuse
+                # IDs between sessions. Require full participants + kickoff.
+                if not virtual_result_fixture_matches(leg, event):
+                    continue
                     continue
                 pick, line = parse_virtual_pick(leg)
                 if pick not in {"over", "under"} or line is None:
@@ -442,7 +534,10 @@ def backfill_virtual_results(tickets, now_iso_value, scope_index=None):
                 line_text = str(int(line) if float(line).is_integer() else line)
                 actual = "O" + line_text if total > line else "U" + line_text if total < line else "PUSH"
                 selected = "O" + line_text if pick == "over" else "U" + line_text
-                record_id = f"{ticket_event_id}|ou|{line}|{selected}"
+                fixture_key = _virtual_fixture_key(leg)
+                if not fixture_key:
+                    continue
+                record_id = f"{fixture_key}|ou|{line}|{selected}"
                 if record_id in seen_records:
                     continue
                 seen_records.add(record_id)
@@ -450,6 +545,10 @@ def backfill_virtual_results(tickets, now_iso_value, scope_index=None):
                     "product": product, "source": source, "event_id": ticket_event_id,
                     "source_event_id": event_id,
                     "match": str(leg.get("match") or ""), "start_time": leg.get("start_time"),
+                    "source_start_time": datetime.fromtimestamp(_fixture_start_ms(event) / 1000, timezone.utc).isoformat(),
+                    "source_participant_1": event.get("homeTeamName") or event.get("team_1") or event.get("participant_1"),
+                    "source_participant_2": event.get("awayTeamName") or event.get("team_2") or event.get("participant_2"),
+                    "fixture_identity_verified": True,
                     "market": "ou", "line": line, "selection": selected,
                     "result": actual, "actual_result": actual,
                     "win": None if actual == "PUSH" else actual == selected,
@@ -457,7 +556,7 @@ def backfill_virtual_results(tickets, now_iso_value, scope_index=None):
                     "settled_at": now_iso_value,
                     "settlement_source": f"SportyBet NG eventResultList via Match Signal {source} ticket backfill ({mode})",
                     "record_id": record_id, "trace_id": record_id,
-                    "backfill_match_mode": "event_id" if same_id else "fixture_time",
+                    "backfill_match_mode": "verified_fixture_identity",
                     "result_scope": {"category_id": category_id or None, "tournament_id": tournament_id or None},
                 })
                 if same_id:
@@ -503,6 +602,8 @@ def replay_ou_leg_from_exact_event_score(leg, rows):
         if str(row.get("event_id") or "").strip() != event_id:
             continue
         if norm(row.get("product") or row.get("sport")) != product:
+            continue
+        if not virtual_result_fixture_matches(leg, row):
             continue
         if not _is_authoritative_score_row(row):
             continue
@@ -553,12 +654,11 @@ def settle_virtual_leg(leg, rows):
         row_product = norm(row.get("product") or row.get("sport"))
         if wanted_product and row_product != wanted_product:
             continue
-        exact_id = bool(event_id and str(row.get("event_id") or "") == event_id)
-        fallback_fixture = bool(
-            not exact_id and wanted_fixture and row_fixture_key(row) == wanted_fixture
-            and close_time(leg.get("start_time"), row.get("timestamp") or row.get("start_time"))
-        )
-        if exact_id or fallback_fixture:
+        # Only identity-verified source rows can settle a virtual leg. A matching
+        # provider event ID never overrides a participant or kickoff mismatch.
+        if event_id and str(row.get("event_id") or "") != event_id:
+            continue
+        if virtual_result_fixture_matches(leg, row):
             candidates.append(row)
 
     matches = []
