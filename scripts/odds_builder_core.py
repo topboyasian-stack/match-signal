@@ -18,7 +18,7 @@ from __future__ import annotations
 import json, math, urllib.parse, urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
-from ticket_history import settled_ticket_history
+from ticket_history import merge_ticket_history, settled_ticket_history
 
 ROOT=Path(__file__).resolve().parents[1]
 DATA=ROOT/"data"
@@ -208,10 +208,7 @@ def combined_odds_gate_state():
     try:
         tracker_path=DATA/"odds_ticket_tracker.json"
         tracker=json.loads(tracker_path.read_text(encoding="utf-8"))
-        tickets=[]
-        if isinstance(tracker,dict):
-            tickets.extend(tracker.get("tickets") or [])
-            tickets.extend(tracker.get("archived_tickets") or [])
+        tickets,_=merge_ticket_history(tracker)
         for ticket in tickets:
             if str(ticket.get("status") or "").upper() != "WON":
                 continue
@@ -580,22 +577,19 @@ def refresh_virtual_quotes(rows):
 _TICKET_SPOILER_CACHE=None
 
 def _load_ticket_performance_index():
-    """Index settled Builder-ticket outcomes by exact product/line/side.
-
-    This is a construction-only safeguard. It never substitutes for the
-    Virtual Lab evidence gate and only activates after a meaningful sample.
-    """
+    """Index settled line/side outcomes across the complete, deduplicated ticket ledger."""
     global _TICKET_SPOILER_CACHE
     if _TICKET_SPOILER_CACHE is not None:
         return _TICKET_SPOILER_CACHE
     raw=load(DATA/"odds_ticket_tracker.json",{})
-    index={}
-    tickets=raw.get("tickets") if isinstance(raw,dict) else []
-    for ticket in tickets if isinstance(tickets,list) else []:
-        if str(ticket.get("status") or "") not in {"WON","LOST"}:
+    tickets,_=merge_ticket_history(raw)
+    event_results={}
+    import re
+    for ticket_index,ticket in enumerate(tickets):
+        if str(ticket.get("status") or "").upper() not in {"WON","LOST"}:
             continue
-        for leg in ticket.get("legs") or []:
-            if not isinstance(leg,dict) or str(leg.get("status") or "") not in {"WON","LOST"}:
+        for leg_index,leg in enumerate(ticket.get("legs") or []):
+            if not isinstance(leg,dict) or str(leg.get("status") or "").upper() not in {"WON","LOST"}:
                 continue
             product=str(leg.get("product") or "")
             pick_text=str(leg.get("pick") or "")
@@ -605,7 +599,6 @@ def _load_ticket_performance_index():
                 continue
             line=leg.get("line")
             if line is None:
-                import re
                 match=re.search(r"(?:over|under)\s+(\d+(?:\.\d+)?)\s*$",lower)
                 if match:
                     line=match.group(1)
@@ -613,13 +606,27 @@ def _load_ticket_performance_index():
                 line_key=f"{float(line):g}"
             except (TypeError,ValueError):
                 continue
+            event_id=str(leg.get("event_id") or leg.get("eventId") or "").strip()
+            ticket_identity=str(ticket.get("ticket_id") or ticket.get("created_at") or ticket_index)
+            identity=event_id or f"{ticket_identity}:leg:{leg_index}"
             key=(product,line_key,side)
-            row=index.setdefault(key,{"n":0,"wins":0,"losses":0})
-            row["n"]+=1
-            if leg.get("status")=="WON":
-                row["wins"]+=1
-            else:
-                row["losses"]+=1
+            dedupe=(key,identity)
+            status=str(leg.get("status") or "").upper()
+            previous=event_results.get(dedupe)
+            if previous is None:
+                event_results[dedupe]=status
+            elif previous != status:
+                # Conflicting outcomes for one event are not independent evidence.
+                event_results[dedupe]="CONFLICT"
+
+    index={}
+    for (key,_event_id),status in event_results.items():
+        if status=="CONFLICT":
+            continue
+        row=index.setdefault(key,{"n":0,"wins":0,"losses":0})
+        row["n"]+=1
+        row["wins"]+=1 if status=="WON" else 0
+        row["losses"]+=1 if status=="LOST" else 0
     _TICKET_SPOILER_CACHE=index
     return index
 
@@ -649,18 +656,18 @@ def ticket_performance_gate(product,line,pick):
 _RESULTS_FIRST_CACHE=None
 
 def _load_results_first_index():
-    """Index actual settled ticket/leg results for results-first qualification."""
+    """Index deduplicated settled ticket and event outcomes across active + archived history."""
     global _RESULTS_FIRST_CACHE
     if _RESULTS_FIRST_CACHE is not None:
         return _RESULTS_FIRST_CACHE
     raw=load(DATA/"odds_ticket_tracker.json",{})
-    exact={}
+    tickets,_=merge_ticket_history(raw)
+    exact_events={}
     product_tickets={}
     construction_tickets={}
-    tickets=raw.get("tickets") if isinstance(raw,dict) else []
     import re
-    for ticket in tickets if isinstance(tickets,list) else []:
-        tstatus=str(ticket.get("status") or "")
+    for ticket_index,ticket in enumerate(tickets):
+        tstatus=str(ticket.get("status") or "").upper()
         if tstatus not in {"WON","LOST"}:
             continue
 
@@ -670,8 +677,7 @@ def _load_results_first_index():
         except (TypeError,ValueError):
             structure_legs=len(legs)
 
-        # Count each product once per settled ticket. These broad product stats
-        # remain useful diagnostics, but they do not decide the current 2-leg lane.
+        # Ticket-structure statistics count each deduplicated ticket once per product.
         product_names={str(product or "") for product in (ticket.get("products") or []) if product}
         product_names.update(
             str(leg.get("product") or leg.get("sport") or "")
@@ -698,8 +704,8 @@ def _load_results_first_index():
             except (TypeError,ValueError):
                 pass
 
-        for leg in legs:
-            if not isinstance(leg,dict) or str(leg.get("status") or "") not in {"WON","LOST"}:
+        for leg_index,leg in enumerate(legs):
+            if not isinstance(leg,dict) or str(leg.get("status") or "").upper() not in {"WON","LOST"}:
                 continue
             product=str(leg.get("product") or leg.get("sport") or "")
             pick_text=str(leg.get("pick") or "").lower()
@@ -708,18 +714,35 @@ def _load_results_first_index():
                 continue
             line=leg.get("line")
             if line is None:
-                m=re.search(r"\b(?:over|under)\s+(\d+(?:\.\d+)?)\b",pick_text)
-                if m:
-                    line=m.group(1)
+                match=re.search(r"\b(?:over|under)\s+(\d+(?:\.\d+)?)\b",pick_text)
+                if match:
+                    line=match.group(1)
             try:
                 line_key=f"{float(line):g}"
             except (TypeError,ValueError):
                 continue
+            event_id=str(leg.get("event_id") or leg.get("eventId") or "").strip()
+            ticket_identity=str(ticket.get("ticket_id") or ticket.get("created_at") or ticket_index)
+            identity=event_id or f"{ticket_identity}:leg:{leg_index}"
             key=(product,line_key,side)
-            row=exact.setdefault(key,{"n":0,"wins":0,"losses":0})
-            row["n"]+=1
-            row["wins"]+=1 if str(leg.get("status"))=="WON" else 0
-            row["losses"]+=1 if str(leg.get("status"))=="LOST" else 0
+            dedupe=(key,identity)
+            status=str(leg.get("status") or "").upper()
+            previous=exact_events.get(dedupe)
+            if previous is None:
+                exact_events[dedupe]=status
+            elif previous != status:
+                # A contradictory event result must not inflate or poison an exact-line sample.
+                exact_events[dedupe]="CONFLICT"
+
+    exact={}
+    for (key,_event_id),status in exact_events.items():
+        if status=="CONFLICT":
+            continue
+        row=exact.setdefault(key,{"n":0,"wins":0,"losses":0})
+        row["n"]+=1
+        row["wins"]+=1 if status=="WON" else 0
+        row["losses"]+=1 if status=="LOST" else 0
+
     _RESULTS_FIRST_CACHE={
         "exact":exact,
         "product_tickets":product_tickets,
@@ -1494,10 +1517,8 @@ def _settled_builder_lane_performance_index(tracker=None):
     if cacheable and _SETTLED_BUILDER_LANE_PERFORMANCE_CACHE is not None:
         return _SETTLED_BUILDER_LANE_PERFORMANCE_CACHE
     payload=load(DATA/"odds_ticket_tracker.json",{}) if tracker is None else tracker
-    source_rows=[]
-    if isinstance(payload,dict):
-        source_rows.extend(("current",x) for x in payload.get("tickets",[]) if isinstance(x,dict))
-        source_rows.extend(("archive",x) for x in payload.get("archived_tickets",[]) if isinstance(x,dict))
+    unique_tickets,_=merge_ticket_history(payload)
+    source_rows=[("unique",x) for x in unique_tickets]
 
     unique={}
     for source,ticket in source_rows:
@@ -1612,9 +1633,7 @@ def _upcoming_desk_pending_event_ids(tracker=None):
         if cacheable:
             _UPCOMING_DESK_PENDING_EVENT_ID_CACHE=event_ids
         return event_ids
-    tickets=[]
-    tickets.extend(x for x in payload.get("tickets",[]) if isinstance(x,dict))
-    tickets.extend(x for x in payload.get("archived_tickets",[]) if isinstance(x,dict))
+    tickets,_=merge_ticket_history(payload)
     for ticket in tickets:
         parent_status=str(ticket.get("status") or "").upper()
         for leg in ticket.get("legs") or []:
@@ -1717,10 +1736,7 @@ def _upcoming_desk_settled_result_index(tracker=None):
         else:
             by_key_event[dedupe]=record
 
-    tickets=[]
-    if isinstance(payload,dict):
-        tickets.extend(x for x in payload.get("tickets",[]) if isinstance(x,dict))
-        tickets.extend(x for x in payload.get("archived_tickets",[]) if isinstance(x,dict))
+    tickets,_=merge_ticket_history(payload)
     for ticket in tickets:
         for leg in ticket.get("legs") or []:
             if not isinstance(leg,dict):
