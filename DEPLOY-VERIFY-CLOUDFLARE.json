@@ -3,10 +3,10 @@
   "core_pages_status": "VERIFIED",
   "qualified_best_quote_coverage_status": "COMPLETE",
   "provider": "Cloudflare Pages",
-  "source_commit": "b794dc86e8f75d81b6f5326257ff403433f835b2",
-  "verified_at": "2026-10-20T09:12:43.100871+00:00",
+  "source_commit": "1236eca0da8490f1f24c43dbcbb7e16006e976d3",
+  "verified_at": "2026-10-20T09:14:47.535700+00:00",
   "live_virtual_feed": {
-    "verified_at": "2026-10-20T09:12:42.797Z",
+    "verified_at": "2026-10-20T09:14:46.706Z",
     "status": "DIAGNOSTIC",
     "scan_complete": true,
     "scan_stop_reason": "all_model_qualified_candidates_matched",
@@ -27,7 +27,7 @@
       {
         "page": 1,
         "count": 100,
-        "fetched_at": "2026-10-20T09:12:42.779Z",
+        "fetched_at": "2026-10-20T09:14:46.684Z",
         "status": "LIVE"
       }
     ],
@@ -57,15 +57,35 @@
     "qualified_examples": []
   },
   "booking_api": {
-    "verified_at": "2026-10-20T09:12:37.970Z",
-    "status": "NO_FUTURE_BATCH",
-    "http_status": null,
-    "ok": false,
-    "batch_id": null,
-    "selection_count": 0,
+    "verified_at": "2026-10-20T09:14:20.863Z",
+    "status": "VOLATILE_MARKET",
+    "http_status": 409,
+    "ok": true,
+    "batch_id": "DESK-BATCH-03",
+    "selection_count": 1,
     "booking_code_available": false,
-    "error": null,
-    "message": null
+    "error": "TOO_FEW_AVAILABLE_SELECTIONS",
+    "message": "Fewer than two valid selections remain available on SportyBet.",
+    "volatile_market": true,
+    "validation": [
+      {
+        "event_id": "sr:match:BAaFN1VR1c1O8TiYfk6Xegw",
+        "ok": true,
+        "resolved_by": "event_id",
+        "resolved_event_id": "sr:match:BAaFN1VR1c1O8TiYfk6Xegw",
+        "market_id": "18",
+        "outcome_id": "12",
+        "specifier": "total=4.5",
+        "outcome": "Over 4.5",
+        "current_odds": 2
+      },
+      {
+        "event_id": "sr:match:BAaFUB1ULfBCXZ20eueCfZw",
+        "ok": false,
+        "excluded": true,
+        "reason": "The exact SportyBet O/U line or selected side is no longer available."
+      }
+    ]
   },
   "checks": [
     "core_pages",
