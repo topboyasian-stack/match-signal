@@ -199,7 +199,7 @@ class UpcomingDeskSettledPromotionGateTests(unittest.TestCase):
         self.assertFalse(result["eligible"])
         self.assertEqual(result["settled_ticket_n"], 9)
         self.assertEqual(result["flat_stake_roi"], round((2 * 2.5 - 7) / 9, 6))
-        self.assertEqual(result["reason"], "insufficient_settled_desk_ticket_sample")
+        self.assertEqual(result["reason"], "insufficient_settled_lane_ticket_sample")
 
     def test_sufficient_sample_still_fails_when_realized_roi_is_negative(self):
         tracker = {
@@ -214,7 +214,7 @@ class UpcomingDeskSettledPromotionGateTests(unittest.TestCase):
         self.assertFalse(result["eligible"])
         self.assertEqual(result["settled_ticket_n"], 12)
         self.assertLess(result["flat_stake_roi"], 0)
-        self.assertEqual(result["reason"], "settled_desk_ticket_roi_below_promotion_floor")
+        self.assertEqual(result["reason"], "settled_lane_ticket_roi_below_promotion_floor")
 
     def test_desk_promotes_only_after_sample_and_positive_roi_floor_both_pass(self):
         tracker = {
