@@ -22,6 +22,70 @@ def leg(index, *, odds=1.15, probability=0.90, product="efootball_gt",
     }
 
 
+
+
+
+def desk_leg(index, *, odds=1.90, probability=0.61, raw_probability=0.68,
+             exact_n=421, exact_hit=0.6033, minute=None, expected_value=None):
+    row=leg(
+        index, odds=odds, probability=probability,
+        expected_value=(probability*odds-1.0) if expected_value is None else expected_value,
+        lane=builder.UPCOMING_DESK_RESEARCH_LANE, minute=minute
+    )
+    row.update({
+        "qualification_lane":builder.UPCOMING_DESK_RESEARCH_LANE,
+        "builder_eligible":True,
+        "builder_probability":probability,
+        "desk_calibrated_probability":probability,
+        "raw_model_probability":raw_probability,
+        "walkforward_exact_line_n":exact_n,
+        "walkforward_exact_line_hit_rate":exact_hit,
+        "desk_learning_adjustment_source":"EXACT_LINE_DIRECTION",
+        "desk_official_qualification_pass":False,
+        "desk_official_qualification_status":"MODEL_PROBABILITY_BELOW_0_65",
+        "upcoming_desk_research_only":True,
+        "odds_fresh":True,
+        "market_odds_age_seconds":30.0,
+        "data_quality":0.90,
+        "uncertainty":0.05,
+        "model_edge":0.05,
+        "line":4.5,
+        "builder_pick":"over",
+    })
+    return row
+
+
+def desk_source_row(now, *, probability=0.61, raw_probability=0.68,
+                    exact_n=421, exact_hit=0.6033):
+    return {
+        "sport":"virtual",
+        "product":"efootball_gt",
+        "league":"Volta International A",
+        "event_id":"desk-source-event",
+        "start_time":(now+timedelta(minutes=15)).isoformat(),
+        "player_1":"Alpha (desk-a)",
+        "player_2":"Beta (desk-b)",
+        "identity_verified":True,
+        "sportybet_odds_line":4.5,
+        "sportybet_over_odds":1.90,
+        "sportybet_under_odds":1.90,
+        "bookmaker_source":"SportyBet NG",
+        "market_odds_timestamp":now.isoformat(),
+        "line":4.5,
+        "pick":"over",
+        "base_model_gate":True,
+        "raw_line_eligible":True,
+        "model_competition_qualified":True,
+        "model_line_qualified":False,
+        "qualified_for_builder":False,
+        "qualification_status":"MODEL_PROBABILITY_BELOW_0_65",
+        "desk_learning_adjustment_source":"EXACT_LINE_DIRECTION",
+        "desk_calibrated_probability":probability,
+        "raw_model_probability":raw_probability,
+        "walkforward_exact_line_n":exact_n,
+        "walkforward_exact_line_hit_rate":exact_hit,
+    }
+
 class CompactEfootballBuilderTests(unittest.TestCase):
     def setUp(self):
         builder._EFOOTBALL_HIGH_CONFIDENCE_TICKET_CALIBRATION_CACHE=None
@@ -453,6 +517,109 @@ class CompactEfootballBuilderTests(unittest.TestCase):
         self.assertEqual(candidate["blocking_reason"],"settled_lane_roi_not_positive")
         self.assertGreaterEqual(candidate["raw_independence_expected_roi"],0.02)
         self.assertIn("Diagnostic-only",diag["shadow_only_policy"])
+
+
+    def test_upcoming_desk_candidate_uses_desk_probability_not_raw_probability(self):
+        now=datetime.now(timezone.utc)
+        source=desk_source_row(now)
+        candidate,reason=builder._upcoming_desk_research_candidate(source,now)
+        self.assertIsNone(reason)
+        self.assertIsNotNone(candidate)
+        self.assertAlmostEqual(candidate["builder_probability"],0.61)
+        self.assertAlmostEqual(candidate["raw_model_probability"],0.68)
+        self.assertEqual(candidate["qualification_lane"],"upcoming_desk_research_only")
+        self.assertFalse(candidate["desk_official_qualification_pass"])
+        self.assertEqual(candidate["desk_official_qualification_status"],"MODEL_PROBABILITY_BELOW_0_65")
+        self.assertFalse(candidate["qualified_for_builder"],"research candidates must not flip the official Desk gate")
+
+    def test_upcoming_desk_candidate_rejects_weak_or_unqualified_evidence(self):
+        now=datetime.now(timezone.utc)
+        cases=[
+            ({"desk_learning_adjustment_source":"SIDE_COMPARISON_ONLY"},"desk_calibration_not_active"),
+            ({"walkforward_exact_line_n":99},"insufficient_exact_line_walkforward_sample"),
+            ({"walkforward_exact_line_hit_rate":0.599},"exact_line_walkforward_hit_rate_below_0_60"),
+            ({"raw_model_probability":0.64},"raw_model_probability_below_0_65"),
+            ({"model_competition_qualified":False},"model_competition_not_qualified"),
+            ({"sportybet_odds_line":3.5},"live_quote_line_mismatch"),
+        ]
+        for update,expected in cases:
+            with self.subTest(expected=expected):
+                row=desk_source_row(now)
+                row.update(update)
+                candidate,reason=builder._upcoming_desk_research_candidate(row,now)
+                self.assertIsNone(candidate)
+                self.assertEqual(reason,expected)
+
+    def test_desk_ticket_probability_uses_exact_line_wilson_bounds_not_legacy_ticket_gamma(self):
+        rows=[desk_leg(0),desk_leg(1,minute=5)]
+        with (
+            patch.object(builder,"_ticket_calibration_gamma",side_effect=AssertionError("legacy gamma must not run")),
+            patch.object(builder,"_efootball_exact_evidence_ticket_gamma",side_effect=AssertionError("settled ROI gamma must not run")),
+        ):
+            metrics=builder._batch_metrics(rows)
+        self.assertEqual(metrics["ticket_calibration_mode"],"upcoming_desk_exact_line_wilson_lower_bound_independence_proxy")
+        self.assertFalse(metrics["ticket_calibration_ready"])
+        self.assertAlmostEqual(metrics["raw_combined_model_probability"],0.61**2,places=5)
+        self.assertLess(metrics["combined_model_probability"],metrics["raw_combined_model_probability"])
+        self.assertGreater(metrics["combined_model_probability"],0.25)
+
+    def test_upcoming_desk_constructor_builds_3_to_4x_ticket_with_all_gates(self):
+        rows=[desk_leg(0,minute=0),desk_leg(1,minute=5)]
+        options,diag=builder._construct_upcoming_desk_research_batches(rows)
+        self.assertTrue(options)
+        self.assertEqual(diag["reason"],None)
+        option=options[0]
+        self.assertEqual(len(option["rows"]),2)
+        self.assertGreaterEqual(option["odds"],3.00)
+        self.assertLessEqual(option["odds"],4.00)
+        self.assertGreaterEqual(option["roi"],0.02)
+        self.assertEqual(option["metrics"]["ticket_calibration_mode"],"upcoming_desk_exact_line_wilson_lower_bound_independence_proxy")
+        self.assertTrue(all(x["qualification_lane"]=="upcoming_desk_research_only" for x in option["rows"]))
+        self.assertTrue(all(x["desk_official_qualification_pass"] is False for x in option["rows"]))
+
+    def test_upcoming_desk_constructor_does_not_force_target_or_add_weak_leg(self):
+        rows=[
+            desk_leg(0,odds=1.65,minute=0),
+            desk_leg(1,odds=1.65,minute=5),
+            desk_leg(2,odds=1.65,minute=10),
+        ]
+        options,diag=builder._construct_upcoming_desk_research_batches(rows)
+        self.assertEqual(options,[])
+        self.assertGreater(diag["rejected_outside_odds"],0)
+        self.assertEqual(diag["batches_selected"],0)
+
+    def test_upcoming_desk_constructor_holds_stale_low_edge_and_thin_sample_rows(self):
+        rows=[
+            desk_leg(0,minute=0),
+            desk_leg(1,minute=5),
+            desk_leg(2,minute=10),
+            desk_leg(3,minute=15),
+        ]
+        rows[0]["odds_fresh"]=False
+        rows[1]["model_edge"]=0.01
+        rows[2]["walkforward_exact_line_n"]=50
+        rows[3]["walkforward_exact_line_hit_rate"]=0.55
+        options,diag=builder._construct_upcoming_desk_research_batches(rows)
+        self.assertEqual(options,[])
+        self.assertGreaterEqual(sum(diag["leg_rejections"].values()),0)
+        # The constructor's final pool is empty once the stricter leg-level gates are applied.
+        self.assertEqual(diag["candidate_count"],0)
+
+    def test_build_value_batches_prioritizes_upcoming_desk_lane_over_held_legacy_lane(self):
+        rows=[desk_leg(0,minute=0),desk_leg(1,minute=5)]
+        with (
+            patch.object(builder,"make_leg",side_effect=lambda row:row),
+            patch.object(builder,"construction_shape_diagnostics",return_value=[]),
+        ):
+            batches,built,diag=builder.build_value_batches(rows)
+        self.assertTrue(batches)
+        self.assertEqual(batches[0]["primary_lane"],"upcoming_desk_research")
+        self.assertEqual(diag["construction_priority"],"upcoming_desk_research_first")
+        self.assertFalse(batches[0]["ticket_calibration_ready"])
+        self.assertFalse(batches[0]["real_money_execution"])
+        self.assertTrue(batches[0]["paper_only"])
+
+
 
 
 if __name__=="__main__":

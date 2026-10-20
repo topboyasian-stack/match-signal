@@ -128,7 +128,7 @@ jobs:
           policy = data.get('selection_policy', {})
           assert policy.get('requires_live_sportybet_price') is True
           assert policy.get('results_first') is True
-          assert policy.get('construction_priority') == 'settled_results_first'
+          assert policy.get('construction_priority') in {'settled_results_first', 'upcoming_desk_research_first'}
           assert float(policy.get('minimum_combined_odds', 0)) >= 2.70
           assert float(policy.get('results_first_min_expected_roi', 0)) >= 0.02
           assert float(policy.get('min_model_edge', 0)) >= 0.025
@@ -141,13 +141,13 @@ jobs:
           assert len(data['qualified_legs']) <= 20
           if data['qualified_legs']:
               lane=str((data.get('batch_policy') or {}).get('primary_lane') or '')
-              selected_floor=2.00 if lane=='efootball_compact_2x' else float(policy.get('minimum_combined_odds', 1.0))
+              selected_floor=(2.00 if lane=='efootball_compact_2x' else (3.00 if lane=='upcoming_desk_research' else float(policy.get('minimum_combined_odds', 1.0))))
               assert float(data.get('market_price_combined_odds', 0)) >= selected_floor
           if data.get('status') == 'UPSTREAM_RESEARCH_GATE_BLOCKED':
               assert not data['qualified_legs']
           for leg in data['qualified_legs']:
               assert leg.get('sport') in {'football', 'tennis', 'virtual'}
-              assert float(leg.get('model_probability', 0)) >= (0.65 if leg.get('sport') == 'virtual' else 0.60)
+              assert float(leg.get('model_probability', 0)) >= (0.60 if lane == 'upcoming_desk_research' else (0.65 if leg.get('sport') == 'virtual' else 0.60))
               assert float(leg.get('model_fair_odds', 0)) > 1
               assert leg.get('real_money_eligible') is False
               assert leg.get('paper_only') is True
@@ -164,7 +164,14 @@ jobs:
               and str(leg.get('qualification_lane') or '') == 'efootball_exact_evidence_value'
               for leg in data['qualified_legs']
           )
-          if data.get('candidates_considered', {}).get('football', 0) > 0 and not all_efootball_value_legs:
+          all_desk_research_legs = bool(data['qualified_legs']) and all(
+              leg.get('sport') == 'virtual'
+              and str(leg.get('product') or '').startswith('efootball_')
+              and str(leg.get('qualification_lane') or '') == 'upcoming_desk_research_only'
+              and leg.get('upcoming_desk_research_only') is True
+              for leg in data['qualified_legs']
+          )
+          if data.get('candidates_considered', {}).get('football', 0) > 0 and not (all_efootball_value_legs or all_desk_research_legs):
               assert 'football' in sports or len(data['qualified_legs']) < 3
           if data.get('market_price_combined_odds') is not None:
               assert data['market_price_combined_odds'] > 1
@@ -191,6 +198,9 @@ jobs:
               if lane == 'efootball_compact_2x':
                   assert 4 <= legs_in_batch <= 5
                   assert batch_odds >= 2.00
+              elif lane == 'upcoming_desk_research':
+                  assert 2 <= legs_in_batch <= 4
+                  assert 3.00 <= batch_odds <= 4.00
               else:
                   assert 2 <= legs_in_batch <= 4
                   assert batch_odds >= float(data.get('batch_policy', {}).get('min_combined_odds', 2.0))
@@ -214,6 +224,24 @@ jobs:
                   required = 0.80
                   assert set(products) <= {'efootball_gt','efootball_adriatic'}
                   assert all(str(leg.get('qualification_lane') or '') == 'efootball_exact_evidence_value' for leg in batch.get('legs', []))
+              if lane == 'upcoming_desk_research':
+                  required = 0.60
+                  assert set(products) <= {'efootball_gt','efootball_adriatic'}
+                  assert batch.get('ticket_calibration_mode') == 'upcoming_desk_exact_line_wilson_lower_bound_independence_proxy'
+                  assert batch.get('ticket_calibration_ready') is False
+                  assert batch.get('paper_only') is True
+                  assert batch.get('real_money_execution') is False
+                  assert float(batch.get('combined_model_probability', 0)) * float(batch.get('combined_odds', 0)) - 1.0 >= 0.02
+                  for leg in batch.get('legs', []):
+                      assert leg.get('qualification_lane') == 'upcoming_desk_research_only'
+                      assert leg.get('upcoming_desk_research_only') is True
+                      assert float(leg.get('desk_calibrated_probability', 0)) >= 0.60
+                      assert float(leg.get('raw_model_probability', 0)) >= 0.65
+                      assert int(leg.get('walkforward_exact_line_n', 0)) >= 100
+                      assert float(leg.get('walkforward_exact_line_hit_rate', 0)) >= 0.60
+                      assert float(leg.get('model_edge', 0)) >= 0.025
+                      assert leg.get('odds_fresh') is True
+                      assert leg.get('real_money_eligible') is False
               if efootball_value_lane:
                   # Isolated evidence-value fallback: exact-side eFootball evidence
                   # has a 65% minimum; this is VALUE_RESEARCH, not high-confidence.

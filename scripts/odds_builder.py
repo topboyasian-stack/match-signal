@@ -95,6 +95,18 @@ MODEL_FIRST_MIN_AVG_PROBABILITY=0.68
 EFOOTBALL_VALUE_MIN_AVG_PROBABILITY=0.65
 EFOOTBALL_VALUE_MIN_LEG_PROBABILITY=0.65
 
+# Separate Upcoming Desk paper-research lane using Desk probabilities and exact-line holdout.
+UPCOMING_DESK_RESEARCH_LANE="upcoming_desk_research_only"
+UPCOMING_DESK_BATCH_LANE="upcoming_desk_research"
+UPCOMING_DESK_MIN_PROBABILITY=0.60
+UPCOMING_DESK_MIN_RAW_PROBABILITY=0.65
+UPCOMING_DESK_MIN_WALKFORWARD_N=100
+UPCOMING_DESK_MIN_WALKFORWARD_HIT_RATE=0.60
+UPCOMING_DESK_MIN_COMBINED_ODDS=3.00
+UPCOMING_DESK_MAX_COMBINED_ODDS=4.00
+UPCOMING_DESK_MAX_LEGS=4
+UPCOMING_DESK_MAX_BATCHES=4
+
 # Separate compact ticket shape matching the lower-odds eFootball examples.
 # Existing per-leg/evidence/price/value gates stay intact.
 COMPACT_EFOOTBALL_MIN_LEGS=4
@@ -1458,6 +1470,90 @@ def _construct_phase2_cyclical_loop_batches(pool,max_batches=4,min_odds=None):
         "reason":None if selected else "no_isolated_streak_break_combination_reached_all_gates"
     }
 
+def _upcoming_desk_research_candidate(event, now):
+    """Normalize one current Upcoming Desk row without using the legacy fallback probability."""
+    if not isinstance(event,dict):
+        return None,"invalid_desk_row"
+    product=str(event.get("product") or "")
+    if event.get("sport")!="virtual" or product not in ACTIVE_VIRTUAL_PRODUCTS:
+        return None,"outside_active_efootball_scope"
+    if not within_builder_horizon(event,now):
+        return None,"outside_builder_horizon"
+    if event.get("base_model_gate") is not True:
+        return None,"base_model_gate_pending"
+    if event.get("raw_line_eligible") is not True:
+        return None,"raw_line_scope_pending"
+    if event.get("model_competition_qualified") is not True:
+        return None,"model_competition_not_qualified"
+    source=str(event.get("desk_learning_adjustment_source") or "").upper()
+    if source not in {"EXACT_LINE_DIRECTION","PROBABILITY_BUCKET"}:
+        return None,"desk_calibration_not_active"
+    try:
+        p=float(event.get("desk_calibrated_probability"))
+        raw_p=float(event.get("raw_model_probability"))
+        line=float(event.get("line"))
+        quote_line=float(event.get("sportybet_odds_line"))
+        exact_n=int(event.get("walkforward_exact_line_n") or 0)
+        exact_hit=float(event.get("walkforward_exact_line_hit_rate"))
+        over=float(event.get("sportybet_over_odds"))
+        under=float(event.get("sportybet_under_odds"))
+    except (TypeError,ValueError):
+        return None,"missing_probability_exact_line_or_price"
+    if not (0.0<p<1.0) or p<UPCOMING_DESK_MIN_PROBABILITY:
+        return None,"desk_probability_below_0_60"
+    if not (0.0<raw_p<1.0) or raw_p<UPCOMING_DESK_MIN_RAW_PROBABILITY:
+        return None,"raw_model_probability_below_0_65"
+    if exact_n<UPCOMING_DESK_MIN_WALKFORWARD_N:
+        return None,"insufficient_exact_line_walkforward_sample"
+    if exact_hit<UPCOMING_DESK_MIN_WALKFORWARD_HIT_RATE:
+        return None,"exact_line_walkforward_hit_rate_below_0_60"
+    if abs(line-quote_line)>1e-9:
+        return None,"live_quote_line_mismatch"
+    side=str(event.get("pick") or "").strip().lower()
+    if side not in {"over","under"}:
+        return None,"invalid_selected_side"
+    if event.get("identity_verified") is not True:
+        return None,"fixture_identity_not_verified"
+    if str(event.get("bookmaker_source") or "")!="SportyBet NG":
+        return None,"sportybet_quote_missing"
+    if over<=1.0 or under<=1.0:
+        return None,"two_sided_sportybet_quote_missing"
+    # Fresh snapshot time takes precedence over any timestamp retained in the
+    # older Unified artifact; downstream make_leg uses this same authoritative stamp.
+    quote_stamp=event.get("market_odds_timestamp") or event.get("timestamp") or event.get("odds_timestamp")
+    try:
+        stamp_dt=datetime.fromisoformat(str(quote_stamp).replace("Z","+00:00")).astimezone(timezone.utc)
+        age=max(0.0,(datetime.now(timezone.utc)-stamp_dt).total_seconds())
+    except (TypeError,ValueError):
+        age=None
+    if age is None or age>MAX_ODDS_AGE_SECONDS:
+        return None,"sportybet_quote_stale_or_untimestamped"
+    candidate=dict(event)
+    candidate["odds_timestamp"]=str(quote_stamp)
+    candidate.update({
+        "sport":"virtual",
+        "builder_market":"virtual_total",
+        "builder_pick":side,
+        "builder_probability":p,
+        "probability":p,
+        "model":"Upcoming Desk desk-calibrated walk-forward estimate · research-only",
+        "qualification_lane":UPCOMING_DESK_RESEARCH_LANE,
+        "desk_official_qualification_pass":event.get("qualified_for_builder") is True,
+        "desk_official_qualification_status":str(event.get("qualification_status") or "UNKNOWN"),
+        "desk_research_probability_source":"desk_calibrated_probability",
+        "desk_research_walkforward_source":"walkforward_exact_line_hit_rate",
+        "evidence_source":"upcoming_desk_exact_line_walkforward",
+        "recent_evidence":{
+            "n":exact_n,
+            "hit_rate":round(exact_hit,6),
+            "source":"unified_upcoming.json",
+            "scope":"selected product + exact O/U line + selected side · walk-forward holdout"
+        },
+        "upcoming_desk_research_only":True,
+    })
+    return candidate,None
+
+
 def virtual_candidates(now):
     """Build Virtual candidates from the freshest exact SportyBet O/U snapshot.
 
@@ -1858,6 +1954,28 @@ def virtual_candidates(now):
             y["qualification_lane"]=str(results_perf.get("qualification_lane") or "")
             out.append(y)
 
+    desk_research_rows=[]
+    desk_research_rejections={}
+    for event in merged:
+        candidate,reason=_upcoming_desk_research_candidate(event,now)
+        if candidate is not None:
+            desk_research_rows.append(candidate)
+        elif reason:
+            desk_research_rejections[reason]=desk_research_rejections.get(reason,0)+1
+    out.extend(desk_research_rows)
+    diagnostics["upcoming_desk_research"]={
+        "enabled":True,
+        "candidate_count":len(desk_research_rows),
+        "min_desk_probability":UPCOMING_DESK_MIN_PROBABILITY,
+        "min_raw_model_probability":UPCOMING_DESK_MIN_RAW_PROBABILITY,
+        "min_walkforward_n":UPCOMING_DESK_MIN_WALKFORWARD_N,
+        "min_walkforward_hit_rate":UPCOMING_DESK_MIN_WALKFORWARD_HIT_RATE,
+        "min_combined_odds":UPCOMING_DESK_MIN_COMBINED_ODDS,
+        "max_combined_odds":UPCOMING_DESK_MAX_COMBINED_ODDS,
+        "max_legs":UPCOMING_DESK_MAX_LEGS,
+        "rejections":dict(sorted(desk_research_rejections.items(),key=lambda item:(-item[1],item[0]))[:12]),
+        "policy":"paper-only Desk lane; active model competition + raw active-line scope + active Desk calibration + >=100 exact-line walk-forward rows at >=60%; current SportyBet quote and standard Builder price/edge gates are mandatory",
+    }
     diagnostics["quote_join"]=quote_diag
     diagnostics["stale_unified_prices_used"]=False
     diagnostics["current_feed_is_price_authority"]=True
@@ -2055,7 +2173,18 @@ def make_leg(x):
     return {
         "sport":x.get("sport"),"competition":x.get("league"),"event_id":x.get("event_id"),
         "start_time":x.get("start_time"),"match":match,"market":x.get("builder_market"),
-        "pick":pick,"model_probability":round(p,6),"model_fair_odds":fair_odds(p),
+        "pick":pick,"line":x.get("line"),"builder_pick":x.get("builder_pick"),
+        "participant_1":x.get("participant_1") or x.get("player_1") or x.get("team_1"),
+        "participant_2":x.get("participant_2") or x.get("player_2") or x.get("team_2"),
+        "model_probability":round(p,6),"desk_calibrated_probability":x.get("desk_calibrated_probability"),
+        "raw_model_probability":x.get("raw_model_probability"),
+        "walkforward_exact_line_n":x.get("walkforward_exact_line_n"),
+        "walkforward_exact_line_hit_rate":x.get("walkforward_exact_line_hit_rate"),
+        "desk_learning_adjustment_source":x.get("desk_learning_adjustment_source"),
+        "desk_official_qualification_pass":x.get("desk_official_qualification_pass",False),
+        "desk_official_qualification_status":x.get("desk_official_qualification_status") or x.get("qualification_status"),
+        "upcoming_desk_research_only":x.get("upcoming_desk_research_only") is True,
+        "model_fair_odds":fair_odds(p),
         "bookmaker_odds":round(bookmaker,3) if bookmaker is not None else None,
         "market_implied_probability":round(implied,6) if implied is not None else None,
         "de_vig_probability":round(devig,6) if devig is not None else None,
@@ -2512,6 +2641,28 @@ def _vfootball_holdout_lower_bound(leg,confidence=0.95):
     except (TypeError,ValueError,AttributeError):
         return None
 
+def _upcoming_desk_wilson_lower_bound(leg,confidence=0.95):
+    """95% Wilson lower bound from an exact product + line + side walk-forward sample."""
+    try:
+        n=int(leg.get("walkforward_exact_line_n") or 0)
+        rate=float(leg.get("walkforward_exact_line_hit_rate"))
+    except (TypeError,ValueError,AttributeError):
+        return None
+    if n<=0 or not 0.0<=rate<=1.0:
+        return None
+    # The desk artifact stores a rounded rate, not raw successes; reconstruct
+    # the nearest integer count as a conservative-proxy input and label it accordingly.
+    wins=max(0,min(n,int(round(rate*n))))
+    from statistics import NormalDist
+    z=NormalDist().inv_cdf(0.5+confidence/2.0)
+    z2=z*z
+    denom=1.0+z2/n
+    centre=(wins/n)+(z2/(2.0*n))
+    spread=z*math.sqrt(((wins/n)*(1.0-wins/n)/n)+(z2/(4.0*n*n)))
+    lower=(centre-spread)/denom
+    return max(0.0005,min(0.9995,lower))
+
+
 def _batch_metrics(legs,calibration_lane=None):
     probs=[max(0.0005,min(0.9995,float(x.get("model_probability") or 0.0))) for x in legs if float(x.get("model_probability") or 0.0)>0]
     edges=[float(x.get("model_edge") or 0.0) for x in legs]
@@ -2523,11 +2674,24 @@ def _batch_metrics(legs,calibration_lane=None):
     raw_combined=math.prod(probs)
     all_vfootball_holdout=all(str(x.get("qualification_lane") or "")=="vfootball_event_holdout_value" and str(x.get("product") or "")=="vfootball" for x in legs)
     all_efootball_evidence=all(str(x.get("qualification_lane") or "")=="efootball_exact_evidence_value" and str(x.get("product") or "").startswith("efootball_") for x in legs)
+    all_upcoming_desk=all(str(x.get("qualification_lane") or "")==UPCOMING_DESK_RESEARCH_LANE for x in legs)
     ticket_calibration_mode="historical_settled_ticket_gamma"
-    ticket_gamma=float(_ticket_calibration_gamma().get("gamma") or 1.0)
+    ticket_gamma=1.0
     ticket_calibration_ready=True
     lane_calibration=None
-    if all_efootball_evidence and calibration_lane=="high_confidence_research":
+    if all_upcoming_desk:
+        lower_bounds=[_upcoming_desk_wilson_lower_bound(x,confidence=0.95) for x in legs]
+        if all(value is not None for value in lower_bounds):
+            calibrated=max(0.0005,min(raw_combined,math.prod(lower_bounds)))
+            ticket_calibration_mode="upcoming_desk_exact_line_wilson_lower_bound_independence_proxy"
+            ticket_gamma=1.0
+            ticket_calibration_ready=False
+        else:
+            calibrated=0.0005
+            ticket_calibration_mode="upcoming_desk_walkforward_lower_bound_unavailable"
+            ticket_gamma=1.0
+            ticket_calibration_ready=False
+    elif all_efootball_evidence and calibration_lane=="high_confidence_research":
         lane_calibration=_efootball_high_confidence_ticket_gamma()
         if lane_calibration.get("trained") is True and lane_calibration.get("promotion_allowed") is True:
             ticket_gamma=float(lane_calibration.get("gamma") or 1.0)
@@ -2558,6 +2722,7 @@ def _batch_metrics(legs,calibration_lane=None):
         else:
             calibrated=_calibrated_ticket_probability(raw_combined)
     else:
+        ticket_gamma=float(_ticket_calibration_gamma().get("gamma") or 1.0)
         calibrated=_calibrated_ticket_probability(raw_combined)
     geometric=math.exp(sum(math.log(p) for p in probs)/len(probs))
     return {
@@ -3673,6 +3838,153 @@ def _secondary_efootball_diagnostics(pool, min_odds=None):
     }
 
 
+def _construct_upcoming_desk_research_batches(
+    pool,
+    max_batches=UPCOMING_DESK_MAX_BATCHES,
+    min_odds=UPCOMING_DESK_MIN_COMBINED_ODDS,
+    max_odds=UPCOMING_DESK_MAX_COMBINED_ODDS,
+    max_legs=UPCOMING_DESK_MAX_LEGS,
+):
+    """Construct 2–4 total-odds Desk research tickets without legacy ticket-gamma calibration."""
+    rows=[]
+    rejection_counts={}
+    def reject(reason):
+        rejection_counts[reason]=rejection_counts.get(reason,0)+1
+    for row in pool:
+        if not isinstance(row,dict) or str(row.get("qualification_lane") or "")!=UPCOMING_DESK_RESEARCH_LANE:
+            continue
+        try:
+            probability=float(row.get("model_probability") or 0.0)
+            raw_probability=float(row.get("raw_model_probability") or 0.0)
+            edge=float(row.get("model_edge") or 0.0)
+            ev=float(row.get("expected_value") or 0.0)
+            exact_n=int(row.get("walkforward_exact_line_n") or 0)
+            exact_hit=float(row.get("walkforward_exact_line_hit_rate"))
+            quality=float(row.get("data_quality") or 0.0)
+            uncertainty=float(row.get("uncertainty") or 1.0)
+            price_age=float(row.get("market_odds_age_seconds"))
+        except (TypeError,ValueError):
+            reject("missing_numeric_desk_fields")
+            continue
+        if row.get("builder_eligible") is not True:
+            reject("builder_price_edge_or_quality_gate")
+            continue
+        if probability<UPCOMING_DESK_MIN_PROBABILITY or raw_probability<UPCOMING_DESK_MIN_RAW_PROBABILITY:
+            reject("desk_or_raw_probability_floor")
+            continue
+        if exact_n<UPCOMING_DESK_MIN_WALKFORWARD_N or exact_hit<UPCOMING_DESK_MIN_WALKFORWARD_HIT_RATE:
+            reject("exact_line_walkforward_gate")
+            continue
+        if edge<MIN_EDGE or ev<0:
+            reject("current_edge_or_single_leg_ev_gate")
+            continue
+        if not row.get("odds_fresh") or price_age>MAX_ODDS_AGE_SECONDS:
+            reject("stale_price")
+            continue
+        if quality<MIN_DATA_QUALITY or uncertainty>MAX_UNCERTAINTY:
+            reject("data_quality_or_uncertainty_gate")
+            continue
+        if str(row.get("product") or "") not in ACTIVE_VIRTUAL_PRODUCTS or not row.get("upcoming_desk_research_only"):
+            reject("active_product_or_desk_source_gate")
+            continue
+        if _upcoming_desk_wilson_lower_bound(row,confidence=0.95) is None:
+            reject("walkforward_lower_bound_unavailable")
+            continue
+        rows.append(row)
+    rows=sorted(rows,key=lambda x:(
+        -float(_upcoming_desk_wilson_lower_bound(x,confidence=0.95) or 0.0),
+        -float(x.get("model_edge") or 0.0),
+        -float(x.get("model_probability") or 0.0),
+        -float(x.get("bookmaker_odds") or 1.0),
+        _kickoff_timestamp(x) if _kickoff_timestamp(x) is not None else float("inf")
+    ))[:40]
+    diag={
+        "enabled":True,
+        "source":"Unified Upcoming selected-side desk-calibrated probability + exact-line walk-forward holdout",
+        "candidate_count":len(rows),
+        "raw_min_probability":UPCOMING_DESK_MIN_RAW_PROBABILITY,
+        "desk_min_probability":UPCOMING_DESK_MIN_PROBABILITY,
+        "walkforward_min_n":UPCOMING_DESK_MIN_WALKFORWARD_N,
+        "walkforward_min_hit_rate":UPCOMING_DESK_MIN_WALKFORWARD_HIT_RATE,
+        "min_combined_odds":min_odds,
+        "max_combined_odds":max_odds,
+        "min_legs":2,
+        "max_legs":min(max_legs,UPCOMING_DESK_MAX_LEGS),
+        "max_batches":max_batches,
+        "combinations_checked":0,
+        "rejected_correlated":0,
+        "rejected_kickoff_span":0,
+        "rejected_outside_odds":0,
+        "rejected_conservative_roi":0,
+        "batches_selected":0,
+        "reason":"no_desk_candidate_passed_all_leg_gates" if not rows else "no_desk_combination_reached_odds_and_conservative_roi_gates",
+        "leg_rejections":dict(sorted(rejection_counts.items(),key=lambda item:(-item[1],item[0]))[:12]),
+        "ticket_probability_method":"product of 95% Wilson lower bounds from each exact product + line + side walk-forward sample; independence proxy, not trained whole-ticket calibration",
+        "uses_legacy_settled_ticket_gamma":False,
+        "real_money_execution":False,
+        "paper_only":True,
+    }
+    import itertools
+    options=[]
+    for shape in range(2,min(int(max_legs),UPCOMING_DESK_MAX_LEGS)+1):
+        for combo in itertools.combinations(rows,shape):
+            diag["combinations_checked"]+=1
+            event_ids=[str(x.get("event_id") or "") for x in combo if x.get("event_id")]
+            participants=[p for row in combo for p in _participants(row)]
+            if len(event_ids)!=len(set(event_ids)) or len(participants)!=len(set(participants)):
+                diag["rejected_correlated"]+=1
+                continue
+            span=_batch_kickoff_span_minutes(combo)
+            if span>MAX_BATCH_KICKOFF_SPAN_MINUTES:
+                diag["rejected_kickoff_span"]+=1
+                continue
+            odds=math.prod(float(x.get("bookmaker_odds") or 1.0) for x in combo)
+            if odds<min_odds-1e-12 or odds>max_odds+1e-12:
+                diag["rejected_outside_odds"]+=1
+                continue
+            metrics=_batch_metrics(list(combo))
+            conservative_probability=float(metrics.get("combined_model_probability") or 0.0)
+            roi=conservative_probability*odds-1.0
+            if roi<RESULTS_FIRST_MIN_EXPECTED_ROI:
+                diag["rejected_conservative_roi"]+=1
+                continue
+            score=(
+                conservative_probability,
+                min(float(_upcoming_desk_wilson_lower_bound(x,confidence=0.95) or 0.0) for x in combo),
+                sum(float(x.get("model_probability") or 0.0) for x in combo)/len(combo),
+                min(float(x.get("model_edge") or 0.0) for x in combo),
+                -span,
+                -shape,
+                odds,
+            )
+            options.append({"rows":list(combo),"metrics":metrics,"odds":odds,"span":span,"roi":roi,"score":score})
+    options.sort(key=lambda option:option["score"],reverse=True)
+    selected=[]
+    used_events=set()
+    used_participants=set()
+    for option in options:
+        if len(selected)>=max_batches:
+            break
+        rows_here=option["rows"]
+        events={str(x.get("event_id") or "") for x in rows_here if x.get("event_id")}
+        participants={p for row in rows_here for p in _participants(row)}
+        if events & used_events or participants & used_participants:
+            continue
+        selected.append(option)
+        used_events.update(events)
+        used_participants.update(participants)
+    diag.update({
+        "batches_selected":len(selected),
+        "used_unique_events":len(used_events),
+        "reason":None if selected else diag["reason"],
+        "candidate_combinations_passed_all_gates":len(options),
+        "selected_combined_odds":[round(float(x["odds"]),3) for x in selected],
+        "selected_leg_counts":[len(x["rows"]) for x in selected],
+        "expected_roi":[round(float(x["roi"]),6) for x in selected],
+    })
+    return selected,diag
+
+
 def build_value_batches(candidates):
     """Build one results-first paper ticket using the best proven 2–7-leg shape.
 
@@ -3698,6 +4010,75 @@ def build_value_batches(candidates):
     }
     construction_shapes=active_efootball_construction_shapes.get("efootball_gt",[])
     eligible_all=[x for x in built if x.get("builder_eligible")]
+    desk_pool=[x for x in eligible_all if str(x.get("qualification_lane") or "")==UPCOMING_DESK_RESEARCH_LANE]
+    desk_options,desk_diag=_construct_upcoming_desk_research_batches(
+        desk_pool,
+        max_batches=UPCOMING_DESK_MAX_BATCHES,
+        min_odds=UPCOMING_DESK_MIN_COMBINED_ODDS,
+        max_odds=UPCOMING_DESK_MAX_COMBINED_ODDS,
+        max_legs=UPCOMING_DESK_MAX_LEGS,
+    )
+    if desk_options:
+        desk_options.sort(key=lambda option:min(
+            _kickoff_timestamp(x) for x in option["rows"]
+            if _kickoff_timestamp(x) is not None
+        ) if any(_kickoff_timestamp(x) is not None for x in option["rows"]) else float("inf"))
+        desk_batches=[]
+        for idx,option in enumerate(desk_options,1):
+            rows=sorted(option["rows"],key=lambda x:(
+                _kickoff_timestamp(x) if _kickoff_timestamp(x) is not None else float("inf")
+            ))
+            metrics=option["metrics"]
+            odds=float(option["odds"])
+            desk_batches.append({
+                "batch_id":f"DESK-BATCH-{idx:02d}",
+                "label":f"Upcoming Desk Research · {odds:.2f}x · {len(rows)} legs",
+                "rank_pending":False,
+                "rank":idx,
+                "legs":rows,
+                "leg_count":len(rows),
+                "combined_odds":round(odds,3),
+                "combined_model_rating":metrics["model_rating"],
+                "combined_model_probability":metrics["combined_model_probability"],
+                "raw_combined_model_probability":metrics["raw_combined_model_probability"],
+                "ticket_calibration_gamma":1.0,
+                "ticket_calibration_mode":metrics["ticket_calibration_mode"],
+                "ticket_calibration_ready":False,
+                "leg_strength_rating":metrics["leg_strength_rating"],
+                "avg_model_probability":metrics["avg_model_probability"],
+                "avg_model_edge_percent":metrics["avg_model_edge_percent"],
+                "products":sorted({str(x.get("product") or "") for x in rows if x.get("product")}),
+                "primary_lane":UPCOMING_DESK_BATCH_LANE,
+                "paper_only":True,
+                "real_money_execution":False,
+                "conservative_expected_roi":round(float(option["roi"]),6),
+                "kickoff_span_minutes":round(float(option["span"]),1),
+                "probability_policy":desk_diag["ticket_probability_method"],
+                "qualification_note":"Research-only construction from Desk-calibrated probabilities; it does not change the official Upcoming qualification flag or promote the historical settled-ticket lane.",
+                "correlation_policy":"same event and participant reuse prohibited; all legs pass current Builder price, edge, data-quality and freshness gates",
+                "construction_objective":"2–4 legs between 3.00x and 4.00x, using 95% Wilson lower bounds per exact-line walk-forward sample; no weak leg is added just to force the target",
+            })
+        return desk_batches,built,{
+            "batch_count":len(desk_batches),
+            "max_batches":UPCOMING_DESK_MAX_BATCHES,
+            "disjoint":True,
+            "min_combined_odds":UPCOMING_DESK_MIN_COMBINED_ODDS,
+            "max_combined_odds":UPCOMING_DESK_MAX_COMBINED_ODDS,
+            "target_combined_odds":3.50,
+            "construction_priority":"upcoming_desk_research_first",
+            "priority_product":"active_efootball_upcoming_desk",
+            "max_legs":UPCOMING_DESK_MAX_LEGS,
+            "adaptive_leg_counts":[2,3,4],
+            "per_leg_min_model_probability":{"2":UPCOMING_DESK_MIN_PROBABILITY,"3":UPCOMING_DESK_MIN_PROBABILITY,"4":UPCOMING_DESK_MIN_PROBABILITY},
+            "per_leg_min_raw_model_probability":UPCOMING_DESK_MIN_RAW_PROBABILITY,
+            "min_exact_line_walkforward_n":UPCOMING_DESK_MIN_WALKFORWARD_N,
+            "min_exact_line_walkforward_hit_rate":UPCOMING_DESK_MIN_WALKFORWARD_HIT_RATE,
+            "max_kickoff_span_minutes":MAX_BATCH_KICKOFF_SPAN_MINUTES,
+            "desk_research_diagnostics":desk_diag,
+            "ticket_probability_method":desk_diag["ticket_probability_method"],
+            "ticket_probability_calibrated_from_settled_tickets":False,
+            "uses_legacy_efootball_ticket_gamma":False,
+        }
     eligible_results=[
         x for x in eligible_all
         if RESULTS_FIRST_ENABLED
@@ -4471,7 +4852,10 @@ def main():
     sports=sorted({x["sport"] for x in selected})
     primary_lane=str(primary.get("primary_lane") or "") if primary else ""
     compact_efootball_lane=primary_lane=="efootball_compact_2x"
-    selected_min_combined_odds=COMPACT_EFOOTBALL_MIN_COMBINED_ODDS if compact_efootball_lane else active_min_combined_odds()
+    selected_min_combined_odds=(
+        COMPACT_EFOOTBALL_MIN_COMBINED_ODDS if compact_efootball_lane
+        else (UPCOMING_DESK_MIN_COMBINED_ODDS if primary_lane==UPCOMING_DESK_BATCH_LANE else active_min_combined_odds())
+    )
     results_first_met=bool(selected) and len(selected)>=BATCH_MIN_LEGS and primary_lane=="vfootball"
     odds_gate=combined_odds_gate_state()
     value_floor_met=bool(selected) and len(selected)>=BATCH_MIN_LEGS and combined>=selected_min_combined_odds
@@ -4499,7 +4883,7 @@ def main():
     ]
     result={
         "generated_at":now.isoformat(),"engine_version":"V6.1-RESEARCH-GATED",
-        "mode":"PAPER_ONLY","target_legs":f"standard 2–4 legs at {odds_gate['floor']:.2f}x active minimum / {odds_gate['preferred_target']:.2f}x preferred; compact eFootball 4–5 legs at {COMPACT_EFOOTBALL_MIN_COMBINED_ODDS:.2f}x+ when all gates pass","sports_supported":["football","tennis","virtual"],
+        "mode":"PAPER_ONLY","target_legs":f"Upcoming Desk research first: 2–4 legs at {UPCOMING_DESK_MIN_COMBINED_ODDS:.2f}x–{UPCOMING_DESK_MAX_COMBINED_ODDS:.2f}x when exact-line walk-forward and fresh-price gates pass; fallback standard 2–4 legs at {odds_gate['floor']:.2f}x active minimum / {odds_gate['preferred_target']:.2f}x preferred; compact eFootball 4–5 legs at {COMPACT_EFOOTBALL_MIN_COMBINED_ODDS:.2f}x+ when all gates pass","sports_supported":["football","tennis","virtual"],
         "ticket_calibration_diagnostics":{
             "historical_settled_ticket_gamma":_ticket_calibration_gamma(),
             "efootball_exact_evidence_lane":_efootball_exact_evidence_ticket_gamma()
@@ -4545,6 +4929,20 @@ def main():
             }
         },
         "selection_policy":{"min_calibrated_probability":MIN_PROB,"virtual_min_probability":VIRTUAL_MIN_PROB,"virtual_builder_lines":"all current O/U lines with exact-side evidence; no forced line list","minimum_combined_odds":active_min_combined_odds(),
+            "construction_priority":"upcoming_desk_research_first" if primary_lane==UPCOMING_DESK_BATCH_LANE else "settled_results_first",
+            "upcoming_desk_research_lane":{
+                "enabled":True,
+                "batch_lane":UPCOMING_DESK_BATCH_LANE,
+                "min_desk_calibrated_probability":UPCOMING_DESK_MIN_PROBABILITY,
+                "min_raw_model_probability":UPCOMING_DESK_MIN_RAW_PROBABILITY,
+                "min_exact_line_walkforward_n":UPCOMING_DESK_MIN_WALKFORWARD_N,
+                "min_exact_line_walkforward_hit_rate":UPCOMING_DESK_MIN_WALKFORWARD_HIT_RATE,
+                "combined_odds_range":[UPCOMING_DESK_MIN_COMBINED_ODDS,UPCOMING_DESK_MAX_COMBINED_ODDS],
+                "ticket_probability_method":"product of 95% Wilson lower bounds from exact product + line + selected-side walk-forward holdout; independence proxy, not trained whole-ticket calibration",
+                "uses_legacy_settled_ticket_gamma":False,
+                "paper_only":True,
+                "real_money_execution":False,
+            },
             "compact_efootball_ticket_lane":{
                 "enabled":True,
                 "active_products":sorted(ACTIVE_VIRTUAL_PRODUCTS),
@@ -4576,7 +4974,13 @@ def main():
             "max_legs":MAX_LEGS,
             "active_construction_max_legs":RESULTS_FIRST_MAX_LEGS,
             "adaptive_leg_counts":[2,3,4],
-            "per_leg_min_model_probability":LEG_COUNT_MIN_MODEL_PROBABILITY,
+            "per_leg_min_model_probability":(
+                {"2":UPCOMING_DESK_MIN_PROBABILITY,"3":UPCOMING_DESK_MIN_PROBABILITY,"4":UPCOMING_DESK_MIN_PROBABILITY}
+                if primary_lane==UPCOMING_DESK_BATCH_LANE else LEG_COUNT_MIN_MODEL_PROBABILITY
+            ),
+            "per_leg_min_raw_model_probability":UPCOMING_DESK_MIN_RAW_PROBABILITY if primary_lane==UPCOMING_DESK_BATCH_LANE else None,
+            "upcoming_desk_research_min_combined_odds":UPCOMING_DESK_MIN_COMBINED_ODDS,
+            "upcoming_desk_research_max_combined_odds":UPCOMING_DESK_MAX_COMBINED_ODDS,
             "preferred_per_leg_model_probability":PREFERRED_LEG_MODEL_PROBABILITY,
             "builder_horizon_minutes":MAX_BUILDER_HORIZON_MINUTES,
             "max_batch_kickoff_span_minutes":MAX_BATCH_KICKOFF_SPAN_MINUTES,
@@ -4642,7 +5046,7 @@ def main():
             "results_first_max_legs":RESULTS_FIRST_MAX_LEGS,
             "target_combined_odds":TARGET_COMBINED_ODDS,
             "accuracy_preservation_ratio":ACCURACY_PRESERVATION_RATIO,
-            "construction_priority":"settled_results_first",
+            "construction_priority":"upcoming_desk_research_first" if primary_lane==UPCOMING_DESK_BATCH_LANE else "settled_results_first",
             "max_batches":MAX_BATCHES,
             "max_legs":MAX_LEGS,
             "compact_efootball_max_legs":COMPACT_EFOOTBALL_MAX_LEGS,
