@@ -1639,7 +1639,7 @@ def _upcoming_desk_recent_result_guard(product,line,side,tracker=None,min_loss_s
     }
 
 
-def _upcoming_desk_research_candidate(event, now):
+def _upcoming_desk_research_candidate(event, now, tracker=None):
     """Normalize one current Upcoming Desk row without using the legacy fallback probability."""
     if not isinstance(event,dict):
         return None,"invalid_desk_row"
@@ -1698,7 +1698,7 @@ def _upcoming_desk_research_candidate(event, now):
         age=None
     if age is None or age>MAX_ODDS_AGE_SECONDS:
         return None,"sportybet_quote_stale_or_untimestamped"
-    recent_guard=_upcoming_desk_recent_result_guard(product,line,side)
+    recent_guard=_upcoming_desk_recent_result_guard(product,line,side,tracker=tracker)
     if recent_guard.get("blocked") is True:
         return None,"recent_settled_line_side_loss_streak"
     candidate=dict(event)

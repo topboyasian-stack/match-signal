@@ -522,7 +522,7 @@ class CompactEfootballBuilderTests(unittest.TestCase):
     def test_upcoming_desk_candidate_uses_desk_probability_not_raw_probability(self):
         now=datetime.now(timezone.utc)
         source=desk_source_row(now)
-        candidate,reason=builder._upcoming_desk_research_candidate(source,now)
+        candidate,reason=builder._upcoming_desk_research_candidate(source,now,tracker={"tickets":[],"archived_tickets":[]})
         self.assertIsNone(reason)
         self.assertIsNotNone(candidate)
         self.assertAlmostEqual(candidate["builder_probability"],0.61)
@@ -539,7 +539,7 @@ class CompactEfootballBuilderTests(unittest.TestCase):
         source["model_line_qualified"]=False
         source["qualified_for_builder"]=False
         source["qualification_status"]="MODEL_LINE_SCOPE_GATE_PENDING"
-        candidate,reason=builder._upcoming_desk_research_candidate(source,now)
+        candidate,reason=builder._upcoming_desk_research_candidate(source,now,tracker={"tickets":[],"archived_tickets":[]})
         self.assertIsNone(reason)
         self.assertIsNotNone(candidate)
         self.assertEqual(candidate["qualification_lane"],"upcoming_desk_research_only")
