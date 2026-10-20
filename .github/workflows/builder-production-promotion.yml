@@ -1,0 +1,24 @@
+name: Match Signal Builder Production Promotion
+
+on:
+  workflow_run:
+    workflows: ["Match Signal Odds Builder"]
+    types: [completed]
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  promote:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Dispatch Cloudflare Pages after Builder publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh workflow run cloudflare-pages.yml --ref main
+          echo "Cloudflare Pages deployment dispatched after successful Odds Builder completion."
