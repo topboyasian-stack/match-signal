@@ -10,7 +10,7 @@ from difflib import SequenceMatcher
 from datetime import datetime, timezone
 from pathlib import Path
 from tennis_total_model import over_probability, recommend_total_line
-from football_competition_match import football_market_identity_matches
+from football_competition_match import football_market_identity_matches, football_market_identity_metadata
 import requests
 try:
     from curl_cffi import requests as curl_requests
@@ -89,6 +89,9 @@ def flatten(body):
             e=dict(e)
             e['_league']=t.get('name')
             e['_category']=t.get('categoryName')
+            e['_identity_metadata']=football_market_identity_metadata(
+                e, tournament=t.get('name'), category=t.get('categoryName')
+            )
             out.append(e)
     return out
 
@@ -118,6 +121,9 @@ def _football_market_event_valid(pred, event, max_hours=3.0):
         event.get('_league'),
         market_category=event.get('_category'),
         prediction_teams=(pred.get('home_team') or pred.get('player_1'), pred.get('away_team') or pred.get('player_2')),
+        market_metadata=event.get('_identity_metadata') or football_market_identity_metadata(
+            event, tournament=event.get('_league'), category=event.get('_category')
+        ),
         market_teams=(event.get('homeTeamName'), event.get('awayTeamName')),
     ):
         return False
