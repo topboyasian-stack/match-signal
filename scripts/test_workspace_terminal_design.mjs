@@ -80,6 +80,8 @@ for (const anchor of ['id="builder-overview"', 'href="#oddsBuilder"', 'id="ob-gu
 assert.ok(builderJs.includes('ACTIVE_VIRTUAL_MIN_PROBABILITY = 0.80'), "Odds Builder active-leg qualification floor must remain");
 assert.ok(builderJs.includes('function isActiveVirtualBatch(batch)'), "Odds Builder active batch filter must remain");
 assert.ok(builderJs.includes('ensureBookingCodes(activeBatches)'), "Odds Builder booking-code path must remain");
+assert.ok(builderJs.includes('function checkBuilderBuildVersion'), "open Odds Builder tabs must detect a new deployed renderer build");
+assert.ok(builderJs.includes('window.setInterval(checkBuilderBuildVersion,60000)'), "open Odds Builder tabs must automatically reload changed renderer builds");
 assert.ok(!builderJs.includes("var fallback=Array.isArray(data.qualified_legs)"), "A standalone leg must never render as a qualified accumulator when no batch survives");
 assert.ok(builderJs.includes("No qualified '+floorLabel+' batches are currently available."), "An empty qualified set must explain that no full batch passed");
 
