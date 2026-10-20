@@ -156,8 +156,8 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn("    types: [completed]", events)
         self.assertIn("  workflow_dispatch:", events)
 
-        # Direct promotion is limited to explicit static page/assets plus their
-        # regression/workflow files. Every changed path is still checked against
+        # Direct promotion is limited to explicit static page/assets, the scoped
+        # booking API contract fix, and their regression/workflow files. Every changed path is still checked against
         # the allowlist in the deployment workflow before any production upload.
         direct_paths = workflow_push_paths(PAGES_WORKFLOW)
         expected_direct_paths = {
@@ -174,6 +174,8 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "darts.html",
             "table-tennis.html",
             "odds-builder.html",
+            "functions/api/sportybet-booking.js",
+            "scripts/test_sportybet_booking_batch_ids.mjs",
             "odds-builder-design.css",
             "reports.html",
             "reports-design.css",
