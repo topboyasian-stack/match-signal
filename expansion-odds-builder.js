@@ -1095,6 +1095,28 @@
       }
     });
   }
+  var oddsBuilderBuildVersionCheckInFlight=false;
+  function checkBuilderBuildVersion(){
+    if(oddsBuilderBuildVersionCheckInFlight)return;
+    oddsBuilderBuildVersionCheckInFlight=true;
+    fetch('./odds-builder.html?build-check='+Date.now(),{cache:'no-store'})
+      .then(function(response){
+        if(!response.ok)throw new Error('Builder build-marker check HTTP '+response.status);
+        return response.text();
+      })
+      .then(function(markup){
+        var match=String(markup||'').match(/<meta[^>]*name=["']match-signal-build["'][^>]*content=["']([^"']+)["']/i);
+        var liveMarker=match&&match[1]?match[1]:'';
+        var currentMeta=document.querySelector('meta[name="match-signal-build"]');
+        var currentMarker=currentMeta?String(currentMeta.getAttribute('content')||''):'';
+        if(liveMarker&&currentMarker&&liveMarker!==currentMarker){
+          window.location.reload();
+        }
+      })
+      .catch(function(){})
+      .finally(function(){oddsBuilderBuildVersionCheckInFlight=false;});
+  }
+
   function boot(){
     if(!document.getElementById('odds-builder-result-style')){
       var s=document.createElement('style');s.id='odds-builder-result-style';s.textContent=`.push-notify-panel{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:12px;padding:13px 15px;border:1px solid rgba(55,231,255,.16);border-radius:14px;background:linear-gradient(145deg,rgba(11,24,37,.96),rgba(7,15,24,.98))}
@@ -1136,7 +1158,7 @@
         if(refresh){var b=findBatchById(refresh.getAttribute('data-booking-refresh'));if(b)requestBookingCode(b,true);}
       });
     }
-    load();window.setInterval(load,60000);window.setInterval(function(){var all=[];(window.__matchSignalOddsBuilderBatches||[]).forEach(function(b){all=all.concat(Array.isArray(b.legs)?b.legs:[]);});refreshVirtualLiveStatuses(all).then(updateLiveTrackers);},30000);window.setInterval(updateTimers,1000);
+    load();window.setInterval(load,60000);window.setInterval(checkBuilderBuildVersion,60000);window.setInterval(function(){var all=[];(window.__matchSignalOddsBuilderBatches||[]).forEach(function(b){all=all.concat(Array.isArray(b.legs)?b.legs:[]);});refreshVirtualLiveStatuses(all).then(updateLiveTrackers);},30000);window.setInterval(updateTimers,1000);
   }
   if(typeof window!=='undefined'&&window.__MATCH_SIGNAL_ODDS_BUILDER_TEST_MODE__){
     window.__MATCH_SIGNAL_ODDS_BUILDER_TEST_HOOKS__={builderArtifactFreshness:builderArtifactFreshness,isCurrentBuilderLeg:isCurrentBuilderLeg,isActiveVirtualBatch:isActiveVirtualBatch,isActiveVirtualBatchAt:isActiveVirtualBatchAt,filterCurrentBuilderSnapshot:filterCurrentBuilderSnapshot,activeVirtualProbabilityFloor:activeVirtualProbabilityFloor};
