@@ -465,5 +465,68 @@ class UpcomingDeskPolicyTests(unittest.TestCase):
             "Do not display 64.97% as 65% when the qualification floor is 65%.",
         )
 
+
+    def test_exact_line_calibration_waits_for_declared_sample_minimum(self):
+        calibrate = ns["calibrate_desk_probability"]
+        make_forecasts = lambda n: [
+            {
+                "product": "efootball_gt", "line": 4.5, "pick": "over",
+                "model_probability": 0.62, "raw_model_probability": 0.80,
+                "win": index < int(n * 0.6),
+            }
+            for index in range(n)
+        ]
+        profile_19 = learning_ns["exact_profiles"](make_forecasts(19))["efootball_gt"]["4.5|over"]
+        report_19 = {"exact_selection": {"4.5|over": profile_19}}
+        probability, source, _ = calibrate(0.80, 4.5, "over", report_19)
+        self.assertEqual(source, "NONE", "19 observations must not activate a 20-row calibration policy")
+        self.assertAlmostEqual(probability, 0.80)
+
+        profile_20 = learning_ns["exact_profiles"](make_forecasts(20))["efootball_gt"]["4.5|over"]
+        report_20 = {"exact_selection": {"4.5|over": profile_20}}
+        probability, source, _ = calibrate(0.80, 4.5, "over", report_20)
+        self.assertEqual(source, "EXACT_LINE_DIRECTION")
+        self.assertLess(probability, 0.80)
+
+    def test_expired_unmatched_forecasts_are_not_counted_as_active_pending(self):
+        now = datetime.now(UTC)
+        row = {
+            "trace_id": "test-expired-unmatched",
+            "product": "efootball_gt",
+            "start_time": (now - timedelta(hours=3)).isoformat(),
+            "observed_at": (now - timedelta(hours=4)).isoformat(),
+            "participant_1": "Alpha",
+            "participant_2": "Beta",
+            "line": 4.5,
+            "pick": "over",
+            "model_probability": 0.70,
+        }
+        diagnostics = learning_ns["reconcile"]([row], {})
+        self.assertEqual(row.get("settlement_reconciliation_status"), "UNMATCHED_EXPIRED")
+        self.assertEqual(diagnostics["expired_unmatched_forecasts"], 1)
+        self.assertFalse(learning_ns["is_pending_forecast"](row))
+
+    def test_trace_capacity_prioritizes_recent_and_upcoming_fixtures(self):
+        now = datetime(2026, 10, 20, 12, 0, tzinfo=UTC)
+        def row(trace_id, kickoff, observed):
+            return {
+                "trace_id": trace_id,
+                "start_time": kickoff.isoformat(),
+                "observed_at": observed.isoformat(),
+                "product": "efootball_gt",
+                "line": 4.5,
+                "pick": "over",
+            }
+        rows = [
+            row("expired", now - timedelta(hours=4), now - timedelta(hours=5)),
+            row("recently-kicked-off", now - timedelta(minutes=20), now - timedelta(minutes=25)),
+            row("next-kickoff", now + timedelta(minutes=10), now - timedelta(minutes=1)),
+            row("later-kickoff", now + timedelta(hours=2), now - timedelta(minutes=2)),
+        ]
+        retained = learning_ns["bound_trace"](rows, now=now, cap=3)
+        retained_ids = {item["trace_id"] for item in retained}
+        self.assertNotIn("expired", retained_ids)
+        self.assertEqual(retained_ids, {"recently-kicked-off", "next-kickoff", "later-kickoff"})
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

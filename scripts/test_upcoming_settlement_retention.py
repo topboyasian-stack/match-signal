@@ -271,9 +271,8 @@ def check_exact_profiles_do_not_pool_products_and_calibration_requires_evidence(
     assert profiles["vfootball"]["7.5|under"]["n"] == 1
     assert profiles["vfootball"]["7.5|under"]["wins"] == 1
 
-    # A real sample size of 15 still gets only a one-third shrinkage toward
-    # the observed calibration offset; this is a confidence correction, not
-    # permission to qualify a line for betting.
+    # The declared exact_selection_min_predictions policy is 20. A profile
+    # with 15 observations remains diagnostic-only and must not adjust a live probability.
     observed_offset = -0.20522608695652178
     exact_weight = 15 / (15 + 30)
     exact_report = {"exact_selection": {
@@ -284,10 +283,16 @@ def check_exact_profiles_do_not_pool_products_and_calibration_requires_evidence(
     }, "calibration": {"active": False, "buckets": {}}}
     raw_probability = 0.8574
     p, source, detail = upcoming.calibrate_desk_probability(raw_probability, 8.5, "under", exact_report)
-    assert abs(p - (raw_probability + observed_offset * exact_weight)) < 1e-9
-    assert p < raw_probability, "Observed underperformance must lower the U8.5 Under estimate"
-    assert source == "EXACT_LINE_DIRECTION"
+    assert abs(p - raw_probability) < 1e-9
+    assert source == "NONE"
     assert detail["n"] == 15
+
+    exact_report["exact_selection"]["8.5|under"]["n"] = 20
+    p, source, detail = upcoming.calibrate_desk_probability(raw_probability, 8.5, "under", exact_report)
+    assert abs(p - (raw_probability + observed_offset * exact_weight)) < 1e-9
+    assert p < raw_probability, "Observed underperformance must lower the U8.5 Under estimate once the minimum is reached"
+    assert source == "EXACT_LINE_DIRECTION"
+    assert detail["n"] == 20
 
     immature_report = {"exact_selection": {
         "7.5|under": {
