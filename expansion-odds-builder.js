@@ -992,11 +992,9 @@
       ].join('');
     }
 
+    // The Qualified Set is ticket-only. Never dress a standalone candidate
+    // (or stale qualified_legs array) as a valid accumulator when no batch passes.
     var cards=batches.map(batchCard).join('');
-    if(!batches.length){
-      var fallback=Array.isArray(data.qualified_legs)?data.qualified_legs:[];
-      cards=fallback.map(function(l,i){return legCard(l,i,0);}).join('');
-    }
 
     var virtualCount=Number((data.candidates_considered||{}).virtual||0);
     var batchDiag=((data.candidate_diagnostics||{}).batch_diagnostics||{});
