@@ -283,7 +283,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn("gh workflow run unified-upcoming.yml --ref main", PROMOTION_WORKFLOW)
         self.assertIn("workflow_dispatch:", PROMOTION_WORKFLOW)
         self.assertIn('paths:\n      - ".github/workflows/builder-production-promotion.yml"', PROMOTION_WORKFLOW)
-        self.assertIn("github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'", PROMOTION_WORKFLOW)
+        self.assertNotIn('  workflow_run:\n    workflows: ["Match Signal Odds Builder"]', PROMOTION_WORKFLOW)
         self.assertIn("Dispatch Unified Upcoming and wait for successful board publication", PROMOTION_WORKFLOW)
         self.assertIn("gh workflow run cloudflare-pages.yml --ref main", PROMOTION_WORKFLOW)
         self.assertIn("gh api \"repos/$GITHUB_REPOSITORY/actions/workflows/unified-upcoming.yml/runs?branch=main&event=workflow_dispatch&per_page=20\"", PROMOTION_WORKFLOW)
@@ -302,11 +302,6 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertGreater(dispatch_step, publish_step, "promotion must happen after the artifact publication step")
         self.assertIn("GH_TOKEN: ${{ github.token }}", BUILDER_WORKFLOW[dispatch_step:])
         self.assertIn("gh workflow run builder-production-promotion.yml --ref main", BUILDER_WORKFLOW[dispatch_step:])
-        self.assertNotIn(
-            '  workflow_run:\\n    workflows: ["Match Signal Odds Builder"]',
-            PROMOTION_WORKFLOW,
-            "use explicit workflow_dispatch from the completed Builder instead of a possibly suppressed workflow_run event",
-        )
         self.assertIn("  workflow_dispatch:", PROMOTION_WORKFLOW)
         self.assertIn(
             "concurrency:\\n  group: builder-production-promotion\\n  cancel-in-progress: false",
