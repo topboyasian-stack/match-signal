@@ -15,10 +15,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Dispatch Cloudflare Pages after Builder publication
+      - name: Dispatch Unified Upcoming refresh before Pages deployment
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh workflow run cloudflare-pages.yml --ref main
-          echo "Cloudflare Pages deployment dispatched after successful Odds Builder completion."
+          gh workflow run unified-upcoming.yml --ref main
+          echo "Unified Upcoming refresh dispatched after successful Builder completion; Cloudflare Pages deploy follows successful board publication."
