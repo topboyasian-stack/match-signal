@@ -151,8 +151,8 @@ class CompetitionSafeFootballMarketTests(unittest.TestCase):
 
     def test_age_group_must_match_on_both_sides(self):
         self.assertFalse(football_market_identity_matches(
-            "UEFA Youth League U19",
-            "UEFA Youth League U17",
+            "UEFA Youth League",
+            "UEFA Youth League",
             market_category="International Youth",
             prediction_teams=("Fenerbahce U19", "Slavia Prague U19"),
             market_teams=("Fenerbahce U17", "Slavia Prague U17"),
