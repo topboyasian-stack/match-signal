@@ -1,0 +1,38 @@
+name: Freshness Deployment Ordering Regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/test_deploy_freshness_order.py'
+      - '.github/workflows/builder-production-promotion.yml'
+      - '.github/workflows/unified-upcoming.yml'
+      - '.github/workflows/cloudflare-pages.yml'
+      - '.github/workflows/freshness-deploy-order-regression.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/test_deploy_freshness_order.py'
+      - '.github/workflows/builder-production-promotion.yml'
+      - '.github/workflows/unified-upcoming.yml'
+      - '.github/workflows/cloudflare-pages.yml'
+      - '.github/workflows/freshness-deploy-order-regression.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  freshness-deploy-order:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install workflow test dependency
+        run: python -m pip install --disable-pip-version-check requests
+      - name: Run deployment freshness ordering regression
+        run: python scripts/test_deploy_freshness_order.py
