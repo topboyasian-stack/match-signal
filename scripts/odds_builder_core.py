@@ -1592,6 +1592,9 @@ def _upcoming_desk_settled_performance_gate(tracker=None,min_tickets=None,min_ro
 _UPCOMING_DESK_PENDING_EVENT_ID_CACHE=None
 
 
+_UPCOMING_DESK_PENDING_EVENT_ID_CACHE=None
+
+
 def _upcoming_desk_pending_event_ids(tracker=None):
     """Return active eFootball events already sitting in any unsettled ticket leg.
 
@@ -1606,6 +1609,8 @@ def _upcoming_desk_pending_event_ids(tracker=None):
     payload=load(DATA/"odds_ticket_tracker.json",{}) if tracker is None else tracker
     event_ids=set()
     if not isinstance(payload,dict):
+        if cacheable:
+            _UPCOMING_DESK_PENDING_EVENT_ID_CACHE=event_ids
         return event_ids
     tickets=[]
     tickets.extend(x for x in payload.get("tickets",[]) if isinstance(x,dict))
@@ -1624,7 +1629,35 @@ def _upcoming_desk_pending_event_ids(tracker=None):
             event_id=str(leg.get("event_id") or leg.get("eventId") or "").strip()
             if event_id:
                 event_ids.add(event_id)
+    if cacheable:
+        _UPCOMING_DESK_PENDING_EVENT_ID_CACHE=event_ids
     return event_ids
+
+
+def _exclude_pending_virtual_ticket_events(rows,pending_event_ids=None):
+    """Remove Virtual legs already awaiting settlement in another paper ticket."""
+    pending=set(pending_event_ids if pending_event_ids is not None else _upcoming_desk_pending_event_ids())
+    rejected=0
+    out=[]
+    for row in rows if isinstance(rows,list) else []:
+        if not isinstance(row,dict):
+            continue
+        product=str(row.get("product") or "").lower()
+        event_id=str(row.get("event_id") or row.get("eventId") or "").strip()
+        if (
+            str(row.get("sport") or "").lower()=="virtual"
+            and product in ACTIVE_VIRTUAL_PRODUCTS
+            and event_id
+            and event_id in pending
+        ):
+            row["builder_eligible"]=False
+            row["status"]="REJECTED"
+            row["builder_rejection_reason"]="event_already_in_pending_ticket"
+            row["pending_ticket_event_hold"]=True
+            rejected+=1
+        out.append(row)
+    return out,rejected
+
 
 def _upcoming_desk_settled_result_index(tracker=None):
     """Index verified settled outcomes by eFootball product + exact line + side.
