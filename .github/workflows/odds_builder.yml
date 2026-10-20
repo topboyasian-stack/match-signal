@@ -351,7 +351,15 @@ jobs:
             cp "$output_dir/tennis_total_research.json" data/tennis_total_research.json
             cp "$output_dir/results_first_evidence_report.json" data/results_first_evidence_report.json
             cp "$output_dir/line_ladder_research.json" data/line_ladder_research.json
-            git add data/odds_builder.json data/tennis_total_research.json data/results_first_evidence_report.json data/line_ladder_research.json
+
+            # Register this run's new batches against the freshest tracker on main.
+            # Commit the tracker and batch artifact atomically so a queued Builder run
+            # cannot see the new batch without also seeing its pending event holds.
+            # Re-run after every publication retry to preserve settlements that landed
+            # on main while this Builder job was calculating.
+            python scripts/odds_ticket_tracker.py
+
+            git add data/odds_builder.json data/odds_ticket_tracker.json data/tennis_total_research.json data/results_first_evidence_report.json data/line_ladder_research.json
 
             if git diff --cached --quiet; then
               echo "No accumulator changes to publish."
