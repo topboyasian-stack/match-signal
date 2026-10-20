@@ -106,7 +106,7 @@ class BuilderRefreshDecisionTests(unittest.TestCase):
         )
         self.assertFalse(result["dispatch"])
         self.assertEqual(result["reason"], "builder_artifact_fresh")
-        self.assertFalse(result["upcoming_board_newer_than_builder_artifact")
+        self.assertFalse(result["upcoming_board_newer_than_builder_artifact"])
 
 
 if __name__ == "__main__":
