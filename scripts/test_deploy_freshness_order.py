@@ -207,6 +207,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             ".github/workflows/automation_watchdog.yml",
             ".github/workflows/efootball-market-research-schedule.yml",
             "scripts/test_automation_watchdog_research_recovery.py",
+            "scripts/test_qualified_best_monitor.mjs",
         }
         self.assertEqual(direct_paths, expected_direct_paths)
         self.assertIn("name: Guard cache-only direct promotion", PAGES_WORKFLOW)
