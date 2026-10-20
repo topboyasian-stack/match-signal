@@ -138,7 +138,7 @@ assert.match(builderUiSource, /4–5 LEGS · 2\.00\+/);
 assert.match(builderUiSource, /standard batches at 2\.70x\+ and compact eFootball batches at 2\.00x\+/);
 assert.match(builderUiSource, /Compact eFootball ticket lane/);
 assert.match(builderUiSource, /function filterCurrentBuilderSnapshot\(data, now\)/);
-assert.match(builderUiSource, /data\.batches\.filter\(function\(batch\)\{return isActiveVirtualBatchAt\(batch,checkedAt\);\}\)/);
+assert.match(builderUiSource, /data\.batches\.filter\(function\(batch\)\{return isActiveVirtualBatchAt\(batch,checkedAt,snapshotAgeMs\);\}\)/);
 assert.match(builderUiSource, /function builderArtifactFreshness\(data, now\)/);
 assert.match(builderUiSource, /UPCOMING_DESK_RESEARCH_MIN_PROBABILITY = 0\.60/);
 assert.match(builderUiSource, /ensureBookingCodes\(activeBatches\)/);
