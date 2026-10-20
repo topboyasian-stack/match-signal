@@ -7,6 +7,7 @@ import sys
 import unittest
 from unittest import mock
 from pathlib import Path
+from datetime import datetime, timezone, timedelta
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT / "scripts") not in sys.path:
@@ -225,15 +226,30 @@ class UpcomingDeskRecentLossGateTests(unittest.TestCase):
 
 
 
-def desk_ticket(ticket_id, status, odds=3.5, lane="upcoming_desk_research"):
+def desk_ticket(ticket_id, status, odds=3.5, lane="upcoming_desk_research", events=None):
+    event_ids = list(events) if events is not None else [f"{ticket_id}-event-a", f"{ticket_id}-event-b"]
+    leg_status = str(status or "PENDING").upper()
+    legs = [{
+        "product": "efootball_gt",
+        "sport": "virtual",
+        "event_id": event_id,
+        "status": leg_status,
+        "market": "virtual_total",
+        "line": 4.5,
+        "builder_pick": "over",
+        "pick": f"Example {index} vs Opponent {index} — O/U over 4.5",
+        "start_time": "2026-10-20T03:00:00+00:00",
+        "qualification_lane": lane,
+    } for index, event_id in enumerate(event_ids, 1)]
     return {
         "ticket_id": ticket_id,
         "primary_lane": lane,
         "status": status,
         "combined_odds": odds,
-        "created_at": f"2026-10-20T04:00:00+00:00",
-        "last_settled_at": f"2026-10-20T05:00:00+00:00",
-        "legs": [],
+        "created_at": "2026-10-20T04:00:00+00:00",
+        "last_settled_at": "2026-10-20T05:00:00+00:00",
+        "leg_count": len(legs),
+        "legs": legs,
     }
 
 
@@ -280,7 +296,29 @@ class UpcomingDeskSettledPromotionGateTests(unittest.TestCase):
         self.assertTrue(result["eligible"])
         self.assertEqual(result["settled_ticket_n"], 10)
         self.assertEqual(result["flat_stake_roi"], 0.05)
+        self.assertEqual(result["event_independent_settled_ticket_n"], 10)
+        self.assertEqual(result["event_independent_flat_stake_roi"], 0.05)
         self.assertIsNone(result["reason"])
+
+    def test_repeated_fixtures_do_not_inflate_the_independent_promotion_sample(self):
+        shared = "repeat-the-same-fixture"
+        tickets = [
+            desk_ticket(f"overlap-win-{i}", "WON", odds=3.5, events=[shared, f"unique-{i}"])
+            for i in range(5)
+        ]
+        tickets += [
+            desk_ticket(f"overlap-loss-{i}", "LOST", odds=3.5, events=[shared, f"loss-{i}"])
+            for i in range(7)
+        ]
+        result = _upcoming_desk_settled_performance_gate(
+            tracker={"tickets": tickets, "archived_tickets": []}
+        )
+        self.assertFalse(result["eligible"])
+        self.assertEqual(result["settled_ticket_n"], 12)
+        self.assertGreater(result["flat_stake_roi"], 0.02)
+        self.assertEqual(result["event_independent_settled_ticket_n"], 0)
+        self.assertEqual(result["overlapping_or_incomplete_ticket_n"], 12)
+        self.assertEqual(result["reason"], "insufficient_event_independent_settled_lane_sample")
 
     def test_pending_and_unrelated_tickets_are_not_settled_promotion_evidence(self):
         tracker = {
@@ -313,6 +351,19 @@ class UpcomingDeskSettledPromotionGateTests(unittest.TestCase):
         self.assertLess(result["flat_stake_roi"], 0)
         self.assertEqual(result["reason"], "settled_lane_ticket_roi_below_promotion_floor")
 
+    def test_high_confidence_lane_needs_non_overlapping_fixtures_too(self):
+        repeated = [desk_ticket(f"same-event-{i}", "WON", odds=4.7,
+                                 lane="high_confidence_research",
+                                 events=["one-reused-event", f"other-{i}"])
+                    for i in range(12)]
+        result = _settled_builder_lane_performance_gate(
+            "high_confidence_research",
+            tracker={"tickets": repeated, "archived_tickets": []}
+        )
+        self.assertFalse(result["eligible"])
+        self.assertEqual(result["event_independent_settled_ticket_n"], 0)
+        self.assertEqual(result["reason"], "insufficient_event_independent_settled_lane_sample")
+
     def test_high_confidence_lane_can_pass_its_own_settled_return_gate(self):
         tracker = {
             "tickets": [
@@ -339,6 +390,42 @@ class UpcomingDeskSettledPromotionGateTests(unittest.TestCase):
         self.assertEqual(filtered[0]["builder_rejection_reason"], "event_already_in_pending_ticket")
         self.assertTrue(filtered[1]["builder_eligible"])
         self.assertTrue(filtered[2]["builder_eligible"])
+
+    def test_stale_archived_pending_events_expire_as_live_holds_without_fabricating_results(self):
+        now = datetime(2026, 10, 20, 16, 0, tzinfo=timezone.utc)
+        tracker = {
+            "tickets": [],
+            "archived_tickets": [
+                {
+                    "ticket_id": "stale-pending",
+                    "status": "PENDING",
+                    "legs": [{
+                        "product": "efootball_gt", "event_id": "old-unresolved-event",
+                        "status": "PENDING", "start_time": "2026-10-19T08:00:00+00:00",
+                    }],
+                },
+                {
+                    "ticket_id": "parent-lost-live-leg",
+                    "status": "LOST",
+                    "legs": [{
+                        "product": "efootball_gt", "event_id": "still-live-event",
+                        "status": "PENDING", "start_time": "2026-10-20T17:00:00+00:00",
+                    }],
+                },
+                {
+                    "ticket_id": "missing-start-fail-closed",
+                    "status": "PENDING",
+                    "legs": [{
+                        "product": "efootball_gt", "event_id": "unknown-time-event",
+                        "status": "PENDING",
+                    }],
+                },
+            ],
+        }
+        pending = _upcoming_desk_pending_event_ids(tracker=tracker, now=now)
+        self.assertEqual(pending, {"still-live-event", "unknown-time-event"})
+        # Expiring a hold never changes the underlying unknown settlement.
+        self.assertEqual(tracker["archived_tickets"][0]["legs"][0]["status"], "PENDING")
 
     def test_open_events_are_excluded_even_when_parent_ticket_already_lost(self):
         tracker = {
