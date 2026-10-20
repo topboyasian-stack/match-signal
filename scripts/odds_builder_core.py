@@ -797,6 +797,17 @@ def results_first_gate(product,line,pick):
     # ledger permanently suppress a stronger event-evidence lane. Construction
     # still has to pass the live whole-ticket calibrated probability/odds gates.
     if not viable_shapes and product=="vfootball":
+        holdout_ticket_gate=_settled_builder_lane_performance_gate("vfootball_event_holdout_value")
+        if holdout_ticket_gate.get("eligible") is not True:
+            return False,{
+                "eligible":False,
+                "reason":holdout_ticket_gate.get("reason") or "vfootball_settled_ticket_performance_hold",
+                "settled_lane_performance_gate":holdout_ticket_gate,
+                "product":product,
+                "event_holdout_reference":{"rows":3295,"poisson_accuracy":0.8173,"participant_accuracy":0.8212},
+                "ticket_ledger_role":"promotion-blocking; event-level holdout no longer overrides the lane's poor settled-ticket ROI",
+                "source":"data/odds_ticket_tracker.json",
+            }
         return True,{
             "eligible":True,
             "reason":"vfootball_event_holdout_lane",
@@ -1473,28 +1484,31 @@ def _construct_phase2_cyclical_loop_batches(pool,max_batches=4,min_odds=None):
 _UPCOMING_DESK_SETTLED_RESULT_INDEX_CACHE=None
 
 
-def _upcoming_desk_settled_performance_gate(tracker=None, min_tickets=None, min_roi=None):
-    """Promote Upcoming Desk batches only after their own settled ticket ROI is proven."""
-    minimum_n=max(1,int(min_tickets if min_tickets is not None else RESULTS_FIRST_MIN_CONSTRUCTION_TICKETS))
-    minimum_roi=float(min_roi if min_roi is not None else RESULTS_FIRST_MIN_EXPECTED_ROI)
+_SETTLED_BUILDER_LANE_PERFORMANCE_CACHE=None
+
+
+def _settled_builder_lane_performance_index(tracker=None):
+    """Summarize distinct, settled flat-stake returns once per actual Builder lane."""
+    global _SETTLED_BUILDER_LANE_PERFORMANCE_CACHE
+    cacheable=tracker is None
+    if cacheable and _SETTLED_BUILDER_LANE_PERFORMANCE_CACHE is not None:
+        return _SETTLED_BUILDER_LANE_PERFORMANCE_CACHE
     payload=load(DATA/"odds_ticket_tracker.json",{}) if tracker is None else tracker
     source_rows=[]
     if isinstance(payload,dict):
-        source_rows.extend(x for x in payload.get("tickets",[]) if isinstance(x,dict))
-        source_rows.extend(x for x in payload.get("archived_tickets",[]) if isinstance(x,dict))
+        source_rows.extend(("current",x) for x in payload.get("tickets",[]) if isinstance(x,dict))
+        source_rows.extend(("archive",x) for x in payload.get("archived_tickets",[]) if isinstance(x,dict))
 
     unique={}
-    for ticket in source_rows:
+    for source,ticket in source_rows:
         lane=str(ticket.get("primary_lane") or ticket.get("construction_lane") or "").strip()
         legs=ticket.get("legs") if isinstance(ticket.get("legs"),list) else []
-        is_desk=lane==UPCOMING_DESK_BATCH_LANE or lane==UPCOMING_DESK_RESEARCH_LANE
         if not lane and legs:
-            is_desk=all(
-                isinstance(leg,dict)
-                and str(leg.get("qualification_lane") or "").strip()==UPCOMING_DESK_RESEARCH_LANE
-                for leg in legs
-            )
-        if not is_desk:
+            leg_lanes={str(leg.get("qualification_lane") or "").strip() for leg in legs if isinstance(leg,dict)}
+            if len(leg_lanes)==1:
+                only=next(iter(leg_lanes))
+                lane=UPCOMING_DESK_BATCH_LANE if only==UPCOMING_DESK_RESEARCH_LANE else only
+        if not lane:
             continue
         status=str(ticket.get("status") or "").upper()
         if status not in {"WON","LOST"}:
@@ -1510,33 +1524,48 @@ def _upcoming_desk_settled_performance_gate(tracker=None, min_tickets=None, min_
             lane,status,str(ticket.get("created_at") or ""),
             str(ticket.get("last_settled_at") or ""),f"{odds:.6f}",
         ))
-        # Current + archived copies of one ticket are one observation, never two.
-        unique[identity]=ticket
+        # Prefer the current ticket row over its archived copy if both exist.
+        unique.setdefault((lane,identity),ticket)
 
-    wins=losses=0
-    odds_sum=0.0
-    net_units=0.0
-    for ticket in unique.values():
-        status=str(ticket.get("status") or "").upper()
+    grouped={}
+    for (lane,_),ticket in unique.items():
+        row=grouped.setdefault(lane,{"settled_ticket_n":0,"wins":0,"losses":0,"flat_stake_net_units":0.0,"combined_odds_sum":0.0})
         odds=float(ticket["combined_odds"])
-        odds_sum+=odds
-        if status=="WON":
-            wins+=1
-            net_units+=odds-1.0
+        row["settled_ticket_n"]+=1
+        row["combined_odds_sum"]+=odds
+        if str(ticket.get("status") or "").upper()=="WON":
+            row["wins"]+=1
+            row["flat_stake_net_units"]+=odds-1.0
         else:
-            losses+=1
-            net_units-=1.0
-    n=wins+losses
-    roi=net_units/n if n else None
-    hit_rate=wins/n if n else None
-    avg_odds=odds_sum/n if n else None
+            row["losses"]+=1
+            row["flat_stake_net_units"]-=1.0
+    if cacheable:
+        _SETTLED_BUILDER_LANE_PERFORMANCE_CACHE=grouped
+    return grouped
+
+
+def _settled_builder_lane_performance_gate(lane,tracker=None,min_tickets=None,min_roi=None):
+    """Fail closed until this lane's own settled tickets demonstrate a positive return."""
+    lane=str(lane or "").strip()
+    minimum_n=max(1,int(min_tickets if min_tickets is not None else RESULTS_FIRST_MIN_CONSTRUCTION_TICKETS))
+    minimum_roi=float(min_roi if min_roi is not None else RESULTS_FIRST_MIN_EXPECTED_ROI)
+    indexed=_settled_builder_lane_performance_index(tracker=tracker)
+    row=indexed.get(lane,{})
+    n=int(row.get("settled_ticket_n") or 0)
+    wins=int(row.get("wins") or 0)
+    losses=int(row.get("losses") or 0)
+    net=float(row.get("flat_stake_net_units") or 0.0)
+    roi=(net/n) if n else None
+    hit_rate=(wins/n) if n else None
+    avg_odds=(float(row.get("combined_odds_sum") or 0.0)/n) if n else None
     eligible=n>=minimum_n and roi is not None and roi>=minimum_roi
     reason=(
         None if eligible else
-        "insufficient_settled_desk_ticket_sample" if n<minimum_n else
-        "settled_desk_ticket_roi_below_promotion_floor"
+        "insufficient_settled_lane_ticket_sample" if n<minimum_n else
+        "settled_lane_ticket_roi_below_promotion_floor"
     )
     return {
+        "lane":lane,
         "eligible":bool(eligible),
         "reason":reason,
         "settled_ticket_n":n,
@@ -1544,13 +1573,20 @@ def _upcoming_desk_settled_performance_gate(tracker=None, min_tickets=None, min_
         "losses":losses,
         "hit_rate":round(hit_rate,6) if hit_rate is not None else None,
         "average_combined_odds":round(avg_odds,6) if avg_odds is not None else None,
-        "flat_stake_net_units":round(net_units,6),
+        "flat_stake_net_units":round(net,6),
         "flat_stake_roi":round(roi,6) if roi is not None else None,
         "minimum_settled_ticket_n":minimum_n,
         "minimum_flat_stake_roi":minimum_roi,
         "source":"data/odds_ticket_tracker.json",
-        "policy":"Desk remains research-only until its own settled ticket sample is sufficient and realized flat-stake ROI reaches the promotion floor.",
+        "policy":"No construction lane may become the primary batch unless its own settled ticket sample and realized flat-stake ROI pass the promotion gate.",
     }
+
+
+def _upcoming_desk_settled_performance_gate(tracker=None,min_tickets=None,min_roi=None):
+    """Desk-specific alias retained for diagnostics and regression tests."""
+    return _settled_builder_lane_performance_gate(
+        UPCOMING_DESK_BATCH_LANE,tracker=tracker,min_tickets=min_tickets,min_roi=min_roi
+    )
 
 
 def _upcoming_desk_pending_event_ids(tracker=None):
