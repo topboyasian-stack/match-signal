@@ -32,6 +32,9 @@ on:
       - 'functions/api/sportybet-booking.js'
       - 'scripts/test_sportybet_booking_batch_ids.mjs'
       - 'odds-builder-design.css'
+      - 'scripts/odds_builder.py'
+      - 'scripts/test_odds_builder_upcoming_desk_recent_losses.py'
+      - '.github/workflows/calibrated-builder-validation.yml'
       - 'reports.html'
       - 'reports-design.css'
       - 'virtual-lab/index.html'
@@ -96,7 +99,7 @@ jobs:
           changed="$(gh api "repos/${GITHUB_REPOSITORY}/compare/${BEFORE_SHA}...${PUSH_SHA}" --jq '.files[].filename')"
           test -n "$changed" || { echo "Direct promotion has no inspectable changed-file list." >&2; exit 1; }
           printf 'Direct promotion changed files:\n%s\n' "$changed"
-          allowed='|_headers|index.html|upcoming.html|qualified-best.html|qualified-best-design.css|scripts/test_qualified_best_design.mjs|functions/api/sportybet-booking.js|scripts/test_sportybet_booking_batch_ids.mjs|expansion-odds-builder.js|scripts/test_odds_builder_ui_freshness.mjs|scripts/test_desk_quote_contract.mjs|sport-hubs-design.css|scripts/test_sport_hub_design.mjs|independent-sport-design.css|scripts/test_independent_sports_design.mjs|darts.html|table-tennis.html|odds-builder.html|odds-builder-design.css|reports.html|reports-design.css|virtual-lab/index.html|virtual-lab-terminal.css|scripts/test_workspace_terminal_design.mjs|football.html|tennis.html|basketball.html|sport-hubs.css|sport-hubs.js|ms-design-system.css|core-workspaces-design.css|scripts/test_core_workspaces_design.mjs|league-logos.js|scripts/test_league_logos.mjs|workspace-ui.js|data/club-logo-registry.json|scripts/sync_club_logos.py|scripts/test_club_logo_registry.py|scripts/qualified_best_monitor.mjs|scripts/test_qualified_best_monitor.mjs|.github/workflows/cloudflare-pages.yml|.github/workflows/qualified-best-live-monitor.yml|.github/workflows/qualified-best-watch.yml|.github/workflows/qualified-best-production-watch.yml|.github/workflows/qualified-best-health-watch-v2.yml|.github/workflows/automation_watchdog.yml|.github/workflows/efootball-market-research-schedule.yml|.github/workflows/efootball-market-research-tests.yml|scripts/test_automation_watchdog_research_recovery.py|scripts/test_qualified_best_monitor.mjs|.github/workflows/unified-upcoming.yml|scripts/ensure_odds_builder_refresh.py|scripts/test_ensure_odds_builder_refresh.py|scripts/test_workflow_trigger_boundaries.py|.github/workflows/odds_builder.yml|scripts/test_cloudflare_only_deploy.mjs|scripts/test_deploy_freshness_order.py|scripts/test_prediction_desk_gates.mjs|scripts/test_upcoming_desk_policy.py|docs/PREDICTION_DESK_POLICY.md|'
+          allowed='|_headers|index.html|upcoming.html|qualified-best.html|qualified-best-design.css|scripts/test_qualified_best_design.mjs|functions/api/sportybet-booking.js|scripts/test_sportybet_booking_batch_ids.mjs|expansion-odds-builder.js|scripts/test_odds_builder_ui_freshness.mjs|scripts/test_desk_quote_contract.mjs|scripts/odds_builder.py|scripts/test_odds_builder_upcoming_desk_recent_losses.py|.github/workflows/calibrated-builder-validation.yml|sport-hubs-design.css|scripts/test_sport_hub_design.mjs|independent-sport-design.css|scripts/test_independent_sports_design.mjs|darts.html|table-tennis.html|odds-builder.html|odds-builder-design.css|reports.html|reports-design.css|virtual-lab/index.html|virtual-lab-terminal.css|scripts/test_workspace_terminal_design.mjs|football.html|tennis.html|basketball.html|sport-hubs.css|sport-hubs.js|ms-design-system.css|core-workspaces-design.css|scripts/test_core_workspaces_design.mjs|league-logos.js|scripts/test_league_logos.mjs|workspace-ui.js|data/club-logo-registry.json|scripts/sync_club_logos.py|scripts/test_club_logo_registry.py|scripts/qualified_best_monitor.mjs|scripts/test_qualified_best_monitor.mjs|.github/workflows/cloudflare-pages.yml|.github/workflows/qualified-best-live-monitor.yml|.github/workflows/qualified-best-watch.yml|.github/workflows/qualified-best-production-watch.yml|.github/workflows/qualified-best-health-watch-v2.yml|.github/workflows/automation_watchdog.yml|.github/workflows/efootball-market-research-schedule.yml|.github/workflows/efootball-market-research-tests.yml|scripts/test_automation_watchdog_research_recovery.py|scripts/test_qualified_best_monitor.mjs|.github/workflows/unified-upcoming.yml|scripts/ensure_odds_builder_refresh.py|scripts/test_ensure_odds_builder_refresh.py|scripts/test_workflow_trigger_boundaries.py|.github/workflows/odds_builder.yml|scripts/test_cloudflare_only_deploy.mjs|scripts/test_deploy_freshness_order.py|scripts/test_prediction_desk_gates.mjs|scripts/test_upcoming_desk_policy.py|docs/PREDICTION_DESK_POLICY.md|'
           while IFS= read -r path; do
             [ -n "$path" ] || continue
             case "$path" in
@@ -275,7 +278,7 @@ jobs:
           test ! -e .pages-deploy/data/efootball_desk_settled_observations.json
           echo "Cloudflare Pages staging passed the 25 MiB single-file limit."
 
-      - name: Regression-test Prediction Desk qualification and best-line selection
+      - name: Regression-test Prediction Desk qualification and workspace designs
         run: |
           node scripts/test_prediction_desk_gates.mjs
           node scripts/test_qualified_best_design.mjs
@@ -284,6 +287,11 @@ jobs:
           node scripts/test_independent_sports_design.mjs
           node --check scripts/test_workspace_terminal_design.mjs
           node scripts/test_workspace_terminal_design.mjs
+          python scripts/test_deploy_freshness_order.py
+          node scripts/test_cloudflare_only_deploy.mjs
+
+      - name: Regression-test Upcoming Desk repeated settled losses
+        run: python scripts/test_odds_builder_upcoming_desk_recent_losses.py
 
       - name: Deploy to Cloudflare Pages
         id: pages-deployment
@@ -338,7 +346,7 @@ jobs:
             {path:'/', css:'/core-workspaces-design.css', markers:['MS-DESK-2026.10.14-V1','core-workspaces-design.css?v=20261014-full-v1','class="cd-page-header"','class="cd-workspace-grid"','id="unifiedBoard"','id="qualifiedBestSummary"'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V1: CORE DESK / FOOTBALL / TENNIS'},
             {path:'/football.html', css:'/core-workspaces-design.css', markers:['MS-FOOTBALL-DESK-2026.10.14-V1','core-workspaces-design.css?v=20261014-full-v1','class="cd-page-header"','id="leagueGrid"','data-sport="football"','league-logos.js?v=20261013-competition-logos2'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V1: CORE DESK / FOOTBALL / TENNIS'},
             {path:'/tennis.html', css:'/core-workspaces-design.css', markers:['MS-TENNIS-DESK-2026.10.14-V1','core-workspaces-design.css?v=20261014-full-v1','class="cd-page-header"','id="leagueGrid"','data-sport="tennis"'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V1: CORE DESK / FOOTBALL / TENNIS'},
-            {path:'/odds-builder.html', css:'/odds-builder-design.css', markers:['MS-ODDS-BUILDER-2026.10.14-V3','odds-builder-design.css?v=20261014-full-v3','class="ob-page-header"','class="ob-section-nav"','class="ob-guide-grid"'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V3: ODDS BUILDER PAGE LAYOUT'},
+            {path:'/odds-builder.html', css:'/odds-builder-design.css', markers:['MS-ODDS-BUILDER-2026.10.20-DESK-FIX2','odds-builder-design.css?v=20261020-ledger-layout2','class="ob-page-header"','class="ob-section-nav"','class="ob-guide-grid"'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V3: ODDS BUILDER PAGE LAYOUT'},
             {path:'/reports.html', css:'/reports-design.css', markers:['MS-REPORTS-2026.10.14-V3','reports-design.css?v=20261014-full-v3','class="rp-dashboard-grid"','id="report-scoreboard"','id="researchLabSummary"'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V3: REPORTS PAGE LAYOUT'},
             {path:'/virtual-lab/', css:'/virtual-lab-terminal.css', markers:['MS-VIRTUAL-LAB-V1-2026.10.14-V3','../virtual-lab-terminal.css?v=20261014-full-v3','class="vl-command-grid"','class="vl-command-rail"','class="vl-insights-grid"'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V3: VIRTUAL LAB PAGE LAYOUT'}
           ];
@@ -441,7 +449,7 @@ jobs:
                   failures.push(path+' contains retired line-ladder clutter or misleading Builder target');
               }
               if (path==='/odds-builder.html') {
-                for (const marker of ['Odds Builder','exact, current SportyBet quotes','MS-ODDS-BUILDER-2026.10.14-V3','odds-builder-design.css?v=20261014-full-v3','class="ob-page-header"','class="ob-section-nav"','class="ob-guide-grid"','id="oddsBuilder"'])
+                for (const marker of ['Odds Builder','evidence-gated research batches','MS-ODDS-BUILDER-2026.10.20-DESK-FIX2','odds-builder-design.css?v=20261020-ledger-layout2','class="ob-page-header"','class="ob-section-nav"','class="ob-guide-grid"','id="oddsBuilder"'])
                   if (!body.includes(marker)) failures.push(path+' missing '+marker);
               }
               if (path==='/football.html' || path==='/tennis.html' || path==='/basketball.html') {

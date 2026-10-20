@@ -50,7 +50,8 @@ assert.match(cloudflare, /https:\/\/match-signal\.pages\.dev/);
 assert.ok(
   cloudflare.includes("|scripts/ensure_odds_builder_refresh.py|scripts/test_ensure_odds_builder_refresh.py|") &&
     cloudflare.includes("|scripts/test_workflow_trigger_boundaries.py|") &&
-    cloudflare.includes("|scripts/test_cloudflare_only_deploy.mjs|"),
+    cloudflare.includes("|scripts/test_cloudflare_only_deploy.mjs|") &&
+    cloudflare.includes("|scripts/odds_builder.py|scripts/test_odds_builder_upcoming_desk_recent_losses.py|.github/workflows/calibrated-builder-validation.yml|"),
   "Builder refresh and deployment-guard regression paths must be explicitly approved by the direct-promotion guard.",
 );
 
