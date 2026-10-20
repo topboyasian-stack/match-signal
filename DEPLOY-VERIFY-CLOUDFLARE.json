@@ -3,10 +3,10 @@
   "core_pages_status": "VERIFIED",
   "qualified_best_quote_coverage_status": "COMPLETE",
   "provider": "Cloudflare Pages",
-  "source_commit": "88802959f827ff879748ff8475754e7011b21e5a",
-  "verified_at": "2026-10-20T10:10:47.580409+00:00",
+  "source_commit": "b597b9a2f3bd0c74fd866e0fc7e741c268c4f294",
+  "verified_at": "2026-10-20T10:12:47.935051+00:00",
   "live_virtual_feed": {
-    "verified_at": "2026-10-20T10:10:46.987Z",
+    "verified_at": "2026-10-20T10:12:47.533Z",
     "status": "DIAGNOSTIC",
     "scan_complete": true,
     "scan_stop_reason": "all_model_qualified_candidates_matched",
@@ -27,7 +27,7 @@
       {
         "page": 1,
         "count": 100,
-        "fetched_at": "2026-10-20T10:10:46.970Z",
+        "fetched_at": "2026-10-20T10:12:47.517Z",
         "status": "LIVE"
       }
     ],
@@ -57,16 +57,35 @@
     "qualified_examples": []
   },
   "booking_api": {
-    "verified_at": "2026-10-20T10:10:21.108Z",
-    "status": "PASS",
-    "http_status": 200,
+    "verified_at": "2026-10-20T10:12:20.578Z",
+    "status": "VOLATILE_MARKET",
+    "http_status": 409,
     "ok": true,
     "batch_id": "DESK-BATCH-03",
-    "selection_count": 2,
-    "booking_code_available": true,
-    "error": null,
-    "message": null,
-    "volatile_market": false
+    "selection_count": 1,
+    "booking_code_available": false,
+    "error": "TOO_FEW_AVAILABLE_SELECTIONS",
+    "message": "Fewer than two valid selections remain available on SportyBet.",
+    "volatile_market": true,
+    "validation": [
+      {
+        "event_id": "sr:match:BAaFUAeBcfISXic7LnftDfQ",
+        "ok": false,
+        "excluded": true,
+        "reason": "The exact SportyBet O/U line or selected side is no longer available."
+      },
+      {
+        "event_id": "sr:match:BAaFWlkPTcE6JbhiuC9K31g",
+        "ok": true,
+        "resolved_by": "event_id",
+        "resolved_event_id": "sr:match:BAaFWlkPTcE6JbhiuC9K31g",
+        "market_id": "18",
+        "outcome_id": "12",
+        "specifier": "total=4.5",
+        "outcome": "Over 4.5",
+        "current_odds": 1.55
+      }
+    ]
   },
   "checks": [
     "core_pages",
