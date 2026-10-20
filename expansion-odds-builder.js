@@ -702,11 +702,41 @@
 
   var ACTIVE_VIRTUAL_MIN_PROBABILITY = 0.80;
   var EFOOTBALL_EXACT_EVIDENCE_MIN_PROBABILITY = 0.65;
+  var UPCOMING_DESK_RESEARCH_MIN_PROBABILITY = 0.60;
   var PHASE2_CYCLICAL_MIN_PROBABILITY = 0.78;
+  var BUILDER_ARTIFACT_MAX_AGE_MS = 15 * 60 * 1000;
+  var BUILDER_MIN_KICKOFF_LEAD_MS = 2 * 60 * 1000;
+  var BUILDER_MAX_QUOTE_AGE_SECONDS = 15 * 60;
+
+  function builderArtifactFreshness(data, now) {
+    var checkedAt=typeof now==="number"&&Number.isFinite(now)?now:Date.now();
+    var generated=dateOf(data&&data.generated_at);
+    var ageMs=generated?checkedAt-generated.getTime():null;
+    return {
+      fresh:!!generated&&ageMs>=-60*1000&&ageMs<=BUILDER_ARTIFACT_MAX_AGE_MS,
+      age_ms:ageMs,
+      generated_at:generated?generated.toISOString():null,
+      max_age_ms:BUILDER_ARTIFACT_MAX_AGE_MS
+    };
+  }
+
+  function isCurrentBuilderLeg(leg, now) {
+    var checkedAt=typeof now==="number"&&Number.isFinite(now)?now:Date.now();
+    var start=dateOf(leg&&leg.start_time);
+    if(!start||start.getTime()<=checkedAt+BUILDER_MIN_KICKOFF_LEAD_MS)return false;
+    if(!leg||leg.odds_fresh!==true)return false;
+    if(leg.market_odds_age_seconds!=null){
+      var quoteAge=Number(leg.market_odds_age_seconds);
+      if(!Number.isFinite(quoteAge)||quoteAge<0||quoteAge>BUILDER_MAX_QUOTE_AGE_SECONDS)return false;
+    }
+    return true;
+  }
+
   function activeVirtualProbabilityFloor(leg,batchLane){
     var legLane=String(leg&&leg.qualification_lane||"").toLowerCase();
     var lane=String(batchLane||leg&&leg.execution_track||"").toLowerCase();
     if(lane==="phase2_cyclical_loop"||lane==="phase2_cyclical_loop_research")return PHASE2_CYCLICAL_MIN_PROBABILITY;
+    if(legLane==="upcoming_desk_research_only"&&(!lane||lane==="upcoming_desk_research"))return UPCOMING_DESK_RESEARCH_MIN_PROBABILITY;
     if(legLane==="efootball_exact_evidence_value")return EFOOTBALL_EXACT_EVIDENCE_MIN_PROBABILITY;
     return ACTIVE_VIRTUAL_MIN_PROBABILITY;
   }
@@ -721,17 +751,21 @@
     }
     return true;
   }
-  function isActiveVirtualBatch(batch){
+  function isActiveVirtualBatch(batch, now){
     if(!batch||typeof batch!=="object")return false;
     var products=Array.isArray(batch.products)?batch.products:[];
     if(products.some(function(p){var k=String(p||"").toLowerCase();return k==="vfootball"||k==="zoom";}))return false;
     var legs=Array.isArray(batch.legs)?batch.legs:[];
     var lane=String(batch.primary_lane||batch.execution_track||"").toLowerCase();
-    return legs.length>0&&legs.every(function(leg){return isActiveVirtualLeg(leg,lane);});
+    var checkedAt=typeof now==="number"&&Number.isFinite(now)?now:Date.now();
+    return legs.length>0&&legs.every(function(leg){
+      return isActiveVirtualLeg(leg,lane)&&isCurrentBuilderLeg(leg,checkedAt);
+    });
   }
 
   function qualificationMonitorHtml(data,visibleBatchCount) {
     // Explain the distinction between a leg passing its own gates and a ticket passing all batch gates.
+    if(data&&data.builder_freshness&&data.builder_freshness.fresh===false)return '';
     if(Number(visibleBatchCount||0)>0)return '';
     var diag=data.candidate_diagnostics||{};
     var vdiag=diag.virtual_gate_diagnostics||{};
@@ -824,17 +858,20 @@
     var activeFloor=Number(compactEfootball?(batchPolicy.min_combined_odds||compactPolicy.min_combined_odds||2.0):(oddsGate.floor||2.7));
     var preferredTarget=Number(oddsGate.preferred_target||2.8);
     var floorLabel=compactEfootball?'2.00+ COMPACT':(activeFloor>=2.8?'2.80+':'2.70+');
-    var status=compactEfootball
-      ? batchCount+' COMPACT EFOOTBALL BATCH'+(batchCount===1?'':'ES')+' · 4–5 LEGS · 2.00+'
-      : data.status==='LIVE_VALUE_SET'
-      ? batchCount+' LIVE VALUE BATCH'+(batchCount===1?'':'ES')+' · 4.00+'
-      : data.status==='VALUE_RESEARCH_SET'
-        ? batchCount+' PAPER VALUE BATCH'+(batchCount===1?'':'ES')+' · '+floorLabel
-        : data.status==='BELOW_4_TARGET_AVAILABLE'
-          ? 'NO BATCH AT '+floorLabel+' THRESHOLD'
-          : data.status==='UPSTREAM_RESEARCH_GATE_BLOCKED'
-            ? 'NO QUALIFIED BATCHES'
-            : (data.status||'—');
+    var staleBuilderData=Boolean(data.builder_freshness&&data.builder_freshness.fresh===false);
+    var status=staleBuilderData
+      ? 'REFRESH REQUIRED · SNAPSHOT EXPIRED'
+      : compactEfootball
+        ? batchCount+' COMPACT EFOOTBALL BATCH'+(batchCount===1?'':'ES')+' · 4–5 LEGS · 2.00+'
+        : data.status==='LIVE_VALUE_SET'
+          ? batchCount+' LIVE VALUE BATCH'+(batchCount===1?'':'ES')+' · 4.00+'
+          : data.status==='VALUE_RESEARCH_SET'
+            ? batchCount+' PAPER VALUE BATCH'+(batchCount===1?'':'ES')+' · '+floorLabel
+            : data.status==='BELOW_4_TARGET_AVAILABLE'
+              ? 'NO BATCH AT '+floorLabel+' THRESHOLD'
+              : data.status==='UPSTREAM_RESEARCH_GATE_BLOCKED'
+                ? 'NO QUALIFIED BATCHES'
+                : (data.status||'—');
 
     var settlementIndex=buildSettlementIndex(tracker,settledLegs);
     function legCard(l,i,batchIndex){
@@ -905,7 +942,11 @@
     var batchDiag=((data.candidate_diagnostics||{}).batch_diagnostics||{});
     var compactDiag=batchDiag.secondary_efootball_compact_diagnostics||{};
     var gateNote;
-    if(batches.length&&compactEfootball){
+    if(staleBuilderData){
+      var snapshotAge=data.builder_freshness.age_ms;
+      var ageLabel=snapshotAge==null?'unknown':Math.round(Math.abs(snapshotAge)/60000)+(snapshotAge<0?' min ahead':' min old');
+      gateNote='<div class="section warning"><b>Waiting for a fresh Builder snapshot</b><div class="sub">The last Odds Builder artifact is '+esc(ageLabel)+'; old-price tickets and booking codes are hidden until a snapshot no older than 15 minutes is available. Every displayed leg must also be marked price-fresh and start more than two minutes from now. Last artifact: '+esc(data.generated_at||'unknown')+'. The scheduled refresh will restore the current set automatically.</div></div>';
+    } else if(batches.length&&compactEfootball){
       gateNote='<div class="section"><b>Compact eFootball ticket lane</b><div class="sub">4–5 eFootball GT/Adriatic legs · minimum 2.00x combined odds · each leg at least 65% with exact-line evidence and recent-spoiler checks · fresh exact SportyBet line/side · whole-ticket expected ROI at least +2%. This is paper value research, not settled Results-first proof; joint probability remains an independence proxy.</div><div class="row"><span>Qualified Virtual candidates</span><b>'+esc(virtualCount)+'</b></div><div class="row"><span>SportyBet price authority</span><b>Fresh Unified Snapshot</b></div></div>';
     } else if(batches.length){
       gateNote='<div class="section"><b>Research batch gate active</b><div class="sub">Standard batch lane: active combined-odds floor '+esc(floorLabel)+'; current exact SportyBet prices and evidence gates apply. Active Virtual products are eFootball GT and eFootball Adriatic; VFootball and Zoom remain research-only. No weaker legs are added to complete a ticket.</div><div class="row"><span>Qualified Virtual candidates</span><b>'+esc(virtualCount)+'</b></div><div class="row"><span>SportyBet price authority</span><b>Fresh Unified Snapshot</b></div></div>';
@@ -922,7 +963,7 @@
 
     var ticketTrack=ticketTrackHtml(tracker);
     var qualificationMonitor=qualificationMonitorHtml(data,batches.length);
-    target.innerHTML=pushNotificationHtml()+'<div class="builder-console"><div class="builder-console-head"><div><span class="builder-kicker">PAPER RESEARCH DESK</span><h3>Live '+floorLabel+' Builder</h3><p>Fresh SportyBet prices are qualified in-process. Batches stay paper-only and disjoint by event.</p></div><div class="builder-live-state"><span class="pulse-dot"></span><b>'+(data.status==='LIVE_VALUE_SET'?'LIVE VALUE SET':batchCount?'PAPER VALUE SET':'NO ACTIVE SET')+'</b><small>'+esc(status)+'</small></div></div><div class="builder-stat-row"><div class="builder-stat builder-stat-main"><small>Active batches</small><strong>'+batchCount+'/6</strong><span>Automatically refreshed</span></div><div class="builder-stat"><small>Sport lanes</small><strong>'+esc(sports.length?sports.join(' · '):'—')+'</strong><span>Current batch set</span></div><div class="builder-stat"><small>Top model rating</small><strong>'+esc(topRating==null?'—':topRating.toFixed(1)+'/100')+'</strong><span>Batch strength proxy</span></div><div class="builder-stat"><small>Top combined odds</small><strong>'+esc(top&&top.combined_odds!=null?Number(top.combined_odds).toFixed(3):'—')+'x</strong><span>SportyBet snapshot</span></div></div></div><div class="builder-batch-panel"><div class="builder-section-head"><div><span class="section-kicker">QUALIFIED SET</span><b>'+floorLabel+' paper research batches</b><span>Expand a batch for its booking code, live quote details, timer and legs.</span></div><div class="builder-section-note"><b>'+esc(virtualCount)+'</b><span>virtual candidates evaluated</span></div></div><div class="batch-list">'+(cards||'<div class="empty">No qualified '+floorLabel+' batches are currently available.</div>')+'</div><div class="builder-feedbar"><span><b>SPORTYBET</b> live snapshot</span><span>Top joint proxy <b>'+esc(topJoint==null?'—':pct(topJoint))+'</b></span><span>Price freshness gate <b>&le; 15m</b></span><span>Paper only <b>Yes</b></span></div>'+gateNote+'</div>'+qualificationMonitor+ticketTrack+'<div class="builder-note">The Builder refreshes automatically. Opening a batch reveals its exact selections and current SportyBet booking code.</div>';
+    target.innerHTML=pushNotificationHtml()+'<div class="builder-console"><div class="builder-console-head"><div><span class="builder-kicker">PAPER RESEARCH DESK</span><h3>Live '+floorLabel+' Builder</h3><p>Fresh SportyBet prices are qualified in-process. Batches stay paper-only and disjoint by event.</p></div><div class="builder-live-state"><span class="pulse-dot"></span><b>'+(staleBuilderData?'REFRESH REQUIRED':data.status==='LIVE_VALUE_SET'?'LIVE VALUE SET':batchCount?'PAPER VALUE SET':'NO ACTIVE SET')+'</b><small>'+esc(status)+'</small></div></div><div class="builder-stat-row"><div class="builder-stat builder-stat-main"><small>Active batches</small><strong>'+batchCount+'/6</strong><span>Automatically refreshed</span></div><div class="builder-stat"><small>Sport lanes</small><strong>'+esc(sports.length?sports.join(' · '):'—')+'</strong><span>Current batch set</span></div><div class="builder-stat"><small>Top model rating</small><strong>'+esc(topRating==null?'—':topRating.toFixed(1)+'/100')+'</strong><span>Batch strength proxy</span></div><div class="builder-stat"><small>Top combined odds</small><strong>'+esc(top&&top.combined_odds!=null?Number(top.combined_odds).toFixed(3):'—')+'x</strong><span>SportyBet snapshot</span></div></div></div><div class="builder-batch-panel"><div class="builder-section-head"><div><span class="section-kicker">QUALIFIED SET</span><b>'+floorLabel+' paper research batches</b><span>Expand a batch for its booking code, live quote details, timer and legs.</span></div><div class="builder-section-note"><b>'+esc(virtualCount)+'</b><span>virtual candidates evaluated</span></div></div><div class="batch-list">'+(cards||'<div class="empty">No qualified '+floorLabel+' batches are currently available.</div>')+'</div><div class="builder-feedbar"><span><b>SPORTYBET</b> live snapshot</span><span>Top joint proxy <b>'+esc(topJoint==null?'—':pct(topJoint))+'</b></span><span>Price freshness gate <b>&le; 15m</b></span><span>Paper only <b>Yes</b></span></div>'+gateNote+'</div>'+qualificationMonitor+ticketTrack+'<div class="builder-note">The Builder refreshes automatically. Opening a batch reveals its exact selections and current SportyBet booking code.</div>';
     updateTimers();
   }
   function load(){
@@ -938,10 +979,11 @@
         });
       })
     ]).then(function(results){
-      var data=results[0],tracker=results[1];
-      var activeBatches=Array.isArray(data.batches)?data.batches.filter(isActiveVirtualBatch):[];
-      var activeLegs=Array.isArray(data.qualified_legs)?data.qualified_legs.filter(isActiveVirtualLeg):[];
-      var activeData=Object.assign({},data,{batches:activeBatches,qualified_legs:activeLegs});
+      var data=results[0],tracker=results[1],checkedAt=Date.now();
+      var freshness=builderArtifactFreshness(data,checkedAt);
+      var activeBatches=freshness.fresh&&Array.isArray(data.batches)?data.batches.filter(function(batch){return isActiveVirtualBatch(batch,checkedAt);}):[];
+      var activeLegs=freshness.fresh&&Array.isArray(data.qualified_legs)?data.qualified_legs.filter(function(leg){return isActiveVirtualLeg(leg)&&isCurrentBuilderLeg(leg,checkedAt);}):[];
+      var activeData=Object.assign({},data,{batches:activeBatches,qualified_legs:activeLegs,builder_freshness:freshness});
       return refreshLiveStatuses(activeLegs).then(function(){return refreshVirtualLiveStatuses(activeBatches.reduce(function(all,b){return all.concat(Array.isArray(b.legs)?b.legs:[]);},[]));}).then(function(){render(activeData,tracker);}).then(function(){return ensureBookingCodes(activeBatches);});
     }).catch(function(e){target.innerHTML='<div class="empty">Accumulator data unavailable: '+esc(e.message)+'</div>';});
   }
@@ -976,6 +1018,9 @@
       });
     }
     load();window.setInterval(load,60000);window.setInterval(function(){var all=[];(window.__matchSignalOddsBuilderBatches||[]).forEach(function(b){all=all.concat(Array.isArray(b.legs)?b.legs:[]);});refreshVirtualLiveStatuses(all).then(updateLiveTrackers);},30000);window.setInterval(updateTimers,1000);
+  }
+  if(typeof window!=='undefined'&&window.__MATCH_SIGNAL_ODDS_BUILDER_TEST_MODE__){
+    window.__MATCH_SIGNAL_ODDS_BUILDER_TEST_HOOKS__={builderArtifactFreshness:builderArtifactFreshness,isCurrentBuilderLeg:isCurrentBuilderLeg,isActiveVirtualBatch:isActiveVirtualBatch,activeVirtualProbabilityFloor:activeVirtualProbabilityFloor};
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 })();
