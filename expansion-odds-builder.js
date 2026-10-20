@@ -763,6 +763,18 @@
     });
   }
 
+  function filterCurrentBuilderSnapshot(data, now) {
+    var checkedAt=typeof now==="number"&&Number.isFinite(now)?now:Date.now();
+    var freshness=builderArtifactFreshness(data,checkedAt);
+    var batches=freshness.fresh&&Array.isArray(data&&data.batches)
+      ? data.batches.filter(function(batch){return isActiveVirtualBatch(batch,checkedAt);})
+      : [];
+    var qualifiedLegs=freshness.fresh&&Array.isArray(data&&data.qualified_legs)
+      ? data.qualified_legs.filter(function(leg){return isActiveVirtualLeg(leg)&&isCurrentBuilderLeg(leg,checkedAt);})
+      : [];
+    return {freshness:freshness,batches:batches,qualified_legs:qualifiedLegs};
+  }
+
   function qualificationMonitorHtml(data,visibleBatchCount) {
     // Explain the distinction between a leg passing its own gates and a ticket passing all batch gates.
     if(data&&data.builder_freshness&&data.builder_freshness.fresh===false)return '';
@@ -979,11 +991,9 @@
         });
       })
     ]).then(function(results){
-      var data=results[0],tracker=results[1],checkedAt=Date.now();
-      var freshness=builderArtifactFreshness(data,checkedAt);
-      var activeBatches=freshness.fresh&&Array.isArray(data.batches)?data.batches.filter(function(batch){return isActiveVirtualBatch(batch,checkedAt);}):[];
-      var activeLegs=freshness.fresh&&Array.isArray(data.qualified_legs)?data.qualified_legs.filter(function(leg){return isActiveVirtualLeg(leg)&&isCurrentBuilderLeg(leg,checkedAt);}):[];
-      var activeData=Object.assign({},data,{batches:activeBatches,qualified_legs:activeLegs,builder_freshness:freshness});
+      var data=results[0],tracker=results[1],current=filterCurrentBuilderSnapshot(data,Date.now());
+      var activeBatches=current.batches,activeLegs=current.qualified_legs;
+      var activeData=Object.assign({},data,{batches:activeBatches,qualified_legs:activeLegs,builder_freshness:current.freshness});
       return refreshLiveStatuses(activeLegs).then(function(){return refreshVirtualLiveStatuses(activeBatches.reduce(function(all,b){return all.concat(Array.isArray(b.legs)?b.legs:[]);},[]));}).then(function(){render(activeData,tracker);}).then(function(){return ensureBookingCodes(activeBatches);});
     }).catch(function(e){target.innerHTML='<div class="empty">Accumulator data unavailable: '+esc(e.message)+'</div>';});
   }
@@ -1020,7 +1030,7 @@
     load();window.setInterval(load,60000);window.setInterval(function(){var all=[];(window.__matchSignalOddsBuilderBatches||[]).forEach(function(b){all=all.concat(Array.isArray(b.legs)?b.legs:[]);});refreshVirtualLiveStatuses(all).then(updateLiveTrackers);},30000);window.setInterval(updateTimers,1000);
   }
   if(typeof window!=='undefined'&&window.__MATCH_SIGNAL_ODDS_BUILDER_TEST_MODE__){
-    window.__MATCH_SIGNAL_ODDS_BUILDER_TEST_HOOKS__={builderArtifactFreshness:builderArtifactFreshness,isCurrentBuilderLeg:isCurrentBuilderLeg,isActiveVirtualBatch:isActiveVirtualBatch,activeVirtualProbabilityFloor:activeVirtualProbabilityFloor};
+    window.__MATCH_SIGNAL_ODDS_BUILDER_TEST_HOOKS__={builderArtifactFreshness:builderArtifactFreshness,isCurrentBuilderLeg:isCurrentBuilderLeg,isActiveVirtualBatch:isActiveVirtualBatch,filterCurrentBuilderSnapshot:filterCurrentBuilderSnapshot,activeVirtualProbabilityFloor:activeVirtualProbabilityFloor};
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 })();
