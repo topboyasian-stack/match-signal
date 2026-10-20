@@ -26,11 +26,13 @@ class AtomicBuilderTicketRegistrationTests(unittest.TestCase):
         loop = block[loop_start:loop_end]
 
         reset = loop.index("git reset --mixed origin/main")
+        restore_tracker = loop.index("git restore --source=origin/main --worktree data/odds_ticket_tracker.json")
         copy_builder = loop.index('cp "$output_dir/odds_builder.json" data/odds_builder.json')
-        track = loop.index("python scripts/odds_ticket_tracker.py")
+        track = loop.index("python scripts/odds_ticket_tracker.py --register-only")
         stage = loop.index("git add data/odds_builder.json")
 
-        self.assertLess(reset, copy_builder)
+        self.assertLess(reset, restore_tracker)
+        self.assertLess(restore_tracker, copy_builder)
         self.assertLess(copy_builder, track)
         self.assertLess(track, stage)
         self.assertIn("data/odds_ticket_tracker.json", loop[stage:])
