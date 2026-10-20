@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT / "scripts") not in sys.path:
     sys.path.insert(0, str(ROOT / "scripts"))
 
-from odds_builder import _upcoming_desk_recent_result_guard, _upcoming_desk_settled_performance_gate, _upcoming_desk_pending_event_ids, _settled_builder_lane_performance_gate
+from odds_builder import _upcoming_desk_recent_result_guard, _upcoming_desk_settled_performance_gate, _upcoming_desk_pending_event_ids, _exclude_pending_virtual_ticket_events, _settled_builder_lane_performance_gate
 
 
 def settled_leg(event_id, status, settled_at, *, line=7.5, side="under", product="efootball_gt"):
@@ -273,6 +273,20 @@ class UpcomingDeskSettledPromotionGateTests(unittest.TestCase):
         self.assertTrue(result["eligible"])
         self.assertEqual(result["settled_ticket_n"], 53)
         self.assertGreaterEqual(result["flat_stake_roi"], 0.02)
+
+    def test_open_ticket_event_is_removed_from_every_virtual_construction_pool(self):
+        rows = [
+            {"sport": "virtual", "product": "efootball_gt", "event_id": "still-open-event", "builder_eligible": True, "status": "ELIGIBLE"},
+            {"sport": "virtual", "product": "efootball_gt", "event_id": "new-event", "builder_eligible": True, "status": "ELIGIBLE"},
+            {"sport": "football", "product": "premier-league", "event_id": "still-open-event", "builder_eligible": True, "status": "ELIGIBLE"},
+        ]
+        filtered, rejected = _exclude_pending_virtual_ticket_events(rows, {"still-open-event"})
+        self.assertEqual(rejected, 1)
+        self.assertFalse(filtered[0]["builder_eligible"])
+        self.assertEqual(filtered[0]["status"], "REJECTED")
+        self.assertEqual(filtered[0]["builder_rejection_reason"], "event_already_in_pending_ticket")
+        self.assertTrue(filtered[1]["builder_eligible"])
+        self.assertTrue(filtered[2]["builder_eligible"])
 
     def test_open_events_are_excluded_even_when_parent_ticket_already_lost(self):
         tracker = {
