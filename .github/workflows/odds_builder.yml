@@ -344,6 +344,7 @@ jobs:
             echo "Publishing Builder artifacts (attempt ${attempt}/4)."
             git fetch origin main
             git reset --mixed origin/main
+            git restore --source=origin/main --worktree data/odds_ticket_tracker.json
 
             # The current Builder run owns these generated artifacts; never stage unrelated
             # files left modified by analysis scripts or concurrent workflows.
