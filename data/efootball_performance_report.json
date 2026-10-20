@@ -1,18 +1,21 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-20T18:39:20.950347+00:00",
+  "generated_at": "2026-10-20T18:48:45.954472+00:00",
   "mode": "PAPER_RESEARCH_ONLY",
   "live_trading_approved": false,
   "production_qualification_enabled": false,
   "odds_builder_eligible": false,
   "source_freshness": {
-    "market_archive_updated_at": "2026-10-20T18:39:20.311652+00:00",
+    "market_archive_updated_at": "2026-10-20T18:48:45.435090+00:00",
     "market_archive_age_minutes": 0.0,
-    "collector_last_capture_at": "2026-10-20T18:39:00.280267+00:00",
-    "collector_age_minutes": 0.3,
+    "collector_last_capture_at": "2026-10-20T18:48:20.296283+00:00",
+    "collector_age_minutes": 0.4,
     "collector_stale_over_30_minutes": false,
     "market_archive_last_run_errors": [],
-    "market_archive_last_run_warnings": [],
+    "market_archive_last_run_warnings": [
+      "17 pending event IDs were at least 15 minutes past kickoff but absent from result responses; 25/60 pending event IDs matched. Will retry on the next settlement pass.",
+      "13 returned event IDs were at least 15 minutes past kickoff but still lacked a confirmed final score/status."
+    ],
     "market_archive_last_run_snapshot_fresh": true,
     "note": "Stale research collection must raise a monitoring warning; it must never stop the normal Qualified Best forecast/deployment workflow."
   },
@@ -1427,39 +1430,101 @@
     "scope_warning": "These are selected Qualified Best/settled line picks, not all forecasts. Multiple line rows can share one fixture, so n is not necessarily an independent-event count."
   },
   "winner_and_gg_ng_market_baselines": {
-    "source_rows": 5563,
-    "unique_sample_ids": 5563,
+    "source_rows": 5580,
+    "unique_sample_ids": 5580,
     "duplicate_sample_id_count": 0,
-    "archive_updated_at": "2026-10-20T18:39:20.311652+00:00",
+    "archive_updated_at": "2026-10-20T18:48:45.435090+00:00",
     "collector_last_run": {
-      "captured_at": "2026-10-20T18:39:00.280267+00:00",
-      "captured_new": 6,
-      "settled_new": 0,
+      "captured_at": "2026-10-20T18:48:20.296283+00:00",
+      "captured_new": 17,
+      "settled_new": 13,
       "settlement_errors": [],
-      "settlement_warnings": [],
-      "settlement_diagnostics": null,
-      "settlement_checked_at": "2026-10-20T18:36:34.768020+00:00",
-      "settlement_attempted": false,
-      "pending_due_settlement_check": 49,
-      "result_events_seen": 0,
-      "exact_result_ids_matched": 0,
+      "settlement_warnings": [
+        "17 pending event IDs were at least 15 minutes past kickoff but absent from result responses; 25/60 pending event IDs matched. Will retry on the next settlement pass.",
+        "13 returned event IDs were at least 15 minutes past kickoff but still lacked a confirmed final score/status."
+      ],
+      "settlement_diagnostics": {
+        "pending_observation_count": 69,
+        "pending_event_id_count": 60,
+        "result_events_seen": 897,
+        "exact_result_ids_matched": 25,
+        "unmatched_event_id_count": 35,
+        "unmatched_event_ids_sample": [
+          "sr:match:75594194",
+          "sr:match:75658676",
+          "sr:match:75658960",
+          "sr:match:75697230",
+          "sr:match:75697410",
+          "sr:match:75697534",
+          "sr:match:75698986",
+          "sr:match:75745688",
+          "sr:match:75745714",
+          "sr:match:75756398"
+        ],
+        "oldest_unmatched_age_minutes": 8323.3,
+        "overdue_unmatched_event_id_count": 17,
+        "overdue_unmatched_event_ids": [
+          "sr:match:75594194",
+          "sr:match:75658676",
+          "sr:match:75658960",
+          "sr:match:75697230",
+          "sr:match:75697410",
+          "sr:match:75697534",
+          "sr:match:75698986",
+          "sr:match:75756672",
+          "sr:match:75757056",
+          "sr:match:75759862"
+        ],
+        "matched_but_unsettled_event_id_count": 13,
+        "matched_but_unsettled_event_ids": [
+          "sr:match:75624450",
+          "sr:match:75624524",
+          "sr:match:75698430",
+          "sr:match:75698612",
+          "sr:match:75698880",
+          "sr:match:75699022",
+          "sr:match:BAaE1hnV8eJOvlA|q4q7woA",
+          "sr:match:BAaFMYmalfkKoP10ybl8CvQ",
+          "sr:match:BAaFMYq|Mfd-Z0-Li676ogQ",
+          "sr:match:BAaFUekLfe8eFYAsgznwmYw"
+        ],
+        "oldest_matched_but_unsettled_age_minutes": 9432.3,
+        "overdue_matched_but_unsettled_event_id_count": 13,
+        "overdue_matched_but_unsettled_event_ids": [
+          "sr:match:75624450",
+          "sr:match:75624524",
+          "sr:match:75698430",
+          "sr:match:75698612",
+          "sr:match:75698880",
+          "sr:match:75699022",
+          "sr:match:BAaE1hnV8eJOvlA|q4q7woA",
+          "sr:match:BAaFMYmalfkKoP10ybl8CvQ",
+          "sr:match:BAaFMYq|Mfd-Z0-Li676ogQ",
+          "sr:match:BAaFUekLfe8eFYAsgznwmYw"
+        ]
+      },
+      "settlement_checked_at": "2026-10-20T18:48:20.296283+00:00",
+      "settlement_attempted": true,
+      "pending_due_settlement_check": 69,
+      "result_events_seen": 897,
+      "exact_result_ids_matched": 25,
       "feed_snapshot_fresh": true,
-      "feed_snapshot_age_seconds": 24.6,
+      "feed_snapshot_age_seconds": 18.7,
       "capture_skipped_reason": null,
       "market_coverage": {
-        "captured_at": "2026-10-20T18:39:00.280267+00:00",
+        "captured_at": "2026-10-20T18:48:20.296283+00:00",
         "source": "current SportyBet virtual feed",
         "window_minutes": 15,
         "products": {
           "efootball_adriatic": {
-            "feed_events": 14,
-            "upcoming_events_with_time": 14,
+            "feed_events": 15,
+            "upcoming_events_with_time": 15,
             "events_within_capture_window": 4,
             "market_type_rows": {
-              "match_winner": 14
+              "match_winner": 15
             },
             "usable_two_way_quote_rows": {
-              "match_winner": 14
+              "match_winner": 15
             },
             "near_kickoff_market_type_rows": {
               "match_winner": 4
@@ -1470,65 +1535,65 @@
             "market_id_29_rows": 0,
             "market_id_29_names": [],
             "market_inventory": {
-              "10|Double Chance": 14,
-              "18|Over/Under": 14,
-              "1|1X2": 14
+              "10|Double Chance": 15,
+              "18|Over/Under": 15,
+              "1|1X2": 15
             }
           },
           "efootball_gt": {
-            "feed_events": 305,
-            "upcoming_events_with_time": 305,
-            "events_within_capture_window": 22,
+            "feed_events": 309,
+            "upcoming_events_with_time": 309,
+            "events_within_capture_window": 19,
             "market_type_rows": {
-              "match_winner": 304,
-              "btts": 17
+              "match_winner": 308,
+              "btts": 22
             },
             "usable_two_way_quote_rows": {
-              "match_winner": 304,
-              "btts": 17
+              "match_winner": 308,
+              "btts": 22
             },
             "near_kickoff_market_type_rows": {
-              "match_winner": 22,
+              "match_winner": 19,
               "btts": 4
             },
             "near_kickoff_usable_quote_rows": {
-              "match_winner": 22,
+              "match_winner": 19,
               "btts": 4
             },
-            "market_id_29_rows": 17,
+            "market_id_29_rows": 22,
             "market_id_29_names": [
               "Both teams to score"
             ],
             "market_inventory": {
-              "10|Double Chance": 27,
-              "11|Draw No Bet": 17,
-              "18|Over/Under": 774,
-              "1|1X2": 304,
-              "26|Odd/even": 17,
-              "29|Both teams to score": 17
+              "10|Double Chance": 34,
+              "11|Draw No Bet": 22,
+              "18|Over/Under": 783,
+              "1|1X2": 308,
+              "26|Odd/even": 22,
+              "29|Both teams to score": 22
             }
           }
         },
         "snapshot_fresh": true,
-        "snapshot_updated_at": "2026-10-20T18:38:35.653139+00:00",
-        "snapshot_age_seconds": 24.6,
+        "snapshot_updated_at": "2026-10-20T18:48:01.637622+00:00",
+        "snapshot_age_seconds": 18.7,
         "freshness_status": "FRESH"
       }
     },
     "market_coverage": {
-      "captured_at": "2026-10-20T18:39:00.280267+00:00",
+      "captured_at": "2026-10-20T18:48:20.296283+00:00",
       "source": "current SportyBet virtual feed",
       "window_minutes": 15,
       "products": {
         "efootball_adriatic": {
-          "feed_events": 14,
-          "upcoming_events_with_time": 14,
+          "feed_events": 15,
+          "upcoming_events_with_time": 15,
           "events_within_capture_window": 4,
           "market_type_rows": {
-            "match_winner": 14
+            "match_winner": 15
           },
           "usable_two_way_quote_rows": {
-            "match_winner": 14
+            "match_winner": 15
           },
           "near_kickoff_market_type_rows": {
             "match_winner": 4
@@ -1539,48 +1604,48 @@
           "market_id_29_rows": 0,
           "market_id_29_names": [],
           "market_inventory": {
-            "10|Double Chance": 14,
-            "18|Over/Under": 14,
-            "1|1X2": 14
+            "10|Double Chance": 15,
+            "18|Over/Under": 15,
+            "1|1X2": 15
           }
         },
         "efootball_gt": {
-          "feed_events": 305,
-          "upcoming_events_with_time": 305,
-          "events_within_capture_window": 22,
+          "feed_events": 309,
+          "upcoming_events_with_time": 309,
+          "events_within_capture_window": 19,
           "market_type_rows": {
-            "match_winner": 304,
-            "btts": 17
+            "match_winner": 308,
+            "btts": 22
           },
           "usable_two_way_quote_rows": {
-            "match_winner": 304,
-            "btts": 17
+            "match_winner": 308,
+            "btts": 22
           },
           "near_kickoff_market_type_rows": {
-            "match_winner": 22,
+            "match_winner": 19,
             "btts": 4
           },
           "near_kickoff_usable_quote_rows": {
-            "match_winner": 22,
+            "match_winner": 19,
             "btts": 4
           },
-          "market_id_29_rows": 17,
+          "market_id_29_rows": 22,
           "market_id_29_names": [
             "Both teams to score"
           ],
           "market_inventory": {
-            "10|Double Chance": 27,
-            "11|Draw No Bet": 17,
-            "18|Over/Under": 774,
-            "1|1X2": 304,
-            "26|Odd/even": 17,
-            "29|Both teams to score": 17
+            "10|Double Chance": 34,
+            "11|Draw No Bet": 22,
+            "18|Over/Under": 783,
+            "1|1X2": 308,
+            "26|Odd/even": 22,
+            "29|Both teams to score": 22
           }
         }
       },
       "snapshot_fresh": true,
-      "snapshot_updated_at": "2026-10-20T18:38:35.653139+00:00",
-      "snapshot_age_seconds": 24.6,
+      "snapshot_updated_at": "2026-10-20T18:48:01.637622+00:00",
+      "snapshot_age_seconds": 18.7,
       "freshness_status": "FRESH"
     },
     "summary_by_product_market": {
@@ -1603,8 +1668,8 @@
         "mean_model_probability": null,
         "mean_brier": 0.6119,
         "mean_log_loss": 1.0132,
-        "captured": 719,
-        "pending": 7,
+        "captured": 721,
+        "pending": 9,
         "chronological_split": {
           "method": "sort by scheduled start time; earliest 70% versus most recent 30%; descriptive only",
           "first_70_percent": {
@@ -2155,26 +2220,26 @@
         "interpretation": "Bookmaker favourite baseline only; not an independent Match Signal model or proof of edge."
       },
       "efootball_gt|btts": {
-        "settled": 776,
-        "wins": 497,
+        "settled": 777,
+        "wins": 498,
         "losses": 279,
-        "hit_rate": 0.6405,
+        "hit_rate": 0.6409,
         "hit_rate_95_wilson": [
-          0.6061,
-          0.6735
+          0.6066,
+          0.6739
         ],
-        "flat_stake_net_units": -0.14,
-        "flat_stake_roi": -0.0002,
+        "flat_stake_net_units": 0.26,
+        "flat_stake_roi": 0.0003,
         "flat_stake_roi_95_approx": [
-          -0.0535,
-          0.0531
+          -0.0529,
+          0.0536
         ],
         "mean_odds": 1.565,
         "mean_model_probability": null,
-        "mean_brier": 0.4654,
-        "mean_log_loss": 0.6581,
-        "captured": 787,
-        "pending": 11,
+        "mean_brier": 0.4651,
+        "mean_log_loss": 0.6578,
+        "captured": 789,
+        "pending": 12,
         "chronological_split": {
           "method": "sort by scheduled start time; earliest 70% versus most recent 30%; descriptive only",
           "first_70_percent": {
@@ -2198,48 +2263,48 @@
             "mean_log_loss": 0.6543
           },
           "latest_30_percent": {
-            "settled": 233,
-            "wins": 149,
+            "settled": 234,
+            "wins": 150,
             "losses": 84,
-            "hit_rate": 0.6395,
+            "hit_rate": 0.641,
             "hit_rate_95_wilson": [
-              0.576,
-              0.6984
+              0.5777,
+              0.6998
             ],
-            "flat_stake_net_units": 2.32,
-            "flat_stake_roi": 0.01,
+            "flat_stake_net_units": 2.72,
+            "flat_stake_roi": 0.0116,
             "flat_stake_roi_95_approx": [
-              -0.0889,
-              0.1088
+              -0.0868,
+              0.1101
             ],
-            "mean_odds": 1.575,
+            "mean_odds": 1.574,
             "mean_model_probability": null,
-            "mean_brier": 0.4742,
-            "mean_log_loss": 0.667
+            "mean_brier": 0.4732,
+            "mean_log_loss": 0.6659
           }
         },
         "segments": {
           "by_competition": [
             {
               "group": "Esoccer H2H GG League",
-              "settled": 776,
-              "wins": 497,
+              "settled": 777,
+              "wins": 498,
               "losses": 279,
-              "hit_rate": 0.6405,
+              "hit_rate": 0.6409,
               "hit_rate_95_wilson": [
-                0.6061,
-                0.6735
+                0.6066,
+                0.6739
               ],
-              "flat_stake_net_units": -0.14,
-              "flat_stake_roi": -0.0002,
+              "flat_stake_net_units": 0.26,
+              "flat_stake_roi": 0.0003,
               "flat_stake_roi_95_approx": [
-                -0.0535,
-                0.0531
+                -0.0529,
+                0.0536
               ],
               "mean_odds": 1.565,
               "mean_model_probability": null,
-              "mean_brier": 0.4654,
-              "mean_log_loss": 0.6581,
+              "mean_brier": 0.4651,
+              "mean_log_loss": 0.6578,
               "screening_label": "monitor"
             }
           ],
@@ -2268,24 +2333,24 @@
             },
             {
               "group": "yes",
-              "settled": 712,
-              "wins": 459,
+              "settled": 713,
+              "wins": 460,
               "losses": 253,
-              "hit_rate": 0.6447,
+              "hit_rate": 0.6452,
               "hit_rate_95_wilson": [
-                0.6088,
-                0.679
+                0.6093,
+                0.6794
               ],
-              "flat_stake_net_units": -1.19,
-              "flat_stake_roi": -0.0017,
+              "flat_stake_net_units": -0.79,
+              "flat_stake_roi": -0.0011,
               "flat_stake_roi_95_approx": [
-                -0.0567,
-                0.0534
+                -0.0561,
+                0.0539
               ],
               "mean_odds": 1.551,
               "mean_model_probability": null,
-              "mean_brier": 0.4635,
-              "mean_log_loss": 0.6561,
+              "mean_brier": 0.4632,
+              "mean_log_loss": 0.6557,
               "screening_label": "monitor"
             }
           ],
@@ -2314,24 +2379,24 @@
             },
             {
               "group": "<1.50",
-              "settled": 235,
-              "wins": 157,
+              "settled": 236,
+              "wins": 158,
               "losses": 78,
-              "hit_rate": 0.6681,
+              "hit_rate": 0.6695,
               "hit_rate_95_wilson": [
-                0.6056,
-                0.7252
+                0.6072,
+                0.7264
               ],
-              "flat_stake_net_units": -14.27,
-              "flat_stake_roi": -0.0607,
+              "flat_stake_net_units": -13.87,
+              "flat_stake_roi": -0.0588,
               "flat_stake_roi_95_approx": [
-                -0.1458,
-                0.0243
+                -0.1435,
+                0.026
               ],
               "mean_odds": 1.408,
               "mean_model_probability": null,
-              "mean_brier": 0.4421,
-              "mean_log_loss": 0.634,
+              "mean_brier": 0.4412,
+              "mean_log_loss": 0.633,
               "screening_label": "weakness to investigate"
             }
           ],
@@ -2404,24 +2469,24 @@
             },
             {
               "group": "18-23 UTC",
-              "settled": 216,
-              "wins": 137,
+              "settled": 217,
+              "wins": 138,
               "losses": 79,
-              "hit_rate": 0.6343,
+              "hit_rate": 0.6359,
               "hit_rate_95_wilson": [
-                0.5682,
-                0.6956
+                0.5701,
+                0.6971
               ],
-              "flat_stake_net_units": -5.27,
-              "flat_stake_roi": -0.0244,
+              "flat_stake_net_units": -4.87,
+              "flat_stake_roi": -0.0224,
               "flat_stake_roi_95_approx": [
-                -0.1243,
-                0.0755
+                -0.122,
+                0.0771
               ],
-              "mean_odds": 1.548,
+              "mean_odds": 1.547,
               "mean_model_probability": null,
-              "mean_brier": 0.4597,
-              "mean_log_loss": 0.6518,
+              "mean_brier": 0.4586,
+              "mean_log_loss": 0.6507,
               "screening_label": "monitor"
             }
           ],
@@ -2626,24 +2691,24 @@
             },
             {
               "group": "2026-10-20",
-              "settled": 130,
-              "wins": 90,
+              "settled": 131,
+              "wins": 91,
               "losses": 40,
-              "hit_rate": 0.6923,
+              "hit_rate": 0.6947,
               "hit_rate_95_wilson": [
-                0.6084,
-                0.7652
+                0.6112,
+                0.767
               ],
-              "flat_stake_net_units": 12.05,
-              "flat_stake_roi": 0.0927,
+              "flat_stake_net_units": 12.45,
+              "flat_stake_roi": 0.095,
               "flat_stake_roi_95_approx": [
-                -0.0347,
-                0.2201
+                -0.0315,
+                0.2216
               ],
-              "mean_odds": 1.569,
+              "mean_odds": 1.567,
               "mean_model_probability": null,
-              "mean_brier": 0.4591,
-              "mean_log_loss": 0.6517,
+              "mean_brier": 0.4574,
+              "mean_log_loss": 0.6498,
               "screening_label": "positive screen — needs holdout confirmation"
             }
           ]
@@ -2653,48 +2718,48 @@
           "best_observed_roi": [
             {
               "group": "Esoccer H2H GG League",
-              "settled": 776,
-              "wins": 497,
+              "settled": 777,
+              "wins": 498,
               "losses": 279,
-              "hit_rate": 0.6405,
+              "hit_rate": 0.6409,
               "hit_rate_95_wilson": [
-                0.6061,
-                0.6735
+                0.6066,
+                0.6739
               ],
-              "flat_stake_net_units": -0.14,
-              "flat_stake_roi": -0.0002,
+              "flat_stake_net_units": 0.26,
+              "flat_stake_roi": 0.0003,
               "flat_stake_roi_95_approx": [
-                -0.0535,
-                0.0531
+                -0.0529,
+                0.0536
               ],
               "mean_odds": 1.565,
               "mean_model_probability": null,
-              "mean_brier": 0.4654,
-              "mean_log_loss": 0.6581,
+              "mean_brier": 0.4651,
+              "mean_log_loss": 0.6578,
               "screening_label": "monitor"
             }
           ],
           "worst_observed_roi": [
             {
               "group": "Esoccer H2H GG League",
-              "settled": 776,
-              "wins": 497,
+              "settled": 777,
+              "wins": 498,
               "losses": 279,
-              "hit_rate": 0.6405,
+              "hit_rate": 0.6409,
               "hit_rate_95_wilson": [
-                0.6061,
-                0.6735
+                0.6066,
+                0.6739
               ],
-              "flat_stake_net_units": -0.14,
-              "flat_stake_roi": -0.0002,
+              "flat_stake_net_units": 0.26,
+              "flat_stake_roi": 0.0003,
               "flat_stake_roi_95_approx": [
-                -0.0535,
-                0.0531
+                -0.0529,
+                0.0536
               ],
               "mean_odds": 1.565,
               "mean_model_probability": null,
-              "mean_brier": 0.4654,
-              "mean_log_loss": 0.6581,
+              "mean_brier": 0.4651,
+              "mean_log_loss": 0.6578,
               "screening_label": "monitor"
             }
           ],
@@ -2703,67 +2768,67 @@
         "interpretation": "Bookmaker favourite baseline only; not an independent Match Signal model or proof of edge."
       },
       "efootball_gt|match_winner": {
-        "settled": 3996,
-        "wins": 1967,
-        "losses": 2029,
-        "hit_rate": 0.4922,
+        "settled": 4008,
+        "wins": 1973,
+        "losses": 2035,
+        "hit_rate": 0.4923,
         "hit_rate_95_wilson": [
           0.4768,
           0.5077
         ],
-        "flat_stake_net_units": -281.17,
-        "flat_stake_roi": -0.0704,
+        "flat_stake_net_units": -282.58,
+        "flat_stake_roi": -0.0705,
         "flat_stake_roi_95_approx": [
-          -0.1004,
-          -0.0403
+          -0.1005,
+          -0.0405
         ],
-        "mean_odds": 1.939,
+        "mean_odds": 1.938,
         "mean_model_probability": null,
-        "mean_brier": 0.6093,
-        "mean_log_loss": 1.0133,
-        "captured": 4057,
-        "pending": 61,
+        "mean_brier": 0.6094,
+        "mean_log_loss": 1.0135,
+        "captured": 4070,
+        "pending": 62,
         "chronological_split": {
           "method": "sort by scheduled start time; earliest 70% versus most recent 30%; descriptive only",
           "first_70_percent": {
-            "settled": 2797,
-            "wins": 1394,
-            "losses": 1403,
-            "hit_rate": 0.4984,
+            "settled": 2805,
+            "wins": 1397,
+            "losses": 1408,
+            "hit_rate": 0.498,
             "hit_rate_95_wilson": [
-              0.4799,
-              0.5169
+              0.4796,
+              0.5165
             ],
-            "flat_stake_net_units": -177.5,
-            "flat_stake_roi": -0.0635,
+            "flat_stake_net_units": -179.2,
+            "flat_stake_roi": -0.0639,
             "flat_stake_roi_95_approx": [
-              -0.0992,
-              -0.0277
+              -0.0996,
+              -0.0282
             ],
-            "mean_odds": 1.932,
+            "mean_odds": 1.933,
             "mean_model_probability": null,
-            "mean_brier": 0.6063,
-            "mean_log_loss": 1.0103
+            "mean_brier": 0.6065,
+            "mean_log_loss": 1.0106
           },
           "latest_30_percent": {
-            "settled": 1199,
-            "wins": 573,
-            "losses": 626,
-            "hit_rate": 0.4779,
+            "settled": 1203,
+            "wins": 576,
+            "losses": 627,
+            "hit_rate": 0.4788,
             "hit_rate_95_wilson": [
-              0.4497,
-              0.5062
+              0.4507,
+              0.5071
             ],
-            "flat_stake_net_units": -103.67,
-            "flat_stake_roi": -0.0865,
+            "flat_stake_net_units": -103.38,
+            "flat_stake_roi": -0.0859,
             "flat_stake_roi_95_approx": [
-              -0.1419,
-              -0.031
+              -0.1412,
+              -0.0307
             ],
-            "mean_odds": 1.953,
+            "mean_odds": 1.95,
             "mean_model_probability": null,
             "mean_brier": 0.6163,
-            "mean_log_loss": 1.0201
+            "mean_log_loss": 1.0203
           }
         },
         "segments": {
@@ -3078,24 +3143,24 @@
             },
             {
               "group": "Copa America",
-              "settled": 30,
-              "wins": 13,
+              "settled": 32,
+              "wins": 15,
               "losses": 17,
-              "hit_rate": 0.4333,
+              "hit_rate": 0.4688,
               "hit_rate_95_wilson": [
-                0.2738,
-                0.608
+                0.3087,
+                0.6355
               ],
-              "flat_stake_net_units": -5.34,
-              "flat_stake_roi": -0.178,
+              "flat_stake_net_units": -3.62,
+              "flat_stake_roi": -0.1131,
               "flat_stake_roi_95_approx": [
-                -0.5221,
-                0.1661
+                -0.4473,
+                0.2211
               ],
-              "mean_odds": 1.93,
+              "mean_odds": 1.925,
               "mean_model_probability": null,
-              "mean_brier": 0.6318,
-              "mean_log_loss": 1.045,
+              "mean_brier": 0.6173,
+              "mean_log_loss": 1.0243,
               "screening_label": "weakness to investigate"
             },
             {
@@ -3144,24 +3209,24 @@
             },
             {
               "group": "Esoccer H2H GG League",
-              "settled": 780,
+              "settled": 781,
               "wins": 331,
-              "losses": 449,
-              "hit_rate": 0.4244,
+              "losses": 450,
+              "hit_rate": 0.4238,
               "hit_rate_95_wilson": [
-                0.3901,
-                0.4593
+                0.3896,
+                0.4588
               ],
-              "flat_stake_net_units": -102.15,
-              "flat_stake_roi": -0.131,
+              "flat_stake_net_units": -103.15,
+              "flat_stake_roi": -0.1321,
               "flat_stake_roi_95_approx": [
-                -0.2028,
-                -0.0591
+                -0.2038,
+                -0.0603
               ],
               "mean_odds": 2.069,
               "mean_model_probability": null,
-              "mean_brier": 0.6483,
-              "mean_log_loss": 1.0718,
+              "mean_brier": 0.6486,
+              "mean_log_loss": 1.0723,
               "screening_label": "weakness to investigate"
             },
             {
@@ -3430,24 +3495,24 @@
             },
             {
               "group": "Premier League (Virtual eComp)",
-              "settled": 52,
+              "settled": 55,
               "wins": 24,
-              "losses": 28,
-              "hit_rate": 0.4615,
+              "losses": 31,
+              "hit_rate": 0.4364,
               "hit_rate_95_wilson": [
-                0.3334,
-                0.595
+                0.3137,
+                0.5673
               ],
-              "flat_stake_net_units": -6.62,
-              "flat_stake_roi": -0.1273,
+              "flat_stake_net_units": -9.62,
+              "flat_stake_roi": -0.1749,
               "flat_stake_roi_95_approx": [
-                -0.3921,
-                0.1374
+                -0.4306,
+                0.0808
               ],
-              "mean_odds": 1.886,
+              "mean_odds": 1.89,
               "mean_model_probability": null,
-              "mean_brier": 0.6473,
-              "mean_log_loss": 1.0663,
+              "mean_brier": 0.6601,
+              "mean_log_loss": 1.0847,
               "screening_label": "weakness to investigate"
             },
             {
@@ -3650,24 +3715,24 @@
             },
             {
               "group": "Volta International A",
-              "settled": 92,
-              "wins": 55,
-              "losses": 37,
-              "hit_rate": 0.5978,
+              "settled": 98,
+              "wins": 59,
+              "losses": 39,
+              "hit_rate": 0.602,
               "hit_rate_95_wilson": [
-                0.4957,
-                0.6922
+                0.503,
+                0.6933
               ],
-              "flat_stake_net_units": 2.89,
-              "flat_stake_roi": 0.0314,
+              "flat_stake_net_units": 3.76,
+              "flat_stake_roi": 0.0384,
               "flat_stake_roi_95_approx": [
-                -0.1482,
-                0.211
+                -0.135,
+                0.2117
               ],
-              "mean_odds": 1.772,
+              "mean_odds": 1.764,
               "mean_model_probability": null,
-              "mean_brier": 0.5349,
-              "mean_log_loss": 0.9002,
+              "mean_brier": 0.5388,
+              "mean_log_loss": 0.9078,
               "screening_label": "monitor"
             },
             {
@@ -3806,24 +3871,24 @@
           "by_favourite_outcome": [
             {
               "group": "away",
-              "settled": 1937,
-              "wins": 963,
-              "losses": 974,
-              "hit_rate": 0.4972,
+              "settled": 1942,
+              "wins": 965,
+              "losses": 977,
+              "hit_rate": 0.4969,
               "hit_rate_95_wilson": [
-                0.4749,
-                0.5194
+                0.4747,
+                0.5191
               ],
-              "flat_stake_net_units": -118.33,
-              "flat_stake_roi": -0.0611,
+              "flat_stake_net_units": -119.53,
+              "flat_stake_roi": -0.0615,
               "flat_stake_roi_95_approx": [
-                -0.1042,
-                -0.018
+                -0.1046,
+                -0.0185
               ],
               "mean_odds": 1.927,
               "mean_model_probability": null,
-              "mean_brier": 0.6112,
-              "mean_log_loss": 1.0155,
+              "mean_brier": 0.6116,
+              "mean_log_loss": 1.0162,
               "screening_label": "weakness to investigate"
             },
             {
@@ -3850,114 +3915,114 @@
             },
             {
               "group": "home",
-              "settled": 2054,
-              "wins": 1003,
-              "losses": 1051,
-              "hit_rate": 0.4883,
+              "settled": 2061,
+              "wins": 1007,
+              "losses": 1054,
+              "hit_rate": 0.4886,
               "hit_rate_95_wilson": [
-                0.4667,
-                0.5099
+                0.4671,
+                0.5102
               ],
-              "flat_stake_net_units": -160.44,
-              "flat_stake_roi": -0.0781,
+              "flat_stake_net_units": -160.65,
+              "flat_stake_roi": -0.0779,
               "flat_stake_roi_95_approx": [
-                -0.12,
-                -0.0362
+                -0.1198,
+                -0.0361
               ],
               "mean_odds": 1.948,
               "mean_model_probability": null,
-              "mean_brier": 0.6073,
-              "mean_log_loss": 1.011,
+              "mean_brier": 0.6072,
+              "mean_log_loss": 1.0109,
               "screening_label": "weakness to investigate"
             }
           ],
           "by_favourite_odds_band": [
             {
               "group": "1.50-1.99",
-              "settled": 1728,
-              "wins": 924,
-              "losses": 804,
-              "hit_rate": 0.5347,
+              "settled": 1736,
+              "wins": 929,
+              "losses": 807,
+              "hit_rate": 0.5351,
               "hit_rate_95_wilson": [
-                0.5112,
-                0.5581
+                0.5116,
+                0.5585
               ],
-              "flat_stake_net_units": -85.37,
-              "flat_stake_roi": -0.0494,
+              "flat_stake_net_units": -84.26,
+              "flat_stake_roi": -0.0485,
               "flat_stake_roi_95_approx": [
-                -0.0915,
-                -0.0073
+                -0.0905,
+                -0.0065
               ],
               "mean_odds": 1.788,
               "mean_model_probability": null,
-              "mean_brier": 0.598,
-              "mean_log_loss": 0.9977,
+              "mean_brier": 0.5981,
+              "mean_log_loss": 0.9979,
               "screening_label": "monitor"
             },
             {
               "group": "2.00-2.49",
-              "settled": 1873,
+              "settled": 1874,
               "wins": 788,
-              "losses": 1085,
-              "hit_rate": 0.4207,
+              "losses": 1086,
+              "hit_rate": 0.4205,
               "hit_rate_95_wilson": [
-                0.3985,
-                0.4432
+                0.3983,
+                0.443
               ],
-              "flat_stake_net_units": -165.71,
-              "flat_stake_roi": -0.0885,
+              "flat_stake_net_units": -166.71,
+              "flat_stake_roi": -0.089,
               "flat_stake_roi_95_approx": [
-                -0.137,
-                -0.0399
+                -0.1375,
+                -0.0404
               ],
               "mean_odds": 2.171,
               "mean_model_probability": null,
-              "mean_brier": 0.6429,
-              "mean_log_loss": 1.0599,
+              "mean_brier": 0.643,
+              "mean_log_loss": 1.0602,
               "screening_label": "weakness to investigate"
             },
             {
               "group": "2.50-2.99",
-              "settled": 52,
+              "settled": 53,
               "wins": 22,
-              "losses": 30,
-              "hit_rate": 0.4231,
+              "losses": 31,
+              "hit_rate": 0.4151,
               "hit_rate_95_wilson": [
-                0.2987,
-                0.5581
+                0.2926,
+                0.5491
               ],
-              "flat_stake_net_units": 3.75,
-              "flat_stake_roi": 0.0721,
+              "flat_stake_net_units": 2.75,
+              "flat_stake_roi": 0.0519,
               "flat_stake_roi_95_approx": [
-                -0.2716,
-                0.4158
+                -0.2876,
+                0.3914
               ],
-              "mean_odds": 2.541,
+              "mean_odds": 2.542,
               "mean_model_probability": null,
-              "mean_brier": 0.6558,
-              "mean_log_loss": 1.0823,
+              "mean_brier": 0.6566,
+              "mean_log_loss": 1.0834,
               "screening_label": "positive screen — needs holdout confirmation"
             },
             {
               "group": "<1.50",
-              "settled": 343,
-              "wins": 233,
-              "losses": 110,
-              "hit_rate": 0.6793,
+              "settled": 345,
+              "wins": 234,
+              "losses": 111,
+              "hit_rate": 0.6783,
               "hit_rate_95_wilson": [
-                0.6282,
-                0.7265
+                0.6272,
+                0.7254
               ],
-              "flat_stake_net_units": -33.84,
-              "flat_stake_roi": -0.0987,
+              "flat_stake_net_units": -34.36,
+              "flat_stake_roi": -0.0996,
               "flat_stake_roi_95_approx": [
-                -0.165,
-                -0.0323
+                -0.1659,
+                -0.0333
               ],
               "mean_odds": 1.339,
               "mean_model_probability": null,
-              "mean_brier": 0.4754,
-              "mean_log_loss": 0.8263,
+              "mean_brier": 0.4767,
+              "mean_log_loss": 0.8283,
               "screening_label": "weakness to investigate"
             }
           ],
@@ -4008,46 +4073,46 @@
             },
             {
               "group": "12-17 UTC",
-              "settled": 1092,
-              "wins": 523,
-              "losses": 569,
-              "hit_rate": 0.4789,
+              "settled": 1103,
+              "wins": 529,
+              "losses": 574,
+              "hit_rate": 0.4796,
               "hit_rate_95_wilson": [
-                0.4494,
-                0.5086
+                0.4502,
+                0.5091
               ],
-              "flat_stake_net_units": -80.23,
-              "flat_stake_roi": -0.0735,
+              "flat_stake_net_units": -80.64,
+              "flat_stake_roi": -0.0731,
               "flat_stake_roi_95_approx": [
-                -0.132,
+                -0.1313,
                 -0.0149
               ],
-              "mean_odds": 1.964,
+              "mean_odds": 1.962,
               "mean_model_probability": null,
-              "mean_brier": 0.6263,
-              "mean_log_loss": 1.0378,
+              "mean_brier": 0.6264,
+              "mean_log_loss": 1.0381,
               "screening_label": "weakness to investigate"
             },
             {
               "group": "18-23 UTC",
-              "settled": 1012,
+              "settled": 1013,
               "wins": 509,
-              "losses": 503,
-              "hit_rate": 0.503,
+              "losses": 504,
+              "hit_rate": 0.5025,
               "hit_rate_95_wilson": [
-                0.4722,
-                0.5337
+                0.4717,
+                0.5332
               ],
-              "flat_stake_net_units": -70.59,
-              "flat_stake_roi": -0.0698,
+              "flat_stake_net_units": -71.59,
+              "flat_stake_roi": -0.0707,
               "flat_stake_roi_95_approx": [
-                -0.1285,
-                -0.011
+                -0.1294,
+                -0.0119
               ],
-              "mean_odds": 1.91,
+              "mean_odds": 1.911,
               "mean_model_probability": null,
-              "mean_brier": 0.5997,
-              "mean_log_loss": 1.0,
+              "mean_brier": 0.6,
+              "mean_log_loss": 1.0004,
               "screening_label": "weakness to investigate"
             }
           ],
@@ -4252,24 +4317,24 @@
             },
             {
               "group": "2026-10-20",
-              "settled": 723,
-              "wins": 336,
-              "losses": 387,
-              "hit_rate": 0.4647,
+              "settled": 735,
+              "wins": 342,
+              "losses": 393,
+              "hit_rate": 0.4653,
               "hit_rate_95_wilson": [
-                0.4287,
-                0.5012
+                0.4295,
+                0.5015
               ],
-              "flat_stake_net_units": -82.25,
+              "flat_stake_net_units": -83.66,
               "flat_stake_roi": -0.1138,
               "flat_stake_roi_95_approx": [
-                -0.1848,
-                -0.0427
+                -0.1842,
+                -0.0434
               ],
-              "mean_odds": 1.948,
+              "mean_odds": 1.946,
               "mean_model_probability": null,
-              "mean_brier": 0.6222,
-              "mean_log_loss": 1.0288,
+              "mean_brier": 0.6228,
+              "mean_log_loss": 1.0301,
               "screening_label": "weakness to investigate"
             }
           ]
@@ -4516,17 +4581,17 @@
       },
       "efootball_gt|btts": {
         "status": "PRELIMINARY_REVIEW_DUE",
-        "settled": 776,
-        "overall_flat_stake_roi": -0.0002,
-        "latest_30_percent_flat_stake_roi": 0.01,
+        "settled": 777,
+        "overall_flat_stake_roi": 0.0003,
+        "latest_30_percent_flat_stake_roi": 0.0116,
         "automatic_promotion": false,
         "decision": "Review the lane now when n>=100; do not wait for an arbitrary 300 if evidence is already consistently weak. Production promotion still requires an independent forecast model, positive post-margin value and a chronological holdout."
       },
       "efootball_gt|match_winner": {
         "status": "REVIEW_NOW_LATEST_30_PERCENT_NEGATIVE",
-        "settled": 3996,
-        "overall_flat_stake_roi": -0.0704,
-        "latest_30_percent_flat_stake_roi": -0.0865,
+        "settled": 4008,
+        "overall_flat_stake_roi": -0.0705,
+        "latest_30_percent_flat_stake_roi": -0.0859,
         "automatic_promotion": false,
         "decision": "Review the lane now when n>=100; do not wait for an arbitrary 300 if evidence is already consistently weak. Production promotion still requires an independent forecast model, positive post-margin value and a chronological holdout."
       }
@@ -4540,20 +4605,20 @@
     "minimum_prior_matches": 30,
     "minimum_matches_per_participant": 3,
     "minimum_estimated_expected_return_for_shadow_pick": 0.02,
-    "scored_unique_history_events": 4708,
+    "scored_unique_history_events": 4720,
     "conflicting_history_events_excluded": 0,
     "skipped_target_counts": {
-      "unsettled_or_invalid_target": 79,
+      "unsettled_or_invalid_target": 83,
       "not_pre_kickoff": 0,
       "insufficient_global_history": 87,
       "invalid_participant_identity": 0,
       "invalid_outcome_or_market": 0
     },
     "forecasts_by_participant_history_tier": {
-      "both_3plus_prior_games": 910,
+      "both_3plus_prior_games": 913,
       "both_seen_under_3_or_one_under_3": 1885,
-      "neither_participant_seen": 1432,
-      "one_participant_unseen_or_low_history": 1170
+      "neither_participant_seen": 1436,
+      "one_participant_unseen_or_low_history": 1176
     },
     "lanes": {
       "efootball_adriatic|match_winner": {
@@ -5267,45 +5332,45 @@
         }
       },
       "efootball_gt|btts": {
-        "forecasted_observations": 768,
-        "unique_events": 768,
-        "mean_training_matches": 2002.3464,
-        "model_mean_brier": 0.5314,
-        "market_mean_brier_same_forecasts": 0.465,
-        "model_minus_market_brier": 0.0664,
-        "model_mean_log_loss": 0.7474,
-        "market_mean_log_loss_same_forecasts": 0.6576,
-        "model_minus_market_log_loss": 0.0898,
+        "forecasted_observations": 769,
+        "unique_events": 769,
+        "mean_training_matches": 2004.9389,
+        "model_mean_brier": 0.5309,
+        "market_mean_brier_same_forecasts": 0.4647,
+        "model_minus_market_brier": 0.0662,
+        "model_mean_log_loss": 0.7468,
+        "market_mean_log_loss_same_forecasts": 0.6573,
+        "model_minus_market_log_loss": 0.0895,
         "value_picks": {
-          "selected_picks": 709,
-          "wins": 432,
+          "selected_picks": 710,
+          "wins": 433,
           "losses": 277,
-          "hit_rate": 0.6093,
-          "flat_stake_net_units": -17.3,
-          "flat_stake_roi": -0.0244,
+          "hit_rate": 0.6099,
+          "flat_stake_net_units": -16.9,
+          "flat_stake_roi": -0.0238,
           "flat_stake_roi_95_approx": [
-            -0.0836,
-            0.0348
+            -0.0829,
+            0.0353
           ],
-          "mean_selected_odds": 1.6247,
+          "mean_selected_odds": 1.6244,
           "mean_selected_probability": 0.7835,
-          "selected_probability_minus_hit_rate": 0.1742,
-          "mean_estimated_expected_return": 0.2624,
-          "estimated_return_minus_realised_roi": 0.2868
+          "selected_probability_minus_hit_rate": 0.1736,
+          "mean_estimated_expected_return": 0.2622,
+          "estimated_return_minus_realised_roi": 0.286
         },
         "method": "Participant-form Poisson goals model using only unique earlier same-product games settled by each target's captured_at; requires 30 prior matches globally, shrinks participants with limited history toward that product's scoring prior, and reports performance by participant-history tier; probabilities do not use bookmaker odds.",
         "chronological_split": {
           "method": "Sort forecasted observations by scheduled kickoff; earliest 70% versus latest 30%.",
           "first_70_percent": {
-            "forecasted_observations": 537,
-            "unique_events": 537,
-            "mean_training_matches": 1423.6313,
-            "model_mean_brier": 0.534,
-            "market_mean_brier_same_forecasts": 0.4609,
-            "model_minus_market_brier": 0.0731,
-            "model_mean_log_loss": 0.7524,
-            "market_mean_log_loss_same_forecasts": 0.6535,
-            "model_minus_market_log_loss": 0.0989,
+            "forecasted_observations": 538,
+            "unique_events": 538,
+            "mean_training_matches": 1426.0669,
+            "model_mean_brier": 0.5333,
+            "market_mean_brier_same_forecasts": 0.4604,
+            "model_minus_market_brier": 0.0729,
+            "model_mean_log_loss": 0.7515,
+            "market_mean_log_loss_same_forecasts": 0.6529,
+            "model_minus_market_log_loss": 0.0986,
             "value_picks": {
               "selected_picks": 507,
               "wins": 310,
@@ -5327,29 +5392,29 @@
           "latest_30_percent": {
             "forecasted_observations": 231,
             "unique_events": 231,
-            "mean_training_matches": 3347.671,
-            "model_mean_brier": 0.5253,
-            "market_mean_brier_same_forecasts": 0.4745,
-            "model_minus_market_brier": 0.0508,
-            "model_mean_log_loss": 0.7358,
-            "market_mean_log_loss_same_forecasts": 0.6672,
-            "model_minus_market_log_loss": 0.0686,
+            "mean_training_matches": 3353.1342,
+            "model_mean_brier": 0.5252,
+            "market_mean_brier_same_forecasts": 0.4747,
+            "model_minus_market_brier": 0.0505,
+            "model_mean_log_loss": 0.7356,
+            "market_mean_log_loss_same_forecasts": 0.6674,
+            "model_minus_market_log_loss": 0.0682,
             "value_picks": {
-              "selected_picks": 202,
-              "wins": 122,
+              "selected_picks": 203,
+              "wins": 123,
               "losses": 80,
-              "hit_rate": 0.604,
-              "flat_stake_net_units": 1.39,
-              "flat_stake_roi": 0.0069,
+              "hit_rate": 0.6059,
+              "flat_stake_net_units": 1.79,
+              "flat_stake_roi": 0.0088,
               "flat_stake_roi_95_approx": [
-                -0.1107,
-                0.1244
+                -0.1082,
+                0.1258
               ],
-              "mean_selected_odds": 1.6875,
-              "mean_selected_probability": 0.7569,
-              "selected_probability_minus_hit_rate": 0.153,
-              "mean_estimated_expected_return": 0.2551,
-              "estimated_return_minus_realised_roi": 0.2483
+              "mean_selected_odds": 1.6861,
+              "mean_selected_probability": 0.757,
+              "selected_probability_minus_hit_rate": 0.1511,
+              "mean_estimated_expected_return": 0.2542,
+              "estimated_return_minus_realised_roi": 0.2454
             }
           }
         },
@@ -5620,72 +5685,72 @@
           },
           {
             "tier": "one_participant_unseen_or_low_history",
-            "forecasted_observations": 225,
-            "unique_events": 225,
-            "mean_training_matches": 1865.7422,
-            "model_mean_brier": 0.5606,
-            "market_mean_brier_same_forecasts": 0.4715,
-            "model_minus_market_brier": 0.0891,
-            "model_mean_log_loss": 0.7823,
-            "market_mean_log_loss_same_forecasts": 0.6643,
-            "model_minus_market_log_loss": 0.1179,
+            "forecasted_observations": 226,
+            "unique_events": 226,
+            "mean_training_matches": 1875.1681,
+            "model_mean_brier": 0.5586,
+            "market_mean_brier_same_forecasts": 0.4704,
+            "model_minus_market_brier": 0.0881,
+            "model_mean_log_loss": 0.78,
+            "market_mean_log_loss_same_forecasts": 0.6632,
+            "model_minus_market_log_loss": 0.1168,
             "value_picks": {
-              "selected_picks": 222,
-              "wins": 133,
+              "selected_picks": 223,
+              "wins": 134,
               "losses": 89,
-              "hit_rate": 0.5991,
-              "flat_stake_net_units": -12.29,
-              "flat_stake_roi": -0.0554,
+              "hit_rate": 0.6009,
+              "flat_stake_net_units": -11.89,
+              "flat_stake_roi": -0.0533,
               "flat_stake_roi_95_approx": [
-                -0.1589,
-                0.0482
+                -0.1565,
+                0.0499
               ],
-              "mean_selected_odds": 1.6002,
-              "mean_selected_probability": 0.8011,
-              "selected_probability_minus_hit_rate": 0.202,
-              "mean_estimated_expected_return": 0.2803,
-              "estimated_return_minus_realised_roi": 0.3357
+              "mean_selected_odds": 1.5993,
+              "mean_selected_probability": 0.801,
+              "selected_probability_minus_hit_rate": 0.2001,
+              "mean_estimated_expected_return": 0.2794,
+              "estimated_return_minus_realised_roi": 0.3327
             },
             "chronological_split": {
               "method": "Sort within this participant-history tier by scheduled kickoff; earliest 70% versus latest 30%.",
               "first_70_percent": {
-                "forecasted_observations": 157,
-                "unique_events": 157,
-                "mean_training_matches": 1339.8599,
-                "model_mean_brier": 0.5531,
-                "market_mean_brier_same_forecasts": 0.4604,
-                "model_minus_market_brier": 0.0928,
-                "model_mean_log_loss": 0.7735,
-                "market_mean_log_loss_same_forecasts": 0.6527,
-                "model_minus_market_log_loss": 0.1208,
+                "forecasted_observations": 158,
+                "unique_events": 158,
+                "mean_training_matches": 1347.1709,
+                "model_mean_brier": 0.5501,
+                "market_mean_brier_same_forecasts": 0.4589,
+                "model_minus_market_brier": 0.0912,
+                "model_mean_log_loss": 0.7699,
+                "market_mean_log_loss_same_forecasts": 0.6511,
+                "model_minus_market_log_loss": 0.1188,
                 "value_picks": {
-                  "selected_picks": 157,
-                  "wins": 95,
+                  "selected_picks": 158,
+                  "wins": 96,
                   "losses": 62,
-                  "hit_rate": 0.6051,
-                  "flat_stake_net_units": -9.66,
-                  "flat_stake_roi": -0.0615,
+                  "hit_rate": 0.6076,
+                  "flat_stake_net_units": -9.26,
+                  "flat_stake_roi": -0.0586,
                   "flat_stake_roi_95_approx": [
-                    -0.1824,
-                    0.0593
+                    -0.1788,
+                    0.0616
                   ],
-                  "mean_selected_odds": 1.583,
+                  "mean_selected_odds": 1.5818,
                   "mean_selected_probability": 0.8036,
-                  "selected_probability_minus_hit_rate": 0.1985,
-                  "mean_estimated_expected_return": 0.271,
-                  "estimated_return_minus_realised_roi": 0.3325
+                  "selected_probability_minus_hit_rate": 0.196,
+                  "mean_estimated_expected_return": 0.2701,
+                  "estimated_return_minus_realised_roi": 0.3287
                 }
               },
               "latest_30_percent": {
                 "forecasted_observations": 68,
                 "unique_events": 68,
-                "mean_training_matches": 3079.9118,
-                "model_mean_brier": 0.5778,
+                "mean_training_matches": 3101.9853,
+                "model_mean_brier": 0.5783,
                 "market_mean_brier_same_forecasts": 0.4972,
-                "model_minus_market_brier": 0.0805,
-                "model_mean_log_loss": 0.8026,
+                "model_minus_market_brier": 0.081,
+                "model_mean_log_loss": 0.8033,
                 "market_mean_log_loss_same_forecasts": 0.6912,
-                "model_minus_market_log_loss": 0.1114,
+                "model_minus_market_log_loss": 0.1121,
                 "value_picks": {
                   "selected_picks": 65,
                   "wins": 38,
@@ -5698,10 +5763,10 @@
                     0.1608
                   ],
                   "mean_selected_odds": 1.6417,
-                  "mean_selected_probability": 0.7951,
-                  "selected_probability_minus_hit_rate": 0.2105,
-                  "mean_estimated_expected_return": 0.3029,
-                  "estimated_return_minus_realised_roi": 0.3433
+                  "mean_selected_probability": 0.7945,
+                  "selected_probability_minus_hit_rate": 0.2099,
+                  "mean_estimated_expected_return": 0.302,
+                  "estimated_return_minus_realised_roi": 0.3424
                 }
               }
             }
@@ -5728,21 +5793,21 @@
           },
           {
             "side": "yes",
-            "selected_picks": 698,
-            "wins": 427,
+            "selected_picks": 699,
+            "wins": 428,
             "losses": 271,
-            "hit_rate": 0.6117,
-            "flat_stake_net_units": -21.4,
-            "flat_stake_roi": -0.0307,
+            "hit_rate": 0.6123,
+            "flat_stake_net_units": -21.0,
+            "flat_stake_roi": -0.03,
             "flat_stake_roi_95_approx": [
-              -0.089,
-              0.0277
+              -0.0883,
+              0.0282
             ],
-            "mean_selected_odds": 1.603,
+            "mean_selected_odds": 1.6027,
             "mean_selected_probability": 0.7893,
-            "selected_probability_minus_hit_rate": 0.1776,
-            "mean_estimated_expected_return": 0.2629,
-            "estimated_return_minus_realised_roi": 0.2936
+            "selected_probability_minus_hit_rate": 0.177,
+            "mean_estimated_expected_return": 0.2627,
+            "estimated_return_minus_realised_roi": 0.2927
           }
         ],
         "by_selected_odds_band_value_picks": [
@@ -5820,41 +5885,41 @@
           },
           {
             "odds_band": "<1.50",
-            "selected_picks": 193,
-            "wins": 128,
+            "selected_picks": 194,
+            "wins": 129,
             "losses": 65,
-            "hit_rate": 0.6632,
-            "flat_stake_net_units": -12.64,
-            "flat_stake_roi": -0.0655,
+            "hit_rate": 0.6649,
+            "flat_stake_net_units": -12.24,
+            "flat_stake_roi": -0.0631,
             "flat_stake_roi_95_approx": [
-              -0.1599,
-              0.0289
+              -0.1571,
+              0.0309
             ],
-            "mean_selected_odds": 1.413,
-            "mean_selected_probability": 0.8089,
-            "selected_probability_minus_hit_rate": 0.1457,
-            "mean_estimated_expected_return": 0.1426,
-            "estimated_return_minus_realised_roi": 0.2081
+            "mean_selected_odds": 1.4129,
+            "mean_selected_probability": 0.8087,
+            "selected_probability_minus_hit_rate": 0.1437,
+            "mean_estimated_expected_return": 0.1423,
+            "estimated_return_minus_realised_roi": 0.2054
           }
         ],
         "by_competition_value_picks": [
           {
             "group": "Esoccer H2H GG League",
-            "selected_picks": 709,
-            "wins": 432,
+            "selected_picks": 710,
+            "wins": 433,
             "losses": 277,
-            "hit_rate": 0.6093,
-            "flat_stake_net_units": -17.3,
-            "flat_stake_roi": -0.0244,
+            "hit_rate": 0.6099,
+            "flat_stake_net_units": -16.9,
+            "flat_stake_roi": -0.0238,
             "flat_stake_roi_95_approx": [
-              -0.0836,
-              0.0348
+              -0.0829,
+              0.0353
             ],
-            "mean_selected_odds": 1.6247,
+            "mean_selected_odds": 1.6244,
             "mean_selected_probability": 0.7835,
-            "selected_probability_minus_hit_rate": 0.1742,
-            "mean_estimated_expected_return": 0.2624,
-            "estimated_return_minus_realised_roi": 0.2868
+            "selected_probability_minus_hit_rate": 0.1736,
+            "mean_estimated_expected_return": 0.2622,
+            "estimated_return_minus_realised_roi": 0.286
           }
         ],
         "by_kickoff_time_value_picks": [
@@ -5914,28 +5979,28 @@
           },
           {
             "group": "18-23 UTC",
-            "selected_picks": 194,
-            "wins": 118,
+            "selected_picks": 195,
+            "wins": 119,
             "losses": 76,
-            "hit_rate": 0.6082,
-            "flat_stake_net_units": -8.63,
-            "flat_stake_roi": -0.0445,
+            "hit_rate": 0.6103,
+            "flat_stake_net_units": -8.23,
+            "flat_stake_roi": -0.0422,
             "flat_stake_roi_95_approx": [
-              -0.1557,
-              0.0667
+              -0.1529,
+              0.0685
             ],
-            "mean_selected_odds": 1.5843,
-            "mean_selected_probability": 0.7759,
-            "selected_probability_minus_hit_rate": 0.1676,
-            "mean_estimated_expected_return": 0.219,
-            "estimated_return_minus_realised_roi": 0.2635
+            "mean_selected_odds": 1.5834,
+            "mean_selected_probability": 0.7758,
+            "selected_probability_minus_hit_rate": 0.1656,
+            "mean_estimated_expected_return": 0.2183,
+            "estimated_return_minus_realised_roi": 0.2605
           }
         ],
         "diagnostic_findings": [
           "The shadow probability forecast scores worse than the same-sample no-vig market baseline on both Brier score and log loss.",
           "The latest chronological 30% repeats the probability-score weakness; this is not just an early-history-only result.",
-          "The selected paper picks estimated 26.2% average return but realised -2.4% ROI (estimate-to-result gap 28.7%); treat the model's edge estimate as overconfident.",
-          "Only 51/768 forecasts (6.6%) had 3+ prior matches for both participants, so most results rely heavily on a product-level scoring prior rather than established participant form."
+          "The selected paper picks estimated 26.2% average return but realised -2.4% ROI (estimate-to-result gap 28.6%); treat the model's edge estimate as overconfident.",
+          "Only 51/769 forecasts (6.6%) had 3+ prior matches for both participants, so most results rely heavily on a product-level scoring prior rather than established participant form."
         ],
         "promotion_review": {
           "status": "REJECT_CURRENT_SHADOW_MODEL_VS_MARKET",
@@ -5945,177 +6010,177 @@
         }
       },
       "efootball_gt|match_winner": {
-        "forecasted_observations": 3952,
-        "unique_events": 3952,
-        "mean_training_matches": 2003.8009,
-        "model_mean_brier": 0.6355,
-        "market_mean_brier_same_forecasts": 0.6093,
-        "model_minus_market_brier": 0.0262,
-        "model_mean_log_loss": 1.0478,
-        "market_mean_log_loss_same_forecasts": 1.0134,
-        "model_minus_market_log_loss": 0.0344,
+        "forecasted_observations": 3964,
+        "unique_events": 3964,
+        "mean_training_matches": 2009.7036,
+        "model_mean_brier": 0.6357,
+        "market_mean_brier_same_forecasts": 0.6094,
+        "model_minus_market_brier": 0.0263,
+        "model_mean_log_loss": 1.0482,
+        "market_mean_log_loss_same_forecasts": 1.0136,
+        "model_minus_market_log_loss": 0.0346,
         "value_picks": {
-          "selected_picks": 3155,
-          "wins": 973,
-          "losses": 2182,
-          "hit_rate": 0.3084,
-          "flat_stake_net_units": -241.2,
-          "flat_stake_roi": -0.0765,
+          "selected_picks": 3165,
+          "wins": 974,
+          "losses": 2191,
+          "hit_rate": 0.3077,
+          "flat_stake_net_units": -247.0,
+          "flat_stake_roi": -0.078,
           "flat_stake_roi_95_approx": [
-            -0.1298,
-            -0.0231
+            -0.1313,
+            -0.0248
           ],
-          "mean_selected_odds": 3.3908,
-          "mean_selected_probability": 0.4278,
-          "selected_probability_minus_hit_rate": 0.1194,
-          "mean_estimated_expected_return": 0.3317,
-          "estimated_return_minus_realised_roi": 0.4081
+          "mean_selected_odds": 3.3911,
+          "mean_selected_probability": 0.4277,
+          "selected_probability_minus_hit_rate": 0.12,
+          "mean_estimated_expected_return": 0.3318,
+          "estimated_return_minus_realised_roi": 0.4099
         },
         "method": "Participant-form Poisson goals model using only unique earlier same-product games settled by each target's captured_at; requires 30 prior matches globally, shrinks participants with limited history toward that product's scoring prior, and reports performance by participant-history tier; probabilities do not use bookmaker odds.",
         "chronological_split": {
           "method": "Sort forecasted observations by scheduled kickoff; earliest 70% versus latest 30%.",
           "first_70_percent": {
-            "forecasted_observations": 2766,
-            "unique_events": 2766,
-            "mean_training_matches": 1412.3087,
-            "model_mean_brier": 0.6335,
-            "market_mean_brier_same_forecasts": 0.6066,
-            "model_minus_market_brier": 0.027,
-            "model_mean_log_loss": 1.0449,
-            "market_mean_log_loss_same_forecasts": 1.011,
-            "model_minus_market_log_loss": 0.0339,
+            "forecasted_observations": 2774,
+            "unique_events": 2774,
+            "mean_training_matches": 1416.3079,
+            "model_mean_brier": 0.6336,
+            "market_mean_brier_same_forecasts": 0.6067,
+            "model_minus_market_brier": 0.0269,
+            "model_mean_log_loss": 1.045,
+            "market_mean_log_loss_same_forecasts": 1.0112,
+            "model_minus_market_log_loss": 0.0338,
             "value_picks": {
-              "selected_picks": 2216,
+              "selected_picks": 2221,
               "wins": 674,
-              "losses": 1542,
-              "hit_rate": 0.3042,
-              "flat_stake_net_units": -162.31,
-              "flat_stake_roi": -0.0732,
+              "losses": 1547,
+              "hit_rate": 0.3035,
+              "flat_stake_net_units": -167.31,
+              "flat_stake_roi": -0.0753,
               "flat_stake_roi_95_approx": [
-                -0.1381,
-                -0.0084
+                -0.1401,
+                -0.0106
               ],
-              "mean_selected_odds": 3.4439,
+              "mean_selected_odds": 3.447,
               "mean_selected_probability": 0.4221,
-              "selected_probability_minus_hit_rate": 0.1179,
-              "mean_estimated_expected_return": 0.3393,
-              "estimated_return_minus_realised_roi": 0.4126
+              "selected_probability_minus_hit_rate": 0.1186,
+              "mean_estimated_expected_return": 0.3407,
+              "estimated_return_minus_realised_roi": 0.416
             }
           },
           "latest_30_percent": {
-            "forecasted_observations": 1186,
-            "unique_events": 1186,
-            "mean_training_matches": 3383.2841,
-            "model_mean_brier": 0.64,
-            "market_mean_brier_same_forecasts": 0.6157,
-            "model_minus_market_brier": 0.0243,
-            "model_mean_log_loss": 1.0544,
-            "market_mean_log_loss_same_forecasts": 1.019,
-            "model_minus_market_log_loss": 0.0355,
+            "forecasted_observations": 1190,
+            "unique_events": 1190,
+            "mean_training_matches": 3392.9639,
+            "model_mean_brier": 0.6407,
+            "market_mean_brier_same_forecasts": 0.6158,
+            "model_minus_market_brier": 0.0249,
+            "model_mean_log_loss": 1.0556,
+            "market_mean_log_loss_same_forecasts": 1.0194,
+            "model_minus_market_log_loss": 0.0363,
             "value_picks": {
-              "selected_picks": 939,
-              "wins": 299,
-              "losses": 640,
-              "hit_rate": 0.3184,
-              "flat_stake_net_units": -78.89,
-              "flat_stake_roi": -0.084,
+              "selected_picks": 944,
+              "wins": 300,
+              "losses": 644,
+              "hit_rate": 0.3178,
+              "flat_stake_net_units": -79.69,
+              "flat_stake_roi": -0.0844,
               "flat_stake_roi_95_approx": [
-                -0.1772,
-                0.0092
+                -0.1774,
+                0.0086
               ],
-              "mean_selected_odds": 3.2655,
-              "mean_selected_probability": 0.4413,
-              "selected_probability_minus_hit_rate": 0.1229,
-              "mean_estimated_expected_return": 0.3136,
-              "estimated_return_minus_realised_roi": 0.3976
+              "mean_selected_odds": 3.2597,
+              "mean_selected_probability": 0.4411,
+              "selected_probability_minus_hit_rate": 0.1233,
+              "mean_estimated_expected_return": 0.3111,
+              "estimated_return_minus_realised_roi": 0.3955
             }
           }
         },
         "by_participant_history_tier": [
           {
             "tier": "both_3plus_prior_games",
-            "forecasted_observations": 699,
-            "unique_events": 699,
-            "mean_training_matches": 2676.7454,
-            "model_mean_brier": 0.6304,
-            "market_mean_brier_same_forecasts": 0.6103,
+            "forecasted_observations": 702,
+            "unique_events": 702,
+            "mean_training_matches": 2682.1923,
+            "model_mean_brier": 0.6316,
+            "market_mean_brier_same_forecasts": 0.6115,
             "model_minus_market_brier": 0.0201,
-            "model_mean_log_loss": 1.0407,
-            "market_mean_log_loss_same_forecasts": 1.0126,
-            "model_minus_market_log_loss": 0.0281,
+            "model_mean_log_loss": 1.0424,
+            "market_mean_log_loss_same_forecasts": 1.0143,
+            "model_minus_market_log_loss": 0.0282,
             "value_picks": {
-              "selected_picks": 565,
-              "wins": 190,
-              "losses": 375,
+              "selected_picks": 568,
+              "wins": 191,
+              "losses": 377,
               "hit_rate": 0.3363,
-              "flat_stake_net_units": -52.46,
-              "flat_stake_roi": -0.0928,
+              "flat_stake_net_units": -51.26,
+              "flat_stake_roi": -0.0902,
               "flat_stake_roi_95_approx": [
-                -0.208,
-                0.0223
+                -0.2054,
+                0.025
               ],
-              "mean_selected_odds": 3.2166,
-              "mean_selected_probability": 0.4556,
-              "selected_probability_minus_hit_rate": 0.1193,
-              "mean_estimated_expected_return": 0.312,
-              "estimated_return_minus_realised_roi": 0.4049
+              "mean_selected_odds": 3.2184,
+              "mean_selected_probability": 0.4551,
+              "selected_probability_minus_hit_rate": 0.1188,
+              "mean_estimated_expected_return": 0.3113,
+              "estimated_return_minus_realised_roi": 0.4015
             },
             "chronological_split": {
               "method": "Sort within this participant-history tier by scheduled kickoff; earliest 70% versus latest 30%.",
               "first_70_percent": {
-                "forecasted_observations": 489,
-                "unique_events": 489,
-                "mean_training_matches": 2252.7014,
-                "model_mean_brier": 0.6114,
-                "market_mean_brier_same_forecasts": 0.5967,
-                "model_minus_market_brier": 0.0147,
-                "model_mean_log_loss": 1.0144,
-                "market_mean_log_loss_same_forecasts": 0.9934,
-                "model_minus_market_log_loss": 0.021,
+                "forecasted_observations": 491,
+                "unique_events": 491,
+                "mean_training_matches": 2257.3381,
+                "model_mean_brier": 0.6104,
+                "market_mean_brier_same_forecasts": 0.5959,
+                "model_minus_market_brier": 0.0146,
+                "model_mean_log_loss": 1.0131,
+                "market_mean_log_loss_same_forecasts": 0.9923,
+                "model_minus_market_log_loss": 0.0208,
                 "value_picks": {
-                  "selected_picks": 403,
+                  "selected_picks": 404,
                   "wins": 144,
-                  "losses": 259,
-                  "hit_rate": 0.3573,
-                  "flat_stake_net_units": -22.78,
-                  "flat_stake_roi": -0.0565,
+                  "losses": 260,
+                  "hit_rate": 0.3564,
+                  "flat_stake_net_units": -23.78,
+                  "flat_stake_roi": -0.0589,
                   "flat_stake_roi_95_approx": [
-                    -0.1927,
-                    0.0797
+                    -0.1948,
+                    0.0771
                   ],
-                  "mean_selected_odds": 3.2445,
-                  "mean_selected_probability": 0.4606,
-                  "selected_probability_minus_hit_rate": 0.1033,
-                  "mean_estimated_expected_return": 0.3306,
-                  "estimated_return_minus_realised_roi": 0.3872
+                  "mean_selected_odds": 3.2575,
+                  "mean_selected_probability": 0.4598,
+                  "selected_probability_minus_hit_rate": 0.1034,
+                  "mean_estimated_expected_return": 0.33,
+                  "estimated_return_minus_realised_roi": 0.3889
                 }
               },
               "latest_30_percent": {
-                "forecasted_observations": 210,
-                "unique_events": 210,
-                "mean_training_matches": 3664.1619,
-                "model_mean_brier": 0.6746,
-                "market_mean_brier_same_forecasts": 0.6422,
-                "model_minus_market_brier": 0.0325,
-                "model_mean_log_loss": 1.1017,
-                "market_mean_log_loss_same_forecasts": 1.0573,
-                "model_minus_market_log_loss": 0.0445,
+                "forecasted_observations": 211,
+                "unique_events": 211,
+                "mean_training_matches": 3670.8341,
+                "model_mean_brier": 0.6809,
+                "market_mean_brier_same_forecasts": 0.6478,
+                "model_minus_market_brier": 0.033,
+                "model_mean_log_loss": 1.1108,
+                "market_mean_log_loss_same_forecasts": 1.0655,
+                "model_minus_market_log_loss": 0.0453,
                 "value_picks": {
-                  "selected_picks": 162,
-                  "wins": 46,
-                  "losses": 116,
-                  "hit_rate": 0.284,
-                  "flat_stake_net_units": -29.68,
-                  "flat_stake_roi": -0.1832,
+                  "selected_picks": 164,
+                  "wins": 47,
+                  "losses": 117,
+                  "hit_rate": 0.2866,
+                  "flat_stake_net_units": -27.48,
+                  "flat_stake_roi": -0.1676,
                   "flat_stake_roi_95_approx": [
-                    -0.3989,
-                    0.0325
+                    -0.3846,
+                    0.0495
                   ],
-                  "mean_selected_odds": 3.1472,
-                  "mean_selected_probability": 0.4431,
-                  "selected_probability_minus_hit_rate": 0.1591,
-                  "mean_estimated_expected_return": 0.2657,
-                  "estimated_return_minus_realised_roi": 0.4489
+                  "mean_selected_odds": 3.1223,
+                  "mean_selected_probability": 0.4434,
+                  "selected_probability_minus_hit_rate": 0.1568,
+                  "mean_estimated_expected_return": 0.2652,
+                  "estimated_return_minus_realised_roi": 0.4328
                 }
               }
             }
@@ -6210,176 +6275,176 @@
           },
           {
             "tier": "neither_participant_seen",
-            "forecasted_observations": 1116,
-            "unique_events": 1116,
-            "mean_training_matches": 1346.8486,
-            "model_mean_brier": 0.6351,
-            "market_mean_brier_same_forecasts": 0.609,
-            "model_minus_market_brier": 0.026,
-            "model_mean_log_loss": 1.0457,
-            "market_mean_log_loss_same_forecasts": 1.0144,
-            "model_minus_market_log_loss": 0.0313,
+            "forecasted_observations": 1120,
+            "unique_events": 1120,
+            "mean_training_matches": 1356.1429,
+            "model_mean_brier": 0.6352,
+            "market_mean_brier_same_forecasts": 0.6087,
+            "model_minus_market_brier": 0.0264,
+            "model_mean_log_loss": 1.0459,
+            "market_mean_log_loss_same_forecasts": 1.0141,
+            "model_minus_market_log_loss": 0.0318,
             "value_picks": {
-              "selected_picks": 890,
+              "selected_picks": 894,
               "wins": 237,
-              "losses": 653,
-              "hit_rate": 0.2663,
-              "flat_stake_net_units": -83.18,
-              "flat_stake_roi": -0.0935,
+              "losses": 657,
+              "hit_rate": 0.2651,
+              "flat_stake_net_units": -87.18,
+              "flat_stake_roi": -0.0975,
               "flat_stake_roi_95_approx": [
-                -0.2004,
-                0.0135
+                -0.2041,
+                0.0091
               ],
-              "mean_selected_odds": 3.6497,
-              "mean_selected_probability": 0.3856,
-              "selected_probability_minus_hit_rate": 0.1193,
-              "mean_estimated_expected_return": 0.3378,
-              "estimated_return_minus_realised_roi": 0.4313
+              "mean_selected_odds": 3.6504,
+              "mean_selected_probability": 0.3857,
+              "selected_probability_minus_hit_rate": 0.1206,
+              "mean_estimated_expected_return": 0.3388,
+              "estimated_return_minus_realised_roi": 0.4363
             },
             "chronological_split": {
               "method": "Sort within this participant-history tier by scheduled kickoff; earliest 70% versus latest 30%.",
               "first_70_percent": {
-                "forecasted_observations": 781,
-                "unique_events": 781,
-                "mean_training_matches": 734.7823,
-                "model_mean_brier": 0.6333,
-                "market_mean_brier_same_forecasts": 0.6048,
-                "model_minus_market_brier": 0.0285,
-                "model_mean_log_loss": 1.0424,
-                "market_mean_log_loss_same_forecasts": 1.0078,
-                "model_minus_market_log_loss": 0.0346,
+                "forecasted_observations": 784,
+                "unique_events": 784,
+                "mean_training_matches": 738.4452,
+                "model_mean_brier": 0.633,
+                "market_mean_brier_same_forecasts": 0.604,
+                "model_minus_market_brier": 0.029,
+                "model_mean_log_loss": 1.0418,
+                "market_mean_log_loss_same_forecasts": 1.0066,
+                "model_minus_market_log_loss": 0.0352,
                 "value_picks": {
-                  "selected_picks": 620,
+                  "selected_picks": 623,
                   "wins": 161,
-                  "losses": 459,
-                  "hit_rate": 0.2597,
-                  "flat_stake_net_units": -78.22,
-                  "flat_stake_roi": -0.1262,
+                  "losses": 462,
+                  "hit_rate": 0.2584,
+                  "flat_stake_net_units": -81.22,
+                  "flat_stake_roi": -0.1304,
                   "flat_stake_roi_95_approx": [
-                    -0.2502,
-                    -0.0021
+                    -0.2539,
+                    -0.0069
                   ],
-                  "mean_selected_odds": 3.662,
-                  "mean_selected_probability": 0.387,
-                  "selected_probability_minus_hit_rate": 0.1273,
-                  "mean_estimated_expected_return": 0.3518,
-                  "estimated_return_minus_realised_roi": 0.478
+                  "mean_selected_odds": 3.6579,
+                  "mean_selected_probability": 0.3871,
+                  "selected_probability_minus_hit_rate": 0.1287,
+                  "mean_estimated_expected_return": 0.3508,
+                  "estimated_return_minus_realised_roi": 0.4812
                 }
               },
               "latest_30_percent": {
-                "forecasted_observations": 335,
-                "unique_events": 335,
-                "mean_training_matches": 2773.7851,
-                "model_mean_brier": 0.6392,
-                "market_mean_brier_same_forecasts": 0.6189,
-                "model_minus_market_brier": 0.0203,
-                "model_mean_log_loss": 1.0535,
-                "market_mean_log_loss_same_forecasts": 1.03,
-                "model_minus_market_log_loss": 0.0235,
+                "forecasted_observations": 336,
+                "unique_events": 336,
+                "mean_training_matches": 2797.4375,
+                "model_mean_brier": 0.6402,
+                "market_mean_brier_same_forecasts": 0.6197,
+                "model_minus_market_brier": 0.0205,
+                "model_mean_log_loss": 1.0554,
+                "market_mean_log_loss_same_forecasts": 1.0315,
+                "model_minus_market_log_loss": 0.024,
                 "value_picks": {
-                  "selected_picks": 270,
+                  "selected_picks": 271,
                   "wins": 76,
-                  "losses": 194,
-                  "hit_rate": 0.2815,
-                  "flat_stake_net_units": -4.96,
-                  "flat_stake_roi": -0.0184,
+                  "losses": 195,
+                  "hit_rate": 0.2804,
+                  "flat_stake_net_units": -5.96,
+                  "flat_stake_roi": -0.022,
                   "flat_stake_roi_95_approx": [
-                    -0.2265,
-                    0.1897
+                    -0.2295,
+                    0.1855
                   ],
-                  "mean_selected_odds": 3.6215,
-                  "mean_selected_probability": 0.3824,
-                  "selected_probability_minus_hit_rate": 0.101,
-                  "mean_estimated_expected_return": 0.3056,
-                  "estimated_return_minus_realised_roi": 0.3239
+                  "mean_selected_odds": 3.6332,
+                  "mean_selected_probability": 0.3825,
+                  "selected_probability_minus_hit_rate": 0.1021,
+                  "mean_estimated_expected_return": 0.311,
+                  "estimated_return_minus_realised_roi": 0.333
                 }
               }
             }
           },
           {
             "tier": "one_participant_unseen_or_low_history",
-            "forecasted_observations": 793,
-            "unique_events": 793,
-            "mean_training_matches": 2028.5422,
+            "forecasted_observations": 798,
+            "unique_events": 798,
+            "mean_training_matches": 2040.6353,
             "model_mean_brier": 0.6496,
-            "market_mean_brier_same_forecasts": 0.6122,
-            "model_minus_market_brier": 0.0374,
-            "model_mean_log_loss": 1.0684,
-            "market_mean_log_loss_same_forecasts": 1.0187,
-            "model_minus_market_log_loss": 0.0497,
+            "market_mean_brier_same_forecasts": 0.6123,
+            "model_minus_market_brier": 0.0373,
+            "model_mean_log_loss": 1.0687,
+            "market_mean_log_loss_same_forecasts": 1.0191,
+            "model_minus_market_log_loss": 0.0496,
             "value_picks": {
-              "selected_picks": 623,
+              "selected_picks": 626,
               "wins": 167,
-              "losses": 456,
-              "hit_rate": 0.2681,
-              "flat_stake_net_units": -110.41,
-              "flat_stake_roi": -0.1772,
+              "losses": 459,
+              "hit_rate": 0.2668,
+              "flat_stake_net_units": -113.41,
+              "flat_stake_roi": -0.1812,
               "flat_stake_roi_95_approx": [
-                -0.2924,
-                -0.062
+                -0.2959,
+                -0.0664
               ],
-              "mean_selected_odds": 3.4427,
-              "mean_selected_probability": 0.4192,
-              "selected_probability_minus_hit_rate": 0.1511,
+              "mean_selected_odds": 3.4406,
+              "mean_selected_probability": 0.4193,
+              "selected_probability_minus_hit_rate": 0.1526,
               "mean_estimated_expected_return": 0.3434,
-              "estimated_return_minus_realised_roi": 0.5206
+              "estimated_return_minus_realised_roi": 0.5246
             },
             "chronological_split": {
               "method": "Sort within this participant-history tier by scheduled kickoff; earliest 70% versus latest 30%.",
               "first_70_percent": {
-                "forecasted_observations": 555,
-                "unique_events": 555,
-                "mean_training_matches": 1475.6414,
-                "model_mean_brier": 0.6479,
+                "forecasted_observations": 558,
+                "unique_events": 558,
+                "mean_training_matches": 1482.7724,
+                "model_mean_brier": 0.6482,
                 "market_mean_brier_same_forecasts": 0.6096,
-                "model_minus_market_brier": 0.0383,
-                "model_mean_log_loss": 1.0655,
-                "market_mean_log_loss_same_forecasts": 1.0156,
-                "model_minus_market_log_loss": 0.0498,
+                "model_minus_market_brier": 0.0387,
+                "model_mean_log_loss": 1.0661,
+                "market_mean_log_loss_same_forecasts": 1.0159,
+                "model_minus_market_log_loss": 0.0503,
                 "value_picks": {
-                  "selected_picks": 429,
+                  "selected_picks": 431,
                   "wins": 115,
-                  "losses": 314,
-                  "hit_rate": 0.2681,
-                  "flat_stake_net_units": -77.12,
-                  "flat_stake_roi": -0.1798,
+                  "losses": 316,
+                  "hit_rate": 0.2668,
+                  "flat_stake_net_units": -79.12,
+                  "flat_stake_roi": -0.1836,
                   "flat_stake_roi_95_approx": [
-                    -0.3186,
-                    -0.041
+                    -0.3218,
+                    -0.0453
                   ],
-                  "mean_selected_odds": 3.4419,
-                  "mean_selected_probability": 0.4196,
-                  "selected_probability_minus_hit_rate": 0.1515,
+                  "mean_selected_odds": 3.4417,
+                  "mean_selected_probability": 0.4195,
+                  "selected_probability_minus_hit_rate": 0.1527,
                   "mean_estimated_expected_return": 0.3567,
-                  "estimated_return_minus_realised_roi": 0.5365
+                  "estimated_return_minus_realised_roi": 0.5403
                 }
               },
               "latest_30_percent": {
-                "forecasted_observations": 238,
-                "unique_events": 238,
-                "mean_training_matches": 3317.8697,
-                "model_mean_brier": 0.6537,
-                "market_mean_brier_same_forecasts": 0.6183,
-                "model_minus_market_brier": 0.0353,
-                "model_mean_log_loss": 1.0754,
-                "market_mean_log_loss_same_forecasts": 1.0259,
-                "model_minus_market_log_loss": 0.0495,
+                "forecasted_observations": 240,
+                "unique_events": 240,
+                "mean_training_matches": 3337.6667,
+                "model_mean_brier": 0.6528,
+                "market_mean_brier_same_forecasts": 0.6188,
+                "model_minus_market_brier": 0.034,
+                "model_mean_log_loss": 1.0746,
+                "market_mean_log_loss_same_forecasts": 1.0265,
+                "model_minus_market_log_loss": 0.0481,
                 "value_picks": {
-                  "selected_picks": 194,
+                  "selected_picks": 195,
                   "wins": 52,
-                  "losses": 142,
-                  "hit_rate": 0.268,
-                  "flat_stake_net_units": -33.29,
-                  "flat_stake_roi": -0.1716,
+                  "losses": 143,
+                  "hit_rate": 0.2667,
+                  "flat_stake_net_units": -34.29,
+                  "flat_stake_roi": -0.1758,
                   "flat_stake_roi_95_approx": [
-                    -0.3786,
-                    0.0354
+                    -0.382,
+                    0.0303
                   ],
-                  "mean_selected_odds": 3.4446,
-                  "mean_selected_probability": 0.4184,
-                  "selected_probability_minus_hit_rate": 0.1504,
-                  "mean_estimated_expected_return": 0.3137,
-                  "estimated_return_minus_realised_roi": 0.4853
+                  "mean_selected_odds": 3.4382,
+                  "mean_selected_probability": 0.4189,
+                  "selected_probability_minus_hit_rate": 0.1523,
+                  "mean_estimated_expected_return": 0.314,
+                  "estimated_return_minus_realised_roi": 0.4898
                 }
               }
             }
@@ -6388,57 +6453,57 @@
         "by_picked_side_value_picks": [
           {
             "side": "away",
-            "selected_picks": 1455,
+            "selected_picks": 1459,
             "wins": 470,
-            "losses": 985,
-            "hit_rate": 0.323,
-            "flat_stake_net_units": -121.09,
-            "flat_stake_roi": -0.0832,
+            "losses": 989,
+            "hit_rate": 0.3221,
+            "flat_stake_net_units": -125.09,
+            "flat_stake_roi": -0.0857,
             "flat_stake_roi_95_approx": [
-              -0.1563,
-              -0.0102
+              -0.1586,
+              -0.0129
             ],
-            "mean_selected_odds": 3.1238,
-            "mean_selected_probability": 0.4519,
-            "selected_probability_minus_hit_rate": 0.1288,
-            "mean_estimated_expected_return": 0.3533,
-            "estimated_return_minus_realised_roi": 0.4365
+            "mean_selected_odds": 3.1256,
+            "mean_selected_probability": 0.4517,
+            "selected_probability_minus_hit_rate": 0.1296,
+            "mean_estimated_expected_return": 0.3537,
+            "estimated_return_minus_realised_roi": 0.4395
           },
           {
             "side": "draw",
-            "selected_picks": 284,
-            "wins": 45,
-            "losses": 239,
-            "hit_rate": 0.1585,
-            "flat_stake_net_units": -6.12,
-            "flat_stake_roi": -0.0215,
+            "selected_picks": 286,
+            "wins": 46,
+            "losses": 240,
+            "hit_rate": 0.1608,
+            "flat_stake_net_units": -3.92,
+            "flat_stake_roi": -0.0137,
             "flat_stake_roi_95_approx": [
-              -0.2905,
-              0.2474
+              -0.2818,
+              0.2544
             ],
-            "mean_selected_odds": 6.1611,
-            "mean_selected_probability": 0.1973,
-            "selected_probability_minus_hit_rate": 0.0388,
-            "mean_estimated_expected_return": 0.1804,
-            "estimated_return_minus_realised_roi": 0.2019
+            "mean_selected_odds": 6.1464,
+            "mean_selected_probability": 0.1978,
+            "selected_probability_minus_hit_rate": 0.0369,
+            "mean_estimated_expected_return": 0.1797,
+            "estimated_return_minus_realised_roi": 0.1934
           },
           {
             "side": "home",
-            "selected_picks": 1416,
+            "selected_picks": 1420,
             "wins": 458,
-            "losses": 958,
-            "hit_rate": 0.3234,
-            "flat_stake_net_units": -113.99,
-            "flat_stake_roi": -0.0805,
+            "losses": 962,
+            "hit_rate": 0.3225,
+            "flat_stake_net_units": -117.99,
+            "flat_stake_roi": -0.0831,
             "flat_stake_roi_95_approx": [
-              -0.1552,
-              -0.0058
+              -0.1576,
+              -0.0086
             ],
-            "mean_selected_odds": 3.1095,
-            "mean_selected_probability": 0.4493,
-            "selected_probability_minus_hit_rate": 0.1259,
-            "mean_estimated_expected_return": 0.3398,
-            "estimated_return_minus_realised_roi": 0.4203
+            "mean_selected_odds": 3.109,
+            "mean_selected_probability": 0.4494,
+            "selected_probability_minus_hit_rate": 0.1269,
+            "mean_estimated_expected_return": 0.34,
+            "estimated_return_minus_realised_roi": 0.4231
           }
         ],
         "by_selected_odds_band_value_picks": [
@@ -6462,75 +6527,75 @@
           },
           {
             "odds_band": "2.00-2.49",
-            "selected_picks": 590,
+            "selected_picks": 591,
             "wins": 228,
-            "losses": 362,
-            "hit_rate": 0.3864,
-            "flat_stake_net_units": -76.97,
-            "flat_stake_roi": -0.1305,
+            "losses": 363,
+            "hit_rate": 0.3858,
+            "flat_stake_net_units": -77.97,
+            "flat_stake_roi": -0.1319,
             "flat_stake_roi_95_approx": [
-              -0.2192,
-              -0.0417
+              -0.2206,
+              -0.0433
             ],
-            "mean_selected_odds": 2.267,
-            "mean_selected_probability": 0.5135,
-            "selected_probability_minus_hit_rate": 0.1271,
-            "mean_estimated_expected_return": 0.1605,
-            "estimated_return_minus_realised_roi": 0.291
+            "mean_selected_odds": 2.2671,
+            "mean_selected_probability": 0.5134,
+            "selected_probability_minus_hit_rate": 0.1277,
+            "mean_estimated_expected_return": 0.1603,
+            "estimated_return_minus_realised_roi": 0.2923
           },
           {
             "odds_band": "2.50-2.99",
-            "selected_picks": 996,
+            "selected_picks": 997,
             "wins": 319,
-            "losses": 677,
-            "hit_rate": 0.3203,
-            "flat_stake_net_units": -138.7,
-            "flat_stake_roi": -0.1393,
+            "losses": 678,
+            "hit_rate": 0.32,
+            "flat_stake_net_units": -139.7,
+            "flat_stake_roi": -0.1401,
             "flat_stake_roi_95_approx": [
-              -0.2173,
-              -0.0612
+              -0.2181,
+              -0.0621
             ],
-            "mean_selected_odds": 2.6974,
-            "mean_selected_probability": 0.4408,
-            "selected_probability_minus_hit_rate": 0.1205,
-            "mean_estimated_expected_return": 0.1879,
-            "estimated_return_minus_realised_roi": 0.3271
+            "mean_selected_odds": 2.6973,
+            "mean_selected_probability": 0.4409,
+            "selected_probability_minus_hit_rate": 0.1209,
+            "mean_estimated_expected_return": 0.1881,
+            "estimated_return_minus_realised_roi": 0.3282
           },
           {
             "odds_band": "3.00-3.99",
-            "selected_picks": 710,
+            "selected_picks": 715,
             "wins": 201,
-            "losses": 509,
-            "hit_rate": 0.2831,
-            "flat_stake_net_units": -44.35,
-            "flat_stake_roi": -0.0625,
+            "losses": 514,
+            "hit_rate": 0.2811,
+            "flat_stake_net_units": -49.35,
+            "flat_stake_roi": -0.069,
             "flat_stake_roi_95_approx": [
-              -0.1727,
-              0.0478
+              -0.1787,
+              0.0406
             ],
-            "mean_selected_odds": 3.3256,
-            "mean_selected_probability": 0.4139,
-            "selected_probability_minus_hit_rate": 0.1308,
+            "mean_selected_odds": 3.3264,
+            "mean_selected_probability": 0.4138,
+            "selected_probability_minus_hit_rate": 0.1327,
             "mean_estimated_expected_return": 0.3739,
-            "estimated_return_minus_realised_roi": 0.4364
+            "estimated_return_minus_realised_roi": 0.4429
           },
           {
             "odds_band": "4.00+",
-            "selected_picks": 702,
-            "wins": 131,
-            "losses": 571,
-            "hit_rate": 0.1866,
-            "flat_stake_net_units": 7.46,
-            "flat_stake_roi": 0.0106,
+            "selected_picks": 705,
+            "wins": 132,
+            "losses": 573,
+            "hit_rate": 0.1872,
+            "flat_stake_net_units": 8.66,
+            "flat_stake_roi": 0.0123,
             "flat_stake_roi_95_approx": [
-              -0.151,
-              0.1723
+              -0.149,
+              0.1735
             ],
-            "mean_selected_odds": 5.7422,
-            "mean_selected_probability": 0.3035,
-            "selected_probability_minus_hit_rate": 0.1169,
-            "mean_estimated_expected_return": 0.6792,
-            "estimated_return_minus_realised_roi": 0.6686
+            "mean_selected_odds": 5.7359,
+            "mean_selected_probability": 0.3037,
+            "selected_probability_minus_hit_rate": 0.1165,
+            "mean_estimated_expected_return": 0.6785,
+            "estimated_return_minus_realised_roi": 0.6663
           },
           {
             "odds_band": "<1.50",
@@ -6608,21 +6673,21 @@
           },
           {
             "group": "Volta International A",
-            "selected_picks": 77,
+            "selected_picks": 82,
             "wins": 19,
-            "losses": 58,
-            "hit_rate": 0.2468,
-            "flat_stake_net_units": -22.3,
-            "flat_stake_roi": -0.2896,
+            "losses": 63,
+            "hit_rate": 0.2317,
+            "flat_stake_net_units": -27.3,
+            "flat_stake_roi": -0.3329,
             "flat_stake_roi_95_approx": [
-              -0.5838,
-              0.0046
+              -0.6116,
+              -0.0543
             ],
-            "mean_selected_odds": 3.6223,
-            "mean_selected_probability": 0.4507,
-            "selected_probability_minus_hit_rate": 0.2039,
-            "mean_estimated_expected_return": 0.5266,
-            "estimated_return_minus_realised_roi": 0.8162
+            "mean_selected_odds": 3.632,
+            "mean_selected_probability": 0.4496,
+            "selected_probability_minus_hit_rate": 0.2178,
+            "mean_estimated_expected_return": 0.533,
+            "estimated_return_minus_realised_roi": 0.8659
           },
           {
             "group": "World Cup A",
@@ -6679,24 +6744,6 @@
             "estimated_return_minus_realised_roi": 0.817
           },
           {
-            "group": "Premier League (Virtual eComp)",
-            "selected_picks": 47,
-            "wins": 11,
-            "losses": 36,
-            "hit_rate": 0.234,
-            "flat_stake_net_units": -10.16,
-            "flat_stake_roi": -0.2162,
-            "flat_stake_roi_95_approx": [
-              -0.6524,
-              0.2201
-            ],
-            "mean_selected_odds": 3.8451,
-            "mean_selected_probability": 0.3976,
-            "selected_probability_minus_hit_rate": 0.1636,
-            "mean_estimated_expected_return": 0.3784,
-            "estimated_return_minus_realised_roi": 0.5946
-          },
-          {
             "group": "FA Cup",
             "selected_picks": 36,
             "wins": 12,
@@ -6731,6 +6778,24 @@
             "selected_probability_minus_hit_rate": 0.1342,
             "mean_estimated_expected_return": 0.4519,
             "estimated_return_minus_realised_roi": 0.656
+          },
+          {
+            "group": "Premier League (Virtual eComp)",
+            "selected_picks": 50,
+            "wins": 12,
+            "losses": 38,
+            "hit_rate": 0.24,
+            "flat_stake_net_units": -8.96,
+            "flat_stake_roi": -0.1792,
+            "flat_stake_roi_95_approx": [
+              -0.6129,
+              0.2545
+            ],
+            "mean_selected_odds": 3.8284,
+            "mean_selected_probability": 0.395,
+            "selected_probability_minus_hit_rate": 0.155,
+            "mean_estimated_expected_return": 0.3663,
+            "estimated_return_minus_realised_roi": 0.5455
           },
           {
             "group": "Serie A",
@@ -6785,6 +6850,24 @@
             "selected_probability_minus_hit_rate": 0.1419,
             "mean_estimated_expected_return": 0.2645,
             "estimated_return_minus_realised_roi": 0.4274
+          },
+          {
+            "group": "Copa America",
+            "selected_picks": 27,
+            "wins": 7,
+            "losses": 20,
+            "hit_rate": 0.2593,
+            "flat_stake_net_units": -4.17,
+            "flat_stake_roi": -0.1544,
+            "flat_stake_roi_95_approx": [
+              -0.7735,
+              0.4646
+            ],
+            "mean_selected_odds": 3.6781,
+            "mean_selected_probability": 0.3736,
+            "selected_probability_minus_hit_rate": 0.1144,
+            "mean_estimated_expected_return": 0.1716,
+            "estimated_return_minus_realised_roi": 0.326
           },
           {
             "group": "Champions League A",
@@ -6859,24 +6942,6 @@
             "estimated_return_minus_realised_roi": 0.5455
           },
           {
-            "group": "Copa America",
-            "selected_picks": 26,
-            "wins": 7,
-            "losses": 19,
-            "hit_rate": 0.2692,
-            "flat_stake_net_units": -3.17,
-            "flat_stake_roi": -0.1219,
-            "flat_stake_roi_95_approx": [
-              -0.7618,
-              0.518
-            ],
-            "mean_selected_odds": 3.7042,
-            "mean_selected_probability": 0.3742,
-            "selected_probability_minus_hit_rate": 0.105,
-            "mean_estimated_expected_return": 0.1753,
-            "estimated_return_minus_realised_roi": 0.2972
-          },
-          {
             "group": "Volta FA Cup",
             "selected_picks": 36,
             "wins": 9,
@@ -6914,21 +6979,21 @@
           },
           {
             "group": "Esoccer H2H GG League",
-            "selected_picks": 573,
+            "selected_picks": 574,
             "wins": 192,
-            "losses": 381,
-            "hit_rate": 0.3351,
-            "flat_stake_net_units": -52.99,
-            "flat_stake_roi": -0.0925,
+            "losses": 382,
+            "hit_rate": 0.3345,
+            "flat_stake_net_units": -53.99,
+            "flat_stake_roi": -0.0941,
             "flat_stake_roi_95_approx": [
-              -0.1996,
-              0.0146
+              -0.201,
+              0.0129
             ],
-            "mean_selected_odds": 2.7583,
+            "mean_selected_odds": 2.7575,
             "mean_selected_probability": 0.4428,
-            "selected_probability_minus_hit_rate": 0.1077,
-            "mean_estimated_expected_return": 0.2018,
-            "estimated_return_minus_realised_roi": 0.2943
+            "selected_probability_minus_hit_rate": 0.1083,
+            "mean_estimated_expected_return": 0.2016,
+            "estimated_return_minus_realised_roi": 0.2956
           },
           {
             "group": "Volta World Cup C",
@@ -7438,45 +7503,45 @@
           },
           {
             "group": "12-17 UTC",
-            "selected_picks": 851,
-            "wins": 257,
-            "losses": 594,
-            "hit_rate": 0.302,
-            "flat_stake_net_units": -86.42,
-            "flat_stake_roi": -0.1016,
+            "selected_picks": 860,
+            "wins": 258,
+            "losses": 602,
+            "hit_rate": 0.3,
+            "flat_stake_net_units": -91.22,
+            "flat_stake_roi": -0.1061,
             "flat_stake_roi_95_approx": [
-              -0.2,
-              -0.0031
+              -0.204,
+              -0.0081
             ],
-            "mean_selected_odds": 3.2387,
-            "mean_selected_probability": 0.4294,
-            "selected_probability_minus_hit_rate": 0.1274,
-            "mean_estimated_expected_return": 0.2967,
-            "estimated_return_minus_realised_roi": 0.3983
+            "mean_selected_odds": 3.2427,
+            "mean_selected_probability": 0.4291,
+            "selected_probability_minus_hit_rate": 0.1291,
+            "mean_estimated_expected_return": 0.298,
+            "estimated_return_minus_realised_roi": 0.4041
           },
           {
             "group": "18-23 UTC",
-            "selected_picks": 791,
+            "selected_picks": 792,
             "wins": 231,
-            "losses": 560,
-            "hit_rate": 0.292,
-            "flat_stake_net_units": -111.95,
-            "flat_stake_roi": -0.1415,
+            "losses": 561,
+            "hit_rate": 0.2917,
+            "flat_stake_net_units": -112.95,
+            "flat_stake_roi": -0.1426,
             "flat_stake_roi_95_approx": [
-              -0.2439,
-              -0.0392
+              -0.2449,
+              -0.0403
             ],
-            "mean_selected_odds": 3.4494,
+            "mean_selected_odds": 3.448,
             "mean_selected_probability": 0.4317,
-            "selected_probability_minus_hit_rate": 0.1397,
-            "mean_estimated_expected_return": 0.3808,
-            "estimated_return_minus_realised_roi": 0.5223
+            "selected_probability_minus_hit_rate": 0.1401,
+            "mean_estimated_expected_return": 0.3803,
+            "estimated_return_minus_realised_roi": 0.523
           }
         ],
         "diagnostic_findings": [
           "The shadow probability forecast scores worse than the same-sample no-vig market baseline on both Brier score and log loss.",
           "The latest chronological 30% repeats the probability-score weakness; this is not just an early-history-only result.",
-          "The selected paper picks estimated 33.2% average return but realised -7.6% ROI (estimate-to-result gap 40.8%); treat the model's edge estimate as overconfident."
+          "The selected paper picks estimated 33.2% average return but realised -7.8% ROI (estimate-to-result gap 41.0%); treat the model's edge estimate as overconfident."
         ],
         "promotion_review": {
           "status": "REJECT_CURRENT_SHADOW_MODEL_VS_MARKET",
@@ -8000,12 +8065,12 @@
   },
   "market_review_status": {
     "efootball_gt_match_winner": {
-      "observations_settled": 3996,
+      "observations_settled": 4008,
       "status": "WEAK_BOOKMAKER_FAVOURITE_BASELINE",
       "reason": "The favourite baseline has negative returns; this argues against promoting the favourite-only rule, not against researching an independent model."
     },
     "efootball_gt_gg_ng": {
-      "observations_settled": 776,
+      "observations_settled": 777,
       "status": "REVIEW_NOW_NOT_PROMOTED",
       "reason": "The sample is large enough for a preliminary review, but the latest chronological segment must be considered and the archive contains market-favourite results, not independent Match Signal BTTS forecasts."
     },
