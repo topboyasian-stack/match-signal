@@ -249,6 +249,9 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn("attempt<=10", PAGES_WORKFLOW)
         self.assertIn("verifiedProductionBoard=snapshot", PAGES_WORKFLOW)
         self.assertIn("stale board timestamps cannot pass deployment verification", PAGES_WORKFLOW)
+        self.assertIn("async function verifyImmutableContract(contract)", PAGES_WORKFLOW)
+        self.assertIn("attempt <= 6", PAGES_WORKFLOW)
+        self.assertIn("Immutable deployment verification exhausted retries", PAGES_WORKFLOW)
 
     def test_pages_inputs_route_through_board_workflow(self):
         board_paths = workflow_push_paths(BOARD_WORKFLOW)
