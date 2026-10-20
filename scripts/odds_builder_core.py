@@ -18,7 +18,7 @@ from __future__ import annotations
 import json, math, urllib.parse, urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
-from ticket_history import merge_ticket_history, settled_ticket_history
+from ticket_history import merge_ticket_history, settled_ticket_history, independent_settled_ticket_history
 
 ROOT=Path(__file__).resolve().parents[1]
 DATA=ROOT/"data"
@@ -208,7 +208,7 @@ def combined_odds_gate_state():
     try:
         tracker_path=DATA/"odds_ticket_tracker.json"
         tracker=json.loads(tracker_path.read_text(encoding="utf-8"))
-        tickets,_=merge_ticket_history(tracker)
+        tickets,_=independent_settled_ticket_history(tracker,min_legs=2,max_legs=7)
         for ticket in tickets:
             if str(ticket.get("status") or "").upper() != "WON":
                 continue
@@ -2713,8 +2713,9 @@ def _ticket_calibration_gamma():
     # history beyond that window lives in "archived_tickets". Recombine and
     # deduplicate before calibration, but never train on an already-corrected
     # combined_model_probability when its raw joint probability is unavailable.
-    tickets=settled_ticket_history(raw,min_legs=2,max_legs=7)
-    settled_count=len(tickets)
+    all_tickets=settled_ticket_history(raw,min_legs=2,max_legs=7)
+    tickets,independence_diagnostics=independent_settled_ticket_history(raw,min_legs=2,max_legs=7)
+    settled_count=len(all_tickets)
     rows=[]
     missing_raw=0
     for ticket in tickets:
@@ -2742,8 +2743,12 @@ def _ticket_calibration_gamma():
         chosen.append(best)
     diagnostics={
         "available_settled_tickets":settled_count,
+        "independent_settled_tickets":len(tickets),
+        "overlapping_event_tickets_excluded":independence_diagnostics.get("overlapping_event_tickets_excluded",0),
+        "tickets_missing_complete_event_identity":independence_diagnostics.get("tickets_missing_complete_event_identity",0),
         "missing_raw_joint_probability_count":missing_raw,
         "source_field":"raw_combined_model_probability",
+        "calibration_cohort":"event-disjoint settled tickets only",
     }
     if len(chosen)<3:
         result={"gamma":1.0,"sample":len(rows),"warmup":warmup,"trained":False,
