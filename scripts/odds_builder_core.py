@@ -4603,7 +4603,7 @@ def build_value_batches(candidates):
         desk_performance_gate.get("reason")
         if desk_diag["primary_lane_held"] else None
     )
-    if desk_options and desk_performance_gate.get("eligible") is True:
+    if desk_options:
         desk_options.sort(key=lambda option:min(
             _kickoff_timestamp(x) for x in option["rows"]
             if _kickoff_timestamp(x) is not None
@@ -4634,6 +4634,9 @@ def build_value_batches(candidates):
                 "avg_model_edge_percent":metrics["avg_model_edge_percent"],
                 "products":sorted({str(x.get("product") or "") for x in rows if x.get("product")}),
                 "primary_lane":UPCOMING_DESK_BATCH_LANE,
+                "promotion_allowed":desk_performance_gate.get("eligible") is True,
+                "promotion_hold_reason":desk_performance_gate.get("reason"),
+                "research_only_promotion_held":desk_performance_gate.get("eligible") is not True,
                 "paper_only":True,
                 "real_money_execution":False,
                 "conservative_expected_roi":round(float(option["roi"]),6),
@@ -4650,7 +4653,11 @@ def build_value_batches(candidates):
             "min_combined_odds":UPCOMING_DESK_MIN_COMBINED_ODDS,
             "max_combined_odds":UPCOMING_DESK_MAX_COMBINED_ODDS,
             "target_combined_odds":3.50,
-            "construction_priority":"upcoming_desk_research_first",
+            "construction_priority":(
+                "upcoming_desk_research_first"
+                if desk_performance_gate.get("eligible") is True
+                else "upcoming_desk_research_observation_only"
+            ),
             "desk_settled_performance_gate":desk_performance_gate,
             "priority_product":"active_efootball_upcoming_desk",
             "max_legs":UPCOMING_DESK_MAX_LEGS,
@@ -5467,7 +5474,17 @@ def main():
     primary=batches[0] if batches else None
     selected=list(primary.get("legs") or []) if primary else []
     combined=float(primary.get("combined_odds") or 1.0) if primary else 1.0
-    booking_info=_create_sportybet_booking_code(selected) if selected else {"status":"UNAVAILABLE","reason":"no_selected_batch"}
+    desk_promotion_held=(
+        primary is not None
+        and str(primary.get("primary_lane") or "")==UPCOMING_DESK_BATCH_LANE
+        and primary.get("promotion_allowed") is not True
+    )
+    booking_info=(
+        {"status":"UNAVAILABLE","reason":"settled_event_independent_promotion_gate_held",
+         "promotion_allowed":False,"paper_only":True,"real_money_execution":False}
+        if selected and desk_promotion_held else
+        (_create_sportybet_booking_code(selected) if selected else {"status":"UNAVAILABLE","reason":"no_selected_batch"})
+    )
     if primary is not None:
         primary["sportybet_booking"]=booking_info
     selection_diag={"participant_correlation_skips":0,"unique_participants":len({_p for leg in selected for _p in _participants(leg)}) if selected else 0}
