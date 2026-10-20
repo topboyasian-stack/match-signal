@@ -559,10 +559,8 @@ def backfill_virtual_results(tickets, now_iso_value, scope_index=None):
                     "backfill_match_mode": "verified_fixture_identity",
                     "result_scope": {"category_id": category_id or None, "tournament_id": tournament_id or None},
                 })
-                if same_id:
-                    matched_ids.add(ticket_event_id)
-                else:
-                    matched_fixtures.add(str(leg.get("match") or ""))
+                # All accepted rows have passed participant and kickoff validation.
+                matched_fixtures.add(fixture_key)
         print(
             f"{source} result backfill matches mode={mode}: {len(matched_ids) + len(matched_fixtures)} "
             f"legs; exact IDs={len(matched_ids)} fixture/time={len(matched_fixtures)}"
