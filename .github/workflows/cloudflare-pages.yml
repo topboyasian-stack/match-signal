@@ -450,7 +450,7 @@ jobs:
                   failures.push(path+' contains retired line-ladder clutter or misleading Builder target');
               }
               if (path==='/odds-builder.html') {
-                for (const marker of ['Odds Builder','Review currently qualified paper tickets',currentBuilderBuildMarker,currentBuilderCssHref.replace(/^\.\//,''),currentBuilderEngineSrc.replace(/^\.\//,''),'class="ob-page-header"','class="ob-section-nav"','class="ob-guide-grid"','id="oddsBuilder"'])
+                for (const marker of ['Odds Builder',currentBuilderBuildMarker,currentBuilderCssHref.replace(/^\.\//,''),currentBuilderEngineSrc.replace(/^\.\//,''),'class="ob-page-header"','class="ob-section-nav"','class="ob-guide-grid"','id="oddsBuilder"'])
                   if (!body.includes(marker)) failures.push(path+' missing '+marker);
               }
               if (path==='/football.html' || path==='/tennis.html' || path==='/basketball.html') {
