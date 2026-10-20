@@ -1481,6 +1481,7 @@ def _upcoming_desk_settled_result_index(tracker=None):
     using the same event count only once; contradictory outcomes for an event
     are dropped instead of choosing whichever source happens to be latest.
     """
+    import re
     global _UPCOMING_DESK_SETTLED_RESULT_INDEX_CACHE
     cacheable=tracker is None
     if cacheable and _UPCOMING_DESK_SETTLED_RESULT_INDEX_CACHE is not None:
