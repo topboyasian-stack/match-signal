@@ -1609,9 +1609,11 @@ def _upcoming_desk_recent_result_guard(product,line,side,tracker=None,min_loss_s
         else:
             break
     latest_three=rows[:3]
+    latest_five=rows[:5]
     latest_three_losses=sum(1 for row in latest_three if row.get("status")=="LOST")
+    latest_five_losses=sum(1 for row in latest_five if row.get("status")=="LOST")
     streak_block=streak>=max(1,int(min_loss_streak or 1))
-    cluster_block=len(latest_three)>=3 and latest_three_losses>=2
+    cluster_block=(len(latest_three)>=3 and latest_three_losses>=2) or (len(latest_five)>=5 and latest_five_losses>=3)
     recent=[{"event_id":row.get("event_id"),"status":row.get("status"),"settled_at":row.get("settled_at"),"source":row.get("source")} for row in rows[:5]]
     blocked=streak_block or cluster_block
     reason=("recent_settled_line_side_loss_streak" if streak_block
@@ -1627,8 +1629,12 @@ def _upcoming_desk_recent_result_guard(product,line,side,tracker=None,min_loss_s
         "consecutive_losses":streak,
         "latest_three_n":len(latest_three),
         "latest_three_losses":latest_three_losses,
+        "latest_five_n":len(latest_five),
+        "latest_five_losses":latest_five_losses,
+        "latest_five_loss_rate":round(latest_five_losses/len(latest_five),4) if latest_five else 0.0,
         "threshold":max(1,int(min_loss_streak or 1)),
         "latest_three_loss_threshold":2,
+        "latest_five_loss_threshold":3,
         "recent_results":recent,
     }
 
