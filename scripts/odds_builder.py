@@ -1541,7 +1541,21 @@ def _upcoming_desk_settled_result_index(tracker=None):
             status=str(leg.get("status") or "PENDING").upper()
             if product not in ACTIVE_VIRTUAL_PRODUCTS or status not in {"WON","LOST","VOID"}:
                 continue
-            side,line=parse_virtual_pick(leg)
+            side=str(leg.get("builder_pick") or "").strip().lower()
+            try:
+                line=float(leg.get("line"))
+            except (TypeError,ValueError):
+                match=re.search(r"\\b(over|under)\\s*([0-9]+(?:\\.[0-9]+)?)",str(leg.get("pick") or ""),re.I)
+                if not match:
+                    continue
+                side=side if side in {"over","under"} else match.group(1).lower()
+                line=float(match.group(2))
+            if side not in {"over","under"}:
+                match=re.search(r"\\b(over|under)\\s*([0-9]+(?:\\.[0-9]+)?)",str(leg.get("pick") or ""),re.I)
+                if match:
+                    side=match.group(1).lower()
+                    if leg.get("line") is None:
+                        line=float(match.group(2))
             stamp=leg.get("settled_at") or ticket.get("last_settled_at") or leg.get("start_time") or ticket.get("created_at")
             add(product,line,side,leg.get("event_id"),status,stamp,"paper_ticket_ledger")
 
