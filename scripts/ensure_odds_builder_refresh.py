@@ -112,11 +112,36 @@ def evaluate_runs(
             last_started_at, last_run = max(recent_runs, key=lambda item: item[0])
             last_run_age = max(0.0, (now - last_started_at).total_seconds() / 60.0)
             if last_run_age < UPCOMING_BOARD_REFRESH_MIN_INTERVAL_MINUTES:
+                last_run_event = str(last_run.get("event") or "").lower()
+                # A scheduled/push Builder cycle can finish just before the
+                # board is published. Its fresh-looking output still predates
+                # that board, so queue one recovery run instead of letting the
+                # normal 16-minute cadence throttle hide the missed input.
+                # A workflow_dispatch run is already a recovery/manual cycle;
+                # honor the interval for those runs to avoid dispatching again
+                # on every subsequent five-minute board refresh.
+                completed_cycle_predates_board = (
+                    upstream_stamp is not None
+                    and last_started_at < upstream_stamp
+                    and last_run_event != "workflow_dispatch"
+                )
+                if completed_cycle_predates_board:
+                    return {
+                        "dispatch": True,
+                        "reason": "upcoming_board_published_after_recent_builder_cycle",
+                        "last_run_id": last_run.get("databaseId"),
+                        "last_run_status": last_run.get("status"),
+                        "last_run_event": last_run_event,
+                        "run_age_minutes": round(last_run_age, 2),
+                        "upcoming_board_refresh_min_interval_minutes": UPCOMING_BOARD_REFRESH_MIN_INTERVAL_MINUTES,
+                        **artifact_fields,
+                    }
                 return {
                     "dispatch": False,
                     "reason": "upcoming_board_newer_but_builder_recent",
                     "last_run_id": last_run.get("databaseId"),
                     "last_run_status": last_run.get("status"),
+                    "last_run_event": last_run_event,
                     "run_age_minutes": round(last_run_age, 2),
                     "upcoming_board_refresh_min_interval_minutes": UPCOMING_BOARD_REFRESH_MIN_INTERVAL_MINUTES,
                     **artifact_fields,
