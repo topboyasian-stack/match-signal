@@ -38,7 +38,8 @@ EFOOTBALL_DIRECTION_MIN_HIT_RATE=0.65
 EFOOTBALL_DIRECTION_RECENT_WINDOW=50
 SETTLED_DESK_RETENTION_HOURS=2
 EFOOTBALL_DESK_LEARNING_MIN_CALIBRATION_N=30
-EFOOTBALL_DESK_EXACT_MIN_N=12
+# Match the learner's declared exact_selection_min_predictions policy.
+EFOOTBALL_DESK_EXACT_MIN_N=20
 # Forecasts outside this near-term window stay visible as research, not as
 # currently qualified virtual picks. This matches the compact eFootball lane.
 QUALIFIED_VIRTUAL_KICKOFF_WINDOW_MINUTES=60

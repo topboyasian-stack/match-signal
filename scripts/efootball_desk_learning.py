@@ -29,6 +29,7 @@ MIN_CALIBRATION_N = 30
 EXACT_MIN_N = 20
 RECENT_WINDOW = 50
 TRACE_CAP = 50000
+SETTLEMENT_RECONCILIATION_GRACE_HOURS = 2
 CAPTURE_PROBABILITY_DELTA = 0.01
 CAPTURE_ODDS_DELTA = 0.01
 CAPTURE_EDGE_DELTA = 0.005
@@ -365,7 +366,12 @@ def merge_settled_observations(ledger, trace):
 
 
 def bound_trace(trace, now=None, cap=TRACE_CAP):
-    """Keep settled rows and imminent-to-settle forecasts ahead of distant rows."""
+    """Keep recent settlement candidates and future forecasts ahead of stale rows.
+
+    The append-only scored ledger preserves outcomes. The bounded trace must
+    prioritize forecasts that can still be reconciled, not old unmatched rows
+    whose kickoff passed days ago.
+    """
     now = now or datetime.now(timezone.utc)
     if len(trace) <= cap:
         return sorted(trace, key=lambda r: str(r.get("observed_at") or ""))
@@ -379,20 +385,25 @@ def bound_trace(trace, now=None, cap=TRACE_CAP):
         if row.get("settled") is not True and row.get("scored_forecast") is not True and row.get("actual_result") != "PUSH"
     ]
     settled_rows.sort(key=lambda r: str(r.get("settled_at") or r.get("observed_at") or ""))
+
+    grace_start = now - timedelta(hours=SETTLEMENT_RECONCILIATION_GRACE_HOURS)
+
+    def pending_priority(row):
+        kickoff = dt(row.get("start_time") or row.get("timestamp"))
+        observed = dt(row.get("observed_at"))
+        observed_epoch = observed.timestamp() if observed else 0.0
+        if kickoff is None:
+            return (3, float("inf"), -observed_epoch)
+        if kickoff <= now:
+            if kickoff >= grace_start:
+                return (0, -kickoff.timestamp(), -observed_epoch)
+            return (2, -kickoff.timestamp(), -observed_epoch)
+        return (1, kickoff.timestamp(), -observed_epoch)
+
+    pending_rows.sort(key=pending_priority)
     if len(settled_rows) >= cap:
         retained = settled_rows[-cap:]
     else:
-        def pending_priority(row):
-            start = dt(row.get("start_time"))
-            observed = dt(row.get("observed_at"))
-            observed_epoch = observed.timestamp() if observed else 0.0
-            if start is None:
-                return (2, float("inf"), -observed_epoch)
-            if start <= now:
-                return (0, start.timestamp(), -observed_epoch)
-            return (1, start.timestamp(), -observed_epoch)
-
-        pending_rows.sort(key=pending_priority)
         retained = settled_rows + pending_rows[:max(0, cap - len(settled_rows))]
     retained.sort(key=lambda r: str(r.get("observed_at") or ""))
     return retained
@@ -472,6 +483,8 @@ def reconcile(trace, history_index):
     unmatched_samples_by_product = {}
     unmatched_reason_counts = {}
     match_counts_by_product = {}
+    reconcile_now = datetime.now(timezone.utc)
+    expiry_cutoff = reconcile_now - timedelta(hours=SETTLEMENT_RECONCILIATION_GRACE_HOURS)
     for exact, forecasts in forecasts_by_exact_key.items():
         if not forecasts:
             continue
@@ -480,6 +493,12 @@ def reconcile(trace, history_index):
         product_counts["forecast_line_groups"] += 1
         item, match_method = resolve_settlement(forecasts[0], history_index, identity_index, names_index)
         if not item:
+            for forecast in forecasts:
+                kickoff = dt(forecast.get("start_time") or forecast.get("timestamp"))
+                if kickoff is not None and kickoff <= expiry_cutoff:
+                    forecast["settlement_reconciliation_status"] = "UNMATCHED_EXPIRED"
+                else:
+                    forecast.pop("settlement_reconciliation_status", None)
             stats["unmatched_line_groups"] += 1
             product_counts["unmatched"] += 1
             product_counts["unmatched_reason_counts"][match_method] = product_counts["unmatched_reason_counts"].get(match_method, 0) + 1
@@ -528,6 +547,10 @@ def reconcile(trace, history_index):
                 if len(product_samples) < 4:
                     product_samples.append(sample)
             continue
+        # A late-arriving canonical result can still resolve an old forecast.
+        # Clear the pending-expiry marker as soon as identity/time reconciliation succeeds.
+        for forecast in forecasts:
+            forecast.pop("settlement_reconciliation_status", None)
         if match_method == "EXACT":
             stats["matched_line_groups_exact"] += 1
             product_counts["matched_exact"] += 1
@@ -589,7 +612,24 @@ def reconcile(trace, history_index):
     stats["unmatched_samples_by_product"] = unmatched_samples_by_product
     stats["unmatched_samples"] = unmatched_samples
     stats["scored_forecasts"] = sum(1 for row in trace if row.get("scored_forecast") is True)
+    stats["expired_unmatched_forecasts"] = sum(
+        1 for row in trace
+        if row.get("settlement_reconciliation_status") == "UNMATCHED_EXPIRED"
+    )
     return stats
+
+
+def is_pending_forecast(row):
+    """Count only unresolved forecasts still inside the settlement grace period."""
+    return bool(
+        isinstance(row, dict)
+        and row.get("settled") is not True
+        and row.get("scored_forecast") is not True
+        and row.get("actual_result") != "PUSH"
+        and not row.get("superseded_before_settlement")
+        and row.get("settlement_reconciliation_status") != "UNMATCHED_EXPIRED"
+    )
+
 
 def settled_forecasts(trace):
     rows = []
@@ -754,8 +794,7 @@ def main():
             "pending_forecasts": sum(
                 1 for r in trace
                 if str(r.get("product") or "efootball_gt").strip().lower() == product
-                and not r.get("settled")
-                and not r.get("superseded_before_settlement")
+                and is_pending_forecast(r)
             ),
             "recent_window": {
                 "n": len(recent),
