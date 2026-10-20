@@ -37,7 +37,7 @@ jobs:
           gh workflow run unified-upcoming.yml --ref main
           board_run_id=""
           for attempt in $(seq 1 180); do
-            board_run_id="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/unified-upcoming.yml/runs?branch=main&event=workflow_dispatch&per_page=20" --jq ".workflow_runs[] | select(.head_sha == \\"$source_sha\\" and .created_at >= \\"$dispatched_at\\") | .id" | head -n 1)"
+            board_run_id="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/unified-upcoming.yml/runs?branch=main&event=workflow_dispatch&per_page=20" --jq ".workflow_runs[] | select(.head_sha == \"$source_sha\" and .created_at >= \"$dispatched_at\") | .id" | head -n 1)"
             if [ -n "$board_run_id" ]; then
               board_status="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$board_run_id" --jq '.status')"
               if [ "$board_status" = "completed" ]; then
@@ -68,7 +68,7 @@ jobs:
           gh workflow run odds_builder.yml --ref main -f skip_promotion=true
           builder_run_id=""
           for attempt in $(seq 1 180); do
-            builder_run_id="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/odds_builder.yml/runs?branch=main&event=workflow_dispatch&per_page=20" --jq ".workflow_runs[] | select(.head_sha == \\"$source_sha\\" and .created_at >= \\"$dispatched_at\\") | .id" | head -n 1)"
+            builder_run_id="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/odds_builder.yml/runs?branch=main&event=workflow_dispatch&per_page=20" --jq ".workflow_runs[] | select(.head_sha == \"$source_sha\" and .created_at >= \"$dispatched_at\") | .id" | head -n 1)"
             if [ -n "$builder_run_id" ]; then
               builder_status="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$builder_run_id" --jq '.status')"
               if [ "$builder_status" = "completed" ]; then
@@ -93,16 +93,18 @@ jobs:
           echo "Verified latest Builder artifact commit: $builder_artifact_sha"
 
       - name: Publish the rebuilt Builder through Unified Upcoming
+        id: post-build-board
         env:
           GH_TOKEN: \${{ github.token }}
         run: |
           set -euo pipefail
           source_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
           dispatched_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo "dispatched_at=$dispatched_at" >> "$GITHUB_OUTPUT"
           gh workflow run unified-upcoming.yml --ref main
           board_run_id=""
           for attempt in $(seq 1 180); do
-            board_run_id="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/unified-upcoming.yml/runs?branch=main&event=workflow_dispatch&per_page=20" --jq ".workflow_runs[] | select(.head_sha == \\"$source_sha\\" and .created_at >= \\"$dispatched_at\\") | .id" | head -n 1)"
+            board_run_id="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/unified-upcoming.yml/runs?branch=main&event=workflow_dispatch&per_page=20" --jq ".workflow_runs[] | select(.head_sha == \"$source_sha\" and .created_at >= \"$dispatched_at\") | .id" | head -n 1)"
             if [ -n "$board_run_id" ]; then
               board_status="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$board_run_id" --jq '.status')"
               if [ "$board_status" = "completed" ]; then
@@ -126,13 +128,13 @@ jobs:
       - name: Wait for Cloudflare to publish the rebuilt Builder and Desk
         env:
           GH_TOKEN: \${{ github.token }}
+          BOARD_DISPATCHED_AT: \${{ steps.post-build-board.outputs.dispatched_at }}
         run: |
           set -euo pipefail
-          source_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
-          dispatched_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          dispatched_at="$BOARD_DISPATCHED_AT"
           deploy_run_id=""
           for attempt in $(seq 1 180); do
-            deploy_run_id="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/cloudflare-pages.yml/runs?branch=main&event=workflow_run&per_page=30" --jq ".workflow_runs[] | select(.head_sha == \\"$source_sha\\" and .created_at >= \\"$dispatched_at\\") | .id" | head -n 1)"
+            deploy_run_id="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/cloudflare-pages.yml/runs?branch=main&event=workflow_run&per_page=30" --jq ".workflow_runs[] | select(.created_at >= \"$dispatched_at\") | .id" | head -n 1)"
             if [ -n "$deploy_run_id" ]; then
               deploy_status="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$deploy_run_id" --jq '.status')"
               if [ "$deploy_status" = "completed" ]; then
