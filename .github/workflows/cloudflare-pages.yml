@@ -352,18 +352,35 @@ jobs:
           if (!deploymentBase.startsWith('https://') || !deploymentBase.endsWith('.pages.dev')) {
             failures.push('Cloudflare deployment step did not publish an immutable Pages URL.');
           } else {
-            for (const contract of workspaceContracts) {
-              try {
-                const [{r:pageResponse,body:pageBody},{r:cssResponse,body:cssBody}] = await Promise.all([
-                  getFrom(deploymentBase, contract.path),
-                  getFrom(deploymentBase, contract.css)
-                ]);
-                if (!pageResponse.ok) failures.push('Immutable deployment '+contract.path+' HTTP '+pageResponse.status);
-                for (const marker of contract.markers) if (!pageBody.includes(marker)) failures.push('Immutable deployment '+contract.path+' missing '+marker);
-                if (!cssResponse.ok) failures.push('Immutable deployment '+contract.css+' HTTP '+cssResponse.status);
-                if (!cssBody.includes(contract.cssMarker)) failures.push('Immutable deployment '+contract.css+' missing V3 stylesheet marker');
-              } catch(e) { failures.push('Immutable deployment verification '+contract.path+' '+e.message); }
+            // Immutable Pages URLs can briefly return 5xx during propagation.
+            // Retry each full page+CSS contract before failing the deployment.
+            async function verifyImmutableContract(contract) {
+              let lastProblems = [];
+              for (let attempt = 1; attempt <= 6; attempt++) {
+                try {
+                  const [{r:pageResponse,body:pageBody},{r:cssResponse,body:cssBody}] = await Promise.all([
+                    getFrom(deploymentBase, contract.path),
+                    getFrom(deploymentBase, contract.css)
+                  ]);
+                  const problems = [];
+                  if (!pageResponse.ok) problems.push(contract.path+' HTTP '+pageResponse.status);
+                  for (const marker of contract.markers) if (!pageBody.includes(marker)) problems.push(contract.path+' missing '+marker);
+                  if (!cssResponse.ok) problems.push(contract.css+' HTTP '+cssResponse.status);
+                  if (!cssBody.includes(contract.cssMarker)) problems.push(contract.css+' missing stylesheet marker');
+                  if (!problems.length) {
+                    if (attempt > 1) console.log('Immutable deployment '+contract.path+' is ready (attempt '+attempt+').');
+                    return null;
+                  }
+                  lastProblems = problems;
+                } catch(e) {
+                  lastProblems = [contract.path+' '+String(e.message||e)];
+                }
+                if (attempt < 6) await new Promise(resolve => setTimeout(resolve, 1500));
+              }
+              return 'Immutable deployment verification exhausted retries: '+lastProblems.join('; ');
             }
+            const immutableIssues = await Promise.all(workspaceContracts.map(verifyImmutableContract));
+            failures.push(...immutableIssues.filter(Boolean));
           }
 
           const workspaceSnapshots = new Map();
