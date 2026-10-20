@@ -44,6 +44,12 @@ on:
     # Standard lane: 2.70x active floor / 2.80x preferred; compact eFootball lane: 4–5 exact-evidence legs at 2.00x+ while preserving every leg/quote/value gate; no weak leg may be added just to reach a floor.
     - cron: '*/15 * * * *'
   workflow_dispatch:
+    inputs:
+      skip_promotion:
+        description: 'Skip promotion when the Builder is run as a step inside the production promotion pipeline'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   actions: write
@@ -371,6 +377,7 @@ jobs:
           exit 1
 
       - name: Dispatch production promotion after Builder artifact publish
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.skip_promotion != true }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

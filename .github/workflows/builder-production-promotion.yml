@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/builder-production-promotion.yml"
+      - ".github/workflows/odds_builder.yml"
+      - "scripts/test_deploy_freshness_order.py"
   workflow_dispatch:
 
 permissions:
@@ -18,69 +20,135 @@ concurrency:
 jobs:
   promote:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 60
     steps:
       - name: Check out the repository for GitHub CLI context
         uses: actions/checkout@v4
         with:
           ref: main
 
-      - name: Dispatch Unified Upcoming and wait for successful board publication
+      - name: Refresh Unified Upcoming before rebuilding the Builder
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: \${{ github.token }}
         run: |
           set -euo pipefail
-          source_sha="$(git rev-parse HEAD)"
+          source_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
           dispatched_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           gh workflow run unified-upcoming.yml --ref main
           board_run_id=""
-          for attempt in $(seq 1 60); do
+          for attempt in $(seq 1 180); do
             board_run_id="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/unified-upcoming.yml/runs?branch=main&event=workflow_dispatch&per_page=20" --jq ".workflow_runs[] | select(.head_sha == \"$source_sha\" and .created_at >= \"$dispatched_at\") | .id" | head -n 1)"
             if [ -n "$board_run_id" ]; then
               board_status="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$board_run_id" --jq '.status')"
               if [ "$board_status" = "completed" ]; then
                 board_conclusion="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$board_run_id" --jq '.conclusion')"
                 if [ "$board_conclusion" != "success" ]; then
-                  echo "Unified Upcoming run $board_run_id completed with conclusion=$board_conclusion; refusing to deploy a stale board." >&2
+                  echo "Pre-build Unified Upcoming run $board_run_id ended with conclusion=$board_conclusion; refusing to build against a failed/stale Desk." >&2
                   exit 1
                 fi
-                echo "Unified Upcoming run $board_run_id completed successfully."
+                echo "Fresh pre-build Desk published by Unified Upcoming run $board_run_id."
                 break
               fi
             fi
-            if [ "$attempt" -eq 60 ]; then
-              echo "Timed out waiting for the dispatched Unified Upcoming workflow to complete." >&2
+            if [ "$attempt" -eq 180 ]; then
+              echo "Timed out waiting for the pre-build Unified Upcoming refresh." >&2
               exit 1
             fi
             sleep 5
           done
           test -n "$board_run_id"
-          echo "Verified successful board refresh before Pages promotion."
 
-      - name: Dispatch Cloudflare Pages after successful board refresh and wait for deployment
+      - name: Rebuild Odds Builder from the refreshed Desk
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: \${{ github.token }}
         run: |
           set -euo pipefail
+          source_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
           dispatched_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          gh workflow run cloudflare-pages.yml --ref main
+          gh workflow run odds_builder.yml --ref main -f skip_promotion=true
+          builder_run_id=""
+          for attempt in $(seq 1 180); do
+            builder_run_id="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/odds_builder.yml/runs?branch=main&event=workflow_dispatch&per_page=20" --jq ".workflow_runs[] | select(.head_sha == \"$source_sha\" and .created_at >= \"$dispatched_at\") | .id" | head -n 1)"
+            if [ -n "$builder_run_id" ]; then
+              builder_status="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$builder_run_id" --jq '.status')"
+              if [ "$builder_status" = "completed" ]; then
+                builder_conclusion="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$builder_run_id" --jq '.conclusion')"
+                if [ "$builder_conclusion" != "success" ]; then
+                  echo "Rebuilt Odds Builder run $builder_run_id ended with conclusion=$builder_conclusion; refusing to publish it." >&2
+                  exit 1
+                fi
+                echo "Odds Builder run $builder_run_id successfully rebuilt and committed its artifacts from the refreshed Desk."
+                break
+              fi
+            fi
+            if [ "$attempt" -eq 180 ]; then
+              echo "Timed out waiting for the refreshed Odds Builder run." >&2
+              exit 1
+            fi
+            sleep 5
+          done
+          test -n "$builder_run_id"
+          builder_artifact_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits?path=data/odds_builder.json&per_page=10" --jq '.[0].sha')"
+          test -n "$builder_artifact_sha"
+          echo "Verified latest Builder artifact commit: $builder_artifact_sha"
+
+      - name: Publish the rebuilt Builder through Unified Upcoming
+        id: post-build-board
+        env:
+          GH_TOKEN: \${{ github.token }}
+        run: |
+          set -euo pipefail
+          source_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
+          dispatched_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo "dispatched_at=$dispatched_at" >> "$GITHUB_OUTPUT"
+          gh workflow run unified-upcoming.yml --ref main
+          board_run_id=""
+          for attempt in $(seq 1 180); do
+            board_run_id="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/unified-upcoming.yml/runs?branch=main&event=workflow_dispatch&per_page=20" --jq ".workflow_runs[] | select(.head_sha == \"$source_sha\" and .created_at >= \"$dispatched_at\") | .id" | head -n 1)"
+            if [ -n "$board_run_id" ]; then
+              board_status="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$board_run_id" --jq '.status')"
+              if [ "$board_status" = "completed" ]; then
+                board_conclusion="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$board_run_id" --jq '.conclusion')"
+                if [ "$board_conclusion" != "success" ]; then
+                  echo "Post-build Unified Upcoming run $board_run_id ended with conclusion=$board_conclusion; refusing to deploy." >&2
+                  exit 1
+                fi
+                echo "Post-build Unified Upcoming run $board_run_id succeeded after the Builder artifact commit."
+                break
+              fi
+            fi
+            if [ "$attempt" -eq 180 ]; then
+              echo "Timed out waiting for the post-build Unified Upcoming publication." >&2
+              exit 1
+            fi
+            sleep 5
+          done
+          test -n "$board_run_id"
+
+      - name: Wait for Cloudflare to publish the rebuilt Builder and Desk
+        env:
+          GH_TOKEN: \${{ github.token }}
+          BOARD_DISPATCHED_AT: \${{ steps.post-build-board.outputs.dispatched_at }}
+        run: |
+          set -euo pipefail
+          dispatched_at="$BOARD_DISPATCHED_AT"
           deploy_run_id=""
-          for attempt in $(seq 1 60); do
-            deploy_run_id="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/cloudflare-pages.yml/runs?branch=main&event=workflow_dispatch&per_page=20" --jq ".workflow_runs[] | select(.created_at >= \"$dispatched_at\") | .id" | head -n 1)"
+          for attempt in $(seq 1 180); do
+            deploy_run_id="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/cloudflare-pages.yml/runs?branch=main&event=workflow_run&per_page=30" --jq ".workflow_runs[] | select(.created_at >= \"$dispatched_at\") | .id" | head -n 1)"
             if [ -n "$deploy_run_id" ]; then
               deploy_status="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$deploy_run_id" --jq '.status')"
               if [ "$deploy_status" = "completed" ]; then
                 deploy_conclusion="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$deploy_run_id" --jq '.conclusion')"
                 if [ "$deploy_conclusion" != "success" ]; then
-                  echo "Cloudflare deployment run $deploy_run_id completed with conclusion=$deploy_conclusion." >&2
+                  echo "Cloudflare Pages run $deploy_run_id ended with conclusion=$deploy_conclusion; production verification failed." >&2
                   exit 1
                 fi
-                echo "Cloudflare deployment run $deploy_run_id completed successfully, after a verified fresh Unified Upcoming run."
+                echo "Cloudflare Pages run $deploy_run_id completed successfully after the post-build board publication."
                 exit 0
               fi
             fi
-            if [ "$attempt" -eq 60 ]; then
-              echo "Timed out waiting for the dispatched Cloudflare Pages deployment to complete." >&2
+            if [ "$attempt" -eq 180 ]; then
+              echo "Timed out waiting for the Cloudflare deployment triggered by the refreshed board." >&2
               exit 1
             fi
             sleep 5

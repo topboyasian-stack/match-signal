@@ -277,23 +277,31 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         missing = sorted(required_inputs - board_paths)
         self.assertEqual(missing, [], f"Deployable inputs bypass the Unified board workflow: {missing}")
 
-    def test_builder_promotion_checks_out_repo_and_dispatches_the_board(self):
+    def test_builder_promotion_rebuilds_from_a_fresh_desk_before_pages(self):
         self.assertIn("uses: actions/checkout@v4", PROMOTION_WORKFLOW)
         self.assertIn("with:\n          ref: main", PROMOTION_WORKFLOW)
-        self.assertIn("gh workflow run unified-upcoming.yml --ref main", PROMOTION_WORKFLOW)
         self.assertIn("workflow_dispatch:", PROMOTION_WORKFLOW)
+        self.assertIn('"Match Signal Unified Upcoming Board"', PAGES_WORKFLOW)
+        self.assertIn("Refresh Unified Upcoming before rebuilding the Builder", PROMOTION_WORKFLOW)
+        self.assertIn("Rebuild Odds Builder from the refreshed Desk", PROMOTION_WORKFLOW)
+        self.assertIn("Publish the rebuilt Builder through Unified Upcoming", PROMOTION_WORKFLOW)
+        self.assertIn("Wait for Cloudflare to publish the rebuilt Builder and Desk", PROMOTION_WORKFLOW)
+        self.assertIn("gh workflow run unified-upcoming.yml --ref main", PROMOTION_WORKFLOW)
+        self.assertIn("gh workflow run odds_builder.yml --ref main -f skip_promotion=true", PROMOTION_WORKFLOW)
+        self.assertIn("event=workflow_run", PROMOTION_WORKFLOW)
+        self.assertIn('if [ "$builder_conclusion" != "success" ]; then', PROMOTION_WORKFLOW)
+        self.assertIn('if [ "$board_conclusion" != "success" ]; then', PROMOTION_WORKFLOW)
+        self.assertIn('if [ "$deploy_conclusion" != "success" ]; then', PROMOTION_WORKFLOW)
+        self.assertNotIn("gh workflow run cloudflare-pages.yml --ref main", PROMOTION_WORKFLOW)
+        board_before_builder = PROMOTION_WORKFLOW.index("gh workflow run unified-upcoming.yml --ref main")
+        builder = PROMOTION_WORKFLOW.index("gh workflow run odds_builder.yml --ref main -f skip_promotion=true")
+        post_build_board = PROMOTION_WORKFLOW.index("Publish the rebuilt Builder through Unified Upcoming")
+        cloudflare_wait = PROMOTION_WORKFLOW.index("Wait for Cloudflare to publish the rebuilt Builder and Desk")
+        self.assertLess(board_before_builder, builder)
+        self.assertLess(builder, post_build_board)
+        self.assertLess(post_build_board, cloudflare_wait)
         self.assertIn('paths:\n      - ".github/workflows/builder-production-promotion.yml"', PROMOTION_WORKFLOW)
         self.assertNotIn('  workflow_run:\n    workflows: ["Match Signal Odds Builder"]', PROMOTION_WORKFLOW)
-        self.assertIn("Dispatch Unified Upcoming and wait for successful board publication", PROMOTION_WORKFLOW)
-        self.assertIn("gh workflow run cloudflare-pages.yml --ref main", PROMOTION_WORKFLOW)
-        self.assertIn("gh api \"repos/$GITHUB_REPOSITORY/actions/workflows/unified-upcoming.yml/runs?branch=main&event=workflow_dispatch&per_page=20\"", PROMOTION_WORKFLOW)
-        self.assertIn("if [ \"$board_conclusion\" != \"success\" ]; then", PROMOTION_WORKFLOW)
-        self.assertIn("if [ \"$deploy_conclusion\" != \"success\" ]; then", PROMOTION_WORKFLOW)
-        self.assertLess(
-            PROMOTION_WORKFLOW.index("gh workflow run unified-upcoming.yml --ref main"),
-            PROMOTION_WORKFLOW.index("gh workflow run cloudflare-pages.yml --ref main"),
-            "Pages may only be dispatched after the board refresh has been awaited and checked",
-        )
 
     def test_builder_explicitly_dispatches_promotion_after_artifact_publish(self):
         publish_step = BUILDER_WORKFLOW.find("      - name: Commit generated accumulator artifact")
@@ -302,6 +310,8 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertGreater(dispatch_step, publish_step, "promotion must happen after the artifact publication step")
         self.assertIn("GH_TOKEN: ${{ github.token }}", BUILDER_WORKFLOW[dispatch_step:])
         self.assertIn("gh workflow run builder-production-promotion.yml --ref main", BUILDER_WORKFLOW[dispatch_step:])
+        self.assertIn("skip_promotion:", BUILDER_WORKFLOW)
+        self.assertIn("inputs.skip_promotion != true", BUILDER_WORKFLOW)
         self.assertIn("  workflow_dispatch:", PROMOTION_WORKFLOW)
         self.assertIn(
             "concurrency:" + chr(10) + "  group: builder-production-promotion" + chr(10) + "  cancel-in-progress: false",
@@ -317,19 +327,14 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
                 continue
             source = workflow_path.read_text(encoding="utf-8")
             if "gh workflow run cloudflare-pages.yml --ref main" in source:
-                if workflow_path.name != "builder-production-promotion.yml":
-                    bypasses.append(str(workflow_path.relative_to(ROOT)))
-                else:
-                    wait_step = source.find("Dispatch Unified Upcoming and wait for successful board publication")
-                    dispatch_step = source.find("gh workflow run cloudflare-pages.yml --ref main")
-                    guard = source.find('if [ "$board_conclusion" != "success" ]; then')
-                    if not (wait_step >= 0 and guard >= 0 and dispatch_step > guard):
-                        bypasses.append(str(workflow_path.relative_to(ROOT)))
+                bypasses.append(str(workflow_path.relative_to(ROOT)))
         self.assertEqual(
             bypasses,
             [],
-            "Feeder workflows must hand off through Unified Upcoming before Pages deployment",
+            "Cloudflare Pages must be triggered by a successful Unified Upcoming publication, not an overlapping direct dispatch.",
         )
+        self.assertIn('      - "Match Signal Unified Upcoming Board"', PAGES_WORKFLOW)
+        self.assertIn("    types: [completed]", PAGES_WORKFLOW)
 
     def test_board_owned_outputs_do_not_trigger_a_self_refresh_loop(self):
         paths = workflow_push_paths(BOARD_WORKFLOW)
