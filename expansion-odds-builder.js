@@ -520,9 +520,21 @@
     });
     function n(v,d){var x=Number(v);return isFinite(x)?x:d;}
     function ticketLabel(t){
-      if(t.status==='WON') return '<span class="ticket-status won">✓ WON</span>';
-      if(t.status==='LOST') return '<span class="ticket-status lost">✕ LOST</span>';
-      return '<span class="ticket-status pending">ONGOING</span>';
+      var status=String(t&&t.status||'PENDING').toUpperCase();
+      if(status==='WON') return '<span class="ticket-status won">✓ WON</span>';
+      if(status==='LOST') return '<span class="ticket-status lost">✕ LOST</span>';
+      var legs=Array.isArray(t&&t.legs)?t.legs:[];
+      var pending=legs.filter(function(leg){return String(leg&&leg.status||'PENDING').toUpperCase()==='PENDING';});
+      var hasSettled=legs.some(function(leg){return /^(WON|LOST|VOID)$/.test(String(leg&&leg.status||'').toUpperCase());});
+      var starts=pending.map(function(leg){return Date.parse(leg.start_time||leg.startTime||leg.start_time_iso||'');}).filter(function(v){return Number.isFinite(v);});
+      var future=starts.filter(function(v){return v>Date.now();}).length;
+      var past=starts.filter(function(v){return v<=Date.now();}).length;
+      if(pending.length && starts.length===pending.length && future===pending.length && !hasSettled) {
+        return '<span class="ticket-status pending">UPCOMING</span>';
+      }
+      if(future>0 && (past>0||hasSettled)) return '<span class="ticket-status pending">IN PROGRESS</span>';
+      if(future>0) return '<span class="ticket-status pending">UPCOMING</span>';
+      return '<span class="ticket-status pending">AWAITING RESULTS</span>';
     }
     function legStatus(leg){
       var s=String(leg&&leg.status||'PENDING').toUpperCase();
@@ -581,17 +593,26 @@
         '</div>'+
       '</details>';
     }
-    var cards=displayTickets.slice(0,50).map(function(t,idx){
+    function renderTicketCard(t,idx){
       var lc=t.leg_counts||{}, total=Number(t.leg_count||((t.legs||[]).length))||0;
       var settled=Number(t.settled_leg_count!=null?t.settled_leg_count:(Number(lc.won||0)+Number(lc.lost||0)+Number(lc.void||0)));
       var pending=Number(t.pending_leg_count!=null?t.pending_leg_count:(lc.pending||0));
       var pctDone=total?Math.max(0,Math.min(100,(settled/total)*100)):0;
       var lostAndPending=t.status==='LOST'&&pending>0;
+      var pendingLegsForState=(Array.isArray(t.legs)?t.legs:[]).filter(function(leg){return String(leg&&leg.status||'PENDING').toUpperCase()==='PENDING';});
+      var pendingStartMs=pendingLegsForState.map(function(leg){return Date.parse(leg.start_time||leg.startTime||leg.start_time_iso||'');}).filter(function(value){return Number.isFinite(value);});
+      var futurePending=pendingStartMs.filter(function(value){return value>Date.now();}).length;
+      var pastPending=pendingStartMs.filter(function(value){return value<=Date.now();}).length;
+      var pendingMessage=futurePending&&pastPending
+        ?'Some selections have kicked off while others remain scheduled; no losing leg has been recorded for this ticket.'
+        :futurePending
+          ?'The remaining selections are scheduled for later kickoffs. No win or loss has been recorded for this ticket yet.'
+          :'Kickoff has passed, but official settlement has not arrived. This ticket remains unresolved until result data is confirmed.';
       var products=(Array.isArray(t.products)?t.products:[]).map(function(x){return String(x||'').toUpperCase();}).filter(Boolean).join(' · ')||'VIRTUAL';
       var created=t.created_at?local(t.created_at):'Unknown';
       var lastSettled=t.last_settled_at?local(t.last_settled_at):'No legs settled yet';
       var headline=(t.batch_id?esc2(t.batch_id)+' · ':'')+ticketLabel(t);
-      return '<details class="ticket-card '+(t.status==='LOST'?'ticket-lost':t.status==='WON'?'ticket-won':'ticket-pending')+'" '+(idx===0?'open':'')+'>'+
+      return '<details class="ticket-card '+(t.status==='LOST'?'ticket-lost':t.status==='WON'?'ticket-won':'ticket-pending')+'" '+''+'>'+
         '<summary class="ticket-card-summary">'+
           '<div class="ticket-card-title"><span class="ticket-kicker">PAPER TICKET · '+esc2(t.ticket_id||'—')+'</span><strong>'+headline+'</strong><small>'+esc2(products)+' · Created '+esc2(created)+'</small></div>'+
           '<div class="ticket-card-odds"><strong>'+esc2(t.combined_odds==null?'—':Number(t.combined_odds).toFixed(3))+'x</strong><span>'+esc2(t.leg_count||total)+' legs</span></div>'+
@@ -610,7 +631,7 @@
           '</div>'+
           '<div class="ticket-state-callout '+(t.status==='LOST'?'lost':t.status==='WON'?'won':'pending')+'">'+
             '<strong>'+headline+'</strong>'+
-            '<span>'+(lostAndPending?'A loss has already settled this accumulator. Remaining legs continue to settle for the historical record.':t.status==='WON'?'Every leg is settled without a loss.':t.status==='LOST'?'The accumulator is settled as lost.':'Ticket is still awaiting final settlement.')+'</span>'+
+            '<span>'+(lostAndPending?'A loss has already settled this accumulator. Remaining legs continue to settle for the historical record.':t.status==='WON'?'Every leg is settled without a loss.':t.status==='LOST'?'The accumulator is settled as lost.':pendingMessage)+'</span>'+
           '</div>'+
           '<div class="ticket-meta-grid">'+
             '<div><small>Created</small><b>'+esc2(created)+'</b></div>'+
@@ -621,22 +642,30 @@
           '<div class="ticket-leg-list">'+ticketLegs(t)+'</div>'+
         '</div>'+
       '</details>';
-    }).join('');
-    if(!cards) cards='<div class="empty">No current or settled paper tickets in this view.</div>';
+    }
+    var activeTicketList=displayTickets.filter(function(t){return String(t&&t.status||'PENDING').toUpperCase()==='PENDING';});
+    var settledTicketList=displayTickets.filter(function(t){return String(t&&t.status||'PENDING').toUpperCase()!=='PENDING';});
+    var cards=activeTicketList.map(renderTicketCard).join('');
+    if(!cards) cards='<div class="empty">No unresolved paper tickets are currently awaiting results.</div>';
+    var recentHistoryCards=settledTicketList.slice(0,8).map(renderTicketCard).join('');
+    var historySection=settledTicketList.length
+      ?'<details class="ticket-history"><summary class="ticket-history-summary"><strong>Recent settled results ('+esc2(settledTicketList.length)+')</strong><span>Open to review the 8 latest completed tickets; older records remain in the archive.</span></summary><div class="ticket-list">'+recentHistoryCards+'</div>'+(settledTicketList.length>8?'<div class="sub">Showing the 8 most recent settled tickets.</div>':'')+'</details>'
+      :'';
     var archiveCards=archivedTickets.slice(0,100).map(archivedTicketHtml).join('');
     var archiveSection=archivedTickets.length
       ?'<details class="ticket-archive"><summary class="ticket-archive-summary"><strong>Archived paper snapshots ('+esc2(archivedTickets.length)+')</strong><span>Older unresolved batches and overflow history are removed from the current list; their original legs and settlement state are preserved below.</span></summary><div class="ticket-list">'+archiveCards+'</div>'+(archivedTickets.length>100?'<div class="sub">Showing the 100 newest archived snapshots; older records remain in the saved paper ledger.</div>':'')+'</details>'
       :'';
 
     return '<section class="ticket-track">'+
-      '<div class="ticket-track-head"><div><span class="ticket-track-kicker">PAPER LEDGER</span><b>Paper Ticket Track</b><div class="sub">Fresh pending tickets appear first. Unresolved snapshots whose latest kickoff was more than six hours ago are archived below rather than shown as ongoing; all snapshots remain available for settlement review.</div></div>'+
+      '<div class="ticket-track-head"><div><span class="ticket-track-kicker">PAPER LEDGER</span><b>Paper Ticket Track</b><div class="sub">Upcoming tickets stay here until their results are confirmed. A lost leg closes the accumulator immediately; unsettled legs remain visible for result reconciliation.</div></div>'+
       '<div class="ticket-track-stats">'+
         '<span><small>Tracked</small><b>'+esc2(tracked)+'</b></span>'+
-        '<span class="ongoing"><small>Ongoing</small><b>'+esc2(ongoing)+'</b></span>'+
+        '<span class="ongoing"><small>Unsettled</small><b>'+esc2(ongoing)+'</b></span>'+
         '<span class="won"><small>Won</small><b>'+esc2(won)+'</b></span>'+
         '<span class="lost"><small>Lost</small><b>'+esc2(lost)+'</b></span>'+
       '</div></div>'+
       '<div class="ticket-list">'+cards+'</div>'+
+      historySection+
       archiveSection+
     '</section>';
   }
@@ -837,14 +866,14 @@
         '</div>';
     }).join('');
     var empty='<div class="empty">No current individual candidate passed all leg-level gates. The system will continue scanning; no ticket is forced.</div>';
-    return '<div class="builder-batch-panel" style="margin-top:12px">'+
-      '<div class="builder-section-head"><div><span class="section-kicker">QUALIFICATION MONITOR</span><b>Why no qualified batch?</b><span>Individual legs and whole-ticket batches have separate gates.</span></div>'+
-      '<div class="builder-section-note"><b>0</b><span>qualified batches</span></div></div>'+
+    return '<details class="builder-batch-panel ob-qualification-wrap">'+
+      '<summary class="diagnostic-summary"><span class="section-kicker">OPTIONAL DIAGNOSTICS</span><b>Why no qualified batch?</b><span>Open only to inspect which checks blocked a ticket.</span></summary>'+
+      '<div class="diagnostic-content">'+
       '<div class="sub" style="margin-bottom:10px">The Builder refreshes every 15 minutes. The eFootball exact-evidence research lane uses a 65% per-leg and average floor; the standard high-confidence lane retains its 80% floor. Neither lane can bypass exact-line evidence, fresh SportyBet price, correlation, odds and whole-ticket expected-return gates.</div>'+
       '<div class="builder-feedbar"><span>Individual leg gates passed <b>'+esc(legPassCount)+'</b></span><span>Exact-evidence eFootball legs at 65%+ <b>'+esc(exactPassCount)+'</b></span><span>Results-first candidates passing <b>'+esc(Number(vdiag.evidence_pass||0))+'</b></span><span>Paper only <b>Yes</b></span></div>'+
       '<div class="grid" style="margin-top:10px">'+(cards||empty)+'</div>'+
       '<div class="sub" style="margin-top:10px">A row marked “Individual gates pass” has not earned a qualified-ticket label: no ticket is declared qualified unless its complete construction passes correlation, timing, minimum combined odds and expected-return checks. No booking code is created from this panel.'+
-      (observedAt?' Latest artifact: '+esc(observedAt):'')+'</div></div>';
+      (observedAt?' Latest artifact: '+esc(observedAt):'')+'</div></div></details>';
   }
 
   function render(data, tracker) {
@@ -980,7 +1009,7 @@
 
     var ticketTrack=ticketTrackHtml(tracker);
     var qualificationMonitor=qualificationMonitorHtml(data,batches.length);
-    target.innerHTML=pushNotificationHtml()+'<div class="builder-console"><div class="builder-console-head"><div><span class="builder-kicker">PAPER RESEARCH DESK</span><h3>Live '+floorLabel+' Builder</h3><p>Fresh SportyBet prices are qualified in-process. Batches stay paper-only and disjoint by event.</p></div><div class="builder-live-state"><span class="pulse-dot"></span><b>'+(staleBuilderData?'REFRESH REQUIRED':data.status==='LIVE_VALUE_SET'?'LIVE VALUE SET':batchCount?'PAPER VALUE SET':'NO ACTIVE SET')+'</b><small>'+esc(status)+'</small></div></div><div class="builder-stat-row"><div class="builder-stat builder-stat-main"><small>Active batches</small><strong>'+batchCount+'/6</strong><span>Automatically refreshed</span></div><div class="builder-stat"><small>Sport lanes</small><strong>'+esc(sports.length?sports.join(' · '):'—')+'</strong><span>Current batch set</span></div><div class="builder-stat"><small>Top model rating</small><strong>'+esc(topRating==null?'—':topRating.toFixed(1)+'/100')+'</strong><span>Batch strength proxy</span></div><div class="builder-stat"><small>Top combined odds</small><strong>'+esc(top&&top.combined_odds!=null?Number(top.combined_odds).toFixed(3):'—')+'x</strong><span>SportyBet snapshot</span></div></div></div><div class="builder-batch-panel"><div class="builder-section-head"><div><span class="section-kicker">QUALIFIED SET</span><b>'+floorLabel+' paper research batches</b><span>Expand a batch for its booking code, live quote details, timer and legs.</span></div><div class="builder-section-note"><b>'+esc(virtualCount)+'</b><span>virtual candidates evaluated</span></div></div><div class="batch-list">'+(cards||'<div class="empty">No qualified '+floorLabel+' batches are currently available.</div>')+'</div><div class="builder-feedbar"><span><b>SPORTYBET</b> live snapshot</span><span>Top joint proxy <b>'+esc(topJoint==null?'—':pct(topJoint))+'</b></span><span>Price freshness gate <b>&le; 15m</b></span><span>Paper only <b>Yes</b></span></div>'+gateNote+'</div>'+qualificationMonitor+ticketTrack+'<div class="builder-note">The Builder refreshes automatically. Opening a batch reveals its exact selections and current SportyBet booking code.</div>';
+    target.innerHTML=pushNotificationHtml()+'<div class="builder-console"><div class="builder-console-head"><div><span class="builder-kicker">PAPER RESEARCH DESK</span><h3>Live '+floorLabel+' Builder</h3><p>Fresh SportyBet prices are qualified in-process. Batches stay paper-only and disjoint by event.</p></div><div class="builder-live-state"><span class="pulse-dot"></span><b>'+(staleBuilderData?'REFRESH REQUIRED':data.status==='LIVE_VALUE_SET'?'LIVE VALUE SET':batchCount?'PAPER VALUE SET':'NO ACTIVE SET')+'</b><small>'+esc(status)+'</small></div></div><div class="builder-stat-row"><div class="builder-stat builder-stat-main"><small>Active batches</small><strong>'+batchCount+'/6</strong><span>Automatically refreshed</span></div><div class="builder-stat"><small>Sport lanes</small><strong>'+esc(sports.length?sports.join(' · '):'—')+'</strong><span>Current batch set</span></div><div class="builder-stat"><small>Top model rating</small><strong>'+esc(topRating==null?'—':topRating.toFixed(1)+'/100')+'</strong><span>Batch strength proxy</span></div><div class="builder-stat"><small>Top combined odds</small><strong>'+esc(top&&top.combined_odds!=null?Number(top.combined_odds).toFixed(3):'—')+'x</strong><span>SportyBet snapshot</span></div></div></div><div class="builder-batch-panel builder-qualified-set"><div class="builder-section-head"><div><span class="section-kicker">QUALIFIED SET</span><b>'+floorLabel+' paper research batches</b><span>Expand a batch for its booking code, live quote details, timer and legs.</span></div><div class="builder-section-note"><b>'+esc(virtualCount)+'</b><span>virtual candidates evaluated</span></div></div><div class="batch-list">'+(cards||'<div class="empty">No qualified '+floorLabel+' batches are currently available.</div>')+'</div><div class="builder-feedbar"><span><b>SPORTYBET</b> live snapshot</span><span>Top joint proxy <b>'+esc(topJoint==null?'—':pct(topJoint))+'</b></span><span>Price freshness gate <b>&le; 15m</b></span><span>Paper only <b>Yes</b></span></div>'+gateNote+'</div>'+qualificationMonitor+ticketTrack+'<div class="builder-note">The Builder refreshes automatically. Opening a batch reveals its exact selections and current SportyBet booking code.</div>';
     updateTimers();
   }
   function load(){
