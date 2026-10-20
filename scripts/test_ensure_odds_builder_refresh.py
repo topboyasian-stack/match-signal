@@ -109,6 +109,17 @@ class BuilderRefreshDecisionTests(unittest.TestCase):
         self.assertEqual(result["reason"], "active_builder_run")
         self.assertEqual(result["active_run_id"], 901)
 
+    def test_board_published_after_active_builder_started_queues_follow_up_refresh(self):
+        result = evaluate_runs(
+            [run(UPCOMING_BOARD_REFRESH_MIN_INTERVAL_MINUTES + 1, "in_progress", run_id=902)],
+            NOW,
+            artifact_generated_at=artifact(10),
+            upstream_board_generated_at=NOW.isoformat().replace("+00:00", "Z"),
+        )
+        self.assertTrue(result["dispatch"])
+        self.assertEqual(result["reason"], "upcoming_board_advanced_during_active_builder_run")
+        self.assertEqual(result["active_run_id"], 902)
+
     def test_fresh_builder_artifact_still_skips_when_board_is_not_newer(self):
         result = evaluate_runs(
             [run(10)],
