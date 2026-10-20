@@ -165,7 +165,7 @@ def find_event(pred, events):
         elif names!=pnames:
             if similarity(names[0],pnames[0])<0.84 or similarity(names[1],pnames[1])<0.84:continue
         est=e.get('estimateStartTime')
-        try:et=datetime.fromtimestamp(float(est)/1000,tz=timezone.utc) if est else None
+        try:et=datetime.fromtimestamp(float(est) if float(est) < 100000000000 else float(est)/1000,tz=timezone.utc) if est else None
         except (TypeError,ValueError,OverflowError):et=None
         delta=abs((et-pt).total_seconds()) if et and pt else 0
         max_seconds = 3 * 3600 if pred.get('sport') == 'football' else 72 * 3600
