@@ -1518,10 +1518,18 @@ def _upcoming_desk_research_candidate(event, now):
         return None,"sportybet_quote_missing"
     if over<=1.0 or under<=1.0:
         return None,"two_sided_sportybet_quote_missing"
-    age=odds_age(event)
+    # Fresh snapshot time takes precedence over any timestamp retained in the
+    # older Unified artifact; downstream make_leg uses this same authoritative stamp.
+    quote_stamp=event.get("market_odds_timestamp") or event.get("timestamp") or event.get("odds_timestamp")
+    try:
+        stamp_dt=datetime.fromisoformat(str(quote_stamp).replace("Z","+00:00")).astimezone(timezone.utc)
+        age=max(0.0,(datetime.now(timezone.utc)-stamp_dt).total_seconds())
+    except (TypeError,ValueError):
+        age=None
     if age is None or age>MAX_ODDS_AGE_SECONDS:
         return None,"sportybet_quote_stale_or_untimestamped"
     candidate=dict(event)
+    candidate["odds_timestamp"]=str(quote_stamp)
     candidate.update({
         "sport":"virtual",
         "builder_market":"virtual_total",
