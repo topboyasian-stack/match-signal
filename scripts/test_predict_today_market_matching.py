@@ -14,7 +14,7 @@ if str(SCRIPTS) not in sys.path:
 
 import predict_today
 import enrich_sportybet_odds
-from football_competition_match import same_competition
+from football_competition_match import same_competition, football_market_identity_matches
 from model_upgrade import _apply_independent_probability_fields
 
 
@@ -33,16 +33,26 @@ def prediction():
     }
 
 
-def sporty_event(*, tournament, start_ms=KICKOFF_MS, event_id="sr:match:fixture"):
+def sporty_event(
+    *,
+    tournament,
+    category="International Clubs",
+    home="Fenerbahce",
+    away="Slavia Prague",
+    start_ms=KICKOFF_MS,
+    event_id="sr:match:fixture",
+):
     return {
         "event_id": event_id,
         "eventId": event_id,
         "tournament": tournament,
         "_league": tournament,
-        "home": "Fenerbahce",
-        "away": "Slavia Prague",
-        "homeTeamName": "Fenerbahce",
-        "awayTeamName": "Slavia Prague",
+        "category": category,
+        "_category": category,
+        "home": home,
+        "away": away,
+        "homeTeamName": home,
+        "awayTeamName": away,
         "start_time_ms": start_ms,
         "estimateStartTime": start_ms,
         "markets": [],
@@ -102,6 +112,58 @@ class CompetitionSafeFootballMarketTests(unittest.TestCase):
             event_id="sr:match:tomorrow",
         )
         self.assertEqual(enrich_sportybet_odds.find_event(pred, [tomorrow]), (None, None))
+
+    def test_youth_category_and_age_markers_override_a_mislabelled_tournament(self):
+        pred = prediction()
+        # Real provider pattern: same club names and kickoff, but the category
+        # identifies this row as youth. A misleading senior tournament label
+        # must not permit attachment.
+        category_mislabeled = sporty_event(
+            tournament="UEFA Champions League",
+            category="International Youth",
+            event_id="sr:match:category-mislabeled-youth",
+        )
+        self.assertIsNone(predict_today._find_sportybet_match(pred, [category_mislabeled])[0])
+        self.assertEqual(enrich_sportybet_odds.find_event(pred, [category_mislabeled]), (None, None))
+
+        # A youth marker in either participant is also authoritative even when
+        # the tournament/category text looks senior.
+        age_marked = sporty_event(
+            tournament="UEFA Champions League",
+            category="International Clubs",
+            home="Fenerbahce U19",
+            away="Slavia Prague U19",
+            event_id="sr:match:age-marked-youth",
+        )
+        self.assertIsNone(predict_today._find_sportybet_match(pred, [age_marked])[0])
+        self.assertEqual(enrich_sportybet_odds.find_event(pred, [age_marked]), (None, None))
+
+        senior = sporty_event(
+            tournament="UEFA Champions League",
+            category="International Clubs",
+            event_id="sr:match:senior",
+        )
+        found, _ = predict_today._find_sportybet_match(pred, [category_mislabeled, age_marked, senior])
+        self.assertIs(found, senior)
+        found, method = enrich_sportybet_odds.find_event(pred, [category_mislabeled, age_marked, senior])
+        self.assertIs(found, senior)
+        self.assertEqual(method, "name_time")
+
+    def test_age_group_must_match_on_both_sides(self):
+        self.assertFalse(football_market_identity_matches(
+            "UEFA Youth League U19",
+            "UEFA Youth League U17",
+            market_category="International Youth",
+            prediction_teams=("Fenerbahce U19", "Slavia Prague U19"),
+            market_teams=("Fenerbahce U17", "Slavia Prague U17"),
+        ))
+        self.assertTrue(football_market_identity_matches(
+            "UEFA Champions League",
+            "UEFA Champions League",
+            market_category="International Clubs",
+            prediction_teams=("Fenerbahce", "Slavia Prague"),
+            market_teams=("Fenerbahce Istanbul", "Slavia Prague"),
+        ))
 
     def test_model_upgrade_replaces_stale_confidence_metadata(self):
         row = {
