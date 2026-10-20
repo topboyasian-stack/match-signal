@@ -1608,17 +1608,27 @@ def _upcoming_desk_recent_result_guard(product,line,side,tracker=None,min_loss_s
             streak+=1
         else:
             break
+    latest_three=rows[:3]
+    latest_three_losses=sum(1 for row in latest_three if row.get("status")=="LOST")
+    streak_block=streak>=max(1,int(min_loss_streak or 1))
+    cluster_block=len(latest_three)>=3 and latest_three_losses>=2
     recent=[{"event_id":row.get("event_id"),"status":row.get("status"),"settled_at":row.get("settled_at"),"source":row.get("source")} for row in rows[:5]]
-    blocked=streak>=max(1,int(min_loss_streak or 1))
+    blocked=streak_block or cluster_block
+    reason=("recent_settled_line_side_loss_streak" if streak_block
+            else "recent_settled_line_side_loss_cluster" if cluster_block
+            else None)
     return {
         "blocked":blocked,
-        "reason":"recent_settled_line_side_loss_streak" if blocked else None,
+        "reason":reason,
         "product":str(product or "").lower(),
         "line":line_key,
         "side":str(side or "").lower(),
         "sample_n":len(rows),
         "consecutive_losses":streak,
+        "latest_three_n":len(latest_three),
+        "latest_three_losses":latest_three_losses,
         "threshold":max(1,int(min_loss_streak or 1)),
+        "latest_three_loss_threshold":2,
         "recent_results":recent,
     }
 
