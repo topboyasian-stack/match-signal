@@ -2578,13 +2578,29 @@ def _settled_exact_line_probability_cap(product,line,side,model_probability,inde
 def make_leg(x):
     raw_p=float(x["builder_probability"])
     if x.get("sport")=="virtual":
-        # Keep the exact product + line + side settled-ticket cap as an
-        # independent safety check for every eFootball lane, including Desk.
-        # The Desk walk-forward lower bound is an additional ticket-level
-        # safeguard; it must not bypass contradictory realized side evidence.
-        settled_side_cap=_settled_exact_line_probability_cap(
+        historical_side_cap=_settled_exact_line_probability_cap(
             x.get("product"),x.get("line"),x.get("builder_pick"),raw_p
         )
+        is_desk_research_lane=(
+            x.get("upcoming_desk_research_only") is True
+            or str(x.get("qualification_lane") or "")==UPCOMING_DESK_RESEARCH_LANE
+        )
+        if is_desk_research_lane:
+            # Do not let prior selected-ticket outcomes from the legacy Builder
+            # override a distinct Desk-calibrated probability whose selected-side,
+            # exact-line chronological holdout and recent-loss guard already run
+            # as separate gates. Keep the pooled result visible for audit, but
+            # keep ticket construction anchored to the Desk probability.
+            settled_side_cap=dict(historical_side_cap)
+            settled_side_cap.update({
+                "applied":False,
+                "reason":"desk_probability_uses_exact_line_walkforward",
+                "effective_probability":round(raw_p,6),
+                "diagnostic_historical_probability":historical_side_cap.get("effective_probability"),
+                "diagnostic_historical_reason":historical_side_cap.get("reason"),
+            })
+        else:
+            settled_side_cap=historical_side_cap
     else:
         settled_side_cap={
             "applied":False,"reason":"product_out_of_scope",
