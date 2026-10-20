@@ -18,7 +18,7 @@ from __future__ import annotations
 import json, math, urllib.parse, urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
-from ticket_history import merge_ticket_history, settled_ticket_history
+from ticket_history import event_disjoint_tickets, merge_ticket_history, settled_ticket_history
 
 ROOT=Path(__file__).resolve().parents[1]
 DATA=ROOT/"data"
@@ -1511,17 +1511,22 @@ _SETTLED_BUILDER_LANE_PERFORMANCE_CACHE=None
 
 
 def _settled_builder_lane_performance_index(tracker=None):
-    """Summarize distinct, settled flat-stake returns once per actual Builder lane."""
+    """Measure lane promotion on an event-disjoint, chronological settled-ticket sample.
+
+    Multiple accumulators that reuse a fixture are not independent evidence for
+    lane promotion. Keep their real-money-free paper returns in the tracker, but
+    count only the first settled ticket for each event set when testing whether a
+    lane has earned promotion.
+    """
     global _SETTLED_BUILDER_LANE_PERFORMANCE_CACHE
     cacheable=tracker is None
     if cacheable and _SETTLED_BUILDER_LANE_PERFORMANCE_CACHE is not None:
         return _SETTLED_BUILDER_LANE_PERFORMANCE_CACHE
     payload=load(DATA/"odds_ticket_tracker.json",{}) if tracker is None else tracker
-    unique_tickets,_=merge_ticket_history(payload)
-    source_rows=[("unique",x) for x in unique_tickets]
+    tickets,_=merge_ticket_history(payload)
 
-    unique={}
-    for source,ticket in source_rows:
+    by_lane={}
+    for ticket_index,ticket in enumerate(tickets):
         lane=str(ticket.get("primary_lane") or ticket.get("construction_lane") or "").strip()
         legs=ticket.get("legs") if isinstance(ticket.get("legs"),list) else []
         if not lane and legs:
@@ -1529,10 +1534,7 @@ def _settled_builder_lane_performance_index(tracker=None):
             if len(leg_lanes)==1:
                 only=next(iter(leg_lanes))
                 lane=UPCOMING_DESK_BATCH_LANE if only==UPCOMING_DESK_RESEARCH_LANE else only
-        if not lane:
-            continue
-        status=str(ticket.get("status") or "").upper()
-        if status not in {"WON","LOST"}:
+        if not lane or str(ticket.get("status") or "").upper() not in {"WON","LOST"}:
             continue
         try:
             odds=float(ticket.get("combined_odds"))
@@ -1540,26 +1542,82 @@ def _settled_builder_lane_performance_index(tracker=None):
             continue
         if not math.isfinite(odds) or odds<=1.0:
             continue
-        ticket_id=str(ticket.get("ticket_id") or "").strip()
-        identity=ticket_id or "|".join((
-            lane,status,str(ticket.get("created_at") or ""),
-            str(ticket.get("last_settled_at") or ""),f"{odds:.6f}",
-        ))
-        # Prefer the current ticket row over its archived copy if both exist.
-        unique.setdefault((lane,identity),ticket)
+        stamp=str(
+            ticket.get("last_settled_at") or ticket.get("settled_at")
+            or ticket.get("updated_at") or ticket.get("created_at") or ""
+        )
+        by_lane.setdefault(lane,[]).append((stamp,ticket_index,ticket,odds))
 
     grouped={}
-    for (lane,_),ticket in unique.items():
-        row=grouped.setdefault(lane,{"settled_ticket_n":0,"wins":0,"losses":0,"flat_stake_net_units":0.0,"combined_odds_sum":0.0})
-        odds=float(ticket["combined_odds"])
-        row["settled_ticket_n"]+=1
-        row["combined_odds_sum"]+=odds
-        if str(ticket.get("status") or "").upper()=="WON":
-            row["wins"]+=1
-            row["flat_stake_net_units"]+=odds-1.0
-        else:
-            row["losses"]+=1
-            row["flat_stake_net_units"]-=1.0
+    for lane,entries in by_lane.items():
+        entries.sort(key=lambda item:(item[0],item[1]))
+        used_events=set()
+        independent=[]
+        dependent_n=0
+        observed_n=0
+        observed_wins=0
+        observed_losses=0
+        observed_net=0.0
+        for _stamp,ticket_index,ticket,odds in entries:
+            status=str(ticket.get("status") or "").upper()
+            observed_n+=1
+            if status=="WON":
+                observed_wins+=1
+                observed_net+=odds-1.0
+            else:
+                observed_losses+=1
+                observed_net-=1.0
+
+            legs=ticket.get("legs") if isinstance(ticket.get("legs"),list) else []
+            event_keys=[]
+            for leg_index,leg in enumerate(legs):
+                if not isinstance(leg,dict):
+                    continue
+                product=str(leg.get("product") or leg.get("sport") or "unknown").strip().lower()
+                event_id=str(leg.get("event_id") or leg.get("eventId") or "").strip()
+                if event_id:
+                    event_keys.append((product,event_id))
+                else:
+                    # Old ledger rows lacking event IDs remain countable as one
+                    # unique ticket-leg identity; they cannot collide silently.
+                    ticket_id=str(ticket.get("ticket_id") or ticket.get("created_at") or ticket_index)
+                    event_keys.append((product,f"legacy:{ticket_id}:{leg_index}"))
+            if not event_keys:
+                ticket_id=str(ticket.get("ticket_id") or ticket.get("created_at") or ticket_index)
+                event_keys=[("ticket",f"no-legs:{ticket_id}")]
+
+            unique_keys=set(event_keys)
+            if unique_keys & used_events:
+                dependent_n+=1
+                continue
+            used_events.update(unique_keys)
+            independent.append((ticket,odds,status))
+
+        row={
+            "settled_ticket_n":len(independent),
+            "observed_settled_ticket_n":observed_n,
+            "dependent_overlap_ticket_n":dependent_n,
+            "independent_event_count":len(used_events),
+            "observed_wins":observed_wins,
+            "observed_losses":observed_losses,
+            "observed_flat_stake_net_units":round(observed_net,6),
+            "wins":0,
+            "losses":0,
+            "flat_stake_net_units":0.0,
+            "combined_odds_sum":0.0,
+        }
+        for ticket,odds,status in independent:
+            row["combined_odds_sum"]+=odds
+            if status=="WON":
+                row["wins"]+=1
+                row["flat_stake_net_units"]+=odds-1.0
+            else:
+                row["losses"]+=1
+                row["flat_stake_net_units"]-=1.0
+        row["flat_stake_net_units"]=round(row["flat_stake_net_units"],6)
+        row["combined_odds_sum"]=round(row["combined_odds_sum"],6)
+        grouped[lane]=row
+
     if cacheable:
         _SETTLED_BUILDER_LANE_PERFORMANCE_CACHE=grouped
     return grouped
@@ -1590,16 +1648,22 @@ def _settled_builder_lane_performance_gate(lane,tracker=None,min_tickets=None,mi
         "eligible":bool(eligible),
         "reason":reason,
         "settled_ticket_n":n,
+        "observed_settled_ticket_n":int(row.get("observed_settled_ticket_n") or 0),
+        "dependent_overlap_ticket_n":int(row.get("dependent_overlap_ticket_n") or 0),
+        "independent_event_count":int(row.get("independent_event_count") or 0),
         "wins":wins,
         "losses":losses,
         "hit_rate":round(hit_rate,6) if hit_rate is not None else None,
         "average_combined_odds":round(avg_odds,6) if avg_odds is not None else None,
         "flat_stake_net_units":round(net,6),
         "flat_stake_roi":round(roi,6) if roi is not None else None,
+        "observed_wins":int(row.get("observed_wins") or 0),
+        "observed_losses":int(row.get("observed_losses") or 0),
+        "observed_flat_stake_net_units":round(float(row.get("observed_flat_stake_net_units") or 0.0),6),
         "minimum_settled_ticket_n":minimum_n,
         "minimum_flat_stake_roi":minimum_roi,
         "source":"data/odds_ticket_tracker.json",
-        "policy":"No construction lane may become the primary batch unless its own settled ticket sample and realized flat-stake ROI pass the promotion gate.",
+        "policy":"Lane promotion uses an event-disjoint chronological settled-ticket sample; overlapping fixtures remain in the raw ledger but cannot inflate the promotion sample or its ROI.",
     }
 
 
@@ -2713,8 +2777,9 @@ def _ticket_calibration_gamma():
     # history beyond that window lives in "archived_tickets". Recombine and
     # deduplicate before calibration, but never train on an already-corrected
     # combined_model_probability when its raw joint probability is unavailable.
-    tickets=settled_ticket_history(raw,min_legs=2,max_legs=7)
-    settled_count=len(tickets)
+    observed_tickets=settled_ticket_history(raw,min_legs=2,max_legs=7)
+    tickets,overlap_diagnostics=event_disjoint_tickets(observed_tickets)
+    settled_count=len(observed_tickets)
     rows=[]
     missing_raw=0
     for ticket in tickets:
@@ -2742,8 +2807,12 @@ def _ticket_calibration_gamma():
         chosen.append(best)
     diagnostics={
         "available_settled_tickets":settled_count,
+        "independent_settled_ticket_count":len(tickets),
+        "dependent_overlap_ticket_count":overlap_diagnostics["dependent_overlap_ticket_count"],
+        "independent_event_count":overlap_diagnostics["unique_event_count"],
         "missing_raw_joint_probability_count":missing_raw,
         "source_field":"raw_combined_model_probability",
+        "calibration_history_policy":"chronological event-disjoint ticket sample; overlapping fixtures do not count as separate calibration observations",
     }
     if len(chosen)<3:
         result={"gamma":1.0,"sample":len(rows),"warmup":warmup,"trained":False,
@@ -2818,18 +2887,15 @@ def _fit_efootball_ticket_gamma(rows, warmup=8, minimum_oos=12):
 
 
 def _efootball_exact_evidence_ticket_gamma():
-    """Validate lane-specific joint-probability calibration and observed ticket returns."""
+    """Validate lane calibration on event-disjoint tickets and observed returns."""
     global _EFOOTBALL_TICKET_CALIBRATION_CACHE
     if _EFOOTBALL_TICKET_CALIBRATION_CACHE is not None:
         return _EFOOTBALL_TICKET_CALIBRATION_CACHE
 
     tracker=load(DATA/"odds_ticket_tracker.json",{})
-    tickets=settled_ticket_history(tracker,min_legs=2,max_legs=7)
-    lane_tickets=[]
-    rows=[]
-    profit_rows=[]
-    missing_raw=0
-    for ticket in tickets:
+    observed_tickets=settled_ticket_history(tracker,min_legs=2,max_legs=7)
+    observed_lane_tickets=[]
+    for ticket in observed_tickets:
         primary_lane=str(ticket.get("primary_lane") or ticket.get("construction_lane") or "").strip()
         legs=ticket.get("legs") if isinstance(ticket.get("legs"),list) else []
         if primary_lane:
@@ -2841,9 +2907,14 @@ def _efootball_exact_evidence_ticket_gamma():
                 and str(leg.get("qualification_lane") or "")=="efootball_exact_evidence_value"
                 for leg in legs
             )
-        if not is_lane_ticket:
-            continue
-        lane_tickets.append(ticket)
+        if is_lane_ticket:
+            observed_lane_tickets.append(ticket)
+
+    lane_tickets,overlap_diagnostics=event_disjoint_tickets(observed_lane_tickets)
+    rows=[]
+    profit_rows=[]
+    missing_raw=0
+    for ticket in lane_tickets:
         status=str(ticket.get("status") or "").upper()
         stamp=str(ticket.get("_calibration_stamp") or "")
         if status not in {"WON","LOST"}:
@@ -2890,6 +2961,9 @@ def _efootball_exact_evidence_ticket_gamma():
     result.update({
         "lane":"efootball_exact_evidence_value",
         "settled_lane_ticket_count":len(lane_tickets),
+        "observed_settled_lane_ticket_count":len(observed_lane_tickets),
+        "dependent_overlap_ticket_count":overlap_diagnostics["dependent_overlap_ticket_count"],
+        "independent_event_count":overlap_diagnostics["unique_event_count"],
         "missing_raw_joint_probability_count":missing_raw,
         "source_field":"raw_combined_model_probability",
         "brier_promotion_allowed":brier_promotion_allowed,
@@ -2902,36 +2976,32 @@ def _efootball_exact_evidence_ticket_gamma():
         "profitability_minimum_settled_tickets":30,
         "promotion_allowed":promotion_allowed,
         "promotion_hold_reason":hold_reason,
-        "active_batch_policy":"require improved chronological OOS Brier and positive settled lane ROI on at least 30 tickets",
-        "dependent_ticket_rows_warning":"Settled tickets can reuse legs/events; OOS calibration and ROI are risk controls, not independent profitability proof."
+        "active_batch_policy":"require improved chronological OOS Brier and positive realized ROI on at least 30 event-disjoint settled tickets",
+        "dependent_ticket_rows_warning":"Tickets reusing an event are retained for raw ledger returns but excluded from calibration and promotion evidence."
     })
     _EFOOTBALL_TICKET_CALIBRATION_CACHE=result
     return result
 
 
 def _efootball_high_confidence_ticket_gamma():
-    """Validate the >=80% per-leg eFootball construction lane independently.
+    """Validate >=80% per-leg eFootball calibration on event-disjoint ticket history.
 
     Only settled history labelled high_confidence_research with 2–4 active
-    eFootball GT/Adriatic legs is comparable. Mixed VFootball/other-sport tickets,
-    weak legs, missing raw joint probabilities, and unsettled rows do not train
-    this lane's probability correction.
+    eFootball GT/Adriatic legs is comparable. Mixed products, weak legs, and
+    overlapping fixture sets do not train this lane's probability correction.
     """
     global _EFOOTBALL_HIGH_CONFIDENCE_TICKET_CALIBRATION_CACHE
     if _EFOOTBALL_HIGH_CONFIDENCE_TICKET_CALIBRATION_CACHE is not None:
         return _EFOOTBALL_HIGH_CONFIDENCE_TICKET_CALIBRATION_CACHE
 
     tracker=load(DATA/"odds_ticket_tracker.json",{})
-    tickets=settled_ticket_history(tracker,min_legs=2,max_legs=4)
+    observed_tickets=settled_ticket_history(tracker,min_legs=2,max_legs=4)
     tagged=0
-    comparable=[]
-    profit_rows=[]
-    rows=[]
-    missing_raw=0
+    candidates=[]
     excluded_products=0
     excluded_weak_legs=0
     excluded_shapes=0
-    for ticket in tickets:
+    for ticket in observed_tickets:
         primary_lane=str(ticket.get("primary_lane") or ticket.get("construction_lane") or "").strip()
         if primary_lane!="high_confidence_research":
             continue
@@ -2959,11 +3029,17 @@ def _efootball_high_confidence_ticket_gamma():
         if any(probability < MIN_SAFE_LEG_MODEL_PROBABILITY or probability > 1.0 for probability in probabilities):
             excluded_weak_legs+=1
             continue
-        comparable.append(ticket)
+        candidates.append(ticket)
+
+    comparable,overlap_diagnostics=event_disjoint_tickets(candidates)
+    profit_rows=[]
+    rows=[]
+    missing_raw=0
+    for ticket in comparable:
         status=str(ticket.get("status") or "").upper()
+        stamp=str(ticket.get("_calibration_stamp") or ticket.get("last_settled_at") or ticket.get("settled_at") or "")
         if status not in {"WON","LOST"}:
             continue
-        stamp=str(ticket.get("_calibration_stamp") or ticket.get("last_settled_at") or ticket.get("settled_at") or "")
         try:
             odds=float(ticket.get("combined_odds"))
         except (TypeError,ValueError):
@@ -3012,6 +3088,9 @@ def _efootball_high_confidence_ticket_gamma():
         "lane":"high_confidence_research",
         "tagged_lane_ticket_count":tagged,
         "settled_lane_ticket_count":len(comparable),
+        "observed_comparable_settled_ticket_count":len(candidates),
+        "dependent_overlap_ticket_count":overlap_diagnostics["dependent_overlap_ticket_count"],
+        "independent_event_count":overlap_diagnostics["unique_event_count"],
         "comparable_raw_probability_sample":len(rows),
         "missing_raw_joint_probability_count":missing_raw,
         "excluded_product_scope_tickets":excluded_products,
@@ -3029,8 +3108,8 @@ def _efootball_high_confidence_ticket_gamma():
         "profitability_minimum_settled_tickets":30,
         "promotion_allowed":promotion_allowed,
         "promotion_hold_reason":hold_reason,
-        "active_batch_policy":"require improved chronological OOS Brier, at least 30 comparable raw-probability observations, and positive settled ROI on at least 30 pure active-eFootball high-confidence tickets",
-        "dependent_ticket_rows_warning":"Historical tickets can reuse events/participants; the lane remains paper-only and requires independent monitoring after construction changes.",
+        "active_batch_policy":"require improved chronological OOS Brier, at least 30 comparable raw-probability observations, and positive settled ROI on at least 30 event-disjoint high-confidence tickets",
+        "dependent_ticket_rows_warning":"Tickets reusing an event are excluded from calibration and promotion evidence; raw ledger returns remain unchanged.",
     })
     _EFOOTBALL_HIGH_CONFIDENCE_TICKET_CALIBRATION_CACHE=result
     return result

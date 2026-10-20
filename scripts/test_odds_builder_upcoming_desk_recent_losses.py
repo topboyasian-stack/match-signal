@@ -451,5 +451,65 @@ class CompleteSettledLedgerIntegrityTests(unittest.TestCase):
         self.assertNotIn("already-settled-b", pending)
 
 
+
+
+class EventDisjointLanePromotionTests(unittest.TestCase):
+    def test_overlapping_settled_tickets_do_not_inflate_promotion_sample(self):
+        def ticket(ticket_id, status, event_ids, stamp, odds=3.5):
+            return {
+                "ticket_id": ticket_id,
+                "primary_lane": "upcoming_desk_research",
+                "status": status,
+                "combined_odds": odds,
+                "created_at": stamp,
+                "last_settled_at": stamp,
+                "legs": [
+                    {
+                        "product": "efootball_gt",
+                        "sport": "virtual",
+                        "event_id": event_id,
+                        "status": "WON" if status == "WON" else "LOST",
+                    }
+                    for event_id in event_ids
+                ],
+            }
+
+        tracker = {
+            "tickets": [
+                ticket("desk-first-win", "WON", ["event-a", "event-b"], "2026-10-20T01:00:00+00:00"),
+                ticket("desk-overlap-loss", "LOST", ["event-a", "event-c"], "2026-10-20T02:00:00+00:00"),
+                ticket("desk-independent-loss", "LOST", ["event-d", "event-e"], "2026-10-20T03:00:00+00:00"),
+            ],
+            "archived_tickets": [],
+        }
+        result = _settled_builder_lane_performance_gate(
+            "upcoming_desk_research", tracker=tracker, min_tickets=3, min_roi=0.02
+        )
+        self.assertFalse(result["eligible"], "a reused event must not count as an independent settled ticket")
+        self.assertEqual(result["settled_ticket_n"], 2)
+        self.assertEqual(result["observed_settled_ticket_n"], 3)
+        self.assertEqual(result["dependent_overlap_ticket_n"], 1)
+        self.assertEqual(result["wins"], 1)
+        self.assertEqual(result["losses"], 1)
+        self.assertEqual(result["observed_wins"], 1)
+        self.assertEqual(result["observed_losses"], 2)
+        self.assertEqual(result["reason"], "insufficient_settled_lane_ticket_sample")
+
+    def test_legacy_ticket_rows_without_event_ids_remain_distinct_by_ticket(self):
+        tracker = {
+            "tickets": [
+                desk_ticket("legacy-win", "WON", odds=3.5),
+                desk_ticket("legacy-loss", "LOST", odds=3.5),
+            ],
+            "archived_tickets": [],
+        }
+        result = _settled_builder_lane_performance_gate(
+            "upcoming_desk_research", tracker=tracker, min_tickets=2, min_roi=0.02
+        )
+        self.assertEqual(result["settled_ticket_n"], 2)
+        self.assertEqual(result["dependent_overlap_ticket_n"], 0)
+        self.assertEqual(result["observed_settled_ticket_n"], 2)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

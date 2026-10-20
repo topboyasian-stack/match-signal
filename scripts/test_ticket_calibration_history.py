@@ -6,7 +6,7 @@ import unittest
 
 import odds_builder as builder
 import ticket_calibration_experiment as experiment
-from ticket_history import merge_ticket_history, settled_ticket_history
+from ticket_history import event_disjoint_tickets, merge_ticket_history, settled_ticket_history
 
 
 def make_ticket(index, *, status=None, stamp=None, ticket_id=None, lane="efootball_exact_evidence_value"):
@@ -142,6 +142,66 @@ class TicketCalibrationHistoryTests(unittest.TestCase):
         self.assertEqual(result["settled_lane_profit_ticket_count"], 40)
         self.assertAlmostEqual(result["settled_lane_flat_stake_roi"], -0.32)
         self.assertEqual(result["promotion_hold_reason"], "settled_lane_roi_not_positive")
+
+
+
+
+class EventDisjointCalibrationHistoryTests(unittest.TestCase):
+    def test_overlapping_event_sets_are_excluded_from_calibration_samples(self):
+        rows = [
+            {
+                "ticket_id": "T-FIRST",
+                "status": "WON",
+                "last_settled_at": "2026-10-20T01:00:00+00:00",
+                "legs": [
+                    {"product": "efootball_gt", "event_id": "event-a"},
+                    {"product": "efootball_gt", "event_id": "event-b"},
+                ],
+            },
+            {
+                "ticket_id": "T-OVERLAP",
+                "status": "LOST",
+                "last_settled_at": "2026-10-20T02:00:00+00:00",
+                "legs": [
+                    {"product": "efootball_gt", "event_id": "event-a"},
+                    {"product": "efootball_gt", "event_id": "event-c"},
+                ],
+            },
+            {
+                "ticket_id": "T-INDEPENDENT",
+                "status": "LOST",
+                "last_settled_at": "2026-10-20T03:00:00+00:00",
+                "legs": [
+                    {"product": "efootball_gt", "event_id": "event-d"},
+                    {"product": "efootball_gt", "event_id": "event-e"},
+                ],
+            },
+        ]
+        independent, diagnostics = event_disjoint_tickets(rows)
+        self.assertEqual([row["ticket_id"] for row in independent], ["T-FIRST", "T-INDEPENDENT"])
+        self.assertEqual(diagnostics["input_ticket_count"], 3)
+        self.assertEqual(diagnostics["independent_ticket_count"], 2)
+        self.assertEqual(diagnostics["dependent_overlap_ticket_count"], 1)
+        self.assertEqual(diagnostics["unique_event_count"], 4)
+
+    def test_same_event_id_on_different_products_does_not_cross_deduplicate(self):
+        rows = [
+            {
+                "ticket_id": "FOOTBALL",
+                "status": "WON",
+                "last_settled_at": "2026-10-20T01:00:00+00:00",
+                "legs": [{"product": "efootball_gt", "event_id": "same-id"}],
+            },
+            {
+                "ticket_id": "TENNIS",
+                "status": "LOST",
+                "last_settled_at": "2026-10-20T02:00:00+00:00",
+                "legs": [{"product": "tennis", "event_id": "same-id"}],
+            },
+        ]
+        independent, diagnostics = event_disjoint_tickets(rows)
+        self.assertEqual(len(independent), 2)
+        self.assertEqual(diagnostics["dependent_overlap_ticket_count"], 0)
 
 
 if __name__ == "__main__":

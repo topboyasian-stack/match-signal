@@ -1094,7 +1094,7 @@ def ticket_is_stale_pending(ticket, now_dt, stale_after_hours=STALE_PENDING_AFTE
     return max(starts) < cutoff
 
 
-def main():
+def main(register_only=False):
     now_dt = datetime.now(timezone.utc)
     now = now_dt.isoformat()
     builder = load(BUILDER, {})
@@ -1138,15 +1138,22 @@ def main():
         by_id[tid] = ticket
         changed = True
 
-    rows = flatten_history()
-    backfilled = backfill_virtual_results(tickets, now)
-    if backfilled:
-        rows.extend(backfilled)
-        print('Virtual result backfill:', len(backfilled), 'legacy leg(s) recovered')
-    # Re-evaluate current and archived tickets alike. A newly matched result can
-    # restore an archived snapshot to the normal settled-ticket view.
-    for ticket in tickets:
-        changed = refresh_ticket(ticket, rows, now, builder) or changed
+    if register_only:
+        # Builder publication uses this bounded mode to reserve its freshly issued
+        # event IDs atomically with the batch artifact. Settlement backfill is left
+        # to the regular tracker workflow so publication does not make result API
+        # calls or overwrite settlement work from a concurrent tracking run.
+        print("Registration-only mode: preserving saved settlements; result refresh skipped.")
+    else:
+        rows = flatten_history()
+        backfilled = backfill_virtual_results(tickets, now)
+        if backfilled:
+            rows.extend(backfilled)
+            print('Virtual result backfill:', len(backfilled), 'legacy leg(s) recovered')
+        # Re-evaluate current and archived tickets alike. A newly matched result can
+        # restore an archived snapshot to the normal settled-ticket view.
+        for ticket in tickets:
+            changed = refresh_ticket(ticket, rows, now, builder) or changed
 
     fresh_or_settled = []
     stale_pending = []
@@ -1216,4 +1223,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    main(register_only="--register-only" in sys.argv)
