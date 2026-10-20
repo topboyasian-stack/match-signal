@@ -4531,7 +4531,9 @@ def build_value_batches(candidates):
             max_legs=MIXED_RESEARCH_MAX_LEGS,
             min_odds=active_min_combined_odds()
         )
-        if mixed_options:
+        mixed_lane_gate=_settled_builder_lane_performance_gate("mixed_vfootball_efootball_value")
+        mixed_diag["settled_lane_performance_gate"]=mixed_lane_gate
+        if mixed_options and mixed_lane_gate.get("eligible") is True:
             mixed_batches=[]
             mixed_options.sort(
                 key=lambda option:min(
@@ -4628,7 +4630,9 @@ def build_value_batches(candidates):
             max_legs=RESULTS_FIRST_MAX_LEGS,
             min_odds=active_min_combined_odds()
         )
-        if vfootball_options:
+        vfootball_lane_gate=_settled_builder_lane_performance_gate("vfootball_event_holdout_value")
+        vfootball_diag["settled_lane_performance_gate"]=vfootball_lane_gate
+        if vfootball_options and vfootball_lane_gate.get("eligible") is True:
             vfootball_batches=[]
             vfootball_options.sort(
                 key=lambda option:min(
@@ -4700,7 +4704,9 @@ def build_value_batches(candidates):
             max_batches=min(4,MAX_BATCHES),
             min_odds=active_min_combined_odds()
         )
-        if phase2_options:
+        phase2_lane_gate=_settled_builder_lane_performance_gate("phase2_cyclical_loop")
+        phase2_diag["settled_lane_performance_gate"]=phase2_lane_gate
+        if phase2_options and phase2_lane_gate.get("eligible") is True:
             phase2_batches=[]
             for idx,option in enumerate(phase2_options,1):
                 rows=sorted(
@@ -4775,7 +4781,9 @@ def build_value_batches(candidates):
             max_legs=RESULTS_FIRST_MAX_LEGS,
             min_odds=active_min_combined_odds()
         )
-        if high_options:
+        high_lane_gate=_settled_builder_lane_performance_gate("high_confidence_research")
+        high_diag["settled_lane_performance_gate"]=high_lane_gate
+        if high_options and high_lane_gate.get("eligible") is True:
             high_batches=[]
             high_options.sort(
                 key=lambda option:min(
@@ -4865,7 +4873,9 @@ def build_value_batches(candidates):
         secondary_batch=[]
         secondary_lane="none"
         secondary_avg_threshold=MODEL_FIRST_MIN_AVG_PROBABILITY
-        if efootball_secondary_pool:
+        efootball_lane_gate=_settled_builder_lane_performance_gate("efootball_exact_evidence_value")
+        efootball_constructor_diag["settled_lane_performance_gate"]=efootball_lane_gate
+        if efootball_secondary_pool and efootball_lane_gate.get("eligible") is True:
             secondary_batch,efootball_constructor_diag=_construct_efootball_value_batch(
                 efootball_secondary_pool,
                 min_odds=active_min_combined_odds(),
@@ -4874,15 +4884,19 @@ def build_value_batches(candidates):
             if secondary_batch:
                 secondary_lane="efootball_exact_evidence_value"
                 secondary_avg_threshold=EFOOTBALL_VALUE_MIN_AVG_PROBABILITY
-        # Separate route for compact 4–5 leg tickets; all per-leg and value gates persist.
-        if not secondary_batch and efootball_secondary_pool:
+        # Compact tickets also need their own settled-ticket performance history;
+        # individual-leg evidence alone cannot promote this unproven joint ticket shape.
+        compact_lane_gate=_settled_builder_lane_performance_gate("efootball_compact_2x")
+        compact_efootball_diag={"shape":None,"candidate_count":0,"combined_odds":None,"combined_probability":None,"roi":None,"span_minutes":None,"search_mode":"held_by_settled_lane_gate","settled_lane_performance_gate":compact_lane_gate}
+        if not secondary_batch and efootball_secondary_pool and compact_lane_gate.get("eligible") is True:
             compact_batch,compact_efootball_diag=_construct_efootball_compact_batch(efootball_secondary_pool)
             if compact_batch:
                 secondary_batch=compact_batch
                 secondary_lane="efootball_compact_2x"
                 secondary_avg_threshold=EFOOTBALL_VALUE_MIN_AVG_PROBABILITY
-        # Only use the generic constructor for genuinely non-eFootball candidates.
-        if not secondary_batch and non_efootball_secondary_pool:
+        # Only use the generic constructor after its own ticket history qualifies.
+        model_first_lane_gate=_settled_builder_lane_performance_gate("model_first_value")
+        if not secondary_batch and non_efootball_secondary_pool and model_first_lane_gate.get("eligible") is True:
             secondary_batch=_construct_model_first_batch(
                 non_efootball_secondary_pool,
                 max_legs=RESULTS_FIRST_MAX_LEGS,
