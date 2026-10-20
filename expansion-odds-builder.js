@@ -720,14 +720,15 @@
     };
   }
 
-  function isCurrentBuilderLeg(leg, now) {
+  function isCurrentBuilderLeg(leg, now, artifactAgeMs) {
     var checkedAt=typeof now==="number"&&Number.isFinite(now)?now:Date.now();
     var start=dateOf(leg&&leg.start_time);
     if(!start||start.getTime()<=checkedAt+BUILDER_MIN_KICKOFF_LEAD_MS)return false;
     if(!leg||leg.odds_fresh!==true)return false;
     if(leg.market_odds_age_seconds!=null){
       var quoteAge=Number(leg.market_odds_age_seconds);
-      if(!Number.isFinite(quoteAge)||quoteAge<0||quoteAge>BUILDER_MAX_QUOTE_AGE_SECONDS)return false;
+      var snapshotAgeSeconds=Number.isFinite(Number(artifactAgeMs))?Math.max(0,Number(artifactAgeMs))/1000:0;
+      if(!Number.isFinite(quoteAge)||quoteAge<0||quoteAge+snapshotAgeSeconds>BUILDER_MAX_QUOTE_AGE_SECONDS)return false;
     }
     return true;
   }
@@ -751,7 +752,7 @@
     }
     return true;
   }
-  function isActiveVirtualBatchAt(batch, now){
+  function isActiveVirtualBatchAt(batch, now, artifactAgeMs){
     if(!batch||typeof batch!=="object")return false;
     var products=Array.isArray(batch.products)?batch.products:[];
     if(products.some(function(p){var k=String(p||"").toLowerCase();return k==="vfootball"||k==="zoom";}))return false;
@@ -759,7 +760,7 @@
     var lane=String(batch.primary_lane||batch.execution_track||"").toLowerCase();
     var checkedAt=typeof now==="number"&&Number.isFinite(now)?now:Date.now();
     return legs.length>0&&legs.every(function(leg){
-      return isActiveVirtualLeg(leg,lane)&&isCurrentBuilderLeg(leg,checkedAt);
+      return isActiveVirtualLeg(leg,lane)&&isCurrentBuilderLeg(leg,checkedAt,artifactAgeMs);
     });
   }
   function isActiveVirtualBatch(batch){
@@ -769,11 +770,12 @@
   function filterCurrentBuilderSnapshot(data, now) {
     var checkedAt=typeof now==="number"&&Number.isFinite(now)?now:Date.now();
     var freshness=builderArtifactFreshness(data,checkedAt);
+    var snapshotAgeMs=freshness.age_ms==null?null:Math.max(0,freshness.age_ms);
     var batches=freshness.fresh&&Array.isArray(data&&data.batches)
-      ? data.batches.filter(function(batch){return isActiveVirtualBatchAt(batch,checkedAt);})
+      ? data.batches.filter(function(batch){return isActiveVirtualBatchAt(batch,checkedAt,snapshotAgeMs);})
       : [];
     var qualifiedLegs=freshness.fresh&&Array.isArray(data&&data.qualified_legs)
-      ? data.qualified_legs.filter(function(leg){return isActiveVirtualLeg(leg)&&isCurrentBuilderLeg(leg,checkedAt);})
+      ? data.qualified_legs.filter(function(leg){return isActiveVirtualLeg(leg)&&isCurrentBuilderLeg(leg,checkedAt,snapshotAgeMs);})
       : [];
     return {freshness:freshness,batches:batches,qualified_legs:qualifiedLegs};
   }

@@ -113,17 +113,14 @@ def evaluate_runs(
             last_run_age = max(0.0, (now - last_started_at).total_seconds() / 60.0)
             if last_run_age < UPCOMING_BOARD_REFRESH_MIN_INTERVAL_MINUTES:
                 last_run_event = str(last_run.get("event") or "").lower()
-                # A scheduled/push Builder cycle can finish just before the
-                # board is published. Its fresh-looking output still predates
-                # that board, so queue one recovery run instead of letting the
-                # normal 16-minute cadence throttle hide the missed input.
-                # A workflow_dispatch run is already a recovery/manual cycle;
-                # honor the interval for those runs to avoid dispatching again
-                # on every subsequent five-minute board refresh.
+                # Any Builder cycle that started before this board was published
+                # may have checked out an older main snapshot, including a
+                # watchdog/manual workflow_dispatch. Queue exactly one recovery
+                # run for the newer board. If the last cycle started at/after the
+                # board timestamp, keep the normal cooldown to prevent duplicates.
                 completed_cycle_predates_board = (
                     upstream_stamp is not None
                     and last_started_at < upstream_stamp
-                    and last_run_event != "workflow_dispatch"
                 )
                 if completed_cycle_predates_board:
                     return {
