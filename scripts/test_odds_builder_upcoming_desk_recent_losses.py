@@ -71,22 +71,26 @@ class SettledSideProbabilityCapTests(unittest.TestCase):
                 "builder_market": "virtual_total", "event_id": "desk-walkforward-cap-test",
                 "odds_timestamp": "2026-10-20T20:00:00+00:00",
             })
-        # The independent settled-side sample is 13/22. Its Beta(2,2)
-        # posterior (15/26) is below the Desk's 0.60 minimum, so the lower
-        # trust-bound must be retained rather than bypassed by the Desk lane.
-        self.assertAlmostEqual(leg["model_probability"], 15 / 26, places=5)
+        # Desk research has its own calibrated probability + exact-line
+        # chronological holdout. Preserve the prior selected-ticket cap as a
+        # diagnostic, but do not let that legacy lane censor this independent lane.
+        self.assertAlmostEqual(leg["model_probability"], 0.677, places=5)
         self.assertTrue(leg["builder_eligible"])
         cap = leg["settled_side_probability_cap"]
-        self.assertTrue(cap["applied"])
-        self.assertEqual(cap["reason"], "settled_side_probability_capped")
+        self.assertFalse(cap["applied"])
+        self.assertEqual(cap["reason"], "desk_probability_uses_exact_line_walkforward")
         self.assertEqual(cap["settled_sample_n"], 22)
-        self.assertAlmostEqual(leg["expected_value"], (15 / 26) * 2.75 - 1, places=5)
+        self.assertAlmostEqual(cap["effective_probability"], 0.677, places=5)
+        self.assertAlmostEqual(cap["diagnostic_historical_probability"], 15 / 26, places=5)
+        self.assertAlmostEqual(leg["expected_value"], 0.677 * 2.75 - 1, places=5)
 
         with mock.patch.object(builder, "_upcoming_desk_pending_event_ids", return_value=set()):
             selected, diagnostics = builder._construct_upcoming_desk_research_batches([leg], max_batches=1)
+        # One candidate is not a ticket, but it must survive the leg-level gate.
         self.assertEqual(selected, [])
-        self.assertEqual(diagnostics["candidate_count"], 0)
-        self.assertEqual(diagnostics["leg_rejections"].get("desk_or_raw_probability_floor"), 1)
+        self.assertEqual(diagnostics["candidate_count"], 1)
+        self.assertNotIn("desk_or_raw_probability_floor", diagnostics["leg_rejections"])
+        self.assertEqual(diagnostics["reason"], "no_desk_combination_reached_odds_and_conservative_roi_gates")
 
     def test_short_odds_raw_model_edge_is_capped_by_losing_exact_line_history(self):
         index = {"exact": {
