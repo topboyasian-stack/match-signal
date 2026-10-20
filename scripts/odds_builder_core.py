@@ -2887,18 +2887,15 @@ def _fit_efootball_ticket_gamma(rows, warmup=8, minimum_oos=12):
 
 
 def _efootball_exact_evidence_ticket_gamma():
-    """Validate lane-specific joint-probability calibration and observed ticket returns."""
+    """Validate lane calibration on event-disjoint tickets and observed returns."""
     global _EFOOTBALL_TICKET_CALIBRATION_CACHE
     if _EFOOTBALL_TICKET_CALIBRATION_CACHE is not None:
         return _EFOOTBALL_TICKET_CALIBRATION_CACHE
 
     tracker=load(DATA/"odds_ticket_tracker.json",{})
-    tickets=settled_ticket_history(tracker,min_legs=2,max_legs=7)
-    lane_tickets=[]
-    rows=[]
-    profit_rows=[]
-    missing_raw=0
-    for ticket in tickets:
+    observed_tickets=settled_ticket_history(tracker,min_legs=2,max_legs=7)
+    observed_lane_tickets=[]
+    for ticket in observed_tickets:
         primary_lane=str(ticket.get("primary_lane") or ticket.get("construction_lane") or "").strip()
         legs=ticket.get("legs") if isinstance(ticket.get("legs"),list) else []
         if primary_lane:
@@ -2910,9 +2907,14 @@ def _efootball_exact_evidence_ticket_gamma():
                 and str(leg.get("qualification_lane") or "")=="efootball_exact_evidence_value"
                 for leg in legs
             )
-        if not is_lane_ticket:
-            continue
-        lane_tickets.append(ticket)
+        if is_lane_ticket:
+            observed_lane_tickets.append(ticket)
+
+    lane_tickets,overlap_diagnostics=event_disjoint_tickets(observed_lane_tickets)
+    rows=[]
+    profit_rows=[]
+    missing_raw=0
+    for ticket in lane_tickets:
         status=str(ticket.get("status") or "").upper()
         stamp=str(ticket.get("_calibration_stamp") or "")
         if status not in {"WON","LOST"}:
@@ -2959,6 +2961,9 @@ def _efootball_exact_evidence_ticket_gamma():
     result.update({
         "lane":"efootball_exact_evidence_value",
         "settled_lane_ticket_count":len(lane_tickets),
+        "observed_settled_lane_ticket_count":len(observed_lane_tickets),
+        "dependent_overlap_ticket_count":overlap_diagnostics["dependent_overlap_ticket_count"],
+        "independent_event_count":overlap_diagnostics["unique_event_count"],
         "missing_raw_joint_probability_count":missing_raw,
         "source_field":"raw_combined_model_probability",
         "brier_promotion_allowed":brier_promotion_allowed,
@@ -2971,8 +2976,8 @@ def _efootball_exact_evidence_ticket_gamma():
         "profitability_minimum_settled_tickets":30,
         "promotion_allowed":promotion_allowed,
         "promotion_hold_reason":hold_reason,
-        "active_batch_policy":"require improved chronological OOS Brier and positive settled lane ROI on at least 30 tickets",
-        "dependent_ticket_rows_warning":"Settled tickets can reuse legs/events; OOS calibration and ROI are risk controls, not independent profitability proof."
+        "active_batch_policy":"require improved chronological OOS Brier and positive realized ROI on at least 30 event-disjoint settled tickets",
+        "dependent_ticket_rows_warning":"Tickets reusing an event are retained for raw ledger returns but excluded from calibration and promotion evidence."
     })
     _EFOOTBALL_TICKET_CALIBRATION_CACHE=result
     return result
