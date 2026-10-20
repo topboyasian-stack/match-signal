@@ -30,5 +30,7 @@ jobs:
         run: python -m pip install --disable-pip-version-check requests
       - name: Run settled-lane and pending-event regressions
         run: python scripts/test_odds_builder_upcoming_desk_recent_losses.py
+      - name: Test atomic Builder batch and pending-event publication
+        run: python scripts/test_odds_builder_atomic_ticket_registration.py
       - name: Compile Builder and regression modules
         run: python -m py_compile scripts/odds_builder_core.py scripts/odds_builder.py scripts/test_odds_builder_upcoming_desk_recent_losses.py
