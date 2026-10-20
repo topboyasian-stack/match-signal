@@ -1,11 +1,13 @@
-"""Strict, shared competition identity checks for football market attachment.
+"""Strict, shared identity checks before a football market can be attached.
 
 Team-name similarity alone is not sufficient: senior and youth competitions can
-contain identically named teams. A match must agree on competition, cohort, and
-any explicit age-group marker before a bookmaker quote can be attached.
+contain identically named teams, and kickoff/competition agreement alone can
+still attach one of several fixtures with the wrong opponent. This module keeps
+the competition, cohort, age group, and both participant identities aligned.
 """
 import re
 import unicodedata
+from difflib import SequenceMatcher
 
 _ALIASES = {
     "epl": "premier league",
@@ -29,6 +31,7 @@ _YOUTH_MARKER_RE = re.compile(
     r"\b(?:youth|junior|academy|reserves?|development league|boys|girls)\b",
     re.IGNORECASE,
 )
+_TEAM_STOPWORDS = {"fc", "afc", "sc", "cf", "ac", "club", "the"}
 
 
 def competition_key(value):
@@ -70,6 +73,47 @@ def _cohort_profile(competition, category=None, teams=()):
     return youth, frozenset(ages)
 
 
+def _team_key(value):
+    """Normalize participant labels while preserving meaningful team-name tokens."""
+    text = unicodedata.normalize("NFKD", str(value or ""))
+    text = "".join(ch for ch in text if not unicodedata.combining(ch)).lower()
+    text = text.replace("&", " and ")
+    text = re.sub(r"[^a-z0-9]+", " ", text)
+    return " ".join(token for token in text.split() if token not in _TEAM_STOPWORDS)
+
+
+def _team_similarity(left, right):
+    """Conservative fuzzy score; missing participant names never match."""
+    a = _team_key(left)
+    b = _team_key(right)
+    if not a or not b:
+        return 0.0
+    if a == b:
+        return 1.0
+    ratio = SequenceMatcher(None, a, b).ratio()
+    at = set(a.split())
+    bt = set(b.split())
+    overlap = len(at & bt) / max(1, len(at | bt))
+    return max(ratio, 0.75 * overlap + 0.25 * ratio)
+
+
+def _participants_match(prediction_teams, market_teams, minimum_similarity=0.78):
+    """Require both clubs to match; one exact club cannot compensate for a wrong rival."""
+    if len(prediction_teams or ()) != 2 or len(market_teams or ()) != 2:
+        return False
+    p1, p2 = prediction_teams
+    m1, m2 = market_teams
+    direct = (
+        _team_similarity(p1, m1) >= minimum_similarity
+        and _team_similarity(p2, m2) >= minimum_similarity
+    )
+    reverse = (
+        _team_similarity(p1, m2) >= minimum_similarity
+        and _team_similarity(p2, m1) >= minimum_similarity
+    )
+    return direct or reverse
+
+
 def football_market_identity_matches(
     prediction_competition,
     market_competition,
@@ -77,13 +121,13 @@ def football_market_identity_matches(
     prediction_teams=(),
     market_teams=(),
 ):
-    """Reject same-named senior/youth fixtures and conflicting age-group labels.
+    """Fail closed unless competition, cohort, age group, and both teams agree.
 
-    Competition equality is still mandatory. The provider category and both
-    teams are checked independently because some feeds reuse senior tournament
-    labels for youth fixtures or omit the age marker from one team name.
-    Unknown or conflicting cohorts fail closed; no quote is attached by names
-    and kickoff alone.
+    Provider category and both participants are checked independently because
+    some feeds reuse senior tournament labels for youth fixtures. Both team names
+    must match in one orientation; a high score for only one team is not enough.
+    Unknown competition, cohort conflict, missing teams, or uncertain team identity
+    means no bookmaker quote is attached.
     """
     if not same_competition(prediction_competition, market_competition):
         return False
@@ -98,7 +142,10 @@ def football_market_identity_matches(
     if prediction_youth != market_youth:
         return False
     # If either side provides an age group, require both sides to provide the
-    # same explicit age group; generic "Youth" is not enough to identify U17 vs U19.
+    # same explicit group; generic "Youth" alone cannot distinguish U17 from U19.
     if prediction_ages != market_ages:
+        return False
+
+    if not _participants_match(prediction_teams, market_teams):
         return False
     return True
