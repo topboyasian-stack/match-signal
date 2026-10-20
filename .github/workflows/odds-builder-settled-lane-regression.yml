@@ -10,6 +10,8 @@ on:
       - 'scripts/odds_builder.py'
       - 'scripts/test_odds_builder_upcoming_desk_recent_losses.py'
       - 'scripts/test_odds_builder_atomic_ticket_registration.py'
+      - 'scripts/test_odds_ticket_tracker_register_only.py'
+      - 'scripts/odds_ticket_tracker.py'
       - '.github/workflows/odds_builder.yml'
       - '.github/workflows/odds-builder-settled-lane-regression.yml'
   workflow_dispatch:
@@ -34,5 +36,7 @@ jobs:
         run: python scripts/test_odds_builder_upcoming_desk_recent_losses.py
       - name: Test atomic Builder batch and pending-event publication
         run: python scripts/test_odds_builder_atomic_ticket_registration.py
+      - name: Test bounded ticket registration without result refresh
+        run: python scripts/test_odds_ticket_tracker_register_only.py
       - name: Compile Builder and regression modules
         run: python -m py_compile scripts/odds_builder_core.py scripts/odds_builder.py scripts/test_odds_builder_upcoming_desk_recent_losses.py
