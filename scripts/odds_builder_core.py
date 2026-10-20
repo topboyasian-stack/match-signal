@@ -606,9 +606,8 @@ def _load_ticket_performance_index():
                 line_key=f"{float(line):g}"
             except (TypeError,ValueError):
                 continue
-            event_id=str(leg.get("event_id") or leg.get("eventId") or "").strip()
             ticket_identity=str(ticket.get("ticket_id") or ticket.get("created_at") or ticket_index)
-            identity=event_id or f"{ticket_identity}:leg:{leg_index}"
+            identity=_fixture_event_key(leg,product=product) or f"{ticket_identity}:leg:{leg_index}"
             key=(product,line_key,side)
             dedupe=(key,identity)
             status=str(leg.get("status") or "").upper()
@@ -721,9 +720,8 @@ def _load_results_first_index():
                 line_key=f"{float(line):g}"
             except (TypeError,ValueError):
                 continue
-            event_id=str(leg.get("event_id") or leg.get("eventId") or "").strip()
             ticket_identity=str(ticket.get("ticket_id") or ticket.get("created_at") or ticket_index)
-            identity=event_id or f"{ticket_identity}:leg:{leg_index}"
+            identity=_fixture_event_key(leg,product=product) or f"{ticket_identity}:leg:{leg_index}"
             key=(product,line_key,side)
             dedupe=(key,identity)
             status=str(leg.get("status") or "").upper()
@@ -944,9 +942,15 @@ def _derive_efootball_score_replay(rows,direct_index,min_n=VIRTUAL_SCORE_REPLAY_
         match=re.fullmatch(r"(\d+)\s*[:\-]\s*(\d+)",str(row.get("score") or "").strip())
         if not match:
             continue
-        grouped.setdefault((product,event_id),[]).append({
+        fixture_identity=_fixture_event_key(row,product=product)
+        if not fixture_identity:
+            continue
+        grouped.setdefault((product,fixture_identity),[]).append({
             "home":int(match.group(1)),
             "away":int(match.group(2)),
+            "event_id":event_id,
+            "fixture_identity":fixture_identity,
+            "start_time":row.get("start_time") or row.get("kickoff_time") or row.get("kickoff"),
             "settled_at":settled_at,
             "participant_1":row.get("participant_1"),
             "participant_2":row.get("participant_2"),
@@ -954,9 +958,9 @@ def _derive_efootball_score_replay(rows,direct_index,min_n=VIRTUAL_SCORE_REPLAY_
 
     score_events=[]
     conflicts=0
-    for (product,event_id),items in grouped.items():
+    for (product,fixture_identity),items in grouped.items():
         scores={(item["home"],item["away"]) for item in items}
-        # If records for one event disagree on the final score, fail closed.
+        # If records for one identified fixture disagree on the final score, fail closed.
         if len(scores)!=1:
             conflicts+=1
             continue
@@ -964,7 +968,9 @@ def _derive_efootball_score_replay(rows,direct_index,min_n=VIRTUAL_SCORE_REPLAY_
         home,away=next(iter(scores))
         score_events.append({
             "product":product,
-            "event_id":event_id,
+            "event_id":representative.get("event_id"),
+            "fixture_identity":fixture_identity,
+            "start_time":representative.get("start_time"),
             "home":home,
             "away":away,
             "total":home+away,
@@ -1008,6 +1014,7 @@ def _derive_efootball_score_replay(rows,direct_index,min_n=VIRTUAL_SCORE_REPLAY_
                         "score_total":event["total"],
                         "settled_at":event["settled_at"],
                         "timestamp":event["settled_at"],
+                         "start_time":event.get("start_time"),
                         "participant_1":event.get("participant_1"),
                         "participant_2":event.get("participant_2"),
                         "derived_from_score":True,
@@ -1645,9 +1652,9 @@ def _upcoming_desk_pending_event_ids(tracker=None):
             status=str(leg.get("status") or "").upper()
             if status!="PENDING" and not (not status and parent_status=="PENDING"):
                 continue
-            event_id=str(leg.get("event_id") or leg.get("eventId") or "").strip()
-            if event_id:
-                event_ids.add(event_id)
+            event_key=_fixture_event_key(leg,product=product)
+            if event_key:
+                event_ids.add(event_key)
     if cacheable:
         _UPCOMING_DESK_PENDING_EVENT_ID_CACHE=event_ids
     return event_ids
@@ -1663,11 +1670,14 @@ def _exclude_pending_virtual_ticket_events(rows,pending_event_ids=None):
             continue
         product=str(row.get("product") or "").lower()
         event_id=str(row.get("event_id") or row.get("eventId") or "").strip()
+        event_key=_fixture_event_key(row,product=product)
+        legacy_pending={str(value) for value in pending
+                        if not str(value).startswith(("fixture:","event:"))}
         if (
             str(row.get("sport") or "").lower()=="virtual"
             and product in ACTIVE_VIRTUAL_PRODUCTS
-            and event_id
-            and event_id in pending
+            and event_key
+            and (event_key in pending or event_id in legacy_pending)
         ):
             row["builder_eligible"]=False
             row["status"]="REJECTED"
@@ -1705,7 +1715,7 @@ def _upcoming_desk_settled_result_index(tracker=None):
         except (TypeError,ValueError,OverflowError):
             return 0.0
 
-    def add(product,line,side,event_id,status,stamp,source):
+    def add(product,line,side,event_id,status,stamp,source,fixture=None):
         product=str(product or "").lower()
         side=str(side or "").lower()
         status=str(status or "").upper()
@@ -1715,13 +1725,18 @@ def _upcoming_desk_settled_result_index(tracker=None):
             line_key=f"{float(line):g}"
         except (TypeError,ValueError):
             return
-        event_key=str(event_id or "").strip()
-        if not event_key:
+        event_id=str(event_id or "").strip()
+        fixture_row=dict(fixture) if isinstance(fixture,dict) else {"product":product,"event_id":event_id}
+        fixture_row["product"]=product
+        fixture_row.setdefault("event_id",event_id)
+        fixture_key=_fixture_event_key(fixture_row,product=product)
+        if not fixture_key:
             return
         key=(product,line_key,side)
-        dedupe=(key,event_key)
+        dedupe=(key,fixture_key)
         record={
-            "product":product,"line":line_key,"side":side,"event_id":event_key,
+            "product":product,"line":line_key,"side":side,"event_id":event_id,
+            "fixture_identity":fixture_key,
             "status":status,"settled_at":str(stamp or ""),"settled_epoch":stamp_epoch(stamp),
             "source":source,
         }
@@ -1761,7 +1776,8 @@ def _upcoming_desk_settled_result_index(tracker=None):
                     if leg.get("line") is None:
                         line=float(match.group(2))
             stamp=leg.get("settled_at") or ticket.get("last_settled_at") or leg.get("start_time") or ticket.get("created_at")
-            add(product,line,side,leg.get("event_id"),status,stamp,"paper_ticket_ledger")
+            add(product,line,side,leg.get("event_id") or leg.get("eventId"),status,stamp,
+                "paper_ticket_ledger",fixture=leg)
 
     # Include recent settled outcomes even when they were observed outside a
     # tracked ticket; exact event IDs deduplicate the overlapping sources.
@@ -1777,15 +1793,15 @@ def _upcoming_desk_settled_result_index(tracker=None):
                 win=row.get("win")
                 status="WON" if win is True else "LOST" if win is False else "VOID" if str(row.get("actual_result") or row.get("result") or "").upper()=="PUSH" else None
                 add(product,line_key,side,row.get("event_id") or row.get("record_id") or row.get("trace_id"),status,
-                    row.get("settled_at") or row.get("timestamp"),"virtual_lab_settlement_archive")
+                    row.get("settled_at") or row.get("timestamp"),"virtual_lab_settlement_archive",fixture=row)
 
     result={}
-    for ((product,line_key,side),event_id),row in by_key_event.items():
+    for ((product,line_key,side),fixture_key),row in by_key_event.items():
         if row.get("status")=="CONFLICT":
             continue
         result.setdefault((product,line_key,side),[]).append(row)
     for rows in result.values():
-        rows.sort(key=lambda row:(float(row.get("settled_epoch") or 0.0),str(row.get("event_id") or "")),reverse=True)
+        rows.sort(key=lambda row:(float(row.get("settled_epoch") or 0.0),str(row.get("fixture_identity") or row.get("event_id") or "")),reverse=True)
     if cacheable:
         _UPCOMING_DESK_SETTLED_RESULT_INDEX_CACHE=result
     return result
@@ -1947,14 +1963,15 @@ def virtual_candidates(now):
     refreshed_rows, quote_diag = refresh_virtual_quotes(model_rows if isinstance(model_rows,list) else [])
 
     def row_key(row):
+        product=str(row.get("product") or "")
+        fixture_key=_fixture_event_key(row,product=product)
+        if not fixture_key:
+            fixture_key=f"unidentified:{row.get('match') or row.get('start_time') or ''}"
         try:
-            return (
-                str(row.get("product") or ""),
-                str(row.get("event_id") or ""),
-                f"{float(row.get('line')):g}" if row.get("line") is not None else "",
-            )
+            line_key=f"{float(row.get('line')):g}" if row.get("line") is not None else ""
         except (TypeError,ValueError):
-            return (str(row.get("product") or ""),str(row.get("event_id") or ""),"")
+            line_key=""
+        return (product,fixture_key,line_key)
     
     original_map={}
     for row in model_rows if isinstance(model_rows,list) else []:
@@ -2673,6 +2690,52 @@ def make_leg(x):
         "sportybet_outcome_id":x.get("sportybet_outcome_id"),
         "sportybet_outcome_name":x.get("sportybet_outcome_name")
     }
+
+
+def _fixture_participant_identity(value):
+    """Normalize a participant name, preferring a provider's stable account tag."""
+    import re
+    raw=str(value or "").strip()
+    embedded=re.search(r"\(([^()]*)\)\s*$",raw)
+    identity=embedded.group(1).strip() if embedded and embedded.group(1).strip() else raw
+    return re.sub(r"[^a-z0-9]+"," ",identity.lower()).strip()
+
+
+def _fixture_event_key(row, product=None):
+    """Stable virtual fixture identity; provider event IDs may be reused by session."""
+    if not isinstance(row,dict):
+        return None
+    product_key=str(product or row.get("product") or row.get("sport") or "").strip().lower()
+    if not product_key:
+        return None
+    import re
+    pairs=(("participant_1","participant_2"),("player_1","player_2"),
+           ("team_1","team_2"),("home","away"),("home_team","away_team"))
+    participants=None
+    for left,right in pairs:
+        a=_fixture_participant_identity(row.get(left))
+        b=_fixture_participant_identity(row.get(right))
+        if a and b and a!=b:
+            participants=tuple(sorted((a,b)))
+            break
+    if not participants:
+        match=str(row.get("match") or row.get("fixture") or "")
+        names=[_fixture_participant_identity(x) for x in re.split(r"\s+vs\.?\s+",match,flags=re.I)]
+        names=[name for name in names if name]
+        if len(names)==2 and names[0]!=names[1]:
+            participants=tuple(sorted(names))
+    raw_start=row.get("start_time") or row.get("kickoff_time") or row.get("kickoff")
+    if participants and raw_start:
+        try:
+            stamp=datetime.fromisoformat(str(raw_start).replace("Z","+00:00"))
+            if stamp.tzinfo is None:
+                stamp=stamp.replace(tzinfo=timezone.utc)
+            kickoff_minute=int(stamp.astimezone(timezone.utc).timestamp()//60)
+            return f"fixture:{product_key}:{kickoff_minute}:{participants[0]}:{participants[1]}"
+        except (TypeError,ValueError,OverflowError):
+            pass
+    event_id=str(row.get("event_id") or row.get("eventId") or "").strip()
+    return f"event:{product_key}:{event_id}" if event_id else None
 
 
 def _participants(leg):
