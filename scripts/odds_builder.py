@@ -4921,6 +4921,20 @@ def main():
             }
         },
         "selection_policy":{"min_calibrated_probability":MIN_PROB,"virtual_min_probability":VIRTUAL_MIN_PROB,"virtual_builder_lines":"all current O/U lines with exact-side evidence; no forced line list","minimum_combined_odds":active_min_combined_odds(),
+            "construction_priority":"upcoming_desk_research_first" if primary_lane==UPCOMING_DESK_BATCH_LANE else "settled_results_first",
+            "upcoming_desk_research_lane":{
+                "enabled":True,
+                "batch_lane":UPCOMING_DESK_BATCH_LANE,
+                "min_desk_calibrated_probability":UPCOMING_DESK_MIN_PROBABILITY,
+                "min_raw_model_probability":UPCOMING_DESK_MIN_RAW_PROBABILITY,
+                "min_exact_line_walkforward_n":UPCOMING_DESK_MIN_WALKFORWARD_N,
+                "min_exact_line_walkforward_hit_rate":UPCOMING_DESK_MIN_WALKFORWARD_HIT_RATE,
+                "combined_odds_range":[UPCOMING_DESK_MIN_COMBINED_ODDS,UPCOMING_DESK_MAX_COMBINED_ODDS],
+                "ticket_probability_method":"product of 95% Wilson lower bounds from exact product + line + selected-side walk-forward holdout; independence proxy, not trained whole-ticket calibration",
+                "uses_legacy_settled_ticket_gamma":False,
+                "paper_only":True,
+                "real_money_execution":False,
+            },
             "compact_efootball_ticket_lane":{
                 "enabled":True,
                 "active_products":sorted(ACTIVE_VIRTUAL_PRODUCTS),
@@ -4952,7 +4966,13 @@ def main():
             "max_legs":MAX_LEGS,
             "active_construction_max_legs":RESULTS_FIRST_MAX_LEGS,
             "adaptive_leg_counts":[2,3,4],
-            "per_leg_min_model_probability":LEG_COUNT_MIN_MODEL_PROBABILITY,
+            "per_leg_min_model_probability":(
+                {"2":UPCOMING_DESK_MIN_PROBABILITY,"3":UPCOMING_DESK_MIN_PROBABILITY,"4":UPCOMING_DESK_MIN_PROBABILITY}
+                if primary_lane==UPCOMING_DESK_BATCH_LANE else LEG_COUNT_MIN_MODEL_PROBABILITY
+            ),
+            "per_leg_min_raw_model_probability":UPCOMING_DESK_MIN_RAW_PROBABILITY if primary_lane==UPCOMING_DESK_BATCH_LANE else None,
+            "upcoming_desk_research_min_combined_odds":UPCOMING_DESK_MIN_COMBINED_ODDS,
+            "upcoming_desk_research_max_combined_odds":UPCOMING_DESK_MAX_COMBINED_ODDS,
             "preferred_per_leg_model_probability":PREFERRED_LEG_MODEL_PROBABILITY,
             "builder_horizon_minutes":MAX_BUILDER_HORIZON_MINUTES,
             "max_batch_kickoff_span_minutes":MAX_BATCH_KICKOFF_SPAN_MINUTES,
@@ -5018,7 +5038,7 @@ def main():
             "results_first_max_legs":RESULTS_FIRST_MAX_LEGS,
             "target_combined_odds":TARGET_COMBINED_ODDS,
             "accuracy_preservation_ratio":ACCURACY_PRESERVATION_RATIO,
-            "construction_priority":"settled_results_first",
+            "construction_priority":"upcoming_desk_research_first" if primary_lane==UPCOMING_DESK_BATCH_LANE else "settled_results_first",
             "max_batches":MAX_BATCHES,
             "max_legs":MAX_LEGS,
             "compact_efootball_max_legs":COMPACT_EFOOTBALL_MAX_LEGS,
