@@ -364,11 +364,68 @@ class UpcomingDeskSettledPromotionGateTests(unittest.TestCase):
             ],
         }
         pending = _upcoming_desk_pending_event_ids(tracker=tracker)
-        self.assertEqual(pending, {"still-open-event", "archived-open-event"})
-        self.assertNotIn("finished-event", pending)
-        self.assertNotIn("research-only-event", pending)
+        self.assertEqual(pending, {
+            "event:efootball_gt:still-open-event",
+            "event:efootball_gt:archived-open-event",
+        })
+        self.assertNotIn("event:efootball_gt:finished-event", pending)
+        self.assertNotIn("event:vfootball:research-only-event", pending)
 
 
+
+
+    def test_reused_provider_id_only_holds_the_same_identified_fixture(self):
+        pending_leg = {
+            "product": "efootball_gt", "event_id": "reused-provider-id",
+            "status": "PENDING", "start_time": "2026-10-20T08:00:00+00:00",
+            "participant_1": "Boca Juniors (zaha)", "participant_2": "Chelsea (mika)",
+        }
+        tracker = {"tickets": [{
+            "ticket_id": "pending-same-session", "status": "PENDING",
+            "legs": [pending_leg],
+        }], "archived_tickets": []}
+        pending = builder._upcoming_desk_pending_event_ids(tracker=tracker)
+        rows = [
+            {"sport": "virtual", "product": "efootball_gt", "event_id": "reused-provider-id",
+             "start_time": "2026-10-20T08:00:00+00:00",
+             "participant_1": "Boca Juniors (zaha)", "participant_2": "Chelsea (mika)",
+             "builder_eligible": True, "status": "ELIGIBLE"},
+            {"sport": "virtual", "product": "efootball_gt", "event_id": "reused-provider-id",
+             "start_time": "2026-10-20T10:00:00+00:00",
+             "participant_1": "Real Madrid (cira)", "participant_2": "Juventus (cappo)",
+             "builder_eligible": True, "status": "ELIGIBLE"},
+        ]
+        filtered, rejected = _exclude_pending_virtual_ticket_events(rows, pending)
+        self.assertEqual(rejected, 1)
+        self.assertFalse(filtered[0]["builder_eligible"])
+        self.assertTrue(filtered[1]["builder_eligible"])
+
+    def test_reused_provider_id_does_not_merge_settled_ticket_outcomes(self):
+        def leg(status, kickoff, left, right):
+            return {
+                "product": "efootball_gt", "event_id": "reused-provider-id",
+                "status": status, "line": 4.5, "builder_pick": "over", "pick": "Over 4.5",
+                "start_time": kickoff, "participant_1": left, "participant_2": right,
+            }
+        tracker = {"tickets": [
+            {"ticket_id": "session-a", "status": "WON", "combined_odds": 3.2,
+             "legs": [leg("WON", "2026-10-20T08:00:00+00:00", "Boca (zaha)", "Chelsea (mika)")],
+             "created_at": "2026-10-20T08:00:00+00:00"},
+            {"ticket_id": "session-b", "status": "LOST", "combined_odds": 3.2,
+             "legs": [leg("LOST", "2026-10-20T10:00:00+00:00", "Real Madrid (cira)", "Juventus (cappo)")],
+             "created_at": "2026-10-20T10:00:00+00:00"},
+        ], "archived_tickets": []}
+        old_spoiler, old_results = builder._TICKET_SPOILER_CACHE, builder._RESULTS_FIRST_CACHE
+        try:
+            builder._TICKET_SPOILER_CACHE = None
+            builder._RESULTS_FIRST_CACHE = None
+            with mock.patch.object(builder, "load", return_value=tracker):
+                performance = builder._load_ticket_performance_index()
+                results = builder._load_results_first_index()
+            self.assertEqual(performance[("efootball_gt", "4.5", "over")], {"n": 2, "wins": 1, "losses": 1})
+            self.assertEqual(results["exact"][("efootball_gt", "4.5", "over")], {"n": 2, "wins": 1, "losses": 1})
+        finally:
+            builder._TICKET_SPOILER_CACHE, builder._RESULTS_FIRST_CACHE = old_spoiler, old_results
 
 
 class CompleteSettledLedgerIntegrityTests(unittest.TestCase):

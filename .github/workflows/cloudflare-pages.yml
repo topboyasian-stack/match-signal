@@ -94,7 +94,7 @@ jobs:
           changed="$(gh api "repos/${GITHUB_REPOSITORY}/compare/${BEFORE_SHA}...${PUSH_SHA}" --jq '.files[].filename')"
           test -n "$changed" || { echo "Direct promotion has no inspectable changed-file list." >&2; exit 1; }
           printf 'Direct promotion changed files:\n%s\n' "$changed"
-          allowed='|_headers|index.html|upcoming.html|qualified-best.html|qualified-best-design.css|scripts/test_qualified_best_design.mjs|functions/api/sportybet-booking.js|functions/api/odds-builder-data.js|scripts/test_sportybet_booking_batch_ids.mjs|expansion-odds-builder.js|scripts/test_odds_builder_ui_freshness.mjs|scripts/test_desk_quote_contract.mjs|sport-hubs-design.css|scripts/test_sport_hub_design.mjs|independent-sport-design.css|scripts/test_independent_sports_design.mjs|darts.html|table-tennis.html|odds-builder.html|odds-builder-design.css|reports.html|reports-design.css|virtual-lab/index.html|virtual-lab-terminal.css|scripts/test_workspace_terminal_design.mjs|football.html|tennis.html|basketball.html|sport-hubs.css|sport-hubs.js|ms-design-system.css|core-workspaces-design.css|scripts/test_core_workspaces_design.mjs|league-logos.js|scripts/test_league_logos.mjs|workspace-ui.js|data/club-logo-registry.json|scripts/sync_club_logos.py|scripts/test_club_logo_registry.py|scripts/qualified_best_monitor.mjs|scripts/test_qualified_best_monitor.mjs|.github/workflows/qualified-best-live-monitor.yml|.github/workflows/qualified-best-watch.yml|.github/workflows/qualified-best-production-watch.yml|.github/workflows/qualified-best-health-watch-v2.yml|.github/workflows/automation_watchdog.yml|.github/workflows/efootball-market-research-schedule.yml|.github/workflows/efootball-market-research-tests.yml|scripts/test_automation_watchdog_research_recovery.py|scripts/test_qualified_best_monitor.mjs|.github/workflows/unified-upcoming.yml|scripts/test_workflow_trigger_boundaries.py|scripts/test_deploy_freshness_order.py|scripts/test_prediction_desk_gates.mjs|scripts/test_upcoming_desk_policy.py|docs/PREDICTION_DESK_POLICY.md|'
+          allowed='|_headers|index.html|upcoming.html|qualified-best.html|qualified-best-design.css|scripts/test_qualified_best_design.mjs|functions/api/sportybet-booking.js|functions/api/odds-builder-data.js|scripts/test_sportybet_booking_batch_ids.mjs|expansion-odds-builder.js|scripts/test_odds_builder_ui_freshness.mjs|scripts/test_desk_quote_contract.mjs|sport-hubs-design.css|scripts/test_sport_hub_design.mjs|independent-sport-design.css|scripts/test_independent_sports_design.mjs|darts.html|table-tennis.html|odds-builder.html|odds-builder-design.css|reports.html|reports-design.css|virtual-lab/index.html|virtual-lab-terminal.css|scripts/test_workspace_terminal_design.mjs|football.html|tennis.html|basketball.html|sport-hubs.css|sport-hubs.js|ms-design-system.css|core-workspaces-design.css|scripts/test_core_workspaces_design.mjs|league-logos.js|scripts/test_league_logos.mjs|workspace-ui.js|data/club-logo-registry.json|scripts/sync_club_logos.py|scripts/test_club_logo_registry.py|scripts/qualified_best_monitor.mjs|scripts/test_qualified_best_monitor.mjs|.github/workflows/qualified-best-live-monitor.yml|.github/workflows/qualified-best-watch.yml|.github/workflows/qualified-best-production-watch.yml|.github/workflows/qualified-best-health-watch-v2.yml|.github/workflows/automation_watchdog.yml|.github/workflows/efootball-market-research-schedule.yml|.github/workflows/efootball-market-research-tests.yml|scripts/test_automation_watchdog_research_recovery.py|scripts/test_qualified_best_monitor.mjs|.github/workflows/unified-upcoming.yml|scripts/test_workflow_trigger_boundaries.py|scripts/test_deploy_freshness_order.py|scripts/test_prediction_desk_gates.mjs|scripts/test_upcoming_desk_policy.py|docs/PREDICTION_DESK_POLICY.md|scripts/ensure_odds_builder_refresh.py|scripts/test_ensure_odds_builder_refresh.py|scripts/test_cloudflare_only_deploy.mjs|'
           while IFS= read -r path; do
             [ -n "$path" ] || continue
             case "$path" in
@@ -352,18 +352,35 @@ jobs:
           if (!deploymentBase.startsWith('https://') || !deploymentBase.endsWith('.pages.dev')) {
             failures.push('Cloudflare deployment step did not publish an immutable Pages URL.');
           } else {
-            for (const contract of workspaceContracts) {
-              try {
-                const [{r:pageResponse,body:pageBody},{r:cssResponse,body:cssBody}] = await Promise.all([
-                  getFrom(deploymentBase, contract.path),
-                  getFrom(deploymentBase, contract.css)
-                ]);
-                if (!pageResponse.ok) failures.push('Immutable deployment '+contract.path+' HTTP '+pageResponse.status);
-                for (const marker of contract.markers) if (!pageBody.includes(marker)) failures.push('Immutable deployment '+contract.path+' missing '+marker);
-                if (!cssResponse.ok) failures.push('Immutable deployment '+contract.css+' HTTP '+cssResponse.status);
-                if (!cssBody.includes(contract.cssMarker)) failures.push('Immutable deployment '+contract.css+' missing V3 stylesheet marker');
-              } catch(e) { failures.push('Immutable deployment verification '+contract.path+' '+e.message); }
+            // Immutable Pages URLs can briefly return 5xx during propagation.
+            // Retry each full page+CSS contract before failing the deployment.
+            async function verifyImmutableContract(contract) {
+              let lastProblems = [];
+              for (let attempt = 1; attempt <= 6; attempt++) {
+                try {
+                  const [{r:pageResponse,body:pageBody},{r:cssResponse,body:cssBody}] = await Promise.all([
+                    getFrom(deploymentBase, contract.path),
+                    getFrom(deploymentBase, contract.css)
+                  ]);
+                  const problems = [];
+                  if (!pageResponse.ok) problems.push(contract.path+' HTTP '+pageResponse.status);
+                  for (const marker of contract.markers) if (!pageBody.includes(marker)) problems.push(contract.path+' missing '+marker);
+                  if (!cssResponse.ok) problems.push(contract.css+' HTTP '+cssResponse.status);
+                  if (!cssBody.includes(contract.cssMarker)) problems.push(contract.css+' missing stylesheet marker');
+                  if (!problems.length) {
+                    if (attempt > 1) console.log('Immutable deployment '+contract.path+' is ready (attempt '+attempt+').');
+                    return null;
+                  }
+                  lastProblems = problems;
+                } catch(e) {
+                  lastProblems = [contract.path+' '+String(e.message||e)];
+                }
+                if (attempt < 6) await new Promise(resolve => setTimeout(resolve, 1500));
+              }
+              return 'Immutable deployment verification exhausted retries: '+lastProblems.join('; ');
             }
+            const immutableIssues = await Promise.all(workspaceContracts.map(verifyImmutableContract));
+            failures.push(...immutableIssues.filter(Boolean));
           }
 
           const workspaceSnapshots = new Map();
