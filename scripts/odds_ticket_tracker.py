@@ -510,7 +510,6 @@ def backfill_virtual_results(tickets, now_iso_value, scope_index=None):
             print(f"WARNING: {source} result backfill failed (mode={mode}, category={category_id or '-'}, tournament={tournament_id or '-'}):", exc)
             continue
 
-        matched_ids = set()
         matched_fixtures = set()
         for event in events:
             if not isinstance(event, dict):
@@ -561,8 +560,8 @@ def backfill_virtual_results(tickets, now_iso_value, scope_index=None):
                 # All accepted rows have passed participant and kickoff validation.
                 matched_fixtures.add(fixture_key)
         print(
-            f"{source} result backfill matches mode={mode}: {len(matched_ids) + len(matched_fixtures)} "
-            f"legs; exact IDs={len(matched_ids)} fixture/time={len(matched_fixtures)}"
+            f"{source} result backfill matches mode={mode}: "
+            f"{len(matched_fixtures)} verified fixture/time matches"
         )
     return out
 
