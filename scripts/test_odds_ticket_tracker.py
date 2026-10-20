@@ -131,6 +131,27 @@ class VirtualResultBackfillTests(unittest.TestCase):
         self.assertEqual(settled["status"], "LOST")
         self.assertEqual(settled["final_score"], [5.0, 2.0])
 
+    def test_backfill_rejects_conflicting_scores_for_one_verified_fixture(self):
+        ticket = self.ticket("efootball_gt", "sr:match:conflicting-session")
+        start_ms = int(datetime.fromisoformat(ticket["legs"][0]["start_time"]).timestamp() * 1000)
+        events = [
+            {"eventId": "sr:match:conflicting-session", "score": "5:2",
+             "homeTeamName": "Liverpool (PlayerA)", "awayTeamName": "Tottenham (PlayerB)",
+             "estimateStartTime": start_ms},
+            {"eventId": "sr:match:conflicting-session", "score": "8:0",
+             "homeTeamName": "Liverpool (PlayerA)", "awayTeamName": "Tottenham (PlayerB)",
+             "estimateStartTime": start_ms},
+        ]
+        def opener(request, timeout=60):
+            class Response:
+                def __enter__(self): return self
+                def __exit__(self, *args): return False
+                def read(self): return json.dumps({"ok": True, "events": events, "errors": []}).encode("utf-8")
+            return Response()
+        with patch("scripts.odds_ticket_tracker.urllib.request.urlopen", side_effect=opener):
+            rows = backfill_virtual_results([ticket], datetime.now(timezone.utc).isoformat(), scope_index={})
+        self.assertEqual(rows, [])
+
     def test_reused_event_id_with_wrong_participants_is_not_settled(self):
         ticket = self.ticket("efootball_gt", "sr:match:reused-id")
         wrong_event = {
@@ -294,6 +315,15 @@ class VirtualResultBackfillTests(unittest.TestCase):
         row = self._authoritative_score_row()
         row["settlement_source"] = "model estimated final score"
         self.assertIsNone(settle_virtual_leg(leg, [row]))
+
+    def test_direct_settlement_rejects_conflicting_verified_scores(self):
+        leg = self._score_replay_leg(line=5.5, pick="under")
+        first = self._authoritative_score_row(line=5.5, score="2:1")
+        second = self._authoritative_score_row(line=5.5, score="8:0")
+        second["win"] = False
+        second["result"] = "O5.5"
+        second["actual_result"] = "O5.5"
+        self.assertIsNone(settle_virtual_leg(leg, [first, second]))
 
     def test_score_replay_rejects_product_mismatch_and_conflicting_scores(self):
         leg = self._score_replay_leg()
