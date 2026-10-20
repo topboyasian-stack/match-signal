@@ -187,7 +187,7 @@ export async function onRequestGet(context){
   }
 
   function identityPart(value){
-    return String(value||'').normalize('NFKC').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim().replace(/\\s+/g,' ');
+    return String(value||'').normalize('NFKC').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim().replace(/\s+/g,' ');
   }
   function eventStartIdentity(event){
     for(const key of ['startTime','estimateStartTime','start_time_ms','start_time','kickoff_time']){
