@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT / "scripts") not in sys.path:
     sys.path.insert(0, str(ROOT / "scripts"))
 
-from odds_builder import _upcoming_desk_recent_result_guard
+from odds_builder import _upcoming_desk_recent_result_guard, _upcoming_desk_settled_performance_gate, _upcoming_desk_pending_event_ids
 
 
 def settled_leg(event_id, status, settled_at, *, line=7.5, side="under", product="efootball_gt"):
@@ -169,6 +169,111 @@ class UpcomingDeskRecentLossGateTests(unittest.TestCase):
         result = _upcoming_desk_recent_result_guard("efootball_gt", 7.5, "under", tracker=losses)
         self.assertFalse(result["blocked"])
         self.assertEqual(result["sample_n"], 1)
+
+
+
+
+def desk_ticket(ticket_id, status, odds=3.5, lane="upcoming_desk_research"):
+    return {
+        "ticket_id": ticket_id,
+        "primary_lane": lane,
+        "status": status,
+        "combined_odds": odds,
+        "created_at": f"2026-10-20T04:00:00+00:00",
+        "last_settled_at": f"2026-10-20T05:00:00+00:00",
+        "legs": [],
+    }
+
+
+class UpcomingDeskSettledPromotionGateTests(unittest.TestCase):
+    def test_nine_settled_desk_tickets_cannot_promote_research_lane(self):
+        tracker = {
+            "tickets": [
+                desk_ticket("desk-win-1", "WON"),
+                desk_ticket("desk-win-2", "WON"),
+                *[desk_ticket(f"desk-loss-{i}", "LOST") for i in range(7)],
+            ],
+            "archived_tickets": [],
+        }
+        result = _upcoming_desk_settled_performance_gate(tracker=tracker)
+        self.assertFalse(result["eligible"])
+        self.assertEqual(result["settled_ticket_n"], 9)
+        self.assertEqual(result["flat_stake_roi"], round((2 * 2.5 - 7) / 9, 6))
+        self.assertEqual(result["reason"], "insufficient_settled_desk_ticket_sample")
+
+    def test_sufficient_sample_still_fails_when_realized_roi_is_negative(self):
+        tracker = {
+            "tickets": [
+                desk_ticket("desk-win-1", "WON"),
+                desk_ticket("desk-win-2", "WON"),
+                *[desk_ticket(f"desk-loss-{i}", "LOST") for i in range(10)],
+            ],
+            "archived_tickets": [],
+        }
+        result = _upcoming_desk_settled_performance_gate(tracker=tracker)
+        self.assertFalse(result["eligible"])
+        self.assertEqual(result["settled_ticket_n"], 12)
+        self.assertLess(result["flat_stake_roi"], 0)
+        self.assertEqual(result["reason"], "settled_desk_ticket_roi_below_promotion_floor")
+
+    def test_desk_promotes_only_after_sample_and_positive_roi_floor_both_pass(self):
+        tracker = {
+            "tickets": [
+                *[desk_ticket(f"desk-win-{i}", "WON", odds=3.5) for i in range(3)],
+                *[desk_ticket(f"desk-loss-{i}", "LOST", odds=3.5) for i in range(7)],
+            ],
+            "archived_tickets": [],
+        }
+        result = _upcoming_desk_settled_performance_gate(tracker=tracker)
+        self.assertTrue(result["eligible"])
+        self.assertEqual(result["settled_ticket_n"], 10)
+        self.assertEqual(result["flat_stake_roi"], 0.05)
+        self.assertIsNone(result["reason"])
+
+    def test_pending_and_unrelated_tickets_are_not_settled_promotion_evidence(self):
+        tracker = {
+            "tickets": [
+                desk_ticket("desk-win-1", "WON"),
+                desk_ticket("desk-win-2", "WON"),
+                desk_ticket("pending", "PENDING"),
+                desk_ticket("other-lane", "WON", lane="high_confidence_research"),
+            ],
+            "archived_tickets": [
+                desk_ticket("desk-win-1", "WON"),  # archived/current duplicate counts once
+            ],
+        }
+        result = _upcoming_desk_settled_performance_gate(tracker=tracker)
+        self.assertFalse(result["eligible"])
+        self.assertEqual(result["settled_ticket_n"], 2)
+        self.assertEqual(result["wins"], 2)
+
+    def test_open_events_are_excluded_even_when_parent_ticket_already_lost(self):
+        tracker = {
+            "tickets": [
+                {
+                    "ticket_id": "ticket-already-lost",
+                    "status": "LOST",
+                    "legs": [
+                        {"product": "efootball_gt", "event_id": "finished-event", "status": "WON"},
+                        {"product": "efootball_gt", "event_id": "still-open-event", "status": "PENDING"},
+                    ],
+                }
+            ],
+            "archived_tickets": [
+                {
+                    "ticket_id": "archived-ticket",
+                    "status": "PENDING",
+                    "legs": [
+                        {"product": "efootball_gt", "event_id": "archived-open-event", "status": "PENDING"},
+                        {"product": "vfootball", "event_id": "research-only-event", "status": "PENDING"},
+                    ],
+                }
+            ],
+        }
+        pending = _upcoming_desk_pending_event_ids(tracker=tracker)
+        self.assertEqual(pending, {"still-open-event", "archived-open-event"})
+        self.assertNotIn("finished-event", pending)
+        self.assertNotIn("research-only-event", pending)
 
 
 if __name__ == "__main__":
