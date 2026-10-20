@@ -6,7 +6,7 @@ import unittest
 
 import odds_builder as builder
 import ticket_calibration_experiment as experiment
-from ticket_history import merge_ticket_history, settled_ticket_history
+from ticket_history import merge_ticket_history, settled_ticket_history, independent_settled_ticket_history
 
 
 def make_ticket(index, *, status=None, stamp=None, ticket_id=None, lane="efootball_exact_evidence_value"):
@@ -37,6 +37,21 @@ def ledger_fixture():
 
 
 class TicketCalibrationHistoryTests(unittest.TestCase):
+    def test_overlapping_event_tickets_are_excluded_from_independent_sample(self):
+        first = make_ticket(1, status="LOST")
+        overlapping = make_ticket(2, status="WON")
+        third = make_ticket(3, status="WON")
+        # Reusing just one leg event makes the whole accumulator dependent.
+        overlapping["legs"][0]["event_id"] = first["legs"][0]["event_id"]
+        raw = {"tickets": [first, overlapping, third], "archived_tickets": []}
+
+        independent, diagnostics = independent_settled_ticket_history(raw)
+        self.assertEqual([row["ticket_id"] for row in independent], ["T-001", "T-003"])
+        self.assertEqual(diagnostics["settled_ticket_rows"], 3)
+        self.assertEqual(diagnostics["independent_ticket_rows"], 2)
+        self.assertEqual(diagnostics["overlapping_event_tickets_excluded"], 1)
+        self.assertEqual(diagnostics["tickets_missing_complete_event_identity"], 0)
+
     def test_archived_and_current_records_are_combined_and_deduplicated(self):
         raw = ledger_fixture()
         unique, diagnostics = merge_ticket_history(raw)
