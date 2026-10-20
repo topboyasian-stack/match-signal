@@ -1589,6 +1589,9 @@ def _upcoming_desk_settled_performance_gate(tracker=None,min_tickets=None,min_ro
     )
 
 
+_UPCOMING_DESK_PENDING_EVENT_ID_CACHE=None
+
+
 def _upcoming_desk_pending_event_ids(tracker=None):
     """Return active eFootball events already sitting in any unsettled ticket leg.
 
@@ -1596,6 +1599,10 @@ def _upcoming_desk_pending_event_ids(tracker=None):
     other leg is still pending. Repeated Builder refreshes must not issue another
     ticket using that same unresolved event.
     """
+    global _UPCOMING_DESK_PENDING_EVENT_ID_CACHE
+    cacheable=tracker is None
+    if cacheable and _UPCOMING_DESK_PENDING_EVENT_ID_CACHE is not None:
+        return _UPCOMING_DESK_PENDING_EVENT_ID_CACHE
     payload=load(DATA/"odds_ticket_tracker.json",{}) if tracker is None else tracker
     event_ids=set()
     if not isinstance(payload,dict):
@@ -4319,6 +4326,7 @@ def build_value_batches(candidates):
     No extra leg is added merely to reach a target.
     """
     built=[make_leg(x) for x in candidates]
+    built,pending_ticket_event_holds=_exclude_pending_virtual_ticket_events(built)
     compact_efootball_diag={
         "enabled":True,
         "candidate_count":0,
@@ -5172,6 +5180,7 @@ def main():
         batch_diag["upcoming_desk_settled_performance_gate"]=desk_performance_gate
         batch_diag["settled_lane_performance_gates"]=settled_lane_gates
         batch_diag["upcoming_desk_pending_open_event_count"]=len(pending_desk_events)
+        batch_diag["pending_virtual_candidate_event_holds"]=sum(1 for row in built if row.get("pending_ticket_event_hold") is True)
         batch_diag["upcoming_desk_primary_promotion_allowed"]=desk_performance_gate.get("eligible") is True
         batch_diag["upcoming_desk_primary_hold_reason"]=desk_performance_gate.get("reason")
     # Evaluate the isolated Phase 2 track independently of the baseline batch path.
