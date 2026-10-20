@@ -1470,6 +1470,144 @@ def _construct_phase2_cyclical_loop_batches(pool,max_batches=4,min_odds=None):
         "reason":None if selected else "no_isolated_streak_break_combination_reached_all_gates"
     }
 
+_UPCOMING_DESK_SETTLED_RESULT_INDEX_CACHE=None
+
+def _upcoming_desk_settled_result_index(tracker=None):
+    """Index verified settled outcomes by eFootball product + exact line + side.
+
+    This joins the paper-ticket ledger to the recent Virtual Lab settlement
+    archive. Ticket rows are important here because a just-settled Builder leg
+    may not have been copied to the rolling lab archive yet. Repeated tickets
+    using the same event count only once; contradictory outcomes for an event
+    are dropped instead of choosing whichever source happens to be latest.
+    """
+    global _UPCOMING_DESK_SETTLED_RESULT_INDEX_CACHE
+    cacheable=tracker is None
+    if cacheable and _UPCOMING_DESK_SETTLED_RESULT_INDEX_CACHE is not None:
+        return _UPCOMING_DESK_SETTLED_RESULT_INDEX_CACHE
+
+    payload=load(DATA/"odds_ticket_tracker.json",{}) if tracker is None else tracker
+    by_key_event={}
+
+    def stamp_epoch(value):
+        try:
+            stamp=datetime.fromisoformat(str(value or "").replace("Z","+00:00"))
+            if stamp.tzinfo is None:
+                stamp=stamp.replace(tzinfo=timezone.utc)
+            return stamp.timestamp()
+        except (TypeError,ValueError,OverflowError):
+            return 0.0
+
+    def add(product,line,side,event_id,status,stamp,source):
+        product=str(product or "").lower()
+        side=str(side or "").lower()
+        status=str(status or "").upper()
+        if product not in ACTIVE_VIRTUAL_PRODUCTS or side not in {"over","under"} or status not in {"WON","LOST","VOID"}:
+            return
+        try:
+            line_key=f"{float(line):g}"
+        except (TypeError,ValueError):
+            return
+        event_key=str(event_id or "").strip()
+        if not event_key:
+            return
+        key=(product,line_key,side)
+        dedupe=(key,event_key)
+        record={
+            "product":product,"line":line_key,"side":side,"event_id":event_key,
+            "status":status,"settled_at":str(stamp or ""),"settled_epoch":stamp_epoch(stamp),
+            "source":source,
+        }
+        previous=by_key_event.get(dedupe)
+        if previous:
+            if previous.get("status")!=status:
+                # Conflicting settlement sources are not safe recent-result evidence.
+                previous["status"]="CONFLICT"
+                return
+            if record["settled_epoch"]>previous.get("settled_epoch",0):
+                by_key_event[dedupe]=record
+        else:
+            by_key_event[dedupe]=record
+
+    tickets=[]
+    if isinstance(payload,dict):
+        tickets.extend(x for x in payload.get("tickets",[]) if isinstance(x,dict))
+        tickets.extend(x for x in payload.get("archived_tickets",[]) if isinstance(x,dict))
+    for ticket in tickets:
+        for leg in ticket.get("legs") or []:
+            if not isinstance(leg,dict):
+                continue
+            product=str(leg.get("product") or leg.get("sport") or "").lower()
+            status=str(leg.get("status") or "PENDING").upper()
+            if product not in ACTIVE_VIRTUAL_PRODUCTS or status not in {"WON","LOST","VOID"}:
+                continue
+            side,line=parse_virtual_pick(leg)
+            stamp=leg.get("settled_at") or ticket.get("last_settled_at") or leg.get("start_time") or ticket.get("created_at")
+            add(product,line,side,leg.get("event_id"),status,stamp,"paper_ticket_ledger")
+
+    # Include recent settled outcomes even when they were observed outside a
+    # tracked ticket; exact event IDs deduplicate the overlapping sources.
+    if cacheable:
+        try:
+            archived=_load_recent_virtual_evidence()
+        except Exception:
+            archived={}
+        for (product,line_key,side),rows in (archived or {}).items():
+            for row in rows if isinstance(rows,list) else []:
+                if not isinstance(row,dict):
+                    continue
+                win=row.get("win")
+                status="WON" if win is True else "LOST" if win is False else "VOID" if str(row.get("actual_result") or row.get("result") or "").upper()=="PUSH" else None
+                add(product,line_key,side,row.get("event_id") or row.get("record_id") or row.get("trace_id"),status,
+                    row.get("settled_at") or row.get("timestamp"),"virtual_lab_settlement_archive")
+
+    result={}
+    for ((product,line_key,side),event_id),row in by_key_event.items():
+        if row.get("status")=="CONFLICT":
+            continue
+        result.setdefault((product,line_key,side),[]).append(row)
+    for rows in result.values():
+        rows.sort(key=lambda row:(float(row.get("settled_epoch") or 0.0),str(row.get("event_id") or "")),reverse=True)
+    if cacheable:
+        _UPCOMING_DESK_SETTLED_RESULT_INDEX_CACHE=result
+    return result
+
+
+def _upcoming_desk_recent_result_guard(product,line,side,tracker=None,min_loss_streak=2):
+    """Hold an exact Desk line/side after two distinct, most-recent settled losses.
+
+    This is an additional research-only circuit breaker, not a probability
+    override. A settled win (or void) on the same product/line/side breaks the
+    streak. It protects the Desk lane from repeating a side after the paper
+    ledger has already recorded consecutive exact-selection losses.
+    """
+    try:
+        line_key=f"{float(line):g}"
+    except (TypeError,ValueError):
+        return {"blocked":False,"reason":"invalid_line","sample_n":0,"loss_streak":0,"recent_results":[]}
+    index=_upcoming_desk_settled_result_index(tracker)
+    rows=index.get((str(product or "").lower(),line_key,str(side or "").lower()),[])
+    streak=0
+    for row in rows:
+        if row.get("status")=="LOST":
+            streak+=1
+        else:
+            break
+    recent=[{"event_id":row.get("event_id"),"status":row.get("status"),"settled_at":row.get("settled_at"),"source":row.get("source")} for row in rows[:5]]
+    blocked=streak>=max(1,int(min_loss_streak or 1))
+    return {
+        "blocked":blocked,
+        "reason":"recent_settled_line_side_loss_streak" if blocked else None,
+        "product":str(product or "").lower(),
+        "line":line_key,
+        "side":str(side or "").lower(),
+        "sample_n":len(rows),
+        "consecutive_losses":streak,
+        "threshold":max(1,int(min_loss_streak or 1)),
+        "recent_results":recent,
+    }
+
+
 def _upcoming_desk_research_candidate(event, now):
     """Normalize one current Upcoming Desk row without using the legacy fallback probability."""
     if not isinstance(event,dict):
@@ -1513,6 +1651,9 @@ def _upcoming_desk_research_candidate(event, now):
     side=str(event.get("pick") or "").strip().lower()
     if side not in {"over","under"}:
         return None,"invalid_selected_side"
+    recent_guard=_upcoming_desk_recent_result_guard(product,line,side)
+    if recent_guard.get("blocked") is True:
+        return None,"recent_settled_line_side_loss_streak"
     if event.get("identity_verified") is not True:
         return None,"fixture_identity_not_verified"
     if str(event.get("bookmaker_source") or "")!="SportyBet NG":
