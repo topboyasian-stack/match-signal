@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 from ensure_odds_builder_refresh import (
     BUILDER_ARTIFACT_MAX_AGE_MINUTES,
     RECENT_RUN_COOLDOWN_MINUTES,
+    UPCOMING_BOARD_REFRESH_MIN_INTERVAL_MINUTES,
     evaluate_runs,
 )
 
@@ -75,9 +76,9 @@ class BuilderRefreshDecisionTests(unittest.TestCase):
         self.assertEqual(result["reason"], "builder_artifact_stale")
 
 
-    def test_newer_upcoming_board_dispatches_even_when_builder_artifact_is_fresh(self):
+    def test_newer_upcoming_board_dispatches_when_builder_cycle_was_missed(self):
         result = evaluate_runs(
-            [run(1)],
+            [run(UPCOMING_BOARD_REFRESH_MIN_INTERVAL_MINUTES + 1)],
             NOW,
             artifact_generated_at=artifact(1),
             upstream_board_generated_at=NOW.isoformat().replace("+00:00", "Z"),
@@ -85,6 +86,17 @@ class BuilderRefreshDecisionTests(unittest.TestCase):
         self.assertTrue(result["dispatch"])
         self.assertEqual(result["reason"], "upcoming_board_newer_than_builder_artifact")
         self.assertTrue(result["upcoming_board_newer_than_builder_artifact"])
+
+    def test_newer_upcoming_board_does_not_duplicate_recent_builder_cycle(self):
+        result = evaluate_runs(
+            [run(1)],
+            NOW,
+            artifact_generated_at=artifact(1),
+            upstream_board_generated_at=NOW.isoformat().replace("+00:00", "Z"),
+        )
+        self.assertFalse(result["dispatch"])
+        self.assertEqual(result["reason"], "upcoming_board_newer_but_builder_recent")
+        self.assertEqual(result["upcoming_board_refresh_min_interval_minutes"], UPCOMING_BOARD_REFRESH_MIN_INTERVAL_MINUTES)
 
     def test_newer_upcoming_board_does_not_dispatch_while_builder_run_is_active(self):
         result = evaluate_runs(
