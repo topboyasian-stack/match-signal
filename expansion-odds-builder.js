@@ -1027,7 +1027,7 @@
 
     var ticketTrack=ticketTrackHtml(tracker);
     var qualificationMonitor=qualificationMonitorHtml(data,batches.length);
-    target.innerHTML=pushNotificationHtml()+'<div class="builder-console"><div class="builder-console-head"><div><span class="builder-kicker">PAPER RESEARCH DESK</span><h3>Live '+floorLabel+' Builder</h3><p>Fresh SportyBet prices are qualified in-process. Batches stay paper-only and disjoint by event.</p></div><div class="builder-live-state"><span class="pulse-dot"></span><b>'+(staleBuilderData?'REFRESH REQUIRED':data.status==='LIVE_VALUE_SET'?'LIVE VALUE SET':batchCount?'PAPER VALUE SET':'NO ACTIVE SET')+'</b><small>'+esc(status)+'</small></div></div><div class="builder-stat-row"><div class="builder-stat builder-stat-main"><small>Active batches</small><strong>'+batchCount+'/6</strong><span>Automatically refreshed</span></div><div class="builder-stat"><small>Sport lanes</small><strong>'+esc(sports.length?sports.join(' · '):'—')+'</strong><span>Current batch set</span></div><div class="builder-stat"><small>Top model rating</small><strong>'+esc(topRating==null?'—':topRating.toFixed(1)+'/100')+'</strong><span>Batch strength proxy</span></div><div class="builder-stat"><small>Top combined odds</small><strong>'+esc(top&&top.combined_odds!=null?Number(top.combined_odds).toFixed(3):'—')+'x</strong><span>SportyBet snapshot</span></div></div></div><div class="builder-batch-panel builder-qualified-set"><div class="builder-section-head"><div><span class="section-kicker">PAPER RESEARCH BATCHES</span><b>'+floorLabel+' evidence-gated batches</b><span>Research-only candidates. Open a batch for selections, booking-code status and evidence.</span></div><div class="builder-section-note"><b>'+esc(virtualCount)+'</b><span>virtual candidates evaluated</span></div></div><div class="batch-list">'+(cards||'<div class="empty">No qualified '+floorLabel+' batches are currently available.</div>')+'</div><div class="builder-feedbar"><span><b>SPORTYBET</b> live snapshot</span><span>Top joint proxy <b>'+esc(topJoint==null?'—':pct(topJoint))+'</b></span><span>Price freshness gate <b>&le; 15m</b></span><span>Paper only <b>Yes</b></span></div>'+gateNote+'</div>'+qualificationMonitor+ticketTrack+'<div class="builder-note">The Builder refreshes automatically. Opening a batch reveals its exact selections and current SportyBet booking code.</div>';
+    target.innerHTML=pushNotificationHtml()+'<div class="builder-console"><div class="builder-console-head"><div><span class="builder-kicker">PAPER RESEARCH DESK</span><h3>Live '+floorLabel+' Builder</h3><p>Fresh SportyBet prices are qualified in-process. Batches stay paper-only and disjoint by event.</p></div><div class="builder-live-state"><span class="pulse-dot"></span><b>'+(staleBuilderData?'REFRESH REQUIRED':data.status==='LIVE_VALUE_SET'?'LIVE VALUE SET':batchCount?'PAPER VALUE SET':'NO ACTIVE SET')+'</b><small>'+esc(status)+'</small><button type="button" class="booking-btn builder-refresh-btn" data-builder-refresh>Refresh now</button><span class="builder-refresh-status" data-builder-refresh-status>Updated '+esc(local(data.generated_at||''))+'</span></div></div><div class="builder-stat-row"><div class="builder-stat builder-stat-main"><small>Active batches</small><strong>'+batchCount+'/6</strong><span>Automatically refreshed</span></div><div class="builder-stat"><small>Sport lanes</small><strong>'+esc(sports.length?sports.join(' · '):'—')+'</strong><span>Current batch set</span></div><div class="builder-stat"><small>Top model rating</small><strong>'+esc(topRating==null?'—':topRating.toFixed(1)+'/100')+'</strong><span>Batch strength proxy</span></div><div class="builder-stat"><small>Top combined odds</small><strong>'+esc(top&&top.combined_odds!=null?Number(top.combined_odds).toFixed(3):'—')+'x</strong><span>SportyBet snapshot</span></div></div></div><div class="builder-batch-panel builder-qualified-set"><div class="builder-section-head"><div><span class="section-kicker">PAPER RESEARCH BATCHES</span><b>'+floorLabel+' evidence-gated batches</b><span>Research-only candidates. Open a batch for selections, booking-code status and evidence.</span></div><div class="builder-section-note"><b>'+esc(virtualCount)+'</b><span>virtual candidates evaluated</span></div></div><div class="batch-list">'+(cards||'<div class="empty">No qualified '+floorLabel+' batches are currently available.</div>')+'</div><div class="builder-feedbar"><span><b>SPORTYBET</b> live snapshot</span><span>Top joint proxy <b>'+esc(topJoint==null?'—':pct(topJoint))+'</b></span><span>Price freshness gate <b>&le; 15m</b></span><span>Paper only <b>Yes</b></span></div>'+gateNote+'</div>'+qualificationMonitor+ticketTrack+'<div class="builder-note">The Builder refreshes automatically. Opening a batch reveals its exact selections and current SportyBet booking code.</div>';
     updateTimers();
   }
   var oddsBuilderHasRendered=false;
@@ -1055,6 +1055,7 @@
     if(oddsBuilderLoadInFlight){oddsBuilderRefreshQueued=true;return;}
     oddsBuilderLoadInFlight=true;
     var expanded=builderExpandedState(target);
+    document.querySelectorAll('[data-builder-refresh]').forEach(function(btn){btn.disabled=true;btn.textContent='Refreshing…';});
     if(!oddsBuilderHasRendered)target.innerHTML='<div class="empty">Loading Odds Builder data…</div>';
     Promise.all([
       fetch('./data/odds_builder.json?v=20261020-desk-guard-'+Date.now(),{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('odds_builder.json HTTP '+r.status);return r.json();}),
@@ -1108,6 +1109,17 @@
       document.addEventListener('click',function(e){
         var enable=e.target.closest&&e.target.closest('[data-push-enable]');
         if(enable){enablePushNotifications();}
+      });
+    }
+    if(!window.__matchSignalBuilderRefreshHandler){
+      window.__matchSignalBuilderRefreshHandler=true;
+      document.addEventListener('click',function(e){
+        var btn=e.target.closest&&e.target.closest('[data-builder-refresh]');
+        if(!btn)return;
+        e.preventDefault();
+        btn.disabled=true;
+        btn.textContent='Refreshing…';
+        load();
       });
     }
     if(!window.__matchSignalBookingHandlers){
