@@ -1511,17 +1511,22 @@ _SETTLED_BUILDER_LANE_PERFORMANCE_CACHE=None
 
 
 def _settled_builder_lane_performance_index(tracker=None):
-    """Summarize distinct, settled flat-stake returns once per actual Builder lane."""
+    """Measure lane promotion on an event-disjoint, chronological settled-ticket sample.
+
+    Multiple accumulators that reuse a fixture are not independent evidence for
+    lane promotion. Keep their real-money-free paper returns in the tracker, but
+    count only the first settled ticket for each event set when testing whether a
+    lane has earned promotion.
+    """
     global _SETTLED_BUILDER_LANE_PERFORMANCE_CACHE
     cacheable=tracker is None
     if cacheable and _SETTLED_BUILDER_LANE_PERFORMANCE_CACHE is not None:
         return _SETTLED_BUILDER_LANE_PERFORMANCE_CACHE
     payload=load(DATA/"odds_ticket_tracker.json",{}) if tracker is None else tracker
-    unique_tickets,_=merge_ticket_history(payload)
-    source_rows=[("unique",x) for x in unique_tickets]
+    tickets,_=merge_ticket_history(payload)
 
-    unique={}
-    for source,ticket in source_rows:
+    by_lane={}
+    for ticket_index,ticket in enumerate(tickets):
         lane=str(ticket.get("primary_lane") or ticket.get("construction_lane") or "").strip()
         legs=ticket.get("legs") if isinstance(ticket.get("legs"),list) else []
         if not lane and legs:
@@ -1529,10 +1534,7 @@ def _settled_builder_lane_performance_index(tracker=None):
             if len(leg_lanes)==1:
                 only=next(iter(leg_lanes))
                 lane=UPCOMING_DESK_BATCH_LANE if only==UPCOMING_DESK_RESEARCH_LANE else only
-        if not lane:
-            continue
-        status=str(ticket.get("status") or "").upper()
-        if status not in {"WON","LOST"}:
+        if not lane or str(ticket.get("status") or "").upper() not in {"WON","LOST"}:
             continue
         try:
             odds=float(ticket.get("combined_odds"))
@@ -1540,26 +1542,82 @@ def _settled_builder_lane_performance_index(tracker=None):
             continue
         if not math.isfinite(odds) or odds<=1.0:
             continue
-        ticket_id=str(ticket.get("ticket_id") or "").strip()
-        identity=ticket_id or "|".join((
-            lane,status,str(ticket.get("created_at") or ""),
-            str(ticket.get("last_settled_at") or ""),f"{odds:.6f}",
-        ))
-        # Prefer the current ticket row over its archived copy if both exist.
-        unique.setdefault((lane,identity),ticket)
+        stamp=str(
+            ticket.get("last_settled_at") or ticket.get("settled_at")
+            or ticket.get("updated_at") or ticket.get("created_at") or ""
+        )
+        by_lane.setdefault(lane,[]).append((stamp,ticket_index,ticket,odds))
 
     grouped={}
-    for (lane,_),ticket in unique.items():
-        row=grouped.setdefault(lane,{"settled_ticket_n":0,"wins":0,"losses":0,"flat_stake_net_units":0.0,"combined_odds_sum":0.0})
-        odds=float(ticket["combined_odds"])
-        row["settled_ticket_n"]+=1
-        row["combined_odds_sum"]+=odds
-        if str(ticket.get("status") or "").upper()=="WON":
-            row["wins"]+=1
-            row["flat_stake_net_units"]+=odds-1.0
-        else:
-            row["losses"]+=1
-            row["flat_stake_net_units"]-=1.0
+    for lane,entries in by_lane.items():
+        entries.sort(key=lambda item:(item[0],item[1]))
+        used_events=set()
+        independent=[]
+        dependent_n=0
+        observed_n=0
+        observed_wins=0
+        observed_losses=0
+        observed_net=0.0
+        for _stamp,ticket_index,ticket,odds in entries:
+            status=str(ticket.get("status") or "").upper()
+            observed_n+=1
+            if status=="WON":
+                observed_wins+=1
+                observed_net+=odds-1.0
+            else:
+                observed_losses+=1
+                observed_net-=1.0
+
+            legs=ticket.get("legs") if isinstance(ticket.get("legs"),list) else []
+            event_keys=[]
+            for leg_index,leg in enumerate(legs):
+                if not isinstance(leg,dict):
+                    continue
+                product=str(leg.get("product") or leg.get("sport") or "unknown").strip().lower()
+                event_id=str(leg.get("event_id") or leg.get("eventId") or "").strip()
+                if event_id:
+                    event_keys.append((product,event_id))
+                else:
+                    # Old ledger rows lacking event IDs remain countable as one
+                    # unique ticket-leg identity; they cannot collide silently.
+                    ticket_id=str(ticket.get("ticket_id") or ticket.get("created_at") or ticket_index)
+                    event_keys.append((product,f"legacy:{ticket_id}:{leg_index}"))
+            if not event_keys:
+                ticket_id=str(ticket.get("ticket_id") or ticket.get("created_at") or ticket_index)
+                event_keys=[("ticket",f"no-legs:{ticket_id}")]
+
+            unique_keys=set(event_keys)
+            if unique_keys & used_events:
+                dependent_n+=1
+                continue
+            used_events.update(unique_keys)
+            independent.append((ticket,odds,status))
+
+        row={
+            "settled_ticket_n":len(independent),
+            "observed_settled_ticket_n":observed_n,
+            "dependent_overlap_ticket_n":dependent_n,
+            "independent_event_count":len(used_events),
+            "observed_wins":observed_wins,
+            "observed_losses":observed_losses,
+            "observed_flat_stake_net_units":round(observed_net,6),
+            "wins":0,
+            "losses":0,
+            "flat_stake_net_units":0.0,
+            "combined_odds_sum":0.0,
+        }
+        for ticket,odds,status in independent:
+            row["combined_odds_sum"]+=odds
+            if status=="WON":
+                row["wins"]+=1
+                row["flat_stake_net_units"]+=odds-1.0
+            else:
+                row["losses"]+=1
+                row["flat_stake_net_units"]-=1.0
+        row["flat_stake_net_units"]=round(row["flat_stake_net_units"],6)
+        row["combined_odds_sum"]=round(row["combined_odds_sum"],6)
+        grouped[lane]=row
+
     if cacheable:
         _SETTLED_BUILDER_LANE_PERFORMANCE_CACHE=grouped
     return grouped
