@@ -283,11 +283,11 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
 
     def test_builder_promotion_checks_out_repo_and_waits_for_the_board_triggered_deployment(self):
         self.assertIn("uses: actions/checkout@v4", PROMOTION_WORKFLOW)
-        self.assertIn("with:\\n          ref: main", PROMOTION_WORKFLOW)
+        self.assertIn("with:\n          ref: main", PROMOTION_WORKFLOW)
         self.assertIn("gh workflow run unified-upcoming.yml --ref main", PROMOTION_WORKFLOW)
         self.assertIn("workflow_dispatch:", PROMOTION_WORKFLOW)
-        self.assertIn('paths:\\n      - ".github/workflows/builder-production-promotion.yml"', PROMOTION_WORKFLOW)
-        self.assertNotIn('  workflow_run:\\n    workflows: ["Match Signal Odds Builder"]', PROMOTION_WORKFLOW)
+        self.assertIn('paths:\n      - ".github/workflows/builder-production-promotion.yml"', PROMOTION_WORKFLOW)
+        self.assertNotIn('  workflow_run:\n    workflows: ["Match Signal Odds Builder"]', PROMOTION_WORKFLOW)
         self.assertIn("Dispatch Unified Upcoming and wait for successful board publication", PROMOTION_WORKFLOW)
         self.assertIn("id: board-refresh", PROMOTION_WORKFLOW)
         self.assertIn('echo "board_run_id=$board_run_id" >> "$GITHUB_OUTPUT"', PROMOTION_WORKFLOW)
