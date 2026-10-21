@@ -4,15 +4,15 @@
   "qualified_best_quote_coverage_status": "COMPLETE",
   "booking_api_status": "VERIFIED",
   "provider": "Cloudflare Pages",
-  "source_commit": "38d6775571b8d6f8cf0e082ce42b0e6f937dac95",
-  "verified_at": "2026-10-21T17:29:52.552879+00:00",
+  "source_commit": "09a1a6893f361dd52cc65fddf473c07871910e85",
+  "verified_at": "2026-10-21T17:32:01.045266+00:00",
   "live_virtual_feed": {
-    "verified_at": "2026-10-21T17:29:49.793Z",
+    "verified_at": "2026-10-21T17:32:00.486Z",
     "status": "DIAGNOSTIC",
     "scan_complete": true,
     "scan_stop_reason": "all_model_qualified_candidates_matched",
     "paper_only": true,
-    "candidate_artifact_rows": 312,
+    "candidate_artifact_rows": 354,
     "virtual_candidate_rows_in_next_7_days": 0,
     "snapshot_gate_qualified_fixtures": 0,
     "snapshot_gate_diagnostics": {
@@ -28,7 +28,7 @@
       {
         "page": 1,
         "count": 100,
-        "fetched_at": "2026-10-21T17:29:49.744Z",
+        "fetched_at": "2026-10-21T17:32:00.468Z",
         "status": "LIVE"
       }
     ],
@@ -58,16 +58,30 @@
     "qualified_examples": []
   },
   "booking_api": {
-    "verified_at": "2026-10-21T17:29:39.578Z",
-    "status": "PASS",
-    "http_status": 200,
+    "verified_at": "2026-10-21T17:31:36.491Z",
+    "status": "VOLATILE_MARKET",
+    "http_status": 409,
     "ok": true,
-    "batch_id": "DESK-BATCH-02",
+    "batch_id": "DESK-BATCH-04",
     "selection_count": 2,
-    "booking_code_available": true,
-    "error": null,
-    "message": null,
-    "volatile_market": false
+    "booking_code_available": false,
+    "error": "NO_AVAILABLE_SELECTIONS",
+    "message": "No Builder selections could be mapped to a currently open SportyBet event/market.",
+    "volatile_market": true,
+    "validation": [
+      {
+        "event_id": "sr:match:BAaFexaKnd5-qyMv8BcP3xA",
+        "ok": false,
+        "excluded": true,
+        "reason": "The exact SportyBet O/U line or selected side is no longer available."
+      },
+      {
+        "event_id": "sr:match:BAaFexZgad46SAd-P1cdt2Q",
+        "ok": false,
+        "excluded": true,
+        "reason": "The exact SportyBet O/U line or selected side is no longer available."
+      }
+    ]
   },
   "checks": [
     "core_pages",
