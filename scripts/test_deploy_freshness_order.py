@@ -281,7 +281,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         missing = sorted(required_inputs - board_paths)
         self.assertEqual(missing, [], f"Deployable inputs bypass the Unified board workflow: {missing}")
 
-    def test_builder_promotion_checks_out_repo_and_dispatches_the_board(self):
+    def test_builder_promotion_checks_out_repo_and_waits_for_the_board_triggered_deployment(self):
         self.assertIn("uses: actions/checkout@v4", PROMOTION_WORKFLOW)
         self.assertIn("with:\n          ref: main", PROMOTION_WORKFLOW)
         self.assertIn("gh workflow run unified-upcoming.yml --ref main", PROMOTION_WORKFLOW)
@@ -289,20 +289,21 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn('paths:\n      - ".github/workflows/builder-production-promotion.yml"', PROMOTION_WORKFLOW)
         self.assertNotIn('  workflow_run:\n    workflows: ["Match Signal Odds Builder"]', PROMOTION_WORKFLOW)
         self.assertIn("Dispatch Unified Upcoming and wait for successful board publication", PROMOTION_WORKFLOW)
-        self.assertIn("gh workflow run cloudflare-pages.yml --ref main", PROMOTION_WORKFLOW)
-        self.assertIn("gh api \"repos/$GITHUB_REPOSITORY/actions/workflows/unified-upcoming.yml/runs?branch=main&event=workflow_dispatch&per_page=20\"", PROMOTION_WORKFLOW)
-        self.assertIn("| [.id, .head_sha] | @tsv", PROMOTION_WORKFLOW)
-        self.assertIn("compare/$source_sha...$candidate_sha", PROMOTION_WORKFLOW)
-        self.assertIn('if [ "$merge_base" = "$source_sha" ]; then', PROMOTION_WORKFLOW)
-        self.assertNotIn("select(.head_sha ==", PROMOTION_WORKFLOW, "automated commits may advance main during dispatch")
-        self.assertIn("if [ \"$board_conclusion\" != \"success\" ]; then", PROMOTION_WORKFLOW)
-        self.assertIn("if [ \"$deploy_conclusion\" != \"success\" ]; then", PROMOTION_WORKFLOW)
+        self.assertIn("id: board-refresh", PROMOTION_WORKFLOW)
+        self.assertIn('echo "board_run_id=$board_run_id" >> "$GITHUB_OUTPUT"', PROMOTION_WORKFLOW)
+        self.assertIn("Wait for successful Pages deployment triggered by refreshed board", PROMOTION_WORKFLOW)
+        self.assertIn("BOARD_RUN_ID: ${{ steps.board-refresh.outputs.board_run_id }}", PROMOTION_WORKFLOW)
+        self.assertIn("BOARD_HEAD_SHA: ${{ steps.board-refresh.outputs.board_head_sha }}", PROMOTION_WORKFLOW)
+        self.assertIn("event=workflow_run&per_page=20", PROMOTION_WORKFLOW)
+        self.assertIn("compare/$BOARD_HEAD_SHA...$candidate_sha", PROMOTION_WORKFLOW)
+        self.assertNotIn("gh workflow run cloudflare-pages.yml --ref main", PROMOTION_WORKFLOW, "Pages already deploys on successful Unified Upcoming workflow_run; do not start a duplicate deployment")
+        self.assertIn('if [ "$board_conclusion" != "success" ]; then', PROMOTION_WORKFLOW)
+        self.assertIn('if [ "$deploy_conclusion" != "success" ]; then', PROMOTION_WORKFLOW)
         self.assertLess(
             PROMOTION_WORKFLOW.index("gh workflow run unified-upcoming.yml --ref main"),
-            PROMOTION_WORKFLOW.index("gh workflow run cloudflare-pages.yml --ref main"),
-            "Pages may only be dispatched after the board refresh has been awaited and checked",
+            PROMOTION_WORKFLOW.index("Wait for successful Pages deployment triggered by refreshed board"),
+            "Promotion must await board publication before awaiting the one deployment triggered by that board.",
         )
-
     def test_builder_explicitly_dispatches_promotion_after_artifact_publish(self):
         publish_step = BUILDER_WORKFLOW.find("      - name: Commit generated accumulator artifact")
         dispatch_step = BUILDER_WORKFLOW.find("      - name: Dispatch production promotion after Builder artifact publish")
@@ -325,20 +326,13 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
                 continue
             source = workflow_path.read_text(encoding="utf-8")
             if "gh workflow run cloudflare-pages.yml --ref main" in source:
-                if workflow_path.name != "builder-production-promotion.yml":
-                    bypasses.append(str(workflow_path.relative_to(ROOT)))
-                else:
-                    wait_step = source.find("Dispatch Unified Upcoming and wait for successful board publication")
-                    dispatch_step = source.find("gh workflow run cloudflare-pages.yml --ref main")
-                    guard = source.find('if [ "$board_conclusion" != "success" ]; then')
-                    if not (wait_step >= 0 and guard >= 0 and dispatch_step > guard):
-                        bypasses.append(str(workflow_path.relative_to(ROOT)))
+                bypasses.append(str(workflow_path.relative_to(ROOT)))
         self.assertEqual(
             bypasses,
             [],
-            "Feeder workflows must hand off through Unified Upcoming before Pages deployment",
+            "Feeder workflows must hand off through Unified Upcoming; Pages is triggered by successful board completion, not dispatched a second time.",
         )
-
+        self.assertIn("Wait for successful Pages deployment triggered by refreshed board", PROMOTION_WORKFLOW)
     def test_board_owned_outputs_do_not_trigger_a_self_refresh_loop(self):
         paths = workflow_push_paths(BOARD_WORKFLOW)
         for output in (
@@ -354,6 +348,9 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         # 2026-10-13 pilot marker and thereby block later production changes.
         self.assertIn("id: prepare-pages", PAGES_WORKFLOW)
         self.assertIn('build_id="MS-UNIFIED-${build_tag}"', PAGES_WORKFLOW)
+        self.assertIn("SOURCE_SHA: ${{ steps.source.outputs.sha }}", PAGES_WORKFLOW)
+        self.assertIn('build_tag="$(date -u +%Y%m%d)-${SOURCE_SHA:0:12}"', PAGES_WORKFLOW)
+        self.assertNotIn('build_tag="$(date -u +%Y%m%d)-${GITHUB_SHA:0:12}"', PAGES_WORKFLOW)
         self.assertIn('echo "build_id=$build_id" >> "$GITHUB_OUTPUT"', PAGES_WORKFLOW)
         self.assertIn("PAGES_BUILD_ID: ${{ steps.prepare-pages.outputs.build_id }}", PAGES_WORKFLOW)
         self.assertIn("const rootBuildMarker = String(process.env.PAGES_BUILD_ID || '')", PAGES_WORKFLOW)
