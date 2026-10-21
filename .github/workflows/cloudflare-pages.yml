@@ -237,12 +237,13 @@ jobs:
         id: prepare-pages
         env:
           MAX_PAGES_FILE_BYTES: "26214400"
+          SOURCE_SHA: ${{ steps.source.outputs.sha }}
         run: |
           set -euo pipefail
           rm -rf .pages-deploy
           mkdir -p .pages-deploy
           rsync -a             --exclude='.git/'             --exclude='.pages-deploy/'             --exclude='node_modules/'             --exclude='data/virtual_lab_history.json'             --exclude='data/efootball_desk_prediction_history.json'             --exclude='data/efootball_desk_settled_observations.json'             ./ .pages-deploy/
-          build_tag="$(date -u +%Y%m%d)-${GITHUB_SHA:0:12}"
+          build_tag="$(date -u +%Y%m%d)-${SOURCE_SHA:0:12}"
           build_id="MS-UNIFIED-${build_tag}"
           BUILD_ID="$build_id" BUILD_TAG="$build_tag" python - <<'PY'
           import os, re
