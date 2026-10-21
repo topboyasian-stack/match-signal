@@ -1,0 +1,31 @@
+name: Deriv Signal Desk QA
+
+on:
+  push:
+    branches:
+      - "**"
+    paths:
+      - "projects/deriv-signal-desk/**"
+      - ".github/workflows/deriv-signal-desk-qa.yml"
+  pull_request:
+    paths:
+      - "projects/deriv-signal-desk/**"
+      - ".github/workflows/deriv-signal-desk-qa.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static-qa:
+    name: Static QA and read-only safety checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Run dashboard QA
+        run: node projects/deriv-signal-desk/qa.mjs
