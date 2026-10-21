@@ -333,6 +333,24 @@ function qualificationState(x){
   const modelQualified=!veto&&(Boolean(x?.betting_qualified)||Boolean(x?.qualified_for_builder)||raw.startsWith("BETTING_QUALIFIED"));
   const product=String(x?.product||"").toLowerCase();
   const exactLineCalibration=probabilityCalibrationInfo(x);
+  // A raw upstream qualification flag is not enough for eFootball totals.
+  // Require at least 30 chronological exact-line walk-forward observations
+  // before any such market can enter Qualified Best. Desk-learning samples
+  // (for example 1 settled result) are not a substitute for this holdout gate.
+  if(modelQualified&&["efootball_gt","efootball_adriatic"].includes(product)&&isOverUnderPrediction(x)){
+    const wfN=x?.walkforward_exact_line_n==null||String(x.walkforward_exact_line_n).trim()===""?NaN:Number(x.walkforward_exact_line_n);
+    const wfHit=x?.walkforward_exact_line_hit_rate==null||String(x.walkforward_exact_line_hit_rate).trim()===""?NaN:Number(x.walkforward_exact_line_hit_rate);
+    if(!Number.isFinite(wfN)||wfN<30||!Number.isFinite(wfHit)||wfHit<0||wfHit>1){
+      return {
+        modelQualified:false,
+        currentPricePass:false,
+        label:"NOT QUALIFIED · EXACT-LINE WALK-FORWARD EVIDENCE INSUFFICIENT",
+        reason:"EXACT_LINE_WALKFORWARD_EVIDENCE_INSUFFICIENT",
+        calibrationN:Number.isFinite(wfN)?wfN:null,
+        walkforwardHitRate:Number.isFinite(wfHit)?wfHit:null
+      };
+    }
+  }
   // Once an active eFootball O/U row has enough chronological exact-line
   // evidence to calibrate its displayed/value probability, that same
   // conservative probability must clear the existing 65% qualification floor.
