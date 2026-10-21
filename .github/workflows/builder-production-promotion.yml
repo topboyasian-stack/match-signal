@@ -73,9 +73,9 @@ jobs:
 
       - name: Dispatch Pages once after refreshed board and wait for successful deployment
         env:
-          GH_TOKEN: \${{ github.token }}
-          BOARD_RUN_ID: \${{ steps.board-refresh.outputs.board_run_id }}
-          BOARD_HEAD_SHA: \${{ steps.board-refresh.outputs.board_head_sha }}
+          GH_TOKEN: ${{ github.token }}
+          BOARD_RUN_ID: ${{ steps.board-refresh.outputs.board_run_id }}
+          BOARD_HEAD_SHA: ${{ steps.board-refresh.outputs.board_head_sha }}
         run: |
           set -euo pipefail
           test -n "$BOARD_RUN_ID"
@@ -87,7 +87,7 @@ jobs:
           deploy_run_id=""
           for attempt in $(seq 1 60); do
             if [ -z "$deploy_run_id" ]; then
-              candidates="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/cloudflare-pages.yml/runs?branch=main&event=workflow_dispatch&per_page=20" --jq ".workflow_runs[] | select(.created_at >= \\"$dispatched_at\\") | [.id, .head_sha] | @tsv")"
+              candidates="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/cloudflare-pages.yml/runs?branch=main&event=workflow_dispatch&per_page=20" --jq ".workflow_runs[] | select(.created_at >= \"$dispatched_at\") | [.id, .head_sha] | @tsv")"
               while IFS=$'\t' read -r candidate_id candidate_sha; do
                 [ -n "$candidate_id" ] || continue
                 merge_base="$(gh api "repos/$GITHUB_REPOSITORY/compare/$BOARD_HEAD_SHA...$candidate_sha" --jq '.merge_base_commit.sha' 2>/dev/null || true)"
