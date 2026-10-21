@@ -1,18 +1,18 @@
 {
-  "status": "VERIFIED_WITH_DIAGNOSTIC_INCOMPLETE",
+  "status": "VERIFIED",
   "core_pages_status": "VERIFIED",
   "qualified_best_quote_coverage_status": "COMPLETE",
-  "booking_api_status": "NO_FUTURE_BATCH",
+  "booking_api_status": "VERIFIED",
   "provider": "Cloudflare Pages",
-  "source_commit": "7ca46995d55c669109fbb5aeb88cc0db1607b6fe",
-  "verified_at": "2026-10-21T14:38:19.814521+00:00",
+  "source_commit": "2c0a9ecf8fe253daae9aa3065d5a0e466528f43b",
+  "verified_at": "2026-10-21T14:41:19.511860+00:00",
   "live_virtual_feed": {
-    "verified_at": "2026-10-21T14:38:18.869Z",
+    "verified_at": "2026-10-21T14:41:18.993Z",
     "status": "DIAGNOSTIC",
     "scan_complete": true,
     "scan_stop_reason": "all_model_qualified_candidates_matched",
     "paper_only": true,
-    "candidate_artifact_rows": 363,
+    "candidate_artifact_rows": 362,
     "virtual_candidate_rows_in_next_7_days": 0,
     "snapshot_gate_qualified_fixtures": 0,
     "snapshot_gate_diagnostics": {
@@ -28,7 +28,7 @@
       {
         "page": 1,
         "count": 100,
-        "fetched_at": "2026-10-21T14:38:18.837Z",
+        "fetched_at": "2026-10-21T14:41:18.961Z",
         "status": "LIVE"
       }
     ],
@@ -58,15 +58,35 @@
     "qualified_examples": []
   },
   "booking_api": {
-    "verified_at": "2026-10-21T14:38:14.441Z",
-    "status": "NO_FUTURE_BATCH",
-    "http_status": null,
-    "ok": false,
-    "batch_id": null,
-    "selection_count": 0,
+    "verified_at": "2026-10-21T14:41:01.329Z",
+    "status": "VOLATILE_MARKET",
+    "http_status": 409,
+    "ok": true,
+    "batch_id": "DESK-BATCH-02",
+    "selection_count": 1,
     "booking_code_available": false,
-    "error": null,
-    "message": null
+    "error": "TOO_FEW_AVAILABLE_SELECTIONS",
+    "message": "Fewer than two valid selections remain available on SportyBet.",
+    "volatile_market": true,
+    "validation": [
+      {
+        "event_id": "sr:match:BAaFSmrK3eKWFTh0o5ePPmw",
+        "ok": true,
+        "resolved_by": "event_id",
+        "resolved_event_id": "sr:match:BAaFSmrK3eKWFTh0o5ePPmw",
+        "market_id": "18",
+        "outcome_id": "12",
+        "specifier": "total=4.5",
+        "outcome": "Over 4.5",
+        "current_odds": 2
+      },
+      {
+        "event_id": "sr:match:BAaFZDhFyd|2RGPLqGN2Xcg",
+        "ok": false,
+        "excluded": true,
+        "reason": "The exact SportyBet O/U line or selected side is no longer available."
+      }
+    ]
   },
   "checks": [
     "core_pages",
@@ -75,7 +95,7 @@
     "live_virtual_proxy",
     "virtual_lab_live_snapshot",
     "live_production_data",
-    "booking_api_post_not_verified",
+    "booking_api_post",
     "qualified_best_shortlist"
   ]
 }
