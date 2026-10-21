@@ -348,6 +348,9 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         # 2026-10-13 pilot marker and thereby block later production changes.
         self.assertIn("id: prepare-pages", PAGES_WORKFLOW)
         self.assertIn('build_id="MS-UNIFIED-${build_tag}"', PAGES_WORKFLOW)
+        self.assertIn("SOURCE_SHA: ${{ steps.source.outputs.sha }}", PAGES_WORKFLOW)
+        self.assertIn('build_tag="$(date -u +%Y%m%d)-${SOURCE_SHA:0:12}"', PAGES_WORKFLOW)
+        self.assertNotIn('build_tag="$(date -u +%Y%m%d)-${GITHUB_SHA:0:12}"', PAGES_WORKFLOW)
         self.assertIn('echo "build_id=$build_id" >> "$GITHUB_OUTPUT"', PAGES_WORKFLOW)
         self.assertIn("PAGES_BUILD_ID: ${{ steps.prepare-pages.outputs.build_id }}", PAGES_WORKFLOW)
         self.assertIn("const rootBuildMarker = String(process.env.PAGES_BUILD_ID || '')", PAGES_WORKFLOW)
