@@ -281,7 +281,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
 
     def test_builder_promotion_dispatches_one_pages_deployment_for_manual_board_refresh(self):
         self.assertIn("uses: actions/checkout@v4", PROMOTION_WORKFLOW)
-        self.assertIn("with:\\n          ref: main", PROMOTION_WORKFLOW)
+        self.assertIn("with:\n          ref: main", PROMOTION_WORKFLOW)
         self.assertIn("gh workflow run unified-upcoming.yml --ref main", PROMOTION_WORKFLOW)
         self.assertIn("id: board-refresh", PROMOTION_WORKFLOW)
         self.assertIn("BOARD_RUN_ID: ${{ steps.board-refresh.outputs.board_run_id }}", PROMOTION_WORKFLOW)
@@ -291,6 +291,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn("event=workflow_dispatch&per_page=20", PROMOTION_WORKFLOW)
         self.assertIn("compare/$BOARD_HEAD_SHA...$candidate_sha", PROMOTION_WORKFLOW)
         self.assertIn('if: ${{ github.event_name != \'workflow_run\' || (github.event.workflow_run.conclusion == \'success\' && (github.event.workflow_run.name != \'Match Signal Unified Upcoming Board\' || github.event.workflow_run.event != \'workflow_dispatch\')) }}', PAGES_WORKFLOW)
+        self.assertIn("github.event.workflow_run.event != 'workflow_dispatch'", PAGES_WORKFLOW)
         self.assertLess(
             PROMOTION_WORKFLOW.index("gh workflow run unified-upcoming.yml --ref main"),
             PROMOTION_WORKFLOW.index("Dispatch Pages once for manually refreshed board and wait for deployment"),
