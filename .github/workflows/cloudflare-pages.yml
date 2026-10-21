@@ -234,6 +234,7 @@ jobs:
         run: npm install --no-audit --no-fund
 
       - name: Prepare Cloudflare Pages deployment directory
+        id: prepare-pages
         env:
           MAX_PAGES_FILE_BYTES: "26214400"
         run: |
@@ -241,6 +242,33 @@ jobs:
           rm -rf .pages-deploy
           mkdir -p .pages-deploy
           rsync -a             --exclude='.git/'             --exclude='.pages-deploy/'             --exclude='node_modules/'             --exclude='data/virtual_lab_history.json'             --exclude='data/efootball_desk_prediction_history.json'             --exclude='data/efootball_desk_settled_observations.json'             ./ .pages-deploy/
+          build_tag="$(date -u +%Y%m%d)-${GITHUB_SHA:0:12}"
+          build_id="MS-UNIFIED-${build_tag}"
+          BUILD_ID="$build_id" BUILD_TAG="$build_tag" python - <<'PY'
+          import os, re
+          from pathlib import Path
+          p=Path('.pages-deploy/index.html')
+          html=p.read_text(encoding='utf-8')
+          html, meta_count = re.subn(
+              r'(<meta\s+name="match-signal-build"\s+content=")[^"]*(">)',
+              lambda m: m.group(1)+os.environ['BUILD_ID']+m.group(2),
+              html, count=1
+          )
+          html, css_count = re.subn(
+              r'(\./ms-design-system\.css\?v=)[^"&]+',
+              lambda m: m.group(1)+os.environ['BUILD_TAG'],
+              html, count=1
+          )
+          if meta_count != 1:
+              raise SystemExit('Expected exactly one match-signal-build meta marker in deployed index.html')
+          if css_count != 1:
+              raise SystemExit('Expected exactly one versioned ms-design-system.css href in deployed index.html')
+          p.write_text(html, encoding='utf-8')
+          print('Prepared deployment build ID:', os.environ['BUILD_ID'])
+          print('Prepared root CSS version:', os.environ['BUILD_TAG'])
+          PY
+          echo "build_id=$build_id" >> "$GITHUB_OUTPUT"
+          echo "build_tag=$build_tag" >> "$GITHUB_OUTPUT"
           gzip -c data/virtual_lab_history.json > .pages-deploy/data/virtual_lab_history.json.gz
           original_bytes=$(stat -c%s data/virtual_lab_history.json)
           compressed_bytes=$(stat -c%s .pages-deploy/data/virtual_lab_history.json.gz)
@@ -312,6 +340,8 @@ jobs:
         timeout-minutes: 3
         env:
           CLOUDFLARE_DEPLOYMENT_URL: ${{ steps.pages-deployment.outputs.url }}
+          PAGES_BUILD_ID: ${{ steps.prepare-pages.outputs.build_id }}
+          PAGES_BUILD_TAG: ${{ steps.prepare-pages.outputs.build_tag }}
         run: |
           node --input-type=module <<'NODE'
           import { readFileSync, writeFileSync } from 'node:fs';
@@ -324,6 +354,9 @@ jobs:
           // cache/build markers caused every deployment to fail after a valid UI update.
           const builderSourceHtml = readFileSync('odds-builder.html', 'utf8');
           const currentBuilderBuildMarker = builderSourceHtml.match(/<meta name="match-signal-build" content="([^"]+)"/)?.[1] || '';
+          const rootBuildMarker = String(process.env.PAGES_BUILD_ID || '');
+          const rootCssHref = './ms-design-system.css?v=' + String(process.env.PAGES_BUILD_TAG || '');
+          if (!rootBuildMarker || !process.env.PAGES_BUILD_TAG) failures.push('Deployment build ID or root CSS version was not generated.');
           const currentBuilderCssHref = builderSourceHtml.match(/href="(\.\/odds-builder-design\.css\?v=[^"]+)"/)?.[1] || '';
           const currentBuilderEngineSrc = builderSourceHtml.match(/src="(\.\/expansion-odds-builder\.js\?v=[^"]+)"/)?.[1] || '';
           if (!currentBuilderBuildMarker || !currentBuilderCssHref || !currentBuilderEngineSrc) {
@@ -344,7 +377,7 @@ jobs:
           // hostname a bounded propagation window. A successful upload alone is not proof
           // that the primary hostname is serving the uploaded HTML/CSS yet.
           const workspaceContracts = [
-            {path:'/', css:'/core-workspaces-design.css', markers:['MS-DESK-2026.10.14-V1','core-workspaces-design.css?v=20261014-full-v1','class="cd-page-header"','class="cd-workspace-grid"','id="unifiedBoard"','id="qualifiedBestSummary"'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V1: CORE DESK / FOOTBALL / TENNIS'},
+            {path:'/', css:'/core-workspaces-design.css', markers:[rootBuildMarker,rootCssHref,'MS-DESK-2026.10.14-V1','core-workspaces-design.css?v=20261014-full-v1','class="cd-page-header"','class="cd-workspace-grid"','id="unifiedBoard"','id="qualifiedBestSummary"'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V1: CORE DESK / FOOTBALL / TENNIS'},
             {path:'/football.html', css:'/core-workspaces-design.css', markers:['MS-FOOTBALL-DESK-2026.10.14-V1','core-workspaces-design.css?v=20261014-full-v1','class="cd-page-header"','id="leagueGrid"','data-sport="football"','league-logos.js?v=20261013-competition-logos2'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V1: CORE DESK / FOOTBALL / TENNIS'},
             {path:'/tennis.html', css:'/core-workspaces-design.css', markers:['MS-TENNIS-DESK-2026.10.14-V1','core-workspaces-design.css?v=20261014-full-v1','class="cd-page-header"','id="leagueGrid"','data-sport="tennis"'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V1: CORE DESK / FOOTBALL / TENNIS'},
             {path:'/odds-builder.html', css:'/odds-builder-design.css', markers:[currentBuilderBuildMarker,currentBuilderCssHref.replace(/^\.\//,''),currentBuilderEngineSrc.replace(/^\.\//,''),'class="ob-page-header"','class="ob-section-nav"','class="ob-guide-grid"','id="oddsBuilder"'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V3: ODDS BUILDER PAGE LAYOUT'},
@@ -444,8 +477,8 @@ jobs:
                 if (!body.includes('/reports.html')) failures.push(path+' missing retired-route redirect');
               }
               if (path==='/') {
-                for (const marker of ['MS-UNIFIED-2026.10.13.4-DESIGN-PILOT1','ms-design-system.css?v=20261013-premium-terminal1'])
-                  if (!body.includes(marker)) failures.push(path+' missing design-system pilot marker: '+marker);
+                for (const marker of [rootBuildMarker,rootCssHref])
+                  if (!body.includes(marker)) failures.push(path+' missing current deployment marker: '+marker);
               }
               if (path==='/' || path==='/upcoming.html') {
                 for (const marker of ['Qualified Best','qualified-best.html','id="qualifiedBestSummary"','Qualified fixtures'])
@@ -960,7 +993,7 @@ jobs:
             'live_virtual_feed':live,
             'booking_api':booking,
             'checks':checks
-          },indent=2)+'\\n')
+          },indent=2)+'\n')
           PY
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
