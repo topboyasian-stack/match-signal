@@ -282,7 +282,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
     def test_builder_promotion_dispatches_one_pages_deployment_for_manual_board_refresh(self):
         self.assertIn("uses: actions/checkout@v4", PROMOTION_WORKFLOW)
         self.assertIn("group: builder-production-promotion-v3", PROMOTION_WORKFLOW)
-        self.assertNotIn("group: builder-production-promotion-v3", PROMOTION_WORKFLOW)
+        self.assertNotIn("group: builder-production-promotion-v2", PROMOTION_WORKFLOW)
         self.assertIn("with:" + chr(10) + "          ref: main", PROMOTION_WORKFLOW)
         self.assertIn("gh workflow run unified-upcoming.yml --ref main", PROMOTION_WORKFLOW)
         self.assertIn("id: board-refresh", PROMOTION_WORKFLOW)
@@ -294,7 +294,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn('[[ "$verification_status" == VERIFIED* ]]', PROMOTION_WORKFLOW)
         self.assertIn("compare/$BOARD_HEAD_SHA...$verification_source", PROMOTION_WORKFLOW)
         self.assertIn('if [ "$verified_epoch_us" -ge "$dispatched_epoch_us" ] && [ "$merge_base" = "$BOARD_HEAD_SHA" ]; then', PROMOTION_WORKFLOW)
-        self.assertIn(new_pages_if, PAGES_WORKFLOW)
+        self.assertIn("if: ${{ github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && (github.event.workflow_run.name != 'Match Signal Unified Upcoming Board' || github.event.workflow_run.event != 'workflow_dispatch')) }}", PAGES_WORKFLOW)
         self.assertLess(
             PROMOTION_WORKFLOW.index("gh workflow run unified-upcoming.yml --ref main"),
             PROMOTION_WORKFLOW.index("Dispatch Pages once for manually refreshed board and verify the published artifact"),
@@ -328,7 +328,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertEqual(
             bypasses,
             [],
-            "Feeder workflows must hand off through Unified Upcoming; Pages is triggered by successful board completion, not dispatched a second time.",
+            "Feeder workflows must hand off through Unified Upcoming; only Builder promotion may dispatch Pages after a manual board refresh.",
         )
         self.assertIn("Dispatch Pages once for manually refreshed board and verify the published artifact", PROMOTION_WORKFLOW)
     def test_builder_artifact_uses_promotion_instead_of_a_duplicate_board_push_trigger(self):
