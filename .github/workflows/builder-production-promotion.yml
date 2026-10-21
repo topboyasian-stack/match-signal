@@ -106,22 +106,3 @@ jobs:
             fi
             sleep 5
           done
-            fi
-            if [ -n "$deploy_run_id" ]; then
-              deploy_status="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$deploy_run_id" --jq '.status')"
-              if [ "$deploy_status" = "completed" ]; then
-                deploy_conclusion="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$deploy_run_id" --jq '.conclusion')"
-                if [ "$deploy_conclusion" != "success" ]; then
-                  echo "Pages workflow_run $deploy_run_id completed with conclusion=$deploy_conclusion; refusing to mask a failed production freshness check." >&2
-                  exit 1
-                fi
-                echo "Pages workflow_run $deploy_run_id completed successfully after refreshed board run $BOARD_RUN_ID."
-                exit 0
-              fi
-            fi
-            if [ "$attempt" -eq 60 ]; then
-              echo "Timed out waiting for the Pages deployment triggered by board run $BOARD_RUN_ID." >&2
-              exit 1
-            fi
-            sleep 5
-          done
