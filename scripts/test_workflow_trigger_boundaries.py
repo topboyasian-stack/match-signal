@@ -53,9 +53,12 @@ def main():
         "Tracker output must not directly trigger the Builder; ticket calibration "
         "is refreshed on the Builder schedule and normal upstream completions."
     )
-    # Preserve the repository's deploy-order contract: these public artifacts
-    # are routed through the board workflow before the Pages deployment verifier.
-    assert "data/odds_builder.json" in board_paths
+    # Builder publishes its artifact and then dispatches the promotion workflow,
+    # which refreshes the board. A direct artifact push trigger would duplicate that run.
+    assert "data/odds_builder.json" not in board_paths, (
+        "Builder artifact must flow through the promotion workflow, not trigger a second board refresh."
+    )
+    assert "gh workflow run builder-production-promotion.yml --ref main" in builder
     assert "data/odds_ticket_tracker.json" in board_paths
 
     # Verify that removing the output-to-consumer feedback does not stop updates.

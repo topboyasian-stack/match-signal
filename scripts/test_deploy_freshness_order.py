@@ -214,7 +214,6 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         }
         self.assertEqual(direct_paths, expected_direct_paths)
         builder_owned_paths = {
-            "data/odds_builder.json",
             "scripts/odds_builder.py",
             "scripts/odds_builder_core.py",
             "scripts/test_odds_builder_score_replay.py",
@@ -267,7 +266,6 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "league.html",
             "functions/**",
             "data/predictions.json",
-            "data/odds_builder.json",
             "data/odds_ticket_tracker.json",
             "data/virtual_lab_live.json",
             "data/darts_*.json",
@@ -333,6 +331,14 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "Feeder workflows must hand off through Unified Upcoming; Pages is triggered by successful board completion, not dispatched a second time.",
         )
         self.assertIn("Wait for successful Pages deployment triggered by refreshed board", PROMOTION_WORKFLOW)
+    def test_builder_artifact_uses_promotion_instead_of_a_duplicate_board_push_trigger(self):
+        # Builder publishes data/odds_builder.json and then dispatches the promotion
+        # workflow, which refreshes Unified Upcoming once. A direct push trigger here
+        # creates a second board run and a competing Pages deployment for the same artifact.
+        paths = workflow_push_paths(BOARD_WORKFLOW)
+        self.assertNotIn("data/odds_builder.json", paths)
+        self.assertIn("gh workflow run builder-production-promotion.yml --ref main", BUILDER_WORKFLOW)
+        self.assertIn("gh workflow run unified-upcoming.yml --ref main", PROMOTION_WORKFLOW)
     def test_board_owned_outputs_do_not_trigger_a_self_refresh_loop(self):
         paths = workflow_push_paths(BOARD_WORKFLOW)
         for output in (
