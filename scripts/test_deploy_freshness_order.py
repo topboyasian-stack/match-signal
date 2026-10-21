@@ -279,7 +279,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         missing = sorted(required_inputs - board_paths)
         self.assertEqual(missing, [], f"Deployable inputs bypass the Unified board workflow: {missing}")
 
-    def test_builder_promotion_checks_out_repo_and_waits_for_the_board_triggered_deployment(self):
+    def test_builder_promotion_dispatches_one_pages_deployment_after_board_refresh(self):
         self.assertIn("uses: actions/checkout@v4", PROMOTION_WORKFLOW)
         self.assertIn("with:\n          ref: main", PROMOTION_WORKFLOW)
         self.assertIn("gh workflow run unified-upcoming.yml --ref main", PROMOTION_WORKFLOW)
@@ -289,18 +289,19 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn("Dispatch Unified Upcoming and wait for successful board publication", PROMOTION_WORKFLOW)
         self.assertIn("id: board-refresh", PROMOTION_WORKFLOW)
         self.assertIn('echo "board_run_id=$board_run_id" >> "$GITHUB_OUTPUT"', PROMOTION_WORKFLOW)
-        self.assertIn("Wait for successful Pages deployment triggered by refreshed board", PROMOTION_WORKFLOW)
+        self.assertIn("Dispatch Pages once after refreshed board and wait for successful deployment", PROMOTION_WORKFLOW)
         self.assertIn("BOARD_RUN_ID: ${{ steps.board-refresh.outputs.board_run_id }}", PROMOTION_WORKFLOW)
         self.assertIn("BOARD_HEAD_SHA: ${{ steps.board-refresh.outputs.board_head_sha }}", PROMOTION_WORKFLOW)
-        self.assertIn("event=workflow_run&per_page=20", PROMOTION_WORKFLOW)
+        self.assertIn("event=workflow_dispatch&per_page=20", PROMOTION_WORKFLOW)
         self.assertIn("compare/$BOARD_HEAD_SHA...$candidate_sha", PROMOTION_WORKFLOW)
-        self.assertNotIn("gh workflow run cloudflare-pages.yml --ref main", PROMOTION_WORKFLOW, "Pages already deploys on successful Unified Upcoming workflow_run; do not start a duplicate deployment")
+        self.assertIn("gh workflow run cloudflare-pages.yml --ref main", PROMOTION_WORKFLOW, "promotion must own exactly one explicit Pages dispatch")
+        self.assertNotIn('      - "Match Signal Unified Upcoming Board"', PAGES_WORKFLOW, "board completion must not also dispatch Pages")
         self.assertIn('if [ "$board_conclusion" != "success" ]; then', PROMOTION_WORKFLOW)
         self.assertIn('if [ "$deploy_conclusion" != "success" ]; then', PROMOTION_WORKFLOW)
         self.assertLess(
             PROMOTION_WORKFLOW.index("gh workflow run unified-upcoming.yml --ref main"),
-            PROMOTION_WORKFLOW.index("Wait for successful Pages deployment triggered by refreshed board"),
-            "Promotion must await board publication before awaiting the one deployment triggered by that board.",
+            PROMOTION_WORKFLOW.index("Dispatch Pages once after refreshed board and wait for successful deployment"),
+            "Promotion must await board publication before dispatching its single Pages deployment.",
         )
     def test_builder_explicitly_dispatches_promotion_after_artifact_publish(self):
         publish_step = BUILDER_WORKFLOW.find("      - name: Commit generated accumulator artifact")
@@ -320,7 +321,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         bypasses = []
         workflow_dir = ROOT / ".github/workflows"
         for workflow_path in sorted(workflow_dir.glob("*.yml")):
-            if workflow_path.name == "cloudflare-pages.yml":
+            if workflow_path.name in {"cloudflare-pages.yml", "builder-production-promotion.yml"}:
                 continue
             source = workflow_path.read_text(encoding="utf-8")
             if "gh workflow run cloudflare-pages.yml --ref main" in source:
@@ -328,7 +329,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertEqual(
             bypasses,
             [],
-            "Feeder workflows must hand off through Unified Upcoming; Pages is triggered by successful board completion, not dispatched a second time.",
+            "Only Builder promotion may dispatch Pages, and only after its board refresh succeeds.",
         )
         self.assertIn("Wait for successful Pages deployment triggered by refreshed board", PROMOTION_WORKFLOW)
     def test_builder_artifact_uses_promotion_instead_of_a_duplicate_board_push_trigger(self):
