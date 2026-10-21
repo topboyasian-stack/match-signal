@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#101827">
+<title>Deriv Signal Desk — Manual Execution Only</title>
+<style>
+:root{--bg:#f3f6fa;--card:#fff;--ink:#152238;--muted:#63738a;--line:#dfe6ef;--navy:#101827;--blue:#3569e8;--blue2:#eaf0ff;--green:#178b58;--greenbg:#e9f8f0;--red:#c8444d;--redbg:#fff0f1;--amber:#a76711;--amberbg:#fff5df;--chart:#fbfcfe;--shadow:0 8px 28px rgba(24,42,67,.06)}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}button,input,select{font:inherit}button,select,input{outline-offset:2px}button{cursor:pointer}.shell{max-width:1600px;margin:auto;padding:18px 22px 26px}.topbar{display:flex;align-items:center;justify-content:space-between;gap:18px;background:var(--navy);color:#fff;border-radius:18px;padding:18px 22px;box-shadow:var(--shadow)}.brand{display:flex;align-items:center;gap:13px;min-width:0}.brandmark{width:43px;height:43px;border-radius:12px;display:grid;place-items:center;background:#24395a;color:#9bb8ff;font-size:24px;font-weight:800}.brand h1{font-size:19px;line-height:1.2;margin:0;font-weight:750;letter-spacing:-.35px}.brand p{margin:4px 0 0;color:#b6c3d8;font-size:12px}.headright{display:flex;align-items:center;gap:10px}.livepill{display:inline-flex;align-items:center;gap:8px;border:1px solid #45536a;background:#1a2637;padding:8px 11px;border-radius:999px;color:#d9e3f2;font-size:12px;white-space:nowrap}.dot{width:7px;height:7px;border-radius:99px;background:#e1a743}.dot.ok{background:#42cf8c}.dot.bad{background:#f1747c}.btn{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:10px;padding:10px 13px;font-weight:650;font-size:12px}.btn.primary{background:var(--blue);border-color:var(--blue);color:white}.btn.dark{background:#23334a;color:#fff;border-color:#344761}.btn:disabled{opacity:.5;cursor:not-allowed}.layout{display:grid;grid-template-columns:minmax(0,1.8fr) minmax(310px,.92fr);gap:16px;margin-top:16px;align-items:start}.maincol,.sidecol{display:grid;gap:16px;min-width:0}.card{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden}.cardhead{padding:17px 19px 12px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.cardhead h2,.cardhead h3{font-size:15px;letter-spacing:-.2px;margin:0;font-weight:760}.subtle{color:var(--muted);font-size:12px;margin:5px 0 0;line-height:1.45}.controls{padding:0 19px 16px;display:flex;gap:10px;align-items:end;flex-wrap:wrap}.field{display:grid;gap:6px;min-width:120px;flex:1}.field label{font-size:11px;color:var(--muted);font-weight:700;letter-spacing:.2px}.field select,.field input{border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink);padding:10px 11px;min-width:0;width:100%;font-size:12px}.field input[type=number]{max-width:170px}.symbolrow{display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding:0 19px 13px}.symbolname{font-size:14px;font-weight:800;letter-spacing:-.1px}.badge{display:inline-flex;align-items:center;gap:5px;border-radius:7px;padding:5px 8px;font-size:10px;font-weight:750;letter-spacing:.35px;text-transform:uppercase}.badge.neutral{background:#edf1f6;color:#526176}.badge.good{background:var(--greenbg);color:var(--green)}.badge.bad{background:var(--redbg);color:var(--red)}.badge.warn{background:var(--amberbg);color:var(--amber)}.pricebox{margin-left:auto;text-align:right}.price{font-size:19px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.5px}.pricecaption{font-size:10px;color:var(--muted);margin-top:2px}.chartwrap{position:relative;margin:0 12px 12px;border:1px solid #e8edf4;border-radius:11px;overflow:hidden;background:var(--chart)}#chart{display:block;width:100%;height:450px}.chartfooter{display:flex;justify-content:space-between;gap:12px;padding:0 18px 15px;color:var(--muted);font-size:11px;flex-wrap:wrap}.legend{display:flex;gap:12px;flex-wrap:wrap}.legenditem{display:inline-flex;align-items:center;gap:6px}.legendline{width:17px;height:3px;border-radius:3px;background:#3576dd}.legendline.slow{background:#f0a03d}.legendarrow{font-size:17px;font-weight:900;line-height:10px}.emptychart{position:absolute;inset:0;display:none;align-items:center;justify-content:center;text-align:center;padding:24px;color:var(--muted);font-size:13px;pointer-events:none}.signalhero{padding:19px}.signaltype{display:flex;gap:12px;align-items:center}.signalicon{width:48px;height:48px;border-radius:14px;display:grid;place-items:center;font-size:29px;font-weight:900}.signalicon.buy{background:var(--greenbg);color:var(--green)}.signalicon.sell{background:var(--redbg);color:var(--red)}.signalicon.wait{background:#edf1f6;color:#7b899c}.signalhero h2{margin:0;font-size:19px;letter-spacing:-.4px}.signalhero .subtle{margin-top:4px}.signaltitle{display:flex;align-items:center;justify-content:space-between;gap:10px}.signalmetrics{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:17px}.metric{border:1px solid var(--line);border-radius:11px;padding:12px;min-width:0}.metric label{display:block;font-size:10px;color:var(--muted);font-weight:700;letter-spacing:.25px;text-transform:uppercase}.metric strong{display:block;margin-top:7px;font-size:16px;letter-spacing:-.2px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}.metric small{display:block;color:var(--muted);font-size:10px;margin-top:4px}.risknote{margin-top:12px;border:1px solid #f0d9a5;background:#fff8e8;padding:10px 12px;border-radius:10px;color:#795720;font-size:11px;line-height:1.5}.rulelist{padding:0 19px 17px;display:grid;gap:11px}.rule{display:flex;align-items:flex-start;gap:9px;color:#405169;font-size:12px;line-height:1.45}.check{width:18px;height:18px;border-radius:6px;background:#eef3ff;color:#3569e8;display:grid;place-items:center;font-weight:900;flex-shrink:0;font-size:12px}.historylist{padding:0 14px 14px;display:grid;gap:8px}.historyitem{display:grid;grid-template-columns:46px minmax(0,1fr) auto;align-items:center;gap:9px;padding:10px;border:1px solid var(--line);border-radius:10px}.historyarrow{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;font-size:20px;font-weight:900}.historyarrow.buy{color:var(--green);background:var(--greenbg)}.historyarrow.sell{color:var(--red);background:var(--redbg)}.historyitem strong{display:block;font-size:12px}.historyitem span{display:block;color:var(--muted);font-size:10px;margin-top:3px}.historyprice{font-size:12px;font-weight:750;font-variant-numeric:tabular-nums;text-align:right}.emptylist{color:var(--muted);font-size:12px;padding:12px}.smallnote{font-size:11px;color:var(--muted);line-height:1.55;padding:0 19px 17px}.footer{margin:17px 3px 0;display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;color:#718097;font-size:10px;line-height:1.5}.footer strong{color:#43536b}.tagrow{display:flex;gap:7px;flex-wrap:wrap}.mini-tag{padding:5px 7px;border-radius:6px;background:#f0f3f8;color:#5c6c82;font-size:10px;font-weight:700}.notice{display:none;margin-top:14px;border:1px solid #edc6c9;background:#fff3f4;color:#903e45;border-radius:12px;padding:12px 14px;font-size:12px;line-height:1.5}.notice.show{display:block}.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#122034;color:white;border-radius:10px;padding:11px 15px;font-size:12px;box-shadow:var(--shadow);z-index:10;display:none;max-width:min(520px,90vw)}.toast.show{display:block}.link{color:var(--blue);text-decoration:none;font-weight:700}.statusline{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:11px}.spinner{width:12px;height:12px;border:2px solid #dfe6ef;border-top-color:var(--blue);border-radius:50%;animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+@media(max-width:1000px){.layout{grid-template-columns:1fr}.sidecol{grid-template-columns:1fr 1fr;align-items:start}.sidecol .card:first-child{grid-column:1/-1}#chart{height:410px}}
+@media(max-width:650px){.shell{padding:10px}.topbar{align-items:flex-start;padding:14px;border-radius:14px}.brand h1{font-size:16px}.brand p{font-size:11px}.headright{flex-direction:column;align-items:flex-end}.livepill{font-size:10px}.layout{margin-top:10px;gap:10px}.maincol,.sidecol{gap:10px}.sidecol{grid-template-columns:1fr}.sidecol .card:first-child{grid-column:auto}.cardhead{padding:14px 14px 10px}.controls{padding:0 14px 14px;gap:8px}.field{min-width:calc(50% - 8px)}.field input[type=number]{max-width:none}.symbolrow{padding:0 14px 10px}.price{font-size:16px}#chart{height:330px}.chartwrap{margin:0 7px 10px}.chartfooter{padding:0 12px 12px}.signalhero{padding:15px}.signalmetrics{gap:7px}.metric{padding:10px}.metric strong{font-size:14px}.footer{margin-top:12px}.brandmark{width:38px;height:38px}}
+</style>
+</head>
+<body>
+<div class="shell">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brandmark">↗</div>
+      <div><h1>DERIV SIGNAL DESK</h1><p>Read-only market analysis · Manual execution only</p></div>
+    </div>
+    <div class="headright">
+      <div class="livepill"><span id="statusDot" class="dot"></span><span id="connectionText">Connecting to Deriv…</span></div>
+      <button id="reconnectBtn" class="btn dark">Reconnect feed</button>
+    </div>
+  </header>
+  <div id="notice" class="notice"></div>
+  <div class="layout">
+    <main class="maincol">
+      <section class="card">
+        <div class="cardhead"><div><h2>Live market chart</h2><p class="subtle">Confirmed arrows are plotted on the candle that triggered the signal.</p></div><span class="badge neutral" id="marketBadge">READ-ONLY</span></div>
+        <div class="controls">
+          <div class="field"><label for="marketSelect">MARKET CLASS</label><select id="marketSelect"><option value="synthetic">Synthetic indices</option><option value="forex">Forex</option><option value="commodities">Commodities</option></select></div>
+          <div class="field"><label for="symbolSelect">INSTRUMENT</label><select id="symbolSelect"><option>Loading symbols…</option></select></div>
+          <div class="field"><label for="timeframeSelect">TIMEFRAME</label><select id="timeframeSelect"><option value="60">1 minute</option><option value="300" selected>5 minutes</option><option value="900">15 minutes</option><option value="3600">1 hour</option><option value="14400">4 hours</option></select></div>
+        </div>
+        <div class="symbolrow">
+          <span class="symbolname" id="activeSymbolName">Waiting for market data</span>
+          <span class="badge neutral" id="timeframeBadge">M5</span>
+          <span class="badge warn" id="signalBarState">Awaiting candles</span>
+          <div class="pricebox"><div class="price" id="livePrice">—</div><div class="pricecaption" id="lastTick">Waiting for first quote</div></div>
+        </div>
+        <div class="chartwrap"><canvas id="chart" aria-label="Live candlestick chart with BUY and SELL signal arrows"></canvas><div id="emptyChart" class="emptychart">Waiting for live price history…<br><br>The chart will draw as soon as Deriv returns candles.</div></div>
+        <div class="chartfooter"><div class="legend"><span class="legenditem"><i class="legendline"></i> EMA 20</span><span class="legenditem"><i class="legendline slow"></i> EMA 50</span><span class="legenditem"><b class="legendarrow" style="color:#178b58">↑</b> BUY</span><span class="legenditem"><b class="legendarrow" style="color:#c8444d">↓</b> SELL</span></div><div id="barCount">0 candles loaded</div></div>
+      </section>
+      <section class="card">
+        <div class="cardhead"><div><h3>Signal rules</h3><p class="subtle">An arrow requires a completed candle and a fresh change into the signal condition.</p></div><span class="badge good">NON-REPAINTING DEFAULT</span></div>
+        <div class="rulelist">
+          <div class="rule"><span class="check">✓</span><span><strong>Trend:</strong> EMA 20 above EMA 50 for BUY; EMA 20 below EMA 50 for SELL.</span></div>
+          <div class="rule"><span class="check">✓</span><span><strong>Momentum:</strong> closing price must agree with EMA 20; RSI must be at least 52 for BUY or at most 48 for SELL.</span></div>
+          <div class="rule"><span class="check">✓</span><span><strong>Confirmation:</strong> the signal is marked on the completed candle, after the conditions switch from inactive to active. Developing conditions may change before candle close.</span></div>
+          <div class="rule"><span class="check">✓</span><span><strong>Risk reference:</strong> stop distance is 1.5 × ATR(14); suggested target is 2R from the reference entry. These are analysis levels, not broker orders.</span></div>
+        </div>
+      </section>
+    </main>
+    <aside class="sidecol">
+      <section class="card">
+        <div class="cardhead"><div><h2>Current signal</h2><p class="subtle">The latest confirmed setup on the selected instrument.</p></div></div>
+        <div class="signalhero">
+          <div class="signaltitle"><div class="signaltype"><div id="signalIcon" class="signalicon wait">—</div><div><h2 id="signalTitle">WAIT</h2><p id="signalSubtitle" class="subtle">Waiting for a confirmed setup.</p></div></div><span id="signalStrength" class="badge neutral">NO SIGNAL</span></div>
+          <div class="signalmetrics">
+            <div class="metric"><label>Reference entry</label><strong id="entryValue">—</strong><small>Signal candle close</small></div>
+            <div class="metric"><label>Stop-loss level</label><strong id="stopValue">—</strong><small>1.5 × ATR(14)</small></div>
+            <div class="metric"><label>Take-profit level</label><strong id="targetValue">—</strong><small>2:1 reward-to-risk</small></div>
+            <div class="metric"><label>Signal candle</label><strong id="signalTimeValue">—</strong><small id="rsiValue">RSI(14): —</small></div>
+          </div>
+          <div class="risknote"><strong>Manual execution only.</strong> This page has no order-placement, account-balance, or position-management connection. Confirm that the symbol and price match your Deriv MT5 terminal before considering any setup.</div>
+        </div>
+      </section>
+      <section class="card">
+        <div class="cardhead"><div><h3>Recent confirmed arrows</h3><p class="subtle">Historical signals visible in the loaded chart.</p></div><span class="badge neutral" id="signalCount">0</span></div>
+        <div id="historyList" class="historylist"><div class="emptylist">No confirmed signals in the loaded candles yet.</div></div>
+      </section>
+      <section class="card">
+        <div class="cardhead"><div><h3>Feed & safety</h3></div></div>
+        <div class="rulelist">
+          <div class="rule"><span class="check">✓</span><span>Uses the public Deriv market-data WebSocket; no Deriv password, API token, balance or trading permission is requested.</span></div>
+          <div class="rule"><span class="check">✓</span><span>The dashboard does not contain any buy, sell, cancel, modify-order or close-position request.</span></div>
+          <div class="rule"><span class="check">✓</span><span>Public Deriv quote and your MT5 quote may differ. Validate each market and symbol before use.</span></div>
+        </div>
+        <div class="controls" style="padding-top:0;padding-bottom:12px;align-items:end">
+          <div class="field" style="min-width:135px;flex:1"><label for="appIdInput">DERIV APP ID</label><input id="appIdInput" value="1089" inputmode="numeric" autocomplete="off" aria-label="Deriv public API app ID"></div>
+          <button id="applyAppIdBtn" class="btn">Apply & reconnect</button>
+        </div>
+        <div class="smallnote">The dashboard first tests Deriv's newer public market-data WebSocket, then tries both documented legacy market-data endpoints. The numeric App ID is used only for the legacy endpoint if selected. Never enter your Deriv password or trading token. <a class="link" href="https://api.deriv.com/docs/setting-up-a-deriv-application/" target="_blank" rel="noopener">Deriv app setup guide ↗</a></div>
+      </section>
+    </aside>
+  </div>
+  <div class="footer"><span><strong>DERIV SIGNAL DESK</strong> · Analysis aid, not financial advice.</span><span>Test with a demo account first. Signals are not a guarantee of profit.</span><span id="footerUpdate">Build 0.5 · Verified public-feed schema</span></div>
+</div>
+<div id="toast" class="toast"></div>
+<script>
+(() => {
+  'use strict';
+  // Read-only public market data. Prefer Deriv's current documented public endpoint; use the legacy endpoint only as a fallback.
+  let APP_ID = '1089';
+  try { APP_ID = localStorage.getItem('deriv_signal_app_id') || '1089'; } catch {}
+  const $ = id => document.getElementById(id);
+  const TF_NAMES = {'60':'M1','300':'M5','900':'M15','3600':'H1','14400':'H4'};
+  $('appIdInput').value = APP_ID;
+  const state = {ws:null, connected:false, symbols:[], candles:[], granularity:300, symbol:'', subscriptionId:null, activeCandleTime:null, currentSignal:null, liveTick:null, initialized:false, requestCounter:1, reconnectTries:0, pingTimer:null, retryTimer:null, connectionTimer:null, endpointIndex:-1, lastConfirmedTime:null, pendingTick:null};
+  const fmtTime = epoch => { if(!epoch) return '—'; try{return new Date(epoch*1000).toLocaleString([], {month:'short',day:'2-digit',hour:'2-digit',minute:'2-digit'});}catch{return '—';} };
+  const fmtPrice = n => Number.isFinite(n) ? Number(n).toLocaleString(undefined,{minimumFractionDigits:Math.min(5,priceDigits()),maximumFractionDigits:priceDigits()}) : '—';
+  function priceDigits(){ const s=state.symbol; if(/^R_/.test(s)||/1HZ|BOOM|CRASH|STEP/i.test(s)) return 2; const item=state.symbols.find(x=>x.symbol===s); const d=item && Number(item.display_precision); return Number.isFinite(d)&&d>=0&&d<=8?d:(/^[A-Z]{6}$/.test(s)?5:2); }
+  function nextId(){return state.requestCounter++;}
+  function showToast(msg){const e=$('toast');e.textContent=msg;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),3600);}
+  function showNotice(msg){const e=$('notice');e.textContent=msg;e.classList.add('show');}
+  function clearNotice(){ $('notice').classList.remove('show'); }
+  function setStatus(label,kind){$('connectionText').textContent=label;$('statusDot').className='dot'+(kind?' '+kind:'');}
+  function send(data){if(state.ws&&state.ws.readyState===WebSocket.OPEN)state.ws.send(JSON.stringify(data));else showNotice('The market-data connection is not open. Press Reconnect feed and try again.');}
+  function classify(s){
+    const market=String(s.market||'').toLowerCase(), sub=String(s.submarket||'').toLowerCase(), name=String(s.display_name||'').toLowerCase(), sym=String(s.symbol||'').toLowerCase();
+    const all=[market,sub,name,sym].join(' ');
+    if(/synthetic|derived|volatility|boom|crash|step index|jump index|range break|drift switch|daily reset|multi.?step|bull market|bear market|(^|\s)1hz|r_\d/.test(all))return 'synthetic';
+    if(/forex|major pairs|minor pairs|exotic pairs|currency/.test(all)||/^[a-z]{6}$/.test(sym))return 'forex';
+    if(/commodit|metals|energy|gold|silver|oil|palladium|platinum|copper/.test(all))return 'commodities';
+    return 'other';
+  }
+  function filteredSymbols(){const cls=$('marketSelect').value;return state.symbols.filter(s=>classify(s)===cls&&![0,false,'0'].includes(s.exchange_is_open)&&![1,true,'1'].includes(s.is_trading_suspended));}
+  function populateSymbols(preferred){
+    const select=$('symbolSelect'), items=filteredSymbols(); select.innerHTML='';
+    if(!items.length){const o=document.createElement('option');o.value='';o.textContent='No matching public symbols returned';select.appendChild(o);state.symbol='';$('activeSymbolName').textContent='No instrument available';return;}
+    items.sort((a,b)=>String(a.display_name||a.symbol).localeCompare(String(b.display_name||b.symbol)));
+    for(const s of items){const o=document.createElement('option');o.value=s.symbol;o.textContent=(s.display_name||s.symbol)+' ('+s.symbol+')';select.appendChild(o);}
+    let chosen=preferred&&items.some(s=>s.symbol===preferred)?preferred:'';
+    if(!chosen&&state.symbol&&items.some(s=>s.symbol===state.symbol))chosen=state.symbol;
+    if(!chosen){const favourites=['R_100','1HZ100V','R_75','frxEURUSD','frxXAUUSD'];chosen=(favourites.find(x=>items.some(s=>s.symbol===x))||items[0].symbol);}
+    select.value=chosen;state.symbol=chosen;const item=items.find(s=>s.symbol===chosen);$('activeSymbolName').textContent=item?(item.display_name||item.symbol):chosen;
+  }
+  function connect(){
+    clearNotice(); stopTimers();
+    if(state.ws){try{state.ws.onclose=null;state.ws.close();}catch{}}
+    state.connected=false;state.initialized=false;state.subscriptionId=null;state.candles=[];state.currentSignal=null;state.lastConfirmedTime=null;state.liveTick=null;state.pendingTick=null;state.endpointIndex=-1;
+    $('emptyChart').style.display='flex';$('emptyChart').innerHTML='Connecting to the public Deriv feed…';drawChart();renderSignal(null);renderHistory([]);setStatus('Connecting…','');
+    openEndpoint(0);
+  }
+  function openEndpoint(index){
+    if(state.connectionTimer){clearTimeout(state.connectionTimer);state.connectionTimer=null;}
+    const endpoints=[
+      {url:'wss://api.derivws.com/trading/v1/options/ws/public',label:'Testing Deriv public market-data endpoint…'},
+      {url:'wss://ws.binaryws.com/websockets/v3',label:'Trying Deriv public legacy endpoint…'},
+      {url:'wss://ws.derivws.com/websockets/v3?app_id='+encodeURIComponent(APP_ID),label:'Trying Deriv registered-App-ID endpoint…'}
+    ];
+    if(index>=endpoints.length){
+      state.connected=false;setStatus('Feed disconnected','bad');
+      showNotice('No Deriv public endpoint returned a usable symbol list. Check whether your current network permits secure WebSocket connections, then reconnect. No candles or signals are calculated while the feed is unavailable. This dashboard does not submit orders.');
+      $('emptyChart').style.display='flex';$('emptyChart').innerHTML='Feed unavailable · no signal can be calculated';drawChart();return;
+    }
+    const endpoint=endpoints[index];state.endpointIndex=index;
+    state.connected=false;
+    setStatus(endpoint.label.replace('…',''),'');
+    $('emptyChart').style.display='flex';$('emptyChart').innerHTML=endpoint.label;
+    let opened=false, symbolsConfirmed=false, ws;
+    const fallback=()=>{
+      if(state.ws!==ws)return;
+      if(state.connectionTimer){clearTimeout(state.connectionTimer);state.connectionTimer=null;}
+      if(state.pingTimer){clearInterval(state.pingTimer);state.pingTimer=null;}
+      state.connected=false;
+      try{ws.onclose=null;ws.onerror=null;ws.onmessage=null;ws.close();}catch{}
+      openEndpoint(index+1);
+    };
+    try{ws=new WebSocket(endpoint.url);}catch(e){openEndpoint(index+1);return;}
+    state.ws=ws;
+    state.connectionTimer=setTimeout(()=>{
+      if(state.ws===ws&&(!opened||!symbolsConfirmed))fallback();
+    },opened?7000:9000);
+    ws.onopen=()=>{
+      if(state.ws!==ws)return;
+      opened=true;
+      if(state.connectionTimer)clearTimeout(state.connectionTimer);
+      setStatus('WebSocket opened, verifying market data…','');
+      $('emptyChart').style.display='flex';$('emptyChart').innerHTML='Connected to the endpoint. Verifying symbol response…';
+      // Only accept a connection after it responds to an actual market-data request.
+      state.connectionTimer=setTimeout(()=>{if(state.ws===ws&&!symbolsConfirmed)fallback();},7000);
+      send({active_symbols:'full',req_id:nextId()});
+    };
+    ws.onmessage=ev=>{
+      if(state.ws!==ws)return;
+      let d;try{d=JSON.parse(ev.data);}catch{return;}
+      if(d.error||d.errors){
+        const msg=d.error?.message||d.errors?.[0]?.message||'Deriv rejected the market-data request.';
+        if(!symbolsConfirmed){showNotice('Endpoint responded but did not accept the expected market-data request: '+msg+'. Trying the next documented endpoint.');fallback();return;}
+        setStatus('Feed error','bad');showNotice('Deriv market-data API returned: '+msg+'. No trading account or trading permissions are used.');return;
+      }
+      if(d.msg_type==='active_symbols'||Array.isArray(d.active_symbols)||Array.isArray(d.data?.active_symbols)){
+        const symbolList=Array.isArray(d.active_symbols)?d.active_symbols:(Array.isArray(d.data?.active_symbols)?d.data.active_symbols:[]);
+        if(!symbolList.length){if(!symbolsConfirmed){showNotice('Endpoint opened but returned no active symbols. Trying the next documented endpoint.');fallback();}return;}
+        // The newer public endpoint names fields `underlying_symbol` and
+        // `underlying_symbol_name`; normalize them to the legacy chart model.
+        state.symbols=symbolList.map(item=>{
+          const step=Number(item.pip_size);
+          const precision=Number.isFinite(Number(item.display_precision))?Number(item.display_precision):(step>0?Math.max(0,Math.round(-Math.log10(step))):undefined);
+          return {...item,
+            symbol:item.symbol||item.underlying_symbol,
+            display_name:item.display_name||item.underlying_symbol_name||item.symbol||item.underlying_symbol,
+            display_precision:precision
+          };
+        }).filter(item=>typeof item.symbol==='string'&&item.symbol.length>0);
+        if(!state.symbols.length){if(!symbolsConfirmed){showNotice('Deriv returned a market list that the dashboard could not identify. Trying the next documented endpoint.');fallback();}return;}
+        symbolsConfirmed=true;
+        if(state.connectionTimer){clearTimeout(state.connectionTimer);state.connectionTimer=null;}
+        state.connected=true;state.reconnectTries=0;
+        setStatus(index===0?'Deriv public market data connected':(index===1?'Deriv legacy feed connected':'Deriv App-ID feed connected'),'ok');
+        populateSymbols();
+        if(!state.symbol){if(index<2){fallback();return;}showNotice('The connected feed returned no symbols for the selected market class. Switch market class or confirm that Deriv exposes this instrument through its public feed.');return;}
+        send({ping:1,req_id:nextId()});
+        state.pingTimer=setInterval(()=>send({ping:1,req_id:nextId()}),25000);
+        loadSymbol(state.symbol);return;
+      }
+      if((d.msg_type==='candles'||d.msg_type==='history'||Array.isArray(d.data?.candles))&&d.req_id===state.historyReqId){
+        const raw=d.candles||d.history?.candles||d.data?.candles||[];
+        if(raw.length){
+          state.candles=raw.map(c=>({time:Number(c.epoch),open:Number(c.open),high:Number(c.high),low:Number(c.low),close:Number(c.close)})).filter(c=>[c.time,c.open,c.high,c.low,c.close].every(Number.isFinite)).sort((a,b)=>a.time-b.time);
+          state.initialized=true;$('emptyChart').style.display='none';rebuildSignals(false);
+          const initialSignals=getSignals();state.lastConfirmedTime=initialSignals.length?initialSignals[initialSignals.length-1].time:null;
+          drawChart();renderHistory(initialSignals);$('signalBarState').textContent='Candle confirmed';$('signalBarState').className='badge good';
+          if(state.pendingTick){const t=state.pendingTick;state.pendingTick=null;handleTick(t);}
+        }else{showNotice('Deriv connected, but returned no historical candles for '+state.symbol+'. Try another symbol or timeframe.');}
+        return;
+      }
+      if((d.msg_type==='tick'&&d.tick)||(d.data?.msg_type==='tick'&&d.data?.tick)){
+        const tick=d.tick||d.data.tick;
+        if(d.echo_req&&d.echo_req.ticks&&d.echo_req.ticks!==state.symbol)return;
+        if(d.subscription&&d.subscription.id)state.subscriptionId=d.subscription.id;
+        if(!state.initialized){state.pendingTick=tick;return;}
+        handleTick(tick);
+      }
+    };
+    ws.onerror=()=>{
+      if(state.ws!==ws)return;
+      if(!symbolsConfirmed){fallback();}
+      else{
+        setStatus('Feed connection interrupted','bad');
+        showNotice('The market-data WebSocket was interrupted. Reconnect before relying on any signal.');
+      }
+    };
+    ws.onclose=()=>{
+      if(state.ws!==ws)return;
+      if(state.connectionTimer){clearTimeout(state.connectionTimer);state.connectionTimer=null;}
+      if(!symbolsConfirmed){openEndpoint(index+1);return;}
+      state.connected=false;stopTimers();setStatus('Feed disconnected','bad');
+      showNotice('The Deriv market-data feed closed after connecting. Reconnect before relying on any signal.');
+    };
+  }
+  function stopTimers(){if(state.pingTimer)clearInterval(state.pingTimer);if(state.retryTimer)clearTimeout(state.retryTimer);if(state.connectionTimer)clearTimeout(state.connectionTimer);state.pingTimer=null;state.retryTimer=null;state.connectionTimer=null;}
+  function loadSymbol(symbol){if(!symbol||!state.connected)return;if(state.subscriptionId){send({forget:state.subscriptionId});state.subscriptionId=null;}state.symbol=symbol;state.granularity=Number($('timeframeSelect').value);state.candles=[];state.initialized=false;state.subscriptionId=null;state.pendingTick=null;state.lastConfirmedTime=null;state.currentSignal=null;renderSignal(null);renderHistory([]);$('emptyChart').style.display='flex';$('emptyChart').innerHTML='Loading historical candles…';$('livePrice').textContent='—';$('lastTick').textContent='Waiting for first quote';$('activeSymbolName').textContent=(state.symbols.find(s=>s.symbol===symbol)?.display_name||symbol);$('timeframeBadge').textContent=TF_NAMES[String(state.granularity)]||'TF';$('signalBarState').textContent='Loading candles';$('signalBarState').className='badge warn';
+    state.historyReqId=nextId();state.tickReqId=nextId();send({ticks_history:symbol,adjust_start_time:1,count:180,end:'latest',style:'candles',granularity:state.granularity,req_id:state.historyReqId});send({ticks:symbol,subscribe:1,req_id:state.tickReqId});
+  }
+  function handleTick(tick){const epoch=Number(tick.epoch),price=Number(tick.quote);if(!Number.isFinite(epoch)||!Number.isFinite(price))return;state.liveTick={epoch,price};$('livePrice').textContent=fmtPrice(price);$('lastTick').textContent='Last quote · '+new Date(epoch*1000).toLocaleTimeString();const bucket=Math.floor(epoch/state.granularity)*state.granularity;let last=state.candles[state.candles.length-1];if(!last){state.pendingTick=tick;return;}
+    if(bucket<last.time){return;}
+    if(bucket===last.time){last.high=Math.max(last.high,price);last.low=Math.min(last.low,price);last.close=price;drawChart();return;}
+    const oldLen=state.candles.length;state.candles.push({time:bucket,open:price,high:price,low:price,close:price});if(state.candles.length>260)state.candles.shift();rebuildSignals(false);const sigs=getSignals();const signalBar=state.candles[state.candles.length-2];const latest=sigs.find(s=>s.time===signalBar?.time);if(latest&&latest.time!==state.lastConfirmedTime){state.lastConfirmedTime=latest.time;state.currentSignal=latest;renderSignal(latest);showToast((latest.type==='buy'?'BUY ↑':'SELL ↓')+' confirmed on '+(state.symbol)+' · '+fmtPrice(latest.entry));}else{state.currentSignal=sigs.length?sigs[sigs.length-1]:null;renderSignal(state.currentSignal);}drawChart();renderHistory(sigs);
+  }
+  function ema(values,period){const arr=new Array(values.length).fill(null);if(!values.length)return arr;const alpha=2/(period+1);let v=values[0];arr[0]=v;for(let i=1;i<values.length;i++){v=values[i]*alpha+v*(1-alpha);arr[i]=v;}return arr;}
+  function rsi(values,period=14){const out=new Array(values.length).fill(null);if(values.length<=period)return out;let gains=0,losses=0;for(let i=1;i<=period;i++){const d=values[i]-values[i-1];if(d>0)gains+=d;else losses-=d;}let avgG=gains/period,avgL=losses/period;out[period]=avgL===0?100:100-(100/(1+avgG/avgL));for(let i=period+1;i<values.length;i++){const d=values[i]-values[i-1];avgG=((avgG*(period-1))+Math.max(d,0))/period;avgL=((avgL*(period-1))+Math.max(-d,0))/period;out[i]=avgL===0?100:100-(100/(1+avgG/avgL));}return out;}
+  function atr(bars,period=14){const tr=new Array(bars.length).fill(null),out=new Array(bars.length).fill(null);for(let i=1;i<bars.length;i++){const b=bars[i],prev=bars[i-1];tr[i]=Math.max(b.high-b.low,Math.abs(b.high-prev.close),Math.abs(b.low-prev.close));}if(bars.length<=period)return out;let sum=0;for(let i=1;i<=period;i++)sum+=tr[i]||0;let v=sum/period;out[period]=v;for(let i=period+1;i<bars.length;i++){v=((v*(period-1))+(tr[i]||0))/period;out[i]=v;}return out;}
+  function calc(){const bars=state.candles,closes=bars.map(b=>b.close);return {fast:ema(closes,20),slow:ema(closes,50),rsi:rsi(closes,14),atr:atr(bars,14)};}
+  function conditionsAt(i,ind){if(i<50||i>=state.candles.length)return {buy:false,sell:false};const b=state.candles[i],r=ind.rsi[i];return {buy:ind.fast[i]>ind.slow[i]&&b.close>ind.fast[i]&&r!==null&&r>=52,sell:ind.fast[i]<ind.slow[i]&&b.close<ind.fast[i]&&r!==null&&r<=48};}
+  function getSignals(){const bars=state.candles;if(bars.length<53)return [];const ind=calc(),signals=[];const finalIndex=bars.length-2;for(let i=50;i<=finalIndex;i++){const now=conditionsAt(i,ind),prev=conditionsAt(i-1,ind);let type=null;if(now.buy&&!prev.buy)type='buy';else if(now.sell&&!prev.sell)type='sell';if(type&&Number.isFinite(ind.atr[i])&&ind.atr[i]>0){const entry=bars[i].close,d=ind.atr[i]*1.5;signals.push({type,time:bars[i].time,entry,stop:type==='buy'?entry-d:entry+d,target:type==='buy'?entry+2*d:entry-2*d,rsi:ind.rsi[i],atr:ind.atr[i]});}}return signals;}
+  function rebuildSignals(allowAlert){const sigs=getSignals();renderHistory(sigs);if(sigs.length){const last=sigs[sigs.length-1];if(!state.currentSignal)state.currentSignal=last;renderSignal(state.currentSignal);}else renderSignal(null);}
+  function renderSignal(sig){const icon=$('signalIcon');if(!sig){icon.className='signalicon wait';icon.textContent='—';$('signalTitle').textContent='WAIT';$('signalSubtitle').textContent=state.initialized?'No fresh confirmed setup on the loaded candles.':'Waiting for a confirmed setup.';$('signalStrength').className='badge neutral';$('signalStrength').textContent='NO SIGNAL';$('entryValue').textContent='—';$('stopValue').textContent='—';$('targetValue').textContent='—';$('signalTimeValue').textContent='—';$('rsiValue').textContent='RSI(14): —';return;}const buy=sig.type==='buy';icon.className='signalicon '+(buy?'buy':'sell');icon.textContent=buy?'↑':'↓';$('signalTitle').textContent=buy?'BUY':'SELL';$('signalSubtitle').textContent=(buy?'Bullish':'Bearish')+' conditions confirmed on a closed candle.';$('signalStrength').className='badge '+(buy?'good':'bad');$('signalStrength').textContent='CONFIRMED';$('entryValue').textContent=fmtPrice(sig.entry);$('stopValue').textContent=fmtPrice(sig.stop);$('targetValue').textContent=fmtPrice(sig.target);$('signalTimeValue').textContent=fmtTime(sig.time);$('rsiValue').textContent='RSI(14): '+(Number.isFinite(sig.rsi)?sig.rsi.toFixed(1):'—');}
+  function renderHistory(signals){$('signalCount').textContent=String(signals.length);const el=$('historyList');el.innerHTML='';if(!signals.length){el.innerHTML='<div class="emptylist">No confirmed signals in the loaded candles yet.</div>';return;}signals.slice(-7).reverse().forEach(s=>{const row=document.createElement('div');row.className='historyitem';const a=document.createElement('div');a.className='historyarrow '+s.type;a.textContent=s.type==='buy'?'↑':'↓';const body=document.createElement('div');const strong=document.createElement('strong');strong.textContent=s.type==='buy'?'BUY confirmed':'SELL confirmed';const span=document.createElement('span');span.textContent=fmtTime(s.time)+' · '+($('symbolSelect').selectedOptions[0]?.textContent||state.symbol);body.append(strong,span);const p=document.createElement('div');p.className='historyprice';p.textContent=fmtPrice(s.entry);row.append(a,body,p);el.appendChild(row);});}
+  function drawChart(){const canvas=$('chart'),ctx=canvas.getContext('2d');if(!ctx)return;const dpr=Math.max(1,window.devicePixelRatio||1),rect=canvas.getBoundingClientRect();canvas.width=Math.max(320,Math.floor(rect.width*dpr));canvas.height=Math.max(240,Math.floor(rect.height*dpr));ctx.setTransform(dpr,0,0,dpr,0,0);const W=rect.width,H=rect.height;ctx.clearRect(0,0,W,H);ctx.fillStyle='#fbfcfe';ctx.fillRect(0,0,W,H);const bars=state.candles;if(!bars.length){ctx.fillStyle='#8a98aa';ctx.font='12px system-ui';ctx.textAlign='center';ctx.fillText('Waiting for Deriv candles…',W/2,H/2);$('barCount').textContent='0 candles loaded';return;}
+    const ind=calc(),visible=Math.min(92,bars.length),start=Math.max(0,bars.length-visible),view=bars.slice(start),left=14,right=78,top=18,bottom=28,cw=W-left-right,ch=H-top-bottom;let max=Math.max(...view.map(b=>b.high)),min=Math.min(...view.map(b=>b.low));const signals=getSignals(),signalMap=new Map(signals.map(s=>[s.time,s]));const pad=(max-min)*.08||Math.abs(max||1)*.001;max+=pad;min-=pad;const y=v=>top+(max-v)/(max-min)*ch;const slot=cw/view.length,bw=Math.max(2,Math.min(10,slot*.62));
+    ctx.strokeStyle='#e8edf4';ctx.lineWidth=1;ctx.font='10px system-ui';ctx.fillStyle='#8592a4';ctx.textAlign='left';for(let i=0;i<=5;i++){const val=max-(max-min)*i/5,yy=y(val);ctx.beginPath();ctx.moveTo(left,yy);ctx.lineTo(W-right+4,yy);ctx.stroke();ctx.fillText(Number(val).toLocaleString(undefined,{maximumFractionDigits:priceDigits()}),W-right+10,yy+3);}
+    const x=i=>left+(i-start+.5)*slot;
+    // EMA lines
+    function lineFor(values,color,width){ctx.beginPath();let began=false;for(let i=start;i<bars.length;i++){if(!Number.isFinite(values[i]))continue;const xx=x(i),yy=y(values[i]);if(!began){ctx.moveTo(xx,yy);began=true;}else ctx.lineTo(xx,yy);}ctx.strokeStyle=color;ctx.lineWidth=width;ctx.stroke();}
+    lineFor(ind.fast,'#3576dd',1.6);lineFor(ind.slow,'#f0a03d',1.6);
+    for(let i=start;i<bars.length;i++){const b=bars[i],xx=x(i),yo=y(b.open),yc=y(b.close),yh=y(b.high),yl=y(b.low),up=b.close>=b.open,color=up?'#178b58':'#c8444d';ctx.strokeStyle=color;ctx.fillStyle=color;ctx.lineWidth=1.25;ctx.beginPath();ctx.moveTo(xx,yh);ctx.lineTo(xx,yl);ctx.stroke();let height=Math.max(1.5,Math.abs(yc-yo));ctx.fillRect(xx-bw/2,Math.min(yo,yc),bw,height);
+      const sig=signalMap.get(b.time);if(sig){const ay=sig.type==='buy'?yl+15:yh-15;ctx.save();ctx.fillStyle=sig.type==='buy'?'#178b58':'#c8444d';ctx.strokeStyle='#ffffff';ctx.lineWidth=1.5;ctx.beginPath();if(sig.type==='buy'){ctx.moveTo(xx,ay-10);ctx.lineTo(xx-8,ay+2);ctx.lineTo(xx-3,ay+2);ctx.lineTo(xx-3,ay+8);ctx.lineTo(xx+3,ay+8);ctx.lineTo(xx+3,ay+2);ctx.lineTo(xx+8,ay+2);}else{ctx.moveTo(xx,ay+10);ctx.lineTo(xx-8,ay-2);ctx.lineTo(xx-3,ay-2);ctx.lineTo(xx-3,ay-8);ctx.lineTo(xx+3,ay-8);ctx.lineTo(xx+3,ay-2);ctx.lineTo(xx+8,ay-2);}ctx.closePath();ctx.fill();ctx.stroke();ctx.font='700 9px system-ui';ctx.textAlign='center';ctx.fillText(sig.type==='buy'?'BUY':'SELL',xx, sig.type==='buy'?ay+20:ay-18);ctx.restore();}}
+    // current price guide
+    const last=bars[bars.length-1].close;const ly=y(last);ctx.setLineDash([4,4]);ctx.strokeStyle='#8090a5';ctx.beginPath();ctx.moveTo(left,ly);ctx.lineTo(W-right+4,ly);ctx.stroke();ctx.setLineDash([]);ctx.fillStyle='#23334a';ctx.fillRect(W-right+6,ly-9,66,18);ctx.fillStyle='#fff';ctx.font='700 10px system-ui';ctx.textAlign='center';ctx.fillText(Number(last).toLocaleString(undefined,{maximumFractionDigits:priceDigits()}),W-right+39,ly+3);
+    ctx.fillStyle='#8a97a9';ctx.font='10px system-ui';ctx.textAlign='center';const labelIndexes=[0,Math.floor(view.length/3),Math.floor(view.length*2/3),view.length-1];labelIndexes.forEach(idx=>{const b=view[idx];if(b)ctx.fillText(new Date(b.time*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),x(start+idx),H-8);});$('barCount').textContent=bars.length+' candles loaded · '+visible+' shown';$('emptyChart').style.display='none';
+  }
+  $('marketSelect').addEventListener('change',()=>{const prev=state.symbol;populateSymbols();if(state.symbol&&state.symbol!==prev)loadSymbol(state.symbol);else if(state.symbol)loadSymbol(state.symbol);});
+  $('symbolSelect').addEventListener('change',e=>loadSymbol(e.target.value));
+  $('timeframeSelect').addEventListener('change',()=>loadSymbol(state.symbol));
+  $('reconnectBtn').addEventListener('click',connect);
+  $('applyAppIdBtn').addEventListener('click',()=>{const id=$('appIdInput').value.trim();if(!/^\d{1,12}$/.test(id)){showToast('Enter the numeric Deriv App ID only.');return;}APP_ID=id;try{localStorage.setItem('deriv_signal_app_id',id);}catch{}connect();});
+  window.addEventListener('resize',drawChart);
+  // This dashboard intentionally has no account connection and no order-placement API calls.
+  connect();
+})();
+</script>
+</body>
+</html>
