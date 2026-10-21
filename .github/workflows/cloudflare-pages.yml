@@ -938,19 +938,29 @@ jobs:
           if b.exists():
               booking=json.loads(b.read_text())
           coverage_complete = live.get('scan_complete') is True
-          checks = ['core_pages','prediction_desk_qualification_gates','research_virtual_lab','live_virtual_proxy','virtual_lab_live_snapshot','live_production_data','booking_api_post']
+          booking_status = str(booking.get('status') or 'NOT_RECORDED')
+          # A no-future-batch result means the POST path was not exercised; do not
+          # count it as a passed booking check or label the full verification VERIFIED.
+          booking_verified = booking.get('ok') is True and booking_status in {'PASS', 'VOLATILE_MARKET'}
+          checks = ['core_pages','prediction_desk_qualification_gates','research_virtual_lab','live_virtual_proxy','virtual_lab_live_snapshot','live_production_data']
+          if booking_verified:
+              checks.append('booking_api_post')
+          else:
+              checks.append('booking_api_post_not_verified')
           checks.append('qualified_best_shortlist' if coverage_complete else 'qualified_best_live_quote_diagnostic_incomplete')
+          verification_complete = coverage_complete and booking_verified
           Path('DEPLOY-VERIFY-CLOUDFLARE.json').write_text(json.dumps({
-            'status':'VERIFIED' if coverage_complete else 'VERIFIED_WITH_DIAGNOSTIC_INCOMPLETE',
+            'status':'VERIFIED' if verification_complete else 'VERIFIED_WITH_DIAGNOSTIC_INCOMPLETE',
             'core_pages_status':'VERIFIED',
             'qualified_best_quote_coverage_status':'COMPLETE' if coverage_complete else 'INCOMPLETE',
+            'booking_api_status':'VERIFIED' if booking_verified else booking_status,
             'provider':'Cloudflare Pages',
             'source_commit':os.environ['DEPLOY_SOURCE_COMMIT'],
             'verified_at':datetime.now(timezone.utc).isoformat(),
             'live_virtual_feed':live,
             'booking_api':booking,
             'checks':checks
-          },indent=2)+'\n')
+          },indent=2)+'\\n')
           PY
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
