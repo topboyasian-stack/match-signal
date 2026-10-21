@@ -4,10 +4,10 @@
   "qualified_best_quote_coverage_status": "COMPLETE",
   "booking_api_status": "VERIFIED",
   "provider": "Cloudflare Pages",
-  "source_commit": "b8d526b6633e36b0ed14f586315de63a6726c4cd",
-  "verified_at": "2026-10-21T18:01:07.930919+00:00",
+  "source_commit": "3ff7836b3f472fe7b4fea3dd64884301d5f73874",
+  "verified_at": "2026-10-21T18:05:11.257272+00:00",
   "live_virtual_feed": {
-    "verified_at": "2026-10-21T18:01:07.431Z",
+    "verified_at": "2026-10-21T18:05:10.737Z",
     "status": "DIAGNOSTIC",
     "scan_complete": true,
     "scan_stop_reason": "all_model_qualified_candidates_matched",
@@ -28,7 +28,7 @@
       {
         "page": 1,
         "count": 100,
-        "fetched_at": "2026-10-21T18:01:07.410Z",
+        "fetched_at": "2026-10-21T18:05:10.698Z",
         "status": "LIVE"
       }
     ],
@@ -58,16 +58,30 @@
     "qualified_examples": []
   },
   "booking_api": {
-    "verified_at": "2026-10-21T18:00:55.526Z",
-    "status": "PASS",
-    "http_status": 200,
+    "verified_at": "2026-10-21T18:04:50.432Z",
+    "status": "VOLATILE_MARKET",
+    "http_status": 409,
     "ok": true,
-    "batch_id": "DESK-BATCH-01",
+    "batch_id": "DESK-BATCH-03",
     "selection_count": 2,
-    "booking_code_available": true,
-    "error": null,
-    "message": null,
-    "volatile_market": false
+    "booking_code_available": false,
+    "error": "NO_AVAILABLE_SELECTIONS",
+    "message": "No Builder selections could be mapped to a currently open SportyBet event/market.",
+    "volatile_market": true,
+    "validation": [
+      {
+        "event_id": "sr:match:BAaFexZfzf-2OAwtxdHspww",
+        "ok": false,
+        "excluded": true,
+        "reason": "The exact SportyBet O/U line or selected side is no longer available."
+      },
+      {
+        "event_id": "sr:match:BAaFexbyseJSU8wuzClf3aA",
+        "ok": false,
+        "excluded": true,
+        "reason": "The exact SportyBet O/U line or selected side is no longer available."
+      }
+    ]
   },
   "checks": [
     "core_pages",
