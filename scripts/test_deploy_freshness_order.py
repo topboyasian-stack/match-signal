@@ -331,7 +331,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             [],
             "Only Builder promotion may dispatch Pages, and only after its board refresh succeeds.",
         )
-        self.assertIn("Wait for successful Pages deployment triggered by refreshed board", PROMOTION_WORKFLOW)
+        self.assertIn("Dispatch Pages once after refreshed board and wait for successful deployment", PROMOTION_WORKFLOW)
     def test_builder_artifact_uses_promotion_instead_of_a_duplicate_board_push_trigger(self):
         # Builder publishes data/odds_builder.json and then dispatches the promotion
         # workflow, which refreshes Unified Upcoming once. A direct push trigger here
