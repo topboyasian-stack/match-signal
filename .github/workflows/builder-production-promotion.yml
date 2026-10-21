@@ -71,7 +71,7 @@ jobs:
           echo "board_head_sha=$candidate_sha" >> "$GITHUB_OUTPUT"
           echo "Verified successful board refresh before Pages promotion."
 
-      - name: Dispatch Pages once for manually refreshed board and wait for deployment
+      - name: Dispatch Pages once for manually refreshed board and verify the published artifact
         env:
           GH_TOKEN: ${{ github.token }}
           BOARD_RUN_ID: ${{ steps.board-refresh.outputs.board_run_id }}
@@ -80,33 +80,30 @@ jobs:
           set -euo pipefail
           test -n "$BOARD_RUN_ID"
           test -n "$BOARD_HEAD_SHA"
-          dispatched_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          dispatched_at="$(python -c 'from datetime import datetime, timezone; print(datetime.now(timezone.utc).isoformat())')"
+          dispatched_epoch_us="$(python -c 'from datetime import datetime; import sys; print(int(datetime.fromisoformat(sys.argv[1]).timestamp() * 1000000))' "$dispatched_at")"
           gh workflow run cloudflare-pages.yml --ref main
-          deploy_run_id=""
           for attempt in $(seq 1 60); do
-            candidates="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/cloudflare-pages.yml/runs?branch=main&event=workflow_dispatch&per_page=20" --jq ".workflow_runs[] | select(.created_at >= \"$dispatched_at\") | [.id, .head_sha] | @tsv")"
-            while IFS=$'\t' read -r candidate_id candidate_sha; do
-              [ -n "$candidate_id" ] || continue
-              merge_base="$(gh api "repos/$GITHUB_REPOSITORY/compare/$BOARD_HEAD_SHA...$candidate_sha" --jq '.merge_base_commit.sha' 2>/dev/null || true)"
-              if [ "$merge_base" = "$BOARD_HEAD_SHA" ]; then
-                deploy_run_id="$candidate_id"
-                break
-              fi
-            done <<< "$candidates"
-            if [ -n "$deploy_run_id" ]; then
-              deploy_status="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$deploy_run_id" --jq '.status')"
-              if [ "$deploy_status" = "completed" ]; then
-                deploy_conclusion="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$deploy_run_id" --jq '.conclusion')"
-                if [ "$deploy_conclusion" != "success" ]; then
-                  echo "Cloudflare Pages run $deploy_run_id completed with conclusion=$deploy_conclusion after board run $BOARD_RUN_ID." >&2
-                  exit 1
+            # The deploy's verification artifact is committed only after its production
+            # smoke tests pass. Use it as the durable success signal instead of waiting
+            # for GitHub to finalize the workflow-run status, which can remain stale.
+            encoded="$(gh api "repos/$GITHUB_REPOSITORY/contents/DEPLOY-VERIFY-CLOUDFLARE.json?ref=main" --jq '.content' 2>/dev/null || true)"
+            if [ -n "$encoded" ]; then
+              payload="$(printf '%s' "$encoded" | base64 --decode 2>/dev/null || true)"
+              verification_source="$(printf '%s' "$payload" | jq -r '.source_commit // empty' 2>/dev/null || true)"
+              verification_time="$(printf '%s' "$payload" | jq -r '.verified_at // empty' 2>/dev/null || true)"
+              verification_status="$(printf '%s' "$payload" | jq -r '.status // empty' 2>/dev/null || true)"
+              if [ -n "$verification_source" ] && [ -n "$verification_time" ] && [[ "$verification_status" == VERIFIED* ]]; then
+                verified_epoch_us="$(python -c 'from datetime import datetime; import sys; print(int(datetime.fromisoformat(sys.argv[1].replace("Z", "+00:00")).timestamp() * 1000000))' "$verification_time" 2>/dev/null || echo 0)"
+                merge_base="$(gh api "repos/$GITHUB_REPOSITORY/compare/$BOARD_HEAD_SHA...$verification_source" --jq '.merge_base_commit.sha' 2>/dev/null || true)"
+                if [ "$verified_epoch_us" -ge "$dispatched_epoch_us" ] && [ "$merge_base" = "$BOARD_HEAD_SHA" ]; then
+                  echo "Production verification artifact $verification_status for source $verification_source was recorded after the Pages dispatch and descends from board run $BOARD_RUN_ID."
+                  exit 0
                 fi
-                echo "Cloudflare Pages run $deploy_run_id completed successfully after board run $BOARD_RUN_ID."
-                exit 0
               fi
             fi
             if [ "$attempt" -eq 60 ]; then
-              echo "Timed out waiting for the explicitly dispatched Pages deployment after board run $BOARD_RUN_ID." >&2
+              echo "Timed out waiting for a fresh successful DEPLOY-VERIFY-CLOUDFLARE.json after board run $BOARD_RUN_ID." >&2
               exit 1
             fi
             sleep 5
