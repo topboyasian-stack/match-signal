@@ -174,9 +174,11 @@ const requiredVirtual = row({
   pick: "under",
   qualification_status: "BETTING_QUALIFIED_PAPER",
   betting_qualified: true,
-  qualified_for_builder: true
+  qualified_for_builder: true,
+  walkforward_exact_line_n: 30,
+  walkforward_exact_line_hit_rate: 0.70
 });
-assert.equal(isRequiredVirtualQuoteRow(requiredVirtual, scopeNow), true, "a model-qualified active eFootball row inside the seven-day feed window is required");
+assert.equal(isRequiredVirtualQuoteRow(requiredVirtual, scopeNow), true, "a model-qualified active eFootball row with adequate exact-line walk-forward evidence inside the seven-day feed window is required");
 
 const highEstimateResearch = {
   ...requiredVirtual,
@@ -418,7 +420,9 @@ const qualifiedSeventy = {
   }),
   betting_qualified: true,
   qualified_for_builder: true,
-  qualification_status: "BETTING_QUALIFIED_PAPER_DIRECTIONAL"
+  qualification_status: "BETTING_QUALIFIED_PAPER_DIRECTIONAL",
+  walkforward_exact_line_n: 36,
+  walkforward_exact_line_hit_rate: 0.70
 };
 assert.equal(isVirtualDeskCandidate(qualifiedSeventy), true, "an upstream-qualified 71% eFootball candidate must reach the exact-price gate");
 assert.equal(qualificationState(qualifiedSeventy).currentPricePass, true, "the sub-80% row still has to pass an exact fresh-price gate");
@@ -436,6 +440,29 @@ assert.ok(probabilityValue(overconfidentUnder) < 0.70, "a 96% raw estimate with 
 assert.ok(probabilityValue(overconfidentUnder) < rawProbabilityValue(overconfidentUnder), "poor exact-line outcomes must pull the Desk estimate down");
 assert.equal(calibration.n, 69, "calibration labels retain their evidence sample size");
 assert.ok(Math.abs(displayedFairOddsValue(overconfidentUnder)-(1/probabilityValue(overconfidentUnder)))<1e-9, "fair odds must agree with the calibrated Desk estimate");
+// Regression for the production failure: an upstream BETTING_QUALIFIED flag
+// plus a high raw probability must not override a one-result exact-line sample.
+const oneResultEfootball = {
+  ...row({
+    sport: "virtual", product: "efootball_gt", probability: 0.86,
+    line: 3, pick: "over", event_id: "efootball-one-result-must-not-qualify",
+    qualification_status: "BETTING_QUALIFIED_PAPER",
+    betting_qualified: true, qualified_for_builder: true,
+    desk_learning_exact_n: 1, desk_learning_exact_accuracy: 0,
+    sportybet_odds_line: 3, sportybet_odds_side: "over",
+    bookmaker_odds: 1.65, sportybet_odds: 1.65,
+    sportybet_over_odds: 1.65, sportybet_under_odds: 2.10
+  }),
+  walkforward_exact_line_n: 1,
+  walkforward_exact_line_hit_rate: 0
+};
+assert.equal(qualificationState(oneResultEfootball).modelQualified, false, "one settled exact-line result cannot satisfy the eFootball walk-forward evidence gate");
+assert.equal(qualificationState(oneResultEfootball).currentPricePass, false, "a positive displayed edge cannot bypass insufficient model evidence");
+assert.equal(qualificationState(oneResultEfootball).reason, "EXACT_LINE_WALKFORWARD_EVIDENCE_INSUFFICIENT");
+assert.equal(qualifiedBestSelections([oneResultEfootball], Date.now()).rows.length, 0, "the exact failure pattern is excluded from Qualified Best");
+const missingWalkforwardEfootball = {...oneResultEfootball, event_id:"efootball-missing-walkforward", walkforward_exact_line_n:null, walkforward_exact_line_hit_rate:null};
+assert.equal(qualificationState(missingWalkforwardEfootball).reason, "EXACT_LINE_WALKFORWARD_EVIDENCE_INSUFFICIENT", "missing walk-forward evidence fails closed even when desk-learning history exists");
+
 const overconfidentQualified = {
   ...row({
     sport: "virtual",
