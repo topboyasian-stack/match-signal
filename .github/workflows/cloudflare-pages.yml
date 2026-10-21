@@ -71,7 +71,7 @@ permissions:
 # so an irrelevant workflow_run that will be skipped cannot replace a pending deploy.
 jobs:
   deploy:
-    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && (github.event.workflow_run.name != 'Match Signal Unified Upcoming Board' || github.event.workflow_run.event != 'workflow_dispatch')) }}
     concurrency:
       group: cloudflare-pages-v3
       cancel-in-progress: false
