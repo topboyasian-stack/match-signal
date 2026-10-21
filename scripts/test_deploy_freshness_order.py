@@ -281,6 +281,8 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
 
     def test_builder_promotion_dispatches_one_pages_deployment_for_manual_board_refresh(self):
         self.assertIn("uses: actions/checkout@v4", PROMOTION_WORKFLOW)
+        self.assertIn("group: builder-production-promotion-v3", PROMOTION_WORKFLOW)
+        self.assertNotIn("group: builder-production-promotion-v2", PROMOTION_WORKFLOW)
         self.assertIn("with:\n          ref: main", PROMOTION_WORKFLOW)
         self.assertIn("gh workflow run unified-upcoming.yml --ref main", PROMOTION_WORKFLOW)
         self.assertIn("id: board-refresh", PROMOTION_WORKFLOW)
