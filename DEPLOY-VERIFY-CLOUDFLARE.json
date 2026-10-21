@@ -3,15 +3,15 @@
   "core_pages_status": "VERIFIED",
   "qualified_best_quote_coverage_status": "COMPLETE",
   "provider": "Cloudflare Pages",
-  "source_commit": "c3187bde5de475dd6c8b5915556737e5361a1620",
-  "verified_at": "2026-10-21T09:53:52.810870+00:00",
+  "source_commit": "d4254f03b393fc00c4ea0d1adc8c9521b8ee648e",
+  "verified_at": "2026-10-21T09:57:20.911995+00:00",
   "live_virtual_feed": {
-    "verified_at": "2026-10-21T09:53:52.215Z",
+    "verified_at": "2026-10-21T09:57:20.450Z",
     "status": "DIAGNOSTIC",
     "scan_complete": true,
     "scan_stop_reason": "all_model_qualified_candidates_matched",
     "paper_only": true,
-    "candidate_artifact_rows": 539,
+    "candidate_artifact_rows": 531,
     "virtual_candidate_rows_in_next_7_days": 0,
     "snapshot_gate_qualified_fixtures": 0,
     "snapshot_gate_diagnostics": {
@@ -27,7 +27,7 @@
       {
         "page": 1,
         "count": 100,
-        "fetched_at": "2026-10-21T09:53:52.192Z",
+        "fetched_at": "2026-10-21T09:57:20.432Z",
         "status": "LIVE"
       }
     ],
@@ -57,15 +57,35 @@
     "qualified_examples": []
   },
   "booking_api": {
-    "verified_at": "2026-10-21T09:53:46.282Z",
-    "status": "NO_FUTURE_BATCH",
-    "http_status": null,
-    "ok": false,
-    "batch_id": null,
-    "selection_count": 0,
+    "verified_at": "2026-10-21T09:57:09.129Z",
+    "status": "VOLATILE_MARKET",
+    "http_status": 409,
+    "ok": true,
+    "batch_id": "DESK-BATCH-01",
+    "selection_count": 1,
     "booking_code_available": false,
-    "error": null,
-    "message": null
+    "error": "TOO_FEW_AVAILABLE_SELECTIONS",
+    "message": "Fewer than two valid selections remain available on SportyBet.",
+    "volatile_market": true,
+    "validation": [
+      {
+        "event_id": "sr:match:BAaFaNlwPeL6SGLKk83Tbvw",
+        "ok": false,
+        "excluded": true,
+        "reason": "The exact SportyBet O/U line or selected side is no longer available."
+      },
+      {
+        "event_id": "sr:match:BAaFZp0qZerSjK9GAYa3SVQ",
+        "ok": true,
+        "resolved_by": "event_id",
+        "resolved_event_id": "sr:match:BAaFZp0qZerSjK9GAYa3SVQ",
+        "market_id": "18",
+        "outcome_id": "13",
+        "specifier": "total=7.5",
+        "outcome": "Under 7.5",
+        "current_odds": 1.85
+      }
+    ]
   },
   "checks": [
     "core_pages",
