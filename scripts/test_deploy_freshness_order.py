@@ -266,7 +266,6 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "league.html",
             "functions/**",
             "data/predictions.json",
-            "data/odds_builder.json",
             "data/odds_ticket_tracker.json",
             "data/virtual_lab_live.json",
             "data/darts_*.json",
