@@ -214,7 +214,6 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         }
         self.assertEqual(direct_paths, expected_direct_paths)
         builder_owned_paths = {
-            "data/odds_builder.json",
             "scripts/odds_builder.py",
             "scripts/odds_builder_core.py",
             "scripts/test_odds_builder_score_replay.py",
