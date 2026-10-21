@@ -71,7 +71,7 @@ jobs:
           echo "board_head_sha=$candidate_sha" >> "$GITHUB_OUTPUT"
           echo "Verified successful board refresh before Pages promotion."
 
-      - name: Wait for successful Pages deployment triggered by refreshed board
+      - name: Dispatch Pages once for manually refreshed board and wait for deployment
         env:
           GH_TOKEN: ${{ github.token }}
           BOARD_RUN_ID: ${{ steps.board-refresh.outputs.board_run_id }}
@@ -80,36 +80,33 @@ jobs:
           set -euo pipefail
           test -n "$BOARD_RUN_ID"
           test -n "$BOARD_HEAD_SHA"
-          board_updated_at="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BOARD_RUN_ID" --jq '.updated_at')"
+          dispatched_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          gh workflow run cloudflare-pages.yml --ref main
           deploy_run_id=""
           for attempt in $(seq 1 60); do
-            # Unified Upcoming already triggers Pages on successful completion. Wait for
-            # that run instead of dispatching a second competing production deployment.
-            if [ -z "$deploy_run_id" ]; then
-              candidates="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/cloudflare-pages.yml/runs?branch=main&event=workflow_run&per_page=20" --jq ".workflow_runs[] | select(.created_at >= \"$board_updated_at\") | [.id, .head_sha] | @tsv")"
-              while IFS=$'\t' read -r candidate_id candidate_sha; do
-                [ -n "$candidate_id" ] || continue
-                merge_base="$(gh api "repos/$GITHUB_REPOSITORY/compare/$BOARD_HEAD_SHA...$candidate_sha" --jq '.merge_base_commit.sha' 2>/dev/null || true)"
-                if [ "$merge_base" = "$BOARD_HEAD_SHA" ]; then
-                  deploy_run_id="$candidate_id"
-                  break
-                fi
-              done <<< "$candidates"
-            fi
+            candidates="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/cloudflare-pages.yml/runs?branch=main&event=workflow_dispatch&per_page=20" --jq ".workflow_runs[] | select(.created_at >= \"$dispatched_at\") | [.id, .head_sha] | @tsv")"
+            while IFS=$'\t' read -r candidate_id candidate_sha; do
+              [ -n "$candidate_id" ] || continue
+              merge_base="$(gh api "repos/$GITHUB_REPOSITORY/compare/$BOARD_HEAD_SHA...$candidate_sha" --jq '.merge_base_commit.sha' 2>/dev/null || true)"
+              if [ "$merge_base" = "$BOARD_HEAD_SHA" ]; then
+                deploy_run_id="$candidate_id"
+                break
+              fi
+            done <<< "$candidates"
             if [ -n "$deploy_run_id" ]; then
               deploy_status="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$deploy_run_id" --jq '.status')"
               if [ "$deploy_status" = "completed" ]; then
                 deploy_conclusion="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$deploy_run_id" --jq '.conclusion')"
                 if [ "$deploy_conclusion" != "success" ]; then
-                  echo "Pages workflow_run $deploy_run_id completed with conclusion=$deploy_conclusion; refusing to mask a failed production freshness check." >&2
+                  echo "Cloudflare Pages run $deploy_run_id completed with conclusion=$deploy_conclusion after board run $BOARD_RUN_ID." >&2
                   exit 1
                 fi
-                echo "Pages workflow_run $deploy_run_id completed successfully after refreshed board run $BOARD_RUN_ID."
+                echo "Cloudflare Pages run $deploy_run_id completed successfully after board run $BOARD_RUN_ID."
                 exit 0
               fi
             fi
             if [ "$attempt" -eq 60 ]; then
-              echo "Timed out waiting for the Pages deployment triggered by board run $BOARD_RUN_ID." >&2
+              echo "Timed out waiting for the explicitly dispatched Pages deployment after board run $BOARD_RUN_ID." >&2
               exit 1
             fi
             sleep 5
