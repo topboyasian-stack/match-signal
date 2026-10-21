@@ -5,10 +5,9 @@ name: Deploy Match Signal to Cloudflare Pages
 on:
   workflow_run:
     workflows:
-      - "Match Signal Unified Upcoming Board"
       - "Match Signal Persistent Club Logo Registry"
     types: [completed]
-  # Static presentation and scoped booking-API changes may deploy directly. Builder outputs, Builder engines, and this workflow itself must wait for the Unified Upcoming refresh and its subsequent Pages deployment.
+  # Static presentation and scoped booking-API changes may deploy directly. Builder outputs flow through the promotion workflow, which refreshes Unified Upcoming and then dispatches exactly one Pages deployment.
   push:
     branches: [main]
     paths:
