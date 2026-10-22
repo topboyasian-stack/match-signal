@@ -16,7 +16,7 @@ The standard ticket lane remains 2–4 legs at the earned 2.70x/2.80x odds polic
 """
 from __future__ import annotations
 import json, math, urllib.parse, urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from ticket_history import merge_ticket_history, settled_ticket_history
 
@@ -200,15 +200,17 @@ def _efootball_holdout_selection(row):
     return profile
 
 def combined_odds_gate_state():
-    """Return the currently earned accuracy-first combined-odds floor for this Builder run."""
+    """Return the earned combined-odds target using event-independent settled wins."""
     global _COMBINED_ODDS_GATE_CACHE
     if _COMBINED_ODDS_GATE_CACHE is not None:
         return _COMBINED_ODDS_GATE_CACHE
     wins=0
+    all_wins=0
     try:
         tracker_path=DATA/"odds_ticket_tracker.json"
         tracker=json.loads(tracker_path.read_text(encoding="utf-8"))
         tickets,_=merge_ticket_history(tracker)
+        independent_ids=_event_independent_settled_ticket_object_ids(tickets)
         for ticket in tickets:
             if str(ticket.get("status") or "").upper() != "WON":
                 continue
@@ -218,9 +220,12 @@ def combined_odds_gate_state():
             except (TypeError,ValueError):
                 continue
             if leg_count in RESULTS_FIRST_CONSTRUCTION_LEG_COUNTS and odds >= TARGET_COMBINED_ODDS:
-                wins+=1
+                all_wins+=1
+                if id(ticket) in independent_ids:
+                    wins+=1
     except Exception:
         wins=0
+        all_wins=0
     hard_gate_active=wins >= HIGH_ODDS_HARD_GATE_WIN_RECORDS
     _COMBINED_ODDS_GATE_CACHE={
         "floor":TARGET_COMBINED_ODDS if hard_gate_active else MIN_ACCURACY_FIRST_ODDS,
@@ -229,9 +234,13 @@ def combined_odds_gate_state():
         "hard_gate_active":hard_gate_active,
         "gate_mode":"earned_preferred_target",
         "settled_2_80_plus_wins":wins,
-        "wins_required_for_2_80_hard_gate":HIGH_ODDS_HARD_GATE_WIN_RECORDS
+        "all_settled_2_80_plus_wins":all_wins,
+        "independent_settled_2_80_plus_wins":wins,
+        "wins_required_for_2_80_hard_gate":HIGH_ODDS_HARD_GATE_WIN_RECORDS,
+        "qualification_basis":"event-independent settled ticket wins; a fixture can only support one settled-ticket win",
     }
     return _COMBINED_ODDS_GATE_CACHE
+
 
 def active_min_combined_odds():
     return float(combined_odds_gate_state()["floor"])
@@ -1517,18 +1526,58 @@ _UPCOMING_DESK_SETTLED_RESULT_INDEX_CACHE=None
 _SETTLED_BUILDER_LANE_PERFORMANCE_CACHE=None
 
 
+def _event_independent_settled_ticket_object_ids(tickets):
+    """Identify settled tickets with no fixture exposure shared with another settled ticket.
+
+    A ticket is independent only when every leg has a product-scoped event ID,
+    it contains no repeated event internally, and every event appears in exactly
+    one settled ticket across all lanes. Pending tickets are not outcomes and do
+    not enter this historical-promotion sample.
+    """
+    counts={}
+    rows=[]
+    for ticket in tickets if isinstance(tickets,list) else []:
+        if not isinstance(ticket,dict) or str(ticket.get("status") or "").upper() not in {"WON","LOST"}:
+            continue
+        legs=ticket.get("legs") if isinstance(ticket.get("legs"),list) else []
+        events=[]
+        complete=bool(legs)
+        for leg in legs:
+            if not isinstance(leg,dict):
+                complete=False
+                continue
+            product=str(leg.get("product") or leg.get("sport") or "").strip().lower()
+            event_id=str(leg.get("event_id") or leg.get("eventId") or "").strip()
+            if not product or not event_id:
+                complete=False
+                continue
+            key=f"{product}|{event_id}"
+            events.append(key)
+            counts[key]=counts.get(key,0)+1
+        if len(events)!=len(set(events)):
+            complete=False
+        rows.append((id(ticket),events,complete))
+    return {
+        ticket_id
+        for ticket_id,events,complete in rows
+        if complete and events and all(counts.get(event,0)==1 for event in events)
+    }
+
+
 def _settled_builder_lane_performance_index(tracker=None):
-    """Summarize distinct, settled flat-stake returns once per actual Builder lane."""
+    """Summarize full realized returns and event-independent outcomes per Builder lane."""
     global _SETTLED_BUILDER_LANE_PERFORMANCE_CACHE
     cacheable=tracker is None
     if cacheable and _SETTLED_BUILDER_LANE_PERFORMANCE_CACHE is not None:
         return _SETTLED_BUILDER_LANE_PERFORMANCE_CACHE
     payload=load(DATA/"odds_ticket_tracker.json",{}) if tracker is None else tracker
     unique_tickets,_=merge_ticket_history(payload)
-    source_rows=[("unique",x) for x in unique_tickets]
+    independent_ids=_event_independent_settled_ticket_object_ids(unique_tickets)
 
     unique={}
-    for source,ticket in source_rows:
+    for index,ticket in enumerate(unique_tickets):
+        if not isinstance(ticket,dict):
+            continue
         lane=str(ticket.get("primary_lane") or ticket.get("construction_lane") or "").strip()
         legs=ticket.get("legs") if isinstance(ticket.get("legs"),list) else []
         if not lane and legs:
@@ -1548,32 +1597,48 @@ def _settled_builder_lane_performance_index(tracker=None):
         if not math.isfinite(odds) or odds<=1.0:
             continue
         ticket_id=str(ticket.get("ticket_id") or "").strip()
-        identity=ticket_id or "|".join((
+        identity=ticket_id or str(ticket.get("snapshot_fingerprint") or "") or "|".join((
             lane,status,str(ticket.get("created_at") or ""),
-            str(ticket.get("last_settled_at") or ""),f"{odds:.6f}",
+            str(ticket.get("last_settled_at") or ""),f"{odds:.6f}",str(index),
         ))
-        # Prefer the current ticket row over its archived copy if both exist.
+        # Ticket history already prefers current rows over archive duplicates.
         unique.setdefault((lane,identity),ticket)
 
     grouped={}
     for (lane,_),ticket in unique.items():
-        row=grouped.setdefault(lane,{"settled_ticket_n":0,"wins":0,"losses":0,"flat_stake_net_units":0.0,"combined_odds_sum":0.0})
+        row=grouped.setdefault(lane,{
+            "settled_ticket_n":0,"wins":0,"losses":0,"flat_stake_net_units":0.0,
+            "combined_odds_sum":0.0,
+            "event_independent_settled_ticket_n":0,"event_independent_wins":0,
+            "event_independent_losses":0,"event_independent_flat_stake_net_units":0.0,
+            "event_independent_combined_odds_sum":0.0,
+        })
         odds=float(ticket["combined_odds"])
+        won=str(ticket.get("status") or "").upper()=="WON"
         row["settled_ticket_n"]+=1
         row["combined_odds_sum"]+=odds
-        if str(ticket.get("status") or "").upper()=="WON":
+        if won:
             row["wins"]+=1
             row["flat_stake_net_units"]+=odds-1.0
         else:
             row["losses"]+=1
             row["flat_stake_net_units"]-=1.0
+        if id(ticket) in independent_ids:
+            row["event_independent_settled_ticket_n"]+=1
+            row["event_independent_combined_odds_sum"]+=odds
+            if won:
+                row["event_independent_wins"]+=1
+                row["event_independent_flat_stake_net_units"]+=odds-1.0
+            else:
+                row["event_independent_losses"]+=1
+                row["event_independent_flat_stake_net_units"]-=1.0
     if cacheable:
         _SETTLED_BUILDER_LANE_PERFORMANCE_CACHE=grouped
     return grouped
 
 
 def _settled_builder_lane_performance_gate(lane,tracker=None,min_tickets=None,min_roi=None):
-    """Fail closed until this lane's own settled tickets demonstrate a positive return."""
+    """Require both realized lane profitability and an adequate event-independent sample."""
     lane=str(lane or "").strip()
     minimum_n=max(1,int(min_tickets if min_tickets is not None else RESULTS_FIRST_MIN_CONSTRUCTION_TICKETS))
     minimum_roi=float(min_roi if min_roi is not None else RESULTS_FIRST_MIN_EXPECTED_ROI)
@@ -1586,11 +1651,28 @@ def _settled_builder_lane_performance_gate(lane,tracker=None,min_tickets=None,mi
     roi=(net/n) if n else None
     hit_rate=(wins/n) if n else None
     avg_odds=(float(row.get("combined_odds_sum") or 0.0)/n) if n else None
-    eligible=n>=minimum_n and roi is not None and roi>=minimum_roi
+
+    independent_n=int(row.get("event_independent_settled_ticket_n") or 0)
+    independent_wins=int(row.get("event_independent_wins") or 0)
+    independent_losses=int(row.get("event_independent_losses") or 0)
+    independent_net=float(row.get("event_independent_flat_stake_net_units") or 0.0)
+    independent_roi=(independent_net/independent_n) if independent_n else None
+    independent_hit_rate=(independent_wins/independent_n) if independent_n else None
+    independent_avg_odds=(
+        float(row.get("event_independent_combined_odds_sum") or 0.0)/independent_n
+    ) if independent_n else None
+
+    eligible=(
+        n>=minimum_n and roi is not None and roi>=minimum_roi
+        and independent_n>=minimum_n and independent_roi is not None
+        and independent_roi>=minimum_roi
+    )
     reason=(
         None if eligible else
         "insufficient_settled_lane_ticket_sample" if n<minimum_n else
-        "settled_lane_ticket_roi_below_promotion_floor"
+        "insufficient_event_independent_settled_lane_sample" if independent_n<minimum_n else
+        "settled_lane_ticket_roi_below_promotion_floor" if roi is None or roi<minimum_roi else
+        "event_independent_settled_lane_roi_below_promotion_floor"
     )
     return {
         "lane":lane,
@@ -1603,10 +1685,20 @@ def _settled_builder_lane_performance_gate(lane,tracker=None,min_tickets=None,mi
         "average_combined_odds":round(avg_odds,6) if avg_odds is not None else None,
         "flat_stake_net_units":round(net,6),
         "flat_stake_roi":round(roi,6) if roi is not None else None,
+        "event_independent_settled_ticket_n":independent_n,
+        "event_independent_wins":independent_wins,
+        "event_independent_losses":independent_losses,
+        "event_independent_hit_rate":round(independent_hit_rate,6) if independent_hit_rate is not None else None,
+        "event_independent_average_combined_odds":round(independent_avg_odds,6) if independent_avg_odds is not None else None,
+        "event_independent_flat_stake_net_units":round(independent_net,6),
+        "event_independent_flat_stake_roi":round(independent_roi,6) if independent_roi is not None else None,
+        "overlapping_or_incomplete_ticket_n":max(0,n-independent_n),
         "minimum_settled_ticket_n":minimum_n,
+        "minimum_event_independent_settled_ticket_n":minimum_n,
         "minimum_flat_stake_roi":minimum_roi,
+        "minimum_event_independent_flat_stake_roi":minimum_roi,
         "source":"data/odds_ticket_tracker.json",
-        "policy":"No construction lane may become the primary batch unless its own settled ticket sample and realized flat-stake ROI pass the promotion gate.",
+        "policy":"Promotion requires the lane's full realized ROI and an adequate, profitable sample of settled tickets whose fixtures do not overlap any other settled Builder ticket. Overlapping tickets remain in the realized ROI but do not inflate independent evidence.",
     }
 
 
@@ -1623,18 +1715,26 @@ _UPCOMING_DESK_PENDING_EVENT_ID_CACHE=None
 _UPCOMING_DESK_PENDING_EVENT_ID_CACHE=None
 
 
-def _upcoming_desk_pending_event_ids(tracker=None):
-    """Return active eFootball events already sitting in any unsettled ticket leg.
+def _upcoming_desk_pending_event_ids(tracker=None, now=None, max_age_hours=6):
+    """Return unresolved events that can still affect a current ticket.
 
-    Inspect each leg independently: a parent accumulator can be LOST while its
-    other leg is still pending. Repeated Builder refreshes must not issue another
-    ticket using that same unresolved event.
+    Archived tickets remain in the immutable ledger, but an unresolved event
+    more than max_age_hours past kickoff no longer reserves a live Builder slot.
+    Unknown/missing kickoff times fail closed. Expiry never changes PENDING
+    settlement status or converts an unknown outcome into a win/loss.
     """
     global _UPCOMING_DESK_PENDING_EVENT_ID_CACHE
-    cacheable=tracker is None
+    cacheable=tracker is None and now is None and float(max_age_hours)==6.0
     if cacheable and _UPCOMING_DESK_PENDING_EVENT_ID_CACHE is not None:
         return _UPCOMING_DESK_PENDING_EVENT_ID_CACHE
     payload=load(DATA/"odds_ticket_tracker.json",{}) if tracker is None else tracker
+    now_dt=now or datetime.now(timezone.utc)
+    if not isinstance(now_dt,datetime):
+        raise TypeError("now must be a datetime when supplied")
+    if now_dt.tzinfo is None:
+        now_dt=now_dt.replace(tzinfo=timezone.utc)
+    now_dt=now_dt.astimezone(timezone.utc)
+    max_age=max(0.0,float(max_age_hours))
     event_ids=set()
     if not isinstance(payload,dict):
         if cacheable:
@@ -1653,12 +1753,23 @@ def _upcoming_desk_pending_event_ids(tracker=None):
             if status!="PENDING" and not (not status and parent_status=="PENDING"):
                 continue
             event_key=_fixture_event_key(leg,product=product)
-            if event_key:
-                event_ids.add(event_key)
+            if not event_key:
+                continue
+            raw_start=leg.get("start_time") or leg.get("startTime") or leg.get("start_time_iso")
+            if raw_start:
+                try:
+                    start_dt=datetime.fromisoformat(str(raw_start).replace("Z","+00:00"))
+                    if start_dt.tzinfo is None:
+                        start_dt=start_dt.replace(tzinfo=timezone.utc)
+                    if start_dt.astimezone(timezone.utc)+timedelta(hours=max_age)<now_dt:
+                        continue
+                except (TypeError,ValueError,OverflowError):
+                    pass
+            # Missing/invalid kickoffs retain a fail-closed hold.
+            event_ids.add(event_key)
     if cacheable:
         _UPCOMING_DESK_PENDING_EVENT_ID_CACHE=event_ids
     return event_ids
-
 
 def _exclude_pending_virtual_ticket_events(rows,pending_event_ids=None):
     """Remove Virtual legs already awaiting settlement in another paper ticket."""
@@ -4574,7 +4685,7 @@ def build_value_batches(candidates):
         desk_performance_gate.get("reason")
         if desk_diag["primary_lane_held"] else None
     )
-    if desk_options and desk_performance_gate.get("eligible") is True:
+    if desk_options:
         desk_options.sort(key=lambda option:min(
             _kickoff_timestamp(x) for x in option["rows"]
             if _kickoff_timestamp(x) is not None
@@ -4605,6 +4716,9 @@ def build_value_batches(candidates):
                 "avg_model_edge_percent":metrics["avg_model_edge_percent"],
                 "products":sorted({str(x.get("product") or "") for x in rows if x.get("product")}),
                 "primary_lane":UPCOMING_DESK_BATCH_LANE,
+                "promotion_allowed":desk_performance_gate.get("eligible") is True,
+                "promotion_hold_reason":desk_performance_gate.get("reason"),
+                "research_only_promotion_held":desk_performance_gate.get("eligible") is not True,
                 "paper_only":True,
                 "real_money_execution":False,
                 "conservative_expected_roi":round(float(option["roi"]),6),
@@ -4621,7 +4735,11 @@ def build_value_batches(candidates):
             "min_combined_odds":UPCOMING_DESK_MIN_COMBINED_ODDS,
             "max_combined_odds":UPCOMING_DESK_MAX_COMBINED_ODDS,
             "target_combined_odds":3.50,
-            "construction_priority":"upcoming_desk_research_first",
+            "construction_priority":(
+                "upcoming_desk_research_first"
+                if desk_performance_gate.get("eligible") is True
+                else "upcoming_desk_research_observation_only"
+            ),
             "desk_settled_performance_gate":desk_performance_gate,
             "priority_product":"active_efootball_upcoming_desk",
             "max_legs":UPCOMING_DESK_MAX_LEGS,
@@ -5438,7 +5556,17 @@ def main():
     primary=batches[0] if batches else None
     selected=list(primary.get("legs") or []) if primary else []
     combined=float(primary.get("combined_odds") or 1.0) if primary else 1.0
-    booking_info=_create_sportybet_booking_code(selected) if selected else {"status":"UNAVAILABLE","reason":"no_selected_batch"}
+    desk_promotion_held=(
+        primary is not None
+        and str(primary.get("primary_lane") or "")==UPCOMING_DESK_BATCH_LANE
+        and primary.get("promotion_allowed") is not True
+    )
+    booking_info=(
+        {"status":"UNAVAILABLE","reason":"settled_event_independent_promotion_gate_held",
+         "promotion_allowed":False,"paper_only":True,"real_money_execution":False}
+        if selected and desk_promotion_held else
+        (_create_sportybet_booking_code(selected) if selected else {"status":"UNAVAILABLE","reason":"no_selected_batch"})
+    )
     if primary is not None:
         primary["sportybet_booking"]=booking_info
     selection_diag={"participant_correlation_skips":0,"unique_participants":len({_p for leg in selected for _p in _participants(leg)}) if selected else 0}
