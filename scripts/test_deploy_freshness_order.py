@@ -339,10 +339,10 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             [],
             "Feeder workflows must hand off through Unified Upcoming; only Builder promotion may dispatch Pages after a manual board refresh.",
         )
-        self.assertIn("Dispatch Cloudflare Pages after post-build board publication and verify the exact Builder artifact", PROMOTION_WORKFLOW)
+        self.assertIn("Dispatch Cloudflare Pages after post-build board and Builder publication", PROMOTION_WORKFLOW)
     def test_builder_artifact_uses_promotion_instead_of_a_duplicate_board_push_trigger(self):
         # Builder publishes data/odds_builder.json and then dispatches the promotion
-        # workflow, which refreshes Unified Upcoming once. A direct push trigger here
+        # workflow, which refreshes Unified Upcoming and waits for the board-triggered Builder run. A direct push trigger here
         # creates a second board run and a competing Pages deployment for the same artifact.
         paths = workflow_push_paths(BOARD_WORKFLOW)
         self.assertNotIn("data/odds_builder.json", paths)
