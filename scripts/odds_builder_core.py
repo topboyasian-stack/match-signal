@@ -4756,6 +4756,7 @@ def build_value_batches(candidates):
                 else "upcoming_desk_research_observation_only"
             ),
             "desk_settled_performance_gate":desk_performance_gate,
+            "upcoming_desk_settled_performance_gate":desk_performance_gate,
             "priority_product":"active_efootball_upcoming_desk",
             "max_legs":UPCOMING_DESK_MAX_LEGS,
             "adaptive_leg_counts":[2,3,4],
