@@ -1,32 +1,32 @@
 {
-  "generated_at": "2026-10-22T23:23:14.648832+00:00",
+  "generated_at": "2026-10-22T23:25:15.268009+00:00",
   "status": "HEALTHY",
   "critical_issues": 0,
   "warning_issues": 0,
-  "info_issues": 1,
+  "info_issues": 0,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
       "status": "PASS",
-      "age_hours": 3.3,
+      "age_hours": 0.06,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.03,
+      "age_hours": 0.04,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 0.03,
+      "age_hours": 0.02,
       "threshold_hours": 4
     },
     {
       "engine": "unified_upcoming",
       "status": "PASS",
-      "age_hours": 0.0,
+      "age_hours": 0.01,
       "threshold_hours": 2
     },
     {
@@ -38,13 +38,13 @@
     {
       "engine": "tennis_forward_discovery",
       "status": "PASS",
-      "age_hours": 1.52,
+      "age_hours": 0.02,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 0.87,
+      "age_hours": 0.91,
       "threshold_hours": 0.5,
       "heartbeat_source": "unified_live_refresh"
     },
@@ -67,19 +67,13 @@
       }
     }
   ],
-  "issues": [
-    {
-      "code": "SELECTION_GATE_EMPTY",
-      "severity": "info",
-      "detail": "Current prediction feed exists but the selected-candidate layer returned zero qualified selections; no gate was weakened"
-    }
-  ],
+  "issues": [],
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
   "paper_only": true,
   "prediction_desk_filters": {
-    "past_kickoff_rows_hidden": 1,
+    "past_kickoff_rows_hidden": 0,
     "stale_live_flags_hidden": 0,
     "expired_settled_rows_hidden": 0,
-    "virtual_market_rows_held_for_kickoff_window": 673
+    "virtual_market_rows_held_for_kickoff_window": 659
   }
 }
