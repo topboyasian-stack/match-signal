@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/builder-production-promotion.yml"
+      - ".github/workflows/odds_builder.yml"
+      - "scripts/test_deploy_freshness_order.py"
   workflow_dispatch:
 
 permissions:
@@ -12,79 +14,181 @@ permissions:
   contents: read
 
 concurrency:
-  # A new queue identity lets the repaired promotion bypass jobs stuck in the old SHA matcher.
+  # Keep the repaired queue identity; never cancel an active production promotion.
   group: builder-production-promotion-v3
   cancel-in-progress: false
 
 jobs:
   promote:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 60
     steps:
       - name: Check out the repository for GitHub CLI context
         uses: actions/checkout@v4
         with:
           ref: main
 
-      - name: Dispatch Unified Upcoming and wait for successful board publication
-        id: board-refresh
+      - name: Refresh Unified Upcoming before rebuilding the Builder
+        id: pre-build-board
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          source_sha="$(git rev-parse HEAD)"
+          source_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
           dispatched_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           gh workflow run unified-upcoming.yml --ref main
           board_run_id=""
-          for attempt in $(seq 1 60); do
-            # Main may advance after checkout while refresh jobs commit their data.
-            # Accept the dispatched board run only if its SHA descends from source_sha.
-            board_candidate="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/unified-upcoming.yml/runs?branch=main&event=workflow_dispatch&per_page=20" --jq ".workflow_runs[] | select(.created_at >= \"$dispatched_at\") | [.id, .head_sha] | @tsv" | head -n 1)"
+          for attempt in $(seq 1 180); do
+            board_candidate="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/unified-upcoming.yml/runs?branch=main&event=workflow_dispatch&per_page=30" --jq ".workflow_runs[] | select(.created_at >= \"$dispatched_at\") | [.id, .head_sha] | @tsv" | head -n 1)"
             if [ -n "$board_candidate" ]; then
               candidate_id="$(printf '%s\n' "$board_candidate" | cut -f1)"
               candidate_sha="$(printf '%s\n' "$board_candidate" | cut -f2)"
-              merge_base="$(gh api "repos/$GITHUB_REPOSITORY/compare/$source_sha...$candidate_sha" --jq '.merge_base_commit.sha')"
+              merge_base="$(gh api "repos/$GITHUB_REPOSITORY/compare/$source_sha...$candidate_sha" --jq '.merge_base_commit.sha' 2>/dev/null || true)"
               if [ "$merge_base" = "$source_sha" ]; then
-                board_run_id="$candidate_id"
-                board_status="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$board_run_id" --jq '.status')"
+                board_status="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$candidate_id" --jq '.status')"
                 if [ "$board_status" = "completed" ]; then
-                  board_conclusion="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$board_run_id" --jq '.conclusion')"
+                  board_conclusion="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$candidate_id" --jq '.conclusion')"
                   if [ "$board_conclusion" != "success" ]; then
-                    echo "Unified Upcoming run $board_run_id completed with conclusion=$board_conclusion; refusing to deploy a stale board." >&2
+                    echo "Pre-build Unified Upcoming run $candidate_id failed: $board_conclusion" >&2
                     exit 1
                   fi
-                  echo "Unified Upcoming run $board_run_id (head $candidate_sha, based on $source_sha) completed successfully."
+                  board_run_id="$candidate_id"
                   break
                 fi
-              else
-                echo "Ignoring board run $candidate_id because $candidate_sha is not based on $source_sha yet."
               fi
             fi
-            if [ "$attempt" -eq 60 ]; then
-              echo "Timed out waiting for the dispatched Unified Upcoming workflow to complete." >&2
+            if [ "$attempt" -eq 180 ]; then
+              echo "Timed out waiting for a successful pre-build Unified Upcoming refresh." >&2
+              exit 1
+            fi
+            sleep 5
+          done
+          test -n "$board_run_id"
+          echo "Pre-build board run $board_run_id succeeded."
+
+      - name: Rebuild Odds Builder from the refreshed Desk
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          source_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
+          dispatched_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          gh workflow run odds_builder.yml --ref main -f skip_promotion=true
+          builder_run_id=""
+          for attempt in $(seq 1 180); do
+            builder_candidate="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/odds_builder.yml/runs?branch=main&event=workflow_dispatch&per_page=30" --jq ".workflow_runs[] | select(.created_at >= \"$dispatched_at\") | [.id, .head_sha] | @tsv" | head -n 1)"
+            if [ -n "$builder_candidate" ]; then
+              candidate_id="$(printf '%s\n' "$builder_candidate" | cut -f1)"
+              candidate_sha="$(printf '%s\n' "$builder_candidate" | cut -f2)"
+              merge_base="$(gh api "repos/$GITHUB_REPOSITORY/compare/$source_sha...$candidate_sha" --jq '.merge_base_commit.sha' 2>/dev/null || true)"
+              if [ "$merge_base" = "$source_sha" ]; then
+                builder_status="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$candidate_id" --jq '.status')"
+                if [ "$builder_status" = "completed" ]; then
+                  builder_conclusion="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$candidate_id" --jq '.conclusion')"
+                  if [ "$builder_conclusion" != "success" ]; then
+                    echo "Odds Builder run $candidate_id failed: $builder_conclusion" >&2
+                    exit 1
+                  fi
+                  builder_run_id="$candidate_id"
+                  break
+                fi
+              fi
+            fi
+            if [ "$attempt" -eq 180 ]; then
+              echo "Timed out waiting for the rebuilt Odds Builder." >&2
+              exit 1
+            fi
+            sleep 5
+          done
+          test -n "$builder_run_id"
+          builder_artifact_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits?path=data/odds_builder.json&per_page=10" --jq '.[0].sha')"
+          test -n "$builder_artifact_sha"
+          echo "Builder run $builder_run_id succeeded; latest artifact commit is $builder_artifact_sha."
+
+      - name: Publish the rebuilt Builder through Unified Upcoming
+        id: post-build-board
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          source_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
+          dispatched_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo "dispatched_at=$dispatched_at" >> "$GITHUB_OUTPUT"
+          gh workflow run unified-upcoming.yml --ref main
+          board_run_id=""
+          board_head_sha=""
+          for attempt in $(seq 1 180); do
+            board_candidate="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/unified-upcoming.yml/runs?branch=main&event=workflow_dispatch&per_page=30" --jq ".workflow_runs[] | select(.created_at >= \"$dispatched_at\") | [.id, .head_sha] | @tsv" | head -n 1)"
+            if [ -n "$board_candidate" ]; then
+              candidate_id="$(printf '%s\n' "$board_candidate" | cut -f1)"
+              candidate_sha="$(printf '%s\n' "$board_candidate" | cut -f2)"
+              merge_base="$(gh api "repos/$GITHUB_REPOSITORY/compare/$source_sha...$candidate_sha" --jq '.merge_base_commit.sha' 2>/dev/null || true)"
+              if [ "$merge_base" = "$source_sha" ]; then
+                board_status="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$candidate_id" --jq '.status')"
+                if [ "$board_status" = "completed" ]; then
+                  board_conclusion="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$candidate_id" --jq '.conclusion')"
+                  if [ "$board_conclusion" != "success" ]; then
+                    echo "Post-build Unified Upcoming run $candidate_id failed: $board_conclusion" >&2
+                    exit 1
+                  fi
+                  board_run_id="$candidate_id"
+                  board_head_sha="$candidate_sha"
+                  break
+                fi
+              fi
+            fi
+            if [ "$attempt" -eq 180 ]; then
+              echo "Timed out waiting for the post-build Unified Upcoming publication." >&2
               exit 1
             fi
             sleep 5
           done
           test -n "$board_run_id"
           echo "board_run_id=$board_run_id" >> "$GITHUB_OUTPUT"
-          echo "board_head_sha=$candidate_sha" >> "$GITHUB_OUTPUT"
-          echo "Verified successful board refresh before Pages promotion."
+          echo "board_head_sha=$board_head_sha" >> "$GITHUB_OUTPUT"
+          echo "Post-build board run $board_run_id succeeded at $board_head_sha."
 
-      - name: Dispatch Pages once for manually refreshed board and verify the published artifact
+      - name: Dispatch Cloudflare Pages after post-build board publication and verify the exact Builder artifact
         env:
           GH_TOKEN: ${{ github.token }}
-          BOARD_RUN_ID: ${{ steps.board-refresh.outputs.board_run_id }}
-          BOARD_HEAD_SHA: ${{ steps.board-refresh.outputs.board_head_sha }}
+          BOARD_RUN_ID: ${{ steps.post-build-board.outputs.board_run_id }}
+          BOARD_HEAD_SHA: ${{ steps.post-build-board.outputs.board_head_sha }}
         run: |
           set -euo pipefail
           test -n "$BOARD_RUN_ID"
           test -n "$BOARD_HEAD_SHA"
-          dispatched_at="$(python -c 'from datetime import datetime, timezone; print(datetime.now(timezone.utc).isoformat())')"
-          dispatched_epoch_us="$(python -c 'from datetime import datetime; import sys; print(int(datetime.fromisoformat(sys.argv[1]).timestamp() * 1000000))' "$dispatched_at")"
+          dispatched_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          dispatched_epoch_us="$(python -c 'from datetime import datetime; import sys; print(int(datetime.fromisoformat(sys.argv[1].replace("Z", "+00:00")).timestamp() * 1000000))' "$dispatched_at")"
           gh workflow run cloudflare-pages.yml --ref main
+          deploy_run_id=""
+          for attempt in $(seq 1 180); do
+            deploy_candidate="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/cloudflare-pages.yml/runs?branch=main&event=workflow_dispatch&per_page=30" --jq ".workflow_runs[] | select(.created_at >= \"$dispatched_at\") | [.id, .head_sha] | @tsv" | head -n 1)"
+            if [ -n "$deploy_candidate" ]; then
+              candidate_id="$(printf '%s\n' "$deploy_candidate" | cut -f1)"
+              candidate_sha="$(printf '%s\n' "$deploy_candidate" | cut -f2)"
+              merge_base="$(gh api "repos/$GITHUB_REPOSITORY/compare/$BOARD_HEAD_SHA...$candidate_sha" --jq '.merge_base_commit.sha' 2>/dev/null || true)"
+              if [ "$merge_base" = "$BOARD_HEAD_SHA" ]; then
+                deploy_status="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$candidate_id" --jq '.status')"
+                if [ "$deploy_status" = "completed" ]; then
+                  deploy_conclusion="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$candidate_id" --jq '.conclusion')"
+                  if [ "$deploy_conclusion" != "success" ]; then
+                    echo "Cloudflare Pages run $candidate_id failed: $deploy_conclusion" >&2
+                    exit 1
+                  fi
+                  deploy_run_id="$candidate_id"
+                  break
+                fi
+              fi
+            fi
+            if [ "$attempt" -eq 180 ]; then
+              echo "Timed out waiting for a successful Cloudflare Pages run after post-build board $BOARD_RUN_ID." >&2
+              exit 1
+            fi
+            sleep 5
+          done
+          test -n "$deploy_run_id"
+
           for attempt in $(seq 1 60); do
-            # A deploy verification artifact is committed only after production smoke tests pass.
             encoded="$(gh api "repos/$GITHUB_REPOSITORY/contents/DEPLOY-VERIFY-CLOUDFLARE.json?ref=main" --jq '.content' 2>/dev/null || true)"
             if [ -n "$encoded" ]; then
               payload="$(printf '%s' "$encoded" | base64 --decode 2>/dev/null || true)"
@@ -95,13 +199,13 @@ jobs:
                 verified_epoch_us="$(python -c 'from datetime import datetime; import sys; print(int(datetime.fromisoformat(sys.argv[1].replace("Z", "+00:00")).timestamp() * 1000000))' "$verification_time" 2>/dev/null || echo 0)"
                 merge_base="$(gh api "repos/$GITHUB_REPOSITORY/compare/$BOARD_HEAD_SHA...$verification_source" --jq '.merge_base_commit.sha' 2>/dev/null || true)"
                 if [ "$verified_epoch_us" -ge "$dispatched_epoch_us" ] && [ "$merge_base" = "$BOARD_HEAD_SHA" ]; then
-                  echo "Production verification artifact $verification_status for source $verification_source was recorded after the Pages dispatch and descends from board run $BOARD_RUN_ID."
+                  echo "Cloudflare verification $verification_status for source $verification_source confirms post-build board $BOARD_RUN_ID and Builder artifact freshness."
                   exit 0
                 fi
               fi
             fi
             if [ "$attempt" -eq 60 ]; then
-              echo "Timed out waiting for a fresh successful DEPLOY-VERIFY-CLOUDFLARE.json after board run $BOARD_RUN_ID." >&2
+              echo "Cloudflare deployment succeeded but no matching fresh production verification record was found." >&2
               exit 1
             fi
             sleep 5
