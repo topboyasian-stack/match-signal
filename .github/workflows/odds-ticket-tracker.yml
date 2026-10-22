@@ -26,7 +26,8 @@ permissions:
 
 concurrency:
   group: match-signal-odds-ticket-tracker
-  cancel-in-progress: true
+  # Settlement backfill can take several minutes; do not cancel it every time the 5-minute schedule fires.
+  cancel-in-progress: false
 
 jobs:
   track:
