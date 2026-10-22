@@ -84,6 +84,16 @@ class BuilderRefreshDecisionTests(unittest.TestCase):
         self.assertEqual(result["reason"], "builder_artifact_fresh")
         self.assertEqual(result["artifact_age_minutes"], 0.0)
 
+    def test_recent_failed_run_does_not_suppress_stale_artifact_retry(self):
+        result = evaluate_runs(
+            [run(2, conclusion="failure", run_id=907)],
+            NOW,
+            artifact_generated_at=artifact(BUILDER_ARTIFACT_MAX_AGE_MINUTES + 12),
+        )
+        self.assertTrue(result["dispatch"])
+        self.assertEqual(result["reason"], "builder_artifact_stale")
+        self.assertEqual(result["last_run_id"], 907)
+
     def test_old_artifact_not_hidden_by_a_recent_failed_run(self):
         result = evaluate_runs([run(12, conclusion="failure")], NOW, artifact_generated_at=artifact(BUILDER_ARTIFACT_MAX_AGE_MINUTES + 8))
         self.assertTrue(result["dispatch"])
