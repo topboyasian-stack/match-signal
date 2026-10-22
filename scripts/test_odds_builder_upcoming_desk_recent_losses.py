@@ -528,7 +528,7 @@ class UpcomingDeskSettledPromotionGateTests(unittest.TestCase):
             ],
         }
         pending = _upcoming_desk_pending_event_ids(tracker=tracker, now=now)
-        self.assertEqual(pending, {"still-live-event", "unknown-time-event"})
+        self.assertEqual(pending, {"event:efootball_gt:still-live-event", "event:efootball_gt:unknown-time-event"})
         # Expiring a hold never changes the underlying unknown settlement.
         self.assertEqual(tracker["archived_tickets"][0]["legs"][0]["status"], "PENDING")
 
