@@ -172,6 +172,16 @@ def evaluate_runs(
     if parsed_runs:
         last_started_at, last_run = max(parsed_runs, key=lambda item: item[0])
         run_age = max(0.0, (now - last_started_at).total_seconds() / 60.0)
+        last_conclusion = str(last_run.get("conclusion") or "").lower()
+        if run_age < RECENT_RUN_COOLDOWN_MINUTES and last_conclusion == "success":
+            return {
+                "dispatch": False,
+                "reason": "recent_successful_builder_run_cooldown",
+                "last_run_id": last_run.get("databaseId"),
+                "last_run_status": last_run.get("status"),
+                "run_age_minutes": round(run_age, 2),
+                **artifact_fields,
+            }
     else:
         last_run = None
         run_age = None
