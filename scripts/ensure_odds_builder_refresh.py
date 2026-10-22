@@ -243,6 +243,11 @@ def latest_upcoming_board_generated_at() -> str | None:
     return str(value) if value else None
 
 
+def builder_dispatch_command() -> list[str]:
+    """Board-triggered refreshes must not recursively start a promotion."""
+    return ["gh", "workflow", "run", BUILDER_WORKFLOW, "--ref", "main", "-f", "skip_promotion=true"]
+
+
 def main() -> int:
     repo = os.environ.get("GITHUB_REPOSITORY", "").strip()
     if not repo:
@@ -286,7 +291,7 @@ def main() -> int:
         return 0
 
     dispatch = subprocess.run(
-        ["gh", "workflow", "run", BUILDER_WORKFLOW, "--ref", "main"],
+        builder_dispatch_command(),
         capture_output=True,
         text=True,
         check=False,
