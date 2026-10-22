@@ -18,6 +18,7 @@ LOGO_WORKFLOW = (ROOT / ".github/workflows/sync-club-logos.yml").read_text(encod
 WATCHDOG_WORKFLOW = (ROOT / ".github/workflows/automation_watchdog.yml").read_text(encoding="utf-8")
 PROMOTION_WORKFLOW = (ROOT / ".github/workflows/builder-production-promotion.yml").read_text(encoding="utf-8")
 BUILDER_WORKFLOW = (ROOT / ".github/workflows/odds_builder.yml").read_text(encoding="utf-8")
+ENSURE_BUILDER_REFRESH = (ROOT / "scripts/ensure_odds_builder_refresh.py").read_text(encoding="utf-8")
 
 
 def workflow_push_paths(source: str) -> set[str]:
@@ -279,16 +280,19 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         missing = sorted(required_inputs - board_paths)
         self.assertEqual(missing, [], f"Deployable inputs bypass the Unified board workflow: {missing}")
 
-    def test_builder_promotion_refreshes_desk_rebuilds_builder_then_publishes_exact_artifact(self):
+    def test_builder_promotion_waits_for_each_board_triggered_builder_before_pages(self):
         self.assertIn("uses: actions/checkout@v4", PROMOTION_WORKFLOW)
         self.assertIn("group: builder-production-promotion-v3", PROMOTION_WORKFLOW)
         self.assertIn("timeout-minutes: 60", PROMOTION_WORKFLOW)
         self.assertIn("Refresh Unified Upcoming before rebuilding the Builder", PROMOTION_WORKFLOW)
-        self.assertIn("Rebuild Odds Builder from the refreshed Desk", PROMOTION_WORKFLOW)
+        self.assertIn("Wait for Builder refresh triggered by the pre-build board", PROMOTION_WORKFLOW)
         self.assertIn("Publish the rebuilt Builder through Unified Upcoming", PROMOTION_WORKFLOW)
-        self.assertIn("Dispatch Cloudflare Pages after post-build board publication and verify the exact Builder artifact", PROMOTION_WORKFLOW)
+        self.assertIn("Wait for Builder refresh triggered by the post-build board", PROMOTION_WORKFLOW)
+        self.assertIn("Dispatch Cloudflare Pages after post-build board and Builder publication", PROMOTION_WORKFLOW)
         self.assertIn("gh workflow run unified-upcoming.yml --ref main", PROMOTION_WORKFLOW)
-        self.assertIn("gh workflow run odds_builder.yml --ref main -f skip_promotion=true", PROMOTION_WORKFLOW)
+        self.assertNotIn("gh workflow run odds_builder.yml", PROMOTION_WORKFLOW)
+        self.assertIn("builder_dispatch_command()", ENSURE_BUILDER_REFRESH)
+        self.assertIn('"skip_promotion=true"', ENSURE_BUILDER_REFRESH)
         self.assertIn("gh workflow run cloudflare-pages.yml --ref main", PROMOTION_WORKFLOW)
         self.assertIn("DEPLOY-VERIFY-CLOUDFLARE.json?ref=main", PROMOTION_WORKFLOW)
         self.assertIn("Immutable deployment /data/odds_builder.json HTTP", PAGES_WORKFLOW)
@@ -296,13 +300,16 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn("skip_promotion:", BUILDER_WORKFLOW)
         self.assertIn("inputs.skip_promotion != true", BUILDER_WORKFLOW)
         pre_board = PROMOTION_WORKFLOW.index("Refresh Unified Upcoming before rebuilding the Builder")
-        builder = PROMOTION_WORKFLOW.index("gh workflow run odds_builder.yml --ref main -f skip_promotion=true")
+        pre_builder = PROMOTION_WORKFLOW.index("Wait for Builder refresh triggered by the pre-build board")
         post_board = PROMOTION_WORKFLOW.index("Publish the rebuilt Builder through Unified Upcoming")
-        pages = PROMOTION_WORKFLOW.index("Dispatch Cloudflare Pages after post-build board publication and verify the exact Builder artifact")
-        self.assertLess(pre_board, builder)
-        self.assertLess(builder, post_board)
-        self.assertLess(post_board, pages)
-        self.assertNotIn("GH_TOKEN: " + chr(92) + "${{ github.token }}", PROMOTION_WORKFLOW)
+        post_builder = PROMOTION_WORKFLOW.index("Wait for Builder refresh triggered by the post-build board")
+        pages = PROMOTION_WORKFLOW.index("Dispatch Cloudflare Pages after post-build board and Builder publication")
+        self.assertLess(pre_board, pre_builder)
+        self.assertLess(pre_builder, post_board)
+        self.assertLess(post_board, post_builder)
+        self.assertLess(post_builder, pages)
+        self.assertNotIn("GH_TOKEN: " + chr(92) + chr(36) + "{{ github.token }}", PROMOTION_WORKFLOW)
+
     def test_builder_explicitly_dispatches_promotion_after_artifact_publish(self):
         publish_step = BUILDER_WORKFLOW.find("      - name: Commit generated accumulator artifact")
         dispatch_step = BUILDER_WORKFLOW.find("      - name: Dispatch production promotion after Builder artifact publish")
