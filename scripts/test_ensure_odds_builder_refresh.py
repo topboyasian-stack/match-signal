@@ -56,10 +56,10 @@ class BuilderRefreshDecisionTests(unittest.TestCase):
         self.assertEqual(result["reason"], "builder_artifact_stale")
         self.assertEqual(result["artifact_age_minutes"], BUILDER_ARTIFACT_MAX_AGE_MINUTES + 4)
 
-    def test_stale_artifact_obeys_short_recent_run_cooldown(self):
+    def test_stale_artifact_dispatches_after_recent_completed_run(self):
         result = evaluate_runs([run(RECENT_RUN_COOLDOWN_MINUTES - 1)], NOW, artifact_generated_at=artifact(BUILDER_ARTIFACT_MAX_AGE_MINUTES + 10))
-        self.assertFalse(result["dispatch"])
-        self.assertEqual(result["reason"], "recent_builder_run_cooldown")
+        self.assertTrue(result["dispatch"])
+        self.assertEqual(result["reason"], "builder_artifact_stale")
 
     def test_stale_artifact_does_not_duplicate_active_run(self):
         result = evaluate_runs([run(30, "in_progress", 900)], NOW, artifact_generated_at=artifact(BUILDER_ARTIFACT_MAX_AGE_MINUTES + 10))
@@ -89,6 +89,17 @@ class BuilderRefreshDecisionTests(unittest.TestCase):
         self.assertTrue(result["dispatch"])
         self.assertEqual(result["reason"], "builder_artifact_stale")
 
+
+    def test_newer_board_and_stale_artifact_dispatch_after_recent_failed_builder(self):
+        result = evaluate_runs(
+            [run(2, conclusion="failure", run_id=906)],
+            NOW,
+            artifact_generated_at=artifact(BUILDER_ARTIFACT_MAX_AGE_MINUTES + 16),
+            upstream_board_generated_at=artifact(3),
+        )
+        self.assertTrue(result["dispatch"])
+        self.assertEqual(result["reason"], "upcoming_board_newer_and_builder_stale_or_failed")
+        self.assertEqual(result["last_run_id"], 906)
 
     def test_newer_upcoming_board_dispatches_when_builder_cycle_was_missed(self):
         result = evaluate_runs(
