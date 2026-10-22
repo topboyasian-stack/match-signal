@@ -297,6 +297,8 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn("DEPLOY-VERIFY-CLOUDFLARE.json?ref=main", PROMOTION_WORKFLOW)
         self.assertIn("Immutable deployment /data/odds_builder.json HTTP", PAGES_WORKFLOW)
         self.assertIn("Cloudflare production hostname did not publish the exact checked-out Odds Builder artifact", PAGES_WORKFLOW)
+        self.assertIn("Odds Builder artifact predates the checked-out Unified Upcoming board", PAGES_WORKFLOW)
+        self.assertIn("Immutable deployment Upcoming board does not match the checked-out board artifact", PAGES_WORKFLOW)
         self.assertIn("skip_promotion:", BUILDER_WORKFLOW)
         self.assertIn("inputs.skip_promotion != true", BUILDER_WORKFLOW)
         pre_board = PROMOTION_WORKFLOW.index("Refresh Unified Upcoming before rebuilding the Builder")
