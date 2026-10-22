@@ -1740,8 +1740,23 @@ def _upcoming_desk_pending_event_ids(tracker=None, now=None, max_age_hours=6):
         if cacheable:
             _UPCOMING_DESK_PENDING_EVENT_ID_CACHE=event_ids
         return event_ids
+    # Current active tickets must continue holding their unresolved fixtures,
+    # even after kickoff, because settlement recovery may still be in progress.
+    # The six-hour expiry applies only to archived rows; rows without stable ticket
+    # identity fail closed rather than being mistaken for archived history.
+    current_ticket_keys=set()
+    current_rows=payload.get("tickets") if isinstance(payload.get("tickets"),list) else []
+    for current in current_rows:
+        if not isinstance(current,dict):
+            continue
+        for field in ("ticket_id","snapshot_fingerprint"):
+            key=str(current.get(field) or "").strip()
+            if key:
+                current_ticket_keys.add(key)
     tickets,_=merge_ticket_history(payload)
     for ticket in tickets:
+        ticket_key=str(ticket.get("ticket_id") or ticket.get("snapshot_fingerprint") or "").strip()
+        is_current_ticket=bool(ticket_key and ticket_key in current_ticket_keys)
         parent_status=str(ticket.get("status") or "").upper()
         for leg in ticket.get("legs") or []:
             if not isinstance(leg,dict):
@@ -1761,7 +1776,7 @@ def _upcoming_desk_pending_event_ids(tracker=None, now=None, max_age_hours=6):
                     start_dt=datetime.fromisoformat(str(raw_start).replace("Z","+00:00"))
                     if start_dt.tzinfo is None:
                         start_dt=start_dt.replace(tzinfo=timezone.utc)
-                    if start_dt.astimezone(timezone.utc)+timedelta(hours=max_age)<now_dt:
+                    if not is_current_ticket and start_dt.astimezone(timezone.utc)+timedelta(hours=max_age)<now_dt:
                         continue
                 except (TypeError,ValueError,OverflowError):
                     pass
@@ -4750,6 +4765,7 @@ def build_value_batches(candidates):
             "min_exact_line_walkforward_hit_rate":UPCOMING_DESK_MIN_WALKFORWARD_HIT_RATE,
             "max_kickoff_span_minutes":MAX_BATCH_KICKOFF_SPAN_MINUTES,
             "desk_research_diagnostics":desk_diag,
+            "upcoming_desk_research_diagnostics":desk_diag,
             "ticket_probability_method":desk_diag["ticket_probability_method"],
             "ticket_probability_calibrated_from_settled_tickets":False,
             "uses_legacy_efootball_ticket_gamma":False,
