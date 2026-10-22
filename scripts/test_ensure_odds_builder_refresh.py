@@ -10,6 +10,7 @@ from ensure_odds_builder_refresh import (
     RECENT_RUN_COOLDOWN_MINUTES,
     UPCOMING_BOARD_REFRESH_MIN_INTERVAL_MINUTES,
     evaluate_runs,
+    builder_dispatch_command,
 )
 
 NOW = datetime(2026, 10, 20, 0, 30, tzinfo=timezone.utc)
@@ -37,6 +38,12 @@ def artifact(age_minutes: int) -> str:
 
 
 class BuilderRefreshDecisionTests(unittest.TestCase):
+    def test_board_triggered_builder_skips_recursive_promotion(self):
+        self.assertEqual(
+            builder_dispatch_command(),
+            ["gh", "workflow", "run", "odds_builder.yml", "--ref", "main", "-f", "skip_promotion=true"],
+        )
+
     def test_fresh_artifact_skips_even_when_run_history_is_old(self):
         result = evaluate_runs([run(60)], NOW, artifact_generated_at=artifact(BUILDER_ARTIFACT_MAX_AGE_MINUTES - 1))
         self.assertFalse(result["dispatch"])
