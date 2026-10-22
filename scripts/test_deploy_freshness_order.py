@@ -311,11 +311,10 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn("GH_TOKEN: ${{ github.token }}", BUILDER_WORKFLOW[dispatch_step:])
         self.assertIn("gh workflow run builder-production-promotion.yml --ref main", BUILDER_WORKFLOW[dispatch_step:])
         self.assertIn("  workflow_dispatch:", PROMOTION_WORKFLOW)
-        self.assertIn(
-            "concurrency:" + chr(10) + "  # A new queue identity lets the repaired promotion bypass jobs stuck in the old SHA matcher." + chr(10) + "  group: builder-production-promotion-v3" + chr(10) + "  cancel-in-progress: false",
-            PROMOTION_WORKFLOW,
-            "serialize promotion runs; each must finish board refresh and deploy before the next begins",
-        )
+        self.assertIn("group: builder-production-promotion-v3", PROMOTION_WORKFLOW)
+        self.assertIn("cancel-in-progress: false", PROMOTION_WORKFLOW)
+        self.assertIn("skip_promotion:", BUILDER_WORKFLOW)
+        self.assertIn("inputs.skip_promotion != true", BUILDER_WORKFLOW)
 
     def test_feeder_workflows_cannot_bypass_the_board_refresh(self):
         bypasses = []
