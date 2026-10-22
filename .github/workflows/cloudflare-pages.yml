@@ -352,9 +352,19 @@ jobs:
           const assets = ['/api/sportybet-virtual','/api/sportybet-darts','/api/sportybet-table-tennis','/api/virtual-lab-history','/expansion.js', '/expansion-odds-builder.js', '/live-analysis.js', '/live-data-worker.js', '/virtual-lab-app.js', '/virtual-lab-confirmed-watch.js', '/virtual-lab.css', '/_redirects', '/data/predictions.json', '/data/unified_upcoming.json', '/data/selection_candidates.json', '/data/expansion_status.json', '/data/odds_builder.json', '/data/odds_ticket_tracker.json', '/data/system_health.json', '/data/tennis_forward_status.json', '/data/prediction_desk_health.json', '/data/results_first_evidence_report.json', '/data/virtual_lab_live.json','/data/virtual_lab_model_eval.json','/data/virtual_lab_eligibility.json','/data/virtual_lab_participants/registry.json','/data/virtual_lab_participant_lifecycle.json','/data/virtual_lab_participants/efootball_confirmed_watch.json','/data/efootball_desk_prediction_history.json.gz','/data/club-logo-registry.json','/sport-hubs.js','/league-logos.js','/sport-hubs.css','/ms-design-system.css','/core-workspaces-design.css','/qualified-best-design.css','/sport-hubs-design.css','/independent-sport-design.css','/odds-builder-design.css','/reports-design.css','/virtual-lab-terminal.css','/workspace-ui.js','/workspace-ui.css','/analyst.js'];
           const failures = [];
           const sourceBuilderArtifact = JSON.parse(readFileSync('data/odds_builder.json', 'utf8'));
+          const sourceBoardArtifact = JSON.parse(readFileSync('data/unified_upcoming.json', 'utf8'));
           const expectedBuilderGeneratedAt = String(sourceBuilderArtifact.generated_at || '');
-          if (!expectedBuilderGeneratedAt || !Number.isFinite(Date.parse(expectedBuilderGeneratedAt))) {
+          const expectedBoardGeneratedAt = String(sourceBoardArtifact.generated_at || sourceBoardArtifact.updated_at || '');
+          const expectedBuilderTimestamp = Date.parse(expectedBuilderGeneratedAt);
+          const expectedBoardTimestamp = Date.parse(expectedBoardGeneratedAt);
+          if (!expectedBuilderGeneratedAt || !Number.isFinite(expectedBuilderTimestamp)) {
             failures.push('Checked-out data/odds_builder.json has no valid generated_at timestamp.');
+          }
+          if (!expectedBoardGeneratedAt || !Number.isFinite(expectedBoardTimestamp)) {
+            failures.push('Checked-out data/unified_upcoming.json has no valid generated_at/updated_at timestamp.');
+          }
+          if (Number.isFinite(expectedBuilderTimestamp) && Number.isFinite(expectedBoardTimestamp) && expectedBuilderTimestamp < expectedBoardTimestamp) {
+            failures.push('Odds Builder artifact predates the checked-out Unified Upcoming board.');
           }
           // Derive the Builder's page contract from this exact checkout. Hard-coded
           // cache/build markers caused every deployment to fail after a valid UI update.
@@ -437,6 +447,20 @@ jobs:
                 if (String(deployedBuilder.status || '') !== String(sourceBuilderArtifact.status || '') || Number(deployedBuilder.batch_count || 0) !== Number(sourceBuilderArtifact.batch_count || 0)) {
                   failures.push('Immutable deployment Odds Builder status/batch count does not match the checked-out artifact.');
                 }
+                const {r:boardResponse,body:boardBody} = await getFrom(deploymentBase, '/data/unified_upcoming.json');
+                if (!boardResponse.ok) failures.push('Immutable deployment /data/unified_upcoming.json HTTP '+boardResponse.status);
+                else {
+                  const deployedBoard = JSON.parse(boardBody);
+                  const deployedBoardGeneratedAt = String(deployedBoard.generated_at || deployedBoard.updated_at || '');
+                  if (deployedBoardGeneratedAt !== expectedBoardGeneratedAt) {
+                    failures.push('Immutable deployment Upcoming board does not match the checked-out board artifact.');
+                  }
+                  const deployedBuilderTimestamp = Date.parse(String(deployedBuilder.generated_at || ''));
+                  const deployedBoardTimestamp = Date.parse(deployedBoardGeneratedAt);
+                  if (Number.isFinite(deployedBuilderTimestamp) && Number.isFinite(deployedBoardTimestamp) && deployedBuilderTimestamp < deployedBoardTimestamp) {
+                    failures.push('Immutable deployment Odds Builder artifact predates its Upcoming board.');
+                  }
+                }
               }
             } catch(e) { failures.push('Immutable deployment /data/odds_builder.json '+String(e.message || e)); }
           }
@@ -479,9 +503,20 @@ jobs:
                 const sameTimestamp = String(currentBuilder.generated_at || '') === expectedBuilderGeneratedAt;
                 const sameStatus = String(currentBuilder.status || '') === String(sourceBuilderArtifact.status || '');
                 const sameBatchCount = Number(currentBuilder.batch_count || 0) === Number(sourceBuilderArtifact.batch_count || 0);
-                if (sameTimestamp && sameStatus && sameBatchCount) {
+                const {r:boardResponse,body:boardBody} = await getFrom(base, '/data/unified_upcoming.json');
+                let boardMatches = false;
+                let builderNotOlderThanBoard = false;
+                if (boardResponse.ok) {
+                  const currentBoard = JSON.parse(boardBody);
+                  const currentBoardGeneratedAt = String(currentBoard.generated_at || currentBoard.updated_at || '');
+                  boardMatches = currentBoardGeneratedAt === expectedBoardGeneratedAt;
+                  const currentBuilderTimestamp = Date.parse(String(currentBuilder.generated_at || ''));
+                  const currentBoardTimestamp = Date.parse(currentBoardGeneratedAt);
+                  builderNotOlderThanBoard = Number.isFinite(currentBuilderTimestamp) && Number.isFinite(currentBoardTimestamp) && currentBuilderTimestamp >= currentBoardTimestamp;
+                }
+                if (sameTimestamp && sameStatus && sameBatchCount && boardMatches && builderNotOlderThanBoard) {
                   productionBuilderFresh = true;
-                  console.log('Cloudflare production hostname serves the exact checked-out Odds Builder artifact: '+expectedBuilderGeneratedAt+' ('+currentBuilder.status+', '+currentBuilder.batch_count+' batches).');
+                  console.log('Cloudflare production hostname serves the exact checked-out Builder and Upcoming board artifacts: Builder '+expectedBuilderGeneratedAt+', board '+expectedBoardGeneratedAt+'.');
                   break;
                 }
                 console.log('Production Odds Builder has not propagated the checked-out artifact yet (attempt '+attempt+'/6): expected '+expectedBuilderGeneratedAt+', received '+String(currentBuilder.generated_at || 'missing'));
