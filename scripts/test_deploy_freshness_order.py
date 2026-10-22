@@ -302,7 +302,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertLess(pre_board, builder)
         self.assertLess(builder, post_board)
         self.assertLess(post_board, pages)
-        self.assertNotIn("GH_TOKEN: \${{ github.token }}", PROMOTION_WORKFLOW)
+        self.assertNotIn("GH_TOKEN: " + chr(92) + "${{ github.token }}", PROMOTION_WORKFLOW)
     def test_builder_explicitly_dispatches_promotion_after_artifact_publish(self):
         publish_step = BUILDER_WORKFLOW.find("      - name: Commit generated accumulator artifact")
         dispatch_step = BUILDER_WORKFLOW.find("      - name: Dispatch production promotion after Builder artifact publish")
