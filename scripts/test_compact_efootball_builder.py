@@ -634,7 +634,12 @@ class CompactEfootballBuilderTests(unittest.TestCase):
             }),
         ):
             batches,built,diag=builder.build_value_batches(rows)
-        self.assertEqual(batches,[])
+        self.assertEqual(len(batches),1,"a held lane should keep collecting only gate-qualified paper research")
+        self.assertFalse(batches[0]["promotion_allowed"])
+        self.assertTrue(batches[0]["research_only_promotion_held"])
+        self.assertEqual(batches[0]["promotion_hold_reason"],"settled_lane_ticket_roi_below_promotion_floor")
+        self.assertTrue(batches[0]["paper_only"])
+        self.assertFalse(batches[0]["real_money_execution"])
         self.assertFalse(diag["upcoming_desk_settled_performance_gate"]["eligible"])
         self.assertEqual(diag["upcoming_desk_settled_performance_gate"]["reason"],"settled_lane_ticket_roi_below_promotion_floor")
 
