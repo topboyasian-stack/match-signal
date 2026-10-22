@@ -4756,6 +4756,7 @@ def build_value_batches(candidates):
                 else "upcoming_desk_research_observation_only"
             ),
             "desk_settled_performance_gate":desk_performance_gate,
+            "upcoming_desk_settled_performance_gate":desk_performance_gate,
             "priority_product":"active_efootball_upcoming_desk",
             "max_legs":UPCOMING_DESK_MAX_LEGS,
             "adaptive_leg_counts":[2,3,4],
@@ -4928,6 +4929,7 @@ def build_value_batches(candidates):
                     "construction_objective":"provide multiple independent paper choices from one fresh scan; prefer the largest safe 2–7-leg shape without forcing weak legs"
                 })
             return mixed_batches,built,{
+                "upcoming_desk_settled_performance_gate":desk_performance_gate,
                 "batch_count":len(mixed_batches),
                 "max_batches":min(4,MAX_BATCHES),
                 "disjoint":True,
@@ -5027,6 +5029,7 @@ def build_value_batches(candidates):
                     "construction_objective":"maximize whole-ticket VFootball event-holdout probability subject to the active 2.70+ odds and calibrated ROI gates"
                 })
             return vfootball_batches,built,{
+                "upcoming_desk_settled_performance_gate":desk_performance_gate,
                 "batch_count":len(vfootball_batches),
                 "max_batches":min(4,MAX_BATCHES),
                 "disjoint":True,
@@ -5105,6 +5108,7 @@ def build_value_batches(candidates):
                     "construction_objective":"maximize isolated streak-break confidence and calibrated whole-ticket probability while preserving the existing 2.70x and +2% ROI gates"
                 })
             return phase2_batches,built,{
+                "upcoming_desk_settled_performance_gate":desk_performance_gate,
                 "batch_count":len(phase2_batches),
                 "max_batches":min(4,MAX_BATCHES),
                 "disjoint":True,
@@ -5178,6 +5182,7 @@ def build_value_batches(candidates):
                     "construction_objective":"prefer the largest safe 2–4-leg construction without adding a weak leg for odds"
                 })
             return high_batches,built,{
+                "upcoming_desk_settled_performance_gate":desk_performance_gate,
                 "batch_count":len(high_batches),
                 "max_batches":min(4,MAX_BATCHES),
                 "disjoint":True,
@@ -5318,6 +5323,7 @@ def build_value_batches(candidates):
                     )
                 })
                 return batches,built,{
+                    "upcoming_desk_settled_performance_gate":desk_performance_gate,
                     "batch_count":1,
                     "max_batches":1,
                     "disjoint":True,
