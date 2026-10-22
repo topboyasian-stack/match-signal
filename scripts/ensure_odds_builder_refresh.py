@@ -98,11 +98,10 @@ def evaluate_runs(
             **artifact_fields,
         }
 
-    # If the only difference is a newer board timestamp, don't run the Builder
-    # more often than its 15-minute schedule. This is a recovery path when a
-    # scheduled Builder run was missed, not a trigger on every 5-minute board build.
-    # The pre-board active-run race is handled above by queuing one pending refresh.
-    if board_newer and artifact_age is not None and artifact_age < BUILDER_ARTIFACT_MAX_AGE_MINUTES:
+    # A newer board must be followed by a Builder run based on that board.
+    # A recent successful Builder can use the short cooldown only when its artifact
+    # is still fresh. Failed runs or stale/missing artifacts always trigger recovery.
+    if board_newer:
         recent_runs = [
             (parse_timestamp(run.get("createdAt")), run)
             for run in runs
@@ -111,17 +110,12 @@ def evaluate_runs(
         if recent_runs:
             last_started_at, last_run = max(recent_runs, key=lambda item: item[0])
             last_run_age = max(0.0, (now - last_started_at).total_seconds() / 60.0)
+            last_run_event = str(last_run.get("event") or "").lower()
+            completed_cycle_predates_board = (
+                upstream_stamp is not None
+                and last_started_at < upstream_stamp
+            )
             if last_run_age < UPCOMING_BOARD_REFRESH_MIN_INTERVAL_MINUTES:
-                last_run_event = str(last_run.get("event") or "").lower()
-                # Any Builder cycle that started before this board was published
-                # may have checked out an older main snapshot, including a
-                # watchdog/manual workflow_dispatch. Queue exactly one recovery
-                # run for the newer board. If the last cycle started at/after the
-                # board timestamp, keep the normal cooldown to prevent duplicates.
-                completed_cycle_predates_board = (
-                    upstream_stamp is not None
-                    and last_started_at < upstream_stamp
-                )
                 if completed_cycle_predates_board:
                     return {
                         "dispatch": True,
@@ -133,9 +127,22 @@ def evaluate_runs(
                         "upcoming_board_refresh_min_interval_minutes": UPCOMING_BOARD_REFRESH_MIN_INTERVAL_MINUTES,
                         **artifact_fields,
                     }
+                last_conclusion = str(last_run.get("conclusion") or "").lower()
+                artifact_is_fresh = artifact_age is not None and artifact_age < BUILDER_ARTIFACT_MAX_AGE_MINUTES
+                if artifact_is_fresh and last_run.get("status") == "completed" and last_conclusion == "success":
+                    return {
+                        "dispatch": False,
+                        "reason": "upcoming_board_newer_but_builder_recent",
+                        "last_run_id": last_run.get("databaseId"),
+                        "last_run_status": last_run.get("status"),
+                        "last_run_event": last_run_event,
+                        "run_age_minutes": round(last_run_age, 2),
+                        "upcoming_board_refresh_min_interval_minutes": UPCOMING_BOARD_REFRESH_MIN_INTERVAL_MINUTES,
+                        **artifact_fields,
+                    }
                 return {
-                    "dispatch": False,
-                    "reason": "upcoming_board_newer_but_builder_recent",
+                    "dispatch": True,
+                    "reason": "upcoming_board_newer_and_builder_stale_or_failed",
                     "last_run_id": last_run.get("databaseId"),
                     "last_run_status": last_run.get("status"),
                     "last_run_event": last_run_event,
@@ -165,15 +172,6 @@ def evaluate_runs(
     if parsed_runs:
         last_started_at, last_run = max(parsed_runs, key=lambda item: item[0])
         run_age = max(0.0, (now - last_started_at).total_seconds() / 60.0)
-        if run_age < RECENT_RUN_COOLDOWN_MINUTES:
-            return {
-                "dispatch": False,
-                "reason": "recent_builder_run_cooldown",
-                "last_run_id": last_run.get("databaseId"),
-                "last_run_status": last_run.get("status"),
-                "run_age_minutes": round(run_age, 2),
-                **artifact_fields,
-            }
     else:
         last_run = None
         run_age = None
