@@ -56,10 +56,10 @@ class BuilderRefreshDecisionTests(unittest.TestCase):
         self.assertEqual(result["reason"], "builder_artifact_stale")
         self.assertEqual(result["artifact_age_minutes"], BUILDER_ARTIFACT_MAX_AGE_MINUTES + 4)
 
-    def test_stale_artifact_dispatches_after_recent_completed_run(self):
+    def test_stale_artifact_waits_briefly_after_recent_successful_run(self):
         result = evaluate_runs([run(RECENT_RUN_COOLDOWN_MINUTES - 1)], NOW, artifact_generated_at=artifact(BUILDER_ARTIFACT_MAX_AGE_MINUTES + 10))
-        self.assertTrue(result["dispatch"])
-        self.assertEqual(result["reason"], "builder_artifact_stale")
+        self.assertFalse(result["dispatch"])
+        self.assertEqual(result["reason"], "recent_successful_builder_run_cooldown")
 
     def test_stale_artifact_does_not_duplicate_active_run(self):
         result = evaluate_runs([run(30, "in_progress", 900)], NOW, artifact_generated_at=artifact(BUILDER_ARTIFACT_MAX_AGE_MINUTES + 10))
