@@ -279,27 +279,30 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         missing = sorted(required_inputs - board_paths)
         self.assertEqual(missing, [], f"Deployable inputs bypass the Unified board workflow: {missing}")
 
-    def test_builder_promotion_dispatches_one_pages_deployment_for_manual_board_refresh(self):
+    def test_builder_promotion_refreshes_desk_rebuilds_builder_then_publishes_exact_artifact(self):
         self.assertIn("uses: actions/checkout@v4", PROMOTION_WORKFLOW)
         self.assertIn("group: builder-production-promotion-v3", PROMOTION_WORKFLOW)
-        self.assertNotIn("group: builder-production-promotion-v2", PROMOTION_WORKFLOW)
-        self.assertIn("with:" + chr(10) + "          ref: main", PROMOTION_WORKFLOW)
+        self.assertIn("timeout-minutes: 60", PROMOTION_WORKFLOW)
+        self.assertIn("Refresh Unified Upcoming before rebuilding the Builder", PROMOTION_WORKFLOW)
+        self.assertIn("Rebuild Odds Builder from the refreshed Desk", PROMOTION_WORKFLOW)
+        self.assertIn("Publish the rebuilt Builder through Unified Upcoming", PROMOTION_WORKFLOW)
+        self.assertIn("Dispatch Cloudflare Pages after post-build board publication and verify the exact Builder artifact", PROMOTION_WORKFLOW)
         self.assertIn("gh workflow run unified-upcoming.yml --ref main", PROMOTION_WORKFLOW)
-        self.assertIn("id: board-refresh", PROMOTION_WORKFLOW)
-        self.assertIn("BOARD_RUN_ID: ${{ steps.board-refresh.outputs.board_run_id }}", PROMOTION_WORKFLOW)
-        self.assertIn("BOARD_HEAD_SHA: ${{ steps.board-refresh.outputs.board_head_sha }}", PROMOTION_WORKFLOW)
-        self.assertIn("Dispatch Pages once for manually refreshed board and verify the published artifact", PROMOTION_WORKFLOW)
+        self.assertIn("gh workflow run odds_builder.yml --ref main -f skip_promotion=true", PROMOTION_WORKFLOW)
         self.assertIn("gh workflow run cloudflare-pages.yml --ref main", PROMOTION_WORKFLOW)
         self.assertIn("DEPLOY-VERIFY-CLOUDFLARE.json?ref=main", PROMOTION_WORKFLOW)
-        self.assertIn('[[ "$verification_status" == VERIFIED* ]]', PROMOTION_WORKFLOW)
-        self.assertIn("compare/$BOARD_HEAD_SHA...$verification_source", PROMOTION_WORKFLOW)
-        self.assertIn('if [ "$verified_epoch_us" -ge "$dispatched_epoch_us" ] && [ "$merge_base" = "$BOARD_HEAD_SHA" ]; then', PROMOTION_WORKFLOW)
-        self.assertIn("if: ${{ github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && (github.event.workflow_run.name != 'Match Signal Unified Upcoming Board' || github.event.workflow_run.event != 'workflow_dispatch')) }}", PAGES_WORKFLOW)
-        self.assertLess(
-            PROMOTION_WORKFLOW.index("gh workflow run unified-upcoming.yml --ref main"),
-            PROMOTION_WORKFLOW.index("Dispatch Pages once for manually refreshed board and verify the published artifact"),
-            "Promotion must refresh the board before dispatching the one Pages deployment for that manual refresh.",
-        )
+        self.assertIn("Immutable deployment /data/odds_builder.json HTTP", PAGES_WORKFLOW)
+        self.assertIn("Cloudflare production hostname did not publish the exact checked-out Odds Builder artifact", PAGES_WORKFLOW)
+        self.assertIn("skip_promotion:", BUILDER_WORKFLOW)
+        self.assertIn("inputs.skip_promotion != true", BUILDER_WORKFLOW)
+        pre_board = PROMOTION_WORKFLOW.index("Refresh Unified Upcoming before rebuilding the Builder")
+        builder = PROMOTION_WORKFLOW.index("gh workflow run odds_builder.yml --ref main -f skip_promotion=true")
+        post_board = PROMOTION_WORKFLOW.index("Publish the rebuilt Builder through Unified Upcoming")
+        pages = PROMOTION_WORKFLOW.index("Dispatch Cloudflare Pages after post-build board publication and verify the exact Builder artifact")
+        self.assertLess(pre_board, builder)
+        self.assertLess(builder, post_board)
+        self.assertLess(post_board, pages)
+        self.assertNotIn("GH_TOKEN: " + chr(92) + "${{ github.token }}", PROMOTION_WORKFLOW)
     def test_builder_explicitly_dispatches_promotion_after_artifact_publish(self):
         publish_step = BUILDER_WORKFLOW.find("      - name: Commit generated accumulator artifact")
         dispatch_step = BUILDER_WORKFLOW.find("      - name: Dispatch production promotion after Builder artifact publish")
@@ -308,11 +311,10 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn("GH_TOKEN: ${{ github.token }}", BUILDER_WORKFLOW[dispatch_step:])
         self.assertIn("gh workflow run builder-production-promotion.yml --ref main", BUILDER_WORKFLOW[dispatch_step:])
         self.assertIn("  workflow_dispatch:", PROMOTION_WORKFLOW)
-        self.assertIn(
-            "concurrency:" + chr(10) + "  # A new queue identity lets the repaired promotion bypass jobs stuck in the old SHA matcher." + chr(10) + "  group: builder-production-promotion-v3" + chr(10) + "  cancel-in-progress: false",
-            PROMOTION_WORKFLOW,
-            "serialize promotion runs; each must finish board refresh and deploy before the next begins",
-        )
+        self.assertIn("group: builder-production-promotion-v3", PROMOTION_WORKFLOW)
+        self.assertIn("cancel-in-progress: false", PROMOTION_WORKFLOW)
+        self.assertIn("skip_promotion:", BUILDER_WORKFLOW)
+        self.assertIn("inputs.skip_promotion != true", BUILDER_WORKFLOW)
 
     def test_feeder_workflows_cannot_bypass_the_board_refresh(self):
         bypasses = []
@@ -330,7 +332,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             [],
             "Feeder workflows must hand off through Unified Upcoming; only Builder promotion may dispatch Pages after a manual board refresh.",
         )
-        self.assertIn("Dispatch Pages once for manually refreshed board and verify the published artifact", PROMOTION_WORKFLOW)
+        self.assertIn("Dispatch Cloudflare Pages after post-build board publication and verify the exact Builder artifact", PROMOTION_WORKFLOW)
     def test_builder_artifact_uses_promotion_instead_of_a_duplicate_board_push_trigger(self):
         # Builder publishes data/odds_builder.json and then dispatches the promotion
         # workflow, which refreshes Unified Upcoming once. A direct push trigger here
