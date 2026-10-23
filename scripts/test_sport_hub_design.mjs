@@ -28,8 +28,7 @@ for (const selectorGroup of selectors) {
 
 for (const [name, html, marker] of [
   ["Football", football, "MS-SPORT-HUBS-2026.10.13-COMPETITION-LOGOS2-DESIGN1"],
-  ["Tennis", tennis, "MS-SPORT-HUBS-2026.10.13-DESIGN1"],
-  ["Basketball", basketball, "MS-SPORT-HUBS-2026.10.13-DESIGN1"]
+  ["Tennis", tennis, "MS-SPORT-HUBS-2026.10.13-DESIGN1"]
 ]) {
   assert.match(html, /data-page="hub"/, name + " must keep the shared hub renderer mode");
   assert.match(html, /data-sport="/, name + " must retain its sport identity");
@@ -44,5 +43,5 @@ assert.doesNotMatch(await read("qualified-best.html"), /sport-hubs-design\.css/,
 
 console.log("Sport hub design checks passed: scoped selectors, versioned page markers, responsive/accessibility rules, renderer mounts and existing Football logo wiring.");
 
-assert.ok(cloudflareWorkflow.includes("if (path===\'/football.html\' || path===\'/tennis.html\' || path===\'/basketball.html\') {"), "only sport hub routes should use the shared hub asset check");
+assert.ok(cloudflareWorkflow.includes("if (path===\'/football.html\' || path===\'/tennis.html\') {"), "only Football and Tennis use the legacy shared sport-hub renderer");
 assert.ok(!cloudflareWorkflow.includes("if (path===\'/football.html\' || path===\'/tennis.html\' || path===\'/basketball.html\' || path===\'/reports.html\') {"), "Reports is a workspace page, not a sport hub");
