@@ -1,5 +1,5 @@
 const ORIGIN='https://match-signal-sportybet-proxy.topboyasian.workers.dev';
-const MARKET_IDS='1,18,219,223,225,227,228';
+const MARKET_IDS='1,18,10,29,11,26,36,14,60100,186,189,202,204,210,225';
 function headers(){return {'Content-Type':'application/json; charset=utf-8','Cache-Control':'public, max-age=15, s-maxage=15, stale-while-revalidate=15','Access-Control-Allow-Origin':'*','Access-Control-Allow-Methods':'GET,OPTIONS'}}
 function normMarket(m){
   const id=String(m?.id??m?.marketId??'');
@@ -21,16 +21,30 @@ export async function onRequestGet(context){
   const pageSize=Math.min(100,Math.max(1,Number(u.searchParams.get('pageSize')||100)));
   const pageNum=Math.max(1,Number(u.searchParams.get('pageNum')||1));
   const timeline=Math.min(168,Math.max(12,Number(u.searchParams.get('timeline')||96)));
-  const url=new URL(ORIGIN+'/api/ng/factsCenter/pcUpcomingEvents');
-  const params={sportId:'sr:sport:2',marketId:MARKET_IDS,pageSize:String(pageSize),pageNum:String(pageNum),todayGames:'false',timeline:String(timeline),_t:String(Date.now())};
-  Object.entries(params).forEach(([k,v])=>url.searchParams.set(k,v));
   const started=Date.now();
+  let payload, endpointUsed, firstError;
+  const requests=[
+    {path:'/api/ng/factsCenter/pcUpcomingEvents',params:{sportId:'sr:sport:2',marketId:MARKET_IDS,pageSize:String(pageSize),pageNum:String(pageNum),todayGames:'false',timeline:String(timeline),_t:String(Date.now())}},
+    {path:'/api/ng/factsCenter/wapConfigurableUpcomingEvents',params:{sportId:'sr:sport:2',pageSize:String(pageSize),pageNum:String(pageNum),todayGames:'false',timeline:String(timeline),_t:String(Date.now())}}
+  ];
   try{
-    const r=await fetch(url.toString(),{headers:{'Accept':'application/json, text/plain, */*'},cache:'no-store',signal:AbortSignal.timeout(12000)});
-    const body=await r.text();
-    if(!r.ok)throw new Error('SportyBet upstream HTTP '+r.status);
-    let payload;try{payload=JSON.parse(body)}catch(_){throw new Error('SportyBet upstream returned non-JSON data')}
-    if(payload?.bizCode!==undefined&&payload.bizCode!==10000)throw new Error('SportyBet upstream bizCode '+payload.bizCode);
+    for(const request of requests){
+      try{
+        const url=new URL(ORIGIN+request.path);
+        Object.entries(request.params).forEach(([k,v])=>url.searchParams.set(k,v));
+        const r=await fetch(url.toString(),{headers:{'Accept':'application/json, text/plain, */*'},cache:'no-store',signal:AbortSignal.timeout(12000)});
+        const body=await r.text();
+        if(!r.ok)throw new Error(request.path+' HTTP '+r.status+' '+body.slice(0,180));
+        let candidate;try{candidate=JSON.parse(body)}catch(_){throw new Error(request.path+' returned non-JSON data')}
+        if(candidate?.bizCode!==undefined&&candidate.bizCode!==10000)throw new Error(request.path+' bizCode '+candidate.bizCode);
+        payload=candidate;
+        endpointUsed=request.path;
+        break;
+      }catch(error){
+        if(!firstError)firstError=String(error?.message||error);
+      }
+    }
+    if(!payload)throw new Error('SportyBet NBA feed failed; first request: '+String(firstError||'unknown error')+'; fallback request also failed');
     const tournaments=Array.isArray(payload?.data?.tournaments)?payload.data.tournaments:[];
     const events=[];
     for(const t of tournaments)for(const e of (Array.isArray(t?.events)?t.events:[])){
@@ -38,7 +52,7 @@ export async function onRequestGet(context){
       const start=Number(e?.estimateStartTime??e?.startTime??e?.start_time_ms);
       const markets=(Array.isArray(e?.markets)?e.markets:[]).map(normMarket);
       if(!id||!Number.isFinite(start)||!markets.length)continue;
-      events.push({event_id:id,home:String(e?.homeTeamName??e?.homeTeam?.name??''),away:String(e?.awayTeamName??e?.awayTeam?.name??''),start_time:new Date(start).toISOString(),tournament:String(t?.name??''),source:'SportyBet Nigeria',source_endpoint:'/api/ng/factsCenter/pcUpcomingEvents',fetched_at:new Date().toISOString(),markets});
+      events.push({event_id:id,home:String(e?.homeTeamName??e?.homeTeam?.name??''),away:String(e?.awayTeamName??e?.awayTeam?.name??''),start_time:new Date(start).toISOString(),tournament:String(t?.name??''),source:'SportyBet Nigeria',source_endpoint:endpointUsed,fetched_at:new Date().toISOString(),markets});
     }
     return new Response(JSON.stringify({ok:true,source:'SportyBet Nigeria',market_contract:{winner_including_overtime:'219',handicap_including_overtime:'223',total_including_overtime:'225',team_total_points:['227','228']},fetched_at:new Date().toISOString(),elapsed_ms:Date.now()-started,event_count:events.length,events}),{status:200,headers:headers()});
   }catch(error){
