@@ -29,20 +29,32 @@ export async function onRequestGet(context){
     {path:'/api/ng/factsCenter/wapConfigurableUpcomingEvents',marketId:null}
   ];
   try{
+    const origins=[ORIGIN,'https://www.sportybet.com'];
     const attempts=await Promise.all(requests.map(async request=>{
-      try{
-        const url=new URL(ORIGIN+request.path);
-        const params={sportId:'sr:sport:2',pageSize:String(pageSize),pageNum:String(pageNum),todayGames:'false',timeline:String(timeline),_t:String(Date.now())};
-        if(request.marketId)params.marketId=request.marketId;
-        Object.entries(params).forEach(([k,v])=>url.searchParams.set(k,v));
-        const r=await fetch(url.toString(),{headers:{'Accept':'application/json, text/plain, */*'},cache:'no-store',signal:AbortSignal.timeout(12000)});
-        const body=await r.text();
-        if(!r.ok)throw new Error(request.path+' marketId='+(request.marketId||'default')+' HTTP '+r.status+' '+body.slice(0,120));
-        let payload;try{payload=JSON.parse(body)}catch(_){throw new Error(request.path+' returned non-JSON data')}
-        if(payload?.bizCode!==undefined&&payload.bizCode!==10000)throw new Error(request.path+' bizCode '+payload.bizCode);
-        const count=getTournaments(payload).reduce((n,t)=>n+(Array.isArray(t?.events)?t.events.length:0),0);
-        return {request,payload,error:null,event_count:count};
-      }catch(error){return {request,payload:null,error:String(error?.message||error),event_count:0}}
+      const errors=[];
+      for(const origin of origins){
+        try{
+          const url=new URL(origin+request.path);
+          const params={sportId:'sr:sport:2',pageSize:String(pageSize),pageNum:String(pageNum),todayGames:'false',timeline:String(timeline),_t:String(Date.now())};
+          if(request.marketId)params.marketId=request.marketId;
+          Object.entries(params).forEach(([k,v])=>url.searchParams.set(k,v));
+          const r=await fetch(url.toString(),{
+            headers:{'Accept':'application/json, text/plain, */*','Current-Country':'NG'},
+            cache:'no-store',signal:AbortSignal.timeout(12000)
+          });
+          const body=await r.text();
+          if(!r.ok)throw new Error('HTTP '+r.status+' '+body.slice(0,160));
+          let payload;try{payload=JSON.parse(body)}catch(_){throw new Error('returned non-JSON data')}
+          if(payload?.bizCode!==undefined&&payload.bizCode!==10000)throw new Error('bizCode '+payload.bizCode);
+          if(payload?.ok===false)throw new Error(String(payload?.detail||payload?.error||'source rejected query'));
+          const count=getTournaments(payload).reduce((n,t)=>n+(Array.isArray(t?.events)?t.events.length:0),0);
+          if(!getTournaments(payload).length)throw new Error('response omitted data.tournaments');
+          return {request,payload,error:null,event_count:count,source_origin:origin};
+        }catch(error){
+          errors.push(origin+': '+String(error?.message||error));
+        }
+      }
+      return {request,payload:null,error:errors.join(' || '),event_count:0};
     }));
     const eventMap=new Map();
     for(const attempt of attempts){
@@ -63,7 +75,7 @@ export async function onRequestGet(context){
           marketMap.set(String(normalized.id)+'|'+String(normalized.specifier||''),normalized);
         }
         existing.markets=Array.from(marketMap.values());
-        const endpoint=attempt.request.path+(attempt.request.marketId?'?marketId='+attempt.request.marketId:'');
+        const endpoint=(attempt.source_origin||ORIGIN)+attempt.request.path+(attempt.request.marketId?'?marketId='+attempt.request.marketId:'');
         if(!existing.source_endpoints.includes(endpoint))existing.source_endpoints.push(endpoint);
         existing.fetched_at=new Date().toISOString();
         eventMap.set(id,existing);
@@ -78,6 +90,7 @@ export async function onRequestGet(context){
     }
     return new Response(JSON.stringify({
       ok:true,source:'SportyBet Nigeria',
+      source_origins:Array.from(new Set(attempts.filter(a=>a.payload).map(a=>a.source_origin))),
       market_contract:{winner_including_overtime:'219',handicap_including_overtime:'223',total_including_overtime:'225',team_total_points:['227','228']},
       fetched_at:new Date().toISOString(),elapsed_ms:Date.now()-started,event_count:events.length,
       total_market_event_count:totalMarketEvents,source_errors:sourceErrors,events
