@@ -210,7 +210,48 @@ def current(name):
   if hn and an:out.append({'event_id':str(e.get('id')),'date':event_date.isoformat(),'home':hn,'away':an,'markets':{}})
  return out
 def run():
- nh,ne=collect('NBA');eh,ee=collect('Eredivisie');nc=current('NBA');ec=current('Eredivisie');np=[{'sport':'basketball','league':'NBA','event_id':r['event_id'],'start_time':r['date'],'player_1':r['home'],'player_2':r['away'],'independent':nba_predict(r,nh),'market':r['markets'],'prediction_status':'research_only','paper_only':True} for r in nc];ep=[]
+ nh,ne=collect('NBA');eh,ee=collect('Eredivisie');nc=current('NBA');ec=current('Eredivisie')
+ # Preserve the first pre-game forecast for each event so later refreshes cannot
+ # rewrite a pick after tip-off and make the settlement record look predictive.
+ old_nba=[]
+ try: old_nba=json.loads((DATA/'nba_predictions.json').read_text())
+ except Exception: old_nba=[]
+ old_by_id={str(x.get('event_id')):x for x in old_nba if isinstance(x,dict)}
+ np=[]; seen=set()
+ for r in nc:
+  eid=str(r['event_id']); start=dt(r['date']); old=old_by_id.get(eid)
+  old_stamp=dt(old.get('generated_at')) if old else None
+  if old and old_stamp and start and old_stamp < start:
+   p=dict(old)
+  else:
+   # Do not create a first-time "prediction" for a game that has already started.
+   if not start or start <= NOW:
+    if old: p=dict(old)
+    else: continue
+   else:
+    model=nba_predict(r,nh); probs=model['moneyline']; pick='p1' if probs['home']>=probs['away'] else 'p2'
+    p={'sport':'basketball','league':'NBA','event_id':eid,'start_time':r['date'],
+       'player_1':r['home'],'player_2':r['away'],
+       'probabilities':{'p1':round(probs['home'],6),'p2':round(probs['away'],6)},
+       'pick':pick,'confidence':round(max(probs['home'],probs['away']),6),
+       'expected_score':model['expected_score'],'expected_total':model['expected_total'],
+       'model':model['model'],'market':r.get('markets') or {},
+       'signal_quality':{'status':'LIVE_EXPERIMENTAL','market_odds_available':False},
+       'generated_at':NOW.isoformat(),'prediction_created_at':NOW.isoformat(),
+       'accuracy_eligible':True,'prediction_status':'live_experimental',
+       'live_experimental':True,'paper_only':True}
+  np.append(p); seen.add(eid)
+ # Retain recent pre-game snapshots long enough for the settlement collector to
+ # match final scores; the settlement ledger remains the durable history.
+ for old in old_nba:
+  if not isinstance(old,dict): continue
+  eid=str(old.get('event_id') or '')
+  start=dt(old.get('start_time'))
+  stamp=dt(old.get('generated_at') or old.get('prediction_created_at'))
+  if eid and eid not in seen and start and stamp and stamp < start and start >= NOW-timedelta(hours=30):
+   np.append(dict(old)); seen.add(eid)
+ np.sort(key=lambda x:x.get('start_time',''))
+ ep=[]
  try:
   from independent_football_model import independent_prediction;hist=[{'sport':'football','settled':True,'final_score':[x['home_score'],x['away_score']],'event_id':x['event_id'],'start_time':x['date'],'league':'Eredivisie','player_1':x['home'],'player_2':x['away']} for x in eh]
   for r in ec:
