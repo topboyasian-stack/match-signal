@@ -16,7 +16,7 @@ assert.ok(css.includes("@media(max-width:480px)") && css.includes("@media(prefer
 assert.ok(ui.includes("String(x.id)==='225'") || ui.includes("String(x.id)==='225'") || ui.includes("String(x.id)==='225'"), "Totals must use the explicit SportyBet market ID for full-game O/U including overtime");
 assert.ok(ui.includes("Math.abs(a-b)<=45*60*1000"), "SportyBet quotes must match exact teams and near-identical kickoff times");
 assert.ok(ui.includes("Date.now()-fetched<=15*60*1000") && ui.includes("fresh:Number.isFinite(fetched)"), "Stale SportyBet quotes must be withheld while fresh quotes remain eligible");
-assert.ok(ui.includes("No odds inferred from ESPN, OddsPapi, or another bookmaker."), "Other-bookmaker odds must never be labelled SportyBet");
+assert.ok(ui.includes("No other bookmaker prices are substituted."), "Other-bookmaker odds must never be labelled SportyBet");
 assert.ok(api.includes("sportId:'sr:sport:2'"), "SportyBet basketball feed must request the basketball sport ID");
 assert.ok(api.includes("const MARKET_IDS='1,18,219,223,225,227,228'"), "Feed must request basketball markets including O/U incl overtime");
 assert.ok(api.includes("total_including_overtime:'225'"), "API contract must explicitly identify total incl overtime");
