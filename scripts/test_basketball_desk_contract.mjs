@@ -6,9 +6,9 @@ const [html, css, ui, api, workflow] = await Promise.all([
   read("basketball.html"), read("basketball-design.css"), read("basketball-live.js"),
   read("functions/api/sportybet-basketball.js"), read(".github/workflows/cloudflare-pages.yml")
 ]);
-assert.ok(html.includes("MS-BASKETBALL-DESK-2026.10.23-V3"), "Basketball must publish the new design marker");
+assert.ok(html.includes("MS-BASKETBALL-DESK-2026.10.23-V4"), "Basketball must publish the new design marker");
 assert.ok(html.includes("core-workspaces-design.css?v=20261014-full-v1"), "Basketball must use the shared Match Signal design layer");
-assert.ok(html.includes("basketball-design.css?v=20261023-full-v1"), "Basketball must load its own scoped design layer");
+assert.ok(html.includes("basketball-design.css?v=20261023-dark-v2"), "Basketball must load its own scoped design layer");
 assert.ok(html.includes('id="msNav"') && html.includes('workspace-ui.js?v=20261023-basketball-nav1'), "Basketball must use the single shared site navigation");
 for (const id of ["liveGames","upcomingGames","totalsBoard","finalResults","performance","marketStatus","totalsStatus"]) assert.ok(html.includes('id="'+id+'"'), "Basketball must preserve renderer mount "+id);
 assert.ok(css.includes("MATCH-SIGNAL-BASKETBALL-DESK-V1"), "Basketball scoped design marker missing");
