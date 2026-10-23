@@ -35,7 +35,7 @@ def sportybet_basketball_feed():
 
 def nba_team_key(value):
     text = re.sub(r"[^a-z0-9]+", " ", str(value or "").lower()).strip()
-    text = re.sub(r"\\s+", " ", text)
+    text = re.sub(r"\s+", " ", text)
     text = re.sub(r"^(la) ", "los angeles ", text)
     text = re.sub(r"^(ny) ", "new york ", text)
     return text
@@ -65,15 +65,15 @@ def sportybet_total_for_fixture(fixture, feed):
         if not market:
             continue
         specifier = str(market.get("specifier") or "")
-        match = re.search(r"(?:^|[,;|&\\s])total\\s*=\\s*(\\d+(?:\\.\\d+)?)(?=$|[,;|&\\s])", specifier, re.I)
+        match = re.search(r"(?:^|[,;|&\s])total\s*=\s*(\d+(?:\.\d+)?)(?=$|[,;|&\s])", specifier, re.I)
         if not match:
             continue
         line = float(match.group(1))
         if not 100 <= line <= 300:
             continue
         outcomes = market.get("outcomes") or []
-        over = next((o for o in outcomes if re.search(r"\\bover\\b", str(o.get("name") or ""), re.I)), None)
-        under = next((o for o in outcomes if re.search(r"\\bunder\\b", str(o.get("name") or ""), re.I)), None)
+        over = next((o for o in outcomes if re.search(r"\bover\b", str(o.get("name") or ""), re.I)), None)
+        under = next((o for o in outcomes if re.search(r"\bunder\b", str(o.get("name") or ""), re.I)), None)
         if not over or not under:
             continue
         over_odds, under_odds = over.get("odds"), under.get("odds")
