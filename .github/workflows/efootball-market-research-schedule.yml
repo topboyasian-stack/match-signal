@@ -130,7 +130,11 @@ jobs:
             exit 0
           fi
           git commit -m "🤖 Update isolated eFootball winner/BTTS market research"
-          for attempt in 1 2 3 4 5; do
+          # Many independent automation workflows legitimately update main. Retry
+          # longer than a single neighbouring workflow's commit cycle, always
+          # rebuilding against the newest archive so no concurrent observations
+          # or report changes are overwritten.
+          for attempt in $(seq 1 12); do
             if git push origin main; then
               echo "Research archive published on attempt $attempt."
               exit 0
@@ -146,6 +150,7 @@ jobs:
               exit 0
             fi
             git commit -m "🤖 Merge isolated eFootball market research samples"
-            sleep $((attempt * 2))
+            sleep $((attempt * 3))
           done
+          echo "Research archive publish exhausted 12 conflict-safe attempts; no force-push was used."
           exit 1
