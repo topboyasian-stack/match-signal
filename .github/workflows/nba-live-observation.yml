@@ -1,0 +1,55 @@
+name: Match Signal NBA In-Game Behavior Recorder
+
+on:
+  schedule:
+    # GitHub cron has a five-minute minimum; record live state repeatedly during game windows.
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/record_nba_live_behavior.py'
+      - '.github/workflows/nba-live-observation.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nba-live-behavior-recorder
+  cancel-in-progress: false
+
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install recorder dependency
+        run: python -m pip install --disable-pip-version-check requests
+      - name: Capture live game, play-by-play and player/team box-score snapshots
+        run: python scripts/record_nba_live_behavior.py
+      - name: Publish timestamped observation history
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/nba_live_observations.json
+          if git diff --cached --quiet; then
+            echo "No new live/final game observations this run."
+            exit 0
+          fi
+          git commit -m "🤖 Record timestamped NBA in-game behavior observations"
+          for attempt in 1 2 3; do
+            git fetch origin main
+            git rebase origin/main
+            if git push origin HEAD:main; then exit 0; fi
+            sleep $((attempt * 3))
+          done
+          echo "Could not publish NBA observations after retries." >&2
+          exit 1
