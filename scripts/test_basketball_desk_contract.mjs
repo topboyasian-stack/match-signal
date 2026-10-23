@@ -14,7 +14,7 @@ for (const id of ["liveGames","upcomingGames","totalsBoard","finalResults","perf
 assert.ok(css.includes("MATCH-SIGNAL-BASKETBALL-DESK-V1"), "Basketball scoped design marker missing");
 assert.ok(css.includes("MATCH-SIGNAL-BASKETBALL-DARK-V3") && html.includes("basketball-design.css?v=20261023-contrast-v8"), "Basketball must deploy the cache-busted contrast/readability safety net");
 assert.ok(css.includes("@media(max-width:480px)") && css.includes("@media(prefers-reduced-motion:reduce)") && css.includes(":focus-visible"), "Basketball design must remain responsive and accessible");
-assert.ok(ui.includes("String(m.id)==='225'"), "Totals must use the explicit SportyBet market ID for full-game O/U including overtime");
+assert.ok(ui.includes("function bestSportyBetTotalMarket(markets)") && ui.includes("String(m.id)") && ui.includes("225"), "Totals must select the explicit SportyBet market ID for full-game O/U including overtime");
 assert.ok(ui.includes("Math.abs(a-b)<=45*60*1000"), "SportyBet quotes must match exact teams and near-identical kickoff times");
 assert.ok(ui.includes("Date.now()-fetched<=15*60*1000") && ui.includes("fresh:Number.isFinite(fetched)"), "Stale SportyBet quotes must be withheld while fresh quotes remain eligible");
 assert.ok(ui.includes("Historical line is context only; no current lean or odds value is inferred.") && ui.includes("Current exact SportyBet event · full-game total market 225"), "Totals must withhold stale prices and clearly label only exact current SportyBet quotes");
