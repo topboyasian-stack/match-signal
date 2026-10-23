@@ -38,7 +38,9 @@ permissions:
   contents: write
 
 concurrency:
-  group: match-signal-efootball-market-research
+  # Keep offline PR validation independent from the live archive publisher.
+  # A stalled publisher must not queue regression checks behind it.
+  group: match-signal-efootball-market-research-${{ github.event_name == 'pull_request' && 'validate' || 'publish' }}
   cancel-in-progress: false
 
 jobs:
