@@ -645,6 +645,62 @@ class CompactEfootballBuilderTests(unittest.TestCase):
 
 
 
+    def test_compact_lane_requires_two_percent_exact_odds_expected_return(self):
+        rows=[leg(i,odds=1.30,probability=0.90,expected_value=0.17) for i in range(5)]
+        rows[0]["expected_value"]=0.019
+        selected,diag=builder._construct_efootball_compact_batch(rows)
+        self.assertEqual(diag["candidate_count"],4)
+        self.assertTrue(selected)
+        self.assertTrue(all(x["expected_value"]>=builder.EFOOTBALL_VALUE_MIN_EXPECTED_RETURN for x in selected))
+
+    def test_compact_lane_ranks_combinations_by_expected_return(self):
+        high_probability_lower_return=[
+            leg(i,odds=1.15,probability=0.95,expected_value=0.0925) for i in range(5)
+        ]
+        lower_probability_higher_return=[
+            leg(i+5,odds=1.50,probability=0.80,expected_value=0.20) for i in range(4)
+        ]
+        selected,diag=builder._construct_efootball_compact_batch(
+            high_probability_lower_return+lower_probability_higher_return
+        )
+        self.assertEqual(diag["reason"],"qualified_compact_efootball_combination")
+        self.assertEqual(len(selected),5)
+        # ROI-first should include all four higher-return legs; probability-first
+        # would instead select the five higher-probability / lower-return legs.
+        self.assertEqual(sum(x["expected_value"]==0.20 for x in selected),4)
+
+    def test_make_leg_rejects_efootball_when_exact_odds_return_is_below_two_percent(self):
+        now=datetime(2026,10,10,9,45,tzinfo=timezone.utc)
+        row={
+            "sport":"virtual","product":"efootball_gt",
+            "qualification_lane":"efootball_exact_evidence_value",
+            "builder_probability":0.635,"builder_pick":"over","line":4.5,
+            "event_id":"ev-test","start_time":(now+timedelta(minutes=15)).isoformat(),
+            "match":"Alpha (alpha) vs Beta (beta)",
+        }
+        with (
+            patch.object(builder,"_settled_exact_line_probability_cap",return_value={
+                "applied":False,"reason":"test","effective_probability":0.635,
+                "settled_sample_n":100,"settled_wins":64,
+            }),
+            patch.object(builder,"selected_price_and_devig",return_value=(1.60,0.625,0.60,True)),
+            patch.object(builder,"odds_age",return_value=30.0),
+            patch.object(builder,"data_quality",return_value=0.95),
+            patch.object(builder,"uncertainty",return_value=0.05),
+            patch.object(builder,"participant_history_signal",return_value={
+                "available":False,"score":0.5,"participants":[],
+            }),
+            patch.object(builder,"_phase2_cyclical_loop_signal",return_value={
+                "enabled":False,"flagged":False,"confidence":0.0,"reason":"test",
+            }),
+        ):
+            built=builder.make_leg(row)
+        self.assertAlmostEqual(built["model_edge"],0.035,places=5)
+        self.assertAlmostEqual(built["expected_value"],0.016,places=5)
+        self.assertFalse(built["builder_eligible"])
+        self.assertFalse(built["efootball_value_gate"]["expected_return_passed"])
+
+
 
 if __name__=="__main__":
     unittest.main()

@@ -94,6 +94,7 @@ MODEL_FIRST_MIN_AVG_PROBABILITY=0.68
 # and whole-ticket expected-ROI gates still apply unchanged.
 EFOOTBALL_VALUE_MIN_AVG_PROBABILITY=0.65
 EFOOTBALL_VALUE_MIN_LEG_PROBABILITY=0.65
+EFOOTBALL_VALUE_MIN_EXPECTED_RETURN=0.02
 
 # Separate Upcoming Desk paper-research lane using Desk probabilities and exact-line holdout.
 UPCOMING_DESK_RESEARCH_LANE="upcoming_desk_research_only"
@@ -2741,9 +2742,15 @@ def make_leg(x):
     market_prob=devig if complete and devig is not None else implied
     edge=(p-market_prob) if market_prob is not None else None
     ev=((p*bookmaker)-1.0) if bookmaker is not None else None
+    is_efootball_value=str(x.get("product") or "").startswith("efootball_")
+    efootball_expected_return_ok=(
+        not is_efootball_value
+        or (ev is not None and ev>=EFOOTBALL_VALUE_MIN_EXPECTED_RETURN)
+    )
     eligible=(
         bookmaker is not None and
         edge is not None and edge>=MIN_EDGE and
+        efootball_expected_return_ok and
         age is not None and age<=MAX_ODDS_AGE_SECONDS and
         quality>=MIN_DATA_QUALITY and uncert<=MAX_UNCERTAINTY
     )
@@ -2812,6 +2819,13 @@ def make_leg(x):
         "de_vig_probability":round(devig,6) if devig is not None else None,
         "model_edge":round(edge,6) if edge is not None else None,
         "expected_value":round(ev,6) if ev is not None else None,
+        "efootball_value_gate":{
+            "applied":is_efootball_value,
+            "minimum_expected_return":EFOOTBALL_VALUE_MIN_EXPECTED_RETURN if is_efootball_value else None,
+            "expected_return_passed":(ev is not None and ev>=EFOOTBALL_VALUE_MIN_EXPECTED_RETURN) if is_efootball_value else None,
+            "minimum_margin_adjusted_edge":MIN_EDGE,
+            "margin_adjusted_edge_passed":edge is not None and edge>=MIN_EDGE,
+        },
         "participant_history":participant_history,
         "participant_history_bonus":round(history_bonus,6),
         "evidence_score":round(evidence_score,6) if evidence_score is not None else None,
@@ -3483,17 +3497,18 @@ def _construct_efootball_value_batch(pool, min_odds=None, max_legs=RESULTS_FIRST
         if str(x.get("qualification_lane") or "")=="efootball_exact_evidence_value"
         and str(x.get("product") or "").startswith("efootball_")
         and float(x.get("model_probability") or 0.0)>=EFOOTBALL_VALUE_MIN_LEG_PROBABILITY
-        and float(x.get("expected_value") or 0.0)>=0.0
+        and float(x.get("expected_value") or 0.0)>=EFOOTBALL_VALUE_MIN_EXPECTED_RETURN
         and x.get("builder_eligible") is True
     ]
     def _rank_holdout(row):
         holdout=_efootball_holdout_selection(row)
         return float(holdout.get("hit_rate") or 0.0) if holdout else 0.0
     rows=sorted(rows,key=lambda x:(
+        -float(x.get("expected_value") or 0.0),
+        -float(x.get("model_edge") or 0.0),
         -float(x.get("model_probability") or 0.0),
         -float(x.get("evidence_score") or 0.0),
         -_rank_holdout(x),
-        -float(x.get("model_edge") or 0.0),
         -float(x.get("bookmaker_odds") or 1.0),
         _kickoff_timestamp(x) if _kickoff_timestamp(x) is not None else float("inf")
     ))
@@ -3582,7 +3597,7 @@ def _construct_efootball_compact_batch(pool):
         and str(x.get("qualification_lane") or "")=="efootball_exact_evidence_value"
         and str(x.get("product") or "") in ACTIVE_VIRTUAL_PRODUCTS
         and float(x.get("model_probability") or 0.0)>=EFOOTBALL_VALUE_MIN_LEG_PROBABILITY
-        and float(x.get("expected_value") or 0.0)>=0.0
+        and float(x.get("expected_value") or 0.0)>=EFOOTBALL_VALUE_MIN_EXPECTED_RETURN
         and float(x.get("bookmaker_odds") or 0.0)>1.0
         and x.get("builder_eligible") is True
     ]
@@ -3590,10 +3605,11 @@ def _construct_efootball_compact_batch(pool):
         holdout=_efootball_holdout_selection(row)
         return float(holdout.get("hit_rate") or 0.0) if holdout else 0.0
     rows=sorted(rows,key=lambda x:(
+        -float(x.get("expected_value") or 0.0),
+        -float(x.get("model_edge") or 0.0),
         -float(x.get("model_probability") or 0.0),
         -float(x.get("evidence_score") or 0.0),
         -_holdout_rate(x),
-        -float(x.get("model_edge") or 0.0),
         -float(x.get("bookmaker_odds") or 1.0),
         _kickoff_timestamp(x) if _kickoff_timestamp(x) is not None else float("inf")
     ))
@@ -3659,11 +3675,12 @@ def _construct_efootball_compact_batch(pool):
                 diag["rejected_expected_roi"]+=1
                 continue
             score=(
+                roi,
                 probability,
+                float(metrics.get("avg_model_edge_percent") or 0.0),
                 min(float(x.get("model_probability") or 0.0) for x in combo),
                 float(metrics.get("avg_model_probability") or 0.0),
                 sum(float(x.get("evidence_score") or 0.0) for x in combo)/len(combo),
-                float(metrics.get("avg_model_edge_percent") or 0.0),
                 -len(combo),
                 -span,
                 odds
@@ -3955,8 +3972,8 @@ def _construct_mixed_virtual_efootball_batches(pool, max_batches=4, max_legs=MIX
         x for x in pool
         if str(x.get("product") or "").startswith("efootball_")
         and str(x.get("qualification_lane") or "")=="efootball_exact_evidence_value"
-        and float(x.get("model_probability") or 0.0)>=VIRTUAL_MIN_PROB
-        and float(x.get("expected_value") or 0.0)>=0.0
+        and float(x.get("model_probability") or 0.0)>=EFOOTBALL_VALUE_MIN_LEG_PROBABILITY
+        and float(x.get("expected_value") or 0.0)>=EFOOTBALL_VALUE_MIN_EXPECTED_RETURN
     ]
 
     vpool=sorted(vpool,key=lambda x:(
@@ -3967,9 +3984,10 @@ def _construct_mixed_virtual_efootball_batches(pool, max_batches=4, max_legs=MIX
         _kickoff_timestamp(x) if _kickoff_timestamp(x) is not None else float("inf"),
     ))[:50]
     epool=sorted(epool,key=lambda x:(
+        -float(x.get("expected_value") or 0.0),
+        -float(x.get("model_edge") or 0.0),
         -float(x.get("model_probability") or 0.0),
         -float(x.get("evidence_score") or 0.0),
-        -float(x.get("model_edge") or 0.0),
         -float(x.get("bookmaker_odds") or 1.0),
         _kickoff_timestamp(x) if _kickoff_timestamp(x) is not None else float("inf"),
     ))[:14]
@@ -4410,12 +4428,13 @@ def _secondary_efootball_diagnostics(pool, min_odds=None):
         x for x in pool
         if str(x.get("product") or "").startswith("efootball_")
         and float(x.get("model_probability") or 0.0) >= EFOOTBALL_VALUE_MIN_LEG_PROBABILITY
-        and float(x.get("expected_value") or 0.0) >= 0.0
+        and float(x.get("expected_value") or 0.0) >= EFOOTBALL_VALUE_MIN_EXPECTED_RETURN
     ]
     rows=sorted(rows,key=lambda x:(
+        -float(x.get("expected_value") or 0.0),
+        -float(x.get("model_edge") or 0.0),
         -float(x.get("model_probability") or 0.0),
         -float(x.get("bookmaker_odds") or 1.0),
-        -float(x.get("model_edge") or 0.0),
         _kickoff_timestamp(x) if _kickoff_timestamp(x) is not None else float("inf")
     ))
     pair_total=0
