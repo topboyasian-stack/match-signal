@@ -305,3 +305,34 @@ def test_time_safe_probability_calibration_shadow_uses_earlier_rows_only():
 
 
 test_time_safe_probability_calibration_shadow_uses_earlier_rows_only()
+
+
+def test_exact_line_side_calibration_shadow_is_chronological_and_paper_only():
+    rows = []
+    start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    for i in range(100):
+        stamp = start + timedelta(hours=i)
+        rows.append({
+            "trace_id": f"exact-line-calibration-{i}",
+            "start_time": stamp.isoformat(),
+            "pick": "under",
+            "line": 6.5,
+            "win": i % 2 == 0,
+            "settled": True,
+            "push": False,
+            "model_probability": 0.70,
+            "bookmaker_odds": 1.9,
+        })
+    result = mod.walk_forward_exact_line_calibration(rows)
+    assert result["mode"] == "PAPER_SHADOW_ONLY"
+    assert result["training_rows"] == 70
+    assert result["holdout_rows"] == 30
+    assert result["training_end_time"] < result["holdout_start_time"]
+    assert result["exact_line_side_calibration_fit_on_training_only"]["under 6.5"]["training_n"] == 70
+    assert result["applied_to_predictions"] is False
+    assert result["production_qualification_enabled"] is False
+    assert result["improvement_raw_minus_calibrated"]["brier"] > 0
+    assert result["improvement_raw_minus_calibrated"]["log_loss"] > 0
+
+
+test_exact_line_side_calibration_shadow_is_chronological_and_paper_only()
