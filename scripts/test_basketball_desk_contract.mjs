@@ -23,6 +23,7 @@ assert.ok(api.includes("https://www.sportybet.com"), "SportyBet feed must fall b
 assert.ok(api.includes("const STANDARD_MARKET_IDS='1,18,10,29,11,26,36,14,60100,186,189,202,204,210'") && api.includes("marketId:'225'"), "Feed must request the provider's supported standard market list and probe O/U incl overtime separately");
 assert.ok(api.includes("/api/ng/factsCenter/wapConfigurableUpcomingEvents"), "Feed must have a supported SportyBet upcoming-event fallback");
 assert.ok(ui.includes("suspend|closed|inactive|settled|unavailable|stop"), "Suspended or closed SportyBet total markets must be withheld");
+assert.ok(ui.includes("function bestSportyBetTotalMarket(markets)") && ui.includes("balance=Math.abs(Math.log") && ui.includes("status!=='0'"), "Totals must choose an active, balanced mainline instead of the first alternate line and reject non-open numeric statuses");
 assert.ok(api.includes("total_including_overtime:'225'"), "API contract must explicitly identify total incl overtime");
 assert.ok(workflow.includes("node scripts/test_basketball_desk_contract.mjs"), "Deployment must execute Basketball contract tests");
 console.log("Basketball desk contract passed: shared UI, scoped responsive design, exact SportyBet event matching, fresh full-game totals including OT.");
