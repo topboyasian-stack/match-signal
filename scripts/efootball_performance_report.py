@@ -268,6 +268,63 @@ def extremes(groups: list[dict[str, Any]], *, min_n: int = 10, limit: int = 5) -
     }
 
 
+def calibration_by_probability_band(rows: list[dict[str, Any]], *, band_width: float = 0.05) -> list[dict[str, Any]]:
+    """Show predicted versus observed probability on settled, priced selections."""
+    groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for row in settled_ou_rows(rows):
+        p = number(row.get("model_probability"))
+        odds = number(row.get("bookmaker_odds"))
+        if p is None or not 0 <= p <= 1 or odds is None or odds <= 1 or row.get("push") is True:
+            continue
+        lower = min(0.95, math.floor((p + 1e-9) / band_width) * band_width)
+        upper = min(1.0, lower + band_width)
+        label = f"{lower:.2f}-{upper:.2f}"
+        groups[label].append(row)
+
+    report = []
+    for label, items in sorted(groups.items()):
+        stats = outcome_stats(items, mode="ou")
+        predicted = stats.get("mean_model_probability")
+        observed = stats.get("hit_rate")
+        report.append({
+            "probability_band": label,
+            **stats,
+            "calibration_gap": rounded(observed - predicted) if observed is not None and predicted is not None else None,
+            "interpretation": (
+                "overconfident in this sample" if predicted is not None and observed is not None and predicted - observed >= 0.05
+                else "underconfident in this sample" if predicted is not None and observed is not None and observed - predicted >= 0.05
+                else "no large observed gap" if predicted is not None and observed is not None
+                else "insufficient valid observations"
+            ),
+        })
+    return report
+
+
+def chronological_line_side_report(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Compare earlier and latest results for each exact O/U line and side."""
+    settled = settled_ou_rows(rows)
+    groups = group_rows(settled, lambda r: f'{str(r.get("pick") or "unknown").lower()} {r.get("line", "unknown")}')
+    result = []
+    for key, items in sorted(groups.items()):
+        ordered = sorted_chronologically(items)
+        cut = int(len(ordered) * 0.70)
+        earlier = outcome_stats(ordered[:cut], mode="ou")
+        recent = outcome_stats(ordered[cut:], mode="ou")
+        total = outcome_stats(ordered, mode="ou")
+        result.append({
+            "line_side": key,
+            "settled": total["settled"],
+            "earlier_70_percent": earlier,
+            "latest_30_percent": recent,
+            "recent_roi_change_vs_earlier": (
+                rounded(recent["flat_stake_roi"] - earlier["flat_stake_roi"])
+                if recent.get("flat_stake_roi") is not None and earlier.get("flat_stake_roi") is not None else None
+            ),
+            "warning": "Descriptive only; rows may share fixtures and the split is not a promotion test.",
+        })
+    return result
+
+
 def build_ou_report(rows: list[dict[str, Any]]) -> dict[str, Any]:
     settled = settled_ou_rows(rows)
     selectors = {
@@ -302,6 +359,8 @@ def build_ou_report(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "eligible_settled_rows": len(settled),
         "metrics": outcome_stats(settled, mode="ou"),
         "chronological_split": split_chronological(settled, "ou"),
+        "chronological_by_line_and_side": chronological_line_side_report(settled),
+        "calibration_by_probability_band": calibration_by_probability_band(settled),
         "segments": segments,
         "exploratory_extremes": {
             "line_side": line_extremes,
