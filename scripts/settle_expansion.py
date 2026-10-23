@@ -36,6 +36,16 @@ def settle():
         preds = load(DATA / filename, [])
         for p in preds:
             if not p.get("live_experimental"): continue
+            # Only score forecasts saved before tip-off. A current/live guess
+            # must never be backfilled as a successful pre-game prediction.
+            try:
+                start = datetime.fromisoformat(str(p.get("start_time") or "").replace("Z", "+00:00"))
+                stamp = datetime.fromisoformat(str(p.get("generated_at") or p.get("prediction_created_at") or "").replace("Z", "+00:00"))
+                if start.tzinfo is None: start = start.replace(tzinfo=timezone.utc)
+                if stamp.tzinfo is None: stamp = stamp.replace(tzinfo=timezone.utc)
+                if stamp >= start or p.get("accuracy_eligible") is False: continue
+            except (TypeError, ValueError):
+                continue
             eid = str(p.get("event_id"))
             if eid in existing and existing[eid].get("settled"): continue
             key = (league, norm(p.get("player_1")), norm(p.get("player_2")), str(p.get("start_time"))[:10])
@@ -60,7 +70,7 @@ def settle():
                 pr = p.get("probabilities") or {}
                 brier = ((pr.get("p1",0)-(outcome=="p1"))**2 + (pr.get("p2",0)-(outcome=="p2"))**2) / 2
                 extra = {"brier": round(brier,6)}
-            existing[eid] = {"event_id": eid, "league": league, "sport": p.get("sport"), "start_time": p.get("start_time"), "player_1": p.get("player_1"), "player_2": p.get("player_2"), "pick": p.get("pick"), "confidence": p.get("confidence"), "probabilities": p.get("probabilities"), "settled": True, "settled_at": datetime.now(timezone.utc).isoformat(), "final_score": [hg, ag], "outcome": outcome, "correct": bool(correct), **extra}
+            existing[eid] = {"event_id": eid, "league": league, "sport": p.get("sport"), "start_time": p.get("start_time"), "player_1": p.get("player_1"), "player_2": p.get("player_2"), "pick": p.get("pick"), "confidence": p.get("confidence"), "probabilities": p.get("probabilities"), "prediction_created_at": p.get("generated_at") or p.get("prediction_created_at"), "prediction_was_pregame": True, "settled": True, "settled_at": datetime.now(timezone.utc).isoformat(), "final_score": [hg, ag], "outcome": outcome, "correct": bool(correct), **extra}
             changed += 1
 
     result = sorted(existing.values(), key=lambda x: str(x.get("start_time")))
