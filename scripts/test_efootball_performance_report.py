@@ -273,3 +273,35 @@ def test_shadow_review_rejects_a_configuration_that_loses_to_market_in_both_peri
     assert mod._shadow_review_status(
         99, 80, -0.02, -0.03, -0.01, -0.02, 0.03,
     ) == "COLLECT_AND_MONITOR"
+
+
+def test_time_safe_probability_calibration_shadow_uses_earlier_rows_only():
+    rows = []
+    start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    # First 70% and latest 30% have the same overconfident forecast; a
+    # time-safe shrinkage mapping should improve proper scoring on this fixture.
+    for i in range(100):
+        stamp = start + timedelta(hours=i)
+        rows.append({
+            "trace_id": f"calibration-{i}",
+            "start_time": stamp.isoformat(),
+            "pick": "over",
+            "line": 5.5,
+            "win": i % 2 == 0,
+            "settled": True,
+            "push": False,
+            "model_probability": 0.70,
+            "bookmaker_odds": 2.0,
+        })
+    result = mod.walk_forward_probability_calibration(rows)
+    assert result["mode"] == "PAPER_SHADOW_ONLY"
+    assert result["training_rows"] == 70
+    assert result["holdout_rows"] == 30
+    assert result["training_end_time"] < result["holdout_start_time"]
+    assert result["applied_to_predictions"] is False
+    assert result["production_qualification_enabled"] is False
+    assert result["improvement_raw_minus_calibrated"]["brier"] > 0
+    assert result["improvement_raw_minus_calibrated"]["log_loss"] > 0
+
+
+test_time_safe_probability_calibration_shadow_uses_earlier_rows_only()
