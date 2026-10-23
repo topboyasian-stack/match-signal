@@ -38,7 +38,9 @@ permissions:
   contents: write
 
 concurrency:
-  group: match-signal-efootball-market-research
+  # Keep offline PR validation independent from the live archive publisher.
+  # A stalled publisher must not queue regression checks behind it.
+  group: match-signal-efootball-market-research-${{ github.event_name == 'pull_request' && 'validate' || 'publish' }}
   cancel-in-progress: false
 
 jobs:
@@ -130,8 +132,12 @@ jobs:
             exit 0
           fi
           git commit -m "🤖 Update isolated eFootball winner/BTTS market research"
-          for attempt in 1 2 3 4 5; do
-            if git push origin main; then
+          # Many independent automation workflows legitimately update main. Retry
+          # longer than a single neighbouring workflow's commit cycle, always
+          # rebuilding against the newest archive so no concurrent observations
+          # or report changes are overwritten.
+          for attempt in $(seq 1 12); do
+            if timeout 20s git push origin main; then
               echo "Research archive published on attempt $attempt."
               exit 0
             fi
@@ -146,6 +152,7 @@ jobs:
               exit 0
             fi
             git commit -m "🤖 Merge isolated eFootball market research samples"
-            sleep $((attempt * 2))
+            sleep $((attempt * 3))
           done
+          echo "Research archive publish exhausted 12 conflict-safe attempts; no force-push was used."
           exit 1
