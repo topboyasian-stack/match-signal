@@ -20,6 +20,7 @@ on:
       - 'scripts/eredivisie_source.py'
       - 'scripts/qa_ere_live.py'
       - 'scripts/settle_expansion.py'
+      - 'scripts/test_nba_sportybet_totals.py'
       - '.github/workflows/live-expansion.yml'
 
 permissions:
@@ -55,6 +56,9 @@ jobs:
 
       - name: Test bounded NBA history collection and season isolation
         run: python scripts/test_expansion_sources.py
+
+      - name: Test exact SportyBet NBA totals and overtime settlement
+        run: python scripts/test_nba_sportybet_totals.py
 
       - name: Generate live-experimental NBA + Eredivisie signals
         run: python scripts/run_live_expansion.py
