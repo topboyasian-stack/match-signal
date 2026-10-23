@@ -1,5 +1,5 @@
 """Regression checks for the accelerated Virtual Lab line-ladder fit."""
-from virtual_lab_model_eval import evaluate_participant_feature_gate,fit_lambda,poisson_over
+from virtual_lab_model_eval import evaluate_participant_feature_gate,fit_lambda,poisson_over,holdout_prediction_rows
 
 def reference_fit(points):
     if not points:return None
@@ -75,3 +75,38 @@ test_participant_gate_rejects_feature_that_only_beats_market()
 test_participant_gate_passes_only_when_both_losses_improve()
 test_participant_gate_fails_closed_on_small_untouched_sample()
 print("Participant feature promotion-gate regression checks passed")
+
+
+def test_holdout_prediction_export_is_efootball_only_and_never_includes_training_rows():
+    scored = [
+        {
+            "event_key": "e1|t1", "event_id": "e1", "timestamp": "2026-10-20T10:00:00+00:00",
+            "product": "efootball_gt", "competition": "GT", "selection": "under",
+            "line": 6.5, "y": 1, "market": 0.51, "poisson": 0.58,
+            "poisson_prior": 0.57, "efootball_shape": 0.56, "participant_model": 0.55,
+        },
+        {
+            "event_key": "e2|t2", "event_id": "e2", "timestamp": "2026-10-20T10:10:00+00:00",
+            "product": "vfootball", "competition": "VF", "selection": "over",
+            "line": 5.5, "y": 0, "market": 0.49, "poisson": 0.48,
+            "poisson_prior": 0.47, "efootball_shape": 0.46, "participant_model": 0.45,
+        },
+        {
+            "event_key": "e3|t3", "event_id": "e3", "timestamp": "2026-10-19T10:00:00+00:00",
+            "product": "efootball_adriatic", "competition": "Adriatic", "selection": "over",
+            "line": 4.5, "y": 0, "market": 0.52, "poisson": 0.53,
+            "poisson_prior": 0.54, "efootball_shape": 0.55, "participant_model": 0.56,
+        },
+    ]
+    exported = holdout_prediction_rows(scored, {"e1|t1"})
+    assert len(exported) == 1
+    assert exported[0]["event_id"] == "e1"
+    assert exported[0]["product"] == "efootball_gt"
+    assert exported[0]["line"] == 6.5
+    assert exported[0]["selection"] == "under"
+    assert exported[0]["poisson"] == 0.58
+    assert all(row["event_key"] in {"e1|t1"} for row in exported)
+
+
+test_holdout_prediction_export_is_efootball_only_and_never_includes_training_rows()
+print("Same-fixture Poisson holdout export regression passed")
