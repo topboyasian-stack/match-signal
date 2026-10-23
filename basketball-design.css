@@ -95,3 +95,153 @@ body[data-page="hub"][data-sport="basketball"] .metric span{display:block;color:
 body[data-page="hub"][data-sport="basketball"] .nba-total-prices .nba-lean{background:#eaf0f2;border-color:#d7e2e5;color:#435e69}
 body[data-page="hub"][data-sport="basketball"] .nba-total-prices .nba-lean b{color:#1f4b56}
 @media(max-width:760px){body[data-page="hub"][data-sport="basketball"] .metric-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+
+/* MATCH-SIGNAL-DARK-THEME-HOTFIX-2026-10-23
+   Basketball must inherit the same dark analytics-terminal system as the other desks.
+   These scoped overrides intentionally supersede the earlier light-theme experiment. */
+body[data-page="hub"][data-sport="basketball"] {
+  --nba-accent: #7edbd1;
+  --nba-accent-soft: rgba(126,219,209,.12);
+  --nba-ink: #edf5fa;
+  --nba-muted: #a0b2c0;
+  --nba-border: #2a4051;
+  --nba-surface: #101b27;
+  --nba-soft: #132230;
+  background:
+    radial-gradient(900px 430px at 80% -180px, rgba(88,188,187,.13), transparent 72%),
+    radial-gradient(760px 360px at 0% 8%, rgba(99,116,190,.09), transparent 70%),
+    linear-gradient(180deg,#0b141e 0%,#09111a 48%,#080e15 100%);
+  color: #edf5fa;
+}
+body[data-page="hub"][data-sport="basketball"] .cd-page-header {
+  background: linear-gradient(112deg,rgba(17,34,46,.98),rgba(12,23,33,.98) 67%,rgba(22,24,42,.98));
+  border-color: #2c4b59;
+  box-shadow: 0 16px 38px rgba(0,0,0,.19);
+}
+body[data-page="hub"][data-sport="basketball"] .cd-page-header h1,
+body[data-page="hub"][data-sport="basketball"] .cd-panel-heading h2,
+body[data-page="hub"][data-sport="basketball"] .cd-rail-card h3,
+body[data-page="hub"][data-sport="basketball"] .cd-header-aside strong,
+body[data-page="hub"][data-sport="basketball"] .cd-aside-meta b { color:#f0f6fa; }
+body[data-page="hub"][data-sport="basketball"] .cd-page-header p,
+body[data-page="hub"][data-sport="basketball"] .cd-header-aside p,
+body[data-page="hub"][data-sport="basketball"] .cd-panel-heading p,
+body[data-page="hub"][data-sport="basketball"] .cd-rail-card p,
+body[data-page="hub"][data-sport="basketball"] .cd-rail-card li,
+body[data-page="hub"][data-sport="basketball"] .cd-aside-meta,
+body[data-page="hub"][data-sport="basketball"] .cd-footer { color:#a0b2c0; }
+body[data-page="hub"][data-sport="basketball"] .cd-eyebrow,
+body[data-page="hub"][data-sport="basketball"] .cd-section-kicker,
+body[data-page="hub"][data-sport="basketball"] .cd-section-nav a span { color:#7edbd1; }
+body[data-page="hub"][data-sport="basketball"] .cd-header-aside,
+body[data-page="hub"][data-sport="basketball"] .cd-section-nav a,
+body[data-page="hub"][data-sport="basketball"] .cd-metric-grid .ms-metric,
+body[data-page="hub"][data-sport="basketball"] .cd-board-panel,
+body[data-page="hub"][data-sport="basketball"] .cd-rail-card {
+  background:linear-gradient(145deg,#111e2b,#0d1722);
+  border-color:#2a4051;
+  box-shadow:0 12px 32px rgba(0,0,0,.16);
+}
+body[data-page="hub"][data-sport="basketball"] .cd-chip {
+  background:#111d29;
+  border-color:#2a4051;
+  color:#c3d0da;
+}
+body[data-page="hub"][data-sport="basketball"] .cd-chip-primary {
+  background:rgba(123,220,178,.08);
+  border-color:rgba(123,220,178,.27);
+  color:#a5eed0;
+}
+body[data-page="hub"][data-sport="basketball"] .cd-metric-grid .ms-metric small,
+body[data-page="hub"][data-sport="basketball"] .cd-metric-grid .ms-metric span { color:#9aabba; }
+body[data-page="hub"][data-sport="basketball"] .cd-metric-grid .ms-metric strong { color:#edf5fa; }
+body[data-page="hub"][data-sport="basketball"] .cd-status {
+  background:#142332;
+  border-color:#304656;
+  color:#b4c4d0;
+}
+body[data-page="hub"][data-sport="basketball"] .cd-status.ok {
+  background:rgba(104,217,167,.1);
+  border-color:rgba(104,217,167,.28);
+  color:#8ce8bd;
+}
+body[data-page="hub"][data-sport="basketball"] .cd-status.warn {
+  background:rgba(240,200,117,.1);
+  border-color:rgba(240,200,117,.28);
+  color:#f0d28e;
+}
+body[data-page="hub"][data-sport="basketball"] .game-card,
+body[data-page="hub"][data-sport="basketball"] .nba-total-card,
+body[data-page="hub"][data-sport="basketball"] .metric {
+  background:linear-gradient(145deg,#132230,#0d1722);
+  border-color:#2a4051;
+  color:#edf5fa;
+}
+body[data-page="hub"][data-sport="basketball"] .tag,
+body[data-page="hub"][data-sport="basketball"] .team-mark,
+body[data-page="hub"][data-sport="basketball"] .nba-total-values>div {
+  background:#182a39;
+  border-color:#304656;
+  color:#c3d0da;
+}
+body[data-page="hub"][data-sport="basketball"] .tag.live {
+  background:rgba(104,217,167,.12);
+  color:#8ce8bd;
+}
+body[data-page="hub"][data-sport="basketball"] .tag.final {
+  background:rgba(126,219,209,.1);
+  color:#9be8e1;
+}
+body[data-page="hub"][data-sport="basketball"] .team,
+body[data-page="hub"][data-sport="basketball"] .scoreline,
+body[data-page="hub"][data-sport="basketball"] .score,
+body[data-page="hub"][data-sport="basketball"] .game-bottom strong,
+body[data-page="hub"][data-sport="basketball"] .nba-total-match strong,
+body[data-page="hub"][data-sport="basketball"] .metric strong { color:#edf5fa; }
+body[data-page="hub"][data-sport="basketball"] .game-time,
+body[data-page="hub"][data-sport="basketball"] .game-bottom small,
+body[data-page="hub"][data-sport="basketball"] .fineprint,
+body[data-page="hub"][data-sport="basketball"] .muted,
+body[data-page="hub"][data-sport="basketball"] .dash,
+body[data-page="hub"][data-sport="basketball"] .nba-total-match small,
+body[data-page="hub"][data-sport="basketball"] .nba-total-values small,
+body[data-page="hub"][data-sport="basketball"] .metric small,
+body[data-page="hub"][data-sport="basketball"] .metric span { color:#9aabba; }
+body[data-page="hub"][data-sport="basketball"] .game-bottom,
+body[data-page="hub"][data-sport="basketball"] .results-table-wrap,
+body[data-page="hub"][data-sport="basketball"] .audit-note { border-color:#2a4051; }
+body[data-page="hub"][data-sport="basketball"] .results-table { background:#0e1924; }
+body[data-page="hub"][data-sport="basketball"] .results-table th {
+  background:#142332;
+  color:#a0b2c0;
+  border-color:#2a4051;
+}
+body[data-page="hub"][data-sport="basketball"] .results-table td {
+  background:#0e1924;
+  color:#d4e0e8;
+  border-color:#263b4b;
+}
+body[data-page="hub"][data-sport="basketball"] .results-table td small { color:#9aabba; }
+body[data-page="hub"][data-sport="basketball"] .final-score { color:#edf5fa!important; }
+body[data-page="hub"][data-sport="basketball"] .audit-note {
+  background:#111e2b;
+  color:#a0b2c0;
+}
+body[data-page="hub"][data-sport="basketball"] .cd-footer { border-color:#2a4051; }
+body[data-page="hub"][data-sport="basketball"] .cd-empty-state,
+body[data-page="hub"][data-sport="basketball"] .empty-state {
+  background:#101c28;
+  border-color:#304656;
+  color:#a0b2c0;
+}
+body[data-page="hub"][data-sport="basketball"] .nba-total-prices,
+body[data-page="hub"][data-sport="basketball"] .nba-total-prices b { color:#edf5fa; }
+body[data-page="hub"][data-sport="basketball"] .nba-total-prices .nba-price-missing {
+  background:rgba(240,200,117,.1);
+  border-color:rgba(240,200,117,.28);
+  color:#f0d28e;
+}
+body[data-page="hub"][data-sport="basketball"] :focus-visible {
+  outline-color:#7edbd1;
+}
