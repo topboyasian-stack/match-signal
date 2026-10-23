@@ -26,9 +26,14 @@ def sportybet_basketball_feed():
         response = S.get(url, params={"pageSize": 100, "timeline": 96}, timeout=12)
         response.raise_for_status()
         payload = response.json()
-        if payload.get("ok") is not True or not isinstance(payload.get("events"), list):
-            return [], "SportyBet feed returned no verified events"
-        return payload["events"], None
+        if payload.get("ok") is not True:
+            return [], f"SportyBet source response failed: {payload.get('error') or 'ok flag was not true'}"
+        if not isinstance(payload.get("events"), list):
+            return [], "SportyBet source response omitted the events array"
+        events = payload["events"]
+        if not events:
+            return [], "SportyBet source returned zero upcoming basketball events"
+        return events, None
     except Exception as exc:
         return [], f"SportyBet feed unavailable: {exc}"
 
@@ -63,6 +68,9 @@ def sportybet_total_for_fixture(fixture, feed):
             continue
         market = next((m for m in (event.get("markets") or []) if str(m.get("id")) == "225"), None)
         if not market:
+            continue
+        market_status = str(market.get("status") or "").lower()
+        if re.search(r"suspend|closed|inactive|settled|unavailable|stop", market_status):
             continue
         specifier = str(market.get("specifier") or "")
         match = re.search(r"(?:^|[,;|&\s])total\s*=\s*(\d+(?:\.\d+)?)(?=$|[,;|&\s])", specifier, re.I)
