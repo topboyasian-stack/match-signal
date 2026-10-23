@@ -231,21 +231,59 @@ def main():
     } for r in ere_history]
 
     ere_predictions = [p for f in ere_fixtures if (p := ere_prediction(f, ere_hist_for_model))]
+    # Keep the first generated pre-game snapshot for every fixture. Refreshing a
+    # row after tip-off must never rewrite history or create fake prediction accuracy.
+    try:
+        old_nba = json.loads((DATA/"nba_predictions.json").read_text(encoding="utf-8"))
+        if not isinstance(old_nba, list): old_nba = []
+    except Exception:
+        old_nba = []
+    old_by_id = {str(x.get("event_id")): x for x in old_nba if isinstance(x, dict)}
     nba_predictions = []
+    seen_nba = set()
     for f in nba_fixtures:
-        p = nba_predict(f, nba_history)
-        if p:
-            probs = p["moneyline"]
-            nba_predictions.append({
-                "sport": "basketball", "league": "NBA", "event_id": f["event_id"],
-                "start_time": f["date"], "player_1": f["home"], "player_2": f["away"],
-                "probabilities": {"p1": round(probs["home"],6), "p2": round(probs["away"],6)},
-                "pick": "p1" if probs["home"] >= probs["away"] else "p2",
-                "confidence": round(max(probs.values()),6), "expected_score": p["expected_score"],
-                "expected_total": p["expected_total"], "markets": {"moneyline": p["moneyline"]},
-                "model": p["model"], "signal_quality": {"status":"LIVE_EXPERIMENTAL"},
-                "prediction_status": "live_experimental", "paper_only": False, "live_experimental": True,
-            })
+        eid = str(f["event_id"])
+        start = dt(f.get("date"))
+        old = old_by_id.get(eid)
+        old_stamp = dt(old.get("generated_at") or old.get("prediction_created_at")) if old else None
+        if old and old_stamp and start and old_stamp < start:
+            row = dict(old)
+        else:
+            # If a fixture has already started and no pre-game snapshot exists,
+            # leave it for live-score monitoring only; do not invent a prediction.
+            if not start or start <= NOW:
+                if old:
+                    row = dict(old)
+                else:
+                    continue
+            else:
+                p = nba_predict(f, nba_history)
+                if not p: continue
+                probs = p["moneyline"]
+                row = {
+                    "sport": "basketball", "league": "NBA", "event_id": eid,
+                    "start_time": f["date"], "player_1": f["home"], "player_2": f["away"],
+                    "probabilities": {"p1": round(probs["home"],6), "p2": round(probs["away"],6)},
+                    "pick": "p1" if probs["home"] >= probs["away"] else "p2",
+                    "confidence": round(max(probs.values()),6), "expected_score": p["expected_score"],
+                    "expected_total": p["expected_total"], "markets": {"moneyline": p["moneyline"]},
+                    "model": p["model"], "signal_quality": {"status":"LIVE_EXPERIMENTAL","market_odds_available":False},
+                    "generated_at": NOW.isoformat(), "prediction_created_at": NOW.isoformat(),
+                    "accuracy_eligible": True, "prediction_status": "live_experimental",
+                    "paper_only": True, "live_experimental": True,
+                }
+        nba_predictions.append(row)
+        seen_nba.add(eid)
+    # Keep recent pre-game snapshots through the settlement grace window.
+    for old in old_nba:
+        if not isinstance(old, dict): continue
+        eid = str(old.get("event_id") or "")
+        start = dt(old.get("start_time"))
+        stamp = dt(old.get("generated_at") or old.get("prediction_created_at"))
+        if eid and eid not in seen_nba and start and stamp and stamp < start and start >= NOW-timedelta(hours=30):
+            nba_predictions.append(dict(old))
+            seen_nba.add(eid)
+    nba_predictions.sort(key=lambda x: x.get("start_time", ""))
 
     (DATA/"ere_divisie_history.json").write_text(json.dumps(ere_history, indent=2), encoding="utf-8")
     (DATA/"nba_history.json").write_text(json.dumps(nba_history, indent=2), encoding="utf-8")
