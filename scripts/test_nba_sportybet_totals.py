@@ -32,6 +32,8 @@ wrong_team = [dict(feed[0], home="Chicago Bulls")]
 assert pipeline.sportybet_total_for_fixture(fixture, wrong_team) is None, "never match odds to a different game"
 wrong_market = [dict(feed[0], markets=[dict(feed[0]["markets"][0], id="18")])]
 assert pipeline.sportybet_total_for_fixture(fixture, wrong_market) is None, "standard O/U must not masquerade as the explicit incl-OT market"
+suspended_market = [dict(feed[0], markets=[dict(feed[0]["markets"][0], status="suspended")])]
+assert pipeline.sportybet_total_for_fixture(fixture, suspended_market) is None, "suspended SportyBet totals must not be used"
 stale = [dict(feed[0], fetched_at=(now-timedelta(minutes=20)).isoformat())]
 assert pipeline.sportybet_total_for_fixture(fixture, stale) is None, "stale quotes must not be used as current prices"
 
