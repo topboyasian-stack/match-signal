@@ -18,7 +18,9 @@ assert.ok(ui.includes("Math.abs(a-b)<=45*60*1000"), "SportyBet quotes must match
 assert.ok(ui.includes("Date.now()-fetched<=15*60*1000") && ui.includes("fresh:Number.isFinite(fetched)"), "Stale SportyBet quotes must be withheld while fresh quotes remain eligible");
 assert.ok(ui.includes("no other bookmaker prices are substituted."), "Other-bookmaker odds must never be labelled SportyBet");
 assert.ok(api.includes("sportId:'sr:sport:2'"), "SportyBet basketball feed must request the basketball sport ID");
-assert.ok(api.includes("const MARKET_IDS='1,18,219,223,225,227,228'"), "Feed must request basketball markets including O/U incl overtime");
+assert.ok(api.includes("const MARKET_IDS='1,18,10,29,11,26,36,14,60100,186,189,202,204,210,225'"), "Feed must request the provider's supported market list plus O/U incl overtime");
+assert.ok(api.includes("/api/ng/factsCenter/wapConfigurableUpcomingEvents"), "Feed must have a supported SportyBet upcoming-event fallback");
+assert.ok(ui.includes("suspend|closed|inactive|settled|unavailable|stop"), "Suspended or closed SportyBet total markets must be withheld");
 assert.ok(api.includes("total_including_overtime:'225'"), "API contract must explicitly identify total incl overtime");
 assert.ok(workflow.includes("node scripts/test_basketball_desk_contract.mjs"), "Deployment must execute Basketball contract tests");
 console.log("Basketball desk contract passed: shared UI, scoped responsive design, exact SportyBet event matching, fresh full-game totals including OT.");
