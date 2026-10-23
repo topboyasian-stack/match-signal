@@ -44,6 +44,15 @@ try {
   assert.equal(invalidSport.status, 400);
   assert.equal(fetchCount, 0, "unsupported sport ids must not reach the provider");
 
+  const nbaTotals = await worker.fetch(new Request(
+    "https://worker.test/api/ng/factsCenter/pcUpcomingEvents?sportId=sr%3Asport%3A2&pageSize=100&pageNum=1&timeline=96&marketId=225"
+  ));
+  assert.equal(nbaTotals.status, 200, "NBA full-game totals market 225 must pass the allowlist");
+  assert.equal(lastUrl.searchParams.get("sportId"), "sr:sport:2");
+  assert.equal(lastUrl.searchParams.get("marketId"), "225");
+  assert.equal(fetchCount, 1);
+  fetchCount = 0;
+
   const proxied = await worker.fetch(new Request(
     "https://worker.test/api/ng/factsCenter/pcUpcomingEvents?sportId=sr%3Asport%3A137&pageSize=100&pageNum=2&timeline=168&marketId=1%2C18&untrusted=https%3A%2F%2Fexample.com"
   ));
