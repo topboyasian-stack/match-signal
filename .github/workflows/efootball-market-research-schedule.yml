@@ -135,7 +135,7 @@ jobs:
           # rebuilding against the newest archive so no concurrent observations
           # or report changes are overwritten.
           for attempt in $(seq 1 12); do
-            if git push origin main; then
+            if timeout 20s git push origin main; then
               echo "Research archive published on attempt $attempt."
               exit 0
             fi
