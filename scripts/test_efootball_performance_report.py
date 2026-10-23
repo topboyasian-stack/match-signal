@@ -51,6 +51,15 @@ def test_ou_stats_and_confidence_grouping():
     assert by_line["under 6.5"]["settled"] == 2
     assert by_line["under 6.5"]["flat_stake_roi"] == -1.0
     assert any("overconfident" in x["finding"].lower() for x in report["findings"]) is False
+    # The report makes calibration and recent line/side changes visible without changing qualification.
+    calibration = {x["probability_band"]: x for x in report["calibration_by_probability_band"]}
+    assert calibration["0.65-0.70"]["settled"] == 2
+    assert calibration["0.65-0.70"]["hit_rate"] == 0.0
+    assert calibration["0.65-0.70"]["calibration_gap"] == -0.65
+    recent_by_line = {x["line_side"]: x for x in report["chronological_by_line_and_side"]}
+    assert recent_by_line["under 6.5"]["settled"] == 2
+    assert recent_by_line["under 6.5"]["latest_30_percent"]["settled"] == 1
+    assert recent_by_line["under 6.5"]["latest_30_percent"]["flat_stake_roi"] == -1.0
 
 
 def test_market_baseline_and_review_threshold_are_not_promotion():
