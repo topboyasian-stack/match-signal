@@ -17,7 +17,7 @@ assert.ok(css.includes("@media(max-width:480px)") && css.includes("@media(prefer
 assert.ok(ui.includes("String(x.id)==='225'") || ui.includes("String(x.id)==='225'") || ui.includes("String(x.id)==='225'"), "Totals must use the explicit SportyBet market ID for full-game O/U including overtime");
 assert.ok(ui.includes("Math.abs(a-b)<=45*60*1000"), "SportyBet quotes must match exact teams and near-identical kickoff times");
 assert.ok(ui.includes("Date.now()-fetched<=15*60*1000") && ui.includes("fresh:Number.isFinite(fetched)"), "Stale SportyBet quotes must be withheld while fresh quotes remain eligible");
-assert.ok(ui.includes("no other bookmaker prices are substituted."), "Other-bookmaker odds must never be labelled SportyBet");
+assert.ok(ui.includes("Historical line is context only; no current lean or odds value is inferred.") && ui.includes("Current exact SportyBet event · full-game total market 225"), "Totals must withhold stale prices and clearly label only exact current SportyBet quotes");
 assert.ok(api.includes("sportId:'sr:sport:2'"), "SportyBet basketball feed must request the basketball sport ID");
 assert.ok(api.includes("https://www.sportybet.com"), "SportyBet feed must fall back to the direct Nigeria endpoint if the proxy rejects basketball");
 assert.ok(api.includes("const STANDARD_MARKET_IDS='1,18,10,29,11,26,36,14,60100,186,189,202,204,210'") && api.includes("marketId:'225'"), "Feed must request the provider's supported standard market list and probe O/U incl overtime separately");
