@@ -42,6 +42,6 @@ export async function onRequestGet(context){
     }
     return new Response(JSON.stringify({ok:true,source:'SportyBet Nigeria',market_contract:{winner_including_overtime:'219',handicap_including_overtime:'223',total_including_overtime:'225',team_total_points:['227','228']},fetched_at:new Date().toISOString(),elapsed_ms:Date.now()-started,event_count:events.length,events}),{status:200,headers:headers()});
   }catch(error){
-    return new Response(JSON.stringify({ok:false,source:'SportyBet Nigeria',error:String(error?.message||error),fetched_at:new Date().toISOString(),event_count:0,events:[]}),{status:502,headers:{...headers(),'Cache-Control':'no-store'}});
+    return new Response(JSON.stringify({ok:false,source:'SportyBet Nigeria',error:String(error?.message||error),fetched_at:new Date().toISOString(),event_count:0,events:[]}),{status:200,headers:{...headers(),'Cache-Control':'no-store'}});
   }
 }
