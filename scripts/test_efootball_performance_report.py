@@ -336,3 +336,61 @@ def test_exact_line_side_calibration_shadow_is_chronological_and_paper_only():
 
 
 test_exact_line_side_calibration_shadow_is_chronological_and_paper_only()
+
+
+def test_same_fixture_poisson_comparison_requires_exact_identity_time_and_outcome():
+    qualified = [
+        settled_ou("2026-10-20", "under", 6.5, True, p=0.60, odds=1.8) | {
+            "product": "efootball_gt", "event_id": "ev-1", "start_time": "2026-10-20T10:00:00+00:00",
+        },
+        settled_ou("2026-10-20", "over", 4.5, False, p=0.70, odds=1.9) | {
+            "product": "efootball_gt", "event_id": "ev-2", "start_time": "2026-10-20T10:10:00+00:00",
+        },
+        settled_ou("2026-10-20", "under", 7.5, True, p=0.65, odds=1.7) | {
+            "product": "efootball_gt", "event_id": "ev-3", "start_time": "2026-10-20T10:20:00+00:00",
+        },
+        settled_ou("2026-10-20", "over", 5.5, True, p=0.65, odds=1.7) | {
+            "product": "efootball_gt", "event_id": "ev-4", "start_time": "2026-10-20T10:30:00+00:00",
+        },
+    ]
+    model_rows = [
+        {
+            "event_key": "ev-1|t1", "event_id": "ev-1", "timestamp": "2026-10-20T10:00:00+00:00",
+            "product": "efootball_gt", "selection": "under", "line": 6.5, "y": 1,
+            "market": 0.52, "poisson": 0.80, "poisson_prior": 0.78,
+            "efootball_shape": 0.76, "participant_model": 0.74,
+        },
+        {
+            "event_key": "ev-2|t2", "event_id": "ev-2", "timestamp": "2026-10-20T10:10:00+00:00",
+            "product": "efootball_gt", "selection": "over", "line": 4.5, "y": 0,
+            "market": 0.55, "poisson": 0.60, "poisson_prior": 0.62,
+            "efootball_shape": 0.64, "participant_model": 0.66,
+        },
+        {
+            "event_key": "ev-3|t3", "event_id": "ev-3", "timestamp": "2026-10-20T12:00:00+00:00",
+            "product": "efootball_gt", "selection": "under", "line": 7.5, "y": 1,
+            "market": 0.55, "poisson": 0.70, "poisson_prior": 0.71,
+            "efootball_shape": 0.72, "participant_model": 0.73,
+        },
+        {
+            "event_key": "ev-4|t4", "event_id": "ev-4", "timestamp": "2026-10-20T10:30:00+00:00",
+            "product": "efootball_gt", "selection": "over", "line": 5.5, "y": 0,
+            "market": 0.55, "poisson": 0.70, "poisson_prior": 0.71,
+            "efootball_shape": 0.72, "participant_model": 0.73,
+        },
+    ]
+    result = mod.compare_qualified_picks_to_poisson_holdout(
+        qualified, {"generated_at": "2026-10-23T00:00:00+00:00", "holdout_scored_predictions": model_rows}
+    )
+    assert result["matched_rows"] == 2
+    assert result["match_coverage"]["timestamp_mismatch"] == 1
+    assert result["match_coverage"]["settlement_outcome_mismatch"] == 1
+    metrics = result["metrics_on_identical_matched_rows"]
+    assert metrics["qualified_model_probability"]["n"] == 2
+    assert metrics["poisson"]["n"] == 2
+    assert metrics["poisson"]["brier"] < metrics["qualified_model_probability"]["brier"]
+    assert result["applied_to_predictions"] is False
+    assert result["production_qualification_enabled"] is False
+
+
+test_same_fixture_poisson_comparison_requires_exact_identity_time_and_outcome()
