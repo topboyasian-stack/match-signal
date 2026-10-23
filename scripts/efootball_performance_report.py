@@ -1186,6 +1186,164 @@ def build_ticket_report(tracker: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _probability_quality_metrics(rows: list[dict[str, Any]], probability_key: str) -> dict[str, Any]:
+    scored = []
+    for row in rows:
+        p = number(row.get(probability_key))
+        if p is None or not 0 <= p <= 1:
+            continue
+        y = 1.0 if row.get("win") is True else 0.0
+        p = max(0.0001, min(0.9999, p))
+        scored.append((p, y))
+    if not scored:
+        return {"n": 0, "brier": None, "log_loss": None, "ece": None, "hit_rate": None, "mean_probability": None, "observed_hit_rate": None}
+    brier = sum((p - y) ** 2 for p, y in scored) / len(scored)
+    log_loss = sum(-(y * math.log(p) + (1.0 - y) * math.log(1.0 - p)) for p, y in scored) / len(scored)
+    ece = 0.0
+    for idx in range(10):
+        lo = idx / 10
+        hi = lo + 0.1 if idx < 9 else 1.0001
+        bucket = [(p, y) for p, y in scored if lo <= p < hi]
+        if bucket:
+            ece += len(bucket) / len(scored) * abs(
+                sum(p for p, _ in bucket) / len(bucket) - sum(y for _, y in bucket) / len(bucket)
+            )
+    return {
+        "n": len(scored),
+        "brier": rounded(brier),
+        "log_loss": rounded(log_loss),
+        "ece": rounded(ece),
+        "hit_rate": rounded(sum((p >= 0.5) == bool(y) for p, y in scored) / len(scored)),
+        "mean_probability": rounded(sum(p for p, _ in scored) / len(scored)),
+        "observed_hit_rate": rounded(sum(y for _, y in scored) / len(scored)),
+    }
+
+
+def compare_qualified_picks_to_poisson_holdout(
+    qualified_rows: list[dict[str, Any]], lab_eval: dict[str, Any], *, timestamp_tolerance_seconds: int = 900
+) -> dict[str, Any]:
+    """Compare qualified O/U probabilities with model variants on identical holdout fixtures.
+
+    Joins on exact product + event ID + line + side and requires scheduled timestamps
+    within 15 minutes. Conflicting outcomes and duplicate qualified keys are excluded.
+    The evaluator's row-level predictions must come from its untouched chronological holdout.
+    """
+    model_rows = lab_eval.get("holdout_scored_predictions")
+    if not isinstance(model_rows, list) or not model_rows:
+        return {
+            "mode": "PAPER_SHADOW_ONLY",
+            "status": "MODEL_HOLDOUT_ROWS_UNAVAILABLE",
+            "matched_rows": 0,
+            "applied_to_predictions": False,
+            "production_qualification_enabled": False,
+            "note": "The Virtual Lab evaluator must export row-level untouched eFootball holdout predictions before same-fixture comparison is possible.",
+        }
+
+    def side_key(value: Any) -> str | None:
+        s = str(value or "").strip().lower()
+        if s.startswith("o"):
+            return "over"
+        if s.startswith("u"):
+            return "under"
+        return None
+
+    def key_for(row: dict[str, Any], *, model: bool = False):
+        product = str(row.get("product") or "").strip().lower()
+        event_id = str(row.get("event_id") or "").strip()
+        line = number(row.get("line"))
+        side = side_key(row.get("selection") if model else row.get("pick"))
+        if not product or not event_id or line is None or side is None:
+            return None
+        return product, event_id, f"{line:g}", side
+
+    model_index: dict[tuple[str, str, str, str], list[dict[str, Any]]] = defaultdict(list)
+    for row in model_rows:
+        if not isinstance(row, dict):
+            continue
+        key = key_for(row, model=True)
+        if key:
+            model_index[key].append(row)
+
+    eligible = settled_ou_rows(qualified_rows)
+    matched: list[dict[str, Any]] = []
+    counts = {
+        "eligible_qualified_rows": len(eligible),
+        "missing_exact_identity": 0,
+        "no_model_holdout_row": 0,
+        "timestamp_mismatch": 0,
+        "settlement_outcome_mismatch": 0,
+        "duplicate_qualified_key": 0,
+    }
+    seen = set()
+    for row in eligible:
+        key = key_for(row)
+        if not key:
+            counts["missing_exact_identity"] += 1
+            continue
+        start = parse_time(row.get("start_time"))
+        if start is None:
+            counts["timestamp_mismatch"] += 1
+            continue
+        identity = (*key, start.isoformat())
+        if identity in seen:
+            counts["duplicate_qualified_key"] += 1
+            continue
+        seen.add(identity)
+        candidates = model_index.get(key, [])
+        if not candidates:
+            counts["no_model_holdout_row"] += 1
+            continue
+        timed = []
+        for candidate in candidates:
+            candidate_time = parse_time(candidate.get("timestamp"))
+            if candidate_time is not None:
+                timed.append((abs((candidate_time - start).total_seconds()), candidate))
+        if not timed:
+            counts["timestamp_mismatch"] += 1
+            continue
+        delta, candidate = min(timed, key=lambda item: item[0])
+        if delta > timestamp_tolerance_seconds:
+            counts["timestamp_mismatch"] += 1
+            continue
+        if bool(candidate.get("y")) != bool(row.get("win")):
+            counts["settlement_outcome_mismatch"] += 1
+            continue
+        matched.append({
+            **row,
+            "market_probability": candidate.get("market"),
+            "poisson_probability": candidate.get("poisson"),
+            "poisson_prior_probability": candidate.get("poisson_prior"),
+            "efootball_shape_probability": candidate.get("efootball_shape"),
+            "participant_model_probability": candidate.get("participant_model"),
+            "model_eval_timestamp": candidate.get("timestamp"),
+            "model_eval_event_key": candidate.get("event_key"),
+        })
+
+    probability_fields = {
+        "qualified_model_probability": "model_probability",
+        "sportybet_devig_baseline": "market_probability",
+        "poisson": "poisson_probability",
+        "poisson_prior": "poisson_prior_probability",
+        "efootball_shape": "efootball_shape_probability",
+        "participant_model": "participant_model_probability",
+    }
+    metrics = {name: _probability_quality_metrics(matched, field) for name, field in probability_fields.items()}
+    matched_n = len(matched)
+    return {
+        "mode": "PAPER_SHADOW_ONLY",
+        "status": "MATCHED_HOLDOUT_AVAILABLE" if matched_n >= 100 else "INSUFFICIENT_MATCHED_ROWS",
+        "join_contract": "exact product + event ID + O/U line + side; scheduled timestamps within 15 minutes; outcome must agree across ledgers",
+        "timestamp_tolerance_seconds": timestamp_tolerance_seconds,
+        "model_evaluation_generated_at": lab_eval.get("generated_at"),
+        "matched_rows": matched_n,
+        "match_coverage": counts,
+        "metrics_on_identical_matched_rows": metrics,
+        "applied_to_predictions": False,
+        "production_qualification_enabled": False,
+        "note": "This is a selected Qualified Best subset intersected with the model evaluator's untouched holdout. Compare Brier/log loss/ECE on this identical set; no model is promoted automatically.",
+    }
+
+
 def build_report(ou_rows: list[dict[str, Any]], market_archive: dict[str, Any],
                  tracker: dict[str, Any], lab_eval: dict[str, Any],
                  generated_at: datetime | None = None) -> dict[str, Any]:
@@ -1263,6 +1421,7 @@ def build_report(ou_rows: list[dict[str, Any]], market_archive: dict[str, Any],
         "independent_winner_ggng_shadow": independent_shadow,
         "ticket_performance": build_ticket_report(tracker),
         "walk_forward_ou_model_evaluation": model_eval,
+        "qualified_best_poisson_same_fixture_comparison": compare_qualified_picks_to_poisson_holdout(ou_rows, lab_eval),
         "market_review_status": market_status,
         "promotion_policy": {
             "preliminary_market_review_threshold": 100,
