@@ -98,4 +98,17 @@ jobs:
             throw new Error('Regional Worker diagnostic response was invalid.');
           }
           console.log('SportyBet diagnostics:', JSON.stringify(diagnostics, null, 2));
+
+          const nbaUrl = base + '/api/ng/factsCenter/pcUpcomingEvents?sportId=sr%3Asport%3A2&pageSize=5&pageNum=1&todayGames=false&timeline=96&marketId=225&probe=' + Date.now();
+          const nbaResponse = await fetch(nbaUrl, { cache: 'no-store', signal: AbortSignal.timeout(15000) });
+          const nbaText = await nbaResponse.text();
+          console.log('NBA totals market-225 probe:', JSON.stringify({
+            http_status: nbaResponse.status,
+            upstream_status: nbaResponse.headers.get('X-Match-Signal-Upstream-Status'),
+            endpoint: nbaResponse.headers.get('X-Match-Signal-Upstream-Endpoint'),
+            body: nbaText.replace(/\\s+/g, ' ').slice(0, 500)
+          }, null, 2));
+          if (nbaResponse.status === 400 && !nbaResponse.headers.has('X-Match-Signal-Upstream-Status')) {
+            throw new Error('Regional Worker rejected the NBA sportId or marketId before reaching SportyBet.');
+          }
           NODE
