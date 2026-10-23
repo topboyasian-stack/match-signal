@@ -4,7 +4,7 @@ Keeps the independent model separate from market prices while allowing the
 current-season competitions to generate real, timestamped experimental signals.
 The outputs are explicitly LIVE_EXPERIMENTAL, never live-trading approved.
 """
-import csv, io, json, math
+import csv, io, json, math, re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import requests
@@ -17,6 +17,118 @@ DATA = ROOT / "data"
 DATA.mkdir(exist_ok=True)
 S = requests.Session()
 S.headers.update({"User-Agent": "Mozilla/5.0 (compatible; MatchSignal/1.0)"})
+
+
+def sportybet_basketball_feed():
+    """Read SportyBet Nigeria pre-match NBA markets through the existing regional proxy."""
+    url = "https://match-signal.pages.dev/api/sportybet-basketball"
+    try:
+        response = S.get(url, params={"pageSize": 100, "timeline": 96}, timeout=12)
+        response.raise_for_status()
+        payload = response.json()
+        if payload.get("ok") is not True or not isinstance(payload.get("events"), list):
+            return [], "SportyBet feed returned no verified events"
+        return payload["events"], None
+    except Exception as exc:
+        return [], f"SportyBet feed unavailable: {exc}"
+
+
+def nba_team_key(value):
+    text = re.sub(r"[^a-z0-9]+", " ", str(value or "").lower()).strip()
+    text = re.sub(r"\\s+", " ", text)
+    text = re.sub(r"^(la) ", "los angeles ", text)
+    text = re.sub(r"^(ny) ", "new york ", text)
+    return text
+
+
+def sportybet_total_for_fixture(fixture, feed):
+    """Return only an exact team/time match to SportyBet market 225 (total incl. OT)."""
+    fixture_home = nba_team_key(fixture.get("home"))
+    fixture_away = nba_team_key(fixture.get("away"))
+    fixture_start = dt(fixture.get("date"))
+    if not fixture_home or not fixture_away or not fixture_start:
+        return None
+    for event in feed:
+        event_home = nba_team_key(event.get("home"))
+        event_away = nba_team_key(event.get("away"))
+        if not ((fixture_home == event_home and fixture_away == event_away) or
+                (fixture_home == event_away and fixture_away == event_home)):
+            continue
+        event_start = dt(event.get("start_time"))
+        if not event_start or abs((event_start - fixture_start).total_seconds()) > 45 * 60:
+            continue
+        fetched_at = dt(event.get("fetched_at"))
+        now = datetime.now(timezone.utc)
+        if not fetched_at or fetched_at > now + timedelta(minutes=2) or now - fetched_at > timedelta(minutes=15):
+            continue
+        market = next((m for m in (event.get("markets") or []) if str(m.get("id")) == "225"), None)
+        if not market:
+            continue
+        specifier = str(market.get("specifier") or "")
+        match = re.search(r"(?:^|[,;|&\\s])total\\s*=\\s*(\\d+(?:\\.\\d+)?)(?=$|[,;|&\\s])", specifier, re.I)
+        if not match:
+            continue
+        line = float(match.group(1))
+        if not 100 <= line <= 300:
+            continue
+        outcomes = market.get("outcomes") or []
+        over = next((o for o in outcomes if re.search(r"\\bover\\b", str(o.get("name") or ""), re.I)), None)
+        under = next((o for o in outcomes if re.search(r"\\bunder\\b", str(o.get("name") or ""), re.I)), None)
+        if not over or not under:
+            continue
+        over_odds, under_odds = over.get("odds"), under.get("odds")
+        if not isinstance(over_odds, (int, float)) or not isinstance(under_odds, (int, float)) or over_odds <= 1 or under_odds <= 1:
+            continue
+        return {
+            "line": line, "over_odds": float(over_odds), "under_odds": float(under_odds),
+            "market_id": "225", "source": "SportyBet Nigeria",
+            "sportybet_event_id": str(event.get("event_id") or ""),
+            "quote_timestamp": fetched_at.isoformat(),
+            "settlement": "Official final score including overtime",
+        }
+    return None
+
+
+def apply_sportybet_total_snapshot(prediction, fixture, feed):
+    """Attach a timestamped pre-game quote without allowing market odds into the model."""
+    start = dt(prediction.get("start_time"))
+    now = datetime.now(timezone.utc)
+    if not start or now >= start:
+        return prediction
+    quote = sportybet_total_for_fixture(fixture, feed)
+    if not quote or dt(quote.get("quote_timestamp")) is None or dt(quote["quote_timestamp"]) >= start:
+        return prediction
+    markets = prediction.get("markets") if isinstance(prediction.get("markets"), dict) else {}
+    existing = markets.get("total_ou") if isinstance(markets.get("total_ou"), dict) else {}
+    # Keep a previously captured pre-game snapshot if a refresh does not yield a newer valid quote.
+    previous = dt(existing.get("quote_timestamp"))
+    current = dt(quote.get("quote_timestamp"))
+    if previous and current and previous >= current:
+        return prediction
+    expected = prediction.get("expected_total")
+    try:
+        edge_points = float(expected) - float(quote["line"])
+    except (TypeError, ValueError):
+        edge_points = None
+    lean = "NO_CLEAR_LEAN"
+    pick = None
+    if edge_points is not None and edge_points >= 3.0:
+        lean, pick = "OVER", "over"
+    elif edge_points is not None and edge_points <= -3.0:
+        lean, pick = "UNDER", "under"
+    quote.update({
+        "expected_total": float(expected) if expected is not None else None,
+        "projection_edge_points": round(edge_points, 2) if edge_points is not None else None,
+        "lean": lean, "pick": pick, "prediction_status": "LIVE_EXPERIMENTAL_NOT_QUALIFIED",
+        "model_is_market_blind": True,
+    })
+    markets["total_ou"] = quote
+    prediction["markets"] = markets
+    signal_quality = prediction.get("signal_quality") if isinstance(prediction.get("signal_quality"), dict) else {}
+    signal_quality["total_market_available"] = True
+    signal_quality["total_market_source"] = "SportyBet Nigeria market 225 (Over/Under incl. overtime)"
+    prediction["signal_quality"] = signal_quality
+    return prediction
 
 
 def dt(v):
@@ -241,6 +353,7 @@ def main():
     old_by_id = {str(x.get("event_id")): x for x in old_nba if isinstance(x, dict)}
     nba_predictions = []
     seen_nba = set()
+    sportybet_feed, sportybet_error = sportybet_basketball_feed()
     for f in nba_fixtures:
         eid = str(f["event_id"])
         start = dt(f.get("date"))
@@ -272,6 +385,7 @@ def main():
                     "accuracy_eligible": True, "prediction_status": "live_experimental",
                     "paper_only": True, "live_experimental": True,
                 }
+        row = apply_sportybet_total_snapshot(row, f, sportybet_feed)
         nba_predictions.append(row)
         seen_nba.add(eid)
     # Keep recent pre-game snapshots through the settlement grace window.
@@ -296,7 +410,7 @@ def main():
             "NBA": {"historical_events": len(nba_history), "current_fixtures": len(nba_fixtures), "collection_errors": len(nba_errors), "status": "LIVE_EXPERIMENTAL" if nba_predictions else ("PRESEASON_READY" if NOW < NBA_START else "NO_CURRENT_FIXTURES"), "history_source": "llimllib/nba_data gamelogs.parquet; ESPN daily scoreboard and NBA Elo CSV fallbacks"},
             "Eredivisie": {"historical_events": len(ere_history), "current_fixtures": len(ere_fixtures), "published_predictions": len(ere_predictions), "collection_errors": len(ere_errors), "status": "LIVE_EXPERIMENTAL" if ere_predictions else "NO_CURRENT_FIXTURES", "fixture_source": "ESPN primary; Football-Data fixtures.csv; SofaScore daily schedule fallback"},
         },
-        "source_diagnostics": {"NBA": nba_errors[:5], "Eredivisie": ere_errors[:5]},
+        "source_diagnostics": {"NBA": nba_errors[:5], "Eredivisie": ere_errors[:5], "SportyBet_NBA_totals": ([sportybet_error] if sportybet_error else [])},
         "monitoring": {"settlement": "expansion_prediction_history.json", "promotion_rule": "live evidence + calibration + market benchmark; automatic demotion on data failure", "market_data_is_benchmark_only": True},
         "notes": ["Independent probabilities never consume market probabilities.", "LIVE_EXPERIMENTAL signals are real generated predictions, not guarantees or live-trading approval.", "NBA remains preseason-ready until 2026-10-20, then enters live experimental mode automatically.", "Eredivisie uses ESPN when available, Football-Data's current fixture feed as the first fallback, and SofaScore's daily schedule as the second fallback."],
     }
