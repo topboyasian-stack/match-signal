@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 
 const root = new URL("../", import.meta.url);
 const read = path => readFile(new URL(path, root), "utf8");
-const [oddsCss, reportsCss, labCss, oddsHtml, reportsHtml, labHtml, builderJs, deploy] = await Promise.all([
+const [oddsCss, reportsCss, labCss, oddsHtml, reportsHtml, labHtml, builderJs, deploy, sharedNav] = await Promise.all([
   read("odds-builder-design.css"),
   read("reports-design.css"),
   read("virtual-lab-terminal.css"),
@@ -11,7 +11,8 @@ const [oddsCss, reportsCss, labCss, oddsHtml, reportsHtml, labHtml, builderJs, d
   read("reports.html"),
   read("virtual-lab/index.html"),
   read("expansion-odds-builder.js"),
-  read(".github/workflows/cloudflare-pages.yml")
+  read(".github/workflows/cloudflare-pages.yml"),
+  read("workspace-ui.js")
 ]);
 
 const scopes = [
@@ -35,6 +36,9 @@ for (const [name, css, scope] of scopes) {
     }
   }
 }
+
+assert.ok(sharedNav.includes(`['Basketball','/basketball.html','🏀','basketball']`), "shared navigation must include Basketball on every workspace");
+assert.ok(sharedNav.includes(`pagePath.endsWith('/basketball.html')?'basketball':`), "Basketball page must receive the active shared-nav state");
 
 const builderMarker = oddsHtml.match(/<meta name="match-signal-build" content="([^"]+)"/)?.[1] || "";
 const builderCssHref = oddsHtml.match(/href="(\.\/odds-builder-design\.css\?v=[^"]+)"/)?.[1] || "";
