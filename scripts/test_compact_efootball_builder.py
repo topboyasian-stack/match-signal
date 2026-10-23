@@ -664,8 +664,10 @@ class CompactEfootballBuilderTests(unittest.TestCase):
             high_probability_lower_return+lower_probability_higher_return
         )
         self.assertEqual(diag["reason"],"qualified_compact_efootball_combination")
-        self.assertEqual(len(selected),4)
-        self.assertTrue(all(x["expected_value"]==0.20 for x in selected))
+        self.assertEqual(len(selected),5)
+        # ROI-first should include all four higher-return legs; probability-first
+        # would instead select the five higher-probability / lower-return legs.
+        self.assertEqual(sum(x["expected_value"]==0.20 for x in selected),4)
 
     def test_make_leg_rejects_efootball_when_exact_odds_return_is_below_two_percent(self):
         now=datetime(2026,10,10,9,45,tzinfo=timezone.utc)
