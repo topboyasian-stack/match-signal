@@ -5503,6 +5503,24 @@ def recent_settled(history,now,known):
     return out[:4]
 
 
+def compact_efootball_ticket_lane_policy() -> dict[str, Any]:
+    """Return the audit-visible compact eFootball policy, matching the enforced gate."""
+    return {
+        "enabled": True,
+        "active_products": sorted(ACTIVE_VIRTUAL_PRODUCTS),
+        "qualification_lane": "efootball_exact_evidence_value",
+        "min_legs": COMPACT_EFOOTBALL_MIN_LEGS,
+        "max_legs": COMPACT_EFOOTBALL_MAX_LEGS,
+        "min_combined_odds": COMPACT_EFOOTBALL_MIN_COMBINED_ODDS,
+        "min_per_leg_model_probability": EFOOTBALL_VALUE_MIN_LEG_PROBABILITY,
+        "min_single_leg_expected_value": EFOOTBALL_VALUE_MIN_EXPECTED_RETURN,
+        "min_expected_ticket_roi": COMPACT_EFOOTBALL_MIN_EXPECTED_ROI,
+        "max_kickoff_span_minutes": COMPACT_EFOOTBALL_MAX_KICKOFF_SPAN_MINUTES,
+        "settled_ticket_performance_claim": False,
+        "no_forced_legs": True,
+    }
+
+
 def main():
     now=datetime.now(timezone.utc)
     gate=load(SELECTION_GATE,{})
@@ -5715,20 +5733,7 @@ def main():
                 "paper_only":True,
                 "real_money_execution":False,
             },
-            "compact_efootball_ticket_lane":{
-                "enabled":True,
-                "active_products":sorted(ACTIVE_VIRTUAL_PRODUCTS),
-                "qualification_lane":"efootball_exact_evidence_value",
-                "min_legs":COMPACT_EFOOTBALL_MIN_LEGS,
-                "max_legs":COMPACT_EFOOTBALL_MAX_LEGS,
-                "min_combined_odds":COMPACT_EFOOTBALL_MIN_COMBINED_ODDS,
-                "min_per_leg_model_probability":EFOOTBALL_VALUE_MIN_LEG_PROBABILITY,
-                "min_single_leg_expected_value":0.0,
-                "min_expected_ticket_roi":COMPACT_EFOOTBALL_MIN_EXPECTED_ROI,
-                "max_kickoff_span_minutes":COMPACT_EFOOTBALL_MAX_KICKOFF_SPAN_MINUTES,
-                "settled_ticket_performance_claim":False,
-                "no_forced_legs":True
-            },
+            "compact_efootball_ticket_lane":compact_efootball_ticket_lane_policy(),
             "accuracy_first_base_floor":RESULTS_FIRST_MIN_COMBINED_ODDS,
             "results_first":True,
             "results_first_min_observations":RESULTS_FIRST_MIN_OBS,
