@@ -436,6 +436,110 @@ def walk_forward_probability_calibration(rows: list[dict[str, Any]], *, min_trai
     }
 
 
+def walk_forward_exact_line_calibration(rows: list[dict[str, Any]], *, min_training_rows: int = 20,
+                                              prior_strength: float = 50.0) -> dict[str, Any]:
+    """Shadow-test exact pick+line recalibration on a later chronological holdout.
+
+    The mapping for each exact O/U side and line is learned only from the first
+    70% of scheduled events. Sparse line/side cohorts retain the raw forecast.
+    This is report-only and never changes any live or paper pick.
+    """
+    eligible = []
+    for row in settled_ou_rows(rows):
+        p = number(row.get("model_probability"))
+        odds = number(row.get("bookmaker_odds"))
+        line = number(row.get("line"))
+        side = str(row.get("pick") or "").strip().lower()
+        start = parse_time(row.get("start_time"))
+        if (p is None or not 0 <= p <= 1 or odds is None or odds <= 1
+                or line is None or side not in {"over", "under"} or start is None):
+            continue
+        eligible.append({**row, "_exact_line_side_key": f"{side} {line:g}"})
+    ordered = sorted_chronologically(eligible)
+    if len(ordered) < 50:
+        return {
+            "mode": "PAPER_SHADOW_ONLY",
+            "status": "INSUFFICIENT_CHRONOLOGICAL_SAMPLE",
+            "eligible_rows": len(ordered),
+            "minimum_rows": 50,
+            "applied_to_predictions": False,
+            "production_qualification_enabled": False,
+        }
+
+    cut = int(len(ordered) * 0.70)
+    training, holdout = ordered[:cut], ordered[cut:]
+    training_groups = group_rows(training, lambda row: row["_exact_line_side_key"])
+    mapping: dict[str, dict[str, Any]] = {}
+    for key, items in training_groups.items():
+        n = len(items)
+        mean_p = mean([float(row["model_probability"]) for row in items]) or 0.0
+        observed = sum(1 for row in items if row["win"] is True) / n
+        weight = n / (n + prior_strength)
+        mapping[key] = {
+            "training_n": n,
+            "mean_raw_probability": rounded(mean_p),
+            "observed_hit_rate": rounded(observed),
+            "shrinkage_weight": rounded(weight),
+            "calibrated_probability": rounded(max(0.01, min(0.99, (1.0 - weight) * mean_p + weight * observed))),
+        }
+
+    scored = []
+    for row in holdout:
+        p = float(row["model_probability"])
+        learned = mapping.get(row["_exact_line_side_key"])
+        calibrated = (
+            float(learned["calibrated_probability"])
+            if learned and learned["training_n"] >= min_training_rows else p
+        )
+        scored.append({"p_raw": p, "p_calibrated": calibrated, "y": 1.0 if row["win"] else 0.0})
+
+    def score(key: str) -> dict[str, Any]:
+        brier = sum((row[key] - row["y"]) ** 2 for row in scored) / len(scored)
+        log_loss = sum(
+            -(row["y"] * math.log(max(0.0001, min(0.9999, row[key])))
+              + (1.0 - row["y"]) * math.log(max(0.0001, min(0.9999, 1.0 - row[key]))))
+            for row in scored
+        ) / len(scored)
+        ece = 0.0
+        for idx in range(20):
+            lo = idx * 0.05
+            hi = lo + 0.05 if idx < 19 else 1.0001
+            bucket_rows = [row for row in scored if lo <= row[key] < hi]
+            if bucket_rows:
+                pred = sum(row[key] for row in bucket_rows) / len(bucket_rows)
+                obs = sum(row["y"] for row in bucket_rows) / len(bucket_rows)
+                ece += len(bucket_rows) / len(scored) * abs(pred - obs)
+        return {"n": len(scored), "brier": rounded(brier), "log_loss": rounded(log_loss), "ece": rounded(ece)}
+
+    raw_metrics = score("p_raw")
+    calibrated_metrics = score("p_calibrated")
+    improvement = {
+        "brier": rounded(raw_metrics["brier"] - calibrated_metrics["brier"]),
+        "log_loss": rounded(raw_metrics["log_loss"] - calibrated_metrics["log_loss"]),
+        "ece": rounded(raw_metrics["ece"] - calibrated_metrics["ece"]),
+    }
+    improved_both = improvement["brier"] is not None and improvement["log_loss"] is not None and improvement["brier"] > 0 and improvement["log_loss"] > 0
+    return {
+        "mode": "PAPER_SHADOW_ONLY",
+        "status": "SHADOW_IMPROVES_BOTH_PROBABILITY_LOSSES" if improved_both else "SHADOW_NOT_VALIDATED",
+        "method": "exact pick+line cohorts; fit on earliest 70%; shrink each cohort's observed hit rate toward its mean forecast using n/(n+50); score latest 30% only; sparse cohorts use raw probabilities",
+        "eligible_rows": len(ordered),
+        "training_rows": len(training),
+        "holdout_rows": len(holdout),
+        "training_start_time": training[0].get("start_time"),
+        "training_end_time": training[-1].get("start_time"),
+        "holdout_start_time": holdout[0].get("start_time"),
+        "holdout_end_time": holdout[-1].get("start_time"),
+        "exact_line_side_calibration_fit_on_training_only": mapping,
+        "holdout_raw_probability_metrics": raw_metrics,
+        "holdout_exact_line_calibrated_metrics": calibrated_metrics,
+        "improvement_raw_minus_calibrated": improvement,
+        "applied_to_predictions": False,
+        "production_qualification_enabled": False,
+        "note": "Exact line/side calibration is an experiment only. A single split is not promotion evidence; require a fresh untouched holdout and exact-market post-margin value checks.",
+    }
+
+
 def build_ou_report(rows: list[dict[str, Any]]) -> dict[str, Any]:
     settled = settled_ou_rows(rows)
     selectors = {
@@ -473,6 +577,7 @@ def build_ou_report(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "chronological_by_line_and_side": chronological_line_side_report(settled),
         "calibration_by_probability_band": calibration_by_probability_band(settled),
         "probability_calibration_shadow": walk_forward_probability_calibration(settled),
+        "exact_line_side_calibration_shadow": walk_forward_exact_line_calibration(settled),
         "segments": segments,
         "exploratory_extremes": {
             "line_side": line_extremes,
