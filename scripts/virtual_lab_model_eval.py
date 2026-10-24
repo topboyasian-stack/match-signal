@@ -5,7 +5,7 @@ Compares SportyBet de-vig baseline, line-ladder Poisson, product prior,
 and the participant-aware model on untouched chronological holdouts.
 """
 from __future__ import annotations
-import json, math
+import json, math, re
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -50,6 +50,17 @@ def stable_participant_identity(product, value):
 
 def clamp(p):
     return max(.0005,min(.9995,float(p)))
+
+
+def normalize_selection(value):
+    """Return the canonical selected O/U side, or None for an unknown label."""
+    side = str(value or "").strip().lower()
+    if re.match(r"^(?:over|o)(?=$|[\s\d.])", side):
+        return "over"
+    if re.match(r"^(?:under|u)(?=$|[\s\d.])", side):
+        return "under"
+    return None
+
 
 def poisson_over(lam,line):
     lam=max(.05,min(30.,float(lam)))
@@ -109,8 +120,10 @@ def build_events(rows):
             if p is None:continue
             try:p=float(p)
             except Exception:continue
-            sel=str(r.get("selection") or "").upper()
-            over=p if sel.startswith("O") else 1-p
+            side=normalize_selection(r.get("selection"))
+            if side is None:
+                continue
+            over=p if side=="over" else 1-p
             pts.append((float(r["line"]),clamp(over)))
         lam=fit_lambda(pts)
         if lam is not None:
@@ -227,15 +240,17 @@ def evaluate(events):
         prior=events[:i]
         for row in event["rows"]:
             if row.get("win") is None or row.get("model_prob") is None:continue
+            selection=normalize_selection(row.get("selection"))
+            if selection is None:
+                continue
             market,pois,base,core,combined,pn,shape_prob,shape_n,shape_weight=probs(prior,event,row)
-            sel=str(row.get("selection") or "").upper()
             # Convert all observations to the probability of the selected side.
-            inv=sel.startswith("U")
+            inv=selection=="under"
             y=1 if bool(row["win"]) else 0
             outputs.append({
                 "event_key":event["key"],"event_id":event["event_id"],"timestamp":event["timestamp"],
                 "start_time":event.get("start_time"),"product":event["product"],"competition":event["competition"],
-                "selection":str(row.get("selection") or "").lower(),
+                "selection":selection,
                 "line":float(row["line"]),"participant_active":pn>=MIN_EVENT_HISTORY,
                 "y":y,
                 "market":1-market if inv else market,
@@ -424,6 +439,17 @@ def main():
       "paper_only":True
     }
     OUTPUT.write_text(json.dumps(out,indent=2)+"\n")
-    print(json.dumps(out,indent=2))
+    # Keep Actions logs concise; the complete evaluation belongs in the JSON
+    # artifact, not megabytes of repeated console output.
+    print(json.dumps({
+      "generated_at":out["generated_at"],
+      "history_rows":out["history_rows"],
+      "ou_rows":out["ou_rows"],
+      "events":out["events"],
+      "holdout":out["holdout"],
+      "holdout_scored_predictions":len(out["holdout_scored_predictions"]),
+      "participant_feature_gate_pass":out["participant_feature_gate"]["pass"],
+      "paper_only":out["paper_only"],
+    },sort_keys=True))
 
 if __name__=="__main__":main()

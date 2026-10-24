@@ -1,5 +1,5 @@
 """Regression checks for the accelerated Virtual Lab line-ladder fit."""
-from virtual_lab_model_eval import evaluate_participant_feature_gate,fit_lambda,poisson_over,holdout_prediction_rows
+from virtual_lab_model_eval import evaluate_participant_feature_gate,fit_lambda,poisson_over,holdout_prediction_rows,normalize_selection
 
 def reference_fit(points):
     if not points:return None
@@ -9,6 +9,13 @@ def reference_fit(points):
         loss=sum((poisson_over(lam,line)-prob)**2 for line,prob in points)/len(points)
         if loss<best[1]:best=(lam,loss)
     return best[0]
+
+assert normalize_selection("Under 6.5") == "under"
+assert normalize_selection("UNDER") == "under"
+assert normalize_selection("Over 4.5") == "over"
+assert normalize_selection("O 1.5") == "over"
+assert normalize_selection("") is None
+assert normalize_selection("unknown side") is None
 
 CASES=[
  [(1.5,.90),(2.5,.77),(3.5,.56),(4.5,.31),(5.5,.15)],
