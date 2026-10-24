@@ -15,6 +15,10 @@ class EfootballResearchRecoveryTests(unittest.TestCase):
 
     def test_research_workflow_is_monitored_separately(self):
         self.assertIn("Isolated eFootball Winner and BTTS Market Research", WATCHDOG)
+        self.assertIn('"Match Signal Virtual Lab Collector"', RESEARCH,
+                      "Refresh performance reports after the collector publishes a new chronological model evaluation")
+        self.assertIn("github.event.workflow_run.conclusion == 'success'", RESEARCH,
+                      "Only process the new model evaluation after a successful collector run")
         self.assertIn("efootball_market_archive_age_minutes", WATCHDOG)
         self.assertIn("efootball_collector_age_minutes", WATCHDOG)
         self.assertIn("EFOOTBALL_RESEARCH_MAX_AGE_MINUTES = 30", WATCHDOG)
