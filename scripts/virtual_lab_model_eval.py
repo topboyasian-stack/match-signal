@@ -51,6 +51,17 @@ def stable_participant_identity(product, value):
 def clamp(p):
     return max(.0005,min(.9995,float(p)))
 
+
+def normalize_selection(value):
+    """Return the canonical selected O/U side, or None for an unknown label."""
+    side = str(value or "").strip().lower()
+    if side.startswith("o"):
+        return "over"
+    if side.startswith("u"):
+        return "under"
+    return None
+
+
 def poisson_over(lam,line):
     lam=max(.05,min(30.,float(lam)))
     k=math.floor(float(line))
@@ -109,8 +120,10 @@ def build_events(rows):
             if p is None:continue
             try:p=float(p)
             except Exception:continue
-            sel=str(r.get("selection") or "").upper()
-            over=p if sel.startswith("O") else 1-p
+            side=normalize_selection(r.get("selection"))
+            if side is None:
+                continue
+            over=p if side=="over" else 1-p
             pts.append((float(r["line"]),clamp(over)))
         lam=fit_lambda(pts)
         if lam is not None:
@@ -227,15 +240,17 @@ def evaluate(events):
         prior=events[:i]
         for row in event["rows"]:
             if row.get("win") is None or row.get("model_prob") is None:continue
+            selection=normalize_selection(row.get("selection"))
+            if selection is None:
+                continue
             market,pois,base,core,combined,pn,shape_prob,shape_n,shape_weight=probs(prior,event,row)
-            sel=str(row.get("selection") or "").upper()
             # Convert all observations to the probability of the selected side.
-            inv=sel.startswith("U")
+            inv=selection=="under"
             y=1 if bool(row["win"]) else 0
             outputs.append({
                 "event_key":event["key"],"event_id":event["event_id"],"timestamp":event["timestamp"],
                 "start_time":event.get("start_time"),"product":event["product"],"competition":event["competition"],
-                "selection":str(row.get("selection") or "").lower(),
+                "selection":selection,
                 "line":float(row["line"]),"participant_active":pn>=MIN_EVENT_HISTORY,
                 "y":y,
                 "market":1-market if inv else market,
