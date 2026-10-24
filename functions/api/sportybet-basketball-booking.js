@@ -62,10 +62,15 @@ async function createShare(selections){
       response=await fetch(ORIGIN+'/api/ng/orders/share?_t='+Date.now(),{method:'POST',headers:{...HEADERS,'Accept-Language':'en-NG,en;q=0.9','Cache-Control':'no-cache','Pragma':'no-cache','Sec-Fetch-Dest':'empty','Sec-Fetch-Mode':'cors','Sec-Fetch-Site':'same-origin'},body:requestBody,cache:'no-store',redirect:'follow',signal:AbortSignal.timeout(15000)});
       contentType=response.headers.get('content-type')||contentType;
       body=await response.text();
-      if(!response.ok) lastDiagnostic='HTTP '+response.status+'; content-type '+contentType+'; response '+body.slice(0,180).replace(/\\s+/g,' ');
-      else {
+      if(!response.ok) {
+        lastDiagnostic='HTTP '+response.status+'; content-type '+contentType+'; response '+body.slice(0,180).replace(/\\s+/g,' ');
+        return {fallback_direct_origin:true,diagnostic:lastDiagnostic,fallback_selections:selections.map(s=>({eventId:s.eventId,marketId:s.marketId,specifier:s.specifier,outcomeId:s.outcomeId}))};
+      } else {
         let payload=null;
-        try{payload=JSON.parse(body)}catch(_){lastDiagnostic='HTTP '+response.status+' but response was not JSON (content-type '+contentType+'): '+(body.slice(0,180).replace(/\\s+/g,' ')||'[empty response]');}
+        try{payload=JSON.parse(body)}catch(_){
+          lastDiagnostic='HTTP '+response.status+' but response was not JSON (content-type '+contentType+'): '+(body.slice(0,180).replace(/\\s+/g,' ')||'[empty response]');
+          return {fallback_direct_origin:true,diagnostic:lastDiagnostic,fallback_selections:selections.map(s=>({eventId:s.eventId,marketId:s.marketId,specifier:s.specifier,outcomeId:s.outcomeId}))};
+        }
         if(payload){
           if(payload?.bizCode!=null&&Number(payload.bizCode)!==10000) throw new Error('SportyBet rejected this slip (code '+payload.bizCode+'). Refresh markets and try again.');
           const data=payload?.data||{},code=String(data.shareCode||'').trim().toUpperCase();
@@ -106,6 +111,7 @@ export async function onRequestPost(context){
     }
     if(selections.length!==legs.length) return json({ok:false,error:'SELECTIONS_CHANGED',message:'One or more legs failed live revalidation. No booking code was created; remove or refresh the flagged selection.',validation},409);
     const share=await createShare(selections);
+    if(share?.fallback_direct_origin===true) return json({ok:false,error:'SPORTYBET_DIRECT_FALLBACK_REQUIRED',message:'SportyBet returned an HTML/edge response to Match Signal. Retrying the verified slip directly from your browser.',fallback_direct_origin:true,diagnostic:share.diagnostic,fallback_selections:share.fallback_selections,validation},502);
     return json({ok:true,mode:'NON_STAKING_BETSLIP_PREPARATION',builder_slot:slot,booking_code:share.code,share_url:share.url,accepted_count:share.accepted_count,initial_selection_count:legs.length,combined_odds:share.combined_odds,unavailable_count:share.unavailable_count,validation,message:'SportyBet returned a share/booking code only. No stake, payment or wager was placed.'});
   }catch(error){return json({ok:false,error:'SPORTYBET_BASKETBALL_BOOKING_FAILED',message:String(error?.message||error)},502);}
 }
