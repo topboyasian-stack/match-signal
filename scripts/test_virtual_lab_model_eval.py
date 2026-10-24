@@ -80,7 +80,8 @@ print("Participant feature promotion-gate regression checks passed")
 def test_holdout_prediction_export_is_efootball_only_and_never_includes_training_rows():
     scored = [
         {
-            "event_key": "e1|t1", "event_id": "e1", "timestamp": "2026-10-20T10:00:00+00:00",
+            "event_key": "e1|t1", "event_id": "e1", "timestamp": "2026-10-20T08:00:00+00:00",
+            "start_time": "2026-10-20T10:00:00+00:00",
             "product": "efootball_gt", "competition": "GT", "selection": "under",
             "line": 6.5, "y": 1, "market": 0.51, "poisson": 0.58,
             "poisson_prior": 0.57, "efootball_shape": 0.56, "participant_model": 0.55,
@@ -104,6 +105,8 @@ def test_holdout_prediction_export_is_efootball_only_and_never_includes_training
     assert exported[0]["product"] == "efootball_gt"
     assert exported[0]["line"] == 6.5
     assert exported[0]["selection"] == "under"
+    assert exported[0]["start_time"] == "2026-10-20T10:00:00+00:00"
+    assert exported[0]["timestamp"] == "2026-10-20T08:00:00+00:00"
     assert exported[0]["poisson"] == 0.58
     assert all(row["event_key"] in {"e1|t1"} for row in exported)
 

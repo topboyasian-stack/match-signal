@@ -6,6 +6,7 @@ on:
     paths:
       - ".github/workflows/builder-production-promotion.yml"
       - ".github/workflows/cloudflare-pages.yml"
+      - ".github/workflows/unified-upcoming.yml"
       - ".github/workflows/odds_builder.yml"
       - ".github/workflows/odds-ticket-tracker.yml"
       - "scripts/odds_builder_core.py"
@@ -48,7 +49,7 @@ jobs:
           dispatched_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           echo "source_sha=$source_sha" >> "$GITHUB_OUTPUT"
           echo "dispatched_at=$dispatched_at" >> "$GITHUB_OUTPUT"
-          gh workflow run unified-upcoming.yml --ref main
+          gh workflow run unified-upcoming.yml --ref main -f promotion_child=true
           board_run_id=""
           for attempt in $(seq 1 180); do
             board_candidate="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/unified-upcoming.yml/runs?branch=main&event=workflow_dispatch&per_page=30" --jq ".workflow_runs[] | select(.created_at >= \"$dispatched_at\") | [.id, .head_sha] | @tsv" | head -n 1)"
@@ -147,7 +148,7 @@ jobs:
           dispatched_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           echo "source_sha=$source_sha" >> "$GITHUB_OUTPUT"
           echo "dispatched_at=$dispatched_at" >> "$GITHUB_OUTPUT"
-          gh workflow run unified-upcoming.yml --ref main
+          gh workflow run unified-upcoming.yml --ref main -f promotion_child=true
           board_run_id=""
           for attempt in $(seq 1 180); do
             board_candidate="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/unified-upcoming.yml/runs?branch=main&event=workflow_dispatch&per_page=30" --jq ".workflow_runs[] | select(.created_at >= \"$dispatched_at\") | [.id, .head_sha] | @tsv" | head -n 1)"

@@ -38,9 +38,15 @@ def artifact(age_minutes: int) -> str:
 
 
 class BuilderRefreshDecisionTests(unittest.TestCase):
-    def test_board_triggered_builder_skips_recursive_promotion(self):
+    def test_normal_board_refresh_enters_production_promotion(self):
         self.assertEqual(
-            builder_dispatch_command(),
+            builder_dispatch_command(skip_promotion=False),
+            ["gh", "workflow", "run", "odds_builder.yml", "--ref", "main"],
+        )
+
+    def test_promotion_child_board_suppresses_recursive_promotion(self):
+        self.assertEqual(
+            builder_dispatch_command(skip_promotion=True),
             ["gh", "workflow", "run", "odds_builder.yml", "--ref", "main", "-f", "skip_promotion=true"],
         )
 

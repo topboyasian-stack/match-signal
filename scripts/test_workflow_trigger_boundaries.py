@@ -60,6 +60,13 @@ def main():
     )
     assert "gh workflow run builder-production-promotion.yml --ref main" in builder
     assert "data/odds_ticket_tracker.json" in board_paths
+    assert "data/virtual_lab_model_eval.json" not in board_paths, (
+        "The board workflow now regenerates and publishes the model-evaluation artifact; "
+        "that generated output must not trigger a second board run."
+    )
+    assert "python scripts/virtual_lab_model_eval.py" in board
+    assert "promotion_child:" in board
+    assert "SKIP_PROMOTION: ${{ github.event_name == 'workflow_dispatch' && inputs.promotion_child == true }}" in board
 
     # Verify that removing the output-to-consumer feedback does not stop updates.
     assert '"Match Signal Unified Upcoming Board"' not in builder, (
