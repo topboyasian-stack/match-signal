@@ -34,11 +34,11 @@ assert.ok(html.includes('id="basketball-builders"') && html.includes('id="basket
 assert.ok(ui.includes("function renderBuilders()") && ui.includes("BASKETBALL_BUILDERS=[[],[],[],[]]") && ui.includes("data-builder-generate"), "Four independent builder cards must be rendered");
 assert.ok(ui.includes("BUILDER_ERRORS") && ui.includes("Code not generated") && ui.includes("data-builder-retry"), "Booking failures must remain visible in the relevant builder with a retry action");
 assert.ok(ui.includes("Booking API returned non-JSON (HTTP ") && ui.includes("await response.text()"), "Browser must surface diagnostics if the booking API itself returns non-JSON");
-assert.ok(booking.includes("attempt<=3") && booking.includes("SportyBet did not create a share code after 3 attempts") && booking.includes("content-type") && booking.includes("unavailable_count"), "Share requests must retry malformed/transient upstream failures and report booking diagnostics");
+assert.ok(booking.includes("hosts=['https://mobile.sportybet.com','https://lite.sportybet.com','https://www.sportybet.com']") && booking.includes("official web hosts") && booking.includes("content-type") && booking.includes("unavailable_count"), "Share generation must try official SportyBet host variants sequentially and report diagnostics without fabricating codes");
 assert.ok(booking.includes("fallback_direct_origin:true") && booking.includes("fallback_selections"), "Basketball booking must return verified selections for the same direct-origin fallback pattern as eFootball");
 assert.ok(ui.includes("async function directOriginBasketballShare") && ui.includes("SportyBet blocked the direct browser fallback") && ui.includes("fallback_direct_origin===true"), "Basketball UI must attempt the direct-origin fallback when the server receives HTML");
 assert.ok(ui.includes("./api/sportybet-basketball-booking"), "Builder UI must request a live-validated SportyBet booking code");
-assert.ok(booking.includes("ORIGIN+'/api/ng/orders/share") && booking.includes("booking_code:share.code"), "Basketball booking endpoint must request and return a genuine SportyBet share code");
+assert.ok(booking.includes("host+'/api/ng/orders/share") && booking.includes("booking_code:share.code"), "Basketball booking endpoint must request and return a genuine SportyBet share code through official host variants");
 assert.ok(booking.includes("leg.market_id||'225'") && booking.includes("SELECTIONS_CHANGED") && booking.includes("NON_STAKING_BETSLIP_PREPARATION"), "Basketball code generation must revalidate exact total market 225 and fail closed without staking");
 
 console.log("Basketball desk contract passed: shared UI, scoped responsive design, exact SportyBet event matching, fresh full-game totals including OT.");
