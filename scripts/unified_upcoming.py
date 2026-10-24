@@ -1432,6 +1432,34 @@ def build_virtual_events(history, lifecycle, eligibility):
         "prospective_poisson_shadow_coverage":shadow_coverage,
     }
 
+def build_under_line_evidence(rows, minimum_line=6.5):
+    """Summarize virtual Under lines from 6.5 upward for research diagnostics only."""
+    grouped={}
+    for row in rows if isinstance(rows,list) else []:
+        if str(row.get("sport") or "").lower()!="virtual" or str(row.get("pick") or "").lower()!="under":
+            continue
+        line=num(row.get("line"))
+        if line is None or line<minimum_line:
+            continue
+        product=str(row.get("product") or "unknown")
+        key=f"{product}|{line:g}|under"
+        record={
+            "product":product,"line":line,"side":"under","event_rows":1,
+            "walkforward_n":int(row.get("walkforward_exact_line_n") or 0),
+            "walkforward_hit_rate":row.get("walkforward_exact_line_hit_rate"),
+            "walkforward_brier":row.get("walkforward_exact_line_brier"),
+            "walkforward_model_variant":row.get("walkforward_exact_line_model_variant"),
+            "qualification_status":row.get("qualification_status") or "NOT_QUALIFIED",
+            "betting_qualified":bool(row.get("betting_qualified")),
+        }
+        previous=grouped.get(key)
+        if previous:
+            previous["event_rows"]+=1
+            previous["betting_qualified"]=previous["betting_qualified"] or record["betting_qualified"]
+        else:
+            grouped[key]=record
+    return grouped
+
 def main():
     rows=[]
     for key in DESK_FILTER_STATS:
@@ -1534,34 +1562,8 @@ def main():
         "events":final,
     }
     OUTPUT.write_text(json.dumps(result,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
-    # Include Under 6.5 as the first priority weak-line diagnostic, alongside
-    # higher totals. This is reporting only; the evidence/qualification gates
-    # below remain unchanged.
-    high_line_under={}
-    for row in final:
-        if str(row.get("sport") or "").lower()!="virtual" or str(row.get("pick") or "").lower()!="under":
-            continue
-        ln=num(row.get("line"))
-        product=str(row.get("product") or "unknown")
-        if ln is None or ln<6.5:
-            continue
-        key=f"{product}|{ln:g}|under"
-        previous=high_line_under.get(key)
-        record={
-            "product":product,"line":ln,"side":"under",
-            "event_rows":1,
-            "walkforward_n":int(row.get("walkforward_exact_line_n") or 0),
-            "walkforward_hit_rate":row.get("walkforward_exact_line_hit_rate"),
-            "walkforward_brier":row.get("walkforward_exact_line_brier"),
-            "walkforward_model_variant":row.get("walkforward_exact_line_model_variant"),
-            "qualification_status":row.get("qualification_status") or "NOT_QUALIFIED",
-            "betting_qualified":bool(row.get("betting_qualified")),
-        }
-        if previous:
-            previous["event_rows"]+=1
-            previous["betting_qualified"]=previous["betting_qualified"] or record["betting_qualified"]
-        else:
-            high_line_under[key]=record
+    # Surface Under 6.5 and higher totals for line-specific diagnostics only.
+    high_line_under=build_under_line_evidence(final)
     desk_health={
         "status":"GENERATED",
         "generated_at":NOW.isoformat(),
