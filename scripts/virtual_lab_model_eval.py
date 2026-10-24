@@ -5,7 +5,7 @@ Compares SportyBet de-vig baseline, line-ladder Poisson, product prior,
 and the participant-aware model on untouched chronological holdouts.
 """
 from __future__ import annotations
-import json, math
+import json, math, re
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -55,9 +55,9 @@ def clamp(p):
 def normalize_selection(value):
     """Return the canonical selected O/U side, or None for an unknown label."""
     side = str(value or "").strip().lower()
-    if side.startswith("o"):
+    if re.match(r"^(?:over|o)(?=$|[\\s\\d.])", side):
         return "over"
-    if side.startswith("u"):
+    if re.match(r"^(?:under|u)(?=$|[\\s\\d.])", side):
         return "under"
     return None
 
