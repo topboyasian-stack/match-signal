@@ -1341,6 +1341,66 @@ def paired_cluster_bootstrap_loss_comparison(
     return output
 
 
+def _retrospective_value_metrics(
+    rows: list[dict[str, Any]], probability_field: str, *, minimum_expected_return: float = 0.02,
+    minimum_margin_adjusted_edge: float = 0.025,
+) -> dict[str, Any]:
+    """Audit quoted-odds value on the same already-selected settled rows; never a live gate."""
+    priced = []
+    missing_odds = 0
+    missing_market_probability = 0
+    for row in rows:
+        p = number(row.get(probability_field))
+        odds = number(row.get("bookmaker_odds"))
+        market_p = number(row.get("market_probability"))
+        if p is None or not 0 <= p <= 1:
+            continue
+        if odds is None or odds <= 1:
+            missing_odds += 1
+            continue
+        if market_p is None or not 0 <= market_p <= 1:
+            missing_market_probability += 1
+            continue
+        if not isinstance(row.get("win"), bool):
+            continue
+        expected_return = p * odds - 1.0
+        edge = p - market_p
+        realized_return = odds - 1.0 if row["win"] else -1.0
+        priced.append({
+            "expected_return": expected_return,
+            "edge": edge,
+            "realized_return": realized_return,
+        })
+    gate = [
+        row for row in priced
+        if row["expected_return"] >= minimum_expected_return
+        and row["edge"] >= minimum_margin_adjusted_edge
+    ]
+    def stats(items: list[dict[str, float]]) -> dict[str, Any]:
+        n = len(items)
+        if not n:
+            return {"n": 0, "mean_expected_return": None, "mean_margin_adjusted_edge": None,
+                    "flat_stake_net_units": 0.0, "flat_stake_roi": None}
+        net = sum(row["realized_return"] for row in items)
+        return {
+            "n": n,
+            "mean_expected_return": rounded(sum(row["expected_return"] for row in items) / n),
+            "mean_margin_adjusted_edge": rounded(sum(row["edge"] for row in items) / n),
+            "flat_stake_net_units": rounded(net),
+            "flat_stake_roi": rounded(net / n),
+        }
+    return {
+        "quoted_rows": len(priced),
+        "missing_odds_rows": missing_odds,
+        "missing_market_probability_rows": missing_market_probability,
+        "minimum_expected_return": minimum_expected_return,
+        "minimum_margin_adjusted_edge": minimum_margin_adjusted_edge,
+        "all_quoted_rows": stats(priced),
+        "rows_passing_both_value_gates": stats(gate),
+        "warning": "Retrospective audit on the already-selected Qualified Best subset; not an unbiased all-candidate backtest and not proof of fresh pre-event quotes.",
+    }
+
+
 def compare_qualified_picks_to_poisson_holdout(
     qualified_rows: list[dict[str, Any]], lab_eval: dict[str, Any], *, timestamp_tolerance_seconds: int = 900
 ) -> dict[str, Any]:
@@ -1454,6 +1514,10 @@ def compare_qualified_picks_to_poisson_holdout(
         "participant_model": "participant_model_probability",
     }
     metrics = {name: _probability_quality_metrics(matched, field) for name, field in probability_fields.items()}
+    retrospective_value = {
+        name: _retrospective_value_metrics(matched, field)
+        for name, field in probability_fields.items()
+    }
     matched_n = len(matched)
 
     line_side_groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
@@ -1493,6 +1557,7 @@ def compare_qualified_picks_to_poisson_holdout(
         "matched_rows": matched_n,
         "match_coverage": counts,
         "metrics_on_identical_matched_rows": metrics,
+        "retrospective_value_by_model_on_identical_rows": retrospective_value,
         "metrics_by_exact_line_side_on_identical_rows": metrics_by_line_side,
         "paired_cluster_bootstrap_loss_comparison": paired_uncertainty,
         "applied_to_predictions": False,
