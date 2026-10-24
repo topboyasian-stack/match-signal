@@ -6,13 +6,14 @@ const [html, css, ui, api, workflow, booking] = await Promise.all([
   read("basketball.html"), read("basketball-design.css"), read("basketball-live.js"),
   read("functions/api/sportybet-basketball.js"), read(".github/workflows/cloudflare-pages.yml"), read("functions/api/sportybet-basketball-booking.js")
 ]);
-assert.ok(html.includes("MS-BASKETBALL-DESK-2026.10.24-V5"), "Basketball must publish the new design marker");
+assert.ok(html.includes("MS-BASKETBALL-DESK-2026.10.24-V6"), "Basketball must publish the new design marker");
 assert.ok(html.includes("core-workspaces-design.css?v=20261014-full-v1"), "Basketball must use the shared Match Signal design layer");
-assert.ok(html.includes("basketball-design.css?v=20261024-totals-workspace-v1"), "Basketball must load its latest contrast-corrected scoped design layer");
+assert.ok(html.includes("basketball-live.js?v=20261024-builder-errors-v2"), "Basketball must cache-bust the visible booking error/retry logic");
+assert.ok(html.includes("basketball-design.css?v=20261024-builder-dark-v2"), "Basketball must load its latest contrast-corrected scoped design layer");
 assert.ok(html.includes('id="msNav"') && html.includes('workspace-ui.js?v=20261023-basketball-nav1'), "Basketball must use the single shared site navigation");
 for (const id of ["liveGames","upcomingGames","totalsBoard","finalResults","performance","marketStatus","totalsStatus"]) assert.ok(html.includes('id="'+id+'"'), "Basketball must preserve renderer mount "+id);
 assert.ok(css.includes("MATCH-SIGNAL-BASKETBALL-DESK-V1"), "Basketball scoped design marker missing");
-assert.ok(css.includes("MATCH-SIGNAL-BASKETBALL-DARK-V3") && html.includes("basketball-design.css?v=20261024-totals-workspace-v1"), "Basketball must deploy the cache-busted contrast/readability safety net");
+assert.ok(css.includes("MATCH-SIGNAL-BASKETBALL-DARK-V3") && html.includes("basketball-design.css?v=20261024-builder-dark-v2"), "Basketball must deploy the cache-busted contrast/readability safety net");
 assert.ok(css.includes("MATCH-SIGNAL-BASKETBALL-BUILDER-DARK-V1") && css.includes(".nba-builder-card") && css.includes("background:linear-gradient(145deg,#132231,#0e1822)"), "All four basketball builders must use the dark terminal theme");
 assert.ok(css.includes("@media(max-width:480px)") && css.includes("@media(prefers-reduced-motion:reduce)") && css.includes(":focus-visible"), "Basketball design must remain responsive and accessible");
 assert.ok(ui.includes("function bestSportyBetTotalMarket(markets)") && ui.includes("String(m.id)") && ui.includes("225"), "Totals must select the explicit SportyBet market ID for full-game O/U including overtime");
