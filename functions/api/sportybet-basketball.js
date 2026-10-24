@@ -11,7 +11,7 @@ function normMarket(m){
       id:String(o?.id??o?.outcomeId??''),
       name:String(o?.desc??o?.name??o?.title??''),
       odds:Number(o?.odds),
-      active:o?.isActive!==false
+      active:o?.isActive==null ? true : (o.isActive===true || Number(o.isActive)===1)
     })).filter(o=>Number.isFinite(o.odds)&&o.odds>1&&o.active)
   };
 }
