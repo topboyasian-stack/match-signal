@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-24T13:20:56.490298+00:00",
+  "generated_at": "2026-10-24T13:26:50.033457+00:00",
   "mode": "PAPER_ONLY",
   "active": true,
   "policy": {
@@ -13,7 +13,7 @@
   },
   "settled_predictions": 1417,
   "total_settled_predictions": 2137,
-  "pending_forecasts": 1578,
+  "pending_forecasts": 1889,
   "recent_window": {
     "n": 50,
     "accuracy": 0.58,
@@ -466,7 +466,7 @@
     "efootball_gt": {
       "active": true,
       "settled_predictions": 1417,
-      "pending_forecasts": 1578,
+      "pending_forecasts": 1889,
       "recent_window": {
         "n": 50,
         "accuracy": 0.58,
@@ -916,17 +916,21 @@
       },
       "prospective_poisson_shadow_capture": {
         "mode": "PAPER_SHADOW_ONLY",
-        "captured_forecast_revisions": 9432,
-        "unique_events_captured": 2648,
-        "rows_with_valid_poisson_shadow": 0,
-        "unique_events_with_valid_poisson_shadow": 0,
-        "pending_rows_with_valid_poisson_shadow": 0,
+        "captured_forecast_revisions": 9198,
+        "unique_events_captured": 2546,
+        "rows_with_valid_poisson_shadow": 54,
+        "unique_events_with_valid_poisson_shadow": 18,
+        "pending_rows_with_valid_poisson_shadow": 54,
         "settled_scored_rows_with_valid_poisson_shadow": 0,
         "rejection_reason_counts": {
-          "shadow_reason_not_recorded": 9029,
-          "missing_side_components": 403
+          "shadow_reason_not_recorded": 8474,
+          "missing_side_components": 403,
+          "eligible_leave_one_line_out_fit": 54,
+          "historical_product_fallback_rejected": 267
         },
-        "valid_shadow_source_counts": {},
+        "valid_shadow_source_counts": {
+          "current_market_ladder_leave_one_line_out": 54
+        },
         "qualification_or_prediction_changes_applied": false,
         "production_qualification_enabled": false
       },
@@ -973,7 +977,7 @@
     "vfootball": {
       "active": true,
       "settled_predictions": 720,
-      "pending_forecasts": 14430,
+      "pending_forecasts": 16681,
       "recent_window": {
         "n": 50,
         "accuracy": 0.9,
@@ -1270,39 +1274,39 @@
   "settled_observations_artifact": "data/efootball_desk_settled_observations.json",
   "source_settlement": "data/virtual_lab_history.json",
   "reconciliation_diagnostics": {
-    "trace_rows": 50000,
+    "trace_rows": 52772,
     "history_index_fixtures": 7272,
-    "forecast_line_groups": 33720,
+    "forecast_line_groups": 33741,
     "matched_line_groups_exact": 2143,
     "matched_line_groups_near_time": 0,
-    "unmatched_line_groups": 31577,
+    "unmatched_line_groups": 31598,
     "ambiguous_line_groups": 0,
     "scored_forecasts": 2133,
     "unmatched_reason_counts": {
-      "TIME_MISMATCH": 16504,
-      "NO_IDENTITY_MATCH": 15073
+      "TIME_MISMATCH": 16510,
+      "NO_IDENTITY_MATCH": 15088
     },
     "trace_product_counts": {
-      "efootball_gt": 9432,
-      "vfootball": 40568
+      "efootball_gt": 9753,
+      "vfootball": 43019
     },
     "history_index_product_counts": {
       "vfootball": 1772,
       "efootball_gt": 5500
     },
-    "trace_rows_with_identity": 50000,
-    "trace_rows_with_time": 50000,
-    "trace_rows_with_identity_and_time": 50000,
+    "trace_rows_with_identity": 52772,
+    "trace_rows_with_time": 52772,
+    "trace_rows_with_identity_and_time": 52772,
     "history_identity_groups": 1102,
     "match_counts_by_product": {
       "efootball_gt": {
-        "forecast_line_groups": 5623,
+        "forecast_line_groups": 5644,
         "matched_exact": 1423,
         "matched_near_time": 0,
-        "unmatched": 4200,
+        "unmatched": 4221,
         "unmatched_reason_counts": {
-          "TIME_MISMATCH": 2034,
-          "NO_IDENTITY_MATCH": 2166
+          "TIME_MISMATCH": 2040,
+          "NO_IDENTITY_MATCH": 2181
         }
       },
       "vfootball": {
@@ -1680,8 +1684,8 @@
         "event_id_candidate_participants_match": false
       }
     ],
-    "expired_unmatched_forecasts": 31144,
-    "captured_new_forecasts": 0,
+    "expired_unmatched_forecasts": 31354,
+    "captured_new_forecasts": 2772,
     "settled_ledger_rows": 2147,
     "settled_ledger_added_this_run": 0
   }
