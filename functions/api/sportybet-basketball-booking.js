@@ -99,7 +99,8 @@ async function createShare(selections){
       const data=payload?.data||{},code=String(data.shareCode||'').trim().toUpperCase();
       if(code){
         const accepted=Array.isArray(data.outcomes)?data.outcomes:[],unavailable=Array.isArray(data.unavailableOutcomes)?data.unavailableOutcomes.length:0;
-        const odds=accepted.length?accepted.reduce((p,x)=>p*(Number(x.odds)>0?Number(x.odds):1),1):selections.reduce((p,x)=>p*x.odds,1);
+        const acceptedOdds=accepted.map(x=>Number(x.odds));
+        const odds=accepted.length===selections.length&&acceptedOdds.every(x=>Number.isFinite(x)&&x>1)?acceptedOdds.reduce((p,x)=>p*x,1):null;
         return {code,url:String(data.shareURL||('https://www.sportybet.com/ng/?c=ng&shareCode='+encodeURIComponent(code))),accepted_count:accepted.length||Math.max(0,selections.length-unavailable),combined_odds:odds,unavailable_count:unavailable};
       }
       diagnostics.push(host+' returned JSON but no shareCode (bizCode '+String(payload?.bizCode??'missing')+').');
@@ -117,7 +118,7 @@ export async function onRequestPost(context){
     const slot=Number(body?.builder_slot);
     const legs=Array.isArray(body?.legs)?body.legs:[];
     if(!Number.isInteger(slot)||slot<1||slot>4) return json({ok:false,error:'INVALID_BUILDER_SLOT',message:'Choose one of the four basketball builders.'},400);
-    if(legs.length<2||legs.length>4) return json({ok:false,error:'INVALID_LEG_COUNT',message:'Each slip needs 2–4 selections.'},422);
+    if(legs.length<2||legs.length>8) return json({ok:false,error:'INVALID_LEG_COUNT',message:'Each slip needs 2–8 selections.'},422);
     const ids=legs.map(l=>String(l.event_id||''));
     if(ids.some(id=>!id)||new Set(ids).size!==ids.length) return json({ok:false,error:'DUPLICATE_OR_MISSING_EVENT',message:'Each builder must contain different, identified events.'},422);
     const events=await liveEvents(context.request);
