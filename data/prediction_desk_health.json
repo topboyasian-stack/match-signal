@@ -1,15 +1,15 @@
 {
   "status": "GENERATED",
-  "generated_at": "2026-10-24T12:52:35.077593+00:00",
+  "generated_at": "2026-10-24T12:55:52.341217+00:00",
   "horizon_days": 7,
-  "event_count": 4853,
+  "event_count": 4860,
   "live_count": 0,
   "pending_settlement_count": 0,
   "publication_filters": {
     "past_kickoff_rows_hidden": 9,
     "stale_live_flags_hidden": 0,
     "expired_settled_rows_hidden": 0,
-    "virtual_market_rows_held_for_kickoff_window": 247
+    "virtual_market_rows_held_for_kickoff_window": 253
   },
   "high_line_under_evidence": [
     {
@@ -97,7 +97,21 @@
       "betting_qualified": false
     }
   ],
+  "prospective_poisson_shadow_coverage": {
+    "efootball_gt": {
+      "efootball_rows": 390,
+      "unique_events": 190,
+      "rows_with_valid_shadow": 0,
+      "unique_events_with_valid_shadow": 0,
+      "rejection_reason_counts": {
+        "missing_side_components": 390
+      },
+      "lambda_fit_source_counts_by_side": {},
+      "mode": "PAPER_SHADOW_ONLY",
+      "qualification_or_prediction_changes_applied": false
+    }
+  },
   "qualified_virtual_kickoff_window_minutes": 60,
-  "virtual_market_rows_held_for_kickoff_window": 247,
+  "virtual_market_rows_held_for_kickoff_window": 253,
   "policy": "Virtual picks outside the next 60 minutes remain visible as research but cannot be currently qualified; the rolling board re-scores as settled results arrive. Past kickoff rows are removed from Upcoming unless still credibly live or inside the two-hour settlement-result grace. Archived evidence is not deleted. High VFootball Under lines require their own exact-line chronological sample before betting qualification."
 }
