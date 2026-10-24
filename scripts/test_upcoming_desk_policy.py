@@ -574,6 +574,66 @@ class UpcomingDeskPolicyTests(unittest.TestCase):
             },
         }
         self.assertEqual(shadow(fallback, "efootball_gt", "over"), (None, None))
+        decision = ns["prospective_poisson_shadow_decision"]
+        self.assertEqual(
+            decision(fallback, "efootball_gt", "over")[2],
+            "historical_product_fallback_rejected",
+        )
+        self.assertEqual(
+            decision(included_line, "efootball_gt", "over")[2],
+            "target_line_not_excluded",
+        )
+        self.assertEqual(
+            decision({}, "efootball_gt", "over")[2],
+            "missing_side_components",
+        )
+
+
+    def test_prospective_shadow_coverage_diagnostics_explain_missing_rows(self):
+        coverage = ns["prospective_poisson_shadow_coverage"]
+        rows = [
+            {
+                "product": "efootball_gt", "event_id": "shadow-good",
+                "poisson_shadow_probability": 0.61,
+                "poisson_shadow_source": "current_market_ladder_leave_one_line_out",
+                "poisson_shadow_reason": "eligible_leave_one_line_out_fit",
+                "validated_model_components": {
+                    "over": {"lambda_fit": {"source": "current_market_ladder_leave_one_line_out"}},
+                    "under": {"lambda_fit": {"source": "current_market_ladder_leave_one_line_out"}},
+                },
+            },
+            {
+                "product": "efootball_gt", "event_id": "shadow-fallback",
+                "poisson_shadow_probability": None,
+                "poisson_shadow_source": None,
+                "poisson_shadow_reason": "historical_product_fallback_rejected",
+                "validated_model_components": {
+                    "over": {"lambda_fit": {"source": "historical_product_lambda_fallback"}},
+                    "under": {"lambda_fit": {"source": "historical_product_lambda_fallback"}},
+                },
+            },
+            {
+                "product": "efootball_adriatic", "event_id": "shadow-no-ladder",
+                "poisson_shadow_probability": None,
+                "poisson_shadow_reason": "insufficient_independent_ladder_fit",
+                "validated_model_components": {},
+            },
+            {"product": "vfootball", "event_id": "out-of-scope"},
+        ]
+        result = coverage(rows)
+        gt = result["efootball_gt"]
+        self.assertEqual(gt["efootball_rows"], 2)
+        self.assertEqual(gt["unique_events"], 2)
+        self.assertEqual(gt["rows_with_valid_shadow"], 1)
+        self.assertEqual(gt["unique_events_with_valid_shadow"], 1)
+        self.assertEqual(gt["rejection_reason_counts"]["eligible_leave_one_line_out_fit"], 1)
+        self.assertEqual(gt["rejection_reason_counts"]["historical_product_fallback_rejected"], 1)
+        self.assertEqual(
+            gt["lambda_fit_source_counts_by_side"]["over"]["historical_product_lambda_fallback"],
+            1,
+        )
+        self.assertFalse(gt["qualification_or_prediction_changes_applied"])
+        self.assertEqual(result["efootball_adriatic"]["rows_with_valid_shadow"], 0)
 
 
     def test_desk_capture_tracks_prospective_poisson_shadow_and_refreshes_when_it_changes(self):
@@ -594,6 +654,7 @@ class UpcomingDeskPolicyTests(unittest.TestCase):
             "validated_model_family": "walk_forward_efootball_poisson",
             "poisson_shadow_probability": 0.61,
             "poisson_shadow_source": "current_market_ladder_leave_one_line_out",
+            "poisson_shadow_reason": "eligible_leave_one_line_out_fit",
             "desk_observed_at": now.isoformat(),
         }
         trace = []
@@ -606,6 +667,7 @@ class UpcomingDeskPolicyTests(unittest.TestCase):
             trace[0]["poisson_shadow_source"],
             "current_market_ladder_leave_one_line_out",
         )
+        self.assertEqual(trace[0]["poisson_shadow_reason"], "eligible_leave_one_line_out_fit")
         changed = dict(row)
         changed["poisson_shadow_probability"] = 0.58
         changed["desk_observed_at"] = (now + timedelta(minutes=5)).isoformat()
@@ -614,6 +676,9 @@ class UpcomingDeskPolicyTests(unittest.TestCase):
         }))
         self.assertFalse(learning_ns["materially_same_forecast"](trace[0], {
             **trace[0], "poisson_shadow_source": "historical_product_lambda_fallback",
+        }))
+        self.assertFalse(learning_ns["materially_same_forecast"](trace[0], {
+            **trace[0], "poisson_shadow_reason": "historical_product_fallback_rejected",
         }))
         self.assertTrue(learning_ns["materially_same_forecast"](trace[0], trace[0]))
 
@@ -661,6 +726,35 @@ class UpcomingDeskPolicyTests(unittest.TestCase):
         self.assertGreater(result["log_loss_difference_95_cluster_bootstrap_ci"][0], 0)
         self.assertFalse(result["qualification_or_prediction_changes_applied"])
         self.assertFalse(result["production_qualification_enabled"])
+
+    def test_shadow_capture_diagnostics_separate_pending_valid_rows_from_rejections(self):
+        now = datetime(2026, 10, 10, 12, 0, tzinfo=UTC)
+        pending = {
+            "trace_id": "pending-shadow-1", "event_id": "event-a",
+            "product": "efootball_gt", "start_time": (now + timedelta(minutes=20)).isoformat(),
+            "observed_at": now.isoformat(), "settled": False, "scored_forecast": False,
+            "poisson_shadow_probability": 0.61,
+            "poisson_shadow_source": "current_market_ladder_leave_one_line_out",
+            "poisson_shadow_reason": "eligible_leave_one_line_out_fit",
+        }
+        rejected = {
+            "trace_id": "rejected-shadow-1", "event_id": "event-b",
+            "product": "efootball_gt", "start_time": (now + timedelta(minutes=25)).isoformat(),
+            "observed_at": now.isoformat(), "settled": False, "scored_forecast": False,
+            "poisson_shadow_probability": None, "poisson_shadow_source": None,
+            "poisson_shadow_reason": "historical_product_fallback_rejected",
+        }
+        result = learning_ns["prospective_poisson_shadow_capture_diagnostics"](
+            [pending, rejected, {**pending, "product": "vfootball", "trace_id": "other"}],
+            "efootball_gt",
+        )
+        self.assertEqual(result["captured_forecast_revisions"], 2)
+        self.assertEqual(result["rows_with_valid_poisson_shadow"], 1)
+        self.assertEqual(result["pending_rows_with_valid_poisson_shadow"], 1)
+        self.assertEqual(result["settled_scored_rows_with_valid_poisson_shadow"], 0)
+        self.assertEqual(result["rejection_reason_counts"]["historical_product_fallback_rejected"], 1)
+        self.assertFalse(result["production_qualification_enabled"])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
