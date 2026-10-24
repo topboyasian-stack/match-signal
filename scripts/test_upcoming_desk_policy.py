@@ -31,6 +31,25 @@ class UpcomingDeskPolicyTests(unittest.TestCase):
         row.update(extra)
         return row
 
+    def test_under_65_is_included_in_weak_line_diagnostics_without_changing_qualification(self):
+        summarize = ns["build_under_line_evidence"]
+        rows = [
+            {"sport": "virtual", "product": "efootball_gt", "pick": "under", "line": 6.5,
+             "walkforward_exact_line_n": 12, "qualification_status": "MODEL_PROBABILITY_BELOW_0_65"},
+            {"sport": "virtual", "product": "efootball_gt", "pick": "under", "line": 6.5,
+             "walkforward_exact_line_n": 12, "qualification_status": "MODEL_PROBABILITY_BELOW_0_65",
+             "betting_qualified": False},
+            {"sport": "virtual", "product": "efootball_gt", "pick": "under", "line": 6.0},
+            {"sport": "virtual", "product": "efootball_gt", "pick": "over", "line": 6.5},
+            {"sport": "football", "product": "efootball_gt", "pick": "under", "line": 6.5},
+        ]
+        report = summarize(rows)
+        self.assertEqual(list(report), ["efootball_gt|6.5|under"])
+        self.assertEqual(report["efootball_gt|6.5|under"]["event_rows"], 2)
+        self.assertEqual(report["efootball_gt|6.5|under"]["walkforward_n"], 12)
+        self.assertFalse(report["efootball_gt|6.5|under"]["betting_qualified"])
+        self.assertEqual(report["efootball_gt|6.5|under"]["qualification_status"], "MODEL_PROBABILITY_BELOW_0_65")
+
     def test_timestamp_helper_supports_chronological_walk_forward_filtering(self):
         stamp = "2026-10-09T13:00:00+00:00"
         self.assertEqual(ns["ts"](stamp), datetime(2026, 10, 9, 13, 0, tzinfo=UTC).timestamp())
