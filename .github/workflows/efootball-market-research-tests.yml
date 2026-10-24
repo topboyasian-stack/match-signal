@@ -6,6 +6,9 @@ on:
       - 'scripts/efootball_market_research.py'
       - 'scripts/test_efootball_market_research.py'
       - 'scripts/efootball_performance_report.py'
+      - 'scripts/unified_upcoming.py'
+      - 'scripts/efootball_desk_learning.py'
+      - 'scripts/test_upcoming_desk_policy.py'
       - 'scripts/test_efootball_performance_report.py'
       - 'scripts/virtual_lab_sync.py'
       - 'functions/api/sportybet-virtual.js'
@@ -19,6 +22,9 @@ on:
       - 'scripts/efootball_market_research.py'
       - 'scripts/test_efootball_market_research.py'
       - 'scripts/efootball_performance_report.py'
+      - 'scripts/unified_upcoming.py'
+      - 'scripts/efootball_desk_learning.py'
+      - 'scripts/test_upcoming_desk_policy.py'
       - 'scripts/test_efootball_performance_report.py'
       - 'scripts/virtual_lab_sync.py'
       - 'functions/api/sportybet-virtual.js'
@@ -42,9 +48,10 @@ jobs:
         run: python -m pip install --upgrade requests
       - name: Compile and run isolated market tests
         run: |
-          python -m py_compile scripts/efootball_market_research.py scripts/test_efootball_market_research.py scripts/efootball_performance_report.py scripts/test_efootball_performance_report.py
+          python -m py_compile scripts/efootball_market_research.py scripts/test_efootball_market_research.py scripts/efootball_performance_report.py scripts/test_efootball_performance_report.py scripts/unified_upcoming.py scripts/efootball_desk_learning.py scripts/test_upcoming_desk_policy.py
           python scripts/test_efootball_market_research.py
           python scripts/test_efootball_performance_report.py
+          python scripts/test_upcoming_desk_policy.py
       - name: Verify re-registered live sync and research schedule linkage
         run: |
           python - <<'PY'
