@@ -6,9 +6,9 @@ const [html, css, ui, api, workflow, booking] = await Promise.all([
   read("basketball.html"), read("basketball-design.css"), read("basketball-live.js"),
   read("functions/api/sportybet-basketball.js"), read(".github/workflows/cloudflare-pages.yml"), read("functions/api/sportybet-basketball-booking.js")
 ]);
-assert.ok(html.includes("MS-BASKETBALL-DESK-2026.10.24-V8"), "Basketball must publish the new design marker");
+assert.ok(html.includes("MS-BASKETBALL-DESK-2026.10.24-V9"), "Basketball must publish the new design marker");
 assert.ok(html.includes("core-workspaces-design.css?v=20261014-full-v1"), "Basketball must use the shared Match Signal design layer");
-assert.ok(html.includes("basketball-live.js?v=20261024-direct-fallback-v4"), "Basketball must cache-bust the visible booking error/retry logic");
+assert.ok(html.includes("basketball-live.js?v=20261024-host-fallback-v5"), "Basketball must cache-bust the visible booking error/retry logic");
 assert.ok(html.includes("basketball-design.css?v=20261024-builder-dark-v3"), "Basketball must load its latest contrast-corrected scoped design layer");
 assert.ok(html.includes('id="msNav"') && html.includes('workspace-ui.js?v=20261023-basketball-nav1'), "Basketball must use the single shared site navigation");
 for (const id of ["liveGames","upcomingGames","totalsBoard","finalResults","performance","marketStatus","totalsStatus"]) assert.ok(html.includes('id="'+id+'"'), "Basketball must preserve renderer mount "+id);
@@ -36,7 +36,7 @@ assert.ok(ui.includes("BUILDER_ERRORS") && ui.includes("Code not generated") && 
 assert.ok(ui.includes("Booking API returned non-JSON (HTTP ") && ui.includes("await response.text()"), "Browser must surface diagnostics if the booking API itself returns non-JSON");
 assert.ok(booking.includes("hosts=['https://mobile.sportybet.com','https://lite.sportybet.com','https://www.sportybet.com']") && booking.includes("official web hosts") && booking.includes("content-type") && booking.includes("unavailable_count"), "Share generation must try official SportyBet host variants sequentially and report diagnostics without fabricating codes");
 assert.ok(booking.includes("fallback_direct_origin:true") && booking.includes("fallback_selections"), "Basketball booking must return verified selections for the same direct-origin fallback pattern as eFootball");
-assert.ok(ui.includes("async function directOriginBasketballShare") && ui.includes("SportyBet blocked the direct browser fallback") && ui.includes("fallback_direct_origin===true"), "Basketball UI must attempt the direct-origin fallback when the server receives HTML");
+assert.ok(!ui.includes("directOriginBasketballShare") && ui.includes("data.message||data.error"), "Basketball UI must surface the server's official-host diagnostics instead of repeating a browser request blocked by CORS");
 assert.ok(ui.includes("./api/sportybet-basketball-booking"), "Builder UI must request a live-validated SportyBet booking code");
 assert.ok(booking.includes("host+'/api/ng/orders/share") && booking.includes("booking_code:share.code"), "Basketball booking endpoint must request and return a genuine SportyBet share code through official host variants");
 assert.ok(booking.includes("leg.market_id||'225'") && booking.includes("SELECTIONS_CHANGED") && booking.includes("NON_STAKING_BETSLIP_PREPARATION"), "Basketball code generation must revalidate exact total market 225 and fail closed without staking");
