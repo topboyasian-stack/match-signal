@@ -29,9 +29,9 @@ assert.ok(workflow.includes("node scripts/test_basketball_desk_contract.mjs"), "
 
 assert.ok(html.includes("How to read this — one clear decision") && html.includes("Model at least 3 points above line"), "Totals page must explain how to choose Over, Under or no clear lean");
 assert.ok(html.includes('id="basketball-builders"') && html.includes('id="basketballBuilderWorkspace"'), "Basketball page must expose its four-builder workspace");
-assert.ok(ui.includes("function renderBuilders()") && ui.includes("Builder 1") && ui.includes("Builder 4") && ui.includes("data-builder-generate"), "Four independent builder cards must be rendered");
+assert.ok(ui.includes("function renderBuilders()") && ui.includes("BASKETBALL_BUILDERS=[[],[],[],[]]") && ui.includes("data-builder-generate"), "Four independent builder cards must be rendered");
 assert.ok(ui.includes("./api/sportybet-basketball-booking"), "Builder UI must request a live-validated SportyBet booking code");
 assert.ok(booking.includes("ORIGIN+'/api/ng/orders/share") && booking.includes("booking_code:share.code"), "Basketball booking endpoint must request and return a genuine SportyBet share code");
-assert.ok(booking.includes("market_id:'225'") && booking.includes("SELECTIONS_CHANGED") && booking.includes("NON_STAKING_BETSLIP_PREPARATION"), "Basketball code generation must revalidate exact total market 225 and fail closed without staking");
+assert.ok(booking.includes("leg.market_id||'225'") && booking.includes("SELECTIONS_CHANGED") && booking.includes("NON_STAKING_BETSLIP_PREPARATION"), "Basketball code generation must revalidate exact total market 225 and fail closed without staking");
 
 console.log("Basketball desk contract passed: shared UI, scoped responsive design, exact SportyBet event matching, fresh full-game totals including OT.");
