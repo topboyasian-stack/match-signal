@@ -397,6 +397,38 @@ def test_same_fixture_poisson_comparison_requires_exact_identity_time_and_outcom
     assert matched["timestamp_mismatch"] == 1
     assert result["applied_to_predictions"] is False
     assert result["production_qualification_enabled"] is False
+    assert result["paired_cluster_bootstrap_loss_comparison"]["status"] == "INSUFFICIENT_EVENT_CLUSTERS"
+    assert result["metrics_by_exact_line_side_on_identical_rows"]
+    assert result["metrics_by_exact_line_side_on_identical_rows"][0]["n"] >= 1
 
 
 test_same_fixture_poisson_comparison_requires_exact_identity_time_and_outcome()
+
+
+def test_cluster_bootstrap_finds_clear_candidate_improvement_and_is_deterministic():
+    rows = []
+    for i in range(60):
+        rows.append({
+            "product": "efootball_gt",
+            "event_id": f"event-{i}",
+            "win": i % 2 == 0,
+            "model_probability": 0.90,
+            "poisson_probability": 0.50,
+            "market_probability": 0.60,
+        })
+    args = {
+        "qualified_vs_poisson": ("model_probability", "poisson_probability"),
+        "market_vs_poisson": ("market_probability", "poisson_probability"),
+    }
+    first = mod.paired_cluster_bootstrap_loss_comparison(rows, args, replicates=300, seed=12)
+    second = mod.paired_cluster_bootstrap_loss_comparison(rows, args, replicates=300, seed=12)
+    assert first == second
+    assert first["event_clusters"] == 60
+    assert first["status"] == "BOOTSTRAP_AVAILABLE"
+    assert first["comparisons"]["qualified_vs_poisson"]["status"] == "CANDIDATE_BETTER_ON_BOTH_WITH_CLUSTER_BOOTSTRAP_SUPPORT"
+    assert first["comparisons"]["qualified_vs_poisson"]["brier_difference_95_cluster_bootstrap_ci"][0] > 0
+    assert first["comparisons"]["qualified_vs_poisson"]["log_loss_difference_95_cluster_bootstrap_ci"][0] > 0
+    assert first["comparisons"]["market_vs_poisson"]["status"] == "CANDIDATE_BETTER_ON_BOTH_WITH_CLUSTER_BOOTSTRAP_SUPPORT"
+
+
+test_cluster_bootstrap_finds_clear_candidate_improvement_and_is_deterministic()
