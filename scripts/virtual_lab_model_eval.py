@@ -439,6 +439,17 @@ def main():
       "paper_only":True
     }
     OUTPUT.write_text(json.dumps(out,indent=2)+"\n")
-    print(json.dumps(out,indent=2))
+    # Keep Actions logs concise; the complete evaluation belongs in the JSON
+    # artifact, not megabytes of repeated console output.
+    print(json.dumps({
+      "generated_at":out["generated_at"],
+      "history_rows":out["history_rows"],
+      "ou_rows":out["ou_rows"],
+      "events":out["events"],
+      "holdout":out["holdout"],
+      "holdout_scored_predictions":len(out["holdout_scored_predictions"]),
+      "participant_feature_gate_pass":out["participant_feature_gate"]["pass"],
+      "paper_only":out["paper_only"],
+    },sort_keys=True))
 
 if __name__=="__main__":main()
