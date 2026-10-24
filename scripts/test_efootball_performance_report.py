@@ -414,7 +414,7 @@ def test_cluster_bootstrap_finds_clear_candidate_improvement_and_is_deterministi
             "win": i % 2 == 0,
             "model_probability": 0.90,
             "poisson_probability": 0.50,
-            "market_probability": 0.60,
+            "market_probability": 0.90,
         })
     args = {
         "qualified_vs_poisson": ("model_probability", "poisson_probability"),
