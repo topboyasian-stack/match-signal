@@ -54,17 +54,28 @@ function mapLeg(leg,event){
   return found||{error:'Exact SportyBet market 225, line and side are no longer available.'};
 }
 async function createShare(selections){
-  const url=ORIGIN+'/api/ng/orders/share?_t='+Date.now();
-  const response=await fetch(url,{method:'POST',headers:{...HEADERS,'Accept-Language':'en-NG,en;q=0.9','Cache-Control':'no-cache','Pragma':'no-cache','Sec-Fetch-Dest':'empty','Sec-Fetch-Mode':'cors','Sec-Fetch-Site':'same-origin'},body:JSON.stringify({selections:selections.map(s=>({eventId:s.eventId,marketId:s.marketId,specifier:s.specifier,outcomeId:s.outcomeId}))}),cache:'no-store',redirect:'follow',signal:AbortSignal.timeout(15000)});
-  const text=await response.text();
-  if(!response.ok) throw new Error('SportyBet share service HTTP '+response.status);
-  let payload;try{payload=JSON.parse(text)}catch(_){throw new Error('SportyBet returned an unreadable share response. No code was created by Match Signal.');}
+  const requestBody=JSON.stringify({selections:selections.map(s=>({eventId:s.eventId,marketId:s.marketId,specifier:s.specifier,outcomeId:s.outcomeId}))});
+  let response=null,text='',lastError='';
+  for(let attempt=1;attempt<=3;attempt++){
+    try{
+      const url=ORIGIN+'/api/ng/orders/share?_t='+Date.now();
+      response=await fetch(url,{method:'POST',headers:{...HEADERS,'Accept-Language':'en-NG,en;q=0.9','Cache-Control':'no-cache','Pragma':'no-cache','Sec-Fetch-Dest':'empty','Sec-Fetch-Mode':'cors','Sec-Fetch-Site':'same-origin'},body:requestBody,cache:'no-store',redirect:'follow',signal:AbortSignal.timeout(15000)});
+      text=await response.text();
+      if(response.ok||![502,503,504].includes(response.status))break;
+      lastError='SportyBet share service HTTP '+response.status+': '+text.slice(0,180);
+    }catch(error){lastError=String(error?.message||error);}
+    if(attempt<3) await new Promise(resolve=>setTimeout(resolve,400*Math.pow(2,attempt-1)));
+  }
+  if(!response)throw new Error('SportyBet share request failed after 3 attempts: '+lastError);
+  if(!response.ok) throw new Error('SportyBet share service HTTP '+response.status+': '+text.slice(0,180));
+  let payload;try{payload=JSON.parse(text)}catch(_){throw new Error('SportyBet returned non-JSON after HTTP success: '+text.slice(0,180));}
   if(payload?.bizCode!=null&&Number(payload.bizCode)!==10000) throw new Error('SportyBet rejected this slip (code '+payload.bizCode+'). Refresh prices and try again.');
   const data=payload?.data||{}, code=String(data.shareCode||'').trim().toUpperCase();
   if(!code) throw new Error('SportyBet did not return a booking/share code.');
   const accepted=Array.isArray(data.outcomes)?data.outcomes:[];
   const odds=accepted.length?accepted.reduce((p,x)=>p*(Number(x.odds)>0?Number(x.odds):1),1):selections.reduce((p,x)=>p*x.odds,1);
-  return {code,url:String(data.shareURL||('https://www.sportybet.com/ng/?c=ng&shareCode='+encodeURIComponent(code))),accepted_count:accepted.length||selections.length,combined_odds:odds,unavailable_count:Array.isArray(data.unavailableOutcomes)?data.unavailableOutcomes.length:0};
+  const unavailable=Array.isArray(data.unavailableOutcomes)?data.unavailableOutcomes.length:0;
+  return {code,url:String(data.shareURL||('https://www.sportybet.com/ng/?c=ng&shareCode='+encodeURIComponent(code))),accepted_count:accepted.length||Math.max(0,selections.length-unavailable),combined_odds:odds,unavailable_count:unavailable};
 }
 export async function onRequestOptions(){return new Response(null,{status:204,headers:OUT_HEADERS});}
 export async function onRequestPost(context){
