@@ -37,6 +37,7 @@ def main():
     board = (WORKFLOWS / "unified-upcoming.yml").read_text(encoding="utf-8")
     watch = (WORKFLOWS / "qualified-best-health-watch-v2.yml").read_text(encoding="utf-8")
     tracker = (WORKFLOWS / "odds-ticket-tracker.yml").read_text(encoding="utf-8")
+    collector = (WORKFLOWS / "virtual-lab-collector.yml").read_text(encoding="utf-8")
 
     builder_paths = push_paths("odds_builder.yml")
     board_paths = push_paths("unified-upcoming.yml")
@@ -61,10 +62,13 @@ def main():
     assert "gh workflow run builder-production-promotion.yml --ref main" in builder
     assert "data/odds_ticket_tracker.json" in board_paths
     assert "data/virtual_lab_model_eval.json" not in board_paths, (
-        "The board workflow now regenerates and publishes the model-evaluation artifact; "
-        "that generated output must not trigger a second board run."
+        "The model-evaluation artifact is collector-owned and must not retrigger the board workflow."
     )
-    assert "python scripts/virtual_lab_model_eval.py" in board
+    assert "python scripts/virtual_lab_model_eval.py" not in board, (
+        "Avoid recomputing the expensive chronological evaluation on every five-minute board refresh."
+    )
+    assert "python scripts/virtual_lab_model_eval.py" in collector
+    assert "data/virtual_lab_model_eval.json" in collector
     assert "promotion_child:" in board
     assert "SKIP_PROMOTION: ${{ github.event_name == 'workflow_dispatch' && inputs.promotion_child == true }}" in board
 
