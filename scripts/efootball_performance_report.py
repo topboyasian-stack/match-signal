@@ -1295,9 +1295,12 @@ def compare_qualified_picks_to_poisson_holdout(
             continue
         timed = []
         for candidate in candidates:
-            candidate_time = parse_time(candidate.get("timestamp"))
-            if candidate_time is not None:
-                timed.append((abs((candidate_time - start).total_seconds()), candidate))
+            # Compare fixture kickoff times, not quote-observation times. A market
+            # snapshot can be hours before the scheduled match and still be the
+            # same fixture; mixing these clocks silently drops valid comparisons.
+            candidate_start = parse_time(candidate.get("start_time"))
+            if candidate_start is not None:
+                timed.append((abs((candidate_start - start).total_seconds()), candidate))
         if not timed:
             counts["timestamp_mismatch"] += 1
             continue
@@ -1316,6 +1319,7 @@ def compare_qualified_picks_to_poisson_holdout(
             "efootball_shape_probability": candidate.get("efootball_shape"),
             "participant_model_probability": candidate.get("participant_model"),
             "model_eval_timestamp": candidate.get("timestamp"),
+            "model_eval_scheduled_start_time": candidate.get("start_time"),
             "model_eval_event_key": candidate.get("event_key"),
         })
 
