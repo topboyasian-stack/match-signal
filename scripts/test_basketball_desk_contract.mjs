@@ -2,13 +2,13 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 const root = new URL("../", import.meta.url);
 const read = p => readFile(new URL(p, root), "utf8");
-const [html, css, ui, api, workflow] = await Promise.all([
+const [html, css, ui, api, workflow, booking] = await Promise.all([
   read("basketball.html"), read("basketball-design.css"), read("basketball-live.js"),
-  read("functions/api/sportybet-basketball.js"), read(".github/workflows/cloudflare-pages.yml")
+  read("functions/api/sportybet-basketball.js"), read(".github/workflows/cloudflare-pages.yml"), read("functions/api/sportybet-basketball-booking.js")
 ]);
-assert.ok(html.includes("MS-BASKETBALL-DESK-2026.10.23-V4"), "Basketball must publish the new design marker");
+assert.ok(html.includes("MS-BASKETBALL-DESK-2026.10.24-V5"), "Basketball must publish the new design marker");
 assert.ok(html.includes("core-workspaces-design.css?v=20261014-full-v1"), "Basketball must use the shared Match Signal design layer");
-assert.ok(html.includes("basketball-design.css?v=20261023-contrast-v8"), "Basketball must load its latest contrast-corrected scoped design layer");
+assert.ok(html.includes("basketball-design.css?v=20261024-totals-workspace-v1"), "Basketball must load its latest contrast-corrected scoped design layer");
 assert.ok(html.includes('id="msNav"') && html.includes('workspace-ui.js?v=20261023-basketball-nav1'), "Basketball must use the single shared site navigation");
 for (const id of ["liveGames","upcomingGames","totalsBoard","finalResults","performance","marketStatus","totalsStatus"]) assert.ok(html.includes('id="'+id+'"'), "Basketball must preserve renderer mount "+id);
 assert.ok(css.includes("MATCH-SIGNAL-BASKETBALL-DESK-V1"), "Basketball scoped design marker missing");
@@ -26,4 +26,12 @@ assert.ok(ui.includes("suspend|closed|inactive|settled|unavailable|stop"), "Susp
 assert.ok(ui.includes("function bestSportyBetTotalMarket(markets)") && ui.includes("balance=Math.abs(Math.log") && ui.includes("status!=='0'"), "Totals must choose an active, balanced mainline instead of the first alternate line and reject non-open numeric statuses");
 assert.ok(api.includes("total_including_overtime:'225'"), "API contract must explicitly identify total incl overtime");
 assert.ok(workflow.includes("node scripts/test_basketball_desk_contract.mjs"), "Deployment must execute Basketball contract tests");
+
+assert.ok(html.includes("How to read this — one clear decision") && html.includes("Model at least 3 points above line"), "Totals page must explain how to choose Over, Under or no clear lean");
+assert.ok(html.includes('id="basketball-builders"') && html.includes('id="basketballBuilderWorkspace"'), "Basketball page must expose its four-builder workspace");
+assert.ok(ui.includes("function renderBuilders()") && ui.includes("Builder 1") && ui.includes("Builder 4") && ui.includes("data-builder-generate"), "Four independent builder cards must be rendered");
+assert.ok(ui.includes("./api/sportybet-basketball-booking"), "Builder UI must request a live-validated SportyBet booking code");
+assert.ok(booking.includes("ORIGIN+'/api/ng/orders/share") && booking.includes("booking_code:share.code"), "Basketball booking endpoint must request and return a genuine SportyBet share code");
+assert.ok(booking.includes("market_id:'225'") && booking.includes("SELECTIONS_CHANGED") && booking.includes("NON_STAKING_BETSLIP_PREPARATION"), "Basketball code generation must revalidate exact total market 225 and fail closed without staking");
+
 console.log("Basketball desk contract passed: shared UI, scoped responsive design, exact SportyBet event matching, fresh full-game totals including OT.");
