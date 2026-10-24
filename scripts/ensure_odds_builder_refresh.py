@@ -251,9 +251,20 @@ def latest_upcoming_board_generated_at() -> str | None:
     return str(value) if value else None
 
 
-def builder_dispatch_command() -> list[str]:
-    """Board-triggered refreshes must not recursively start a promotion."""
-    return ["gh", "workflow", "run", BUILDER_WORKFLOW, "--ref", "main", "-f", "skip_promotion=true"]
+def builder_dispatch_command(skip_promotion: bool | None = None) -> list[str]:
+    """Dispatch a Builder refresh; only promotion-owned board refreshes suppress promotion.
+
+    Normal board refreshes must let the completed Builder start the ordered
+    production-promotion workflow. Boards rebuilt from inside that promotion
+    pass SKIP_PROMOTION=true so the child Builder does not recursively queue
+    another promotion.
+    """
+    if skip_promotion is None:
+        skip_promotion = os.environ.get("SKIP_PROMOTION", "").strip().lower() in {"1", "true", "yes"}
+    command = ["gh", "workflow", "run", BUILDER_WORKFLOW, "--ref", "main"]
+    if skip_promotion:
+        command.extend(["-f", "skip_promotion=true"])
+    return command
 
 
 def main() -> int:
