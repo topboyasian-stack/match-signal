@@ -55,9 +55,9 @@ def clamp(p):
 def normalize_selection(value):
     """Return the canonical selected O/U side, or None for an unknown label."""
     side = str(value or "").strip().lower()
-    if re.match(r"^(?:over|o)(?=$|[\\s\\d.])", side):
+    if re.match(r"^(?:over|o)(?=$|[\s\d.])", side):
         return "over"
-    if re.match(r"^(?:under|u)(?=$|[\\s\\d.])", side):
+    if re.match(r"^(?:under|u)(?=$|[\s\d.])", side):
         return "under"
     return None
 
