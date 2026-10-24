@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import math
+import random
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -1219,6 +1220,127 @@ def _probability_quality_metrics(rows: list[dict[str, Any]], probability_key: st
     }
 
 
+def paired_cluster_bootstrap_loss_comparison(
+    rows: list[dict[str, Any]], comparisons: dict[str, tuple[str, str]], *,
+    replicates: int = 500, seed: int = 20261024, min_event_clusters: int = 30,
+) -> dict[str, Any]:
+    """Compare proper-score losses with paired resampling by fixture/event.
+
+    Each bootstrap resamples event clusters rather than individual line selections,
+    so multiple selections from one fixture stay together. Positive reference-minus-
+    candidate differences mean the candidate model scored better. This remains a
+    descriptive uncertainty screen; repeated participants can still induce dependence.
+    """
+    def valid_probability(value: Any) -> float | None:
+        p = number(value)
+        return max(0.0001, min(0.9999, p)) if p is not None and 0 <= p <= 1 else None
+
+    def row_cluster(row: dict[str, Any], index: int) -> str:
+        product = str(row.get("product") or "")
+        event_id = str(row.get("event_id") or "")
+        if event_id:
+            return f"{product}|{event_id}"
+        return str(row.get("trace_id") or row.get("event_key") or f"row-{index}")
+
+    def score_diffs(sample: list[dict[str, Any]], reference_field: str,
+                    candidate_field: str) -> tuple[float | None, float | None, int]:
+        brier_diffs = []
+        log_diffs = []
+        for row in sample:
+            ref_p = valid_probability(row.get(reference_field))
+            cand_p = valid_probability(row.get(candidate_field))
+            y = 1.0 if row.get("win") is True or row.get("y") == 1 else 0.0
+            if ref_p is None or cand_p is None:
+                continue
+            brier_diffs.append((ref_p - y) ** 2 - (cand_p - y) ** 2)
+            ref_log = -(y * math.log(ref_p) + (1.0 - y) * math.log(1.0 - ref_p))
+            cand_log = -(y * math.log(cand_p) + (1.0 - y) * math.log(1.0 - cand_p))
+            log_diffs.append(ref_log - cand_log)
+        if not brier_diffs:
+            return None, None, 0
+        return sum(brier_diffs) / len(brier_diffs), sum(log_diffs) / len(log_diffs), len(brier_diffs)
+
+    output: dict[str, Any] = {
+        "method": "paired percentile bootstrap by product + event ID; all line/side selections for a sampled event remain together",
+        "replicates": replicates,
+        "seed": seed,
+        "minimum_event_clusters": min_event_clusters,
+        "positive_difference_means_candidate_has_lower_loss": True,
+        "status": "INSUFFICIENT_EVENT_CLUSTERS",
+        "event_clusters": 0,
+        "comparisons": {},
+        "note": "Approximate uncertainty intervals account for multiple line selections within one fixture but not all dependence from recurring participants. These intervals do not authorize model promotion.",
+    }
+    for name, (reference_field, candidate_field) in comparisons.items():
+        by_cluster: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        eligible_count = 0
+        for i, row in enumerate(rows):
+            ref_p = valid_probability(row.get(reference_field))
+            cand_p = valid_probability(row.get(candidate_field))
+            if ref_p is None or cand_p is None:
+                continue
+            by_cluster[row_cluster(row, i)].append(row)
+            eligible_count += 1
+        cluster_keys = sorted(by_cluster)
+        if len(cluster_keys) < min_event_clusters:
+            output["event_clusters"] = max(output["event_clusters"], len(cluster_keys))
+            output["comparisons"][name] = {
+                "reference_probability": reference_field,
+                "candidate_probability": candidate_field,
+                "eligible_rows": eligible_count,
+                "event_clusters": len(cluster_keys),
+                "status": "INSUFFICIENT_EVENT_CLUSTERS",
+                "brier_difference_reference_minus_candidate": None,
+                "brier_difference_95_cluster_bootstrap_ci": None,
+                "log_loss_difference_reference_minus_candidate": None,
+                "log_loss_difference_95_cluster_bootstrap_ci": None,
+            }
+            continue
+        output["event_clusters"] = max(output["event_clusters"], len(cluster_keys))
+        point_brier, point_log, pair_n = score_diffs(rows, reference_field, candidate_field)
+        rng = random.Random(seed)
+        bootstrap_brier: list[float] = []
+        bootstrap_log: list[float] = []
+        for _ in range(replicates):
+            selected_keys = [rng.choice(cluster_keys) for _ in cluster_keys]
+            sample = [row for cluster in selected_keys for row in by_cluster[cluster]]
+            brier_diff, log_diff, _ = score_diffs(sample, reference_field, candidate_field)
+            if brier_diff is not None and log_diff is not None:
+                bootstrap_brier.append(brier_diff)
+                bootstrap_log.append(log_diff)
+        bootstrap_brier.sort()
+        bootstrap_log.sort()
+
+        def interval(values: list[float]) -> list[float] | None:
+            if not values:
+                return None
+            lo_i = int(0.025 * (len(values) - 1))
+            hi_i = int(0.975 * (len(values) - 1))
+            return [rounded(values[lo_i]), rounded(values[hi_i])]
+
+        brier_ci = interval(bootstrap_brier)
+        log_ci = interval(bootstrap_log)
+        supported = bool(
+            brier_ci and log_ci
+            and brier_ci[0] > 0
+            and log_ci[0] > 0
+        )
+        output["comparisons"][name] = {
+            "reference_probability": reference_field,
+            "candidate_probability": candidate_field,
+            "eligible_rows": pair_n,
+            "event_clusters": len(cluster_keys),
+            "brier_difference_reference_minus_candidate": rounded(point_brier),
+            "brier_difference_95_cluster_bootstrap_ci": brier_ci,
+            "log_loss_difference_reference_minus_candidate": rounded(point_log),
+            "log_loss_difference_95_cluster_bootstrap_ci": log_ci,
+            "status": "CANDIDATE_BETTER_ON_BOTH_WITH_CLUSTER_BOOTSTRAP_SUPPORT" if supported else "NO_CLEAR_PAIRED_ADVANTAGE",
+        }
+    if output["event_clusters"] >= min_event_clusters:
+        output["status"] = "BOOTSTRAP_AVAILABLE"
+    return output
+
+
 def compare_qualified_picks_to_poisson_holdout(
     qualified_rows: list[dict[str, Any]], lab_eval: dict[str, Any], *, timestamp_tolerance_seconds: int = 900
 ) -> dict[str, Any]:
@@ -1333,6 +1455,35 @@ def compare_qualified_picks_to_poisson_holdout(
     }
     metrics = {name: _probability_quality_metrics(matched, field) for name, field in probability_fields.items()}
     matched_n = len(matched)
+
+    line_side_groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for row in matched:
+        side = side_key(row.get("pick"))
+        line = number(row.get("line"))
+        if side and line is not None:
+            line_side_groups[f"{side} {line:g}"].append(row)
+    metrics_by_line_side = []
+    for label, segment in sorted(line_side_groups.items()):
+        metrics_by_line_side.append({
+            "line_side": label,
+            "n": len(segment),
+            "unique_events": len({f"{r.get('product') or ''}|{r.get('event_id') or ''}" for r in segment}),
+            "sample_label": "descriptive_only_small_sample" if len(segment) < 30 else "descriptive_holdout_segment",
+            "metrics_on_identical_rows": {
+                name: _probability_quality_metrics(segment, field)
+                for name, field in probability_fields.items()
+            },
+        })
+    paired_uncertainty = paired_cluster_bootstrap_loss_comparison(
+        matched,
+        {
+            "qualified_vs_poisson": ("model_probability", "poisson_probability"),
+            "market_vs_poisson": ("market_probability", "poisson_probability"),
+            "qualified_vs_poisson_prior": ("model_probability", "poisson_prior_probability"),
+            "qualified_vs_efootball_shape": ("model_probability", "efootball_shape_probability"),
+            "qualified_vs_participant_model": ("model_probability", "participant_model_probability"),
+        },
+    )
     return {
         "mode": "PAPER_SHADOW_ONLY",
         "status": "MATCHED_HOLDOUT_AVAILABLE" if matched_n >= 100 else "INSUFFICIENT_MATCHED_ROWS",
@@ -1342,6 +1493,8 @@ def compare_qualified_picks_to_poisson_holdout(
         "matched_rows": matched_n,
         "match_coverage": counts,
         "metrics_on_identical_matched_rows": metrics,
+        "metrics_by_exact_line_side_on_identical_rows": metrics_by_line_side,
+        "paired_cluster_bootstrap_loss_comparison": paired_uncertainty,
         "applied_to_predictions": False,
         "production_qualification_enabled": False,
         "note": "This is a selected Qualified Best subset intersected with the model evaluator's untouched holdout. Compare Brier/log loss/ECE on this identical set; no model is promoted automatically.",
