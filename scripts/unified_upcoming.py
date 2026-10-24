@@ -179,6 +179,35 @@ def exact_line_direction_oos(eval_art, product, line, side):
     return {"n":0,"hit_rate":None,"brier":None,"variant":selected_variant}
 
 
+def prospective_poisson_shadow_probability(components, product, side):
+    """Return a paper-only, leave-the-target-line-out Poisson probability for the selected side.
+
+    Only accept an actually fitted current SportyBet O/U ladder. Historical product
+    fallbacks and incomplete side estimates are not represented as independent shadow
+    evidence, and this function never changes the displayed/qualified forecast.
+    """
+    if str(product or "").strip().lower() not in {"efootball_gt", "efootball_adriatic"}:
+        return None, None
+    side_key = str(side or "").strip().lower()
+    if side_key not in {"over", "under"} or not isinstance(components, dict):
+        return None, None
+    side_components = components.get(side_key)
+    if not isinstance(side_components, dict):
+        return None, None
+    fit = side_components.get("lambda_fit")
+    over_probability = num(side_components.get("poisson_over_probability"))
+    if not (
+        isinstance(fit, dict)
+        and fit.get("source") == "current_market_ladder_leave_one_line_out"
+        and fit.get("target_line_excluded") is True
+        and over_probability is not None
+        and 0.0 <= over_probability <= 1.0
+    ):
+        return None, None
+    selected_probability = over_probability if side_key == "over" else 1.0 - over_probability
+    return clamp(selected_probability), "current_market_ladder_leave_one_line_out"
+
+
 def virtual_market_line(market):
     """Parse a current SportyBet O/U total line without inventing neighboring lines."""
     line=num((market or {}).get("line"))
@@ -1224,6 +1253,9 @@ def build_virtual_events(history, lifecycle, eligibility):
             qualified=qualification_status in QUALIFIED_VIRTUAL_STATUSES
             kickoff_minutes_remaining=virtual_kickoff_window_minutes(start,NOW)
             kickoff_window_pass=bool(kickoff_minutes_remaining is not None and 0 < kickoff_minutes_remaining <= QUALIFIED_VIRTUAL_KICKOFF_WINDOW_MINUTES)
+            poisson_shadow_probability, poisson_shadow_source = prospective_poisson_shadow_probability(
+                validated_meta, product, chosen_pick
+            )
             add(out,{
                 "sport":"virtual",
                 "product":product,
@@ -1242,6 +1274,8 @@ def build_virtual_events(history, lifecycle, eligibility):
                 "probability":round(chosen_model,4),
                 "probabilities":{"over":round(over,4),"under":round(under,4)},
                 "raw_model_probability":round(raw_chosen_model,4),
+                "poisson_shadow_probability":round(poisson_shadow_probability,4) if poisson_shadow_probability is not None else None,
+                "poisson_shadow_source":poisson_shadow_source,
                 "validated_model_family":f"walk_forward_efootball_{selected_model_variant}",
                 "validated_model_variant":selected_model_variant,
                 "validated_model_over_probability":round(raw_over,4),
