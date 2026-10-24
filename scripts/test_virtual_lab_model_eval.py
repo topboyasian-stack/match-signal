@@ -1,5 +1,5 @@
 """Regression checks for the accelerated Virtual Lab line-ladder fit."""
-from virtual_lab_model_eval import evaluate_participant_feature_gate,fit_lambda,poisson_over,holdout_prediction_rows,normalize_selection
+from virtual_lab_model_eval import evaluate_participant_feature_gate,fit_lambda,poisson_over,holdout_prediction_rows,normalize_selection,build_events
 
 def reference_fit(points):
     if not points:return None
@@ -16,6 +16,35 @@ assert normalize_selection("Over 4.5") == "over"
 assert normalize_selection("O 1.5") == "over"
 assert normalize_selection("") is None
 assert normalize_selection("unknown side") is None
+
+
+def test_legacy_settled_history_timestamp_is_scheduled_kickoff():
+    kickoff = "2026-10-20T10:00:00+00:00"
+    capture = "2026-10-20T08:15:00+00:00"
+    events = build_events([{
+        "market": "ou",
+        "win": True,
+        "event_id": "legacy-event-1",
+        "timestamp": kickoff,
+        # Legacy Virtual Lab settled rows have no explicit start_time; timestamp
+        # is the scheduled kickoff and captured_at stores the earlier quote time.
+        "captured_at": capture,
+        "product": "efootball_gt",
+        "competition": "GT",
+        "participant_1": "Alpha (alpha)",
+        "participant_2": "Beta (beta)",
+        "line": 4.5,
+        "selection": "Under 5.5",
+        "model_prob": 0.62,
+        "score": "3:2",
+    }])
+    assert len(events) == 1
+    assert events[0]["start_time"] == kickoff
+    assert events[0]["timestamp"] == kickoff
+
+
+test_legacy_settled_history_timestamp_is_scheduled_kickoff()
+
 
 CASES=[
  [(1.5,.90),(2.5,.77),(3.5,.56),(4.5,.31),(5.5,.15)],
