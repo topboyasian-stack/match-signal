@@ -266,6 +266,7 @@ def materially_same_forecast(old, new):
         and close(old.get("raw_model_probability"), new.get("raw_model_probability"), CAPTURE_PROBABILITY_DELTA)
         and close(old.get("poisson_shadow_probability"), new.get("poisson_shadow_probability"), CAPTURE_PROBABILITY_DELTA)
         and str(old.get("poisson_shadow_source") or "") == str(new.get("poisson_shadow_source") or "")
+        and str(old.get("poisson_shadow_reason") or "") == str(new.get("poisson_shadow_reason") or "")
         and close(old.get("bookmaker_odds"), new.get("bookmaker_odds"), CAPTURE_ODDS_DELTA)
         and close(old.get("model_edge_vs_market"), new.get("model_edge_vs_market"), CAPTURE_EDGE_DELTA)
     )
@@ -302,6 +303,7 @@ def capture(trace, board):
             "raw_model_probability": num(row.get("raw_model_probability")),
             "poisson_shadow_probability": num(row.get("poisson_shadow_probability")),
             "poisson_shadow_source": row.get("poisson_shadow_source"),
+            "poisson_shadow_reason": row.get("poisson_shadow_reason"),
             "model_version": row.get("model_version"),
             "validated_model_family": row.get("validated_model_family"),
             "bookmaker_odds": num(row.get("bookmaker_odds")),
@@ -694,6 +696,48 @@ def _probability_quality_metrics(rows, probability_field):
     }
 
 
+def prospective_poisson_shadow_capture_diagnostics(trace, product):
+    """Explain forward-shadow coverage separately from its not-yet-settled score sample."""
+    product_key = str(product or "").strip().lower()
+    rows = [
+        row for row in (trace if isinstance(trace, list) else []) if isinstance(row, dict)
+        and str(row.get("product") or "efootball_gt").strip().lower() == product_key
+    ]
+    reason_counts = {}
+    fit_source_counts = {}
+    for row in rows:
+        probability = num(row.get("poisson_shadow_probability"))
+        reason = str(row.get("poisson_shadow_reason") or (
+            "eligible_leave_one_line_out_fit" if probability is not None
+            else "shadow_reason_not_recorded"
+        ))
+        reason_counts[reason] = reason_counts.get(reason, 0) + 1
+        source = str(row.get("poisson_shadow_source") or "")
+        if source:
+            fit_source_counts[source] = fit_source_counts.get(source, 0) + 1
+    valid = [
+        row for row in rows
+        if (probability := num(row.get("poisson_shadow_probability"))) is not None
+        and 0.0 <= probability <= 1.0
+    ]
+    pending_valid = [row for row in valid if is_pending_forecast(row)]
+    settled_valid = [row for row in valid if row.get("scored_forecast") is True]
+    event_key = lambda row: fixture_key(row) or str(row.get("trace_id") or "")
+    return {
+        "mode": "PAPER_SHADOW_ONLY",
+        "captured_forecast_revisions": len(rows),
+        "unique_events_captured": len({event_key(row) for row in rows if event_key(row)}),
+        "rows_with_valid_poisson_shadow": len(valid),
+        "unique_events_with_valid_poisson_shadow": len({event_key(row) for row in valid if event_key(row)}),
+        "pending_rows_with_valid_poisson_shadow": len(pending_valid),
+        "settled_scored_rows_with_valid_poisson_shadow": len(settled_valid),
+        "rejection_reason_counts": reason_counts,
+        "valid_shadow_source_counts": fit_source_counts,
+        "qualification_or_prediction_changes_applied": False,
+        "production_qualification_enabled": False,
+    }
+
+
 def prospective_poisson_shadow_comparison(forecasts, *, min_sample=100, replicates=300, seed=20261024):
     """Compare current desk calibration to a Poisson score recorded strictly pre-kickoff.
 
@@ -981,6 +1025,10 @@ def main():
             },
             "exact_selection_active": exact_active,
             "exact_selection": exact,
+            "prospective_poisson_shadow_capture": (
+                prospective_poisson_shadow_capture_diagnostics(trace, product)
+                if product in {"efootball_gt", "efootball_adriatic"} else None
+            ),
             "prospective_poisson_shadow_comparison": (
                 prospective_poisson_shadow_comparison(product_settled)
                 if product in {"efootball_gt", "efootball_adriatic"} else None
