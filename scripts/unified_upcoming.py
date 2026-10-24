@@ -1177,7 +1177,7 @@ def build_virtual_events(history, lifecycle, eligibility):
             try:
                 if validated_vl_probs is None or validated_fit_lambda is None:
                     raise RuntimeError("validated walk-forward model helpers unavailable")
-                prior_events=[h_event for h_event in validated_history_events if ts(h_event.get("timestamp")) < start.timestamp()]
+                prior_events=[h_event for h_event in validated_history_events if (h_time := dt(h_event.get("timestamp"))) is not None and h_time < start]
                 # Fit against the rest of the current O/U ladder and leave the
                 # target line out. Fitting lambda to this line's own odds makes
                 # the model circular and invalidates its advertised value edge.
