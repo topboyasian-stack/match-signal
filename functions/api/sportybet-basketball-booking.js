@@ -56,30 +56,21 @@ function mapLeg(leg,event){
 async function createShare(selections){
   const requestBody=JSON.stringify({selections:selections.map(s=>({eventId:s.eventId,marketId:s.marketId,specifier:s.specifier,outcomeId:s.outcomeId}))});
   let lastDiagnostic='No response from SportyBet.';
-  // SportyBet's share endpoint sometimes answers HTTP 200 with an HTML edge page,
-  // an empty body, or JSON without a share code. Retry those transient responses too.
   for(let attempt=1;attempt<=3;attempt++){
-    let response=null,body='',contentType='';
+    let response=null,body='',contentType='not supplied';
     try{
-      const url=ORIGIN+'/api/ng/orders/share?_t='+Date.now();
-      response=await fetch(url,{method:'POST',headers:{...HEADERS,'Accept-Language':'en-NG,en;q=0.9','Cache-Control':'no-cache','Pragma':'no-cache','Sec-Fetch-Dest':'empty','Sec-Fetch-Mode':'cors','Sec-Fetch-Site':'same-origin'},body:requestBody,cache:'no-store',redirect:'follow',signal:AbortSignal.timeout(15000)});
-      contentType=response.headers.get('content-type')||'not supplied';
+      response=await fetch(ORIGIN+'/api/ng/orders/share?_t='+Date.now(),{method:'POST',headers:{...HEADERS,'Accept-Language':'en-NG,en;q=0.9','Cache-Control':'no-cache','Pragma':'no-cache','Sec-Fetch-Dest':'empty','Sec-Fetch-Mode':'cors','Sec-Fetch-Site':'same-origin'},body:requestBody,cache:'no-store',redirect:'follow',signal:AbortSignal.timeout(15000)});
+      contentType=response.headers.get('content-type')||contentType;
       body=await response.text();
-      if(!response.ok){
-        lastDiagnostic='HTTP '+response.status+'; content-type '+contentType+'; response '+body.slice(0,180).replace(/\\s+/g,' ');
-      }else{
+      if(!response.ok) lastDiagnostic='HTTP '+response.status+'; content-type '+contentType+'; response '+body.slice(0,180).replace(/\\s+/g,' ');
+      else {
         let payload=null;
-        try{payload=JSON.parse(body)}catch(_){
-          lastDiagnostic='HTTP '+response.status+' but response was not JSON (content-type '+contentType+'): '+(body.slice(0,180).replace(/\\s+/g,' ')||'[empty response]');
-        }
+        try{payload=JSON.parse(body)}catch(_){lastDiagnostic='HTTP '+response.status+' but response was not JSON (content-type '+contentType+'): '+(body.slice(0,180).replace(/\\s+/g,' ')||'[empty response]');}
         if(payload){
-          if(payload?.bizCode!=null&&Number(payload.bizCode)!==10000){
-            throw new Error('SportyBet rejected this slip (code '+payload.bizCode+'). Refresh the markets and try again.');
-          }
+          if(payload?.bizCode!=null&&Number(payload.bizCode)!==10000) throw new Error('SportyBet rejected this slip (code '+payload.bizCode+'). Refresh markets and try again.');
           const data=payload?.data||{},code=String(data.shareCode||'').trim().toUpperCase();
           if(code){
-            const accepted=Array.isArray(data.outcomes)?data.outcomes:[];
-            const unavailable=Array.isArray(data.unavailableOutcomes)?data.unavailableOutcomes.length:0;
+            const accepted=Array.isArray(data.outcomes)?data.outcomes:[],unavailable=Array.isArray(data.unavailableOutcomes)?data.unavailableOutcomes.length:0;
             const odds=accepted.length?accepted.reduce((p,x)=>p*(Number(x.odds)>0?Number(x.odds):1),1):selections.reduce((p,x)=>p*x.odds,1);
             return {code,url:String(data.shareURL||('https://www.sportybet.com/ng/?c=ng&shareCode='+encodeURIComponent(code))),accepted_count:accepted.length||Math.max(0,selections.length-unavailable),combined_odds:odds,unavailable_count:unavailable};
           }
