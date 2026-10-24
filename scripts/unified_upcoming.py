@@ -179,33 +179,99 @@ def exact_line_direction_oos(eval_art, product, line, side):
     return {"n":0,"hit_rate":None,"brier":None,"variant":selected_variant}
 
 
-def prospective_poisson_shadow_probability(components, product, side):
-    """Return a paper-only, leave-the-target-line-out Poisson probability for the selected side.
+def prospective_poisson_shadow_decision(components, product, side):
+    """Explain whether a target-line-excluded current-market Poisson shadow is usable.
 
-    Only accept an actually fitted current SportyBet O/U ladder. Historical product
-    fallbacks and incomplete side estimates are not represented as independent shadow
-    evidence, and this function never changes the displayed/qualified forecast.
+    Historical lambda fallbacks, incomplete O/U quotes, and missing independent
+    ladder fits remain visible as rejection reasons. The returned probability never
+    changes the displayed forecast or qualification decision.
     """
-    if str(product or "").strip().lower() not in {"efootball_gt", "efootball_adriatic"}:
-        return None, None
+    product_key = str(product or "").strip().lower()
+    if product_key not in {"efootball_gt", "efootball_adriatic"}:
+        return None, None, "product_out_of_scope"
     side_key = str(side or "").strip().lower()
-    if side_key not in {"over", "under"} or not isinstance(components, dict):
-        return None, None
+    if side_key not in {"over", "under"}:
+        return None, None, "invalid_side"
+    if not isinstance(components, dict):
+        return None, None, "missing_validated_components"
     side_components = components.get(side_key)
     if not isinstance(side_components, dict):
-        return None, None
+        return None, None, "missing_side_components"
     fit = side_components.get("lambda_fit")
+    if not isinstance(fit, dict):
+        return None, None, "missing_lambda_fit_metadata"
+    fit_source = str(fit.get("source") or "")
+    if fit_source != "current_market_ladder_leave_one_line_out":
+        source_reasons = {
+            "historical_product_lambda_fallback": "historical_product_fallback_rejected",
+            "default_product_lambda_fallback": "default_product_fallback_rejected",
+            "no_independent_ladder_fit": "insufficient_independent_ladder_fit",
+        }
+        return None, None, source_reasons.get(fit_source, "fit_source_not_validated")
+    if fit.get("target_line_excluded") is not True:
+        return None, None, "target_line_not_excluded"
     over_probability = num(side_components.get("poisson_over_probability"))
-    if not (
-        isinstance(fit, dict)
-        and fit.get("source") == "current_market_ladder_leave_one_line_out"
-        and fit.get("target_line_excluded") is True
-        and over_probability is not None
-        and 0.0 <= over_probability <= 1.0
-    ):
-        return None, None
+    if over_probability is None:
+        return None, None, "missing_poisson_over_probability"
+    if not 0.0 <= over_probability <= 1.0:
+        return None, None, "invalid_poisson_over_probability"
     selected_probability = over_probability if side_key == "over" else 1.0 - over_probability
-    return clamp(selected_probability), "current_market_ladder_leave_one_line_out"
+    return clamp(selected_probability), "current_market_ladder_leave_one_line_out", "eligible_leave_one_line_out_fit"
+
+
+def prospective_poisson_shadow_probability(components, product, side):
+    """Compatibility wrapper; return only the probability and source for older callers."""
+    probability, source, _reason = prospective_poisson_shadow_decision(components, product, side)
+    return probability, source
+
+
+def prospective_poisson_shadow_coverage(rows):
+    """Summarize why upcoming eFootball rows do or do not carry a prospective shadow."""
+    report = {}
+    for row in rows if isinstance(rows, list) else []:
+        if not isinstance(row, dict):
+            continue
+        product = str(row.get("product") or "").strip().lower()
+        if product not in {"efootball_gt", "efootball_adriatic"}:
+            continue
+        group = report.setdefault(product, {
+            "efootball_rows": 0,
+            "unique_events": set(),
+            "rows_with_valid_shadow": 0,
+            "unique_events_with_valid_shadow": set(),
+            "rejection_reason_counts": {},
+            "lambda_fit_source_counts_by_side": {},
+        })
+        group["efootball_rows"] += 1
+        event_id = str(row.get("event_id") or "")
+        if event_id:
+            group["unique_events"].add(event_id)
+        if num(row.get("poisson_shadow_probability")) is not None:
+            group["rows_with_valid_shadow"] += 1
+            if event_id:
+                group["unique_events_with_valid_shadow"].add(event_id)
+        reason = str(row.get("poisson_shadow_reason") or (
+            "eligible_leave_one_line_out_fit" if num(row.get("poisson_shadow_probability")) is not None
+            else "shadow_reason_not_recorded"
+        ))
+        reason_counts = group["rejection_reason_counts"]
+        reason_counts[reason] = reason_counts.get(reason, 0) + 1
+        components = row.get("validated_model_components")
+        if isinstance(components, dict):
+            for side in ("over", "under"):
+                side_row = components.get(side)
+                if not isinstance(side_row, dict):
+                    continue
+                fit = side_row.get("lambda_fit")
+                source = str((fit or {}).get("source") or "missing_lambda_fit_metadata") if isinstance(fit, dict) else "missing_lambda_fit_metadata"
+                side_counts = group["lambda_fit_source_counts_by_side"].setdefault(side, {})
+                side_counts[source] = side_counts.get(source, 0) + 1
+    for group in report.values():
+        group["unique_events"] = len(group["unique_events"])
+        group["unique_events_with_valid_shadow"] = len(group["unique_events_with_valid_shadow"])
+        group["mode"] = "PAPER_SHADOW_ONLY"
+        group["qualification_or_prediction_changes_applied"] = False
+    return report
 
 
 def virtual_market_line(market):
@@ -1253,7 +1319,7 @@ def build_virtual_events(history, lifecycle, eligibility):
             qualified=qualification_status in QUALIFIED_VIRTUAL_STATUSES
             kickoff_minutes_remaining=virtual_kickoff_window_minutes(start,NOW)
             kickoff_window_pass=bool(kickoff_minutes_remaining is not None and 0 < kickoff_minutes_remaining <= QUALIFIED_VIRTUAL_KICKOFF_WINDOW_MINUTES)
-            poisson_shadow_probability, poisson_shadow_source = prospective_poisson_shadow_probability(
+            poisson_shadow_probability, poisson_shadow_source, poisson_shadow_reason = prospective_poisson_shadow_decision(
                 validated_meta, product, chosen_pick
             )
             add(out,{
@@ -1276,6 +1342,7 @@ def build_virtual_events(history, lifecycle, eligibility):
                 "raw_model_probability":round(raw_chosen_model,4),
                 "poisson_shadow_probability":round(poisson_shadow_probability,4) if poisson_shadow_probability is not None else None,
                 "poisson_shadow_source":poisson_shadow_source,
+                "poisson_shadow_reason":poisson_shadow_reason,
                 "validated_model_family":f"walk_forward_efootball_{selected_model_variant}",
                 "validated_model_variant":selected_model_variant,
                 "validated_model_over_probability":round(raw_over,4),
@@ -1347,7 +1414,15 @@ def build_virtual_events(history, lifecycle, eligibility):
                 "paper_only":True,
                 "identity_verified":bool(home and away),
             })
-    return out, {"status":"base_model_policy_parity","historical_events":len(history or []),"base_model_gate":base_model_gate,"participant_enhancement_gate":participant_gate,"live_refresh":live_refresh_meta}
+    shadow_coverage = prospective_poisson_shadow_coverage(out)
+    return out, {
+        "status":"base_model_policy_parity",
+        "historical_events":len(history or []),
+        "base_model_gate":base_model_gate,
+        "participant_enhancement_gate":participant_gate,
+        "live_refresh":live_refresh_meta,
+        "prospective_poisson_shadow_coverage":shadow_coverage,
+    }
 
 def main():
     rows=[]
@@ -1489,6 +1564,7 @@ def main():
         "high_line_under_evidence":list(high_line_under.values()),
         "qualified_virtual_kickoff_window_minutes":QUALIFIED_VIRTUAL_KICKOFF_WINDOW_MINUTES,
         "virtual_market_rows_held_for_kickoff_window":DESK_FILTER_STATS["virtual_market_rows_held_for_kickoff_window"],
+        "prospective_poisson_shadow_coverage":virtual_meta.get("prospective_poisson_shadow_coverage",{}),
         "policy":"Virtual picks outside the next 60 minutes remain visible as research but cannot be currently qualified; the rolling board re-scores as settled results arrive. Past kickoff rows are removed from Upcoming unless still credibly live or inside the two-hour settlement-result grace. Archived evidence is not deleted. High VFootball Under lines require their own exact-line chronological sample before betting qualification.",
     }
     (DATA/"prediction_desk_health.json").write_text(json.dumps(desk_health,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
