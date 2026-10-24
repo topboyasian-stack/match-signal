@@ -397,6 +397,17 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn("'status':'VERIFIED' if verification_complete else 'VERIFIED_WITH_DIAGNOSTIC_INCOMPLETE'", PAGES_WORKFLOW)
         self.assertIn("'booking_api_status':'VERIFIED' if booking_verified else booking_status", PAGES_WORKFLOW)
 
+    def test_conflict_recovery_rebuilds_model_evaluation_before_staging(self):
+        recovery = BOARD_WORKFLOW.split('echo "Rebase conflict; rebuild the board from the latest main."')[-1]
+        reset = recovery.find("git reset --hard origin/main")
+        evaluator = recovery.find("python scripts/virtual_lab_model_eval.py")
+        stage = recovery.find("git add data/unified_upcoming.json")
+        self.assertGreaterEqual(reset, 0)
+        self.assertGreater(evaluator, reset, "conflict recovery must rerun the evaluator after fetching latest main")
+        self.assertGreater(stage, evaluator, "staged holdout predictions must come from the rerun evaluator")
+        self.assertIn("conflict recovery must rebuild untouched eFootball holdout forecasts", recovery)
+        self.assertIn('all(row.get("start_time") and row.get("event_id") for row in rows)', recovery)
+
     def test_publishing_refresh_is_not_cancelled_or_dispatched_twice(self):
         self.assertIn("  cancel-in-progress: false", BOARD_WORKFLOW)
         self.assertNotIn("gh workflow run cloudflare-pages.yml", BOARD_WORKFLOW)
