@@ -95,8 +95,11 @@ def build_events(rows):
         stamp=str(r.get("timestamp") or "")
         if not eid or not stamp:continue
         key=eid+"|"+stamp
+        # Collector settlement history stores the scheduled kickoff in
+        # "timestamp" and the original pre-event market capture in "captured_at".
+        # Older records do not duplicate kickoff in a separate "start_time" field.
         g=groups.setdefault(key,{
-            "key":key,"event_id":eid,"timestamp":stamp,"start_time":str(r.get("start_time") or ""),
+            "key":key,"event_id":eid,"timestamp":stamp,"start_time":str(r.get("start_time") or stamp),
             "product":str(r.get("product") or "other"),
             "competition":str(r.get("competition") or "Unknown"),
             "home":str(r.get("participant_1") or ""),
@@ -104,7 +107,7 @@ def build_events(rows):
             "rows":[],"total":None
         })
         g["rows"].append(r)
-        if not g.get("start_time") and r.get("start_time"):
+        if r.get("start_time"):
             g["start_time"] = str(r.get("start_time"))
         if g["total"] is None:
             m=str(r.get("score") or "").replace(" ","").split(":")
