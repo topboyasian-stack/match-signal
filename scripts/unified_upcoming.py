@@ -1534,15 +1534,16 @@ def main():
         "events":final,
     }
     OUTPUT.write_text(json.dumps(result,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
-    # A compact sidecar lets the AI Analyst explain stale fixtures and weak
-    # exact-line evidence without pulling the entire multi-sport board into AI context.
+    # Include Under 6.5 as the first priority weak-line diagnostic, alongside
+    # higher totals. This is reporting only; the evidence/qualification gates
+    # below remain unchanged.
     high_line_under={}
     for row in final:
         if str(row.get("sport") or "").lower()!="virtual" or str(row.get("pick") or "").lower()!="under":
             continue
         ln=num(row.get("line"))
         product=str(row.get("product") or "unknown")
-        if ln is None or ln<7.5:
+        if ln is None or ln<6.5:
             continue
         key=f"{product}|{ln:g}|under"
         previous=high_line_under.get(key)
@@ -1573,7 +1574,7 @@ def main():
         "prospective_poisson_shadow_coverage":virtual_meta.get("prospective_poisson_shadow_coverage",{}),
         "qualified_virtual_kickoff_window_minutes":QUALIFIED_VIRTUAL_KICKOFF_WINDOW_MINUTES,
         "virtual_market_rows_held_for_kickoff_window":DESK_FILTER_STATS["virtual_market_rows_held_for_kickoff_window"],
-        "policy":"Virtual picks outside the next 60 minutes remain visible as research but cannot be currently qualified; the rolling board re-scores as settled results arrive. Past kickoff rows are removed from Upcoming unless still credibly live or inside the two-hour settlement-result grace. Archived evidence is not deleted. High VFootball Under lines require their own exact-line chronological sample before betting qualification.",
+        "policy":"Virtual picks outside the next 60 minutes remain visible as research but cannot be currently qualified; the rolling board re-scores as settled results arrive. Past kickoff rows are removed from Upcoming unless still credibly live or inside the two-hour settlement-result grace. Archived evidence is not deleted. Under 6.5 and higher Under lines are surfaced for line-specific diagnostics; high VFootball Under lines require their own exact-line chronological sample before betting qualification.",
     }
     (DATA/"prediction_desk_health.json").write_text(json.dumps(desk_health,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
     print(json.dumps(result["summary"],indent=2))
