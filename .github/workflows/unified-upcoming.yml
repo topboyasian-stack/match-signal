@@ -87,7 +87,6 @@ on:
       - 'data/odds_ticket_tracker.json'
       - 'data/virtual_lab_history.json'
       - 'data/virtual_lab_live.json'
-      - 'data/virtual_lab_model_eval.json'
       - 'data/virtual_lab_eligibility.json'
       - 'data/virtual_lab_participant_profiles.json'
       - 'data/virtual_lab_confirmed_participants.json'
@@ -126,6 +125,12 @@ on:
       - 'functions/api/sportybet-virtual-results.js'
       - '.github/workflows/cloudflare-pages.yml'
   workflow_dispatch:
+    inputs:
+      promotion_child:
+        description: "Internal board refresh launched by Builder Production Promotion; prevent recursive promotion dispatch."
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   actions: write
@@ -168,6 +173,26 @@ jobs:
         run: python scripts/test_upcoming_desk_policy.py
       - name: Test participant model promotion gate and walk-forward model evaluation
         run: python scripts/test_virtual_lab_model_eval.py
+      - name: Refresh time-safe Virtual Lab model evaluation and untouched holdout rows
+        run: python scripts/virtual_lab_model_eval.py
+      - name: Validate row-level eFootball holdout forecast export
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path("data/virtual_lab_model_eval.json").read_text(encoding="utf-8"))
+          rows = data.get("holdout_scored_predictions")
+          assert isinstance(rows, list) and rows, "fresh model evaluation must export untouched holdout forecasts"
+          assert int(data.get("holdout", {}).get("rows", 0)) > 0, "chronological holdout must not be empty"
+          products = {str(row.get("product") or "") for row in rows}
+          assert products and products <= {"efootball_gt", "efootball_adriatic"}, products
+          assert all(row.get("event_id") and row.get("event_key") for row in rows), "holdout joins require event identity"
+          assert all(row.get("selection") in {"over", "under"} for row in rows), "holdout selections must be normalized"
+          assert all(row.get("y") in {0, 1} for row in rows), "holdout outcomes must be settled binary results"
+          for field in ("market", "poisson", "poisson_prior", "efootball_shape", "participant_model"):
+              assert all(isinstance(row.get(field), (int, float)) for row in rows), f"missing holdout probabilities for {field}"
+          print("Fresh untouched eFootball holdout forecasts:", len(rows), "rows;", data.get("generated_at"))
+          PY
       - name: Regression-test Prediction Desk qualification and best-line selection
         run: node scripts/test_prediction_desk_gates.mjs
       - name: Test Qualified Best production monitor outcomes
@@ -191,7 +216,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/unified_upcoming.json data/prediction_desk_health.json data/selection_candidates.json data/selection_candidate_status.json data/system_health.json data/efootball_desk_learning.json data/efootball_desk_prediction_history.json data/efootball_desk_settled_observations.json
+          git add data/unified_upcoming.json data/prediction_desk_health.json data/selection_candidates.json data/selection_candidate_status.json data/system_health.json data/efootball_desk_learning.json data/efootball_desk_prediction_history.json data/efootball_desk_settled_observations.json data/virtual_lab_model_eval.json
           if git diff --cached --quiet; then
             echo "Unified board already current."
             exit 0
@@ -199,7 +224,7 @@ jobs:
           git commit -m "🤖 Refresh unified upcoming board"
           for attempt in 1 2 3 4 5 6; do
             if git push origin main; then
-              echo "Unified board and health published; Cloudflare deployment will start after this workflow completes."
+              echo "Unified board published; the refreshed Builder will hand off to the ordered production-promotion workflow."
               exit 0
             fi
 
@@ -222,7 +247,7 @@ jobs:
             python scripts/selection_candidate_collector.py
             python scripts/efootball_desk_learning.py
             python scripts/system_health_audit.py
-            git add data/unified_upcoming.json data/prediction_desk_health.json data/selection_candidates.json data/selection_candidate_status.json data/system_health.json data/efootball_desk_learning.json data/efootball_desk_prediction_history.json data/efootball_desk_settled_observations.json
+            git add data/unified_upcoming.json data/prediction_desk_health.json data/selection_candidates.json data/selection_candidate_status.json data/system_health.json data/efootball_desk_learning.json data/efootball_desk_prediction_history.json data/efootball_desk_settled_observations.json data/virtual_lab_model_eval.json
             if git diff --cached --quiet; then
               echo "Latest main already contains the current generated board."
               exit 0
@@ -236,4 +261,5 @@ jobs:
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
+          SKIP_PROMOTION: ${{ github.event_name == 'workflow_dispatch' && inputs.promotion_child == true }}
         run: python scripts/ensure_odds_builder_refresh.py
