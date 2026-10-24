@@ -432,3 +432,25 @@ def test_cluster_bootstrap_finds_clear_candidate_improvement_and_is_deterministi
 
 
 test_cluster_bootstrap_finds_clear_candidate_improvement_and_is_deterministic()
+
+
+def test_retrospective_value_audit_uses_exact_odds_and_both_value_gates():
+    rows = [
+        {"model_probability": 0.60, "market_probability": 0.45, "bookmaker_odds": 2.0, "win": True},
+        {"model_probability": 0.60, "market_probability": 0.45, "bookmaker_odds": 2.0, "win": False},
+        {"model_probability": 0.65, "market_probability": 0.60, "bookmaker_odds": 1.5, "win": True},
+        {"model_probability": 0.70, "market_probability": None, "bookmaker_odds": 2.0, "win": True},
+    ]
+    result = mod._retrospective_value_metrics(rows, "model_probability")
+    assert result["quoted_rows"] == 3
+    assert result["missing_market_probability_rows"] == 1
+    assert result["minimum_expected_return"] == 0.02
+    assert result["minimum_margin_adjusted_edge"] == 0.025
+    assert result["rows_passing_both_value_gates"]["n"] == 2
+    assert result["rows_passing_both_value_gates"]["flat_stake_net_units"] == 0.0
+    assert result["rows_passing_both_value_gates"]["flat_stake_roi"] == 0.0
+    assert result["rows_passing_both_value_gates"]["mean_expected_return"] == 0.2
+    assert "already-selected Qualified Best subset" in result["warning"]
+
+
+test_retrospective_value_audit_uses_exact_odds_and_both_value_gates()
