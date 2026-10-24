@@ -156,14 +156,20 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         events = PAGES_WORKFLOW[:events_end]
         self.assertNotIn('      - "Match Signal Unified Upcoming Board"', events,
                          "Pages must not deploy on initial board completion before the matching Builder artifact exists")
-        self.assertIn('      - "Match Signal Persistent Club Logo Registry"', events)
-        self.assertIn("    types: [completed]", events)
+        self.assertNotIn('      - "Match Signal Persistent Club Logo Registry"', events,
+                         "a logo workflow_run can race the ordered Builder promotion and deploy a stale Builder artifact; registry commits already deploy through scoped push paths")
+        self.assertNotIn("  workflow_run:", events,
+                         "production deployment must be triggered by scoped static pushes or the ordered Builder Production Promotion dispatch, not unrelated completed workflows")
         self.assertIn("  workflow_dispatch:", events)
 
         # Direct promotion is limited to UI/static assets and the scoped booking API.
         # Board-driven data updates are handed to Builder Production Promotion,
         # which waits for a fresh board and matching Builder artifact before Pages deployment.
         direct_paths = workflow_push_paths(PAGES_WORKFLOW)
+        self.assertNotIn(".github/workflows/efootball-market-research-tests.yml", direct_paths,
+                         "CI-only test workflow changes must not trigger a production Pages deployment")
+        self.assertIn("data/club-logo-registry.json", direct_paths)
+        self.assertIn("assets/club-logos/**", direct_paths)
         expected_direct_paths = {
             "_headers",
             "index.html",
@@ -214,7 +220,6 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             ".github/workflows/qualified-best-health-watch-v2.yml",
             ".github/workflows/automation_watchdog.yml",
             ".github/workflows/efootball-market-research-schedule.yml",
-            ".github/workflows/efootball-market-research-tests.yml",
             "scripts/test_automation_watchdog_research_recovery.py",
             "scripts/test_qualified_best_monitor.mjs",
         }
