@@ -31,6 +31,11 @@ class UpcomingDeskPolicyTests(unittest.TestCase):
         row.update(extra)
         return row
 
+    def test_timestamp_helper_supports_chronological_walk_forward_filtering(self):
+        stamp = "2026-10-09T13:00:00+00:00"
+        self.assertEqual(ns["ts"](stamp), datetime(2026, 10, 9, 13, 0, tzinfo=UTC).timestamp())
+        self.assertGreater(ns["ts"]("not-a-timestamp"), ns["ts"](stamp))
+
     def test_virtual_qualified_picks_wait_until_the_next_60_minute_window(self):
         gate = ns["apply_virtual_kickoff_window_gate"]
         self.assertEqual(ns["QUALIFIED_VIRTUAL_KICKOFF_WINDOW_MINUTES"], 60)
