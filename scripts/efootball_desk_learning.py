@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import math
+import random
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -263,6 +264,8 @@ def materially_same_forecast(old, new):
     return (
         close(old.get("model_probability"), new.get("model_probability"), CAPTURE_PROBABILITY_DELTA)
         and close(old.get("raw_model_probability"), new.get("raw_model_probability"), CAPTURE_PROBABILITY_DELTA)
+        and close(old.get("poisson_shadow_probability"), new.get("poisson_shadow_probability"), CAPTURE_PROBABILITY_DELTA)
+        and str(old.get("poisson_shadow_source") or "") == str(new.get("poisson_shadow_source") or "")
         and close(old.get("bookmaker_odds"), new.get("bookmaker_odds"), CAPTURE_ODDS_DELTA)
         and close(old.get("model_edge_vs_market"), new.get("model_edge_vs_market"), CAPTURE_EDGE_DELTA)
     )
@@ -297,6 +300,8 @@ def capture(trace, board):
             "pick": side_of(row),
             "model_probability": p if (p := num(row.get("probability"))) is not None else None,
             "raw_model_probability": num(row.get("raw_model_probability")),
+            "poisson_shadow_probability": num(row.get("poisson_shadow_probability")),
+            "poisson_shadow_source": row.get("poisson_shadow_source"),
             "model_version": row.get("model_version"),
             "validated_model_family": row.get("validated_model_family"),
             "bookmaker_odds": num(row.get("bookmaker_odds")),
@@ -644,6 +649,167 @@ def settled_forecasts(trace):
     return rows
 
 
+def _probability_quality_metrics(rows, probability_field):
+    """Proper-score and calibration metrics for one probability field on fixed settlements."""
+    scored = []
+    for row in rows:
+        if row.get("scored_forecast") is not True or not isinstance(row.get("win"), bool):
+            continue
+        probability = num(row.get(probability_field))
+        if probability is None or not 0.0 <= probability <= 1.0:
+            continue
+        probability = max(0.0001, min(0.9999, probability))
+        scored.append((row, probability, 1.0 if row["win"] else 0.0))
+    if not scored:
+        return {
+            "n": 0, "event_clusters": 0, "hit_rate": None, "mean_probability": None,
+            "observed_hit_rate": None, "brier": None, "log_loss": None, "ece": None,
+        }
+    brier = sum((p-y)**2 for _, p, y in scored) / len(scored)
+    log_loss = sum(
+        -(y*math.log(p) + (1.0-y)*math.log(1.0-p)) for _, p, y in scored
+    ) / len(scored)
+    ece = 0.0
+    for idx in range(10):
+        lo = idx / 10
+        hi = lo + 0.1 if idx < 9 else 1.0001
+        bucket = [(p, y) for _, p, y in scored if lo <= p < hi]
+        if bucket:
+            ece += len(bucket)/len(scored) * abs(
+                sum(p for p, _ in bucket)/len(bucket) - sum(y for _, y in bucket)/len(bucket)
+            )
+    clusters = {
+        fixture_key(row) or str(row.get("trace_id") or row.get("event_id") or id(row))
+        for row, _, _ in scored
+    }
+    return {
+        "n": len(scored),
+        "event_clusters": len(clusters),
+        "hit_rate": sum((p >= 0.5) == bool(y) for _, p, y in scored) / len(scored),
+        "mean_probability": sum(p for _, p, _ in scored) / len(scored),
+        "observed_hit_rate": sum(y for _, _, y in scored) / len(scored),
+        "brier": brier,
+        "log_loss": log_loss,
+        "ece": ece,
+    }
+
+
+def prospective_poisson_shadow_comparison(forecasts, *, min_sample=100, replicates=300, seed=20261024):
+    """Compare current desk calibration to a Poisson score recorded strictly pre-kickoff.
+
+    The Poisson probability is for the same picked side and exact line as the desk
+    forecast. The current line's quote is excluded from the ladder fit. Results are
+    paper-only; the shadow is never fed back into qualification or ticket construction.
+    """
+    matched = [
+        row for row in forecasts
+        if row.get("scored_forecast") is True
+        and isinstance(row.get("win"), bool)
+        and num(row.get("model_probability")) is not None
+        and num(row.get("poisson_shadow_probability")) is not None
+        and 0.0 <= float(row["model_probability"]) <= 1.0
+        and 0.0 <= float(row["poisson_shadow_probability"]) <= 1.0
+    ]
+    current_metrics = _probability_quality_metrics(matched, "model_probability")
+    poisson_metrics = _probability_quality_metrics(matched, "poisson_shadow_probability")
+    brier_delta = (
+        current_metrics["brier"] - poisson_metrics["brier"]
+        if current_metrics["brier"] is not None and poisson_metrics["brier"] is not None else None
+    )
+    log_delta = (
+        current_metrics["log_loss"] - poisson_metrics["log_loss"]
+        if current_metrics["log_loss"] is not None and poisson_metrics["log_loss"] is not None else None
+    )
+
+    by_selection = {}
+    selection_groups = {}
+    for row in matched:
+        line = num(row.get("line"))
+        side = side_of(row)
+        if line is None or not side:
+            continue
+        selection_groups.setdefault(f"{line:g}|{side}", []).append(row)
+    for key, group in sorted(selection_groups.items()):
+        current = _probability_quality_metrics(group, "model_probability")
+        poisson = _probability_quality_metrics(group, "poisson_shadow_probability")
+        by_selection[key] = {
+            "n": len(group),
+            "event_clusters": current["event_clusters"],
+            "sample_label": "descriptive_only_small_sample" if len(group) < 30 else "descriptive_forward_shadow_segment",
+            "desk_probability": current,
+            "poisson_shadow_probability": poisson,
+            "brier_difference_desk_minus_poisson": (
+                current["brier"] - poisson["brier"]
+                if current["brier"] is not None and poisson["brier"] is not None else None
+            ),
+            "log_loss_difference_desk_minus_poisson": (
+                current["log_loss"] - poisson["log_loss"]
+                if current["log_loss"] is not None and poisson["log_loss"] is not None else None
+            ),
+        }
+
+    by_cluster = {}
+    for row in matched:
+        key = fixture_key(row) or str(row.get("event_key") or row.get("trace_id") or "")
+        if key:
+            by_cluster.setdefault(key, []).append(row)
+    cluster_keys = sorted(by_cluster)
+    bootstrap_brier = []
+    bootstrap_log = []
+    if len(cluster_keys) >= 2 and replicates > 0:
+        rng = random.Random(seed)
+        for _ in range(replicates):
+            chosen = [rng.choice(cluster_keys) for _ in cluster_keys]
+            sample = [row for key in chosen for row in by_cluster[key]]
+            current = _probability_quality_metrics(sample, "model_probability")
+            poisson = _probability_quality_metrics(sample, "poisson_shadow_probability")
+            if current["brier"] is not None and poisson["brier"] is not None:
+                bootstrap_brier.append(current["brier"] - poisson["brier"])
+            if current["log_loss"] is not None and poisson["log_loss"] is not None:
+                bootstrap_log.append(current["log_loss"] - poisson["log_loss"])
+    bootstrap_brier.sort()
+    bootstrap_log.sort()
+
+    def percentile_ci(values):
+        if not values:
+            return None
+        lo = int(0.025 * (len(values)-1))
+        hi = int(0.975 * (len(values)-1))
+        return [values[lo], values[hi]]
+
+    brier_ci = percentile_ci(bootstrap_brier)
+    log_ci = percentile_ci(bootstrap_log)
+    status = "COLLECTING_PROSPECTIVE_SHADOW"
+    if len(matched) >= min_sample and len(cluster_keys) >= 60:
+        if brier_ci and log_ci and brier_ci[0] > 0 and log_ci[0] > 0:
+            status = "POISSON_SHADOW_BETTER_WITH_CLUSTER_BOOTSTRAP_SUPPORT"
+        elif brier_ci and log_ci and brier_ci[1] < 0 and log_ci[1] < 0:
+            status = "CURRENT_DESK_BETTER_WITH_CLUSTER_BOOTSTRAP_SUPPORT"
+        else:
+            status = "NO_CLEAR_PAIRED_ADVANTAGE"
+    return {
+        "mode": "PAPER_SHADOW_ONLY",
+        "status": status,
+        "matched_settled_forecasts": len(matched),
+        "unique_event_clusters": len(cluster_keys),
+        "minimum_forecasts_for_comparison": min_sample,
+        "bootstrap_replicates": replicates,
+        "bootstrap_seed": seed,
+        "same_picked_side_and_line": True,
+        "poisson_target_line_excluded_from_fit": True,
+        "desk_probability_metrics": current_metrics,
+        "poisson_shadow_probability_metrics": poisson_metrics,
+        "brier_difference_desk_minus_poisson": brier_delta,
+        "log_loss_difference_desk_minus_poisson": log_delta,
+        "brier_difference_95_cluster_bootstrap_ci": brier_ci,
+        "log_loss_difference_95_cluster_bootstrap_ci": log_ci,
+        "metrics_by_exact_line_side": by_selection,
+        "qualification_or_prediction_changes_applied": False,
+        "production_qualification_enabled": False,
+        "note": "These are forward forecasts captured before kickoff, compared on identical settled selected-side/line rows. Event-cluster bootstrap keeps multiple lines from one fixture together; recurring-participant dependence is not fully modeled. This diagnostic cannot promote or replace any production model.",
+    }
+
+
 def calibration(forecasts, probability_field="model_probability"):
     """Summarize a probability scale separately for monitoring or raw-score calibration."""
     buckets = {}
@@ -815,6 +981,10 @@ def main():
             },
             "exact_selection_active": exact_active,
             "exact_selection": exact,
+            "prospective_poisson_shadow_comparison": (
+                prospective_poisson_shadow_comparison(product_settled)
+                if product in {"efootball_gt", "efootball_adriatic"} else None
+            ),
         }
 
     # Keep the original top-level fields compatible with existing readers:
