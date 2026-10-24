@@ -6,14 +6,14 @@ const [html, css, ui, api, workflow, booking] = await Promise.all([
   read("basketball.html"), read("basketball-design.css"), read("basketball-live.js"),
   read("functions/api/sportybet-basketball.js"), read(".github/workflows/cloudflare-pages.yml"), read("functions/api/sportybet-basketball-booking.js")
 ]);
-assert.ok(html.includes("MS-BASKETBALL-DESK-2026.10.24-V6"), "Basketball must publish the new design marker");
+assert.ok(html.includes("MS-BASKETBALL-DESK-2026.10.24-V7"), "Basketball must publish the new design marker");
 assert.ok(html.includes("core-workspaces-design.css?v=20261014-full-v1"), "Basketball must use the shared Match Signal design layer");
-assert.ok(html.includes("basketball-live.js?v=20261024-builder-errors-v2"), "Basketball must cache-bust the visible booking error/retry logic");
-assert.ok(html.includes("basketball-design.css?v=20261024-builder-dark-v2"), "Basketball must load its latest contrast-corrected scoped design layer");
+assert.ok(html.includes("basketball-live.js?v=20261024-booking-diagnostics-v3"), "Basketball must cache-bust the visible booking error/retry logic");
+assert.ok(html.includes("basketball-design.css?v=20261024-builder-dark-v3"), "Basketball must load its latest contrast-corrected scoped design layer");
 assert.ok(html.includes('id="msNav"') && html.includes('workspace-ui.js?v=20261023-basketball-nav1'), "Basketball must use the single shared site navigation");
 for (const id of ["liveGames","upcomingGames","totalsBoard","finalResults","performance","marketStatus","totalsStatus"]) assert.ok(html.includes('id="'+id+'"'), "Basketball must preserve renderer mount "+id);
 assert.ok(css.includes("MATCH-SIGNAL-BASKETBALL-DESK-V1"), "Basketball scoped design marker missing");
-assert.ok(css.includes("MATCH-SIGNAL-BASKETBALL-DARK-V3") && html.includes("basketball-design.css?v=20261024-builder-dark-v2"), "Basketball must deploy the cache-busted contrast/readability safety net");
+assert.ok(css.includes("MATCH-SIGNAL-BASKETBALL-DARK-V3") && html.includes("basketball-design.css?v=20261024-builder-dark-v3"), "Basketball must deploy the cache-busted contrast/readability safety net");
 assert.ok(css.includes("MATCH-SIGNAL-BASKETBALL-BUILDER-DARK-V1") && css.includes(".nba-builder-card") && css.includes("background:linear-gradient(145deg,#132231,#0e1822)"), "All four basketball builders must use the dark terminal theme");
 assert.ok(css.includes("@media(max-width:480px)") && css.includes("@media(prefers-reduced-motion:reduce)") && css.includes(":focus-visible"), "Basketball design must remain responsive and accessible");
 assert.ok(ui.includes("function bestSportyBetTotalMarket(markets)") && ui.includes("String(m.id)") && ui.includes("225"), "Totals must select the explicit SportyBet market ID for full-game O/U including overtime");
@@ -33,7 +33,8 @@ assert.ok(html.includes("How to read this — one clear decision") && html.inclu
 assert.ok(html.includes('id="basketball-builders"') && html.includes('id="basketballBuilderWorkspace"'), "Basketball page must expose its four-builder workspace");
 assert.ok(ui.includes("function renderBuilders()") && ui.includes("BASKETBALL_BUILDERS=[[],[],[],[]]") && ui.includes("data-builder-generate"), "Four independent builder cards must be rendered");
 assert.ok(ui.includes("BUILDER_ERRORS") && ui.includes("Code not generated") && ui.includes("data-builder-retry"), "Booking failures must remain visible in the relevant builder with a retry action");
-assert.ok(api.includes("attempt<=3") && api.includes("SportyBet share service HTTP") && api.includes("unavailable_count"), "Share requests must retry transient upstream failures and report booking diagnostics");
+assert.ok(ui.includes("Booking API returned non-JSON (HTTP ") && ui.includes("await response.text()"), "Browser must surface diagnostics if the booking API itself returns non-JSON");
+assert.ok(api.includes("attempt<=3") && api.includes("SportyBet did not create a share code after 3 attempts") && api.includes("content-type "+contentType)===false && api.includes("unavailable_count"), "Share requests must retry malformed/transient upstream failures and report booking diagnostics");
 assert.ok(ui.includes("./api/sportybet-basketball-booking"), "Builder UI must request a live-validated SportyBet booking code");
 assert.ok(booking.includes("ORIGIN+'/api/ng/orders/share") && booking.includes("booking_code:share.code"), "Basketball booking endpoint must request and return a genuine SportyBet share code");
 assert.ok(booking.includes("leg.market_id||'225'") && booking.includes("SELECTIONS_CHANGED") && booking.includes("NON_STAKING_BETSLIP_PREPARATION"), "Basketball code generation must revalidate exact total market 225 and fail closed without staking");
