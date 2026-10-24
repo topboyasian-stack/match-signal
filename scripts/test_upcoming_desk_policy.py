@@ -528,5 +528,139 @@ class UpcomingDeskPolicyTests(unittest.TestCase):
         self.assertNotIn("expired", retained_ids)
         self.assertEqual(retained_ids, {"recently-kicked-off", "next-kickoff", "later-kickoff"})
 
+
+    def test_poisson_shadow_probability_requires_leave_one_line_out_live_ladder_fit(self):
+        shadow = ns["prospective_poisson_shadow_probability"]
+        components = {
+            "over": {
+                "poisson_over_probability": 0.62,
+                "lambda_fit": {
+                    "source": "current_market_ladder_leave_one_line_out",
+                    "target_line_excluded": True,
+                },
+            },
+            "under": {
+                "poisson_over_probability": 0.62,
+                "lambda_fit": {
+                    "source": "current_market_ladder_leave_one_line_out",
+                    "target_line_excluded": True,
+                },
+            },
+        }
+        over, source = shadow(components, "efootball_gt", "over")
+        under, under_source = shadow(components, "efootball_gt", "under")
+        self.assertAlmostEqual(over, 0.62)
+        self.assertAlmostEqual(under, 0.38)
+        self.assertEqual(source, "current_market_ladder_leave_one_line_out")
+        self.assertEqual(under_source, source)
+        self.assertEqual(shadow(components, "vfootball", "over"), (None, None))
+        included_line = {
+            "over": {
+                "poisson_over_probability": 0.62,
+                "lambda_fit": {
+                    "source": "current_market_ladder_leave_one_line_out",
+                    "target_line_excluded": False,
+                },
+            },
+        }
+        self.assertEqual(shadow(included_line, "efootball_gt", "over"), (None, None))
+        fallback = {
+            "over": {
+                "poisson_over_probability": 0.62,
+                "lambda_fit": {
+                    "source": "historical_product_lambda_fallback",
+                    "target_line_excluded": True,
+                },
+            },
+        }
+        self.assertEqual(shadow(fallback, "efootball_gt", "over"), (None, None))
+
+
+    def test_desk_capture_tracks_prospective_poisson_shadow_and_refreshes_when_it_changes(self):
+        now = datetime.now(UTC)
+        row = {
+            "event_id": "prospective-shadow-capture-test",
+            "product": "efootball_gt",
+            "league": "Test League",
+            "player_1": "Alpha (shadow-player-a)",
+            "player_2": "Beta (shadow-player-b)",
+            "line": 4.5,
+            "pick": "over",
+            "market": "over_under",
+            "start_time": (now + timedelta(minutes=30)).isoformat(),
+            "probability": 0.65,
+            "raw_model_probability": 0.67,
+            "model_version": "shadow-test-v1",
+            "validated_model_family": "walk_forward_efootball_poisson",
+            "poisson_shadow_probability": 0.61,
+            "poisson_shadow_source": "current_market_ladder_leave_one_line_out",
+            "desk_observed_at": now.isoformat(),
+        }
+        trace = []
+        captured = learning_ns["capture"](
+            trace, {"generated_at": now.isoformat(), "events": [row]}
+        )
+        self.assertEqual(captured, 1)
+        self.assertAlmostEqual(trace[0]["poisson_shadow_probability"], 0.61)
+        self.assertEqual(
+            trace[0]["poisson_shadow_source"],
+            "current_market_ladder_leave_one_line_out",
+        )
+        changed = dict(row)
+        changed["poisson_shadow_probability"] = 0.58
+        changed["desk_observed_at"] = (now + timedelta(minutes=5)).isoformat()
+        self.assertFalse(learning_ns["materially_same_forecast"](trace[0], {
+            **trace[0], "poisson_shadow_probability": 0.58,
+        }))
+        self.assertFalse(learning_ns["materially_same_forecast"](trace[0], {
+            **trace[0], "poisson_shadow_source": "historical_product_lambda_fallback",
+        }))
+        self.assertTrue(learning_ns["materially_same_forecast"](trace[0], trace[0]))
+
+
+    def test_prospective_poisson_shadow_uses_identical_settled_forecasts_and_cluster_uncertainty(self):
+        start = datetime(2026, 10, 1, 10, 0, tzinfo=UTC)
+        rows = []
+        # Forecast probability is overconfident (0.85) while the shadow assigns
+        # 0.60; 72/120 wins give a deterministic synthetic 60% observed rate.
+        for i in range(120):
+            kickoff = start + timedelta(minutes=i * 3)
+            rows.append({
+                "trace_id": f"prospective-shadow-{i}",
+                "event_id": f"shadow-event-{i}",
+                "event_key": f"efootball_gt|{i}|alpha{i}|beta{i}|4.5",
+                "product": "efootball_gt",
+                "participant_1": f"Alpha{i} (alpha{i})",
+                "participant_2": f"Beta{i} (beta{i})",
+                "start_time": kickoff.isoformat(),
+                "observed_at": (kickoff - timedelta(minutes=2)).isoformat(),
+                "line": 4.5,
+                "pick": "over",
+                "model_probability": 0.85,
+                "poisson_shadow_probability": 0.60,
+                "poisson_shadow_source": "current_market_ladder_leave_one_line_out",
+                "scored_forecast": True,
+                "settled": True,
+                "push": False,
+                "win": i < 72,
+            })
+        result = learning_ns["prospective_poisson_shadow_comparison"](
+            rows, min_sample=100, replicates=250, seed=123
+        )
+        repeated = learning_ns["prospective_poisson_shadow_comparison"](
+            rows, min_sample=100, replicates=250, seed=123
+        )
+        self.assertEqual(result, repeated)
+        self.assertEqual(result["mode"], "PAPER_SHADOW_ONLY")
+        self.assertEqual(result["matched_settled_forecasts"], 120)
+        self.assertEqual(result["unique_event_clusters"], 120)
+        self.assertEqual(result["status"], "POISSON_SHADOW_BETTER_WITH_CLUSTER_BOOTSTRAP_SUPPORT")
+        self.assertGreater(result["brier_difference_desk_minus_poisson"], 0)
+        self.assertGreater(result["log_loss_difference_desk_minus_poisson"], 0)
+        self.assertGreater(result["brier_difference_95_cluster_bootstrap_ci"][0], 0)
+        self.assertGreater(result["log_loss_difference_95_cluster_bootstrap_ci"][0], 0)
+        self.assertFalse(result["qualification_or_prediction_changes_applied"])
+        self.assertFalse(result["production_qualification_enabled"])
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
