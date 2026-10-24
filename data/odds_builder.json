@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-24T12:52:18.636880+00:00",
+  "generated_at": "2026-10-24T12:53:47.702117+00:00",
   "engine_version": "V6.1-RESEARCH-GATED",
   "mode": "PAPER_ONLY",
   "target_legs": "Upcoming Desk is primary only after its own settled-ticket sample (n≥10) and realized flat-stake ROI ≥2% pass; otherwise use a separately qualified fallback or NO_BET. Desk 2–4 legs target 3.00x–4.00x with exact-line walk-forward and fresh-price gates; standard fallback 2.80x minimum / 2.80x preferred; compact eFootball 2.00x+ only when all gates pass",
@@ -72,9 +72,9 @@
       "status": "ok",
       "stats": {
         "provider": "SportyBet NG",
-        "fetched_at": "2026-10-24T12:52:18.778444+00:00",
-        "football_events": 1988,
-        "tennis_events": 146,
+        "fetched_at": "2026-10-24T12:53:47.826669+00:00",
+        "football_events": 1990,
+        "tennis_events": 147,
         "matched": 58,
         "unmatched": 85,
         "match_errors": [],
@@ -95,21 +95,21 @@
   "candidate_diagnostics": {
     "football_candidates": 3,
     "tennis_candidates": 9,
-    "virtual_candidates": 134,
+    "virtual_candidates": 133,
     "virtual_gate_diagnostics": {
-      "seen": 361,
-      "qualified": 361,
+      "seen": 358,
+      "qualified": 358,
       "evidence_pass": 0,
-      "rejected_evidence": 582,
+      "rejected_evidence": 577,
       "rejected_ticket_performance": 0,
       "rejected_results_first": 0,
-      "current_feed_events": 625,
+      "current_feed_events": 619,
       "model_templates": 24,
-      "current_market_candidates": 722,
-      "evidence_value_candidates": 134,
+      "current_market_candidates": 716,
+      "evidence_value_candidates": 133,
       "reasons": {
-        "efootball_evidence_value_lane": 134,
-        "recent_evidence_below_threshold": 582,
+        "efootball_evidence_value_lane": 133,
+        "recent_evidence_below_threshold": 577,
         "no_exact_line_model": 6
       },
       "virtual_scope_policy": {
@@ -286,7 +286,7 @@
       ],
       "discovery_universe": {
         "scope": "all current SportyBet eFootball events and every observed O/U line inside the Builder horizon",
-        "events_scanned": 183,
+        "events_scanned": 177,
         "product_line_pairs_scanned": 14,
         "modelable_product_line_side_pairs": 24,
         "product_line_side_pairs_without_8_settled_observations": 4,
@@ -294,16 +294,16 @@
         "note": "No-evidence lines remain discovery-only. Thin eFootball half-line keys may use one outcome per unique settled score when fewer than 8 direct exact-line/side rows exist; current exact-line SportyBet price and all existing gates remain mandatory."
       },
       "current_product_counts": {
-        "efootball_gt": 361
+        "efootball_gt": 358
       },
       "current_market_line_counts": {
         "efootball_gt|0.5": 2,
-        "efootball_gt|1.5": 30,
-        "efootball_gt|2.5": 72,
+        "efootball_gt|1.5": 29,
+        "efootball_gt|2.5": 71,
         "efootball_gt|6.5": 35,
         "efootball_gt|7.5": 12,
         "efootball_gt|5.5": 57,
-        "efootball_gt|3.5": 76,
+        "efootball_gt|3.5": 75,
         "efootball_gt|4.5": 58,
         "efootball_gt|4": 2,
         "efootball_gt|8.5": 7,
@@ -313,16 +313,15 @@
         "efootball_gt|5": 1
       },
       "price_snapshot_sources": {
-        "fresh_direct_sportybet_match": 358,
-        "fresh_unified_sportybet_snapshot": 3
+        "fresh_direct_sportybet_match": 358
       },
       "live_quote_refresh": {
         "source": null,
-        "live_events": 634,
+        "live_events": 636,
         "matched_by_id": 4778,
         "matched_by_match": 0,
         "matched_by_participant_time": 0,
-        "unmatched": 87
+        "unmatched": 75
       },
       "upcoming_desk_research": {
         "enabled": true,
@@ -337,19 +336,19 @@
         "rejections": {
           "outside_active_efootball_scope": 4420,
           "missing_probability_exact_line_or_price": 198,
-          "model_competition_not_qualified": 163,
-          "outside_builder_horizon": 12
+          "model_competition_not_qualified": 160,
+          "outside_builder_horizon": 3
         },
         "policy": "paper-only Desk lane; base model and model-qualified competition + active Desk calibration + >=100 exact-line walk-forward rows at >=60%; exact-line research can cross the official raw model-line allowlist without changing official qualification; current SportyBet quote and standard Builder price/edge gates remain mandatory"
       },
       "quote_join": {
-        "live_events": 634,
-        "live_match_keys": 634,
+        "live_events": 636,
+        "live_match_keys": 636,
         "live_pair_keys": 616,
         "matched_by_id": 4778,
         "matched_by_match": 0,
         "matched_by_participant_time": 0,
-        "unmatched": 87,
+        "unmatched": 75,
         "samples": [
           {
             "event_id": "sr:match:75912344",
@@ -378,11 +377,11 @@
       "current_feed_is_price_authority": true,
       "price_authority": "fresh SportyBet snapshot collected in-process immediately before Builder qualification"
     },
-    "evaluated": 146,
+    "evaluated": 145,
     "individual_leg_diagnostics": {
-      "builder_eligible_leg_count": 110,
-      "efootball_exact_evidence_leg_candidates": 110,
-      "efootball_exact_evidence_at_65_percent_floor": 69,
+      "builder_eligible_leg_count": 109,
+      "efootball_exact_evidence_leg_candidates": 109,
+      "efootball_exact_evidence_at_65_percent_floor": 68,
       "efootball_exact_evidence_below_65_percent_floor": 41,
       "efootball_exact_evidence_min_probability": 0.65,
       "standard_construction_min_probability": 0.8,
@@ -391,7 +390,7 @@
     },
     "rejections": {
       "REJECTED": 36,
-      "LIVE_VALUE": 110
+      "LIVE_VALUE": 109
     },
     "selection_diversity": {
       "participant_correlation_skips": 0,
@@ -727,9 +726,9 @@
           "policy": "Promotion requires the lane's full realized ROI and an adequate, profitable sample of settled tickets whose fixtures do not overlap any other settled Builder ticket. Overlapping tickets remain in the realized ROI but do not inflate independent evidence."
         }
       },
-      "secondary_pool_eligible_legs": 110,
+      "secondary_pool_eligible_legs": 109,
       "secondary_efootball_diagnostics": {
-        "pool_size": 69,
+        "pool_size": 68,
         "top_legs": [
           {
             "match": "Real Madrid (Virtual_2) vs Atleti (Virtual_5)",
@@ -973,12 +972,12 @@
           }
         ],
         "pair_scan": {
-          "pairs_total": 2346,
-          "odds_reach_pairs": 2262,
-          "correlation_rejections": 391,
-          "kickoff_span_rejections": 347,
-          "calibration_hold_rejections": 1524,
-          "calibration_held_pairs_with_positive_raw_independence_roi": 1524,
+          "pairs_total": 2278,
+          "odds_reach_pairs": 2194,
+          "correlation_rejections": 388,
+          "kickoff_span_rejections": 329,
+          "calibration_hold_rejections": 1477,
+          "calibration_held_pairs_with_positive_raw_independence_roi": 1477,
           "roi_rejections": 0,
           "fully_qualified_pairs": 0
         },
@@ -1227,7 +1226,7 @@
           "policy": "Promotion requires the lane's full realized ROI and an adequate, profitable sample of settled tickets whose fixtures do not overlap any other settled Builder ticket. Overlapping tickets remain in the realized ROI but do not inflate independent evidence."
         }
       },
-      "mixed_pool_eligible_legs": 110,
+      "mixed_pool_eligible_legs": 109,
       "mixed_max_kickoff_span_minutes": 360,
       "mixed_diagnostics": {
         "vfootball_pool": 0,
@@ -1985,8 +1984,8 @@
   "candidates_considered": {
     "football": 3,
     "tennis": 9,
-    "virtual": 134,
-    "all_built": 146
+    "virtual": 133,
+    "all_built": 145
   },
   "qualified_legs": [],
   "best_available_legs": [
@@ -2064,7 +2063,7 @@
       "product": "efootball_gt",
       "edge_percent": 36.3,
       "odds_fresh": true,
-      "market_odds_age_seconds": 14.0,
+      "market_odds_age_seconds": 16.8,
       "data_quality": 0.75,
       "uncertainty": 0.058,
       "market_complete": true,
@@ -2168,7 +2167,7 @@
         "historical_breaks": 0,
         "reason": "model_probability_below_78_percent"
       },
-      "market_odds_timestamp": "2026-10-24T12:53:04.777618+00:00",
+      "market_odds_timestamp": "2026-10-24T12:54:34.235799+00:00",
       "sportybet_event_id": "sr:match:BAaFhyO5Ld4Gt7ujA2RkS5g",
       "sportybet_market_id": "18",
       "sportybet_specifier": "total=2.5",
@@ -2249,7 +2248,7 @@
       "product": "efootball_gt",
       "edge_percent": 36.3,
       "odds_fresh": true,
-      "market_odds_age_seconds": 14.0,
+      "market_odds_age_seconds": 16.8,
       "data_quality": 0.75,
       "uncertainty": 0.058,
       "market_complete": true,
@@ -2353,7 +2352,7 @@
         "historical_breaks": 0,
         "reason": "model_probability_below_78_percent"
       },
-      "market_odds_timestamp": "2026-10-24T12:53:04.777618+00:00",
+      "market_odds_timestamp": "2026-10-24T12:54:34.235799+00:00",
       "sportybet_event_id": "sr:match:BAaFhyOKlcNaAc1KnHLhwHw",
       "sportybet_market_id": "18",
       "sportybet_specifier": "total=2.5",
@@ -2434,7 +2433,7 @@
       "product": "efootball_gt",
       "edge_percent": 34.74,
       "odds_fresh": true,
-      "market_odds_age_seconds": 14.0,
+      "market_odds_age_seconds": 16.8,
       "data_quality": 0.75,
       "uncertainty": 0.058,
       "market_complete": true,
@@ -2538,7 +2537,7 @@
         "historical_breaks": 0,
         "reason": "model_probability_below_78_percent"
       },
-      "market_odds_timestamp": "2026-10-24T12:53:04.777618+00:00",
+      "market_odds_timestamp": "2026-10-24T12:54:34.235799+00:00",
       "sportybet_event_id": "sr:match:BAaFhyQR|csWQXWgJ6W4FwA",
       "sportybet_market_id": "18",
       "sportybet_specifier": "total=2.5",
@@ -2619,7 +2618,7 @@
       "product": "efootball_gt",
       "edge_percent": 33.65,
       "odds_fresh": true,
-      "market_odds_age_seconds": 14.0,
+      "market_odds_age_seconds": 16.8,
       "data_quality": 0.75,
       "uncertainty": 0.058,
       "market_complete": true,
@@ -2723,7 +2722,7 @@
         "historical_breaks": 0,
         "reason": "model_probability_below_78_percent"
       },
-      "market_odds_timestamp": "2026-10-24T12:53:04.777618+00:00",
+      "market_odds_timestamp": "2026-10-24T12:54:34.235799+00:00",
       "sportybet_event_id": "sr:match:BAaFhyOupeWyWKaGT4gfVew",
       "sportybet_market_id": "18",
       "sportybet_specifier": "total=2.5",
@@ -2804,7 +2803,7 @@
       "product": "efootball_gt",
       "edge_percent": 32.93,
       "odds_fresh": true,
-      "market_odds_age_seconds": 14.0,
+      "market_odds_age_seconds": 16.8,
       "data_quality": 0.75,
       "uncertainty": 0.058,
       "market_complete": true,
@@ -2908,7 +2907,7 @@
         "historical_breaks": 0,
         "reason": "model_probability_below_78_percent"
       },
-      "market_odds_timestamp": "2026-10-24T12:53:04.777618+00:00",
+      "market_odds_timestamp": "2026-10-24T12:54:34.235799+00:00",
       "sportybet_event_id": "sr:match:BAaFhyPEyfkOPPzJruRutkA",
       "sportybet_market_id": "18",
       "sportybet_specifier": "total=2.5",
@@ -4280,7 +4279,7 @@
       "product": "efootball_gt",
       "edge_percent": 0.06,
       "odds_fresh": true,
-      "market_odds_age_seconds": 13.9,
+      "market_odds_age_seconds": 16.7,
       "data_quality": 0.75,
       "uncertainty": 0.12,
       "market_complete": true,
@@ -4391,7 +4390,7 @@
         "historical_breaks": 0,
         "reason": "insufficient_cycle_history"
       },
-      "market_odds_timestamp": "2026-10-24T12:53:04.777618+00:00",
+      "market_odds_timestamp": "2026-10-24T12:54:34.235799+00:00",
       "sportybet_event_id": "sr:match:D317241026",
       "sportybet_market_id": "18",
       "sportybet_specifier": "total=0.5",
@@ -4474,7 +4473,7 @@
       "product": "efootball_gt",
       "edge_percent": 0.4,
       "odds_fresh": true,
-      "market_odds_age_seconds": 14.0,
+      "market_odds_age_seconds": 16.8,
       "data_quality": 0.75,
       "uncertainty": 0.058,
       "market_complete": true,
@@ -4578,7 +4577,7 @@
         "historical_breaks": 0,
         "reason": "model_probability_below_78_percent"
       },
-      "market_odds_timestamp": "2026-10-24T12:53:04.777618+00:00",
+      "market_odds_timestamp": "2026-10-24T12:54:34.235799+00:00",
       "sportybet_event_id": "sr:match:D317241026",
       "sportybet_market_id": "18",
       "sportybet_specifier": "total=2.5",
@@ -4663,7 +4662,7 @@
       "product": "efootball_gt",
       "edge_percent": 4.23,
       "odds_fresh": true,
-      "market_odds_age_seconds": 14.0,
+      "market_odds_age_seconds": 16.8,
       "data_quality": 0.75,
       "uncertainty": 0.052,
       "market_complete": true,
@@ -4774,7 +4773,7 @@
         "historical_breaks": 0,
         "reason": "model_probability_below_78_percent"
       },
-      "market_odds_timestamp": "2026-10-24T12:53:04.777618+00:00",
+      "market_odds_timestamp": "2026-10-24T12:54:34.235799+00:00",
       "sportybet_event_id": "sr:match:BAaFomncgcBql-TlV-pPBDA",
       "sportybet_market_id": "18",
       "sportybet_specifier": "total=4.5",
@@ -4855,7 +4854,7 @@
       "product": "efootball_gt",
       "edge_percent": -7.86,
       "odds_fresh": true,
-      "market_odds_age_seconds": 14.0,
+      "market_odds_age_seconds": 16.8,
       "data_quality": 0.75,
       "uncertainty": 0.011,
       "market_complete": true,
@@ -4966,7 +4965,7 @@
         "historical_breaks": 0,
         "reason": "model_probability_below_78_percent"
       },
-      "market_odds_timestamp": "2026-10-24T12:53:04.777618+00:00",
+      "market_odds_timestamp": "2026-10-24T12:54:34.235799+00:00",
       "sportybet_event_id": "sr:match:75912458",
       "sportybet_market_id": "18",
       "sportybet_specifier": "total=4",
@@ -5047,7 +5046,7 @@
       "product": "efootball_gt",
       "edge_percent": 31.29,
       "odds_fresh": true,
-      "market_odds_age_seconds": 14.0,
+      "market_odds_age_seconds": 16.8,
       "data_quality": 0.75,
       "uncertainty": 0.058,
       "market_complete": true,
@@ -5151,7 +5150,7 @@
         "historical_breaks": 0,
         "reason": "model_probability_below_78_percent"
       },
-      "market_odds_timestamp": "2026-10-24T12:53:04.777618+00:00",
+      "market_odds_timestamp": "2026-10-24T12:54:34.235799+00:00",
       "sportybet_event_id": "sr:match:D223241026",
       "sportybet_market_id": "18",
       "sportybet_specifier": "total=2.5",
@@ -5232,7 +5231,7 @@
       "product": "efootball_gt",
       "edge_percent": -6.94,
       "odds_fresh": true,
-      "market_odds_age_seconds": 14.0,
+      "market_odds_age_seconds": 16.8,
       "data_quality": 0.75,
       "uncertainty": 0.052,
       "market_complete": true,
@@ -5343,7 +5342,7 @@
         "historical_breaks": 0,
         "reason": "model_probability_below_78_percent"
       },
-      "market_odds_timestamp": "2026-10-24T12:53:04.777618+00:00",
+      "market_odds_timestamp": "2026-10-24T12:54:34.235799+00:00",
       "sportybet_event_id": "sr:match:D223241026",
       "sportybet_market_id": "18",
       "sportybet_specifier": "total=4.5",
@@ -5424,7 +5423,7 @@
       "product": "efootball_gt",
       "edge_percent": 22.13,
       "odds_fresh": true,
-      "market_odds_age_seconds": 14.0,
+      "market_odds_age_seconds": 16.8,
       "data_quality": 0.75,
       "uncertainty": 0.058,
       "market_complete": true,
@@ -5528,7 +5527,7 @@
         "historical_breaks": 0,
         "reason": "model_probability_below_78_percent"
       },
-      "market_odds_timestamp": "2026-10-24T12:53:04.777618+00:00",
+      "market_odds_timestamp": "2026-10-24T12:54:34.235799+00:00",
       "sportybet_event_id": "sr:match:BAaFhynTkc7Gv2RNT-qJKqw",
       "sportybet_market_id": "18",
       "sportybet_specifier": "total=2.5",
@@ -5609,7 +5608,7 @@
       "product": "efootball_gt",
       "edge_percent": 21.33,
       "odds_fresh": true,
-      "market_odds_age_seconds": 14.0,
+      "market_odds_age_seconds": 16.8,
       "data_quality": 0.75,
       "uncertainty": 0.058,
       "market_complete": true,
@@ -5713,7 +5712,7 @@
         "historical_breaks": 0,
         "reason": "model_probability_below_78_percent"
       },
-      "market_odds_timestamp": "2026-10-24T12:53:04.777618+00:00",
+      "market_odds_timestamp": "2026-10-24T12:54:34.235799+00:00",
       "sportybet_event_id": "sr:match:BAaFhyOZlcTWbhYkdSY8dnQ",
       "sportybet_market_id": "18",
       "sportybet_specifier": "total=2.5",
