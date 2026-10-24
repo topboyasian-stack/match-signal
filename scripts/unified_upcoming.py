@@ -83,6 +83,11 @@ def num(v):
         return x if math.isfinite(x) else None
     except (TypeError,ValueError):return None
 
+def ts(v):
+    """Return a timezone-aware timestamp for chronological model filtering."""
+    parsed=dt(v)
+    return parsed.timestamp() if parsed is not None else float("inf")
+
 def apply_virtual_kickoff_window_gate(qualification_status, start, now=NOW):
     """Keep a virtual pick research-only until it is within 60 minutes of kickoff."""
     status=str(qualification_status or "")
