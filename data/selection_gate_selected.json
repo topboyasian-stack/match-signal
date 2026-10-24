@@ -13,7 +13,7 @@
     "rankings": {
       "p1": 13,
       "p2": 41,
-      "gap": 28.0
+      "gap": 28
     },
     "form": {
       "p1": 0.9,
@@ -22,11 +22,11 @@
       "p2_last10": "WLLWWWLWWL"
     },
     "probabilities": {
-      "p1": 0.6923,
-      "p2": 0.3077
+      "p1": 0.6548,
+      "p2": 0.3452
     },
     "pick": "p1",
-    "confidence": 0.6923,
+    "confidence": 0.6548,
     "analytics": {
       "set_win_prob": {
         "p1": 0.6312,
@@ -40,12 +40,12 @@
       "expected_sets": 2.47,
       "total_games": {
         "line": 19.5,
-        "over": 0.6778,
-        "under": 0.3222,
+        "over": 0.7371,
+        "under": 0.2629,
         "pick": "over",
-        "base_model_over": 0.737087,
-        "base_model_under": 0.262913,
-        "source": "V5.1 matchup-conditioned empirical total-games distribution",
+        "base_model_over": 0.7371,
+        "base_model_under": 0.2629,
+        "source": "continuous tennis model + walk-forward O/U calibration v4",
         "model_version": "5.2",
         "v51": {
           "distribution": {
@@ -116,21 +116,45 @@
           25.5
         ],
         "market_alignment_updated_at": "2026-10-24T18:47:18.557456+00:00",
-        "confidence_floor_met": true
+        "confidence_floor_met": true,
+        "calibration_status": "PAPER_RESEARCH",
+        "calibration_features": {
+          "line": 19.5,
+          "three_sets_bin": "mid",
+          "confidence_bin": "high",
+          "tour": "ATP",
+          "empirical_over_rate": null,
+          "calibration_source": "upstream_only",
+          "empirical_weight": 0.0,
+          "prior_model_over": 0.7371,
+          "global_over_rate": 0.4449
+        }
       },
       "games_handicap": {
         "estimated_margin_p1": 0.16,
         "pick": "p1"
-      }
+      },
+      "elo": {
+        "p1": 1455.6,
+        "p2": 1453.1,
+        "p1_win_prob": 0.5035,
+        "weight": 0.5
+      },
+      "walkforward_raw_p1": 0.6548,
+      "walkforward_calibrated_p1": 0.6548,
+      "ranking_probability": 0.7882
     },
-    "model": "ATP/WTA ranking + recent form",
+    "model": "ESPN + ranking/form base + walk-forward player Elo + current ATP/WTA rank + walk-forward probability calibration",
     "signal_quality": {
       "components": 4,
       "max_components": 5,
       "ranking_gap": 28.0,
       "form_gap": 0.3,
       "market_available": false,
-      "secondary_analytics_calibrated": true
+      "secondary_analytics_calibrated": true,
+      "elo_available": true,
+      "elo_gap": 2.4,
+      "ranking_available": true
     },
     "prediction_status": "qualified_candidate",
     "projection_tier": "deep_model",
@@ -1013,7 +1037,7 @@
       "empirical": 0.8011,
       "raw": 0.8083
     },
-    "model_version": "5.0 historical-calibrated",
+    "model_version": "2026-09-17-walkforward-calibrated",
     "calculated_at": "2026-10-24T18:47:13.057025+00:00",
     "sportybet_market_snapshot": {
       "source": "SportyBet NG web API via Cloudflare proxy",
@@ -1333,7 +1357,7 @@
     "rankings": {
       "p1": 6,
       "p2": 123,
-      "gap": 117.0
+      "gap": 117
     },
     "form": {
       "p1": 0.571,
@@ -1342,11 +1366,11 @@
       "p2_last10": "WWWL"
     },
     "probabilities": {
-      "p1": 0.8201,
-      "p2": 0.1799
+      "p1": 0.8647,
+      "p2": 0.1353
     },
     "pick": "p1",
-    "confidence": 0.8201,
+    "confidence": 0.8647,
     "analytics": {
       "set_win_prob": {
         "p1": 0.7295,
@@ -1360,12 +1384,12 @@
       "expected_sets": 2.39,
       "total_games": {
         "line": 21.5,
-        "over": 0.653,
-        "under": 0.347,
+        "over": 0.704,
+        "under": 0.296,
         "pick": "over",
-        "base_model_over": 0.703961,
-        "base_model_under": 0.296039,
-        "source": "V5.1 matchup-conditioned empirical total-games distribution",
+        "base_model_over": 0.704,
+        "base_model_under": 0.296,
+        "source": "continuous tennis model + walk-forward O/U calibration v4",
         "model_version": "5.2",
         "v51": {
           "distribution": {
@@ -1434,21 +1458,45 @@
           25.5
         ],
         "market_alignment_updated_at": "2026-10-24T18:47:18.557456+00:00",
-        "confidence_floor_met": true
+        "confidence_floor_met": true,
+        "calibration_status": "PAPER_RESEARCH",
+        "calibration_features": {
+          "line": 21.5,
+          "three_sets_bin": "low",
+          "confidence_bin": "very_high",
+          "tour": "ATP",
+          "empirical_over_rate": null,
+          "calibration_source": "upstream_only",
+          "empirical_weight": 0.0,
+          "prior_model_over": 0.704,
+          "global_over_rate": 0.4449
+        }
       },
       "games_handicap": {
         "estimated_margin_p1": 0.28,
         "pick": "p1"
-      }
+      },
+      "elo": {
+        "p1": 1500.0,
+        "p2": 1500.0,
+        "p1_win_prob": 0.5,
+        "weight": 0.5
+      },
+      "walkforward_raw_p1": 0.8647,
+      "walkforward_calibrated_p1": 0.8647,
+      "ranking_probability": 0.9687
     },
-    "model": "ATP/WTA ranking + recent form",
+    "model": "ESPN + ranking/form base + walk-forward player Elo + current ATP/WTA rank + walk-forward probability calibration",
     "signal_quality": {
       "components": 4,
       "max_components": 5,
       "ranking_gap": 117.0,
       "form_gap": 0.179,
       "market_available": false,
-      "secondary_analytics_calibrated": true
+      "secondary_analytics_calibrated": true,
+      "elo_available": false,
+      "elo_gap": null,
+      "ranking_available": true
     },
     "prediction_status": "qualified_candidate",
     "projection_tier": "deep_model",
@@ -2225,7 +2273,7 @@
       "empirical": 0.8011,
       "raw": 0.7858
     },
-    "model_version": "5.0 historical-calibrated",
+    "model_version": "2026-09-17-walkforward-calibrated",
     "calculated_at": "2026-10-24T18:47:13.057025+00:00",
     "sportybet_market_snapshot": {
       "source": "SportyBet NG web API via Cloudflare proxy",
@@ -2498,366 +2546,6 @@
   {
     "sport": "tennis",
     "league": "ATP",
-    "event_id": "185178",
-    "start_time": "2026-10-26T04:00Z",
-    "player_1": "Lorenzo Musetti",
-    "player_2": "Frances Tiafoe",
-    "venue": "Vienna, Austria",
-    "surface": "Unknown",
-    "tournament": "Erste Bank Open",
-    "round": "Round 1",
-    "rankings": {
-      "p1": 26,
-      "p2": 9,
-      "gap": 17.0
-    },
-    "form": {
-      "p1": 0.667,
-      "p2": 0.7,
-      "p1_last10": "WLLWWW",
-      "p2_last10": "WWWWWLWLWL"
-    },
-    "probabilities": {
-      "p1": 0.3414,
-      "p2": 0.6586
-    },
-    "pick": "p2",
-    "confidence": 0.6586,
-    "analytics": {
-      "set_win_prob": {
-        "p1": 0.3926,
-        "p2": 0.6074
-      },
-      "straight_sets": {
-        "p1": 0.1541,
-        "p2": 0.3689
-      },
-      "three_sets": 0.4769,
-      "expected_sets": 2.48,
-      "total_games": {
-        "line": null,
-        "over": null,
-        "under": null,
-        "pick": null,
-        "base_model_over": 0.6909,
-        "base_model_under": 0.3091,
-        "source": "V5.1 matchup-conditioned empirical total-games distribution",
-        "model_version": "5.2",
-        "v51": {
-          "distribution": {
-            "12": 0.014151,
-            "13": 0.014151,
-            "14": 0.01475,
-            "15": 0.014151,
-            "16": 0.014151,
-            "17": 0.060891,
-            "18": 0.036678,
-            "19": 0.067427,
-            "20": 0.107908,
-            "21": 0.029278,
-            "22": 0.021586,
-            "23": 0.051354,
-            "24": 0.053995,
-            "25": 0.014903,
-            "26": 0.014151,
-            "27": 0.014151,
-            "28": 0.014151,
-            "29": 0.035839,
-            "30": 0.014151,
-            "31": 0.051841,
-            "32": 0.080506,
-            "33": 0.032822,
-            "34": 0.018569,
-            "35": 0.016954,
-            "36": 0.014151,
-            "37": 0.014151,
-            "38": 0.017194,
-            "39": 0.014151,
-            "40": 0.029778,
-            "41": 0.014151,
-            "42": 0.059614,
-            "43": 0.014151,
-            "44": 0.014151
-          },
-          "expected_total": 25.971,
-          "neighbors": 46,
-          "effective_sample": 1.883,
-          "model": "V5.1 matchup-conditioned empirical total-games distribution",
-          "line": 18.5,
-          "over": 0.831078,
-          "under": 0.168922,
-          "pick": "over",
-          "tour": "ATP",
-          "recommended_line": 18.5,
-          "recommended_pick": "over",
-          "recommended_probability": 0.831078
-        },
-        "line_strategy": "exact SportyBet market line when available; ladder fallback only without market line",
-        "raw_over": 0.8311,
-        "raw_under": 0.1689,
-        "calibrated_over": 0.8157,
-        "calibrated_under": 0.1843,
-        "model_line_before_market_alignment": 18.5,
-        "market_alignment_status": "NO_EXACT_SPORTYBET_TOTAL_LINE",
-        "market_available_lines": [],
-        "market_alignment_updated_at": "2026-10-24T18:47:18.557456+00:00"
-      },
-      "games_handicap": {
-        "estimated_margin_p1": -0.13,
-        "pick": "p2"
-      }
-    },
-    "model": "ATP/WTA ranking + recent form",
-    "signal_quality": {
-      "components": 4,
-      "max_components": 5,
-      "ranking_gap": 17.0,
-      "form_gap": 0.033,
-      "market_available": false,
-      "secondary_analytics_calibrated": true
-    },
-    "prediction_status": "qualified_candidate",
-    "projection_tier": "deep_model",
-    "evidence_depth": "ranking_form_market_recent_form",
-    "qualification_status": "candidate",
-    "paper_only": true,
-    "sportybet_market": {
-      "provider": "SportyBet NG",
-      "event_id": "sr:match:75989932",
-      "tournament": "ATP Vienna, Austria Men Singles",
-      "category": "ATP",
-      "start_time": "2026-10-26T12:00:00+00:00",
-      "winner": {
-        "p1_book": 1.94,
-        "draw_book": null,
-        "p2_book": 1.91,
-        "p1_fair_prob": 0.49610389610389616,
-        "draw_fair_prob": null,
-        "p2_fair_prob": 0.5038961038961038,
-        "p1_fair_odds": 2.015706806282722,
-        "draw_fair_odds": null,
-        "p2_fair_odds": 1.984536082474227,
-        "market_id": "186",
-        "overround": 0.03902412694985702,
-        "raw_outcomes": [
-          {
-            "id": "4",
-            "name": "Home",
-            "book_odds": 1.94,
-            "implied": 0.5154639175257733,
-            "fair_prob": 0.49610389610389616,
-            "fair_odds": 2.015706806282722
-          },
-          {
-            "id": "5",
-            "name": "Away",
-            "book_odds": 1.91,
-            "implied": 0.5235602094240838,
-            "fair_prob": 0.5038961038961038,
-            "fair_odds": 1.984536082474227
-          }
-        ]
-      },
-      "totals": [],
-      "market_count": 3,
-      "markets": [
-        {
-          "id": "186",
-          "name": "Winner",
-          "line": null,
-          "overround": 0.039024,
-          "outcomes": [
-            {
-              "id": "4",
-              "name": "Home",
-              "book_odds": 1.94,
-              "implied": 0.5154639175257733,
-              "fair_prob": 0.49610389610389616,
-              "fair_odds": 2.015706806282722
-            },
-            {
-              "id": "5",
-              "name": "Away",
-              "book_odds": 1.91,
-              "implied": 0.5235602094240838,
-              "fair_prob": 0.5038961038961038,
-              "fair_odds": 1.984536082474227
-            }
-          ]
-        },
-        {
-          "id": "202",
-          "name": "1st set - winner",
-          "line": null,
-          "overround": 0.049876,
-          "outcomes": [
-            {
-              "id": "4",
-              "name": "Home",
-              "book_odds": 1.91,
-              "implied": 0.5235602094240838,
-              "fair_prob": 0.49868766404199477,
-              "fair_odds": 2.0052631578947366
-            },
-            {
-              "id": "5",
-              "name": "Away",
-              "book_odds": 1.9,
-              "implied": 0.5263157894736842,
-              "fair_prob": 0.5013123359580053,
-              "fair_odds": 1.994764397905759
-            }
-          ]
-        },
-        {
-          "id": "202",
-          "name": "2nd set - winner",
-          "line": null,
-          "overround": 0.049876,
-          "outcomes": [
-            {
-              "id": "4",
-              "name": "Home",
-              "book_odds": 1.91,
-              "implied": 0.5235602094240838,
-              "fair_prob": 0.49868766404199477,
-              "fair_odds": 2.0052631578947366
-            },
-            {
-              "id": "5",
-              "name": "Away",
-              "book_odds": 1.9,
-              "implied": 0.5263157894736842,
-              "fair_prob": 0.5013123359580053,
-              "fair_odds": 1.994764397905759
-            }
-          ]
-        }
-      ],
-      "fetched_at": "2026-10-24T18:47:12.261276+00:00",
-      "available": true,
-      "match": {
-        "score": 0.8641,
-        "method": "direct",
-        "name_direct": 0.8708,
-        "name_reverse": 0.2414
-      }
-    },
-    "sportybet_winner_odds": {
-      "p1": 1.94,
-      "p2": 1.91,
-      "market_id": "186",
-      "market": "Winner",
-      "lastOddsChangeTime": 1792863418000
-    },
-    "sportybet_market_id": "186",
-    "sportybet_outcome_id": "5",
-    "sportybet_outcome_name": "Away",
-    "sportybet_total_market": null,
-    "sportybet_total_games_odds": [],
-    "market_insights": {
-      "provider": "SportyBet NG",
-      "available": true,
-      "matched_event_id": "sr:match:75989932",
-      "match_score": 0.8641,
-      "winner_model_edge_vs_market": 0.154704,
-      "winner_model_pick": "p2",
-      "winner_market_fair_prob": 0.503896,
-      "total": null,
-      "snapshot_at": "2026-10-24T18:47:18.557456+00:00",
-      "source": "SportyBet NG",
-      "winner_model_probability": 0.6586,
-      "winner_market_probability": 0.503896,
-      "winner_expected_value": 0.257926,
-      "winner_book_odds": 1.91,
-      "winner_fair_odds": 1.5184,
-      "winner_value_signal": true
-    },
-    "raw_confidence": 0.8311,
-    "calibrated_confidence": 0.8157,
-    "calibration": {
-      "market": "tennis:total_games:ATP:18.5",
-      "method": "tour_line_recency_empirical_bayes",
-      "tour": "ATP",
-      "line": 18.5,
-      "sample_size": 51,
-      "effective_sample": 31.44,
-      "empirical": 0.8011,
-      "raw": 0.8311
-    },
-    "model_version": "5.0 historical-calibrated",
-    "calculated_at": "2026-10-24T18:47:13.057025+00:00",
-    "sportybet_market_snapshot": {
-      "source": "SportyBet NG web API via Cloudflare proxy",
-      "fetched_at": "2026-10-24T18:47:18.557456+00:00",
-      "match_type": "name_time",
-      "sportybet_event_id": "sr:match:75989932",
-      "league": "ATP Vienna, Austria Men Singles",
-      "sportybet_start_time": 1793016000000,
-      "winner": {
-        "p1": 1.94,
-        "p2": 1.91,
-        "market_id": "186",
-        "market": "Winner",
-        "lastOddsChangeTime": 1792863418000
-      }
-    },
-    "market_source": "SportyBet NG",
-    "odds_timestamp": "2026-10-24T18:47:18.557456+00:00",
-    "architecture": "independent statistical + market benchmark + calibration + value",
-    "decision": "PAPER ONLY",
-    "behavior_context": {
-      "version": "behavior-profiles-v2",
-      "matched": false,
-      "teams": {},
-      "source": "behavior_profiles.json",
-      "use": "context_only_unvalidated",
-      "probability_adjustment_applied": false
-    },
-    "individual_behavior_context": {
-      "p1": {
-        "sport": "tennis",
-        "name": "Lorenzo Musetti",
-        "observations": 0,
-        "provider_identity": false,
-        "note": "Awaiting provider athlete identity/statistics feed"
-      },
-      "p2": {
-        "sport": "tennis",
-        "name": "Frances Tiafoe",
-        "observations": 0,
-        "provider_identity": false,
-        "note": "Awaiting provider athlete identity/statistics feed"
-      }
-    },
-    "live_eligible": false,
-    "testing_mode": "paper",
-    "candidate_status": "BETTING_QUALIFIED_PAPER",
-    "qualification_basis": {
-      "confidence_ok": true,
-      "value_ok": true,
-      "value_source": "current_sportybet_winner_edge_ev",
-      "evidence_tier": "GLOBAL_MODEL_ONLY",
-      "tournament_gate_non_blocking": true,
-      "selection_gate_non_blocking": true
-    },
-    "selection_gate": {
-      "status": "passed",
-      "sport": "tennis",
-      "tournament": "Erste Bank Open",
-      "selection": "p2",
-      "confidence_threshold": 0.65,
-      "threshold_source": "walkforward_precision_gate",
-      "mode": "PAPER_ONLY",
-      "evidence_tier": "GLOBAL_MODEL_ONLY",
-      "tournament_gate_non_blocking": true,
-      "selection_gate_non_blocking": true,
-      "reasons": []
-    }
-  },
-  {
-    "sport": "tennis",
-    "league": "ATP",
     "event_id": "185138",
     "start_time": "2026-10-26T04:00Z",
     "player_1": "Taylor Fritz",
@@ -2869,7 +2557,7 @@
     "rankings": {
       "p1": 14,
       "p2": 39,
-      "gap": 25.0
+      "gap": 25
     },
     "form": {
       "p1": 0.667,
@@ -2878,11 +2566,11 @@
       "p2_last10": "WLWWWLWWWL"
     },
     "probabilities": {
-      "p1": 0.6638,
-      "p2": 0.3362
+      "p1": 0.6541,
+      "p2": 0.3459
     },
     "pick": "p1",
-    "confidence": 0.6638,
+    "confidence": 0.6541,
     "analytics": {
       "set_win_prob": {
         "p1": 0.611,
@@ -2896,12 +2584,12 @@
       "expected_sets": 2.48,
       "total_games": {
         "line": 20.5,
-        "over": 0.6513,
-        "under": 0.3487,
+        "over": 0.7018,
+        "under": 0.2982,
         "pick": "over",
-        "base_model_over": 0.70177,
-        "base_model_under": 0.29823,
-        "source": "V5.1 matchup-conditioned empirical total-games distribution",
+        "base_model_over": 0.7018,
+        "base_model_under": 0.2982,
+        "source": "continuous tennis model + walk-forward O/U calibration v4",
         "model_version": "5.2",
         "v51": {
           "distribution": {
@@ -2972,21 +2660,45 @@
           26.5
         ],
         "market_alignment_updated_at": "2026-10-24T18:47:18.557456+00:00",
-        "confidence_floor_met": true
+        "confidence_floor_met": true,
+        "calibration_status": "PAPER_RESEARCH",
+        "calibration_features": {
+          "line": 20.5,
+          "three_sets_bin": "mid",
+          "confidence_bin": "high",
+          "tour": "ATP",
+          "empirical_over_rate": null,
+          "calibration_source": "upstream_only",
+          "empirical_weight": 0.0,
+          "prior_model_over": 0.7018,
+          "global_over_rate": 0.4449
+        }
       },
       "games_handicap": {
         "estimated_margin_p1": 0.14,
         "pick": "p1"
-      }
+      },
+      "elo": {
+        "p1": 1522.8,
+        "p2": 1477.6,
+        "p1_win_prob": 0.5646,
+        "weight": 0.5
+      },
+      "walkforward_raw_p1": 0.6541,
+      "walkforward_calibrated_p1": 0.6541,
+      "ranking_probability": 0.7642
     },
-    "model": "ATP/WTA ranking + recent form",
+    "model": "ESPN + ranking/form base + walk-forward player Elo + current ATP/WTA rank + walk-forward probability calibration",
     "signal_quality": {
       "components": 4,
       "max_components": 5,
       "ranking_gap": 25.0,
       "form_gap": 0.033,
       "market_available": false,
-      "secondary_analytics_calibrated": true
+      "secondary_analytics_calibrated": true,
+      "elo_available": true,
+      "elo_gap": 45.1,
+      "ranking_available": true
     },
     "prediction_status": "qualified_candidate",
     "projection_tier": "deep_model",
@@ -3869,7 +3581,7 @@
       "empirical": 0.8011,
       "raw": 0.8291
     },
-    "model_version": "5.0 historical-calibrated",
+    "model_version": "2026-09-17-walkforward-calibrated",
     "calculated_at": "2026-10-24T18:47:13.057025+00:00",
     "sportybet_market_snapshot": {
       "source": "SportyBet NG web API via Cloudflare proxy",
