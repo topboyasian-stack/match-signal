@@ -5,10 +5,13 @@ name: Deploy Match Signal to Cloudflare Pages
 on:
   workflow_run:
     workflows:
-      - "Match Signal Unified Upcoming Board"
       - "Match Signal Persistent Club Logo Registry"
     types: [completed]
-  # Static presentation and scoped booking-API changes may deploy directly. Builder outputs, Builder engines, and this workflow itself must wait for the Unified Upcoming refresh and its subsequent Pages deployment.
+  # Builder/data production is ordered by Builder Production Promotion:
+  # refresh board -> build/publish Odds Builder -> refresh board from that artifact
+  # -> rebuild/publish Builder -> deploy and verify Pages. Do not deploy on the
+  # initial board completion because its Builder artifact may still be stale.
+  # Static presentation and scoped booking-API changes may still deploy directly.
   push:
     branches: [main]
     paths:
