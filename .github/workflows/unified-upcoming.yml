@@ -246,6 +246,18 @@ jobs:
             python scripts/unified_upcoming_cleanup.py
             python scripts/selection_candidate_collector.py
             python scripts/efootball_desk_learning.py
+            # Conflict recovery starts from the newest main checkout, so regenerate
+            # the evaluator artifact too before staging it. Never publish the old
+            # run's holdout JSON just because that file already exists locally.
+            python scripts/virtual_lab_model_eval.py
+            python - <<'PY'
+            import json
+            from pathlib import Path
+            data = json.loads(Path("data/virtual_lab_model_eval.json").read_text(encoding="utf-8"))
+            rows = data.get("holdout_scored_predictions")
+            assert isinstance(rows, list) and rows, "conflict recovery must rebuild untouched eFootball holdout forecasts"
+            assert all(row.get("start_time") and row.get("event_id") for row in rows), "holdout rows must retain exact fixture identity and scheduled kickoff"
+            PY
             python scripts/system_health_audit.py
             git add data/unified_upcoming.json data/prediction_desk_health.json data/selection_candidates.json data/selection_candidate_status.json data/system_health.json data/efootball_desk_learning.json data/efootball_desk_prediction_history.json data/efootball_desk_settled_observations.json data/virtual_lab_model_eval.json
             if git diff --cached --quiet; then
