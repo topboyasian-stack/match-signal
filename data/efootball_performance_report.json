@@ -1,18 +1,21 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-25T17:40:29.597074+00:00",
+  "generated_at": "2026-10-25T17:44:41.655439+00:00",
   "mode": "PAPER_RESEARCH_ONLY",
   "live_trading_approved": false,
   "production_qualification_enabled": false,
   "odds_builder_eligible": false,
   "source_freshness": {
-    "market_archive_updated_at": "2026-10-25T17:40:28.313735+00:00",
+    "market_archive_updated_at": "2026-10-25T17:44:40.477613+00:00",
     "market_archive_age_minutes": 0.0,
-    "collector_last_capture_at": "2026-10-25T17:40:28.313735+00:00",
-    "collector_age_minutes": 0.0,
+    "collector_last_capture_at": "2026-10-25T17:42:30.409348+00:00",
+    "collector_age_minutes": 2.2,
     "collector_stale_over_30_minutes": false,
     "market_archive_last_run_errors": [],
-    "market_archive_last_run_warnings": [],
+    "market_archive_last_run_warnings": [
+      "730 pending event IDs were at least 15 minutes past kickoff but absent from result responses; 35/766 pending event IDs matched. Will retry on the next settlement pass.",
+      "35 returned event IDs were at least 15 minutes past kickoff but still lacked a confirmed final score/status."
+    ],
     "market_archive_last_run_snapshot_fresh": true,
     "note": "Stale research collection must raise a monitoring warning; it must never stop the normal Qualified Best forecast/deployment workflow."
   },
@@ -4038,27 +4041,89 @@
     "scope_warning": "These are selected Qualified Best/settled line picks, not all forecasts. Multiple line rows can share one fixture, so n is not necessarily an independent-event count."
   },
   "winner_and_gg_ng_market_baselines": {
-    "source_rows": 9963,
-    "unique_sample_ids": 9963,
+    "source_rows": 9967,
+    "unique_sample_ids": 9967,
     "duplicate_sample_id_count": 0,
-    "archive_updated_at": "2026-10-25T17:40:28.313735+00:00",
+    "archive_updated_at": "2026-10-25T17:44:40.477613+00:00",
     "collector_last_run": {
-      "captured_at": "2026-10-25T17:40:28.313735+00:00",
-      "captured_new": 28,
+      "captured_at": "2026-10-25T17:42:30.409348+00:00",
+      "captured_new": 4,
       "settled_new": 0,
       "settlement_errors": [],
-      "settlement_warnings": [],
-      "settlement_diagnostics": null,
-      "settlement_checked_at": "2026-10-25T17:37:16.387920+00:00",
-      "settlement_attempted": false,
-      "pending_due_settlement_check": 775,
-      "result_events_seen": 0,
-      "exact_result_ids_matched": 0,
+      "settlement_warnings": [
+        "730 pending event IDs were at least 15 minutes past kickoff but absent from result responses; 35/766 pending event IDs matched. Will retry on the next settlement pass.",
+        "35 returned event IDs were at least 15 minutes past kickoff but still lacked a confirmed final score/status."
+      ],
+      "settlement_diagnostics": {
+        "pending_observation_count": 777,
+        "pending_event_id_count": 766,
+        "result_events_seen": 1176,
+        "exact_result_ids_matched": 35,
+        "unmatched_event_id_count": 731,
+        "unmatched_event_ids_sample": [
+          "sr:match:75697230",
+          "sr:match:75697410",
+          "sr:match:75697534",
+          "sr:match:75745918",
+          "sr:match:75756672",
+          "sr:match:75757056",
+          "sr:match:75759862",
+          "sr:match:75907740",
+          "sr:match:75907746",
+          "sr:match:75910644"
+        ],
+        "oldest_unmatched_age_minutes": 15457.5,
+        "overdue_unmatched_event_id_count": 730,
+        "overdue_unmatched_event_ids": [
+          "sr:match:75697230",
+          "sr:match:75697410",
+          "sr:match:75697534",
+          "sr:match:75745918",
+          "sr:match:75756672",
+          "sr:match:75757056",
+          "sr:match:75759862",
+          "sr:match:75907740",
+          "sr:match:75907746",
+          "sr:match:75910644"
+        ],
+        "matched_but_unsettled_event_id_count": 35,
+        "matched_but_unsettled_event_ids": [
+          "sr:match:75624450",
+          "sr:match:75624524",
+          "sr:match:75698430",
+          "sr:match:75698612",
+          "sr:match:75698880",
+          "sr:match:75698986",
+          "sr:match:75699022",
+          "sr:match:75798028",
+          "sr:match:75798058",
+          "sr:match:75798082"
+        ],
+        "oldest_matched_but_unsettled_age_minutes": 16566.5,
+        "overdue_matched_but_unsettled_event_id_count": 35,
+        "overdue_matched_but_unsettled_event_ids": [
+          "sr:match:75624450",
+          "sr:match:75624524",
+          "sr:match:75698430",
+          "sr:match:75698612",
+          "sr:match:75698880",
+          "sr:match:75698986",
+          "sr:match:75699022",
+          "sr:match:75798028",
+          "sr:match:75798058",
+          "sr:match:75798082"
+        ]
+      },
+      "settlement_checked_at": "2026-10-25T17:42:30.409348+00:00",
+      "settlement_attempted": true,
+      "pending_due_settlement_check": 777,
+      "result_events_seen": 1176,
+      "exact_result_ids_matched": 35,
       "feed_snapshot_fresh": true,
-      "feed_snapshot_age_seconds": 16.9,
+      "feed_snapshot_age_seconds": 20.7,
       "capture_skipped_reason": null,
       "market_coverage": {
-        "captured_at": "2026-10-25T17:40:28.313735+00:00",
+        "captured_at": "2026-10-25T17:42:30.409348+00:00",
         "source": "current SportyBet virtual feed",
         "window_minutes": 15,
         "products": {
@@ -4087,47 +4152,47 @@
             }
           },
           "efootball_gt": {
-            "feed_events": 174,
-            "upcoming_events_with_time": 174,
-            "events_within_capture_window": 22,
+            "feed_events": 176,
+            "upcoming_events_with_time": 176,
+            "events_within_capture_window": 24,
             "market_type_rows": {
-              "match_winner": 174,
-              "btts": 23
+              "match_winner": 176,
+              "btts": 22
             },
             "usable_two_way_quote_rows": {
-              "match_winner": 174,
-              "btts": 23
+              "match_winner": 176,
+              "btts": 22
             },
             "near_kickoff_market_type_rows": {
-              "match_winner": 22,
+              "match_winner": 24,
               "btts": 4
             },
             "near_kickoff_usable_quote_rows": {
-              "match_winner": 22,
+              "match_winner": 24,
               "btts": 4
             },
-            "market_id_29_rows": 23,
+            "market_id_29_rows": 22,
             "market_id_29_names": [
               "Both teams to score"
             ],
             "market_inventory": {
-              "10|Double Chance": 39,
-              "11|Draw No Bet": 23,
-              "18|Over/Under": 356,
-              "1|1X2": 174,
-              "26|Odd/even": 23,
-              "29|Both teams to score": 23
+              "10|Double Chance": 38,
+              "11|Draw No Bet": 22,
+              "18|Over/Under": 359,
+              "1|1X2": 176,
+              "26|Odd/even": 22,
+              "29|Both teams to score": 22
             }
           }
         },
         "snapshot_fresh": true,
-        "snapshot_updated_at": "2026-10-25T17:40:11.448226+00:00",
-        "snapshot_age_seconds": 16.9,
+        "snapshot_updated_at": "2026-10-25T17:42:09.677589+00:00",
+        "snapshot_age_seconds": 20.7,
         "freshness_status": "FRESH"
       }
     },
     "market_coverage": {
-      "captured_at": "2026-10-25T17:40:28.313735+00:00",
+      "captured_at": "2026-10-25T17:42:30.409348+00:00",
       "source": "current SportyBet virtual feed",
       "window_minutes": 15,
       "products": {
@@ -4156,42 +4221,42 @@
           }
         },
         "efootball_gt": {
-          "feed_events": 174,
-          "upcoming_events_with_time": 174,
-          "events_within_capture_window": 22,
+          "feed_events": 176,
+          "upcoming_events_with_time": 176,
+          "events_within_capture_window": 24,
           "market_type_rows": {
-            "match_winner": 174,
-            "btts": 23
+            "match_winner": 176,
+            "btts": 22
           },
           "usable_two_way_quote_rows": {
-            "match_winner": 174,
-            "btts": 23
+            "match_winner": 176,
+            "btts": 22
           },
           "near_kickoff_market_type_rows": {
-            "match_winner": 22,
+            "match_winner": 24,
             "btts": 4
           },
           "near_kickoff_usable_quote_rows": {
-            "match_winner": 22,
+            "match_winner": 24,
             "btts": 4
           },
-          "market_id_29_rows": 23,
+          "market_id_29_rows": 22,
           "market_id_29_names": [
             "Both teams to score"
           ],
           "market_inventory": {
-            "10|Double Chance": 39,
-            "11|Draw No Bet": 23,
-            "18|Over/Under": 356,
-            "1|1X2": 174,
-            "26|Odd/even": 23,
-            "29|Both teams to score": 23
+            "10|Double Chance": 38,
+            "11|Draw No Bet": 22,
+            "18|Over/Under": 359,
+            "1|1X2": 176,
+            "26|Odd/even": 22,
+            "29|Both teams to score": 22
           }
         }
       },
       "snapshot_fresh": true,
-      "snapshot_updated_at": "2026-10-25T17:40:11.448226+00:00",
-      "snapshot_age_seconds": 16.9,
+      "snapshot_updated_at": "2026-10-25T17:42:09.677589+00:00",
+      "snapshot_age_seconds": 20.7,
       "freshness_status": "FRESH"
     },
     "summary_by_product_market": {
@@ -4894,8 +4959,8 @@
         "mean_model_probability": null,
         "mean_brier": 0.4663,
         "mean_log_loss": 0.659,
-        "captured": 1410,
-        "pending": 14,
+        "captured": 1411,
+        "pending": 15,
         "chronological_split": {
           "method": "sort by scheduled start time; earliest 70% versus most recent 30%; descriptive only",
           "first_70_percent": {
@@ -5552,8 +5617,8 @@
         "mean_model_probability": null,
         "mean_brier": 0.6105,
         "mean_log_loss": 1.0159,
-        "captured": 7276,
-        "pending": 767,
+        "captured": 7279,
+        "pending": 770,
         "chronological_split": {
           "method": "sort by scheduled start time; earliest 70% versus most recent 30%; descriptive only",
           "first_70_percent": {
@@ -7484,7 +7549,7 @@
     "scored_unique_history_events": 7764,
     "conflicting_history_events_excluded": 0,
     "skipped_target_counts": {
-      "unsettled_or_invalid_target": 803,
+      "unsettled_or_invalid_target": 807,
       "not_pre_kickoff": 0,
       "insufficient_global_history": 87,
       "invalid_participant_identity": 0,
@@ -10832,123 +10897,123 @@
     "interpretation": "Ticket outcomes are dependent when tickets reuse the same legs. Compare them separately from single-pick accuracy; do not interpret the raw ticket hit rate as per-leg performance."
   },
   "walk_forward_ou_model_evaluation": {
-    "generated_at": "2026-10-25T16:10:36.496802+00:00",
+    "generated_at": "2026-10-25T17:41:06.438415+00:00",
     "method": "strict chronological walk-forward; each scored event only sees earlier settled events",
     "holdout_definition": {
       "fraction": 0.3,
-      "events": 2226,
-      "rows": 5749,
-      "participant_rows": 5749
+      "events": 2230,
+      "rows": 5754,
+      "participant_rows": 5754
     },
     "efootball_gt_walk_forward_metrics_by_variant": {
       "market": {
-        "n": 4049,
-        "brier": 0.2569994162218273,
-        "log_loss": 0.7077337818979749,
-        "hit_rate": 0.5132131390466782,
-        "ece": 0.0851059390387867
+        "n": 4054,
+        "brier": 0.2572412685250701,
+        "log_loss": 0.7082600740164134,
+        "hit_rate": 0.5128268376911692,
+        "ece": 0.08637215844413682
       },
       "poisson": {
-        "n": 4049,
-        "brier": 0.23851493685510902,
-        "log_loss": 0.6697971186915048,
-        "hit_rate": 0.5840948382316621,
-        "ece": 0.017514864840731545
+        "n": 4054,
+        "brier": 0.23848251605126108,
+        "log_loss": 0.6697778889816791,
+        "hit_rate": 0.5848544647261964,
+        "ece": 0.015718462454224803
       },
       "poisson_prior": {
-        "n": 4049,
-        "brier": 0.2419347401303985,
-        "log_loss": 0.6769379910821762,
-        "hit_rate": 0.5808841689306001,
-        "ece": 0.01991346774206745
+        "n": 4054,
+        "brier": 0.24221842865006377,
+        "log_loss": 0.6775900044806629,
+        "hit_rate": 0.580414405525407,
+        "ece": 0.023707059794027804
       },
       "efootball_shape": {
-        "n": 4049,
-        "brier": 0.2483196167133278,
-        "log_loss": 0.6904895669979376,
-        "hit_rate": 0.5655717461101507,
-        "ece": 0.06351963504989144
+        "n": 4054,
+        "brier": 0.24893408396197123,
+        "log_loss": 0.6918545141741774,
+        "hit_rate": 0.5643808584114455,
+        "ece": 0.0676262002151557
       },
       "participant_model": {
-        "n": 4049,
-        "brier": 0.24638408882304855,
-        "log_loss": 0.6863064286542009,
-        "hit_rate": 0.5635959496171894,
-        "ece": 0.05849669509888647
+        "n": 4054,
+        "brier": 0.24693402371636528,
+        "log_loss": 0.6875396124764892,
+        "hit_rate": 0.5626541687222496,
+        "ece": 0.060702572710267064
       }
     },
     "overall_chronological_holdout_metrics": {
       "market": {
-        "n": 5749,
-        "brier": 0.31240499971841285,
-        "log_loss": 0.8860891821052758,
-        "hit_rate": 0.4774743433640633,
-        "ece": 0.18137693480034303
+        "n": 5754,
+        "brier": 0.3125272522939887,
+        "log_loss": 0.8863049991450938,
+        "hit_rate": 0.47723322905804655,
+        "ece": 0.18217829862723248
       },
       "poisson": {
-        "n": 5749,
-        "brier": 0.2059324659011315,
-        "log_loss": 0.5913566059558517,
-        "hit_rate": 0.6524612976169769,
-        "ece": 0.013750964721009727
+        "n": 5754,
+        "brier": 0.20593793660255144,
+        "log_loss": 0.5914112193239512,
+        "hit_rate": 0.6529370872436566,
+        "ece": 0.012374761920104815
       },
       "poisson_prior": {
-        "n": 5749,
-        "brier": 0.2081582554787127,
-        "log_loss": 0.5957756505739183,
-        "hit_rate": 0.6508958079666028,
-        "ece": 0.01256969019087805
+        "n": 5754,
+        "brier": 0.20838770882703675,
+        "log_loss": 0.5963075094860079,
+        "hit_rate": 0.6505039972193257,
+        "ece": 0.015461210771596847
       },
       "efootball_shape": {
-        "n": 5749,
-        "brier": 0.21283786662228787,
-        "log_loss": 0.6059302227923009,
-        "hit_rate": 0.639415550530527,
-        "ece": 0.04443363726685292
+        "n": 5754,
+        "brier": 0.21330162383057003,
+        "log_loss": 0.6069653796524859,
+        "hit_rate": 0.6385123392422662,
+        "ece": 0.04734351651066522
       },
       "participant_model": {
-        "n": 5749,
-        "brier": 0.21130666932637476,
-        "log_loss": 0.6024657995878036,
-        "hit_rate": 0.6376761175856671,
-        "ece": 0.040566560151997555
+        "n": 5754,
+        "brier": 0.21172492881595048,
+        "log_loss": 0.6034097653196439,
+        "hit_rate": 0.6369482099409107,
+        "ece": 0.041653832890875056
       }
     },
     "overall_participant_holdout_metrics": {
       "market": {
-        "n": 5749,
-        "brier": 0.31240499971841285,
-        "log_loss": 0.8860891821052758,
-        "hit_rate": 0.4774743433640633,
-        "ece": 0.18137693480034303
+        "n": 5754,
+        "brier": 0.3125272522939887,
+        "log_loss": 0.8863049991450938,
+        "hit_rate": 0.47723322905804655,
+        "ece": 0.18217829862723248
       },
       "poisson": {
-        "n": 5749,
-        "brier": 0.2059324659011315,
-        "log_loss": 0.5913566059558517,
-        "hit_rate": 0.6524612976169769,
-        "ece": 0.013750964721009727
+        "n": 5754,
+        "brier": 0.20593793660255144,
+        "log_loss": 0.5914112193239512,
+        "hit_rate": 0.6529370872436566,
+        "ece": 0.012374761920104815
       },
       "poisson_prior": {
-        "n": 5749,
-        "brier": 0.2081582554787127,
-        "log_loss": 0.5957756505739183,
-        "hit_rate": 0.6508958079666028,
-        "ece": 0.01256969019087805
+        "n": 5754,
+        "brier": 0.20838770882703675,
+        "log_loss": 0.5963075094860079,
+        "hit_rate": 0.6505039972193257,
+        "ece": 0.015461210771596847
       },
       "efootball_shape": {
-        "n": 5749,
-        "brier": 0.21283786662228787,
-        "log_loss": 0.6059302227923009,
-        "hit_rate": 0.639415550530527,
-        "ece": 0.04443363726685292
+        "n": 5754,
+        "brier": 0.21330162383057003,
+        "log_loss": 0.6069653796524859,
+        "hit_rate": 0.6385123392422662,
+        "ece": 0.04734351651066522
       },
       "participant_model": {
-        "n": 5749,
-        "brier": 0.21130666932637476,
-        "log_loss": 0.6024657995878036,
-        "hit_rate": 0.6376761175856671,
-        "ece": 0.040566560151997555
+        "n": 5754,
+        "brier": 0.21172492881595048,
+        "log_loss": 0.6034097653196439,
+        "hit_rate": 0.6369482099409107,
+        "ece": 0.041653832890875056
       }
     },
     "note": "Full-line O/U replay evaluation is a different population from Qualified Best picks and bookmaker-favourite 1X2/BTTS research."
@@ -10958,7 +11023,7 @@
     "status": "MATCHED_HOLDOUT_AVAILABLE",
     "join_contract": "exact product + event ID + O/U line + side; scheduled timestamps within 15 minutes; outcome must agree across ledgers",
     "timestamp_tolerance_seconds": 900,
-    "model_evaluation_generated_at": "2026-10-25T16:10:36.496802+00:00",
+    "model_evaluation_generated_at": "2026-10-25T17:41:06.438415+00:00",
     "matched_rows": 914,
     "match_coverage": {
       "eligible_qualified_rows": 2345,
@@ -11000,7 +11065,7 @@
         "n": 914,
         "brier": 0.2409,
         "log_loss": 0.675,
-        "ece": 0.0238,
+        "ece": 0.0239,
         "hit_rate": 0.593,
         "mean_probability": 0.6159,
         "observed_hit_rate": 0.5941
@@ -11106,7 +11171,7 @@
         },
         "rows_passing_both_value_gates": {
           "n": 184,
-          "mean_expected_return": 0.0554,
+          "mean_expected_return": 0.0555,
           "mean_margin_adjusted_edge": 0.1417,
           "flat_stake_net_units": -16.7,
           "flat_stake_roi": -0.0908
@@ -11143,17 +11208,17 @@
         "minimum_margin_adjusted_edge": 0.025,
         "all_quoted_rows": {
           "n": 914,
-          "mean_expected_return": -0.0124,
+          "mean_expected_return": -0.0123,
           "mean_margin_adjusted_edge": 0.1116,
           "flat_stake_net_units": -57.99,
           "flat_stake_roi": -0.0634
         },
         "rows_passing_both_value_gates": {
-          "n": 312,
-          "mean_expected_return": 0.0841,
-          "mean_margin_adjusted_edge": 0.1783,
-          "flat_stake_net_units": -38.39,
-          "flat_stake_roi": -0.123
+          "n": 313,
+          "mean_expected_return": 0.084,
+          "mean_margin_adjusted_edge": 0.1781,
+          "flat_stake_net_units": -39.12,
+          "flat_stake_roi": -0.125
         },
         "warning": "Retrospective audit on the already-selected Qualified Best subset; not an unbiased all-candidate backtest and not proof of fresh pre-event quotes."
       }
@@ -11256,11 +11321,11 @@
           },
           "poisson_prior": {
             "n": 2,
-            "brier": 0.1312,
-            "log_loss": 0.4496,
-            "ece": 0.3621,
+            "brier": 0.1311,
+            "log_loss": 0.4495,
+            "ece": 0.362,
             "hit_rate": 1.0,
-            "mean_probability": 0.6379,
+            "mean_probability": 0.638,
             "observed_hit_rate": 1.0
           },
           "efootball_shape": {
@@ -11319,7 +11384,7 @@
           "poisson_prior": {
             "n": 57,
             "brier": 0.2627,
-            "log_loss": 0.7228,
+            "log_loss": 0.7229,
             "ece": 0.1407,
             "hit_rate": 0.5614,
             "mean_probability": 0.7021,
@@ -11461,7 +11526,7 @@
           "participant_model": {
             "n": 85,
             "brier": 0.2666,
-            "log_loss": 0.7287,
+            "log_loss": 0.7288,
             "ece": 0.1466,
             "hit_rate": 0.5176,
             "mean_probability": 0.6642,
@@ -11568,9 +11633,9 @@
             "n": 162,
             "brier": 0.2279,
             "log_loss": 0.6478,
-            "ece": 0.0672,
+            "ece": 0.0671,
             "hit_rate": 0.6296,
-            "mean_probability": 0.6183,
+            "mean_probability": 0.6184,
             "observed_hit_rate": 0.6296
           },
           "efootball_shape": {
@@ -11586,9 +11651,9 @@
             "n": 162,
             "brier": 0.2291,
             "log_loss": 0.6503,
-            "ece": 0.0382,
+            "ece": 0.0383,
             "hit_rate": 0.6296,
-            "mean_probability": 0.6123,
+            "mean_probability": 0.6124,
             "observed_hit_rate": 0.6296
           }
         }
@@ -11629,10 +11694,10 @@
           "poisson_prior": {
             "n": 173,
             "brier": 0.229,
-            "log_loss": 0.6508,
-            "ece": 0.0945,
+            "log_loss": 0.6507,
+            "ece": 0.0944,
             "hit_rate": 0.6705,
-            "mean_probability": 0.576,
+            "mean_probability": 0.5762,
             "observed_hit_rate": 0.6705
           },
           "efootball_shape": {
@@ -11690,8 +11755,8 @@
           },
           "poisson_prior": {
             "n": 1,
-            "brier": 0.1983,
-            "log_loss": 0.5893,
+            "brier": 0.1982,
+            "log_loss": 0.5892,
             "ece": 0.4453,
             "hit_rate": 1.0,
             "mean_probability": 0.5547,
@@ -11815,10 +11880,10 @@
           "poisson_prior": {
             "n": 26,
             "brier": 0.2618,
-            "log_loss": 0.7185,
-            "ece": 0.1279,
+            "log_loss": 0.7186,
+            "ece": 0.128,
             "hit_rate": 0.5385,
-            "mean_probability": 0.6663,
+            "mean_probability": 0.6664,
             "observed_hit_rate": 0.5385
           },
           "efootball_shape": {
@@ -11833,8 +11898,8 @@
           "participant_model": {
             "n": 26,
             "brier": 0.2711,
-            "log_loss": 0.74,
-            "ece": 0.1644,
+            "log_loss": 0.7399,
+            "ece": 0.1645,
             "hit_rate": 0.5385,
             "mean_probability": 0.7029,
             "observed_hit_rate": 0.5385
@@ -11878,9 +11943,9 @@
             "n": 7,
             "brier": 0.2521,
             "log_loss": 0.6982,
-            "ece": 0.1032,
+            "ece": 0.1033,
             "hit_rate": 0.5714,
-            "mean_probability": 0.6747,
+            "mean_probability": 0.6748,
             "observed_hit_rate": 0.5714
           },
           "efootball_shape": {
@@ -11939,10 +12004,10 @@
           "poisson_prior": {
             "n": 2,
             "brier": 0.2533,
-            "log_loss": 0.6973,
-            "ece": 0.1669,
+            "log_loss": 0.6972,
+            "ece": 0.1668,
             "hit_rate": 0.5,
-            "mean_probability": 0.6669,
+            "mean_probability": 0.6668,
             "observed_hit_rate": 0.5
           },
           "efootball_shape": {
@@ -12000,11 +12065,11 @@
           },
           "poisson_prior": {
             "n": 1,
-            "brier": 0.3232,
-            "log_loss": 0.8406,
-            "ece": 0.5685,
+            "brier": 0.3231,
+            "log_loss": 0.8403,
+            "ece": 0.5684,
             "hit_rate": 0.0,
-            "mean_probability": 0.5685,
+            "mean_probability": 0.5684,
             "observed_hit_rate": 0.0
           },
           "efootball_shape": {
@@ -12063,10 +12128,10 @@
           "poisson_prior": {
             "n": 174,
             "brier": 0.251,
-            "log_loss": 0.6952,
+            "log_loss": 0.6951,
             "ece": 0.059,
             "hit_rate": 0.5172,
-            "mean_probability": 0.5763,
+            "mean_probability": 0.5762,
             "observed_hit_rate": 0.5172
           },
           "efootball_shape": {
@@ -12082,7 +12147,7 @@
             "n": 174,
             "brier": 0.2538,
             "log_loss": 0.7008,
-            "ece": 0.0686,
+            "ece": 0.0687,
             "hit_rate": 0.5172,
             "mean_probability": 0.5859,
             "observed_hit_rate": 0.5172
@@ -12143,10 +12208,10 @@
           "participant_model": {
             "n": 91,
             "brier": 0.2358,
-            "log_loss": 0.664,
-            "ece": 0.0559,
+            "log_loss": 0.6639,
+            "ece": 0.0558,
             "hit_rate": 0.6154,
-            "mean_probability": 0.6454,
+            "mean_probability": 0.6455,
             "observed_hit_rate": 0.6154
           }
         }
@@ -12205,10 +12270,10 @@
           "participant_model": {
             "n": 66,
             "brier": 0.2476,
-            "log_loss": 0.6895,
-            "ece": 0.0665,
+            "log_loss": 0.6894,
+            "ece": 0.0666,
             "hit_rate": 0.5909,
-            "mean_probability": 0.6574,
+            "mean_probability": 0.6575,
             "observed_hit_rate": 0.5909
           }
         }
@@ -12249,10 +12314,10 @@
           "poisson_prior": {
             "n": 43,
             "brier": 0.2519,
-            "log_loss": 0.699,
-            "ece": 0.0837,
+            "log_loss": 0.6991,
+            "ece": 0.0838,
             "hit_rate": 0.5814,
-            "mean_probability": 0.6651,
+            "mean_probability": 0.6652,
             "observed_hit_rate": 0.5814
           },
           "efootball_shape": {
@@ -12267,10 +12332,10 @@
           "participant_model": {
             "n": 43,
             "brier": 0.2582,
-            "log_loss": 0.7135,
-            "ece": 0.1203,
+            "log_loss": 0.7133,
+            "ece": 0.1205,
             "hit_rate": 0.5814,
-            "mean_probability": 0.7017,
+            "mean_probability": 0.7019,
             "observed_hit_rate": 0.5814
           }
         }
@@ -12360,12 +12425,12 @@
           "event_clusters": 703,
           "brier_difference_reference_minus_candidate": 0.0128,
           "brier_difference_95_cluster_bootstrap_ci": [
-            0.0065,
+            0.0066,
             0.0192
           ],
           "log_loss_difference_reference_minus_candidate": 0.0444,
           "log_loss_difference_95_cluster_bootstrap_ci": [
-            0.0245,
+            0.0246,
             0.0671
           ],
           "status": "CANDIDATE_BETTER_ON_BOTH_WITH_CLUSTER_BOOTSTRAP_SUPPORT"
