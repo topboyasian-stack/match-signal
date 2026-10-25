@@ -1,52 +1,52 @@
 {
-  "generated_at": "2026-10-25T09:51:11.134715+00:00",
-  "status": "FAIL",
-  "critical_issues": 1,
-  "warning_issues": 2,
+  "generated_at": "2026-10-25T10:02:51.470216+00:00",
+  "status": "HEALTHY",
+  "critical_issues": 0,
+  "warning_issues": 0,
   "info_issues": 1,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
       "status": "PASS",
-      "age_hours": 0.08,
+      "age_hours": 0.27,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.11,
+      "age_hours": 0.3,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 0.08,
+      "age_hours": 0.28,
       "threshold_hours": 4
     },
     {
       "engine": "unified_upcoming",
-      "status": "STALE",
-      "age_hours": 3.54,
+      "status": "PASS",
+      "age_hours": 0.05,
       "threshold_hours": 2
     },
     {
       "engine": "prediction_desk_health",
-      "status": "STALE",
-      "age_hours": 3.54,
+      "status": "PASS",
+      "age_hours": 0.05,
       "threshold_hours": 2
     },
     {
       "engine": "tennis_forward_discovery",
       "status": "PASS",
-      "age_hours": 4.71,
+      "age_hours": 4.9,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
-      "status": "INFO",
-      "age_hours": 3.09,
+      "status": "PASS",
+      "age_hours": 3.29,
       "threshold_hours": 0.5,
-      "heartbeat_source": "virtual_lab_live.json"
+      "heartbeat_source": "unified_live_refresh"
     },
     {
       "engine": "retired_engines",
@@ -54,7 +54,7 @@
       "lanes": {
         "darts_x": {
           "status": "RETIRED",
-          "artifact_at": "2026-10-25T09:45:34.215578+00:00"
+          "artifact_at": "2026-10-25T09:57:41.701719+00:00"
         },
         "table_tennis_x": {
           "status": "RETIRED",
@@ -69,30 +69,15 @@
   ],
   "issues": [
     {
-      "code": "STALE_UNIFIED_UPCOMING",
-      "severity": "critical",
-      "detail": "generated_at age 3.54h exceeds 2h"
-    },
-    {
-      "code": "PREDICTION_DESK_HEALTH_STALE",
-      "severity": "warning",
-      "detail": "Prediction Desk health sidecar age 3.54h exceeds 2h"
-    },
-    {
       "code": "SELECTION_GATE_EMPTY",
       "severity": "info",
       "detail": "Current prediction feed exists but the selected-candidate layer returned zero qualified selections; no gate was weakened"
-    },
-    {
-      "code": "UNIFIED_BOARD_STALE",
-      "severity": "warning",
-      "detail": "unified board age 3.54h exceeds 2h"
     }
   ],
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
   "paper_only": true,
   "prediction_desk_filters": {
-    "past_kickoff_rows_hidden": 4,
+    "past_kickoff_rows_hidden": 1,
     "stale_live_flags_hidden": 0,
     "expired_settled_rows_hidden": 0,
     "virtual_market_rows_held_for_kickoff_window": 0
