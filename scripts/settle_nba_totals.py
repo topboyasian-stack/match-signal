@@ -3,6 +3,7 @@
 import json
 import os
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from pathlib import Path
 import requests
 
@@ -88,7 +89,7 @@ def main():
     for p in predictions:
         dt = parse_time(p.get("start_time"))
         if dt:
-            dates.add(dt.astimezone(timezone.utc).strftime("%Y%m%d"))
+            dates.add(dt.astimezone(ZoneInfo("America/New_York")).strftime("%Y%m%d"))
     added = 0
     for day in sorted(dates):
         try:
