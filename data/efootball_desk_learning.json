@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-26T15:38:38.448610+00:00",
+  "generated_at": "2026-10-26T17:28:07.533418+00:00",
   "mode": "PAPER_ONLY",
   "active": true,
   "policy": {
@@ -13,7 +13,7 @@
   },
   "settled_predictions": 2091,
   "total_settled_predictions": 3221,
-  "pending_forecasts": 1210,
+  "pending_forecasts": 775,
   "recent_window": {
     "n": 50,
     "accuracy": 0.62,
@@ -634,7 +634,7 @@
     "efootball_gt": {
       "active": true,
       "settled_predictions": 2091,
-      "pending_forecasts": 1210,
+      "pending_forecasts": 775,
       "recent_window": {
         "n": 50,
         "accuracy": 0.62,
@@ -1252,20 +1252,20 @@
       },
       "prospective_poisson_shadow_capture": {
         "mode": "PAPER_SHADOW_ONLY",
-        "captured_forecast_revisions": 7923,
-        "unique_events_captured": 2576,
-        "rows_with_valid_poisson_shadow": 651,
-        "unique_events_with_valid_poisson_shadow": 198,
-        "pending_rows_with_valid_poisson_shadow": 177,
+        "captured_forecast_revisions": 7697,
+        "unique_events_captured": 2539,
+        "rows_with_valid_poisson_shadow": 729,
+        "unique_events_with_valid_poisson_shadow": 224,
+        "pending_rows_with_valid_poisson_shadow": 132,
         "settled_scored_rows_with_valid_poisson_shadow": 24,
         "rejection_reason_counts": {
-          "shadow_reason_not_recorded": 3686,
+          "shadow_reason_not_recorded": 3302,
           "missing_side_components": 403,
-          "historical_product_fallback_rejected": 3183,
-          "eligible_leave_one_line_out_fit": 651
+          "historical_product_fallback_rejected": 3263,
+          "eligible_leave_one_line_out_fit": 729
         },
         "valid_shadow_source_counts": {
-          "current_market_ladder_leave_one_line_out": 651
+          "current_market_ladder_leave_one_line_out": 729
         },
         "qualification_or_prediction_changes_applied": false,
         "production_qualification_enabled": false
@@ -1671,7 +1671,7 @@
     "vfootball": {
       "active": true,
       "settled_predictions": 1130,
-      "pending_forecasts": 6756,
+      "pending_forecasts": 6322,
       "recent_window": {
         "n": 50,
         "accuracy": 0.86,
@@ -2083,49 +2083,49 @@
   "settled_observations_artifact": "data/efootball_desk_settled_observations.json",
   "source_settlement": "data/virtual_lab_history.json",
   "reconciliation_diagnostics": {
-    "trace_rows": 50112,
+    "trace_rows": 51408,
     "history_index_fixtures": 7539,
-    "forecast_line_groups": 35540,
+    "forecast_line_groups": 36847,
     "matched_line_groups_exact": 3227,
     "matched_line_groups_near_time": 0,
-    "unmatched_line_groups": 32313,
+    "unmatched_line_groups": 33620,
     "ambiguous_line_groups": 0,
     "scored_forecasts": 3217,
     "unmatched_reason_counts": {
-      "TIME_MISMATCH": 17234,
-      "NO_IDENTITY_MATCH": 15079
+      "TIME_MISMATCH": 17927,
+      "NO_IDENTITY_MATCH": 15693
     },
     "trace_product_counts": {
-      "efootball_gt": 7954,
-      "vfootball": 42158
+      "efootball_gt": 8081,
+      "vfootball": 43327
     },
     "history_index_product_counts": {
       "efootball_gt": 5966,
       "vfootball": 1573
     },
-    "trace_rows_with_identity": 50112,
-    "trace_rows_with_time": 50112,
-    "trace_rows_with_identity_and_time": 50112,
+    "trace_rows_with_identity": 51408,
+    "trace_rows_with_time": 51408,
+    "trace_rows_with_identity_and_time": 51408,
     "history_identity_groups": 1119,
     "match_counts_by_product": {
       "efootball_gt": {
-        "forecast_line_groups": 5337,
+        "forecast_line_groups": 5475,
         "matched_exact": 2097,
         "matched_near_time": 0,
-        "unmatched": 3240,
+        "unmatched": 3378,
         "unmatched_reason_counts": {
-          "TIME_MISMATCH": 1844,
-          "NO_IDENTITY_MATCH": 1396
+          "TIME_MISMATCH": 1895,
+          "NO_IDENTITY_MATCH": 1483
         }
       },
       "vfootball": {
-        "forecast_line_groups": 30203,
+        "forecast_line_groups": 31372,
         "matched_exact": 1130,
         "matched_near_time": 0,
-        "unmatched": 29073,
+        "unmatched": 30242,
         "unmatched_reason_counts": {
-          "NO_IDENTITY_MATCH": 13683,
-          "TIME_MISMATCH": 15390
+          "TIME_MISMATCH": 16032,
+          "NO_IDENTITY_MATCH": 14210
         }
       }
     },
@@ -2226,81 +2226,93 @@
       ],
       "vfootball": [
         {
-          "reason": "NO_IDENTITY_MATCH",
+          "reason": "TIME_MISMATCH",
           "trace_product": "vfootball",
-          "trace_event_id": "sr:match:200026102422542",
+          "trace_event_id": "sr:match:200026102423536",
           "trace_event_id_present": true,
-          "trace_start_time": "2026-10-24T05:12:00+00:00",
+          "trace_start_time": "2026-10-24T05:20:00+00:00",
           "trace_participants_normalized": [
-            "cel",
-            "vil"
+            "ata",
+            "juv"
           ],
-          "same_participants_any_product_count": 0,
-          "closest_history_product": null,
-          "closest_history_event_id_present": false,
-          "closest_history_time": null,
-          "closest_history_time_delta_seconds": null,
-          "closest_history_participants_normalized": null,
+          "same_participants_any_product_count": 4,
+          "closest_history_product": "vfootball",
+          "closest_history_event_id_present": true,
+          "closest_history_time": "2026-10-04T05:20:00+00:00",
+          "closest_history_time_delta_seconds": -1728000.0,
+          "closest_history_participants_normalized": [
+            "ata",
+            "juv"
+          ],
           "same_product_event_id_history_count": 0,
           "closest_history_time_delta_seconds_by_event_id": null,
           "event_id_candidate_participants_match": false
         },
         {
-          "reason": "NO_IDENTITY_MATCH",
+          "reason": "TIME_MISMATCH",
           "trace_product": "vfootball",
-          "trace_event_id": "sr:match:200026102422542",
+          "trace_event_id": "sr:match:200026102423536",
           "trace_event_id_present": true,
-          "trace_start_time": "2026-10-24T05:12:00+00:00",
+          "trace_start_time": "2026-10-24T05:20:00+00:00",
           "trace_participants_normalized": [
-            "cel",
-            "vil"
+            "ata",
+            "juv"
           ],
-          "same_participants_any_product_count": 0,
-          "closest_history_product": null,
-          "closest_history_event_id_present": false,
-          "closest_history_time": null,
-          "closest_history_time_delta_seconds": null,
-          "closest_history_participants_normalized": null,
+          "same_participants_any_product_count": 4,
+          "closest_history_product": "vfootball",
+          "closest_history_event_id_present": true,
+          "closest_history_time": "2026-10-04T05:20:00+00:00",
+          "closest_history_time_delta_seconds": -1728000.0,
+          "closest_history_participants_normalized": [
+            "ata",
+            "juv"
+          ],
           "same_product_event_id_history_count": 0,
           "closest_history_time_delta_seconds_by_event_id": null,
           "event_id_candidate_participants_match": false
         },
         {
-          "reason": "NO_IDENTITY_MATCH",
+          "reason": "TIME_MISMATCH",
           "trace_product": "vfootball",
-          "trace_event_id": "sr:match:200026102422542",
+          "trace_event_id": "sr:match:200026102423536",
           "trace_event_id_present": true,
-          "trace_start_time": "2026-10-24T05:12:00+00:00",
+          "trace_start_time": "2026-10-24T05:20:00+00:00",
           "trace_participants_normalized": [
-            "cel",
-            "vil"
+            "ata",
+            "juv"
           ],
-          "same_participants_any_product_count": 0,
-          "closest_history_product": null,
-          "closest_history_event_id_present": false,
-          "closest_history_time": null,
-          "closest_history_time_delta_seconds": null,
-          "closest_history_participants_normalized": null,
+          "same_participants_any_product_count": 4,
+          "closest_history_product": "vfootball",
+          "closest_history_event_id_present": true,
+          "closest_history_time": "2026-10-04T05:20:00+00:00",
+          "closest_history_time_delta_seconds": -1728000.0,
+          "closest_history_participants_normalized": [
+            "ata",
+            "juv"
+          ],
           "same_product_event_id_history_count": 0,
           "closest_history_time_delta_seconds_by_event_id": null,
           "event_id_candidate_participants_match": false
         },
         {
-          "reason": "NO_IDENTITY_MATCH",
+          "reason": "TIME_MISMATCH",
           "trace_product": "vfootball",
-          "trace_event_id": "sr:match:200026102422542",
+          "trace_event_id": "sr:match:200026102423536",
           "trace_event_id_present": true,
-          "trace_start_time": "2026-10-24T05:12:00+00:00",
+          "trace_start_time": "2026-10-24T05:20:00+00:00",
           "trace_participants_normalized": [
-            "cel",
-            "vil"
+            "ata",
+            "juv"
           ],
-          "same_participants_any_product_count": 0,
-          "closest_history_product": null,
-          "closest_history_event_id_present": false,
-          "closest_history_time": null,
-          "closest_history_time_delta_seconds": null,
-          "closest_history_participants_normalized": null,
+          "same_participants_any_product_count": 4,
+          "closest_history_product": "vfootball",
+          "closest_history_event_id_present": true,
+          "closest_history_time": "2026-10-04T05:20:00+00:00",
+          "closest_history_time_delta_seconds": -1728000.0,
+          "closest_history_participants_normalized": [
+            "ata",
+            "juv"
+          ],
           "same_product_event_id_history_count": 0,
           "closest_history_time_delta_seconds_by_event_id": null,
           "event_id_candidate_participants_match": false
@@ -2493,8 +2505,8 @@
         "event_id_candidate_participants_match": false
       }
     ],
-    "expired_unmatched_forecasts": 38279,
-    "captured_new_forecasts": 112,
+    "expired_unmatched_forecasts": 40450,
+    "captured_new_forecasts": 1408,
     "settled_ledger_rows": 3231,
     "settled_ledger_added_this_run": 0
   }
