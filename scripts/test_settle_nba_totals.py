@@ -24,9 +24,9 @@ class SettlementTests(unittest.TestCase):
         self.assertEqual(result_for(p, event())["result"], "push")
     def test_under_loss_is_recorded(self):
         p = prediction()
-        p["markets"]["total_ou"].update({"line":225.5,"pick":"under"})
-        self.assertEqual(result_for(p, event())["result"], "under")
-        self.assertNotEqual(result_for(p, event())["pick"], "under")
+        p["markets"]["total_ou"].update({"line":220.5,"pick":"under"})
+        self.assertEqual(result_for(p, event())["result"], "over")
+        self.assertNotEqual(result_for(p, event())["pick"], result_for(p, event())["result"])
     def test_wrong_fixture_id_rejected(self):
         self.assertIsNone(result_for(prediction(), event(id="wrong")))
     def test_missing_market_rejected(self):
