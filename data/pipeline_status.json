@@ -1,31 +1,62 @@
 {
-  "updated_at": "2026-10-25T22:32:41.582274+00:00",
-  "prediction_count": 76,
+  "updated_at": "2026-10-26T03:07:32.014414+00:00",
+  "prediction_count": 104,
   "football_count": 76,
-  "tennis_count": 0,
-  "errors": [
-    "tennis:ATP:no actionable singles matches in next 7 days"
-  ],
+  "tennis_count": 28,
+  "errors": [],
   "quality_control": {
-    "rejected_total": 0,
-    "rejected_by_reason": {},
-    "rejected_by_tour": {},
+    "rejected_total": 141,
+    "rejected_by_reason": {
+      "missing real player name": 93,
+      "non-singles draw": 48
+    },
+    "rejected_by_tour": {
+      "ATP": {
+        "missing real player name": 93,
+        "non-singles draw": 48
+      }
+    },
     "deduplicated_matches": 0,
     "deduplicated_examples": [],
-    "filtered_low_confidence": 0,
-    "filtered_low_confidence_examples": [],
+    "filtered_low_confidence": 4,
+    "filtered_low_confidence_examples": [
+      {
+        "match": "Jurij Rodionov vs Nikoloz Basilashvili",
+        "tour": "ATP",
+        "confidence": 0.5188,
+        "signal_components": 4
+      },
+      {
+        "match": "Mika Brunold vs Nuno Borges",
+        "tour": "ATP",
+        "confidence": 0.5437,
+        "signal_components": 2
+      },
+      {
+        "match": "Alex Michelsen vs Botic Van De Zandschulp",
+        "tour": "ATP",
+        "confidence": 0.5087,
+        "signal_components": 4
+      },
+      {
+        "match": "Yannick Hanfmann vs Jan-Lennard Struff",
+        "tour": "ATP",
+        "confidence": 0.5096,
+        "signal_components": 4
+      }
+    ],
     "fallback_by_league": {}
   },
   "market_data": {
     "provider": "SportyBet NG",
-    "fetched_at": "2026-10-25T22:32:17.791935+00:00",
-    "football_events": 1095,
-    "tennis_events": 312,
-    "matched": 51,
+    "fetched_at": "2026-10-26T03:07:04.253515+00:00",
+    "football_events": 1109,
+    "tennis_events": 329,
+    "matched": 79,
     "unmatched": 25,
     "match_errors": [],
     "fetch_errors": [],
-    "coverage": 0.6711
+    "coverage": 0.7596
   },
   "data_source": "ESPN public scoreboards + ESPN ATP/WTA rankings + recent 60-day results + SportyBet NG live market layer",
   "free_server_cost": true,
