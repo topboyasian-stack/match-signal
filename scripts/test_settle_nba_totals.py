@@ -1,5 +1,5 @@
 import unittest
-from scripts.settle_nba_totals import result_for
+from settle_nba_totals import result_for
 
 def prediction(**overrides):
     p = {"event_id":"abc","start_time":"2026-10-25T20:00:00+00:00",
