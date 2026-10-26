@@ -8,11 +8,11 @@ const [html, css, ui, api, workflow, booking] = await Promise.all([
 ]);
 assert.ok(html.includes("MS-BASKETBALL-DESK-2026.10.24-V11"), "Basketball must publish the new design marker");
 assert.ok(html.includes("core-workspaces-design.css?v=20261014-full-v1"), "Basketball must use the shared Match Signal design layer");
-assert.ok(html.includes("basketball-live.js?v=20261024-alternative-totals-v1"), "Basketball must cache-bust the visible booking error/retry logic");
+assert.ok(html.includes("basketball-live.js?v=20261026-ledger-v1"), "Basketball must cache-bust the visible booking error/retry logic");
 assert.ok(html.includes("basketball-design.css?v=20261024-builder-dark-v3"), "Basketball must load its latest contrast-corrected scoped design layer");
 assert.ok(workflow.includes("MS-BASKETBALL-DESK-2026.10.24-V11") && workflow.includes("basketball-design.css?v=20261024-builder-dark-v3"), "Pages production smoke markers must match the current Basketball page and CSS versions");
 assert.ok(html.includes('id="msNav"') && html.includes('workspace-ui.js?v=20261023-basketball-nav1'), "Basketball must use the single shared site navigation");
-for (const id of ["liveGames","upcomingGames","totalsBoard","finalResults","performance","marketStatus","totalsStatus"]) assert.ok(html.includes('id="'+id+'"'), "Basketball must preserve renderer mount "+id);
+for (const id of ["liveGames","upcomingGames","totalsBoard","finalResults","nbaTotalsLedger","performance","marketStatus","totalsStatus"]) assert.ok(html.includes('id="'+id+'"'), "Basketball must preserve renderer mount "+id);
 assert.ok(css.includes("MATCH-SIGNAL-BASKETBALL-DESK-V1"), "Basketball scoped design marker missing");
 assert.ok(css.includes("MATCH-SIGNAL-BASKETBALL-DARK-V3") && html.includes("basketball-design.css?v=20261024-builder-dark-v3"), "Basketball must deploy the cache-busted contrast/readability safety net");
 assert.ok(css.includes("MATCH-SIGNAL-BASKETBALL-BUILDER-DARK-V1") && css.includes(".nba-builder-card") && css.includes("background:linear-gradient(145deg,#132231,#0e1822)"), "All four basketball builders must use the dark terminal theme");
@@ -34,6 +34,8 @@ assert.ok(workflow.includes("node scripts/test_basketball_desk_contract.mjs"), "
 
 assert.ok(html.includes("How to read this — one clear decision") && html.includes("Model at least 3 points above line"), "Totals page must explain how to choose Over, Under or no clear lean");
 assert.ok(html.includes('id="basketball-builders"') && html.includes('id="basketballBuilderWorkspace"'), "Basketball page must expose its four-builder workspace");
+assert.ok(ui.includes("function totalsLedgerHtml()") && ui.includes("data/nba_totals_ledger.json") && ui.includes("totalSummary.accuracy"), "NBA totals must read persistent settlement records and calculate accuracy only from decided settlements");
+assert.ok(html.includes("PERSISTENT SETTLEMENT LEDGER"), "Basketball desk must expose retained totals settlements");
 assert.ok(ui.includes("function renderBuilders()") && ui.includes("BASKETBALL_BUILDERS=[[],[],[],[]]") && ui.includes("data-builder-generate"), "Four independent builder cards must be rendered");
 assert.ok(ui.includes("BUILDER_ERRORS") && ui.includes("Code not generated") && ui.includes("data-builder-retry"), "Booking failures must remain visible in the relevant builder with a retry action");
 assert.ok(ui.includes("Booking API returned non-JSON (HTTP ") && ui.includes("await response.text()"), "Browser must surface diagnostics if the booking API itself returns non-JSON");
