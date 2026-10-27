@@ -77,6 +77,19 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertNotIn("4-59/5 * * * *", crons)
         self.assertNotIn("*/5 * * * *", crons)
 
+    def test_builder_promotion_refresh_isolated_from_normal_board_queue(self):
+        # GitHub replaces older pending runs within one concurrency group. The Builder's
+        # pre/post refresh must therefore use a dedicated group and exact dispatch filtering.
+        self.assertIn(
+            "group: match-signal-unified-upcoming-${{ github.event_name == 'workflow_dispatch' && inputs.promotion_child && 'promotion' || 'normal' }}",
+            BOARD_WORKFLOW,
+        )
+        self.assertIn(
+            r'select(.event == \"workflow_dispatch\" and .head_branch == \"main\" and .created_at >= \"$dispatched_at\")',
+            PROMOTION_WORKFLOW,
+            "the promotion wait must never accept a cancelled scheduled/push board run as its dispatched child",
+        )
+
     def test_monitor_schedule_is_rearmed_and_deployment_trigger_is_preserved(self):
         # Keep deployment-triggered monitoring separate from the newly registered cron identity.
         self.assertEqual(workflow_schedule_crons(MONITOR_WORKFLOW), [])
