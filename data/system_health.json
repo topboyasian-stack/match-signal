@@ -1,50 +1,50 @@
 {
-  "generated_at": "2026-10-27T08:37:04.176642+00:00",
-  "status": "HEALTHY",
-  "critical_issues": 0,
-  "warning_issues": 0,
+  "generated_at": "2026-10-27T11:00:18.278414+00:00",
+  "status": "FAIL",
+  "critical_issues": 3,
+  "warning_issues": 2,
   "info_issues": 0,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
-      "status": "PASS",
-      "age_hours": 3.64,
+      "status": "STALE",
+      "age_hours": 6.02,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.08,
+      "age_hours": 2.38,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 0.83,
+      "age_hours": 3.22,
       "threshold_hours": 4
     },
     {
       "engine": "unified_upcoming",
-      "status": "PASS",
-      "age_hours": 0.01,
+      "status": "STALE",
+      "age_hours": 2.39,
       "threshold_hours": 2
     },
     {
       "engine": "prediction_desk_health",
-      "status": "PASS",
-      "age_hours": 0.05,
+      "status": "STALE",
+      "age_hours": 2.44,
       "threshold_hours": 2
     },
     {
       "engine": "tennis_forward_discovery",
       "status": "PASS",
-      "age_hours": 3.16,
+      "age_hours": 5.55,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 0.75,
+      "age_hours": 0.0,
       "threshold_hours": 0.5,
       "heartbeat_source": "unified_live_refresh"
     },
@@ -67,7 +67,33 @@
       }
     }
   ],
-  "issues": [],
+  "issues": [
+    {
+      "code": "STALE_CORE_PREDICTION_PIPELINE",
+      "severity": "critical",
+      "detail": "updated_at age 6.02h exceeds 4h"
+    },
+    {
+      "code": "STALE_UNIFIED_UPCOMING",
+      "severity": "critical",
+      "detail": "generated_at age 2.39h exceeds 2h"
+    },
+    {
+      "code": "PREDICTION_DESK_HEALTH_STALE",
+      "severity": "warning",
+      "detail": "Prediction Desk health sidecar age 2.44h exceeds 2h"
+    },
+    {
+      "code": "PIPELINE_STALE",
+      "severity": "critical",
+      "detail": "pipeline_status age 6.02h exceeds 4h"
+    },
+    {
+      "code": "UNIFIED_BOARD_STALE",
+      "severity": "warning",
+      "detail": "unified board age 2.39h exceeds 2h"
+    }
+  ],
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
   "paper_only": true,
   "prediction_desk_filters": {
