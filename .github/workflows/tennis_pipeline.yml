@@ -18,6 +18,7 @@ on:
       - 'scripts/test_enrich_sportybet_odds.py'
       - 'scripts/football_competition_match.py'
       - 'scripts/test_predict_today_market_matching.py'
+      - 'scripts/test_workflow_trigger_boundaries.py'
       - 'scripts/calibrate_tennis_analytics.py'
       - 'scripts/build_football_performance.py'
       - 'scripts/calibrate_models.py'
@@ -71,6 +72,8 @@ jobs:
           git reset --hard origin/main
       - name: Test exact-line tennis SportyBet alignment
         run: python scripts/test_enrich_sportybet_odds.py
+      - name: Test workflow trigger boundaries and optional source failure isolation
+        run: python scripts/test_workflow_trigger_boundaries.py
       - name: Run football competition-safe market matching tests
         run: python scripts/test_predict_today_market_matching.py
       # Optional NBA history enrichment is currently unavailable upstream (HTTP 404).
