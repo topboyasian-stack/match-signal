@@ -24,7 +24,7 @@ assert.ok(ui.includes("length>8") && ui.includes("length>=8") && ui.includes("no
 assert.ok(ui.includes("Math.abs(a-b)<=45*60*1000"), "SportyBet quotes must match exact teams and near-identical kickoff times");
 assert.ok(ui.includes("Date.now()-fetched<=15*60*1000") && ui.includes("fresh:Number.isFinite(fetched)"), "Stale SportyBet quotes must be withheld while fresh quotes remain eligible");
 assert.ok(ui.includes("Historical line is context only; no current lean or odds value is inferred.") && ui.includes("Current exact SportyBet event · full-game total market 225"), "Totals must withhold stale prices and clearly label only exact current SportyBet quotes");
-assert.ok(ui.includes("edge=fresh&&Number.isFinite(expected)&&line!=null?expected-line:null") && ui.includes("historical line not used for lean"), "Historical lines must never produce a current model lean or edge");
+assert.ok(ui.includes("edge=fresh&&modelFresh&&Number.isFinite(expected)&&line!=null?expected-line:null") && ui.includes("historical line not used for lean"), "Historical lines must never produce a current model lean or edge");
 assert.ok(ui.includes("modelFresh=Number.isFinite(modelGenerated)&&now-modelGenerated<=24*60*60*1000") && ui.includes("edge=fresh&&modelFresh&&Number.isFinite(expected)&&line!=null?expected-line:null") && ui.includes("stale projection · refresh required"), "Stale NBA projections must not produce current leans even when the bookmaker quote is fresh");
 assert.ok(api.includes("sportId:'sr:sport:2'"), "SportyBet basketball feed must request the basketball sport ID");
 assert.ok(api.includes("https://www.sportybet.com"), "SportyBet feed must fall back to the direct Nigeria endpoint if the proxy rejects basketball");
