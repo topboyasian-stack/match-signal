@@ -294,13 +294,10 @@ jobs:
           # Frequent deployment-triggered checks must not hide a missing cron. When
           # the cron is stale/missing, dispatch a fallback check even if a recent
           # deployment-triggered run passed. A 10-minute dispatch cooldown bounds retries.
-          cloudflare_success_event = (
-              watchdog_event_name == 'workflow_run'
-              and source_workflow_name == 'Deploy Match Signal to Cloudflare Pages'
-              and source_workflow_conclusion == 'success'
+          monitor_fallback_allowed = (
+              watchdog_event_name in {'schedule', 'workflow_dispatch', 'push'}
+              or (watchdog_event_name == 'workflow_run' and source_workflow_conclusion == 'success')
           )
-          heartbeat_signal_event = (watchdog_event_name == 'workflow_run' and source_workflow_name in {'Match Signal Odds Ticket Tracker', 'Match Signal Virtual Lab Live Sync'} and source_workflow_conclusion == 'success')
-          monitor_fallback_allowed = watchdog_event_name in {'schedule', 'workflow_dispatch', 'push'} or cloudflare_success_event or heartbeat_signal_event
           monitor_schedule_fallback_needed = monitor_schedule_status in {'STALE', 'MISSING_SCHEDULED_RUN'}
           monitor_check_fallback_needed = monitor_last_age_minutes is None or monitor_last_age_minutes > 15
           if monitor_runs is not None and monitor_fallback_allowed and (monitor_schedule_fallback_needed or monitor_check_fallback_needed):

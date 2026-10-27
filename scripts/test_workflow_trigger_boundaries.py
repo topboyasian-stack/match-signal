@@ -36,6 +36,7 @@ def main():
     builder = (WORKFLOWS / "odds_builder.yml").read_text(encoding="utf-8")
     board = (WORKFLOWS / "unified-upcoming.yml").read_text(encoding="utf-8")
     watch = (WORKFLOWS / "qualified-best-health-watch-v2.yml").read_text(encoding="utf-8")
+    watchdog = (WORKFLOWS / "automation_watchdog.yml").read_text(encoding="utf-8")
     tracker = (WORKFLOWS / "odds-ticket-tracker.yml").read_text(encoding="utf-8")
     collector = (WORKFLOWS / "virtual-lab-collector.yml").read_text(encoding="utf-8")
     core_pipeline = (WORKFLOWS / "tennis_pipeline.yml").read_text(encoding="utf-8")
@@ -97,6 +98,9 @@ def main():
     # and its own five-minute safety schedule remains enabled.
     assert "- cron: '*/5 * * * *'" in tracker
     assert "- cron: '8,18,28,38,48,58 * * * *'" in watch
+    assert "or (watchdog_event_name == 'workflow_run' and source_workflow_conclusion == 'success')" in watchdog, (
+        "A successful workflow-run heartbeat must trigger the Qualified Best monitor fallback when cron delivery is stale."
+    )
     assert '"Match Signal Odds Builder"' in tracker
     assert '"Match Signal Result Settlement"' in tracker
     assert '"Match Signal Virtual Lab Collector"' in tracker
