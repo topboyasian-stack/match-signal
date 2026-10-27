@@ -60,6 +60,17 @@ jobs:
       - name: Test exact SportyBet NBA totals and overtime settlement
         run: python scripts/test_nba_sportybet_totals.py
 
+      - name: Test conflict-safe expansion publication
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path('.github/workflows/live-expansion.yml').read_text(encoding='utf-8')
+          publish = source.split('name: Commit isolated expansion data', 1)[1]
+          assert 'if git rebase origin/main; then' in publish
+          assert 'Generated files conflict with newer main data; rebuild only on this path.' in publish
+          assert publish.index('if git rebase origin/main; then') < publish.index('python scripts/run_live_expansion.py')
+          print('Expansion publishing retries rebase first and only rebuild on file conflicts.')
+          PY
       - name: Generate live-experimental NBA + Eredivisie signals
         run: python scripts/run_live_expansion.py
 
@@ -104,25 +115,33 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           for attempt in $(seq 1 8); do
-            # Rebase the generated artifact set on the newest main. Match Signal
-            # has several independent data writers, so do not abandon a valid
-            # collection after only five short push-collision retries.
             git fetch origin main
-            git reset --hard origin/main
-            python scripts/run_live_expansion.py
-            python scripts/repair_ere_live.py
-            python scripts/qa_ere_live.py
-            git add data/ere_divisie_history.json data/nba_history.json data/ere_divisie_predictions.json data/nba_predictions.json data/expansion_status.json data/expansion_prediction_history.json data/expansion_live_performance.json data/ere_divisie_qa.json
-            if git diff --cached --quiet; then
-              echo "Expansion artifacts did not change on attempt $attempt."
-              exit 0
+            # Rebase first: an ordinary main-head advance should not rerun
+            # the network-heavy NBA history and SportyBet collection.
+            if git rebase origin/main; then
+              if git push origin main; then
+                exit 0
+              fi
+              echo "main advanced during rebased publish; retrying ($attempt/8)."
+            else
+              echo "Generated files conflict with newer main data; rebuild only on this path."
+              git rebase --abort || true
+              git reset --hard origin/main
+              python scripts/run_live_expansion.py
+              python scripts/repair_ere_live.py
+              python scripts/qa_ere_live.py
+              git add data/ere_divisie_history.json data/nba_history.json data/ere_divisie_predictions.json data/nba_predictions.json data/expansion_status.json data/expansion_prediction_history.json data/expansion_live_performance.json data/ere_divisie_qa.json
+              if git diff --cached --quiet; then
+                echo "Latest main already contains the current expansion artifacts."
+                exit 0
+              fi
+              git commit -m "🤖 Refresh isolated live experimental NBA and Eredivisie signals"
+              if git push origin main; then
+                exit 0
+              fi
+              echo "Rebuilt artifacts still collided with main ($attempt/8)."
             fi
-            git commit -m "🤖 Refresh isolated live experimental NBA and Eredivisie signals"
-            if git push origin main; then
-              exit 0
-            fi
-            echo "Concurrent main update rejected the push; retrying ($attempt/8)."
-            sleep $((attempt * 5 + RANDOM % 6))
+            sleep $((attempt * 3 + RANDOM % 4))
           done
           echo "Unable to publish isolated expansion data after eight retries."
           exit 1
