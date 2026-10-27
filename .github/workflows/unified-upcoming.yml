@@ -140,7 +140,7 @@ concurrency:
   # Keep promotion-child board refreshes out of the ordinary scheduled/push queue.
   # GitHub replaces older pending runs in a concurrency group; isolating this child
   # prevents a routine feed update from cancelling the Builder's required pre/post refresh.
-  group: match-signal-unified-upcoming
+  group: match-signal-unified-upcoming-${{ github.event_name == 'workflow_dispatch' && inputs.promotion_child && 'promotion' || 'normal' }}
   cancel-in-progress: false
 
 jobs:
@@ -175,8 +175,7 @@ jobs:
           from pathlib import Path
           source = Path('.github/workflows/unified-upcoming.yml').read_text(encoding='utf-8')
           concurrency = source.rsplit('\nconcurrency:\n', 1)[1].split('\njobs:\n', 1)[0]
-          assert 'group: match-signal-unified-upcoming' in concurrency
-          assert 'promotion' not in concurrency
+          assert "group: match-signal-unified-upcoming-${{ github.event_name == 'workflow_dispatch' && inputs.promotion_child && 'promotion' || 'normal' }}" in concurrency
           publish = source.rsplit('      - name: Publish unified board and health', 1)[1]
           assert 'Newer unified board already published; skipping stale candidate.' in publish
           assert publish.index('if git rebase origin/main; then') < publish.index('Newer unified board already published; skipping stale candidate.')

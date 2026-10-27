@@ -140,7 +140,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn("monitor_dispatch_age_minutes < 10", WATCHDOG_WORKFLOW, "a stale/missing schedule should auto-repair even when a recent deployment-triggered check exists, but fallback dispatches need a cooldown")
         self.assertIn("elif active('qualified-best-production-watch.yml') and not monitor_schedule_fallback_needed:", WATCHDOG_WORKFLOW, "an active deploy-triggered monitor must not suppress fallback when cron is stale or missing")
         self.assertIn("A deployment-triggered monitor is active; the fallback is queued behind it.", WATCHDOG_WORKFLOW, "record that the fallback is queued behind the active deployment check")
-        self.assertIn("or cloudflare_success_event or heartbeat_signal_event", WATCHDOG_WORKFLOW)
+        self.assertIn("or (watchdog_event_name == 'workflow_run' and source_workflow_conclusion == 'success')", WATCHDOG_WORKFLOW)
         self.assertIn("source_workflow_name in {'Match Signal Odds Ticket Tracker', 'Match Signal Virtual Lab Live Sync'}", WATCHDOG_WORKFLOW)
         self.assertIn('      - "Match Signal Virtual Lab Live Sync"', WATCHDOG_WORKFLOW)
         self.assertIn("and source_workflow_conclusion == 'success'", WATCHDOG_WORKFLOW, "the event-driven browser fallback must run only after Cloudflare deployment succeeds")
