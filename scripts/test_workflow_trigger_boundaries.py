@@ -96,7 +96,7 @@ def main():
     # Tracker is still refreshed from Builder / settlement / collector outputs,
     # and its own five-minute safety schedule remains enabled.
     assert "- cron: '*/5 * * * *'" in tracker
-    assert "- cron: '6,16,26,36,46,56 * * * *'" in watch
+    assert "- cron: '8,18,28,38,48,58 * * * *'" in watch
     assert '"Match Signal Odds Builder"' in tracker
     assert '"Match Signal Result Settlement"' in tracker
     assert '"Match Signal Virtual Lab Collector"' in tracker
