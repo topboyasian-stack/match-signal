@@ -10,8 +10,8 @@ RESEARCH = (ROOT / ".github/workflows/efootball-market-research-schedule.yml").r
 class EfootballResearchRecoveryTests(unittest.TestCase):
     def test_schedules_are_registered_on_staggered_offset_cadences(self):
         self.assertIn("cron: '8,18,28,38,48,58 * * * *'", WATCHDOG)
-        self.assertIn("cron: '7,17,27,37,47,57 * * * *'", (ROOT / ".github/workflows/qualified-best-health-watch-v2.yml").read_text(encoding="utf-8"))
-        self.assertIn("cron: '4,19,34,49 * * * *'", RESEARCH)
+        self.assertIn("cron: '5,15,25,35,45,55 * * * *'", (ROOT / ".github/workflows/qualified-best-health-watch-v2.yml").read_text(encoding="utf-8"))
+        self.assertIn("cron: '9,24,39,54 * * * *'", RESEARCH)
 
     def test_research_workflow_is_monitored_separately(self):
         self.assertIn("Isolated eFootball Winner and BTTS Market Research", WATCHDOG)
