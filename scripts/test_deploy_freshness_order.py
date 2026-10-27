@@ -90,6 +90,12 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "the promotion wait must never accept a cancelled scheduled/push board run as its dispatched child",
         )
 
+        self.assertGreaterEqual(
+            PROMOTION_WORKFLOW.count(r'.event == \\"workflow_dispatch\\" and .head_branch == \\"main\\"'),
+            5,
+            "every pre/post board, Builder and deployment wait must filter the exact dispatched child run",
+        )
+
     def test_monitor_schedule_is_rearmed_and_deployment_trigger_is_preserved(self):
         # Keep deployment-triggered monitoring separate from the newly registered cron identity.
         self.assertEqual(workflow_schedule_crons(MONITOR_WORKFLOW), [])
