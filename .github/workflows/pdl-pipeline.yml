@@ -48,12 +48,15 @@ jobs:
           from pathlib import Path
           p=Path('data/predictions.json')
           rows=json.loads(p.read_text()) if p.exists() else []
-          pdl=json.loads(Path('data/pdl_predictions.json').read_text())
+          status=json.loads(Path('data/pdl_status.json').read_text())
+          # Keep the last-good artifact for recovery/audit, but never surface it as
+          # current fixtures when the upstream providers are blocked or stale.
+          pdl=json.loads(Path('data/pdl_predictions.json').read_text()) if status.get('status') == 'CURRENT' else []
           rows=[r for r in rows if r.get('league')!='England Amateur - U21 Professional Development League']
           rows.extend(pdl)
           rows.sort(key=lambda r:(str(r.get('start_time') or ''),str(r.get('sport') or ''),str(r.get('player_1') or '')))
           p.write_text(json.dumps(rows,indent=2,ensure_ascii=False)+'\n')
-          print('PDL publication rows:',len(pdl),'main rows:',len(rows))
+          print('PDL status:',status.get('status'),'publication rows:',len(pdl),'main rows:',len(rows))
           PY
       - name: Synchronize SportyBet prices
         run: python scripts/enrich_sportybet_odds.py
@@ -63,11 +66,16 @@ jobs:
           import json
           from pathlib import Path
           rows=json.loads(Path('data/predictions.json').read_text())
+          status=json.loads(Path('data/pdl_status.json').read_text())
           pdl=[r for r in rows if r.get('league')=='England Amateur - U21 Professional Development League']
-          assert all(r.get('sport')=='football' for r in pdl)
-          assert all(r.get('paper_only') is True for r in pdl)
-          assert all(r.get('model_version')=='PDL-1.2-2026.09.22' for r in pdl)
-          print('PDL feed validated:',len(pdl))
+          if status.get('status') != 'CURRENT':
+              assert not pdl, 'stale PDL rows must not be published as current fixtures'
+              print('PDL safely withheld; source status:',status.get('status'))
+          else:
+              assert all(r.get('sport')=='football' for r in pdl)
+              assert all(r.get('paper_only') is True for r in pdl)
+              assert all(r.get('model_version')=='PDL-1.2-2026.09.22' for r in pdl)
+              print('Current PDL feed validated:',len(pdl))
           PY
       - name: Commit PDL feed
         shell: bash
