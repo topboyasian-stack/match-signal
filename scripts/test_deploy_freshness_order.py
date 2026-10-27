@@ -96,6 +96,12 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "every pre/post board, Builder and deployment wait must filter the exact dispatched child run",
         )
 
+        self.assertNotIn(
+            '"scripts/test_deploy_freshness_order.py"',
+            PROMOTION_WORKFLOW,
+            "test-only edits must not enqueue production promotions or replace pending runs",
+        )
+
     def test_monitor_schedule_is_rearmed_and_deployment_trigger_is_preserved(self):
         # Keep deployment-triggered monitoring separate from the newly registered cron identity.
         self.assertEqual(workflow_schedule_crons(MONITOR_WORKFLOW), [])
