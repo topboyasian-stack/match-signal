@@ -73,7 +73,11 @@ jobs:
         run: python scripts/test_enrich_sportybet_odds.py
       - name: Run football competition-safe market matching tests
         run: python scripts/test_predict_today_market_matching.py
+      # Optional NBA history enrichment is currently unavailable upstream (HTTP 404).
+      # Basketball remains a separate paper-only experimental lane; this must not block
+      # the canonical football/tennis refresh when that optional source is missing.
       - name: Normalize NBA 2026 team gamelog into competitive game-level history
+        continue-on-error: true
         run: |
           python - <<'PY'
           import io, json, requests
