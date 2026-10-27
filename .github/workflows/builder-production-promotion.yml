@@ -52,7 +52,7 @@ jobs:
           gh workflow run unified-upcoming.yml --ref main -f promotion_child=true
           board_run_id=""
           for attempt in $(seq 1 180); do
-            board_candidate="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/unified-upcoming.yml/runs?branch=main&event=workflow_dispatch&per_page=30" --jq ".workflow_runs[] | select(.created_at >= \"$dispatched_at\") | [.id, .head_sha] | @tsv" | head -n 1)"
+            board_candidate="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/unified-upcoming.yml/runs?branch=main&event=workflow_dispatch&per_page=30" --jq ".workflow_runs[] | select(.event == \"workflow_dispatch\" and .head_branch == \"main\" and .created_at >= \"$dispatched_at\") | [.id, .head_sha] | @tsv" | head -n 1)"
             if [ -n "$board_candidate" ]; then
               candidate_id="$(printf '%s\n' "$board_candidate" | cut -f1)"
               candidate_sha="$(printf '%s\n' "$board_candidate" | cut -f2)"
