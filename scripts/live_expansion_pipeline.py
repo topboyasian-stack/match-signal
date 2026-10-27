@@ -337,6 +337,19 @@ def ere_prediction(fixture, history):
     }
 
 
+def should_refresh_nba_prediction(old, start, now=None, max_age_hours=6):
+    """Refresh old projections only while the fixture is still pre-game."""
+    now = now or NOW
+    if not old:
+        return True
+    if not start or start <= now:
+        return False
+    stamp = dt(old.get("generated_at") or old.get("prediction_created_at"))
+    if not stamp or stamp >= start:
+        return True
+    return now - stamp >= timedelta(hours=max_age_hours)
+
+
 def main():
     nba_history, nba_errors = collect("NBA")
     ere_history, ere_errors = collect("Eredivisie")
@@ -351,8 +364,9 @@ def main():
     } for r in ere_history]
 
     ere_predictions = [p for f in ere_fixtures if (p := ere_prediction(f, ere_hist_for_model))]
-    # Keep the first generated pre-game snapshot for every fixture. Refreshing a
-    # row after tip-off must never rewrite history or create fake prediction accuracy.
+    # Refresh stale upcoming projections before tip-off so the current desk does
+    # not keep a multi-day-old forecast. Once a game starts, retain its last
+    # pre-game snapshot unchanged for honest settlement and accuracy tracking.
     try:
         old_nba = json.loads((DATA/"nba_predictions.json").read_text(encoding="utf-8"))
         if not isinstance(old_nba, list): old_nba = []
@@ -366,8 +380,7 @@ def main():
         eid = str(f["event_id"])
         start = dt(f.get("date"))
         old = old_by_id.get(eid)
-        old_stamp = dt(old.get("generated_at") or old.get("prediction_created_at")) if old else None
-        if old and old_stamp and start and old_stamp < start:
+        if old and not should_refresh_nba_prediction(old, start, NOW):
             row = dict(old)
         else:
             # If a fixture has already started and no pre-game snapshot exists,
