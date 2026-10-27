@@ -169,7 +169,16 @@ jobs:
       - name: Compile unified engines
         run: python -m py_compile scripts/unified_upcoming.py scripts/unified_upcoming_cleanup.py scripts/selection_candidate_collector.py scripts/test_selection_candidate_collector.py scripts/efootball_desk_learning.py scripts/test_upcoming_settlement_retention.py scripts/test_upcoming_desk_policy.py scripts/system_health_audit.py scripts/predict_today.py scripts/virtual_lab_model_eval.py scripts/test_virtual_lab_model_eval.py scripts/system_health_audit_lib.py scripts/test_system_health_audit_lib.py
       - name: Validate freshness deployment ordering
-        run: python scripts/test_deploy_freshness_order.py
+        run: |
+          python scripts/test_deploy_freshness_order.py
+          python - <<'PY'
+          from pathlib import Path
+          source = Path('.github/workflows/unified-upcoming.yml').read_text(encoding='utf-8')
+          publish = source.split('name: Publish unified board and health', 1)[1]
+          assert 'Newer unified board already published; skipping stale candidate.' in publish
+          assert publish.index('if git rebase origin/main; then') < publish.index('Newer unified board already published; skipping stale candidate.')
+          print('Publication skips a stale candidate when main already has a newer board.')
+          PY
       - name: Test settled expiry and eFootball reconciliation
         run: python scripts/test_upcoming_settlement_retention.py
       - name: Test virtual near-term qualification window
@@ -207,6 +216,13 @@ jobs:
             exit 0
           fi
           git commit -m "🤖 Refresh unified upcoming board"
+          candidate_board_stamp="$(python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('data/unified_upcoming.json').read_text(encoding='utf-8'))
+          print(d.get('generated_at') or d.get('updated_at') or '')
+          PY
+          )"
           for attempt in 1 2 3 4 5 6; do
             if git push origin main; then
               echo "Unified board published; the refreshed Builder will hand off to the ordered production-promotion workflow."
@@ -227,6 +243,27 @@ jobs:
             echo "Rebase conflict; rebuild the board from the latest main."
             git rebase --abort || true
             git reset --hard origin/main
+            current_board_stamp="$(python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('data/unified_upcoming.json')
+          d=json.loads(p.read_text(encoding='utf-8')) if p.exists() else {}
+          print(d.get('generated_at') or d.get('updated_at') or '')
+          PY
+            )"
+            if python - "$candidate_board_stamp" "$current_board_stamp" <<'PY'
+          from datetime import datetime
+          import sys
+          def parse(value):
+              try: return datetime.fromisoformat(value.replace('Z', '+00:00'))
+              except Exception: return None
+          candidate, current = map(parse, sys.argv[1:3])
+          sys.exit(0 if candidate and current and current >= candidate else 1)
+          PY
+            then
+              echo "Newer unified board already published; skipping stale candidate."
+              exit 0
+            fi
             python scripts/unified_upcoming.py
             python scripts/unified_upcoming_cleanup.py
             python scripts/selection_candidate_collector.py
