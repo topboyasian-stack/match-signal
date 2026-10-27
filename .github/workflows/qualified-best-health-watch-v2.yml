@@ -1,7 +1,7 @@
 name: Match Signal Qualified Best Scheduled Health Watch v2
 
 on:
-  # Keep this independent ten-minute monitor active; its push trigger bootstraps a run when GitHub cron delivery has no recorded baseline.
+  # Use a staggered ten-minute cadence; push events also bootstrap monitor verification after a schedule gap.
   schedule:
     - cron: '5,15,25,35,45,55 * * * *'
   workflow_dispatch:
