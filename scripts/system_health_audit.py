@@ -11,6 +11,8 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+from system_health_audit_lib import pdl_health_summary
+
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
 NOW = datetime.now(timezone.utc)
@@ -47,6 +49,7 @@ virtual_live = load("virtual_lab_live.json", {})
 autopilot = load("autopilot_status.json", {})
 darts = load("darts_status.json", {})
 table = load("table_tennis_status.json", {})
+pdl_status = load("pdl_status.json", {})
 unified = load("unified_upcoming.json", {})
 tennis_forward = load("tennis_forward_status.json", {})
 desk_health = load("prediction_desk_health.json", {})
@@ -70,6 +73,13 @@ try:
     accuracy_valid = bool(json.loads(raw)) if raw else False
 except Exception:
     accuracy_valid = False
+
+published_pdl_rows = sum(
+    1 for row in prediction_rows
+    if isinstance(row, dict)
+    and str(row.get("league") or "") == "England Amateur - U21 Professional Development League"
+)
+pdl_lane, pdl_issues = pdl_health_summary(pdl_status, published_pdl_rows)
 
 checks = []
 
@@ -165,8 +175,11 @@ retired = {
         "historical_events": int(nba_competition.get("historical_events") or 0),
         "current_fixtures": int(nba_competition.get("current_fixtures") or 0),
     },
+    # PDL stays paper-only and is explicitly visible even when external providers block refresh.
+    "pdl_experimental_prediction_feed": pdl_lane,
 }
 checks.append({"engine": "engine_lifecycle", "status": "INFO", "lanes": retired})
+checks.extend(pdl_issues)
 
 prediction_count = int(pipeline.get("prediction_count") or 0)
 football_count = int(pipeline.get("football_count") or 0)
