@@ -22,6 +22,7 @@ assert.ok(ui.includes("function bestSportyBetTotalMarket(markets)") && ui.includ
 assert.ok(ui.includes("function sportyBetTotalMarkets(markets)") && ui.includes("data-total-line-choice") && ui.includes("SELECTED_TOTAL_LINES"), "Basketball totals must expose live-feed alternative lines and use the selected line for the card and builder");
 assert.ok(ui.includes("length>8") && ui.includes("length>=8") && ui.includes("not verified by SportyBet"), "Basketball builders must enforce the eight-leg limit and withhold unverified combined odds");
 assert.ok(ui.includes("Math.abs(a-b)<=45*60*1000"), "SportyBet quotes must match exact teams and near-identical kickoff times");
+assert.ok(ui.includes("replace(/\\s+/g,' ')"), "NBA team-name normalization must collapse whitespace rather than match a literal backslash-s sequence");
 assert.ok(ui.includes("Date.now()-fetched<=15*60*1000") && ui.includes("fresh:Number.isFinite(fetched)"), "Stale SportyBet quotes must be withheld while fresh quotes remain eligible");
 assert.ok(ui.includes("Historical line is context only; no current lean or odds value is inferred.") && ui.includes("Current exact SportyBet event · full-game total market 225"), "Totals must withhold stale prices and clearly label only exact current SportyBet quotes");
 assert.ok(ui.includes("edge=fresh&&modelFresh&&Number.isFinite(expected)&&line!=null?expected-line:null") && ui.includes("historical line not used for lean"), "Historical lines must never produce a current model lean or edge");
