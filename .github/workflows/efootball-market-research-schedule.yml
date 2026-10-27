@@ -2,7 +2,7 @@ name: Isolated eFootball Winner and BTTS Market Research
 
 on:
   schedule:
-    # Shift this independent 15-minute research heartbeat too; watchdog fallback remains the recovery path if schedules stall.
+    # Keep this isolated 15-minute research heartbeat active; its workflow-file push trigger re-arms a run when scheduled delivery has gone stale.
     - cron: '4,19,34,49 * * * *'
   workflow_dispatch:
   workflow_run:
