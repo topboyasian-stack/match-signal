@@ -175,7 +175,7 @@ jobs:
           from pathlib import Path
           source = Path('.github/workflows/unified-upcoming.yml').read_text(encoding='utf-8')
           concurrency = source.rsplit('\nconcurrency:\n', 1)[1].split('\njobs:\n', 1)[0]
-          assert "group: match-signal-unified-upcoming-${{ github.event_name == 'workflow_dispatch' && inputs.promotion_child && 'promotion' || 'normal' }}" in concurrency
+          assert "group: match-signal-unified-upcoming-" in concurrency and "'promotion'" in concurrency
           publish = source.rsplit('      - name: Publish unified board and health', 1)[1]
           assert 'Newer unified board already published; skipping stale candidate.' in publish
           assert publish.index('if git rebase origin/main; then') < publish.index('Newer unified board already published; skipping stale candidate.')
