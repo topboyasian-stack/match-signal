@@ -89,10 +89,12 @@ jobs:
           git add data/pdl_predictions.json data/pdl_status.json data/predictions.json data/sportybet_odds_snapshot.json
           if git diff --cached --quiet; then echo "No PDL changes."; exit 0; fi
           git commit -m "🤖 Publish England U21 PDL prediction feed"
-          for attempt in 1 2 3; do
+          for attempt in 1 2 3 4 5 6 7 8; do
             if git push origin main; then exit 0; fi
+            echo "Concurrent main update blocked PDL publish; rebasing safely (attempt $attempt/8)."
             git fetch origin main
             git rebase origin/main || { git rebase --abort 2>/dev/null || true; exit 1; }
-            sleep $((attempt*3))
+            sleep $((attempt*2))
           done
+          echo "PDL publish exhausted eight safe rebases; no force-push was used." >&2
           exit 1
