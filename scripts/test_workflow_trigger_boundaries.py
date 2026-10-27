@@ -38,6 +38,8 @@ def main():
     watch = (WORKFLOWS / "qualified-best-health-watch-v2.yml").read_text(encoding="utf-8")
     tracker = (WORKFLOWS / "odds-ticket-tracker.yml").read_text(encoding="utf-8")
     collector = (WORKFLOWS / "virtual-lab-collector.yml").read_text(encoding="utf-8")
+    core_pipeline = (WORKFLOWS / "tennis_pipeline.yml").read_text(encoding="utf-8")
+    health_audit = (ROOT / "scripts" / "system_health_audit.py").read_text(encoding="utf-8")
 
     builder_paths = push_paths("odds_builder.yml")
     board_paths = push_paths("unified-upcoming.yml")
@@ -99,6 +101,16 @@ def main():
     assert '"Match Signal Result Settlement"' in tracker
     assert '"Match Signal Virtual Lab Collector"' in tracker
     assert "data/odds_builder.json" in tracker_paths
+
+    # Optional NBA history enrichment must not block the canonical football/tennis feed.
+    nba_step = core_pipeline.split("      - name: Normalize NBA 2026 team gamelog", 1)[1].split("      - name:", 1)[0]
+    assert "continue-on-error: true" in nba_step, (
+        "Missing optional NBA source must not stop core football/tennis predictions."
+    )
+    # Keep the retired core moneyline provider distinct from the active paper-only NBA totals lane.
+    assert '"basketball_core_moneyline"' in health_audit
+    assert '"nba_totals_desk"' in health_audit
+    assert '"basketball": {"status": "RETIRED"' not in health_audit
 
     print("Match Signal workflow trigger boundary tests passed.")
 
