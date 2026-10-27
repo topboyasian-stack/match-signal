@@ -288,7 +288,40 @@ def build(hist,future):
     return out
 
 def main():
-    hist,history_source=history();future,fixture_source=upcoming();pred=build(hist,future);now=datetime.now(timezone.utc).isoformat()
-    status={"updated_at":now,"competition":LEAGUE,"historical_rows":len(hist),"current_upcoming":len(pred),"historical_source":history_source,"fixture_source":fixture_source,"model":"PDL-1.2-2026.09.22","paper_only":True,"gates":{"model_live_trading_approved":False,"requires_walk_forward_validation":True,"requires_market_benchmark":True}}
-    (DATA/"pdl_predictions.json").write_text(json.dumps(pred,indent=2,ensure_ascii=False)+"\n",encoding="utf-8");(DATA/"pdl_status.json").write_text(json.dumps(status,indent=2,ensure_ascii=False)+"\n",encoding="utf-8");print(json.dumps(status,indent=2))
+    now=datetime.now(timezone.utc).isoformat()
+    status_path=DATA/"pdl_status.json"
+    predictions_path=DATA/"pdl_predictions.json"
+    previous={}
+    try:
+        previous=json.loads(status_path.read_text(encoding="utf-8"))
+    except Exception:
+        previous={}
+    try:
+        hist,history_source=history()
+        future,fixture_source=upcoming()
+        if fixture_source=="none":
+            raise RuntimeError("all configured upcoming-fixture sources are unavailable")
+        pred=build(hist,future)
+    except Exception as exc:
+        # Do not replace a last-known-good feed with fabricated empty data when
+        # external providers block the runner (for example HTTP 403 responses).
+        status={
+            **previous,
+            "status":"STALE_SOURCE_UNAVAILABLE",
+            "last_attempt_at":now,
+            "last_error":f"{type(exc).__name__}: {str(exc)[:500]}",
+            "last_successful_update_at":previous.get("updated_at"),
+            "preserved_last_known_good_predictions":predictions_path.exists(),
+            "competition":LEAGUE,
+            "model":"PDL-1.2-2026.09.22",
+            "paper_only":True,
+            "gates":{"model_live_trading_approved":False,"requires_walk_forward_validation":True,"requires_market_benchmark":True},
+        }
+        status_path.write_text(json.dumps(status,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
+        print(json.dumps(status,indent=2))
+        return
+    status={"status":"CURRENT","updated_at":now,"last_attempt_at":now,"competition":LEAGUE,"historical_rows":len(hist),"current_upcoming":len(pred),"historical_source":history_source,"fixture_source":fixture_source,"model":"PDL-1.2-2026.09.22","paper_only":True,"gates":{"model_live_trading_approved":False,"requires_walk_forward_validation":True,"requires_market_benchmark":True}}
+    predictions_path.write_text(json.dumps(pred,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
+    status_path.write_text(json.dumps(status,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
+    print(json.dumps(status,indent=2))
 if __name__=="__main__":main()
