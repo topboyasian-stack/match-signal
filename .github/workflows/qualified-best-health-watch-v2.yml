@@ -1,7 +1,7 @@
 name: Match Signal Qualified Best Scheduled Health Watch v2
 
 on:
-  # Re-register the independent ten-minute monitor on a shifted cadence after missed scheduled ticks.
+  # Keep this independent ten-minute monitor active; its push trigger bootstraps a run when GitHub cron delivery has no recorded baseline.
   schedule:
     - cron: '6,16,26,36,46,56 * * * *'
   workflow_dispatch:
