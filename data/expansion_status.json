@@ -1,12 +1,12 @@
 {
-  "updated_at": "2026-10-27T14:28:27.474388+00:00",
+  "updated_at": "2026-10-27T18:50:07.511316+00:00",
   "release_mode": "LIVE_EXPERIMENTAL",
   "live_trading_approved": false,
   "competitions": {
     "NBA": {
-      "historical_events": 1263,
-      "current_fixtures": 0,
-      "collection_errors": 0,
+      "historical_events": 1336,
+      "current_fixtures": 64,
+      "collection_errors": 1,
       "status": "LIVE_EXPERIMENTAL",
       "history_source": "llimllib/nba_data gamelogs.parquet; ESPN daily scoreboard and NBA Elo CSV fallbacks"
     },
@@ -21,12 +21,14 @@
     }
   },
   "source_diagnostics": {
-    "NBA": [],
+    "NBA": [
+      "nba_gamelogs: 404 Client Error: Not Found for url: https://raw.githubusercontent.com/llimllib/nba_data/main/data/gamelogs.parquet"
+    ],
     "Eredivisie": [
-      "2025-10-27..2025-11-02: 403 Client Error: Forbidden for url: https://site.api.espn.com/apis/site/v2/sports/soccer/ned.1/scoreboard?dates=20251027-20251102",
-      "2025-11-03..2025-11-09: 403 Client Error: Forbidden for url: https://site.api.espn.com/apis/site/v2/sports/soccer/ned.1/scoreboard?dates=20251103-20251109",
-      "2025-11-10..2025-11-16: 403 Client Error: Forbidden for url: https://site.api.espn.com/apis/site/v2/sports/soccer/ned.1/scoreboard?dates=20251110-20251116",
-      "2025-11-17..2025-11-23: 403 Client Error: Forbidden for url: https://site.api.espn.com/apis/site/v2/sports/soccer/ned.1/scoreboard?dates=20251117-20251123",
+      "2025-10-27..2025-11-02: 400 Client Error: Bad Request for url: https://site.api.espn.com/apis/site/v2/sports/soccer/ned.1/scoreboard?dates=20251027-20251102",
+      "2025-11-03..2025-11-09: 400 Client Error: Bad Request for url: https://site.api.espn.com/apis/site/v2/sports/soccer/ned.1/scoreboard?dates=20251103-20251109",
+      "2025-11-10..2025-11-16: 400 Client Error: Bad Request for url: https://site.api.espn.com/apis/site/v2/sports/soccer/ned.1/scoreboard?dates=20251110-20251116",
+      "2025-11-17..2025-11-23: 400 Client Error: Bad Request for url: https://site.api.espn.com/apis/site/v2/sports/soccer/ned.1/scoreboard?dates=20251117-20251123",
       "2025-11-24..2025-11-30: 400 Client Error: Bad Request for url: https://site.api.espn.com/apis/site/v2/sports/soccer/ned.1/scoreboard?dates=20251124-20251130"
     ],
     "SportyBet_NBA_totals": []
@@ -41,7 +43,6 @@
     "LIVE_EXPERIMENTAL signals are real generated predictions, not guarantees or live-trading approval.",
     "NBA remains preseason-ready until 2026-10-20, then enters live experimental mode automatically.",
     "Eredivisie uses ESPN when available, Football-Data's current fixture feed as the first fallback, and SofaScore's daily schedule as the second fallback.",
-    "Eredivisie repair source added after free Football-Data endpoint rate limiting; no market odds are fabricated when unavailable.",
     "Eredivisie repair source added after free Football-Data endpoint rate limiting; no market odds are fabricated when unavailable."
   ],
   "main_prediction_feed_merged": true,
