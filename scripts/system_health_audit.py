@@ -149,12 +149,24 @@ if str(virtual_live.get("status") or "") == "LIVE" and int(virtual_live.get("eve
 else:
     checks.append(issue("VIRTUAL_LIVE_FEED_INVALID", "critical", f"live virtual status={virtual_live.get('status')!r}, events={int(virtual_live.get('events_count') or 0)}"))
 
+nba_competition = (expansion.get("competitions") or {}).get("NBA") or {}
 retired = {
     "darts_x": {"status": "RETIRED", "artifact_at": darts.get("updated_at")},
     "table_tennis_x": {"status": "RETIRED", "artifact_at": table.get("updated_at")},
-    "basketball": {"status": "RETIRED", "provider": (pipeline.get("basketball_market_provider_status") or "not_active")},
+    # The legacy core basketball moneyline provider is retired, but the separate
+    # ESPN/SportyBet NBA totals desk is still an experimental paper-only lane.
+    "basketball_core_moneyline": {
+        "status": "RETIRED",
+        "provider": pipeline.get("basketball_market_provider_status") or "not_active",
+    },
+    "nba_totals_desk": {
+        "status": nba_competition.get("status") or "UNKNOWN",
+        "paper_only": not bool(expansion.get("live_trading_approved")),
+        "historical_events": int(nba_competition.get("historical_events") or 0),
+        "current_fixtures": int(nba_competition.get("current_fixtures") or 0),
+    },
 }
-checks.append({"engine": "retired_engines", "status": "INFO", "lanes": retired})
+checks.append({"engine": "engine_lifecycle", "status": "INFO", "lanes": retired})
 
 prediction_count = int(pipeline.get("prediction_count") or 0)
 football_count = int(pipeline.get("football_count") or 0)
