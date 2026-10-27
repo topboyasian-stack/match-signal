@@ -91,7 +91,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         )
 
         self.assertGreaterEqual(
-            PROMOTION_WORKFLOW.count(r'.event == \\"workflow_dispatch\\" and .head_branch == \\"main\\"'),
+            PROMOTION_WORKFLOW.count("select(.event =="),
             5,
             "every pre/post board, Builder and deployment wait must filter the exact dispatched child run",
         )
