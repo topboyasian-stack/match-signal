@@ -27,20 +27,16 @@ def parse_date(v):
             except Exception:pass
     return None
 
-SOFASCORE="https://www.sofascore.com/api/v1"
-TOURNAMENT_ID=13946
 
-def sofascore_json(path):
-    r=S.get(SOFASCORE+path,timeout=30,headers={"User-Agent":"MatchSignal/PDL/1.2"})
-    r.raise_for_status()
-    return r.json()
-
-def current_season():
-    body=sofascore_json(f"/unique-tournament/{TOURNAMENT_ID}/seasons")
-    seasons=body.get("seasons") or []
-    if not seasons:
-        raise RuntimeError("SofaScore returned no PDL seasons")
-    return int(seasons[0]["id"])
+def future_only(rows, now=None):
+    """Return only fixtures with a valid kickoff strictly in the future."""
+    now = now or datetime.now(timezone.utc)
+    future = []
+    for row in rows or []:
+        start = parse_date(row.get("start_time"))
+        if start and start > now:
+            future.append(row)
+    return sorted(future, key=lambda row: parse_date(row.get("start_time")) or now)
 
 def betstudy_history():
     response=S.get(RESULTS_URL,timeout=30)
@@ -109,56 +105,15 @@ def betstudy_history():
 
 
 
-def sofascore_history():
-    season=current_season()
-    rows=[]
-    for page in range(0,10):
-        body=sofascore_json(f"/unique-tournament/{TOURNAMENT_ID}/season/{season}/events/last/{page}")
-        events=body.get("events") or []
-        if not events:
-            break
-        for e in events:
-            status=(e.get("status") or {})
-            if status.get("type") not in {"finished","post"} and status.get("code") not in {100,120}:
-                continue
-            home=e.get("homeTeam") or {}
-            away=e.get("awayTeam") or {}
-            hs=(e.get("homeScore") or {}).get("current")
-            as_=(e.get("awayScore") or {}).get("current")
-            if hs is None:
-                hs=(e.get("homeScore") or {}).get("normaltime")
-            if as_ is None:
-                as_=(e.get("awayScore") or {}).get("normaltime")
-            ts=e.get("startTimestamp")
-            if not ts or hs is None or as_ is None:
-                continue
-            rows.append({
-                "event_id":f"sofascore|{e.get('id')}",
-                "start_time":datetime.fromtimestamp(float(ts),tz=timezone.utc).isoformat(),
-                "home":str(home.get("name") or "").strip(),
-                "away":str(away.get("name") or "").strip(),
-                "home_score":float(hs),
-                "away_score":float(as_),
-                "source":"SofaScore structured PDL season feed",
-            })
-        if len(events)<20:
-            break
-    rows=[x for x in rows if x["home"] and x["away"]]
-    if not rows:
-        raise RuntimeError("SofaScore PDL results returned no finished events")
-    return sorted(
-        {x["event_id"]:x for x in rows}.values(),
-        key=lambda x:x["start_time"]
-    )
-
-
 def history():
     try:
         return betstudy_history(), "BetStudy"
     except Exception as primary_error:
-        hist=sofascore_history()
-        return hist, "SofaScore fallback"
-
+        # SofaScore now responds with a 403 anti-bot challenge to automated
+        # requests. Do not try to bypass that block; report the actual primary
+        # source failure and keep PDL forecasts withheld until an allowed source
+        # is available.
+        raise RuntimeError(f"BetStudy history unavailable: {primary_error}; SofaScore fallback disabled after upstream 403 challenge") from primary_error
 
 
 
@@ -239,18 +194,17 @@ def betstudy_upcoming():
     )
 
 
-def upcoming():
-    try:
-        events=sportybet_upcoming()
-        if events:
-            return events, "SportyBet"
-    except Exception:
-        pass
-    events=betstudy_upcoming()
-    if events:
-        return events, "BetStudy"
-    return [], "none"
-
+def upcoming(now=None):
+    errors = []
+    for source, fetch in (("SportyBet", sportybet_upcoming), ("BetStudy", betstudy_upcoming)):
+        try:
+            events = future_only(fetch(), now)
+            if events:
+                return events, source
+            errors.append(f"{source}: no future fixtures")
+        except Exception as exc:
+            errors.append(f"{source}: {exc}")
+    raise RuntimeError("No future PDL fixtures from configured sources: " + "; ".join(errors))
 
 
 def pois(lam,k):return math.exp(-lam)*lam**k/math.factorial(k)
