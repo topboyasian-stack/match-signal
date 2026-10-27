@@ -174,7 +174,7 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           source = Path('.github/workflows/unified-upcoming.yml').read_text(encoding='utf-8')
-          concurrency = source.split('concurrency:', 1)[1].split('jobs:', 1)[0]
+          concurrency = source.rsplit('\\nconcurrency:\\n', 1)[1].split('\\njobs:\\n', 1)[0]
           assert 'group: match-signal-unified-upcoming' in concurrency
           assert 'promotion' not in concurrency
           publish = source.rsplit('      - name: Publish unified board and health', 1)[1]
