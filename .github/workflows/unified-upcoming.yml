@@ -174,7 +174,7 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           source = Path('.github/workflows/unified-upcoming.yml').read_text(encoding='utf-8')
-          publish = source.split('name: Publish unified board and health', 1)[1]
+          publish = source.split('      - name: Publish unified board and health', 1)[1]
           assert 'Newer unified board already published; skipping stale candidate.' in publish
           assert publish.index('if git rebase origin/main; then') < publish.index('Newer unified board already published; skipping stale candidate.')
           print('Publication skips a stale candidate when main already has a newer board.')
