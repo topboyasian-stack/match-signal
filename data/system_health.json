@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-28T10:39:19.699930+00:00",
+  "generated_at": "2026-10-28T10:43:16.206622+00:00",
   "status": "FAIL",
   "critical_issues": 2,
   "warning_issues": 0,
@@ -8,45 +8,45 @@
     {
       "engine": "core_prediction_pipeline",
       "status": "STALE",
-      "age_hours": 5.08,
+      "age_hours": 5.14,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.53,
+      "age_hours": 0.6,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 2.17,
+      "age_hours": 2.24,
       "threshold_hours": 4
     },
     {
       "engine": "unified_upcoming",
       "status": "PASS",
-      "age_hours": 0.54,
+      "age_hours": 0.01,
       "threshold_hours": 2
     },
     {
       "engine": "prediction_desk_health",
       "status": "PASS",
-      "age_hours": 0.58,
+      "age_hours": 0.05,
       "threshold_hours": 2
     },
     {
       "engine": "tennis_forward_discovery",
       "status": "PASS",
-      "age_hours": 4.52,
+      "age_hours": 4.58,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 0.01,
+      "age_hours": 0.08,
       "threshold_hours": 0.5,
-      "heartbeat_source": "unified_live_refresh"
+      "heartbeat_source": "virtual_lab_live.json"
     },
     {
       "engine": "engine_lifecycle",
@@ -87,7 +87,7 @@
     {
       "code": "STALE_CORE_PREDICTION_PIPELINE",
       "severity": "critical",
-      "detail": "updated_at age 5.08h exceeds 4h"
+      "detail": "updated_at age 5.14h exceeds 4h"
     },
     {
       "code": "PDL_EXPERIMENTAL_FEED_STALE",
@@ -97,15 +97,15 @@
     {
       "code": "PIPELINE_STALE",
       "severity": "critical",
-      "detail": "pipeline_status age 5.08h exceeds 4h"
+      "detail": "pipeline_status age 5.14h exceeds 4h"
     }
   ],
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
   "paper_only": true,
   "prediction_desk_filters": {
-    "past_kickoff_rows_hidden": 3,
+    "past_kickoff_rows_hidden": 7,
     "stale_live_flags_hidden": 0,
     "expired_settled_rows_hidden": 0,
-    "virtual_market_rows_held_for_kickoff_window": 196
+    "virtual_market_rows_held_for_kickoff_window": 203
   }
 }
