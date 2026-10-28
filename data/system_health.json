@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-28T19:49:28.920095+00:00",
+  "generated_at": "2026-10-28T19:54:56.364246+00:00",
   "status": "FAIL",
   "critical_issues": 3,
   "warning_issues": 0,
@@ -8,19 +8,19 @@
     {
       "engine": "core_prediction_pipeline",
       "status": "STALE",
-      "age_hours": 4.73,
+      "age_hours": 4.82,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.09,
+      "age_hours": 0.08,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "STALE",
-      "age_hours": 4.36,
+      "age_hours": 4.45,
       "threshold_hours": 4
     },
     {
@@ -38,15 +38,15 @@
     {
       "engine": "tennis_forward_discovery",
       "status": "PASS",
-      "age_hours": 4.67,
+      "age_hours": 4.76,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 3.01,
+      "age_hours": 0.1,
       "threshold_hours": 0.5,
-      "heartbeat_source": "unified_live_refresh"
+      "heartbeat_source": "virtual_lab_live.json"
     },
     {
       "engine": "engine_lifecycle",
@@ -54,11 +54,11 @@
       "lanes": {
         "darts_x": {
           "status": "RETIRED",
-          "artifact_at": "2026-10-28T16:50:26.705845+00:00"
+          "artifact_at": "2026-10-28T19:50:23.336021+00:00"
         },
         "table_tennis_x": {
           "status": "RETIRED",
-          "artifact_at": "2026-10-28T17:00:08.230081+00:00"
+          "artifact_at": "2026-10-28T19:50:35.487851+00:00"
         },
         "basketball_core_moneyline": {
           "status": "RETIRED",
@@ -87,12 +87,12 @@
     {
       "code": "STALE_CORE_PREDICTION_PIPELINE",
       "severity": "critical",
-      "detail": "updated_at age 4.73h exceeds 4h"
+      "detail": "updated_at age 4.82h exceeds 4h"
     },
     {
       "code": "STALE_EXPANSION",
       "severity": "critical",
-      "detail": "updated_at age 4.36h exceeds 4h"
+      "detail": "updated_at age 4.45h exceeds 4h"
     },
     {
       "code": "PDL_EXPERIMENTAL_FEED_STALE",
@@ -102,15 +102,15 @@
     {
       "code": "PIPELINE_STALE",
       "severity": "critical",
-      "detail": "pipeline_status age 4.73h exceeds 4h"
+      "detail": "pipeline_status age 4.82h exceeds 4h"
     }
   ],
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
   "paper_only": true,
   "prediction_desk_filters": {
-    "past_kickoff_rows_hidden": 10,
+    "past_kickoff_rows_hidden": 17,
     "stale_live_flags_hidden": 0,
     "expired_settled_rows_hidden": 0,
-    "virtual_market_rows_held_for_kickoff_window": 186
+    "virtual_market_rows_held_for_kickoff_window": 178
   }
 }
