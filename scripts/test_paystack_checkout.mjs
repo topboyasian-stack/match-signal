@@ -16,6 +16,7 @@ const schema = await read('migrations/0001_match_signal_payments.sql');
 const checkout = await read('api-access.html');
 const success = await read('payment-success.html');
 const docs = await read('docs/PAYSTACK_API_LAUNCH.md');
+const deployWorkflow = await read('.github/workflows/cloudflare-pages.yml');
 
 assert.match(init, /api\.paystack\.co\/transaction\/initialize/);
 assert.match(init, /const amount = 500000/);
@@ -36,6 +37,12 @@ assert.match(checkout, /\/api\/payments\/initialize/);
 assert.match(success, /\/api\/payments\/verify/);
 assert.match(docs, /PAYSTACK_SECRET_KEY/);
 assert.match(docs, /MATCH_SIGNAL_DB/);
+assert.match(deployWorkflow, /functions\\/api\\/payments\\/initialize\\.js/);
+assert.match(deployWorkflow, /functions\\/api\\/payments\\/verify\\.js/);
+assert.match(deployWorkflow, /--exclude='scripts\\/'/);
+assert.match(deployWorkflow, /--exclude='\\.github\\/'/);
+assert.match(deployWorkflow, /--exclude='migrations\\/'/);
+assert.match(deployWorkflow, /Smoke-test Paystack surface and block internal assets/);
 
 async function walk(dir) {
   const out = [];
