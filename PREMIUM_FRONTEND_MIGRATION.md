@@ -143,3 +143,16 @@ Known basketball acceptance criteria carried forward from the Basketball Predict
 8. **Release gate:** add automated regression checks for started-game filtering, line/price/lean synchronization, stale-quote rejection, settlement idempotency, and builder totals. Keep the market at `SHADOW / REPAIR` until the tests pass and the reconciled sample is independently checked.
 
 This basketball backlog is part of the continuing backend work even while the football paper-research cohort is evaluated first. It must not be removed from navigation or silently abandoned as a side effect of narrowing the initial launch scope.
+
+
+## Basketball totals ledger audit (2026-10-29; main branch, paper-only)
+
+The current `data/nba_totals_ledger.json` is a useful separate cohort and supports continuing the totals experiment, but it does **not** yet support a paid performance claim:
+
+- The file reports **40 settled decisions, 31 correct (77.5%)**. All 40 recorded picks are **Over**; the observed 31 wins are exactly the 31 games whose final totals were Over their saved lines. This is a one-sided cohort, not evidence that both Over and Under selection works.
+- **Quote freshness fails the 15-minute gate for most records.** Comparing each saved quote timestamp with the event start gives 6/40 quotes within 15 minutes and 34/40 older than 15 minutes. The ledger's saved timestamps therefore cannot be treated as 40 compliant, current-price picks.
+- The rows store the SportyBet source, market ID 225, line and quote timestamp, but **do not store the Over and Under decimal prices**. ROI, closing-line comparison, and price-based value cannot be reconstructed from this ledger.
+- The prediction records are pre-game and the final-score settlement is tied to exact ESPN event IDs, which is useful evidence. However, a quote near kickoff is not proof that the same quote was available when the prediction was first published; the publication snapshot needs to freeze prediction, line, both prices and quote timestamp together.
+- The separate `data/basketball_predictions.json` is currently an empty array and `data/basketball_accuracy.json` reports zero settled records, so those files do not reconcile with the 40-record NBA totals ledger. The UI/API must not blend these as if they were one source of truth.
+
+**Decision:** keep NBA full-game totals as a separate shadow/paper candidate and continue fixing its data path. Do not discard it based on the older all-basketball holdout, but do not promote the 77.5% figure into marketing or paid-picks claims. Next engineering priorities are (1) freeze timestamped publication snapshots with both decimal prices, (2) reject quotes older than 15 minutes at publication, (3) add both Over and Under decisions without retrospective selection, (4) reconcile the totals ledger with the UI/feed and accuracy artifacts, and (5) compute calibration and ROI only on that same eligible cohort. No production deployment is changed by this audit.
