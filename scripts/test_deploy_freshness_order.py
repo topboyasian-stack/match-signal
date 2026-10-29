@@ -214,7 +214,6 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "functions/api/payments/webhook.js",
             "scripts/test_paystack_checkout.mjs",
             ".github/workflows/paystack-checkout-contract.yml",
-            ".github/workflows/cloudflare-pages.yml",
             "_redirects",
             "upcoming.html",
             "qualified-best.html",
