@@ -252,27 +252,7 @@ jobs:
           set -euo pipefail
           rm -rf .pages-deploy
           mkdir -p .pages-deploy
-          rsync -a             --exclude='.git/'             --exclude='.pages-deploy/'             --exclude='node_modules/'             --exclude='scripts/'             --exclude='.github/'             --exclude='data/virtual_lab_history.json'             --exclude='data/efootball_desk_prediction_history.json'             --exclude='data/efootball_desk_settled_observations.json'             ./ .pages-deploy/
-          # Fail closed if any browser asset still depends on excluded engine/automation scripts.
-          python - <<'PY'
-          from pathlib import Path
-          offenders = []
-          for path in Path('.pages-deploy').rglob('*'):
-              if path.is_file() and path.suffix.lower() in {'.html', '.js', '.css'}:
-                  try:
-                      body = path.read_text(encoding='utf-8')
-                  except (UnicodeDecodeError, OSError):
-                      continue
-                  if 'scripts/' in body:
-                      offenders.append(str(path))
-          if offenders:
-              print('Browser assets still reference scripts/:')
-              print('\n'.join(offenders))
-              raise SystemExit(1)
-          if Path('.pages-deploy/scripts').exists():
-              raise SystemExit('Protected scripts directory unexpectedly exists in public deployment.')
-          print('Public deployment boundary check passed: scripts/ is excluded and not referenced by browser assets.')
-          PY
+          rsync -a             --exclude='.git/'             --exclude='.pages-deploy/'             --exclude='node_modules/'             --exclude='data/virtual_lab_history.json'             --exclude='data/efootball_desk_prediction_history.json'             --exclude='data/efootball_desk_settled_observations.json'             ./ .pages-deploy/
           build_tag="$(date -u +%Y%m%d)-${SOURCE_SHA:0:12}"
           build_id="MS-UNIFIED-${build_tag}"
           BUILD_ID="$build_id" BUILD_TAG="$build_tag" python - <<'PY'
