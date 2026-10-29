@@ -23,3 +23,7 @@ jobs:
           node-version: '20'
       - name: Validate internal-path blocks and browser references
         run: node scripts/test_public_internal_path_redirects.mjs
+      - name: Verify the Cloudflare branch preview, when available
+        env:
+          MATCH_SIGNAL_PREVIEW_BASE: https://security-block-public-internal-paths.match-signal.pages.dev
+        run: node scripts/test_public_internal_path_redirects.mjs
