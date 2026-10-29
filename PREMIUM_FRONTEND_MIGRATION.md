@@ -90,5 +90,39 @@ The existing Cloudflare Pages workflow builds from a broad repository-root copy 
 
 **Not ready to sell a performance claim or enable paid access yet.** First protect source and internal datasets, define a minimal public output, reconcile the settled ledger, and implement real per-user entitlements. Any initial offer should be described honestly as paper research, with the current sample size and missing ROI evidence visible.
 
+
+## Market-selection decision (2026-10-29)
+
+Use a narrow, evidence-led launch scope while all other sports and markets continue in shadow evaluation. These are **paper-research candidates**, not validated profitable products.
+
+### Launch candidate: football pre-match, with strict qualification
+
+- Prioritize Champions League fixtures for the first monitored cohort: the current football performance artifact reports 30 correct from 46 settled (65.22%). The sample is still modest and accuracy alone does not establish value.
+- Across the football confidence buckets, picks at 70%+ report 46 correct from 64 settled (71.88%). This is the strongest reported confidence bucket, but the source artifact and cohort definitions must be audited for selection bias and publication-time integrity before using it in a paid product.
+- Use other major-league football only as secondary/shadow cohorts until each league has its own minimum-sample, calibration, and market-price evidence.
+- Only qualify an individual pick when the event is not started, the SportyBet fixture match is exact, the required market quote is current (no older than 15 minutes), and the model-versus-market value calculation passes its gate. Missing or stale quotes mean no qualified selection; never substitute a historical line.
+- The initial paid-facing page should be framed as a **limited paper-research pilot**, not a proven tipster or profitable service, until genuine bookmaker prices have been captured at publication and a frozen cohort demonstrates positive, reproducible out-of-sample returns after settlement.
+
+### Do not lead with these markets yet
+
+- Tennis match winner: 209/434 correct (48.16%) in the latest tennis artifact.
+- Tennis totals: 166/384 decisions correct (43.23%).
+- Overall football 1X2: 225/442 correct (50.90%) in the latest football artifact.
+- Basketball: historical strict holdout noted in prior QA was 59.01% accuracy versus a 63.98% market baseline and -17.08% ROI over 161 games; current basketball settled-ledger reconciliation is incomplete. Keep basketball in backend repair/shadow mode until the prediction/settlement chain is verified end-to-end.
+- Do not select accumulators as the flagship product based on combined model probabilities alone. Evaluate individual leg calibration, exact current bookmaker prices, and settled accumulator-level ROI separately.
+
+### Backend improvement loop for every non-launch market
+
+1. Keep a timestamped, append-only record of the prediction exactly as shown before kickoff, including model/version, probability, exact market/line, verified bookmaker odds and timestamp, and quote-match confidence.
+2. Settle only from authoritative results; preserve void/push handling and do not overwrite prior snapshots.
+3. Report sample size, accuracy, Brier score/calibration, and ROI only where real bookmaker odds exist; compare with a de-vigged bookmaker baseline.
+4. Segment results by sport, market, league/tour, confidence bucket, odds band, and quote age. Use minimum sample gates and rolling out-of-sample windows; do not promote a market from a small high-accuracy slice alone.
+5. Keep challenger models in shadow mode. Promote only if they improve calibration and net performance against the frozen production baseline; retain rollback capability.
+6. Publish a simple market status: `PILOT`, `SHADOW / COLLECTING EVIDENCE`, or `PAUSED / REPAIR`. No automated betting.
+
+### Current release gate
+
+The best current **candidate** is football pre-match with a high-confidence filter, with Champions League as the first cohort to evaluate. It is not yet a green-lit paid-picks claim: the overall verified ledger still has zero real-bookmaker-price ROI observations. Start by instrumenting this narrow cohort correctly, publish the paper record transparently, and continue improving tennis, basketball, totals, and accumulators without promoting them prematurely.
+
 ## Immediate next action
 Create a non-production inventory of browser-loaded files, public JSON feeds, and Pages Functions, then build an explicit public asset manifest and run it on a preview. Do not alter the current production deploy workflow until the preview has passed.
