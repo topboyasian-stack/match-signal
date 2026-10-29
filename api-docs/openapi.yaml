@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Match Signal Research API
-  version: 1.1.0
+  version: 1.2.0
   description: |
     Read-only football and tennis prediction data, audited paper-performance
     aggregates, research-qualified manual accumulator candidates, and event-market
@@ -26,6 +26,9 @@ info:
 servers:
   - url: https://match-signal.pages.dev/api/v1
     description: Match Signal Cloudflare Pages production API
+externalDocs:
+  description: Paystack checkout, Cloudflare D1 setup, webhook configuration and acceptance tests
+  url: https://github.com/topboyasian-stack/match-signal/blob/main/docs/PAYSTACK_API_LAUNCH.md
 security:
   - bearerAuth: []
 tags:
@@ -135,11 +138,10 @@ components:
       scheme: bearer
       bearerFormat: API key
       description: |
-        Server-side Cloudflare Pages secret MATCH_SIGNAL_API_KEY. Never embed
-        this secret in browser JavaScript, a public repository, or a client app.
-        For marketplace distribution, configure the provider-side upstream
-        credential in the marketplace integration; never publish the upstream
-        secret as a consumer key.
+        Use the customer API key issued after a verified Paystack checkout at /api-access.html.
+        Send it as Authorization: Bearer <api_key>. Keys expire after 30 days.
+        The optional MATCH_SIGNAL_API_KEY is a legacy server-side shared key and
+        must never be embedded in browser JavaScript, a public repository, or a client app.
   responses:
     Unauthorized:
       description: Missing or invalid bearer credential.
@@ -168,7 +170,7 @@ components:
       properties:
         error:
           type: string
-          enum: [UNAUTHORIZED, API_NOT_CONFIGURED, DATA_UNAVAILABLE, LEDGER_UNAVAILABLE, ACCUMULATOR_UNAVAILABLE]
+          enum: [UNAUTHORIZED, API_NOT_CONFIGURED, DATA_UNAVAILABLE, LEDGER_UNAVAILABLE, ACCUMULATOR_UNAVAILABLE, MARKET_RESEARCH_UNAVAILABLE, INVALID_SPORT]
     PredictionsResponse:
       type: object
       required: [version, updated_at, count, sport, predictions]
