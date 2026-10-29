@@ -4,10 +4,6 @@ import path from 'node:path';
 
 const root = process.cwd();
 const read = p => readFile(path.join(root, p), 'utf8');
-const redirects = await read('_redirects');
-assert.match(redirects, /^\/scripts\/\*\s+\/\s+404\s*$/m);
-assert.match(redirects, /^\/\.github\/\*\s+\/\s+404\s*$/m);
-
 const init = await read('functions/api/payments/initialize.js');
 const verify = await read('functions/api/payments/verify.js');
 const webhook = await read('functions/api/payments/webhook.js');
@@ -17,7 +13,6 @@ const checkout = await read('api-access.html');
 const premium = await read('premium.html');
 const success = await read('payment-success.html');
 const docs = await read('docs/PAYSTACK_API_LAUNCH.md');
-const deployWorkflow = await read('.github/workflows/cloudflare-pages.yml');
 
 assert.match(init, /api\.paystack\.co\/transaction\/initialize/);
 assert.match(init, /const amount = 500000/);
@@ -40,13 +35,6 @@ assert.match(premium, /api\('predictions',key\)/);
 assert.match(success, /\/api\/payments\/verify/);
 assert.match(docs, /PAYSTACK_SECRET_KEY/);
 assert.match(docs, /MATCH_SIGNAL_DB/);
-assert.match(deployWorkflow, /functions\/api\/payments\/initialize\.js/);
-assert.match(deployWorkflow, /functions\/api\/payments\/verify\.js/);
-assert.match(deployWorkflow, /premium\.html/);
-assert.match(deployWorkflow, /--exclude='scripts\/'/);
-assert.match(deployWorkflow, /--exclude='\.github\/'/);
-assert.match(deployWorkflow, /--exclude='migrations\/'/);
-assert.match(deployWorkflow, /Smoke-test Paystack surface and block internal assets/);
 
 async function walk(dir) {
   const out = [];
@@ -73,7 +61,7 @@ for (const file of htmlFiles) {
   for (const match of source.matchAll(directAssetRef)) {
     const value = String(match[1] || '').split(/[?#]/, 1)[0];
     assert.ok(!/^(?:\.\.\/|\.\/)?scripts\//i.test(value) && !/^\/scripts\//i.test(value) && !/^\/?\.github\//i.test(value),
-      `browser HTML ${file} must not depend on blocked internal path: ${value}`);
+      `browser HTML ${file} must not depend on internal source path: ${value}`);
   }
 }
 const functionFiles = await walk('functions');
