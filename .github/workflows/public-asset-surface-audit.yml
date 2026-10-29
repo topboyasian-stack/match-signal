@@ -19,11 +19,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Build audit-only inventory
+      - name: Build audit-only inventory and probe production paths
+        env:
+          MATCH_SIGNAL_PUBLIC_BASE: https://match-signal.pages.dev
         run: |
           node --check scripts/audit_public_asset_surface.mjs
           node scripts/audit_public_asset_surface.mjs
-          node --input-type=module -e "import fs from 'node:fs'; const d=JSON.parse(fs.readFileSync('PUBLIC-ASSET-SURFACE-INVENTORY.json','utf8')); if(d.mode!=='AUDIT_ONLY_NO_DEPLOYMENT_CHANGES'||!d.totals.repository_files||!Array.isArray(d.pages_function_source_files)||!Array.isArray(d.browser_references)) process.exit(1); console.log('Inventory validated:', JSON.stringify(d.totals));"
+          node --input-type=module -e "import fs from 'node:fs'; const d=JSON.parse(fs.readFileSync('PUBLIC-ASSET-SURFACE-INVENTORY.json','utf8')); if(d.mode!=='AUDIT_ONLY_NO_DEPLOYMENT_CHANGES'||!d.totals.repository_files||!Array.isArray(d.pages_function_source_files)||!Array.isArray(d.browser_references)||!Array.isArray(d.production_path_probes)||d.production_path_probes.length<10) process.exit(1); console.log('Inventory validated:', JSON.stringify(d.totals)); console.log('Production path probes:', JSON.stringify(d.production_path_probes));"
       - name: Upload inventory for review
         uses: actions/upload-artifact@v4
         with:
