@@ -4,7 +4,7 @@ function emailValid(value) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) && 
 export async function onRequestPost(context) {
   const origin = allowedOrigin(context.request, context.env);
   const cors = origin ? { 'Access-Control-Allow-Origin': origin, 'Vary': 'Origin' } : {};
-  if (context.request.headers.get('Origin') && !origin) return json({ error: 'ORIGIN_NOT_ALLOWED' }, 403, { ...BASE_HEADERS, ...cors });
+  if (!origin) return json({ error: 'ORIGIN_NOT_ALLOWED' }, 403, { ...BASE_HEADERS, ...cors });
   if (!context.env.PAYSTACK_SECRET_KEY || !context.env.MATCH_SIGNAL_DB) return json({ error: 'PAYMENTS_NOT_CONFIGURED', message: 'Payment processing is not configured yet.' }, 503, { ...BASE_HEADERS, ...cors });
   let body;
   try { body = await context.request.json(); } catch { return json({ error: 'INVALID_JSON' }, 400, { ...BASE_HEADERS, ...cors }); }
