@@ -163,7 +163,7 @@ def main():
     # The frozen publication record takes precedence over the mutable current desk row.
     candidates_by_id = {str(p.get("event_id")): p for p in predictions if p.get("event_id")}
     snapshots_by_id = {}
-    for snapshot in sorted(snapshots, key=lambda row: str(row.get("published_at") or "")):
+    for snapshot in sorted(snapshots, key=lambda row: str(row.get("published_at") or "") if isinstance(row, dict) else ""):
         if isinstance(snapshot, dict) and snapshot.get("event_id"):
             snapshots_by_id.setdefault(str(snapshot["event_id"]), snapshot)
     candidates_by_id.update(snapshots_by_id)
@@ -239,6 +239,18 @@ def main():
     records = sorted(by_id.values(), key=lambda x: x.get("start_time", ""))
     decided = [r for r in records if r.get("result") in ("over", "under")]
     wins = sum(r.get("pick") == r.get("result") for r in decided)
+    roi_decided = [
+        r for r in decided
+        if r.get("roi_eligible") is True
+        and isinstance(r.get("over_odds"), (int, float))
+        and isinstance(r.get("under_odds"), (int, float))
+    ]
+    roi_wins = sum(r.get("pick") == r.get("result") for r in roi_decided)
+    roi_profit = sum(
+        (float(r["over_odds"] if r.get("pick") == "over" else r["under_odds"]) - 1)
+        if r.get("pick") == r.get("result") else -1
+        for r in roi_decided
+    )
     payload = {
         "updated_at": datetime.now(timezone.utc).isoformat(),
         "source": "ESPN public NBA scoreboard",
@@ -253,7 +265,13 @@ def main():
                     "accuracy": wins / len(decided) if decided else None,
                     "pushes": sum(r.get("result") == "push" for r in records),
                     "over_settled": sum(r.get("pick") == "over" for r in decided),
-                    "under_settled": sum(r.get("pick") == "under" for r in decided)},
+                    "under_settled": sum(r.get("pick") == "under" for r in decided),
+                    "roi_eligible_decided": len(roi_decided),
+                    "roi_eligible_correct": roi_wins,
+                    "roi_eligible_accuracy": roi_wins / len(roi_decided) if roi_decided else None,
+                    "roi_eligible_unit_profit": round(roi_profit, 4) if roi_decided else None,
+                    "roi_eligible_roi": round(roi_profit / len(roi_decided), 4) if roi_decided else None,
+                    "roi_basis": "Flat 1-unit stake at the saved selected-side SportyBet decimal price; pushes excluded; only verified publication snapshots count"},
         "records": records,
     }
     LEDGER.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
