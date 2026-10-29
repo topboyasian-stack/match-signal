@@ -31,16 +31,49 @@ console.log("[coverage] read candidate artifact bytes=" + candidateRaw.length);
 const rows = JSON.parse(candidateRaw);
 console.log("[coverage] parsed candidate rows=" + rows.length);
 const now = Date.now();
-// Qualified Best can only promote rows that pass the model gate. High-probability
-// research projections and explicitly pending rows are intentionally excluded;
-// otherwise this checker paginates the whole research pool and can time out.
-const virtualCandidates = rows.filter(isVirtualDeskCandidate).filter(row => {
+const activeEfootballProducts = new Set(["efootball_gt", "efootball_adriatic"]);
+function isWithinUpcomingWindow(row) {
   const product = String(row?.product || "").toLowerCase();
   const kickoff = Date.parse(String(row?.start_time || ""));
-  return ["efootball_gt", "efootball_adriatic"].includes(product) &&
-    Number.isFinite(kickoff) && kickoff > now && kickoff <= now + 7 * 24 * 60 * 60 * 1000 &&
-    qualificationState(row).modelQualified === true;
-});
+  return String(row?.sport || "").toLowerCase() === "virtual" &&
+    activeEfootballProducts.has(product) &&
+    Number.isFinite(kickoff) && kickoff > now && kickoff <= now + 7 * 24 * 60 * 60 * 1000;
+}
+// Separate raw upcoming inventory from candidates and actual qualified selections.
+// This diagnostic must never loosen model/price gates just to create a pick.
+const rawVirtualRowsInNext7Days = rows.filter(isWithinUpcomingWindow);
+const deskCandidateRows = rawVirtualRowsInNext7Days.filter(row =>
+  isVirtualDeskCandidate(row) && isOverUnderPrediction(row) && Boolean(String(row?.event_id || ""))
+);
+const virtualCandidates = deskCandidateRows.filter(row =>
+  qualificationState(row).modelQualified === true
+);
+const qualificationStatusCounts = {};
+const qualificationBlockerCounts = {};
+const probabilityBucketCounts = {
+  missing_or_invalid: 0,
+  below_0_65: 0,
+  from_0_65_to_below_0_80: 0,
+  at_least_0_80: 0
+};
+for (const row of rawVirtualRowsInNext7Days) {
+  const status = String(row?.qualification_status || row?.candidate_status || "UNSPECIFIED");
+  qualificationStatusCounts[status] = (qualificationStatusCounts[status] || 0) + 1;
+  const gate = qualificationState(row);
+  if (gate.modelQualified !== true) {
+    const reason = String(gate.reason || "MODEL_GATE_NOT_PASSED");
+    qualificationBlockerCounts[reason] = (qualificationBlockerCounts[reason] || 0) + 1;
+  } else if (gate.currentPricePass !== true) {
+    const reason = String(gate.reason || "CURRENT_PRICE_GATE_NOT_PASSED");
+    qualificationBlockerCounts[reason] = (qualificationBlockerCounts[reason] || 0) + 1;
+  }
+  const probability = rawProbabilityValue(row);
+  if (probability === null) probabilityBucketCounts.missing_or_invalid++;
+  else if (probability < 0.65) probabilityBucketCounts.below_0_65++;
+  else if (probability < 0.80) probabilityBucketCounts.from_0_65_to_below_0_80++;
+  else probabilityBucketCounts.at_least_0_80++;
+}
+
 console.log("[coverage] model-qualified eFootball candidate rows=" + virtualCandidates.length);
 const poolGate = qualifiedBestSelections(virtualCandidates, now);
 console.log("[coverage] pre-refresh gate diagnostics computed");
@@ -336,7 +369,14 @@ const output = {
   scan_stop_reason: scanStopReason,
   paper_only: true,
   candidate_artifact_rows: rows.length,
+  raw_virtual_rows_in_next_7_days: rawVirtualRowsInNext7Days.length,
+  desk_candidate_rows_in_next_7_days: deskCandidateRows.length,
+  model_qualified_rows_in_next_7_days: virtualCandidates.length,
+  // Backward-compatible field: this is the model-qualified count, not raw feed inventory.
   virtual_candidate_rows_in_next_7_days: virtualCandidates.length,
+  qualification_status_counts: qualificationStatusCounts,
+  qualification_blocker_counts: qualificationBlockerCounts,
+  raw_probability_bucket_counts: probabilityBucketCounts,
   snapshot_gate_qualified_fixtures: poolGate.rows.length,
   snapshot_gate_diagnostics: poolGate.diagnostics,
   live_source_pages: pages,
