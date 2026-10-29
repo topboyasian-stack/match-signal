@@ -24,3 +24,15 @@ jobs:
         run: node --check scripts/test_live_virtual_quote_coverage.mjs
       - name: Check virtual qualification diagnostic contract
         run: node scripts/test_virtual_gate_diagnostic_contract.mjs
+      - name: Compare current candidate gates with live production quote feed
+        env:
+          MATCH_SIGNAL_PUBLIC_BASE: https://match-signal.pages.dev
+        run: node scripts/test_live_virtual_quote_coverage.mjs
+      - name: Upload live diagnostic report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: virtual-gate-production-diagnostic-${{ github.run_id }}
+          path: LIVE-PRODUCTION-CHECK.json
+          if-no-files-found: warn
+          retention-days: 14
