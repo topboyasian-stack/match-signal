@@ -18,7 +18,7 @@ const success = await read('payment-success.html');
 const docs = await read('docs/PAYSTACK_API_LAUNCH.md');
 
 assert.match(init, /api\.paystack\.co\/transaction\/initialize/);
-assert.match(init, /MATCH_SIGNAL_API_MONTHLY_PRICE_KOBO\s*\|\|\s*'500000'/);
+assert.match(init, /const amount = 500000/);
 assert.doesNotMatch(init, /body\.amount|body\.price/);
 assert.match(verify, /api\.paystack\.co\/transaction\/verify/);
 assert.match(verify, /verified\.data\?\.status!=='success'/);
