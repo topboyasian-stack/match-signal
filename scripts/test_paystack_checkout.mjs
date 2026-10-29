@@ -51,17 +51,17 @@ async function walkHtml(dir, out = []) {
     if (item.isDirectory() && ['.git', 'node_modules', '.github', 'scripts', 'functions', 'data'].includes(item.name)) continue;
     const rel = path.posix.join(dir, item.name);
     if (item.isDirectory()) await walkHtml(rel, out);
-    else if (item.isFile() && /\\.html?$/i.test(item.name)) out.push(rel);
+    else if (item.isFile() && /\.html?$/i.test(item.name)) out.push(rel);
   }
   return out;
 }
 const htmlFiles = await walkHtml('.');
-const directAssetRef = /(?:src|href|poster|data-src)\\s*=\\s*["']([^"'#]+)["']/gi;
+const directAssetRef = /(?:src|href|poster|data-src)\s*=\s*["']([^"'#]+)["']/gi;
 for (const file of htmlFiles) {
   const source = await read(file);
   for (const match of source.matchAll(directAssetRef)) {
     const value = String(match[1] || '').split(/[?#]/, 1)[0];
-    assert.ok(!/^(?:\\.\\.\\/|\\.\\/)?scripts\\//i.test(value) && !/^\\/scripts\\//i.test(value) && !/^\\/?\\.github\\//i.test(value),
+    assert.ok(!/^(?:\.\.\/|\.\/)?scripts\//i.test(value) && !/^\/scripts\//i.test(value) && !/^\/?\.github\//i.test(value),
       `browser HTML ${file} must not depend on blocked internal path: ${value}`);
   }
 }
