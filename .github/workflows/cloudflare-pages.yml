@@ -1074,6 +1074,34 @@ jobs:
           console.log('Production HTTP smoke tests passed: '+pages.length+' pages, '+assets.length+' assets, NBA ESPN proxy');
           NODE
 
+      - name: Smoke-test Paystack surface and block internal assets
+        timeout-minutes: 2
+        env:
+          CLOUDFLARE_DEPLOYMENT_URL: ${{ steps.pages-deployment.outputs.url }}
+        run: |
+          node --input-type=module <<'NODE'
+          const base = process.env.CLOUDFLARE_DEPLOYMENT_URL;
+          if (!base || !base.startsWith('https://')) throw new Error('Missing immutable Cloudflare deployment URL');
+          const failures = [];
+          for (const path of ['/api-access.html','/api-terms.html','/payment-success.html','/api-docs/openapi.yaml']) {
+            const r = await fetch(base + path, {cache:'no-store'});
+            if (r.status !== 200) failures.push(path + ' expected 200, got ' + r.status);
+            else console.log('Monetization surface passed:', path);
+          }
+          for (const path of ['/scripts/private_ml_core.py','/.github/workflows/live-expansion.yml','/migrations/0001_match_signal_payments.sql']) {
+            const r = await fetch(base + path, {method:'GET',redirect:'manual',cache:'no-store'});
+            if (r.status !== 404 && r.status !== 410) failures.push(path + ' should be unavailable, got ' + r.status);
+            else console.log('Internal asset blocked:', path, r.status);
+          }
+          const api = await fetch(base + '/api/v1/performance', {cache:'no-store'});
+          if (![401,503].includes(api.status)) failures.push('/api/v1/performance without a key should be 401 or 503, got ' + api.status);
+          else console.log('Subscriber API access gate active: HTTP ' + api.status);
+          const options = await fetch(base + '/api/payments/verify', {method:'OPTIONS',headers:{'Origin':'https://match-signal.pages.dev','Access-Control-Request-Method':'POST'},cache:'no-store'});
+          if (options.status !== 204) failures.push('/api/payments/verify OPTIONS expected 204, got ' + options.status);
+          else console.log('Paystack verification function route passed OPTIONS smoke test');
+          if (failures.length) { console.error(failures.join('\\n')); process.exit(1); }
+          NODE
+
       - name: Verify live eFootball quote coverage for Qualified Best
         timeout-minutes: 3
         run: node scripts/test_live_virtual_quote_coverage.mjs
