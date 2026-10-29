@@ -10,6 +10,7 @@ import requests
 
 ROOT = Path(__file__).resolve().parents[1]
 PREDICTIONS = ROOT / "data" / "nba_predictions.json"
+SNAPSHOTS = ROOT / "data" / "nba_totals_publication_snapshots.json"
 LEDGER = ROOT / "data" / "nba_totals_ledger.json"
 BASE = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba"
 SESSION = requests.Session()
@@ -100,7 +101,7 @@ def result_for(prediction, event):
     status = (event.get("status") or {}).get("type") or {}
     if not (status.get("completed") or status.get("state") == "post"):
         return None
-    pred_time = parse_time(prediction.get("prediction_created_at") or prediction.get("generated_at") or prediction.get("published_at"))
+    pred_time = parse_time(prediction.get("published_at") or prediction.get("prediction_created_at") or prediction.get("generated_at"))
     start_time = parse_time(prediction.get("start_time"))
     if not pred_time or not start_time or pred_time >= start_time:
         return None
@@ -135,7 +136,11 @@ def result_for(prediction, event):
     return {
         "ledger_id": "nba-total:" + str(event["id"]),
         "sport": "basketball", "league": "NBA", "event_id": str(event["id"]),
-        "start_time": prediction["start_time"], "player_1": prediction.get("player_1"),
+        "start_time": prediction["start_time"], "published_at": prediction.get("published_at"),
+        "publication_snapshot_id": prediction.get("publication_snapshot_id"),
+        "publication_snapshot_verified": prediction.get("publication_snapshot_verified") is True,
+        "publication_snapshot_kind": prediction.get("publication_snapshot_kind"),
+        "player_1": prediction.get("player_1"),
         "player_2": prediction.get("player_2"), "prediction_created_at": pred_time.isoformat(),
         "model": prediction.get("model"), "expected_total": prediction.get("expected_total"),
         "market_id": "225", "market_source": market.get("source"),
@@ -150,16 +155,29 @@ def result_for(prediction, event):
 
 def main():
     predictions = load(PREDICTIONS, [])
+    snapshots = load(SNAPSHOTS, [])
+    if not isinstance(predictions, list):
+        predictions = []
+    if not isinstance(snapshots, list):
+        snapshots = []
+    # The frozen publication record takes precedence over the mutable current desk row.
+    candidates_by_id = {str(p.get("event_id")): p for p in predictions if p.get("event_id")}
+    snapshots_by_id = {}
+    for snapshot in sorted(snapshots, key=lambda row: str(row.get("published_at") or "")):
+        if isinstance(snapshot, dict) and snapshot.get("event_id"):
+            snapshots_by_id.setdefault(str(snapshot["event_id"]), snapshot)
+    candidates_by_id.update(snapshots_by_id)
+    candidates = list(candidates_by_id.values())
     old = load(LEDGER, {"records": []})
     records = old.get("records", []) if isinstance(old, dict) else []
     by_id = {str(r.get("event_id")): r for r in records if r.get("event_id")}
     # Add price-audit metadata to legacy rows without changing their settled outcome.
-    # The current prediction file is not proof of an immutable historical publication snapshot.
+    # A frozen snapshot is preferred; a mutable current row is explicitly unverified.
     predictions_by_id = {str(p.get("event_id")): p for p in predictions if p.get("event_id")}
     for eid, row in by_id.items():
         if "roi_eligible" in row:
             continue
-        prediction = predictions_by_id.get(eid)
+        prediction = snapshots_by_id.get(eid) or predictions_by_id.get(eid)
         market = ((prediction or {}).get("markets") or {}).get("total_ou") or {}
         try:
             row_line_matches = float(row.get("line")) == float(market.get("line"))
@@ -170,12 +188,18 @@ def main():
                 prediction, market,
                 parse_time(prediction.get("prediction_created_at") or prediction.get("generated_at") or prediction.get("published_at"))
             )
-            audit["publication_snapshot_verified"] = False
-            audit["roi_eligible"] = False
+            is_frozen_snapshot = bool(
+                prediction.get("publication_snapshot_verified") is True
+                and prediction.get("publication_snapshot_id")
+                and prediction.get("published_at")
+            )
+            audit["publication_snapshot_verified"] = is_frozen_snapshot
+            audit["roi_eligible"] = bool(audit["roi_eligible"] and is_frozen_snapshot)
             audit["price_audit_backfilled"] = True
-            audit["roi_ineligibility_reasons"] = sorted(set(
-                audit["roi_ineligibility_reasons"] + ["backfilled_from_current_prediction_not_frozen_snapshot"]
-            ))
+            if not is_frozen_snapshot:
+                audit["roi_ineligibility_reasons"] = sorted(set(
+                    audit["roi_ineligibility_reasons"] + ["backfilled_from_current_prediction_not_frozen_snapshot"]
+                ))
             row.update(audit)
         else:
             row.update({
@@ -189,7 +213,7 @@ def main():
             })
     # Reconcile every prediction date, including recently completed games missed by a prior run.
     dates = set()
-    for p in predictions:
+    for p in candidates:
         dt = parse_time(p.get("start_time"))
         if dt:
             dates.add(dt.astimezone(ZoneInfo("America/New_York")).strftime("%Y%m%d"))
@@ -203,7 +227,7 @@ def main():
             print("Scoreboard fetch failed for", day, ":", str(exc)[:180])
             continue
         event_by_id = {str(e.get("id")): e for e in events if e.get("id")}
-        for p in predictions:
+        for p in candidates:
             eid = str(p.get("event_id") or "")
             event = event_by_id.get(eid)
             if not event or eid in by_id:
