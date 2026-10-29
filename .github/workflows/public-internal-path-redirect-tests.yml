@@ -1,0 +1,29 @@
+name: Public internal-path redirect regression tests
+
+on:
+  pull_request:
+    paths:
+      - '_redirects'
+      - 'scripts/test_public_internal_path_redirects.mjs'
+      - '.github/workflows/public-internal-path-redirect-tests.yml'
+      - '*.html'
+      - '**/*.html'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Validate internal-path blocks and browser references
+        run: node scripts/test_public_internal_path_redirects.mjs
+      - name: Verify the isolated preview deployment, when accessible
+        env:
+          MATCH_SIGNAL_PREVIEW_BASE: https://deploy-preview-353--match-signal.netlify.app
+        run: node scripts/test_public_internal_path_redirects.mjs
