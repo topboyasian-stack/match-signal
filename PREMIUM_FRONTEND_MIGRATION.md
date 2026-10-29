@@ -108,7 +108,7 @@ Use a narrow, evidence-led launch scope while all other sports and markets conti
 - Tennis match winner: 209/434 correct (48.16%) in the latest tennis artifact.
 - Tennis totals: 166/384 decisions correct (43.23%).
 - Overall football 1X2: 225/442 correct (50.90%) in the latest football artifact.
-- Basketball: historical strict holdout noted in prior QA was 59.01% accuracy versus a 63.98% market baseline and -17.08% ROI over 161 games; current basketball settled-ledger reconciliation is incomplete. Keep basketball in backend repair/shadow mode until the prediction/settlement chain is verified end-to-end.
+- **Basketball full-game totals: include as a separate candidate cohort, not exclude with all basketball.** If the user's totals results outperform the other basketball markets, preserve and evaluate that specific market in parallel with the football pilot. Keep it in a controlled paper-research/shadow pilot until its totals-only sample is reconciled against the settled ledger, publication-time SportyBet quotes are verified, and calibration plus bookmaker-relative returns can be computed for the same cohort. Do not generalize totals performance to basketball moneyline/spread or the whole sport. The historical strict basketball holdout (59.01% accuracy versus a 63.98% market baseline and -17.08% ROI over 161 games) is an overall/previous cohort and does not by itself disprove a better-performing totals submarket; current basketball settlement reconciliation remains incomplete.
 - Do not select accumulators as the flagship product based on combined model probabilities alone. Evaluate individual leg calibration, exact current bookmaker prices, and settled accumulator-level ROI separately.
 
 ### Backend improvement loop for every non-launch market
