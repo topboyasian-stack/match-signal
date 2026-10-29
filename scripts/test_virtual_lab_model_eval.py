@@ -1,5 +1,5 @@
 """Regression checks for the accelerated Virtual Lab line-ladder fit."""
-from virtual_lab_model_eval import evaluate_participant_feature_gate,fit_lambda,poisson_over,holdout_prediction_rows,normalize_selection,build_events
+from virtual_lab_model_eval import evaluate_participant_feature_gate,fit_lambda,poisson_over,holdout_prediction_rows,normalize_selection,build_events,selection_line_key,rows_with_selection_line_key
 
 def reference_fit(points):
     if not points:return None
@@ -149,3 +149,20 @@ def test_holdout_prediction_export_is_efootball_only_and_never_includes_training
 
 test_holdout_prediction_export_is_efootball_only_and_never_includes_training_rows()
 print("Same-fixture Poisson holdout export regression passed")
+
+def test_product_selection_line_keys_are_exact_and_directional():
+    rows = [
+        {"product": "efootball_gt", "selection": "under", "line": 4.5, "y": 1},
+        {"product": "efootball_gt", "selection": "over", "line": 4.5, "y": 0},
+        {"product": "efootball_gt", "selection": "under", "line": 7.5, "y": 1},
+        {"product": "efootball_gt", "selection": "draw", "line": 4.5, "y": 1},
+    ]
+    assert [selection_line_key(row) for row in rows] == ["u4.5", "o4.5", "u7.5", None]
+    exported = rows_with_selection_line_key(rows)
+    assert [row["selection_line"] for row in exported] == ["u4.5", "o4.5", "u7.5"]
+    assert len(exported) == 3
+    assert "selection_line" not in rows[0], "helper must not mutate canonical scored rows"
+
+
+test_product_selection_line_keys_are_exact_and_directional()
+print("Product-side-line evidence-key regression passed")
