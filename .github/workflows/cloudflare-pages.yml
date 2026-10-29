@@ -273,7 +273,7 @@ jobs:
               raise SystemExit('Protected scripts directory unexpectedly exists in public deployment.')
           print('Public deployment boundary check passed: scripts/ is excluded and not referenced by browser assets.')
           PY
-                    build_tag="$(date -u +%Y%m%d)-${SOURCE_SHA:0:12}"
+          build_tag="$(date -u +%Y%m%d)-${SOURCE_SHA:0:12}"
           build_id="MS-UNIFIED-${build_tag}"
           BUILD_ID="$build_id" BUILD_TAG="$build_tag" python - <<'PY'
           import os, re
