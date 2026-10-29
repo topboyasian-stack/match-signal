@@ -1,4 +1,18 @@
 import { authorizeApi, json } from '../../_lib/api-auth.js';
 function headers(){return {'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','Access-Control-Allow-Origin':'*','X-Content-Type-Options':'nosniff'}}
 async function assetJson(context,path){const u=new URL(context.request.url);u.pathname=path;const r=await context.env.ASSETS.fetch(u);return r.ok?r.json():null}
-export async function onRequestGet(context){const denied=await authorizeApi(context,headers());if(denied)return denied;const data=await assetJson(context,'/data/predictions.json');if(!data)return json({error:'DATA_UNAVAILABLE'},503,headers());const url=new URL(context.request.url),sport=url.searchParams.get('sport');if(sport&&!['football','tennis'].includes(sport.toLowerCase()))return json({error:'INVALID_SPORT'},400,headers());const rows=(Array.isArray(data)?data:[]).filter(x=>!sport||String(x.sport).toLowerCase()===sport.toLowerCase());return json({version:'match-signal-api-v1',updated_at:new Date().toISOString(),count:rows.length,sport:sport||'all',predictions:rows},200,headers())}
+function latestSourceTimestamp(rows){
+  const candidates=rows.map(x=>x.updated_at||x.calculated_at||x.generated_at||x.published_at||x.created_at).filter(Boolean).map(value=>({value,time:Date.parse(value)})).filter(x=>Number.isFinite(x.time));
+  if(!candidates.length)return null;
+  candidates.sort((a,b)=>b.time-a.time);
+  return new Date(candidates[0].time).toISOString();
+}
+export async function onRequestGet(context){
+  const denied=await authorizeApi(context,headers());if(denied)return denied;
+  const data=await assetJson(context,'/data/predictions.json');
+  if(!data)return json({error:'DATA_UNAVAILABLE'},503,headers());
+  const url=new URL(context.request.url),sport=url.searchParams.get('sport');
+  if(sport&&!['football','tennis'].includes(sport.toLowerCase()))return json({error:'INVALID_SPORT'},400,headers());
+  const rows=(Array.isArray(data)?data:[]).filter(x=>!sport||String(x.sport).toLowerCase()===sport.toLowerCase());
+  return json({version:'match-signal-api-v1',updated_at:latestSourceTimestamp(rows),count:rows.length,sport:sport||'all',predictions:rows},200,headers());
+}
