@@ -14,6 +14,7 @@ const webhook = await read('functions/api/payments/webhook.js');
 const auth = await read('functions/_lib/api-auth.js');
 const schema = await read('migrations/0001_match_signal_payments.sql');
 const checkout = await read('api-access.html');
+const premium = await read('premium.html');
 const success = await read('payment-success.html');
 const docs = await read('docs/PAYSTACK_API_LAUNCH.md');
 const deployWorkflow = await read('.github/workflows/cloudflare-pages.yml');
