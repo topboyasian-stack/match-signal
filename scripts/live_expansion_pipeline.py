@@ -491,7 +491,7 @@ def main():
 
     # Freeze one first-qualified, fresh-price publication per event. Later desk refreshes
     # may change the visible quote, but cannot rewrite the historical performance cohort.
-    snapshot_status = append_nba_totals_publication_snapshots(nba_predictions, published_at=NOW.isoformat())
+    snapshot_status = append_nba_totals_publication_snapshots(nba_predictions, published_at=datetime.now(timezone.utc).isoformat())
 
     (DATA/"ere_divisie_history.json").write_text(json.dumps(ere_history, indent=2), encoding="utf-8")
     (DATA/"nba_history.json").write_text(json.dumps(nba_history, indent=2), encoding="utf-8")
