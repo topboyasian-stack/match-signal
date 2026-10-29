@@ -199,6 +199,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "_headers",
             "index.html",
             "api-access.html",
+            "premium.html",
             "api-terms.html",
             "payment-success.html",
             "api-docs/openapi.yaml",
