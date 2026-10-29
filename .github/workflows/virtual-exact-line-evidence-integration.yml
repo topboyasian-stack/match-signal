@@ -1,0 +1,103 @@
+name: Virtual exact-line evidence integration
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/virtual_lab_model_eval.py'
+      - 'scripts/test_virtual_lab_model_eval.py'
+      - 'scripts/unified_upcoming.py'
+      - 'scripts/test_upcoming_desk_policy.py'
+      - 'scripts/virtual_lab_eligibility.py'
+      - 'scripts/selection_candidate_collector.py'
+      - '.github/workflows/virtual-exact-line-evidence-integration.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rebuild-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install HTTP dependency
+        run: python -m pip install --disable-pip-version-check requests
+      - name: Run focused model and qualification regressions
+        run: |
+          python -m py_compile scripts/virtual_lab_model_eval.py scripts/unified_upcoming.py scripts/virtual_lab_eligibility.py scripts/selection_candidate_collector.py
+          python scripts/test_virtual_lab_model_eval.py
+          python scripts/test_upcoming_desk_policy.py
+      - name: Rebuild strict chronological evaluation from repository history
+        run: python scripts/virtual_lab_model_eval.py
+      - name: Validate exact product-side-line evidence schema
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report=json.loads(Path('data/virtual_lab_model_eval.json').read_text())
+          by_product=report.get('by_product_selection_line') or {}
+          diagnostics=((report.get('efootball_gt_diagnostics') or {}).get('selection') or {})
+          assert isinstance(by_product,dict) and by_product, 'exact product-side-line holdout table is empty'
+          assert isinstance(by_product.get('efootball_gt'),dict), 'missing efootball_gt exact-line table'
+          assert isinstance(diagnostics,dict) and diagnostics, 'directional gate diagnostic table is empty'
+          keys=by_product['efootball_gt']
+          assert all(k.startswith(('o','u')) for k in keys), f'invalid side-line keys: {list(keys)[:10]}'
+          for key, variants in keys.items():
+              assert isinstance(variants,dict), f'{key} has no variant metrics'
+              assert any(isinstance(v,dict) and 'n' in v for v in variants.values()), f'{key} has no holdout counts'
+          print('Exact side-line table:', len(keys), 'keys; directional diagnostics:', len(diagnostics))
+          PY
+      - name: Recalculate conservative product and line eligibility
+        run: python scripts/virtual_lab_eligibility.py
+      - name: Rebuild upcoming board against the corrected evidence artifact
+        env:
+          MATCH_SIGNAL_PUBLIC_BASE: https://match-signal.pages.dev
+        run: python scripts/unified_upcoming.py
+      - name: Rebuild compact candidate artifact
+        run: python scripts/selection_candidate_collector.py
+      - name: Summarize qualification results without changing thresholds
+        run: |
+          python - <<'PY'
+          import json
+          from collections import Counter
+          from datetime import datetime, timezone
+          from pathlib import Path
+          report=json.loads(Path('data/virtual_lab_model_eval.json').read_text())
+          board=json.loads(Path('data/unified_upcoming.json').read_text())
+          candidates=json.loads(Path('data/selection_candidates.json').read_text())
+          now=datetime.now(timezone.utc)
+          from datetime import datetime as dt
+          def parse(value):
+              try:
+                  stamp=dt.fromisoformat(str(value).replace('Z','+00:00'))
+                  return stamp if stamp.tzinfo else stamp.replace(tzinfo=timezone.utc)
+              except Exception:
+                  return None
+          future=[x for x in candidates if x.get('sport')=='virtual' and x.get('product') in {'efootball_gt','efootball_adriatic'} and (parse(x.get('start_time')) or now) > now]
+          status_counts=Counter(str(x.get('qualification_status') or x.get('candidate_status') or 'UNSPECIFIED') for x in future)
+          qualified=[x for x in future if x.get('betting_qualified') is True or x.get('qualified_for_builder') is True or str(x.get('qualification_status') or '').startswith('BETTING_QUALIFIED')]
+          summary={
+            'generated_at':datetime.now(timezone.utc).isoformat(),
+            'paper_only':True,
+            'holdout_product_side_line_keys':len((report.get('by_product_selection_line') or {}).get('efootball_gt') or {}),
+            'future_active_efootball_candidates':len(future),
+            'model_qualified_candidates':len(qualified),
+            'qualification_status_counts':dict(status_counts),
+            'thresholds_changed':False,
+            'notes':'Zero qualified picks remain a valid result if exact-line holdout/recent evidence, quote freshness, market edge, or expected-return gates still fail.'
+          }
+          Path('virtual-exact-line-evidence-integration.json').write_text(json.dumps(summary,indent=2)+'\n')
+          print(json.dumps(summary,indent=2))
+          PY
+      - name: Upload integration summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: virtual-exact-line-evidence-integration-${{ github.run_id }}
+          path: virtual-exact-line-evidence-integration.json
+          if-no-files-found: warn
+          retention-days: 14
