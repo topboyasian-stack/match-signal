@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS ms_api_keys (
   id TEXT PRIMARY KEY,
   email TEXT NOT NULL,
   key_hash TEXT NOT NULL UNIQUE,
+  key_ciphertext TEXT NOT NULL,
   plan_code TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','revoked','expired')),
   expires_at TEXT,
