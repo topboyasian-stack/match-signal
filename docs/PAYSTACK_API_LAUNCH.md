@@ -4,7 +4,8 @@ This is the no-upfront-cost checkout path for selling time-limited access to the
 
 ## What is included
 
-- `/api-access.html`: customer checkout page (₦5,000 / 30 days by default; one-time, no automatic renewal).
+- `/api-access.html`: customer checkout page (₦5,000 / 30 days; one-time, no automatic renewal).
+- `/premium.html`: authenticated Premium Research Desk using the issued API key.
 - `POST /api/payments/initialize`: server-side Paystack transaction initialization; price is controlled server-side in kobo.
 - `POST /api/payments/verify`: server verifies the transaction with Paystack before issuing an API key.
 - `POST /api/payments/webhook`: verifies Paystack's SHA-512 HMAC signature and reconciles successful payments.
@@ -63,5 +64,5 @@ The API is research-only. Prediction accuracy is not a guarantee of profit, and 
 - D1 must be bound and migrated in Cloudflare; this repository change cannot create or bind a database inside your Cloudflare account.
 - A Paystack secret must be added in Cloudflare; no secret belongs in the repository.
 - Live collections are not verified until the deployed test checkout, callback, webhook, key expiry and failed-payment paths have passed.
-- The API keys currently authorize the documented API endpoints. This change does not lock existing public HTML pages behind a subscription.
+- The API keys authorize the documented API endpoints and Premium Research Desk. Existing public HTML pages remain public; the paid product is the authenticated dashboard and API convenience, not exclusive ownership of public prediction records.
 - Before launch, inspect the static output for private/internal files; HTTP cache headers alone do not make a public file private.
