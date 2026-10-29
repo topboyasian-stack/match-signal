@@ -37,11 +37,11 @@ assert.match(checkout, /\/api\/payments\/initialize/);
 assert.match(success, /\/api\/payments\/verify/);
 assert.match(docs, /PAYSTACK_SECRET_KEY/);
 assert.match(docs, /MATCH_SIGNAL_DB/);
-assert.match(deployWorkflow, /functions\\/api\\/payments\\/initialize\\.js/);
-assert.match(deployWorkflow, /functions\\/api\\/payments\\/verify\\.js/);
-assert.match(deployWorkflow, /--exclude='scripts\\/'/);
-assert.match(deployWorkflow, /--exclude='\\.github\\/'/);
-assert.match(deployWorkflow, /--exclude='migrations\\/'/);
+assert.match(deployWorkflow, /functions\/api\/payments\/initialize\.js/);
+assert.match(deployWorkflow, /functions\/api\/payments\/verify\.js/);
+assert.match(deployWorkflow, /--exclude='scripts\/'/);
+assert.match(deployWorkflow, /--exclude='\.github\/'/);
+assert.match(deployWorkflow, /--exclude='migrations\/'/);
 assert.match(deployWorkflow, /Smoke-test Paystack surface and block internal assets/);
 
 async function walk(dir) {
