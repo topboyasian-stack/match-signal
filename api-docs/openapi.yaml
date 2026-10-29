@@ -1,44 +1,271 @@
 openapi: 3.0.3
 info:
-  title: Match Signal API
-  version: 1.0.0
-  description: Read-only API for Match Signal prediction, performance, accumulator and event-market research data. Paper/research only.
+  title: Match Signal Research API
+  version: 1.1.0
+  description: |
+    Read-only football and tennis prediction data, audited paper-performance
+    aggregates, research-qualified manual accumulator candidates, and event-market
+    comparisons from Match Signal.
+
+    IMPORTANT: This API is paper/research data, not betting advice or a promise
+    of profit. The published ledger currently reports 1,149 published records,
+    754 settled, 374 correct (49.6% aggregate settled accuracy), and zero
+    real-bookmaker-price ROI observations. ROI is unavailable until price-backed
+    publication snapshots exist. These figures are a dated dataset snapshot and
+    may change as the ledger is rebuilt.
+
+    No endpoint places bets, stakes money, or executes trades. Consumers must
+    independently inspect each response's status, timestamp, sample size,
+    quote freshness, and qualification fields. Missing or stale prices must not
+    be interpreted as current bookmaker odds.
+  contact:
+    name: Match Signal API support
+    url: https://github.com/topboyasian-stack/match-signal
+  license:
+    name: API access subject to provider terms
 servers:
   - url: https://match-signal.pages.dev/api/v1
+    description: Match Signal Cloudflare Pages production API
 security:
   - bearerAuth: []
+tags:
+  - name: Predictions
+    description: Read-only prediction feed.
+  - name: Performance
+    description: Aggregated paper ledger performance and methodology.
+  - name: Accumulator
+    description: Research-only manual accumulator candidates; never an execution instruction.
+  - name: Market research
+    description: Read-only event-market comparison output.
 paths:
   /predictions:
     get:
-      summary: Current football and tennis predictions
+      tags: [Predictions]
+      operationId: getPredictions
+      summary: Get the current football and tennis prediction feed
+      description: |
+        Returns published prediction rows from the current feed. The optional
+        sport filter accepts football or tennis. These are model outputs and
+        paper records; the endpoint does not promise that any row has a current
+        verified bookmaker quote or qualifies as a bet.
       parameters:
         - in: query
           name: sport
-          schema: {type: string, enum: [football, tennis]}
+          description: Filter by sport.
+          required: false
+          schema:
+            type: string
+            enum: [football, tennis]
       responses:
-        '200': {description: Prediction feed}
-        '401': {description: Unauthorized}
+        '200':
+          description: Prediction feed returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PredictionsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/NotConfiguredOrUnavailable'
   /performance:
     get:
-      summary: Verified paper performance aggregates
+      tags: [Performance]
+      operationId: getPerformance
+      summary: Get verified paper-performance aggregates
+      description: |
+        Returns aggregate counts by sport, market and confidence band from the
+        verified paper ledger. ROI can be null when eligible real bookmaker
+        prices are unavailable; null does not mean zero ROI.
       responses:
-        '200': {description: Performance data}
-        '401': {description: Unauthorized}
+        '200':
+          description: Aggregate paper performance returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PerformanceResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/NotConfiguredOrUnavailable'
   /accumulator:
     get:
-      summary: Research-qualified manual 3-4 selection accumulator
+      tags: [Accumulator]
+      operationId: getAccumulator
+      summary: Get research-qualified manual accumulator candidates
+      description: |
+        Returns the current research artifact, its status, reference combined
+        odds, qualified legs and bookmaker-price metadata. Empty legs or a
+        non-qualified status must be respected. This endpoint does not build,
+        place, or stake a wager.
       responses:
-        '200': {description: Accumulator data}
-        '401': {description: Unauthorized}
+        '200':
+          description: Accumulator research output returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccumulatorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/NotConfiguredOrUnavailable'
   /market-research:
     get:
-      summary: Read-only event-market comparison research
+      tags: [Market research]
+      operationId: getMarketResearch
+      summary: Get read-only event-market research comparisons
+      description: |
+        Returns the current event-market research artifact when available.
+        Results are analytical only. Matching may be unavailable or uncertain;
+        do not treat research comparisons as execution signals.
       responses:
-        '200': {description: Market research data}
-        '401': {description: Unauthorized}
+        '200':
+          description: Market research artifact returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericResearchResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/NotConfiguredOrUnavailable'
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
-      description: Cloudflare Pages secret MATCH_SIGNAL_API_KEY
+      bearerFormat: API key
+      description: |
+        Server-side Cloudflare Pages secret MATCH_SIGNAL_API_KEY. Never embed
+        this secret in browser JavaScript, a public repository, or a client app.
+        For marketplace distribution, configure the provider-side upstream
+        credential in the marketplace integration; never publish the upstream
+        secret as a consumer key.
+  responses:
+    Unauthorized:
+      description: Missing or invalid bearer credential.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            unauthorized:
+              value:
+                error: UNAUTHORIZED
+    NotConfiguredOrUnavailable:
+      description: The server-side API secret is not configured or the source artifact is unavailable.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            notConfigured:
+              value:
+                error: API_NOT_CONFIGURED
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          enum: [UNAUTHORIZED, API_NOT_CONFIGURED, DATA_UNAVAILABLE, LEDGER_UNAVAILABLE, ACCUMULATOR_UNAVAILABLE]
+    PredictionsResponse:
+      type: object
+      required: [version, updated_at, count, sport, predictions]
+      properties:
+        version:
+          type: string
+          example: match-signal-api-v1
+        updated_at:
+          type: string
+          format: date-time
+        count:
+          type: integer
+          minimum: 0
+        sport:
+          type: string
+          description: Requested sport filter or all.
+        predictions:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+          description: Prediction rows from the current feed. Inspect each row's own fields and timestamps.
+    PerformanceResponse:
+      type: object
+      required: [version, updated_at, status, summary, by_sport, by_market, by_confidence]
+      properties:
+        version:
+          type: string
+          example: match-signal-api-v1
+        updated_at:
+          type: string
+          format: date-time
+        status:
+          type: string
+          example: PAPER_TRACKED_NOT_LIVE_MONETIZED
+        summary:
+          $ref: '#/components/schemas/PerformanceAggregate'
+        by_sport:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/PerformanceAggregate'
+        by_market:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/PerformanceAggregate'
+        by_confidence:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/PerformanceAggregate'
+    PerformanceAggregate:
+      type: object
+      properties:
+        published:
+          type: integer
+          minimum: 0
+        settled:
+          type: integer
+          minimum: 0
+        correct:
+          type: integer
+          minimum: 0
+        accuracy:
+          type: number
+          minimum: 0
+          maximum: 1
+          nullable: true
+        measured_roi:
+          type: number
+          nullable: true
+          description: Null when eligible real bookmaker-price observations are absent.
+        roi_observations:
+          type: integer
+          minimum: 0
+    AccumulatorResponse:
+      type: object
+      required: [version, updated_at, status, reference_combined_odds, qualified_legs, bookmaker_odds]
+      properties:
+        version:
+          type: string
+          example: match-signal-api-v1
+        updated_at:
+          type: string
+          format: date-time
+        status:
+          type: string
+        reference_combined_odds:
+          type: number
+          nullable: true
+        qualified_legs:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        bookmaker_odds:
+          type: object
+          additionalProperties: true
+    GenericResearchResponse:
+      type: object
+      description: Shape depends on the currently published market-research artifact.
+      additionalProperties: true
