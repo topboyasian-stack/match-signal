@@ -56,7 +56,9 @@ def price_audit_fields(prediction, market, pred_time):
     )
     price_pair_valid = over_odds is not None and under_odds is not None
     explicit_snapshot = bool(
-        published_time and prediction.get("publication_snapshot_id")
+        published_time
+        and prediction.get("publication_snapshot_id")
+        and prediction.get("publication_snapshot_verified") is True
     )
     source = str(market.get("source") or "").strip().lower()
     source_verified = source == "sportybet nigeria"
