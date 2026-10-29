@@ -70,6 +70,25 @@ Keep two distinct user experiences while reusing one protected source of truth:
 - No claims that the public repository or a copyright notice protects source confidentiality.
 - No production switch before preview verification.
 
-## Immediate next action
 
-Read the current Cloudflare Pages configuration and confirm whether the production output directory serves repository-root files. Then map each required asset into an explicit public build allowlist before changing the deployment.
+## Verified baseline audit (2026-10-29)
+
+The current generated ledger on `main` reports:
+- 1,152 published records; 754 settled; 374 correct; aggregate settled accuracy 49.6%.
+- Real-bookmaker-price ROI observations: 0; measured ROI is unavailable, not zero.
+- Sport breakdown: football 219/434 settled correct (50.46%); tennis 155/320 (48.44%).
+- The ledger status is `PAPER_TRACKED_NOT_LIVE_MONETIZED`; these are paper-research records, not evidence of profitable betting.
+- The ledger currently includes row-level model probabilities, fair odds, Brier scores, and other fields. A future public feed should explicitly allowlist fields rather than return raw ledger rows.
+
+Existing `/api/v1/predictions`, `/api/v1/performance`, and `/api/v1/accumulator` endpoints use one shared `MATCH_SIGNAL_API_KEY`. They are not a safe browser login or subscriber-entitlement system. Never embed that key in either front end.
+
+## Deployment workflow caution
+
+The existing Cloudflare Pages workflow builds from a broad repository-root copy and runs many validation steps from `scripts/`. Excluding `scripts/` from that workflow before completing a dependency and output audit could break the build or change what gets published. Do not merge a broad exclusion into the production workflow as a first step. Keep deployment unchanged until an explicit public asset manifest and preview-only audit are in place.
+
+## Go/no-go status
+
+**Not ready to sell a performance claim or enable paid access yet.** First protect source and internal datasets, define a minimal public output, reconcile the settled ledger, and implement real per-user entitlements. Any initial offer should be described honestly as paper research, with the current sample size and missing ROI evidence visible.
+
+## Immediate next action
+Create a non-production inventory of browser-loaded files, public JSON feeds, and Pages Functions, then build an explicit public asset manifest and run it on a preview. Do not alter the current production deploy workflow until the preview has passed.
