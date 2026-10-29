@@ -19,7 +19,7 @@ async function decryptKey(secret, value) {
 export async function onRequestPost(context) {
   const origin=allowedOrigin(context.request,context.env);
   const cors=origin?{'Access-Control-Allow-Origin':origin,'Vary':'Origin'}:{};
-  if(context.request.headers.get('Origin')&&!origin)return json({error:'ORIGIN_NOT_ALLOWED'},403,{...H,...cors});
+  if(!origin)return json({error:'ORIGIN_NOT_ALLOWED'},403,{...H,...cors});
   if(!context.env.PAYSTACK_SECRET_KEY||!context.env.MATCH_SIGNAL_DB)return json({error:'PAYMENTS_NOT_CONFIGURED'},503,{...H,...cors});
   let body; try{body=await context.request.json()}catch{return json({error:'INVALID_JSON'},400,{...H,...cors})}
   const reference=String(body.reference||'').trim();
