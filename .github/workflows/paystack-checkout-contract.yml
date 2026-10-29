@@ -1,0 +1,30 @@
+name: Match Signal Paystack checkout contract
+on:
+  pull_request:
+    paths:
+      - 'functions/**'
+      - 'migrations/**'
+      - 'api-access.html'
+      - 'payment-success.html'
+      - 'api-terms.html'
+      - 'api-docs/openapi.yaml'
+      - 'docs/PAYSTACK_API_LAUNCH.md'
+      - '_redirects'
+      - 'scripts/test_paystack_checkout.mjs'
+      - '.github/workflows/paystack-checkout-contract.yml'
+permissions:
+  contents: read
+jobs:
+  checkout-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Check JavaScript syntax
+        run: |
+          find functions -type f -name '*.js' -print0 | xargs -0 -n1 node --check
+      - name: Validate payment integration and access boundaries
+        run: node scripts/test_paystack_checkout.mjs
