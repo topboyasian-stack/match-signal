@@ -1,0 +1,35 @@
+name: Match Signal public asset surface audit
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'scripts/audit_public_asset_surface.mjs'
+      - '.github/workflows/public-asset-surface-audit.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Build audit-only inventory
+        run: |
+          node --check scripts/audit_public_asset_surface.mjs
+          node scripts/audit_public_asset_surface.mjs
+          node --input-type=module -e "import fs from 'node:fs'; const d=JSON.parse(fs.readFileSync('PUBLIC-ASSET-SURFACE-INVENTORY.json','utf8')); if(d.mode!=='AUDIT_ONLY_NO_DEPLOYMENT_CHANGES'||!d.totals.repository_files||!Array.isArray(d.pages_function_source_files)||!Array.isArray(d.browser_references)) process.exit(1); console.log('Inventory validated:', JSON.stringify(d.totals));"
+      - name: Upload inventory for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: match-signal-public-asset-surface-inventory
+          path: |
+            PUBLIC-ASSET-SURFACE-INVENTORY.json
+            PUBLIC-ASSET-SURFACE-INVENTORY.md
+          if-no-files-found: error
+          retention-days: 30
