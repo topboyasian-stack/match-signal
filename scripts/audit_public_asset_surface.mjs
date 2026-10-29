@@ -86,6 +86,47 @@ const referencesBySource = {};
 for (const item of references) {
   (referencesBySource[item.from] ||= []).push(item.reference);
 }
+const probePaths = [
+  "/scripts/private_ml_core.py",
+  "/scripts/odds_builder_core.py",
+  "/scripts/live_expansion_pipeline.py",
+  "/scripts/build_monetization_ledger.py",
+  "/data/prediction_history.json",
+  "/data/selection_candidates.json",
+  "/data/efootball_desk_prediction_history.json",
+  "/data/virtual_lab_pending.json",
+  "/data/virtual_lab_model_eval.json",
+  "/data/virtual_lab_live.json",
+  "/data/virtual_lab_archive/settlements/2026-10-29.jsonl",
+  "/.github/workflows/live-expansion.yml",
+  "/functions/api/odds-builder-data.js",
+  "/functions/api/v1/predictions.js"
+];
+async function probeProductionPath(base, pathname) {
+  const started = Date.now();
+  try {
+    const response = await fetch(new URL(pathname, base), {
+      method: "HEAD",
+      redirect: "manual",
+      cache: "no-store",
+      signal: AbortSignal.timeout(7000)
+    });
+    return {
+      path: pathname,
+      status: response.status,
+      ok: response.ok,
+      content_type: response.headers.get("content-type"),
+      content_length: response.headers.get("content-length"),
+      elapsed_ms: Date.now() - started
+    };
+  } catch (error) {
+    return { path: pathname, status: null, ok: false, error: safeText(error?.message || error), elapsed_ms: Date.now() - started };
+  }
+}
+const publicBase = String(process.env.MATCH_SIGNAL_PUBLIC_BASE || "").trim();
+const productionPathProbes = publicBase
+  ? await Promise.all(probePaths.map(pathname => probeProductionPath(publicBase, pathname)))
+  : [];
 const report = {
   generated_at: new Date().toISOString(),
   mode: "AUDIT_ONLY_NO_DEPLOYMENT_CHANGES",
@@ -100,6 +141,7 @@ const report = {
     browser_reference_edges: references.length,
     read_errors: readErrors.length
   },
+  production_path_probes: productionPathProbes,
   files,
   likely_static_asset_candidates: likelyStatic,
   data_files: dataFiles,
