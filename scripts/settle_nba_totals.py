@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Idempotently settle only timestamped NBA full-game totals from exact ESPN event IDs."""
 import json
+import math
 import os
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
@@ -36,7 +37,7 @@ def price_audit_fields(prediction, market, pred_time):
     def positive_decimal(value):
         try:
             value = float(value)
-            return value if value > 1.0 else None
+            return value if math.isfinite(value) and value > 1.0 else None
         except (TypeError, ValueError):
             return None
 
