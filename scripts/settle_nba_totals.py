@@ -26,6 +26,70 @@ def parse_time(value):
     except (TypeError, ValueError):
         return None
 
+def price_audit_fields(prediction, market, pred_time):
+    """Preserve price evidence and explicitly flag whether it is ROI-grade."""
+    quote_time = parse_time(market.get("quote_timestamp"))
+    published_time = parse_time(prediction.get("published_at"))
+    publication_basis = "published_at" if published_time else "prediction_created_at_proxy"
+    reference_time = published_time or pred_time
+
+    def positive_decimal(value):
+        try:
+            value = float(value)
+            return value if value > 1.0 else None
+        except (TypeError, ValueError):
+            return None
+
+    over_odds = positive_decimal(market.get("over_odds"))
+    under_odds = positive_decimal(market.get("under_odds"))
+    age_at_reference = (
+        (reference_time - quote_time).total_seconds() / 60
+        if reference_time and quote_time else None
+    )
+    age_at_start = None
+    start_time = parse_time(prediction.get("start_time"))
+    if start_time and quote_time:
+        age_at_start = (start_time - quote_time).total_seconds() / 60
+
+    fresh_at_reference = (
+        age_at_reference is not None and 0 <= age_at_reference <= 15
+    )
+    price_pair_valid = over_odds is not None and under_odds is not None
+    explicit_snapshot = bool(
+        published_time and prediction.get("publication_snapshot_id")
+    )
+    source = str(market.get("source") or "").strip().lower()
+    source_verified = source == "sportybet nigeria"
+
+    reasons = []
+    if not explicit_snapshot:
+        reasons.append("no_verified_immutable_publication_snapshot")
+    if not quote_time:
+        reasons.append("missing_quote_timestamp")
+    elif age_at_reference is None or age_at_reference < 0:
+        reasons.append("quote_not_proven_available_at_publication")
+    elif age_at_reference > 15:
+        reasons.append("quote_older_than_15_minutes_at_publication")
+    if not price_pair_valid:
+        reasons.append("missing_or_invalid_over_under_decimal_prices")
+    if not source_verified:
+        reasons.append("bookmaker_source_not_verified_as_sportybet_nigeria")
+
+    return {
+        "over_odds": over_odds,
+        "under_odds": under_odds,
+        "quote_age_minutes_at_publication": round(age_at_reference, 3) if age_at_reference is not None else None,
+        "quote_age_minutes_at_start": round(age_at_start, 3) if age_at_start is not None else None,
+        "quote_fresh_at_publication": fresh_at_reference,
+        "price_pair_valid": price_pair_valid,
+        "publication_time_basis": publication_basis,
+        "publication_snapshot_verified": explicit_snapshot,
+        "price_source_verified": source_verified,
+        "roi_eligible": not reasons,
+        "roi_ineligibility_reasons": reasons,
+    }
+
+
 def result_for(prediction, event):
     """Return a settlement record only when exact identity and pregame evidence pass."""
     if str(prediction.get("event_id") or "") != str(event.get("id") or ""):
@@ -64,6 +128,7 @@ def result_for(prediction, event):
         return None
     total = hs + aws
     outcome = "over" if total > line else "under" if total < line else "push"
+    price_audit = price_audit_fields(prediction, market, pred_time)
     return {
         "ledger_id": "nba-total:" + str(event["id"]),
         "sport": "basketball", "league": "NBA", "event_id": str(event["id"]),
@@ -72,6 +137,7 @@ def result_for(prediction, event):
         "model": prediction.get("model"), "expected_total": prediction.get("expected_total"),
         "market_id": "225", "market_source": market.get("source"),
         "quote_timestamp": market.get("quote_timestamp"), "line": line, "pick": pick,
+        **price_audit,
         "final_score": [int(hs) if hs.is_integer() else hs, int(aws) if aws.is_integer() else aws],
         "final_total": total, "result": outcome,
         "settled": True, "settled_at": datetime.now(timezone.utc).isoformat(),
@@ -84,6 +150,40 @@ def main():
     old = load(LEDGER, {"records": []})
     records = old.get("records", []) if isinstance(old, dict) else []
     by_id = {str(r.get("event_id")): r for r in records if r.get("event_id")}
+    # Add price-audit metadata to legacy rows without changing their settled outcome.
+    # The current prediction file is not proof of an immutable historical publication snapshot.
+    predictions_by_id = {str(p.get("event_id")): p for p in predictions if p.get("event_id")}
+    for eid, row in by_id.items():
+        if "roi_eligible" in row:
+            continue
+        prediction = predictions_by_id.get(eid)
+        market = ((prediction or {}).get("markets") or {}).get("total_ou") or {}
+        try:
+            row_line_matches = float(row.get("line")) == float(market.get("line"))
+        except (TypeError, ValueError):
+            row_line_matches = False
+        if prediction and row.get("pick") == market.get("pick") and row_line_matches:
+            audit = price_audit_fields(
+                prediction, market,
+                parse_time(prediction.get("prediction_created_at") or prediction.get("generated_at") or prediction.get("published_at"))
+            )
+            audit["publication_snapshot_verified"] = False
+            audit["roi_eligible"] = False
+            audit["price_audit_backfilled"] = True
+            audit["roi_ineligibility_reasons"] = sorted(set(
+                audit["roi_ineligibility_reasons"] + ["backfilled_from_current_prediction_not_frozen_snapshot"]
+            ))
+            row.update(audit)
+        else:
+            row.update({
+                "over_odds": None, "under_odds": None,
+                "quote_age_minutes_at_publication": None, "quote_age_minutes_at_start": None,
+                "quote_fresh_at_publication": False, "price_pair_valid": False,
+                "publication_time_basis": "unavailable_for_legacy_record",
+                "publication_snapshot_verified": False, "price_source_verified": False,
+                "roi_eligible": False, "price_audit_backfilled": True,
+                "roi_ineligibility_reasons": ["no_matching_prediction_snapshot_for_legacy_record"],
+            })
     # Reconcile every prediction date, including recently completed games missed by a prior run.
     dates = set()
     for p in predictions:
@@ -120,7 +220,8 @@ def main():
         "settlement_rules": ["Exact ESPN event ID only", "Pre-game prediction timestamp required",
                              "Market ID 225 and saved Over/Under line/pick required",
                              "Final official score includes overtime", "Pushes excluded from accuracy",
-                             "Existing settled event IDs are immutable and never duplicated"],
+                             "Existing settlement outcomes are never overwritten",
+                             "ROI requires a verified immutable publication snapshot, fresh quote and both valid prices"],
         "summary": {"settled": len(records), "decided": len(decided), "correct": wins,
                     "accuracy": wins / len(decided) if decided else None,
                     "pushes": sum(r.get("result") == "push" for r in records),
