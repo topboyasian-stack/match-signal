@@ -23,7 +23,7 @@
   result.className='';result.innerHTML='<p><strong>API key</strong></p><code class="key" id="apiKey"></code><p><strong>Plan:</strong> '+String(data.plan).replace(/[&<>"]/g,'')+'<br><strong>Expires:</strong> '+String(data.expires_at||'30 days after activation').replace(/[&<>"]/g,'')+'</p><p class="notice">Send this key in the request header <code>Authorization: Bearer YOUR_API_KEY</code>. Do not place it in public frontend JavaScript or commit it to GitHub.</p><button class="btn" id="copyKey" type="button">Copy API key</button>';
   document.getElementById('apiKey').textContent=data.api_key;
   document.getElementById('copyKey').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(data.api_key);document.getElementById('copyKey').textContent='Copied'}catch{document.getElementById('copyKey').textContent='Select the key above to copy'}});
-  sessionStorage.removeItem('ms_checkout_token_'+reference);actions.className='';
+  actions.className='';
  }catch{fail('The verification service could not be reached. Your payment has not been assumed successful. Reload this page to retry.')}
 })();
 </script></body></html>
