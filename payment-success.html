@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Verify Match Signal payment</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f4f7fb;color:#17253a;font:16px/1.6 system-ui,sans-serif}main{max-width:720px;margin:44px auto;padding:0 18px}.card{background:#fff;border:1px solid #dbe4ee;border-radius:16px;padding:clamp(22px,5vw,40px)}h1{line-height:1.15}.muted{color:#64748b}.notice{background:#eff6ff;padding:14px;border-radius:8px}.key{display:block;overflow-wrap:anywhere;padding:15px;background:#102137;color:#e5f2ff;border-radius:8px;font: .95rem ui-monospace,monospace;user-select:all}.btn{display:inline-block;background:#1769aa;color:#fff;text-decoration:none;border:0;border-radius:8px;padding:12px 16px;font-weight:750;cursor:pointer;margin:8px 8px 0 0}.error{color:#b42318}.hidden{display:none}label{display:block;font-weight:700;margin-top:18px}footer{margin-top:18px;font-size:.88rem;color:#64748b}a{color:#1769aa}
+</style></head><body><main><section class="card">
+<div class="muted">MATCH SIGNAL · PAYMENT CONFIRMATION</div><h1 id="heading">Verifying your payment</h1><p id="message" aria-live="polite">Checking the transaction directly with Paystack. Please keep this page open.</p>
+<div id="result" class="hidden"></div>
+<div id="actions" class="hidden"><a class="btn" href="/premium.html">Open Premium Research Desk</a><a class="btn" href="/api-docs/openapi.yaml">Open API documentation</a><a class="btn" href="/">Public Match Signal</a></div>
+</section><footer>Do not share your API key publicly. Match Signal is a read-only paper/research service, not a promise of profit.</footer></main>
+<script>
+(async()=>{
+ const q=new URLSearchParams(location.search),reference=q.get('reference')||q.get('trxref')||'';
+ const token=reference?sessionStorage.getItem('ms_checkout_token_'+reference):null;
+ const heading=document.getElementById('heading'),message=document.getElementById('message'),result=document.getElementById('result'),actions=document.getElementById('actions');
+ function fail(text){heading.textContent='Payment verification needs attention';message.className='error';message.textContent=text+' Keep your Paystack receipt and transaction reference. You can reload this page to retry.'}
+ if(!/^MS_[A-Za-z0-9_-]{8,100}$/.test(reference)||!token){fail('This browser session does not contain the checkout verification token. Return to the original checkout tab or contact support with your receipt.');return}
+ try{
+  const response=await fetch('/api/payments/verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reference,checkout_token:token})});
+  const data=await response.json();
+  if(!response.ok||data.status!=='paid'||!data.api_key){fail(data.message||'Paystack has not confirmed this payment yet.');return}
+  heading.textContent='Payment confirmed — API access ready';
+  message.textContent='Your payment has been verified by Paystack. Copy and securely save your API key now. It will not be shown in public pages.';
+  result.className='';result.innerHTML='<p><strong>API key</strong></p><code class="key" id="apiKey"></code><p><strong>Plan:</strong> '+String(data.plan).replace(/[&<>"]/g,'')+'<br><strong>Expires:</strong> '+String(data.expires_at||'30 days after activation').replace(/[&<>"]/g,'')+'</p><p class="notice">Send this key in the request header <code>Authorization: Bearer YOUR_API_KEY</code>. Do not place it in public frontend JavaScript or commit it to GitHub.</p><button class="btn" id="copyKey" type="button">Copy API key</button>';
+  document.getElementById('apiKey').textContent=data.api_key;
+  document.getElementById('copyKey').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(data.api_key);document.getElementById('copyKey').textContent='Copied'}catch{document.getElementById('copyKey').textContent='Select the key above to copy'}});
+  actions.className='';
+ }catch{fail('The verification service could not be reached. Your payment has not been assumed successful. Reload this page to retry.')}
+})();
+</script></body></html>

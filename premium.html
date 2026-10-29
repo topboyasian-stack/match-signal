@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Match Signal Premium Research Desk</title>
+<style>
+:root{color-scheme:light;--ink:#17253a;--muted:#64748b;--line:#dbe4ee;--bg:#f4f7fb;--blue:#1769aa;--teal:#087f8c;--good:#137547;--bad:#b42318}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}main{max-width:1180px;margin:26px auto;padding:0 18px}.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.brand{font-size:.78rem;letter-spacing:.1em;font-weight:850;color:var(--blue)}a{color:var(--blue)}.pill{font-size:.76rem;font-weight:800;padding:6px 10px;border-radius:999px;background:#e4f5ed;color:#146c43}.hero{margin:20px 0 18px}.hero h1{font-size:clamp(2rem,5vw,3rem);line-height:1.08;margin:8px 0}.muted{color:var(--muted)}.panel{background:white;border:1px solid var(--line);border-radius:14px;padding:20px;margin:14px 0;box-shadow:0 8px 28px #10233a08}.connect{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;align-items:end}.field label{display:block;font-weight:750;margin-bottom:6px}input{width:100%;min-width:0;border:1px solid #b8c6d6;border-radius:8px;padding:12px;font:inherit}button,.button{border:0;border-radius:8px;padding:12px 15px;font:inherit;font-weight:800;cursor:pointer;background:var(--blue);color:white;text-decoration:none;display:inline-block}button.secondary,.button.secondary{background:#e8eef5;color:#263d56}.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.metric{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px}.metric small{display:block;color:var(--muted)}.metric strong{display:block;font-size:1.7rem;line-height:1.3;margin-top:6px}.grid{display:grid;grid-template-columns:1.2fr .8fr;gap:14px}.panel h2{font-size:1.15rem;margin:0 0 12px}.status{font-size:.9rem;margin:10px 0 0;color:var(--muted)}.error{color:var(--bad)}.good{color:var(--good)}.scroll{overflow:auto}table{width:100%;border-collapse:collapse;min-width:660px}th,td{text-align:left;border-bottom:1px solid #e7edf3;padding:10px 9px;vertical-align:top}th{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}td{font-size:.88rem}.tag{display:inline-block;border-radius:6px;padding:3px 7px;background:#eef4f9;font-size:.75rem;font-weight:750}.notice{background:#fff7e6;border:1px solid #f2dfb1;padding:12px 14px;border-radius:9px;color:#71521a;font-size:.88rem}.hidden{display:none}footer{padding:22px 0;color:var(--muted);font-size:.85rem}@media(max-width:760px){.connect{grid-template-columns:1fr 1fr}.field{grid-column:1/-1}.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.grid{grid-template-columns:1fr}}@media(max-width:420px){.connect{grid-template-columns:1fr}.metrics{gap:8px}.metric{padding:12px}.metric strong{font-size:1.4rem}}
+</style></head>
+<body><main>
+<header class="top"><div class="brand">MATCH SIGNAL · RESEARCH & INTELLIGENCE</div><div><span class="pill">PREMIUM API ACCESS</span> <a href="/api-access.html">Manage access</a></div></header>
+<section class="hero"><div class="brand">AUTHENTICATED RESEARCH WORKSPACE</div><h1>Premium Research Desk</h1><p class="muted">Connect the API key issued after checkout to load the authenticated prediction feed, paper-performance summary, accumulator research and event-market diagnostics.</p></section>
+<section class="panel">
+<form id="connectForm" class="connect">
+<div class="field"><label for="apiKey">Your Match Signal API key</label><input id="apiKey" type="password" autocomplete="off" spellcheck="false" required placeholder="ms_live_…"></div>
+<button type="submit" id="connectButton">Connect desk</button><button class="secondary" id="clearButton" type="button">Clear key</button>
+</form><p id="connectionStatus" class="status" role="status" aria-live="polite">Enter your key to load the premium workspace. The key is stored only in this browser tab's session.</p>
+</section>
+<div id="dashboard" class="hidden">
+<section class="metrics">
+<div class="metric"><small>Feed rows returned</small><strong id="feedCount">—</strong></div>
+<div class="metric"><small>Paper records settled</small><strong id="settledCount">—</strong></div>
+<div class="metric"><small>Settled accuracy</small><strong id="accuracy">—</strong></div>
+<div class="metric"><small>Measured ROI observations</small><strong id="roiCount">—</strong></div>
+</section>
+<div class="grid">
+<section class="panel"><h2>Authenticated prediction feed</h2><p id="feedStatus" class="status">Waiting for connection…</p><div class="scroll"><table><thead><tr><th>Event</th><th>Sport / Market</th><th>Selection</th><th>Model probability</th><th>Start time</th></tr></thead><tbody id="predictionsBody"><tr><td colspan="5">Connect your key to load data.</td></tr></tbody></table></div><p id="feedMore" class="status"></p></section>
+<div>
+<section class="panel"><h2>Paper performance</h2><p id="performanceStatus" class="status">Waiting for connection…</p><div id="performanceDetails" class="status"></div></section>
+<section class="panel"><h2>Accumulator research</h2><p id="builderStatus" class="status">Waiting for connection…</p><div id="builderDetails" class="status"></div></section>
+<section class="panel"><h2>Event-market research</h2><p id="marketStatus" class="status">Waiting for connection…</p><div id="marketDetails" class="status"></div></section>
+</div></div>
+</div>
+<section class="panel notice"><strong>Research-only disclosure:</strong> Predictions can be wrong. Current verified bookmaker quotes and real-price ROI may be unavailable; model probabilities are not bookmaker odds. Match Signal does not place bets and does not guarantee profit. Existing public Match Signal pages remain public; this paid access provides the authenticated research desk and API convenience, not exclusive ownership of publicly displayed predictions.</section>
+<footer><a href="/api-docs/openapi.yaml">API documentation</a> · <a href="/api-terms.html">Access terms</a> · <a href="/">Public Match Signal desk</a></footer>
+</main>
+<script>
+const form=document.getElementById('connectForm'),input=document.getElementById('apiKey'),status=document.getElementById('connectionStatus'),dashboard=document.getElementById('dashboard');
+const saved=sessionStorage.getItem('ms_premium_api_key');if(saved)input.value=saved;
+function showText(id,value){document.getElementById(id).textContent=value==null||value===''?'—':String(value)}
+function pct(value){if(value===null||value===undefined||value==='')return 'Unavailable';const n=Number(value);return Number.isFinite(n)?(n*100).toFixed(1)+'%':'Unavailable'}
+function displayTime(value){if(!value)return '—';const d=new Date(value);return Number.isNaN(d.getTime())?String(value):d.toLocaleString()}
+async function api(path,key){const r=await fetch('/api/v1/'+path,{headers:{Authorization:'Bearer '+key},cache:'no-store'});let data={};try{data=await r.json()}catch{}if(!r.ok)throw new Error(data.message||data.error||('HTTP '+r.status));return data}
+function setStatus(id,message,error=false){const el=document.getElementById(id);el.textContent=message;el.className='status'+(error?' error':'')}
+function cell(row,value){const td=document.createElement('td');td.textContent=value==null||value===''?'—':String(value);row.appendChild(td)}
+function renderPredictions(data){
+ const body=document.getElementById('predictionsBody');body.replaceChildren();
+ const rows=Array.isArray(data.predictions)?data.predictions:[];
+ for(const item of rows.slice(0,40)){
+  const tr=document.createElement('tr');
+  cell(tr,item.event||item.fixture||item.match||[item.home_team,item.away_team].filter(Boolean).join(' vs '));
+  cell(tr,[item.sport,item.market||item.market_name].filter(Boolean).join(' · '));
+  cell(tr,item.selection||item.pick||item.prediction);
+  const prob=Number(item.model_probability??item.probability);
+  cell(tr,Number.isFinite(prob)?(prob<=1?pct(prob):prob.toFixed(1)+'%'):'—');
+  cell(tr,displayTime(item.start_time||item.kickoff||item.commence_time));
+  body.appendChild(tr);
+ }
+ if(!rows.length){const tr=document.createElement('tr');cell(tr,'No prediction rows are available in the current source feed.');body.appendChild(tr).lastChild.colSpan=5;}
+ showText('feedCount',data.count??rows.length);
+ setStatus('feedStatus',rows.length+' row(s) returned · source timestamp: '+(data.updated_at?displayTime(data.updated_at):'not provided'));
+ showText('feedMore',rows.length>40?'Showing first 40 of '+rows.length+' rows. Use the API endpoint for the full feed.':'');
+}
+async function connect(key){
+ status.className='status';status.textContent='Authenticating key and loading research data…';dashboard.classList.remove('hidden');
+ try{
+  const feed=await api('predictions',key);
+  sessionStorage.setItem('ms_premium_api_key',key);
+  renderPredictions(feed);
+  const tasks=await Promise.allSettled([api('performance',key),api('accumulator',key),api('market-research',key)]);
+  const [p,b,m]=tasks;
+  if(p.status==='fulfilled'){
+   const d=p.value,s=d.summary||{};showText('settledCount',s.settled??'—');showText('accuracy',pct(s.accuracy));showText('roiCount',s.roi_observations??0);
+   setStatus('performanceStatus','Ledger status: '+(d.status||'not specified'));
+   showText('performanceDetails','Published: '+(s.published??'—')+' · Settled: '+(s.settled??'—')+' · Correct: '+(s.correct??'—')+' · Measured ROI: '+(s.measured_roi==null?'Unavailable (no qualifying price records)':pct(s.measured_roi)));
+  }else setStatus('performanceStatus',p.reason.message||'Performance endpoint unavailable.',true);
+  if(b.status==='fulfilled'){
+   const d=b.value;setStatus('builderStatus','Status: '+(d.status||'not specified'));
+   showText('builderDetails','Reference combined odds: '+(d.reference_combined_odds??'Unavailable')+' · Qualified legs returned: '+(Array.isArray(d.qualified_legs)?d.qualified_legs.length:0));
+  }else setStatus('builderStatus',b.reason.message||'Accumulator endpoint unavailable.',true);
+  if(m.status==='fulfilled'){
+   const d=m.value;setStatus('marketStatus','Status: '+(d.status||'not specified'));
+   const kalshi=d.kalshi||{};showText('marketDetails','Market comparisons: '+(kalshi.comparison_count??'—')+' · Execution: '+(d.execution||'disabled')+' · Webull: '+((d.webull||{}).status||'not connected'));
+  }else setStatus('marketStatus',m.reason.message||'Market research endpoint unavailable.',true);
+  status.className='status good';status.textContent='Connected. This tab now remembers the key until the tab is closed or you clear it.';
+ }catch(err){
+  sessionStorage.removeItem('ms_premium_api_key');dashboard.classList.add('hidden');status.className='status error';status.textContent=err.message==='UNAUTHORIZED'?'This key is invalid or expired. Check the key or renew access.':(err.message||'Unable to connect. Check the key and try again.');
+ }
+}
+form.addEventListener('submit',e=>{e.preventDefault();const key=input.value.trim();if(key)connect(key)});
+document.getElementById('clearButton').addEventListener('click',()=>{sessionStorage.removeItem('ms_premium_api_key');input.value='';dashboard.classList.add('hidden');status.className='status';status.textContent='Key cleared from this tab.'});
+if(saved)connect(saved);
+</script></body></html>
