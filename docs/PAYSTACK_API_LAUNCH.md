@@ -18,7 +18,7 @@ This is the no-upfront-cost checkout path for selling time-limited access to the
 2. Create a **D1 database** (no paid third-party service is needed for the D1 binding; check your Cloudflare plan quotas) and bind it with the exact variable name `MATCH_SIGNAL_DB`.
 3. Apply `migrations/0001_match_signal_payments.sql` to that database using the D1 console or Cloudflare's D1 migration workflow. Confirm both `ms_payments` and `ms_api_keys` tables exist.
 4. Under the Pages project's **Settings → Variables and Secrets**, add `PAYSTACK_SECRET_KEY` as an encrypted secret. Use Paystack test keys for a test deployment first. Never put the key in HTML, a public variable, or Git.
-5. Optionally set `MATCH_SIGNAL_API_MONTHLY_PRICE_KOBO` to a whole number of kobo. Default is `500000` (₦5,000). Keep this as a server-side variable; do not accept a price from the browser.
+5. Launch price is fixed server-side at `500000` kobo (₦5,000) for one 30-day access term. Change the server code and the displayed price together if you later choose a different price; never accept a price from the browser.
 6. `MATCH_SIGNAL_ALLOWED_ORIGINS` defaults to `https://match-signal.pages.dev`. If checkout uses a custom domain, set this to a comma-separated list of exact trusted origins, including the scheme, with no path.
 7. Deploy the branch through the pull request and verify the deployment is serving these files. Do not merge or switch the production branch until the checks below pass.
 
