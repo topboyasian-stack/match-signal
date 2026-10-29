@@ -1,5 +1,6 @@
 import json
 import sys
+import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -55,6 +56,34 @@ assert total["pick"] == "over" and total["lean"] == "OVER"
 assert total["projection_edge_points"] == 6.5
 assert total["model_is_market_blind"] is True
 assert attached["markets"]["moneyline"]["home"] == 0.6, "SportyBet prices must not alter independent winner probabilities"
+
+# First qualified totals publication is frozen once per event and cannot be overwritten.
+snapshot_prediction = {
+    "sport": "basketball", "league": "NBA", "event_id": "espn:test-snapshot",
+    "start_time": start.isoformat(), "player_1": fixture["home"], "player_2": fixture["away"],
+    "prediction_created_at": now.isoformat(), "generated_at": now.isoformat(),
+    "expected_total": 235.0, "markets": attached["markets"],
+}
+snapshot = pipeline.nba_total_publication_snapshot(snapshot_prediction, now.isoformat())
+assert snapshot and snapshot["publication_snapshot_verified"] is True
+assert snapshot["publication_snapshot_id"].startswith("nba-total-pub:")
+assert snapshot["markets"]["total_ou"]["over_odds"] == 1.91
+assert snapshot["markets"]["total_ou"]["under_odds"] == 1.89
+
+with tempfile.TemporaryDirectory() as tmp:
+    snapshot_path = Path(tmp) / "nba_totals_publication_snapshots.json"
+    first = pipeline.append_nba_totals_publication_snapshots([snapshot_prediction], snapshot_path, now.isoformat())
+    assert first == {"added": 1, "total": 1}
+    changed = json.loads(json.dumps(snapshot_prediction))
+    changed["markets"]["total_ou"]["line"] = 231.5
+    second = pipeline.append_nba_totals_publication_snapshots([changed], snapshot_path, (now + timedelta(minutes=30)).isoformat())
+    saved = json.loads(snapshot_path.read_text(encoding="utf-8"))
+    assert second == {"added": 0, "total": 1}, "a later desk refresh must not overwrite the first published selection"
+    assert saved[0]["markets"]["total_ou"]["line"] == 228.5
+
+stale_prediction = json.loads(json.dumps(snapshot_prediction))
+stale_prediction["markets"]["total_ou"]["quote_timestamp"] = (now - timedelta(minutes=20)).isoformat()
+assert pipeline.nba_total_publication_snapshot(stale_prediction, now.isoformat()) is None, "stale prices must not be published into the eligible snapshot cohort"
 
 settlement = (ROOT / "scripts" / "settle_expansion.py").read_text(encoding="utf-8")
 assert "total_ou_final_points" in settlement and "Official final score including overtime" in settlement
