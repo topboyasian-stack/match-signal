@@ -20,11 +20,11 @@ const sandbox = { Date, Number, String, Math, Array, Boolean, Object, Map, Set, 
 vm.createContext(sandbox);
 vm.runInContext(
   source.slice(sourceStart, sourceEnd) +
-    "\n;globalThis.__desk={isVirtualDeskCandidate,qualificationState,exactVirtualMarketLine,qualifiedBestSelections};",
+    "\n;globalThis.__desk={isVirtualDeskCandidate,qualificationState,exactVirtualMarketLine,qualifiedBestSelections,isOverUnderPrediction,rawProbabilityValue};",
   sandbox,
   { filename: "sport-hubs.js#live-quote-coverage" }
 );
-const { isVirtualDeskCandidate, qualificationState, exactVirtualMarketLine, qualifiedBestSelections } = sandbox.__desk;
+const { isVirtualDeskCandidate, qualificationState, exactVirtualMarketLine, qualifiedBestSelections, isOverUnderPrediction, rawProbabilityValue } = sandbox.__desk;
 
 const candidateRaw = await readFile(new URL("../data/selection_candidates.json", import.meta.url), "utf8");
 console.log("[coverage] read candidate artifact bytes=" + candidateRaw.length);
