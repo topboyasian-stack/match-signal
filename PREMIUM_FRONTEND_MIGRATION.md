@@ -126,3 +126,20 @@ The best current **candidate** is football pre-match with a high-confidence filt
 
 ## Immediate next action
 Create a non-production inventory of browser-loaded files, public JSON feeds, and Pages Functions, then build an explicit public asset manifest and run it on a preview. Do not alter the current production deploy workflow until the preview has passed.
+
+## Basketball: explicit repair track (not dropped)
+
+Basketball is excluded from the first commercial pilot because its current data and settlement chain is not yet trustworthy enough—not because the sport is being removed from Match Signal. Keep the Basketball page and its existing prediction engine in place while repairing and validating it in shadow mode. Do not claim it is fixed or publish performance claims until the checks below pass.
+
+Known basketball acceptance criteria carried forward from the Basketball Prediction Status QA:
+
+1. **Upcoming/live state:** exclude games that have already started from Upcoming; ensure live and final states reflect the event status rather than stale schedule data.
+2. **Current bookmaker line integrity:** model projected totals must remain separate from SportyBet lines. A historical line (for example, the Kings–Grizzlies example showed model total 234.7 against a historical SportyBet line of 221.5) must never be represented as a current verified quote or used to generate a current lean.
+3. **Alternative-line consistency:** when a SportyBet total line is changed, update the selected line, both relevant prices, model lean/value calculation, and every linked odds-builder selection together. Do not leave mixed values from different lines.
+4. **Freshness gate:** a selection may qualify only against an exact matched SportyBet fixture and market with a verified quote no older than 15 minutes. If no current quote exists, show a clear unavailable/no-lean state and do not substitute historical prices.
+5. **Settlement ledger:** reconcile every published basketball prediction against the authoritative final result, including full-game overtime rules and void/push cases. Store immutable publication-time snapshots and settlement evidence; do not count a displayed final score as a settled ledger result until the ledger confirms it.
+6. **Performance reconciliation:** resolve the conflicting historical prediction/final counts seen in QA and reconcile the Basketball UI, prediction feed, results view, and settled ledger to one source of truth. Then calculate accuracy, calibration and bookmaker-relative ROI only for the exact same eligible cohort; do not reuse the historical 59.01% holdout figure as current performance.
+7. **Builder validation:** verify the four Basketball odds-builder areas use only current, valid selections and calculate combined odds correctly; prevent missing prices or stale lines from silently producing a 1.00 combined-odds result.
+8. **Release gate:** add automated regression checks for started-game filtering, line/price/lean synchronization, stale-quote rejection, settlement idempotency, and builder totals. Keep the market at `SHADOW / REPAIR` until the tests pass and the reconciled sample is independently checked.
+
+This basketball backlog is part of the continuing backend work even while the football paper-research cohort is evaluated first. It must not be removed from navigation or silently abandoned as a side effect of narrowing the initial launch scope.
