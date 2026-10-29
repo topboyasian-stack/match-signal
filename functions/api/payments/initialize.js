@@ -11,7 +11,7 @@ export async function onRequestPost(context) {
   const email = String(body.email || '').trim().toLowerCase();
   if (!emailValid(email)) return json({ error: 'INVALID_EMAIL' }, 400, { ...BASE_HEADERS, ...cors });
   const plan = 'api_monthly';
-  const amount = Number.parseInt(context.env.MATCH_SIGNAL_API_MONTHLY_PRICE_KOBO || '500000', 10);
+  const amount = 500000; // Fixed server-side launch price: NGN 5,000. Never accept price from the browser.
   if (!Number.isSafeInteger(amount) || amount < 10000 || amount > 100000000) return json({ error: 'INVALID_PRICE_CONFIGURATION' }, 503, { ...BASE_HEADERS, ...cors });
   const reference = 'MS_' + Date.now().toString(36) + '_' + randomToken(12);
   const checkoutToken = randomToken(32);
