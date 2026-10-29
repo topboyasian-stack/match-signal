@@ -455,7 +455,7 @@ def main():
       "efootball_gt_diagnostics":{
         "competition":nested_table("competition","line",[r for r in hold if r["product"]=="efootball_gt"]),
         "line":{str(line):{variant:metrics([r for r in hold if r["product"]=="efootball_gt" and r["line"]==line],variant) for variant in variants} for line in evaluation_lines},
-        "selection":nested_table("selection","line",[r for r in hold if r["product"]=="efootball_gt"])
+        "selection":nested_table("selection_line","line",rows_with_selection_line_key([r for r in hold if r["product"]=="efootball_gt"]))
       },
       "participant_feature_gate":{
         "minimum_participant_total_history":MIN_PARTICIPANT_TOTAL_HISTORY,
