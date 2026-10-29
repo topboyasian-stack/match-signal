@@ -339,7 +339,11 @@ def ere_prediction(fixture, history):
 
 
 def nba_total_publication_snapshot(prediction, published_at=None):
-    """Freeze the first fresh, priced Over/Under selection published for an NBA event."""
+    """Freeze the first price-auditable pre-match NBA total generated for an event.
+
+This is a complete research cohort, not a claim that the model signal passed a
+separate confidence/qualification threshold.
+"""
     published_at = dt(published_at or NOW.isoformat())
     start = dt(prediction.get("start_time"))
     market = ((prediction.get("markets") or {}).get("total_ou") or {})
@@ -370,7 +374,7 @@ def nba_total_publication_snapshot(prediction, published_at=None):
     snapshot = json.loads(json.dumps(prediction))
     snapshot["published_at"] = published_at.isoformat()
     snapshot["publication_snapshot_verified"] = True
-    snapshot["publication_snapshot_kind"] = "first_qualified_pre_match_nba_total"
+    snapshot["publication_snapshot_kind"] = "first_price_auditable_pre_match_nba_total"
     identity = "|".join([
         str(snapshot.get("event_id") or ""), snapshot["published_at"],
         str(line), str(market.get("pick")), str(market.get("quote_timestamp")),
