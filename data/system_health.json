@@ -1,26 +1,26 @@
 {
-  "generated_at": "2026-10-30T19:51:30.396214+00:00",
+  "generated_at": "2026-10-30T19:57:35.845501+00:00",
   "status": "FAIL",
-  "critical_issues": 2,
+  "critical_issues": 3,
   "warning_issues": 0,
   "info_issues": 1,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
       "status": "STALE",
-      "age_hours": 4.83,
+      "age_hours": 4.93,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.13,
+      "age_hours": 0.09,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
-      "status": "PASS",
-      "age_hours": 3.93,
+      "status": "STALE",
+      "age_hours": 4.03,
       "threshold_hours": 4
     },
     {
@@ -32,19 +32,19 @@
     {
       "engine": "prediction_desk_health",
       "status": "PASS",
-      "age_hours": 0.05,
+      "age_hours": 0.06,
       "threshold_hours": 2
     },
     {
       "engine": "tennis_forward_discovery",
       "status": "PASS",
-      "age_hours": 4.77,
+      "age_hours": 4.87,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 1.14,
+      "age_hours": 1.24,
       "threshold_hours": 0.5,
       "heartbeat_source": "unified_live_refresh"
     },
@@ -87,7 +87,12 @@
     {
       "code": "STALE_CORE_PREDICTION_PIPELINE",
       "severity": "critical",
-      "detail": "updated_at age 4.83h exceeds 4h"
+      "detail": "updated_at age 4.93h exceeds 4h"
+    },
+    {
+      "code": "STALE_EXPANSION",
+      "severity": "critical",
+      "detail": "updated_at age 4.03h exceeds 4h"
     },
     {
       "code": "PDL_EXPERIMENTAL_FEED_STALE",
@@ -97,7 +102,7 @@
     {
       "code": "PIPELINE_STALE",
       "severity": "critical",
-      "detail": "pipeline_status age 4.83h exceeds 4h"
+      "detail": "pipeline_status age 4.93h exceeds 4h"
     }
   ],
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
@@ -106,6 +111,6 @@
     "past_kickoff_rows_hidden": 13,
     "stale_live_flags_hidden": 0,
     "expired_settled_rows_hidden": 0,
-    "virtual_market_rows_held_for_kickoff_window": 54
+    "virtual_market_rows_held_for_kickoff_window": 51
   }
 }
