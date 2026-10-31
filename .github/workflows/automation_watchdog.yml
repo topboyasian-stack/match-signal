@@ -66,6 +66,8 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Validate bounded watchdog recovery before running it
+        run: python scripts/test_automation_watchdog_research_recovery.py
 
       - name: Install Virtual Lab live-feed dependency
         if: github.event_name != 'workflow_run'
