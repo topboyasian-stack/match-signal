@@ -3,7 +3,7 @@
 'use strict';
 const qs=new URLSearchParams(location.search),eventId=qs.get('event_id');
 const API='https://site.api.espn.com/apis/site/v2';
-const FOOTBALL={EPL:'eng.1','La Liga':'esp.1',Bundesliga:'ger.1','Serie A':'ita.1',Ligue 1:'fra.1',Champions League:'uefa.champions',MLS:'usa.1','Primeira League':'por.1','Primeira Liga':'por.1'};
+const FOOTBALL={EPL:'eng.1','La Liga':'esp.1',Bundesliga:'ger.1','Serie A':'ita.1','Ligue 1':'fra.1','Champions League':'uefa.champions',MLS:'usa.1','Primeira League':'por.1','Primeira Liga':'por.1'};
 const BASKETBALL={NBA:'nba',WNBA:'wnba',NCAAM:'mens-college-basketball',NCAAW:'womens-college-basketball',Euroleague:'euroleague',ACB:'acb',BBL:'eng.1',BSL:'tur.1'};
 const TENNIS=['atp','wta'];
 const $=id=>document.getElementById(id);
