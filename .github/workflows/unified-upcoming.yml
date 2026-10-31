@@ -173,7 +173,7 @@ jobs:
           assert "group: match-signal-unified-upcoming-" in concurrency and "'promotion'" in concurrency
           publish = source.rsplit('      - name: Publish unified board and health', 1)[1]
           assert 'Newer unified board already published; skipping stale candidate.' in publish
-          assert publish.index('if git rebase origin/main; then') < publish.index('Newer unified board already published; skipping stale candidate.')
+          assert publish.index('if ! git rebase origin/main; then') < publish.index('Newer unified board already published; skipping stale candidate.')
           print('Publication skips a stale candidate when main already has a newer board.')
           PY
       - name: Test settled expiry and eFootball reconciliation
