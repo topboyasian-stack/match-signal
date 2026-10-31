@@ -10,7 +10,7 @@ ROOT=Path(__file__).resolve().parents[1]; DATA=ROOT/'data'; DATA.mkdir(exist_ok=
 BASE='https://site.api.espn.com/apis/site/v2/sports'; NOW=datetime.now(timezone.utc)
 S=requests.Session();S.headers.update({'User-Agent':'Mozilla/5.0 (compatible; MatchSignal/1.0)'})
 NBA_START=datetime(2026,10,20,tzinfo=timezone.utc)
-NBA_TOTALS_MODEL_VERSION="nba-total-v4-pace-efficiency-calibrated"
+NBA_TOTALS_MODEL_VERSION="nba-total-v5-pace-efficiency-calibrated"
 NBA_PARQUET='https://raw.githubusercontent.com/llimllib/nba_data/main/data/gamelogs.parquet'
 NBA_DUCKDB_CATALOG='https://basketball-data.billmill.org/nba/nba.duckdb'
 NBA_ELO_CSV='https://datahub.io/fivethirtyeight/nba-elo/_r/-/data/nbaallelo.csv'
