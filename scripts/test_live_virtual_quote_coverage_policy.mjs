@@ -4,7 +4,9 @@ import { readFile } from "node:fs/promises";
 const coverage = await readFile(new URL("./test_live_virtual_quote_coverage.mjs", import.meta.url), "utf8");
 const deploy = await readFile(new URL("../.github/workflows/cloudflare-pages.yml", import.meta.url), "utf8");
 
-assert.match(coverage, /const upcomingVirtualCandidates = rows\\.filter\\(row =>/);
+assert.match(coverage, /const upcomingVirtualCandidates = rows\.filter\(row =>/);
+assert.match(coverage, /String\(row\?\.sport \|\| ""\)\.toLowerCase\(\) === "virtual"/);
+assert.match(coverage, /candidate_pool_unique_events_in_next_7_days/);
 assert.match(coverage, /String\\(row\\?\\.sport \\|\\| ""\\)\\.toLowerCase\\(\\) === "virtual"/);
 assert.match(coverage, /candidate_pool_unique_events_in_next_7_days/);
 assert.match(coverage, /const noModelQualifiedCandidates = virtualCandidates\.length === 0/);
