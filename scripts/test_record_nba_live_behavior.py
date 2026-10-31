@@ -46,6 +46,7 @@ class LiveBoxscoreProjectionTests(unittest.TestCase):
         ])
         self.assertGreater(result["stats_summary"]["home_possessions"], 0)
         self.assertGreater(result["stats_summary"]["away_possessions"], 0)
+        self.assertNotEqual(result["stat_adjusted_total"], result["score_pace_total"])
         self.assertTrue(206.5 <= result["live_total_estimate"] <= 242.5)
 
     def test_falls_back_explicitly_when_boxscore_fields_are_missing(self):
