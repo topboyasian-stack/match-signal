@@ -12,6 +12,11 @@ export async function onRequestGet(context){
   const event=String(u.searchParams.get('event')||target.searchParams.get('event')||'');
   if(event && !/^\\d{6,12}$/.test(event)) return new Response(JSON.stringify({ok:false,error:'INVALID_ESPN_EVENT'}),{status:400,headers:corsHeaders()});
   if(event) target.searchParams.set('event',event);
+  if(target.pathname.endsWith('/summary')){
+    target.searchParams.set('region',target.searchParams.get('region')||'us');
+    target.searchParams.set('lang',target.searchParams.get('lang')||'en');
+    target.searchParams.set('contentorigin',target.searchParams.get('contentorigin')||'espn');
+  }
   try{
     const requestHeaders={Accept:'application/json','User-Agent':'MatchSignal/4.0 (+https://github.com/topboyasian-stack/match-signal)'};
     let upstream=await fetch(target.toString(),{headers:requestHeaders,cache:'no-store',signal:AbortSignal.timeout(8000)});
