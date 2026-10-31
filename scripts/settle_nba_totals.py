@@ -166,6 +166,27 @@ def result_for(prediction, event):
         "paper_only": True,
     }
 
+def select_settlement_snapshot(rows):
+    """Choose the first directional frozen revision, or the first neutral snapshot.
+
+    A neutral price capture remains preserved in the archive. If the line later
+    moves enough to create a directional model lean, the first such published
+    revision becomes the one-event settlement candidate. Later revisions never
+    replace it, so settled results cannot be selected after observing outcomes.
+    """
+    ordered = sorted(
+        [row for row in (rows or []) if isinstance(row, dict)],
+        key=lambda row: (str(row.get("published_at") or ""), str(row.get("publication_snapshot_id") or "")),
+    )
+    if not ordered:
+        return None
+    for row in ordered:
+        market = ((row.get("markets") or {}).get("total_ou") or {})
+        if str(market.get("pick") or "").strip().lower() in {"over", "under"}:
+            return row
+    return ordered[0]
+
+
 def candidate_key(row):
     """One independent settlement cohort per event and totals-model version."""
     return (
@@ -198,21 +219,19 @@ def main():
         key = candidate_key(prediction)
         predictions_by_key[key] = prediction
         candidates_by_key[key] = prediction
-    snapshots_by_key = {}
-    for snapshot in sorted(
-        snapshots,
-        key=lambda row: (
-            str(row.get("published_at") or ""),
-            str(row.get("event_id") or ""),
-            str(row.get("totals_model_version") or "legacy"),
-        ),
-    ):
+    snapshot_groups = {}
+    for snapshot in snapshots:
         if not isinstance(snapshot, dict) or not snapshot.get("event_id"):
             continue
         key = candidate_key(snapshot)
-        snapshots_by_key.setdefault(key, snapshot)
-        # Frozen publication evidence always wins over a mutable prediction row.
-        candidates_by_key[key] = snapshots_by_key[key]
+        snapshot_groups.setdefault(key, []).append(snapshot)
+    snapshots_by_key = {}
+    for key, revisions in snapshot_groups.items():
+        chosen = select_settlement_snapshot(revisions)
+        if chosen is not None:
+            snapshots_by_key[key] = chosen
+            # Frozen publication evidence always wins over the mutable row.
+            candidates_by_key[key] = chosen
     candidates = list(candidates_by_key.values())
 
     old = load(LEDGER, {"records": []})
