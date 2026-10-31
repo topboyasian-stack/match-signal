@@ -24,7 +24,7 @@ def sportybet_basketball_feed():
     """Read SportyBet Nigeria pre-match NBA markets through the existing regional proxy."""
     url = "https://match-signal.pages.dev/api/sportybet-basketball"
     try:
-        response = S.get(url, params={"pageSize": 100, "timeline": 96}, timeout=12)
+        response = S.get(url, params={"pageSize": 100, "timeline": 168}, timeout=12)
         response.raise_for_status()
         payload = response.json()
         if payload.get("ok") is not True:
