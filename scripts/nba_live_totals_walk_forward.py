@@ -125,6 +125,7 @@ def evaluate(observation_payload, history_rows, model_version=None):
                 "live_total_estimate": live_estimate,
                 "pregame_expected_total": pregame,
                 "actual_total": actual,
+                "actual_source": actual_source,
                 "observed_at": observed_at.isoformat(),
                 "projection_source": projection.get("projection_source"),
                 "uses_live_boxscore_stats": projection.get("uses_live_boxscore_stats") is True,
