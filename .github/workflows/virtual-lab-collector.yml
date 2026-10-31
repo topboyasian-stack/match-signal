@@ -189,7 +189,8 @@ jobs:
             python scripts/virtual_lab_h2h_enricher.py
             python scripts/virtual_lab_confirmed_participants.py
             python scripts/virtual_lab_eligibility.py
-            python scripts/system_health_audit.py
+            # Shared system health is owned by Unified Upcoming; leave its artifact
+            # untouched here so the collector can safely retry fetch/rebase/push.
             stage_outputs
             if ! git diff --cached --quiet; then
               git commit -m "🤖 Collect and settle Virtual Lab observations"
