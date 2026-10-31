@@ -2,7 +2,7 @@
 """Unit tests for exposing stale PDL source status without publishing stale picks."""
 import unittest
 
-from system_health_audit_lib import pdl_health_summary, virtual_live_health_summary
+from system_health_audit_lib import pdl_health_summary, virtual_live_health_summary, nba_live_observation_health_summary
 
 
 class PDLHealthSummaryTests(unittest.TestCase):
@@ -76,6 +76,25 @@ class VirtualLiveHealthSummaryTests(unittest.TestCase):
         self.assertEqual(check["status"], "FAIL")
         self.assertEqual(issues[0]["code"], "VIRTUAL_LIVE_FEED_INVALID")
         self.assertEqual(issues[0]["severity"], "critical")
+
+
+class NbaLiveObservationHealthSummaryTests(unittest.TestCase):
+    def test_recent_recorder_heartbeat_passes_even_without_active_games(self):
+        check, issues = nba_live_observation_health_summary(
+            {"updated_at": "2026-10-31T06:00:00Z", "games": {}}, 0.1
+        )
+        self.assertEqual(check["status"], "PASS")
+        self.assertEqual(check["games_tracked"], 0)
+        self.assertEqual(issues, [])
+
+    def test_stale_recorder_is_visible_as_warning(self):
+        check, issues = nba_live_observation_health_summary(
+            {"games": {"event-1": {"snapshots": [{}, {}]}}}, 4.0
+        )
+        self.assertEqual(check["status"], "STALE")
+        self.assertEqual(check["snapshots_recorded"], 2)
+        self.assertEqual(issues[0]["code"], "NBA_LIVE_OBSERVATION_STALE")
+        self.assertEqual(issues[0]["severity"], "warning")
 
 
 if __name__ == "__main__":
