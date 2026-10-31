@@ -1,39 +1,39 @@
 {
-  "generated_at": "2026-10-31T20:31:05.384362+00:00",
+  "generated_at": "2026-10-31T20:35:59.185149+00:00",
   "paper_only": true,
   "evaluation_type": "NBA_TOTALS_WALK_FORWARD_V1",
   "market_id": "225",
   "market_definition": "full_game_total_including_overtime",
   "model_version": "nba-total-v4-pace-efficiency-calibrated",
-  "history_games": 1326,
+  "history_games": 1335,
   "walk_forward": {
     "method": "expanding chronological forecasts; each game uses only strictly earlier completed games",
     "baseline": "mean NBA game total over the preceding 90 days (or all prior games when unavailable)",
-    "development_games": 1028,
+    "development_games": 1036,
     "holdout": {
-      "n": 258,
-      "mae": 15.4223,
-      "rmse": 19.7526,
-      "bias": 1.519,
+      "n": 259,
+      "mae": 15.4672,
+      "rmse": 19.6957,
+      "bias": 2.1202,
       "uncalibrated": {
-        "n": 258,
-        "mae": 15.4668,
-        "rmse": 19.797,
-        "bias": 2.016
+        "n": 259,
+        "mae": 15.5096,
+        "rmse": 19.7402,
+        "bias": 2.5004
       },
-      "baseline_mae": 16.7465,
-      "baseline_rmse": 21.5388,
-      "baseline_bias": 1.9752,
-      "mae_improvement_vs_baseline": 1.3242,
+      "baseline_mae": 16.491,
+      "baseline_rmse": 21.1856,
+      "baseline_bias": 2.5876,
+      "mae_improvement_vs_baseline": 1.0238,
       "beats_baseline": true,
       "pace_feature_games": 0
     }
   },
   "model_calibration": {
     "selected_pace_blend_weight": 0.0,
-    "production_bias_correction": 0.497,
-    "development_n": 1028,
-    "development_raw_bias": 0.497,
+    "production_bias_correction": 0.3802,
+    "development_n": 1036,
+    "development_raw_bias": 0.3802,
     "pace_feature_development_games": 0,
     "pace_feature_coverage": 0.0,
     "selection_rule": "minimum development MAE across a predeclared pace blend grid; residual bias estimated on development only"
