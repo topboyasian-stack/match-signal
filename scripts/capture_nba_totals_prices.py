@@ -6,7 +6,7 @@ predictions. It never rebuilds the model, changes probabilities, or invents a
 line when SportyBet does not expose the exact fixture and both prices.
 """
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from expansion_pipeline import NBA_TOTALS_MODEL_VERSION
