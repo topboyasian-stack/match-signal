@@ -180,7 +180,7 @@ def main():
         "source": "ESPN public scoreboard/summary",
         "mode": "PAPER_RESEARCH_ONLY",
         "games": current_games,
-    }, indent=2, ensure_ascii=False) + "\\n", encoding="utf-8")
+    }, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     total = sum(len(x.get("snapshots") or []) for x in games.values())
     print(json.dumps({"live_or_final_events_observed_this_run": len(observations),
                       "games_in_history": len(games), "snapshots_retained": total,
