@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 from expansion_pipeline import NBA_TOTALS_MODEL_VERSION
-from capture_nba_totals_prices import attach_fresh_quote, capture
+from capture_nba_totals_prices import attach_fresh_quote, capture, capture_timestamp
 
 
 def make_prediction(now, **overrides):
@@ -85,6 +85,17 @@ class PriceCaptureTests(unittest.TestCase):
         self.assertEqual(stats["prediction_price_updates"], 1)
         self.assertEqual(len(candidates), 1)
         self.assertEqual(legacy["totals_model_version"], "nba-total-v3")
+
+    def test_capture_time_is_taken_after_feed_response_not_before(self):
+        before_response = self.now
+        fetched = before_response + timedelta(seconds=3)
+        feed = [{"fetched_at": fetched.isoformat()}]
+        self.assertEqual(capture_timestamp(feed, before_response), fetched)
+
+    def test_capture_time_does_not_follow_unbounded_future_feed_clock(self):
+        before_response = self.now
+        feed = [{"fetched_at": (before_response + timedelta(minutes=3)).isoformat()}]
+        self.assertEqual(capture_timestamp(feed, before_response), before_response)
 
     def test_does_not_overwrite_a_newer_price_snapshot(self):
         newer = make_quote(self.now)

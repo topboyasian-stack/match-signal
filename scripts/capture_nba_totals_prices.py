@@ -139,8 +139,25 @@ def capture(predictions, feed, now):
     return snapshot_candidates, stats
 
 
+def capture_timestamp(feed, observed_at=None):
+    """Use the post-response clock, bounded by the feed's own capture timestamp."""
+    now = observed_at or datetime.now(timezone.utc)
+    feed_stamps = [
+        dt(event.get("fetched_at"))
+        for event in (feed or [])
+        if isinstance(event, dict) and dt(event.get("fetched_at")) is not None
+    ]
+    if feed_stamps:
+        latest = max(feed_stamps)
+        # The proxy stamps events just before returning its response. When its
+        # clock is a few seconds ahead of the runner, the received feed is still
+        # demonstrably in-hand before the immutable publication is appended.
+        if now < latest <= now + timedelta(minutes=2):
+            now = latest
+    return now
+
+
 def main():
-    now = datetime.now(timezone.utc)
     predictions = load_json(PREDICTIONS, [])
     snapshots = load_json(SNAPSHOTS, [])
     ledger_payload = load_json(LEDGER, {})
@@ -156,6 +173,7 @@ def main():
         history = []
 
     feed, feed_error = sportybet_basketball_feed()
+    now = capture_timestamp(feed, datetime.now(timezone.utc))
     snapshot_candidates, stats = capture(predictions, feed, now)
     before_count = len(snapshots)
     snapshot_status = append_nba_totals_publication_snapshots(
