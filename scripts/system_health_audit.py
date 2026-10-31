@@ -11,7 +11,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from system_health_audit_lib import pdl_health_summary, virtual_live_health_summary
+from system_health_audit_lib import pdl_health_summary, virtual_live_health_summary, nba_live_observation_health_summary
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
@@ -46,6 +46,7 @@ odds = load("odds_builder.json", {})
 expansion = load("expansion_status.json", {})
 virtual = load("virtual_lab_status.json", {})
 virtual_live = load("virtual_lab_live.json", {})
+nba_live_observations = load("nba_live_observations.json", {})
 autopilot = load("autopilot_status.json", {})
 darts = load("darts_status.json", {})
 table = load("table_tennis_status.json", {})
@@ -149,6 +150,12 @@ virtual_live_check, virtual_live_issues = virtual_live_health_summary(
 )
 checks.append(virtual_live_check)
 checks.extend(virtual_live_issues)
+nba_live_observation_age = age_hours(nba_live_observations.get("updated_at"))
+nba_live_check, nba_live_issues = nba_live_observation_health_summary(
+    nba_live_observations, nba_live_observation_age, max_age_hours=0.25
+)
+checks.append(nba_live_check)
+checks.extend(nba_live_issues)
 
 nba_competition = (expansion.get("competitions") or {}).get("NBA") or {}
 retired = {
