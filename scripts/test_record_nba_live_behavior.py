@@ -6,7 +6,7 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
-from record_nba_live_behavior import fetch_scoreboard_window, live_total_projection, load_observation_history, write_observation_history
+from record_nba_live_behavior import fetch_scoreboard_window, live_total_projection, load_observation_history, should_append_observation, write_observation_history
 
 
 def stat(name, value, abbreviation=None):
@@ -106,6 +106,35 @@ class LiveBoxscoreProjectionTests(unittest.TestCase):
         result = live_total_projection(sample_record(), {})
         self.assertEqual(result["status"], "NO_PREGAME_BASELINE")
 
+
+    def test_same_minute_final_transition_is_not_deduplicated(self):
+        observed = "2026-10-31T23:59:30+00:00"
+        live = {
+            "observed_at": observed, "game_state": "live", "status": "0:00 - 4th",
+            "period": 4, "clock": "0:00",
+            "home": {"score": "110"}, "away": {"score": "105"},
+        }
+        duplicate = dict(live, observed_at="2026-10-31T23:59:55+00:00")
+        final = {
+            **live, "observed_at": "2026-10-31T23:59:55+00:00",
+            "game_state": "final", "status": "Final",
+        }
+        changed_score = {
+            **live, "observed_at": "2026-10-31T23:59:55+00:00",
+            "home": {"score": "112"},
+        }
+        self.assertFalse(should_append_observation(live, duplicate))
+        self.assertTrue(should_append_observation(live, final))
+        self.assertTrue(should_append_observation(live, changed_score))
+
+    def test_next_minute_observation_is_kept_even_without_score_change(self):
+        live = {
+            "observed_at": "2026-10-31T23:59:30+00:00", "game_state": "live",
+            "status": "1:00 - 4th", "period": 4, "clock": "1:00",
+            "home": {"score": "110"}, "away": {"score": "105"},
+        }
+        next_minute = {**live, "observed_at": "2026-11-01T00:00:10+00:00"}
+        self.assertTrue(should_append_observation(live, next_minute))
 
     def test_legacy_json_archive_migrates_to_gzip_and_round_trips(self):
         with tempfile.TemporaryDirectory() as tmp:
