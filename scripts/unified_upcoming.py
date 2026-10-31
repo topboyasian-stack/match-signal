@@ -1633,7 +1633,10 @@ def main():
                    "publication_filters":dict(DESK_FILTER_STATS)},
         "events":final,
     }
-    OUTPUT.write_text(json.dumps(result,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
+    # Cloudflare Pages rejects any single static asset >=25 MiB. The event payload can
+    # exceed that limit when emitted with indentation; compact JSON preserves the
+    # complete board and keeps the published artifact safely below the limit.
+    OUTPUT.write_text(json.dumps(result,ensure_ascii=False,separators=(",",":"))+"\n",encoding="utf-8")
     # Surface Under 6.5 and higher totals for line-specific diagnostics only.
     high_line_under=build_under_line_evidence(final)
     desk_health={
