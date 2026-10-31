@@ -149,3 +149,60 @@ def nba_live_observation_health_summary(
             ),
         })
     return check, issues
+
+
+def virtual_participant_history_health_summary(
+    virtual_status_age_hours: float,
+    desk_health_payload: dict[str, Any] | None,
+    max_age_minutes: float = 30.0,
+) -> tuple[dict[str, Any], list[dict[str, str]]]:
+    """Fail system health when the participant-history source gate is stale.
+
+    A newly generated Unified Upcoming board is not evidence that the underlying
+    participant, settlement and model snapshots are current.
+    """
+    data = desk_health_payload if isinstance(desk_health_payload, dict) else {}
+    freshness = data.get("participant_history_freshness")
+    freshness = freshness if isinstance(freshness, dict) else {}
+    reported_fresh = freshness.get("fresh") is True
+    try:
+        input_age_minutes = max(0.0, float(freshness.get("max_age_minutes")))
+    except (TypeError, ValueError):
+        input_age_minutes = float("inf")
+    try:
+        source_age_minutes = max(0.0, float(virtual_status_age_hours) * 60.0)
+    except (TypeError, ValueError):
+        source_age_minutes = float("inf")
+    raw_stale_inputs = freshness.get("stale_inputs") or freshness.get("stale_sources") or []
+    stale_inputs = [str(value) for value in raw_stale_inputs] if isinstance(raw_stale_inputs, list) else []
+    reported_reason = str(freshness.get("reason") or "").strip()
+
+    healthy = (
+        reported_fresh
+        and input_age_minutes <= max_age_minutes
+        and source_age_minutes <= max_age_minutes
+    )
+    check = {
+        "engine": "virtual_participant_history",
+        "status": "PASS" if healthy else "STALE",
+        "max_input_age_minutes": round(input_age_minutes, 1) if input_age_minutes != float("inf") else None,
+        "virtual_lab_status_age_minutes": round(source_age_minutes, 1) if source_age_minutes != float("inf") else None,
+        "threshold_minutes": max_age_minutes,
+        "stale_inputs": stale_inputs,
+    }
+    if healthy:
+        return check, []
+
+    reasons = []
+    if not reported_fresh:
+        reasons.append(reported_reason or "participant_history_freshness.fresh is not true")
+    if input_age_minutes > max_age_minutes:
+        reasons.append(f"oldest participant/settlement/model input is {input_age_minutes:.1f} minutes old")
+    if source_age_minutes > max_age_minutes:
+        reasons.append(f"virtual_lab_status.json is {source_age_minutes:.1f} minutes old")
+    detail = "; ".join(dict.fromkeys(reasons)) or "participant history freshness is unverified"
+    return check, [{
+        "code": "VIRTUAL_PARTICIPANT_HISTORY_STALE",
+        "severity": "critical",
+        "detail": detail + "; current eFootball/virtual predictions must remain withheld until the source collector publishes fresh data",
+    }]
