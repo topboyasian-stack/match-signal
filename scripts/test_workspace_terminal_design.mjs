@@ -49,7 +49,7 @@ assert.ok(builderEngineSrc.startsWith("./expansion-odds-builder.js?v="), "Odds B
 assert.ok(oddsHtml.includes('data-page="odds-builder"'), "Odds Builder must carry its page scope");
 for (const [name, html, scope, href, marker] of [
   ["Reports", reportsHtml, 'data-page="reports"', "reports-design.css?v=20261014-full-v3", "MS-REPORTS-2026.10.14-V3"],
-  ["Virtual Lab", labHtml, 'data-page="virtual-lab"', "../virtual-lab-terminal.css?v=20261014-full-v3", "MS-VIRTUAL-LAB-V1-2026.10.14-V3"]
+  ["Virtual Lab", labHtml, 'data-page="virtual-lab"', "../virtual-lab-terminal.css?v=20261031-recent-performance-guard1", "MS-VIRTUAL-LAB-V1-2026.10.14-V3"]
 ]) {
   assert.ok(html.includes(scope), name + " must carry its page scope");
   assert.ok(html.includes(href), name + " must load the versioned design layer");
@@ -61,7 +61,7 @@ assert.ok(reportsHtml.includes('id="reportGrid"') && reportsHtml.includes('id="r
 for (const mount of ['id="predictionDesk"', 'id="nearQualifiedRadar"', 'id="oddsBuilder"', 'id="labDiagnostics"', 'id="researchConclusion"']) {
   assert.ok(labHtml.includes(mount), "Virtual Lab mount must remain: " + mount);
 }
-assert.ok(labHtml.includes("../virtual-lab-app.js?v=20261011-redesign3"), "Virtual Lab engine script must remain");
+assert.ok(labHtml.includes("../virtual-lab-app.js?v=20261031-recent-performance-guard1"), "Virtual Lab engine script must remain");
 assert.ok(labHtml.includes("../virtual-lab-confirmed-watch.js?v=20261011-annotate-fix1"), "Virtual Lab participant monitor must remain");
 
 assert.ok(oddsHtml.includes('class="ob-page-header"') && oddsHtml.includes('class="ob-section-nav"') && oddsHtml.includes('class="ob-guide-grid"'), "Odds Builder must use the reorganized page hierarchy");
