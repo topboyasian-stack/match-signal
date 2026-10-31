@@ -89,6 +89,54 @@ def test_publication_capture_is_separate_from_settlement_and_roi():
     assert result["capture_status"] == "CAPTURED"
 
 
+
+def test_capture_status_is_partial_until_every_v5_forecast_has_a_frozen_price_pair():
+    from nba_totals_walk_forward import publication_capture_metrics
+    published = "2026-10-31T20:45:00+00:00"
+    snapshot = {
+        "event_id": "g1",
+        "totals_model_version": NBA_TOTALS_MODEL_VERSION,
+        "published_at": published,
+        "start_time": "2026-10-31T22:00:00+00:00",
+        "publication_snapshot_id": "nba-total-pub:g1",
+        "publication_snapshot_verified": True,
+        "markets": {"total_ou": {
+            "market_id": "225", "source": "SportyBet Nigeria",
+            "sportybet_event_id": "sr:match:g1",
+            "quote_capture_basis": "SportyBet API response observed_at",
+            "quote_timestamp": "2026-10-31T20:44:30+00:00",
+            "line": 212.5, "over_odds": 1.97, "under_odds": 1.88,
+            "pick": None,
+        }},
+    }
+    def prediction(event_id):
+        return {
+            "event_id": event_id,
+            "totals_model_version": NBA_TOTALS_MODEL_VERSION,
+            "generated_at": published,
+            "markets": {"total_ou": {
+                "market_id": "225", "source": "SportyBet Nigeria",
+                "quote_timestamp": "2026-10-31T20:44:30+00:00",
+                "line": 212.5, "over_odds": 1.97, "under_odds": 1.88,
+            }},
+        }
+    partial = publication_capture_metrics([snapshot], [prediction("g1"), prediction("g2")])
+    assert partial["capture_status"] == "PARTIAL"
+    assert partial["snapshot_coverage"] == 0.5
+    assert partial["immutable_fresh_publication_snapshots"] == 1
+    assert partial["unmatched_fresh_market_predictions"] == 1
+
+    complete = publication_capture_metrics([snapshot, dict(snapshot, event_id="g2",
+        publication_snapshot_id="nba-total-pub:g2")], [prediction("g1"), prediction("g2")])
+    assert complete["capture_status"] == "CAPTURED"
+    assert complete["snapshot_coverage"] == 1.0
+
+    waiting = publication_capture_metrics([], [prediction("g1")])
+    assert waiting["capture_status"] == "AWAITING_FRESH_MARKET_225_QUOTES"
+    empty = publication_capture_metrics([], [])
+    assert empty["capture_status"] == "NO_CURRENT_MODEL_PREDICTIONS"
+
+
 def test_evaluator_never_promotes_without_market_holdout():
     rows = [game(f"g{i}", (i % 28) + 1, "A", "B", 100 + i % 5, 98 + i % 7) for i in range(1, 29)]
     result = evaluate(rows, [])
@@ -100,5 +148,6 @@ if __name__ == "__main__":
     test_walk_forward_does_not_use_current_or_future_games()
     test_market_evidence_rejects_unverified_and_old_model_records()
     test_publication_capture_is_separate_from_settlement_and_roi()
+    test_capture_status_is_partial_until_every_v5_forecast_has_a_frozen_price_pair()
     test_evaluator_never_promotes_without_market_holdout()
-    print("NBA totals walk-forward regression tests: PASS (4 groups)")
+    print("NBA totals walk-forward regression tests: PASS (5 groups)")
