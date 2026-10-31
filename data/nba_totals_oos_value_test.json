@@ -1,0 +1,41 @@
+{
+  "generated_at": "2026-10-31T19:35:04.823954+00:00",
+  "paper_only": true,
+  "evaluation_type": "NBA_TOTALS_WALK_FORWARD_V1",
+  "market_id": "225",
+  "market_definition": "full_game_total_including_overtime",
+  "model_version": "nba-total-v2-balanced-home-margin",
+  "history_games": 1335,
+  "walk_forward": {
+    "method": "expanding chronological forecasts; each game uses only strictly earlier completed games",
+    "baseline": "mean NBA game total over the preceding 90 days (or all prior games when unavailable)",
+    "development_games": 1036,
+    "holdout": {
+      "n": 259,
+      "mae": 16.0197,
+      "rmse": 20.2938,
+      "bias": 3.4243,
+      "baseline_mae": 16.491,
+      "baseline_rmse": 21.1856,
+      "baseline_bias": 2.5876,
+      "mae_improvement_vs_baseline": 0.4713,
+      "beats_baseline": true
+    }
+  },
+  "verified_market_records": 0,
+  "market_development_records": 0,
+  "market_holdout": {
+    "n": 0,
+    "wins": 0,
+    "losses": 0,
+    "pushes": 0,
+    "win_rate": null,
+    "profit_units": 0.0,
+    "roi": null,
+    "roi_ci95_lower": null,
+    "market_favorite_roi": null,
+    "roi_vs_market_favorite": null
+  },
+  "release_decision": "RESEARCH_ONLY",
+  "release_reason": "Not qualified: require at least 100 unseen forecast games with lower MAE than baseline and absolute bias <=3 points, plus at least 100 settled, immutable, fresh SportyBet market-225 holdout bets with positive ROI, a positive 95% lower confidence bound, and ROI above the market-favourite baseline."
+}
