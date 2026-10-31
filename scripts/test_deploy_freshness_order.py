@@ -240,6 +240,8 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "functions/api/sportybet-virtual-results.js",
             "functions/api/espn.js",
             "scripts/test_espn_proxy.mjs",
+            "scripts/test_live_virtual_quote_coverage.mjs",
+            "scripts/test_live_virtual_quote_coverage_policy.mjs",
             "match-signal-theme.css",
             "match-tracker.html",
             "match-tracker-v2.html",
