@@ -163,13 +163,13 @@ def test_v4_uses_strictly_prior_scores_pace_and_efficiency():
 def test_v2_normalizer_keeps_only_valid_regular_season_pace_metrics():
     now=datetime(2026,10,31,12,tzinfo=UTC)
     rows=p.normalize_nba_duckdb_rows([
-        {"event_id":"0022600001","date":"2026-10-25T23:00:00+00:00","game_type":"regular_season",
+        {"event_id":"0022600001","date":"2026-10-25","game_type":"regular_season",
          "home":"Boston Celtics","away":"New York Knicks","home_score":112,"away_score":105,
          "home_pace":99.5,"away_pace":100.5,"home_off_rating":115.2,"away_off_rating":110.1,
          "home_def_rating":108.2,"away_def_rating":113.4,"home_possessions":98,"away_possessions":99},
-        {"event_id":"preseason","date":"2026-10-25T23:00:00+00:00","game_type":"preseason",
+        {"event_id":"preseason","date":"2026-10-25","game_type":"preseason",
          "home":"A","away":"B","home_score":100,"away_score":100},
-        {"event_id":"future","date":"2026-11-01T23:00:00+00:00","game_type":"regular_season",
+        {"event_id":"future","date":"2026-11-01","game_type":"regular_season",
          "home":"A","away":"B","home_score":100,"away_score":100}
     ],now)
     assert len(rows)==1 and rows[0]["source"]=="nba_data_v2_team_game_logs"
