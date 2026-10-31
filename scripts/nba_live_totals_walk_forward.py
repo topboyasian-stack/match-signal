@@ -7,6 +7,7 @@ independent samples.
 """
 import json
 import math
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -151,8 +152,12 @@ def main():
         if OBSERVATIONS.exists() and OBSERVATIONS.stat().st_size else {"games": {}}
     )
     history = json.loads(HISTORY.read_text(encoding="utf-8")) if HISTORY.exists() else []
-    from expansion_pipeline import NBA_TOTALS_MODEL_VERSION
-    result = evaluate(observations, history, NBA_TOTALS_MODEL_VERSION)
+    # Read the model version without importing the full training pipeline
+    # (which pulls pandas/pyarrow); the five-minute recorder needs only stdlib.
+    model_source = (ROOT / "scripts" / "expansion_pipeline.py").read_text(encoding="utf-8")
+    match = re.search(r'^NBA_TOTALS_MODEL_VERSION\s*=\s*"([^"]+)"', model_source, re.MULTILINE)
+    model_version = match.group(1) if match else None
+    result = evaluate(observations, history, model_version)
     OUTPUT.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(result, indent=2))
 
