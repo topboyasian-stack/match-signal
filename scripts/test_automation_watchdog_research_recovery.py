@@ -73,6 +73,16 @@ class EfootballResearchRecoveryTests(unittest.TestCase):
                          "Watchdog must not overwrite the board's shared health artifact.")
 
 
+    def test_stale_virtual_lab_collector_replaces_a_stuck_active_run(self):
+        self.assertIn("VIRTUAL_LAB_COLLECTOR_STALE_RUN_MAX_AGE_MINUTES = 45", WATCHDOG)
+        self.assertIn("virtual_collector_active_runs", WATCHDOG)
+        self.assertIn("stale_virtual_collector_runs", WATCHDOG)
+        self.assertIn("gh', 'run', 'cancel", WATCHDOG)
+        self.assertIn("recover_stale_virtual_lab_collector", WATCHDOG)
+        self.assertIn("virtual_lab_collector_recovery_status", WATCHDOG)
+        self.assertIn("virtual_lab_collector_active_run_age_minutes", WATCHDOG)
+        self.assertIn("a newer collector run is still active", WATCHDOG)
+
     def test_stale_or_stuck_unified_upcoming_has_bounded_recovery(self):
         self.assertIn("UNIFIED_UPCOMING_MAX_AGE_MINUTES = 15", WATCHDOG)
         self.assertIn("UNIFIED_UPCOMING_DISPATCH_COOLDOWN_MINUTES = 10", WATCHDOG)
