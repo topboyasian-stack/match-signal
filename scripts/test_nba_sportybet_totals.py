@@ -96,6 +96,18 @@ assert snapshot["totals_model_version"] == pipeline.NBA_TOTALS_MODEL_VERSION
 assert snapshot["publication_snapshot_id"].startswith("nba-total-pub:")
 assert snapshot["markets"]["total_ou"]["over_odds"] == 1.91
 assert snapshot["markets"]["total_ou"]["under_odds"] == 1.89
+# Price provenance is frozen for every prediction with a valid current SportyBet
+# pair, even when the model has no directional lean. No-lean rows never enter ROI.
+no_lean_prediction = json.loads(json.dumps(snapshot_prediction))
+no_lean_prediction["event_id"] = "espn:test-no-lean"
+no_lean_prediction["markets"]["total_ou"]["pick"] = None
+no_lean_prediction["markets"]["total_ou"]["lean"] = "NO_CLEAR_LEAN"
+no_lean_snapshot = pipeline.nba_total_publication_snapshot(no_lean_prediction, now.isoformat())
+assert no_lean_snapshot and no_lean_snapshot["publication_snapshot_verified"] is True
+assert no_lean_snapshot["markets"]["total_ou"]["line"] == 228.5
+assert no_lean_snapshot["markets"]["total_ou"]["over_odds"] == 1.91
+assert no_lean_snapshot["markets"]["total_ou"]["under_odds"] == 1.89
+
 
 with tempfile.TemporaryDirectory() as tmp:
     snapshot_path = Path(tmp) / "nba_totals_publication_snapshots.json"
