@@ -85,11 +85,27 @@ def evaluate(observation_payload, history_rows, model_version=None):
     games = (observation_payload or {}).get("games") or {}
     selected = {label: [] for label, _, _, _ in PERIOD_TARGETS}
     for event_id, game in games.items():
-        actual = finals.get(str(event_id))
+        snapshots = game.get("snapshots") or []
+        # The live recorder's ESPN event IDs differ from the NBA stats
+        # provider's game IDs. Prefer this exact ESPN event's saved final row.
+        final_rows = [row for row in snapshots if row.get("game_state") == "final"]
+        final_rows.sort(key=lambda row: str(row.get("observed_at") or ""))
+        actual = None
+        if final_rows:
+            final_row = final_rows[-1]
+            home_score = number((final_row.get("home") or {}).get("score"))
+            away_score = number((final_row.get("away") or {}).get("score"))
+            if home_score is not None and away_score is not None:
+                actual = home_score + away_score
+        actual_source = "ESPN final scoreboard snapshot" if actual is not None else None
+        if actual is None:
+            actual = finals.get(str(event_id))
+            if actual is not None:
+                actual_source = "NBA historical score row with matching event ID"
         if actual is None:
             continue
         candidates = []
-        for snapshot in game.get("snapshots") or []:
+        for snapshot in snapshots:
             if snapshot.get("game_state") != "live":
                 continue
             if model_version and snapshot.get("pregame_totals_model_version") != model_version:
