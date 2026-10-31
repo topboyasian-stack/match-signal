@@ -27,8 +27,8 @@ class EfootballResearchRecoveryTests(unittest.TestCase):
         self.assertEqual(issues[0]["code"], "NBA_LIVE_OBSERVATION_STALE")
 
     def test_schedules_are_registered_on_staggered_offset_cadences(self):
-        self.assertIn("cron: '8,18,28,38,48,58 * * * *'", WATCHDOG)
-        self.assertIn("cron: '6,16,26,36,46,56 * * * *'", (ROOT / ".github/workflows/qualified-best-health-watch-v2.yml").read_text(encoding="utf-8"))
+        self.assertIn("cron: '3,13,23,33,43,53 * * * *'", WATCHDOG)
+        self.assertIn("cron: '7,17,27,37,47,57 * * * *'", (ROOT / ".github/workflows/qualified-best-health-watch-v2.yml").read_text(encoding="utf-8"))
         self.assertIn("cron: '9,24,39,54 * * * *'", RESEARCH)
 
     def test_research_workflow_is_monitored_separately(self):
