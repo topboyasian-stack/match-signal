@@ -475,7 +475,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
 
     def test_unified_board_publish_push_is_bounded(self):
         source = (ROOT / ".github/workflows/unified-upcoming.yml").read_text(encoding="utf-8")
-        self.assertIn("timeout 45s git push origin main", source)
+        self.assertIn("timeout 120s git push origin main", source)
         self.assertIn("for attempt in 1 2 3 4 5 6; do", source)
         self.assertIn("sleep 2", source)
         self.assertIn("GIT_TERMINAL_PROMPT=0", source)
