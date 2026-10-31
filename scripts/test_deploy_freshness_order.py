@@ -133,7 +133,11 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         crons = workflow_schedule_crons(WATCHDOG_WORKFLOW)
         self.assertIn("8,18,28,38,48,58 * * * *", crons)
         self.assertNotIn("1,11,21,31,41,51 * * * *", crons, "cron must change to re-arm the missing scheduled watchdog")
-        self.assertIn("if unified_age > 0.2 and not active('unified-upcoming.yml'):", WATCHDOG_WORKFLOW)
+        self.assertIn("UNIFIED_UPCOMING_MAX_AGE_MINUTES = 15", WATCHDOG_WORKFLOW)
+        self.assertIn("UNIFIED_UPCOMING_DISPATCH_COOLDOWN_MINUTES = 10", WATCHDOG_WORKFLOW)
+        self.assertIn("UNIFIED_UPCOMING_STALE_RUN_MAX_AGE_MINUTES = 20", WATCHDOG_WORKFLOW)
+        self.assertIn("unified_upcoming_refresh_status", WATCHDOG_WORKFLOW)
+        self.assertNotIn("if unified_age > 0.2 and not active('unified-upcoming.yml'):", WATCHDOG_WORKFLOW)
         self.assertIn("'unified_upcoming_hours': 0.2", WATCHDOG_WORKFLOW)
 
     def test_watchdog_has_event_driven_monitoring_and_bounded_failure_recovery(self):
@@ -284,6 +288,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "scripts/test_deploy_freshness_order.py",
             "scripts/test_workflow_trigger_boundaries.py",
             "scripts/test_prediction_desk_gates.mjs",
+            "scripts/test_efootball_market_research.py",
             "scripts/test_upcoming_desk_policy.py",
             "docs/PREDICTION_DESK_POLICY.md",
             "scripts/qualified_best_monitor.mjs",
