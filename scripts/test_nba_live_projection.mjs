@@ -57,4 +57,7 @@ assert.equal(api.nbaTotalsReleaseQualified({ release_decision: "APPROVED", holdo
 assert.equal(api.nbaTotalRowQualified({ prediction_status: "live_experimental", markets: { total_ou: { market_id: "225", prediction_status: "LIVE_EXPERIMENTAL_NOT_QUALIFIED" } } }, { release_decision: "APPROVED", holdout: { n: 161, roi: 0.03, accuracy_delta: 0.01 } }), false);
 assert.equal(api.nbaTotalRowQualified({ prediction_status: "BETTING_QUALIFIED", markets: { total_ou: { market_id: "225", prediction_status: "BETTING_QUALIFIED" } } }, { release_decision: "RESEARCH_ONLY", holdout: { n: 161, roi: 0.03, accuracy_delta: 0.01 } }), false);
 assert.equal(api.nbaTotalRowQualified({ prediction_status: "live_experimental", markets: { total_ou: { market_id: "225", prediction_status: "BETTING_QUALIFIED" } } }, { release_decision: "APPROVED", holdout: { n: 161, roi: 0.03, accuracy_delta: 0.01 } }), true);
+assert.match(source, /RESEARCH ONLY · NO BETTING LEAN/);
+assert.match(source, /Research-only model: no betting lean or builder action/);
+assert.match(source, /NBA totals are research-only; this builder stays locked until the model passes strict out-of-sample validation\./);
 console.log("NBA live projection and verified totals tests passed.");
