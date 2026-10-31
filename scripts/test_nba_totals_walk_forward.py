@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Offline regression tests for the NBA totals walk-forward evaluator."""
 from datetime import datetime, timezone
-from nba_totals_walk_forward import build_forecasts, evaluate, market_metrics, verified_market_records
+from nba_totals_walk_forward import build_forecasts, evaluate, market_metrics, publication_capture_metrics, verified_market_records
 from expansion_pipeline import NBA_TOTALS_MODEL_VERSION
 
 
@@ -52,6 +52,43 @@ def test_market_evidence_rejects_unverified_and_old_model_records():
     assert metrics["by_pick"]["under"]["accuracy"] == 0.0
 
 
+
+def test_publication_capture_is_separate_from_settlement_and_roi():
+    published = "2026-10-31T20:45:00+00:00"
+    snapshot = {
+        "event_id": "espn-1",
+        "totals_model_version": NBA_TOTALS_MODEL_VERSION,
+        "published_at": published,
+        "start_time": "2026-10-31T22:00:00+00:00",
+        "publication_snapshot_id": "nba-total-pub:test-001",
+        "publication_snapshot_verified": True,
+        "markets": {"total_ou": {
+            "market_id": "225", "source": "SportyBet Nigeria",
+            "sportybet_event_id": "sr:match:test-001",
+            "quote_capture_basis": "SportyBet API response observed_at",
+            "quote_timestamp": "2026-10-31T20:44:30+00:00",
+            "line": 212.5, "over_odds": 1.97, "under_odds": 1.88,
+            "pick": None,
+        }},
+    }
+    prediction = {
+        "event_id": "espn-1", "totals_model_version": NBA_TOTALS_MODEL_VERSION,
+        "markets": {"total_ou": {
+            "market_id": "225", "source": "SportyBet Nigeria",
+            "quote_timestamp": "2026-10-31T20:44:30+00:00",
+            "line": 212.5, "over_odds": 1.97, "under_odds": 1.88,
+        }},
+        "generated_at": published,
+    }
+    result = publication_capture_metrics([snapshot], [prediction])
+    assert result["model_predictions"] == 1
+    assert result["predictions_with_fresh_sportybet_market_225_pair"] == 1
+    assert result["immutable_fresh_publication_snapshots"] == 1
+    assert result["directional_pick_snapshots"] == 0
+    assert result["no_clear_lean_snapshots"] == 1
+    assert result["capture_status"] == "CAPTURED"
+
+
 def test_evaluator_never_promotes_without_market_holdout():
     rows = [game(f"g{i}", (i % 28) + 1, "A", "B", 100 + i % 5, 98 + i % 7) for i in range(1, 29)]
     result = evaluate(rows, [])
@@ -62,5 +99,6 @@ def test_evaluator_never_promotes_without_market_holdout():
 if __name__ == "__main__":
     test_walk_forward_does_not_use_current_or_future_games()
     test_market_evidence_rejects_unverified_and_old_model_records()
+    test_publication_capture_is_separate_from_settlement_and_roi()
     test_evaluator_never_promotes_without_market_holdout()
-    print("NBA totals walk-forward regression tests: PASS (3 groups)")
+    print("NBA totals walk-forward regression tests: PASS (4 groups)")

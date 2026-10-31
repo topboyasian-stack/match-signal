@@ -470,7 +470,16 @@ def main():
         ledger_path = DATA / "nba_totals_ledger.json"
         ledger_payload = json.loads(ledger_path.read_text(encoding="utf-8")) if ledger_path.exists() else []
         ledger_rows = ledger_payload.get("records", []) if isinstance(ledger_payload, dict) else ledger_payload
-        calibration_report = evaluate_nba_totals(nba_history, ledger_rows if isinstance(ledger_rows, list) else [])
+        snapshots_path = DATA / "nba_totals_publication_snapshots.json"
+        snapshots_payload = json.loads(snapshots_path.read_text(encoding="utf-8")) if snapshots_path.exists() else []
+        predictions_path = DATA / "nba_predictions.json"
+        predictions_payload = json.loads(predictions_path.read_text(encoding="utf-8")) if predictions_path.exists() else []
+        calibration_report = evaluate_nba_totals(
+            nba_history,
+            ledger_rows if isinstance(ledger_rows, list) else [],
+            snapshots_payload if isinstance(snapshots_payload, list) else [],
+            predictions_payload if isinstance(predictions_payload, list) else [],
+        )
         (DATA / "nba_totals_oos_value_test.json").write_text(
             json.dumps(calibration_report, indent=2) + "\n", encoding="utf-8"
         )

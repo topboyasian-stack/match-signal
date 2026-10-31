@@ -19,6 +19,8 @@ ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
 HISTORY = DATA / "nba_history.json"
 LEDGER = DATA / "nba_totals_ledger.json"
+SNAPSHOTS = DATA / "nba_totals_publication_snapshots.json"
+PREDICTIONS = DATA / "nba_predictions.json"
 OUTPUT = DATA / "nba_totals_oos_value_test.json"
 MIN_PRIOR_GAMES = 40
 HOLDOUT_FRACTION = 0.20
@@ -158,6 +160,81 @@ def verified_market_records(rows):
     )
 
 
+def publication_capture_metrics(snapshots, predictions=None):
+    """Report immutable price capture separately from settled profitability evidence."""
+    current = [
+        row for row in (snapshots or [])
+        if isinstance(row, dict) and row.get("totals_model_version") == NBA_TOTALS_MODEL_VERSION
+    ]
+    valid = []
+    for row in current:
+        market = ((row.get("markets") or {}).get("total_ou") or {})
+        published = parse_time(row.get("published_at"))
+        start = parse_time(row.get("start_time"))
+        quote = parse_time(market.get("quote_timestamp"))
+        try:
+            line = float(market.get("line"))
+            over = float(market.get("over_odds"))
+            under = float(market.get("under_odds"))
+        except (TypeError, ValueError):
+            continue
+        age = (published - quote).total_seconds() / 60 if published and quote else None
+        if not (
+            row.get("publication_snapshot_verified") is True
+            and str(row.get("publication_snapshot_id") or "").strip()
+            and str(row.get("event_id") or "").strip()
+            and str(market.get("market_id") or "") == "225"
+            and str(market.get("source") or "").strip().lower() == "sportybet nigeria"
+            and str(market.get("sportybet_event_id") or "").strip()
+            and market.get("quote_capture_basis") == "SportyBet API response observed_at"
+            and published is not None and start is not None and quote is not None
+            and quote <= published < start and age is not None and 0 <= age <= 15
+            and 100 <= line <= 300
+            and math.isfinite(over) and over > 1 and math.isfinite(under) and under > 1
+        ):
+            continue
+        valid.append(row)
+
+    predictions = [
+        row for row in (predictions or [])
+        if isinstance(row, dict) and row.get("totals_model_version") == NBA_TOTALS_MODEL_VERSION
+    ]
+    attached = []
+    for row in predictions:
+        market = ((row.get("markets") or {}).get("total_ou") or {})
+        try:
+            line = float(market.get("line"))
+            over = float(market.get("over_odds"))
+            under = float(market.get("under_odds"))
+        except (TypeError, ValueError):
+            continue
+        stamp = parse_time(market.get("quote_timestamp"))
+        published = parse_time(row.get("generated_at") or row.get("prediction_created_at"))
+        age = (published - stamp).total_seconds() / 60 if published and stamp else None
+        if (
+            str(market.get("market_id") or "") == "225"
+            and str(market.get("source") or "").strip().lower() == "sportybet nigeria"
+            and stamp is not None and published is not None
+            and 0 <= age <= 15 and 100 <= line <= 300
+            and math.isfinite(over) and over > 1 and math.isfinite(under) and under > 1
+        ):
+            attached.append(row)
+
+    picks = [row for row in valid if str(((row.get("markets") or {}).get("total_ou") or {}).get("pick") or "").lower() in {"over", "under"}]
+    no_lean = [row for row in valid if str(((row.get("markets") or {}).get("total_ou") or {}).get("pick") or "").lower() not in {"over", "under"}]
+    return {
+        "model_version": NBA_TOTALS_MODEL_VERSION,
+        "model_predictions": len(predictions),
+        "predictions_with_fresh_sportybet_market_225_pair": len(attached),
+        "immutable_fresh_publication_snapshots": len(valid),
+        "directional_pick_snapshots": len(picks),
+        "no_clear_lean_snapshots": len(no_lean),
+        "unpriced_or_unavailable_prediction_count": max(0, len(predictions) - len(attached)),
+        "unmatched_fresh_market_predictions": max(0, len(attached) - len(valid)),
+        "capture_status": "CAPTURED" if valid else "AWAITING_FRESH_MARKET_225_QUOTES",
+    }
+
+
 def market_metrics(rows):
     profits, favorite_profits = [], []
     wins = losses = pushes = 0
@@ -216,7 +293,7 @@ def _blend_total(row, weight):
     return base + weight * (float(pace) - base)
 
 
-def evaluate(history, ledger):
+def evaluate(history, ledger, snapshots=None, predictions=None):
     forecasts = build_forecasts(history)
     split = int(len(forecasts) * (1.0 - HOLDOUT_FRACTION))
     development, holdout = forecasts[:split], forecasts[split:]
@@ -254,6 +331,7 @@ def evaluate(history, ledger):
         if model_metrics["mae"] is not None and baseline_metrics["mae"] is not None else None
     )
 
+    publication_capture = publication_capture_metrics(snapshots, predictions)
     market_rows = verified_market_records(ledger)
     market_split = int(len(market_rows) * (1.0 - HOLDOUT_FRACTION))
     market_holdout = market_metrics(market_rows[market_split:])
@@ -303,6 +381,7 @@ def evaluate(history, ledger):
             "pace_feature_coverage": round(pace_development_n / len(development), 4) if development else 0.0,
             "selection_rule": "minimum development MAE across a predeclared pace blend grid; residual bias estimated on development only",
         },
+        "publication_capture": publication_capture,
         "verified_market_records": len(market_rows),
         "market_development_records": market_split,
         "market_overall": market_overall,
@@ -319,7 +398,11 @@ def main():
     history = json.loads(HISTORY.read_text(encoding="utf-8"))
     ledger_payload = json.loads(LEDGER.read_text(encoding="utf-8")) if LEDGER.exists() else []
     ledger = ledger_payload.get("records", []) if isinstance(ledger_payload, dict) else ledger_payload
-    result = evaluate(history, ledger if isinstance(ledger, list) else [])
+    snapshot_rows = json.loads(SNAPSHOTS.read_text(encoding="utf-8")) if SNAPSHOTS.exists() else []
+    prediction_rows = json.loads(PREDICTIONS.read_text(encoding="utf-8")) if PREDICTIONS.exists() else []
+    result = evaluate(history, ledger if isinstance(ledger, list) else [],
+                      snapshot_rows if isinstance(snapshot_rows, list) else [],
+                      prediction_rows if isinstance(prediction_rows, list) else [])
     OUTPUT.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(result, indent=2))
 

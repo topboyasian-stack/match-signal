@@ -56,6 +56,7 @@ on:
       - 'data/club-logo-registry.json'
       - 'assets/club-logos/**'
       - 'data/licenses/**'
+      - '.github/workflows/cloudflare-pages.yml'
   pull_request:
     paths:
       - 'virtual-lab-app.js'
@@ -288,7 +289,11 @@ jobs:
           set -euo pipefail
           rm -rf .pages-deploy
           mkdir -p .pages-deploy
-          rsync -a             --exclude='.git/'             --exclude='.pages-deploy/'             --exclude='node_modules/'             --exclude='data/virtual_lab_history.json'             --exclude='data/efootball_desk_prediction_history.json'             --exclude='data/efootball_desk_settled_observations.json'             ./ .pages-deploy/
+          rsync -a             --exclude='.git/'             --exclude='.pages-deploy/'             --exclude='node_modules/'             --exclude='data/virtual_lab_history.json'             --exclude='data/efootball_desk_prediction_history.json'             --exclude='data/efootball_desk_settled_observations.json' --exclude='data/nba_live_observations.json' --exclude='data/nba_live_observations.json.gz'             ./ .pages-deploy/
+          test ! -e .pages-deploy/data/nba_live_observations.json
+          test ! -e .pages-deploy/data/nba_live_observations.json.gz
+          # The five-minute ESPN event archive is a server-side evaluation source,
+          # never a browser asset; only nba_live_current.json is part of the live desk.
           # Cloudflare Pages rejects any single file at or above 25 MiB. Keep
           # the canonical JSON in Git readable if needed, but always minify the
           # deployment copy of the unified board before the provider size check.

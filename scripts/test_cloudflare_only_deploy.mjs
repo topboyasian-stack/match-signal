@@ -48,6 +48,15 @@ const cloudflare = fs.readFileSync(path.join(workflowsDir, "cloudflare-pages.yml
 assert.match(cloudflare, /name:\s*Deploy Match Signal to Cloudflare Pages/);
 assert.match(cloudflare, /https:\/\/match-signal\.pages\.dev/);
 assert.ok(
+  cloudflare.includes("--exclude='data/nba_live_observations.json'") &&
+    cloudflare.includes("test ! -e .pages-deploy/data/nba_live_observations.json"),
+  "The private 30-day NBA live-observation archive must stay out of the public Pages asset package.",
+);
+assert.ok(
+  cloudflare.includes("      - '.github/workflows/cloudflare-pages.yml'"),
+  "A deployment-workflow-only repair must trigger its own production verification run.",
+);
+assert.ok(
   cloudflare.includes("|scripts/ensure_odds_builder_refresh.py|scripts/test_ensure_odds_builder_refresh.py|") &&
     cloudflare.includes("|scripts/test_workflow_trigger_boundaries.py|") &&
     cloudflare.includes("|scripts/test_cloudflare_only_deploy.mjs|") &&
