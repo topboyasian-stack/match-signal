@@ -1520,3 +1520,4 @@ if(!window.__MATCH_SIGNAL_WORKSPACE_UI__){
   document.body.appendChild(workspaceScript);
 }
 })();
+// Production deployment marker: settled eFootball calibration and qualification safeguards are ready for smoke verification.
