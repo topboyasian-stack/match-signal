@@ -8,7 +8,8 @@ def test_period_estimates_are_paired_to_final_scores_and_separated():
     history = []
     for i in range(35):
         event_id = f"game-{i}"
-        history.append({"event_id": event_id, "home_score": 110, "away_score": 105})
+        # The ESPN live event ID intentionally differs from an NBA stats game ID.
+        history.append({"event_id": f"nba-stats-{i}", "home_score": 110, "away_score": 105})
         snapshots = []
         for elapsed, estimate in ((10.0, 217.0), (22.0, 216.0), (34.0, 214.0), (42.0, 213.0)):
             snapshots.append({
@@ -31,6 +32,13 @@ def test_period_estimates_are_paired_to_final_scores_and_separated():
             observed_at=f"2026-10-{(i % 20) + 1:02d}T00:11:00+00:00",
             live_total_projection={**snapshots[0]["live_total_projection"], "elapsed_minutes": 11.0},
         ))
+        snapshots.append({
+            "event_id": event_id,
+            "game_state": "final",
+            "observed_at": f"2026-10-{(i % 20) + 1:02d}T23:55:00+00:00",
+            "home": {"score": "110"},
+            "away": {"score": "105"},
+        })
         games[event_id] = {"event_id": event_id, "snapshots": snapshots}
 
     result = evaluate({"games": games}, history, "model-v4")
