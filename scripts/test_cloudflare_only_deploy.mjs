@@ -67,6 +67,11 @@ assert.ok(
   "A change to the live Builder data endpoint must trigger a Cloudflare Pages deployment.",
 );
 assert.ok(
+  cloudflare.includes("      - 'functions/api/espn.js'") &&
+    cloudflare.includes("|functions/api/espn.js|"),
+  "The ESPN summary proxy must trigger and be permitted in Cloudflare deployments when its implementation changes.",
+);
+assert.ok(
   cloudflare.includes("|scripts/test_live_virtual_quote_coverage.mjs|") &&
     cloudflare.includes("|scripts/test_nba_live_projection.mjs|") &&
     cloudflare.includes("|scripts/visual_site_audit.mjs|") &&
