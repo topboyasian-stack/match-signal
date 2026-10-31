@@ -80,8 +80,8 @@ def _team_possessions(record, side):
     stats = list(_stat_entries(row.get("statistics") or row.get("stats") or row))
     values = {}
     aliases = {
-        "fga": ("fieldgoalsmade-fieldgoalsattempted", "fieldgoalsattempted", "fieldgoalattempts", "fga", "fg"),
-        "fta": ("freethrowsmade-freethrowsattempted", "freethrowsattempted", "freethrowattempts", "fta", "ft"),
+        "fga": ("fieldgoalsmadefieldgoalsattempted", "fieldgoalsattempted", "fieldgoalattempts", "fga", "fg"),
+        "fta": ("freethrowsmadefreethrowsattempted", "freethrowsattempted", "freethrowattempts", "fta", "ft"),
         "orb": ("offensiverebounds", "offensiverebound", "oreb", "orb", "or"),
         "to": ("totalturnovers", "turnovers", "tov", "to"),
     }
