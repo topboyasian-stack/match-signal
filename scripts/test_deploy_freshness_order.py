@@ -265,6 +265,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "functions/api/sportybet-basketball.js",
             "functions/api/sportybet-basketball-booking.js",
             "scripts/test_basketball_desk_contract.mjs",
+            "scripts/test_nba_live_projection.mjs",
             "sport-hubs.css",
             "sport-hubs.js",
             "ms-design-system.css",
