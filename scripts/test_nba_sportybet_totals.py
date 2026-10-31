@@ -97,7 +97,7 @@ assert total["projection_edge_points"] == 6.5
 assert total["model_is_market_blind"] is True
 assert attached["markets"]["moneyline"]["home"] == 0.6, "SportyBet prices must not alter independent winner probabilities"
 
-# First qualified totals publication is frozen once per event and cannot be overwritten.
+# Distinct price states are appended immutably; identical repeated polls are deduplicated.
 snapshot_prediction = {
     "sport": "basketball", "league": "NBA", "event_id": "espn:test-snapshot",
     "start_time": start.isoformat(), "player_1": fixture["home"], "player_2": fixture["away"],
@@ -132,8 +132,10 @@ with tempfile.TemporaryDirectory() as tmp:
     changed["markets"]["total_ou"]["line"] = 231.5
     second = pipeline.append_nba_totals_publication_snapshots([changed], snapshot_path, (now + timedelta(minutes=30)).isoformat())
     saved = json.loads(snapshot_path.read_text(encoding="utf-8"))
-    assert second == {"added": 0, "total": 1}, "a later desk refresh must not overwrite the first published selection"
-    assert saved[0]["markets"]["total_ou"]["line"] == 228.5
+    assert second == {"added": 1, "total": 2}, "a changed line must create a new immutable price revision"
+    assert [row["markets"]["total_ou"]["line"] for row in saved] == [228.5, 231.5]
+    repeat = pipeline.append_nba_totals_publication_snapshots([changed], snapshot_path, (now + timedelta(minutes=31)).isoformat())
+    assert repeat == {"added": 0, "total": 2}, "an identical model/line/price state must not create duplicate revisions"
     # The same fixture must start a new independently frozen cohort when the
     # model version changes; the previous model's event key must not block V4.
     versioned_path = Path(tmp) / "nba_totals_versioned_snapshots.json"
@@ -151,6 +153,12 @@ with tempfile.TemporaryDirectory() as tmp:
         [snapshot_prediction], versioned_path, (now + timedelta(minutes=2)).isoformat()
     )
     assert duplicate_v4 == {"added": 0, "total": 2}
+    revision = json.loads(json.dumps(snapshot_prediction))
+    revision["markets"]["total_ou"]["line"] = 231.5
+    next_revision = pipeline.append_nba_totals_publication_snapshots(
+        [revision], versioned_path, (now + timedelta(minutes=3)).isoformat()
+    )
+    assert next_revision == {"added": 1, "total": 3}
     versioned_rows = json.loads(versioned_path.read_text(encoding="utf-8"))
     assert {row["totals_model_version"] for row in versioned_rows} == {
         "nba-total-v3-matchup-recent-team-total", pipeline.NBA_TOTALS_MODEL_VERSION
