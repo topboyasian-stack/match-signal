@@ -13,10 +13,20 @@ export async function onRequestGet(context){
   if(event && !/^\\d{6,12}$/.test(event)) return new Response(JSON.stringify({ok:false,error:'INVALID_ESPN_EVENT'}),{status:400,headers:corsHeaders()});
   if(event) target.searchParams.set('event',event);
   try{
-    const upstream=await fetch(target.toString(),{headers:{Accept:'application/json','User-Agent':'MatchSignal/4.0 (+https://github.com/topboyasian-stack/match-signal)'},cache:'no-store',signal:AbortSignal.timeout(8000)});
-    const body=await upstream.text();
+    const requestHeaders={Accept:'application/json','User-Agent':'MatchSignal/4.0 (+https://github.com/topboyasian-stack/match-signal)'};
+    let upstream=await fetch(target.toString(),{headers:requestHeaders,cache:'no-store',signal:AbortSignal.timeout(8000)});
+    let body=await upstream.text();
+    // ESPN sometimes serves the same game-summary payload more reliably from
+    // site.web.api. Keep scoreboard requests on site.api and retry only summary.
+    if(!upstream.ok && target.pathname.endsWith('/summary')){
+      const fallbackTarget=new URL(target.pathname+target.search,'https://site.web.api.espn.com');
+      const fallback=await fetch(fallbackTarget.toString(),{headers:requestHeaders,cache:'no-store',signal:AbortSignal.timeout(8000)});
+      const fallbackBody=await fallback.text();
+      if(fallback.ok){upstream=fallback;body=fallbackBody;}
+      else body=JSON.stringify({ok:false,error:'ESPN_SUMMARY_UPSTREAM_FAILED',primary_status:upstream.status,fallback_status:fallback.status,primary_body:body.slice(0,100),fallback_body:fallbackBody.slice(0,100)});
+    }
     if(!upstream.ok){
-      return new Response(JSON.stringify({ok:false,error:'ESPN_UPSTREAM_HTTP_'+upstream.status,body_prefix:body.slice(0,160)}),{status:upstream.status,headers:corsHeaders()});
+      return new Response(JSON.stringify({ok:false,error:'ESPN_UPSTREAM_HTTP_'+upstream.status,body_prefix:body.slice(0,240)}),{status:upstream.status,headers:corsHeaders()});
     }
     return new Response(body,{status:200,headers:{...corsHeaders(),'X-Match-Signal-Proxy':'ESPN'}});
   }catch(e){
