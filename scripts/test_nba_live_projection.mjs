@@ -6,7 +6,7 @@ const start = source.indexOf("function statNumber(");
 const end = source.indexOf("function liveHtml(){", start);
 assert.ok(start >= 0 && end > start, "Live projection helpers must exist before the live desk renderer.");
 const helperSource = source.slice(start, end);
-const api = new Function("teamKey", helperSource + "\nreturn { liveTotalProjection, teamPossessions, verifiedTotalRecord };")(
+const api = new Function("teamKey", helperSource + "\nreturn { liveTotalProjection, teamPossessions, verifiedTotalRecord, nbaTotalsReleaseQualified, nbaTotalRowQualified };")(
   value => String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()
 );
 const stat = (name, displayValue, abbreviation) => ({ name, displayValue, abbreviation });
@@ -49,4 +49,12 @@ assert.equal(api.verifiedTotalRecord(verified), true);
 assert.equal(api.verifiedTotalRecord({ ...verified, publication_snapshot_verified: false }), false);
 assert.equal(api.verifiedTotalRecord({ ...verified, roi_eligible: false }), false);
 assert.equal(api.verifiedTotalRecord({ ...verified, quote_fresh_at_publication: false }), false);
+assert.equal(api.nbaTotalsReleaseQualified({ release_decision: "RESEARCH_ONLY", holdout: { n: 161, roi: -0.1708, accuracy_delta: -0.0497 } }), false);
+assert.equal(api.nbaTotalsReleaseQualified({ release_decision: "APPROVED", holdout: { n: 161, roi: -0.01, accuracy_delta: 0.02 } }), false);
+assert.equal(api.nbaTotalsReleaseQualified({ release_decision: "APPROVED", holdout: { n: 161, roi: 0.03, accuracy_delta: -0.01 } }), false);
+assert.equal(api.nbaTotalsReleaseQualified({ release_decision: "APPROVED", holdout: { n: 99, roi: 0.03, accuracy_delta: 0.01 } }), false);
+assert.equal(api.nbaTotalsReleaseQualified({ release_decision: "APPROVED", holdout: { n: 161, roi: 0.03, accuracy_delta: 0.01 } }), true);
+assert.equal(api.nbaTotalRowQualified({ prediction_status: "live_experimental", markets: { total_ou: { market_id: "225", prediction_status: "LIVE_EXPERIMENTAL_NOT_QUALIFIED" } } }, { release_decision: "APPROVED", holdout: { n: 161, roi: 0.03, accuracy_delta: 0.01 } }), false);
+assert.equal(api.nbaTotalRowQualified({ prediction_status: "BETTING_QUALIFIED", markets: { total_ou: { market_id: "225", prediction_status: "BETTING_QUALIFIED" } } }, { release_decision: "RESEARCH_ONLY", holdout: { n: 161, roi: 0.03, accuracy_delta: 0.01 } }), false);
+assert.equal(api.nbaTotalRowQualified({ prediction_status: "live_experimental", markets: { total_ou: { market_id: "225", prediction_status: "BETTING_QUALIFIED" } } }, { release_decision: "APPROVED", holdout: { n: 161, roi: 0.03, accuracy_delta: 0.01 } }), true);
 console.log("NBA live projection and verified totals tests passed.");
