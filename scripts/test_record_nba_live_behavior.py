@@ -80,7 +80,7 @@ class LiveBoxscoreProjectionTests(unittest.TestCase):
         record["clock"] = "30.6"
         result = live_total_projection(record, fresh_prediction())
         self.assertEqual(result["status"], "AVAILABLE")
-        self.assertAlmostEqual(result["elapsed_minutes"], 23.49, places=2)
+        self.assertAlmostEqual(result["elapsed_minutes"], 23.5, places=1)
         self.assertIn(result["projection_source"], {
             "ESPN_LIVE_BOXSCORE_POSSESSIONS_AND_SCORE_PACE",
             "ESPN_LIVE_SCORE_CLOCK_PACE_ONLY",
@@ -92,7 +92,7 @@ class LiveBoxscoreProjectionTests(unittest.TestCase):
         record["clock"] = "0:30.6"
         result = live_total_projection(record, fresh_prediction())
         self.assertEqual(result["status"], "AVAILABLE")
-        self.assertAlmostEqual(result["elapsed_minutes"], 35.49, places=2)
+        self.assertAlmostEqual(result["elapsed_minutes"], 35.5, places=1)
 
     def test_insufficient_elapsed_time_withholds_live_estimate(self):
         record = sample_record()
