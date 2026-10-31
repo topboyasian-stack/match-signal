@@ -1,4 +1,5 @@
 // eFootball confidence is settled-result calibrated for display/value; exact-line evidence and recent-performance guards still control qualification.
+// Re-promote this renderer after the Cloudflare companion-test allowlist was corrected.
 (()=>{'use strict';const Q=s=>document.querySelector(s),E=v=>{const d=document.createElement('div');d.textContent=String(v??'');return d.innerHTML},N=v=>Number.isFinite(Number(v))?Number(v):null,P=v=>N(v)==null?'—':Math.round(N(v)*100)+'%',OD=p=>N(p)>0?(1/N(p)).toFixed(2):'—',DT=v=>{const d=new Date(v);return isNaN(d)?'—':d.toLocaleString([], {weekday:'short',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})};
 function workspaceEntityLabel(value,kind){
   const raw=String(value||'Unknown').trim()||'Unknown';
