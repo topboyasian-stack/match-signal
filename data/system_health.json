@@ -1,20 +1,20 @@
 {
-  "generated_at": "2026-10-31T11:13:43.490134+00:00",
-  "status": "HEALTHY",
+  "generated_at": "2026-10-31T11:14:06.741208+00:00",
+  "status": "DEGRADED",
   "critical_issues": 0,
-  "warning_issues": 0,
+  "warning_issues": 1,
   "info_issues": 1,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
       "status": "PASS",
-      "age_hours": 0.13,
+      "age_hours": 0.14,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.07,
+      "age_hours": 0.08,
       "threshold_hours": 8
     },
     {
@@ -26,28 +26,28 @@
     {
       "engine": "unified_upcoming",
       "status": "PASS",
-      "age_hours": 0.23,
+      "age_hours": 0.24,
       "threshold_hours": 2
     },
     {
       "engine": "prediction_desk_health",
       "status": "PASS",
-      "age_hours": 0.26,
+      "age_hours": 0.27,
       "threshold_hours": 2
     },
     {
       "engine": "tennis_forward_discovery",
       "status": "PASS",
-      "age_hours": 0.08,
+      "age_hours": 0.09,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
-      "status": "PASS",
-      "age_hours": 0.0,
+      "status": "STALE",
+      "age_hours": 0.55,
       "threshold_hours": 0.5,
       "heartbeat_source": "virtual_lab_live.json",
-      "events_count": 682
+      "events_count": 710
     },
     {
       "engine": "nba_live_observation_recorder",
@@ -94,6 +94,11 @@
     }
   ],
   "issues": [
+    {
+      "code": "VIRTUAL_LIVE_FEED_STALE",
+      "severity": "warning",
+      "detail": "virtual_lab_live.json age 0.55h exceeds 0.50h; a downstream Unified Upcoming refresh cannot substitute for a fresh source snapshot"
+    },
     {
       "code": "PDL_EXPERIMENTAL_FEED_STALE",
       "severity": "info",
