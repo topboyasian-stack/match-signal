@@ -11,7 +11,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from system_health_audit_lib import pdl_health_summary, virtual_live_health_summary, nba_live_observation_health_summary
+from system_health_audit_lib import pdl_health_summary, virtual_live_health_summary, nba_live_observation_health_summary, virtual_participant_history_health_summary
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
@@ -126,6 +126,15 @@ elif desk_health_age > 2:
         "warning",
         f"Prediction Desk health sidecar age {desk_health_age:.2f}h exceeds 2h"
     ))
+
+# A freshly rebuilt board may still contain no certifiable eFootball/virtual
+# picks if participant lifecycle, settlement and model inputs did not refresh.
+virtual_status_age = age_hours(virtual.get("updated_at"))
+virtual_participant_check, virtual_participant_issues = virtual_participant_history_health_summary(
+    virtual_status_age, desk_health, max_age_minutes=30.0
+)
+checks.append(virtual_participant_check)
+checks.extend(virtual_participant_issues)
 
 # The separate 14-day tennis discovery task runs every six hours. A missing or
 # old report means the system cannot distinguish "no fixtures" from "discovery
