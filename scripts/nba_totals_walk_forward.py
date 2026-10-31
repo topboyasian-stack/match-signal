@@ -119,6 +119,10 @@ def _roi_grade_record(row):
         return False
     if str(row.get("market_source") or "").strip().lower() != "sportybet nigeria":
         return False
+    if not str(row.get("sportybet_event_id") or "").strip():
+        return False
+    if row.get("quote_capture_basis") != "SportyBet API response observed_at":
+        return False
     if "ESPN official scoreboard event ID" not in str(row.get("settlement_source") or ""):
         return False
     published, start, quote = (
