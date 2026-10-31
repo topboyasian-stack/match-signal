@@ -130,11 +130,11 @@ permissions:
   contents: write
 
 concurrency:
-  # Keep promotion-child board refreshes out of the ordinary scheduled/push queue.
-  # GitHub replaces older pending runs in a concurrency group; isolating this child
-  # prevents a routine feed update from cancelling the Builder's required pre/post refresh.
+  # Ordinary refreshes are latest-wins: obsolete board builds must not hold the queue
+  # when newer fixture/form data is available. Promotion-child refreshes are isolated
+  # and never cancel the Builder's required pre/post-production refresh.
   group: match-signal-unified-upcoming-${{ github.event_name == 'workflow_dispatch' && inputs.promotion_child && 'promotion' || 'normal' }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' || inputs.promotion_child != true }}
 
 jobs:
   unified:
