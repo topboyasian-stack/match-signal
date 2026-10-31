@@ -40,6 +40,7 @@ assert.ok(api.includes("total_including_overtime:'225'"), "API contract must exp
 assert.ok(workflow.includes("node scripts/test_basketball_desk_contract.mjs"), "Deployment must execute Basketball contract tests");
 assert.ok(workflow.includes("const SMOKE_REQUEST_TIMEOUT_MS = 15000") && workflow.includes("AbortSignal.timeout(SMOKE_REQUEST_TIMEOUT_MS)"), "Production smoke requests must be individually time-bounded.");
 assert.ok(workflow.includes("timeout-minutes: 5"), "Production smoke job must have a bounded total timeout that accommodates Cloudflare propagation retries.");
+assert.ok(workflow.includes("const LIVE_RESULTS_TIMEOUT_MS = 45000") && workflow.includes("LIVE_RESULTS_TIMEOUT_MS)"), "Slow historical result-provider checks must get their own bounded 45-second budget.");
 
 assert.ok(html.includes("How to read this — one clear decision") && html.includes("Model at least 3 points above line"), "Totals page must explain how to choose Over, Under or no clear lean");
 assert.ok(html.includes('id="basketball-builders"') && html.includes('id="basketballBuilderWorkspace"'), "Basketball page must expose its four-builder workspace");
