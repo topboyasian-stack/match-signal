@@ -9,6 +9,7 @@ from system_health_audit_lib import nba_live_observation_health_summary, virtual
 WATCHDOG = (ROOT / ".github/workflows/automation_watchdog.yml").read_text(encoding="utf-8")
 RESEARCH = (ROOT / ".github/workflows/efootball-market-research-schedule.yml").read_text(encoding="utf-8")
 PAGES = (ROOT / ".github/workflows/cloudflare-pages.yml").read_text(encoding="utf-8")
+NBA_SETTLEMENT = (ROOT / ".github/workflows/nba-totals-settlement.yml").read_text(encoding="utf-8")
 
 
 class EfootballResearchRecoveryTests(unittest.TestCase):
@@ -83,6 +84,22 @@ class EfootballResearchRecoveryTests(unittest.TestCase):
         self.assertIn("virtual_lab_collector_recovery_status", WATCHDOG)
         self.assertIn("virtual_lab_collector_active_run_age_minutes", WATCHDOG)
         self.assertIn("a newer collector run is still active", WATCHDOG)
+
+    def test_stale_nba_totals_ledger_has_bounded_recovery(self):
+        self.assertIn("NBA_TOTALS_LEDGER_MAX_AGE_MINUTES = 30", WATCHDOG)
+        self.assertIn("NBA_TOTALS_LEDGER_STALE_QUEUE_MAX_AGE_MINUTES = 10", WATCHDOG)
+        self.assertIn("NBA_TOTALS_LEDGER_STALE_RUN_MAX_AGE_MINUTES = 15", WATCHDOG)
+        self.assertIn("recover_stale_nba_totals_ledger", WATCHDOG)
+        self.assertIn("cancel_stale_nba_totals_settlement_run", WATCHDOG)
+        self.assertIn("'nba_totals_ledger_recovery_status': nba_totals_ledger_recovery_status", WATCHDOG)
+
+    def test_nba_settlement_heartbeat_and_ledger_publication_are_recoverable(self):
+        self.assertIn("cron: '1,16,31,46 * * * *'", NBA_SETTLEMENT)
+        self.assertIn("for attempt in 1 2 3 4 5; do", NBA_SETTLEMENT)
+        self.assertIn("git reset --hard origin/main", NBA_SETTLEMENT)
+        self.assertIn("A newer/equal ledger is already published; preserving it.", NBA_SETTLEMENT)
+        self.assertIn("if git push origin HEAD:main; then", NBA_SETTLEMENT)
+        self.assertIn("nba_totals_ledger_age_minutes", WATCHDOG)
 
     def test_stale_or_stuck_unified_upcoming_has_bounded_recovery(self):
         self.assertIn("UNIFIED_UPCOMING_MAX_AGE_MINUTES = 15", WATCHDOG)
