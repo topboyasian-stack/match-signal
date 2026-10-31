@@ -98,25 +98,25 @@ def test_gamelogs_team_rows_are_joined_and_preseason_excluded():
     finally:
         p.NOW,p.S.get,p.pd.read_parquet=old_now,old_get,old_read
 
-def test_collection_prefers_gamelogs_and_preserves_fallback_diagnostics():
-    old_parquet,old_collect,old_elo=p.nba_parquet_fallback,p.collect_espn,p.nba_elo_fallback
+def test_collection_prefers_pace_gamelogs_and_preserves_fallback_diagnostics():
+    old_source,old_collect,old_elo=p.nba_duckdb_fallback,p.collect_espn,p.nba_elo_fallback
     try:
-        p.nba_parquet_fallback=lambda:[{"event_id":"parquet"}]
-        p.collect_espn=lambda *args,**kwargs:(_ for _ in ()).throw(AssertionError("ESPN should not be needed when dated gamelogs are valid"))
+        p.nba_duckdb_fallback=lambda:[{"event_id":"duckdb"}]
+        p.collect_espn=lambda *args,**kwargs:(_ for _ in ()).throw(AssertionError("ESPN should not be needed when v2 pace gamelogs are valid"))
         rows,errors=p.collect("NBA")
-        assert rows==[{"event_id":"parquet"}] and errors==[],(rows,errors)
-        def fail_parquet():raise ValueError("parquet unavailable")
-        p.nba_parquet_fallback=fail_parquet
+        assert rows==[{"event_id":"duckdb"}] and errors==[],(rows,errors)
+        def fail_source():raise ValueError("public catalog unavailable")
+        p.nba_duckdb_fallback=fail_source
         p.collect_espn=lambda *args,**kwargs:([],["ESPN daily scoreboard failed"])
         p.nba_elo_fallback=lambda:[{"event_id":"elo"}]
         rows,errors=p.collect("NBA")
         assert rows==[{"event_id":"elo"}],rows
-        assert errors==["nba_gamelogs: parquet unavailable","ESPN daily scoreboard failed"],errors
+        assert errors==["nba_data_v2_team_game_logs: public catalog unavailable","ESPN daily scoreboard failed"],errors
     finally:
-        p.nba_parquet_fallback,p.collect_espn,p.nba_elo_fallback=old_parquet,old_collect,old_elo
+        p.nba_duckdb_fallback,p.collect_espn,p.nba_elo_fallback=old_source,old_collect,old_elo
 
 
-def test_totals_v3_uses_strictly_prior_last_twelve_game_totals():
+def test_v4_uses_strictly_prior_scores_pace_and_efficiency():
     old_now=p.NOW
     try:
         p.NOW=datetime(2026,10,31,12,tzinfo=UTC)
@@ -125,26 +125,59 @@ def test_totals_v3_uses_strictly_prior_last_twelve_game_totals():
             stamp=p.NOW-__import__("datetime").timedelta(days=14-i)
             base.append({"event_id":f"home-prior-{i}","date":stamp.isoformat(),
                          "home":"Home Team","away":f"Opponent {i}",
-                         "home_score":100.0+i,"away_score":100.0})
+                         "home_score":100.0+i,"away_score":100.0,
+                         "home_pace":100,"away_pace":100,
+                         "home_off_rating":112,"away_off_rating":111,
+                         "home_def_rating":110,"away_def_rating":109,
+                         "home_possessions":98,"away_possessions":99})
             base.append({"event_id":f"away-prior-{i}","date":stamp.isoformat(),
                          "home":f"Other {i}","away":"Away Team",
-                         "home_score":100.0,"away_score":100.0+i})
+                         "home_score":100.0,"away_score":100.0+i,
+                         "home_pace":100,"away_pace":100,
+                         "home_off_rating":111,"away_off_rating":112,
+                         "home_def_rating":109,"away_def_rating":110,
+                         "home_possessions":99,"away_possessions":98})
         fixture={"event_id":"upcoming","date":(p.NOW+__import__("datetime").timedelta(days=1)).isoformat(),
                  "home":"Home Team","away":"Away Team"}
-        forecast=p.nba_predict(fixture,base)
+        forecast=p.nba_predict(fixture,base,pace_blend_weight=.5,bias_adjustment=1.25)
         assert forecast["totals_model_version"]==p.NBA_TOTALS_MODEL_VERSION
         assert forecast["total_model_features"]["recency_half_life_days"]==30
         assert forecast["total_model_features"]["recent_team_total_window"]==12
+        assert forecast["total_model_features"]["pace_efficiency_available"] is True
+        assert forecast["total_model_features"]["pace_blend_weight"]==.5
+        assert forecast["total_model_features"]["bias_correction_points"]==1.25
         assert abs(forecast["expected_total"]-(forecast["expected_score"]["home"]+forecast["expected_score"]["away"]))<1e-8
         weighted=p.weights(base,p.dt(fixture["date"]),30)
         assert len(weighted["Home Team"]["recent_totals"])==12
         assert len(weighted["Away Team"]["recent_totals"])==12
         future=base+[{"event_id":"future","date":(p.NOW+__import__("datetime").timedelta(days=2)).isoformat(),
-                      "home":"Home Team","away":"Away Team","home_score":300.0,"away_score":300.0}]
-        after=p.nba_predict(fixture,future)
+                      "home":"Home Team","away":"Away Team","home_score":300.0,"away_score":300.0,
+                      "home_pace":111,"away_pace":111,"home_off_rating":140,"away_off_rating":140,
+                      "home_def_rating":140,"away_def_rating":140}]
+        after=p.nba_predict(fixture,future,pace_blend_weight=.5,bias_adjustment=1.25)
         assert after["expected_total"]==forecast["expected_total"], "future games must not enter a pregame forecast"
     finally:
         p.NOW=old_now
+
+
+def test_v2_normalizer_keeps_only_valid_regular_season_pace_metrics():
+    now=datetime(2026,10,31,12,tzinfo=UTC)
+    rows=p.normalize_nba_duckdb_rows([
+        {"event_id":"0022600001","date":"2026-10-25T23:00:00+00:00","game_type":"regular_season",
+         "home":"Boston Celtics","away":"New York Knicks","home_score":112,"away_score":105,
+         "home_pace":99.5,"away_pace":100.5,"home_off_rating":115.2,"away_off_rating":110.1,
+         "home_def_rating":108.2,"away_def_rating":113.4,"home_possessions":98,"away_possessions":99},
+        {"event_id":"preseason","date":"2026-10-25T23:00:00+00:00","game_type":"preseason",
+         "home":"A","away":"B","home_score":100,"away_score":100},
+        {"event_id":"future","date":"2026-11-01T23:00:00+00:00","game_type":"regular_season",
+         "home":"A","away":"B","home_score":100,"away_score":100}
+    ],now)
+    assert len(rows)==1 and rows[0]["source"]=="nba_data_v2_team_game_logs"
+    assert rows[0]["home_pace"]==99.5 and rows[0]["away_off_rating"]==110.1
+    assert rows[0]["home_possessions"]==98
+
+
+
 
 if __name__=="__main__":
     test_history_windows_and_preseason_exclusion()
