@@ -1,3 +1,4 @@
+// NBA totals v3 client release: same-model forecast version and totals-only OOS evidence must match.
 /* NBA totals desk: totals-only model-version-matched release evidence */
 /* Match Signal NBA live desk: ESPN scoreboard + research-only model feed. */
 (function(){
