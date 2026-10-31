@@ -24,7 +24,24 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  validate:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install recorder dependency
+        run: python -m pip install --disable-pip-version-check requests
+      - name: Compile recorder and run offline projection tests
+        run: |
+          python -m py_compile scripts/record_nba_live_behavior.py scripts/test_record_nba_live_behavior.py
+          python scripts/test_record_nba_live_behavior.py
+
   record:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 4
     steps:
