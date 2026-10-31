@@ -1,24 +1,25 @@
 {
-  "generated_at": "2026-10-31T22:43:53.818962+00:00",
+  "generated_at": "2026-10-31T22:52:31.028329+00:00",
   "paper_only": true,
   "evaluation_type": "NBA_LIVE_TOTALS_PERIOD_WALK_FORWARD_V1",
   "model_version": "nba-total-v5-pace-efficiency-calibrated",
   "source": "Archived ESPN live scoreboard/box-score estimates paired with official final totals",
   "observation_window_days": 30,
-  "selection": "One nearest target snapshot per settled event at end of Q1 (11.5m), halftime (23.5m), end of Q3 (35.5m), and mid-Q4 (42m); missing projections and unsettled games are excluded, never imputed.",
+  "selection": "One nearest target snapshot per settled event at end of Q1 (11.5m), halftime (23.5m), end of Q3 (35.5m), and mid-Q4 (42m); snapshots farther than the target tolerance are excluded, and missing projections/unsettled games are never imputed.",
+  "period_target_tolerance_minutes": 2.5,
   "minimum_games_per_period": 30,
   "observation_coverage": {
     "model_version": "nba-total-v5-pace-efficiency-calibrated",
     "v5_live_events_observed": 1,
-    "v5_live_snapshots": 5,
-    "available_estimates": 4,
+    "v5_live_snapshots": 6,
+    "available_estimates": 5,
     "estimate_status_counts": {
       "COLLECTING": 1,
-      "AVAILABLE": 4
+      "AVAILABLE": 5
     },
     "available_snapshots_by_period": {
       "Q1": 2,
-      "Halftime": 2,
+      "Halftime": 3,
       "Q3": 0,
       "Q4": 0
     },
@@ -28,7 +29,7 @@
       "Q3_end": 35.5,
       "Q4": 42.0
     },
-    "boxscore_possession_estimates": 4,
+    "boxscore_possession_estimates": 5,
     "score_clock_fallback_estimates": 0,
     "accuracy_sample_unit": "one distinct settled game per period, not each five-minute snapshot"
   },
