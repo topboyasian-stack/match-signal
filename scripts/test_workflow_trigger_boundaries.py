@@ -91,6 +91,9 @@ def main():
     assert "data/virtual_lab_participants/efootball_confirmed_watch.json" in collector_paths, (
         "The explicit manual watch input must still be able to trigger the collector."
     )
+    assert "cancel-in-progress: true" in collector, (
+        "A newer fixed collector run must supersede an obsolete artifact-publication retry."
+    )
 
     # Unified Upcoming is the single owner of the canonical all-sports board,
     # eFootball candidate pool and shared system-health artifact. Autopilot and
