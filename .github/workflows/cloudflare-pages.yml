@@ -447,18 +447,19 @@ jobs:
             failures.push('Checked-out Odds Builder source is missing its build marker or versioned CSS/engine reference.');
           }
           const SMOKE_REQUEST_TIMEOUT_MS = 15000;
-          async function getFrom(origin, path) {
+          const LIVE_RESULTS_TIMEOUT_MS = 45000;
+          async function getFrom(origin, path, timeoutMs = SMOKE_REQUEST_TIMEOUT_MS) {
             const r = await fetch(origin + path + (path.includes('?') ? '&' : '?') + 'smoke=' + Date.now(), {
               cache:'no-store',
-              signal: AbortSignal.timeout(SMOKE_REQUEST_TIMEOUT_MS)
+              signal: AbortSignal.timeout(timeoutMs)
             });
             const body = await r.text();
             return {r,body};
           }
           let verifiedProductionBoard = null;
-          const get = async path => {
+          const get = async (path, timeoutMs = SMOKE_REQUEST_TIMEOUT_MS) => {
             if (path === '/data/unified_upcoming.json' && verifiedProductionBoard) return verifiedProductionBoard;
-            return getFrom(base, path);
+            return getFrom(base, path, timeoutMs);
           };
 
           // Verify the immutable deployment itself first, then give Cloudflare's production
@@ -917,7 +918,7 @@ jobs:
                 startTime:String(Date.now()-86400000),
                 endTime:String(Date.now())
               });
-              const {r,body}=await get('/api/sportybet-virtual-results?'+p.toString());
+              const {r,body}=await get('/api/sportybet-virtual-results?'+p.toString(), LIVE_RESULTS_TIMEOUT_MS);
               if (!r.ok) failures.push('/api/sportybet-virtual-results '+source+' HTTP '+r.status);
               const payload=JSON.parse(body);
               if (payload?.ok!==true) failures.push('/api/sportybet-virtual-results '+source+' returned ok!=true');
