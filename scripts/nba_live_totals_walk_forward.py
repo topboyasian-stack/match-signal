@@ -72,6 +72,57 @@ def metrics(rows):
     }
 
 
+def observation_coverage(games, model_version=None):
+    """Describe V5 live observations separately from settled accuracy samples."""
+    statuses = {}
+    period_snapshots = {"Q1": 0, "Halftime": 0, "Q3": 0, "Q4": 0}
+    event_ids = set()
+    live_snapshot_count = available_count = stats_based = score_clock_only = 0
+    for event_id, game in (games or {}).items():
+        game_has_model_observation = False
+        for snapshot in game.get("snapshots") or []:
+            if snapshot.get("game_state") != "live":
+                continue
+            if model_version and snapshot.get("pregame_totals_model_version") != model_version:
+                continue
+            game_has_model_observation = True
+            live_snapshot_count += 1
+            projection = snapshot.get("live_total_projection") or {}
+            status = str(projection.get("status") or "MISSING_PROJECTION")
+            statuses[status] = statuses.get(status, 0) + 1
+            if status != "AVAILABLE":
+                continue
+            available_count += 1
+            if projection.get("uses_live_boxscore_stats") is True:
+                stats_based += 1
+            else:
+                score_clock_only += 1
+            elapsed = number(projection.get("elapsed_minutes"))
+            if elapsed is None:
+                continue
+            if 0 <= elapsed < 12:
+                period_snapshots["Q1"] += 1
+            elif 12 <= elapsed < 24:
+                period_snapshots["Halftime"] += 1
+            elif 24 <= elapsed < 36:
+                period_snapshots["Q3"] += 1
+            elif 36 <= elapsed <= 48:
+                period_snapshots["Q4"] += 1
+        if game_has_model_observation:
+            event_ids.add(str(event_id))
+    return {
+        "model_version": model_version,
+        "v5_live_events_observed": len(event_ids),
+        "v5_live_snapshots": live_snapshot_count,
+        "available_estimates": available_count,
+        "estimate_status_counts": statuses,
+        "available_snapshots_by_period": period_snapshots,
+        "boxscore_possession_estimates": stats_based,
+        "score_clock_fallback_estimates": score_clock_only,
+        "accuracy_sample_unit": "one distinct settled game per period, not each five-minute snapshot",
+    }
+
+
 def evaluate(observation_payload, history_rows, model_version=None):
     finals = {}
     for row in history_rows if isinstance(history_rows, list) else []:
@@ -152,6 +203,7 @@ def evaluate(observation_payload, history_rows, model_version=None):
         "observation_window_days": 30,
         "selection": "One nearest target snapshot per settled event and period; missing projections and unsettled games are excluded, never imputed.",
         "minimum_games_per_period": MIN_PERIOD_SAMPLE,
+        "observation_coverage": observation_coverage(games, model_version),
         "settled_events_with_observations": len({row["event_id"] for row in all_rows}),
         "by_period": by_period,
         "overall": metrics(all_rows),
