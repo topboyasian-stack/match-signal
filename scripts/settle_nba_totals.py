@@ -141,8 +141,11 @@ def result_for(prediction, event):
     total = hs + aws
     outcome = "over" if total > line else "under" if total < line else "push"
     price_audit = price_audit_fields(prediction, market, pred_time)
+    model_version = str(prediction.get("totals_model_version") or "legacy")
+    snapshot_id = str(prediction.get("publication_snapshot_id") or "mutable")
+    ledger_identity = ":".join((str(event["id"]), model_version, snapshot_id))
     return {
-        "ledger_id": "nba-total:" + str(event["id"]),
+        "ledger_id": "nba-total:" + ledger_identity,
         "sport": "basketball", "league": "NBA", "event_id": str(event["id"]),
         "start_time": prediction["start_time"], "published_at": prediction.get("published_at"),
         "publication_snapshot_id": prediction.get("publication_snapshot_id"),
@@ -163,6 +166,21 @@ def result_for(prediction, event):
         "paper_only": True,
     }
 
+def candidate_key(row):
+    """One independent settlement cohort per event and totals-model version."""
+    return (
+        str(row.get("event_id") or ""),
+        str(row.get("totals_model_version") or "legacy"),
+    )
+
+
+def ledger_key(row):
+    return (
+        str(row.get("event_id") or ""),
+        str(row.get("totals_model_version") or "legacy"),
+    )
+
+
 def main():
     predictions = load(PREDICTIONS, [])
     snapshots = load(SNAPSHOTS, [])
@@ -170,45 +188,72 @@ def main():
         predictions = []
     if not isinstance(snapshots, list):
         snapshots = []
-    # The frozen publication record takes precedence over the mutable current desk row.
-    candidates_by_id = {str(p.get("event_id")): p for p in predictions if p.get("event_id")}
-    snapshots_by_id = {}
-    for snapshot in sorted(snapshots, key=lambda row: str(row.get("published_at") or "") if isinstance(row, dict) else ""):
-        if isinstance(snapshot, dict) and snapshot.get("event_id"):
-            snapshots_by_id.setdefault(str(snapshot["event_id"]), snapshot)
-    candidates_by_id.update(snapshots_by_id)
-    candidates = list(candidates_by_id.values())
+
+    # A new model version starts its own immutable cohort for the same fixture.
+    candidates_by_key = {}
+    predictions_by_key = {}
+    for prediction in predictions:
+        if not prediction.get("event_id"):
+            continue
+        key = candidate_key(prediction)
+        predictions_by_key[key] = prediction
+        candidates_by_key[key] = prediction
+    snapshots_by_key = {}
+    for snapshot in sorted(
+        snapshots,
+        key=lambda row: (
+            str(row.get("published_at") or ""),
+            str(row.get("event_id") or ""),
+            str(row.get("totals_model_version") or "legacy"),
+        ),
+    ):
+        if not isinstance(snapshot, dict) or not snapshot.get("event_id"):
+            continue
+        key = candidate_key(snapshot)
+        snapshots_by_key.setdefault(key, snapshot)
+        # Frozen publication evidence always wins over a mutable prediction row.
+        candidates_by_key[key] = snapshots_by_key[key]
+    candidates = list(candidates_by_key.values())
+
     old = load(LEDGER, {"records": []})
     records = old.get("records", []) if isinstance(old, dict) else []
-    by_id = {str(r.get("event_id")): r for r in records if r.get("event_id")}
-    # Add price-audit metadata to legacy rows without changing their settled outcome.
-    # A frozen snapshot is preferred; a mutable current row is explicitly unverified.
-    predictions_by_id = {str(p.get("event_id")): p for p in predictions if p.get("event_id")}
-    for eid, row in by_id.items():
+    by_key = {ledger_key(row): row for row in records if row.get("event_id")}
+
+    # Add price audit metadata only to legacy rows which predate audit columns.
+    # Settled outcomes are never overwritten and never borrow another model's quote.
+    for key, row in list(by_key.items()):
         if "roi_eligible" in row:
             continue
-        prediction = snapshots_by_id.get(eid) or predictions_by_id.get(eid)
+        event_id, row_version = key
+        matching = [
+            snapshot for snapshot_key, snapshot in snapshots_by_key.items()
+            if snapshot_key[0] == event_id and
+            (row_version == "legacy" or snapshot_key[1] == row_version)
+        ]
+        prediction = matching[0] if matching else predictions_by_key.get(key)
         market = ((prediction or {}).get("markets") or {}).get("total_ou") or {}
         try:
-            row_line_matches = float(row.get("line")) == float(market.get("line"))
+            line_matches = float(row.get("line")) == float(market.get("line"))
         except (TypeError, ValueError):
-            row_line_matches = False
-        if prediction and row.get("pick") == market.get("pick") and row_line_matches:
+            line_matches = False
+        if prediction and row.get("pick") == market.get("pick") and line_matches:
             audit = price_audit_fields(
                 prediction, market,
-                parse_time(prediction.get("prediction_created_at") or prediction.get("generated_at") or prediction.get("published_at"))
+                parse_time(prediction.get("published_at") or prediction.get("prediction_created_at")
+                           or prediction.get("generated_at"))
             )
-            is_frozen_snapshot = bool(
+            is_snapshot = bool(
                 prediction.get("publication_snapshot_verified") is True
                 and prediction.get("publication_snapshot_id")
                 and prediction.get("published_at")
             )
-            audit["publication_snapshot_verified"] = is_frozen_snapshot
-            audit["roi_eligible"] = bool(audit["roi_eligible"] and is_frozen_snapshot)
+            audit["publication_snapshot_verified"] = is_snapshot
+            audit["roi_eligible"] = bool(audit["roi_eligible"] and is_snapshot)
             audit["price_audit_backfilled"] = True
-            if not is_frozen_snapshot:
+            if not is_snapshot:
                 audit["roi_ineligibility_reasons"] = sorted(set(
-                    audit["roi_ineligibility_reasons"] + ["backfilled_from_current_prediction_not_frozen_snapshot"]
+                    audit["roi_ineligibility_reasons"]
+                    + ["backfilled_from_current_prediction_not_frozen_snapshot"]
                 ))
             row.update(audit)
         else:
@@ -221,12 +266,12 @@ def main():
                 "roi_eligible": False, "price_audit_backfilled": True,
                 "roi_ineligibility_reasons": ["no_matching_prediction_snapshot_for_legacy_record"],
             })
-    # Reconcile every prediction date, including recently completed games missed by a prior run.
+
     dates = set()
-    for p in candidates:
-        dt = parse_time(p.get("start_time"))
-        if dt:
-            dates.add(dt.astimezone(ZoneInfo("America/New_York")).strftime("%Y%m%d"))
+    for prediction in candidates:
+        stamp = parse_time(prediction.get("start_time"))
+        if stamp:
+            dates.add(stamp.astimezone(ZoneInfo("America/New_York")).strftime("%Y%m%d"))
     added = 0
     for day in sorted(dates):
         try:
@@ -236,56 +281,89 @@ def main():
         except (requests.RequestException, ValueError) as exc:
             print("Scoreboard fetch failed for", day, ":", str(exc)[:180])
             continue
-        event_by_id = {str(e.get("id")): e for e in events if e.get("id")}
-        for p in candidates:
-            eid = str(p.get("event_id") or "")
-            event = event_by_id.get(eid)
-            if not event or eid in by_id:
+        event_by_id = {str(event.get("id")): event for event in events if event.get("id")}
+        for prediction in candidates:
+            event_id = str(prediction.get("event_id") or "")
+            key = candidate_key(prediction)
+            event = event_by_id.get(event_id)
+            if not event or key in by_key:
                 continue
-            row = result_for(p, event)
+            row = result_for(prediction, event)
             if row:
-                by_id[eid] = row
+                by_key[key] = row
                 added += 1
-    records = sorted(by_id.values(), key=lambda x: x.get("start_time", ""))
-    decided = [r for r in records if r.get("result") in ("over", "under")]
-    wins = sum(r.get("pick") == r.get("result") for r in decided)
-    roi_decided = [
-        r for r in decided
-        if r.get("roi_eligible") is True
-        and isinstance(r.get("over_odds"), (int, float))
-        and isinstance(r.get("under_odds"), (int, float))
-    ]
-    roi_wins = sum(r.get("pick") == r.get("result") for r in roi_decided)
-    roi_profit = sum(
-        (float(r["over_odds"] if r.get("pick") == "over" else r["under_odds"]) - 1)
-        if r.get("pick") == r.get("result") else -1
-        for r in roi_decided
+
+    records = sorted(
+        by_key.values(),
+        key=lambda row: (
+            str(row.get("start_time") or ""),
+            str(row.get("event_id") or ""),
+            str(row.get("totals_model_version") or "legacy"),
+        ),
     )
+    decided = [row for row in records if row.get("result") in ("over", "under")]
+    wins = sum(row.get("pick") == row.get("result") for row in decided)
+    roi_decided = [
+        row for row in decided
+        if row.get("roi_eligible") is True
+        and isinstance(row.get("over_odds"), (int, float))
+        and isinstance(row.get("under_odds"), (int, float))
+    ]
+    roi_wins = sum(row.get("pick") == row.get("result") for row in roi_decided)
+    roi_profit = sum(
+        (float(row["over_odds"] if row.get("pick") == "over" else row["under_odds"]) - 1)
+        if row.get("pick") == row.get("result") else -1
+        for row in roi_decided
+    )
+    by_model_version = {}
+    for row in records:
+        version = str(row.get("totals_model_version") or "legacy")
+        stats = by_model_version.setdefault(
+            version, {"settled": 0, "decided": 0, "correct": 0, "over": 0, "under": 0}
+        )
+        stats["settled"] += 1
+        if row.get("result") in ("over", "under"):
+            stats["decided"] += 1
+            stats["correct"] += int(row.get("pick") == row.get("result"))
+            if row.get("pick") in ("over", "under"):
+                stats[row["pick"]] += 1
+    for stats in by_model_version.values():
+        stats["accuracy"] = stats["correct"] / stats["decided"] if stats["decided"] else None
+
     payload = {
         "updated_at": datetime.now(timezone.utc).isoformat(),
         "source": "ESPN public NBA scoreboard",
         "market_definition": "SportyBet market 225 full-game totals, overtime included",
         "paper_only": True,
-        "settlement_rules": ["Exact ESPN event ID only", "Pre-game prediction timestamp required",
-                             "Market ID 225 and saved Over/Under line/pick required",
-                             "Final official score includes overtime", "Pushes excluded from accuracy",
-                             "Existing settlement outcomes are never overwritten",
-                             "ROI requires a verified immutable publication snapshot, fresh quote and both valid prices"],
-        "summary": {"settled": len(records), "decided": len(decided), "correct": wins,
-                    "accuracy": wins / len(decided) if decided else None,
-                    "pushes": sum(r.get("result") == "push" for r in records),
-                    "over_settled": sum(r.get("pick") == "over" for r in decided),
-                    "under_settled": sum(r.get("pick") == "under" for r in decided),
-                    "roi_eligible_decided": len(roi_decided),
-                    "roi_eligible_correct": roi_wins,
-                    "roi_eligible_accuracy": roi_wins / len(roi_decided) if roi_decided else None,
-                    "roi_eligible_unit_profit": round(roi_profit, 4) if roi_decided else None,
-                    "roi_eligible_roi": round(roi_profit / len(roi_decided), 4) if roi_decided else None,
-                    "roi_basis": "Flat 1-unit stake at the saved selected-side SportyBet decimal price; pushes excluded; only verified publication snapshots count"},
+        "settlement_rules": [
+            "Exact ESPN event ID only",
+            "Pregame publication timestamp required",
+            "Market ID 225 and saved Over/Under line/pick required",
+            "Final official score includes overtime",
+            "Pushes excluded from accuracy",
+            "Existing model-version settlement outcomes are never overwritten",
+            "Each event/model-version cohort is settled independently",
+            "ROI requires a verified immutable publication snapshot, fresh quote and both valid prices",
+        ],
+        "summary": {
+            "settled": len(records), "decided": len(decided), "correct": wins,
+            "accuracy": wins / len(decided) if decided else None,
+            "pushes": sum(row.get("result") == "push" for row in records),
+            "over_settled": sum(row.get("pick") == "over" for row in decided),
+            "under_settled": sum(row.get("pick") == "under" for row in decided),
+            "roi_eligible_decided": len(roi_decided),
+            "roi_eligible_correct": roi_wins,
+            "roi_eligible_accuracy": roi_wins / len(roi_decided) if roi_decided else None,
+            "roi_eligible_unit_profit": round(roi_profit, 4) if roi_decided else None,
+            "roi_eligible_roi": round(roi_profit / len(roi_decided), 4) if roi_decided else None,
+            "by_model_version": by_model_version,
+            "roi_basis": "Flat 1-unit stake at the saved selected-side SportyBet decimal price; pushes excluded; only verified publication snapshots count",
+        },
         "records": records,
     }
     LEDGER.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(json.dumps({"new_settlements": added, **payload["summary"], "updated_at": payload["updated_at"]}))
+
 
 if __name__ == "__main__":
     main()
