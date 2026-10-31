@@ -35,7 +35,9 @@ on:
       - 'reports.html'
       - 'reports-design.css'
       - 'virtual-lab/index.html'
+      - 'virtual-lab-app.js'
       - 'virtual-lab-terminal.css'
+      - 'scripts/test_virtual_lab_recent_performance_gate.mjs'
       - 'scripts/test_workspace_terminal_design.mjs'
       - 'football.html'
       - 'tennis.html'
@@ -62,6 +64,14 @@ on:
       - '.github/workflows/efootball-market-research-schedule.yml'
       - 'scripts/test_automation_watchdog_research_recovery.py'
       - 'scripts/test_qualified_best_monitor.mjs'
+  pull_request:
+    paths:
+      - 'virtual-lab-app.js'
+      - 'virtual-lab/index.html'
+      - 'virtual-lab-terminal.css'
+      - 'scripts/test_virtual_lab_recent_performance_gate.mjs'
+      - 'scripts/validate_virtual_lab_v1.py'
+      - '.github/workflows/cloudflare-pages.yml'
   workflow_dispatch:
 
 permissions:
@@ -72,8 +82,27 @@ permissions:
 # Serialization lives on the eligible deploy job below, after its event condition,
 # so an irrelevant workflow_run that will be skipped cannot replace a pending deploy.
 jobs:
+  validate:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check Virtual Lab JavaScript syntax
+        run: node --check virtual-lab-app.js
+      - name: Run eFootball recent-performance regression
+        run: node scripts/test_virtual_lab_recent_performance_gate.mjs
+      - name: Validate Virtual Lab page and renderer contract
+        run: python scripts/validate_virtual_lab_v1.py
+
   deploy:
-    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name != 'pull_request' && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success') }}
     concurrency:
       group: cloudflare-pages-v3
       cancel-in-progress: false
@@ -97,7 +126,7 @@ jobs:
           changed="$(gh api "repos/${GITHUB_REPOSITORY}/compare/${BEFORE_SHA}...${PUSH_SHA}" --jq '.files[].filename')"
           test -n "$changed" || { echo "Direct promotion has no inspectable changed-file list." >&2; exit 1; }
           printf 'Direct promotion changed files:\n%s\n' "$changed"
-          allowed='|.github/workflows/nba-totals-settlement.yml|.github/workflows/nba-source-tests.yml|scripts/settle_nba_totals.py|scripts/test_settle_nba_totals.py|data/nba_totals_ledger.json|_headers|index.html|upcoming.html|qualified-best.html|qualified-best-design.css|scripts/test_qualified_best_design.mjs|functions/api/sportybet-booking.js|functions/api/odds-builder-data.js|functions/api/sportybet-virtual-results.js|scripts/test_sportybet_booking_batch_ids.mjs|expansion-odds-builder.js|scripts/test_odds_builder_ui_freshness.mjs|scripts/test_desk_quote_contract.mjs|sport-hubs-design.css|scripts/test_sport_hub_design.mjs|independent-sport-design.css|scripts/test_independent_sports_design.mjs|darts.html|table-tennis.html|odds-builder.html|odds-builder-design.css|reports.html|reports-design.css|virtual-lab/index.html|virtual-lab-terminal.css|scripts/test_workspace_terminal_design.mjs|football.html|tennis.html|basketball.html|basketball-live.js|basketball-design.css|functions/api/sportybet-basketball.js|functions/api/sportybet-basketball-booking.js|scripts/test_basketball_desk_contract.mjs|sport-hubs.css|sport-hubs.js|ms-design-system.css|core-workspaces-design.css|scripts/test_core_workspaces_design.mjs|league-logos.js|scripts/test_league_logos.mjs|workspace-ui.js|data/club-logo-registry.json|scripts/sync_club_logos.py|scripts/test_club_logo_registry.py|scripts/qualified_best_monitor.mjs|scripts/test_qualified_best_monitor.mjs|.github/workflows/qualified-best-live-monitor.yml|.github/workflows/qualified-best-watch.yml|.github/workflows/qualified-best-production-watch.yml|.github/workflows/qualified-best-health-watch-v2.yml|.github/workflows/automation_watchdog.yml|.github/workflows/efootball-market-research-schedule.yml|scripts/test_automation_watchdog_research_recovery.py|scripts/test_qualified_best_monitor.mjs|.github/workflows/unified-upcoming.yml|scripts/test_workflow_trigger_boundaries.py|scripts/test_deploy_freshness_order.py|scripts/test_prediction_desk_gates.mjs|scripts/test_efootball_market_research.py|scripts/test_deploy_freshness_order.py|scripts/test_upcoming_desk_policy.py|docs/PREDICTION_DESK_POLICY.md|scripts/ensure_odds_builder_refresh.py|scripts/test_ensure_odds_builder_refresh.py|scripts/test_cloudflare_only_deploy.mjs|'
+          allowed='|.github/workflows/nba-totals-settlement.yml|.github/workflows/nba-source-tests.yml|scripts/settle_nba_totals.py|scripts/test_settle_nba_totals.py|data/nba_totals_ledger.json|_headers|index.html|upcoming.html|qualified-best.html|qualified-best-design.css|scripts/test_qualified_best_design.mjs|functions/api/sportybet-booking.js|functions/api/odds-builder-data.js|functions/api/sportybet-virtual-results.js|scripts/test_sportybet_booking_batch_ids.mjs|expansion-odds-builder.js|scripts/test_odds_builder_ui_freshness.mjs|scripts/test_desk_quote_contract.mjs|sport-hubs-design.css|scripts/test_sport_hub_design.mjs|independent-sport-design.css|scripts/test_independent_sports_design.mjs|darts.html|table-tennis.html|odds-builder.html|odds-builder-design.css|reports.html|reports-design.css|virtual-lab/index.html|virtual-lab-app.js|virtual-lab-terminal.css|scripts/test_virtual_lab_recent_performance_gate.mjs|scripts/test_workspace_terminal_design.mjs|football.html|tennis.html|basketball.html|basketball-live.js|basketball-design.css|functions/api/sportybet-basketball.js|functions/api/sportybet-basketball-booking.js|scripts/test_basketball_desk_contract.mjs|sport-hubs.css|sport-hubs.js|ms-design-system.css|core-workspaces-design.css|scripts/test_core_workspaces_design.mjs|league-logos.js|scripts/test_league_logos.mjs|workspace-ui.js|data/club-logo-registry.json|scripts/sync_club_logos.py|scripts/test_club_logo_registry.py|scripts/qualified_best_monitor.mjs|scripts/test_qualified_best_monitor.mjs|.github/workflows/qualified-best-live-monitor.yml|.github/workflows/qualified-best-watch.yml|.github/workflows/qualified-best-production-watch.yml|.github/workflows/qualified-best-health-watch-v2.yml|.github/workflows/automation_watchdog.yml|.github/workflows/efootball-market-research-schedule.yml|scripts/test_automation_watchdog_research_recovery.py|scripts/test_qualified_best_monitor.mjs|.github/workflows/unified-upcoming.yml|scripts/test_workflow_trigger_boundaries.py|scripts/test_deploy_freshness_order.py|scripts/test_prediction_desk_gates.mjs|scripts/test_efootball_market_research.py|scripts/test_deploy_freshness_order.py|scripts/test_upcoming_desk_policy.py|docs/PREDICTION_DESK_POLICY.md|scripts/ensure_odds_builder_refresh.py|scripts/test_ensure_odds_builder_refresh.py|scripts/test_cloudflare_only_deploy.mjs|'
           while IFS= read -r path; do
             [ -n "$path" ] || continue
             case "$path" in
@@ -191,6 +220,7 @@ jobs:
           python scripts/validate_virtual_lab_v1.py
           node --check workspace-ui.js
           node --check virtual-lab-app.js
+          node scripts/test_virtual_lab_recent_performance_gate.mjs
           node --check virtual-lab-confirmed-watch.js
           node --check sport-hubs.js
           node --check league-logos.js
@@ -359,7 +389,7 @@ jobs:
           const base = 'https://match-signal.pages.dev';
           const deploymentBase = String(process.env.CLOUDFLARE_DEPLOYMENT_URL || '').replace(/\/+$/, '');
           const pages = ['/', '/upcoming.html', '/qualified-best', '/qualified-best.html', '/odds-builder.html', '/football.html', '/tennis.html', '/basketball.html', '/darts.html', '/table-tennis.html', '/league.html?sport=football&league=England%20Amateur%20-%20U21%20Professional%20Development%20League', '/reports.html', '/live.html', '/expansion.html', '/virtual-lab/', '/virtual-lab', '/research.html', '/virtual-lab.html', '/analyst.html'];
-          const assets = ['/api/sportybet-virtual','/api/sportybet-darts','/api/sportybet-table-tennis','/api/virtual-lab-history','/expansion.js', '/expansion-odds-builder.js', '/live-analysis.js', '/live-data-worker.js', '/virtual-lab-app.js', '/virtual-lab-confirmed-watch.js', '/virtual-lab.css', '/_redirects', '/data/predictions.json', '/data/unified_upcoming.json', '/data/selection_candidates.json', '/data/expansion_status.json', '/data/odds_builder.json', '/data/odds_ticket_tracker.json', '/data/system_health.json', '/data/tennis_forward_status.json', '/data/prediction_desk_health.json', '/data/results_first_evidence_report.json', '/data/virtual_lab_live.json','/data/virtual_lab_model_eval.json','/data/virtual_lab_eligibility.json','/data/virtual_lab_participants/registry.json','/data/virtual_lab_participant_lifecycle.json','/data/virtual_lab_participants/efootball_confirmed_watch.json','/data/efootball_desk_prediction_history.json.gz','/data/club-logo-registry.json','/sport-hubs.js','/basketball-live.js','/basketball-design.css','/api/sportybet-basketball','/league-logos.js','/sport-hubs.css','/ms-design-system.css','/core-workspaces-design.css','/qualified-best-design.css','/sport-hubs-design.css','/independent-sport-design.css','/odds-builder-design.css','/reports-design.css','/virtual-lab-terminal.css','/workspace-ui.js','/workspace-ui.css','/analyst.js'];
+          const assets = ['/api/sportybet-virtual','/api/sportybet-darts','/api/sportybet-table-tennis','/api/virtual-lab-history','/expansion.js', '/expansion-odds-builder.js', '/live-analysis.js', '/live-data-worker.js', '/virtual-lab-app.js', '/virtual-lab-confirmed-watch.js', '/virtual-lab.css', '/_redirects', '/data/predictions.json', '/data/unified_upcoming.json', '/data/selection_candidates.json', '/data/expansion_status.json', '/data/odds_builder.json', '/data/odds_ticket_tracker.json', '/data/system_health.json', '/data/tennis_forward_status.json', '/data/prediction_desk_health.json', '/data/results_first_evidence_report.json', '/data/virtual_lab_live.json','/data/virtual_lab_model_eval.json','/data/virtual_lab_eligibility.json','/data/virtual_lab_participants/registry.json','/data/virtual_lab_participant_lifecycle.json','/data/virtual_lab_participants/efootball_confirmed_watch.json','/data/efootball_desk_learning.json','/data/efootball_desk_prediction_history.json.gz','/data/club-logo-registry.json','/sport-hubs.js','/basketball-live.js','/basketball-design.css','/api/sportybet-basketball','/league-logos.js','/sport-hubs.css','/ms-design-system.css','/core-workspaces-design.css','/qualified-best-design.css','/sport-hubs-design.css','/independent-sport-design.css','/odds-builder-design.css','/reports-design.css','/virtual-lab-terminal.css','/workspace-ui.js','/workspace-ui.css','/analyst.js'];
           const failures = [];
           const sourceBuilderArtifact = JSON.parse(readFileSync('data/odds_builder.json', 'utf8'));
           const sourceBoardArtifact = JSON.parse(readFileSync('data/unified_upcoming.json', 'utf8'));
@@ -409,7 +439,7 @@ jobs:
             {path:'/basketball.html', css:'/basketball-design.css', markers:['MS-BASKETBALL-DESK-2026.10.24-V11','core-workspaces-design.css?v=20261014-full-v1','basketball-design.css?v=20261024-builder-dark-v3','basketball-live.js?v=20261031-live-boxscore-v11','id="msNav"','workspace-ui.js?v=20261023-basketball-nav1','id="totalsBoard"','id="marketStatus"'], cssMarker:'MATCH-SIGNAL-BASKETBALL-DESK-V1'},
             {path:'/odds-builder.html', css:'/odds-builder-design.css', markers:[currentBuilderBuildMarker,currentBuilderCssHref.replace(/^\.\//,''),currentBuilderEngineSrc.replace(/^\.\//,''),'class="ob-page-header"','class="ob-section-nav"','class="ob-guide-grid"','id="oddsBuilder"'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V3: ODDS BUILDER PAGE LAYOUT'},
             {path:'/reports.html', css:'/reports-design.css', markers:['MS-REPORTS-2026.10.14-V3','reports-design.css?v=20261014-full-v3','class="rp-dashboard-grid"','id="report-scoreboard"','id="researchLabSummary"'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V3: REPORTS PAGE LAYOUT'},
-            {path:'/virtual-lab/', css:'/virtual-lab-terminal.css', markers:['MS-VIRTUAL-LAB-V1-2026.10.14-V3','../virtual-lab-terminal.css?v=20261014-full-v3','class="vl-command-grid"','class="vl-command-rail"','class="vl-insights-grid"'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V3: VIRTUAL LAB PAGE LAYOUT'}
+            {path:'/virtual-lab/', css:'/virtual-lab-terminal.css', markers:['MS-VIRTUAL-LAB-V1-2026.10.14-V3','../virtual-lab-terminal.css?v=20261031-recent-performance-guard1','../virtual-lab-app.js?v=20261031-recent-performance-guard1','class="vl-command-grid"','class="vl-command-rail"','class="vl-insights-grid"'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V3: VIRTUAL LAB PAGE LAYOUT'}
           ];
           if (!deploymentBase.startsWith('https://') || !deploymentBase.endsWith('.pages.dev')) {
             failures.push('Cloudflare deployment step did not publish an immutable Pages URL.');
@@ -624,7 +654,7 @@ jobs:
                   if (!body.includes(marker)) failures.push(path+' missing '+marker);
               }
               if (path==='/virtual-lab/' || path==='/virtual-lab') {
-                for (const marker of ['Virtual Lab','virtual-lab-app.js','predictionDesk','oddsBuilder','How to use the Lab / what to select','Research conclusion','/virtual-lab/','data-page="virtual-lab"','MS-VIRTUAL-LAB-V1-2026.10.14-V3','../virtual-lab-terminal.css?v=20261014-full-v3','class="vl-command-grid"','class="vl-command-rail"','class="vl-insights-grid"','id="participantLabPanel"','id="labDiagnosticsPanel"'])
+                for (const marker of ['Virtual Lab','virtual-lab-app.js','predictionDesk','oddsBuilder','How to use the Lab / what to select','Research conclusion','/virtual-lab/','data-page="virtual-lab"','MS-VIRTUAL-LAB-V1-2026.10.14-V3','../virtual-lab-terminal.css?v=20261031-recent-performance-guard1','../virtual-lab-app.js?v=20261031-recent-performance-guard1','class="vl-command-grid"','class="vl-command-rail"','class="vl-insights-grid"','id="participantLabPanel"','id="labDiagnosticsPanel"'])
                   if (!body.includes(marker)) failures.push(path+' missing '+marker);
               }
               if (path==='/research.html' || path==='/virtual-lab.html') {

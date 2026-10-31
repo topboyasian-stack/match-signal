@@ -20,8 +20,9 @@ const PARTICIPANT_PROFILES='/data/virtual_lab_participant_lifecycle.json';
 const PARTICIPANT_H2H='/data/virtual_lab_participant_h2h.json';
 const EXTERNAL_H2H='/data/virtual_lab_external_h2h.json';
 const CONFIRMED_WATCH='/data/virtual_lab_participants/efootball_confirmed_watch.json';
+const DESK_LEARNING='/data/efootball_desk_learning.json';
 const SUPPORTED_VIRTUAL_PRODUCTS=new Set(['efootball_gt','efootball_adriatic','vfootball','zoom']);
-const state={rows:[],filtered:[],live:[],liveMode:'none',liveUpdated:null,picks:[],builder:[],historyLoaded:false,modelRows:[],modelEvents:[],modelGate:false,participantModelGate:false,baseModelGate:false,modelHoldout:null,modelEvaluation:null,participantProfiles:null,participantH2H:null,externalH2H:null,confirmedWatch:null,participantLifecycle:null,eligibility:{eligible_competitions:['Virtual'],raw_eligible_competitions:['Esoccer H2H GG League','Europa League','FA Cup','International (Virtual eComp)','La Liga (Virtual eComp)','Premier League 2x6','Virtual','Volta Premier League'],eligible_ou_lines:[],raw_eligible_ou_lines:[0.5,1.5,2.5,7.5],experimental_ou_lines:[1.5],priority_ou_lines:[1.5,3.5,4.5],model_qualified_competitions:['Virtual','Volta Champions League A'],model_qualified_ou_lines:[3.5,4.5],eligible_markets:['ou']},predictionCache:new Map(),modelCalibration:{}};
+const state={rows:[],filtered:[],live:[],liveMode:'none',liveUpdated:null,picks:[],builder:[],historyLoaded:false,modelRows:[],modelEvents:[],modelGate:false,participantModelGate:false,baseModelGate:false,modelHoldout:null,modelEvaluation:null,participantProfiles:null,participantH2H:null,externalH2H:null,confirmedWatch:null,participantLifecycle:null,deskLearning:null,eligibility:{eligible_competitions:['Virtual'],raw_eligible_competitions:['Esoccer H2H GG League','Europa League','FA Cup','International (Virtual eComp)','La Liga (Virtual eComp)','Premier League 2x6','Virtual','Volta Premier League'],eligible_ou_lines:[],raw_eligible_ou_lines:[0.5,1.5,2.5,7.5],experimental_ou_lines:[1.5],priority_ou_lines:[1.5,3.5,4.5],model_qualified_competitions:['Virtual','Volta Champions League A'],model_qualified_ou_lines:[3.5,4.5],eligible_markets:['ou']},predictionCache:new Map(),modelCalibration:{}};
 
 const $=id=>document.getElementById(id);
 const esc=v=>{const d=document.createElement('div');d.textContent=String(v??'');return d.innerHTML};
@@ -830,16 +831,38 @@ function historicalCalibration(product,marketType,pickCode,rawProb,startTime){
   }
   return {prob:rawProb,n:Math.max(exact.length,broad.length),source:'market'};
 }
+function recentProductPerformanceGate(product){
+  const p=String(product||'').toLowerCase();
+  if(!['efootball_gt','efootball_adriatic'].includes(p))return {blocked:false,reason:null,n:0,accuracy:null};
+  const artifact=state.deskLearning||null;
+  const generated=Date.parse(String(artifact?.generated_at||''));
+  const age=Date.now()-generated;
+  if(!Number.isFinite(generated)||age>60*60*1000||age< -120000){
+    return {blocked:true,reason:'RECENT_PERFORMANCE_DATA_UNAVAILABLE',n:0,accuracy:null};
+  }
+  const recent=artifact?.by_product?.[p]?.recent_window||null;
+  const n=Number(recent?.n),accuracy=Number(recent?.accuracy);
+  if(!Number.isFinite(n)||n<30||!Number.isFinite(accuracy)||accuracy<0||accuracy>1){
+    return {blocked:true,reason:'RECENT_PERFORMANCE_EVIDENCE_INSUFFICIENT',
+      n:Number.isFinite(n)?n:0,accuracy:Number.isFinite(accuracy)?accuracy:null};
+  }
+  if(accuracy<0.55){
+    return {blocked:true,reason:'RECENT_ACCURACY_BELOW_55_PERCENT',n,accuracy};
+  }
+  return {blocked:false,reason:null,n,accuracy};
+}
+
 function qualifiesResearchPick(c){
   if(!c)return false;
   const edge=c.calibratedProb-c.bookImplied;
   const modelOk=c.marketType==='ou'?state.modelGate:true;
-  return state.historyLoaded && modelOk && c.calibrationN>=30 && edge>=0.02;
+  return state.historyLoaded && modelOk && c.calibrationN>=30 && edge>=0.02 && !recentProductPerformanceGate(c.eventProduct||c.product).blocked;
 }
 function qualifiesBaseResearchPick(c,e){
   if(!c||!e||!state.historyLoaded)return false;
   const edge=Number(c.calibratedProb)-Number(c.bookImplied);
   if(!Number.isFinite(edge)||edge<0.02)return false;
+  if(recentProductPerformanceGate(e.product).blocked)return false;
   if(c.marketType==='ou'){
     // Primary predictions must use the intersection of raw evidence and the
     // strict walk-forward model gate. Raw candidates remain visible separately
@@ -988,7 +1011,8 @@ function predictionForEvent(e){
     const eventName=competitionKey(e.competition||e.tournament||'');
     const eventRaw=scopedEligibility("raw_eligible_competitions_by_product",e.product,state.eligibility.raw_eligible_competitions||[]).some(x=>competitionKey(x)===eventName);
     const eventModel=scopedEligibility("model_qualified_competitions_by_product",e.product,state.eligibility.model_qualified_competitions||[]).some(x=>competitionKey(x)===eventName);
-    const status=participantQualified?'QUALIFIED_PARTICIPANT_ENHANCED':
+    const recentPerformance=recentProductPerformanceGate(e.product);
+    const status=recentPerformance.blocked?'RECENT_PERFORMANCE_GUARD':participantQualified?'QUALIFIED_PARTICIPANT_ENHANCED':
       (baseQualified?'QUALIFIED_BASE_EVIDENCE':
       (!active.length&&!experimental.length?'LINE_GATE_PENDING':
       (eventRaw&&!eventModel?'RAW_EVIDENCE · MODEL_GATE_PENDING':
@@ -1005,7 +1029,7 @@ function predictionForEvent(e){
       // The desk may show the fixture, but direction stays WAIT until a
       // validated side clears the evidence gates.
       candidate:candidate&&state.historyLoaded?candidate:null,
-      candidate_status:status,
+      candidate_status:status,recent_performance:recentPerformance,
       model_tier:participantQualified?'participant-enhanced':'base-evidence',
       bestWinner:null,bestOU:qualified?primaryCandidate:null,
       experimentalOU:qualified&&primaryCandidate.experimental?primaryCandidate:null,
@@ -1185,6 +1209,8 @@ function renderNearQualifiedRadar(){
       const compName=String(e.competition||e.tournament||'');
       const compModel=modelComps.some(x=>competitionKey(x)===competitionKey(compName));
       const reasons=[];
+      const recentGate=recentProductPerformanceGate(e.product);
+      if(recentGate.blocked)reasons.push(recentGate.reason==='RECENT_ACCURACY_BELOW_55_PERCENT'?'RECENT ACCURACY '+fmtPct(recentGate.accuracy)+' BELOW 55%':'RECENT PERFORMANCE EVIDENCE UNAVAILABLE');
       if(!compModel)reasons.push('LEAGUE MODEL GATE');
       if(!rawLine)reasons.push('LINE NOT RAW-ELIGIBLE');
       if(rawLine&&!modelLine)reasons.push('LINE MODEL GATE');
@@ -1195,7 +1221,7 @@ function renderNearQualifiedRadar(){
       if(edge<-0.005)continue;
       candidates.push({
         event:e,market:c,line,modelProb,calibratedProb:cal.prob,edge,calibrationN:cal.n,
-        rawLine,modelLine,compModel,reasons
+        rawLine,modelLine,compModel,reasons,recentGate
       });
     }
   }
@@ -1208,7 +1234,7 @@ function renderNearQualifiedRadar(){
   }
   host.innerHTML=top.map((x,i)=>{
     const e=x.event,c=x.market,book=Number(c.bookmakerOdds),edge=x.edge;
-    const status=edge>=0.02?'EDGE PASSED · PROMOTION BLOCKER':'CLOSE TO EDGE GATE';
+    const status=x.recentGate?.blocked?'PAUSED · RECENT PERFORMANCE':edge>=0.02?'EDGE PASSED · PROMOTION BLOCKER':'CLOSE TO EDGE GATE';
     return '<article class="radarCard">'+
       '<div class="radarTop"><span>#'+(i+1)+' · '+esc(e.product)+' · '+esc(e.competition||e.tournament||'')+'</span><time>'+esc(e.start_time?date(e.start_time):'—')+'</time></div>'+
       '<div class="radarMatch"><strong>'+esc(e.home||e.participant_1||'—')+'</strong><span>vs</span><strong>'+esc(e.away||e.participant_2||'—')+'</strong></div>'+
@@ -1221,17 +1247,22 @@ function renderNearQualifiedRadar(){
 function renderPredictionDesk(){
   const host=$('predictionDesk');if(!host)return;
   const picks=state.picks.slice(0,40);
+  const productFilter=$('product')?.value||'';
+  const showEfootballGate=['efootball','efootball_gt','efootball_adriatic','all'].includes(productFilter);
+  const gtGate=recentProductPerformanceGate('efootball_gt'),adriaticGate=recentProductPerformanceGate('efootball_adriatic');
+  const gateText=(name,g)=>g.reason==='RECENT_ACCURACY_BELOW_55_PERCENT'?name+' '+fmtPct(g.accuracy)+' across last '+g.n+' · below 55%':g.reason==='RECENT_PERFORMANCE_EVIDENCE_INSUFFICIENT'?name+' recent sample insufficient (n='+g.n+')':g.blocked?name+' recent performance data unavailable':'';
+  const gateBanner=showEfootballGate&&(gtGate.blocked||adriaticGate.blocked)?'<div class="vl-recent-performance-gate" role="status"><strong>EFOOTBALL QUALIFICATION PAUSED</strong><span>'+esc([gateText('GT',gtGate),gateText('eAdriatic',adriaticGate)].filter(Boolean).join(' · '))+'</span><small>These markets remain research-only until each product has at least 30 recent settled results and accuracy of 55% or better.</small></div>':'';
   $('predictionCount').textContent=String(picks.length);
   if(!picks.length){
     const liveCount=state.live.length;
     const eligibleCount=upcomingEventsFrom(state.live).filter(e=>isEligibleResearchEvent(e)||isConfirmedWatchedEvent(e)).length;
-    host.innerHTML=liveCount
+    host.innerHTML=gateBanner+(liveCount
       ? '<div class="empty">LIVE FEED CONNECTED · '+liveCount+' upcoming fixtures loaded, but none currently match the research desk filter.'+(eligibleCount?' '+eligibleCount+' match the research-league filter but have no supported O/U prediction line right now.':' Research-eligible upcoming predictions will appear when a supported O/U market is available.')+'</div>'
-      : '<div class="empty">No live virtual fixtures are currently loaded.</div>';
+      : '<div class="empty">No live virtual fixtures are currently loaded.</div>');
     renderNearQualifiedRadar();
     return;
   }
-  host.innerHTML=picks.map(function(p,i){
+  host.innerHTML=gateBanner+picks.map(function(p,i){
     function row(x,label){
       if(!x)return '<div class="calcRow"><span>'+label+'</span><b>—</b><span>—</span><span>—</span><span>—</span></div>';
       const modelP=x.calibratedProb!=null?x.calibratedProb:x.fairProb;
@@ -1244,14 +1275,15 @@ function renderPredictionDesk(){
       '<div class="primaryPick">'+hotBadge+'<span>'+(p.model_tier==='participant-enhanced'?'QUALIFIED · PARTICIPANT ENHANCED':'QUALIFIED · BASE EVIDENCE')+'</span><strong>'+esc(p.primary.pickCode)+'</strong><b>'+fmtPct(p.primary.calibratedProb)+'</b><small>edge '+fmtPct(p.primary.edge)+' · n='+p.primary.calibrationN+'</small></div>':
       p.candidate?
       '<div class="primaryPick candidatePrediction">'+hotBadge+'<span>'+
-        (p.candidate_status==='PROMOTION_PENDING'?'EVIDENCE CANDIDATE · PROMOTION PENDING':
+        (p.candidate_status==='RECENT_PERFORMANCE_GUARD'?'PAUSED · RECENT PERFORMANCE GATE':
+         p.candidate_status==='PROMOTION_PENDING'?'EVIDENCE CANDIDATE · PROMOTION PENDING':
          p.candidate_status==='RAW_EVIDENCE · MODEL_GATE_PENDING'?'RESEARCH CANDIDATE · MODEL GATE PENDING':
          p.candidate_status==='MODEL_EVIDENCE · RAW_GATE_PENDING'?'RESEARCH CANDIDATE · RAW EVIDENCE PENDING':
          p.candidate_status==='MODEL_GATE_PENDING'?'RESEARCH CANDIDATE · MODEL GATE PENDING':'EVIDENCE CANDIDATE')+
         '</span><strong>'+esc(p.candidate.pickCode||'—')+'</strong><b>'+fmtPct(p.candidate.calibratedProb??p.candidate.fairProb)+'</b><small>book '+(Number.isFinite(Number(p.candidate.bookmakerOdds))?Number(p.candidate.bookmakerOdds).toFixed(2):'—')+' · model '+(state.modelGate?'participant-enhanced':'core evidence')+'</small></div>':
       watch?'<div class="primaryPick mutedPrediction">'+hotBadge+'<span>O/U 1.5 RESEARCH WATCH</span><strong>'+esc(watch.pickCode)+'</strong><b>'+fmtPct(watch.calibratedProb)+'</b><small>participant n='+(watch.recurrence?watch.recurrence.entityN:0)+' · model is experimental</small></div>':
       '<div class="primaryPick mutedPrediction"><span>NO EVIDENCE CANDIDATE</span><strong>WAIT</strong><b>Market baseline only</b></div>';
-    const addLabel=p.primary?'＋ Add qualified paper pick':'Locked · evidence not yet promoted';
+    const addLabel=p.primary?'＋ Add qualified paper pick':p.recent_performance?.blocked?'Paused · recent performance gate':'Locked · evidence not yet promoted';
     const activeRec=p.bestOU&&p.bestOU.recurrence;
     const expRec=p.experimentalOU&&p.experimentalOU.recurrence;
     const primaryEvidence=(p.bestOU&&p.bestOU.participantEvidence)||(p.experimentalOU&&p.experimentalOU.participantEvidence)||null;
@@ -1480,6 +1512,8 @@ async function loadLive(silent=false){
     $('liveMeta').textContent='Requesting current eFootball / Virtual Football markets';
   }
   try{
+    const learningChanged=await loadDeskLearning();
+    if(learningChanged)rebuildPredictionDesk();
     const live=await fetchLiveRemote();
     const changed=publishLiveEvents(live.events,'remote',live.updated_at);
     const meta=$('liveMeta');
@@ -1597,6 +1631,36 @@ async function refreshPredictionDesk(){
     if(button){button.disabled=false;button.textContent='↻ Refresh predictions';}
   }
 }
+async function loadDeskLearning(){
+  const previous=state.deskLearning?.generated_at||null;
+  const beforeGT=state._deskLearningGateGT??recentProductPerformanceGate('efootball_gt').blocked;
+  const beforeAdriatic=state._deskLearningGateAdriatic??recentProductPerformanceGate('efootball_adriatic').blocked;
+  try{
+    const r=await fetch(DESK_LEARNING+'?t='+Date.now(),{cache:'no-store',headers:{'Accept':'application/json'}});
+    if(!r.ok)throw new Error('eFootball recent-performance artifact HTTP '+r.status);
+    const d=await r.json();
+    state.deskLearning=d&&typeof d==='object'?d:null;
+    const afterGT=recentProductPerformanceGate('efootball_gt').blocked;
+    const afterAdriatic=recentProductPerformanceGate('efootball_adriatic').blocked;
+    state._deskLearningGateGT=afterGT;
+    state._deskLearningGateAdriatic=afterAdriatic;
+    const changed=previous!==(state.deskLearning?.generated_at||null)||beforeGT!==afterGT||beforeAdriatic!==afterAdriatic;
+    if(changed)state.predictionCache.clear();
+    if(afterGT||afterAdriatic)state.builder=(state.builder||[]).filter(p=>!recentProductPerformanceGate(p?.product).blocked);
+    return changed;
+  }catch(e){
+    state.deskLearning=null;
+    const afterGT=recentProductPerformanceGate('efootball_gt').blocked;
+    const afterAdriatic=recentProductPerformanceGate('efootball_adriatic').blocked;
+    state._deskLearningGateGT=afterGT;
+    state._deskLearningGateAdriatic=afterAdriatic;
+    state.predictionCache.clear();
+    state.builder=(state.builder||[]).filter(p=>!recentProductPerformanceGate(p?.product).blocked);
+    const changed=!!previous||beforeGT!==afterGT||beforeAdriatic!==afterAdriatic;
+    console.warn('Virtual Lab recent-performance guard:',e);
+    return changed;
+  }
+}
 async function loadConfirmedWatch(){
   try{
     const r=await fetch(CONFIRMED_WATCH+'?t='+Date.now(),{cache:'no-store',headers:{'Accept':'application/json'}});
@@ -1700,6 +1764,7 @@ async function loadHistory(){
       state.rows=arr.map(normalize);
       state.historyLoaded=true;
       state.predictionCache.clear();
+      await loadDeskLearning();
       await loadModelEvaluation();
       await loadConfirmedWatch();
       await loadParticipantProfiles();
