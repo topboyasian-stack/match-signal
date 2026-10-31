@@ -66,40 +66,62 @@ jobs:
           from pathlib import Path
           source = Path('.github/workflows/live-expansion.yml').read_text(encoding='utf-8')
           publish = source.split('name: Commit isolated expansion data', 1)[1]
+          assert 'git add data/nba_history.json' in publish
+          assert publish.index('git add data/nba_history.json') < publish.index('if git rebase origin/main; then')
           assert 'if git rebase origin/main; then' in publish
           assert 'Generated files conflict with newer main data; rebuild only on this path.' in publish
           assert publish.index('if git rebase origin/main; then') < publish.index('python scripts/run_live_expansion.py')
-          print('Expansion publishing retries rebase first and only rebuild on file conflicts.')
+          assert "steps.ere_publication.outputs.ready" in source
+          assert "python scripts/settle_nba_totals.py" in source
+          print('NBA artifacts publish independently; clean worktrees rebase without repeated collection; Eredivisie stays guarded.')
           PY
       - name: Generate live-experimental NBA + Eredivisie signals
         run: python scripts/run_live_expansion.py
+
+      - name: Settle NBA total snapshots against official final ESPN scores
+        run: python scripts/settle_nba_totals.py
 
       - name: Evaluate NBA totals on a strict chronological holdout
         run: python scripts/nba_totals_walk_forward.py
 
       - name: Repair and publish Eredivisie from resilient current-season sources
+        id: ere_repair
+        continue-on-error: true
         run: python scripts/repair_ere_live.py
 
-      - name: Assert current Eredivisie fixtures were actually published
+      - name: Decide whether Eredivisie artifacts are safe to publish
+        id: ere_publication
+        env:
+          ERE_REPAIR_RESULT: ${{ steps.ere_repair.outcome }}
         run: |
           python - <<'PY'
           import json
+          import os
           from pathlib import Path
           data = json.loads(Path('data/ere_divisie_predictions.json').read_text())
           status = json.loads(Path('data/expansion_status.json').read_text())
-          fixtures = status.get('competitions', {}).get('Eredivisie', {}).get('current_fixtures', 0)
-          if fixtures < 1 or len(data) < 1:
-              raise SystemExit(f'ABORT: live Eredivisie publication is empty (fixtures={fixtures}, predictions={len(data)})')
-          print(f'Publication guard passed: {fixtures} fixtures / {len(data)} Eredivisie predictions')
+          fixtures = int(status.get('competitions', {}).get('Eredivisie', {}).get('current_fixtures') or 0)
+          ready = os.environ.get('ERE_REPAIR_RESULT') == 'success' and fixtures >= 1 and len(data) >= 1
+          if ready:
+              print(f'Eredivisie publication guard passed: {fixtures} fixtures / {len(data)} predictions')
+          else:
+              print(f'Eredivisie is empty (fixtures={fixtures}, predictions={len(data)}); skip only Eredivisie files. NBA publication continues.')
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write('ready=' + ('true' if ready else 'false') + '\n')
           PY
 
       - name: QA Eredivisie predictions before settlement/publication
+        id: ere_qa
+        if: steps.ere_publication.outputs.ready == 'true'
+        continue-on-error: true
         run: python scripts/qa_ere_live.py
 
       - name: Settle completed expansion signals
+        if: steps.ere_publication.outputs.ready == 'true' && steps.ere_qa.outcome == 'success'
         run: python scripts/settle_expansion.py
 
       - name: Verify isolated expansion artifacts
+        if: steps.ere_publication.outputs.ready == 'true' && steps.ere_qa.outcome == 'success'
         run: |
           python - <<'PY'
           import json
@@ -113,14 +135,30 @@ jobs:
           PY
       - name: Commit isolated expansion data
         shell: bash
+        env:
+          ERE_READY: ${{ steps.ere_publication.outputs.ready == 'true' && steps.ere_qa.outcome == 'success' }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Always publish the independent NBA work. Publish Eredivisie only
+          # after its own fixture and prediction guard has passed.
+          git add data/nba_history.json data/nba_predictions.json data/nba_totals_publication_snapshots.json data/nba_totals_ledger.json data/nba_totals_oos_value_test.json
+          if [[ "$ERE_READY" == "true" ]]; then
+            git add data/ere_divisie_history.json data/ere_divisie_predictions.json data/expansion_status.json data/expansion_prediction_history.json data/expansion_live_performance.json data/ere_divisie_qa.json
+          fi
+          if git diff --cached --quiet; then
+            echo "Latest main already contains the current NBA research artifacts."
+            exit 0
+          fi
+          git commit -m "🤖 Publish isolated NBA totals research and validated expansion data"
+
+          # Generated non-published files may remain in the worktree; stash them
+          # so a normal main advance can be rebased without rebuilding NBA data.
+          git stash push --include-untracked -m "defer unpublished expansion artifacts" || true
           for attempt in $(seq 1 8); do
             git fetch origin main
-            # Rebase first: an ordinary main-head advance should not rerun
-            # the network-heavy NBA history and SportyBet collection.
             if git rebase origin/main; then
               if git push origin main; then
                 exit 0
@@ -131,20 +169,17 @@ jobs:
               git rebase --abort || true
               git reset --hard origin/main
               python scripts/run_live_expansion.py
-              python scripts/repair_ere_live.py
-              python scripts/qa_ere_live.py
-              git add data/ere_divisie_history.json data/nba_history.json data/ere_divisie_predictions.json data/nba_predictions.json data/nba_totals_publication_snapshots.json data/nba_totals_oos_value_test.json data/expansion_status.json data/expansion_prediction_history.json data/expansion_live_performance.json data/ere_divisie_qa.json
+              python scripts/settle_nba_totals.py
+              python scripts/nba_totals_walk_forward.py
+              git add data/nba_history.json data/nba_predictions.json data/nba_totals_publication_snapshots.json data/nba_totals_ledger.json data/nba_totals_oos_value_test.json
               if git diff --cached --quiet; then
-                echo "Latest main already contains the current expansion artifacts."
+                echo "Latest main already contains the current NBA research artifacts."
                 exit 0
               fi
-              git commit -m "🤖 Refresh isolated live experimental NBA and Eredivisie signals"
-              if git push origin main; then
-                exit 0
-              fi
-              echo "Rebuilt artifacts still collided with main ($attempt/8)."
+              git commit -m "🤖 Refresh NBA totals research after main advanced"
+              git stash push --include-untracked -m "defer unpublished expansion artifacts" || true
             fi
             sleep $((attempt * 3 + RANDOM % 4))
           done
-          echo "Unable to publish isolated expansion data after eight retries."
+          echo "Unable to publish NBA research artifacts after eight retries."
           exit 1
