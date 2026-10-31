@@ -1512,6 +1512,8 @@ async function loadLive(silent=false){
     $('liveMeta').textContent='Requesting current eFootball / Virtual Football markets';
   }
   try{
+    const learningChanged=await loadDeskLearning();
+    if(learningChanged)rebuildPredictionDesk();
     const live=await fetchLiveRemote();
     const changed=publishLiveEvents(live.events,'remote',live.updated_at);
     const meta=$('liveMeta');
@@ -1630,18 +1632,31 @@ async function refreshPredictionDesk(){
   }
 }
 async function loadDeskLearning(){
+  const previous=state.deskLearning?.generated_at||null;
+  const beforeGT=recentProductPerformanceGate('efootball_gt').blocked;
+  const beforeAdriatic=recentProductPerformanceGate('efootball_adriatic').blocked;
   try{
     const r=await fetch(DESK_LEARNING+'?t='+Date.now(),{cache:'no-store',headers:{'Accept':'application/json'}});
     if(!r.ok)throw new Error('eFootball recent-performance artifact HTTP '+r.status);
     const d=await r.json();
     state.deskLearning=d&&typeof d==='object'?d:null;
-    state.predictionCache.clear();
-    return !!state.deskLearning;
+    const afterGT=recentProductPerformanceGate('efootball_gt').blocked;
+    const afterAdriatic=recentProductPerformanceGate('efootball_adriatic').blocked;
+    const changed=previous!==(state.deskLearning?.generated_at||null)||beforeGT!==afterGT||beforeAdriatic!==afterAdriatic;
+    if(changed){
+      state.predictionCache.clear();
+      state.builder=(state.builder||[]).filter(p=>!recentProductPerformanceGate(p?.product).blocked);
+    }
+    return changed;
   }catch(e){
     state.deskLearning=null;
-    state.predictionCache.clear();
+    const changed=!!previous||!beforeGT||!beforeAdriatic;
+    if(changed){
+      state.predictionCache.clear();
+      state.builder=(state.builder||[]).filter(p=>!recentProductPerformanceGate(p?.product).blocked);
+    }
     console.warn('Virtual Lab recent-performance guard:',e);
-    return false;
+    return changed;
   }
 }
 async function loadConfirmedWatch(){
