@@ -187,6 +187,8 @@ def nba_duckdb_fallback():
  con=duckdb.connect(database=':memory:')
  try:
   con.execute('SET threads=2')
+  con.execute('INSTALL httpfs')
+  con.execute('LOAD httpfs')
   con.execute(f"ATTACH '{NBA_DUCKDB_CATALOG}' AS nba (READ_ONLY)")
   query="""
    SELECT CAST(g.game_id AS VARCHAR) AS event_id,
