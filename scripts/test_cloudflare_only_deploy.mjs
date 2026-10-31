@@ -66,6 +66,20 @@ assert.ok(
   cloudflare.includes("      - 'functions/api/odds-builder-data.js'"),
   "A change to the live Builder data endpoint must trigger a Cloudflare Pages deployment.",
 );
+assert.ok(
+  cloudflare.includes("|scripts/test_live_virtual_quote_coverage.mjs|") &&
+    cloudflare.includes("|scripts/test_nba_live_projection.mjs|") &&
+    cloudflare.includes("|scripts/visual_site_audit.mjs|") &&
+    cloudflare.includes("/apis/site/v2/sports/basketball/nba/summary") &&
+    cloudflare.includes("NBA live-summary proxy passed"),
+  "The eFootball quote-coverage regression, NBA projection test, visual audit and ESPN summary proxy must be explicitly approved and verified.",
+);
+const liveCoverageTest = fs.readFileSync("scripts/test_live_virtual_quote_coverage.mjs", "utf8");
+assert.ok(
+  liveCoverageTest.includes("../data/efootball_desk_learning.json") &&
+    liveCoverageTest.includes("efootballDeskLearning"),
+  "The eFootball quote-coverage VM must load its product-specific learning artifact before evaluating production qualification functions.",
+);
 
 const monitor = fs.readFileSync(path.join(workflowsDir, "qualified-best-production-watch.yml"), "utf8");
 assert.match(
