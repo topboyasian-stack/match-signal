@@ -90,8 +90,7 @@ jobs:
       - name: Run Virtual Lab v1 repository contract
         run: python scripts/validate_virtual_lab_v1.py
 
-      - name: Recompute system health after Virtual Lab refresh
-        run: python scripts/system_health_audit.py
+      # Shared system health is published by Unified Upcoming after collector completion.
 
       - name: Validate optional manual watch namespace
         run: |
