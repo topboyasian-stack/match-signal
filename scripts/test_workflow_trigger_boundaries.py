@@ -92,6 +92,7 @@ def main():
         "The explicit manual watch input must still be able to trigger the collector."
     )
     for generated_collector_output in (
+        "data/virtual_lab_confirmed_participants.json",
         "data/virtual_lab_participant_h2h.json",
         "data/virtual_lab_external_h2h.json",
         "data/virtual_lab_archive/**",
