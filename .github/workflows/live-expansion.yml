@@ -74,6 +74,9 @@ jobs:
       - name: Generate live-experimental NBA + Eredivisie signals
         run: python scripts/run_live_expansion.py
 
+      - name: Evaluate NBA totals on a strict chronological holdout
+        run: python scripts/nba_totals_walk_forward.py
+
       - name: Repair and publish Eredivisie from resilient current-season sources
         run: python scripts/repair_ere_live.py
 
@@ -130,7 +133,7 @@ jobs:
               python scripts/run_live_expansion.py
               python scripts/repair_ere_live.py
               python scripts/qa_ere_live.py
-              git add data/ere_divisie_history.json data/nba_history.json data/ere_divisie_predictions.json data/nba_predictions.json data/nba_totals_publication_snapshots.json data/expansion_status.json data/expansion_prediction_history.json data/expansion_live_performance.json data/ere_divisie_qa.json
+              git add data/ere_divisie_history.json data/nba_history.json data/ere_divisie_predictions.json data/nba_predictions.json data/nba_totals_publication_snapshots.json data/nba_totals_oos_value_test.json data/expansion_status.json data/expansion_prediction_history.json data/expansion_live_performance.json data/ere_divisie_qa.json
               if git diff --cached --quiet; then
                 echo "Latest main already contains the current expansion artifacts."
                 exit 0

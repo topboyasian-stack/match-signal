@@ -142,7 +142,7 @@ def result_for(prediction, event):
         "publication_snapshot_kind": prediction.get("publication_snapshot_kind"),
         "player_1": prediction.get("player_1"),
         "player_2": prediction.get("player_2"), "prediction_created_at": pred_time.isoformat(),
-        "model": prediction.get("model"), "expected_total": prediction.get("expected_total"),
+        "model": prediction.get("model"), "totals_model_version": prediction.get("totals_model_version"), "expected_total": prediction.get("expected_total"),
         "market_id": "225", "market_source": market.get("source"),
         "quote_timestamp": market.get("quote_timestamp"), "line": line, "pick": pick,
         **price_audit,

@@ -9,6 +9,7 @@ ROOT=Path(__file__).resolve().parents[1]; DATA=ROOT/'data'; DATA.mkdir(exist_ok=
 BASE='https://site.api.espn.com/apis/site/v2/sports'; NOW=datetime.now(timezone.utc)
 S=requests.Session();S.headers.update({'User-Agent':'Mozilla/5.0 (compatible; MatchSignal/1.0)'})
 NBA_START=datetime(2026,10,20,tzinfo=timezone.utc)
+NBA_TOTALS_MODEL_VERSION="nba-total-v2-balanced-home-margin"
 NBA_PARQUET='https://raw.githubusercontent.com/llimllib/nba_data/main/data/gamelogs.parquet'
 NBA_ELO_CSV='https://datahub.io/fivethirtyeight/nba-elo/_r/-/data/nbaallelo.csv'
 def dt(x):
@@ -191,7 +192,7 @@ def weights(hist,cut):
    if q['last'] is None or d>q['last']:q['last']=d
  return s
 def nba_predict(r,hist):
- cut=dt(r['date']) or NOW;s=weights(hist,cut);h=s.get(r['home'],{});a=s.get(r['away'],{});hp=h.get('pf',0)/max(h.get('n',1),1e-9);ap=a.get('pf',0)/max(a.get('n',1),1e-9);hd=h.get('pa',0)/max(h.get('n',1),1e-9);ad=a.get('pa',0)/max(a.get('n',1),1e-9);lp=sum(x['pf'] for x in s.values())/max(sum(x['n'] for x in s.values()),1e-9);hm=.58*(hp+ad)/2+.42*lp+2.5;am=.58*(ap+hd)/2+.42*lp;hr=(cut-h['last']).total_seconds()/86400 if h.get('last') else 4;ar=(cut-a['last']).total_seconds()/86400 if a.get('last') else 4;adj=max(-2,min(2,(hr-ar)*.35));hm+=adj;am-=adj;p=1/(1+math.exp(-(hm-am)/7.5));return {'moneyline':{'home':p,'away':1-p},'expected_score':{'home':hm,'away':am},'expected_total':hm+am,'rest_days':{'home':hr,'away':ar},'model':'NBA independent recency-weighted offense/defense + home/rest; no market input','paper_only':True}
+ cut=dt(r['date']) or NOW;s=weights(hist,cut);h=s.get(r['home'],{});a=s.get(r['away'],{});hp=h.get('pf',0)/max(h.get('n',1),1e-9);ap=a.get('pf',0)/max(a.get('n',1),1e-9);hd=h.get('pa',0)/max(h.get('n',1),1e-9);ad=a.get('pa',0)/max(a.get('n',1),1e-9);lp=sum(x['pf'] for x in s.values())/max(sum(x['n'] for x in s.values()),1e-9);hm=.58*(hp+ad)/2+.42*lp+1.25;am=.58*(ap+hd)/2+.42*lp-1.25;hr=(cut-h['last']).total_seconds()/86400 if h.get('last') else 4;ar=(cut-a['last']).total_seconds()/86400 if a.get('last') else 4;adj=max(-2,min(2,(hr-ar)*.35));hm+=adj;am-=adj;p=1/(1+math.exp(-(hm-am)/7.5));return {'moneyline':{'home':p,'away':1-p},'expected_score':{'home':hm,'away':am},'expected_total':hm+am,'totals_model_version':NBA_TOTALS_MODEL_VERSION,'rest_days':{'home':hr,'away':ar},'model':'NBA independent recency-weighted offense/defense + balanced home margin; totals v2','paper_only':True}
 def current(name):
  if name=='NBA' and NOW<NBA_START:return []
  start=NOW-timedelta(days=1)
@@ -235,7 +236,7 @@ def run():
        'probabilities':{'p1':round(probs['home'],6),'p2':round(probs['away'],6)},
        'pick':pick,'confidence':round(max(probs['home'],probs['away']),6),
        'expected_score':model['expected_score'],'expected_total':model['expected_total'],
-       'model':model['model'],'market':r.get('markets') or {},
+       'totals_model_version':model.get('totals_model_version'),'model':model['model'],'market':r.get('markets') or {},
        'signal_quality':{'status':'LIVE_EXPERIMENTAL','market_odds_available':False},
        'generated_at':NOW.isoformat(),'prediction_created_at':NOW.isoformat(),
        'accuracy_eligible':True,'prediction_status':'live_experimental',

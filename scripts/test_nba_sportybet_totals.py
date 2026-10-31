@@ -62,10 +62,12 @@ snapshot_prediction = {
     "sport": "basketball", "league": "NBA", "event_id": "espn:test-snapshot",
     "start_time": start.isoformat(), "player_1": fixture["home"], "player_2": fixture["away"],
     "prediction_created_at": now.isoformat(), "generated_at": now.isoformat(),
+    "totals_model_version": pipeline.NBA_TOTALS_MODEL_VERSION,
     "expected_total": 235.0, "markets": attached["markets"],
 }
 snapshot = pipeline.nba_total_publication_snapshot(snapshot_prediction, now.isoformat())
 assert snapshot and snapshot["publication_snapshot_verified"] is True
+assert snapshot["totals_model_version"] == pipeline.NBA_TOTALS_MODEL_VERSION
 assert snapshot["publication_snapshot_id"].startswith("nba-total-pub:")
 assert snapshot["markets"]["total_ou"]["over_odds"] == 1.91
 assert snapshot["markets"]["total_ou"]["under_odds"] == 1.89

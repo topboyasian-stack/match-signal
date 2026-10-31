@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import requests
 
-from expansion_pipeline import collect, current, nba_predict, NBA_START, NOW
+from expansion_pipeline import collect, current, nba_predict, NBA_START, NBA_TOTALS_MODEL_VERSION, NOW
 from independent_football_model import independent_prediction
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -417,6 +417,8 @@ def should_refresh_nba_prediction(old, start, now=None, max_age_hours=6):
         return True
     if not start or start <= now:
         return False
+    if old.get("totals_model_version") != NBA_TOTALS_MODEL_VERSION:
+        return True
     stamp = dt(old.get("generated_at") or old.get("prediction_created_at"))
     if not stamp or stamp >= start:
         return True
@@ -473,7 +475,7 @@ def main():
                     "probabilities": {"p1": round(probs["home"],6), "p2": round(probs["away"],6)},
                     "pick": "p1" if probs["home"] >= probs["away"] else "p2",
                     "confidence": round(max(probs.values()),6), "expected_score": p["expected_score"],
-                    "expected_total": p["expected_total"], "markets": {"moneyline": p["moneyline"]},
+                    "expected_total": p["expected_total"], "totals_model_version": p.get("totals_model_version"), "markets": {"moneyline": p["moneyline"]},
                     "model": p["model"], "signal_quality": {"status":"LIVE_EXPERIMENTAL","market_odds_available":False},
                     "generated_at": NOW.isoformat(), "prediction_created_at": NOW.isoformat(),
                     "accuracy_eligible": True, "prediction_status": "live_experimental",

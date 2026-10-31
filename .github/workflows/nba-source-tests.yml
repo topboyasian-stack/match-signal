@@ -5,6 +5,11 @@ on:
     paths:
       - 'scripts/expansion_pipeline.py'
       - 'scripts/test_expansion_sources.py'
+      - 'scripts/nba_totals_walk_forward.py'
+      - 'scripts/test_nba_totals_walk_forward.py'
+      - 'scripts/live_expansion_pipeline.py'
+      - 'scripts/settle_nba_totals.py'
+      - 'scripts/test_nba_sportybet_totals.py'
       - 'basketball-live.js'
       - 'basketball.html'
       - 'scripts/test_basketball_desk_contract.mjs'
@@ -44,3 +49,5 @@ jobs:
         run: node scripts/test_nba_live_projection.mjs
       - name: Run NBA source and season-isolation tests
         run: python scripts/test_expansion_sources.py
+          python scripts/test_nba_totals_walk_forward.py
+          python scripts/test_nba_sportybet_totals.py
