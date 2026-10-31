@@ -267,6 +267,30 @@ def evaluate(events):
             })
     return outputs
 
+def selection_line_key(row):
+    """Canonical side + exact line key for product-scoped holdout evidence."""
+    selection = normalize_selection(row.get("selection"))
+    try:
+        line = float(row.get("line"))
+    except (TypeError, ValueError):
+        return None
+    if selection not in {"over", "under"} or not math.isfinite(line):
+        return None
+    return f"{'o' if selection == 'over' else 'u'}{line:g}"
+
+
+def rows_with_selection_line_key(rows):
+    """Copy scored rows with a side-and-line key for exact product/market validation."""
+    out = []
+    for row in rows:
+        key = selection_line_key(row)
+        if key:
+            item = dict(row)
+            item["selection_line"] = key
+            out.append(item)
+    return out
+
+
 def holdout_prediction_rows(scored, hold_keys):
     """Export exact eFootball holdout forecasts for same-fixture audit joins.
 
@@ -426,10 +450,12 @@ def main():
       "by_product_competition":nested_table("product","competition",hold),
       "by_product_line":nested_table("product","line",hold),
       "by_product_selection":nested_table("product","selection",hold),
+      # This is the exact schema consumed by Unified Upcoming's per-line/direction gate.
+      "by_product_selection_line":nested_table("product","selection_line",rows_with_selection_line_key(hold)),
       "efootball_gt_diagnostics":{
         "competition":nested_table("competition","line",[r for r in hold if r["product"]=="efootball_gt"]),
         "line":{str(line):{variant:metrics([r for r in hold if r["product"]=="efootball_gt" and r["line"]==line],variant) for variant in variants} for line in evaluation_lines},
-        "selection":nested_table("selection","line",[r for r in hold if r["product"]=="efootball_gt"])
+        "selection":nested_table("selection_line","line",rows_with_selection_line_key([r for r in hold if r["product"]=="efootball_gt"]))
       },
       "participant_feature_gate":{
         "minimum_participant_total_history":MIN_PARTICIPANT_TOTAL_HISTORY,

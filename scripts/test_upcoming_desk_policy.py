@@ -780,5 +780,36 @@ class UpcomingDeskPolicyTests(unittest.TestCase):
         self.assertFalse(result["production_qualification_enabled"])
 
 
+    def test_exact_line_direction_oos_uses_exact_product_side_line_metrics(self):
+        metrics = {"n": 100, "brier": 0.18, "log_loss": 0.55, "ece": 0.03}
+        market = {"n": 100, "brier": 0.23, "log_loss": 0.66, "ece": 0.04}
+        eval_art = {
+            "holdout_metrics": {"market": market, "poisson": metrics},
+            "by_product": {"efootball_gt": {"market": market, "poisson": metrics}},
+            "by_product_selection_line": {
+                "efootball_gt": {
+                    "u4.5": {"poisson": {"n": 42, "hit_rate": 0.69, "brier": 0.19}},
+                    "o4.5": {"poisson": {"n": 37, "hit_rate": 0.67, "brier": 0.20}},
+                    "u7.5": {"poisson": {"n": 11, "hit_rate": 0.91, "brier": 0.08}},
+                }
+            },
+        }
+        result = ns["exact_line_direction_oos"](eval_art, "efootball_gt", 4.5, "under")
+        self.assertEqual(result, {"n": 42, "hit_rate": 0.69, "brier": 0.19, "variant": "poisson"})
+        self.assertEqual(ns["exact_line_direction_oos"](eval_art, "efootball_gt", 7.5, "under")["n"], 11)
+        self.assertEqual(ns["exact_line_direction_oos"](eval_art, "efootball_gt", 4.5, "over")["n"], 37)
+
+        # A legacy side-only aggregate is not exact-line evidence and must not be borrowed.
+        legacy = {
+            "holdout_metrics": {"market": market, "poisson": metrics},
+            "by_product": {"efootball_gt": {"market": market, "poisson": metrics}},
+            "by_product_selection": {
+                "efootball_gt": {"under": {"poisson": {"n": 900, "hit_rate": 0.99}}}
+            },
+        }
+        no_borrow = ns["exact_line_direction_oos"](legacy, "efootball_gt", 4.5, "under")
+        self.assertEqual(no_borrow["n"], 0)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
