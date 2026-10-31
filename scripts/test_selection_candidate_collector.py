@@ -41,6 +41,30 @@ def base_row(**overrides):
 
 
 class SelectionCandidateQuotePreservationTests(unittest.TestCase):
+    def test_preserves_participant_history_freshness_into_candidate_pool(self):
+        row = base_row()
+        row.update({
+            "participant_history_fresh": False,
+            "participant_history_age_minutes": 184.2,
+            "participant_history_stale_reason": "input older than 30 minutes: collector_status",
+        })
+        result = collector.compact(row, NOW)
+        self.assertIsNotNone(result)
+        self.assertFalse(result["participant_history_fresh"])
+        self.assertAlmostEqual(result["participant_history_age_minutes"], 184.2)
+        self.assertEqual(
+            result["participant_history_stale_reason"],
+            "input older than 30 minutes: collector_status",
+        )
+
+        row["participant_history_fresh"] = True
+        row["participant_history_age_minutes"] = 4.0
+        row["participant_history_stale_reason"] = None
+        result = collector.compact(row, NOW)
+        self.assertTrue(result["participant_history_fresh"])
+        self.assertEqual(result["participant_history_age_minutes"], 4.0)
+        self.assertIsNone(result["participant_history_stale_reason"])
+
     def test_preserves_both_current_virtual_total_sides(self):
         result = collector.compact(base_row(), NOW)
         self.assertIsNotNone(result)
