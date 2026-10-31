@@ -21,3 +21,4 @@ export async function onRequestGet(context){
     return new Response(JSON.stringify({ok:false,error:'ESPN_PROXY_FAILED',detail:String(e?.message||e)}),{status:502,headers:corsHeaders()});
   }
 }
+// Production deployment retriggered after the Cloudflare promotion guard allowlist repair.
