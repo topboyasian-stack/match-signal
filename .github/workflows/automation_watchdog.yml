@@ -590,6 +590,14 @@ jobs:
                               'status':'failed',
                               'detail':'; '.join(cancel_failures)
                           })
+                      elif any(run not in stale_active_runs for run in unified_active_runs):
+                          unified_refresh_status = 'ACTIVE'
+                          actions.append({
+                              'workflow':'unified-upcoming.yml',
+                              'action':'recover_stale_unified_upcoming_run',
+                              'status':'suppressed_active_run',
+                              'detail':'A newer Unified Upcoming run is still active; the stale run was cancelled without creating a duplicate.'
+                          })
                       else:
                           dispatch = subprocess.run(
                               ['gh', 'workflow', 'run', 'unified-upcoming.yml', '--ref', 'main'],
