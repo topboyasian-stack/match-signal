@@ -242,10 +242,12 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "tennis.html",
             "basketball.html",
             "basketball-live.js",
+            "basketball-live-analysis.js",
             "basketball-design.css",
             "functions/api/sportybet-basketball.js",
             "functions/api/sportybet-basketball-booking.js",
             "scripts/test_basketball_desk_contract.mjs",
+            "scripts/test_basketball_live_analysis.mjs",
             "sport-hubs.css",
             "sport-hubs.js",
             "ms-design-system.css",
@@ -259,10 +261,6 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "data/licenses/**",
             "scripts/sync_club_logos.py",
             "scripts/test_club_logo_registry.py",
-            ".github/workflows/qualified-best-health-watch-v2.yml",
-            ".github/workflows/efootball-market-research-schedule.yml",
-            "scripts/test_automation_watchdog_research_recovery.py",
-            "scripts/test_qualified_best_monitor.mjs",
         }
         self.assertEqual(direct_paths, expected_direct_paths)
         builder_owned_paths = {

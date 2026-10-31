@@ -65,11 +65,14 @@ class EfootballResearchRecoveryTests(unittest.TestCase):
         self.assertIn("python scripts/system_health_audit.py", WATCHDOG)
 
     def test_automation_watchdog_changes_do_not_trigger_a_static_pages_deploy(self):
-        self.assertNotIn(
+        for path in (
             "      - '.github/workflows/automation_watchdog.yml'",
-            PAGES,
-            "watchdog-only changes must not consume a Cloudflare Pages production deployment",
-        )
+            "      - '.github/workflows/qualified-best-health-watch-v2.yml'",
+            "      - '.github/workflows/efootball-market-research-schedule.yml'",
+            "      - 'scripts/test_automation_watchdog_research_recovery.py'",
+            "      - 'scripts/test_qualified_best_monitor.mjs'",
+        ):
+            self.assertNotIn(path, PAGES, "automation-only changes must not consume a Cloudflare Pages deployment")
 
     def test_watchdog_contract_is_run_by_research_pr_validation(self):
         self.assertIn("scripts/test_automation_watchdog_research_recovery.py", RESEARCH)
