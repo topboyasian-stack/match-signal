@@ -38,6 +38,29 @@ market = pipeline.sportybet_total_for_fixture(fixture, feed)
 assert market and market["market_id"] == "225" and market["line"] == 228.5
 assert market["settlement"] == "Official final score including overtime"
 assert market["source"] == "SportyBet Nigeria"
+assert market["quote_capture_basis"] == "SportyBet API response observed_at"
+
+# The source may return several specifiers for market 225. Select a complete,
+# balanced main pair instead of blindly taking the first one.
+multi_line_feed = [dict(feed[0], markets=[
+    dict(feed[0]["markets"][0], specifier="total=208.5", outcomes=[
+        {"name": "Over", "odds": 1.25, "active": True},
+        {"name": "Under", "odds": 4.10, "active": True},
+    ]),
+    dict(feed[0]["markets"][0], specifier="total=228.5", outcomes=[
+        {"name": "Over", "odds": 1.91, "active": True},
+        {"name": "Under", "odds": 1.89, "active": True},
+    ]),
+    dict(feed[0]["markets"][0], specifier="total=238.5", outcomes=[
+        {"name": "Over", "odds": 3.80, "active": True},
+        {"name": "Under", "odds": 1.28, "active": True},
+    ]),
+])]
+selected_line = pipeline.sportybet_total_for_fixture(fixture, multi_line_feed, expected_total=235.0)
+assert selected_line and selected_line["line"] == 228.5
+assert selected_line["over_odds"] == 1.91 and selected_line["under_odds"] == 1.89
+assert selected_line["quote_capture_basis"] == "SportyBet API response observed_at"
+
 
 wrong_team = [dict(feed[0], home="Chicago Bulls")]
 assert pipeline.sportybet_total_for_fixture(fixture, wrong_team) is None, "never match odds to a different game"
