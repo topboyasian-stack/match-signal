@@ -130,11 +130,11 @@ permissions:
   contents: write
 
 concurrency:
-  # Ordinary refreshes are latest-wins: obsolete board builds must not hold the queue
-  # when newer fixture/form data is available. Promotion-child refreshes are isolated
-  # and never cancel the Builder's required pre/post-production refresh.
+  # Let a board build finish. Cancelling an active refresh every five minutes prevented
+  # the slower model + publication steps from ever updating the canonical board.
+  # Promotion-child refreshes remain isolated from the normal schedule.
   group: match-signal-unified-upcoming-${{ github.event_name == 'workflow_dispatch' && inputs.promotion_child && 'promotion' || 'normal' }}
-  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' || inputs.promotion_child != true }}
+  cancel-in-progress: false
 
 jobs:
   unified:
@@ -159,6 +159,8 @@ jobs:
           git reset --hard origin/main
       - name: Test Odds Builder refresh recovery decision
         run: python scripts/test_ensure_odds_builder_refresh.py
+      - name: Test automation trigger boundaries
+        run: python scripts/test_workflow_trigger_boundaries.py
       - name: Compile unified engines
         run: python -m py_compile scripts/unified_upcoming.py scripts/unified_upcoming_cleanup.py scripts/selection_candidate_collector.py scripts/test_selection_candidate_collector.py scripts/efootball_desk_learning.py scripts/test_upcoming_settlement_retention.py scripts/test_upcoming_desk_policy.py scripts/system_health_audit.py scripts/predict_today.py scripts/virtual_lab_model_eval.py scripts/test_virtual_lab_model_eval.py scripts/system_health_audit_lib.py scripts/test_system_health_audit_lib.py
       - name: Validate freshness deployment ordering
