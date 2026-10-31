@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Offline tests for the NBA live totals period evaluator."""
-from nba_live_totals_walk_forward import evaluate
+from nba_live_totals_walk_forward import evaluate, observation_coverage
 
 
 def test_period_estimates_are_paired_to_final_scores_and_separated():
@@ -47,6 +47,11 @@ def test_period_estimates_are_paired_to_final_scores_and_separated():
         assert result["by_period"][bucket]["n"] == 35
     assert result["overall"]["n"] == 140
     assert result["overall"]["mae"] is not None
+    assert result["observation_coverage"]["v5_live_events_observed"] == 35
+    assert result["observation_coverage"]["v5_live_snapshots"] == 175
+    assert result["observation_coverage"]["available_estimates"] == 175
+    assert result["observation_coverage"]["boxscore_possession_estimates"] == 175
+    assert result["observation_coverage"]["available_snapshots_by_period"]["Q1"] == 70
 
 
 def test_unsettled_games_and_wrong_model_versions_are_excluded():
@@ -69,6 +74,9 @@ def test_unsettled_games_and_wrong_model_versions_are_excluded():
     result = evaluate(observations, [], "model-v4")
     assert result["overall"]["n"] == 0
     assert result["evidence_sufficient"] is False
+    assert result["observation_coverage"]["v5_live_events_observed"] == 1
+    assert result["observation_coverage"]["available_estimates"] == 1
+    assert result["observation_coverage"]["estimate_status_counts"] == {"AVAILABLE": 1}
 
 
 if __name__ == "__main__":
