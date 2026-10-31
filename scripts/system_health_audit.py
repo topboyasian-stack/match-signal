@@ -11,7 +11,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from system_health_audit_lib import pdl_health_summary
+from system_health_audit_lib import pdl_health_summary, virtual_live_health_summary
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
@@ -144,20 +144,11 @@ if tennis_forward_age > 8:
     ))
 
 virtual_live_age = age_hours(virtual_live.get("updated_at"))
-unified_virtual = ((unified.get("summary") or {}).get("virtual_model") or {})
-live_refresh = unified_virtual.get("live_refresh") or {}
-if str(virtual_live.get("status") or "") == "LIVE" and int(virtual_live.get("events_count") or 0) > 0:
-    checks.append(
-        {
-            "engine": "virtual_live_feed",
-            "status": "PASS" if (virtual_live_age <= 0.5 or live_refresh.get("refreshed")) else "INFO",
-            "age_hours": round(virtual_live_age, 2),
-            "threshold_hours": 0.5,
-            "heartbeat_source": "unified_live_refresh" if live_refresh.get("refreshed") else "virtual_lab_live.json",
-        }
-    )
-else:
-    checks.append(issue("VIRTUAL_LIVE_FEED_INVALID", "critical", f"live virtual status={virtual_live.get('status')!r}, events={int(virtual_live.get('events_count') or 0)}"))
+virtual_live_check, virtual_live_issues = virtual_live_health_summary(
+    virtual_live, virtual_live_age, max_age_hours=0.5
+)
+checks.append(virtual_live_check)
+checks.extend(virtual_live_issues)
 
 nba_competition = (expansion.get("competitions") or {}).get("NBA") or {}
 retired = {
