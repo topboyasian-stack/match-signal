@@ -50,16 +50,18 @@ assert.equal(api.liveTotalProjection({ ...record, period: 5, clock: "04:00" }, f
 const verified = {
   settled: true, publication_snapshot_verified: true, roi_eligible: true,
   quote_fresh_at_publication: true, price_pair_valid: true, price_source_verified: true,
-  market_id: 225, pick: "over", result: "over"
+  market_id: 225, sportybet_event_id: "sr:match:test", quote_capture_basis: "SportyBet API response observed_at", pick: "over", result: "over"
 };
 assert.equal(api.verifiedTotalRecord(verified), true);
 assert.equal(api.verifiedTotalRecord({ ...verified, publication_snapshot_verified: false }), false);
 assert.equal(api.verifiedTotalRecord({ ...verified, roi_eligible: false }), false);
 assert.equal(api.verifiedTotalRecord({ ...verified, quote_fresh_at_publication: false }), false);
+assert.equal(api.verifiedTotalRecord({ ...verified, sportybet_event_id: "" }), false);
+assert.equal(api.verifiedTotalRecord({ ...verified, quote_capture_basis: "unknown" }), false);
 const qualifiedTotalsEvidence = {
   evaluation_type: "NBA_TOTALS_WALK_FORWARD_V1", market_id: "225",
   market_definition: "full_game_total_including_overtime",
-  model_version: "nba-total-v3-matchup-recent-team-total", release_decision: "QUALIFIED",
+  model_version: "nba-total-v4-pace-efficiency-calibrated", release_decision: "QUALIFIED",
   walk_forward: { holdout: { n: 150, mae: 12.2, baseline_mae: 14.1, bias: 0.8 } },
   market_holdout: { n: 120, roi: 0.08, roi_ci95_lower: 0.02, roi_vs_market_favorite: 0.03 }
 };
@@ -71,9 +73,9 @@ assert.equal(api.nbaTotalsReleaseQualified({ ...qualifiedTotalsEvidence, market_
 assert.equal(api.nbaTotalsReleaseQualified({ ...qualifiedTotalsEvidence, market_holdout: { n: 120, roi: 0.08, roi_ci95_lower: 0.02, roi_vs_market_favorite: -0.01 } }), false);
 assert.equal(api.nbaTotalsReleaseQualified(qualifiedTotalsEvidence), true);
 assert.equal(api.nbaTotalRowQualified({ totals_model_version: "old-model", prediction_status: "BETTING_QUALIFIED", markets: { total_ou: { market_id: "225", prediction_status: "BETTING_QUALIFIED" } } }, qualifiedTotalsEvidence), false);
-assert.equal(api.nbaTotalRowQualified({ totals_model_version: "nba-total-v3-matchup-recent-team-total", prediction_status: "live_experimental", markets: { total_ou: { market_id: "225", prediction_status: "LIVE_EXPERIMENTAL_NOT_QUALIFIED" } } }, qualifiedTotalsEvidence), false);
-assert.equal(api.nbaTotalRowQualified({ totals_model_version: "nba-total-v3-matchup-recent-team-total", prediction_status: "BETTING_QUALIFIED", markets: { total_ou: { market_id: "225", prediction_status: "BETTING_QUALIFIED" } } }, { ...qualifiedTotalsEvidence, release_decision: "RESEARCH_ONLY" }), false);
-assert.equal(api.nbaTotalRowQualified({ totals_model_version: "nba-total-v3-matchup-recent-team-total", prediction_status: "BETTING_QUALIFIED", markets: { total_ou: { market_id: "225", prediction_status: "BETTING_QUALIFIED" } } }, qualifiedTotalsEvidence), true);
+assert.equal(api.nbaTotalRowQualified({ totals_model_version: "nba-total-v4-pace-efficiency-calibrated", prediction_status: "live_experimental", markets: { total_ou: { market_id: "225", prediction_status: "LIVE_EXPERIMENTAL_NOT_QUALIFIED" } } }, qualifiedTotalsEvidence), false);
+assert.equal(api.nbaTotalRowQualified({ totals_model_version: "nba-total-v4-pace-efficiency-calibrated", prediction_status: "BETTING_QUALIFIED", markets: { total_ou: { market_id: "225", prediction_status: "BETTING_QUALIFIED" } } }, { ...qualifiedTotalsEvidence, release_decision: "RESEARCH_ONLY" }), false);
+assert.equal(api.nbaTotalRowQualified({ totals_model_version: "nba-total-v4-pace-efficiency-calibrated", prediction_status: "BETTING_QUALIFIED", markets: { total_ou: { market_id: "225", prediction_status: "BETTING_QUALIFIED" } } }, qualifiedTotalsEvidence), true);
 assert.match(source, /RESEARCH ONLY · NO BETTING LEAN/);
 assert.match(source, /Research-only model: no betting lean or builder action/);
 assert.match(source, /NBA totals are research-only; this builder stays locked until the model passes strict out-of-sample validation\./);
