@@ -71,7 +71,9 @@ def main():
         "Builder artifact must flow through the promotion workflow, not trigger a second board refresh."
     )
     assert "gh workflow run builder-production-promotion.yml --ref main" in builder
-    assert "data/odds_ticket_tracker.json" in board_paths
+    assert "data/odds_ticket_tracker.json" not in board_paths, (
+        "Ticket tracker is downstream of the Builder; its generated output must not start another board build."
+    )
     assert "data/virtual_lab_model_eval.json" not in board_paths, (
         "The model-evaluation artifact is collector-owned and must not retrigger the board workflow."
     )
