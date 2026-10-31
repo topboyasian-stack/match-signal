@@ -102,7 +102,17 @@ class SettlementTests(unittest.TestCase):
         p["publication_snapshot_verified"] = False
         audit = price_audit_fields(p, p["markets"]["total_ou"], parse_time_for_test(p["prediction_created_at"]))
         self.assertFalse(audit["roi_eligible"])
-        self.assertIn("no_verified_immutable_publication_snapshot", audit["roi_ineligibility_reasons"])\n\n    def test_missing_exact_sportybet_event_blocks_roi(self):\n        p = prediction()\n        p["published_at"] = "2026-10-25T19:00:00+00:00"\n        p["publication_snapshot_id"] = "nba-total-snapshot-abc"\n        p["publication_snapshot_verified"] = True\n        p["markets"]["total_ou"]["sportybet_event_id"] = ""\n        audit = price_audit_fields(p, p["markets"]["total_ou"], parse_time_for_test(p["prediction_created_at"]))\n        self.assertFalse(audit["roi_eligible"])\n        self.assertIn("missing_exact_sportybet_event_id", audit["roi_ineligibility_reasons"])
+        self.assertIn("no_verified_immutable_publication_snapshot", audit["roi_ineligibility_reasons"])
+
+    def test_missing_exact_sportybet_event_blocks_roi(self):
+        p = prediction()
+        p["published_at"] = "2026-10-25T19:00:00+00:00"
+        p["publication_snapshot_id"] = "nba-total-snapshot-abc"
+        p["publication_snapshot_verified"] = True
+        p["markets"]["total_ou"]["sportybet_event_id"] = ""
+        audit = price_audit_fields(p, p["markets"]["total_ou"], parse_time_for_test(p["prediction_created_at"]))
+        self.assertFalse(audit["roi_eligible"])
+        self.assertIn("missing_exact_sportybet_event_id", audit["roi_ineligibility_reasons"])
 
 if __name__ == "__main__":
     unittest.main()
