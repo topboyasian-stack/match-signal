@@ -16,6 +16,7 @@ from live_expansion_pipeline import (
     dt,
     S,
     sportybet_total_for_fixture,
+    nba_team_key,
 )
 from nba_totals_walk_forward import evaluate as evaluate_nba_totals
 
@@ -95,6 +96,49 @@ def sportybet_basketball_feed_paged(max_pages=5):
     return list(events_by_id.values()), error
 
 
+
+def diagnose_fixture_quote(fixture, feed, now):
+    """Explain why an upcoming NBA fixture has no fresh exact market-225 pair."""
+    fixture_home = nba_team_key(fixture.get("home"))
+    fixture_away = nba_team_key(fixture.get("away"))
+    fixture_start = dt(fixture.get("date"))
+    if not fixture_home or not fixture_away or not fixture_start:
+        return "INVALID_FIXTURE_IDENTITY"
+    named = []
+    for event in feed or []:
+        event_home = nba_team_key(event.get("home"))
+        event_away = nba_team_key(event.get("away"))
+        if (
+            fixture_home == event_home and fixture_away == event_away
+        ) or (
+            fixture_home == event_away and fixture_away == event_home
+        ):
+            named.append(event)
+    if not named:
+        return "NO_EXACT_TEAM_EVENT_IN_FEED"
+    timed = [
+        event for event in named
+        if dt(event.get("start_time")) is not None
+        and abs((dt(event.get("start_time")) - fixture_start).total_seconds()) <= 45 * 60
+    ]
+    if not timed:
+        return "SPORTYBET_START_TIME_MISMATCH_OVER_45_MIN"
+    fresh = [
+        event for event in timed
+        if dt(event.get("fetched_at")) is not None
+        and -120 <= (now - dt(event.get("fetched_at"))).total_seconds() <= 15 * 60
+    ]
+    if not fresh:
+        return "SPORTYBET_EVENT_QUOTE_STALE_OR_TIMESTAMP_MISSING"
+    market_events = [
+        event for event in fresh
+        if any(str(market.get("id")) == "225" for market in (event.get("markets") or []))
+    ]
+    if not market_events:
+        return "MARKET_225_NOT_OFFERED_FOR_MATCHED_FIXTURE"
+    return "MARKET_225_LINE_OR_BOTH_PRICES_UNUSABLE"
+
+
 def load_json(path, default):
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
@@ -166,6 +210,8 @@ def capture(predictions, feed, now):
         "prediction_price_updates": 0,
         "started_or_finished_skipped": 0,
         "fresh_price_snapshots_considered": 0,
+        "price_match_status_counts": {},
+        "unmatched_fixtures": [],
     }
     snapshot_candidates = []
     for prediction in predictions:
@@ -189,8 +235,17 @@ def capture(predictions, feed, now):
         )
         if quote:
             stats["exact_fresh_market_matches"] += 1
+            reason = "MATCHED"
             if attach_fresh_quote(prediction, quote, now):
                 stats["prediction_price_updates"] += 1
+        else:
+            reason = diagnose_fixture_quote(fixture, feed, now)
+            stats["unmatched_fixtures"].append({
+                "event_id": str(prediction.get("event_id") or ""),
+                "home": fixture["home"], "away": fixture["away"],
+                "start_time": fixture["date"], "reason": reason,
+            })
+        stats["price_match_status_counts"][reason] = stats["price_match_status_counts"].get(reason, 0) + 1
         market = ((prediction.get("markets") or {}).get("total_ou") or {})
         quote_time = dt(market.get("quote_timestamp"))
         if (
@@ -273,8 +328,9 @@ def main():
         "publication_capture": report.get("publication_capture"),
         "release_decision": report.get("release_decision"),
         "note": (
-            "Missing market-225 events are left unpriced. No substitute bookmaker, old quote, "
-            "synthetic price, or reconstructed line is inserted."
+            "Missing market-225 events are left unpriced. Per-fixture diagnostics distinguish "
+            "unopened bookmaker markets from identity/time mismatch or an unusable price pair. "
+            "No substitute bookmaker, old quote, synthetic price, or reconstructed line is inserted."
         ),
     }
     STATUS.write_text(json.dumps(status, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")

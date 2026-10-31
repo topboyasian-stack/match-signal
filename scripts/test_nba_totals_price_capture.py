@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 from expansion_pipeline import NBA_TOTALS_MODEL_VERSION
-from capture_nba_totals_prices import attach_fresh_quote, capture, capture_timestamp, sportybet_basketball_feed_paged
+from capture_nba_totals_prices import attach_fresh_quote, capture, capture_timestamp, diagnose_fixture_quote, sportybet_basketball_feed_paged
 
 
 def make_prediction(now, **overrides):
@@ -139,6 +139,62 @@ class PriceCaptureTests(unittest.TestCase):
         self.assertEqual(stats["prediction_price_updates"], 1)
         self.assertEqual(len(candidates), 1)
         self.assertEqual(legacy["totals_model_version"], "nba-total-v3")
+
+    def test_fixture_diagnostics_separate_unopened_market_from_matching_errors(self):
+        fixture = {
+            "home": "Boston Celtics", "away": "New York Knicks",
+            "date": (self.now + timedelta(hours=2)).isoformat(),
+        }
+        no_event = [{
+            "event_id": "other", "home": "Chicago Bulls", "away": "Miami Heat",
+            "start_time": fixture["date"], "fetched_at": self.now.isoformat(), "markets": [],
+        }]
+        self.assertEqual(
+            diagnose_fixture_quote(fixture, no_event, self.now),
+            "NO_EXACT_TEAM_EVENT_IN_FEED",
+        )
+
+        wrong_time = [{
+            "event_id": "same", "home": "Boston Celtics", "away": "New York Knicks",
+            "start_time": (self.now + timedelta(hours=3)).isoformat(),
+            "fetched_at": self.now.isoformat(), "markets": [],
+        }]
+        self.assertEqual(
+            diagnose_fixture_quote(fixture, wrong_time, self.now),
+            "SPORTYBET_START_TIME_MISMATCH_OVER_45_MIN",
+        )
+
+        no_market = [{
+            "event_id": "same", "home": "Boston Celtics", "away": "New York Knicks",
+            "start_time": fixture["date"], "fetched_at": self.now.isoformat(), "markets": [],
+        }]
+        self.assertEqual(
+            diagnose_fixture_quote(fixture, no_market, self.now),
+            "MARKET_225_NOT_OFFERED_FOR_MATCHED_FIXTURE",
+        )
+
+        incomplete = [{
+            "event_id": "same", "home": "Boston Celtics", "away": "New York Knicks",
+            "start_time": fixture["date"], "fetched_at": self.now.isoformat(),
+            "markets": [{"id": "225", "specifier": "total=220.5", "outcomes": []}],
+        }]
+        self.assertEqual(
+            diagnose_fixture_quote(fixture, incomplete, self.now),
+            "MARKET_225_LINE_OR_BOTH_PRICES_UNUSABLE",
+        )
+
+        valid = [{
+            "event_id": "same", "home": "Boston Celtics", "away": "New York Knicks",
+            "start_time": fixture["date"], "fetched_at": self.now.isoformat(),
+            "markets": [{
+                "id": "225", "specifier": "total=220.5", "outcomes": [
+                    {"name": "Over", "odds": 1.91, "active": True},
+                    {"name": "Under", "odds": 1.89, "active": True},
+                ],
+            }],
+        }]
+        self.assertIsNotNone(sportybet_total_for_fixture(fixture, valid, expected_total=224.5))
+        self.assertEqual(diagnose_fixture_quote(fixture, valid, self.now), "MATCHED")
 
     def test_capture_time_is_taken_after_feed_response_not_before(self):
         before_response = self.now
