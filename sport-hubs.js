@@ -156,6 +156,19 @@ function displayedFairOddsValue(x){
   const fair=Number(x?.model_fair_odds);
   return Number.isFinite(fair)&&fair>1?fair:null;
 }
+const VIRTUAL_PARTICIPANT_INPUT_MAX_AGE_MINUTES=30;
+function virtualParticipantHistoryCurrent(row,boardGeneratedAt,now=Date.now()){
+  const product=String(row?.product||"").toLowerCase();
+  const isVirtual=String(row?.sport||"").toLowerCase()==="virtual"||
+    ["efootball_gt","efootball_adriatic","vfootball","zoom"].includes(product);
+  if(!isVirtual)return true;
+  if(row?.participant_history_fresh!==true||row?.participant_history_age_minutes==null)return false;
+  const inputAge=Number(row.participant_history_age_minutes);
+  const generatedAt=typeof boardGeneratedAt==="number"?boardGeneratedAt:Date.parse(String(boardGeneratedAt||""));
+  if(!Number.isFinite(inputAge)||!Number.isFinite(generatedAt))return false;
+  const boardAgeMinutes=Math.max(0,(now-generatedAt)/60000);
+  return inputAge+boardAgeMinutes<=VIRTUAL_PARTICIPANT_INPUT_MAX_AGE_MINUTES;
+}
 function isVirtualDeskCandidate(row){
   if(!row)return false;
   const product=String(row?.product||"").toLowerCase();
@@ -751,7 +764,7 @@ function unifiedRow(group){
   const when=DT(x.start_time);
   const qualification=qualificationState(x);
   const product=String(x?.product||"").toLowerCase();
-  const participantHistoryStale=x?.participant_history_fresh!==true&&(
+  const participantHistoryStale=x?.participant_history_fresh_now!==true&&(
     String(x?.sport||"").toLowerCase()==="virtual" ||
     ["efootball_gt","efootball_adriatic","vfootball","zoom"].includes(product)
   );
@@ -870,7 +883,7 @@ async function renderUnifiedBoard(){
       const product=String(row?.product||"").toLowerCase();
       const isVirtual=String(row?.sport||"").toLowerCase()==="virtual"||
         ["efootball_gt","efootball_adriatic","vfootball","zoom"].includes(product);
-      return isVirtual&&row?.participant_history_fresh!==true;
+      return isVirtual&&!virtualParticipantHistoryCurrent(row,generatedAt,Date.now());
     }).length;
     if(dataStatusEl){
       const ageMs=Number.isFinite(generatedAt)?Date.now()-generatedAt:NaN;
@@ -906,7 +919,7 @@ async function renderUnifiedBoard(){
     // The core prediction feed intentionally does not contain Virtual/eFootball.
     // Bring the existing evidence-backed eFootball candidate lane onto the
     // Upcoming Desk without turning it into a Builder qualification bypass.
-    const virtualCandidates=selectedRows.filter(isVirtualDeskCandidate).filter(row=>row?.participant_history_fresh===true);
+    const virtualCandidates=selectedRows.filter(isVirtualDeskCandidate).filter(row=>virtualParticipantHistoryCurrent(row,generatedAt,Date.now()));
     // Track the saved-pool baseline for diagnosis only; it is not a live qualification.
     const virtualSnapshotQualifiedFixtureCount=qualifiedBestSelections(virtualCandidates,Date.now()).rows.length;
     let virtualQuoteRefreshState="pending";
@@ -1312,6 +1325,12 @@ async function renderUnifiedBoard(){
         return true;
       });
       const isVirtualQualificationRow=x=>String(x?.sport||"").toLowerCase()==="virtual"||["efootball_gt","efootball_adriatic","vfootball","zoom"].includes(String(x?.product||"").toLowerCase());
+      const freshnessCheckTime=Date.now();
+      for(const row of filteredRows){
+        if(isVirtualQualificationRow(row)){
+          row.participant_history_fresh_now=virtualParticipantHistoryCurrent(row,generatedAt,freshnessCheckTime);
+        }
+      }
       const virtualViewActive=!sport?.value||sport.value==="all"||sport.value==="virtual";
       const virtualRowsInView=filteredRows.some(isVirtualQualificationRow);
       const virtualQuotePending=virtualQuoteRefreshState==="pending"&&virtualViewActive&&virtualCandidates.length>0;
@@ -1323,7 +1342,7 @@ async function renderUnifiedBoard(){
       // exactSportyBetQuote still enforces each row's strict 15-minute age limit.
       const qualificationRows=sourceDataFresh?filteredRows.filter(x=>{
         if(!isVirtualQualificationRow(x))return true;
-        if(x?.participant_history_fresh!==true)return false;
+        if(x?.participant_history_fresh_now!==true)return false;
         if(virtualQuoteRefreshState==="complete")return true;
         return (virtualQuoteRefreshState==="partial"||virtualQuoteRefreshState==="cached")&&
           x.desk_quote_refresh==="fresh_exact_event_line_side";
