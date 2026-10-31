@@ -73,14 +73,17 @@ def test_publication_capture_is_separate_from_settlement_and_roi():
     }
     prediction = {
         "event_id": "espn-1", "totals_model_version": NBA_TOTALS_MODEL_VERSION,
+        "start_time": "2026-10-31T22:00:00+00:00",
         "markets": {"total_ou": {
             "market_id": "225", "source": "SportyBet Nigeria",
+            "sportybet_event_id": "sr:match:test-001",
+            "quote_capture_basis": "SportyBet API response observed_at",
             "quote_timestamp": "2026-10-31T20:44:30+00:00",
             "line": 212.5, "over_odds": 1.97, "under_odds": 1.88,
         }},
         "generated_at": published,
     }
-    result = publication_capture_metrics([snapshot], [prediction])
+    result = publication_capture_metrics([snapshot], [prediction], as_of="2026-10-31T20:45:30+00:00")
     assert result["model_predictions"] == 1
     assert result["predictions_with_fresh_sportybet_market_225_pair"] == 1
     assert result["immutable_fresh_publication_snapshots"] == 1
@@ -114,24 +117,34 @@ def test_capture_status_is_partial_until_every_v5_forecast_has_a_frozen_price_pa
             "event_id": event_id,
             "totals_model_version": NBA_TOTALS_MODEL_VERSION,
             "generated_at": published,
+            "start_time": "2026-10-31T22:00:00+00:00",
             "markets": {"total_ou": {
                 "market_id": "225", "source": "SportyBet Nigeria",
+                "sportybet_event_id": "sr:match:" + event_id,
+                "quote_capture_basis": "SportyBet API response observed_at",
                 "quote_timestamp": "2026-10-31T20:44:30+00:00",
                 "line": 212.5, "over_odds": 1.97, "under_odds": 1.88,
             }},
         }
-    partial = publication_capture_metrics([snapshot], [prediction("g1"), prediction("g2")])
+    as_of = "2026-10-31T20:45:30+00:00"
+    partial = publication_capture_metrics([snapshot], [prediction("g1"), prediction("g2")], as_of=as_of)
     assert partial["capture_status"] == "PARTIAL"
     assert partial["snapshot_coverage"] == 0.5
     assert partial["immutable_fresh_publication_snapshots"] == 1
     assert partial["unmatched_fresh_market_predictions"] == 1
 
-    complete = publication_capture_metrics([snapshot, dict(snapshot, event_id="g2",
-        publication_snapshot_id="nba-total-pub:g2")], [prediction("g1"), prediction("g2")])
+    second_snapshot = dict(snapshot, event_id="g2", publication_snapshot_id="nba-total-pub:g2")
+    second_market = dict(snapshot["markets"]["total_ou"], sportybet_event_id="sr:match:g2")
+    second_snapshot["markets"] = {"total_ou": second_market}
+    complete = publication_capture_metrics(
+        [snapshot, second_snapshot], [prediction("g1"), prediction("g2")], as_of=as_of
+    )
     assert complete["capture_status"] == "CAPTURED"
     assert complete["snapshot_coverage"] == 1.0
 
-    waiting = publication_capture_metrics([], [prediction("g1")])
+    stale_prediction = prediction("g1")
+    stale_prediction["markets"]["total_ou"]["quote_timestamp"] = "2026-10-31T20:20:00+00:00"
+    waiting = publication_capture_metrics([], [stale_prediction], as_of=as_of)
     assert waiting["capture_status"] == "AWAITING_FRESH_MARKET_225_QUOTES"
     empty = publication_capture_metrics([], [])
     assert empty["capture_status"] == "NO_CURRENT_MODEL_PREDICTIONS"
@@ -143,6 +156,7 @@ def test_capture_status_is_partial_until_every_v5_forecast_has_a_frozen_price_pa
         [],
         [snapshot],
         [prediction("g1")],
+        as_of=as_of,
     )
     assert full_report["publication_capture"]["model_predictions"] == 1
     assert full_report["publication_capture"]["immutable_fresh_publication_snapshots"] == 1
