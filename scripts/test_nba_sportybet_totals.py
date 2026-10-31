@@ -3,10 +3,25 @@ import sys
 import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 import live_expansion_pipeline as pipeline
+
+class FeedResponse:
+    def raise_for_status(self):
+        return None
+    def json(self):
+        return {"ok": True, "events": [{"event_id": "sr:match:test-feed"}]}
+
+
+with patch.object(pipeline.S, "get", return_value=FeedResponse()) as feed_get:
+    feed_events, feed_error = pipeline.sportybet_basketball_feed()
+    assert feed_error is None and len(feed_events) == 1
+    assert feed_get.call_args.kwargs["params"]["timeline"] == 168, (
+        "SportyBet lookup must cover the seven-day NBA prediction horizon"
+    )
 
 now = datetime.now(timezone.utc)
 start = now + timedelta(hours=3)
