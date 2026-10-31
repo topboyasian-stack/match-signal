@@ -1,26 +1,26 @@
 {
-  "generated_at": "2026-10-31T12:32:10.528529+00:00",
-  "status": "HEALTHY",
+  "generated_at": "2026-10-31T12:35:35.296806+00:00",
+  "status": "DEGRADED",
   "critical_issues": 0,
-  "warning_issues": 0,
+  "warning_issues": 1,
   "info_issues": 1,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
       "status": "PASS",
-      "age_hours": 0.09,
+      "age_hours": 0.15,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.07,
+      "age_hours": 0.08,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 0.05,
+      "age_hours": 0.11,
       "threshold_hours": 4
     },
     {
@@ -32,19 +32,19 @@
     {
       "engine": "prediction_desk_health",
       "status": "PASS",
-      "age_hours": 0.03,
+      "age_hours": 0.04,
       "threshold_hours": 2
     },
     {
       "engine": "tennis_forward_discovery",
       "status": "PASS",
-      "age_hours": 0.05,
+      "age_hours": 0.11,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
-      "status": "PASS",
-      "age_hours": 0.47,
+      "status": "STALE",
+      "age_hours": 0.52,
       "threshold_hours": 0.5,
       "heartbeat_source": "virtual_lab_live.json",
       "events_count": 690
@@ -52,7 +52,7 @@
     {
       "engine": "nba_live_observation_recorder",
       "status": "PASS",
-      "age_hours": 0.07,
+      "age_hours": 0.13,
       "threshold_hours": 0.25,
       "heartbeat_source": "nba_live_observations.json",
       "games_tracked": 18,
@@ -95,6 +95,11 @@
   ],
   "issues": [
     {
+      "code": "VIRTUAL_LIVE_FEED_STALE",
+      "severity": "warning",
+      "detail": "virtual_lab_live.json age 0.52h exceeds 0.50h; a downstream Unified Upcoming refresh cannot substitute for a fresh source snapshot"
+    },
+    {
       "code": "PDL_EXPERIMENTAL_FEED_STALE",
       "severity": "info",
       "detail": "PDL experimental source is STALE_SOURCE_UNAVAILABLE; last-success timestamp is 2026-10-24T09:41:33.194342+00:00. The current prediction feed contains no PDL rows, so stale fixtures remain withheld."
@@ -107,6 +112,6 @@
     "stale_live_flags_hidden": 0,
     "expired_settled_rows_hidden": 0,
     "virtual_market_rows_held_for_kickoff_window": 0,
-    "virtual_rows_held_for_stale_participant_history": 4773
+    "virtual_rows_held_for_stale_participant_history": 4779
   }
 }
