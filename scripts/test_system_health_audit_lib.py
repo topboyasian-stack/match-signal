@@ -2,7 +2,7 @@
 """Unit tests for exposing stale PDL source status without publishing stale picks."""
 import unittest
 
-from system_health_audit_lib import pdl_health_summary, virtual_live_health_summary, nba_live_observation_health_summary
+from system_health_audit_lib import pdl_health_summary, virtual_live_health_summary, nba_live_observation_health_summary, virtual_participant_history_health_summary
 
 
 class PDLHealthSummaryTests(unittest.TestCase):
@@ -76,6 +76,44 @@ class VirtualLiveHealthSummaryTests(unittest.TestCase):
         self.assertEqual(check["status"], "FAIL")
         self.assertEqual(issues[0]["code"], "VIRTUAL_LIVE_FEED_INVALID")
         self.assertEqual(issues[0]["severity"], "critical")
+
+
+class VirtualParticipantHistoryHealthSummaryTests(unittest.TestCase):
+    def test_stale_participant_history_is_critical_even_when_board_sidecar_is_fresh(self):
+        check, issues = virtual_participant_history_health_summary(
+            9.8,
+            {
+                "generated_at": "2026-10-31T12:50:00+00:00",
+                "participant_history_freshness": {
+                    "fresh": False,
+                    "max_age_minutes": 588.0,
+                    "reason": "input older than 30 minutes: participant_lifecycle, collector_status, model_evaluation",
+                },
+            },
+            max_age_minutes=30.0,
+        )
+        self.assertEqual(check["engine"], "virtual_participant_history")
+        self.assertEqual(check["status"], "STALE")
+        self.assertEqual(check["threshold_minutes"], 30.0)
+        self.assertEqual(issues[0]["code"], "VIRTUAL_PARTICIPANT_HISTORY_STALE")
+        self.assertEqual(issues[0]["severity"], "critical")
+        self.assertIn("participant_lifecycle", issues[0]["detail"])
+        self.assertIn("must remain withheld", issues[0]["detail"])
+
+    def test_fresh_participant_history_passes_only_when_both_sources_are_fresh(self):
+        check, issues = virtual_participant_history_health_summary(
+            0.1,
+            {"participant_history_freshness": {"fresh": True, "max_age_minutes": 4.0, "stale_inputs": []}},
+            max_age_minutes=30.0,
+        )
+        self.assertEqual(check["status"], "PASS")
+        self.assertEqual(check["max_input_age_minutes"], 4.0)
+        self.assertEqual(issues, [])
+
+    def test_missing_freshness_metadata_is_not_reported_as_pass(self):
+        check, issues = virtual_participant_history_health_summary(0.1, {}, max_age_minutes=30.0)
+        self.assertEqual(check["status"], "STALE")
+        self.assertEqual(issues[0]["code"], "VIRTUAL_PARTICIPANT_HISTORY_STALE")
 
 
 class NbaLiveObservationHealthSummaryTests(unittest.TestCase):
