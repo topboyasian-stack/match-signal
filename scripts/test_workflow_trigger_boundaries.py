@@ -49,6 +49,10 @@ def main():
     tracker_paths = push_paths("odds-ticket-tracker.yml")
     collector_paths = push_paths("virtual-lab-collector.yml")
     autopilot_paths = push_paths("autopilot-refresh.yml")
+    board_concurrency = board.split("\\nconcurrency:\\n", 1)[1].split("\\njobs:\\n", 1)[0]
+    assert "cancel-in-progress: false" in board_concurrency, (
+        "The five-minute Upcoming schedule must not cancel an active slow board build before publication."
+    )
 
     # These are generated outputs, not Builder inputs. Keep the expensive Builder
     # on its 15-minute schedule and use the post-publication stale-artifact helper
