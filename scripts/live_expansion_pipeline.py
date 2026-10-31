@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import requests
 
-from expansion_pipeline import collect, current, nba_predict, NBA_START, NBA_TOTALS_MODEL_VERSION, NOW
+from expansion_pipeline import collect, current, nba_predict, NBA_START, NBA_TOTALS_MODEL_VERSION, NBA_TOTALS_MODEL_LABEL, NOW
 from independent_football_model import independent_prediction
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -579,6 +579,10 @@ def main():
                     "accuracy_eligible": True, "prediction_status": "live_experimental",
                     "paper_only": True, "live_experimental": True,
                 }
+        if row.get("totals_model_version") == NBA_TOTALS_MODEL_VERSION:
+            # Prior V5 rows can retain the old V4 display label even though their
+            # stored total features are already V5 pace/efficiency calibrated.
+            row["model"] = NBA_TOTALS_MODEL_LABEL
         row = apply_sportybet_total_snapshot(row, f, sportybet_feed)
         nba_predictions.append(row)
         seen_nba.add(eid)
@@ -589,7 +593,10 @@ def main():
         start = dt(old.get("start_time"))
         stamp = dt(old.get("generated_at") or old.get("prediction_created_at"))
         if eid and eid not in seen_nba and start and stamp and stamp < start and start >= NOW-timedelta(hours=30):
-            nba_predictions.append(dict(old))
+            retained = dict(old)
+            if retained.get("totals_model_version") == NBA_TOTALS_MODEL_VERSION:
+                retained["model"] = NBA_TOTALS_MODEL_LABEL
+            nba_predictions.append(retained)
             seen_nba.add(eid)
     nba_predictions.sort(key=lambda x: x.get("start_time", ""))
 
