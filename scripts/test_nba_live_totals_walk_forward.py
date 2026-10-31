@@ -41,7 +41,7 @@ def test_period_estimates_are_paired_to_final_scores_and_separated():
         })
         games[event_id] = {"event_id": event_id, "snapshots": snapshots}
 
-    result = evaluate({"games": games}, history, "model-v4")
+    result = evaluate({"games": games}, history, "model-v5")
     assert result["evidence_sufficient"] is True
     for bucket in ("Q1_end", "Halftime", "Q3_end", "Q4"):
         assert result["by_period"][bucket]["n"] == 35
@@ -58,20 +58,20 @@ def test_unsettled_games_and_wrong_model_versions_are_excluded():
     observations = {"games": {
         "unfinished": {"snapshots": [{
             "game_state": "live",
-            "pregame_totals_model_version": "model-v4",
+            "pregame_totals_model_version": "model-v5",
             "live_total_projection": {"status": "AVAILABLE", "elapsed_minutes": 11.5,
                                       "live_total_estimate": 220, "pregame_expected_total": 225},
             "observed_at": "2026-10-31T00:10:00+00:00",
         }]},
         "legacy": {"snapshots": [{
             "game_state": "live",
-            "pregame_totals_model_version": "old",
+            "pregame_totals_model_version": "model-v4",
             "live_total_projection": {"status": "AVAILABLE", "elapsed_minutes": 10,
                                       "live_total_estimate": 220, "pregame_expected_total": 225},
             "observed_at": "2026-10-31T00:10:00+00:00",
         }]},
     }}
-    result = evaluate(observations, [], "model-v4")
+    result = evaluate(observations, [], "model-v5")
     assert result["overall"]["n"] == 0
     assert result["evidence_sufficient"] is False
     assert result["observation_coverage"]["v5_live_events_observed"] == 1

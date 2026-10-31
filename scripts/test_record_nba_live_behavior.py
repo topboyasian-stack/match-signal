@@ -78,7 +78,7 @@ class LiveBoxscoreProjectionTests(unittest.TestCase):
         record = sample_record()
         record["period"] = 1
         record["clock"] = "08:00"
-        result = live_total_projection(record, {"expected_total": 224.5})
+        result = live_total_projection(record, fresh_prediction())
         self.assertEqual(result["status"], "COLLECTING")
 
     def test_missing_or_stale_timestamp_is_withheld_like_the_live_desk(self):
