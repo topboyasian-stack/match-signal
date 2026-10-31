@@ -1521,3 +1521,5 @@ if(!window.__MATCH_SIGNAL_WORKSPACE_UI__){
 }
 })();
 // Production deployment marker: settled eFootball calibration and qualification safeguards are ready for smoke verification.
+
+// Force a new Pages promotion after the companion allowlist was corrected.
