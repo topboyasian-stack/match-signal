@@ -128,7 +128,8 @@ def main():
 
     collector_publish = collector.split("      - name: Publish collector artifacts", 1)[1]
     assert "git add " in collector_publish
-    assert "data/system_health.json" not in collector_publish
+    assert "git add data/system_health.json" not in collector_publish
+    assert "python scripts/system_health_audit.py" not in collector_publish
 
     live_sync_publish = live_sync.split("      - name: Publish live snapshot without overwriting newer data", 1)[1]
     assert "git add data/virtual_lab_live.json data/system_health.json" not in live_sync_publish
