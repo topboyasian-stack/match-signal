@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Capture timestamped, research-only NBA in-game team/player behavior snapshots."""
 import json, math, os, re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 import requests
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -17,6 +18,26 @@ def get(url, params=None):
     r = S.get(url, params=params, timeout=20)
     r.raise_for_status()
     return r.json()
+
+
+def fetch_scoreboard_window(now):
+    """Fetch adjacent Eastern calendar days so UTC rollover cannot hide NBA games."""
+    eastern_day = now.astimezone(ZoneInfo("America/New_York")).date()
+    requested = [(eastern_day + timedelta(days=offset)).strftime("%Y%m%d") for offset in (-1, 0, 1)]
+    events_by_id = {}
+    errors = []
+    for day in requested:
+        try:
+            board = get(BASE + "/scoreboard", {"dates": day})
+            for event in board.get("events") or []:
+                event_id = str(event.get("id") or "")
+                if event_id:
+                    events_by_id[event_id] = event
+        except Exception as exc:
+            errors.append({"date": day, "error": str(exc)[:240]})
+    if errors and not events_by_id:
+        raise RuntimeError("All adjacent-day ESPN scoreboards failed: " + "; ".join(x["date"] + ": " + x["error"] for x in errors))
+    return list(events_by_id.values()), requested, errors
 
 def team_row(c):
     t = c.get("team") or {}
@@ -210,9 +231,7 @@ def live_total_projection(record, prediction):
 
 def main():
     now = datetime.now(timezone.utc)
-    day = now.strftime("%Y%m%d")
-    board = get(BASE + "/scoreboard", {"dates": day})
-    events = board.get("events") or []
+    events, scoreboard_dates, scoreboard_errors = fetch_scoreboard_window(now)
     observations = []
     try:
         predictions = json.loads(PREDICTIONS.read_text(encoding="utf-8"))
@@ -288,6 +307,8 @@ def main():
             hist["latest"] = hist["snapshots"][-1]
     payload = {"updated_at": now.isoformat(), "monitor": "NBA_IN_GAME_BEHAVIOR_V1",
                "cadence_target_minutes": 5, "source": "ESPN public scoreboard/summary",
+               "scoreboard_dates_checked": scoreboard_dates,
+               "scoreboard_errors": scoreboard_errors,
                "limitations": ["Only publicly exposed play-by-play and box-score fields are recorded.",
                                "No proprietary tracking, player-tracking coordinates, or inferred intent.",
                                "Missing provider fields are recorded as unavailable, never fabricated."],
@@ -309,6 +330,8 @@ def main():
     CURRENT_OUT.write_text(json.dumps({
         "updated_at": now.isoformat(),
         "source": "ESPN public scoreboard/summary",
+        "scoreboard_dates_checked": scoreboard_dates,
+        "scoreboard_errors": scoreboard_errors,
         "mode": "PAPER_RESEARCH_ONLY",
         "games": current_games,
     }, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
