@@ -104,6 +104,9 @@ def main():
     assert "data/unified_upcoming.json" not in autopilot_publish
     assert "data/selection_candidates.json" not in autopilot_publish
     assert "data/system_health.json" not in autopilot_publish
+    assert "cancel-in-progress: true" in autopilot, (
+        "A newer readiness-only heartbeat should supersede stale autopilot work instead of publishing behind it."
+    )
 
     collector_publish = collector.split("      - name: Publish collector artifacts", 1)[1]
     assert "git add " in collector_publish
