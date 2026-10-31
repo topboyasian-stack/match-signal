@@ -106,3 +106,46 @@ def virtual_live_health_summary(
         })
 
     return check, issues
+
+
+def nba_live_observation_health_summary(
+    payload: dict[str, Any] | None,
+    snapshot_age_hours: float,
+    max_age_hours: float = 0.25,
+) -> tuple[dict[str, Any], list[dict[str, str]]]:
+    """Track the NBA live-observation collector heartbeat independently of game count."""
+    data = payload if isinstance(payload, dict) else {}
+    try:
+        age = max(0.0, float(snapshot_age_hours))
+    except (TypeError, ValueError):
+        age = float("inf")
+    games = data.get("games") or {}
+    games_count = len(games) if isinstance(games, (dict, list)) else 0
+    snapshots_count = 0
+    values = games.values() if isinstance(games, dict) else games if isinstance(games, list) else []
+    for game in values:
+        if isinstance(game, dict):
+            snapshots = game.get("snapshots") or []
+            if isinstance(snapshots, list):
+                snapshots_count += len(snapshots)
+
+    check = {
+        "engine": "nba_live_observation_recorder",
+        "status": "PASS" if age <= max_age_hours else "STALE",
+        "age_hours": round(age, 2) if age != float("inf") else None,
+        "threshold_hours": max_age_hours,
+        "heartbeat_source": "nba_live_observations.json",
+        "games_tracked": games_count,
+        "snapshots_recorded": snapshots_count,
+    }
+    issues: list[dict[str, str]] = []
+    if check["status"] == "STALE":
+        issues.append({
+            "code": "NBA_LIVE_OBSERVATION_STALE",
+            "severity": "warning",
+            "detail": (
+                f"nba_live_observations.json age {age:.2f}h exceeds {max_age_hours:.2f}h; "
+                "the in-game observation recorder has not published a recent heartbeat"
+            ),
+        })
+    return check, issues

@@ -17,6 +17,8 @@ on:
       - "Match Signal Unified Upcoming Board"
       - "Deploy Match Signal to Cloudflare Pages"
       - "Match Signal Odds Ticket Tracker"
+      - "Match Signal Odds Builder"
+      - "Match Signal NBA In-Game Behavior Recorder"
       - "Match Signal Virtual Lab Live Sync"
       - "Isolated eFootball Winner and BTTS Market Research"
     types: [completed]
@@ -33,7 +35,7 @@ concurrency:
 jobs:
   watchdog:
     # Use successful Odds Ticket Tracker completions as an event-driven heartbeat when GitHub cron delivery stalls.
-    if: ${{ github.event_name != 'workflow_run' || (github.event.workflow_run.name == 'Match Signal Unified Upcoming Board' && github.event.workflow_run.conclusion != 'success') || github.event.workflow_run.name == 'Deploy Match Signal to Cloudflare Pages' || (github.event.workflow_run.name == 'Match Signal Odds Ticket Tracker' && github.event.workflow_run.conclusion == 'success') || (github.event.workflow_run.name == 'Match Signal Virtual Lab Live Sync' && github.event.workflow_run.conclusion == 'success') || (github.event.workflow_run.name == 'Isolated eFootball Winner and BTTS Market Research' && github.event.workflow_run.conclusion == 'success') }}
+    if: ${{ github.event_name != 'workflow_run' || (github.event.workflow_run.name == 'Match Signal Unified Upcoming Board' && github.event.workflow_run.conclusion != 'success') || github.event.workflow_run.name == 'Deploy Match Signal to Cloudflare Pages' || (github.event.workflow_run.name == 'Match Signal Odds Ticket Tracker' && github.event.workflow_run.conclusion == 'success') || (github.event.workflow_run.name == 'Match Signal Odds Builder' && github.event.workflow_run.conclusion == 'success') || (github.event.workflow_run.name == 'Match Signal NBA In-Game Behavior Recorder' && github.event.workflow_run.conclusion == 'success') || (github.event.workflow_run.name == 'Match Signal Virtual Lab Live Sync' && github.event.workflow_run.conclusion == 'success') || (github.event.workflow_run.name == 'Isolated eFootball Winner and BTTS Market Research' && github.event.workflow_run.conclusion == 'success') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -84,6 +86,7 @@ jobs:
 
           now = datetime.now(timezone.utc)
           virtual = load('data/virtual_lab_live.json')
+          nba_live = load('data/nba_live_observations.json')
           virtual_status = load('data/virtual_lab_status.json')
           pipeline = load('data/pipeline_status.json')
           odds = load('data/odds_builder.json')
@@ -110,6 +113,12 @@ jobs:
           odds_age_minutes = round(odds_age * 60, 1)
           expansion_age = age_hours(expansion.get('updated_at'))
           virtual_age = age_hours(virtual.get('updated_at'))
+          nba_live_age = age_hours(nba_live.get('updated_at'))
+          VIRTUAL_LIVE_MAX_AGE_MINUTES = 30
+          NBA_LIVE_MAX_AGE_MINUTES = 15
+          LIVE_FEED_DISPATCH_COOLDOWN_MINUTES = 10
+          virtual_live_age_minutes = round(virtual_age * 60, 1)
+          nba_live_age_minutes = round(nba_live_age * 60, 1)
           virtual_status_age = age_hours(virtual_status.get('updated_at'))
           darts_age = age_hours(darts.get('updated_at'))
           table_tennis_age = age_hours(table_tennis.get('updated_at'))
@@ -146,6 +155,17 @@ jobs:
                   print(f'WARN unable to inspect {workflow}: {error}')
                   return False
               return any(r.get('status') in {'queued', 'in_progress', 'waiting', 'pending'} for r in runs)
+
+          def last_dispatch_age(workflow, limit=30):
+              runs, error = recent_runs(workflow, limit)
+              if runs is None:
+                  return None, error
+              ages = [
+                  minutes_since(r.get('createdAt'))
+                  for r in runs
+                  if r.get('event') == 'workflow_dispatch' and minutes_since(r.get('createdAt')) is not None
+              ]
+              return (min(ages) if ages else None), None
 
           # Independent eFootball winner/GG-NG archive freshness is monitored separately
           # from the live desk. A stale shadow archive should trigger research recovery,
@@ -313,6 +333,90 @@ jobs:
                   detail = ('Scheduled monitor run is '+monitor_schedule_status+'; dispatching a fallback despite recent deployment checks.' if monitor_schedule_fallback_needed else 'No Qualified Best browser check in the last 15 minutes; fallback monitor dispatched.') + active_note
                   r = subprocess.run(['gh', 'workflow', 'run', 'qualified-best-health-watch-v2.yml', '--ref', 'main'], text=True, capture_output=True)
                   actions.append({'workflow':'qualified-best-health-watch-v2.yml','action':'monitor_failsafe_dispatch','status':'requested' if r.returncode == 0 else 'failed','detail':(r.stderr.strip() if r.returncode else detail)})
+          # Recover source collectors when GitHub scheduled events are missed.
+          # Dispatch cooldowns prevent a stale upstream outage from creating a run loop.
+          virtual_sync_dispatch_age, virtual_sync_history_error = last_dispatch_age(
+              'virtual-lab-live-sync-heartbeat.yml', 30
+          )
+          if virtual_live_age_minutes > VIRTUAL_LIVE_MAX_AGE_MINUTES:
+              if virtual_sync_history_error:
+                  actions.append({
+                      'workflow':'virtual-lab-live-sync-heartbeat.yml',
+                      'action':'inspect_live_sync_freshness',
+                      'status':'failed',
+                      'detail':virtual_sync_history_error
+                  })
+              elif active('virtual-lab-live-sync-heartbeat.yml'):
+                  actions.append({
+                      'workflow':'virtual-lab-live-sync-heartbeat.yml',
+                      'action':'virtual_live_failsafe_dispatch',
+                      'status':'suppressed_active_run',
+                      'detail':'Virtual Lab source snapshot is stale, but its live-sync workflow is already queued or active.'
+                  })
+              elif virtual_sync_dispatch_age is not None and virtual_sync_dispatch_age < LIVE_FEED_DISPATCH_COOLDOWN_MINUTES:
+                  actions.append({
+                      'workflow':'virtual-lab-live-sync-heartbeat.yml',
+                      'action':'virtual_live_failsafe_dispatch',
+                      'status':'suppressed_cooldown',
+                      'detail':'Virtual Lab live-sync fallback was dispatched '+str(virtual_sync_dispatch_age)+' minute(s) ago.'
+                  })
+              else:
+                  result = subprocess.run(
+                      ['gh', 'workflow', 'run', 'virtual-lab-live-sync-heartbeat.yml', '--ref', 'main'],
+                      text=True, capture_output=True
+                  )
+                  actions.append({
+                      'workflow':'virtual-lab-live-sync-heartbeat.yml',
+                      'action':'virtual_live_failsafe_dispatch',
+                      'status':'requested' if result.returncode == 0 else 'failed',
+                      'detail':result.stderr.strip() if result.returncode else (
+                          'Dispatched because virtual_lab_live.json age '
+                          +str(virtual_live_age_minutes)+' minutes exceeds '
+                          +str(VIRTUAL_LIVE_MAX_AGE_MINUTES)+' minutes.'
+                      )
+                  })
+
+          nba_live_dispatch_age, nba_live_history_error = last_dispatch_age(
+              'nba-live-observation.yml', 30
+          )
+          if nba_live_age_minutes > NBA_LIVE_MAX_AGE_MINUTES:
+              if nba_live_history_error:
+                  actions.append({
+                      'workflow':'nba-live-observation.yml',
+                      'action':'inspect_nba_live_recorder_freshness',
+                      'status':'failed',
+                      'detail':nba_live_history_error
+                  })
+              elif active('nba-live-observation.yml'):
+                  actions.append({
+                      'workflow':'nba-live-observation.yml',
+                      'action':'nba_live_recorder_failsafe_dispatch',
+                      'status':'suppressed_active_run',
+                      'detail':'NBA observation snapshot is stale, but the in-game recorder is already queued or active.'
+                  })
+              elif nba_live_dispatch_age is not None and nba_live_dispatch_age < LIVE_FEED_DISPATCH_COOLDOWN_MINUTES:
+                  actions.append({
+                      'workflow':'nba-live-observation.yml',
+                      'action':'nba_live_recorder_failsafe_dispatch',
+                      'status':'suppressed_cooldown',
+                      'detail':'NBA live-recorder fallback was dispatched '+str(nba_live_dispatch_age)+' minute(s) ago.'
+                  })
+              else:
+                  result = subprocess.run(
+                      ['gh', 'workflow', 'run', 'nba-live-observation.yml', '--ref', 'main'],
+                      text=True, capture_output=True
+                  )
+                  actions.append({
+                      'workflow':'nba-live-observation.yml',
+                      'action':'nba_live_recorder_failsafe_dispatch',
+                      'status':'requested' if result.returncode == 0 else 'failed',
+                      'detail':result.stderr.strip() if result.returncode else (
+                          'Dispatched because nba_live_observations.json age '
+                          +str(nba_live_age_minutes)+' minutes exceeds '
+                          +str(NBA_LIVE_MAX_AGE_MINUTES)+' minutes.'
+                      )
+                  })
+
           efootball_research_archive_stale = (
               efootball_market_archive_age_minutes is None
               or efootball_market_archive_age_minutes > EFOOTBALL_RESEARCH_MAX_AGE_MINUTES
@@ -436,6 +540,9 @@ jobs:
               'expansion_age_hours': round(expansion_age, 2),
               'virtual_lab_last_update': virtual.get('updated_at'),
               'virtual_lab_age_hours': round(virtual_age, 2),
+              'virtual_lab_live_sync_dispatch_age_minutes': virtual_sync_dispatch_age,
+              'nba_live_observation_age_minutes': nba_live_age_minutes,
+              'nba_live_observation_dispatch_age_minutes': nba_live_dispatch_age,
               'virtual_lab_status_age_hours': round(virtual_status_age, 2),
               'darts_age_hours': round(darts_age, 2),
               'table_tennis_age_hours': round(table_tennis_age, 2),
@@ -459,13 +566,16 @@ jobs:
               ),
               'virtual_lab_events': virtual.get('events_count', 0),
               'virtual_lab_products': virtual.get('product_counts', {}),
-              'thresholds': {'pipeline_hours': 4, 'odds_builder_minutes': ODDS_BUILDER_MAX_AGE_MINUTES, 'expansion_hours': 4, 'virtual_lab_hours': 1, 'virtual_lab_status_hours': 1, 'darts_hours': 2, 'table_tennis_hours': 2, 'unified_upcoming_hours': 0.2, 'qualified_best_monitor_minutes': 15, 'efootball_market_research_minutes': EFOOTBALL_RESEARCH_MAX_AGE_MINUTES, 'efootball_market_research_dispatch_cooldown_minutes': EFOOTBALL_RESEARCH_DISPATCH_COOLDOWN_MINUTES},
+              'thresholds': {'pipeline_hours': 4, 'odds_builder_minutes': ODDS_BUILDER_MAX_AGE_MINUTES, 'expansion_hours': 4, 'virtual_lab_hours': 1, 'virtual_lab_status_hours': 1, 'darts_hours': 2, 'table_tennis_hours': 2, 'unified_upcoming_hours': 0.2, 'qualified_best_monitor_minutes': 15, 'virtual_live_minutes': VIRTUAL_LIVE_MAX_AGE_MINUTES, 'nba_live_observation_minutes': NBA_LIVE_MAX_AGE_MINUTES, 'live_feed_dispatch_cooldown_minutes': LIVE_FEED_DISPATCH_COOLDOWN_MINUTES, 'efootball_market_research_minutes': EFOOTBALL_RESEARCH_MAX_AGE_MINUTES, 'efootball_market_research_dispatch_cooldown_minutes': EFOOTBALL_RESEARCH_DISPATCH_COOLDOWN_MINUTES},
               'actions': actions,
-              'policy': 'Watchdog self-heals stale engines, records Qualified Best scheduled/actual monitor age, dispatches a fallback when the scheduled monitor is missing/stale even if deployment checks are recent (10-minute cooldown), retries failed board/deploy runs once per 20-minute cooldown, and dispatches isolated eFootball winner/GG-NG research when its market archive or collector capture is over 30 minutes stale (15-minute cooldown). The eFootball research workflow is shadow-only and never gates Qualified Best or Odds Builder. Workflow_run checks do not rewrite feed data to avoid downstream loops. Health publication is retried across concurrent data writers.'
+              'policy': 'Watchdog self-heals stale engines, records Qualified Best scheduled/actual monitor age, dispatches a fallback when the scheduled monitor is missing/stale even if deployment checks are recent (10-minute cooldown), retries failed board/deploy runs once per 20-minute cooldown, and dispatches isolated eFootball winner/GG-NG research when its market archive or collector capture is over 30 minutes stale (15-minute cooldown). The eFootball research workflow is shadow-only and never gates Qualified Best or Odds Builder. Stale Virtual Lab live snapshots and NBA in-game observation heartbeats trigger bounded fallback dispatches. Successful NBA recorder and Odds Builder completions provide an event-driven watchdog heartbeat when cron delivery stalls. Workflow_run checks do not rewrite feed data to avoid downstream loops. Health publication is retried across concurrent data writers.'
           }
           Path('data/automation_health.json').write_text(json.dumps(health, indent=2) + '\n')
           print(json.dumps(health, indent=2))
           PY
+
+      - name: Recompute system health after live-feed freshness checks
+        run: python scripts/system_health_audit.py
 
       - name: Commit automation health record
         shell: bash
@@ -474,14 +584,16 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           cp data/automation_health.json /tmp/automation_health.json
+          cp data/system_health.json /tmp/system_health.json
           for attempt in 1 2 3 4 5; do
             git fetch origin main
             git reset --hard origin/main
             cp /tmp/automation_health.json data/automation_health.json
+            cp /tmp/system_health.json data/system_health.json
             if [ -f /tmp/virtual_lab_live_candidate.json ]; then
               cp /tmp/virtual_lab_live_candidate.json data/virtual_lab_live.json
             fi
-            git add data/automation_health.json data/virtual_lab_live.json
+            git add data/automation_health.json data/virtual_lab_live.json data/system_health.json
             if git diff --cached --quiet; then
               echo "No automation health change."
               exit 0

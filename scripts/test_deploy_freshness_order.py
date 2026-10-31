@@ -137,7 +137,11 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn("'unified_upcoming_hours': 0.2", WATCHDOG_WORKFLOW)
 
     def test_watchdog_has_event_driven_monitoring_and_bounded_failure_recovery(self):
-        self.assertIn('  workflow_run:\n    workflows:\n      - "Match Signal Unified Upcoming Board"\n      - "Deploy Match Signal to Cloudflare Pages"\n      - "Match Signal Odds Ticket Tracker"', WATCHDOG_WORKFLOW)
+        self.assertIn('"Match Signal Unified Upcoming Board"', WATCHDOG_WORKFLOW)
+        self.assertIn('"Deploy Match Signal to Cloudflare Pages"', WATCHDOG_WORKFLOW)
+        self.assertIn('"Match Signal Odds Ticket Tracker"', WATCHDOG_WORKFLOW)
+        self.assertIn('"Match Signal Odds Builder"', WATCHDOG_WORKFLOW)
+        self.assertIn('"Match Signal NBA In-Game Behavior Recorder"', WATCHDOG_WORKFLOW)
         self.assertIn("github.event.workflow_run.conclusion != 'success'", WATCHDOG_WORKFLOW, "successful board completions should be checked after deployment, not before it")
         self.assertIn("if: github.event_name != 'workflow_run'\n        run: python -m pip install --upgrade requests", WATCHDOG_WORKFLOW, "event-driven health checks must not reinstall the feed-sync dependency")
         self.assertIn("if: github.event_name != 'workflow_run'", WATCHDOG_WORKFLOW)
@@ -256,7 +260,6 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "scripts/sync_club_logos.py",
             "scripts/test_club_logo_registry.py",
             ".github/workflows/qualified-best-health-watch-v2.yml",
-            ".github/workflows/automation_watchdog.yml",
             ".github/workflows/efootball-market-research-schedule.yml",
             "scripts/test_automation_watchdog_research_recovery.py",
             "scripts/test_qualified_best_monitor.mjs",

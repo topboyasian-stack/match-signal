@@ -3,11 +3,29 @@ import textwrap
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
+import sys
+sys.path.insert(0, str(ROOT / "scripts"))
+from system_health_audit_lib import nba_live_observation_health_summary, virtual_live_health_summary
 WATCHDOG = (ROOT / ".github/workflows/automation_watchdog.yml").read_text(encoding="utf-8")
 RESEARCH = (ROOT / ".github/workflows/efootball-market-research-schedule.yml").read_text(encoding="utf-8")
+PAGES = (ROOT / ".github/workflows/cloudflare-pages.yml").read_text(encoding="utf-8")
 
 
 class EfootballResearchRecoveryTests(unittest.TestCase):
+    def test_virtual_live_source_cannot_be_marked_fresh_by_downstream_refresh(self):
+        check, issues = virtual_live_health_summary(
+            {"status": "LIVE", "events_count": 20}, 4.0
+        )
+        self.assertEqual(check["status"], "STALE")
+        self.assertEqual(issues[0]["code"], "VIRTUAL_LIVE_FEED_STALE")
+
+    def test_nba_observation_recorder_staleness_is_visible(self):
+        check, issues = nba_live_observation_health_summary(
+            {"games": {}}, 1.0
+        )
+        self.assertEqual(check["status"], "STALE")
+        self.assertEqual(issues[0]["code"], "NBA_LIVE_OBSERVATION_STALE")
+
     def test_schedules_are_registered_on_staggered_offset_cadences(self):
         self.assertIn("cron: '8,18,28,38,48,58 * * * *'", WATCHDOG)
         self.assertIn("cron: '5,15,25,35,45,55 * * * *'", (ROOT / ".github/workflows/qualified-best-health-watch-v2.yml").read_text(encoding="utf-8"))
@@ -35,6 +53,23 @@ class EfootballResearchRecoveryTests(unittest.TestCase):
         self.assertIn("if odds_age_minutes > ODDS_BUILDER_MAX_AGE_MINUTES and not active('odds_builder.yml'):", WATCHDOG)
         self.assertNotIn("if odds_age > 8 and not active('odds_builder.yml'):", WATCHDOG)
         self.assertIn("'odds_builder_age_minutes': odds_age_minutes", WATCHDOG)
+
+    def test_stale_virtual_and_nba_live_sources_have_bounded_recovery(self):
+        self.assertIn('"Match Signal Odds Builder"', WATCHDOG)
+        self.assertIn('"Match Signal NBA In-Game Behavior Recorder"', WATCHDOG)
+        self.assertIn("VIRTUAL_LIVE_MAX_AGE_MINUTES = 30", WATCHDOG)
+        self.assertIn("NBA_LIVE_MAX_AGE_MINUTES = 15", WATCHDOG)
+        self.assertIn("LIVE_FEED_DISPATCH_COOLDOWN_MINUTES = 10", WATCHDOG)
+        self.assertIn("virtual-lab-live-sync-heartbeat.yml", WATCHDOG)
+        self.assertIn("nba-live-observation.yml", WATCHDOG)
+        self.assertIn("python scripts/system_health_audit.py", WATCHDOG)
+
+    def test_automation_watchdog_changes_do_not_trigger_a_static_pages_deploy(self):
+        self.assertNotIn(
+            "      - '.github/workflows/automation_watchdog.yml'",
+            PAGES,
+            "watchdog-only changes must not consume a Cloudflare Pages production deployment",
+        )
 
     def test_watchdog_contract_is_run_by_research_pr_validation(self):
         self.assertIn("scripts/test_automation_watchdog_research_recovery.py", RESEARCH)
