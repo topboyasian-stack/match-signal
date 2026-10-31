@@ -417,18 +417,32 @@ def append_nba_totals_publication_snapshots(predictions, path=None, published_at
             existing = []
     except (OSError, json.JSONDecodeError):
         existing = []
-    known = {str(row.get("event_id")) for row in existing if isinstance(row, dict) and row.get("event_id")}
+    # A new model version must start its own immutable cohort for the same
+    # future fixture. Deduplicate only within (event_id, model_version).
+    def cohort_key(row):
+        return (
+            str(row.get("event_id") or ""),
+            str(row.get("totals_model_version") or "legacy"),
+        )
+    known = {cohort_key(row) for row in existing if isinstance(row, dict) and row.get("event_id")}
     added = 0
     for prediction in predictions:
         event_id = str(prediction.get("event_id") or "")
-        if not event_id or event_id in known:
+        if not event_id:
+            continue
+        key = cohort_key(prediction)
+        if key in known:
             continue
         snapshot = nba_total_publication_snapshot(prediction, published_at)
         if snapshot:
             existing.append(snapshot)
-            known.add(event_id)
+            known.add(key)
             added += 1
-    existing.sort(key=lambda row: (str(row.get("published_at") or ""), str(row.get("event_id") or "")))
+    existing.sort(key=lambda row: (
+        str(row.get("published_at") or ""),
+        str(row.get("event_id") or ""),
+        str(row.get("totals_model_version") or "legacy"),
+    ))
     path.write_text(json.dumps(existing, indent=2, ensure_ascii=False) + chr(10), encoding="utf-8")
     return {"added": added, "total": len(existing)}
 
