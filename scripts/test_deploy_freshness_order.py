@@ -320,7 +320,6 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "league.html",
             "functions/**",
             "data/predictions.json",
-            "data/odds_ticket_tracker.json",
             "data/darts_*.json",
             "data/table_tennis_*.json",
             "data/pdl_predictions.json",
@@ -331,6 +330,8 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         }
         missing = sorted(required_inputs - board_paths)
         self.assertEqual(missing, [], f"Deployable inputs bypass the Unified board workflow: {missing}")
+        self.assertNotIn("data/odds_ticket_tracker.json", board_paths,
+                         "Tracker output is downstream and must not retrigger Upcoming.")
 
         # The live snapshot is an output of Virtual Lab Live Sync. The board
         # consumes that workflow's successful completion, so a second push-path
