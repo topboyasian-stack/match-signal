@@ -462,7 +462,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn("'booking_api_status':'VERIFIED' if booking_verified else booking_status", PAGES_WORKFLOW)
 
     def test_publishing_refresh_is_not_cancelled_or_dispatched_twice(self):
-        self.assertIn("  cancel-in-progress: false", BOARD_WORKFLOW)
+        self.assertIn("cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' || inputs.promotion_child != true }}", BOARD_WORKFLOW)
         self.assertNotIn("gh workflow run cloudflare-pages.yml", BOARD_WORKFLOW)
         self.assertIn(
             "the refreshed Builder will hand off to the ordered production-promotion workflow.",
