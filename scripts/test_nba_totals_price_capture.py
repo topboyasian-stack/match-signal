@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 from expansion_pipeline import NBA_TOTALS_MODEL_VERSION
-from capture_nba_totals_prices import attach_fresh_quote, capture, capture_timestamp, diagnose_fixture_quote, sportybet_basketball_feed_paged
+from capture_nba_totals_prices import attach_fresh_quote, capture, capture_timestamp, diagnose_fixture_quote, nearby_feed_events, sportybet_basketball_feed_paged
 
 
 def make_prediction(now, **overrides):
@@ -194,6 +194,11 @@ class PriceCaptureTests(unittest.TestCase):
             }],
         }]
         self.assertEqual(diagnose_fixture_quote(fixture, valid, self.now), "MATCHED")
+        nearby = nearby_feed_events(fixture, valid)
+        self.assertEqual(len(nearby), 1)
+        self.assertEqual(nearby[0]["home"], "Boston Celtics")
+        self.assertTrue(nearby[0]["market_225_present"])
+        self.assertLessEqual(nearby[0]["minutes_from_fixture"], 180)
 
     def test_capture_time_is_taken_after_feed_response_not_before(self):
         before_response = self.now
