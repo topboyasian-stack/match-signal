@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """Capture timestamped, research-only NBA in-game team/player behavior snapshots."""
-import json, math, os, re
+import gzip, json, math, os, re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 import requests
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "data" / "nba_live_observations.json"
+OUT = ROOT / "data" / "nba_live_observations.json.gz"
+LEGACY_OUT = ROOT / "data" / "nba_live_observations.json"
 CURRENT_OUT = ROOT / "data" / "nba_live_current.json"
 PREDICTIONS = ROOT / "data" / "nba_predictions.json"
 BASE = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba"
@@ -18,6 +19,42 @@ def get(url, params=None):
     r = S.get(url, params=params, timeout=20)
     r.raise_for_status()
     return r.json()
+
+
+def load_observation_history(archive_path=OUT, legacy_path=LEGACY_OUT):
+    """Load the compressed 30-day archive, migrating transparently from legacy JSON."""
+    if archive_path.exists():
+        try:
+            with gzip.open(archive_path, "rt", encoding="utf-8") as source:
+                payload = json.load(source)
+            return payload if isinstance(payload, dict) else {}
+        except (OSError, EOFError, json.JSONDecodeError):
+            # A corrupt/newly truncated compressed archive is not silently treated
+            # as valid history; try the legacy copy only when it still exists.
+            pass
+    if legacy_path.exists():
+        try:
+            payload = json.loads(legacy_path.read_text(encoding="utf-8"))
+            return payload if isinstance(payload, dict) else {}
+        except (OSError, json.JSONDecodeError):
+            pass
+    return {}
+
+
+def write_observation_history(payload, archive_path=OUT, legacy_path=LEGACY_OUT):
+    """Atomically save compressed history and remove the legacy public-sized JSON."""
+    archive_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path = archive_path.with_name(archive_path.name + ".tmp")
+    try:
+        with gzip.open(temporary_path, "wt", encoding="utf-8", compresslevel=6) as target:
+            json.dump(payload, target, indent=2, ensure_ascii=False)
+            target.write("\n")
+        temporary_path.replace(archive_path)
+    finally:
+        if temporary_path.exists():
+            temporary_path.unlink()
+    if legacy_path.exists() and legacy_path != archive_path:
+        legacy_path.unlink()
 
 
 def fetch_scoreboard_window(now):
@@ -290,11 +327,7 @@ def main():
             record["live_total_projection"] = live_total_projection(record, pregame)
         observations.append(record)
 
-    try:
-        old = json.loads(OUT.read_text(encoding="utf-8"))
-        if not isinstance(old, dict): old = {}
-    except Exception:
-        old = {}
+    old = load_observation_history()
     games = old.get("games") if isinstance(old.get("games"), dict) else {}
     for rec in observations:
         hist = games.setdefault(rec["event_id"], {"event_id": rec["event_id"], "scheduled_at": rec.get("scheduled_at"), "snapshots": []})
@@ -320,8 +353,7 @@ def main():
                                "No proprietary tracking, player-tracking coordinates, or inferred intent.",
                                "Missing provider fields are recorded as unavailable, never fabricated."],
                "games": games}
-    OUT.parent.mkdir(exist_ok=True)
-    OUT.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    write_observation_history(payload)
     # Publish a small latest-only artifact for the live desk. The 30-day audit
     # history remains separate and is never downloaded by the browser.
     current_games = {}
