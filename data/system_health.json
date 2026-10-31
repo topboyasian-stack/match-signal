@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-31T11:48:56.607745+00:00",
+  "generated_at": "2026-10-31T11:49:24.659074+00:00",
   "status": "DEGRADED",
   "critical_issues": 0,
   "warning_issues": 1,
@@ -8,7 +8,7 @@
     {
       "engine": "core_prediction_pipeline",
       "status": "PASS",
-      "age_hours": 0.72,
+      "age_hours": 0.73,
       "threshold_hours": 4
     },
     {
@@ -20,13 +20,13 @@
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 0.5,
+      "age_hours": 0.51,
       "threshold_hours": 4
     },
     {
       "engine": "unified_upcoming",
       "status": "PASS",
-      "age_hours": 0.09,
+      "age_hours": 0.1,
       "threshold_hours": 2
     },
     {
@@ -43,20 +43,20 @@
     },
     {
       "engine": "virtual_live_feed",
-      "status": "PASS",
-      "age_hours": 0.01,
+      "status": "STALE",
+      "age_hours": 0.6,
       "threshold_hours": 0.5,
       "heartbeat_source": "virtual_lab_live.json",
-      "events_count": 664
+      "events_count": 682
     },
     {
       "engine": "nba_live_observation_recorder",
-      "status": "STALE",
-      "age_hours": 0.48,
+      "status": "PASS",
+      "age_hours": 0.01,
       "threshold_hours": 0.25,
       "heartbeat_source": "nba_live_observations.json",
       "games_tracked": 18,
-      "snapshots_recorded": 58
+      "snapshots_recorded": 68
     },
     {
       "engine": "engine_lifecycle",
@@ -95,9 +95,9 @@
   ],
   "issues": [
     {
-      "code": "NBA_LIVE_OBSERVATION_STALE",
+      "code": "VIRTUAL_LIVE_FEED_STALE",
       "severity": "warning",
-      "detail": "nba_live_observations.json age 0.48h exceeds 0.25h; the in-game observation recorder has not published a recent heartbeat"
+      "detail": "virtual_lab_live.json age 0.60h exceeds 0.50h; a downstream Unified Upcoming refresh cannot substitute for a fresh source snapshot"
     },
     {
       "code": "PDL_EXPERIMENTAL_FEED_STALE",
