@@ -2,7 +2,7 @@
 """Unit tests for exposing stale PDL source status without publishing stale picks."""
 import unittest
 
-from system_health_audit_lib import pdl_health_summary
+from system_health_audit_lib import pdl_health_summary, virtual_live_health_summary
 
 
 class PDLHealthSummaryTests(unittest.TestCase):
@@ -49,6 +49,33 @@ class PDLHealthSummaryTests(unittest.TestCase):
         self.assertEqual(lane["status"], "UNKNOWN")
         self.assertEqual(issues[0]["code"], "PDL_EXPERIMENTAL_FEED_STATUS_UNKNOWN")
         self.assertEqual(issues[0]["severity"], "warning")
+
+
+class VirtualLiveHealthSummaryTests(unittest.TestCase):
+    def test_fresh_nonempty_live_snapshot_passes(self):
+        check, issues = virtual_live_health_summary(
+            {"status": "LIVE", "events_count": 12}, 0.2
+        )
+        self.assertEqual(check["status"], "PASS")
+        self.assertEqual(check["heartbeat_source"], "virtual_lab_live.json")
+        self.assertEqual(issues, [])
+
+    def test_stale_snapshot_is_degraded_even_if_a_downstream_board_refreshed(self):
+        check, issues = virtual_live_health_summary(
+            {"status": "LIVE", "events_count": 12}, 3.82
+        )
+        self.assertEqual(check["status"], "STALE")
+        self.assertEqual(issues[0]["code"], "VIRTUAL_LIVE_FEED_STALE")
+        self.assertEqual(issues[0]["severity"], "warning")
+        self.assertIn("cannot substitute", issues[0]["detail"])
+
+    def test_empty_or_invalid_live_snapshot_is_critical(self):
+        check, issues = virtual_live_health_summary(
+            {"status": "UPSTREAM_EMPTY", "events_count": 0}, 0.1
+        )
+        self.assertEqual(check["status"], "FAIL")
+        self.assertEqual(issues[0]["code"], "VIRTUAL_LIVE_FEED_INVALID")
+        self.assertEqual(issues[0]["severity"], "critical")
 
 
 if __name__ == "__main__":
