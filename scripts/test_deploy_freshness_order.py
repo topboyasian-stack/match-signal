@@ -259,10 +259,6 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "data/licenses/**",
             "scripts/sync_club_logos.py",
             "scripts/test_club_logo_registry.py",
-            ".github/workflows/qualified-best-health-watch-v2.yml",
-            ".github/workflows/efootball-market-research-schedule.yml",
-            "scripts/test_automation_watchdog_research_recovery.py",
-            "scripts/test_qualified_best_monitor.mjs",
         }
         self.assertEqual(direct_paths, expected_direct_paths)
         builder_owned_paths = {
