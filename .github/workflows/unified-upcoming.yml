@@ -138,7 +138,7 @@ jobs:
   unified:
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 35
     steps:
       - name: Checkout latest main
         uses: actions/checkout@v4
@@ -221,7 +221,7 @@ jobs:
           )"
           export GIT_TERMINAL_PROMPT=0
           for attempt in 1 2 3 4 5 6; do
-            if timeout 45s git push origin main; then
+            if timeout 120s git push origin main; then
               echo "Unified board published; the refreshed Builder will hand off to the ordered production-promotion workflow."
               exit 0
             fi
