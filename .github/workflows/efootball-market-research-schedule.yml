@@ -34,8 +34,8 @@ on:
       - 'data/virtual_lab_model_eval.json'
       - 'scripts/virtual_lab_sync.py'
       - 'functions/api/sportybet-virtual.js'
-      - '.github/workflows/automation_watchdog.yml'
-      - 'scripts/test_automation_watchdog_research_recovery.py'
+      # Watchdog changes are validated on PRs and collector completion; don't
+      # start a full market-research publish for an unrelated watchdog edit.
       - '.github/workflows/efootball-market-research-schedule.yml'
 
 permissions:
