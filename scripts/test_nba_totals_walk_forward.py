@@ -33,6 +33,8 @@ def test_market_evidence_rejects_unverified_and_old_model_records():
         "settled": True, "publication_snapshot_verified": True, "roi_eligible": True,
         "quote_fresh_at_publication": True, "price_pair_valid": True, "price_source_verified": True,
         "market_id": "225", "market_source": "SportyBet Nigeria",
+        "sportybet_event_id": "sr:match:test-001",
+        "quote_capture_basis": "SportyBet API response observed_at",
         "settlement_source": "ESPN official scoreboard event ID",
         "published_at": published.isoformat(), "start_time": "2026-01-01T11:00:00+00:00",
         "quote_timestamp": "2026-01-01T09:55:00+00:00", "line": 200.5,
@@ -41,7 +43,8 @@ def test_market_evidence_rejects_unverified_and_old_model_records():
     }
     invalid = dict(good, publication_snapshot_verified=False)
     old_model = dict(good, totals_model_version="old-model")
-    assert verified_market_records([good, invalid, old_model]) == [good]
+    untraceable = dict(good, sportybet_event_id=None)
+    assert verified_market_records([good, invalid, old_model, untraceable]) == [good]
     metrics = market_metrics([good, dict(good, event_id="g2", pick="under")])
     assert metrics["by_pick"]["over"]["n"] == 1
     assert metrics["by_pick"]["over"]["accuracy"] == 1.0
