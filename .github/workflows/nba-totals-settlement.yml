@@ -1,7 +1,8 @@
 name: NBA totals settlement ledger
 on:
   schedule:
-    - cron: '*/15 * * * *'
+    # Offset and re-arm the settlement heartbeat after several missed refresh cycles.
+    - cron: '1,16,31,46 * * * *'
   workflow_dispatch:
   push:
     branches: [main]
@@ -31,11 +32,59 @@ jobs:
         run: python scripts/test_settle_nba_totals.py
       - name: Reconcile official final scores
         run: python scripts/settle_nba_totals.py
-      - name: Persist ledger
+      - name: Persist ledger with bounded concurrent-main retries
+        shell: bash
         run: |
+          set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add data/nba_totals_ledger.json
-          if git diff --cached --quiet; then exit 0; fi
-          git commit -m 'Record verified NBA totals settlements'
-          git push origin HEAD:main
+          candidate='/tmp/nba_totals_ledger_candidate.json'
+          cp data/nba_totals_ledger.json "$candidate"
+
+          # Main receives frequent board and Builder commits. Rebuild only this
+          # ledger commit on the newest main, never force-push and never overwrite
+          # a newer ledger publication from another run.
+          for attempt in 1 2 3 4 5; do
+            echo "Publishing NBA totals ledger (attempt ${attempt}/5)."
+            git fetch origin main
+            git reset --hard origin/main
+            if python - <<'PY'
+          import json
+          from datetime import datetime
+          from pathlib import Path
+          candidate=json.loads(Path('/tmp/nba_totals_ledger_candidate.json').read_text())
+          path=Path('data/nba_totals_ledger.json')
+          remote=json.loads(path.read_text()) if path.exists() else {}
+          def parsed(value):
+              try: return datetime.fromisoformat(str(value).replace('Z','+00:00'))
+              except Exception: return None
+          cand=parsed(candidate.get('updated_at'))
+          live=parsed(remote.get('updated_at'))
+          if cand and live and live >= cand:
+              print('A newer/equal ledger is already published; preserving it.')
+              raise SystemExit(10)
+          PY
+            then
+              :
+            else
+              rc=$?
+              if [ "$rc" -eq 10 ]; then exit 0; fi
+              exit "$rc"
+            fi
+
+            cp "$candidate" data/nba_totals_ledger.json
+            git add data/nba_totals_ledger.json
+            if git diff --cached --quiet; then
+              echo "No NBA totals ledger changes to publish."
+              exit 0
+            fi
+            git commit -m 'Record verified NBA totals settlements'
+            if git push origin HEAD:main; then
+              echo "NBA totals ledger publication succeeded."
+              exit 0
+            fi
+            echo "Concurrent main update detected; retrying on the latest main."
+            sleep $((attempt * 2))
+          done
+          echo "NBA totals ledger could not publish after five retries." >&2
+          exit 1
