@@ -39,6 +39,8 @@ def main():
     watchdog = (WORKFLOWS / "automation_watchdog.yml").read_text(encoding="utf-8")
     tracker = (WORKFLOWS / "odds-ticket-tracker.yml").read_text(encoding="utf-8")
     collector = (WORKFLOWS / "virtual-lab-collector.yml").read_text(encoding="utf-8")
+    live_sync = (WORKFLOWS / "virtual-lab-live-sync-heartbeat.yml").read_text(encoding="utf-8")
+    autopilot = (WORKFLOWS / "autopilot-refresh.yml").read_text(encoding="utf-8")
     core_pipeline = (WORKFLOWS / "tennis_pipeline.yml").read_text(encoding="utf-8")
     health_audit = (ROOT / "scripts" / "system_health_audit.py").read_text(encoding="utf-8")
 
@@ -46,6 +48,7 @@ def main():
     board_paths = push_paths("unified-upcoming.yml")
     tracker_paths = push_paths("odds-ticket-tracker.yml")
     collector_paths = push_paths("virtual-lab-collector.yml")
+    autopilot_paths = push_paths("autopilot-refresh.yml")
 
     # These are generated outputs, not Builder inputs. Keep the expensive Builder
     # on its 15-minute schedule and use the post-publication stale-artifact helper
@@ -88,6 +91,26 @@ def main():
     assert "data/virtual_lab_participants/efootball_confirmed_watch.json" in collector_paths, (
         "The explicit manual watch input must still be able to trigger the collector."
     )
+
+    # Unified Upcoming is the single owner of the canonical all-sports board,
+    # eFootball candidate pool and shared system-health artifact. Autopilot and
+    # live/settlement collectors must not publish the same files concurrently.
+    assert "scripts/unified_upcoming.py" not in autopilot_paths
+    assert "scripts/selection_candidate_collector.py" not in autopilot_paths
+    assert "python scripts/unified_upcoming.py" not in autopilot
+    assert "python scripts/selection_candidate_collector.py" not in autopilot
+    autopilot_publish = autopilot.split("      - name: Publish football readiness and autopilot status", 1)[1]
+    autopilot_publish = autopilot_publish.split("      - name:", 1)[0]
+    assert "data/unified_upcoming.json" not in autopilot_publish
+    assert "data/selection_candidates.json" not in autopilot_publish
+    assert "data/system_health.json" not in autopilot_publish
+
+    collector_publish = collector.split("      - name: Publish collector artifacts", 1)[1]
+    assert "git add " in collector_publish
+    assert "data/system_health.json" not in collector_publish
+
+    live_sync_publish = live_sync.split("      - name: Publish live snapshot without overwriting newer data", 1)[1]
+    assert "git add data/virtual_lab_live.json data/system_health.json" not in live_sync_publish
     assert "python scripts/virtual_lab_model_eval.py" not in board, (
         "Avoid recomputing the expensive chronological evaluation on every five-minute board refresh."
     )

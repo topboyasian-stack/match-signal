@@ -66,8 +66,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           cp data/virtual_lab_live.json /tmp/virtual_lab_live_candidate.json
-          cp data/system_health.json /tmp/system_health_candidate.json
-          git add data/virtual_lab_live.json data/system_health.json
+          git add data/virtual_lab_live.json
           if git diff --cached --quiet; then
             echo "No snapshot change."
             exit 0
@@ -81,7 +80,6 @@ jobs:
             echo "Concurrent main update detected; comparing snapshot timestamps (attempt ${attempt})."
             git fetch origin main
             git reset --hard origin/main
-            cp /tmp/system_health_candidate.json data/system_health.json
             python - <<'PY'
           import json
           from datetime import datetime, timezone

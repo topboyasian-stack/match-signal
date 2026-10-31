@@ -18,8 +18,6 @@ on:
     paths:
       - 'scripts/autopilot_guard.py'
       - 'scripts/football_forward_readiness.py'
-      - 'scripts/unified_upcoming.py'
-      - 'scripts/selection_candidate_collector.py'
       - 'scripts/system_health_audit.py'
       - 'live.html'
       - '.github/workflows/autopilot-refresh.yml'
@@ -60,7 +58,7 @@ jobs:
           git reset --hard origin/main
 
       - name: Compile derived/health modules
-        run: python -m py_compile scripts/autopilot_guard.py scripts/football_forward_readiness.py scripts/unified_upcoming.py scripts/selection_candidate_collector.py scripts/system_health_audit.py scripts/independent_football_model.py scripts/football_model_council.py
+        run: python -m py_compile scripts/autopilot_guard.py scripts/football_forward_readiness.py scripts/system_health_audit.py scripts/independent_football_model.py scripts/football_model_council.py
 
       - name: Build walk-forward Football model council when history exists
         shell: bash
@@ -74,33 +72,27 @@ jobs:
       - name: Build football forward-planning readiness
         run: python scripts/football_forward_readiness.py
 
-      - name: Build unified all-sports upcoming/prediction board
-        run: python scripts/unified_upcoming.py
-
-      - name: Collect model-first selection candidates
-        run: python scripts/selection_candidate_collector.py
-
       - name: Run whole-system health audit
         run: python scripts/system_health_audit.py
 
       - name: Run autonomous freshness and source coverage guard
         run: python scripts/autopilot_guard.py
 
-      - name: Publish derived readiness, unified board and health
+      - name: Publish football readiness and autopilot status
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/autopilot_status.json data/football_team_history.json data/football_model_council.json data/football_forward_readiness.json data/unified_upcoming.json data/prediction_desk_health.json data/selection_candidates.json data/selection_candidate_status.json data/system_health.json
+          git add data/autopilot_status.json data/football_model_council.json data/football_forward_readiness.json
           if git diff --cached --quiet; then
-            echo "Autopilot derived layer already current."
+            echo "Autopilot-owned readiness artifacts already current."
             exit 0
           fi
           git commit -m "🤖 Refresh derived readiness and health layer"
           for attempt in 1 2 3; do
             if git push origin main; then
-              echo "Derived layer publication succeeded."
+              echo "Football readiness publication succeeded."
               exit 0
             fi
             git fetch origin main
@@ -109,13 +101,11 @@ jobs:
               python scripts/football_model_council.py
             fi
             python scripts/football_forward_readiness.py
-            python scripts/unified_upcoming.py
-            python scripts/selection_candidate_collector.py
             python scripts/system_health_audit.py
             python scripts/autopilot_guard.py
             git add data/autopilot_status.json data/football_team_history.json data/football_model_council.json data/football_forward_readiness.json data/unified_upcoming.json data/prediction_desk_health.json data/selection_candidates.json data/selection_candidate_status.json data/system_health.json
             if git diff --cached --quiet; then
-              echo "Latest main already contains the derived layer."
+              echo "Latest main already contains the current football readiness artifacts."
               exit 0
             fi
             git commit -m "🤖 Refresh derived readiness and health layer"
