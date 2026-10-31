@@ -136,7 +136,9 @@ def main():
     assert "python scripts/virtual_lab_model_eval.py" in collector
     assert "data/virtual_lab_model_eval.json" in collector
     assert "promotion_child:" in board
-    assert "cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' || inputs.promotion_child != true }}" in board
+    assert "cancel-in-progress: false" in board_concurrency, (
+        "Ordinary scheduled refreshes must finish; promotion-child is isolated by its own concurrency group."
+    )
     assert "SKIP_PROMOTION: ${{ github.event_name == 'workflow_dispatch' && inputs.promotion_child == true }}" in board
 
     # Verify that removing the output-to-consumer feedback does not stop updates.
