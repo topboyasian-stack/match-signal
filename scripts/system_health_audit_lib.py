@@ -57,3 +57,52 @@ def pdl_health_summary(payload: dict[str, Any] | None, published_rows: int) -> t
             "detail": f"PDL feed status is {state}; source freshness has not been confirmed.",
         })
     return lane, issues
+
+
+
+def virtual_live_health_summary(
+    payload: dict[str, Any] | None,
+    snapshot_age_hours: float,
+    max_age_hours: float = 0.5,
+) -> tuple[dict[str, Any], list[dict[str, str]]]:
+    """Judge the actual live-feed snapshot, never a downstream board heartbeat."""
+    data = payload if isinstance(payload, dict) else {}
+    state = str(data.get("status") or "UNKNOWN").strip().upper()
+    try:
+        events = max(0, int(data.get("events_count") or 0))
+    except (TypeError, ValueError):
+        events = 0
+    try:
+        age = max(0.0, float(snapshot_age_hours))
+    except (TypeError, ValueError):
+        age = float("inf")
+
+    check = {
+        "engine": "virtual_live_feed",
+        "status": "PASS",
+        "age_hours": round(age, 2) if age != float("inf") else None,
+        "threshold_hours": max_age_hours,
+        "heartbeat_source": "virtual_lab_live.json",
+        "events_count": events,
+    }
+    issues: list[dict[str, str]] = []
+
+    if state != "LIVE" or events <= 0:
+        check["status"] = "FAIL"
+        issues.append({
+            "code": "VIRTUAL_LIVE_FEED_INVALID",
+            "severity": "critical",
+            "detail": f"live virtual status={state!r}, events={events}; a non-empty LIVE snapshot is required",
+        })
+    elif age > max_age_hours:
+        check["status"] = "STALE"
+        issues.append({
+            "code": "VIRTUAL_LIVE_FEED_STALE",
+            "severity": "warning",
+            "detail": (
+                f"virtual_lab_live.json age {age:.2f}h exceeds {max_age_hours:.2f}h; "
+                "a downstream Unified Upcoming refresh cannot substitute for a fresh source snapshot"
+            ),
+        })
+
+    return check, issues
