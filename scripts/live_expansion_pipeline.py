@@ -380,9 +380,7 @@ separate confidence/qualification threshold.
         return None
     if (published_at - quote_time).total_seconds() > 15 * 60:
         return None
-    if str(market.get("pick") or "").lower() not in {"over", "under"}:
-        return None
-    try:
+    # Freeze line and both prices even when the model has no directional lean.\n    # Only picked/settled rows can later enter ROI qualification.\n    try:
         line = float(market.get("line"))
         over_odds = float(market.get("over_odds"))
         under_odds = float(market.get("under_odds"))
@@ -399,7 +397,7 @@ separate confidence/qualification threshold.
     snapshot["publication_snapshot_kind"] = "first_price_auditable_pre_match_nba_total"
     identity = "|".join([
         str(snapshot.get("event_id") or ""), snapshot["published_at"],
-        str(line), str(market.get("pick")), str(market.get("quote_timestamp")),
+        str(line), str(market.get("pick") or "no_clear_lean"), str(market.get("quote_timestamp")),
         str(over_odds), str(under_odds),
     ])
     snapshot["publication_snapshot_id"] = "nba-total-pub:" + hashlib.sha256(identity.encode("utf-8")).hexdigest()[:24]
