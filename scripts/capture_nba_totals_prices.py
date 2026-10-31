@@ -142,6 +142,33 @@ def diagnose_fixture_quote(fixture, feed, now):
     return "MARKET_225_LINE_OR_BOTH_PRICES_UNUSABLE"
 
 
+def nearby_feed_events(fixture, feed, limit=3, window_minutes=180):
+    """Expose nearby feed teams/times for unmatched fixture diagnosis only."""
+    start = dt(fixture.get("date"))
+    if not start:
+        return []
+    candidates = []
+    for event in feed or []:
+        event_start = dt(event.get("start_time"))
+        if not event_start:
+            continue
+        delta = abs((event_start - start).total_seconds()) / 60
+        if delta > window_minutes:
+            continue
+        candidates.append({
+            "event_id": str(event.get("event_id") or ""),
+            "home": str(event.get("home") or ""),
+            "away": str(event.get("away") or ""),
+            "start_time": event_start.isoformat(),
+            "minutes_from_fixture": round(delta, 1),
+            "market_225_present": any(
+                str(market.get("id")) == "225"
+                for market in (event.get("markets") or [])
+            ),
+            "fetched_at": event.get("fetched_at"),
+        })
+    return sorted(candidates, key=lambda row: (row["minutes_from_fixture"], row["event_id"]))[:limit]
+
 def load_json(path, default):
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
@@ -247,6 +274,7 @@ def capture(predictions, feed, now):
                 "event_id": str(prediction.get("event_id") or ""),
                 "home": fixture["home"], "away": fixture["away"],
                 "start_time": fixture["date"], "reason": reason,
+                "nearby_feed_candidates": nearby_feed_events(fixture, feed),
             })
         stats["price_match_status_counts"][reason] = stats["price_match_status_counts"].get(reason, 0) + 1
         market = ((prediction.get("markets") or {}).get("total_ou") or {})
