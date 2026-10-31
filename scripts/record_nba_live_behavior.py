@@ -283,6 +283,36 @@ def live_total_projection(record, prediction, now=None):
         "qualification": "PAPER_RESEARCH_ONLY_NOT_BETTING_QUALIFIED",
     }
 
+def should_append_observation(previous, current):
+    """Keep one ordinary poll per minute, but never lose a same-minute state change."""
+    if not isinstance(previous, dict):
+        return True
+    if not isinstance(current, dict):
+        return False
+    previous_minute = str(previous.get("observed_at") or "")[:16]
+    current_minute = str(current.get("observed_at") or "")[:16]
+    if not previous_minute or previous_minute != current_minute:
+        return True
+
+    # A final score/state transition must be archived even when it lands in
+    # the same wall-clock minute as the last live poll. Otherwise settlement
+    # evaluation can lose its only event-ID-matched final scoreboard row.
+    if previous.get("game_state") != current.get("game_state"):
+        return True
+    if previous.get("period") != current.get("period"):
+        return True
+    if previous.get("status") != current.get("status"):
+        return True
+    if previous.get("clock") != current.get("clock"):
+        return True
+    for side in ("home", "away"):
+        old_team = previous.get(side) or {}
+        new_team = current.get(side) or {}
+        if old_team.get("score") != new_team.get("score"):
+            return True
+    return False
+
+
 def main():
     now = datetime.now(timezone.utc)
     events, scoreboard_dates, scoreboard_errors = fetch_scoreboard_window(now)
@@ -348,8 +378,10 @@ def main():
     games = old.get("games") if isinstance(old.get("games"), dict) else {}
     for rec in observations:
         hist = games.setdefault(rec["event_id"], {"event_id": rec["event_id"], "scheduled_at": rec.get("scheduled_at"), "snapshots": []})
-        # Avoid duplicate commits of the same observed game state within one minute.
-        if not hist["snapshots"] or hist["snapshots"][-1].get("observed_at", "")[:16] != rec["observed_at"][:16]:
+        # Deduplicate routine same-minute polls while preserving score, clock,
+        # period and live-to-final transitions needed by the settlement evaluator.
+        previous = hist["snapshots"][-1] if hist["snapshots"] else None
+        if should_append_observation(previous, rec):
             hist["snapshots"].append(rec)
         hist["scheduled_at"] = rec.get("scheduled_at") or hist.get("scheduled_at")
         hist["latest"] = rec
