@@ -136,6 +136,17 @@ def test_capture_status_is_partial_until_every_v5_forecast_has_a_frozen_price_pa
     empty = publication_capture_metrics([], [])
     assert empty["capture_status"] == "NO_CURRENT_MODEL_PREDICTIONS"
 
+    # The full evaluator must retain the supplied forecast rows; its internal
+    # calibration candidates must not shadow the external prediction list.
+    full_report = evaluate(
+        [game("h1", 1, "A", "B", 100, 90), game("h2", 2, "C", "D", 101, 99)],
+        [],
+        [snapshot],
+        [prediction("g1")],
+    )
+    assert full_report["publication_capture"]["model_predictions"] == 1
+    assert full_report["publication_capture"]["immutable_fresh_publication_snapshots"] == 1
+
 
 def test_evaluator_never_promotes_without_market_holdout():
     rows = [game(f"g{i}", (i % 28) + 1, "A", "B", 100 + i % 5, 98 + i % 7) for i in range(1, 29)]
