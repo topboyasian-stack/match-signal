@@ -314,9 +314,9 @@ def evaluate(history, ledger, snapshots=None, predictions=None):
     grid = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
     candidates = []
     for weight in grid:
-        predictions = [_blend_total(row, weight) for row in development]
+        candidate_predictions = [_blend_total(row, weight) for row in development]
         actuals = [float(row["actual_total"]) for row in development]
-        errors = [prediction - actual for prediction, actual in zip(predictions, actuals)]
+        errors = [prediction - actual for prediction, actual in zip(candidate_predictions, actuals)]
         mae = sum(abs(error) for error in errors) / len(errors) if errors else float("inf")
         rmse = math.sqrt(sum(error * error for error in errors) / len(errors)) if errors else float("inf")
         candidates.append((mae, rmse, weight))
