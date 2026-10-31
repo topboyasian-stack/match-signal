@@ -16,6 +16,8 @@ on:
     branches: [main]
     paths:
       - 'scripts/record_nba_live_behavior.py'
+      - 'scripts/nba_live_totals_walk_forward.py'
+      - 'scripts/test_nba_live_totals_walk_forward.py'
       - '.github/workflows/nba-live-observation.yml'
 
 permissions:
@@ -57,7 +59,7 @@ jobs:
       - name: Install recorder dependency
         run: python -m pip install --disable-pip-version-check requests
       - name: Compile recorder before collection
-        run: python -m py_compile scripts/record_nba_live_behavior.py
+        run: python -m py_compile scripts/record_nba_live_behavior.py scripts/nba_live_totals_walk_forward.py
       - name: Run offline live-projection regression tests
         run: python scripts/test_record_nba_live_behavior.py
       - name: Capture live game, play-by-play, box-score and period estimates
