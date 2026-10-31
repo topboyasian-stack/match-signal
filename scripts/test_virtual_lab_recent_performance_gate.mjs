@@ -62,6 +62,8 @@ assert.equal(gateFor(missing)('efootball_gt').blocked,true);
 
 assert.ok(source.includes("const DESK_LEARNING='/data/efootball_desk_learning.json'"));
 assert.ok(source.includes('await loadDeskLearning()'));
+assert.ok(source.includes('const learningChanged=await loadDeskLearning()'));
+assert.ok(source.includes('state.builder=(state.builder||[]).filter(p=>!recentProductPerformanceGate(p?.product).blocked)'));
 assert.ok(source.includes('candidate_status:status,recent_performance:recentPerformance'));
 assert.ok(source.includes("p.candidate_status==='RECENT_PERFORMANCE_GUARD'"));
 assert.ok(source.includes('EFOOTBALL QUALIFICATION PAUSED'));
