@@ -5,7 +5,7 @@ def prediction(**overrides):
     p = {"event_id":"abc","start_time":"2026-10-25T20:00:00+00:00",
          "prediction_created_at":"2026-10-25T19:00:00+00:00",
          "player_1":"Home Team","player_2":"Away Team","expected_total":220.5,
-         "model":"test","markets":{"total_ou":{"market_id":"225","line":220.5,"pick":"over","source":"SportyBet Nigeria", "quote_timestamp":"2026-10-25T18:55:00+00:00", "over_odds":1.91, "under_odds":1.89}}}
+         "model":"test","markets":{"total_ou":{"market_id":"225","line":220.5,"pick":"over","source":"SportyBet Nigeria", "sportybet_event_id":"sr:match:abc", "quote_capture_basis":"SportyBet API response observed_at", "quote_timestamp":"2026-10-25T18:55:00+00:00", "over_odds":1.91, "under_odds":1.89}}}
     p.update(overrides)
     return p
 
@@ -61,7 +61,7 @@ class SettlementTests(unittest.TestCase):
         market = p["markets"]["total_ou"]
         audit = price_audit_fields(p, market, parse_time_for_test(p["prediction_created_at"]))
         self.assertTrue(audit["roi_eligible"])
-        self.assertTrue(audit["publication_snapshot_verified"])
+        self.assertTrue(audit["publication_snapshot_verified"])\n        self.assertEqual(audit["sportybet_event_id"], "sr:match:abc")\n        self.assertEqual(audit["quote_capture_basis"], "SportyBet API response observed_at")
 
     def test_stale_quote_not_roi_eligible(self):
         p = prediction()
@@ -100,7 +100,7 @@ class SettlementTests(unittest.TestCase):
         p["publication_snapshot_verified"] = False
         audit = price_audit_fields(p, p["markets"]["total_ou"], parse_time_for_test(p["prediction_created_at"]))
         self.assertFalse(audit["roi_eligible"])
-        self.assertIn("no_verified_immutable_publication_snapshot", audit["roi_ineligibility_reasons"])
+        self.assertIn("no_verified_immutable_publication_snapshot", audit["roi_ineligibility_reasons"])\n\n    def test_missing_exact_sportybet_event_blocks_roi(self):\n        p = prediction()\n        p["published_at"] = "2026-10-25T19:00:00+00:00"\n        p["publication_snapshot_id"] = "nba-total-snapshot-abc"\n        p["publication_snapshot_verified"] = True\n        p["markets"]["total_ou"]["sportybet_event_id"] = ""\n        audit = price_audit_fields(p, p["markets"]["total_ou"], parse_time_for_test(p["prediction_created_at"]))\n        self.assertFalse(audit["roi_eligible"])\n        self.assertIn("missing_exact_sportybet_event_id", audit["roi_ineligibility_reasons"])
 
 if __name__ == "__main__":
     unittest.main()
