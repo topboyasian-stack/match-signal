@@ -5,6 +5,7 @@ Only archived estimates for completed games are scored. A single near-target
 snapshot per game and period prevents five-minute refreshes being counted as
 independent samples.
 """
+import gzip
 import json
 import math
 import re
@@ -13,7 +14,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
-OBSERVATIONS = DATA / "nba_live_observations.json"
+OBSERVATIONS = DATA / "nba_live_observations.json.gz"
+LEGACY_OBSERVATIONS = DATA / "nba_live_observations.json"
 HISTORY = DATA / "nba_history.json"
 OUTPUT = DATA / "nba_live_totals_oos.json"
 MIN_PERIOD_SAMPLE = 30
@@ -163,11 +165,19 @@ def evaluate(observation_payload, history_rows, model_version=None):
     }
 
 
+def load_observation_archive():
+    if OBSERVATIONS.exists():
+        with gzip.open(OBSERVATIONS, "rt", encoding="utf-8") as source:
+            payload = json.load(source)
+        return payload if isinstance(payload, dict) else {"games": {}}
+    if LEGACY_OBSERVATIONS.exists():
+        payload = json.loads(LEGACY_OBSERVATIONS.read_text(encoding="utf-8"))
+        return payload if isinstance(payload, dict) else {"games": {}}
+    return {"games": {}}
+
+
 def main():
-    observations = (
-        json.loads(OBSERVATIONS.read_text(encoding="utf-8"))
-        if OBSERVATIONS.exists() and OBSERVATIONS.stat().st_size else {"games": {}}
-    )
+    observations = load_observation_archive()
     history = json.loads(HISTORY.read_text(encoding="utf-8")) if HISTORY.exists() else []
     # Read the model version without importing the full training pipeline
     # (which pulls pandas/pyarrow); the five-minute recorder needs only stdlib.
