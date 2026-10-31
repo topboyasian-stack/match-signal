@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-10-31T07:34:44.064219+00:00",
-  "status": "HEALTHY",
+  "generated_at": "2026-10-31T07:34:50.951841+00:00",
+  "status": "DEGRADED",
   "critical_issues": 0,
-  "warning_issues": 0,
+  "warning_issues": 1,
   "info_issues": 2,
   "checks": [
     {
@@ -20,7 +20,7 @@
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 1.95,
+      "age_hours": 1.96,
       "threshold_hours": 4
     },
     {
@@ -43,11 +43,11 @@
     },
     {
       "engine": "virtual_live_feed",
-      "status": "PASS",
-      "age_hours": 0.0,
+      "status": "STALE",
+      "age_hours": 0.53,
       "threshold_hours": 0.5,
       "heartbeat_source": "virtual_lab_live.json",
-      "events_count": 718
+      "events_count": 700
     },
     {
       "engine": "nba_live_observation_recorder",
@@ -94,6 +94,11 @@
     }
   ],
   "issues": [
+    {
+      "code": "VIRTUAL_LIVE_FEED_STALE",
+      "severity": "warning",
+      "detail": "virtual_lab_live.json age 0.53h exceeds 0.50h; a downstream Unified Upcoming refresh cannot substitute for a fresh source snapshot"
+    },
     {
       "code": "PDL_EXPERIMENTAL_FEED_STALE",
       "severity": "info",
