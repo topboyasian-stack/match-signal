@@ -80,7 +80,7 @@ jobs:
         shell: bash
         run: |
           if python scripts/virtual_lab_sync.py; then
-            cp data/virtual_lab_live.json /tmp/virtual_lab_live_candidate.json
+            echo "Live snapshot checked locally; the dedicated Live Sync workflow remains the publisher."
           else
             echo "::warning::Virtual Lab live sync failed. Continuing into freshness checks and stale-board recovery."
           fi
@@ -725,9 +725,6 @@ jobs:
           print(json.dumps(health, indent=2))
           PY
 
-      - name: Recompute system health after live-feed freshness checks
-        run: python scripts/system_health_audit.py
-
       - name: Commit automation health record
         shell: bash
         run: |
@@ -735,16 +732,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           cp data/automation_health.json /tmp/automation_health.json
-          cp data/system_health.json /tmp/system_health.json
           for attempt in 1 2 3 4 5; do
             git fetch origin main
             git reset --hard origin/main
             cp /tmp/automation_health.json data/automation_health.json
-            cp /tmp/system_health.json data/system_health.json
-            if [ -f /tmp/virtual_lab_live_candidate.json ]; then
-              cp /tmp/virtual_lab_live_candidate.json data/virtual_lab_live.json
-            fi
-            git add data/automation_health.json data/virtual_lab_live.json data/system_health.json
+            git add data/automation_health.json
             if git diff --cached --quiet; then
               echo "No automation health change."
               exit 0
