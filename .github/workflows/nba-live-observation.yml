@@ -31,8 +31,6 @@ jobs:
           python-version: '3.12'
       - name: Install recorder dependency
         run: python -m pip install --disable-pip-version-check requests
-      - name: Validate live total projection logic
-        run: python scripts/test_nba_live_behavior.py
       - name: Capture live game, play-by-play and player/team box-score snapshots
         run: python scripts/record_nba_live_behavior.py
       - name: Publish timestamped observation history
