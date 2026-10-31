@@ -106,9 +106,7 @@ def main():
         assert generated_collector_output not in collector_paths, (
             f"Collector output {generated_collector_output} must not trigger another expensive collector run."
         )
-    assert "cancel-in-progress: false" in collector, (
-        "The collector must finish publication before another scheduled run takes over."
-    )
+    assert "cancel-in-progress: true" in collector, (
         "A newer fixed collector run must supersede an obsolete artifact-publication retry."
     )
 
