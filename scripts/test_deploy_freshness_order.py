@@ -473,12 +473,16 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
 
 
 
-    def test_unified_board_publish_push_is_bounded(self):
+    def test_unified_board_publish_rebases_before_bounded_pushes(self):
         source = (ROOT / ".github/workflows/unified-upcoming.yml").read_text(encoding="utf-8")
-        self.assertIn("timeout 120s git push origin main", source)
+        self.assertIn("timeout --signal=TERM --kill-after=10s 45s git fetch origin main", source)
+        self.assertIn("timeout --signal=TERM --kill-after=10s 90s git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=30 push origin HEAD:main", source)
         self.assertIn("for attempt in 1 2 3 4 5 6; do", source)
-        self.assertIn("sleep 2", source)
+        self.assertIn("sleep \"$attempt\"", source)
         self.assertIn("GIT_TERMINAL_PROMPT=0", source)
+        self.assertIn("Newer unified board already published; skipping stale candidate.", source)
+        self.assertIn("git commit --amend --no-edit", source)
+        self.assertLess(source.index("git fetch origin main"), source.index("git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=30 push origin HEAD:main"))
 
 if __name__ == "__main__":
     unittest.main()
