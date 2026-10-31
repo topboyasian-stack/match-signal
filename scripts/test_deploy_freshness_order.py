@@ -260,6 +260,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "core-workspaces-design.css",
             "league-logos.js",
             "workspace-ui.js",
+            "scripts/test_workspace_terminal_design.mjs",
             "data/club-logo-registry.json",
             "assets/club-logos/**",
             "data/licenses/**",
