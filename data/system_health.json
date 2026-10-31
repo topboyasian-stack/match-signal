@@ -1,62 +1,62 @@
 {
-  "generated_at": "2026-10-31T12:05:51.841058+00:00",
-  "status": "DEGRADED",
+  "generated_at": "2026-10-31T12:06:36.001997+00:00",
+  "status": "HEALTHY",
   "critical_issues": 0,
-  "warning_issues": 1,
+  "warning_issues": 0,
   "info_issues": 1,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
       "status": "PASS",
-      "age_hours": 0.28,
+      "age_hours": 0.29,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.1,
+      "age_hours": 0.03,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 0.24,
+      "age_hours": 0.25,
       "threshold_hours": 4
     },
     {
       "engine": "unified_upcoming",
       "status": "PASS",
-      "age_hours": 0.37,
+      "age_hours": 0.39,
       "threshold_hours": 2
     },
     {
       "engine": "prediction_desk_health",
       "status": "PASS",
-      "age_hours": 0.43,
+      "age_hours": 0.44,
       "threshold_hours": 2
     },
     {
       "engine": "tennis_forward_discovery",
       "status": "PASS",
-      "age_hours": 0.24,
+      "age_hours": 0.25,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 0.03,
+      "age_hours": 0.04,
       "threshold_hours": 0.5,
       "heartbeat_source": "virtual_lab_live.json",
       "events_count": 690
     },
     {
       "engine": "nba_live_observation_recorder",
-      "status": "STALE",
-      "age_hours": 0.29,
+      "status": "PASS",
+      "age_hours": 0.02,
       "threshold_hours": 0.25,
       "heartbeat_source": "nba_live_observations.json",
       "games_tracked": 18,
-      "snapshots_recorded": 68
+      "snapshots_recorded": 78
     },
     {
       "engine": "engine_lifecycle",
@@ -94,11 +94,6 @@
     }
   ],
   "issues": [
-    {
-      "code": "NBA_LIVE_OBSERVATION_STALE",
-      "severity": "warning",
-      "detail": "nba_live_observations.json age 0.29h exceeds 0.25h; the in-game observation recorder has not published a recent heartbeat"
-    },
     {
       "code": "PDL_EXPERIMENTAL_FEED_STALE",
       "severity": "info",
