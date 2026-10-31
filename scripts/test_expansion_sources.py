@@ -175,6 +175,7 @@ def test_v2_normalizer_keeps_only_valid_regular_season_pace_metrics():
     assert len(rows)==1 and rows[0]["source"]=="nba_data_v2_team_game_logs"
     assert rows[0]["home_pace"]==99.5 and rows[0]["away_off_rating"]==110.1
     assert rows[0]["home_possessions"]==98
+    assert rows[0]["date"]=="2026-10-26T03:59:59.999999+00:00", rows[0]["date"]
 
 
 
