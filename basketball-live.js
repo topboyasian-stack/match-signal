@@ -1,3 +1,4 @@
+/* NBA totals desk: totals-only model-version-matched release evidence */
 /* Match Signal NBA live desk: ESPN scoreboard + research-only model feed. */
 (function(){
 'use strict';
