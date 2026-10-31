@@ -25,12 +25,13 @@ on:
 permissions:
   contents: write
 
-# V5 publication retry: rebuild against latest main after concurrent data writers.
-
+# Autopilot publishes only football readiness; the Unified Upcoming workflow owns
+# the all-sports board, candidate pool and shared system-health artifact.
 concurrency:
-  # Autopilot may publish derived artifacts, but it must never cancel the core prediction publisher.
+  # A new heartbeat supersedes stale readiness-only work. It cannot cancel the
+  # Unified Upcoming publisher because it uses a different concurrency group.
   group: match-signal-autopilot-publish
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   refresh:
