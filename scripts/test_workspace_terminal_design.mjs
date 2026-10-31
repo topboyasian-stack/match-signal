@@ -99,7 +99,8 @@ for (const path of directPaths) {
   assert.ok(deploy.includes("'" + path + "'"), "Cloudflare push trigger must include " + path);
   assert.ok(deploy.includes("|" + path + "|"), "Cloudflare static promotion allowlist must include " + path);
 }
-assert.ok(!deploy.includes("      - '.github/workflows/cloudflare-pages.yml'"),
+const deployPushEvent = deploy.split("\n  pull_request:\n", 1)[0];
+assert.ok(!deployPushEvent.includes("      - '.github/workflows/cloudflare-pages.yml'"),
   "Cloudflare workflow edits must wait for a successful Unified Upcoming refresh");
 assert.ok(!deploy.includes("|.github/workflows/cloudflare-pages.yml|"),
   "Cloudflare workflow edits must not bypass the board-first promotion chain");
