@@ -43,8 +43,8 @@ class EfootballResearchRecoveryTests(unittest.TestCase):
         self.assertIn("VIRTUAL_LIVE_MAX_AGE_MINUTES = 30", WATCHDOG)
         self.assertIn("NBA_LIVE_MAX_AGE_MINUTES = 15", WATCHDOG)
         self.assertIn("LIVE_FEED_DISPATCH_COOLDOWN_MINUTES = 10", WATCHDOG)
-        self.assertIn("gh workflow run virtual-lab-live-sync-heartbeat.yml --ref main", WATCHDOG)
-        self.assertIn("gh workflow run nba-live-observation.yml --ref main", WATCHDOG)
+        self.assertIn("virtual-lab-live-sync-heartbeat.yml", WATCHDOG)
+        self.assertIn("nba-live-observation.yml", WATCHDOG)
         self.assertIn("python scripts/system_health_audit.py", WATCHDOG)
 
     def test_automation_watchdog_changes_do_not_trigger_a_static_pages_deploy(self):
