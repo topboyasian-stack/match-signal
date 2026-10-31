@@ -449,6 +449,24 @@ def should_refresh_nba_prediction(old, start, now=None, max_age_hours=6):
 
 def main():
     nba_history, nba_errors = collect("NBA")
+    # Fit the pace contribution and residual correction strictly on the
+    # evaluator's development window before emitting new forecasts.
+    try:
+        from nba_totals_walk_forward import evaluate as evaluate_nba_totals
+        ledger_path = DATA / "nba_totals_ledger.json"
+        ledger_payload = json.loads(ledger_path.read_text(encoding="utf-8")) if ledger_path.exists() else []
+        ledger_rows = ledger_payload.get("records", []) if isinstance(ledger_payload, dict) else ledger_payload
+        calibration_report = evaluate_nba_totals(nba_history, ledger_rows if isinstance(ledger_rows, list) else [])
+        (DATA / "nba_totals_oos_value_test.json").write_text(
+            json.dumps(calibration_report, indent=2) + "\n", encoding="utf-8"
+        )
+        model_calibration = calibration_report.get("model_calibration") or {}
+        pace_blend_weight = float(model_calibration.get("selected_pace_blend_weight") or 0.0)
+        bias_adjustment = float(model_calibration.get("production_bias_correction") or 0.0)
+    except Exception as exc:
+        print(json.dumps({"nba_totals_calibration_error": str(exc)}))
+        pace_blend_weight = 0.0
+        bias_adjustment = 0.0
     ere_history, ere_errors = collect("Eredivisie")
     nba_fixtures = [] if NOW < NBA_START else current("NBA")
     ere_fixtures = current_ere()
@@ -488,7 +506,7 @@ def main():
                 else:
                     continue
             else:
-                p = nba_predict(f, nba_history)
+                p = nba_predict(f, nba_history, pace_blend_weight=pace_blend_weight, bias_adjustment=bias_adjustment)
                 if not p: continue
                 probs = p["moneyline"]
                 row = {
@@ -497,7 +515,7 @@ def main():
                     "probabilities": {"p1": round(probs["home"],6), "p2": round(probs["away"],6)},
                     "pick": "p1" if probs["home"] >= probs["away"] else "p2",
                     "confidence": round(max(probs.values()),6), "expected_score": p["expected_score"],
-                    "expected_total": p["expected_total"], "totals_model_version": p.get("totals_model_version"), "markets": {"moneyline": p["moneyline"]},
+                    "expected_total": p["expected_total"], "totals_model_version": p.get("totals_model_version"), "total_model_features": p.get("total_model_features"), "markets": {"moneyline": p["moneyline"]},
                     "model": p["model"], "signal_quality": {"status":"LIVE_EXPERIMENTAL","market_odds_available":False},
                     "generated_at": NOW.isoformat(), "prediction_created_at": NOW.isoformat(),
                     "accuracy_eligible": True, "prediction_status": "live_experimental",
@@ -529,7 +547,7 @@ def main():
     status = {
         "updated_at": NOW.isoformat(), "release_mode": "LIVE_EXPERIMENTAL", "live_trading_approved": False,
         "competitions": {
-            "NBA": {"historical_events": len(nba_history), "current_fixtures": len(nba_fixtures), "collection_errors": len(nba_errors), "status": "LIVE_EXPERIMENTAL" if nba_predictions else ("PRESEASON_READY" if NOW < NBA_START else "NO_CURRENT_FIXTURES"), "history_source": "llimllib/nba_data gamelogs.parquet; ESPN daily scoreboard and NBA Elo CSV fallbacks"},
+            "NBA": {"historical_events": len(nba_history), "current_fixtures": len(nba_fixtures), "collection_errors": len(nba_errors), "status": "LIVE_EXPERIMENTAL" if nba_predictions else ("PRESEASON_READY" if NOW < NBA_START else "NO_CURRENT_FIXTURES"), "history_source": "llimllib/nba_data v2 team_game_logs pace and efficiency catalog; ESPN and NBA Elo fallbacks"},
             "Eredivisie": {"historical_events": len(ere_history), "current_fixtures": len(ere_fixtures), "published_predictions": len(ere_predictions), "collection_errors": len(ere_errors), "status": "LIVE_EXPERIMENTAL" if ere_predictions else "NO_CURRENT_FIXTURES", "fixture_source": "ESPN primary; Football-Data fixtures.csv; SofaScore daily schedule fallback"},
         },
         "source_diagnostics": {"NBA": nba_errors[:5], "Eredivisie": ere_errors[:5], "SportyBet_NBA_totals": ([sportybet_error] if sportybet_error else [])},
