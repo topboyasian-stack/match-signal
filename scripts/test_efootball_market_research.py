@@ -245,6 +245,7 @@ def test_efootball_display_calibration_is_applied():
  assert buckets["0.8"]["n"]>=30 and buckets["0.8"]["calibrated_probability"]<0.60,buckets["0.8"]
  assert buckets["0.85"]["n"]>=30 and buckets["0.85"]["calibrated_probability"]<0.55,buckets["0.85"]
  assert "product_wide_raw_probability_bucket" in source
+ assert "function isVirtualDeskCandidate(row)" in source and "const probability=probabilityValue(row);" in source
  assert "efootball_desk_learning.json" in source and "60*60*1000" in source
  assert "RECENT_PRODUCT_ACCURACY_BELOW_55_PERCENT" in source
  assert "product-wide settled calibration" in source
