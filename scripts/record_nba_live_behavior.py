@@ -206,10 +206,19 @@ def live_total_projection(record, prediction, now=None):
         return {"status": "OVERTIME_CONTEXT_ONLY" if period > 4 else "LIVE_DATA_INCOMPLETE",
                 "reason": "Regulation pace projection is withheld during overtime or when period data is missing."}
     clock = str(record.get("clock") or "").strip()
-    match = re.fullmatch(r"(\d{1,2}):(\d{2})", clock)
-    if not match:
+    # ESPN normally emits M:SS, but switches to seconds-only decimal notation
+    # during the final minute of a period (for example, "30.6"). Accept both
+    # forms so valid in-game estimates are not blanked at precisely that point.
+    clock_match = re.fullmatch(r"(?:(\d{1,2}):(\d{1,2}(?:\.\d+)?))|(\d{1,2}(?:\.\d+)?)", clock)
+    if not clock_match:
         return {"status": "LIVE_DATA_INCOMPLETE", "reason": "ESPN game clock is unavailable."}
-    remaining = int(match.group(1)) + int(match.group(2)) / 60
+    if clock_match.group(3) is not None:
+        remaining = float(clock_match.group(3)) / 60.0
+    else:
+        seconds = float(clock_match.group(2))
+        if seconds >= 60:
+            return {"status": "LIVE_DATA_INCOMPLETE", "reason": "ESPN game clock seconds are outside the valid range."}
+        remaining = int(clock_match.group(1)) + seconds / 60.0
     if remaining < 0 or remaining > 12:
         return {"status": "LIVE_DATA_INCOMPLETE", "reason": "ESPN game clock is outside the regulation-period range."}
     elapsed = (period - 1) * 12 + (12 - remaining)
