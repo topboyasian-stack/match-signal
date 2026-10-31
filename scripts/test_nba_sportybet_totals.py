@@ -119,6 +119,28 @@ with tempfile.TemporaryDirectory() as tmp:
     saved = json.loads(snapshot_path.read_text(encoding="utf-8"))
     assert second == {"added": 0, "total": 1}, "a later desk refresh must not overwrite the first published selection"
     assert saved[0]["markets"]["total_ou"]["line"] == 228.5
+    # The same fixture must start a new independently frozen cohort when the
+    # model version changes; the previous model's event key must not block V4.
+    versioned_path = Path(tmp) / "nba_totals_versioned_snapshots.json"
+    v3_prediction = json.loads(json.dumps(snapshot_prediction))
+    v3_prediction["totals_model_version"] = "nba-total-v3-matchup-recent-team-total"
+    v3_snapshot = pipeline.append_nba_totals_publication_snapshots(
+        [v3_prediction], versioned_path, now.isoformat()
+    )
+    assert v3_snapshot == {"added": 1, "total": 1}
+    v4_snapshot = pipeline.append_nba_totals_publication_snapshots(
+        [snapshot_prediction], versioned_path, (now + timedelta(minutes=1)).isoformat()
+    )
+    assert v4_snapshot == {"added": 1, "total": 2}
+    duplicate_v4 = pipeline.append_nba_totals_publication_snapshots(
+        [snapshot_prediction], versioned_path, (now + timedelta(minutes=2)).isoformat()
+    )
+    assert duplicate_v4 == {"added": 0, "total": 2}
+    versioned_rows = json.loads(versioned_path.read_text(encoding="utf-8"))
+    assert {row["totals_model_version"] for row in versioned_rows} == {
+        "nba-total-v3-matchup-recent-team-total", pipeline.NBA_TOTALS_MODEL_VERSION
+    }
+
 
 stale_prediction = json.loads(json.dumps(snapshot_prediction))
 stale_prediction["markets"]["total_ou"]["quote_timestamp"] = (now - timedelta(minutes=20)).isoformat()
