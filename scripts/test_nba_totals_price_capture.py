@@ -151,7 +151,16 @@ class PriceCaptureTests(unittest.TestCase):
         }]
         self.assertEqual(
             diagnose_fixture_quote(fixture, no_event, self.now),
-            "NO_EXACT_TEAM_EVENT_IN_FEED",
+            "SPORTYBET_FIXTURE_NOT_LISTED_IN_FEED",
+        )
+
+        partial_identity = [{
+            "event_id": "partial", "home": "Boston Celtics", "away": "Miami Heat",
+            "start_time": fixture["date"], "fetched_at": self.now.isoformat(), "markets": [],
+        }]
+        self.assertEqual(
+            diagnose_fixture_quote(fixture, partial_identity, self.now),
+            "SPORTYBET_PARTIAL_TEAM_IDENTITY_MATCH",
         )
 
         wrong_time = [{
