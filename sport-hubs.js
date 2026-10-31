@@ -157,7 +157,7 @@ function displayedFairOddsValue(x){
 function isVirtualDeskCandidate(row){
   if(!row)return false;
   const product=String(row?.product||"").toLowerCase();
-  const probability=rawProbabilityValue(row);
+  const probability=probabilityValue(row);
   const start=Date.parse(String(row?.start_time||""));
   const upstreamQualified=Boolean(row?.betting_qualified)||Boolean(row?.qualified_for_builder)||
     String(row?.qualification_status||"").startsWith("BETTING_QUALIFIED");
