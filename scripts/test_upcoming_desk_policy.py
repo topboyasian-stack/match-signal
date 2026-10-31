@@ -843,5 +843,27 @@ class UpcomingDeskPolicyTests(unittest.TestCase):
         self.assertEqual(no_borrow["n"], 0)
 
 
+    def test_efootball_recent_product_drawdown_pauses_qualification(self):
+        gate = ns["efootball_recent_performance_gate"]
+        drawdown = {"by_product": {"efootball_gt": {"recent_window": {
+            "n": 50, "accuracy": 0.44, "brier": 0.2516978982
+        }}}}
+        paused = gate(drawdown, "efootball_gt")
+        self.assertFalse(paused["pass"])
+        self.assertEqual(paused["status"], "RECENT_PRODUCT_DRAWDOWN_PAUSE")
+        self.assertEqual(paused["recent_n"], 50)
+        recovered = {"by_product": {"efootball_gt": {"recent_window": {
+            "n": 50, "accuracy": 0.56, "brier": 0.24
+        }}}}
+        self.assertTrue(gate(recovered, "efootball_gt")["pass"])
+        immature = {"by_product": {"efootball_gt": {"recent_window": {
+            "n": 49, "accuracy": 0.70, "brier": 0.18
+        }}}}
+        pending = gate(immature, "efootball_gt")
+        self.assertFalse(pending["pass"])
+        self.assertEqual(pending["status"], "RECENT_PRODUCT_EVIDENCE_PENDING")
+        self.assertEqual(gate({}, "efootball_gt")["status"], "RECENT_PRODUCT_EVIDENCE_PENDING")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

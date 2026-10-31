@@ -39,6 +39,9 @@ EFOOTBALL_DIRECTION_RECENT_WINDOW=50
 SETTLED_DESK_RETENTION_HOURS=2
 VIRTUAL_PARTICIPANT_INPUT_MAX_AGE_MINUTES=30
 EFOOTBALL_DESK_LEARNING_MIN_CALIBRATION_N=30
+EFOOTBALL_RECENT_WINDOW_MIN_N=50
+EFOOTBALL_RECENT_MIN_HIT_RATE=0.55
+EFOOTBALL_RECENT_MAX_BRIER=0.25
 # Match the learner's declared exact_selection_min_predictions policy.
 EFOOTBALL_DESK_EXACT_MIN_N=20
 # Forecasts outside this near-term window stay visible as research, not as
@@ -63,6 +66,7 @@ DESK_FILTER_STATS={
     "expired_settled_rows_hidden":0,
     "virtual_market_rows_held_for_kickoff_window":0,
     "virtual_rows_held_for_stale_participant_history":0,
+    "virtual_rows_held_for_recent_product_drawdown":0,
 }
 
 def load(name, default):
@@ -976,6 +980,33 @@ def build_efootball_directional_gate(eval_art, history):
     return out
 
 
+def efootball_recent_performance_gate(report, product="efootball_gt"):
+    """Pause current eFootball qualification when recent product-wide results deteriorate."""
+    report = report if isinstance(report, dict) else {}
+    by_product = report.get("by_product") if isinstance(report.get("by_product"), dict) else {}
+    product_report = by_product.get(product) if isinstance(by_product.get(product), dict) else {}
+    if not product_report and product == "efootball_gt":
+        product_report = report
+    recent = product_report.get("recent_window") if isinstance(product_report, dict) else {}
+    recent = recent if isinstance(recent, dict) else {}
+    raw_n = num(recent.get("n"))
+    n = int(raw_n) if raw_n is not None and raw_n >= 0 else 0
+    accuracy = num(recent.get("accuracy"))
+    brier = num(recent.get("brier"))
+    evidence_ready = n >= EFOOTBALL_RECENT_WINDOW_MIN_N and accuracy is not None and brier is not None
+    passed = bool(evidence_ready and accuracy >= EFOOTBALL_RECENT_MIN_HIT_RATE and brier <= EFOOTBALL_RECENT_MAX_BRIER)
+    status = ("RECENT_PRODUCT_EVIDENCE_PENDING" if not evidence_ready else
+              "PASS" if passed else "RECENT_PRODUCT_DRAWDOWN_PAUSE")
+    return {
+        "product": product, "pass": passed, "status": status, "recent_n": n,
+        "recent_accuracy": round(accuracy, 4) if accuracy is not None else None,
+        "recent_brier": round(brier, 5) if brier is not None else None,
+        "minimum_n": EFOOTBALL_RECENT_WINDOW_MIN_N,
+        "minimum_accuracy": EFOOTBALL_RECENT_MIN_HIT_RATE,
+        "maximum_brier": EFOOTBALL_RECENT_MAX_BRIER,
+    }
+
+
 def resolve_efootball_qualification_status(
     *,
     base_model_gate,
@@ -1304,6 +1335,10 @@ def build_virtual_events(history, lifecycle, eligibility, participant_history_fr
                 }
             product_desk_calibration=product_desk_learning.get("calibration") or {}
             product_exact_profiles=product_desk_learning.get("exact_selection") or {}
+            product_recent_performance_gate=(
+                efootball_recent_performance_gate(desk_learning,product)
+                if product.startswith("efootball") else {"product":product,"pass":True,"status":"NOT_APPLICABLE"}
+            )
 
             over, over_learning_source, over_learning_profile=calibrate_desk_probability(
                 raw_over, line, "over", product_desk_learning
@@ -1348,6 +1383,9 @@ def build_virtual_events(history, lifecycle, eligibility, participant_history_fr
                     product_bootstrap=product_bootstrap_gate.get(product,False),
                     directional_pass=bool(directional.get("pass")),
                 )
+                if qualification_status in QUALIFIED_VIRTUAL_STATUSES and not product_recent_performance_gate["pass"]:
+                    qualification_status=product_recent_performance_gate["status"]
+                    DESK_FILTER_STATS["virtual_rows_held_for_recent_product_drawdown"]+=1
             elif product=="vfootball":
                 # A very high Under estimate is not enough on its own. Guard
                 # U7.5/U8.5 and higher until the exact direction has >=30
@@ -1414,6 +1452,7 @@ def build_virtual_events(history, lifecycle, eligibility, participant_history_fr
                 "validated_model_components":validated_meta,
                 "desk_learning_active":over_learning_source!="NONE" or under_learning_source!="NONE",
                 "desk_learning_settled_n":int(product_desk_learning.get("settled_predictions") or 0),
+                "recent_product_performance_gate":product_recent_performance_gate,
                 "desk_learning_bucket":bucket_key,
                 "desk_learning_adjustment_source":(
                     chosen_learning_source if chosen_learning_source!="NONE"
@@ -1489,6 +1528,7 @@ def build_virtual_events(history, lifecycle, eligibility, participant_history_fr
         "historical_events":len(history or []),
         "base_model_gate":base_model_gate,
         "participant_enhancement_gate":participant_gate,
+        "efootball_gt_recent_performance_gate":efootball_recent_performance_gate(desk_learning,"efootball_gt"),
         "participant_history_freshness":participant_freshness or {"fresh":bool(participant_history_fresh)},
         "live_refresh":live_refresh_meta,
         "prospective_poisson_shadow_coverage":shadow_coverage,

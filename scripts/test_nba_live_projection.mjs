@@ -6,7 +6,7 @@ const start = source.indexOf("function statNumber(");
 const end = source.indexOf("function liveHtml(){", start);
 assert.ok(start >= 0 && end > start, "Live projection helpers must exist before the live desk renderer.");
 const helperSource = source.slice(start, end);
-const api = new Function("teamKey", helperSource + "\nreturn { liveTotalProjection, teamPossessions, verifiedTotalRecord, nbaTotalsReleaseQualified, nbaTotalRowQualified };")(
+const api = new Function("teamKey", helperSource + "\nreturn { liveTotalProjection, nbaPredictionFresh, teamPossessions, verifiedTotalRecord, nbaTotalsReleaseQualified, nbaTotalRowQualified };")(
   value => String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()
 );
 const stat = (name, displayValue, abbreviation) => ({ name, displayValue, abbreviation });
@@ -30,7 +30,13 @@ const record = {
     ] }
   ]
 };
-const projection = api.liveTotalProjection(record, { expected_total: 224.5 });
+const freshPrediction = { expected_total: 224.5, generated_at: new Date(Date.now() - 30 * 60 * 1000).toISOString() };
+assert.equal(api.nbaPredictionFresh(freshPrediction).fresh, true);
+assert.equal(api.nbaPredictionFresh({ expected_total: 224.5 }).fresh, false);
+const stalePrediction = { expected_total: 224.5, generated_at: new Date(Date.now() - 7 * 60 * 60 * 1000).toISOString() };
+assert.equal(api.nbaPredictionFresh(stalePrediction).reason, "OLDER_THAN_SIX_HOURS");
+assert.equal(api.liveTotalProjection(record, stalePrediction).status, "STALE_PREGAME_BASELINE");
+const projection = api.liveTotalProjection(record, freshPrediction);
 assert.equal(projection.status, "AVAILABLE");
 assert.equal(projection.uses_live_boxscore_stats, true);
 assert.equal(projection.projection_source, "ESPN_LIVE_BOXSCORE_POSSESSIONS_AND_SCORE_PACE");
@@ -38,8 +44,8 @@ assert.ok(projection.stats_summary.fields_used.includes("FGA"));
 assert.ok(projection.stats_summary.fields_used.includes("turnovers"));
 assert.ok(projection.live_total_estimate >= 206.5 && projection.live_total_estimate <= 242.5);
 assert.equal(projection.qualification, "PAPER_RESEARCH_ONLY_NOT_BETTING_QUALIFIED");
-assert.equal(api.liveTotalProjection({ ...record, period: 1, clock: "09:00" }, { expected_total: 224.5 }).status, "COLLECTING");
-assert.equal(api.liveTotalProjection({ ...record, period: 5, clock: "04:00" }, { expected_total: 224.5 }).status, "OVERTIME_CONTEXT_ONLY");
+assert.equal(api.liveTotalProjection({ ...record, period: 1, clock: "09:00" }, freshPrediction).status, "COLLECTING");
+assert.equal(api.liveTotalProjection({ ...record, period: 5, clock: "04:00" }, freshPrediction).status, "OVERTIME_CONTEXT_ONLY");
 const verified = {
   settled: true, publication_snapshot_verified: true, roi_eligible: true,
   quote_fresh_at_publication: true, price_pair_valid: true, price_source_verified: true,
