@@ -79,7 +79,42 @@ def test_unsettled_games_and_wrong_model_versions_are_excluded():
     assert result["observation_coverage"]["estimate_status_counts"] == {"AVAILABLE": 1}
 
 
+def test_period_targets_reject_snapshots_too_far_from_checkpoint():
+    # These values fall inside the broad period buckets but are 2.7 minutes
+    # before the target. They must not be mislabelled as end-of-period samples.
+    event_id = "game-too-far-from-period-target"
+    snapshots = []
+    for index, elapsed in enumerate((8.8, 20.8, 32.8, 39.3)):
+        snapshots.append({
+            "event_id": event_id,
+            "game_state": "live",
+            "observed_at": f"2026-10-31T00:{index * 5:02d}:00+00:00",
+            "pregame_totals_model_version": "model-v5",
+            "live_total_projection": {
+                "status": "AVAILABLE",
+                "elapsed_minutes": elapsed,
+                "live_total_estimate": 220.0,
+                "pregame_expected_total": 225.0,
+                "projection_source": "ESPN_LIVE_BOXSCORE_POSSESSIONS_AND_SCORE_PACE",
+                "uses_live_boxscore_stats": True,
+            },
+        })
+    snapshots.append({
+        "event_id": event_id,
+        "game_state": "final",
+        "observed_at": "2026-10-31T23:55:00+00:00",
+        "home": {"score": "110"},
+        "away": {"score": "105"},
+    })
+    result = evaluate({"games": {event_id: {"event_id": event_id, "snapshots": snapshots}}}, [], "model-v5")
+    assert result["evidence_sufficient"] is False
+    assert result["overall"]["n"] == 0
+    for bucket in ("Q1_end", "Halftime", "Q3_end", "Q4"):
+        assert result["by_period"][bucket]["n"] == 0
+
+
 if __name__ == "__main__":
     test_period_estimates_are_paired_to_final_scores_and_separated()
     test_unsettled_games_and_wrong_model_versions_are_excluded()
+    test_period_targets_reject_snapshots_too_far_from_checkpoint()
     print("NBA live totals period walk-forward tests: PASS")

@@ -19,6 +19,7 @@ LEGACY_OBSERVATIONS = DATA / "nba_live_observations.json"
 HISTORY = DATA / "nba_history.json"
 OUTPUT = DATA / "nba_live_totals_oos.json"
 MIN_PERIOD_SAMPLE = 30
+PERIOD_TARGET_TOLERANCE_MINUTES = 2.5
 PERIOD_TARGETS = (
     ("Q1_end", 11.5, 8.0, 12.0),
     ("Halftime", 23.5, 20.0, 24.0),
@@ -189,7 +190,9 @@ def evaluate(observation_payload, history_rows, model_version=None):
             if not period_rows:
                 continue
             best = min(period_rows, key=lambda row: (abs(row["elapsed_minutes"] - target), row["observed_at"]))
-            if abs(best["elapsed_minutes"] - target) <= 4.5:
+            # Five-minute capture cadence can land just before/after a boundary.
+            # Do not label an early-quarter estimate as an end-of-period sample.
+            if abs(best["elapsed_minutes"] - target) <= PERIOD_TARGET_TOLERANCE_MINUTES:
                 selected[label].append(best)
 
     by_period = {label: metrics(rows) for label, rows in selected.items()}
@@ -202,7 +205,8 @@ def evaluate(observation_payload, history_rows, model_version=None):
         "model_version": model_version,
         "source": "Archived ESPN live scoreboard/box-score estimates paired with official final totals",
         "observation_window_days": 30,
-        "selection": "One nearest target snapshot per settled event at end of Q1 (11.5m), halftime (23.5m), end of Q3 (35.5m), and mid-Q4 (42m); missing projections and unsettled games are excluded, never imputed.",
+        "selection": "One nearest target snapshot per settled event at end of Q1 (11.5m), halftime (23.5m), end of Q3 (35.5m), and mid-Q4 (42m); snapshots farther than the target tolerance are excluded, and missing projections/unsettled games are never imputed.",
+        "period_target_tolerance_minutes": PERIOD_TARGET_TOLERANCE_MINUTES,
         "minimum_games_per_period": MIN_PERIOD_SAMPLE,
         "observation_coverage": observation_coverage(games, model_version),
         "settled_events_with_observations": len({row["event_id"] for row in all_rows}),
