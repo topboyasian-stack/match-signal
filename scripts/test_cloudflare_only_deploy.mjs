@@ -52,6 +52,10 @@ assert.ok(
     cloudflare.includes("|scripts/test_workflow_trigger_boundaries.py|") &&
     cloudflare.includes("|scripts/test_cloudflare_only_deploy.mjs|") &&
     cloudflare.includes("|live.html|") &&
+    cloudflare.includes("|match-signal-ip.js|") &&
+    cloudflare.includes("|api-access.html|") &&
+    cloudflare.includes("      - 'match-signal-ip.js'") &&
+    cloudflare.includes("      - 'api-access.html'") &&
     cloudflare.includes("      - 'live.html'") &&
     cloudflare.includes("|functions/api/odds-builder-data.js|") &&
     cloudflare.includes("|functions/api/sportybet-virtual-results.js|") &&
