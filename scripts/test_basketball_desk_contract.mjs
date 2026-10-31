@@ -39,7 +39,7 @@ assert.ok(workflow.includes("node scripts/test_basketball_desk_contract.mjs"), "
 
 assert.ok(html.includes("How to read this — one clear decision") && html.includes("Model at least 3 points above line"), "Totals page must explain how to choose Over, Under or no clear lean");
 assert.ok(html.includes('id="basketball-builders"') && html.includes('id="basketballBuilderWorkspace"'), "Basketball page must expose its four-builder workspace");
-assert.ok(ui.includes("function totalsLedgerHtml()") && ui.includes("data/nba_totals_ledger.json") && ui.includes("totalSummary.accuracy"), "NBA totals must read persistent settlement records and calculate accuracy only from decided settlements");
+assert.ok(ui.includes("function totalsLedgerHtml()") && ui.includes("data/nba_totals_ledger.json") && ui.includes("verifiedTotalRecord"), "NBA totals must read persistent settlement records and calculate accuracy only from decided settlements");
 assert.ok(html.includes("PERSISTENT SETTLEMENT LEDGER"), "Basketball desk must expose retained totals settlements");
 assert.ok(ui.includes("function renderBuilders()") && ui.includes("BASKETBALL_BUILDERS=[[],[],[],[]]") && ui.includes("data-builder-generate"), "Four independent builder cards must be rendered");
 assert.ok(ui.includes("BUILDER_ERRORS") && ui.includes("Code not generated") && ui.includes("data-builder-retry"), "Booking failures must remain visible in the relevant builder with a retry action");
@@ -52,6 +52,9 @@ assert.ok(booking.includes("host+'/api/ng/orders/share") && booking.includes("bo
 assert.ok(booking.includes("leg.market_id||'225'") && booking.includes("SELECTIONS_CHANGED") && booking.includes("NON_STAKING_BETSLIP_PREPARATION"), "Basketball code generation must revalidate exact total market 225 and fail closed without staking");
 
 assert.ok(ui.includes("nba_live_current.json") && ui.includes("live_total_projection") && ui.includes("score_pace_total"), "Live desk must load the latest ESPN in-game observation and display a separate score-pace estimate.");
+assert.ok(ui.includes("/apis/site/v2/sports/basketball/nba/summary") && ui.includes("./api/espn?path=") && ui.includes("await refreshLiveObservations();") && ui.includes("},45000)"), "Live desk must refresh current ESPN summaries after scoreboard updates on the 45-second browser cycle.");
+assert.ok(ui.includes("function liveTotalProjection") && ui.includes("OVERTIME_CONTEXT_ONLY") && ui.includes("At least six minutes of game time"), "Live NBA projections must require a meaningful sample and withhold regulation estimates during overtime.");
+assert.ok(ui.includes("publication_snapshot_verified===true") && ui.includes("roi_eligible===true") && ui.includes("quote_fresh_at_publication===true") && ui.includes("Legacy result-only accuracy"), "Legacy NBA total outcomes must remain separate from verified snapshot accuracy and ROI.");
 assert.ok(ui.includes("uses_live_boxscore_stats") && ui.includes("home_possessions") && ui.includes("FGA, FTA, offensive rebounds and turnovers"), "Live desk must expose whether the total estimate actually consumed both teams’ live box-score possession inputs.");
 assert.ok(ui.includes("Live behavior snapshot is stale or unavailable") && ui.includes("12*60*1000"), "Live insights must fail closed when the observation artifact is stale.");
 assert.ok(ui.includes("Pregame probability is unchanged") && ui.includes("Paper research only"), "Live insights must preserve the pre-game forecast and research-only boundary.");
