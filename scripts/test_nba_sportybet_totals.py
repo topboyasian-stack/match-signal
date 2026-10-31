@@ -130,6 +130,7 @@ with tempfile.TemporaryDirectory() as tmp:
     assert first == {"added": 1, "total": 1}
     changed = json.loads(json.dumps(snapshot_prediction))
     changed["markets"]["total_ou"]["line"] = 231.5
+    changed["markets"]["total_ou"]["quote_timestamp"] = (now + timedelta(minutes=30)).isoformat()
     second = pipeline.append_nba_totals_publication_snapshots([changed], snapshot_path, (now + timedelta(minutes=30)).isoformat())
     saved = json.loads(snapshot_path.read_text(encoding="utf-8"))
     assert second == {"added": 1, "total": 2}, "a changed line must create a new immutable price revision"
