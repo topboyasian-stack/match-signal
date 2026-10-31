@@ -108,7 +108,28 @@ const start = source.indexOf("function isOverUnderPrediction(x){");
 const end = source.indexOf("function ladderAnchor(rows){", start);
 assert.ok(start >= 0 && end > start, "production desk gate functions are extractable");
 
-const sandbox = { Date, Number, String, Math, Array, Boolean, Object, Map, Set, RegExp };
+const sandbox = {
+  Date, Number, String, Math, Array, Boolean, Object, Map, Set, RegExp,
+  efootballDeskLearning: {
+    generated_at: new Date().toISOString(),
+    by_product: {
+      efootball_gt: {
+        recent_window: { n: 50, accuracy: 0.70 },
+        raw_probability_calibration: { buckets: {
+          "0.8": { n: 346, calibrated_probability: 0.5455, accuracy: 0.5202, calibration_weight: 0.92 },
+          "0.85": { n: 390, calibrated_probability: 0.4880, accuracy: 0.4590, calibration_weight: 0.93 },
+          "0.9": { n: 444, calibrated_probability: 0.5623, accuracy: 0.5383, calibration_weight: 0.94 }
+        } }
+      },
+      efootball_adriatic: {
+        recent_window: { n: 50, accuracy: 0.70 },
+        raw_probability_calibration: { buckets: {
+          "0.8": { n: 100, calibrated_probability: 0.60, accuracy: 0.60, calibration_weight: 0.90 }
+        } }
+      }
+    }
+  }
+};
 vm.createContext(sandbox);
 vm.runInContext(
   source.slice(start, end) +
