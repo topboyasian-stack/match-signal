@@ -33,6 +33,7 @@ on:
       - 'scripts/ensure_odds_builder_refresh.py'
       - 'scripts/test_ensure_odds_builder_refresh.py'
       - 'scripts/test_cloudflare_only_deploy.mjs'
+      - 'scripts/visual_site_audit.mjs'
       - '.github/workflows/deploy-pages.yml'
       - '.github/workflows/settle-results.yml'
       - '.github/workflows/tennis_pipeline.yml'
@@ -98,6 +99,7 @@ jobs:
           node --check scripts/test_workspace_terminal_design.mjs
           node --check scripts/qualified_best_monitor.mjs
           node --check scripts/qualified_best_monitor_lib.mjs
+          node --check scripts/visual_site_audit.mjs
           node --check scripts/test_qualified_best_monitor.mjs
           node --check functions/api/sportybet-virtual.js
           node --check scripts/test_sportybet_virtual_upcoming_mode.mjs
@@ -120,7 +122,7 @@ jobs:
   production-monitor:
     if: github.event_name != 'pull_request' && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 20
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       QUALIFIED_BEST_URL: https://match-signal.pages.dev/qualified-best.html
@@ -145,9 +147,11 @@ jobs:
             qualified-best-chromium-${{ runner.os }}-
 
       - name: Install browser monitor dependency
+        id: install-browser
         run: npm install --no-save playwright
 
       - name: Install Chromium and system dependencies
+        id: install-chromium
         run: npx playwright install --with-deps chromium
 
       - name: Test valid-zero versus failed-check classification
@@ -155,6 +159,21 @@ jobs:
 
       - name: Inspect production Qualified Best through the real browser gate
         run: node scripts/qualified_best_monitor.mjs
+
+      - name: Inspect every Match Signal route at desktop and mobile widths
+        if: always() && steps.install-browser.outcome == 'success' && steps.install-chromium.outcome == 'success'
+        env:
+          MATCH_SIGNAL_BASE_URL: https://match-signal.pages.dev
+        run: node scripts/visual_site_audit.mjs
+
+      - name: Upload full-site responsive screenshots and report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: match-signal-full-site-visual-audit-${{ github.run_id }}
+          path: visual-site-audit/
+          if-no-files-found: warn
+          retention-days: 30
 
       - name: Upload timestamped production diagnostics
         if: always()
