@@ -13,6 +13,8 @@ on:
       - 'scripts/virtual_lab_confirmed_participants.py'
       - 'scripts/virtual_lab_h2h_enricher.py'
       - 'virtual-lab-confirmed-watch.js'
+      # Manual watch input remains a trigger, but generated H2H/archive files below are intentionally excluded
+      # to prevent the collector's own publication from immediately launching a second full 12-minute run.
       - 'data/virtual_lab_participants/efootball_confirmed_watch.json'
       - 'data/virtual_lab_confirmed_participants.json'
       - 'scripts/virtual_lab_eligibility.py'
@@ -20,9 +22,6 @@ on:
       - 'virtual-lab-app.js'
       - 'research.html'
       - 'virtual-lab/**'
-      - 'data/virtual_lab_participant_h2h.json'
-      - 'data/virtual_lab_external_h2h.json'
-      - 'data/virtual_lab_archive/**'
   schedule:
     # This full settlement/evaluation pass recently took about 12 minutes. Keep it
     # on a 15-minute cadence; the separate live-feed sync and Unified Upcoming board
