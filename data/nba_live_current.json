@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-10-31T23:03:39.276891+00:00",
+  "updated_at": "2026-10-31T23:05:53.147782+00:00",
   "source": "ESPN public scoreboard/summary",
   "scoreboard_dates_checked": [
     "20261030",
@@ -10,7 +10,7 @@
   "mode": "PAPER_RESEARCH_ONLY",
   "games": {
     "401909897": {
-      "observed_at": "2026-10-31T23:03:39.276891+00:00",
+      "observed_at": "2026-10-31T23:05:53.147782+00:00",
       "event_id": "401909897",
       "scheduled_at": "2026-10-31T22:00Z",
       "game_state": "live",
@@ -1911,8 +1911,38 @@
       "boxscore_available": true,
       "pregame_totals_model_version": "nba-total-v5-pace-efficiency-calibrated",
       "live_total_projection": {
-        "status": "LIVE_DATA_INCOMPLETE",
-        "reason": "ESPN game clock is unavailable."
+        "status": "AVAILABLE",
+        "pregame_expected_total": 209.1,
+        "pregame_baseline_age_minutes": 141,
+        "live_score_total": 109.0,
+        "elapsed_minutes": 23.5,
+        "score_pace_total": 222.7,
+        "stat_adjusted_total": 227.3,
+        "live_total_estimate": 214.1,
+        "live_weight": 0.294,
+        "projection_source": "ESPN_LIVE_BOXSCORE_POSSESSIONS_AND_SCORE_PACE",
+        "uses_live_boxscore_stats": true,
+        "stats_summary": {
+          "home_possessions": 54.1,
+          "away_possessions": 62.1,
+          "average_possessions": 58.1,
+          "live_points_per_possession": 1.877,
+          "pregame_points_per_possession_prior": 2.091,
+          "adjusted_points_per_possession": 1.952,
+          "efficiency_sample_weight": 0.65,
+          "projected_remaining_possessions": 60.6,
+          "fields_used": [
+            "FGA",
+            "FTA",
+            "offensive rebounds",
+            "turnovers",
+            "score",
+            "game clock"
+          ]
+        },
+        "formula": "Pregame total blended with live score pace and, when available, possession/efficiency estimated from FGA, FTA, offensive rebounds and turnovers; live adjustment capped at +/-18 points.",
+        "uses_bookmaker_prices": false,
+        "qualification": "PAPER_RESEARCH_ONLY_NOT_BETTING_QUALIFIED"
       }
     }
   }
