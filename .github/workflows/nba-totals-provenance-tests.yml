@@ -1,0 +1,31 @@
+name: NBA totals price-provenance regression tests
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/settle_nba_totals.py'
+      - 'scripts/test_settle_nba_totals.py'
+      - 'scripts/live_expansion_pipeline.py'
+      - 'scripts/test_nba_sportybet_totals.py'
+      - '.github/workflows/nba-totals-provenance-tests.yml'
+      - '.github/workflows/live-expansion.yml'
+      - '.github/workflows/nba-totals-settlement.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test dependency
+        run: python -m pip install --disable-pip-version-check requests pandas pyarrow
+      - name: Run NBA totals settlement and price-provenance tests
+        run: |
+          python scripts/test_settle_nba_totals.py
+          python scripts/test_nba_sportybet_totals.py
