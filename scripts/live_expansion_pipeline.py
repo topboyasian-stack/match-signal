@@ -4,7 +4,7 @@ Keeps the independent model separate from market prices while allowing the
 current-season competitions to generate real, timestamped experimental signals.
 The outputs are explicitly LIVE_EXPERIMENTAL, never live-trading approved.
 """
-import csv, io, json, math, re
+import csv, hashlib, io, json, math, re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import requests
@@ -15,6 +15,7 @@ from independent_football_model import independent_prediction
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
 DATA.mkdir(exist_ok=True)
+NBA_TOTAL_SNAPSHOTS = DATA / "nba_totals_publication_snapshots.json"
 S = requests.Session()
 S.headers.update({"User-Agent": "Mozilla/5.0 (compatible; MatchSignal/1.0)"})
 
@@ -337,6 +338,78 @@ def ere_prediction(fixture, history):
     }
 
 
+def nba_total_publication_snapshot(prediction, published_at=None):
+    """Freeze the first price-auditable pre-match NBA total generated for an event.
+
+This is a complete research cohort, not a claim that the model signal passed a
+separate confidence/qualification threshold.
+"""
+    published_at = dt(published_at or NOW.isoformat())
+    start = dt(prediction.get("start_time"))
+    market = ((prediction.get("markets") or {}).get("total_ou") or {})
+    quote_time = dt(market.get("quote_timestamp"))
+    if not published_at or not start or published_at >= start:
+        return None
+    if str(market.get("market_id") or "") != "225":
+        return None
+    if str(market.get("source") or "").strip().lower() != "sportybet nigeria":
+        return None
+    if not quote_time or quote_time > published_at or quote_time >= start:
+        return None
+    if (published_at - quote_time).total_seconds() > 15 * 60:
+        return None
+    if str(market.get("pick") or "").lower() not in {"over", "under"}:
+        return None
+    try:
+        line = float(market.get("line"))
+        over_odds = float(market.get("over_odds"))
+        under_odds = float(market.get("under_odds"))
+    except (TypeError, ValueError):
+        return None
+    if not 100 <= line <= 300 or not all(math.isfinite(x) and x > 1 for x in (over_odds, under_odds)):
+        return None
+    if not market.get("sportybet_event_id"):
+        return None
+
+    snapshot = json.loads(json.dumps(prediction))
+    snapshot["published_at"] = published_at.isoformat()
+    snapshot["publication_snapshot_verified"] = True
+    snapshot["publication_snapshot_kind"] = "first_price_auditable_pre_match_nba_total"
+    identity = "|".join([
+        str(snapshot.get("event_id") or ""), snapshot["published_at"],
+        str(line), str(market.get("pick")), str(market.get("quote_timestamp")),
+        str(over_odds), str(under_odds),
+    ])
+    snapshot["publication_snapshot_id"] = "nba-total-pub:" + hashlib.sha256(identity.encode("utf-8")).hexdigest()[:24]
+    snapshot["paper_only"] = True
+    return snapshot
+
+
+def append_nba_totals_publication_snapshots(predictions, path=None, published_at=None):
+    """Append one immutable, first-qualified snapshot per event; never overwrite prior picks."""
+    path = Path(path) if path else NBA_TOTAL_SNAPSHOTS
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        existing = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(existing, list):
+            existing = []
+    except (OSError, json.JSONDecodeError):
+        existing = []
+    known = {str(row.get("event_id")) for row in existing if isinstance(row, dict) and row.get("event_id")}
+    added = 0
+    for prediction in predictions:
+        event_id = str(prediction.get("event_id") or "")
+        if not event_id or event_id in known:
+            continue
+        snapshot = nba_total_publication_snapshot(prediction, published_at)
+        if snapshot:
+            existing.append(snapshot)
+            known.add(event_id)
+            added += 1
+    existing.sort(key=lambda row: (str(row.get("published_at") or ""), str(row.get("event_id") or "")))
+    path.write_text(json.dumps(existing, indent=2, ensure_ascii=False) + chr(10), encoding="utf-8")
+    return {"added": added, "total": len(existing)}
+
 def should_refresh_nba_prediction(old, start, now=None, max_age_hours=6):
     """Refresh old projections only while the fixture is still pre-game."""
     now = now or NOW
@@ -420,6 +493,10 @@ def main():
             seen_nba.add(eid)
     nba_predictions.sort(key=lambda x: x.get("start_time", ""))
 
+    # Freeze one first-qualified, fresh-price publication per event. Later desk refreshes
+    # may change the visible quote, but cannot rewrite the historical performance cohort.
+    snapshot_status = append_nba_totals_publication_snapshots(nba_predictions, published_at=datetime.now(timezone.utc).isoformat())
+
     (DATA/"ere_divisie_history.json").write_text(json.dumps(ere_history, indent=2), encoding="utf-8")
     (DATA/"nba_history.json").write_text(json.dumps(nba_history, indent=2), encoding="utf-8")
     (DATA/"ere_divisie_predictions.json").write_text(json.dumps(ere_predictions, indent=2), encoding="utf-8")
@@ -432,6 +509,7 @@ def main():
             "Eredivisie": {"historical_events": len(ere_history), "current_fixtures": len(ere_fixtures), "published_predictions": len(ere_predictions), "collection_errors": len(ere_errors), "status": "LIVE_EXPERIMENTAL" if ere_predictions else "NO_CURRENT_FIXTURES", "fixture_source": "ESPN primary; Football-Data fixtures.csv; SofaScore daily schedule fallback"},
         },
         "source_diagnostics": {"NBA": nba_errors[:5], "Eredivisie": ere_errors[:5], "SportyBet_NBA_totals": ([sportybet_error] if sportybet_error else [])},
+        "nba_totals_publication_snapshots": snapshot_status,
         "monitoring": {"settlement": "expansion_prediction_history.json", "promotion_rule": "live evidence + calibration + market benchmark; automatic demotion on data failure", "market_data_is_benchmark_only": True},
         "notes": ["Independent probabilities never consume market probabilities.", "LIVE_EXPERIMENTAL signals are real generated predictions, not guarantees or live-trading approval.", "NBA remains preseason-ready until 2026-10-20, then enters live experimental mode automatically.", "Eredivisie uses ESPN when available, Football-Data's current fixture feed as the first fallback, and SofaScore's daily schedule as the second fallback."],
     }
