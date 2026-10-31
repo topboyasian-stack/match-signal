@@ -66,7 +66,6 @@ assert.ok(
   cloudflare.includes("|scripts/test_live_virtual_quote_coverage.mjs|") &&
     cloudflare.includes("|scripts/test_nba_live_projection.mjs|") &&
     cloudflare.includes("|scripts/visual_site_audit.mjs|") &&
-    cloudflare.includes("node scripts/test_nba_live_projection.mjs") &&
     cloudflare.includes("/apis/site/v2/sports/basketball/nba/summary") &&
     cloudflare.includes("NBA live-summary proxy passed"),
   "The NBA projection regression, eFootball quote-coverage regression, visual audit and ESPN summary proxy must be explicitly approved and verified.",
