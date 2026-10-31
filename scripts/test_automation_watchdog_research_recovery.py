@@ -5,6 +5,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 WATCHDOG = (ROOT / ".github/workflows/automation_watchdog.yml").read_text(encoding="utf-8")
 RESEARCH = (ROOT / ".github/workflows/efootball-market-research-schedule.yml").read_text(encoding="utf-8")
+PAGES = (ROOT / ".github/workflows/cloudflare-pages.yml").read_text(encoding="utf-8")
 
 
 class EfootballResearchRecoveryTests(unittest.TestCase):
@@ -35,6 +36,23 @@ class EfootballResearchRecoveryTests(unittest.TestCase):
         self.assertIn("if odds_age_minutes > ODDS_BUILDER_MAX_AGE_MINUTES and not active('odds_builder.yml'):", WATCHDOG)
         self.assertNotIn("if odds_age > 8 and not active('odds_builder.yml'):", WATCHDOG)
         self.assertIn("'odds_builder_age_minutes': odds_age_minutes", WATCHDOG)
+
+    def test_stale_virtual_and_nba_live_sources_have_bounded_recovery(self):
+        self.assertIn('"Match Signal Odds Builder"', WATCHDOG)
+        self.assertIn('"Match Signal NBA In-Game Behavior Recorder"', WATCHDOG)
+        self.assertIn("VIRTUAL_LIVE_MAX_AGE_MINUTES = 30", WATCHDOG)
+        self.assertIn("NBA_LIVE_MAX_AGE_MINUTES = 15", WATCHDOG)
+        self.assertIn("LIVE_FEED_DISPATCH_COOLDOWN_MINUTES = 10", WATCHDOG)
+        self.assertIn("gh workflow run virtual-lab-live-sync-heartbeat.yml --ref main", WATCHDOG)
+        self.assertIn("gh workflow run nba-live-observation.yml --ref main", WATCHDOG)
+        self.assertIn("python scripts/system_health_audit.py", WATCHDOG)
+
+    def test_automation_watchdog_changes_do_not_trigger_a_static_pages_deploy(self):
+        self.assertNotIn(
+            "      - '.github/workflows/automation_watchdog.yml'",
+            PAGES,
+            "watchdog-only changes must not consume a Cloudflare Pages production deployment",
+        )
 
     def test_watchdog_contract_is_run_by_research_pr_validation(self):
         self.assertIn("scripts/test_automation_watchdog_research_recovery.py", RESEARCH)
