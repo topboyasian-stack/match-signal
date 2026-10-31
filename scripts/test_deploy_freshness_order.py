@@ -87,9 +87,9 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
 
     def test_board_schedule_is_offset_from_hour_boundary(self):
         crons = workflow_schedule_crons(BOARD_WORKFLOW)
-        self.assertIn("2-59/5 * * * *", crons)
-        self.assertNotIn("3-59/5 * * * *", crons, "cron must change to re-arm the missing scheduled board publisher")
-        self.assertNotIn("4-59/5 * * * *", crons)
+        self.assertIn("5-59/5 * * * *", crons)
+        self.assertNotIn("2-59/5 * * * *", crons, "cron must change to re-arm the missing scheduled board publisher")
+        self.assertNotIn("*/5 * * * *", crons)
         self.assertNotIn("*/5 * * * *", crons)
 
     def test_builder_promotion_refresh_isolated_from_normal_board_queue(self):
@@ -121,8 +121,8 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         # Keep deployment-triggered monitoring separate from the newly registered cron identity.
         self.assertEqual(workflow_schedule_crons(MONITOR_WORKFLOW), [])
         crons = workflow_schedule_crons(SCHEDULE_MONITOR_WORKFLOW)
-        self.assertIn("6,16,26,36,46,56 * * * *", crons)
-        self.assertNotIn("1,11,21,31,41,51 * * * *", crons, "schedule must move to a fresh workflow identity")
+        self.assertIn("7,17,27,37,47,57 * * * *", crons)
+        self.assertNotIn("6,16,26,36,46,56 * * * *", crons, "schedule must move to a fresh workflow identity")
         self.assertNotIn("*/5 * * * *", crons)
         events_end = MONITOR_WORKFLOW.find("\npermissions:")
         self.assertGreater(events_end, 0)
@@ -134,8 +134,8 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
 
     def test_watchdog_schedule_is_rearmed_and_stale_board_self_heals_quickly(self):
         crons = workflow_schedule_crons(WATCHDOG_WORKFLOW)
-        self.assertIn("8,18,28,38,48,58 * * * *", crons)
-        self.assertNotIn("1,11,21,31,41,51 * * * *", crons, "cron must change to re-arm the missing scheduled watchdog")
+        self.assertIn("3,13,23,33,43,53 * * * *", crons)
+        self.assertNotIn("8,18,28,38,48,58 * * * *", crons, "cron must change to re-arm the missing scheduled watchdog")
         self.assertIn("UNIFIED_UPCOMING_MAX_AGE_MINUTES = 15", WATCHDOG_WORKFLOW)
         self.assertIn("UNIFIED_UPCOMING_DISPATCH_COOLDOWN_MINUTES = 10", WATCHDOG_WORKFLOW)
         self.assertIn("UNIFIED_UPCOMING_STALE_RUN_MAX_AGE_MINUTES = 20", WATCHDOG_WORKFLOW)
