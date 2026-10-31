@@ -107,6 +107,7 @@ jobs:
           now = datetime.now(timezone.utc)
           virtual = load('data/virtual_lab_live.json')
           nba_live = load('data/nba_live_observations.json')
+          nba_totals_ledger = load('data/nba_totals_ledger.json')
           virtual_status = load('data/virtual_lab_status.json')
           pipeline = load('data/pipeline_status.json')
           odds = load('data/odds_builder.json')
@@ -134,6 +135,9 @@ jobs:
           expansion_age = age_hours(expansion.get('updated_at'))
           virtual_age = age_hours(virtual.get('updated_at'))
           nba_live_age = age_hours(nba_live.get('updated_at'))
+          nba_totals_ledger_age = age_hours(nba_totals_ledger.get('updated_at'))
+          NBA_TOTALS_LEDGER_MAX_AGE_MINUTES = 30
+          nba_totals_ledger_age_minutes = round(nba_totals_ledger_age * 60, 1)
           VIRTUAL_LIVE_MAX_AGE_MINUTES = 30
           NBA_LIVE_MAX_AGE_MINUTES = 15
           LIVE_FEED_DISPATCH_COOLDOWN_MINUTES = 10
@@ -440,6 +444,126 @@ jobs:
                           +str(NBA_LIVE_MAX_AGE_MINUTES)+' minutes.'
                       )
                   })
+
+          # The NBA scoreboard recorder and totals settlement ledger are independent.
+          # A fresh live feed must not hide a stale settled-results ledger.
+          NBA_TOTALS_LEDGER_STALE_RUN_MAX_AGE_MINUTES = 15
+          NBA_TOTALS_LEDGER_STALE_QUEUE_MAX_AGE_MINUTES = 10
+          nba_totals_runs, nba_totals_history_error = recent_runs('nba-totals-settlement.yml', 30)
+          nba_totals_active_runs = [
+              run for run in (nba_totals_runs or [])
+              if run.get('status') in {'queued', 'in_progress', 'waiting', 'pending'}
+          ]
+          nba_totals_active_run_age_minutes = max(
+              [minutes_since(run.get('createdAt')) for run in nba_totals_active_runs
+               if minutes_since(run.get('createdAt')) is not None],
+              default=None
+          )
+          oldest_active_nba_totals_run = max(
+              nba_totals_active_runs,
+              key=lambda run: minutes_since(run.get('createdAt')) or 0,
+              default=None
+          )
+          nba_totals_active_run_status = oldest_active_nba_totals_run.get('status') if oldest_active_nba_totals_run else None
+          nba_totals_dispatch_age_minutes, nba_totals_dispatch_history_error = last_dispatch_age('nba-totals-settlement.yml', 30)
+          nba_totals_ledger_recovery_status = 'FRESH' if nba_totals_ledger_age_minutes <= NBA_TOTALS_LEDGER_MAX_AGE_MINUTES else 'NOT_NEEDED'
+
+          if nba_totals_ledger_age_minutes > NBA_TOTALS_LEDGER_MAX_AGE_MINUTES:
+              if nba_totals_runs is None:
+                  nba_totals_ledger_recovery_status = 'HISTORY_ERROR'
+                  actions.append({
+                      'workflow':'nba-totals-settlement.yml',
+                      'action':'inspect_stale_nba_totals_ledger',
+                      'status':'failed',
+                      'detail':nba_totals_history_error
+                  })
+              else:
+                  stale_nba_totals_runs = [
+                      run for run in nba_totals_active_runs
+                      if minutes_since(run.get('createdAt')) is not None
+                      and (
+                          minutes_since(run.get('createdAt')) > NBA_TOTALS_LEDGER_STALE_RUN_MAX_AGE_MINUTES
+                          or (
+                              run.get('status') in {'queued', 'waiting', 'pending'}
+                              and minutes_since(run.get('createdAt')) > NBA_TOTALS_LEDGER_STALE_QUEUE_MAX_AGE_MINUTES
+                          )
+                      )
+                  ]
+                  if stale_nba_totals_runs:
+                      cancel_failures = []
+                      for run in stale_nba_totals_runs:
+                          run_id = run.get('databaseId')
+                          if not run_id:
+                              cancel_failures.append('stale NBA settlement run has no database ID')
+                              continue
+                          cancel = subprocess.run(['gh', 'run', 'cancel', str(run_id)], text=True, capture_output=True)
+                          if cancel.returncode != 0:
+                              cancel_failures.append(cancel.stderr.strip() or ('could not cancel NBA settlement run '+str(run_id)))
+                          else:
+                              actions.append({
+                                  'workflow':'nba-totals-settlement.yml',
+                                  'action':'cancel_stale_nba_totals_settlement_run',
+                                  'status':'requested',
+                                  'detail':'Cancelled stale NBA settlement run '+str(run_id)+' after '+str(minutes_since(run.get('createdAt')))+' minutes.'
+                              })
+                      if cancel_failures:
+                          nba_totals_ledger_recovery_status = 'CANCEL_FAILED'
+                          actions.append({
+                              'workflow':'nba-totals-settlement.yml',
+                              'action':'recover_stale_nba_totals_ledger',
+                              'status':'failed',
+                              'detail':'; '.join(cancel_failures)
+                          })
+                      elif any(run not in stale_nba_totals_runs for run in nba_totals_active_runs):
+                          nba_totals_ledger_recovery_status = 'NEWER_RUN_ACTIVE'
+                          actions.append({
+                              'workflow':'nba-totals-settlement.yml',
+                              'action':'recover_stale_nba_totals_ledger',
+                              'status':'suppressed_active_run',
+                              'detail':'Cancelled stale NBA settlement run(s); a newer run is still active.'
+                          })
+                      else:
+                          dispatch = subprocess.run(['gh', 'workflow', 'run', 'nba-totals-settlement.yml', '--ref', 'main'], text=True, capture_output=True)
+                          nba_totals_ledger_recovery_status = 'DISPATCHED' if dispatch.returncode == 0 else 'DISPATCH_FAILED'
+                          actions.append({
+                              'workflow':'nba-totals-settlement.yml',
+                              'action':'recover_stale_nba_totals_ledger',
+                              'status':'requested' if dispatch.returncode == 0 else 'failed',
+                              'detail':dispatch.stderr.strip() if dispatch.returncode else 'Cancelled stuck settlement run(s) and dispatched a fresh NBA totals reconciliation.'
+                          })
+                  elif nba_totals_active_runs:
+                      nba_totals_ledger_recovery_status = 'SUPPRESSED_ACTIVE_RUN'
+                      actions.append({
+                          'workflow':'nba-totals-settlement.yml',
+                          'action':'recover_stale_nba_totals_ledger',
+                          'status':'suppressed_active_run',
+                          'detail':'NBA totals ledger is '+str(nba_totals_ledger_age_minutes)+' minutes old; oldest active settlement run is '+str(nba_totals_active_run_age_minutes)+' minute(s) old (status '+str(nba_totals_active_run_status)+').'
+                      })
+                  elif nba_totals_dispatch_history_error:
+                      nba_totals_ledger_recovery_status = 'DISPATCH_HISTORY_ERROR'
+                      actions.append({
+                          'workflow':'nba-totals-settlement.yml',
+                          'action':'inspect_nba_totals_dispatch_cooldown',
+                          'status':'failed',
+                          'detail':nba_totals_dispatch_history_error
+                      })
+                  elif nba_totals_dispatch_age_minutes is not None and nba_totals_dispatch_age_minutes < 10:
+                      nba_totals_ledger_recovery_status = 'SUPPRESSED_COOLDOWN'
+                      actions.append({
+                          'workflow':'nba-totals-settlement.yml',
+                          'action':'recover_stale_nba_totals_ledger',
+                          'status':'suppressed_cooldown',
+                          'detail':'NBA totals settlement fallback was dispatched '+str(nba_totals_dispatch_age_minutes)+' minute(s) ago; cooldown is 10 minutes.'
+                      })
+                  else:
+                      dispatch = subprocess.run(['gh', 'workflow', 'run', 'nba-totals-settlement.yml', '--ref', 'main'], text=True, capture_output=True)
+                      nba_totals_ledger_recovery_status = 'DISPATCHED' if dispatch.returncode == 0 else 'DISPATCH_FAILED'
+                      actions.append({
+                          'workflow':'nba-totals-settlement.yml',
+                          'action':'recover_stale_nba_totals_ledger',
+                          'status':'requested' if dispatch.returncode == 0 else 'failed',
+                          'detail':dispatch.stderr.strip() if dispatch.returncode else ('NBA totals ledger is '+str(nba_totals_ledger_age_minutes)+' minutes old; dispatched official-score settlement recovery.')
+                      })
 
           efootball_research_archive_stale = (
               efootball_market_archive_age_minutes is None
@@ -800,6 +924,15 @@ jobs:
               'virtual_lab_live_sync_dispatch_age_minutes': virtual_sync_dispatch_age,
               'nba_live_observation_age_minutes': nba_live_age_minutes,
               'nba_live_observation_dispatch_age_minutes': nba_live_dispatch_age,
+              'nba_totals_ledger_updated_at': nba_totals_ledger.get('updated_at'),
+              'nba_totals_ledger_age_minutes': nba_totals_ledger_age_minutes,
+              'nba_totals_ledger_max_age_minutes': NBA_TOTALS_LEDGER_MAX_AGE_MINUTES,
+              'nba_totals_settled_count': (nba_totals_ledger.get('summary') or {}).get('settled'),
+              'nba_totals_ledger_recovery_status': nba_totals_ledger_recovery_status,
+              'nba_totals_active_run_age_minutes': nba_totals_active_run_age_minutes,
+              'nba_totals_active_run_status': nba_totals_active_run_status,
+              'nba_totals_stale_run_max_age_minutes': NBA_TOTALS_LEDGER_STALE_RUN_MAX_AGE_MINUTES,
+              'nba_totals_stale_queue_max_age_minutes': NBA_TOTALS_LEDGER_STALE_QUEUE_MAX_AGE_MINUTES,
               'virtual_lab_status_age_hours': round(virtual_status_age, 2),
               'virtual_lab_collector_active_run_age_minutes': virtual_lab_collector_active_run_age_minutes,
               'virtual_lab_collector_stale_run_max_age_minutes': VIRTUAL_LAB_COLLECTOR_STALE_RUN_MAX_AGE_MINUTES,
@@ -833,9 +966,9 @@ jobs:
               ),
               'virtual_lab_events': virtual.get('events_count', 0),
               'virtual_lab_products': virtual.get('product_counts', {}),
-              'thresholds': {'pipeline_hours': 4, 'odds_builder_minutes': ODDS_BUILDER_MAX_AGE_MINUTES, 'expansion_hours': 4, 'virtual_lab_hours': 1, 'virtual_lab_status_hours': 1, 'darts_hours': 2, 'table_tennis_hours': 2, 'unified_upcoming_hours': 0.2, 'qualified_best_monitor_minutes': 15, 'virtual_live_minutes': VIRTUAL_LIVE_MAX_AGE_MINUTES, 'nba_live_observation_minutes': NBA_LIVE_MAX_AGE_MINUTES, 'live_feed_dispatch_cooldown_minutes': LIVE_FEED_DISPATCH_COOLDOWN_MINUTES, 'efootball_market_research_minutes': EFOOTBALL_RESEARCH_MAX_AGE_MINUTES, 'efootball_market_research_dispatch_cooldown_minutes': EFOOTBALL_RESEARCH_DISPATCH_COOLDOWN_MINUTES},
+              'thresholds': {'pipeline_hours': 4, 'odds_builder_minutes': ODDS_BUILDER_MAX_AGE_MINUTES, 'expansion_hours': 4, 'virtual_lab_hours': 1, 'virtual_lab_status_hours': 1, 'darts_hours': 2, 'table_tennis_hours': 2, 'unified_upcoming_hours': 0.2, 'qualified_best_monitor_minutes': 15, 'virtual_live_minutes': VIRTUAL_LIVE_MAX_AGE_MINUTES, 'nba_live_observation_minutes': NBA_LIVE_MAX_AGE_MINUTES, 'nba_totals_ledger_minutes': NBA_TOTALS_LEDGER_MAX_AGE_MINUTES, 'live_feed_dispatch_cooldown_minutes': LIVE_FEED_DISPATCH_COOLDOWN_MINUTES, 'efootball_market_research_minutes': EFOOTBALL_RESEARCH_MAX_AGE_MINUTES, 'efootball_market_research_dispatch_cooldown_minutes': EFOOTBALL_RESEARCH_DISPATCH_COOLDOWN_MINUTES},
               'actions': actions,
-              'policy': 'Watchdog self-heals stale engines, records Qualified Best scheduled/actual monitor age, dispatches a fallback when the scheduled monitor is missing/stale even if deployment checks are recent (10-minute cooldown), retries failed board/deploy runs once per 20-minute cooldown, and dispatches isolated eFootball winner/GG-NG research when its market archive or collector capture is over 30 minutes stale (15-minute cooldown). The eFootball research workflow is shadow-only and never gates Qualified Best or Odds Builder. Stale Virtual Lab participant/settlement/model artifacts trigger collector recovery even when a queued/in-progress run is stuck (cancel queued runs after 10 minutes or running jobs after 25 minutes); live snapshots and NBA in-game observation heartbeats trigger bounded fallback dispatches. Successful NBA recorder and Odds Builder completions provide an event-driven watchdog heartbeat when cron delivery stalls. Workflow_run checks do not rewrite feed data to avoid downstream loops. Health publication is retried across concurrent data writers.'
+              'policy': 'Watchdog self-heals stale engines, records Qualified Best scheduled/actual monitor age, dispatches a fallback when the scheduled monitor is missing/stale even if deployment checks are recent (10-minute cooldown), retries failed board/deploy runs once per 20-minute cooldown, and dispatches isolated eFootball winner/GG-NG research when its market archive or collector capture is over 30 minutes stale (15-minute cooldown). The eFootball research workflow is shadow-only and never gates Qualified Best or Odds Builder. Stale Virtual Lab participant/settlement/model artifacts and NBA totals settlement ledgers trigger bounded recovery even when queued/in-progress runs are stuck. The NBA ledger recovers after 30 minutes of stale publication, cancelling queued runs after 10 minutes or jobs after 15 minutes; Virtual Lab collector runs cancel queued runs after 10 minutes or jobs after 25 minutes. Stale Virtual Lab participant/settlement/model artifacts trigger collector recovery even when a queued/in-progress run is stuck (cancel queued runs after 10 minutes or running jobs after 25 minutes); live snapshots and NBA in-game observation heartbeats trigger bounded fallback dispatches. Successful NBA recorder and Odds Builder completions provide an event-driven watchdog heartbeat when cron delivery stalls. Workflow_run checks do not rewrite feed data to avoid downstream loops. Health publication is retried across concurrent data writers.'
           }
           Path('data/automation_health.json').write_text(json.dumps(health, indent=2) + '\n')
           print(json.dumps(health, indent=2))
