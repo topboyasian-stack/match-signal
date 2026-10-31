@@ -187,6 +187,11 @@ def select_settlement_snapshot(rows):
     return ordered[0]
 
 
+def matching_snapshot_for_ledger(snapshots_by_key, key):
+    """Only same-event, same-model frozen evidence may audit a settled row."""
+    return snapshots_by_key.get(key)
+
+
 def candidate_key(row):
     """One independent settlement cohort per event and totals-model version."""
     return (
@@ -244,12 +249,8 @@ def main():
         if "roi_eligible" in row:
             continue
         event_id, row_version = key
-        matching = [
-            snapshot for snapshot_key, snapshot in snapshots_by_key.items()
-            if snapshot_key[0] == event_id and
-            (row_version == "legacy" or snapshot_key[1] == row_version)
-        ]
-        prediction = matching[0] if matching else predictions_by_key.get(key)
+        snapshot = matching_snapshot_for_ledger(snapshots_by_key, key)
+        prediction = snapshot if snapshot is not None else predictions_by_key.get(key)
         market = ((prediction or {}).get("markets") or {}).get("total_ou") or {}
         try:
             line_matches = float(row.get("line")) == float(market.get("line"))
