@@ -51,6 +51,8 @@ assert.ok(
   cloudflare.includes("|scripts/ensure_odds_builder_refresh.py|scripts/test_ensure_odds_builder_refresh.py|") &&
     cloudflare.includes("|scripts/test_workflow_trigger_boundaries.py|") &&
     cloudflare.includes("|scripts/test_cloudflare_only_deploy.mjs|") &&
+    cloudflare.includes("|live.html|") &&
+    cloudflare.includes("      - 'live.html'") &&
     cloudflare.includes("|functions/api/odds-builder-data.js|") &&
     cloudflare.includes("|functions/api/sportybet-virtual-results.js|") &&
     cloudflare.includes("      - 'functions/api/sportybet-virtual-results.js'"),
