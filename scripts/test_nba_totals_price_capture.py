@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 from expansion_pipeline import NBA_TOTALS_MODEL_VERSION
-from capture_nba_totals_prices import attach_fresh_quote, capture, capture_timestamp
+from capture_nba_totals_prices import attach_fresh_quote, capture, capture_timestamp, sportybet_basketball_feed_paged
 
 
 def make_prediction(now, **overrides):
@@ -41,6 +41,60 @@ def make_quote(now, **overrides):
 class PriceCaptureTests(unittest.TestCase):
     def setUp(self):
         self.now = datetime.now(timezone.utc)
+
+    def test_feed_paginates_seven_day_window_and_merges_duplicate_market_rows(self):
+        first_page = [
+            {"event_id": f"event-{i}", "home": f"Home {i}", "away": f"Away {i}",
+             "fetched_at": self.now.isoformat(), "markets": []}
+            for i in range(100)
+        ]
+        second_page = [
+            {"event_id": "event-100", "home": "Home 100", "away": "Away 100",
+             "fetched_at": self.now.isoformat(), "markets": [
+                 {"id": "225", "specifier": "total=220.5", "outcomes": []}
+             ]},
+            {"event_id": "event-0", "home": "Home 0", "away": "Away 0",
+             "fetched_at": (self.now + timedelta(seconds=1)).isoformat(), "markets": [
+                 {"id": "225", "specifier": "total=221.5", "outcomes": []}
+             ]},
+        ]
+
+        class Response:
+            def __init__(self, events):
+                self.events = events
+            def raise_for_status(self):
+                return None
+            def json(self):
+                return {"ok": True, "events": self.events}
+
+        with patch("capture_nba_totals_prices.S.get", side_effect=[
+            Response(first_page), Response(second_page)
+        ]) as feed_get:
+            events, error = sportybet_basketball_feed_paged(max_pages=5)
+
+        self.assertIsNone(error)
+        self.assertEqual([call.kwargs["params"]["pageNum"] for call in feed_get.call_args_list], [1, 2])
+        self.assertTrue(all(call.kwargs["params"]["timeline"] == 168 for call in feed_get.call_args_list))
+        self.assertEqual(len(events), 101)
+        duplicate = next(row for row in events if row["event_id"] == "event-0")
+        self.assertEqual({market["specifier"] for market in duplicate["markets"]}, {"total=221.5"})
+
+    def test_feed_returns_partial_pages_when_a_later_page_fails(self):
+        class Response:
+            def raise_for_status(self):
+                return None
+            def json(self):
+                return {"ok": True, "events": [
+                    {"event_id": f"event-{i}", "markets": []} for i in range(100)
+                ]}
+
+        with patch("capture_nba_totals_prices.S.get", side_effect=[
+            Response(), RuntimeError("page two unavailable")
+        ]):
+            events, error = sportybet_basketball_feed_paged(max_pages=3)
+
+        self.assertEqual(len(events), 100)
+        self.assertIn("page 2", error)
 
     def test_captures_exact_fresh_pair_and_calculates_direction(self):
         prediction = make_prediction(self.now)
