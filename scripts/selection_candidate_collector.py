@@ -233,6 +233,12 @@ def compact(row, now):
         "qualified_for_builder": bool(row.get("qualified_for_builder")),
         "participant_status": row.get("participant_status"),
         "participant_history_rows": row.get("participant_history_rows"),
+        # Carry the exact freshness evidence from the board into the separate
+        # candidate pool so the browser never treats a projection as fresh
+        # merely because the pool itself was recently regenerated.
+        "participant_history_fresh": row.get("participant_history_fresh"),
+        "participant_history_age_minutes": num(row.get("participant_history_age_minutes")),
+        "participant_history_stale_reason": row.get("participant_history_stale_reason"),
         "source_engine": row.get("source_engine"),
         "model": row.get("model"),
         "model_version": row.get("model_version"),
