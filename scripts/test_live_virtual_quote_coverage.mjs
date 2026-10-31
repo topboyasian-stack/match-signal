@@ -36,13 +36,20 @@ const now = Date.now();
 // Qualified Best can only promote rows that pass the model gate. High-probability
 // research projections and explicitly pending rows are intentionally excluded;
 // otherwise this checker paginates the whole research pool and can time out.
-const virtualCandidates = rows.filter(isVirtualDeskCandidate).filter(row => {
+const upcomingVirtualCandidates = rows.filter(isVirtualDeskCandidate).filter(row => {
   const product = String(row?.product || "").toLowerCase();
   const kickoff = Date.parse(String(row?.start_time || ""));
   return ["efootball_gt", "efootball_adriatic"].includes(product) &&
-    Number.isFinite(kickoff) && kickoff > now && kickoff <= now + 7 * 24 * 60 * 60 * 1000 &&
-    qualificationState(row).modelQualified === true;
+    Number.isFinite(kickoff) && kickoff > now && kickoff <= now + 7 * 24 * 60 * 60 * 1000;
 });
+// Keep the live shortlist separate from the research candidate pool. A zero
+// model-qualified slate is a legitimate safety outcome, not proof that quotes
+// matched or that the whole candidate pool was checked.
+const virtualCandidates = upcomingVirtualCandidates.filter(row =>
+  qualificationState(row).modelQualified === true
+);
+const noModelQualifiedCandidates = virtualCandidates.length === 0;
+console.log("[coverage] upcoming eFootball research candidates=" + upcomingVirtualCandidates.length);
 console.log("[coverage] model-qualified eFootball candidate rows=" + virtualCandidates.length);
 const poolGate = qualifiedBestSelections(virtualCandidates, now);
 console.log("[coverage] pre-refresh gate diagnostics computed");
@@ -203,7 +210,14 @@ for (let page = 1; page <= MAX_PAGES; page++) {
     matched_candidate_rows: matchedNow,
     seen_unique_events: byEvent.size
   }));
-  const allResolved = matchedNow === virtualCandidates.length;
+  if (noModelQualifiedCandidates) {
+    // Page 1 has still proven that the live feed is reachable. No further pages
+    // are required because the current model gate produced no eligible rows.
+    scanComplete = true;
+    scanStopReason = "no_model_qualified_candidates";
+    break;
+  }
+  const allResolved = virtualCandidates.length > 0 && matchedNow === virtualCandidates.length;
   if (allResolved) {
     scanComplete = true;
     scanStopReason = "all_model_qualified_candidates_matched";
@@ -333,11 +347,16 @@ for (const row of virtualCandidates) {
 const liveGate = qualifiedBestSelections(currentRows, Date.now());
 const output = {
   verified_at: new Date().toISOString(),
-  status: scanComplete ? "DIAGNOSTIC" : "INCOMPLETE",
+  status: noModelQualifiedCandidates ? "VALID_ZERO_QUALIFIED_CANDIDATES" : scanComplete ? "DIAGNOSTIC" : "INCOMPLETE",
+  coverage_state: noModelQualifiedCandidates ? "VALID_ZERO" : scanComplete ? "MATCHED" : "INCOMPLETE",
   scan_complete: scanComplete,
   scan_stop_reason: scanStopReason,
+  no_model_qualified_candidates: noModelQualifiedCandidates,
   paper_only: true,
   candidate_artifact_rows: rows.length,
+  candidate_pool_rows_in_next_7_days: upcomingVirtualCandidates.length,
+  model_qualified_candidate_rows_in_next_7_days: virtualCandidates.length,
+  // Retain the prior field for existing readers; it counts model-qualified rows.
   virtual_candidate_rows_in_next_7_days: virtualCandidates.length,
   snapshot_gate_qualified_fixtures: poolGate.rows.length,
   snapshot_gate_diagnostics: poolGate.diagnostics,
