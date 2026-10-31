@@ -3,12 +3,29 @@ import textwrap
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
+import sys
+sys.path.insert(0, str(ROOT / "scripts"))
+from system_health_audit_lib import nba_live_observation_health_summary, virtual_live_health_summary
 WATCHDOG = (ROOT / ".github/workflows/automation_watchdog.yml").read_text(encoding="utf-8")
 RESEARCH = (ROOT / ".github/workflows/efootball-market-research-schedule.yml").read_text(encoding="utf-8")
 PAGES = (ROOT / ".github/workflows/cloudflare-pages.yml").read_text(encoding="utf-8")
 
 
 class EfootballResearchRecoveryTests(unittest.TestCase):
+    def test_virtual_live_source_cannot_be_marked_fresh_by_downstream_refresh(self):
+        check, issues = virtual_live_health_summary(
+            {"status": "LIVE", "events_count": 20}, 4.0
+        )
+        self.assertEqual(check["status"], "STALE")
+        self.assertEqual(issues[0]["code"], "VIRTUAL_LIVE_FEED_STALE")
+
+    def test_nba_observation_recorder_staleness_is_visible(self):
+        check, issues = nba_live_observation_health_summary(
+            {"games": {}}, 1.0
+        )
+        self.assertEqual(check["status"], "STALE")
+        self.assertEqual(issues[0]["code"], "NBA_LIVE_OBSERVATION_STALE")
+
     def test_schedules_are_registered_on_staggered_offset_cadences(self):
         self.assertIn("cron: '8,18,28,38,48,58 * * * *'", WATCHDOG)
         self.assertIn("cron: '5,15,25,35,45,55 * * * *'", (ROOT / ".github/workflows/qualified-best-health-watch-v2.yml").read_text(encoding="utf-8"))
