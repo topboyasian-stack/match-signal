@@ -40,11 +40,31 @@ def sportybet_basketball_feed():
 
 
 def nba_team_key(value):
+    """Canonicalize full NBA names and unambiguous NBA nicknames for exact matching."""
     text = re.sub(r"[^a-z0-9]+", " ", str(value or "").lower()).strip()
     text = re.sub(r"\s+", " ", text)
     text = re.sub(r"^(la) ", "los angeles ", text)
+    text = re.sub(r"^(l a) ", "los angeles ", text)
     text = re.sub(r"^(ny) ", "new york ", text)
-    return text
+    aliases = {
+        "76ers": "philadelphia 76ers", "sixers": "philadelphia 76ers",
+        "celtics": "boston celtics", "nets": "brooklyn nets", "knicks": "new york knicks",
+        "raptors": "toronto raptors", "bulls": "chicago bulls",
+        "cavaliers": "cleveland cavaliers", "cavs": "cleveland cavaliers",
+        "pistons": "detroit pistons", "pacers": "indiana pacers", "bucks": "milwaukee bucks",
+        "hawks": "atlanta hawks", "hornets": "charlotte hornets", "heat": "miami heat",
+        "magic": "orlando magic", "wizards": "washington wizards",
+        "nuggets": "denver nuggets", "timberwolves": "minnesota timberwolves",
+        "wolves": "minnesota timberwolves", "thunder": "oklahoma city thunder",
+        "trail blazers": "portland trail blazers", "blazers": "portland trail blazers",
+        "jazz": "utah jazz", "warriors": "golden state warriors",
+        "clippers": "los angeles clippers", "l a clippers": "los angeles clippers",
+        "lakers": "los angeles lakers", "grizzlies": "memphis grizzlies",
+        "pelicans": "new orleans pelicans", "suns": "phoenix suns",
+        "kings": "sacramento kings", "spurs": "san antonio spurs",
+        "rockets": "houston rockets", "mavericks": "dallas mavericks",
+    }
+    return aliases.get(text, text)
 
 
 def sportybet_total_for_fixture(fixture, feed, expected_total=None):
