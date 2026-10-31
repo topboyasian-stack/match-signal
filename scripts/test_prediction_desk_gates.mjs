@@ -595,7 +595,8 @@ assert.equal(efootballCalibration.source,"product_wide_raw_probability_bucket","
 assert.ok(Math.abs(efootballCalibration.probability-0.5455)<0.00001,"raw 84.54% must be reduced to the settled 0.80-bucket calibration");
 assert.ok(Math.abs(probabilityValue(efootballCalibrationRow)-0.5455)<0.00001,"displayed probability must use the settled product calibration");
 assert.ok(Math.abs(displayedFairOddsValue(efootballCalibrationRow)-(1/0.5455))<0.001,"fair odds must be recalculated from calibrated probability");
-assert.equal(isVirtualDeskCandidate(efootballCalibrationRow),false,"an overconfident raw 84% score cannot remain in the high-confidence list after calibration");
+assert.equal(isVirtualDeskCandidate(efootballCalibrationRow),true,"an upstream candidate can remain visible for research after its probability is calibrated");
+assert.equal(qualificationState(efootballCalibrationRow).reason,"EXACT_LINE_WALKFORWARD_EVIDENCE_INSUFFICIENT","product-wide calibration cannot replace the exact-line qualification gate");
 const savedLearningTimestamp=sandbox.efootballDeskLearning.generated_at;
 sandbox.efootballDeskLearning.generated_at=new Date(Date.now()-61*60*1000).toISOString();
 assert.equal(probabilityValue(efootballCalibrationRow),null,"stale calibration must withhold eFootball O/U probabilities instead of exposing raw confidence");
