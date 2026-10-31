@@ -47,14 +47,16 @@ def nba_team_key(value):
     return text
 
 
-def sportybet_total_for_fixture(fixture, feed):
-    """Return only an exact team/time match to SportyBet market 225 (total incl. OT)."""
+def sportybet_total_for_fixture(fixture, feed, expected_total=None):
+    """Select an exact-fixture, fresh market-225 line with both observed prices."""
     fixture_home = nba_team_key(fixture.get("home"))
     fixture_away = nba_team_key(fixture.get("away"))
     fixture_start = dt(fixture.get("date"))
     if not fixture_home or not fixture_away or not fixture_start:
         return None
-    for event in feed:
+    now = datetime.now(timezone.utc)
+    candidates = []
+    for event in feed or []:
         event_home = nba_team_key(event.get("home"))
         event_away = nba_team_key(event.get("away"))
         if not ((fixture_home == event_home and fixture_away == event_away) or
@@ -64,39 +66,59 @@ def sportybet_total_for_fixture(fixture, feed):
         if not event_start or abs((event_start - fixture_start).total_seconds()) > 45 * 60:
             continue
         fetched_at = dt(event.get("fetched_at"))
-        now = datetime.now(timezone.utc)
         if not fetched_at or fetched_at > now + timedelta(minutes=2) or now - fetched_at > timedelta(minutes=15):
             continue
-        market = next((m for m in (event.get("markets") or []) if str(m.get("id")) == "225"), None)
-        if not market:
-            continue
-        market_status = str(market.get("status") or "").lower()
-        if re.search(r"suspend|closed|inactive|settled|unavailable|stop", market_status):
-            continue
-        specifier = str(market.get("specifier") or "")
-        match = re.search(r"(?:^|[,;|&\s])total\s*=\s*(\d+(?:\.\d+)?)(?=$|[,;|&\s])", specifier, re.I)
-        if not match:
-            continue
-        line = float(match.group(1))
-        if not 100 <= line <= 300:
-            continue
-        outcomes = market.get("outcomes") or []
-        over = next((o for o in outcomes if re.search(r"\bover\b", str(o.get("name") or ""), re.I)), None)
-        under = next((o for o in outcomes if re.search(r"\bunder\b", str(o.get("name") or ""), re.I)), None)
-        if not over or not under:
-            continue
-        over_odds, under_odds = over.get("odds"), under.get("odds")
-        if not isinstance(over_odds, (int, float)) or not isinstance(under_odds, (int, float)) or over_odds <= 1 or under_odds <= 1:
-            continue
-        return {
-            "line": line, "over_odds": float(over_odds), "under_odds": float(under_odds),
-            "market_id": "225", "source": "SportyBet Nigeria",
-            "sportybet_event_id": str(event.get("event_id") or ""),
-            "quote_timestamp": fetched_at.isoformat(),
-            "settlement": "Official final score including overtime",
-        }
-    return None
-
+        for market in event.get("markets") or []:
+            if str(market.get("id")) != "225":
+                continue
+            market_status = str(market.get("status") or "").strip().lower()
+            if re.search(r"suspend|closed|inactive|settled|unavailable|stop", market_status):
+                continue
+            if market_status.isdigit() and market_status != "0":
+                continue
+            specifier = str(market.get("specifier") or "")
+            match = re.search(r"(?:^|[,;|&\s])(?:total|line)\s*=\s*(\d+(?:\.\d+)?)(?=$|[,;|&\s])", specifier, re.I)
+            if match:
+                line = float(match.group(1))
+            else:
+                try:
+                    line = float(market.get("line"))
+                except (TypeError, ValueError):
+                    continue
+            if not 100 <= line <= 300:
+                continue
+            outcomes = market.get("outcomes") or []
+            over = next((o for o in outcomes if re.search(r"\bover\b", str(o.get("name") or ""), re.I)
+                         and o.get("active", True) is not False), None)
+            under = next((o for o in outcomes if re.search(r"\bunder\b", str(o.get("name") or ""), re.I)
+                          and o.get("active", True) is not False), None)
+            if not over or not under:
+                continue
+            try:
+                over_odds, under_odds = float(over.get("odds")), float(under.get("odds"))
+            except (TypeError, ValueError):
+                continue
+            if not all(math.isfinite(x) and x > 1 for x in (over_odds, under_odds)):
+                continue
+            balance = abs(math.log(over_odds / under_odds)) + 0.05 * abs((over_odds + under_odds) / 2 - 1.9)
+            distance = abs(line - float(expected_total)) if expected_total is not None else 0.0
+            candidates.append({
+                "line": line, "over_odds": over_odds, "under_odds": under_odds,
+                "market_id": "225", "source": "SportyBet Nigeria",
+                "sportybet_event_id": str(event.get("event_id") or ""),
+                "quote_timestamp": fetched_at.isoformat(),
+                "quote_capture_basis": "SportyBet API response observed_at",
+                "market_selection_score": round(balance, 6),
+                "settlement": "Official final score including overtime",
+                "_balance": balance, "_distance": distance,
+            })
+    if not candidates:
+        return None
+    # Prefer the balanced/main price pair; forecast proximity only breaks a tie.
+    chosen = min(candidates, key=lambda x: (x["_balance"], x["_distance"], x["line"]))
+    chosen.pop("_balance", None)
+    chosen.pop("_distance", None)
+    return chosen
 
 def apply_sportybet_total_snapshot(prediction, fixture, feed):
     """Attach a timestamped pre-game quote without allowing market odds into the model."""
@@ -104,7 +126,7 @@ def apply_sportybet_total_snapshot(prediction, fixture, feed):
     now = datetime.now(timezone.utc)
     if not start or now >= start:
         return prediction
-    quote = sportybet_total_for_fixture(fixture, feed)
+    quote = sportybet_total_for_fixture(fixture, feed, expected_total=prediction.get("expected_total"))
     if not quote or dt(quote.get("quote_timestamp")) is None or dt(quote["quote_timestamp"]) >= start:
         return prediction
     markets = prediction.get("markets") if isinstance(prediction.get("markets"), dict) else {}
