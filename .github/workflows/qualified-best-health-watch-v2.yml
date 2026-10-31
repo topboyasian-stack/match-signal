@@ -3,8 +3,8 @@ name: Match Signal Qualified Best Scheduled Health Watch v2
 on:
   # Use a staggered ten-minute cadence; push events also bootstrap monitor verification after a schedule gap.
   schedule:
-    # Register a fresh ten-minute monitor cadence away from the board and watchdog ticks.
-    - cron: '7,17,27,37,47,57 * * * *'
+    # Re-register the monitor cadence after repeated missing scheduled executions.
+    - cron: '2,12,22,32,42,52 * * * *'
   workflow_dispatch:
   push:
     branches: [main]
