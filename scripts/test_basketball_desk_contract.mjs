@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 const root = new URL("../", import.meta.url);
 const read = p => readFile(new URL(p, root), "utf8");
-const [html, css, ui, api, workflow, booking] = await Promise.all([
+const [html, css, ui, api, workflow, booking, recorder, nbaRecorderWorkflow] = await Promise.all([
   read("basketball.html"), read("basketball-design.css"), read("basketball-live.js"),
-  read("functions/api/sportybet-basketball.js"), read(".github/workflows/cloudflare-pages.yml"), read("functions/api/sportybet-basketball-booking.js")
+  read("functions/api/sportybet-basketball.js"), read(".github/workflows/cloudflare-pages.yml"), read("functions/api/sportybet-basketball-booking.js"), read("scripts/record_nba_live_behavior.py"), read(".github/workflows/nba-live-observation.yml")
 ]);
 assert.ok(html.includes("MS-BASKETBALL-DESK-2026.10.24-V11"), "Basketball must publish the new design marker");
 assert.ok(html.includes("core-workspaces-design.css?v=20261014-full-v1"), "Basketball must use the shared Match Signal design layer");
@@ -51,4 +51,9 @@ assert.ok(ui.includes("./api/sportybet-basketball-booking"), "Builder UI must re
 assert.ok(booking.includes("host+'/api/ng/orders/share") && booking.includes("booking_code:share.code"), "Basketball booking endpoint must request and return a genuine SportyBet share code through official host variants");
 assert.ok(booking.includes("leg.market_id||'225'") && booking.includes("SELECTIONS_CHANGED") && booking.includes("NON_STAKING_BETSLIP_PREPARATION"), "Basketball code generation must revalidate exact total market 225 and fail closed without staking");
 
-console.log("Basketball desk contract passed: shared UI, scoped responsive design, exact SportyBet event matching, fresh full-game totals including OT.");
+assert.ok(ui.includes("nba_live_current.json") && ui.includes("live_total_projection") && ui.includes("score_pace_total"), "Live desk must load the latest ESPN in-game observation and display a separate score-pace estimate.");
+assert.ok(ui.includes("Live behavior snapshot is stale or unavailable") && ui.includes("12*60*1000"), "Live insights must fail closed when the observation artifact is stale.");
+assert.ok(ui.includes("Pregame probability is unchanged") && ui.includes("Paper research only"), "Live insights must preserve the pre-game forecast and research-only boundary.");
+assert.ok(nbaRecorderWorkflow.includes("data/nba_live_current.json") && nbaRecorderWorkflow.includes("git add data/nba_live_observations.json data/nba_live_current.json"), "NBA recorder must publish the compact live artifact alongside its audit history.");
+assert.ok(recorder.includes("def live_total_projection") && recorder.includes("pace_total = live_total / elapsed * 48") && recorder.includes("pregame + 18") && recorder.includes("OVERTIME_CONTEXT_ONLY"), "NBA live projection must use score/clock pace, cap the live adjustment, and withhold regulation estimates in overtime.");
+console.log("Basketball desk contract passed: shared UI, scoped responsive design, exact SportyBet event matching, fresh totals, and separate timestamp-gated live score-pace insights.");
