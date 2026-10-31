@@ -36,17 +36,18 @@ const now = Date.now();
 // Qualified Best can only promote rows that pass the model gate. High-probability
 // research projections and explicitly pending rows are intentionally excluded;
 // otherwise this checker paginates the whole research pool and can time out.
-const upcomingVirtualCandidates = rows.filter(isVirtualDeskCandidate).filter(row => {
+const upcomingVirtualCandidates = rows.filter(row => {
   const product = String(row?.product || "").toLowerCase();
   const kickoff = Date.parse(String(row?.start_time || ""));
-  return ["efootball_gt", "efootball_adriatic"].includes(product) &&
+  return String(row?.sport || "").toLowerCase() === "virtual" &&
+    ["efootball_gt", "efootball_adriatic"].includes(product) &&
     Number.isFinite(kickoff) && kickoff > now && kickoff <= now + 7 * 24 * 60 * 60 * 1000;
 });
-// Keep the live shortlist separate from the research candidate pool. A zero
-// model-qualified slate is a legitimate safety outcome, not proof that quotes
-// matched or that the whole candidate pool was checked.
+// Count the whole near-term virtual eFootball research pool. The UI helper
+// is intentionally narrower (80%+ or upstream-qualified), so it must not be
+// used to count research rows or diagnose why a zero shortlist is valid.
 const virtualCandidates = upcomingVirtualCandidates.filter(row =>
-  qualificationState(row).modelQualified === true
+  isVirtualDeskCandidate(row) && qualificationState(row).modelQualified === true
 );
 const noModelQualifiedCandidates = virtualCandidates.length === 0;
 console.log("[coverage] upcoming eFootball research candidates=" + upcomingVirtualCandidates.length);
@@ -355,6 +356,7 @@ const output = {
   paper_only: true,
   candidate_artifact_rows: rows.length,
   candidate_pool_rows_in_next_7_days: upcomingVirtualCandidates.length,
+  candidate_pool_unique_events_in_next_7_days: new Set(upcomingVirtualCandidates.map(row => String(row?.event_id || "")).filter(Boolean)).size,
   model_qualified_candidate_rows_in_next_7_days: virtualCandidates.length,
   // Retain the prior field for existing readers; it counts model-qualified rows.
   virtual_candidate_rows_in_next_7_days: virtualCandidates.length,
