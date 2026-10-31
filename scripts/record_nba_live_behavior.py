@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Capture timestamped, research-only NBA in-game team/player behavior snapshots."""
-import json, os, re
+import json, math, os, re
 from datetime import datetime, timezone
 from pathlib import Path
 import requests
