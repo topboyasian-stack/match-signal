@@ -118,7 +118,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         # Keep deployment-triggered monitoring separate from the newly registered cron identity.
         self.assertEqual(workflow_schedule_crons(MONITOR_WORKFLOW), [])
         crons = workflow_schedule_crons(SCHEDULE_MONITOR_WORKFLOW)
-        self.assertIn("5,15,25,35,45,55 * * * *", crons)
+        self.assertIn("6,16,26,36,46,56 * * * *", crons)
         self.assertNotIn("1,11,21,31,41,51 * * * *", crons, "schedule must move to a fresh workflow identity")
         self.assertNotIn("*/5 * * * *", crons)
         events_end = MONITOR_WORKFLOW.find("\npermissions:")
@@ -133,7 +133,11 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         crons = workflow_schedule_crons(WATCHDOG_WORKFLOW)
         self.assertIn("8,18,28,38,48,58 * * * *", crons)
         self.assertNotIn("1,11,21,31,41,51 * * * *", crons, "cron must change to re-arm the missing scheduled watchdog")
-        self.assertIn("if unified_age > 0.2 and not active('unified-upcoming.yml'):", WATCHDOG_WORKFLOW)
+        self.assertIn("UNIFIED_UPCOMING_MAX_AGE_MINUTES = 15", WATCHDOG_WORKFLOW)
+        self.assertIn("UNIFIED_UPCOMING_DISPATCH_COOLDOWN_MINUTES = 10", WATCHDOG_WORKFLOW)
+        self.assertIn("UNIFIED_UPCOMING_STALE_RUN_MAX_AGE_MINUTES = 20", WATCHDOG_WORKFLOW)
+        self.assertIn("unified_upcoming_refresh_status", WATCHDOG_WORKFLOW)
+        self.assertNotIn("if unified_age > 0.2 and not active('unified-upcoming.yml'):", WATCHDOG_WORKFLOW)
         self.assertIn("'unified_upcoming_hours': 0.2", WATCHDOG_WORKFLOW)
 
     def test_watchdog_has_event_driven_monitoring_and_bounded_failure_recovery(self):
