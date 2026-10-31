@@ -223,7 +223,7 @@ jobs:
           )"
           export GIT_TERMINAL_PROMPT=0
           for attempt in 1 2 3 4 5 6; do
-            if timeout 12s git push origin main; then
+            if timeout 45s git push origin main; then
               echo "Unified board published; the refreshed Builder will hand off to the ordered production-promotion workflow."
               exit 0
             fi
