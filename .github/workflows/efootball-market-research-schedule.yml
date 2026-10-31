@@ -140,8 +140,8 @@ jobs:
           # longer than a single neighbouring workflow's commit cycle, always
           # rebuilding against the newest archive so no concurrent observations
           # or report changes are overwritten.
-          for attempt in $(seq 1 12); do
-            if timeout 20s git push origin main; then
+          for attempt in $(seq 1 6); do
+            if timeout 10s git push origin main; then
               echo "Research archive published on attempt $attempt."
               exit 0
             fi
@@ -156,7 +156,7 @@ jobs:
               exit 0
             fi
             git commit -m "🤖 Merge isolated eFootball market research samples"
-            sleep $((attempt * 3))
+            sleep 2
           done
           echo "Research archive publish exhausted 12 conflict-safe attempts; no force-push was used."
           exit 1
