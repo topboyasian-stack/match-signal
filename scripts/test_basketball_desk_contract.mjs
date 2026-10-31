@@ -8,7 +8,7 @@ const [html, css, ui, api, workflow, booking, recorder, nbaRecorderWorkflow] = a
 ]);
 assert.ok(html.includes("MS-BASKETBALL-DESK-2026.10.24-V11"), "Basketball must publish the new design marker");
 assert.ok(html.includes("core-workspaces-design.css?v=20261014-full-v1"), "Basketball must use the shared Match Signal design layer");
-assert.ok(html.includes("basketball-live.js?v=20261031-live-insights-v10"), "Basketball must cache-bust the visible booking error/retry logic");
+assert.ok(html.includes("basketball-live.js?v=20261031-live-boxscore-v11"), "Basketball must cache-bust the visible booking error/retry logic");
 assert.ok(html.includes("basketball-design.css?v=20261024-builder-dark-v3"), "Basketball must load its latest contrast-corrected scoped design layer");
 assert.ok(workflow.includes("MS-BASKETBALL-DESK-2026.10.24-V11") && workflow.includes("basketball-design.css?v=20261024-builder-dark-v3"), "Pages production smoke markers must match the current Basketball page and CSS versions");
 assert.ok(html.includes('id="msNav"') && html.includes('workspace-ui.js?v=20261023-basketball-nav1'), "Basketball must use the single shared site navigation");
@@ -52,6 +52,7 @@ assert.ok(booking.includes("host+'/api/ng/orders/share") && booking.includes("bo
 assert.ok(booking.includes("leg.market_id||'225'") && booking.includes("SELECTIONS_CHANGED") && booking.includes("NON_STAKING_BETSLIP_PREPARATION"), "Basketball code generation must revalidate exact total market 225 and fail closed without staking");
 
 assert.ok(ui.includes("nba_live_current.json") && ui.includes("live_total_projection") && ui.includes("score_pace_total"), "Live desk must load the latest ESPN in-game observation and display a separate score-pace estimate.");
+assert.ok(ui.includes("uses_live_boxscore_stats") && ui.includes("home_possessions") && ui.includes("FGA, FTA, offensive rebounds and turnovers"), "Live desk must expose whether the total estimate actually consumed both teams’ live box-score possession inputs.");
 assert.ok(ui.includes("Live behavior snapshot is stale or unavailable") && ui.includes("12*60*1000"), "Live insights must fail closed when the observation artifact is stale.");
 assert.ok(ui.includes("Pregame probability is unchanged") && ui.includes("Paper research only"), "Live insights must preserve the pre-game forecast and research-only boundary.");
 assert.ok(nbaRecorderWorkflow.includes("data/nba_live_current.json") && nbaRecorderWorkflow.includes("git add data/nba_live_observations.json data/nba_live_current.json"), "NBA recorder must publish the compact live artifact alongside its audit history.");
