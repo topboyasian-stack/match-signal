@@ -160,8 +160,12 @@ def verified_market_records(rows):
     )
 
 
-def publication_capture_metrics(snapshots, predictions=None):
-    """Report immutable price capture separately from settled profitability evidence."""
+def publication_capture_metrics(snapshots, predictions=None, as_of=None):
+    """Report immutable revision coverage separately from today's quote availability."""
+    checked_at = parse_time(as_of) if as_of is not None else datetime.now(timezone.utc)
+    if checked_at is None:
+        checked_at = datetime.now(timezone.utc)
+
     current = [
         row for row in (snapshots or [])
         if isinstance(row, dict) and row.get("totals_model_version") == NBA_TOTALS_MODEL_VERSION
@@ -195,49 +199,67 @@ def publication_capture_metrics(snapshots, predictions=None):
             continue
         valid.append(row)
 
-    predictions = [
-        row for row in (predictions or [])
-        if isinstance(row, dict) and row.get("totals_model_version") == NBA_TOTALS_MODEL_VERSION
-    ]
-    attached = []
-    for row in predictions:
+    predictions_by_event = {
+        str(row.get("event_id")): row
+        for row in (predictions or [])
+        if isinstance(row, dict)
+        and row.get("totals_model_version") == NBA_TOTALS_MODEL_VERSION
+        and row.get("event_id")
+    }
+    attached_event_ids = set()
+    for event_id, row in predictions_by_event.items():
         market = ((row.get("markets") or {}).get("total_ou") or {})
+        start = parse_time(row.get("start_time"))
+        stamp = parse_time(market.get("quote_timestamp"))
         try:
             line = float(market.get("line"))
             over = float(market.get("over_odds"))
             under = float(market.get("under_odds"))
         except (TypeError, ValueError):
             continue
-        stamp = parse_time(market.get("quote_timestamp"))
-        published = parse_time(row.get("generated_at") or row.get("prediction_created_at"))
-        age = (published - stamp).total_seconds() / 60 if published and stamp else None
+        age = (checked_at - stamp).total_seconds() / 60 if stamp else None
         if (
             str(market.get("market_id") or "") == "225"
             and str(market.get("source") or "").strip().lower() == "sportybet nigeria"
-            and stamp is not None and published is not None
-            and 0 <= age <= 15 and 100 <= line <= 300
+            and str(market.get("sportybet_event_id") or "").strip()
+            and market.get("quote_capture_basis") == "SportyBet API response observed_at"
+            and stamp is not None and start is not None
+            and stamp <= checked_at < start and age is not None and 0 <= age <= 15
+            and 100 <= line <= 300
             and math.isfinite(over) and over > 1 and math.isfinite(under) and under > 1
         ):
-            attached.append(row)
+            attached_event_ids.add(event_id)
 
-    picks = [row for row in valid if str(((row.get("markets") or {}).get("total_ou") or {}).get("pick") or "").lower() in {"over", "under"}]
-    no_lean = [row for row in valid if str(((row.get("markets") or {}).get("total_ou") or {}).get("pick") or "").lower() not in {"over", "under"}]
-    unpriced = max(0, len(predictions) - len(attached))
-    unmatched = max(0, len(attached) - len(valid))
-    coverage = round(len(valid) / len(predictions), 4) if predictions else None
-    if not predictions:
+    snapshot_event_ids = {
+        str(row.get("event_id")) for row in valid
+        if str(row.get("event_id") or "") in predictions_by_event
+    }
+    predicted_event_ids = set(predictions_by_event)
+    unpriced = len(predicted_event_ids - attached_event_ids)
+    unmatched = len(attached_event_ids - snapshot_event_ids)
+    coverage = round(len(snapshot_event_ids) / len(predicted_event_ids), 4) if predicted_event_ids else None
+    picks = [
+        row for row in valid
+        if str(((row.get("markets") or {}).get("total_ou") or {}).get("pick") or "").lower() in {"over", "under"}
+    ]
+    no_lean = [
+        row for row in valid
+        if str(((row.get("markets") or {}).get("total_ou") or {}).get("pick") or "").lower() not in {"over", "under"}
+    ]
+    if not predicted_event_ids:
         status = "NO_CURRENT_MODEL_PREDICTIONS"
-    elif len(valid) >= len(predictions) and unmatched == 0:
+    elif predicted_event_ids <= snapshot_event_ids and unmatched == 0:
         status = "CAPTURED"
-    elif valid:
+    elif valid or attached_event_ids:
         status = "PARTIAL"
     else:
         status = "AWAITING_FRESH_MARKET_225_QUOTES"
     return {
         "model_version": NBA_TOTALS_MODEL_VERSION,
-        "model_predictions": len(predictions),
-        "predictions_with_fresh_sportybet_market_225_pair": len(attached),
+        "model_predictions": len(predicted_event_ids),
+        "predictions_with_fresh_sportybet_market_225_pair": len(attached_event_ids),
         "immutable_fresh_publication_snapshots": len(valid),
+        "unique_events_with_immutable_snapshots": len(snapshot_event_ids),
         "snapshot_coverage": coverage,
         "directional_pick_snapshots": len(picks),
         "no_clear_lean_snapshots": len(no_lean),
@@ -305,7 +327,7 @@ def _blend_total(row, weight):
     return base + weight * (float(pace) - base)
 
 
-def evaluate(history, ledger, snapshots=None, predictions=None):
+def evaluate(history, ledger, snapshots=None, predictions=None, as_of=None):
     forecasts = build_forecasts(history)
     split = int(len(forecasts) * (1.0 - HOLDOUT_FRACTION))
     development, holdout = forecasts[:split], forecasts[split:]
@@ -343,7 +365,7 @@ def evaluate(history, ledger, snapshots=None, predictions=None):
         if model_metrics["mae"] is not None and baseline_metrics["mae"] is not None else None
     )
 
-    publication_capture = publication_capture_metrics(snapshots, predictions)
+    publication_capture = publication_capture_metrics(snapshots, predictions, as_of=as_of)
     market_rows = verified_market_records(ledger)
     market_split = int(len(market_rows) * (1.0 - HOLDOUT_FRACTION))
     market_holdout = market_metrics(market_rows[market_split:])
