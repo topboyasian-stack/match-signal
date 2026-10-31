@@ -1,6 +1,11 @@
 name: Match Signal NBA In-Game Behavior Recorder
 
 on:
+  pull_request:
+    paths:
+      - 'scripts/record_nba_live_behavior.py'
+      - 'scripts/test_record_nba_live_behavior.py'
+      - '.github/workflows/nba-live-observation.yml'
   schedule:
     # GitHub cron has a five-minute minimum; record live state repeatedly during game windows.
     - cron: '*/5 * * * *'
@@ -33,6 +38,8 @@ jobs:
         run: python -m pip install --disable-pip-version-check requests
       - name: Compile recorder before collection
         run: python -m py_compile scripts/record_nba_live_behavior.py
+      - name: Run offline live-projection regression tests
+        run: python scripts/test_record_nba_live_behavior.py
       - name: Capture live game, play-by-play and player/team box-score snapshots
         run: python scripts/record_nba_live_behavior.py
       - name: Publish timestamped observation history
