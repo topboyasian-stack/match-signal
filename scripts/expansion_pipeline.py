@@ -396,7 +396,7 @@ def nba_predict(r,hist,pace_blend_weight=0.0,bias_adjustment=0.0):
    'home_expected_off_rating':components['home_expected_off_rating'],
    'away_expected_off_rating':components['away_expected_off_rating']
   },
-  'model':'NBA totals v4: development-calibrated score-form plus team-game pace/efficiency; no bookmaker inputs',
+  'model':'NBA totals v5: development-calibrated score-form plus team-game pace/efficiency; no bookmaker inputs',
   'paper_only':True
 }
 def current(name):

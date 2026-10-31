@@ -165,7 +165,7 @@ def _team_possessions(record, side):
     return {"possessions": possessions, **values}
 
 
-def live_total_projection(record, prediction):
+def live_total_projection(record, prediction, now=None):
     """Blend the pre-game baseline with live score, clock and ESPN box-score pace/efficiency.
 
     Live stats are used only when both teams expose the fields needed to estimate
@@ -180,6 +180,22 @@ def live_total_projection(record, prediction):
         return {"status": "NO_PREGAME_BASELINE", "reason": "Saved pre-game expected total is unavailable."}
     if not 100 <= pregame <= 320:
         return {"status": "NO_PREGAME_BASELINE", "reason": "Saved pre-game projection is outside the valid NBA total range."}
+
+    # Match the live desk's six-hour timestamp gate so offline validation
+    # never scores a live estimate the actual interface would hide.
+    now = now or datetime.now(timezone.utc)
+    prediction_stamp = _timestamp(
+        prediction.get("generated_at") or prediction.get("prediction_created_at") or prediction.get("published_at")
+    )
+    age_seconds = now.timestamp() - prediction_stamp if prediction_stamp > 0 else None
+    if age_seconds is None or age_seconds < -120 or age_seconds > 6 * 60 * 60:
+        age_minutes = round(age_seconds / 60, 1) if age_seconds is not None else None
+        return {
+            "status": "STALE_PREGAME_BASELINE",
+            "reason": "The pre-game NBA snapshot is missing or older than six hours; a refreshed model input is required.",
+            "baseline_age_minutes": age_minutes,
+        }
+    baseline_age_minutes = max(0, round(age_seconds / 60))
     try:
         period = int(record.get("period") or 0)
         home_score = float((record.get("home") or {}).get("score"))
@@ -252,6 +268,7 @@ def live_total_projection(record, prediction):
     return {
         "status": "AVAILABLE",
         "pregame_expected_total": round(pregame, 1),
+        "pregame_baseline_age_minutes": baseline_age_minutes,
         "live_score_total": round(live_total, 1),
         "elapsed_minutes": round(elapsed, 1),
         "score_pace_total": round(score_pace, 1),
@@ -324,7 +341,7 @@ def main():
             # Archive the exact live estimate with the raw score/clock/stats
             # observed at this timestamp; recalculating later would destroy the
             # historical state needed for honest period-by-period validation.
-            record["live_total_projection"] = live_total_projection(record, pregame)
+            record["live_total_projection"] = live_total_projection(record, pregame, now=now)
         observations.append(record)
 
     old = load_observation_history()

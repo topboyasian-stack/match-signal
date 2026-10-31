@@ -3,7 +3,7 @@
 import json
 import tempfile
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 from record_nba_live_behavior import fetch_scoreboard_window, live_total_projection, load_observation_history, write_observation_history
@@ -40,9 +40,16 @@ def sample_record(with_stats=True):
     return record
 
 
+def fresh_prediction(now=None, **overrides):
+    now = now or datetime.now(timezone.utc)
+    prediction = {"expected_total": 224.5, "generated_at": now.isoformat()}
+    prediction.update(overrides)
+    return prediction
+
+
 class LiveBoxscoreProjectionTests(unittest.TestCase):
     def test_uses_both_teams_live_boxscore_to_estimate_possessions(self):
-        result = live_total_projection(sample_record(), {"expected_total": 224.5})
+        result = live_total_projection(sample_record(), fresh_prediction())
         self.assertEqual(result["status"], "AVAILABLE")
         self.assertTrue(result["uses_live_boxscore_stats"])
         self.assertEqual(result["projection_source"], "ESPN_LIVE_BOXSCORE_POSSESSIONS_AND_SCORE_PACE")
@@ -55,7 +62,7 @@ class LiveBoxscoreProjectionTests(unittest.TestCase):
         self.assertTrue(206.5 <= result["live_total_estimate"] <= 242.5)
 
     def test_falls_back_explicitly_when_boxscore_fields_are_missing(self):
-        result = live_total_projection(sample_record(False), {"expected_total": 224.5})
+        result = live_total_projection(sample_record(False), fresh_prediction())
         self.assertEqual(result["status"], "AVAILABLE")
         self.assertFalse(result["uses_live_boxscore_stats"])
         self.assertEqual(result["projection_source"], "ESPN_LIVE_SCORE_CLOCK_PACE_ONLY")
@@ -64,7 +71,7 @@ class LiveBoxscoreProjectionTests(unittest.TestCase):
     def test_overtime_never_reuses_regulation_pace_projection(self):
         record = sample_record()
         record["period"] = 5
-        result = live_total_projection(record, {"expected_total": 224.5})
+        result = live_total_projection(record, fresh_prediction())
         self.assertEqual(result["status"], "OVERTIME_CONTEXT_ONLY")
 
     def test_insufficient_elapsed_time_withholds_live_estimate(self):
@@ -73,6 +80,27 @@ class LiveBoxscoreProjectionTests(unittest.TestCase):
         record["clock"] = "08:00"
         result = live_total_projection(record, {"expected_total": 224.5})
         self.assertEqual(result["status"], "COLLECTING")
+
+    def test_missing_or_stale_timestamp_is_withheld_like_the_live_desk(self):
+        now = datetime(2026, 10, 31, 22, 0, tzinfo=timezone.utc)
+        missing = live_total_projection(sample_record(), {"expected_total": 224.5}, now=now)
+        self.assertEqual(missing["status"], "STALE_PREGAME_BASELINE")
+        old = live_total_projection(
+            sample_record(), fresh_prediction(now - timedelta(hours=6, seconds=1)), now=now
+        )
+        self.assertEqual(old["status"], "STALE_PREGAME_BASELINE")
+        future = live_total_projection(
+            sample_record(), fresh_prediction(now + timedelta(minutes=3)), now=now
+        )
+        self.assertEqual(future["status"], "STALE_PREGAME_BASELINE")
+
+    def test_live_projection_reports_eligible_baseline_age(self):
+        now = datetime(2026, 10, 31, 22, 0, tzinfo=timezone.utc)
+        result = live_total_projection(
+            sample_record(), fresh_prediction(now - timedelta(minutes=30)), now=now
+        )
+        self.assertEqual(result["status"], "AVAILABLE")
+        self.assertEqual(result["pregame_baseline_age_minutes"], 30)
 
     def test_missing_pregame_baseline_fails_closed(self):
         result = live_total_projection(sample_record(), {})

@@ -20,9 +20,9 @@ HISTORY = DATA / "nba_history.json"
 OUTPUT = DATA / "nba_live_totals_oos.json"
 MIN_PERIOD_SAMPLE = 30
 PERIOD_TARGETS = (
-    ("Q1_end", 10.0, 6.0, 12.0),
-    ("Halftime", 22.0, 12.0, 24.0),
-    ("Q3_end", 34.0, 24.0, 36.0),
+    ("Q1_end", 11.5, 8.0, 12.0),
+    ("Halftime", 23.5, 20.0, 24.0),
+    ("Q3_end", 35.5, 32.0, 36.0),
     ("Q4", 42.0, 36.0, 48.0),
 )
 
@@ -117,6 +117,7 @@ def observation_coverage(games, model_version=None):
         "available_estimates": available_count,
         "estimate_status_counts": statuses,
         "available_snapshots_by_period": period_snapshots,
+        "period_target_elapsed_minutes": {label: target for label, target, _, _ in PERIOD_TARGETS},
         "boxscore_possession_estimates": stats_based,
         "score_clock_fallback_estimates": score_clock_only,
         "accuracy_sample_unit": "one distinct settled game per period, not each five-minute snapshot",
@@ -201,7 +202,7 @@ def evaluate(observation_payload, history_rows, model_version=None):
         "model_version": model_version,
         "source": "Archived ESPN live scoreboard/box-score estimates paired with official final totals",
         "observation_window_days": 30,
-        "selection": "One nearest target snapshot per settled event and period; missing projections and unsettled games are excluded, never imputed.",
+        "selection": "One nearest target snapshot per settled event at end of Q1 (11.5m), halftime (23.5m), end of Q3 (35.5m), and mid-Q4 (42m); missing projections and unsettled games are excluded, never imputed.",
         "minimum_games_per_period": MIN_PERIOD_SAMPLE,
         "observation_coverage": observation_coverage(games, model_version),
         "settled_events_with_observations": len({row["event_id"] for row in all_rows}),

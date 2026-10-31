@@ -11,12 +11,12 @@ def test_period_estimates_are_paired_to_final_scores_and_separated():
         # The ESPN live event ID intentionally differs from an NBA stats game ID.
         history.append({"event_id": f"nba-stats-{i}", "home_score": 110, "away_score": 105})
         snapshots = []
-        for elapsed, estimate in ((10.0, 217.0), (22.0, 216.0), (34.0, 214.0), (42.0, 213.0)):
+        for elapsed, estimate in ((11.5, 217.0), (23.5, 216.0), (35.5, 214.0), (42.0, 213.0)):
             snapshots.append({
                 "event_id": event_id,
                 "game_state": "live",
                 "observed_at": f"2026-10-{(i % 20) + 1:02d}T00:{int(elapsed):02d}:00+00:00",
-                "pregame_totals_model_version": "model-v4",
+                "pregame_totals_model_version": "model-v5",
                 "live_total_projection": {
                     "status": "AVAILABLE",
                     "elapsed_minutes": elapsed,
@@ -59,7 +59,7 @@ def test_unsettled_games_and_wrong_model_versions_are_excluded():
         "unfinished": {"snapshots": [{
             "game_state": "live",
             "pregame_totals_model_version": "model-v4",
-            "live_total_projection": {"status": "AVAILABLE", "elapsed_minutes": 10,
+            "live_total_projection": {"status": "AVAILABLE", "elapsed_minutes": 11.5,
                                       "live_total_estimate": 220, "pregame_expected_total": 225},
             "observed_at": "2026-10-31T00:10:00+00:00",
         }]},
