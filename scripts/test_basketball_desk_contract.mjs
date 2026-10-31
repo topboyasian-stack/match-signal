@@ -8,7 +8,7 @@ const [html, css, ui, api, workflow, booking, recorder, nbaRecorderWorkflow] = a
 ]);
 assert.ok(html.includes("MS-BASKETBALL-DESK-2026.10.24-V11"), "Basketball must publish the new design marker");
 assert.ok(html.includes("core-workspaces-design.css?v=20261014-full-v1"), "Basketball must use the shared Match Signal design layer");
-assert.ok(html.includes("basketball-live.js?v=20261031-live-insights-v10"), "Basketball must cache-bust the visible booking error/retry logic");
+assert.ok(html.includes("basketball-live.js?v=20261031-live-boxscore-v11"), "Basketball must cache-bust the visible booking error/retry logic");
 assert.ok(html.includes("basketball-design.css?v=20261024-builder-dark-v3"), "Basketball must load its latest contrast-corrected scoped design layer");
 assert.ok(workflow.includes("MS-BASKETBALL-DESK-2026.10.24-V11") && workflow.includes("basketball-design.css?v=20261024-builder-dark-v3"), "Pages production smoke markers must match the current Basketball page and CSS versions");
 assert.ok(html.includes('id="msNav"') && html.includes('workspace-ui.js?v=20261023-basketball-nav1'), "Basketball must use the single shared site navigation");
