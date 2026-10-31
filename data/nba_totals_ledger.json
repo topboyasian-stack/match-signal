@@ -1,15 +1,16 @@
 {
-  "updated_at": "2026-10-31T20:39:43.589401+00:00",
+  "updated_at": "2026-10-31T20:42:44.148350+00:00",
   "source": "ESPN public NBA scoreboard",
   "market_definition": "SportyBet market 225 full-game totals, overtime included",
   "paper_only": true,
   "settlement_rules": [
     "Exact ESPN event ID only",
-    "Pre-game prediction timestamp required",
+    "Pregame publication timestamp required",
     "Market ID 225 and saved Over/Under line/pick required",
     "Final official score includes overtime",
     "Pushes excluded from accuracy",
-    "Existing settlement outcomes are never overwritten",
+    "Existing model-version settlement outcomes are never overwritten",
+    "Each event/model-version cohort is settled independently",
     "ROI requires a verified immutable publication snapshot, fresh quote and both valid prices"
   ],
   "summary": {
@@ -25,6 +26,16 @@
     "roi_eligible_accuracy": null,
     "roi_eligible_unit_profit": null,
     "roi_eligible_roi": null,
+    "by_model_version": {
+      "legacy": {
+        "settled": 53,
+        "decided": 53,
+        "correct": 40,
+        "over": 53,
+        "under": 0,
+        "accuracy": 0.7547169811320755
+      }
+    },
     "roi_basis": "Flat 1-unit stake at the saved selected-side SportyBet decimal price; pushes excluded; only verified publication snapshots count"
   },
   "records": [
@@ -1841,49 +1852,6 @@
       "price_audit_backfilled": true
     },
     {
-      "ledger_id": "nba-total:401909279",
-      "sport": "basketball",
-      "league": "NBA",
-      "event_id": "401909279",
-      "start_time": "2026-10-30T23:30:00+00:00",
-      "player_1": "Brooklyn Nets",
-      "player_2": "Detroit Pistons",
-      "prediction_created_at": "2026-10-30T15:55:04.267888+00:00",
-      "model": "NBA independent recency-weighted offense/defense + home/rest; no market input",
-      "expected_total": 227.3064726060128,
-      "market_id": "225",
-      "market_source": "SportyBet Nigeria",
-      "quote_timestamp": "2026-10-30T20:45:56.132000+00:00",
-      "line": 208.5,
-      "pick": "over",
-      "final_score": [
-        94,
-        110
-      ],
-      "final_total": 204.0,
-      "result": "under",
-      "settled": true,
-      "settled_at": "2026-10-31T02:06:20.057844+00:00",
-      "settlement_source": "ESPN official scoreboard event ID; final score includes overtime",
-      "paper_only": true,
-      "over_odds": 1.24,
-      "under_odds": 4.16,
-      "quote_age_minutes_at_publication": -290.864,
-      "quote_age_minutes_at_start": 164.064,
-      "quote_fresh_at_publication": false,
-      "price_pair_valid": true,
-      "publication_time_basis": "prediction_created_at_proxy",
-      "publication_snapshot_verified": false,
-      "price_source_verified": true,
-      "roi_eligible": false,
-      "roi_ineligibility_reasons": [
-        "backfilled_from_current_prediction_not_frozen_snapshot",
-        "no_verified_immutable_publication_snapshot",
-        "quote_not_proven_available_at_publication"
-      ],
-      "price_audit_backfilled": true
-    },
-    {
       "ledger_id": "nba-total:401909278",
       "sport": "basketball",
       "league": "NBA",
@@ -1926,6 +1894,49 @@
       "settled_at": "2026-10-31T08:07:03.615775+00:00",
       "settlement_source": "ESPN official scoreboard event ID; final score includes overtime",
       "paper_only": true
+    },
+    {
+      "ledger_id": "nba-total:401909279",
+      "sport": "basketball",
+      "league": "NBA",
+      "event_id": "401909279",
+      "start_time": "2026-10-30T23:30:00+00:00",
+      "player_1": "Brooklyn Nets",
+      "player_2": "Detroit Pistons",
+      "prediction_created_at": "2026-10-30T15:55:04.267888+00:00",
+      "model": "NBA independent recency-weighted offense/defense + home/rest; no market input",
+      "expected_total": 227.3064726060128,
+      "market_id": "225",
+      "market_source": "SportyBet Nigeria",
+      "quote_timestamp": "2026-10-30T20:45:56.132000+00:00",
+      "line": 208.5,
+      "pick": "over",
+      "final_score": [
+        94,
+        110
+      ],
+      "final_total": 204.0,
+      "result": "under",
+      "settled": true,
+      "settled_at": "2026-10-31T02:06:20.057844+00:00",
+      "settlement_source": "ESPN official scoreboard event ID; final score includes overtime",
+      "paper_only": true,
+      "over_odds": 1.24,
+      "under_odds": 4.16,
+      "quote_age_minutes_at_publication": -290.864,
+      "quote_age_minutes_at_start": 164.064,
+      "quote_fresh_at_publication": false,
+      "price_pair_valid": true,
+      "publication_time_basis": "prediction_created_at_proxy",
+      "publication_snapshot_verified": false,
+      "price_source_verified": true,
+      "roi_eligible": false,
+      "roi_ineligibility_reasons": [
+        "backfilled_from_current_prediction_not_frozen_snapshot",
+        "no_verified_immutable_publication_snapshot",
+        "quote_not_proven_available_at_publication"
+      ],
+      "price_audit_backfilled": true
     },
     {
       "ledger_id": "nba-total:401909280",
