@@ -29,7 +29,7 @@ class EfootballResearchRecoveryTests(unittest.TestCase):
 
     def test_schedules_are_registered_on_staggered_offset_cadences(self):
         self.assertIn("cron: '3,13,23,33,43,53 * * * *'", WATCHDOG)
-        self.assertIn("cron: '7,17,27,37,47,57 * * * *'", (ROOT / ".github/workflows/qualified-best-health-watch-v2.yml").read_text(encoding="utf-8"))
+        self.assertIn("cron: '2,12,22,32,42,52 * * * *'", (ROOT / ".github/workflows/qualified-best-health-watch-v2.yml").read_text(encoding="utf-8"))
         self.assertIn("cron: '9,24,39,54 * * * *'", RESEARCH)
 
     def test_research_archive_publish_retries_are_bounded(self):
