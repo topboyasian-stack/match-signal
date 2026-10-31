@@ -25,6 +25,8 @@ on:
       - "Match Signal Odds Builder"
       - "Match Signal NBA In-Game Behavior Recorder"
       - "Match Signal Virtual Lab Live Sync"
+      - "Match Signal Virtual Lab Collector"
+      - "NBA totals settlement ledger"
       - "Isolated eFootball Winner and BTTS Market Research"
     types: [completed]
   workflow_dispatch:
@@ -53,7 +55,7 @@ jobs:
 
   watchdog:
     # Use successful Odds Ticket Tracker completions as an event-driven heartbeat when GitHub cron delivery stalls.
-    if: ${{ github.event_name != 'pull_request' && (github.event_name != 'workflow_run' || (github.event.workflow_run.name == 'Match Signal Unified Upcoming Board' && github.event.workflow_run.conclusion != 'success') || github.event.workflow_run.name == 'Deploy Match Signal to Cloudflare Pages' || (github.event.workflow_run.name == 'Match Signal Odds Ticket Tracker' && github.event.workflow_run.conclusion == 'success') || (github.event.workflow_run.name == 'Match Signal Odds Builder' && github.event.workflow_run.conclusion == 'success') || (github.event.workflow_run.name == 'Match Signal NBA In-Game Behavior Recorder' && github.event.workflow_run.conclusion == 'success') || (github.event.workflow_run.name == 'Match Signal Virtual Lab Live Sync' && github.event.workflow_run.conclusion == 'success') || (github.event.workflow_run.name == 'Isolated eFootball Winner and BTTS Market Research' && github.event.workflow_run.conclusion == 'success')) }}
+    if: ${{ github.event_name != 'pull_request' && (github.event_name != 'workflow_run' || (github.event.workflow_run.name == 'Match Signal Unified Upcoming Board' && github.event.workflow_run.conclusion != 'success') || github.event.workflow_run.name == 'Deploy Match Signal to Cloudflare Pages' || (github.event.workflow_run.name == 'Match Signal Odds Ticket Tracker' && github.event.workflow_run.conclusion == 'success') || (github.event.workflow_run.name == 'Match Signal Odds Builder' && github.event.workflow_run.conclusion == 'success') || (github.event.workflow_run.name == 'Match Signal NBA In-Game Behavior Recorder' && github.event.workflow_run.conclusion == 'success') || (github.event.workflow_run.name == 'Match Signal Virtual Lab Live Sync' && github.event.workflow_run.conclusion == 'success') || (github.event.workflow_run.name == 'Match Signal Virtual Lab Collector' && github.event.workflow_run.conclusion == 'success') || (github.event.workflow_run.name == 'NBA totals settlement ledger' && github.event.workflow_run.conclusion == 'success') || (github.event.workflow_run.name == 'Isolated eFootball Winner and BTTS Market Research' && github.event.workflow_run.conclusion == 'success')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
