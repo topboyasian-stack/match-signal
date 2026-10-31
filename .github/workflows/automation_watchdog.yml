@@ -5,6 +5,11 @@ name: Match Signal Automation Watchdog
 # 2026-10-02: Darts-X and Table Tennis-X self-heal workflows restored; their dispatch targets are live again.
 
 on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/automation_watchdog.yml'
+      - 'scripts/test_automation_watchdog_research_recovery.py'
   push:
     branches: [main]
     paths:
@@ -33,9 +38,22 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  regression:
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout proposed changes
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test bounded watchdog recovery and inline script syntax
+        run: python scripts/test_automation_watchdog_research_recovery.py
+
   watchdog:
     # Use successful Odds Ticket Tracker completions as an event-driven heartbeat when GitHub cron delivery stalls.
-    if: ${{ github.event_name != 'workflow_run' || (github.event.workflow_run.name == 'Match Signal Unified Upcoming Board' && github.event.workflow_run.conclusion != 'success') || github.event.workflow_run.name == 'Deploy Match Signal to Cloudflare Pages' || (github.event.workflow_run.name == 'Match Signal Odds Ticket Tracker' && github.event.workflow_run.conclusion == 'success') || (github.event.workflow_run.name == 'Match Signal Odds Builder' && github.event.workflow_run.conclusion == 'success') || (github.event.workflow_run.name == 'Match Signal NBA In-Game Behavior Recorder' && github.event.workflow_run.conclusion == 'success') || (github.event.workflow_run.name == 'Match Signal Virtual Lab Live Sync' && github.event.workflow_run.conclusion == 'success') || (github.event.workflow_run.name == 'Isolated eFootball Winner and BTTS Market Research' && github.event.workflow_run.conclusion == 'success') }}
+    if: ${{ github.event_name != 'pull_request' && (github.event_name != 'workflow_run' || (github.event.workflow_run.name == 'Match Signal Unified Upcoming Board' && github.event.workflow_run.conclusion != 'success') || github.event.workflow_run.name == 'Deploy Match Signal to Cloudflare Pages' || (github.event.workflow_run.name == 'Match Signal Odds Ticket Tracker' && github.event.workflow_run.conclusion == 'success') || (github.event.workflow_run.name == 'Match Signal Odds Builder' && github.event.workflow_run.conclusion == 'success') || (github.event.workflow_run.name == 'Match Signal NBA In-Game Behavior Recorder' && github.event.workflow_run.conclusion == 'success') || (github.event.workflow_run.name == 'Match Signal Virtual Lab Live Sync' && github.event.workflow_run.conclusion == 'success') || (github.event.workflow_run.name == 'Isolated eFootball Winner and BTTS Market Research' && github.event.workflow_run.conclusion == 'success')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -48,6 +66,8 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Validate bounded watchdog recovery before running it
+        run: python scripts/test_automation_watchdog_research_recovery.py
 
       - name: Install Virtual Lab live-feed dependency
         if: github.event_name != 'workflow_run'
@@ -123,6 +143,10 @@ jobs:
           darts_age = age_hours(darts.get('updated_at'))
           table_tennis_age = age_hours(table_tennis.get('updated_at'))
           unified_age = age_hours(unified.get('generated_at'))
+          UNIFIED_UPCOMING_MAX_AGE_MINUTES = 15
+          UNIFIED_UPCOMING_DISPATCH_COOLDOWN_MINUTES = 10
+          UNIFIED_UPCOMING_STALE_RUN_MAX_AGE_MINUTES = 20
+          unified_age_minutes = round(unified_age * 60, 1)
 
           def recent_runs(workflow, limit=100):
               p = subprocess.run(
@@ -512,13 +536,135 @@ jobs:
               r = subprocess.run(['gh', 'workflow', 'run', 'table-tennis-x.yml', '--ref', 'main'], text=True, capture_output=True)
               actions.append({'workflow':'table-tennis-x.yml','action':'dispatch','status':'requested' if r.returncode == 0 else 'failed','detail':(r.stderr.strip() if r.returncode else 'Table Tennis-X self-heal')})
 
-          if (virtual_age + 0.01) < unified_age and not active('unified-upcoming.yml'):
-              r = subprocess.run(['gh', 'workflow', 'run', 'unified-upcoming.yml', '--ref', 'main'], text=True, capture_output=True)
-              actions.append({'workflow':'unified-upcoming.yml','action':'dispatch','status':'requested' if r.returncode == 0 else 'failed','detail':(r.stderr.strip() if r.returncode else 'Unified board refresh after newer Virtual Lab snapshot')})
+          unified_refresh_reasons = []
+          if unified_age_minutes > UNIFIED_UPCOMING_MAX_AGE_MINUTES:
+              unified_refresh_reasons.append(
+                  'published board is '+str(unified_age_minutes)+' minutes old'
+              )
+          if (virtual_age + 0.01) < unified_age:
+              unified_refresh_reasons.append('a newer Virtual Lab snapshot is waiting for board publication')
 
-          if unified_age > 0.2 and not active('unified-upcoming.yml'): 
-              r = subprocess.run(['gh', 'workflow', 'run', 'unified-upcoming.yml', '--ref', 'main'], text=True, capture_output=True)
-              actions.append({'workflow':'unified-upcoming.yml','action':'dispatch','status':'requested' if r.returncode == 0 else 'failed','detail':(r.stderr.strip() if r.returncode else 'Unified board self-heal')})
+          unified_runs, unified_history_error = recent_runs('unified-upcoming.yml', 30)
+          unified_dispatch_age_minutes = None
+          unified_active_run_age_minutes = None
+          unified_active_runs = []
+          if unified_runs is not None:
+              dispatch_ages = [
+                  minutes_since(run.get('createdAt')) for run in unified_runs
+                  if run.get('event') == 'workflow_dispatch'
+                  and minutes_since(run.get('createdAt')) is not None
+              ]
+              unified_dispatch_age_minutes = min(dispatch_ages) if dispatch_ages else None
+              unified_active_runs = [
+                  run for run in unified_runs
+                  if run.get('status') in {'queued', 'in_progress', 'waiting', 'pending'}
+              ]
+              active_ages = [
+                  minutes_since(run.get('createdAt')) for run in unified_active_runs
+                  if minutes_since(run.get('createdAt')) is not None
+              ]
+              unified_active_run_age_minutes = max(active_ages) if active_ages else None
+
+          unified_refresh_status = 'FRESH'
+          if unified_refresh_reasons:
+              unified_refresh_reason = '; '.join(unified_refresh_reasons)
+              if unified_history_error:
+                  unified_refresh_status = 'HISTORY_ERROR'
+                  actions.append({
+                      'workflow':'unified-upcoming.yml',
+                      'action':'inspect_unified_upcoming_freshness',
+                      'status':'failed',
+                      'detail':unified_history_error
+                  })
+              else:
+                  stale_active_runs = [
+                      run for run in unified_active_runs
+                      if minutes_since(run.get('createdAt')) is not None
+                      and minutes_since(run.get('createdAt')) > UNIFIED_UPCOMING_STALE_RUN_MAX_AGE_MINUTES
+                  ]
+                  if stale_active_runs:
+                      cancel_failures = []
+                      for run in stale_active_runs:
+                          run_id = run.get('databaseId')
+                          if not run_id:
+                              cancel_failures.append('active run has no database ID')
+                              continue
+                          cancel = subprocess.run(
+                              ['gh', 'run', 'cancel', str(run_id)],
+                              text=True, capture_output=True
+                          )
+                          if cancel.returncode != 0:
+                              cancel_failures.append(cancel.stderr.strip() or ('could not cancel run '+str(run_id)))
+                          else:
+                              actions.append({
+                                  'workflow':'unified-upcoming.yml',
+                                  'action':'cancel_stale_unified_upcoming_run',
+                                  'status':'requested',
+                                  'detail':'Cancelled stale queued/in-progress board run '+str(run_id)+' after '+str(minutes_since(run.get('createdAt')))+' minutes.'
+                              })
+                      if cancel_failures:
+                          unified_refresh_status = 'CANCEL_FAILED'
+                          actions.append({
+                              'workflow':'unified-upcoming.yml',
+                              'action':'recover_stale_unified_upcoming_run',
+                              'status':'failed',
+                              'detail':'; '.join(cancel_failures)
+                          })
+                      elif any(run not in stale_active_runs for run in unified_active_runs):
+                          unified_refresh_status = 'ACTIVE'
+                          actions.append({
+                              'workflow':'unified-upcoming.yml',
+                              'action':'recover_stale_unified_upcoming_run',
+                              'status':'suppressed_active_run',
+                              'detail':'A newer Unified Upcoming run is still active; the stale run was cancelled without creating a duplicate.'
+                          })
+                      else:
+                          dispatch = subprocess.run(
+                              ['gh', 'workflow', 'run', 'unified-upcoming.yml', '--ref', 'main'],
+                              text=True, capture_output=True
+                          )
+                          unified_refresh_status = 'DISPATCHED' if dispatch.returncode == 0 else 'DISPATCH_FAILED'
+                          actions.append({
+                              'workflow':'unified-upcoming.yml',
+                              'action':'recover_stale_unified_upcoming_run',
+                              'status':'requested' if dispatch.returncode == 0 else 'failed',
+                              'detail':dispatch.stderr.strip() if dispatch.returncode else (
+                                  'Cancelled a stale board run and dispatched a fresh Unified Upcoming build: '+unified_refresh_reason
+                              )
+                          })
+                  elif unified_active_runs:
+                      unified_refresh_status = 'ACTIVE'
+                      actions.append({
+                          'workflow':'unified-upcoming.yml',
+                          'action':'unified_upcoming_failsafe_dispatch',
+                          'status':'suppressed_active_run',
+                          'detail':'Unified Upcoming is stale, but a board run is active and has not exceeded the 20-minute recovery limit.'
+                      })
+                  elif (
+                      unified_dispatch_age_minutes is not None
+                      and unified_dispatch_age_minutes < UNIFIED_UPCOMING_DISPATCH_COOLDOWN_MINUTES
+                  ):
+                      unified_refresh_status = 'COOLDOWN'
+                      actions.append({
+                          'workflow':'unified-upcoming.yml',
+                          'action':'unified_upcoming_failsafe_dispatch',
+                          'status':'suppressed_cooldown',
+                          'detail':'Unified Upcoming fallback was dispatched '+str(unified_dispatch_age_minutes)+' minute(s) ago; cooldown is '+str(UNIFIED_UPCOMING_DISPATCH_COOLDOWN_MINUTES)+' minutes.'
+                      })
+                  else:
+                      dispatch = subprocess.run(
+                          ['gh', 'workflow', 'run', 'unified-upcoming.yml', '--ref', 'main'],
+                          text=True, capture_output=True
+                      )
+                      unified_refresh_status = 'DISPATCHED' if dispatch.returncode == 0 else 'DISPATCH_FAILED'
+                      actions.append({
+                          'workflow':'unified-upcoming.yml',
+                          'action':'unified_upcoming_failsafe_dispatch',
+                          'status':'requested' if dispatch.returncode == 0 else 'failed',
+                          'detail':dispatch.stderr.strip() if dispatch.returncode else (
+                              'Unified Upcoming self-heal: '+unified_refresh_reason
+                          )
+                      })
 
           if odds_age_minutes > ODDS_BUILDER_MAX_AGE_MINUTES and not active('odds_builder.yml'):
               r = subprocess.run(['gh', 'workflow', 'run', 'odds_builder.yml', '--ref', 'main'], text=True, capture_output=True)
@@ -547,6 +693,11 @@ jobs:
               'darts_age_hours': round(darts_age, 2),
               'table_tennis_age_hours': round(table_tennis_age, 2),
               'unified_upcoming_age_hours': round(unified_age, 2),
+              'unified_upcoming_age_minutes': unified_age_minutes,
+              'unified_upcoming_max_age_minutes': UNIFIED_UPCOMING_MAX_AGE_MINUTES,
+              'unified_upcoming_dispatch_age_minutes': unified_dispatch_age_minutes,
+              'unified_upcoming_active_run_age_minutes': unified_active_run_age_minutes,
+              'unified_upcoming_refresh_status': unified_refresh_status,
               'qualified_best_monitor_last_run_age_minutes': monitor_last_age_minutes,
               'qualified_best_monitor_last_scheduled_run_age_minutes': monitor_scheduled_age_minutes,
               'qualified_best_monitor_last_fallback_dispatch_age_minutes': monitor_dispatch_age_minutes,
