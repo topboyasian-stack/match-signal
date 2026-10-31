@@ -9,6 +9,7 @@ assert.match(coverage, /const noModelQualifiedCandidates = virtualCandidates\.le
 assert.match(coverage, /if \(noModelQualifiedCandidates\)/);
 assert.match(coverage, /scanStopReason = "no_model_qualified_candidates"/);
 assert.match(coverage, /coverage_state: noModelQualifiedCandidates \? "VALID_ZERO"/);
+assert.match(coverage, /status: noModelQualifiedCandidates \? "VALID_ZERO_QUALIFIED_CANDIDATES"/);
 assert.match(coverage, /candidate_pool_rows_in_next_7_days: upcomingVirtualCandidates\.length/);
 assert.match(coverage, /model_qualified_candidate_rows_in_next_7_days: virtualCandidates\.length/);
 
