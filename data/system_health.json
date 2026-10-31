@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-10-31T08:10:23.490002+00:00",
-  "status": "DEGRADED",
+  "generated_at": "2026-10-31T08:10:21.047227+00:00",
+  "status": "HEALTHY",
   "critical_issues": 0,
-  "warning_issues": 1,
+  "warning_issues": 0,
   "info_issues": 2,
   "checks": [
     {
@@ -14,7 +14,7 @@
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.22,
+      "age_hours": 0.21,
       "threshold_hours": 8
     },
     {
@@ -43,11 +43,11 @@
     },
     {
       "engine": "virtual_live_feed",
-      "status": "STALE",
-      "age_hours": 0.53,
+      "status": "PASS",
+      "age_hours": 0.01,
       "threshold_hours": 0.5,
       "heartbeat_source": "virtual_lab_live.json",
-      "events_count": 705
+      "events_count": 704
     },
     {
       "engine": "nba_live_observation_recorder",
@@ -94,11 +94,6 @@
     }
   ],
   "issues": [
-    {
-      "code": "VIRTUAL_LIVE_FEED_STALE",
-      "severity": "warning",
-      "detail": "virtual_lab_live.json age 0.53h exceeds 0.50h; a downstream Unified Upcoming refresh cannot substitute for a fresh source snapshot"
-    },
     {
       "code": "PDL_EXPERIMENTAL_FEED_STALE",
       "severity": "info",
