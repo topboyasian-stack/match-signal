@@ -20,23 +20,78 @@ S = requests.Session()
 S.headers.update({"User-Agent": "Mozilla/5.0 (compatible; MatchSignal/1.0)"})
 
 
-def sportybet_basketball_feed():
-    """Read SportyBet Nigeria pre-match NBA markets through the existing regional proxy."""
+def sportybet_basketball_feed(max_pages=5):
+    """Read and merge the seven-day SportyBet basketball feed across all available pages.
+
+    The API's first page is not guaranteed to contain the NBA fixtures. Keep
+    market capture and the main Upcoming refresh on the same bounded pagination
+    contract, merge duplicate events by market/specifier, and preserve partial
+    results if a later page fails.
+    """
     url = "https://match-signal.pages.dev/api/sportybet-basketball"
-    try:
-        response = S.get(url, params={"pageSize": 100, "timeline": 168}, timeout=12)
-        response.raise_for_status()
-        payload = response.json()
-        if payload.get("ok") is not True:
-            return [], f"SportyBet source response failed: {payload.get('error') or 'ok flag was not true'}"
-        if not isinstance(payload.get("events"), list):
-            return [], "SportyBet source response omitted the events array"
-        events = payload["events"]
-        if not events:
-            return [], "SportyBet source returned zero upcoming basketball events"
-        return events, None
-    except Exception as exc:
-        return [], f"SportyBet feed unavailable: {exc}"
+    events_by_id = {}
+    page_errors = []
+    for page in range(1, max(1, int(max_pages)) + 1):
+        try:
+            response = S.get(
+                url,
+                params={"pageSize": 100, "timeline": 168, "pageNum": page},
+                timeout=12,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            if not isinstance(payload, dict) or payload.get("ok") is not True:
+                detail = payload.get("error") if isinstance(payload, dict) else None
+                raise RuntimeError(detail or "ok flag was not true")
+            page_events = payload.get("events")
+            if not isinstance(page_events, list):
+                raise RuntimeError("SportyBet source response omitted the events array")
+        except Exception as exc:
+            page_errors.append(f"page {page}: {exc}")
+            if page == 1:
+                return [], "SportyBet feed unavailable: " + "; ".join(page_errors)
+            break
+
+        new_ids = 0
+        for event in page_events:
+            if not isinstance(event, dict):
+                continue
+            event_id = str(event.get("event_id") or event.get("id") or "")
+            if not event_id:
+                continue
+            current = events_by_id.get(event_id)
+            if current is None:
+                current = dict(event)
+                current["markets"] = []
+                events_by_id[event_id] = current
+                new_ids += 1
+            else:
+                old_fetch = dt(current.get("fetched_at"))
+                new_fetch = dt(event.get("fetched_at"))
+                if new_fetch and (not old_fetch or new_fetch >= old_fetch):
+                    for key, value in event.items():
+                        if key != "markets":
+                            current[key] = value
+            market_map = {
+                (str(m.get("id") or ""), str(m.get("specifier") or "")): m
+                for m in (current.get("markets") or [])
+                if isinstance(m, dict)
+            }
+            for market in event.get("markets") or []:
+                if isinstance(market, dict):
+                    key = (str(market.get("id") or ""), str(market.get("specifier") or ""))
+                    market_map[key] = market
+            current["markets"] = list(market_map.values())
+
+        # A short page marks the end of the feed. If pageNum is ignored or a
+        # page repeats old events, stop instead of spending more requests.
+        if len(page_events) < 100 or new_ids == 0:
+            break
+
+    if not events_by_id:
+        detail = "; ".join(page_errors) if page_errors else "SportyBet source returned zero upcoming basketball events"
+        return [], "SportyBet feed unavailable: " + detail
+    return list(events_by_id.values()), ("; ".join(page_errors) if page_errors else None)
 
 
 def nba_team_key(value):
