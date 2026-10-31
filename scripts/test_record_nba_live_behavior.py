@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """Offline contract tests for NBA live box-score projection."""
+import json
+import tempfile
 import unittest
 from datetime import datetime, timezone
+from pathlib import Path
 from unittest.mock import patch
-from record_nba_live_behavior import fetch_scoreboard_window, live_total_projection
+from record_nba_live_behavior import fetch_scoreboard_window, live_total_projection, load_observation_history, write_observation_history
 
 
 def stat(name, value, abbreviation=None):
@@ -75,6 +78,22 @@ class LiveBoxscoreProjectionTests(unittest.TestCase):
         result = live_total_projection(sample_record(), {})
         self.assertEqual(result["status"], "NO_PREGAME_BASELINE")
 
+
+    def test_legacy_json_archive_migrates_to_gzip_and_round_trips(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            compressed = root / "nba_live_observations.json.gz"
+            legacy = root / "nba_live_observations.json"
+            expected = {
+                "updated_at": "2026-10-31T21:00:00+00:00",
+                "games": {"event-1": {"event_id": "event-1", "snapshots": [{"observed_at": "2026-10-31T21:00:00+00:00"}]}},
+            }
+            legacy.write_text(json.dumps(expected), encoding="utf-8")
+            self.assertEqual(load_observation_history(compressed, legacy), expected)
+            write_observation_history(expected, compressed, legacy)
+            self.assertTrue(compressed.exists())
+            self.assertFalse(legacy.exists(), "the raw legacy archive must be removed after compression")
+            self.assertEqual(load_observation_history(compressed, legacy), expected)
 
     def test_scoreboard_window_uses_eastern_adjacent_days_after_utc_rollover(self):
         now = datetime(2026, 10, 31, 10, 10, tzinfo=timezone.utc)
