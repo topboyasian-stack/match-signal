@@ -21,6 +21,10 @@ on:
       - 'scripts/qa_ere_live.py'
       - 'scripts/settle_expansion.py'
       - 'scripts/test_nba_sportybet_totals.py'
+      - 'scripts/nba_totals_walk_forward.py'
+      - 'scripts/test_nba_totals_walk_forward.py'
+      - 'scripts/nba_live_totals_walk_forward.py'
+      - 'scripts/test_nba_live_totals_walk_forward.py'
       - '.github/workflows/live-expansion.yml'
 
 permissions:
@@ -47,7 +51,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install dependencies
-        run: python -m pip install --upgrade requests pandas pyarrow
+        run: python -m pip install --upgrade requests pandas pyarrow duckdb
 
       - name: Sync with latest main
         run: |
@@ -59,6 +63,11 @@ jobs:
 
       - name: Test exact SportyBet NBA totals and overtime settlement
         run: python scripts/test_nba_sportybet_totals.py
+
+      - name: Test calibrated NBA totals evaluator and live-period evaluator
+        run: |
+          python scripts/test_nba_totals_walk_forward.py
+          python scripts/test_nba_live_totals_walk_forward.py
 
       - name: Test conflict-safe expansion publication
         run: |
