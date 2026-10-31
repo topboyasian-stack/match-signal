@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Offline contract tests for NBA live box-score projection."""
 import unittest
-from record_nba_live_behavior import live_total_projection
+from datetime import datetime, timezone
+from unittest.mock import patch
+from record_nba_live_behavior import fetch_scoreboard_window, live_total_projection
 
 
 def stat(name, value, abbreviation=None):
@@ -72,6 +74,32 @@ class LiveBoxscoreProjectionTests(unittest.TestCase):
     def test_missing_pregame_baseline_fails_closed(self):
         result = live_total_projection(sample_record(), {})
         self.assertEqual(result["status"], "NO_PREGAME_BASELINE")
+
+
+    def test_scoreboard_window_uses_eastern_adjacent_days_after_utc_rollover(self):
+        now = datetime(2026, 10, 31, 10, 10, tzinfo=timezone.utc)
+        calls = []
+        def fake_get(url, params=None):
+            calls.append(params["dates"])
+            return {"events": [{"id": "game-" + params["dates"]}]}
+        with patch("record_nba_live_behavior.get", side_effect=fake_get):
+            events, dates, errors = fetch_scoreboard_window(now)
+        self.assertEqual(dates, ["20261030", "20261031", "20261101"])
+        self.assertEqual(calls, dates)
+        self.assertEqual({row["id"] for row in events}, {"game-20261030", "game-20261031", "game-20261101"})
+        self.assertEqual(errors, [])
+
+    def test_scoreboard_window_deduplicates_events_and_records_partial_source_errors(self):
+        now = datetime(2026, 10, 31, 10, 10, tzinfo=timezone.utc)
+        def fake_get(url, params=None):
+            if params["dates"] == "20261030":
+                raise RuntimeError("temporary provider error")
+            return {"events": [{"id": "same-game"}, {"id": "same-game", "status": "latest"}]}
+        with patch("record_nba_live_behavior.get", side_effect=fake_get):
+            events, dates, errors = fetch_scoreboard_window(now)
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0]["status"], "latest")
+        self.assertEqual(errors[0]["date"], "20261030")
 
 
 if __name__ == "__main__":
