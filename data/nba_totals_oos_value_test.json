@@ -1,10 +1,10 @@
 {
-  "generated_at": "2026-10-31T19:58:28.957581+00:00",
+  "generated_at": "2026-10-31T20:26:59.233751+00:00",
   "paper_only": true,
   "evaluation_type": "NBA_TOTALS_WALK_FORWARD_V1",
   "market_id": "225",
   "market_definition": "full_game_total_including_overtime",
-  "model_version": "nba-total-v3-matchup-recent-team-total",
+  "model_version": "nba-total-v4-pace-efficiency-calibrated",
   "history_games": 1335,
   "walk_forward": {
     "method": "expanding chronological forecasts; each game uses only strictly earlier completed games",
@@ -12,24 +12,82 @@
     "development_games": 1036,
     "holdout": {
       "n": 259,
-      "mae": 15.5096,
-      "rmse": 19.7402,
-      "bias": 2.5004,
+      "mae": 15.4672,
+      "rmse": 19.6957,
+      "bias": 2.1202,
+      "uncalibrated": {
+        "n": 259,
+        "mae": 15.5096,
+        "rmse": 19.7402,
+        "bias": 2.5004
+      },
       "baseline_mae": 16.491,
       "baseline_rmse": 21.1856,
       "baseline_bias": 2.5876,
-      "mae_improvement_vs_baseline": 0.9814,
-      "beats_baseline": true
+      "mae_improvement_vs_baseline": 1.0238,
+      "beats_baseline": true,
+      "pace_feature_games": 0
     }
+  },
+  "model_calibration": {
+    "selected_pace_blend_weight": 0.0,
+    "production_bias_correction": 0.3802,
+    "development_n": 1036,
+    "development_raw_bias": 0.3802,
+    "pace_feature_development_games": 0,
+    "pace_feature_coverage": 0.0,
+    "selection_rule": "minimum development MAE across a predeclared pace blend grid; residual bias estimated on development only"
   },
   "verified_market_records": 0,
   "market_development_records": 0,
+  "market_overall": {
+    "n": 0,
+    "wins": 0,
+    "losses": 0,
+    "pushes": 0,
+    "win_rate": null,
+    "over_under_accuracy": null,
+    "by_pick": {
+      "over": {
+        "n": 0,
+        "wins": 0,
+        "losses": 0,
+        "accuracy": null
+      },
+      "under": {
+        "n": 0,
+        "wins": 0,
+        "losses": 0,
+        "accuracy": null
+      }
+    },
+    "profit_units": 0.0,
+    "roi": null,
+    "roi_ci95_lower": null,
+    "market_favorite_roi": null,
+    "roi_vs_market_favorite": null
+  },
   "market_holdout": {
     "n": 0,
     "wins": 0,
     "losses": 0,
     "pushes": 0,
     "win_rate": null,
+    "over_under_accuracy": null,
+    "by_pick": {
+      "over": {
+        "n": 0,
+        "wins": 0,
+        "losses": 0,
+        "accuracy": null
+      },
+      "under": {
+        "n": 0,
+        "wins": 0,
+        "losses": 0,
+        "accuracy": null
+      }
+    },
     "profit_units": 0.0,
     "roi": null,
     "roi_ci95_lower": null,
@@ -37,5 +95,5 @@
     "roi_vs_market_favorite": null
   },
   "release_decision": "RESEARCH_ONLY",
-  "release_reason": "Not qualified: require at least 100 unseen forecast games with lower MAE than baseline and absolute bias <=3 points, plus at least 100 settled, immutable, fresh SportyBet market-225 holdout bets with positive ROI, a positive 95% lower confidence bound, and ROI above the market-favourite baseline."
+  "release_reason": "Not qualified: require at least 100 unseen calibrated forecast games with lower MAE than baseline and absolute bias <=3 points, plus at least 100 settled, immutable, fresh SportyBet market-225 holdout bets with positive ROI, a positive 95% lower confidence bound, and ROI above the market-favourite baseline."
 }

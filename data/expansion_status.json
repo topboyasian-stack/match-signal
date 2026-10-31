@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-10-31T20:00:40.690380+00:00",
+  "updated_at": "2026-10-31T20:27:00.583468+00:00",
   "release_mode": "LIVE_EXPERIMENTAL",
   "live_trading_approved": false,
   "competitions": {
@@ -8,7 +8,7 @@
       "current_fixtures": 61,
       "collection_errors": 1,
       "status": "LIVE_EXPERIMENTAL",
-      "history_source": "llimllib/nba_data gamelogs.parquet; ESPN daily scoreboard and NBA Elo CSV fallbacks"
+      "history_source": "llimllib/nba_data v2 team_game_logs pace and efficiency catalog; ESPN and NBA Elo fallbacks"
     },
     "Eredivisie": {
       "historical_events": 152,
@@ -22,7 +22,7 @@
   },
   "source_diagnostics": {
     "NBA": [
-      "nba_gamelogs: 404 Client Error: Not Found for url: https://raw.githubusercontent.com/llimllib/nba_data/main/data/gamelogs.parquet"
+      "nba_data_v2_team_game_logs: HTTP Error: HTTP GET error on 'https://basketball-data.billmill.org/nba/nba.duckdb.wal' (HTTP 403 Forbidden)"
     ],
     "Eredivisie": [
       "2025-10-31..2025-11-06: 400 Client Error: Bad Request for url: https://site.api.espn.com/apis/site/v2/sports/soccer/ned.1/scoreboard?dates=20251031-20251106",
@@ -47,7 +47,6 @@
     "LIVE_EXPERIMENTAL signals are real generated predictions, not guarantees or live-trading approval.",
     "NBA remains preseason-ready until 2026-10-20, then enters live experimental mode automatically.",
     "Eredivisie uses ESPN when available, Football-Data's current fixture feed as the first fallback, and SofaScore's daily schedule as the second fallback.",
-    "Eredivisie repair source added after free Football-Data endpoint rate limiting; no market odds are fabricated when unavailable.",
     "Eredivisie repair source added after free Football-Data endpoint rate limiting; no market odds are fabricated when unavailable."
   ],
   "main_prediction_feed_merged": true,
