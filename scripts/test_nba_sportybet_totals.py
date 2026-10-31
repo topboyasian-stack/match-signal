@@ -25,12 +25,14 @@ feed = [{
     }],
 }]
 # Forecasts can refresh before tip-off, but must freeze once the game starts.
-fresh_snapshot = {"generated_at": (now-timedelta(hours=2)).isoformat()}
-stale_snapshot = {"generated_at": (now-timedelta(hours=7)).isoformat()}
+fresh_snapshot = {"generated_at": (now-timedelta(hours=2)).isoformat(), "totals_model_version": pipeline.NBA_TOTALS_MODEL_VERSION}
+stale_snapshot = {"generated_at": (now-timedelta(hours=7)).isoformat(), "totals_model_version": pipeline.NBA_TOTALS_MODEL_VERSION}
+legacy_snapshot = {"generated_at": (now-timedelta(hours=1)).isoformat(), "totals_model_version": "nba-total-v1"}
 assert pipeline.should_refresh_nba_prediction(fresh_snapshot, start, now) is False
 assert pipeline.should_refresh_nba_prediction(stale_snapshot, start, now) is True
 assert pipeline.should_refresh_nba_prediction(stale_snapshot, now-timedelta(minutes=1), now) is False
 assert pipeline.should_refresh_nba_prediction({}, start, now) is True
+assert pipeline.should_refresh_nba_prediction(legacy_snapshot, start, now) is True, "pregame forecasts from old totals logic must refresh into the versioned model"
 
 market = pipeline.sportybet_total_for_fixture(fixture, feed)
 assert market and market["market_id"] == "225" and market["line"] == 228.5
