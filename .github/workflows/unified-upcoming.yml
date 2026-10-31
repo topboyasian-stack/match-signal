@@ -165,6 +165,7 @@ jobs:
         run: |
           python scripts/test_workflow_trigger_boundaries.py
           python scripts/test_deploy_freshness_order.py
+          python scripts/test_system_health_audit_lib.py
           python - <<'PY'
           from pathlib import Path
           source = Path('.github/workflows/unified-upcoming.yml').read_text(encoding='utf-8')
