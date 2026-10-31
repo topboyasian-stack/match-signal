@@ -16,7 +16,10 @@ const sourceStart = source.indexOf("function isOverUnderPrediction(x){");
 const sourceEnd = source.indexOf("function ladderAnchor(rows){", sourceStart);
 if (sourceStart < 0 || sourceEnd <= sourceStart) throw new Error("Production desk gate functions could not be extracted");
 
-const sandbox = { Date, Number, String, Math, Array, Boolean, Object, Map, Set, RegExp };
+const learningRaw = await readFile(new URL("../data/efootball_desk_learning.json", import.meta.url), "utf8");
+console.log("[coverage] loaded eFootball desk learning bytes=" + learningRaw.length);
+const efootballDeskLearning = JSON.parse(learningRaw);
+const sandbox = { Date, Number, String, Math, Array, Boolean, Object, Map, Set, RegExp, efootballDeskLearning };
 vm.createContext(sandbox);
 vm.runInContext(
   source.slice(sourceStart, sourceEnd) +
