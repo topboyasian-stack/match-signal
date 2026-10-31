@@ -281,6 +281,13 @@ def main():
             record["player_statistics"] = []
             record["plays_available"] = False
             record["boxscore_available"] = False
+        if record["game_state"] == "live":
+            pregame = predictions_by_event.get(eid)
+            record["pregame_totals_model_version"] = (pregame or {}).get("totals_model_version")
+            # Archive the exact live estimate with the raw score/clock/stats
+            # observed at this timestamp; recalculating later would destroy the
+            # historical state needed for honest period-by-period validation.
+            record["live_total_projection"] = live_total_projection(record, pregame)
         observations.append(record)
 
     try:
@@ -323,7 +330,7 @@ def main():
             continue
         current = dict(rec)
         current["recent_plays"] = (current.get("recent_plays") or [])[-8:]
-        current["live_total_projection"] = live_total_projection(
+        current["live_total_projection"] = rec.get("live_total_projection") or live_total_projection(
             rec, predictions_by_event.get(str(rec.get("event_id")))
         )
         current_games[str(rec["event_id"])] = current
