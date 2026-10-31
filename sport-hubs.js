@@ -8,7 +8,7 @@ function workspaceEntityLabel(value,kind){
   const safeAttr=v=>String(v??'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   return '<span class="ws-entity-label"><a class="ws-media-slot" data-ws-media-kind="'+kind+'" data-ws-media-name="'+safeAttr(raw)+'" title="'+safeAttr(cleanName)+'">'+E(initials)+'</a><span class="ws-entity-name">'+E(raw)+'</span></span>';
 }
-async function get(path){const sep=String(path).includes('?')?'&':'?';const r=await fetch(path+sep+'v='+Date.now(),{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);return r.json()}function mergeRows(base,pdl){const out=new Map();[...(Array.isArray(base)?base:[]),...(Array.isArray(pdl)?pdl:[])].forEach(row=>{if(!row||!row.event_id)return;out.set(String(row.event_id),row)});return [...out.values()]}const nav=()=>'<nav class="ms-nav"><a class="ms-brand ms-brand-link" href="./index.html" aria-label="Return to Match Signal main desk"><div class="ms-mark" aria-hidden="true"><svg viewBox="0 0 48 48" width="32" height="32" fill="none"><path d="M9 28.5a15 15 0 0 1 30 0" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/><path d="M14 29a10 10 0 0 1 20 0M19 29a5 5 0 0 1 10 0" stroke="#42e59a" stroke-width="2.4" stroke-linecap="round"/><path d="M24 29l9-11" stroke="#eef7fb" stroke-width="3" stroke-linecap="round"/><circle cx="24" cy="29" r="3.2" fill="#37e7ff"/><path d="M8 35h32" stroke="#7c6cff" stroke-width="1.8" stroke-linecap="round"/></svg></div><div><h1>Match Signal</h1><p>Real-data, market-calibrated sports prediction desk</p></div></a><div class="ms-tabs"><a class="ms-btn" href="./index.html">📅 Upcoming</a><a class="ms-btn" href="./qualified-best.html">✅ Qualified Best</a><a class="ms-btn" href="./football.html">⚽ Football</a><a class="ms-btn" href="./tennis.html">🎾 Tennis</a><a class="ms-btn" href="./basketball.html">🏀 Basketball</a><a class="ms-btn" href="./live.html">🔴 Live</a><a class="ms-btn" href="./reports.html">📊 Reports</a><a class="ms-btn" href="./odds-builder.html">🧮 Odds Builder</a><a class="ms-btn" href="./virtual-lab/">🧪 Lab</a><a class="ms-btn" href="./analyst.html">✦ AI Analyst <small>Private</small></a></div></nav>';function injectNav(){const n=Q('#msNav');if(n)n.innerHTML=nav()}function footballLeagues(rows){const base=['La Liga','Bundesliga','Ligue 1','Champions League'];return [...new Set([...base,...rows.filter(x=>x.sport==='football').map(x=>x.league).filter(Boolean)])]}function leagueCard(name,rows,sport,meta={}){const count=rows.filter(x=>x.sport===sport&&x.league===name).length;const calculating=meta.calculating===true&&count===0;const desc=sport==='football'&&name.includes('Professional Development')?'U21 academy competition · historical results + dedicated forward fixture model':sport==='tennis'?name+' tour · tournament-level fixtures and model signals':name+' · 22-day forward planning when fixtures are available';const badge=calculating?'Calculating':count===0?'Pending':count+' predictions';return '<article class="ms-league"><div class="ms-league-top"><h3>'+E(name)+'</h3><span class="ms-badge '+(calculating?'':'')+'">'+badge+'</span></div><p>'+E(desc)+'</p><a href="./league.html?sport='+encodeURIComponent(sport)+'&league='+encodeURIComponent(name)+'">Open league page →</a></article>'}function workspaceEntityLabel(name,kind){
+async function get(path){const sep=String(path).includes('?')?'&':'?';const r=await fetch(path+sep+'v='+Date.now(),{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);return r.json()}let efootballDeskLearning=null;function mergeRows(base,pdl){const out=new Map();[...(Array.isArray(base)?base:[]),...(Array.isArray(pdl)?pdl:[])].forEach(row=>{if(!row||!row.event_id)return;out.set(String(row.event_id),row)});return [...out.values()]}const nav=()=>'<nav class="ms-nav"><a class="ms-brand ms-brand-link" href="./index.html" aria-label="Return to Match Signal main desk"><div class="ms-mark" aria-hidden="true"><svg viewBox="0 0 48 48" width="32" height="32" fill="none"><path d="M9 28.5a15 15 0 0 1 30 0" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/><path d="M14 29a10 10 0 0 1 20 0M19 29a5 5 0 0 1 10 0" stroke="#42e59a" stroke-width="2.4" stroke-linecap="round"/><path d="M24 29l9-11" stroke="#eef7fb" stroke-width="3" stroke-linecap="round"/><circle cx="24" cy="29" r="3.2" fill="#37e7ff"/><path d="M8 35h32" stroke="#7c6cff" stroke-width="1.8" stroke-linecap="round"/></svg></div><div><h1>Match Signal</h1><p>Real-data, market-calibrated sports prediction desk</p></div></a><div class="ms-tabs"><a class="ms-btn" href="./index.html">📅 Upcoming</a><a class="ms-btn" href="./qualified-best.html">✅ Qualified Best</a><a class="ms-btn" href="./football.html">⚽ Football</a><a class="ms-btn" href="./tennis.html">🎾 Tennis</a><a class="ms-btn" href="./basketball.html">🏀 Basketball</a><a class="ms-btn" href="./live.html">🔴 Live</a><a class="ms-btn" href="./reports.html">📊 Reports</a><a class="ms-btn" href="./odds-builder.html">🧮 Odds Builder</a><a class="ms-btn" href="./virtual-lab/">🧪 Lab</a><a class="ms-btn" href="./analyst.html">✦ AI Analyst <small>Private</small></a></div></nav>';function injectNav(){const n=Q('#msNav');if(n)n.innerHTML=nav()}function footballLeagues(rows){const base=['La Liga','Bundesliga','Ligue 1','Champions League'];return [...new Set([...base,...rows.filter(x=>x.sport==='football').map(x=>x.league).filter(Boolean)])]}function leagueCard(name,rows,sport,meta={}){const count=rows.filter(x=>x.sport===sport&&x.league===name).length;const calculating=meta.calculating===true&&count===0;const desc=sport==='football'&&name.includes('Professional Development')?'U21 academy competition · historical results + dedicated forward fixture model':sport==='tennis'?name+' tour · tournament-level fixtures and model signals':name+' · 22-day forward planning when fixtures are available';const badge=calculating?'Calculating':count===0?'Pending':count+' predictions';return '<article class="ms-league"><div class="ms-league-top"><h3>'+E(name)+'</h3><span class="ms-badge '+(calculating?'':'')+'">'+badge+'</span></div><p>'+E(desc)+'</p><a href="./league.html?sport='+encodeURIComponent(sport)+'&league='+encodeURIComponent(name)+'">Open league page →</a></article>'}function workspaceEntityLabel(name,kind){
   const raw=String(name||"Unknown").trim();if(!kind)return E(raw);
   const clean=kind==="team"?raw.replace(/\s*\([^()]+\)\s*$/,"").trim():raw,words=clean.split(/\s+/).filter(Boolean);
   const initials=(words.length>1?words[0][0]+words[1][0]:(words[0]||"MS").slice(0,2)).toUpperCase();
@@ -117,30 +117,47 @@ function probabilityCalibrationInfo(x){
   const n=rawN==null||String(rawN).trim()===""?NaN:Number(rawN);
   const hit=rawHit==null||String(rawHit).trim()===""?NaN:Number(rawHit);
   if(raw===null||!["efootball_gt","efootball_adriatic"].includes(product)||
-     !isOverUnderPrediction(x)||!Number.isFinite(line)||(side!=="over"&&side!=="under")||
-     !Number.isFinite(n)||n<30||!Number.isFinite(hit)||hit<0||hit>1)return null;
-  // Blend the model estimate toward its own exact-line chronological walk-forward
-  // hit rate. n/(n+30) is the same evidence-weighting form used by the desk
-  // learner; it reduces unsupported certainty without pretending the historical
-  // rate is a guarantee. This adjustment affects Desk display/value evaluation only.
-  const weight=n/(n+30);
-  const probability=Math.max(0.01,Math.min(0.99,raw+(hit-raw)*weight));
-  return {raw,probability,hitRate:hit,n,weight};
+     !isOverUnderPrediction(x)||!Number.isFinite(line)||(side!=="over"&&side!=="under"))return null;
+  // Exact-line chronological evidence takes priority whenever it is mature.
+  if(Number.isFinite(n)&&n>=30&&Number.isFinite(hit)&&hit>=0&&hit<=1){
+    const weight=n/(n+30);
+    const probability=Math.max(0.01,Math.min(0.99,raw+(hit-raw)*weight));
+    return {raw,probability,hitRate:hit,n,weight,source:"exact_line_walkforward"};
+  }
+  // Fallback is product-specific, based only on settled raw model probabilities.
+  // It is display/value calibration, not a substitute for the separate exact-line
+  // walk-forward gate required before an eFootball selection can qualify.
+  const generated=Date.parse(String(efootballDeskLearning?.generated_at||""));
+  if(!Number.isFinite(generated)||Date.now()-generated>60*60*1000||generated>Date.now()+120000)return null;
+  const bucketWidth=0.05;
+  const bucketKey=(Math.floor((Math.max(0,Math.min(0.9999,raw))+1e-9)/bucketWidth)*bucketWidth)
+    .toFixed(2).replace(/0+$/,"").replace(/\.$/,"");
+  const bucket=efootballDeskLearning?.by_product?.[product]?.raw_probability_calibration?.buckets?.[bucketKey];
+  const bucketN=Number(bucket?.n),calibrated=Number(bucket?.calibrated_probability);
+  const bucketHit=Number(bucket?.accuracy);
+  if(!bucket||!Number.isFinite(bucketN)||bucketN<30||!Number.isFinite(calibrated)||calibrated<0||calibrated>1)return null;
+  return {raw,probability:calibrated,hitRate:Number.isFinite(bucketHit)?bucketHit:null,n:bucketN,
+    weight:Number(bucket.calibration_weight)||0,source:"product_wide_raw_probability_bucket"};
 }
 function probabilityValue(x){
   const calibrated=probabilityCalibrationInfo(x);
-  return calibrated?calibrated.probability:rawProbabilityValue(x);
+  if(calibrated)return calibrated.probability;
+  const product=String(x?.product||"").toLowerCase();
+  if(["efootball_gt","efootball_adriatic"].includes(product)&&isOverUnderPrediction(x))return null;
+  return rawProbabilityValue(x);
 }
 function displayedFairOddsValue(x){
   const calibration=probabilityCalibrationInfo(x);
   if(calibration&&calibration.probability>0)return 1/calibration.probability;
+  const product=String(x?.product||"").toLowerCase();
+  if(["efootball_gt","efootball_adriatic"].includes(product)&&isOverUnderPrediction(x))return null;
   const fair=Number(x?.model_fair_odds);
   return Number.isFinite(fair)&&fair>1?fair:null;
 }
 function isVirtualDeskCandidate(row){
   if(!row)return false;
   const product=String(row?.product||"").toLowerCase();
-  const probability=rawProbabilityValue(row);
+  const probability=probabilityValue(row);
   const start=Date.parse(String(row?.start_time||""));
   const upstreamQualified=Boolean(row?.betting_qualified)||Boolean(row?.qualified_for_builder)||
     String(row?.qualification_status||"").startsWith("BETTING_QUALIFIED");
@@ -333,6 +350,15 @@ function qualificationState(x){
   const modelQualified=!veto&&(Boolean(x?.betting_qualified)||Boolean(x?.qualified_for_builder)||raw.startsWith("BETTING_QUALIFIED"));
   const product=String(x?.product||"").toLowerCase();
   const exactLineCalibration=probabilityCalibrationInfo(x);
+  const recentCalibration=efootballDeskLearning?.by_product?.[product]?.recent_window||null;
+  const recentN=Number(recentCalibration?.n),recentAccuracy=Number(recentCalibration?.accuracy);
+  if(modelQualified&&["efootball_gt","efootball_adriatic"].includes(product)&&
+     Number.isFinite(recentN)&&recentN>=30&&Number.isFinite(recentAccuracy)&&recentAccuracy<0.55){
+    return {modelQualified:false,currentPricePass:false,
+      label:"NOT QUALIFIED · RECENT PRODUCT ACCURACY "+(recentAccuracy*100).toFixed(1)+"% (LAST "+Math.round(recentN)+")",
+      reason:"RECENT_PRODUCT_ACCURACY_BELOW_55_PERCENT",
+      recentAccuracy,recentN};
+  }
   // A raw upstream qualification flag is not enough for eFootball totals.
   // Require at least 30 chronological exact-line walk-forward observations
   // before any such market can enter Qualified Best. Desk-learning samples
@@ -430,7 +456,7 @@ function unifiedMarketLine(x){
   return '<div class="ms-market-row">'+
     '<span class="ms-market-name"><b>'+E(market)+'</b></span>'+
     '<span>'+(calibration?'Desk-calibrated estimate':'Model estimate')+' <b>'+(p==null?"—":P(p))+'</b></span>'+
-    (calibration?'<span>Raw model <b>'+P(calibration.raw)+'</b> · exact-line walk-forward '+(calibration.hitRate*100).toFixed(2)+'%'+' (n='+Math.round(calibration.n)+')</span>':'')+
+    (calibration?'<span>Raw model <b>'+P(calibration.raw)+'</b> · '+(calibration.source==="exact_line_walkforward"?"exact-line walk-forward":"product-wide settled calibration")+(calibration.hitRate==null?"":" "+(calibration.hitRate*100).toFixed(2)+"%")+' (n='+Math.round(calibration.n)+')</span>':'')+
     '<span>Model fair <b>'+E(fairLabel)+'</b></span>'+
     '<span>Evidence <b>'+E(String(evidence||"unavailable"))+'</b></span>'+
     '<span class="'+marketQuoteClass+'">'+E(marketReference)+'</span>'+
@@ -759,13 +785,15 @@ async function renderUnifiedBoard(){
     let selectionCandidatesError=null;
     let riskGate=null;
     try{
-      const [sel,rg]=await Promise.all([
+      const [sel,rg,learning]=await Promise.all([
         get('./data/selection_candidates.json'),
-        get('./data/risk_gate.json')
+        get('./data/risk_gate.json'),
+        get('./data/efootball_desk_learning.json').catch(()=>null)
       ]);
       selectedRows=Array.isArray(sel)?sel:[];
       selectionCandidatesLoaded=Array.isArray(sel);
       riskGate=rg;
+      efootballDeskLearning=learning&&typeof learning==="object"?learning:null;
     }catch(error){
       selectionCandidatesError=String(error?.message||error||"candidate source unavailable");
     }
