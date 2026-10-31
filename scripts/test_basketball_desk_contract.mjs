@@ -8,7 +8,7 @@ const [html, css, ui, api, workflow, booking, recorder, nbaRecorderWorkflow] = a
 ]);
 assert.ok(html.includes("MS-BASKETBALL-DESK-2026.10.24-V11"), "Basketball must publish the new design marker");
 assert.ok(html.includes("core-workspaces-design.css?v=20261014-full-v1"), "Basketball must use the shared Match Signal design layer");
-assert.ok(html.includes("basketball-live.js?v=20261031-nba-live-pace-v15"), "Basketball must cache-bust the visible booking error/retry logic");
+assert.ok(html.includes("basketball-live.js?v=20261101-sportybet-pages-v16"), "Basketball must cache-bust the paginated live SportyBet quote refresh and visible booking error/retry logic");
 assert.ok(html.includes("basketball-design.css?v=20261024-builder-dark-v3"), "Basketball must load its latest contrast-corrected scoped design layer");
 assert.ok(workflow.includes("MS-BASKETBALL-DESK-2026.10.24-V11") && workflow.includes("basketball-design.css?v=20261024-builder-dark-v3"), "Pages production smoke markers must match the current Basketball page and CSS versions");
 assert.ok(workflow.includes("basketball-live.js?v=20261031-nba-live-pace-v15"), "Pages smoke tests must track the latest NBA live desk release-gate asset");
@@ -56,6 +56,9 @@ assert.ok(ui.includes("./api/sportybet-basketball-booking"), "Builder UI must re
 assert.ok(booking.includes("host+'/api/ng/orders/share") && booking.includes("booking_code:share.code"), "Basketball booking endpoint must request and return a genuine SportyBet share code through official host variants");
 assert.ok(booking.includes("leg.market_id||'225'") && booking.includes("SELECTIONS_CHANGED") && booking.includes("NON_STAKING_BETSLIP_PREPARATION"), "Basketball code generation must revalidate exact total market 225 and fail closed without staking");
 
+assert.ok(/async function refreshSportyBet\(\)[\s\S]*pageSize=100&timeline=168&pageNum=/.test(ui), "Visible basketball desk must page through the full seven-day SportyBet feed instead of stopping at page one.");
+assert.ok(/d\.events\.length<100\|\|newIds===0/.test(ui), "SportyBet browser pagination must stop on a short final page or repeated event page.");
+assert.ok(ui.includes("String(m.id||'')+'|'+String(m.specifier||'')"), "Duplicate SportyBet events must merge markets by market ID and specifier without dropping later-page prices.");
 assert.ok(ui.includes("nba_live_current.json") && ui.includes("live_total_projection") && ui.includes("score_pace_total"), "Live desk must load the latest ESPN in-game observation and display a separate score-pace estimate.");
 assert.ok(ui.includes("/apis/site/v2/sports/basketball/nba/summary") && ui.includes("./api/espn?path=") && ui.includes("await refreshLiveObservations();") && ui.includes("},45000)"), "Live desk must refresh current ESPN summaries after scoreboard updates on the 45-second browser cycle.");
 assert.ok(ui.includes("function liveTotalProjection") && ui.includes("OVERTIME_CONTEXT_ONLY") && ui.includes("At least six minutes of game time"), "Live NBA projections must require a meaningful sample and withhold regulation estimates during overtime.");
