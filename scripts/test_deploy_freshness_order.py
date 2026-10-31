@@ -250,6 +250,8 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "basketball.html",
             "basketball-live.js",
             "live.html",
+            "match-signal-ip.js",
+            "api-access.html",
             "basketball-design.css",
             "functions/api/sportybet-basketball.js",
             "functions/api/sportybet-basketball-booking.js",
