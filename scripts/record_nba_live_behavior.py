@@ -143,7 +143,8 @@ def live_total_projection(record, prediction):
         return {"status": "COLLECTING", "reason": "At least six minutes of game time are required before showing a live estimate."}
 
     live_total = home_score + away_score
-    score_pace = live_total / elapsed * 48
+    pace_total = live_total / elapsed * 48
+    score_pace = pace_total
     home_stats = _team_possessions(record, "home")
     away_stats = _team_possessions(record, "away")
     stats_used = bool(home_stats and away_stats)
