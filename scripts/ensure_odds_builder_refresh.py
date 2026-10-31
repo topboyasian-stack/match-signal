@@ -267,6 +267,25 @@ def builder_dispatch_command(skip_promotion: bool | None = None) -> list[str]:
     return command
 
 
+
+def apply_promotion_child_handoff(
+    decision: dict[str, Any],
+    skip_promotion: bool,
+) -> dict[str, Any]:
+    """Require a dedicated workflow_dispatch Builder run inside ordered promotion.
+
+    A separate active Builder may be based on a pre-board checkout. The parent
+    promotion waits specifically for a workflow_dispatch child, so generic
+    freshness and active-run guards must not suppress this handoff.
+    """
+    result = dict(decision)
+    if skip_promotion and not result.get("dispatch"):
+        result["normal_guard_reason"] = result.get("reason")
+        result["dispatch"] = True
+        result["reason"] = "promotion_child_requires_builder_handoff"
+    return result
+
+
 def main() -> int:
     repo = os.environ.get("GITHUB_REPOSITORY", "").strip()
     if not repo:
@@ -299,18 +318,20 @@ def main() -> int:
 
     artifact_generated_at = latest_artifact_generated_at(repo)
     upcoming_board_generated_at = latest_upcoming_board_generated_at()
+    skip_promotion = os.environ.get("SKIP_PROMOTION", "").strip().lower() in {"1", "true", "yes"}
     decision = evaluate_runs(
         runs,
         artifact_generated_at=artifact_generated_at,
         upstream_board_generated_at=upcoming_board_generated_at,
     )
+    decision = apply_promotion_child_handoff(decision, skip_promotion)
     print(json.dumps({"workflow": BUILDER_WORKFLOW, **decision}, sort_keys=True))
     if not decision["dispatch"]:
         print("Odds Builder artifact is fresh, a run is active, or the short recent-run cooldown is in effect.")
         return 0
 
     dispatch = subprocess.run(
-        builder_dispatch_command(),
+        builder_dispatch_command(skip_promotion=skip_promotion),
         capture_output=True,
         text=True,
         check=False,
@@ -318,7 +339,10 @@ def main() -> int:
     if dispatch.returncode != 0:
         print("::error::Odds Builder dispatch failed: " + (dispatch.stderr.strip() or "gh workflow run failed"), file=sys.stderr)
         return 1
-    print("Dispatched Odds Builder because its artifact is stale/missing or a newer Upcoming Desk board postdates the active run.")
+    if skip_promotion:
+        print("Dispatched the required standalone Builder handoff for the ordered production promotion.")
+    else:
+        print("Dispatched Odds Builder because its artifact is stale/missing or a newer Upcoming Desk board postdates the active run.")
     return 0
 
 

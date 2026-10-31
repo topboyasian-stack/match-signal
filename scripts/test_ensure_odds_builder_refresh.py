@@ -11,6 +11,7 @@ from ensure_odds_builder_refresh import (
     UPCOMING_BOARD_REFRESH_MIN_INTERVAL_MINUTES,
     evaluate_runs,
     builder_dispatch_command,
+    apply_promotion_child_handoff,
 )
 
 NOW = datetime(2026, 10, 20, 0, 30, tzinfo=timezone.utc)
@@ -207,6 +208,26 @@ class BuilderRefreshDecisionTests(unittest.TestCase):
         self.assertFalse(result["dispatch"])
         self.assertEqual(result["reason"], "builder_artifact_fresh")
         self.assertFalse(result["upcoming_board_newer_than_builder_artifact"])
+
+
+    def test_promotion_child_forces_handoff_when_an_unrelated_builder_is_active(self):
+        original = {
+            "dispatch": False,
+            "reason": "active_builder_run",
+            "active_run_id": 1234,
+        }
+        result = apply_promotion_child_handoff(original, skip_promotion=True)
+        self.assertTrue(result["dispatch"])
+        self.assertEqual(result["reason"], "promotion_child_requires_builder_handoff")
+        self.assertEqual(result["normal_guard_reason"], "active_builder_run")
+        self.assertFalse(original["dispatch"])
+
+    def test_non_promotion_child_preserves_fresh_artifact_skip(self):
+        original = {"dispatch": False, "reason": "builder_artifact_fresh"}
+        result = apply_promotion_child_handoff(original, skip_promotion=False)
+        self.assertFalse(result["dispatch"])
+        self.assertEqual(result["reason"], "builder_artifact_fresh")
+
 
 
 if __name__ == "__main__":
