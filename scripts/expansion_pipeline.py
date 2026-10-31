@@ -194,7 +194,7 @@ def nba_duckdb_fallback():
    SELECT CAST(g.game_id AS VARCHAR) AS event_id,
           CAST(g.start_time AS VARCHAR) AS date,
           g.game_type AS game_type,
-          ht.full_name AS home, at.full_name AS away,
+          ht.full_name AS home, away_lookup.full_name AS away,
           CAST(h.team_id AS VARCHAR) AS home_id,
           CAST(a.team_id AS VARCHAR) AS away_id,
           CAST(h.pts AS DOUBLE) AS home_score,
@@ -214,8 +214,8 @@ def nba_duckdb_fallback():
        ON a.season=g.season AND a.game_id=g.game_id AND a.team_id=g.away_team_id
      JOIN nba.team_seasons ht
        ON ht.season=g.season AND ht.team_id=g.home_team_id
-     JOIN nba.team_seasons at
-       ON at.season=g.season AND at.team_id=g.away_team_id
+     JOIN nba.team_seasons away_lookup
+       ON away_lookup.season=g.season AND away_lookup.team_id=g.away_team_id
     WHERE g.season IN (?,?)
       AND g.game_type='regular_season'
       AND g.start_time>=?
