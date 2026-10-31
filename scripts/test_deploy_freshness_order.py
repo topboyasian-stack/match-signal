@@ -433,6 +433,11 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
                          "the five-minute board refresh must not rerun the expensive chronological evaluator")
         self.assertNotIn("data/virtual_lab_model_eval.json", BOARD_WORKFLOW,
                          "the board must not stage or publish the collector-owned evaluation artifact")
+        self.assertIn("Reconcile with latest main before every push.", collector)
+        self.assertIn("timeout --signal=TERM --kill-after=10s 45s env GIT_TERMINAL_PROMPT=0 git fetch origin main", collector)
+        self.assertIn("timeout --signal=TERM --kill-after=10s 90s env GIT_TERMINAL_PROMPT=0 git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=30 push origin HEAD:main", collector)
+        self.assertIn("Only regenerate the expensive research snapshot for a true same-file", collector)
+        self.assertLess(collector.index("git fetch origin main"), collector.index("git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=30 push origin HEAD:main"))
 
     def test_root_build_and_css_markers_are_generated_per_deployment(self):
         # Root-page smoke checks must follow the deployed source, not freeze the
