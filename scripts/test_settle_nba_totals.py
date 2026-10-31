@@ -1,5 +1,5 @@
 import unittest
-from settle_nba_totals import result_for, price_audit_fields, candidate_key, ledger_key, select_settlement_snapshot
+from settle_nba_totals import result_for, price_audit_fields, candidate_key, ledger_key, select_settlement_snapshot, matching_snapshot_for_ledger
 
 def prediction(**overrides):
     p = {"event_id":"abc","start_time":"2026-10-25T20:00:00+00:00",
@@ -151,6 +151,24 @@ class SettlementTests(unittest.TestCase):
         second["markets"]["total_ou"]["pick"] = None
         self.assertEqual(select_settlement_snapshot([second, first])["publication_snapshot_id"], "neutral-first")
 
+
+    def test_legacy_ledger_cannot_borrow_v5_publication_snapshot(self):
+        legacy_key = ("abc", "legacy")
+        snapshots = {
+            ("abc", "nba-total-v5-pace-efficiency-calibrated"): {
+                "event_id": "abc",
+                "totals_model_version": "nba-total-v5-pace-efficiency-calibrated",
+                "publication_snapshot_verified": True,
+                "publication_snapshot_id": "v5-snapshot",
+            }
+        }
+        self.assertIsNone(matching_snapshot_for_ledger(snapshots, legacy_key))
+        self.assertIs(
+            matching_snapshot_for_ledger(
+                snapshots, ("abc", "nba-total-v5-pace-efficiency-calibrated")
+            ),
+            snapshots[("abc", "nba-total-v5-pace-efficiency-calibrated")],
+        )
 
     def test_same_fixture_can_settle_separate_model_versions(self):
         v3 = prediction()
