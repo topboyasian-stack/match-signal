@@ -118,7 +118,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         # Keep deployment-triggered monitoring separate from the newly registered cron identity.
         self.assertEqual(workflow_schedule_crons(MONITOR_WORKFLOW), [])
         crons = workflow_schedule_crons(SCHEDULE_MONITOR_WORKFLOW)
-        self.assertIn("5,15,25,35,45,55 * * * *", crons)
+        self.assertIn("6,16,26,36,46,56 * * * *", crons)
         self.assertNotIn("1,11,21,31,41,51 * * * *", crons, "schedule must move to a fresh workflow identity")
         self.assertNotIn("*/5 * * * *", crons)
         events_end = MONITOR_WORKFLOW.find("\npermissions:")
