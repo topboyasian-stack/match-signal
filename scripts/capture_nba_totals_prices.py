@@ -14,7 +14,7 @@ from live_expansion_pipeline import (
     DATA,
     append_nba_totals_publication_snapshots,
     dt,
-    sportybet_basketball_feed,
+    S,
     sportybet_total_for_fixture,
 )
 from nba_totals_walk_forward import evaluate as evaluate_nba_totals
@@ -25,6 +25,74 @@ LEDGER = DATA / "nba_totals_ledger.json"
 HISTORY = DATA / "nba_history.json"
 REPORT = DATA / "nba_totals_oos_value_test.json"
 STATUS = DATA / "nba_totals_price_capture_status.json"
+
+
+def sportybet_basketball_feed_paged(max_pages=5):
+    """Read up to five seven-day SportyBet pages and merge events without duplicates."""
+    url = "https://match-signal.pages.dev/api/sportybet-basketball"
+    events_by_id = {}
+    page_errors = []
+    for page in range(1, max(1, int(max_pages)) + 1):
+        try:
+            response = S.get(
+                url,
+                params={"pageSize": 100, "timeline": 168, "pageNum": page},
+                timeout=12,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            if payload.get("ok") is not True:
+                raise RuntimeError(payload.get("error") or "SportyBet source did not return ok=true")
+            page_events = payload.get("events")
+            if not isinstance(page_events, list):
+                raise RuntimeError("SportyBet page omitted its events array")
+        except Exception as exc:
+            page_errors.append(f"page {page}: {exc}")
+            if page == 1:
+                return [], "SportyBet feed unavailable: " + "; ".join(page_errors)
+            break
+
+        new_ids = 0
+        for event in page_events:
+            if not isinstance(event, dict):
+                continue
+            event_id = str(event.get("event_id") or event.get("id") or "")
+            if not event_id:
+                continue
+            current = events_by_id.get(event_id)
+            if current is None:
+                current = dict(event)
+                current["markets"] = []
+                events_by_id[event_id] = current
+                new_ids += 1
+            else:
+                old_fetch = dt(current.get("fetched_at"))
+                new_fetch = dt(event.get("fetched_at"))
+                if new_fetch and (not old_fetch or new_fetch >= old_fetch):
+                    for key, value in event.items():
+                        if key != "markets":
+                            current[key] = value
+            market_map = {
+                (str(m.get("id") or ""), str(m.get("specifier") or "")): m
+                for m in (current.get("markets") or [])
+                if isinstance(m, dict)
+            }
+            for market in event.get("markets") or []:
+                if isinstance(market, dict):
+                    key = (str(market.get("id") or ""), str(market.get("specifier") or ""))
+                    market_map[key] = market
+            current["markets"] = list(market_map.values())
+
+        # A short page is the provider's end marker. If pageNum is ignored or
+        # returns a repeated page, stop instead of wasting more feed requests.
+        if len(page_events) < 100 or new_ids == 0:
+            break
+
+    if not events_by_id:
+        detail = "; ".join(page_errors) if page_errors else "SportyBet source returned zero upcoming basketball events"
+        return [], detail
+    error = "; ".join(page_errors) if page_errors else None
+    return list(events_by_id.values()), error
 
 
 def load_json(path, default):
@@ -172,7 +240,7 @@ def main():
     if not isinstance(history, list):
         history = []
 
-    feed, feed_error = sportybet_basketball_feed()
+    feed, feed_error = sportybet_basketball_feed_paged()
     now = capture_timestamp(feed, datetime.now(timezone.utc))
     snapshot_candidates, stats = capture(predictions, feed, now)
     before_count = len(snapshots)
