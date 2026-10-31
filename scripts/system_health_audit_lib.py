@@ -203,6 +203,6 @@ def virtual_participant_history_health_summary(
     detail = "; ".join(dict.fromkeys(reasons)) or "participant history freshness is unverified"
     return check, [{
         "code": "VIRTUAL_PARTICIPANT_HISTORY_STALE",
-        "severity": "critical",
+        "severity": "warning",
         "detail": detail + "; current eFootball/virtual predictions must remain withheld until the source collector publishes fresh data",
     }]
