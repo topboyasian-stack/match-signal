@@ -157,7 +157,13 @@ def normalize_nba_duckdb_rows(rows,now=None):
  for raw in rows or []:
   if not isinstance(raw,dict):continue
   if str(raw.get('game_type') or '').strip().lower()!='regular_season':continue
-  stamp=dt(raw.get('date') or raw.get('start_time'))
+  raw_date=raw.get('date') or raw.get('game_date') or raw.get('start_time')
+  stamp=dt(raw_date)
+  # The NBA stats catalog records a game_date, not a tip timestamp.
+  # Make it available only after 23:59:59 UTC on that date to avoid
+  # using any same-day game result in another pre-game forecast.
+  if stamp and isinstance(raw_date,str) and len(raw_date.strip())==10:
+   stamp=stamp.replace(hour=23,minute=59,second=59,microsecond=999999)
   home=str(raw.get('home') or '').strip()
   away=str(raw.get('away') or '').strip()
   try:hs=float(raw.get('home_score'));aws=float(raw.get('away_score'))
@@ -192,7 +198,7 @@ def nba_duckdb_fallback():
   con.execute(f"ATTACH '{NBA_DUCKDB_CATALOG}' AS nba (READ_ONLY)")
   query="""
    SELECT CAST(g.game_id AS VARCHAR) AS event_id,
-          CAST(g.start_time AS VARCHAR) AS date,
+          CAST(g.game_date AS VARCHAR) AS date,
           g.game_type AS game_type,
           ht.full_name AS home, away_lookup.full_name AS away,
           CAST(h.team_id AS VARCHAR) AS home_id,
@@ -218,11 +224,11 @@ def nba_duckdb_fallback():
        ON away_lookup.season=g.season AND away_lookup.team_id=g.away_team_id
     WHERE g.season IN (?,?)
       AND g.game_type='regular_season'
-      AND g.start_time>=?
-      AND g.start_time<=?
-    ORDER BY g.start_time,g.game_id
+      AND g.game_date>=CAST(? AS DATE)
+      AND g.game_date<=CAST(? AS DATE)
+    ORDER BY g.game_date,g.game_id
   """
-  frame=con.execute(query,[previous_season,active_season,NOW-timedelta(days=365),NOW]).fetchdf()
+  frame=con.execute(query,[previous_season,active_season,(NOW-timedelta(days=365)).date(),NOW.date()]).fetchdf()
   rows=normalize_nba_duckdb_rows(frame.to_dict(orient='records'),NOW)
   if not rows:raise ValueError('public NBA v2 catalog returned zero regular-season games in the 365-day window')
   return rows
