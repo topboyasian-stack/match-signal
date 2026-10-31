@@ -27,7 +27,7 @@ try {
       const page = await browser.newPage({ viewport, locale: "en-NG", reducedMotion: "reduce" });
       const pageErrors = [];
       const failedResponses = [];
-      page.on("pageerror", error => pageErrors.push(String(error?.message || error)));
+      page.on("pageerror", error => pageErrors.push({ message: String(error?.message || error), stack: String(error?.stack || "") }));
       page.on("response", response => {
         const responseUrl = new URL(response.url());
         const expectedProtectedApiGate = response.status() === 401 && responseUrl.pathname.startsWith("/api/analyst");
