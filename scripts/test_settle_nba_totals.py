@@ -1,5 +1,5 @@
 import unittest
-from settle_nba_totals import result_for, price_audit_fields
+from settle_nba_totals import result_for, price_audit_fields, candidate_key, ledger_key
 
 def prediction(**overrides):
     p = {"event_id":"abc","start_time":"2026-10-25T20:00:00+00:00",
@@ -113,6 +113,22 @@ class SettlementTests(unittest.TestCase):
         audit = price_audit_fields(p, p["markets"]["total_ou"], parse_time_for_test(p["prediction_created_at"]))
         self.assertFalse(audit["roi_eligible"])
         self.assertIn("missing_exact_sportybet_event_id", audit["roi_ineligibility_reasons"])
+
+
+    def test_same_fixture_can_settle_separate_model_versions(self):
+        v3 = prediction()
+        v3["totals_model_version"] = "nba-total-v3-matchup-recent-team-total"
+        v3["publication_snapshot_id"] = "snapshot-v3"
+        v4 = prediction()
+        v4["totals_model_version"] = "nba-total-v4-pace-efficiency-calibrated"
+        v4["publication_snapshot_id"] = "snapshot-v4"
+        self.assertNotEqual(candidate_key(v3), candidate_key(v4))
+        row_v3 = result_for(v3, event())
+        row_v4 = result_for(v4, event())
+        self.assertNotEqual(row_v3["ledger_id"], row_v4["ledger_id"])
+        self.assertNotEqual(ledger_key(row_v3), ledger_key(row_v4))
+        self.assertEqual(row_v3["event_id"], row_v4["event_id"])
+        self.assertEqual(row_v3["result"], row_v4["result"])
 
 if __name__ == "__main__":
     unittest.main()
