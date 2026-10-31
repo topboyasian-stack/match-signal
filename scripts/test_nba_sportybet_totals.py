@@ -39,6 +39,15 @@ feed = [{
         ],
     }],
 }]
+# Exact NBA nickname aliases are canonicalized without fuzzy matching.
+assert pipeline.nba_team_key("L.A. Clippers") == pipeline.nba_team_key("Los Angeles Clippers")
+assert pipeline.nba_team_key("76ers") == pipeline.nba_team_key("Philadelphia 76ers")
+assert pipeline.nba_team_key("Blazers") == pipeline.nba_team_key("Portland Trail Blazers")
+nickname_feed = [dict(feed[0], home="Lakers", away="Celtics")]
+assert pipeline.sportybet_total_for_fixture(fixture, nickname_feed) is not None, (
+    "exact NBA nickname aliases should still match the correct fixture"
+)
+
 # Forecasts can refresh before tip-off, but must freeze once the game starts.
 fresh_snapshot = {"generated_at": (now-timedelta(hours=2)).isoformat(), "totals_model_version": pipeline.NBA_TOTALS_MODEL_VERSION}
 stale_snapshot = {"generated_at": (now-timedelta(hours=7)).isoformat(), "totals_model_version": pipeline.NBA_TOTALS_MODEL_VERSION}
