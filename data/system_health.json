@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-10-31T07:03:04.107511+00:00",
-  "status": "DEGRADED",
+  "generated_at": "2026-10-31T07:03:34.860707+00:00",
+  "status": "HEALTHY",
   "critical_issues": 0,
-  "warning_issues": 2,
+  "warning_issues": 0,
   "info_issues": 2,
   "checks": [
     {
@@ -14,7 +14,7 @@
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.1,
+      "age_hours": 0.11,
       "threshold_hours": 8
     },
     {
@@ -26,33 +26,33 @@
     {
       "engine": "unified_upcoming",
       "status": "PASS",
-      "age_hours": 0.12,
+      "age_hours": 0.13,
       "threshold_hours": 2
     },
     {
       "engine": "prediction_desk_health",
       "status": "PASS",
-      "age_hours": 0.16,
+      "age_hours": 0.17,
       "threshold_hours": 2
     },
     {
       "engine": "tennis_forward_discovery",
       "status": "PASS",
-      "age_hours": 0.88,
+      "age_hours": 0.89,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
-      "status": "STALE",
-      "age_hours": 4.36,
+      "status": "PASS",
+      "age_hours": 0.0,
       "threshold_hours": 0.5,
       "heartbeat_source": "virtual_lab_live.json",
-      "events_count": 508
+      "events_count": 700
     },
     {
       "engine": "nba_live_observation_recorder",
-      "status": "STALE",
-      "age_hours": 4.74,
+      "status": "PASS",
+      "age_hours": 0.01,
       "threshold_hours": 0.25,
       "heartbeat_source": "nba_live_observations.json",
       "games_tracked": 8,
@@ -94,16 +94,6 @@
     }
   ],
   "issues": [
-    {
-      "code": "VIRTUAL_LIVE_FEED_STALE",
-      "severity": "warning",
-      "detail": "virtual_lab_live.json age 4.36h exceeds 0.50h; a downstream Unified Upcoming refresh cannot substitute for a fresh source snapshot"
-    },
-    {
-      "code": "NBA_LIVE_OBSERVATION_STALE",
-      "severity": "warning",
-      "detail": "nba_live_observations.json age 4.74h exceeds 0.25h; the in-game observation recorder has not published a recent heartbeat"
-    },
     {
       "code": "PDL_EXPERIMENTAL_FEED_STALE",
       "severity": "info",
