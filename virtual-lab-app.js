@@ -1633,8 +1633,8 @@ async function refreshPredictionDesk(){
 }
 async function loadDeskLearning(){
   const previous=state.deskLearning?.generated_at||null;
-  const beforeGT=recentProductPerformanceGate('efootball_gt').blocked;
-  const beforeAdriatic=recentProductPerformanceGate('efootball_adriatic').blocked;
+  const beforeGT=state._deskLearningGateGT??recentProductPerformanceGate('efootball_gt').blocked;
+  const beforeAdriatic=state._deskLearningGateAdriatic??recentProductPerformanceGate('efootball_adriatic').blocked;
   try{
     const r=await fetch(DESK_LEARNING+'?t='+Date.now(),{cache:'no-store',headers:{'Accept':'application/json'}});
     if(!r.ok)throw new Error('eFootball recent-performance artifact HTTP '+r.status);
@@ -1642,19 +1642,21 @@ async function loadDeskLearning(){
     state.deskLearning=d&&typeof d==='object'?d:null;
     const afterGT=recentProductPerformanceGate('efootball_gt').blocked;
     const afterAdriatic=recentProductPerformanceGate('efootball_adriatic').blocked;
+    state._deskLearningGateGT=afterGT;
+    state._deskLearningGateAdriatic=afterAdriatic;
     const changed=previous!==(state.deskLearning?.generated_at||null)||beforeGT!==afterGT||beforeAdriatic!==afterAdriatic;
-    if(changed){
-      state.predictionCache.clear();
-      state.builder=(state.builder||[]).filter(p=>!recentProductPerformanceGate(p?.product).blocked);
-    }
+    if(changed)state.predictionCache.clear();
+    if(afterGT||afterAdriatic)state.builder=(state.builder||[]).filter(p=>!recentProductPerformanceGate(p?.product).blocked);
     return changed;
   }catch(e){
     state.deskLearning=null;
-    const changed=!!previous||!beforeGT||!beforeAdriatic;
-    if(changed){
-      state.predictionCache.clear();
-      state.builder=(state.builder||[]).filter(p=>!recentProductPerformanceGate(p?.product).blocked);
-    }
+    const afterGT=recentProductPerformanceGate('efootball_gt').blocked;
+    const afterAdriatic=recentProductPerformanceGate('efootball_adriatic').blocked;
+    state._deskLearningGateGT=afterGT;
+    state._deskLearningGateAdriatic=afterAdriatic;
+    state.predictionCache.clear();
+    state.builder=(state.builder||[]).filter(p=>!recentProductPerformanceGate(p?.product).blocked);
+    const changed=!!previous||beforeGT!==afterGT||beforeAdriatic!==afterAdriatic;
     console.warn('Virtual Lab recent-performance guard:',e);
     return changed;
   }
