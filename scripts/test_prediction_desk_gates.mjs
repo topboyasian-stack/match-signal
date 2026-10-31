@@ -108,7 +108,28 @@ const start = source.indexOf("function isOverUnderPrediction(x){");
 const end = source.indexOf("function ladderAnchor(rows){", start);
 assert.ok(start >= 0 && end > start, "production desk gate functions are extractable");
 
-const sandbox = { Date, Number, String, Math, Array, Boolean, Object, Map, Set, RegExp };
+const sandbox = {
+  Date, Number, String, Math, Array, Boolean, Object, Map, Set, RegExp,
+  efootballDeskLearning: {
+    generated_at: new Date().toISOString(),
+    by_product: {
+      efootball_gt: {
+        recent_window: { n: 50, accuracy: 0.70 },
+        raw_probability_calibration: { buckets: {
+          "0.8": { n: 346, calibrated_probability: 0.5455, accuracy: 0.5202, calibration_weight: 0.92 },
+          "0.85": { n: 390, calibrated_probability: 0.4880, accuracy: 0.4590, calibration_weight: 0.93 },
+          "0.9": { n: 444, calibrated_probability: 0.5623, accuracy: 0.5383, calibration_weight: 0.94 }
+        } }
+      },
+      efootball_adriatic: {
+        recent_window: { n: 50, accuracy: 0.70 },
+        raw_probability_calibration: { buckets: {
+          "0.8": { n: 100, calibrated_probability: 0.60, accuracy: 0.60, calibration_weight: 0.90 }
+        } }
+      }
+    }
+  }
+};
 vm.createContext(sandbox);
 vm.runInContext(
   source.slice(start, end) +
@@ -562,5 +583,26 @@ assert.match(source,/for\(let snapshotAttempt=1;snapshotAttempt<=2;snapshotAttem
 assert.match(source,/live_quote_snapshot_attempts:virtualQuoteSnapshotAttempts/,"the monitor records how many full snapshot passes were needed");
 assert.notEqual(rendererVersions[0], "20261013-qualified-best-live-verification-cachefix3", "a live coverage retry changes the shared renderer cache key");
 
+
+
+const efootballCalibrationRow=row({
+  product:"efootball_gt",sport:"virtual",market:"over_under",pick:"over",line:9.5,
+  probability:0.8454,model_probability:0.8454,walkforward_exact_line_n:0,
+  walkforward_exact_line_hit_rate:null
+});
+const efootballCalibration=probabilityCalibrationInfo(efootballCalibrationRow);
+assert.equal(efootballCalibration.source,"product_wide_raw_probability_bucket","when exact-line evidence is immature, use product-specific settled calibration");
+assert.ok(Math.abs(efootballCalibration.probability-0.5455)<0.00001,"raw 84.54% must be reduced to the settled 0.80-bucket calibration");
+assert.ok(Math.abs(probabilityValue(efootballCalibrationRow)-0.5455)<0.00001,"displayed probability must use the settled product calibration");
+assert.ok(Math.abs(displayedFairOddsValue(efootballCalibrationRow)-(1/0.5455))<0.001,"fair odds must be recalculated from calibrated probability");
+assert.equal(isVirtualDeskCandidate(efootballCalibrationRow),false,"an overconfident raw 84% score cannot remain in the high-confidence list after calibration");
+const savedLearningTimestamp=sandbox.efootballDeskLearning.generated_at;
+sandbox.efootballDeskLearning.generated_at=new Date(Date.now()-61*60*1000).toISOString();
+assert.equal(probabilityValue(efootballCalibrationRow),null,"stale calibration must withhold eFootball O/U probabilities instead of exposing raw confidence");
+sandbox.efootballDeskLearning.generated_at=savedLearningTimestamp;
+sandbox.efootballDeskLearning.by_product.efootball_gt.recent_window.accuracy=0.50;
+const recentPerformanceGuard=qualificationState(efootballCalibrationRow);
+assert.equal(recentPerformanceGuard.reason,"RECENT_PRODUCT_ACCURACY_BELOW_55_PERCENT","poor recent product accuracy must veto an otherwise qualified eFootball row");
+sandbox.efootballDeskLearning.by_product.efootball_gt.recent_window.accuracy=0.70;
 
 console.log("Prediction Desk gate regressions passed: explicit status veto, probability-band separation, exact line/side, 15-minute freshness, qualified-first ranking, future-only shortlist, active virtual scope, and provider specifier normalization.");
