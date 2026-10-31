@@ -1,7 +1,8 @@
 """Research-only NBA + Eredivisie expansion collector and model."""
 import csv,io,json,math
 from collections import defaultdict
-from datetime import datetime,timedelta,timezone
+from datetime import datetime,timedelta,timezone,time as day_end_time
+from zoneinfo import ZoneInfo
 from pathlib import Path
 import requests
 import pandas as pd
@@ -163,7 +164,12 @@ def normalize_nba_duckdb_rows(rows,now=None):
   # Make it available only after 23:59:59 UTC on that date to avoid
   # using any same-day game result in another pre-game forecast.
   if stamp and isinstance(raw_date,str) and len(raw_date.strip())==10:
-   stamp=stamp.replace(hour=23,minute=59,second=59,microsecond=999999)
+   # game_date is defined by the NBA in US Eastern time. End the day in
+   # America/New_York, then convert to UTC; midnight-UTC would leak the
+   # results of late Eastern games into next-morning pregame forecasts.
+   stamp=datetime.combine(
+    stamp.date(),day_end_time.max,tzinfo=ZoneInfo('America/New_York')
+   ).astimezone(timezone.utc)
   home=str(raw.get('home') or '').strip()
   away=str(raw.get('away') or '').strip()
   try:hs=float(raw.get('home_score'));aws=float(raw.get('away_score'))
