@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Offline regression tests for the NBA totals walk-forward evaluator."""
 from datetime import datetime, timezone
-from nba_totals_walk_forward import build_forecasts, evaluate, verified_market_records
+from nba_totals_walk_forward import build_forecasts, evaluate, market_metrics, verified_market_records
 from expansion_pipeline import NBA_TOTALS_MODEL_VERSION
 
 
@@ -42,6 +42,11 @@ def test_market_evidence_rejects_unverified_and_old_model_records():
     invalid = dict(good, publication_snapshot_verified=False)
     old_model = dict(good, totals_model_version="old-model")
     assert verified_market_records([good, invalid, old_model]) == [good]
+    metrics = market_metrics([good, dict(good, event_id="g2", pick="under")])
+    assert metrics["by_pick"]["over"]["n"] == 1
+    assert metrics["by_pick"]["over"]["accuracy"] == 1.0
+    assert metrics["by_pick"]["under"]["n"] == 1
+    assert metrics["by_pick"]["under"]["accuracy"] == 0.0
 
 
 def test_evaluator_never_promotes_without_market_holdout():
