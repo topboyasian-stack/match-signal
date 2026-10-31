@@ -64,6 +64,8 @@ def price_audit_fields(prediction, market, pred_time):
     )
     source = str(market.get("source") or "").strip().lower()
     source_verified = source == "sportybet nigeria"
+    sportybet_event_id = str(market.get("sportybet_event_id") or "").strip()
+    quote_capture_basis = str(market.get("quote_capture_basis") or "").strip()
 
     reasons = []
     if not explicit_snapshot:
@@ -78,6 +80,10 @@ def price_audit_fields(prediction, market, pred_time):
         reasons.append("missing_or_invalid_over_under_decimal_prices")
     if not source_verified:
         reasons.append("bookmaker_source_not_verified_as_sportybet_nigeria")
+    if not sportybet_event_id:
+        reasons.append("missing_exact_sportybet_event_id")
+    if quote_capture_basis != "SportyBet API response observed_at":
+        reasons.append("missing_sportybet_observed_at_provenance")
 
     return {
         "over_odds": over_odds,
@@ -89,6 +95,8 @@ def price_audit_fields(prediction, market, pred_time):
         "publication_time_basis": publication_basis,
         "publication_snapshot_verified": explicit_snapshot,
         "price_source_verified": source_verified,
+        "sportybet_event_id": sportybet_event_id,
+        "quote_capture_basis": quote_capture_basis,
         "roi_eligible": not reasons,
         "roi_ineligibility_reasons": reasons,
     }
@@ -144,6 +152,8 @@ def result_for(prediction, event):
         "player_2": prediction.get("player_2"), "prediction_created_at": pred_time.isoformat(),
         "model": prediction.get("model"), "totals_model_version": prediction.get("totals_model_version"), "expected_total": prediction.get("expected_total"),
         "market_id": "225", "market_source": market.get("source"),
+        "sportybet_event_id": market.get("sportybet_event_id"),
+        "quote_capture_basis": market.get("quote_capture_basis"),
         "quote_timestamp": market.get("quote_timestamp"), "line": line, "pick": pick,
         **price_audit,
         "final_score": [int(hs) if hs.is_integer() else hs, int(aws) if aws.is_integer() else aws],
