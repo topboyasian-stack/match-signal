@@ -68,13 +68,15 @@ class EfootballResearchRecoveryTests(unittest.TestCase):
         self.assertIn("LIVE_FEED_DISPATCH_COOLDOWN_MINUTES = 10", WATCHDOG)
         self.assertIn("virtual-lab-live-sync-heartbeat.yml", WATCHDOG)
         self.assertIn("nba-live-observation.yml", WATCHDOG)
-        self.assertIn("python scripts/system_health_audit.py", WATCHDOG)
+        self.assertIn("Path('data/automation_health.json')", WATCHDOG)
+        self.assertNotIn("python scripts/system_health_audit.py", WATCHDOG,
+                         "Watchdog must not overwrite the board's shared health artifact.")
 
 
     def test_stale_or_stuck_unified_upcoming_has_bounded_recovery(self):
         self.assertIn("UNIFIED_UPCOMING_MAX_AGE_MINUTES = 15", WATCHDOG)
         self.assertIn("UNIFIED_UPCOMING_DISPATCH_COOLDOWN_MINUTES = 10", WATCHDOG)
-        self.assertIn("UNIFIED_UPCOMING_STALE_RUN_MAX_AGE_MINUTES = 20", WATCHDOG)
+        self.assertIn("UNIFIED_UPCOMING_STALE_RUN_MAX_AGE_MINUTES = 40", WATCHDOG)
         self.assertIn("gh', 'run', 'cancel", WATCHDOG)
         self.assertIn("unified_upcoming_dispatch_age_minutes", WATCHDOG)
         self.assertIn("unified_upcoming_active_run_age_minutes", WATCHDOG)
