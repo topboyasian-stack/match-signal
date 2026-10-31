@@ -51,7 +51,7 @@
         <span><strong>${BRAND}</strong> <span class="ms-ip-owner">• Public owner: ${OWNER}</span></span>
         <span>${COPYRIGHT}</span>
         <span class="ms-ip-build">Build ${BUILD}</span>
-        <button class="ms-ip-about" type="button" aria-label="Ownership information about Match Signal">ⓘ Ownership</button>
+        <button class="ms-ip-about" type="button">ⓘ Ownership</button>
       `;
       document.body.appendChild(footer);
     }
