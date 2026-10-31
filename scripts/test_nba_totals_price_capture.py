@@ -193,7 +193,6 @@ class PriceCaptureTests(unittest.TestCase):
                 ],
             }],
         }]
-        self.assertIsNotNone(sportybet_total_for_fixture(fixture, valid, expected_total=224.5))
         self.assertEqual(diagnose_fixture_quote(fixture, valid, self.now), "MATCHED")
 
     def test_capture_time_is_taken_after_feed_response_not_before(self):

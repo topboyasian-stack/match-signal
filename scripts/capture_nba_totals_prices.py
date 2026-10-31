@@ -136,6 +136,9 @@ def diagnose_fixture_quote(fixture, feed, now):
     ]
     if not market_events:
         return "MARKET_225_NOT_OFFERED_FOR_MATCHED_FIXTURE"
+    # Reuse the production matcher so diagnostics validate line, market status and both active prices.
+    if sportybet_total_for_fixture(fixture, fresh, expected_total=fixture.get("expected_total")):
+        return "MATCHED"
     return "MARKET_225_LINE_OR_BOTH_PRICES_UNUSABLE"
 
 
