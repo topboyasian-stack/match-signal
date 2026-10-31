@@ -91,6 +91,14 @@ def main():
     assert "data/virtual_lab_participants/efootball_confirmed_watch.json" in collector_paths, (
         "The explicit manual watch input must still be able to trigger the collector."
     )
+    for generated_collector_output in (
+        "data/virtual_lab_participant_h2h.json",
+        "data/virtual_lab_external_h2h.json",
+        "data/virtual_lab_archive/**",
+    ):
+        assert generated_collector_output not in collector_paths, (
+            f"Collector output {generated_collector_output} must not trigger another expensive collector run."
+        )
     assert "cancel-in-progress: true" in collector, (
         "A newer fixed collector run must supersede an obsolete artifact-publication retry."
     )
