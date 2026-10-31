@@ -23,6 +23,44 @@ with patch.object(pipeline.S, "get", return_value=FeedResponse()) as feed_get:
         "SportyBet lookup must cover the seven-day NBA prediction horizon"
     )
 
+# The Upcoming refresh must page beyond the first 100 events, while merging
+# duplicate event IDs and keeping market rows that arrive on a later page.
+class PagedFeedResponse:
+    def __init__(self, events):
+        self.events = events
+    def raise_for_status(self):
+        return None
+    def json(self):
+        return {"ok": True, "events": self.events}
+
+first_page = [
+    {"event_id": f"event-{i}", "home": f"Home {i}", "away": f"Away {i}",
+     "fetched_at": quote_time if "quote_time" in globals() else datetime.now(timezone.utc).isoformat(),
+     "markets": []}
+    for i in range(100)
+]
+merged_market = {"id": "225", "specifier": "total=220.5", "outcomes": [
+    {"name": "Over", "odds": 1.91, "active": True},
+    {"name": "Under", "odds": 1.89, "active": True},
+]}
+second_page = [
+    dict(first_page[0], markets=[merged_market]),
+    {"event_id": "event-100", "home": "Home 100", "away": "Away 100",
+     "markets": [merged_market]},
+]
+with patch.object(pipeline.S, "get", side_effect=[
+    PagedFeedResponse(first_page), PagedFeedResponse(second_page)
+]) as paged_get:
+    paged_events, paged_error = pipeline.sportybet_basketball_feed(max_pages=3)
+    assert paged_error is None
+    assert [call.kwargs["params"]["pageNum"] for call in paged_get.call_args_list] == [1, 2]
+    assert all(call.kwargs["params"]["timeline"] == 168 for call in paged_get.call_args_list)
+    assert len(paged_events) == 101
+    duplicate_event = next(event for event in paged_events if event["event_id"] == "event-0")
+    assert any(market["id"] == "225" for market in duplicate_event["markets"]), (
+        "a duplicate event on a later page must contribute its market rows"
+    )
+
 now = datetime.now(timezone.utc)
 start = now + timedelta(hours=3)
 quote_time = now.isoformat()
