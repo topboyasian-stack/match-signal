@@ -320,7 +320,6 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "functions/**",
             "data/predictions.json",
             "data/odds_ticket_tracker.json",
-            "data/virtual_lab_live.json",
             "data/darts_*.json",
             "data/table_tennis_*.json",
             "data/pdl_predictions.json",
@@ -331,6 +330,14 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         }
         missing = sorted(required_inputs - board_paths)
         self.assertEqual(missing, [], f"Deployable inputs bypass the Unified board workflow: {missing}")
+
+        # The live snapshot is an output of Virtual Lab Live Sync. The board
+        # consumes that workflow's successful completion, so a second push-path
+        # trigger would launch duplicate/cancelling board builds for the same poll.
+        workflow_run_block = BOARD_WORKFLOW.split("  workflow_run:", 1)[1].split("\n  schedule:", 1)[0]
+        self.assertIn('"Match Signal Virtual Lab Live Sync"', workflow_run_block)
+        self.assertIn('"Match Signal Virtual Lab Collector"', workflow_run_block)
+        self.assertNotIn("data/virtual_lab_live.json", board_paths)
 
     def test_builder_promotion_waits_for_each_board_triggered_builder_before_pages(self):
         self.assertIn("uses: actions/checkout@v4", PROMOTION_WORKFLOW)
