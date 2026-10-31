@@ -132,6 +132,11 @@ def main():
 
     live_sync_publish = live_sync.split("      - name: Publish live snapshot without overwriting newer data", 1)[1]
     assert "git add data/virtual_lab_live.json data/system_health.json" not in live_sync_publish
+
+    watchdog_publish = watchdog.split("      - name: Commit automation health record", 1)[1]
+    assert "git add data/automation_health.json" in watchdog_publish
+    assert "data/system_health.json" not in watchdog_publish
+    assert "git add data/virtual_lab_live.json" not in watchdog_publish
     assert "python scripts/virtual_lab_model_eval.py" not in board, (
         "Avoid recomputing the expensive chronological evaluation on every five-minute board refresh."
     )
