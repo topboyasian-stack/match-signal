@@ -8,6 +8,7 @@ on:
       - 'basketball-live.js'
       - 'basketball.html'
       - 'scripts/test_basketball_desk_contract.mjs'
+      - 'scripts/test_nba_live_projection.mjs'
       - '.github/workflows/nba-source-tests.yml'
   push:
     branches: [main]
@@ -38,5 +39,7 @@ jobs:
           python -m py_compile scripts/expansion_pipeline.py scripts/live_expansion_pipeline.py scripts/run_live_expansion.py scripts/settle_expansion.py scripts/test_expansion_sources.py
       - name: Run Basketball desk contract regression
         run: node scripts/test_basketball_desk_contract.mjs
+      - name: Run NBA live projection and evidence-gate tests
+        run: node scripts/test_nba_live_projection.mjs
       - name: Run NBA source and season-isolation tests
         run: python scripts/test_expansion_sources.py
