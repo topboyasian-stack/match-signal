@@ -584,4 +584,25 @@ assert.match(source,/live_quote_snapshot_attempts:virtualQuoteSnapshotAttempts/,
 assert.notEqual(rendererVersions[0], "20261013-qualified-best-live-verification-cachefix3", "a live coverage retry changes the shared renderer cache key");
 
 
+
+const efootballCalibrationRow=row({
+  product:"efootball_gt",sport:"virtual",market:"over_under",pick:"over",line:9.5,
+  probability:0.8454,model_probability:0.8454,walkforward_exact_line_n:0,
+  walkforward_exact_line_hit_rate:null
+});
+const efootballCalibration=probabilityCalibrationInfo(efootballCalibrationRow);
+assert.equal(efootballCalibration.source,"product_wide_raw_probability_bucket","when exact-line evidence is immature, use product-specific settled calibration");
+assert.ok(Math.abs(efootballCalibration.probability-0.5455)<0.00001,"raw 84.54% must be reduced to the settled 0.80-bucket calibration");
+assert.ok(Math.abs(probabilityValue(efootballCalibrationRow)-0.5455)<0.00001,"displayed probability must use the settled product calibration");
+assert.ok(Math.abs(displayedFairOddsValue(efootballCalibrationRow)-(1/0.5455))<0.001,"fair odds must be recalculated from calibrated probability");
+assert.equal(isVirtualDeskCandidate(efootballCalibrationRow),false,"an overconfident raw 84% score cannot remain in the high-confidence list after calibration");
+const savedLearningTimestamp=sandbox.efootballDeskLearning.generated_at;
+sandbox.efootballDeskLearning.generated_at=new Date(Date.now()-61*60*1000).toISOString();
+assert.equal(probabilityValue(efootballCalibrationRow),null,"stale calibration must withhold eFootball O/U probabilities instead of exposing raw confidence");
+sandbox.efootballDeskLearning.generated_at=savedLearningTimestamp;
+sandbox.efootballDeskLearning.by_product.efootball_gt.recent_window.accuracy=0.50;
+const recentPerformanceGuard=qualificationState(efootballCalibrationRow);
+assert.equal(recentPerformanceGuard.reason,"RECENT_PRODUCT_ACCURACY_BELOW_55_PERCENT","poor recent product accuracy must veto an otherwise qualified eFootball row");
+sandbox.efootballDeskLearning.by_product.efootball_gt.recent_window.accuracy=0.70;
+
 console.log("Prediction Desk gate regressions passed: explicit status veto, probability-band separation, exact line/side, 15-minute freshness, qualified-first ranking, future-only shortlist, active virtual scope, and provider specifier normalization.");
