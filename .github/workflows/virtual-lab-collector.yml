@@ -36,8 +36,9 @@ permissions:
 
 concurrency:
   group: match-signal-virtual-lab-collector
-  # Replace the old collector stuck in artifact publication; generated outputs no longer self-trigger it.
-  cancel-in-progress: true
+  # The full collector can take longer than its 15-minute schedule. Never cancel an
+  # active settlement/model run during artifact publication; queue the next run instead.
+  cancel-in-progress: false
 
 jobs:
   collect:
