@@ -64,6 +64,14 @@ on:
       - '.github/workflows/efootball-market-research-schedule.yml'
       - 'scripts/test_automation_watchdog_research_recovery.py'
       - 'scripts/test_qualified_best_monitor.mjs'
+  pull_request:
+    paths:
+      - 'virtual-lab-app.js'
+      - 'virtual-lab/index.html'
+      - 'virtual-lab-terminal.css'
+      - 'scripts/test_virtual_lab_recent_performance_gate.mjs'
+      - 'scripts/validate_virtual_lab_v1.py'
+      - '.github/workflows/cloudflare-pages.yml'
   workflow_dispatch:
 
 permissions:
@@ -74,8 +82,27 @@ permissions:
 # Serialization lives on the eligible deploy job below, after its event condition,
 # so an irrelevant workflow_run that will be skipped cannot replace a pending deploy.
 jobs:
+  validate:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check Virtual Lab JavaScript syntax
+        run: node --check virtual-lab-app.js
+      - name: Run eFootball recent-performance regression
+        run: node scripts/test_virtual_lab_recent_performance_gate.mjs
+      - name: Validate Virtual Lab page and renderer contract
+        run: python scripts/validate_virtual_lab_v1.py
+
   deploy:
-    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name != 'pull_request' && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success') }}
     concurrency:
       group: cloudflare-pages-v3
       cancel-in-progress: false
