@@ -26,9 +26,12 @@ def workflow_push_paths(source: str) -> set[str]:
     if start < 0:
         return set()
     paths_start = source.find("    paths:\n", start)
-    paths_end = source.find("\n  workflow_dispatch:", paths_start)
-    if paths_start < 0 or paths_end < 0:
+    if paths_start < 0:
         return set()
+    # Stop at the next top-level event key, not workflow_dispatch specifically.
+    # Pull-request paths must never be mistaken for direct production push paths.
+    next_event = re.search(r"(?m)^  [A-Za-z_][A-Za-z0-9_-]*:\s*$", source[paths_start + len("    paths:\n"):])
+    paths_end = paths_start + len("    paths:\n") + next_event.start() if next_event else len(source)
     return set(re.findall(r"^      - '([^']+)'$", source[paths_start:paths_end], re.MULTILINE))
 
 
