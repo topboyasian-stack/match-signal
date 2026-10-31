@@ -380,7 +380,9 @@ separate confidence/qualification threshold.
         return None
     if (published_at - quote_time).total_seconds() > 15 * 60:
         return None
-    # Freeze line and both prices even when the model has no directional lean.\n    # Only picked/settled rows can later enter ROI qualification.\n    try:
+    # Freeze line and both prices even when the model has no directional lean.
+    # Only picked/settled rows can later enter ROI qualification.
+    try:
         line = float(market.get("line"))
         over_odds = float(market.get("over_odds"))
         under_odds = float(market.get("under_odds"))
