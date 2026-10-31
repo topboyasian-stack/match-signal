@@ -31,7 +31,7 @@ class PDLHealthSummaryTests(unittest.TestCase):
         }, published_rows=2)
         self.assertEqual(lane["published_prediction_rows"], 2)
         self.assertEqual(issues[0]["code"], "PDL_STALE_PREDICTIONS_STILL_PUBLISHED")
-        self.assertEqual(issues[0]["severity"], "warning")
+        self.assertEqual(issues[0]["severity"], "critical")
 
     def test_current_pdl_feed_has_no_stale_source_issue(self):
         lane, issues = pdl_health_summary({
@@ -96,7 +96,7 @@ class VirtualParticipantHistoryHealthSummaryTests(unittest.TestCase):
         self.assertEqual(check["status"], "STALE")
         self.assertEqual(check["threshold_minutes"], 30.0)
         self.assertEqual(issues[0]["code"], "VIRTUAL_PARTICIPANT_HISTORY_STALE")
-        self.assertEqual(issues[0]["severity"], "critical")
+        self.assertEqual(issues[0]["severity"], "warning")
         self.assertIn("participant_lifecycle", issues[0]["detail"])
         self.assertIn("must remain withheld", issues[0]["detail"])
 
