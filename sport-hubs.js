@@ -765,7 +765,7 @@ function unifiedRow(group){
   const displayBook=quote.displayOdds==null?book:quote.displayOdds;
   const result=String(x.settlement_result||"").toUpperCase();
   const won=settled && (x.settlement_result===x.pick || result==="WIN" || result==="WON" || x.win===true);
-  const status=settled?(won?"SETTLED · ✓ WIN":"SETTLED · ✕ LOSS"):
+  let status=settled?(won?"SETTLED · ✓ WIN":"SETTLED · ✕ LOSS"):
     (qualified?"BETTING-QUALIFIED · PAPER":
     (modelQualified?qualification.label:
     (candidateBand==="MODEL_90_PLUS"?"MODEL ESTIMATE ≥90% · NOT QUALIFIED":
