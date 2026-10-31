@@ -92,7 +92,10 @@ try {
       try {
         await page.screenshot({
           path: "visual-site-audit/" + screenshotName,
-          fullPage: true,
+          // Very long data-heavy dashboards can exceed Chromium's full-page
+          // screenshot texture limits. Keep the audit screenshot reliable by
+          // capturing the viewport on pages taller than 18,000 CSS pixels.
+          fullPage: Number(layout.body_height || 0) <= 18000,
           animations: "disabled",
           timeout: 15000
         });
