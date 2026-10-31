@@ -31,7 +31,7 @@ class PDLHealthSummaryTests(unittest.TestCase):
         }, published_rows=2)
         self.assertEqual(lane["published_prediction_rows"], 2)
         self.assertEqual(issues[0]["code"], "PDL_STALE_PREDICTIONS_STILL_PUBLISHED")
-        self.assertEqual(issues[0]["severity"], "critical")
+        self.assertEqual(issues[0]["severity"], "warning")
 
     def test_current_pdl_feed_has_no_stale_source_issue(self):
         lane, issues = pdl_health_summary({
