@@ -64,6 +64,18 @@ class EfootballResearchRecoveryTests(unittest.TestCase):
         self.assertIn("nba-live-observation.yml", WATCHDOG)
         self.assertIn("python scripts/system_health_audit.py", WATCHDOG)
 
+
+    def test_stale_or_stuck_unified_upcoming_has_bounded_recovery(self):
+        self.assertIn("UNIFIED_UPCOMING_MAX_AGE_MINUTES = 15", WATCHDOG)
+        self.assertIn("UNIFIED_UPCOMING_DISPATCH_COOLDOWN_MINUTES = 10", WATCHDOG)
+        self.assertIn("UNIFIED_UPCOMING_STALE_RUN_MAX_AGE_MINUTES = 20", WATCHDOG)
+        self.assertIn("gh', 'run', 'cancel", WATCHDOG)
+        self.assertIn("unified_upcoming_dispatch_age_minutes", WATCHDOG)
+        self.assertIn("unified_upcoming_active_run_age_minutes", WATCHDOG)
+        self.assertIn("unified_upcoming_refresh_status", WATCHDOG)
+        self.assertIn("a newer Virtual Lab snapshot is waiting for board publication", WATCHDOG)
+        self.assertNotIn("if unified_age > 0.2 and not active('unified-upcoming.yml'):", WATCHDOG)
+
     def test_automation_watchdog_changes_do_not_trigger_a_static_pages_deploy(self):
         self.assertNotIn(
             "      - '.github/workflows/automation_watchdog.yml'",
