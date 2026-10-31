@@ -74,7 +74,8 @@ class EfootballResearchRecoveryTests(unittest.TestCase):
 
 
     def test_stale_virtual_lab_collector_replaces_a_stuck_active_run(self):
-        self.assertIn("VIRTUAL_LAB_COLLECTOR_STALE_RUN_MAX_AGE_MINUTES = 45", WATCHDOG)
+        self.assertIn("VIRTUAL_LAB_COLLECTOR_STALE_RUN_MAX_AGE_MINUTES = 25", WATCHDOG)
+        self.assertIn("VIRTUAL_LAB_COLLECTOR_STALE_QUEUE_MAX_AGE_MINUTES = 10", WATCHDOG)
         self.assertIn("virtual_collector_active_runs", WATCHDOG)
         self.assertIn("stale_virtual_collector_runs", WATCHDOG)
         self.assertIn("gh', 'run', 'cancel", WATCHDOG)
