@@ -20,7 +20,6 @@ on:
       - 'virtual-lab-app.js'
       - 'research.html'
       - 'virtual-lab/**'
-      - 'data/virtual_lab_participants/**'
       - 'data/virtual_lab_participant_h2h.json'
       - 'data/virtual_lab_external_h2h.json'
       - 'data/virtual_lab_archive/**'
@@ -63,6 +62,9 @@ jobs:
         run: node --check virtual-lab-app.js
       - name: Syntax-check Virtual Lab confirmed watch renderer
         run: node --check virtual-lab-confirmed-watch.js
+
+      - name: Test automated workflow trigger boundaries
+        run: python scripts/test_workflow_trigger_boundaries.py
 
       - name: Syntax-check collector
         run: python -m py_compile scripts/virtual_lab_collector.py

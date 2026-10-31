@@ -750,8 +750,13 @@ function unifiedRow(group){
   if(!x)return "";
   const when=DT(x.start_time);
   const qualification=qualificationState(x);
-  const qualified=qualification.currentPricePass;
-  const modelQualified=qualification.modelQualified;
+  const product=String(x?.product||"").toLowerCase();
+  const participantHistoryStale=x?.participant_history_fresh===false&&(
+    String(x?.sport||"").toLowerCase()==="virtual" ||
+    ["efootball_gt","efootball_adriatic","vfootball","zoom"].includes(product)
+  );
+  const qualified=!participantHistoryStale&&qualification.currentPricePass;
+  const modelQualified=!participantHistoryStale&&qualification.modelQualified;
   const candidateBand=String(x.model_candidate_status||"");
   const live=String(x.event_state||"").toUpperCase()==="LIVE";
   const settled=String(x.event_state||"").toUpperCase()==="SETTLED";
@@ -767,6 +772,7 @@ function unifiedRow(group){
     candidateBand==="MODEL_80_PLUS"?"MODEL ESTIMATE ≥80% · NOT QUALIFIED":
     candidateBand==="MODEL_70_PLUS"?"MODEL ESTIMATE ≥70% · NOT QUALIFIED":
     (live?"LIVE RESEARCH · NOT QUALIFIED":"MODEL RESEARCH · NOT QUALIFIED"))));
+  if(participantHistoryStale&&!settled)status="PARTICIPANT HISTORY STALE · NOT QUALIFIED";
   return '<article class="ms-up-row ms-fixture-card">'+
     '<div class="ms-up-time"><b>'+E(when)+'</b><span>'+E(String(x.start_time||"").slice(0,10))+'</span></div>'+
     '<div class="ms-up-event"><div class="ms-up-meta"><span class="ms-sport-pill">'+sportIcon(x.sport)+' '+E(x.sport==="table_tennis"?"Table Tennis":(x.sport||"Sport"))+'</span><span>'+E(x.league||x.competition||"Unclassified")+'</span><span class="ms-fixture-market-count">1 prediction</span></div>'+
@@ -860,11 +866,20 @@ async function renderUnifiedBoard(){
     const generatedAt=Date.parse(String(payload?.generated_at||""));
     const generatedEl=Q('#upLast');
     const dataStatusEl=Q('#qualifiedBestDataStatus');
+    const staleParticipantCount=all.filter(row=>{
+      const product=String(row?.product||"").toLowerCase();
+      const isVirtual=String(row?.sport||"").toLowerCase()==="virtual"||
+        ["efootball_gt","efootball_adriatic","vfootball","zoom"].includes(product);
+      return isVirtual&&row?.participant_history_fresh===false;
+    }).length;
     if(dataStatusEl){
       const ageMs=Number.isFinite(generatedAt)?Date.now()-generatedAt:NaN;
       const ageMinutes=Number.isFinite(ageMs)?Math.floor(ageMs/60000):null;
-      if(ageMinutes==null||ageMinutes>30||ageMs< -2*60*1000){
-        const age=ageMinutes==null?"unknown":ageMinutes<60?ageMinutes+" minute(s)":Math.floor(ageMinutes/60)+"h "+(ageMinutes%60)+"m";
+      const age=ageMinutes==null?"unknown":ageMinutes<60?ageMinutes+" minute(s)":Math.floor(ageMinutes/60)+"h "+(ageMinutes%60)+"m";
+      if(staleParticipantCount>0){
+        dataStatusEl.className="ms-qualified-data-status ms-qualified-data-status-stale";
+        dataStatusEl.textContent="PARTICIPANT HISTORY STALE · "+staleParticipantCount+" virtual/eFootball forecast rows are research-only. The participant, settlement and model snapshots must refresh before any current pick can be certified. Board age: "+age+".";
+      }else if(ageMinutes==null||ageMinutes>30||ageMs< -2*60*1000){
         dataStatusEl.className="ms-qualified-data-status ms-qualified-data-status-stale";
         dataStatusEl.textContent="SOURCE DATA STALE · last published "+(payload?.generated_at||"timestamp unavailable")+" ("+age+" old). Current picks cannot be certified from stale source data.";
       }else{
@@ -891,7 +906,7 @@ async function renderUnifiedBoard(){
     // The core prediction feed intentionally does not contain Virtual/eFootball.
     // Bring the existing evidence-backed eFootball candidate lane onto the
     // Upcoming Desk without turning it into a Builder qualification bypass.
-    const virtualCandidates=selectedRows.filter(isVirtualDeskCandidate);
+    const virtualCandidates=selectedRows.filter(isVirtualDeskCandidate).filter(row=>row?.participant_history_fresh!==false);
     // Track the saved-pool baseline for diagnosis only; it is not a live qualification.
     const virtualSnapshotQualifiedFixtureCount=qualifiedBestSelections(virtualCandidates,Date.now()).rows.length;
     let virtualQuoteRefreshState="pending";
@@ -1308,6 +1323,7 @@ async function renderUnifiedBoard(){
       // exactSportyBetQuote still enforces each row's strict 15-minute age limit.
       const qualificationRows=sourceDataFresh?filteredRows.filter(x=>{
         if(!isVirtualQualificationRow(x))return true;
+        if(x?.participant_history_fresh===false)return false;
         if(virtualQuoteRefreshState==="complete")return true;
         return (virtualQuoteRefreshState==="partial"||virtualQuoteRefreshState==="cached")&&
           x.desk_quote_refresh==="fresh_exact_event_line_side";
@@ -1370,6 +1386,7 @@ async function renderUnifiedBoard(){
         selection_candidates_error:selectionCandidatesError,
         source_fallback_used:sourceFallbackUsed,
         fallback_rows_loaded:fallbackRowsLoaded,
+        participant_history_stale_rows:staleParticipantCount,
         rows_loaded:all.length,
         rows_in_filtered_view:filteredRows.length,
         active_virtual_candidate_count:virtualCandidates.length,

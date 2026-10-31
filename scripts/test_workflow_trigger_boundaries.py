@@ -45,6 +45,7 @@ def main():
     builder_paths = push_paths("odds_builder.yml")
     board_paths = push_paths("unified-upcoming.yml")
     tracker_paths = push_paths("odds-ticket-tracker.yml")
+    collector_paths = push_paths("virtual-lab-collector.yml")
 
     # These are generated outputs, not Builder inputs. Keep the expensive Builder
     # on its 15-minute schedule and use the post-publication stale-artifact helper
@@ -66,6 +67,26 @@ def main():
     assert "data/odds_ticket_tracker.json" in board_paths
     assert "data/virtual_lab_model_eval.json" not in board_paths, (
         "The model-evaluation artifact is collector-owned and must not retrigger the board workflow."
+    )
+    for generated_virtual_artifact in (
+        "data/virtual_lab_participant_lifecycle.json",
+        "data/virtual_lab_history.json",
+        "data/virtual_lab_live.json",
+        "data/virtual_lab_eligibility.json",
+        "data/virtual_lab_participant_profiles.json",
+        "data/virtual_lab_confirmed_participants.json",
+        "data/virtual_lab_confirmed_participant_results.json",
+        "data/virtual_lab_participants/**",
+    ):
+        assert generated_virtual_artifact not in board_paths, (
+            f"Collector/live-sync output {generated_virtual_artifact} must be handled by its workflow_run completion, "
+            "not also create a duplicate board run from push."
+        )
+    assert "data/virtual_lab_participants/**" not in collector_paths, (
+        "The collector must not watch its own generated registry under the broad participant namespace."
+    )
+    assert "data/virtual_lab_participants/efootball_confirmed_watch.json" in collector_paths, (
+        "The explicit manual watch input must still be able to trigger the collector."
     )
     assert "python scripts/virtual_lab_model_eval.py" not in board, (
         "Avoid recomputing the expensive chronological evaluation on every five-minute board refresh."

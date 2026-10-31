@@ -37,6 +37,7 @@ EFOOTBALL_DIRECTION_MIN_RECENT_ROWS=30
 EFOOTBALL_DIRECTION_MIN_HIT_RATE=0.65
 EFOOTBALL_DIRECTION_RECENT_WINDOW=50
 SETTLED_DESK_RETENTION_HOURS=2
+VIRTUAL_PARTICIPANT_INPUT_MAX_AGE_MINUTES=30
 EFOOTBALL_DESK_LEARNING_MIN_CALIBRATION_N=30
 # Match the learner's declared exact_selection_min_predictions policy.
 EFOOTBALL_DESK_EXACT_MIN_N=20
@@ -61,6 +62,7 @@ DESK_FILTER_STATS={
     "stale_live_flags_hidden":0,
     "expired_settled_rows_hidden":0,
     "virtual_market_rows_held_for_kickoff_window":0,
+    "virtual_rows_held_for_stale_participant_history":0,
 }
 
 def load(name, default):
@@ -76,6 +78,48 @@ def dt(v):
         x=datetime.fromisoformat(str(v).replace("Z","+00:00"))
         return x if x.tzinfo else x.replace(tzinfo=timezone.utc)
     except Exception:return None
+
+def virtual_participant_data_freshness(lifecycle, collector_status, model_evaluation, now=NOW):
+    """Require fresh participant lifecycle, settlement collector and walk-forward model inputs."""
+    lifecycle = lifecycle if isinstance(lifecycle, dict) else {}
+    collector_status = collector_status if isinstance(collector_status, dict) else {}
+    model_evaluation = model_evaluation if isinstance(model_evaluation, dict) else {}
+    stamps = {
+        "participant_lifecycle": dt(lifecycle.get("generated_at")),
+        "collector_status": dt(collector_status.get("updated_at")),
+        "model_evaluation": dt(model_evaluation.get("generated_at")),
+    }
+    missing = [name for name, stamp in stamps.items() if stamp is None]
+    future = [name for name, stamp in stamps.items()
+              if stamp is not None and stamp > now + timedelta(minutes=2)]
+    ages = {name: max(0.0, (now - stamp).total_seconds() / 60.0)
+            for name, stamp in stamps.items() if stamp is not None}
+    max_age = max(ages.values()) if ages else None
+    stale = [name for name, age in ages.items() if age > VIRTUAL_PARTICIPANT_INPUT_MAX_AGE_MINUTES]
+    fresh = not missing and not future and not stale
+    reason = None
+    if missing:
+        reason = "missing freshness timestamp: " + ", ".join(missing)
+    elif future:
+        reason = "future-dated input timestamp: " + ", ".join(future)
+    elif stale:
+        reason = "input older than 30 minutes: " + ", ".join(stale)
+    return fresh, {
+        "fresh": fresh,
+        "max_age_minutes": round(max_age, 1) if max_age is not None else None,
+        "max_age_minutes_allowed": VIRTUAL_PARTICIPANT_INPUT_MAX_AGE_MINUTES,
+        "input_age_minutes": {name: round(age, 1) for name, age in ages.items()},
+        "participant_lifecycle_generated_at": lifecycle.get("generated_at"),
+        "collector_status_updated_at": collector_status.get("updated_at"),
+        "model_evaluation_generated_at": model_evaluation.get("generated_at"),
+        "reason": reason,
+    }
+
+def apply_virtual_participant_history_freshness_gate(qualification_status, participant_history_fresh):
+    """Stale participant/settlement/model inputs are never a current eFootball recommendation."""
+    if not participant_history_fresh:
+        return "PARTICIPANT_HISTORY_STALE"
+    return str(qualification_status or "")
 
 def num(v):
     try:
@@ -969,7 +1013,7 @@ def resolve_efootball_qualification_status(
         return "BETTING_QUALIFIED_PAPER_DIRECTIONAL"
     return "DIRECTIONAL_LINE_VALIDATION_GATE_PENDING"
 
-def build_virtual_events(history, lifecycle, eligibility):
+def build_virtual_events(history, lifecycle, eligibility, participant_history_fresh=True, participant_freshness=None, evaluation=None):
     """Forward Virtual/eFootball projections using the same base qualification policy
     as the Virtual Lab, without waiting for participant enhancement to pass.
     """
@@ -1033,7 +1077,7 @@ def build_virtual_events(history, lifecycle, eligibility):
         for k,v in (eligibility.get("eligible_ou_lines_by_product") or {}).items()
     }
 
-    eval_art=load("virtual_lab_model_eval.json",{})
+    eval_art=evaluation if isinstance(evaluation,dict) else load("virtual_lab_model_eval.json",{})
     h=eval_art.get("holdout_metrics") or {}
     market=h.get("market") or {}
     variants=["efootball_shape","poisson_prior","poisson"]
@@ -1329,8 +1373,13 @@ def build_virtual_events(history, lifecycle, eligibility):
 
             pre_window_qualification_status=qualification_status
             qualification_status=apply_virtual_kickoff_window_gate(qualification_status,start,NOW)
+            qualification_status=apply_virtual_participant_history_freshness_gate(
+                qualification_status, participant_history_fresh
+            )
             if pre_window_qualification_status in QUALIFIED_VIRTUAL_STATUSES and qualification_status=="KICKOFF_WINDOW_PENDING":
                 DESK_FILTER_STATS["virtual_market_rows_held_for_kickoff_window"]+=1
+            if not participant_history_fresh:
+                DESK_FILTER_STATS["virtual_rows_held_for_stale_participant_history"]+=1
             qualified=qualification_status in QUALIFIED_VIRTUAL_STATUSES
             kickoff_minutes_remaining=virtual_kickoff_window_minutes(start,NOW)
             kickoff_window_pass=bool(kickoff_minutes_remaining is not None and 0 < kickoff_minutes_remaining <= QUALIFIED_VIRTUAL_KICKOFF_WINDOW_MINUTES)
@@ -1404,6 +1453,11 @@ def build_virtual_events(history, lifecycle, eligibility):
                            ("participant_lifecycle_plus_base_model" if participant_history>=3 else "feed_discovered_base_model")))
                 ),
                 "participant_status":participant_status,
+                "participant_history_fresh":bool(participant_history_fresh),
+                "participant_history_age_minutes":(participant_freshness or {}).get("max_age_minutes"),
+                "participant_history_stale_reason":None if participant_history_fresh else (
+                    (participant_freshness or {}).get("reason") or "participant history/model evidence has not been refreshed"
+                ),
                 "participant_history_rows":participant_history,
                 "participant_hot_watch":participant_hot,
                 "participant_enhancement_gate":participant_gate,
@@ -1435,6 +1489,7 @@ def build_virtual_events(history, lifecycle, eligibility):
         "historical_events":len(history or []),
         "base_model_gate":base_model_gate,
         "participant_enhancement_gate":participant_gate,
+        "participant_history_freshness":participant_freshness or {"fresh":bool(participant_history_fresh)},
         "live_refresh":live_refresh_meta,
         "prospective_poisson_shadow_coverage":shadow_coverage,
     }
@@ -1472,6 +1527,11 @@ def main():
     for key in DESK_FILTER_STATS:
         DESK_FILTER_STATS[key]=0
     lifecycle=load("virtual_lab_participant_lifecycle.json",{})
+    virtual_status=load("virtual_lab_status.json",{})
+    virtual_evaluation=load("virtual_lab_model_eval.json",{})
+    participant_history_fresh, participant_freshness = virtual_participant_data_freshness(
+        lifecycle, virtual_status, virtual_evaluation, NOW
+    )
     core_source=load("predictions.json",[])
     selected_rows=load("selection_candidates.json",[])
     selection_map={}
@@ -1513,7 +1573,12 @@ def main():
     # Darts-X and Table Tennis-X are retired from the active desk. Their
     # historical artifacts remain preserved, but no new rows enter Upcoming.
     core_rows(rows,load("basketball_predictions.json",[]),selection_map)
-    virtual, virtual_meta=build_virtual_events(load_virtual_history(), lifecycle, load("virtual_lab_eligibility.json",{}))
+    virtual, virtual_meta=build_virtual_events(
+        load_virtual_history(), lifecycle, load("virtual_lab_eligibility.json",{}),
+        participant_history_fresh=participant_history_fresh,
+        participant_freshness=participant_freshness,
+        evaluation=virtual_evaluation,
+    )
     rows.extend(virtual)
 
     # Fallback/augmentation: some expansion artifacts are generated separately
@@ -1579,6 +1644,7 @@ def main():
         "live_count":live_count,
         "pending_settlement_count":pending_settlement,
         "publication_filters":dict(DESK_FILTER_STATS),
+        "participant_history_freshness":participant_freshness,
         "high_line_under_evidence":list(high_line_under.values()),
         "prospective_poisson_shadow_coverage":virtual_meta.get("prospective_poisson_shadow_coverage",{}),
         "qualified_virtual_kickoff_window_minutes":QUALIFIED_VIRTUAL_KICKOFF_WINDOW_MINUTES,

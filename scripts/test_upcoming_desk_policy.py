@@ -55,6 +55,38 @@ class UpcomingDeskPolicyTests(unittest.TestCase):
         self.assertEqual(ns["ts"](stamp), datetime(2026, 10, 9, 13, 0, tzinfo=UTC).timestamp())
         self.assertGreater(ns["ts"]("not-a-timestamp"), ns["ts"](stamp))
 
+    def test_participant_history_and_model_inputs_must_be_fresh_before_efootball_qualification(self):
+        check = ns["virtual_participant_data_freshness"]
+        gate = ns["apply_virtual_participant_history_freshness_gate"]
+        now = self.now
+        fresh_stamp = (now - timedelta(minutes=12)).isoformat()
+        fresh = {"generated_at": fresh_stamp}
+        status = {"updated_at": fresh_stamp}
+        evaluation = {"generated_at": fresh_stamp}
+        is_fresh, meta = check(fresh, status, evaluation, now)
+        self.assertTrue(is_fresh)
+        self.assertEqual(meta["max_age_minutes_allowed"], 30)
+        self.assertEqual(gate("BETTING_QUALIFIED_PAPER", is_fresh), "BETTING_QUALIFIED_PAPER")
+
+        old_stamp = (now - timedelta(minutes=31)).isoformat()
+        is_fresh, meta = check(
+            {"generated_at": old_stamp}, status, evaluation, now
+        )
+        self.assertFalse(is_fresh)
+        self.assertIn("participant_lifecycle", meta["reason"])
+        self.assertEqual(
+            gate("BETTING_QUALIFIED_PAPER", is_fresh),
+            "PARTICIPANT_HISTORY_STALE",
+        )
+
+        is_fresh, meta = check(fresh, status, {}, now)
+        self.assertFalse(is_fresh, "missing model evaluation timestamp must fail closed")
+        self.assertIn("model_evaluation", meta["reason"])
+        self.assertEqual(
+            gate("EDGE_BELOW_2PCT", is_fresh),
+            "PARTICIPANT_HISTORY_STALE",
+        )
+
     def test_virtual_qualified_picks_wait_until_the_next_60_minute_window(self):
         gate = ns["apply_virtual_kickoff_window_gate"]
         self.assertEqual(ns["QUALIFIED_VIRTUAL_KICKOFF_WINDOW_MINUTES"], 60)
