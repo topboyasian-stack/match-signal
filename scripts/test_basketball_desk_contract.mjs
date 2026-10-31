@@ -8,7 +8,7 @@ const [html, css, ui, api, workflow, booking] = await Promise.all([
 ]);
 assert.ok(html.includes("MS-BASKETBALL-DESK-2026.10.24-V11"), "Basketball must publish the new design marker");
 assert.ok(html.includes("core-workspaces-design.css?v=20261014-full-v1"), "Basketball must use the shared Match Signal design layer");
-assert.ok(html.includes("basketball-live.js?v=20261027-totals-v7"), "Basketball must cache-bust the visible booking error/retry logic");
+assert.ok(html.includes("basketball-live.js?v=20261029-upcoming-kickoff-v8"), "Basketball must cache-bust the visible booking error/retry logic");
 assert.ok(html.includes("basketball-design.css?v=20261024-builder-dark-v3"), "Basketball must load its latest contrast-corrected scoped design layer");
 assert.ok(workflow.includes("MS-BASKETBALL-DESK-2026.10.24-V11") && workflow.includes("basketball-design.css?v=20261024-builder-dark-v3"), "Pages production smoke markers must match the current Basketball page and CSS versions");
 assert.ok(html.includes('id="msNav"') && html.includes('workspace-ui.js?v=20261023-basketball-nav1'), "Basketball must use the single shared site navigation");
@@ -18,6 +18,7 @@ assert.ok(css.includes("MATCH-SIGNAL-BASKETBALL-DARK-V3") && html.includes("bask
 assert.ok(css.includes("MATCH-SIGNAL-BASKETBALL-BUILDER-DARK-V1") && css.includes(".nba-builder-card") && css.includes("background:linear-gradient(145deg,#132231,#0e1822)"), "All four basketball builders must use the dark terminal theme");
 assert.ok(css.includes("@media(max-width:480px)") && css.includes("@media(prefers-reduced-motion:reduce)") && css.includes(":focus-visible"), "Basketball design must remain responsive and accessible");
 assert.ok(ui.includes("S.predictions.filter(function(p){return new Date(p.start_time).getTime()>now;})"), "Upcoming NBA totals must exclude fixtures whose scheduled start has passed");
+assert.ok(ui.includes("return !(e&&(e.completed||e.live))&&new Date(p.start_time).getTime()>now;"), "Upcoming NBA predictions must exclude every fixture after scheduled kickoff even when the score feed has no matching live row");
 assert.ok(ui.includes("function bestSportyBetTotalMarket(markets)") && ui.includes("String(m.id)") && ui.includes("225"), "Totals must select the explicit SportyBet market ID for full-game O/U including overtime");
 assert.ok(ui.includes("function sportyBetTotalMarkets(markets)") && ui.includes("data-total-line-choice") && ui.includes("SELECTED_TOTAL_LINES"), "Basketball totals must expose live-feed alternative lines and use the selected line for the card and builder");
 assert.ok(ui.includes("length>8") && ui.includes("length>=8") && ui.includes("not verified by SportyBet"), "Basketball builders must enforce the eight-leg limit and withhold unverified combined odds");
