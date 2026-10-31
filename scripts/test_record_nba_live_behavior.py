@@ -74,6 +74,26 @@ class LiveBoxscoreProjectionTests(unittest.TestCase):
         result = live_total_projection(record, fresh_prediction())
         self.assertEqual(result["status"], "OVERTIME_CONTEXT_ONLY")
 
+    def test_decimal_seconds_only_clock_from_espn_final_minute_is_supported(self):
+        record = sample_record()
+        record["period"] = 2
+        record["clock"] = "30.6"
+        result = live_total_projection(record, fresh_prediction())
+        self.assertEqual(result["status"], "AVAILABLE")
+        self.assertAlmostEqual(result["elapsed_minutes"], 23.49, places=2)
+        self.assertIn(result["projection_source"], {
+            "ESPN_LIVE_BOXSCORE_POSSESSIONS_AND_SCORE_PACE",
+            "ESPN_LIVE_SCORE_CLOCK_PACE_ONLY",
+        })
+
+    def test_decimal_seconds_in_minute_second_clock_is_supported(self):
+        record = sample_record()
+        record["period"] = 3
+        record["clock"] = "0:30.6"
+        result = live_total_projection(record, fresh_prediction())
+        self.assertEqual(result["status"], "AVAILABLE")
+        self.assertAlmostEqual(result["elapsed_minutes"], 35.49, places=2)
+
     def test_insufficient_elapsed_time_withholds_live_estimate(self):
         record = sample_record()
         record["period"] = 1
