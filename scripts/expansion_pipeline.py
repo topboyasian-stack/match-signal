@@ -183,24 +183,30 @@ def normalize_nba_duckdb_rows(rows,now=None):
  return sorted({r['event_id']:r for r in normalized}.values(),key=lambda x:(x['date'],x['event_id']))
 
 def nba_duckdb_fallback():
- """Collect joined team-game logs with actual NBA possessions, pace and ratings."""
+ """Collect NBA team-game logs from public season Parquet files, bypassing the catalog WAL."""
  try:
   import duckdb
  except Exception as exc:
   raise RuntimeError(f'DuckDB dependency unavailable: {exc}')
  active_season=NOW.year+1 if NOW.month>=7 else NOW.year
- previous_season=active_season-1
+ seasons=[active_season-1,active_season]
+ base='https://basketball-data.billmill.org/nba/stats'
+ def parquet_list(dataset):
+  return '['+','.join("'"+base+'/'+dataset+'/season='+str(season)+'/data.parquet'+"'" for season in seasons)+']'
  con=duckdb.connect(database=':memory:')
  try:
   con.execute('SET threads=2')
   con.execute('INSTALL httpfs')
   con.execute('LOAD httpfs')
-  con.execute(f"ATTACH '{NBA_DUCKDB_CATALOG}' AS nba (READ_ONLY)")
-  query="""
-   SELECT CAST(g.game_id AS VARCHAR) AS event_id,
-          CAST(g.game_date AS VARCHAR) AS date,
+  team_logs=parquet_list('team_game_logs')
+  games=parquet_list('games')
+  team_seasons=parquet_list('team_seasons')
+  query=f"""
+   SELECT CAST(h.game_id AS VARCHAR) AS event_id,
+          CAST(h.game_date AS VARCHAR) AS date,
           g.game_type AS game_type,
-          ht.full_name AS home, away_lookup.full_name AS away,
+          home_team.full_name AS home,
+          away_team.full_name AS away,
           CAST(h.team_id AS VARCHAR) AS home_id,
           CAST(a.team_id AS VARCHAR) AS away_id,
           CAST(h.pts AS DOUBLE) AS home_score,
@@ -213,24 +219,26 @@ def nba_duckdb_fallback():
           CAST(a.def_rating AS DOUBLE) AS away_def_rating,
           CAST(h.poss AS DOUBLE) AS home_possessions,
           CAST(a.poss AS DOUBLE) AS away_possessions
-     FROM nba.games g
-     JOIN nba.team_game_logs h
-       ON h.season=g.season AND h.game_id=g.game_id AND h.team_id=g.home_team_id
-     JOIN nba.team_game_logs a
-       ON a.season=g.season AND a.game_id=g.game_id AND a.team_id=g.away_team_id
-     JOIN nba.team_seasons ht
-       ON ht.season=g.season AND ht.team_id=g.home_team_id
-     JOIN nba.team_seasons away_lookup
-       ON away_lookup.season=g.season AND away_lookup.team_id=g.away_team_id
-    WHERE g.season IN (?,?)
-      AND g.game_type='regular_season'
-      AND g.game_date>=CAST(? AS DATE)
-      AND g.game_date<=CAST(? AS DATE)
-    ORDER BY g.game_date,g.game_id
+     FROM read_parquet({team_logs}, union_by_name=true) h
+     JOIN read_parquet({team_logs}, union_by_name=true) a
+       ON a.season=h.season AND a.game_id=h.game_id
+      AND a.team_id=h.opp_team_id AND a.opp_team_id=h.team_id
+     JOIN read_parquet({games}, union_by_name=true) g
+       ON g.season=h.season AND g.game_id=h.game_id
+     JOIN read_parquet({team_seasons}, union_by_name=true) home_team
+       ON home_team.season=h.season AND home_team.team_id=h.team_id
+     JOIN read_parquet({team_seasons}, union_by_name=true) away_team
+       ON away_team.season=a.season AND away_team.team_id=a.team_id
+    WHERE g.game_type='regular_season'
+      AND h.home IS TRUE
+      AND h.game_date>=CAST('{(NOW-timedelta(days=365)).date().isoformat()}' AS DATE)
+      AND h.game_date<=CAST('{NOW.date().isoformat()}' AS DATE)
+    ORDER BY h.game_date,h.game_id
   """
-  frame=con.execute(query,[previous_season,active_season,(NOW-timedelta(days=365)).date(),NOW.date()]).fetchdf()
+  frame=con.execute(query).fetchdf()
   rows=normalize_nba_duckdb_rows(frame.to_dict(orient='records'),NOW)
-  if not rows:raise ValueError('public NBA v2 catalog returned zero regular-season games in the 365-day window')
+  if not rows:
+   raise ValueError('public NBA team-game-log Parquet files returned zero usable regular-season games in the 365-day window')
   return rows
  finally:
   con.close()
