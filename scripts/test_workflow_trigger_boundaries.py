@@ -170,7 +170,7 @@ def main():
     # Tracker is still refreshed from Builder / settlement / collector outputs,
     # and its own five-minute safety schedule remains enabled.
     assert "- cron: '*/5 * * * *'" in tracker
-    assert "- cron: '7,17,27,37,47,57 * * * *'" in watch
+    assert "- cron: '2,12,22,32,42,52 * * * *'" in watch
     assert "or (watchdog_event_name == 'workflow_run' and source_workflow_conclusion == 'success')" in watchdog, (
         "A successful workflow-run heartbeat must trigger the Qualified Best monitor fallback when cron delivery is stale."
     )
