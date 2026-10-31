@@ -13,7 +13,7 @@ import math
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from expansion_pipeline import NBA_TOTALS_MODEL_VERSION, nba_predict, dt as parse_time
+from expansion_pipeline import NBA_TOTALS_MODEL_VERSION, nba_total_components, dt as parse_time
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
@@ -46,24 +46,30 @@ def clean_history(rows):
         if not stamp or not home or not away or hs is None or aws is None or hs < 0 or aws < 0:
             continue
         event_id = str(row.get("event_id") or f"{stamp.isoformat()}|{home}|{away}")
-        clean[event_id] = {
+        clean_row = {
             "event_id": event_id, "date": stamp.isoformat(), "home": home, "away": away,
             "home_score": hs, "away_score": aws,
         }
+        for key in (
+            "home_pace", "away_pace", "home_off_rating", "away_off_rating",
+            "home_def_rating", "away_def_rating", "home_possessions", "away_possessions",
+        ):
+            clean_row[key] = finite_number(row.get(key))
+        clean[event_id] = clean_row
     return sorted(clean.values(), key=lambda row: (row["date"], row["event_id"]))
 
 
 def build_forecasts(history, min_prior_games=MIN_PRIOR_GAMES):
-    """Build an expanding-window forecast stream; current/future games are excluded."""
+    """Build expanding-window total components; every forecast uses only pre-tip games."""
     rows = clean_history(history)
     prior = []
     forecasts = []
     for game in rows:
         tip = parse_time(game["date"])
         if len(prior) >= min_prior_games:
-            prediction = nba_predict(game, prior)
-            model_total = finite_number(prediction.get("expected_total"))
-            if model_total is not None:
+            components = nba_total_components(game, prior)
+            base_total = finite_number(components.get("base_total"))
+            if base_total is not None:
                 cutoff = tip - timedelta(days=BASELINE_DAYS)
                 recent = [item for item in prior if cutoff <= parse_time(item["date"]) < tip]
                 baseline_rows = recent or prior
@@ -72,13 +78,16 @@ def build_forecasts(history, min_prior_games=MIN_PRIOR_GAMES):
                 ) / len(baseline_rows)
                 forecasts.append({
                     "event_id": game["event_id"], "date": game["date"],
-                    "model_total": model_total, "baseline_total": baseline_total,
+                    "base_total": base_total,
+                    "pace_total": finite_number(components.get("pace_total")),
+                    "pace_available": components.get("pace_available") is True,
+                    "model_total": base_total,
+                    "baseline_total": baseline_total,
                     "actual_total": float(game["home_score"]) + float(game["away_score"]),
                     "prior_games": len(prior),
                 })
         prior.append(game)
     return forecasts
-
 
 def regression_metrics(rows, forecast_key):
     errors = [
@@ -148,6 +157,10 @@ def verified_market_records(rows):
 def market_metrics(rows):
     profits, favorite_profits = [], []
     wins = losses = pushes = 0
+    by_pick = {
+        "over": {"n": 0, "wins": 0, "losses": 0, "accuracy": None},
+        "under": {"n": 0, "wins": 0, "losses": 0, "accuracy": None},
+    }
     for row in rows:
         final_total, line = float(row["final_total"]), float(row["line"])
         outcome = "over" if final_total > line else "under" if final_total < line else "push"
@@ -155,10 +168,15 @@ def market_metrics(rows):
             pushes += 1
             continue
         pick = str(row["pick"]).lower()
+        if pick not in by_pick:
+            continue
         odds = float(row["over_odds"] if pick == "over" else row["under_odds"])
         won = pick == outcome
         wins += int(won)
         losses += int(not won)
+        by_pick[pick]["n"] += 1
+        by_pick[pick]["wins"] += int(won)
+        by_pick[pick]["losses"] += int(not won)
         profits.append(odds - 1.0 if won else -1.0)
         favorite = "over" if float(row["over_odds"]) <= float(row["under_odds"]) else "under"
         fav_odds = float(row["over_odds"] if favorite == "over" else row["under_odds"])
@@ -172,9 +190,13 @@ def market_metrics(rows):
     else:
         lower = None
     favorite_roi = sum(favorite_profits) / len(favorite_profits) if favorite_profits else None
+    for side, values in by_pick.items():
+        values["accuracy"] = round(values["wins"] / values["n"], 4) if values["n"] else None
     return {
         "n": n, "wins": wins, "losses": losses, "pushes": pushes,
         "win_rate": round(wins / n, 4) if n else None,
+        "over_under_accuracy": round(wins / n, 4) if n else None,
+        "by_pick": by_pick,
         "profit_units": round(sum(profits), 4) if n else 0.0,
         "roi": round(roi, 4) if roi is not None else None,
         "roi_ci95_lower": round(lower, 4) if lower is not None else None,
@@ -182,20 +204,58 @@ def market_metrics(rows):
         "roi_vs_market_favorite": round(roi - favorite_roi, 4) if roi is not None and favorite_roi is not None else None,
     }
 
+def _blend_total(row, weight):
+    base = float(row["base_total"])
+    pace = row.get("pace_total")
+    if row.get("pace_available") is not True or finite_number(pace) is None:
+        return base
+    return base + weight * (float(pace) - base)
+
 
 def evaluate(history, ledger):
     forecasts = build_forecasts(history)
     split = int(len(forecasts) * (1.0 - HOLDOUT_FRACTION))
     development, holdout = forecasts[:split], forecasts[split:]
-    model_metrics = regression_metrics(holdout, "model_total")
+
+    # Choose the pace contribution and residual correction on development only.
+    grid = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
+    candidates = []
+    for weight in grid:
+        predictions = [_blend_total(row, weight) for row in development]
+        actuals = [float(row["actual_total"]) for row in development]
+        errors = [prediction - actual for prediction, actual in zip(predictions, actuals)]
+        mae = sum(abs(error) for error in errors) / len(errors) if errors else float("inf")
+        rmse = math.sqrt(sum(error * error for error in errors) / len(errors)) if errors else float("inf")
+        candidates.append((mae, rmse, weight))
+    selected_weight = min(candidates)[2] if candidates else 0.0
+    development_errors = [
+        _blend_total(row, selected_weight) - float(row["actual_total"])
+        for row in development
+    ]
+    bias_correction = sum(development_errors) / len(development_errors) if development_errors else 0.0
+
+    raw_holdout = [
+        {**row, "forecast_total": _blend_total(row, selected_weight)}
+        for row in holdout
+    ]
+    calibrated_holdout = [
+        {**row, "forecast_total": row["forecast_total"] - bias_correction}
+        for row in raw_holdout
+    ]
+    model_metrics = regression_metrics(calibrated_holdout, "forecast_total")
+    raw_model_metrics = regression_metrics(raw_holdout, "forecast_total")
     baseline_metrics = regression_metrics(holdout, "baseline_total")
     improvement = (
         round(baseline_metrics["mae"] - model_metrics["mae"], 4)
         if model_metrics["mae"] is not None and baseline_metrics["mae"] is not None else None
     )
+
     market_rows = verified_market_records(ledger)
     market_split = int(len(market_rows) * (1.0 - HOLDOUT_FRACTION))
     market_holdout = market_metrics(market_rows[market_split:])
+    market_overall = market_metrics(market_rows)
+    pace_development_n = sum(row.get("pace_available") is True for row in development)
+    pace_holdout_n = sum(row.get("pace_available") is True for row in holdout)
     forecast_ok = (
         model_metrics["n"] >= MIN_FORECAST_HOLDOUT and improvement is not None and improvement > 0
         and model_metrics["bias"] is not None and abs(model_metrics["bias"]) <= 3.0
@@ -221,24 +281,35 @@ def evaluate(history, ledger):
             "development_games": len(development),
             "holdout": {
                 **model_metrics,
+                "uncalibrated": raw_model_metrics,
                 "baseline_mae": baseline_metrics["mae"],
                 "baseline_rmse": baseline_metrics["rmse"],
                 "baseline_bias": baseline_metrics["bias"],
                 "mae_improvement_vs_baseline": improvement,
                 "beats_baseline": bool(improvement is not None and improvement > 0),
+                "pace_feature_games": pace_holdout_n,
             },
+        },
+        "model_calibration": {
+            "selected_pace_blend_weight": round(selected_weight, 4),
+            "production_bias_correction": round(bias_correction, 4),
+            "development_n": len(development),
+            "development_raw_bias": round(sum(development_errors) / len(development_errors), 4) if development_errors else None,
+            "pace_feature_development_games": pace_development_n,
+            "pace_feature_coverage": round(pace_development_n / len(development), 4) if development else 0.0,
+            "selection_rule": "minimum development MAE across a predeclared pace blend grid; residual bias estimated on development only",
         },
         "verified_market_records": len(market_rows),
         "market_development_records": market_split,
+        "market_overall": market_overall,
         "market_holdout": market_holdout,
         "release_decision": "QUALIFIED" if forecast_ok and market_ok else "RESEARCH_ONLY",
         "release_reason": (
-            "Chronological score forecasts beat the rolling baseline and the untouched, model-version-specific SportyBet holdout passed the pre-registered ROI and confidence checks."
+            "Chronological calibrated score forecasts beat the rolling baseline and the untouched, model-version-specific SportyBet holdout passed the pre-registered ROI and confidence checks."
             if forecast_ok and market_ok else
-            "Not qualified: require at least 100 unseen forecast games with lower MAE than baseline and absolute bias <=3 points, plus at least 100 settled, immutable, fresh SportyBet market-225 holdout bets with positive ROI, a positive 95% lower confidence bound, and ROI above the market-favourite baseline."
+            "Not qualified: require at least 100 unseen calibrated forecast games with lower MAE than baseline and absolute bias <=3 points, plus at least 100 settled, immutable, fresh SportyBet market-225 holdout bets with positive ROI, a positive 95% lower confidence bound, and ROI above the market-favourite baseline."
         ),
     }
-
 
 def main():
     history = json.loads(HISTORY.read_text(encoding="utf-8"))
