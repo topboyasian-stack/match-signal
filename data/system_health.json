@@ -1,70 +1,70 @@
 {
-  "generated_at": "2026-10-31T15:16:52.116245+00:00",
-  "status": "DEGRADED",
+  "generated_at": "2026-10-31T15:37:11.444073+00:00",
+  "status": "HEALTHY",
   "critical_issues": 0,
-  "warning_issues": 2,
+  "warning_issues": 0,
   "info_issues": 1,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
       "status": "PASS",
-      "age_hours": 0.76,
+      "age_hours": 1.1,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.08,
+      "age_hours": 0.33,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 0.71,
+      "age_hours": 1.05,
       "threshold_hours": 4
     },
     {
       "engine": "unified_upcoming",
       "status": "PASS",
-      "age_hours": 0.01,
+      "age_hours": 0.0,
       "threshold_hours": 2
     },
     {
       "engine": "prediction_desk_health",
       "status": "PASS",
-      "age_hours": 0.04,
+      "age_hours": 0.03,
       "threshold_hours": 2
     },
     {
       "engine": "virtual_participant_history",
-      "status": "STALE",
-      "max_input_age_minutes": 81.3,
-      "virtual_lab_status_age_minutes": 83.8,
+      "status": "PASS",
+      "max_input_age_minutes": 6.5,
+      "virtual_lab_status_age_minutes": 8.2,
       "threshold_minutes": 30.0,
       "stale_inputs": []
     },
     {
       "engine": "tennis_forward_discovery",
       "status": "PASS",
-      "age_hours": 0.71,
+      "age_hours": 1.05,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 0.42,
+      "age_hours": 0.24,
       "threshold_hours": 0.5,
       "heartbeat_source": "virtual_lab_live.json",
-      "events_count": 631
+      "events_count": 610
     },
     {
       "engine": "nba_live_observation_recorder",
-      "status": "STALE",
-      "age_hours": 0.52,
+      "status": "PASS",
+      "age_hours": 0.23,
       "threshold_hours": 0.25,
       "heartbeat_source": "nba_live_observations.json",
       "games_tracked": 18,
-      "snapshots_recorded": 138
+      "snapshots_recorded": 148
     },
     {
       "engine": "engine_lifecycle",
@@ -72,7 +72,7 @@
       "lanes": {
         "darts_x": {
           "status": "RETIRED",
-          "artifact_at": "2026-10-31T13:08:43.548945+00:00"
+          "artifact_at": "2026-10-31T15:25:55.403787+00:00"
         },
         "table_tennis_x": {
           "status": "RETIRED",
@@ -103,16 +103,6 @@
   ],
   "issues": [
     {
-      "code": "VIRTUAL_PARTICIPANT_HISTORY_STALE",
-      "severity": "warning",
-      "detail": "input older than 30 minutes: participant_lifecycle, collector_status, model_evaluation; oldest participant/settlement/model input is 81.3 minutes old; virtual_lab_status.json is 83.8 minutes old; current eFootball/virtual predictions must remain withheld until the source collector publishes fresh data"
-    },
-    {
-      "code": "NBA_LIVE_OBSERVATION_STALE",
-      "severity": "warning",
-      "detail": "nba_live_observations.json age 0.52h exceeds 0.25h; the in-game observation recorder has not published a recent heartbeat"
-    },
-    {
       "code": "PDL_EXPERIMENTAL_FEED_STALE",
       "severity": "info",
       "detail": "PDL experimental source is STALE_SOURCE_UNAVAILABLE; last-success timestamp is 2026-10-24T09:41:33.194342+00:00. The current prediction feed contains no PDL rows, so stale fixtures remain withheld."
@@ -121,10 +111,10 @@
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
   "paper_only": true,
   "prediction_desk_filters": {
-    "past_kickoff_rows_hidden": 18,
+    "past_kickoff_rows_hidden": 21,
     "stale_live_flags_hidden": 0,
     "expired_settled_rows_hidden": 0,
-    "virtual_market_rows_held_for_kickoff_window": 0,
-    "virtual_rows_held_for_stale_participant_history": 4692
+    "virtual_market_rows_held_for_kickoff_window": 77,
+    "virtual_rows_held_for_stale_participant_history": 0
   }
 }
