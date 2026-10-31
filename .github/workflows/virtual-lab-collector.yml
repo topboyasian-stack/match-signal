@@ -37,7 +37,8 @@ permissions:
 
 concurrency:
   group: match-signal-virtual-lab-collector
-  cancel-in-progress: false
+  # A newer fixed collector run must replace an obsolete publish/retry loop.
+  cancel-in-progress: true
 
 jobs:
   collect:
