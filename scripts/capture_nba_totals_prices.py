@@ -115,7 +115,22 @@ def diagnose_fixture_quote(fixture, feed, now):
         ):
             named.append(event)
     if not named:
-        return "NO_EXACT_TEAM_EVENT_IN_FEED"
+        # Separate a true feed-coverage gap from a possible team-identity issue.
+        # No event in the seven-day response means the market cannot be priced;
+        # it does not justify guessing an event ID, using another bookmaker, or
+        # labelling the quote matcher itself as failed.
+        nearby = []
+        for event in feed or []:
+            event_home = nba_team_key(event.get("home"))
+            event_away = nba_team_key(event.get("away"))
+            event_start = dt(event.get("start_time"))
+            if not event_start or abs((event_start - fixture_start).total_seconds()) > 45 * 60:
+                continue
+            if fixture_home in {event_home, event_away} or fixture_away in {event_home, event_away}:
+                nearby.append(event)
+        if nearby:
+            return "SPORTYBET_PARTIAL_TEAM_IDENTITY_MATCH"
+        return "SPORTYBET_FIXTURE_NOT_LISTED_IN_FEED"
     timed = [
         event for event in named
         if dt(event.get("start_time")) is not None
