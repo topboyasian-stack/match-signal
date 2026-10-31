@@ -106,8 +106,8 @@ def main():
         assert generated_collector_output not in collector_paths, (
             f"Collector output {generated_collector_output} must not trigger another expensive collector run."
         )
-    assert "cancel-in-progress: true" in collector, (
-        "A newer corrected collector must replace a collector stuck in artifact publication."
+    assert "cancel-in-progress: false" in collector, (
+        "The full collector must finish publishing fresh participant/model inputs even when the next 15-minute cadence arrives."
     )
 
     # Unified Upcoming is the single owner of the canonical all-sports board,
