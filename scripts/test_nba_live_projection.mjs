@@ -38,6 +38,7 @@ assert.equal(api.nbaPredictionFresh(stalePrediction).reason, "OLDER_THAN_SIX_HOU
 assert.equal(api.liveTotalProjection(record, stalePrediction).status, "STALE_PREGAME_BASELINE");
 const projection = api.liveTotalProjection(record, freshPrediction);
 assert.equal(projection.status, "AVAILABLE");
+assert.ok(projection.pregame_baseline_age_minutes >= 0 && projection.pregame_baseline_age_minutes <= 60);
 assert.equal(projection.uses_live_boxscore_stats, true);
 assert.equal(projection.projection_source, "ESPN_LIVE_BOXSCORE_POSSESSIONS_AND_SCORE_PACE");
 assert.ok(projection.stats_summary.fields_used.includes("FGA"));
