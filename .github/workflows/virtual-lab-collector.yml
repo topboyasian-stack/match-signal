@@ -35,9 +35,8 @@ permissions:
 
 concurrency:
   group: match-signal-virtual-lab-collector
-  # The full capture + strict chronological evaluation can take about 12 minutes.
-  # Let the active run publish; the newest pending heartbeat can follow without cancelling it.
-  cancel-in-progress: false
+  # Replace the old collector stuck in artifact publication; generated outputs no longer self-trigger it.
+  cancel-in-progress: true
 
 jobs:
   collect:
