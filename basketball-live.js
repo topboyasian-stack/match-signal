@@ -46,7 +46,7 @@ function nbaTotalsReleaseQualified(evidence){
   return evidence&&evidence.evaluation_type==="NBA_TOTALS_WALK_FORWARD_V1"&&
     String(evidence.market_id||"")==="225"&&
     evidence.market_definition==="full_game_total_including_overtime"&&
-    evidence.model_version==="nba-total-v2-balanced-home-margin"&&decision==="QUALIFIED"&&
+    evidence.model_version==="nba-total-v3-matchup-recent-team-total"&&decision==="QUALIFIED"&&
     Number.isFinite(forecastN)&&forecastN>=100&&Number.isFinite(forecastMae)&&
     Number.isFinite(baselineMae)&&forecastMae<baselineMae&&Number.isFinite(bias)&&Math.abs(bias)<=3&&
     Number.isFinite(marketN)&&marketN>=100&&Number.isFinite(roi)&&roi>0&&
@@ -56,7 +56,7 @@ function nbaTotalRowQualified(prediction,evidence){
   const market=prediction&&prediction.markets&&prediction.markets.total_ou||{};
   const status=String(market.prediction_status||prediction&&prediction.prediction_status||"").trim().toUpperCase();
   return String(market.market_id||"")==="225"&&status==="BETTING_QUALIFIED"&&
-    String(prediction&&prediction.totals_model_version||"")==="nba-total-v2-balanced-home-margin"&&
+    String(prediction&&prediction.totals_model_version||"")==="nba-total-v3-matchup-recent-team-total"&&
     nbaTotalsReleaseQualified(evidence);
 }
 function verifiedTotalRecord(x){return Boolean(x&&x.settled===true&&x.publication_snapshot_verified===true&&x.roi_eligible===true&&x.quote_fresh_at_publication===true&&x.price_pair_valid===true&&x.price_source_verified===true&&String(x.market_id)==='225'&&['over','under'].includes(String(x.pick||''))&&['over','under','push'].includes(String(x.result||'')));}

@@ -9,7 +9,7 @@ ROOT=Path(__file__).resolve().parents[1]; DATA=ROOT/'data'; DATA.mkdir(exist_ok=
 BASE='https://site.api.espn.com/apis/site/v2/sports'; NOW=datetime.now(timezone.utc)
 S=requests.Session();S.headers.update({'User-Agent':'Mozilla/5.0 (compatible; MatchSignal/1.0)'})
 NBA_START=datetime(2026,10,20,tzinfo=timezone.utc)
-NBA_TOTALS_MODEL_VERSION="nba-total-v2-balanced-home-margin"
+NBA_TOTALS_MODEL_VERSION="nba-total-v3-matchup-recent-team-total"
 NBA_PARQUET='https://raw.githubusercontent.com/llimllib/nba_data/main/data/gamelogs.parquet'
 NBA_ELO_CSV='https://datahub.io/fivethirtyeight/nba-elo/_r/-/data/nbaallelo.csv'
 def dt(x):
@@ -181,18 +181,64 @@ def collect(name):
  if rows:return rows,errs
  fallback_rows,fallback_errors=ere_fallback()
  return fallback_rows,errs+fallback_errors
-def weights(hist,cut):
- s=defaultdict(lambda:{'pf':0.,'pa':0.,'n':0.,'last':None})
- for r in hist:
-  d=dt(r['date'])
+def weights(hist,cut,half_life_days=30):
+ """Build strictly pre-tip team scoring rates and each team's last 12 game totals."""
+ s=defaultdict(lambda:{'pf':0.,'pa':0.,'n':0.,'last':None,'recent_totals':[]})
+ half_life=max(1.0,float(half_life_days))
+ ordered=sorted(hist,key=lambda r:dt(r.get('date')) or datetime.min.replace(tzinfo=timezone.utc))
+ for r in ordered:
+  d=dt(r.get('date'))
   if not d or d>=cut:continue
-  w=math.exp(-math.log(2)*max(0,(cut-d).total_seconds()/86400)/120)
-  for n,p,o in ((r['home'],r['home_score'],r['away_score']),(r['away'],r['away_score'],r['home_score'])):
+  w=math.exp(-math.log(2)*max(0,(cut-d).total_seconds()/86400)/half_life)
+  try:game_total=float(r['home_score'])+float(r['away_score'])
+  except (TypeError,ValueError,KeyError):continue
+  if not math.isfinite(game_total) or game_total<0:continue
+  for n,p,o in ((r.get('home'),r.get('home_score'),r.get('away_score')),(r.get('away'),r.get('away_score'),r.get('home_score'))):
+   try:p=float(p);o=float(o)
+   except (TypeError,ValueError):continue
+   if not n or not math.isfinite(p) or not math.isfinite(o):continue
    q=s[n];q['pf']+=w*p;q['pa']+=w*o;q['n']+=w
+   q['recent_totals'].append(game_total)
+   if len(q['recent_totals'])>12:q['recent_totals'].pop(0)
    if q['last'] is None or d>q['last']:q['last']=d
  return s
 def nba_predict(r,hist):
- cut=dt(r['date']) or NOW;s=weights(hist,cut);h=s.get(r['home'],{});a=s.get(r['away'],{});hp=h.get('pf',0)/max(h.get('n',1),1e-9);ap=a.get('pf',0)/max(a.get('n',1),1e-9);hd=h.get('pa',0)/max(h.get('n',1),1e-9);ad=a.get('pa',0)/max(a.get('n',1),1e-9);lp=sum(x['pf'] for x in s.values())/max(sum(x['n'] for x in s.values()),1e-9);hm=.58*(hp+ad)/2+.42*lp+1.25;am=.58*(ap+hd)/2+.42*lp-1.25;hr=(cut-h['last']).total_seconds()/86400 if h.get('last') else 4;ar=(cut-a['last']).total_seconds()/86400 if a.get('last') else 4;adj=max(-2,min(2,(hr-ar)*.35));hm+=adj;am-=adj;p=1/(1+math.exp(-(hm-am)/7.5));return {'moneyline':{'home':p,'away':1-p},'expected_score':{'home':hm,'away':am},'expected_total':hm+am,'totals_model_version':NBA_TOTALS_MODEL_VERSION,'rest_days':{'home':hr,'away':ar},'model':'NBA independent recency-weighted offense/defense + balanced home margin; totals v2','paper_only':True}
+ cut=dt(r['date']) or NOW
+ s=weights(hist,cut,half_life_days=30)
+ h=s.get(r['home'],{});a=s.get(r['away'],{})
+ hp=h.get('pf',0)/max(h.get('n',1),1e-9)
+ ap=a.get('pf',0)/max(a.get('n',1),1e-9)
+ hd=h.get('pa',0)/max(h.get('n',1),1e-9)
+ ad=a.get('pa',0)/max(a.get('n',1),1e-9)
+ league_team_points=sum(x['pf'] for x in s.values())/max(sum(x['n'] for x in s.values()),1e-9)
+ fallback_total=2*league_team_points if league_team_points>0 else 225.0
+ hform=h.get('recent_totals') or []
+ aform=a.get('recent_totals') or []
+ h_recent=sum(hform[-12:])/len(hform[-12:]) if hform else fallback_total
+ a_recent=sum(aform[-12:])/len(aform[-12:]) if aform else fallback_total
+ matchup=(hp+ad+ap+hd)/2 if h.get('n',0)>0 and a.get('n',0)>0 else fallback_total
+ expected_total=.5*matchup+.5*((h_recent+a_recent)/2)
+ if not math.isfinite(expected_total) or expected_total<=0:expected_total=fallback_total
+ home_raw=(hp+ad)/2 if h.get('n',0)>0 and a.get('n',0)>0 else expected_total/2
+ away_raw=(ap+hd)/2 if h.get('n',0)>0 and a.get('n',0)>0 else expected_total/2
+ hr=(cut-h['last']).total_seconds()/86400 if h.get('last') else 4
+ ar=(cut-a['last']).total_seconds()/86400 if a.get('last') else 4
+ rest_adj=max(-2,min(2,(hr-ar)*.35))
+ margin=.58*(home_raw-away_raw)+2.5+2*rest_adj
+ margin=max(-.8*expected_total,min(.8*expected_total,margin))
+ hm=expected_total/2+margin/2
+ am=expected_total/2-margin/2
+ p=1/(1+math.exp(-margin/7.5))
+ return {
+  'moneyline':{'home':p,'away':1-p},
+  'expected_score':{'home':hm,'away':am},
+  'expected_total':expected_total,
+  'totals_model_version':NBA_TOTALS_MODEL_VERSION,
+  'rest_days':{'home':hr,'away':ar},
+  'total_model_features':{'recency_half_life_days':30,'recent_team_total_window':12,'matchup_weight':.5,'recent_team_total_weight':.5},
+  'model':'NBA totals v3: 30-day recency-weighted matchup scoring rates + 50/50 last-12 team game-total form; margin model kept separate',
+  'paper_only':True
+}
 def current(name):
  if name=='NBA' and NOW<NBA_START:return []
  start=NOW-timedelta(days=1)

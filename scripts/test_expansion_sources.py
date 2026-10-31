@@ -115,10 +115,42 @@ def test_collection_prefers_gamelogs_and_preserves_fallback_diagnostics():
     finally:
         p.nba_parquet_fallback,p.collect_espn,p.nba_elo_fallback=old_parquet,old_collect,old_elo
 
+
+def test_totals_v3_uses_strictly_prior_last_twelve_game_totals():
+    old_now=p.NOW
+    try:
+        p.NOW=datetime(2026,10,31,12,tzinfo=UTC)
+        base=[]
+        for i in range(14):
+            stamp=p.NOW-__import__("datetime").timedelta(days=14-i)
+            base.append({"event_id":f"home-prior-{i}","date":stamp.isoformat(),
+                         "home":"Home Team","away":f"Opponent {i}",
+                         "home_score":100.0+i,"away_score":100.0})
+            base.append({"event_id":f"away-prior-{i}","date":stamp.isoformat(),
+                         "home":f"Other {i}","away":"Away Team",
+                         "home_score":100.0,"away_score":100.0+i})
+        fixture={"event_id":"upcoming","date":(p.NOW+__import__("datetime").timedelta(days=1)).isoformat(),
+                 "home":"Home Team","away":"Away Team"}
+        forecast=p.nba_predict(fixture,base)
+        assert forecast["totals_model_version"]==p.NBA_TOTALS_MODEL_VERSION
+        assert forecast["total_model_features"]["recency_half_life_days"]==30
+        assert forecast["total_model_features"]["recent_team_total_window"]==12
+        assert abs(forecast["expected_total"]-(forecast["expected_score"]["home"]+forecast["expected_score"]["away"]))<1e-8
+        weighted=p.weights(base,p.dt(fixture["date"]),30)
+        assert len(weighted["Home Team"]["recent_totals"])==12
+        assert len(weighted["Away Team"]["recent_totals"])==12
+        future=base+[{"event_id":"future","date":(p.NOW+__import__("datetime").timedelta(days=2)).isoformat(),
+                      "home":"Home Team","away":"Away Team","home_score":300.0,"away_score":300.0}]
+        after=p.nba_predict(fixture,future)
+        assert after["expected_total"]==forecast["expected_total"], "future games must not enter a pregame forecast"
+    finally:
+        p.NOW=old_now
+
 if __name__=="__main__":
     test_history_windows_and_preseason_exclusion()
     test_daily_scoreboard_uses_single_dates()
     test_regular_season_fixture_gate()
     test_gamelogs_team_rows_are_joined_and_preseason_excluded()
     test_collection_prefers_gamelogs_and_preserves_fallback_diagnostics()
-    print("NBA source regression tests: PASS (5 groups)")
+    test_totals_v3_uses_strictly_prior_last_twelve_game_totals()
+    print("NBA source regression tests: PASS (6 groups)")
