@@ -107,7 +107,7 @@ assert.ok(!deploy.includes("|.github/workflows/cloudflare-pages.yml|"),
 assert.ok(deploy.includes("node scripts/test_workspace_terminal_design.mjs"), "production promotion must run workspace visual regressions");
 for (const marker of [
   "reports-design.css?v=20261014-full-v3",
-  "../virtual-lab-terminal.css?v=20261014-full-v3"
+  "../virtual-lab-terminal.css?v=20261031-recent-performance-guard1"
 ]) {
   assert.ok(deploy.includes(marker), "production smoke tests must verify asset wiring: " + marker);
 }
