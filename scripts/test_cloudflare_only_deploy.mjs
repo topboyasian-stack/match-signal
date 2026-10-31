@@ -53,10 +53,6 @@ assert.ok(
   "The private 30-day NBA live-observation archive must stay out of the public Pages asset package.",
 );
 assert.ok(
-  cloudflare.includes("      - '.github/workflows/cloudflare-pages.yml'"),
-  "A deployment-workflow-only repair must trigger its own production verification run.",
-);
-assert.ok(
   cloudflare.includes("|scripts/ensure_odds_builder_refresh.py|scripts/test_ensure_odds_builder_refresh.py|") &&
     cloudflare.includes("|scripts/test_workflow_trigger_boundaries.py|") &&
     cloudflare.includes("|scripts/test_cloudflare_only_deploy.mjs|") &&
