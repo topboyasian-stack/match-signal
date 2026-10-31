@@ -9,8 +9,9 @@ ROOT=Path(__file__).resolve().parents[1]; DATA=ROOT/'data'; DATA.mkdir(exist_ok=
 BASE='https://site.api.espn.com/apis/site/v2/sports'; NOW=datetime.now(timezone.utc)
 S=requests.Session();S.headers.update({'User-Agent':'Mozilla/5.0 (compatible; MatchSignal/1.0)'})
 NBA_START=datetime(2026,10,20,tzinfo=timezone.utc)
-NBA_TOTALS_MODEL_VERSION="nba-total-v3-matchup-recent-team-total"
+NBA_TOTALS_MODEL_VERSION="nba-total-v4-pace-efficiency-calibrated"
 NBA_PARQUET='https://raw.githubusercontent.com/llimllib/nba_data/main/data/gamelogs.parquet'
+NBA_DUCKDB_CATALOG='https://basketball-data.billmill.org/nba/nba.duckdb'
 NBA_ELO_CSV='https://datahub.io/fivethirtyeight/nba-elo/_r/-/data/nbaallelo.csv'
 def dt(x):
  try:
@@ -146,6 +147,86 @@ def nba_parquet_fallback():
    raise ValueError(f'unexpected NBA gamelog schema: {list(df.columns)[:20]}')
  if not rows:raise ValueError(f'{NBA_PARQUET}: zero usable dated NBA regular-season rows in 365-day window')
  return sorted({r['event_id']:r for r in rows}.values(),key=lambda x:x['date'])
+def normalize_nba_duckdb_rows(rows,now=None):
+ """Normalize the public v2 NBA team-game logs with pace and efficiency."""
+ now=now or NOW
+ cutoff=now-timedelta(days=365)
+ normalized=[]
+ fields=('home_pace','away_pace','home_off_rating','away_off_rating',
+         'home_def_rating','away_def_rating','home_possessions','away_possessions')
+ for raw in rows or []:
+  if not isinstance(raw,dict):continue
+  if str(raw.get('game_type') or '').strip().lower()!='regular_season':continue
+  stamp=dt(raw.get('date') or raw.get('start_time'))
+  home=str(raw.get('home') or '').strip()
+  away=str(raw.get('away') or '').strip()
+  try:hs=float(raw.get('home_score'));aws=float(raw.get('away_score'))
+  except (TypeError,ValueError):continue
+  if not stamp or stamp<cutoff or stamp>now or not home or not away:continue
+  if not all(math.isfinite(x) and x>=0 for x in (hs,aws)):continue
+  row={'event_id':str(raw.get('event_id') or ''),
+       'date':stamp.isoformat(),'home':home,'away':away,
+       'home_id':str(raw.get('home_id') or ''),'away_id':str(raw.get('away_id') or ''),
+       'home_score':hs,'away_score':aws,'markets':{},
+       'source':'nba_data_v2_team_game_logs'}
+  for key in fields:
+   try:value=float(raw.get(key))
+   except (TypeError,ValueError):value=None
+   row[key]=value if value is not None and math.isfinite(value) and value>0 else None
+  if row['event_id']:normalized.append(row)
+ return sorted({r['event_id']:r for r in normalized}.values(),key=lambda x:(x['date'],x['event_id']))
+
+def nba_duckdb_fallback():
+ """Collect joined team-game logs with actual NBA possessions, pace and ratings."""
+ try:
+  import duckdb
+ except Exception as exc:
+  raise RuntimeError(f'DuckDB dependency unavailable: {exc}')
+ active_season=NOW.year+1 if NOW.month>=7 else NOW.year
+ previous_season=active_season-1
+ con=duckdb.connect(database=':memory:')
+ try:
+  con.execute('SET threads=2')
+  con.execute(f"ATTACH '{NBA_DUCKDB_CATALOG}' AS nba (READ_ONLY)")
+  query="""
+   SELECT CAST(g.game_id AS VARCHAR) AS event_id,
+          CAST(g.start_time AS VARCHAR) AS date,
+          g.game_type AS game_type,
+          ht.full_name AS home, at.full_name AS away,
+          CAST(h.team_id AS VARCHAR) AS home_id,
+          CAST(a.team_id AS VARCHAR) AS away_id,
+          CAST(h.pts AS DOUBLE) AS home_score,
+          CAST(a.pts AS DOUBLE) AS away_score,
+          CAST(h.pace AS DOUBLE) AS home_pace,
+          CAST(a.pace AS DOUBLE) AS away_pace,
+          CAST(h.off_rating AS DOUBLE) AS home_off_rating,
+          CAST(a.off_rating AS DOUBLE) AS away_off_rating,
+          CAST(h.def_rating AS DOUBLE) AS home_def_rating,
+          CAST(a.def_rating AS DOUBLE) AS away_def_rating,
+          CAST(h.poss AS DOUBLE) AS home_possessions,
+          CAST(a.poss AS DOUBLE) AS away_possessions
+     FROM nba.games g
+     JOIN nba.team_game_logs h
+       ON h.season=g.season AND h.game_id=g.game_id AND h.team_id=g.home_team_id
+     JOIN nba.team_game_logs a
+       ON a.season=g.season AND a.game_id=g.game_id AND a.team_id=g.away_team_id
+     JOIN nba.team_seasons ht
+       ON ht.season=g.season AND ht.team_id=g.home_team_id
+     JOIN nba.team_seasons at
+       ON at.season=g.season AND at.team_id=g.away_team_id
+    WHERE g.season IN (?,?)
+      AND g.game_type='regular_season'
+      AND g.start_time>=?
+      AND g.start_time<=?
+    ORDER BY g.start_time,g.game_id
+  """
+  frame=con.execute(query,[previous_season,active_season,NOW-timedelta(days=365),NOW]).fetchdf()
+  rows=normalize_nba_duckdb_rows(frame.to_dict(orient='records'),NOW)
+  if not rows:raise ValueError('public NBA v2 catalog returned zero regular-season games in the 365-day window')
+  return rows
+ finally:
+  con.close()
+
 def nba_elo_fallback():
  df=pd.read_csv(io.StringIO(text(NBA_ELO_CSV)),usecols=['game_id','lg_id','date_game','team_id','fran_id','pts','opp_id','opp_fran','opp_pts','game_location'])
  df=df[df['lg_id'].astype(str).str.upper().eq('NBA')]
@@ -163,16 +244,14 @@ def nba_elo_fallback():
  return sorted({r['event_id']:r for r in rows}.values(),key=lambda x:x['date'])
 def nba_fallback():
  errors=[]
- for name,fn in (('nba_parquet',nba_parquet_fallback),('nba_elo_csv',nba_elo_fallback)):
+ for name,fn in (('nba_data_v2',nba_duckdb_fallback),('nba_parquet_legacy',nba_parquet_fallback),('nba_elo_csv',nba_elo_fallback)):
   try:return fn(),[]
   except Exception as e:errors.append(f'{name}: {e}')
  return [],errors
 def collect(name):
  if name=='NBA':
-  # Prefer the daily-updated dated game log archive. ESPN range requests
-  # returned repeated HTTP 400s, and its older team_box schema has no game date.
-  try:return nba_parquet_fallback(),[]
-  except Exception as exc:errors=[f'nba_gamelogs: {exc}']
+  try:return nba_duckdb_fallback(),[]
+  except Exception as exc:errors=[f'nba_data_v2_team_game_logs: {exc}']
   rows,espn_errors=collect_espn('basketball/nba',daily=True);errors.extend(espn_errors)
   if rows:return rows,errors
   try:return nba_elo_fallback(),errors
@@ -181,9 +260,17 @@ def collect(name):
  if rows:return rows,errs
  fallback_rows,fallback_errors=ere_fallback()
  return fallback_rows,errs+fallback_errors
+def _finite_number(value):
+ try:
+  number=float(value)
+  return number if math.isfinite(number) else None
+ except (TypeError,ValueError):return None
+
 def weights(hist,cut,half_life_days=30):
- """Build strictly pre-tip team scoring rates and each team's last 12 game totals."""
- s=defaultdict(lambda:{'pf':0.,'pa':0.,'n':0.,'last':None,'recent_totals':[]})
+ """Build strictly pre-tip scoring, recent-total, pace and efficiency profiles."""
+ s=defaultdict(lambda:{'pf':0.,'pa':0.,'n':0.,'last':None,'recent_totals':[],
+                       'pace_sum':0.,'pace_n':0.,'off_sum':0.,'off_n':0.,
+                       'def_sum':0.,'def_n':0.,'poss_sum':0.,'poss_n':0.})
  half_life=max(1.0,float(half_life_days))
  ordered=sorted(hist,key=lambda r:dt(r.get('date')) or datetime.min.replace(tzinfo=timezone.utc))
  for r in ordered:
@@ -193,50 +280,98 @@ def weights(hist,cut,half_life_days=30):
   try:game_total=float(r['home_score'])+float(r['away_score'])
   except (TypeError,ValueError,KeyError):continue
   if not math.isfinite(game_total) or game_total<0:continue
-  for n,p,o in ((r.get('home'),r.get('home_score'),r.get('away_score')),(r.get('away'),r.get('away_score'),r.get('home_score'))):
+  for side,name,p,o in (('home',r.get('home'),r.get('home_score'),r.get('away_score')),
+                        ('away',r.get('away'),r.get('away_score'),r.get('home_score'))):
    try:p=float(p);o=float(o)
    except (TypeError,ValueError):continue
-   if not n or not math.isfinite(p) or not math.isfinite(o):continue
-   q=s[n];q['pf']+=w*p;q['pa']+=w*o;q['n']+=w
+   if not name or not math.isfinite(p) or not math.isfinite(o):continue
+   q=s[name];q['pf']+=w*p;q['pa']+=w*o;q['n']+=w
    q['recent_totals'].append(game_total)
    if len(q['recent_totals'])>12:q['recent_totals'].pop(0)
+   for metric,field in (('pace',f'{side}_pace'),('off',f'{side}_off_rating'),
+                        ('def',f'{side}_def_rating'),('poss',f'{side}_possessions')):
+    value=_finite_number(r.get(field))
+    if value is not None and value>0:
+     q[metric+'_sum']+=w*value;q[metric+'_n']+=w
    if q['last'] is None or d>q['last']:q['last']=d
  return s
-def nba_predict(r,hist):
- cut=dt(r['date']) or NOW
+
+def nba_total_components(r,hist):
+ """Return score-form and independent pace/efficiency estimates for one fixture."""
+ cut=dt(r.get('date')) or NOW
  s=weights(hist,cut,half_life_days=30)
- h=s.get(r['home'],{});a=s.get(r['away'],{})
+ h=s.get(r.get('home'),{});a=s.get(r.get('away'),{})
  hp=h.get('pf',0)/max(h.get('n',1),1e-9)
  ap=a.get('pf',0)/max(a.get('n',1),1e-9)
  hd=h.get('pa',0)/max(h.get('n',1),1e-9)
  ad=a.get('pa',0)/max(a.get('n',1),1e-9)
  league_team_points=sum(x['pf'] for x in s.values())/max(sum(x['n'] for x in s.values()),1e-9)
  fallback_total=2*league_team_points if league_team_points>0 else 225.0
- hform=h.get('recent_totals') or []
- aform=a.get('recent_totals') or []
+ hform=h.get('recent_totals') or [];aform=a.get('recent_totals') or []
  h_recent=sum(hform[-12:])/len(hform[-12:]) if hform else fallback_total
  a_recent=sum(aform[-12:])/len(aform[-12:]) if aform else fallback_total
  matchup=(hp+ad+ap+hd)/2 if h.get('n',0)>0 and a.get('n',0)>0 else fallback_total
- expected_total=.5*matchup+.5*((h_recent+a_recent)/2)
- if not math.isfinite(expected_total) or expected_total<=0:expected_total=fallback_total
- home_raw=(hp+ad)/2 if h.get('n',0)>0 and a.get('n',0)>0 else expected_total/2
- away_raw=(ap+hd)/2 if h.get('n',0)>0 and a.get('n',0)>0 else expected_total/2
- hr=(cut-h['last']).total_seconds()/86400 if h.get('last') else 4
- ar=(cut-a['last']).total_seconds()/86400 if a.get('last') else 4
+ base_total=.5*matchup+.5*((h_recent+a_recent)/2)
+ def avg(team,key):
+  count=team.get(key+'_n',0)
+  return team.get(key+'_sum',0)/count if count>0 else None
+ h_pace,a_pace=avg(h,'pace'),avg(a,'pace')
+ h_off,a_off=avg(h,'off'),avg(a,'off')
+ h_def,a_def=avg(h,'def'),avg(a,'def')
+ pace_available=all(x is not None for x in (h_pace,a_pace,h_off,a_off,h_def,a_def))
+ pace_total=None;game_pace=None;home_expected_eff=None;away_expected_eff=None
+ if pace_available:
+  game_pace=(h_pace+a_pace)/2
+  home_expected_eff=(h_off+a_def)/2
+  away_expected_eff=(a_off+h_def)/2
+  if 75<=game_pace<=115 and 75<=home_expected_eff<=145 and 75<=away_expected_eff<=145:
+   pace_total=game_pace*(home_expected_eff+away_expected_eff)/100
+  else:
+   pace_available=False;game_pace=None;home_expected_eff=None;away_expected_eff=None
+ return {
+  'base_total':base_total,'pace_total':pace_total,'pace_available':bool(pace_available and pace_total is not None),
+  'game_pace':game_pace,'home_expected_off_rating':home_expected_eff,
+  'away_expected_off_rating':away_expected_eff,'fallback_total':fallback_total,
+  'rest_days':{
+   'home':(cut-h['last']).total_seconds()/86400 if h.get('last') else 4,
+   'away':(cut-a['last']).total_seconds()/86400 if a.get('last') else 4
+  },
+  'home_raw':(hp+ad)/2 if h.get('n',0)>0 and a.get('n',0)>0 else base_total/2,
+  'away_raw':(ap+hd)/2 if h.get('n',0)>0 and a.get('n',0)>0 else base_total/2,
+  'recency_half_life_days':30,'recent_team_total_window':12
+ }
+
+def nba_predict(r,hist,pace_blend_weight=0.0,bias_adjustment=0.0):
+ components=nba_total_components(r,hist)
+ try:weight=max(0.0,min(1.0,float(pace_blend_weight)))
+ except (TypeError,ValueError):weight=0.0
+ try:bias=float(bias_adjustment)
+ except (TypeError,ValueError):bias=0.0
+ if not math.isfinite(bias):bias=0.0
+ if not components['pace_available']:weight=0.0
+ base=components['base_total']
+ pace=components['pace_total'] if components['pace_available'] else base
+ expected_total=max(100.0,min(320.0,base+weight*(pace-base)-bias))
+ hr=components['rest_days']['home'];ar=components['rest_days']['away']
  rest_adj=max(-2,min(2,(hr-ar)*.35))
- margin=.58*(home_raw-away_raw)+2.5+2*rest_adj
+ margin=.58*(components['home_raw']-components['away_raw'])+2.5+2*rest_adj
  margin=max(-.8*expected_total,min(.8*expected_total,margin))
- hm=expected_total/2+margin/2
- am=expected_total/2-margin/2
+ hm=expected_total/2+margin/2;am=expected_total/2-margin/2
  p=1/(1+math.exp(-margin/7.5))
  return {
-  'moneyline':{'home':p,'away':1-p},
-  'expected_score':{'home':hm,'away':am},
-  'expected_total':expected_total,
-  'totals_model_version':NBA_TOTALS_MODEL_VERSION,
-  'rest_days':{'home':hr,'away':ar},
-  'total_model_features':{'recency_half_life_days':30,'recent_team_total_window':12,'matchup_weight':.5,'recent_team_total_weight':.5},
-  'model':'NBA totals v3: 30-day recency-weighted matchup scoring rates + 50/50 last-12 team game-total form; margin model kept separate',
+  'moneyline':{'home':p,'away':1-p},'expected_score':{'home':hm,'away':am},
+  'expected_total':expected_total,'totals_model_version':NBA_TOTALS_MODEL_VERSION,
+  'rest_days':components['rest_days'],
+  'total_model_features':{
+   'recency_half_life_days':30,'recent_team_total_window':12,
+   'pace_efficiency_available':components['pace_available'],
+   'pace_blend_weight':weight,'pace_efficiency_total':components['pace_total'],
+   'score_form_reference_total':base,'bias_correction_points':bias,
+   'game_pace':components['game_pace'],
+   'home_expected_off_rating':components['home_expected_off_rating'],
+   'away_expected_off_rating':components['away_expected_off_rating']
+  },
+  'model':'NBA totals v4: development-calibrated score-form plus team-game pace/efficiency; no bookmaker inputs',
   'paper_only':True
 }
 def current(name):
