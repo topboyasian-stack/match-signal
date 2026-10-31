@@ -61,7 +61,9 @@ class SettlementTests(unittest.TestCase):
         market = p["markets"]["total_ou"]
         audit = price_audit_fields(p, market, parse_time_for_test(p["prediction_created_at"]))
         self.assertTrue(audit["roi_eligible"])
-        self.assertTrue(audit["publication_snapshot_verified"])\n        self.assertEqual(audit["sportybet_event_id"], "sr:match:abc")\n        self.assertEqual(audit["quote_capture_basis"], "SportyBet API response observed_at")\n        self.assertEqual(audit["sportybet_event_id"], "sr:match:abc")\n        self.assertEqual(audit["quote_capture_basis"], "SportyBet API response observed_at")
+        self.assertTrue(audit["publication_snapshot_verified"])
+        self.assertEqual(audit["sportybet_event_id"], "sr:match:abc")
+        self.assertEqual(audit["quote_capture_basis"], "SportyBet API response observed_at")
 
     def test_stale_quote_not_roi_eligible(self):
         p = prediction()
