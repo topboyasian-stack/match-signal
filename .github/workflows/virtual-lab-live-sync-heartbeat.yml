@@ -102,7 +102,7 @@ jobs:
             if [ "$rc" -ne 0 ]; then
               exit "$rc"
             fi
-            git add data/virtual_lab_live.json data/system_health.json
+            git add data/virtual_lab_live.json
             git commit -m "🤖 Refresh Virtual Lab live feed"
             sleep $((attempt * 2))
           done
