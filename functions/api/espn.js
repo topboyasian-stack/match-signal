@@ -10,7 +10,7 @@ export async function onRequestGet(context){
   // Accept the event ID whether the caller supplied it beside path or inside
   // the encoded ESPN path. Normalize to one canonical query value.
   const event=String(u.searchParams.get('event')||target.searchParams.get('event')||'');
-  if(event && !/^\\d{6,12}$/.test(event)) return new Response(JSON.stringify({ok:false,error:'INVALID_ESPN_EVENT'}),{status:400,headers:corsHeaders()});
+  if(event && !/^\d{6,12}$/.test(event)) return new Response(JSON.stringify({ok:false,error:'INVALID_ESPN_EVENT'}),{status:400,headers:corsHeaders()});
   if(event) target.searchParams.set('event',event);
   if(target.pathname.endsWith('/summary')){
     target.searchParams.set('region',target.searchParams.get('region')||'us');
