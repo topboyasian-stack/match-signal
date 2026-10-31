@@ -406,7 +406,7 @@ jobs:
           echo "Immutable Cloudflare deployment URL: $deployment_url"
 
       - name: Run production HTTP and asset smoke tests
-        timeout-minutes: 3
+        timeout-minutes: 5
         env:
           CLOUDFLARE_DEPLOYMENT_URL: ${{ steps.pages-deployment.outputs.url }}
           PAGES_BUILD_ID: ${{ steps.prepare-pages.outputs.build_id }}
@@ -446,8 +446,12 @@ jobs:
           if (!currentBuilderBuildMarker || !currentBuilderCssHref || !currentBuilderEngineSrc) {
             failures.push('Checked-out Odds Builder source is missing its build marker or versioned CSS/engine reference.');
           }
+          const SMOKE_REQUEST_TIMEOUT_MS = 15000;
           async function getFrom(origin, path) {
-            const r = await fetch(origin + path + (path.includes('?') ? '&' : '?') + 'smoke=' + Date.now(), {cache:'no-store'});
+            const r = await fetch(origin + path + (path.includes('?') ? '&' : '?') + 'smoke=' + Date.now(), {
+              cache:'no-store',
+              signal: AbortSignal.timeout(SMOKE_REQUEST_TIMEOUT_MS)
+            });
             const body = await r.text();
             return {r,body};
           }
@@ -602,7 +606,7 @@ jobs:
           // Canonical route assertions: root is the only public desk entrypoint.
           for (const legacyPath of ['/index.html','/index-tight','/index-tight.html']) {
             try {
-              const rr=await fetch(base+legacyPath,{redirect:'manual',cache:'no-store'});
+              const rr=await fetch(base+legacyPath,{redirect:'manual',cache:'no-store',signal:AbortSignal.timeout(SMOKE_REQUEST_TIMEOUT_MS)});
               const location=rr.headers.get('location')||'';
               if (rr.status!==301 || !location.endsWith('/')) failures.push(legacyPath+' did not canonicalize to /');
             } catch(e) { failures.push(legacyPath+' '+e.message); }
@@ -806,7 +810,8 @@ jobs:
             const r=await fetch(base+'/api/analyst/records?smoke='+Date.now(),{
               method:'GET',
               headers:{Origin:base,Accept:'application/json'},
-              cache:'no-store'
+              cache:'no-store',
+              signal:AbortSignal.timeout(SMOKE_REQUEST_TIMEOUT_MS)
             });
             const body=await r.text();
             let payload={};
@@ -924,14 +929,15 @@ jobs:
             const r = await fetch(base + '/api/sportybet-booking', {
               method: 'OPTIONS',
               headers: { 'Origin': base, 'Access-Control-Request-Method': 'POST' },
-              cache: 'no-store'
+              cache: 'no-store',
+              signal: AbortSignal.timeout(SMOKE_REQUEST_TIMEOUT_MS)
             });
             if (r.status !== 204) failures.push('/api/sportybet-booking OPTIONS HTTP '+r.status);
             else console.log('SportyBet booking-code API route passed OPTIONS smoke test');
           } catch(e) { failures.push('/api/sportybet-booking OPTIONS '+e.message); }
 
           try {
-            const dataResp = await fetch(base + '/data/odds_builder.json?bookingSmoke=' + Date.now(), {cache:'no-store'});
+            const dataResp = await fetch(base + '/data/odds_builder.json?bookingSmoke=' + Date.now(), {cache:'no-store',signal:AbortSignal.timeout(SMOKE_REQUEST_TIMEOUT_MS)});
             if (!dataResp.ok) throw new Error('odds_builder.json HTTP '+dataResp.status);
             const data = await dataResp.json();
             const now = Date.now();
@@ -967,7 +973,8 @@ jobs:
                   method: 'POST',
                   headers: {'Content-Type':'application/json','Accept':'application/json'},
                   body: JSON.stringify({batch_id: String(batch.batch_id)}),
-                  cache: 'no-store'
+                  cache: 'no-store',
+                  signal: AbortSignal.timeout(SMOKE_REQUEST_TIMEOUT_MS)
                 });
                 const raw = await rr.text();
                 let payload = null;
