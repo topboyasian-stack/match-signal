@@ -112,6 +112,8 @@ jobs:
           nba_live = load('data/nba_live_observations.json')
           nba_totals_ledger = load('data/nba_totals_ledger.json')
           virtual_status = load('data/virtual_lab_status.json')
+          virtual_lifecycle = load('data/virtual_lab_participant_lifecycle.json')
+          virtual_model_eval = load('data/virtual_lab_model_eval.json')
           pipeline = load('data/pipeline_status.json')
           odds = load('data/odds_builder.json')
           expansion = load('data/expansion_status.json')
@@ -642,8 +644,18 @@ jobs:
           # Do not let a run stuck in GitHub's queued/in-progress state suppress
           # recovery forever. The collector's publication is the source of the
           # participant lifecycle, settlement ledger and walk-forward evaluation.
+          VIRTUAL_LAB_COLLECTOR_MAX_AGE_MINUTES = 30
           VIRTUAL_LAB_COLLECTOR_STALE_RUN_MAX_AGE_MINUTES = 25
           VIRTUAL_LAB_COLLECTOR_STALE_QUEUE_MAX_AGE_MINUTES = 10
+          virtual_participant_history_input_ages = [
+              minutes_since(virtual_lifecycle.get('generated_at') or virtual_lifecycle.get('updated_at')),
+              minutes_since(virtual_status.get('updated_at')),
+              minutes_since(virtual_model_eval.get('generated_at') or virtual_model_eval.get('updated_at')),
+          ]
+          virtual_lab_participant_history_age_minutes = round(max(
+              [age for age in virtual_participant_history_input_ages if age is not None],
+              default=999.0
+          ), 1)
           virtual_collector_runs, virtual_collector_history_error = recent_runs('virtual-lab-collector.yml', 30)
           virtual_collector_active_runs = [
               run for run in (virtual_collector_runs or [])
@@ -660,9 +672,12 @@ jobs:
               default=None
           )
           virtual_lab_collector_active_run_status = oldest_active_collector_run.get('status') if oldest_active_collector_run else None
-          virtual_lab_collector_recovery_status = 'FRESH' if virtual_status_age <= 1 else 'NOT_NEEDED'
+          virtual_lab_collector_recovery_status = (
+              'FRESH' if virtual_lab_participant_history_age_minutes <= VIRTUAL_LAB_COLLECTOR_MAX_AGE_MINUTES
+              else 'RECOVERY_REQUIRED'
+          )
 
-          if virtual_status_age > 1:
+          if virtual_lab_participant_history_age_minutes > VIRTUAL_LAB_COLLECTOR_MAX_AGE_MINUTES:
               if virtual_collector_runs is None:
                   virtual_lab_collector_recovery_status = 'HISTORY_ERROR'
                   actions.append({
@@ -730,7 +745,7 @@ jobs:
                               'action':'recover_stale_virtual_lab_collector',
                               'status':'requested' if dispatch.returncode == 0 else 'failed',
                               'detail':dispatch.stderr.strip() if dispatch.returncode else (
-                                  'Cancelled stale collector run(s) and dispatched a fresh Virtual Lab collector because participant/settlement/model artifacts are '+str(round(virtual_status_age, 2))+' hours old.'
+                                  'Cancelled stale collector run(s) and dispatched a fresh Virtual Lab collector because participant/settlement/model inputs are '+str(virtual_lab_participant_history_age_minutes)+' minutes old.'
                               )
                           })
                   elif virtual_collector_active_runs:
@@ -751,7 +766,7 @@ jobs:
                           'workflow':'virtual-lab-collector.yml',
                           'action':'dispatch',
                           'status':'requested' if dispatch.returncode == 0 else 'failed',
-                          'detail':dispatch.stderr.strip() if dispatch.returncode else 'Virtual Lab participant/settlement/model artifacts are '+str(round(virtual_status_age, 2))+' hours old; dispatched collector recovery.'
+                          'detail':dispatch.stderr.strip() if dispatch.returncode else 'Virtual Lab participant/settlement/model inputs are '+str(virtual_lab_participant_history_age_minutes)+' minutes old; dispatched collector recovery.'
                       })
 
           if expansion_age > 4 and not active('live-expansion.yml'):
@@ -937,6 +952,8 @@ jobs:
               'nba_totals_stale_run_max_age_minutes': NBA_TOTALS_LEDGER_STALE_RUN_MAX_AGE_MINUTES,
               'nba_totals_stale_queue_max_age_minutes': NBA_TOTALS_LEDGER_STALE_QUEUE_MAX_AGE_MINUTES,
               'virtual_lab_status_age_hours': round(virtual_status_age, 2),
+              'virtual_lab_participant_history_age_minutes': virtual_lab_participant_history_age_minutes,
+              'virtual_lab_collector_max_age_minutes': VIRTUAL_LAB_COLLECTOR_MAX_AGE_MINUTES,
               'virtual_lab_collector_active_run_age_minutes': virtual_lab_collector_active_run_age_minutes,
               'virtual_lab_collector_stale_run_max_age_minutes': VIRTUAL_LAB_COLLECTOR_STALE_RUN_MAX_AGE_MINUTES,
               'virtual_lab_collector_stale_queue_max_age_minutes': VIRTUAL_LAB_COLLECTOR_STALE_QUEUE_MAX_AGE_MINUTES,

@@ -74,6 +74,15 @@ class EfootballResearchRecoveryTests(unittest.TestCase):
                          "Watchdog must not overwrite the board's shared health artifact.")
 
 
+    def test_collector_recovery_uses_the_same_30_minute_participant_freshness_limit(self):
+        self.assertIn("data/virtual_lab_participant_lifecycle.json", WATCHDOG)
+        self.assertIn("data/virtual_lab_model_eval.json", WATCHDOG)
+        self.assertIn("VIRTUAL_LAB_COLLECTOR_MAX_AGE_MINUTES = 30", WATCHDOG)
+        self.assertIn("virtual_lab_participant_history_age_minutes = round(max(", WATCHDOG)
+        self.assertIn("if virtual_lab_participant_history_age_minutes > VIRTUAL_LAB_COLLECTOR_MAX_AGE_MINUTES:", WATCHDOG)
+        self.assertNotIn("if virtual_status_age > 1:", WATCHDOG,
+                         "Collector recovery must not wait an extra 30 minutes after the board marks history stale.")
+
     def test_stale_virtual_lab_collector_replaces_a_stuck_active_run(self):
         self.assertIn("VIRTUAL_LAB_COLLECTOR_STALE_RUN_MAX_AGE_MINUTES = 25", WATCHDOG)
         self.assertIn("VIRTUAL_LAB_COLLECTOR_STALE_QUEUE_MAX_AGE_MINUTES = 10", WATCHDOG)
