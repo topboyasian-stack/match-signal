@@ -168,56 +168,69 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          # Artifact generation is expensive. When unrelated automation advances main,
-          # rebase the already-generated collector commit instead of recalculating every
-          # model/profile artifact after each non-fast-forward rejection.
-          for attempt in 1 2 3 4 5; do
+          # Reconcile with latest main before every push. Do not spend two minutes
+          # pushing a 50MB snapshot that is already guaranteed to be rejected.
+          # Only regenerate the expensive research snapshot for a true same-file
+          # conflict, never for ordinary concurrent board/Builder commits.
+          stage_outputs() {
             git add data/virtual_lab_pending.json data/virtual_lab_history.json data/virtual_lab_status.json data/virtual_lab_eligibility.json data/virtual_lab_model_eval.json data/virtual_lab_participant_profiles.json data/virtual_lab_participant_h2h.json data/virtual_lab_external_h2h.json data/virtual_lab_confirmed_participant_results.json data/virtual_lab_participants/registry.json data/virtual_lab_participant_lifecycle.json data/virtual_lab_archive/settlements
+          }
 
+          regenerate_after_conflict() {
+            echo "Collector-owned files conflicted with a newer publication; rebuilding one coherent snapshot."
+            git rebase --abort || true
+            timeout --signal=TERM --kill-after=10s 45s env GIT_TERMINAL_PROMPT=0 git fetch origin main
+            git reset --hard origin/main
+            python scripts/virtual_lab_collector.py
+            python scripts/virtual_lab_model_eval.py
+            python scripts/virtual_lab_participant_profiles.py
+            python scripts/virtual_lab_h2h_enricher.py
+            python scripts/virtual_lab_confirmed_participants.py
+            python scripts/virtual_lab_eligibility.py
+            python scripts/system_health_audit.py
+            stage_outputs
+            if ! git diff --cached --quiet; then
+              git commit -m "🤖 Collect and settle Virtual Lab observations"
+            fi
+          }
+
+          for attempt in 1 2 3 4 5; do
+            stage_outputs
             if ! git diff --cached --quiet; then
               git commit -m "🤖 Collect and settle Virtual Lab observations"
             fi
 
+            if ! timeout --signal=TERM --kill-after=10s 45s env GIT_TERMINAL_PROMPT=0 git fetch origin main; then
+              echo "Could not fetch latest main before publish attempt $attempt." >&2
+              if [ "$attempt" -eq 5 ]; then exit 1; fi
+              sleep $((attempt * 2))
+              continue
+            fi
+
+            if ! git rebase origin/main; then
+              regenerate_after_conflict
+            fi
+
+            # The Unified Upcoming workflow is the canonical publisher of shared
+            # system health. Recompute it locally, but don't stage it in this commit.
+            python scripts/system_health_audit.py
+
             ahead="$(git rev-list --count origin/main..HEAD)"
             if [ "$ahead" -eq 0 ]; then
-              echo "Virtual Lab collector produced no publishable data changes."
+              echo "Virtual Lab collector artifacts already match latest main."
               exit 0
             fi
 
-            # Keep network writes non-interactive and time-bounded.
-            if timeout --signal=TERM --kill-after=10s 120s env GIT_TERMINAL_PROMPT=0 git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=30 push origin HEAD:main; then
+            # Main receives frequent independent updates. A bounded push is attempted
+            # only after fetching/rebasing; retries fetch again at the top of the loop.
+            if timeout --signal=TERM --kill-after=10s 90s env GIT_TERMINAL_PROMPT=0 git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=30 push origin HEAD:main; then
               echo "Virtual Lab collector publication succeeded on attempt $attempt."
               exit 0
             fi
 
-            if [ "$attempt" -eq 5 ]; then
-              break
-            fi
-
-            echo "Publication attempt $attempt lost a race with another main writer; rebasing the existing collector commit first."
-            sleep $((attempt * 2))
-            timeout --signal=TERM --kill-after=10s 45s env GIT_TERMINAL_PROMPT=0 git fetch origin main
-
-            if git rebase origin/main; then
-              # The Unified Upcoming workflow is the canonical publisher of
-              # shared system health. Keep it out of this collector commit so
-              # routine health writes cannot force a full model re-run.
-              python scripts/system_health_audit.py
-            else
-              # A true same-file conflict needs a fresh collector snapshot. Do this
-              # only after rebase fails, not for unrelated commits elsewhere in main.
-              echo "Collector artifact overlap detected; refreshing collector data from latest main."
-              git rebase --abort || true
-              git reset --hard origin/main
-              python scripts/virtual_lab_collector.py
-              python scripts/virtual_lab_model_eval.py
-              python scripts/virtual_lab_participant_profiles.py
-              python scripts/virtual_lab_h2h_enricher.py
-              python scripts/virtual_lab_confirmed_participants.py
-              python scripts/virtual_lab_eligibility.py
-              python scripts/system_health_audit.py
-            fi
+            echo "Publication attempt $attempt failed after a latest-main rebase; retrying without recomputing the model."
+            if [ "$attempt" -lt 5 ]; then sleep $((attempt * 2)); fi
           done
 
-          echo "Virtual Lab collector could not publish after bounded rebase attempts."
+          echo "Virtual Lab collector could not publish after five bounded latest-main retries." >&2
           exit 1
