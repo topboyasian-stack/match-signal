@@ -51,7 +51,7 @@ try {
   const externalPathResponse = await onRequestGet({ request: externalPathRequest });
   assert.equal(externalPathResponse.status, 400, "the proxy must remain restricted to ESPN");
 
-  assert.equal(upstreamRequests.length, beforeInvalid + 1, "only the valid summary request may reach ESPN");
+  assert.equal(upstreamRequests.length, beforeInvalid, "invalid IDs and external hosts must not reach ESPN");
 
   console.log("ESPN proxy regression passed: numeric summary event IDs accepted; malformed IDs and external hosts rejected.");
 } finally {
