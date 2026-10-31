@@ -1,7 +1,7 @@
 """Research-only NBA + Eredivisie expansion collector and model."""
 import csv,io,json,math
 from collections import defaultdict
-from datetime import datetime,timedelta,timezone,time as day_end_time
+from datetime import datetime,date,timedelta,timezone,time as day_end_time
 from zoneinfo import ZoneInfo
 from pathlib import Path
 import requests
@@ -163,7 +163,10 @@ def normalize_nba_duckdb_rows(rows,now=None):
   # The NBA stats catalog records a game_date, not a tip timestamp.
   # Make it available only after 23:59:59 UTC on that date to avoid
   # using any same-day game result in another pre-game forecast.
-  if stamp and isinstance(raw_date,str) and len(raw_date.strip())==10:
+  is_date_only = (
+   isinstance(raw_date,str) and len(raw_date.strip())==10
+  ) or (isinstance(raw_date,date) and not isinstance(raw_date,datetime))
+  if stamp and is_date_only:
    # game_date is defined by the NBA in US Eastern time. End the day in
    # America/New_York, then convert to UTC; midnight-UTC would leak the
    # results of late Eastern games into next-morning pregame forecasts.
