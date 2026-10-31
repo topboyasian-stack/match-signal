@@ -32,6 +32,8 @@ on:
       - 'functions/api/sportybet-virtual-results.js'
       - 'functions/api/espn.js'
       - 'scripts/test_espn_proxy.mjs'
+      - 'scripts/test_live_virtual_quote_coverage.mjs'
+      - 'scripts/test_live_virtual_quote_coverage_policy.mjs'
       - 'scripts/test_sportybet_booking_batch_ids.mjs'
       - 'match-signal-theme.css'
       - 'match-tracker.html'
@@ -81,6 +83,7 @@ on:
       - 'scripts/validate_virtual_lab_v1.py'
       - 'scripts/test_cloudflare_only_deploy.mjs'
       - 'scripts/test_live_virtual_quote_coverage.mjs'
+      - 'scripts/test_live_virtual_quote_coverage_policy.mjs'
       - '.github/workflows/cloudflare-pages.yml'
   workflow_dispatch:
 
@@ -140,7 +143,7 @@ jobs:
           changed="$(gh api "repos/${GITHUB_REPOSITORY}/compare/${BEFORE_SHA}...${PUSH_SHA}" --jq '.files[].filename')"
           test -n "$changed" || { echo "Direct promotion has no inspectable changed-file list." >&2; exit 1; }
           printf 'Direct promotion changed files:\n%s\n' "$changed"
-          allowed='|.github/workflows/nba-totals-settlement.yml|.github/workflows/nba-source-tests.yml|scripts/settle_nba_totals.py|scripts/test_settle_nba_totals.py|data/nba_totals_ledger.json|_headers|index.html|upcoming.html|qualified-best.html|qualified-best-design.css|scripts/test_qualified_best_design.mjs|functions/api/sportybet-booking.js|functions/api/odds-builder-data.js|functions/api/sportybet-virtual-results.js|functions/api/espn.js|scripts/test_espn_proxy.mjs|scripts/test_sportybet_booking_batch_ids.mjs|expansion-odds-builder.js|scripts/test_odds_builder_ui_freshness.mjs|scripts/test_desk_quote_contract.mjs|sport-hubs-design.css|scripts/test_sport_hub_design.mjs|independent-sport-design.css|scripts/test_independent_sports_design.mjs|darts.html|table-tennis.html|odds-builder.html|odds-builder-design.css|reports.html|reports-design.css|virtual-lab/index.html|virtual-lab-app.js|virtual-lab-terminal.css|scripts/test_virtual_lab_recent_performance_gate.mjs|scripts/test_workspace_terminal_design.mjs|football.html|tennis.html|basketball.html|basketball-live.js|live.html|match-signal-ip.js|api-access.html|basketball-design.css|functions/api/sportybet-basketball.js|functions/api/sportybet-basketball-booking.js|scripts/test_basketball_desk_contract.mjs|sport-hubs.css|sport-hubs.js|ms-design-system.css|core-workspaces-design.css|scripts/test_core_workspaces_design.mjs|league-logos.js|scripts/test_league_logos.mjs|workspace-ui.js|data/club-logo-registry.json|scripts/sync_club_logos.py|scripts/test_club_logo_registry.py|scripts/qualified_best_monitor.mjs|scripts/test_qualified_best_monitor.mjs|.github/workflows/qualified-best-live-monitor.yml|.github/workflows/qualified-best-watch.yml|.github/workflows/qualified-best-production-watch.yml|.github/workflows/qualified-best-health-watch-v2.yml|.github/workflows/automation_watchdog.yml|.github/workflows/efootball-market-research-schedule.yml|scripts/test_automation_watchdog_research_recovery.py|scripts/test_qualified_best_monitor.mjs|.github/workflows/unified-upcoming.yml|scripts/test_workflow_trigger_boundaries.py|scripts/test_deploy_freshness_order.py|scripts/test_prediction_desk_gates.mjs|scripts/test_efootball_market_research.py|scripts/test_deploy_freshness_order.py|scripts/test_upcoming_desk_policy.py|docs/PREDICTION_DESK_POLICY.md|scripts/ensure_odds_builder_refresh.py|scripts/test_ensure_odds_builder_refresh.py|scripts/test_cloudflare_only_deploy.mjs|scripts/test_live_virtual_quote_coverage.mjs|scripts/test_nba_live_projection.mjs|scripts/visual_site_audit.mjs|match-signal-theme.css|match-tracker.html|match-tracker-v2.html|match-tracker-v2.js|match-tracker-v3.html|'
+          allowed='|.github/workflows/nba-totals-settlement.yml|.github/workflows/nba-source-tests.yml|scripts/settle_nba_totals.py|scripts/test_settle_nba_totals.py|data/nba_totals_ledger.json|_headers|index.html|upcoming.html|qualified-best.html|qualified-best-design.css|scripts/test_qualified_best_design.mjs|functions/api/sportybet-booking.js|functions/api/odds-builder-data.js|functions/api/sportybet-virtual-results.js|functions/api/espn.js|scripts/test_espn_proxy.mjs|scripts/test_sportybet_booking_batch_ids.mjs|expansion-odds-builder.js|scripts/test_odds_builder_ui_freshness.mjs|scripts/test_desk_quote_contract.mjs|sport-hubs-design.css|scripts/test_sport_hub_design.mjs|independent-sport-design.css|scripts/test_independent_sports_design.mjs|darts.html|table-tennis.html|odds-builder.html|odds-builder-design.css|reports.html|reports-design.css|virtual-lab/index.html|virtual-lab-app.js|virtual-lab-terminal.css|scripts/test_virtual_lab_recent_performance_gate.mjs|scripts/test_workspace_terminal_design.mjs|football.html|tennis.html|basketball.html|basketball-live.js|live.html|match-signal-ip.js|api-access.html|basketball-design.css|functions/api/sportybet-basketball.js|functions/api/sportybet-basketball-booking.js|scripts/test_basketball_desk_contract.mjs|sport-hubs.css|sport-hubs.js|ms-design-system.css|core-workspaces-design.css|scripts/test_core_workspaces_design.mjs|league-logos.js|scripts/test_league_logos.mjs|workspace-ui.js|data/club-logo-registry.json|scripts/sync_club_logos.py|scripts/test_club_logo_registry.py|scripts/qualified_best_monitor.mjs|scripts/test_qualified_best_monitor.mjs|.github/workflows/qualified-best-live-monitor.yml|.github/workflows/qualified-best-watch.yml|.github/workflows/qualified-best-production-watch.yml|.github/workflows/qualified-best-health-watch-v2.yml|.github/workflows/automation_watchdog.yml|.github/workflows/efootball-market-research-schedule.yml|scripts/test_automation_watchdog_research_recovery.py|scripts/test_qualified_best_monitor.mjs|.github/workflows/unified-upcoming.yml|scripts/test_workflow_trigger_boundaries.py|scripts/test_deploy_freshness_order.py|scripts/test_prediction_desk_gates.mjs|scripts/test_efootball_market_research.py|scripts/test_deploy_freshness_order.py|scripts/test_upcoming_desk_policy.py|docs/PREDICTION_DESK_POLICY.md|scripts/ensure_odds_builder_refresh.py|scripts/test_ensure_odds_builder_refresh.py|scripts/test_cloudflare_only_deploy.mjs|scripts/test_live_virtual_quote_coverage.mjs|scripts/test_live_virtual_quote_coverage_policy.mjs|scripts/test_nba_live_projection.mjs|scripts/visual_site_audit.mjs|match-signal-theme.css|match-tracker.html|match-tracker-v2.html|match-tracker-v2.js|match-tracker-v3.html|'
           while IFS= read -r path; do
             [ -n "$path" ] || continue
             case "$path" in
@@ -367,6 +370,7 @@ jobs:
       - name: Regression-test Prediction Desk qualification and best-line selection
         run: |
           node scripts/test_espn_proxy.mjs
+          node scripts/test_live_virtual_quote_coverage_policy.mjs
           node scripts/test_prediction_desk_gates.mjs
           node scripts/test_qualified_best_design.mjs
           node scripts/test_sport_hub_design.mjs
@@ -1141,7 +1145,8 @@ jobs:
           b=Path('/tmp/booking-production-check.json')
           if b.exists():
               booking=json.loads(b.read_text())
-          coverage_complete = live.get('scan_complete') is True
+          valid_zero_coverage = live.get('no_model_qualified_candidates') is True and live.get('scan_complete') is True
+          coverage_complete = live.get('scan_complete') is True and not valid_zero_coverage
           booking_status = str(booking.get('status') or 'NOT_RECORDED')
           # A no-future-batch result means the POST path was not exercised; do not
           # count it as a passed booking check or label the full verification VERIFIED.
@@ -1151,12 +1156,17 @@ jobs:
               checks.append('booking_api_post')
           else:
               checks.append('booking_api_post_not_verified')
-          checks.append('qualified_best_shortlist' if coverage_complete else 'qualified_best_live_quote_diagnostic_incomplete')
-          verification_complete = coverage_complete and booking_verified
+          if valid_zero_coverage:
+              checks.append('qualified_best_valid_zero')
+          else:
+              checks.append('qualified_best_shortlist' if coverage_complete else 'qualified_best_live_quote_diagnostic_incomplete')
+          verification_complete = (coverage_complete or valid_zero_coverage) and booking_verified
           Path('DEPLOY-VERIFY-CLOUDFLARE.json').write_text(json.dumps({
             'status':'VERIFIED' if verification_complete else 'VERIFIED_WITH_DIAGNOSTIC_INCOMPLETE',
             'core_pages_status':'VERIFIED',
-            'qualified_best_quote_coverage_status':'COMPLETE' if coverage_complete else 'INCOMPLETE',
+            'qualified_best_quote_coverage_status':'VALID_ZERO' if valid_zero_coverage else 'COMPLETE' if coverage_complete else 'INCOMPLETE',
+            'qualified_best_candidate_pool_rows':live.get('candidate_pool_rows_in_next_7_days',0),
+            'qualified_best_model_qualified_rows':live.get('model_qualified_candidate_rows_in_next_7_days',live.get('virtual_candidate_rows_in_next_7_days',0)),
             'booking_api_status':'VERIFIED' if booking_verified else booking_status,
             'provider':'Cloudflare Pages',
             'source_commit':os.environ['DEPLOY_SOURCE_COMMIT'],
