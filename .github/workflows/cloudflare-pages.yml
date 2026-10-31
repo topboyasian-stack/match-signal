@@ -289,6 +289,24 @@ jobs:
           rm -rf .pages-deploy
           mkdir -p .pages-deploy
           rsync -a             --exclude='.git/'             --exclude='.pages-deploy/'             --exclude='node_modules/'             --exclude='data/virtual_lab_history.json'             --exclude='data/efootball_desk_prediction_history.json'             --exclude='data/efootball_desk_settled_observations.json'             ./ .pages-deploy/
+          # Cloudflare Pages rejects any single file at or above 25 MiB. Keep
+          # the canonical JSON in Git readable if needed, but always minify the
+          # deployment copy of the unified board before the provider size check.
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          path=Path('.pages-deploy/data/unified_upcoming.json')
+          if not path.is_file():
+              raise SystemExit('Missing unified Upcoming board in Pages staging directory.')
+          source_bytes=path.stat().st_size
+          payload=json.loads(path.read_text(encoding='utf-8'))
+          path.write_text(json.dumps(payload,ensure_ascii=False,separators=(',',':'))+'\\n',encoding='utf-8')
+          deployed_bytes=path.stat().st_size
+          limit=int(os.environ['MAX_PAGES_FILE_BYTES'])
+          print(f'Unified Upcoming board: {source_bytes} bytes source -> {deployed_bytes} bytes minified.')
+          if deployed_bytes >= limit:
+              raise SystemExit(f'Minified unified Upcoming board still exceeds the Pages per-file limit ({deployed_bytes} >= {limit}).')
+          PY
           build_tag="$(date -u +%Y%m%d)-${SOURCE_SHA:0:12}"
           build_id="MS-UNIFIED-${build_tag}"
           BUILD_ID="$build_id" BUILD_TAG="$build_tag" python - <<'PY'
