@@ -396,7 +396,7 @@ separate confidence/qualification threshold.
     snapshot = json.loads(json.dumps(prediction))
     snapshot["published_at"] = published_at.isoformat()
     snapshot["publication_snapshot_verified"] = True
-    snapshot["publication_snapshot_kind"] = "first_price_auditable_pre_match_nba_total"
+    snapshot["publication_snapshot_kind"] = "immutable_sportybet_market_225_revision"
     identity = "|".join([
         str(snapshot.get("event_id") or ""), snapshot["published_at"],
         str(line), str(market.get("pick") or "no_clear_lean"), str(market.get("quote_timestamp")),
@@ -408,7 +408,12 @@ separate confidence/qualification threshold.
 
 
 def append_nba_totals_publication_snapshots(predictions, path=None, published_at=None):
-    """Append one immutable, first-qualified snapshot per event; never overwrite prior picks."""
+    """Append each distinct forecast/price state without mutating prior evidence.
+
+    Repeated polling of the same model version, line, side and price pair is
+    deduplicated. A changed market line/price or a new model forecast revision
+    is saved as a separate immutable snapshot for the same fixture.
+    """
     path = Path(path) if path else NBA_TOTAL_SNAPSHOTS
     path.parent.mkdir(parents=True, exist_ok=True)
     try:
@@ -417,20 +422,30 @@ def append_nba_totals_publication_snapshots(predictions, path=None, published_at
             existing = []
     except (OSError, json.JSONDecodeError):
         existing = []
-    # A new model version must start its own immutable cohort for the same
-    # future fixture. Deduplicate only within (event_id, model_version).
-    def cohort_key(row):
+
+    def revision_key(row):
+        market = ((row.get("markets") or {}).get("total_ou") or {})
         return (
             str(row.get("event_id") or ""),
             str(row.get("totals_model_version") or "legacy"),
+            str(row.get("generated_at") or row.get("prediction_created_at") or ""),
+            str(market.get("line") or ""),
+            str(market.get("pick") or "no_clear_lean"),
+            str(market.get("over_odds") or ""),
+            str(market.get("under_odds") or ""),
         )
-    known = {cohort_key(row) for row in existing if isinstance(row, dict) and row.get("event_id")}
+
+    known = {
+        revision_key(row) for row in existing
+        if isinstance(row, dict) and row.get("event_id")
+    }
     added = 0
     for prediction in predictions:
-        event_id = str(prediction.get("event_id") or "")
-        if not event_id:
+        if not isinstance(prediction, dict) or not prediction.get("event_id"):
             continue
-        key = cohort_key(prediction)
+        # The candidate's line and both prices are validated again by
+        # nba_total_publication_snapshot before they enter the immutable archive.
+        key = revision_key(prediction)
         if key in known:
             continue
         snapshot = nba_total_publication_snapshot(prediction, published_at)
