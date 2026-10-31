@@ -467,5 +467,11 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertNotIn("gh workflow run cloudflare-pages.yml", BOARD_WORKFLOW)
 
 
+
+    def test_unified_board_publish_push_is_bounded(self):
+        source = (ROOT / ".github/workflows/unified-upcoming.yml").read_text(encoding="utf-8")
+        self.assertIn("timeout 60s git push origin main", source)
+        self.assertIn("GIT_TERMINAL_PROMPT=0", source)
+
 if __name__ == "__main__":
     unittest.main()

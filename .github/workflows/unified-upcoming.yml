@@ -225,13 +225,14 @@ jobs:
           print(d.get('generated_at') or d.get('updated_at') or '')
           PY
           )"
+          export GIT_TERMINAL_PROMPT=0
           for attempt in 1 2 3 4 5 6; do
-            if git push origin main; then
+            if timeout 60s git push origin main; then
               echo "Unified board published; the refreshed Builder will hand off to the ordered production-promotion workflow."
               exit 0
             fi
 
-            echo "main advanced during publication attempt ${attempt}; fetching the current head."
+            echo "Unified board push attempt ${attempt} failed or timed out; fetching the current head."
             git fetch origin main
             # First try to replay the generated artifact commit on the new head.
             # If the same generated files changed remotely, abort and rebuild from
