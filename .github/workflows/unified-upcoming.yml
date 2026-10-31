@@ -228,7 +228,7 @@ jobs:
           )"
           export GIT_TERMINAL_PROMPT=0
           for attempt in 1 2 3 4 5 6; do
-            if timeout 60s git push origin main; then
+            if timeout 12s git push origin main; then
               echo "Unified board published; the refreshed Builder will hand off to the ordered production-promotion workflow."
               exit 0
             fi
@@ -240,7 +240,7 @@ jobs:
             # the current main rather than overwriting newer results or histories.
             if git rebase origin/main; then
               echo "Rebased generated board commit onto current main."
-              sleep $((attempt * 4))
+              sleep 2
               continue
             fi
 
@@ -279,7 +279,7 @@ jobs:
               exit 0
             fi
             git commit -m "🤖 Refresh unified upcoming board"
-            sleep $((attempt * 4))
+            sleep 2
           done
           echo "Failed to publish generated Prediction Desk data after six synchronized attempts."
           exit 1
