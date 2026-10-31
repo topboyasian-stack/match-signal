@@ -222,16 +222,28 @@ def publication_capture_metrics(snapshots, predictions=None):
 
     picks = [row for row in valid if str(((row.get("markets") or {}).get("total_ou") or {}).get("pick") or "").lower() in {"over", "under"}]
     no_lean = [row for row in valid if str(((row.get("markets") or {}).get("total_ou") or {}).get("pick") or "").lower() not in {"over", "under"}]
+    unpriced = max(0, len(predictions) - len(attached))
+    unmatched = max(0, len(attached) - len(valid))
+    coverage = round(len(valid) / len(predictions), 4) if predictions else None
+    if not predictions:
+        status = "NO_CURRENT_MODEL_PREDICTIONS"
+    elif len(valid) >= len(predictions) and unmatched == 0:
+        status = "CAPTURED"
+    elif valid:
+        status = "PARTIAL"
+    else:
+        status = "AWAITING_FRESH_MARKET_225_QUOTES"
     return {
         "model_version": NBA_TOTALS_MODEL_VERSION,
         "model_predictions": len(predictions),
         "predictions_with_fresh_sportybet_market_225_pair": len(attached),
         "immutable_fresh_publication_snapshots": len(valid),
+        "snapshot_coverage": coverage,
         "directional_pick_snapshots": len(picks),
         "no_clear_lean_snapshots": len(no_lean),
-        "unpriced_or_unavailable_prediction_count": max(0, len(predictions) - len(attached)),
-        "unmatched_fresh_market_predictions": max(0, len(attached) - len(valid)),
-        "capture_status": "CAPTURED" if valid else "AWAITING_FRESH_MARKET_225_QUOTES",
+        "unpriced_or_unavailable_prediction_count": unpriced,
+        "unmatched_fresh_market_predictions": unmatched,
+        "capture_status": status,
     }
 
 
