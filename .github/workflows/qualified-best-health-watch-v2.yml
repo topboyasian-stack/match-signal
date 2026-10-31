@@ -6,10 +6,13 @@ on:
     # Re-register the monitor cadence after repeated missing scheduled executions.
     - cron: '2,12,22,32,42,52 * * * *'
   workflow_dispatch:
+  workflow_run:
+    workflows:
+      - "Deploy Match Signal to Cloudflare Pages"
+    types: [completed]
   push:
     branches: [main]
     paths:
-      - '.github/workflows/qualified-best-health-watch-v2.yml'
       - 'scripts/qualified_best_monitor.mjs'
       - 'scripts/test_qualified_best_monitor.mjs'
 
@@ -23,6 +26,7 @@ concurrency:
 
 jobs:
   production-monitor:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
