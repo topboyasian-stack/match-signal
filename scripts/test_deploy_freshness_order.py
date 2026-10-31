@@ -138,7 +138,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertNotIn("8,18,28,38,48,58 * * * *", crons, "cron must change to re-arm the missing scheduled watchdog")
         self.assertIn("UNIFIED_UPCOMING_MAX_AGE_MINUTES = 15", WATCHDOG_WORKFLOW)
         self.assertIn("UNIFIED_UPCOMING_DISPATCH_COOLDOWN_MINUTES = 10", WATCHDOG_WORKFLOW)
-        self.assertIn("UNIFIED_UPCOMING_STALE_RUN_MAX_AGE_MINUTES = 20", WATCHDOG_WORKFLOW)
+        self.assertIn("UNIFIED_UPCOMING_STALE_RUN_MAX_AGE_MINUTES = 40", WATCHDOG_WORKFLOW)
         self.assertIn("unified_upcoming_refresh_status", WATCHDOG_WORKFLOW)
         self.assertNotIn("if unified_age > 0.2 and not active('unified-upcoming.yml'):", WATCHDOG_WORKFLOW)
         self.assertIn("'unified_upcoming_hours': 0.2", WATCHDOG_WORKFLOW)
