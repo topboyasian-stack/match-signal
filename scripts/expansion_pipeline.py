@@ -11,6 +11,7 @@ BASE='https://site.api.espn.com/apis/site/v2/sports'; NOW=datetime.now(timezone.
 S=requests.Session();S.headers.update({'User-Agent':'Mozilla/5.0 (compatible; MatchSignal/1.0)'})
 NBA_START=datetime(2026,10,20,tzinfo=timezone.utc)
 NBA_TOTALS_MODEL_VERSION="nba-total-v5-pace-efficiency-calibrated"
+NBA_TOTALS_MODEL_LABEL="NBA totals v5: development-calibrated score-form plus team-game pace/efficiency; no bookmaker inputs"
 NBA_PARQUET='https://raw.githubusercontent.com/llimllib/nba_data/main/data/gamelogs.parquet'
 NBA_DUCKDB_CATALOG='https://basketball-data.billmill.org/nba/nba.duckdb'
 NBA_ELO_CSV='https://datahub.io/fivethirtyeight/nba-elo/_r/-/data/nbaallelo.csv'
@@ -396,7 +397,7 @@ def nba_predict(r,hist,pace_blend_weight=0.0,bias_adjustment=0.0):
    'home_expected_off_rating':components['home_expected_off_rating'],
    'away_expected_off_rating':components['away_expected_off_rating']
   },
-  'model':'NBA totals v5: development-calibrated score-form plus team-game pace/efficiency; no bookmaker inputs',
+  'model':NBA_TOTALS_MODEL_LABEL,
   'paper_only':True
 }
 def current(name):
