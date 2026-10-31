@@ -9,6 +9,14 @@ on:
       - 'scripts/test_nba_live_totals_walk_forward.py'
       - 'data/nba_predictions.json'
       - '.github/workflows/nba-live-observation.yml'
+  workflow_run:
+    # Automated data commits use GITHUB_TOKEN and do not reliably wake downstream workflows.
+    # Record live state after each successful NBA model/price refresh as well as on the 5-minute schedule.
+    workflows:
+      - "Match Signal Live Expansion"
+      - "NBA totals SportyBet market-225 price capture"
+      - "NBA totals settlement ledger"
+    types: [completed]
   schedule:
     # GitHub cron has a five-minute minimum; record live state repeatedly during game windows.
     - cron: '*/5 * * * *'
@@ -48,7 +56,7 @@ jobs:
           python scripts/test_nba_live_totals_walk_forward.py
 
   record:
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 4
     steps:
