@@ -1,5 +1,5 @@
 import unittest
-from settle_nba_totals import result_for, price_audit_fields, candidate_key, ledger_key
+from settle_nba_totals import result_for, price_audit_fields, candidate_key, ledger_key, select_settlement_snapshot
 
 def prediction(**overrides):
     p = {"event_id":"abc","start_time":"2026-10-25T20:00:00+00:00",
@@ -113,6 +113,43 @@ class SettlementTests(unittest.TestCase):
         audit = price_audit_fields(p, p["markets"]["total_ou"], parse_time_for_test(p["prediction_created_at"]))
         self.assertFalse(audit["roi_eligible"])
         self.assertIn("missing_exact_sportybet_event_id", audit["roi_ineligibility_reasons"])
+
+
+
+    def test_first_directional_snapshot_is_selected_after_neutral_revisions(self):
+        neutral = prediction()
+        neutral["published_at"] = "2026-10-25T18:50:00+00:00"
+        neutral["publication_snapshot_id"] = "neutral-1"
+        neutral["publication_snapshot_verified"] = True
+        neutral["markets"]["total_ou"]["pick"] = None
+        neutral["markets"]["total_ou"]["line"] = 221.5
+
+        first_directional = prediction()
+        first_directional["published_at"] = "2026-10-25T19:00:00+00:00"
+        first_directional["publication_snapshot_id"] = "under-1"
+        first_directional["publication_snapshot_verified"] = True
+        first_directional["markets"]["total_ou"].update({"pick": "under", "line": 220.5})
+
+        later_directional = prediction()
+        later_directional["published_at"] = "2026-10-25T19:15:00+00:00"
+        later_directional["publication_snapshot_id"] = "over-2"
+        later_directional["publication_snapshot_verified"] = True
+        later_directional["markets"]["total_ou"].update({"pick": "over", "line": 224.5})
+
+        chosen = select_settlement_snapshot([neutral, later_directional, first_directional])
+        self.assertEqual(chosen["publication_snapshot_id"], "under-1")
+        self.assertEqual(chosen["markets"]["total_ou"]["pick"], "under")
+
+    def test_all_neutral_snapshots_remain_non_directional(self):
+        first = prediction()
+        first["published_at"] = "2026-10-25T18:50:00+00:00"
+        first["publication_snapshot_id"] = "neutral-first"
+        first["markets"]["total_ou"]["pick"] = None
+        second = prediction()
+        second["published_at"] = "2026-10-25T19:00:00+00:00"
+        second["publication_snapshot_id"] = "neutral-second"
+        second["markets"]["total_ou"]["pick"] = None
+        self.assertEqual(select_settlement_snapshot([second, first])["publication_snapshot_id"], "neutral-first")
 
 
     def test_same_fixture_can_settle_separate_model_versions(self):
