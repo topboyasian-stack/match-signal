@@ -16,6 +16,7 @@ assert.match(qualifiedHtml, /MS-UNIFIED-2026\.10\.13\.5-DESIGN-PILOT2/, "Qualifi
 assert.match(qualifiedHtml, /qualified-best-design\.css\?v=20261013-premium-terminal2/, "Qualified Best must load the versioned stylesheet");
 assert.match(qualifiedHtml, /id="qualifiedBestBoard"/, "the live qualified board mount must remain intact");
 assert.match(qualifiedHtml, /id="qualifiedBestLastSeenBoard"/, "the not-current archive mount must remain intact");
+assert.doesNotMatch(qualifiedHtml, /\\\\n/, "HTML must not contain literal \\n text between markup tags");
 assert.match(css, /body\[data-page="qualified-best"\]/, "all page visuals must target Qualified Best");
 assert.match(css, /\.ms-qualified-best-row/, "current qualified picks need dedicated styling");
 assert.match(css, /\.ms-qualified-best-lastseen-row/, "last-seen rows need separate styling");
