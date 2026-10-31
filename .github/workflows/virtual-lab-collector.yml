@@ -35,8 +35,9 @@ permissions:
 
 concurrency:
   group: match-signal-virtual-lab-collector
-  # A newer fixed collector run must replace an obsolete publish/retry loop.
-  cancel-in-progress: true
+  # The full capture + strict chronological evaluation can take about 12 minutes.
+  # Let the active run publish; the newest pending heartbeat can follow without cancelling it.
+  cancel-in-progress: false
 
 jobs:
   collect:
