@@ -8,10 +8,10 @@ const [html, css, ui, api, workflow, booking, recorder, nbaRecorderWorkflow] = a
 ]);
 assert.ok(html.includes("MS-BASKETBALL-DESK-2026.10.24-V11"), "Basketball must publish the new design marker");
 assert.ok(html.includes("core-workspaces-design.css?v=20261014-full-v1"), "Basketball must use the shared Match Signal design layer");
-assert.ok(html.includes("basketball-live.js?v=20261031-nba-live-freshness-v13"), "Basketball must cache-bust the visible booking error/retry logic");
+assert.ok(html.includes("basketball-live.js?v=20261031-nba-live-freshness-v14"), "Basketball must cache-bust the visible booking error/retry logic");
 assert.ok(html.includes("basketball-design.css?v=20261024-builder-dark-v3"), "Basketball must load its latest contrast-corrected scoped design layer");
 assert.ok(workflow.includes("MS-BASKETBALL-DESK-2026.10.24-V11") && workflow.includes("basketball-design.css?v=20261024-builder-dark-v3"), "Pages production smoke markers must match the current Basketball page and CSS versions");
-assert.ok(workflow.includes("basketball-live.js?v=20261031-nba-live-freshness-v13"), "Pages smoke tests must track the latest NBA live desk release-gate asset");
+assert.ok(workflow.includes("basketball-live.js?v=20261031-nba-live-freshness-v14"), "Pages smoke tests must track the latest NBA live desk release-gate asset");
 assert.ok(html.includes('id="msNav"') && html.includes('workspace-ui.js?v=20261023-basketball-nav1'), "Basketball must use the single shared site navigation");
 for (const id of ["liveGames","upcomingGames","totalsBoard","finalResults","nbaTotalsLedger","performance","marketStatus","totalsStatus"]) assert.ok(html.includes('id="'+id+'"'), "Basketball must preserve renderer mount "+id);
 assert.ok(css.includes("MATCH-SIGNAL-BASKETBALL-DESK-V1"), "Basketball scoped design marker missing");
@@ -60,7 +60,7 @@ assert.ok(ui.includes("nba_live_current.json") && ui.includes("live_total_projec
 assert.ok(ui.includes("/apis/site/v2/sports/basketball/nba/summary") && ui.includes("./api/espn?path=") && ui.includes("await refreshLiveObservations();") && ui.includes("},45000)"), "Live desk must refresh current ESPN summaries after scoreboard updates on the 45-second browser cycle.");
 assert.ok(ui.includes("function liveTotalProjection") && ui.includes("OVERTIME_CONTEXT_ONLY") && ui.includes("At least six minutes of game time"), "Live NBA projections must require a meaningful sample and withhold regulation estimates during overtime.");
 assert.ok(ui.includes("publication_snapshot_verified===true") && ui.includes("roi_eligible===true") && ui.includes("quote_fresh_at_publication===true") && ui.includes("Legacy result-only accuracy"), "Legacy NBA total outcomes must remain separate from verified snapshot accuracy and ROI.");
-assert.ok(ui.includes("function nbaTotalsReleaseQualified(oos)") && ui.includes('["QUALIFIED","APPROVED"].includes(decision)') && ui.includes("roi>0") && ui.includes("delta>=0"), "NBA totals must require an approved, positive strict holdout that is not worse than the market.");
+assert.ok(ui.includes("function nbaTotalsReleaseQualified(evidence)") && ui.includes("nba_totals_oos_value_test.json") && ui.includes("NBA_TOTALS_WALK_FORWARD_V1") && ui.includes("roi_ci95_lower") && ui.includes("roi_vs_market_favorite") && !ui.includes("nba_oos_value_test.json"), "NBA totals must use totals-only, version-matched walk-forward evidence with a positive 95% ROI lower bound.");
 assert.ok(ui.includes("function nbaTotalRowQualified(prediction,oos)") && ui.includes('status==="BETTING_QUALIFIED"'), "Each NBA totals selection must be explicitly betting-qualified after the global release gate.");
 assert.ok(ui.includes("lean=qualified&&edge!=null") && ui.includes("RESEARCH ONLY · NO BETTING LEAN"), "Unreleased NBA model projections must never be rendered as Over/Under betting leans.");
 assert.ok(ui.includes("canAdd=!!(qualified&&fresh") && ui.includes("!nbaTotalsReleaseQualified(S.oos)"), "NBA SportyBet builders must remain unavailable until both release and per-row qualification pass.");
