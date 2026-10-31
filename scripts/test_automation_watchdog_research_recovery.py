@@ -31,6 +31,12 @@ class EfootballResearchRecoveryTests(unittest.TestCase):
         self.assertIn("cron: '7,17,27,37,47,57 * * * *'", (ROOT / ".github/workflows/qualified-best-health-watch-v2.yml").read_text(encoding="utf-8"))
         self.assertIn("cron: '9,24,39,54 * * * *'", RESEARCH)
 
+    def test_research_archive_publish_retries_are_bounded(self):
+        self.assertIn("for attempt in $(seq 1 6); do", RESEARCH)
+        self.assertIn("timeout 10s git push origin main", RESEARCH)
+        self.assertIn("sleep 2", RESEARCH)
+        self.assertIn("no force-push was used", RESEARCH)
+
     def test_research_workflow_is_monitored_separately(self):
         self.assertIn("Isolated eFootball Winner and BTTS Market Research", WATCHDOG)
         self.assertIn('"Match Signal Virtual Lab Collector"', RESEARCH,
