@@ -512,9 +512,107 @@ jobs:
                   'detail':research_detail
               })
 
-          if virtual_status_age > 1 and not active('virtual-lab-collector.yml'):
-              r = subprocess.run(['gh', 'workflow', 'run', 'virtual-lab-collector.yml', '--ref', 'main'], text=True, capture_output=True)
-              actions.append({'workflow':'virtual-lab-collector.yml','action':'dispatch','status':'requested' if r.returncode == 0 else 'failed','detail':(r.stderr.strip() if r.returncode else 'Virtual Lab research-ledger self-heal')})
+          # Do not let a run stuck in GitHub's queued/in-progress state suppress
+          # recovery forever. The collector's publication is the source of the
+          # participant lifecycle, settlement ledger and walk-forward evaluation.
+          VIRTUAL_LAB_COLLECTOR_STALE_RUN_MAX_AGE_MINUTES = 45
+          virtual_collector_runs, virtual_collector_history_error = recent_runs('virtual-lab-collector.yml', 30)
+          virtual_collector_active_runs = [
+              run for run in (virtual_collector_runs or [])
+              if run.get('status') in {'queued', 'in_progress', 'waiting', 'pending'}
+          ]
+          virtual_lab_collector_active_run_age_minutes = max(
+              [minutes_since(run.get('createdAt')) for run in virtual_collector_active_runs
+               if minutes_since(run.get('createdAt')) is not None],
+              default=None
+          )
+          virtual_lab_collector_recovery_status = 'FRESH' if virtual_status_age <= 1 else 'NOT_NEEDED'
+
+          if virtual_status_age > 1:
+              if virtual_collector_runs is None:
+                  virtual_lab_collector_recovery_status = 'HISTORY_ERROR'
+                  actions.append({
+                      'workflow':'virtual-lab-collector.yml',
+                      'action':'inspect_stale_virtual_lab_collector',
+                      'status':'failed',
+                      'detail':virtual_collector_history_error
+                  })
+              else:
+                  stale_virtual_collector_runs = [
+                      run for run in virtual_collector_active_runs
+                      if minutes_since(run.get('createdAt')) is not None
+                      and minutes_since(run.get('createdAt')) > VIRTUAL_LAB_COLLECTOR_STALE_RUN_MAX_AGE_MINUTES
+                  ]
+                  if stale_virtual_collector_runs:
+                      cancel_failures = []
+                      for run in stale_virtual_collector_runs:
+                          run_id = run.get('databaseId')
+                          if not run_id:
+                              cancel_failures.append('stale collector run has no database ID')
+                              continue
+                          cancel = subprocess.run(
+                              ['gh', 'run', 'cancel', str(run_id)],
+                              text=True, capture_output=True
+                          )
+                          if cancel.returncode != 0:
+                              cancel_failures.append(cancel.stderr.strip() or ('could not cancel collector run '+str(run_id)))
+                          else:
+                              actions.append({
+                                  'workflow':'virtual-lab-collector.yml',
+                                  'action':'cancel_stale_virtual_lab_collector_run',
+                                  'status':'requested',
+                                  'detail':'Cancelled stale collector run '+str(run_id)+' after '+str(minutes_since(run.get('createdAt')))+' minutes.'
+                              })
+                      if cancel_failures:
+                          virtual_lab_collector_recovery_status = 'CANCEL_FAILED'
+                          actions.append({
+                              'workflow':'virtual-lab-collector.yml',
+                              'action':'recover_stale_virtual_lab_collector',
+                              'status':'failed',
+                              'detail':'; '.join(cancel_failures)
+                          })
+                      elif any(run not in stale_virtual_collector_runs for run in virtual_collector_active_runs):
+                          virtual_lab_collector_recovery_status = 'NEWER_RUN_ACTIVE'
+                          actions.append({
+                              'workflow':'virtual-lab-collector.yml',
+                              'action':'recover_stale_virtual_lab_collector',
+                              'status':'suppressed_active_run',
+                              'detail':'Cancelled stale collector run(s); a newer collector run is still active.'
+                          })
+                      else:
+                          dispatch = subprocess.run(
+                              ['gh', 'workflow', 'run', 'virtual-lab-collector.yml', '--ref', 'main'],
+                              text=True, capture_output=True
+                          )
+                          virtual_lab_collector_recovery_status = 'DISPATCHED' if dispatch.returncode == 0 else 'DISPATCH_FAILED'
+                          actions.append({
+                              'workflow':'virtual-lab-collector.yml',
+                              'action':'recover_stale_virtual_lab_collector',
+                              'status':'requested' if dispatch.returncode == 0 else 'failed',
+                              'detail':dispatch.stderr.strip() if dispatch.returncode else (
+                                  'Cancelled stale collector run(s) and dispatched a fresh Virtual Lab collector because participant/settlement/model artifacts are '+str(round(virtual_status_age, 2))+' hours old.'
+                              )
+                          })
+                  elif virtual_collector_active_runs:
+                      virtual_lab_collector_recovery_status = 'SUPPRESSED_ACTIVE_RUN'
+                      actions.append({
+                          'workflow':'virtual-lab-collector.yml',
+                          'action':'recover_stale_virtual_lab_collector',
+                          'status':'suppressed_active_run',
+                          'detail':'Collector artifacts are '+str(round(virtual_status_age, 2))+' hours old; newest active run is '+str(virtual_lab_collector_active_run_age_minutes)+' minute(s) old and has not exceeded the '+str(VIRTUAL_LAB_COLLECTOR_STALE_RUN_MAX_AGE_MINUTES)+'-minute recovery limit.'
+                      })
+                  else:
+                      dispatch = subprocess.run(
+                          ['gh', 'workflow', 'run', 'virtual-lab-collector.yml', '--ref', 'main'],
+                          text=True, capture_output=True
+                      )
+                      virtual_lab_collector_recovery_status = 'DISPATCHED' if dispatch.returncode == 0 else 'DISPATCH_FAILED'
+                      actions.append({
+                          'workflow':'virtual-lab-collector.yml',
+                          'action':'dispatch',
+                          'status':'requested' if dispatch.returncode == 0 else 'failed',
+                          'detail':dispatch.stderr.strip() if dispatch.returncode else 'Virtual Lab participant/settlement/model artifacts are '+str(round(virtual_status_age, 2))+' hours old; dispatched collector recovery.'
+                      })
 
           if expansion_age > 4 and not active('live-expansion.yml'):
               r = subprocess.run(['gh', 'workflow', 'run', 'live-expansion.yml', '--ref', 'main'], text=True, capture_output=True)
@@ -690,6 +788,9 @@ jobs:
               'nba_live_observation_age_minutes': nba_live_age_minutes,
               'nba_live_observation_dispatch_age_minutes': nba_live_dispatch_age,
               'virtual_lab_status_age_hours': round(virtual_status_age, 2),
+              'virtual_lab_collector_active_run_age_minutes': virtual_lab_collector_active_run_age_minutes,
+              'virtual_lab_collector_stale_run_max_age_minutes': VIRTUAL_LAB_COLLECTOR_STALE_RUN_MAX_AGE_MINUTES,
+              'virtual_lab_collector_recovery_status': virtual_lab_collector_recovery_status,
               'darts_age_hours': round(darts_age, 2),
               'table_tennis_age_hours': round(table_tennis_age, 2),
               'unified_upcoming_age_hours': round(unified_age, 2),
@@ -719,7 +820,7 @@ jobs:
               'virtual_lab_products': virtual.get('product_counts', {}),
               'thresholds': {'pipeline_hours': 4, 'odds_builder_minutes': ODDS_BUILDER_MAX_AGE_MINUTES, 'expansion_hours': 4, 'virtual_lab_hours': 1, 'virtual_lab_status_hours': 1, 'darts_hours': 2, 'table_tennis_hours': 2, 'unified_upcoming_hours': 0.2, 'qualified_best_monitor_minutes': 15, 'virtual_live_minutes': VIRTUAL_LIVE_MAX_AGE_MINUTES, 'nba_live_observation_minutes': NBA_LIVE_MAX_AGE_MINUTES, 'live_feed_dispatch_cooldown_minutes': LIVE_FEED_DISPATCH_COOLDOWN_MINUTES, 'efootball_market_research_minutes': EFOOTBALL_RESEARCH_MAX_AGE_MINUTES, 'efootball_market_research_dispatch_cooldown_minutes': EFOOTBALL_RESEARCH_DISPATCH_COOLDOWN_MINUTES},
               'actions': actions,
-              'policy': 'Watchdog self-heals stale engines, records Qualified Best scheduled/actual monitor age, dispatches a fallback when the scheduled monitor is missing/stale even if deployment checks are recent (10-minute cooldown), retries failed board/deploy runs once per 20-minute cooldown, and dispatches isolated eFootball winner/GG-NG research when its market archive or collector capture is over 30 minutes stale (15-minute cooldown). The eFootball research workflow is shadow-only and never gates Qualified Best or Odds Builder. Stale Virtual Lab live snapshots and NBA in-game observation heartbeats trigger bounded fallback dispatches. Successful NBA recorder and Odds Builder completions provide an event-driven watchdog heartbeat when cron delivery stalls. Workflow_run checks do not rewrite feed data to avoid downstream loops. Health publication is retried across concurrent data writers.'
+              'policy': 'Watchdog self-heals stale engines, records Qualified Best scheduled/actual monitor age, dispatches a fallback when the scheduled monitor is missing/stale even if deployment checks are recent (10-minute cooldown), retries failed board/deploy runs once per 20-minute cooldown, and dispatches isolated eFootball winner/GG-NG research when its market archive or collector capture is over 30 minutes stale (15-minute cooldown). The eFootball research workflow is shadow-only and never gates Qualified Best or Odds Builder. Stale Virtual Lab participant/settlement/model artifacts trigger collector recovery even when a queued/in-progress run is stuck (cancel after 45 minutes); live snapshots and NBA in-game observation heartbeats trigger bounded fallback dispatches. Successful NBA recorder and Odds Builder completions provide an event-driven watchdog heartbeat when cron delivery stalls. Workflow_run checks do not rewrite feed data to avoid downstream loops. Health publication is retried across concurrent data writers.'
           }
           Path('data/automation_health.json').write_text(json.dumps(health, indent=2) + '\n')
           print(json.dumps(health, indent=2))
