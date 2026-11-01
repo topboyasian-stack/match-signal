@@ -279,5 +279,53 @@ class CompetitionSafeFootballMarketTests(unittest.TestCase):
         self.assertEqual(row["calibration"]["temperature"], 1.1)
 
 
+
+class FuturePrematchFilterTests(unittest.TestCase):
+    def setUp(self):
+        self.now = datetime(2026, 11, 1, 12, 0, tzinfo=timezone.utc)
+
+    def event(self, start, *, state="pre", completed=False, name="STATUS_SCHEDULED"):
+        return {
+            "id": "fixture-1",
+            "date": start,
+            "status": {"type": {"state": state, "completed": completed, "name": name}},
+        }
+
+    def test_future_scheduled_fixture_is_allowed(self):
+        self.assertTrue(predict_today.is_future_prematch_event(
+            self.event("2026-11-01T12:05:00Z"), now=self.now
+        ))
+
+    def test_already_started_time_is_rejected_even_if_provider_says_pre(self):
+        # Regression for a Basel final that remained in the provider's pre-match
+        # date board after its scheduled 14:30 UTC start.
+        self.assertFalse(predict_today.is_future_prematch_event(
+            self.event("2026-11-01T11:59:00Z"), now=self.now
+        ))
+
+    def test_near_kickoff_is_held_out_of_upcoming(self):
+        self.assertFalse(predict_today.is_future_prematch_event(
+            self.event("2026-11-01T12:01:00Z"), now=self.now
+        ))
+
+    def test_live_and_completed_statuses_are_rejected(self):
+        self.assertFalse(predict_today.is_future_prematch_event(
+            self.event("2026-11-01T13:00:00Z", state="in", name="STATUS_IN_PROGRESS"),
+            now=self.now,
+        ))
+        self.assertFalse(predict_today.is_future_prematch_event(
+            self.event("2026-11-01T13:00:00Z", completed=True, state="post", name="STATUS_FINAL"),
+            now=self.now,
+        ))
+
+    def test_missing_or_unparseable_start_time_is_rejected(self):
+        self.assertFalse(predict_today.is_future_prematch_event(
+            self.event(None), now=self.now
+        ))
+        self.assertFalse(predict_today.is_future_prematch_event(
+            self.event("not-a-time"), now=self.now
+        ))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
