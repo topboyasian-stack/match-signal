@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
 DATA.mkdir(exist_ok=True)
 NBA_TOTAL_SNAPSHOTS = DATA / "nba_totals_publication_snapshots.json"
+NBA_TOURNAMENT_ID = "sr:tournament:132"
 S = requests.Session()
 S.headers.update({"User-Agent": "Mozilla/5.0 (compatible; MatchSignal/1.0)"})
 
@@ -35,7 +36,7 @@ def sportybet_basketball_feed(max_pages=5):
         try:
             response = S.get(
                 url,
-                params={"pageSize": 100, "timeline": 168, "pageNum": page},
+                params={"pageSize": 100, "timeline": 168, "pageNum": page, "tournamentId": NBA_TOURNAMENT_ID},
                 timeout=12,
             )
             response.raise_for_status()

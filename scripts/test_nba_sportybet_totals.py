@@ -22,6 +22,9 @@ with patch.object(pipeline.S, "get", return_value=FeedResponse()) as feed_get:
     assert feed_get.call_args.kwargs["params"]["timeline"] == 168, (
         "SportyBet lookup must cover the seven-day NBA prediction horizon"
     )
+    assert feed_get.call_args.kwargs["params"]["tournamentId"] == "sr:tournament:132", (
+        "NBA totals lookup must target the exact NBA tournament, not the general college-basketball feed"
+    )
 
 # The Upcoming refresh must page beyond the first 100 events, while merging
 # duplicate event IDs and keeping market rows that arrive on a later page.

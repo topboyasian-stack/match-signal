@@ -1,5 +1,6 @@
 const ORIGIN='https://match-signal-sportybet-proxy.topboyasian.workers.dev';
 const STANDARD_MARKET_IDS='1,18,10,29,11,26,36,14,60100,186,189,202,204,210';
+const NBA_TOURNAMENT_ID='sr:tournament:132';
 function headers(){return {'Content-Type':'application/json; charset=utf-8','Cache-Control':'public, max-age=15, s-maxage=15, stale-while-revalidate=15','Access-Control-Allow-Origin':'*','Access-Control-Allow-Methods':'GET,OPTIONS'}}
 function normMarket(m){
   const id=String(m?.id??m?.marketId??'');
@@ -22,6 +23,10 @@ export async function onRequestGet(context){
   const pageSize=Math.min(100,Math.max(1,Number(u.searchParams.get('pageSize')||100)));
   const pageNum=Math.max(1,Number(u.searchParams.get('pageNum')||1));
   const timeline=Math.min(168,Math.max(12,Number(u.searchParams.get('timeline')||96)));
+  const tournamentId=String(u.searchParams.get('tournamentId')||'').trim();
+  if(tournamentId && tournamentId!==NBA_TOURNAMENT_ID){
+    return new Response(JSON.stringify({ok:false,error:'UNSUPPORTED_TOURNAMENT_ID'}),{status:400,headers:headers()});
+  }
   const started=Date.now();
   const requests=[
     {path:'/api/ng/factsCenter/pcUpcomingEvents',marketId:STANDARD_MARKET_IDS},
@@ -37,6 +42,7 @@ export async function onRequestGet(context){
           const url=new URL(origin+request.path);
           const params={sportId:'sr:sport:2',pageSize:String(pageSize),pageNum:String(pageNum),todayGames:'false',timeline:String(timeline),_t:String(Date.now())};
           if(request.marketId)params.marketId=request.marketId;
+          if(tournamentId)params.tournamentId=tournamentId;
           Object.entries(params).forEach(([k,v])=>url.searchParams.set(k,v));
           const r=await fetch(url.toString(),{
             headers:{'Accept':'application/json, text/plain, */*','Current-Country':'NG'},
@@ -67,6 +73,7 @@ export async function onRequestGet(context){
           event_id:id,home:String(e?.homeTeamName??e?.homeTeam?.name??''),
           away:String(e?.awayTeamName??e?.awayTeam?.name??''),
           start_time:new Date(start).toISOString(),tournament:String(t?.name??''),
+          tournament_id:String(t?.id??t?.tournamentId??e?.tournamentId??''),
           source:'SportyBet Nigeria',source_endpoints:[],fetched_at:new Date().toISOString(),markets:[]
         };
         const marketMap=new Map((existing.markets||[]).map(m=>[String(m.id)+'|'+String(m.specifier||''),m]));
