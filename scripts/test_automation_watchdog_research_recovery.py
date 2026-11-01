@@ -10,6 +10,7 @@ WATCHDOG = (ROOT / ".github/workflows/automation_watchdog.yml").read_text(encodi
 RESEARCH = (ROOT / ".github/workflows/efootball-market-research-schedule.yml").read_text(encoding="utf-8")
 PAGES = (ROOT / ".github/workflows/cloudflare-pages.yml").read_text(encoding="utf-8")
 NBA_SETTLEMENT = (ROOT / ".github/workflows/nba-totals-settlement.yml").read_text(encoding="utf-8")
+NBA_RECORDER = (ROOT / ".github/workflows/nba-live-observation.yml").read_text(encoding="utf-8")
 
 
 class EfootballResearchRecoveryTests(unittest.TestCase):
@@ -60,6 +61,13 @@ class EfootballResearchRecoveryTests(unittest.TestCase):
         self.assertIn("if odds_age_minutes > ODDS_BUILDER_MAX_AGE_MINUTES and not active('odds_builder.yml'):", WATCHDOG)
         self.assertNotIn("if odds_age > 8 and not active('odds_builder.yml'):", WATCHDOG)
         self.assertIn("'odds_builder_age_minutes': odds_age_minutes", WATCHDOG)
+
+    def test_nba_recorder_refreshes_after_board_audit_without_a_workflow_loop(self):
+        self.assertIn('"Match Signal Unified Upcoming Board"', NBA_RECORDER)
+        board_workflow = (ROOT / ".github/workflows/unified-upcoming.yml").read_text(encoding="utf-8")
+        trigger_block = board_workflow.split("  workflow_run:", 1)[1].split("  schedule:", 1)[0]
+        self.assertNotIn('"Match Signal NBA In-Game Behavior Recorder"', trigger_block,
+                         "The board must not recursively rerun because the recorder completed.")
 
     def test_stale_virtual_and_nba_live_sources_have_bounded_recovery(self):
         self.assertIn('"Match Signal Odds Builder"', WATCHDOG)
