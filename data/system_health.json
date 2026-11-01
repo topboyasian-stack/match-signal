@@ -1,26 +1,26 @@
 {
-  "generated_at": "2026-11-01T00:54:27.424863+00:00",
+  "generated_at": "2026-11-01T00:59:49.788722+00:00",
   "status": "DEGRADED",
   "critical_issues": 0,
-  "warning_issues": 1,
+  "warning_issues": 2,
   "info_issues": 1,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
       "status": "PASS",
-      "age_hours": 1.54,
+      "age_hours": 1.63,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.12,
+      "age_hours": 0.08,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 1.5,
+      "age_hours": 1.59,
       "threshold_hours": 4
     },
     {
@@ -37,22 +37,22 @@
     },
     {
       "engine": "virtual_participant_history",
-      "status": "PASS",
-      "max_input_age_minutes": 25.0,
-      "virtual_lab_status_age_minutes": 28.0,
+      "status": "STALE",
+      "max_input_age_minutes": 30.5,
+      "virtual_lab_status_age_minutes": 33.3,
       "threshold_minutes": 30.0,
       "stale_inputs": []
     },
     {
       "engine": "tennis_forward_discovery",
       "status": "PASS",
-      "age_hours": 1.5,
+      "age_hours": 1.59,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 0.33,
+      "age_hours": 0.42,
       "threshold_hours": 0.5,
       "heartbeat_source": "virtual_lab_live.json",
       "events_count": 667
@@ -103,6 +103,11 @@
   ],
   "issues": [
     {
+      "code": "VIRTUAL_PARTICIPANT_HISTORY_STALE",
+      "severity": "warning",
+      "detail": "input older than 30 minutes: participant_lifecycle, collector_status; oldest participant/settlement/model input is 30.5 minutes old; virtual_lab_status.json is 33.3 minutes old; current eFootball/virtual predictions must remain withheld until the source collector publishes fresh data"
+    },
+    {
       "code": "NBA_LIVE_OBSERVATION_STALE",
       "severity": "warning",
       "detail": "nba_live_observations.json age 999.00h exceeds 0.25h; the in-game observation recorder has not published a recent heartbeat"
@@ -119,8 +124,8 @@
     "past_kickoff_rows_hidden": 3,
     "stale_live_flags_hidden": 0,
     "expired_settled_rows_hidden": 0,
-    "virtual_market_rows_held_for_kickoff_window": 56,
-    "virtual_rows_held_for_stale_participant_history": 0,
+    "virtual_market_rows_held_for_kickoff_window": 0,
+    "virtual_rows_held_for_stale_participant_history": 4236,
     "virtual_rows_held_for_recent_product_drawdown": 27
   }
 }
