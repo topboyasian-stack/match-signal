@@ -7,10 +7,11 @@ on:
     - cron: '7,22,37,52 * * * *'
   workflow_dispatch:
   workflow_run:
-    # Re-capture prices when the model publishes a new fixture/line set.
-    # This is event-driven on the prediction refresh, not on every board render.
+    # Re-capture after either a model/line refresh or the five-minute board refresh.
+    # The board does not listen for capture completion, so this cannot form a loop.
     workflows:
       - "Match Signal Live Expansion"
+      - "Match Signal Unified Upcoming Board"
     types: [completed]
   push:
     branches: [main]
