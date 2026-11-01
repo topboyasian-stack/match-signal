@@ -16,6 +16,9 @@ on:
       - "Match Signal Live Expansion"
       - "NBA totals SportyBet market-225 price capture"
       - "NBA totals settlement ledger"
+      # Refresh the recorder when a newly generated board audits source freshness.
+      # Unified Upcoming does not listen for recorder completion, so this adds no loop.
+      - "Match Signal Unified Upcoming Board"
     types: [completed]
   schedule:
     # GitHub cron has a five-minute minimum; record live state repeatedly during game windows.
