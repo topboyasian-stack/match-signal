@@ -7,6 +7,7 @@ user has to discover them manually.
 """
 from __future__ import annotations
 
+import gzip
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -21,6 +22,15 @@ NOW = datetime.now(timezone.utc)
 def load(name, default):
     try:
         return json.loads((DATA / name).read_text(encoding="utf-8"))
+    except Exception:
+        return default
+
+
+def load_gzip(name, default):
+    """Load a compressed JSON artifact without treating an unavailable file as fresh."""
+    try:
+        with gzip.open(DATA / name, "rt", encoding="utf-8") as source:
+            return json.load(source)
     except Exception:
         return default
 
@@ -46,7 +56,10 @@ odds = load("odds_builder.json", {})
 expansion = load("expansion_status.json", {})
 virtual = load("virtual_lab_status.json", {})
 virtual_live = load("virtual_lab_live.json", {})
-nba_live_observations = load("nba_live_observations.json", {})
+nba_live_observations = load_gzip("nba_live_observations.json.gz", {})
+if not nba_live_observations.get("updated_at"):
+    # Backward compatibility for a legacy JSON archive on older deployments.
+    nba_live_observations = load("nba_live_observations.json", {})
 autopilot = load("autopilot_status.json", {})
 darts = load("darts_status.json", {})
 table = load("table_tennis_status.json", {})
