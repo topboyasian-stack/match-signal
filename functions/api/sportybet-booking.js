@@ -516,7 +516,7 @@ async function handlePost(context) {
         continue;
       }
       if (manualMode) {
-        const canon = value => String(value || '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim().replace(/\\s+/g, ' ');
+        const canon = value => String(value || '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ');
         const requestedStart = Date.parse(String(leg?.start_time || ''));
         const currentStart = Number(event?.estimateStartTime || 0);
         const namesMatch = [leg.player_1, leg.player_2].every(name =>

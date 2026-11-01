@@ -226,12 +226,25 @@
     var sportId = sport === 'football' ? 'sr:sport:1' : 'sr:sport:5';
     var marketIds = sport === 'football' ? '1,18,10,14,16,29,45,47' : '186,210,202,204,189,203,188,187';
     try {
-      var url = './api/sportybet?sportId=' + encodeURIComponent(sportId) + '&marketId=' + encodeURIComponent(marketIds) + '&pageSize=100&pageNum=1&timeline=168&_ms=' + Date.now();
-      var response = await fetch(url, { cache: 'no-store', headers: { 'Accept': 'application/json' } });
-      if (!response.ok) throw new Error('SportyBet feed HTTP ' + response.status);
-      var payload = await response.json();
-      if (payload && payload.ok === false) throw new Error(payload.detail || payload.error || 'SportyBet feed unavailable');
-      var tournaments = payload && payload.data && Array.isArray(payload.data.tournaments) ? payload.data.tournaments : [];
+      var pageRequests = [1, 2, 3].map(function (pageNum) {
+        var url = './api/sportybet?sportId=' + encodeURIComponent(sportId) + '&marketId=' + encodeURIComponent(marketIds) + '&pageSize=100&pageNum=' + pageNum + '&timeline=168&_ms=' + Date.now();
+        return fetch(url, { cache: 'no-store', headers: { 'Accept': 'application/json' } }).then(function (response) {
+          if (!response.ok) throw new Error('SportyBet feed HTTP ' + response.status);
+          return response.json();
+        }).then(function (payload) {
+          if (payload && payload.ok === false) throw new Error(payload.detail || payload.error || 'SportyBet feed unavailable');
+          return payload && payload.data && Array.isArray(payload.data.tournaments) ? payload.data.tournaments : [];
+        });
+      });
+      var pageResults = await Promise.allSettled(pageRequests);
+      var tournaments = [], successfulPages = 0;
+      pageResults.forEach(function (result) {
+        if (result.status === 'fulfilled') {
+          successfulPages++;
+          tournaments = tournaments.concat(result.value);
+        }
+      });
+      if (!successfulPages) throw new Error('All SportyBet fixture pages were unavailable.');
       var now = Date.now(), seen = {};
       feedEvents = [];
       tournaments.forEach(function (tournament) {
