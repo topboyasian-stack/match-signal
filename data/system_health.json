@@ -1,26 +1,26 @@
 {
-  "generated_at": "2026-11-01T08:20:53.542573+00:00",
+  "generated_at": "2026-11-01T09:20:08.713221+00:00",
   "status": "DEGRADED",
   "critical_issues": 0,
-  "warning_issues": 1,
+  "warning_issues": 2,
   "info_issues": 2,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
       "status": "PASS",
-      "age_hours": 2.39,
+      "age_hours": 3.38,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.27,
+      "age_hours": 0.09,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 2.34,
+      "age_hours": 3.33,
       "threshold_hours": 4
     },
     {
@@ -37,25 +37,25 @@
     },
     {
       "engine": "virtual_participant_history",
-      "status": "PASS",
-      "max_input_age_minutes": 9.6,
-      "virtual_lab_status_age_minutes": 12.5,
+      "status": "STALE",
+      "max_input_age_minutes": 68.5,
+      "virtual_lab_status_age_minutes": 71.8,
       "threshold_minutes": 30.0,
       "stale_inputs": []
     },
     {
       "engine": "tennis_forward_discovery",
       "status": "PASS",
-      "age_hours": 1.66,
+      "age_hours": 2.65,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 0.34,
+      "age_hours": 0.06,
       "threshold_hours": 0.5,
       "heartbeat_source": "virtual_lab_live.json",
-      "events_count": 672
+      "events_count": 675
     },
     {
       "engine": "nba_live_observation_recorder",
@@ -72,11 +72,11 @@
       "lanes": {
         "darts_x": {
           "status": "RETIRED",
-          "artifact_at": "2026-11-01T07:26:24.106115+00:00"
+          "artifact_at": "2026-11-01T08:26:10.362960+00:00"
         },
         "table_tennis_x": {
           "status": "RETIRED",
-          "artifact_at": "2026-11-01T07:26:36.642936+00:00"
+          "artifact_at": "2026-11-01T08:45:52.243804+00:00"
         },
         "basketball_core_moneyline": {
           "status": "RETIRED",
@@ -94,7 +94,7 @@
           "historical_rows_last_success": 61,
           "upcoming_rows_last_success": 3,
           "published_prediction_rows": 0,
-          "last_attempt_at": "2026-11-01T02:11:09.219302+00:00",
+          "last_attempt_at": "2026-11-01T09:13:30.736801+00:00",
           "last_successful_update_at": "2026-10-24T09:41:33.194342+00:00",
           "last_error": "RuntimeError: BetStudy history unavailable: 403 Client Error: Forbidden for url: https://www.betstudy.com/soccer-stats/c/england/u21-professional-development-league-2/d/results/; SofaScore fallback disabled after upstream 403 challenge"
         }
@@ -102,6 +102,11 @@
     }
   ],
   "issues": [
+    {
+      "code": "VIRTUAL_PARTICIPANT_HISTORY_STALE",
+      "severity": "warning",
+      "detail": "input older than 30 minutes: participant_lifecycle, collector_status, model_evaluation; oldest participant/settlement/model input is 68.5 minutes old; virtual_lab_status.json is 71.8 minutes old; current eFootball/virtual predictions must remain withheld until the source collector publishes fresh data"
+    },
     {
       "code": "NBA_LIVE_OBSERVATION_STALE",
       "severity": "warning",
@@ -124,8 +129,8 @@
     "past_kickoff_rows_hidden": 3,
     "stale_live_flags_hidden": 0,
     "expired_settled_rows_hidden": 0,
-    "virtual_market_rows_held_for_kickoff_window": 18,
-    "virtual_rows_held_for_stale_participant_history": 0,
-    "virtual_rows_held_for_recent_product_drawdown": 23
+    "virtual_market_rows_held_for_kickoff_window": 0,
+    "virtual_rows_held_for_stale_participant_history": 4952,
+    "virtual_rows_held_for_recent_product_drawdown": 22
   }
 }
