@@ -5,6 +5,7 @@ const WAP_UPCOMING_ENDPOINT = "/api/ng/factsCenter/wapConfigurableUpcomingEvents
 const WAP_LIVE_ENDPOINT = "/api/ng/factsCenter/wapConfigurableIndexLiveEvents";
 const ALLOWED_ENDPOINTS = new Set([PC_ENDPOINT, WAP_UPCOMING_ENDPOINT, WAP_LIVE_ENDPOINT]);
 const ALLOWED_SPORTS = new Set(["sr:sport:2", "sr:sport:137", "sr:sport:202120001"]);
+const ALLOWED_TOURNAMENTS = new Set(["sr:tournament:132"]);
 const ALLOWED_MARKETS = new Set(["1","18","10","29","11","26","36","14","60100","186","189","202","204","210","219","223","225","227","228"]);
 
 const UPSTREAM_HEADERS = {
@@ -44,6 +45,9 @@ function readSafeParams(url, path) {
   const pageSize = Number(url.searchParams.get("pageSize") || 100);
   const pageNum = Number(url.searchParams.get("pageNum") || 1);
   const timeline = Number(url.searchParams.get("timeline") || 168);
+  const tournamentId = String(url.searchParams.get("tournamentId") || "");
+  if (tournamentId && !ALLOWED_TOURNAMENTS.has(tournamentId)) throw new Error("Unsupported tournamentId");
+  if (tournamentId && sportId !== "sr:sport:2") throw new Error("Tournament filtering is only allowed for basketball");
   if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > 100) throw new Error("pageSize must be an integer from 1 to 100");
   if (!Number.isInteger(pageNum) || pageNum < 1 || pageNum > 5) throw new Error("pageNum must be an integer from 1 to 5");
   if (!Number.isInteger(timeline) || timeline < 12 || timeline > 720) throw new Error("timeline must be an integer from 12 to 720");
@@ -55,6 +59,7 @@ function readSafeParams(url, path) {
     timeline: String(timeline),
     _t: String(Date.now())
   });
+  if (tournamentId) params.set("tournamentId", tournamentId);
   if (path === PC_ENDPOINT) {
     const raw = String(url.searchParams.get("marketId") || [...ALLOWED_MARKETS].join(","));
     const ids = raw.split(",").map(value => value.trim()).filter(Boolean);

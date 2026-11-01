@@ -75,6 +75,7 @@ class PriceCaptureTests(unittest.TestCase):
         self.assertIsNone(error)
         self.assertEqual([call.kwargs["params"]["pageNum"] for call in feed_get.call_args_list], [1, 2])
         self.assertTrue(all(call.kwargs["params"]["timeline"] == 168 for call in feed_get.call_args_list))
+        self.assertTrue(all(call.kwargs["params"]["tournamentId"] == "sr:tournament:132" for call in feed_get.call_args_list))
         self.assertEqual(len(events), 101)
         duplicate = next(row for row in events if row["event_id"] == "event-0")
         self.assertEqual({market["specifier"] for market in duplicate["markets"]}, {"total=221.5"})

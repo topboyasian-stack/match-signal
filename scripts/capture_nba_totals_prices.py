@@ -26,6 +26,7 @@ LEDGER = DATA / "nba_totals_ledger.json"
 HISTORY = DATA / "nba_history.json"
 REPORT = DATA / "nba_totals_oos_value_test.json"
 STATUS = DATA / "nba_totals_price_capture_status.json"
+NBA_TOURNAMENT_ID = "sr:tournament:132"
 
 
 def sportybet_basketball_feed_paged(max_pages=5):
@@ -37,7 +38,7 @@ def sportybet_basketball_feed_paged(max_pages=5):
         try:
             response = S.get(
                 url,
-                params={"pageSize": 100, "timeline": 168, "pageNum": page},
+                params={"pageSize": 100, "timeline": 168, "pageNum": page, "tournamentId": NBA_TOURNAMENT_ID},
                 timeout=12,
             )
             response.raise_for_status()
@@ -172,6 +173,8 @@ def nearby_feed_events(fixture, feed, limit=3, window_minutes=180):
             continue
         candidates.append({
             "event_id": str(event.get("event_id") or ""),
+            "tournament": str(event.get("tournament") or ""),
+            "tournament_id": str(event.get("tournament_id") or ""),
             "home": str(event.get("home") or ""),
             "away": str(event.get("away") or ""),
             "start_time": event_start.isoformat(),
