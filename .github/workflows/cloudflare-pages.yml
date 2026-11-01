@@ -8,6 +8,7 @@ on:
   # -> rebuild/publish Builder -> deploy and verify Pages. Do not deploy on the
   # initial board completion because its Builder artifact may still be stale.
   # Static presentation and scoped booking-API changes may still deploy directly.
+  # This workflow file itself is intentionally excluded from direct promotion; changes to it go through Builder Production Promotion.
   push:
     branches: [main]
     paths:
