@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-01T22:03:21.073414+00:00",
+  "generated_at": "2026-11-01T22:06:52.614795+00:00",
   "status": "DEGRADED",
   "critical_issues": 0,
   "warning_issues": 2,
@@ -8,19 +8,19 @@
     {
       "engine": "core_prediction_pipeline",
       "status": "PASS",
-      "age_hours": 1.55,
+      "age_hours": 1.61,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.06,
+      "age_hours": 0.05,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 1.22,
+      "age_hours": 1.28,
       "threshold_hours": 4
     },
     {
@@ -32,27 +32,27 @@
     {
       "engine": "prediction_desk_health",
       "status": "PASS",
-      "age_hours": 0.06,
+      "age_hours": 0.04,
       "threshold_hours": 2
     },
     {
       "engine": "virtual_participant_history",
       "status": "STALE",
-      "max_input_age_minutes": 43.7,
-      "virtual_lab_status_age_minutes": 47.2,
+      "max_input_age_minutes": 48.2,
+      "virtual_lab_status_age_minutes": 50.7,
       "threshold_minutes": 30.0,
       "stale_inputs": []
     },
     {
       "engine": "tennis_forward_discovery",
       "status": "PASS",
-      "age_hours": 1.51,
+      "age_hours": 1.57,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 0.07,
+      "age_hours": 0.13,
       "threshold_hours": 0.5,
       "heartbeat_source": "virtual_lab_live.json",
       "events_count": 708
@@ -60,7 +60,7 @@
     {
       "engine": "nba_live_observation_recorder",
       "status": "PASS",
-      "age_hours": 0.07,
+      "age_hours": 0.13,
       "threshold_hours": 0.25,
       "heartbeat_source": "nba_live_observations.json.gz",
       "games_tracked": 18,
@@ -105,7 +105,7 @@
     {
       "code": "VIRTUAL_PARTICIPANT_HISTORY_STALE",
       "severity": "warning",
-      "detail": "input older than 30 minutes: participant_lifecycle, collector_status, model_evaluation; oldest participant/settlement/model input is 43.7 minutes old; virtual_lab_status.json is 47.2 minutes old; current eFootball/virtual predictions must remain withheld until the source collector publishes fresh data"
+      "detail": "input older than 30 minutes: participant_lifecycle, collector_status, model_evaluation; oldest participant/settlement/model input is 48.2 minutes old; virtual_lab_status.json is 50.7 minutes old; current eFootball/virtual predictions must remain withheld until the source collector publishes fresh data"
     },
     {
       "code": "PDL_EXPERIMENTAL_FEED_STALE",
@@ -121,11 +121,11 @@
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
   "paper_only": true,
   "prediction_desk_filters": {
-    "past_kickoff_rows_hidden": 5,
+    "past_kickoff_rows_hidden": 18,
     "stale_live_flags_hidden": 0,
     "expired_settled_rows_hidden": 0,
     "virtual_market_rows_held_for_kickoff_window": 0,
-    "virtual_rows_held_for_stale_participant_history": 4925,
-    "virtual_rows_held_for_recent_product_drawdown": 23
+    "virtual_rows_held_for_stale_participant_history": 4933,
+    "virtual_rows_held_for_recent_product_drawdown": 26
   }
 }
