@@ -1,14 +1,14 @@
 {
-  "generated_at": "2026-11-01T16:33:24.817989+00:00",
+  "generated_at": "2026-11-01T16:38:09.301331+00:00",
   "status": "DEGRADED",
   "critical_issues": 0,
-  "warning_issues": 1,
+  "warning_issues": 3,
   "info_issues": 2,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
       "status": "PASS",
-      "age_hours": 1.48,
+      "age_hours": 1.56,
       "threshold_hours": 4
     },
     {
@@ -20,7 +20,7 @@
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 0.16,
+      "age_hours": 0.24,
       "threshold_hours": 4
     },
     {
@@ -32,27 +32,27 @@
     {
       "engine": "prediction_desk_health",
       "status": "PASS",
-      "age_hours": 0.05,
+      "age_hours": 0.04,
       "threshold_hours": 2
     },
     {
       "engine": "virtual_participant_history",
-      "status": "PASS",
-      "max_input_age_minutes": 24.2,
-      "virtual_lab_status_age_minutes": 27.3,
+      "status": "STALE",
+      "max_input_age_minutes": 29.8,
+      "virtual_lab_status_age_minutes": 32.1,
       "threshold_minutes": 30.0,
       "stale_inputs": []
     },
     {
       "engine": "tennis_forward_discovery",
       "status": "PASS",
-      "age_hours": 1.43,
+      "age_hours": 1.51,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
-      "status": "PASS",
-      "age_hours": 0.46,
+      "status": "STALE",
+      "age_hours": 0.54,
       "threshold_hours": 0.5,
       "heartbeat_source": "virtual_lab_live.json",
       "events_count": 640
@@ -102,6 +102,16 @@
     }
   ],
   "issues": [
+    {
+      "code": "VIRTUAL_PARTICIPANT_HISTORY_STALE",
+      "severity": "warning",
+      "detail": "virtual_lab_status.json is 32.1 minutes old; current eFootball/virtual predictions must remain withheld until the source collector publishes fresh data"
+    },
+    {
+      "code": "VIRTUAL_LIVE_FEED_STALE",
+      "severity": "warning",
+      "detail": "virtual_lab_live.json age 0.54h exceeds 0.50h; a downstream Unified Upcoming refresh cannot substitute for a fresh source snapshot"
+    },
     {
       "code": "NBA_LIVE_OBSERVATION_STALE",
       "severity": "warning",
