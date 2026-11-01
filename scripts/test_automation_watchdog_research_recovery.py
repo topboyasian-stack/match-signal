@@ -70,12 +70,15 @@ class EfootballResearchRecoveryTests(unittest.TestCase):
         self.assertNotIn('"Match Signal NBA In-Game Behavior Recorder"', trigger_block,
                          "The board must not recursively rerun because the recorder completed.")
 
-    def test_nba_price_capture_runs_after_successful_model_refresh_not_every_board_render(self):
+    def test_nba_price_capture_runs_after_model_and_board_refresh_without_a_loop(self):
         self.assertIn('"Match Signal Live Expansion"', NBA_CAPTURE)
+        self.assertIn('"Match Signal Unified Upcoming Board"', NBA_CAPTURE)
         capture_job = NBA_CAPTURE.split("  capture:", 1)[1]
         self.assertIn("github.event.workflow_run.conclusion == 'success'", capture_job)
-        self.assertNotIn('"Match Signal Unified Upcoming Board"', NBA_CAPTURE,
-                         "Do not run a SportyBet capture on every five-minute board refresh.")
+        board_workflow = (ROOT / ".github/workflows/unified-upcoming.yml").read_text(encoding="utf-8")
+        trigger_block = board_workflow.split("  workflow_run:", 1)[1].split("  schedule:", 1)[0]
+        self.assertNotIn('"NBA totals SportyBet market-225 price capture"', trigger_block,
+                         "The capture must never recursively trigger another board rebuild.")
 
     def test_stale_virtual_and_nba_live_sources_have_bounded_recovery(self):
         self.assertIn('"Match Signal Odds Builder"', WATCHDOG)
