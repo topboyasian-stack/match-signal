@@ -134,7 +134,7 @@ def nba_live_observation_health_summary(
         "status": "PASS" if age <= max_age_hours else "STALE",
         "age_hours": round(age, 2) if age != float("inf") else None,
         "threshold_hours": max_age_hours,
-        "heartbeat_source": "nba_live_observations.json",
+        "heartbeat_source": "nba_live_observations.json.gz",
         "games_tracked": games_count,
         "snapshots_recorded": snapshots_count,
     }
@@ -144,7 +144,7 @@ def nba_live_observation_health_summary(
             "code": "NBA_LIVE_OBSERVATION_STALE",
             "severity": "warning",
             "detail": (
-                f"nba_live_observations.json age {age:.2f}h exceeds {max_age_hours:.2f}h; "
+                f"nba_live_observations.json.gz age {age:.2f}h exceeds {max_age_hours:.2f}h; "
                 "the in-game observation recorder has not published a recent heartbeat"
             ),
         })
