@@ -368,6 +368,42 @@ def _parse_dt(value):
         return None
 
 
+def is_future_prematch_event(event, now=None, start_buffer_seconds=120):
+    """Fail closed unless a fixture has a reliable, not-yet-started kickoff.
+
+    ESPN can retain a scheduled/pre status briefly after kickoff or return events
+    from a date-range board whose start time has already passed. The explicit time
+    check prevents those rows leaking into the live Upcoming feed.
+    """
+    if not isinstance(event, dict):
+        return False
+    status = (event.get("status") or {}).get("type") or {}
+    if status.get("completed"):
+        return False
+    state = str(status.get("state") or "").strip().lower()
+    if state and state not in {"pre", "scheduled", "pending"}:
+        return False
+    status_label = " ".join(
+        str(status.get(key) or "").lower()
+        for key in ("name", "description", "shortDetail", "detail")
+    )
+    if any(label in status_label for label in (
+        "in progress", "live", "final", "completed", "postponed",
+        "cancelled", "canceled", "suspended", "delayed",
+    )):
+        return False
+    start = _parse_dt(event.get("date") or event.get("start_time") or event.get("startTime"))
+    if start is None:
+        return False
+    if start.tzinfo is None:
+        start = start.replace(tzinfo=timezone.utc)
+    current = now or datetime.now(timezone.utc)
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=timezone.utc)
+    buffer_seconds = max(0, int(start_buffer_seconds))
+    return start.astimezone(timezone.utc) > current.astimezone(timezone.utc) + timedelta(seconds=buffer_seconds)
+
+
 def _football_market_fixture_valid(pred, event, max_hours=3.0):
     """Require the right football competition and a near-identical kickoff."""
     if str(pred.get("sport") or "").lower() != "football":
@@ -1029,13 +1065,13 @@ def fetch_current_predictions():
                 date = today + timedelta(days=day_offset)
                 board = fetch_scoreboard("soccer", league, date.strftime("%Y%m%d"))
                 for event in board.get("events", []):
+                    if not is_future_prematch_event(event):
+                        continue
                     event_id = str(event.get("id") or "")
                     if event_id and event_id in seen_events:
                         continue
                     if event_id:
                         seen_events.add(event_id)
-                    if event.get("status", {}).get("type", {}).get("completed"):
-                        continue
                     prediction = football_prediction(event, label)
                     if prediction:
                         predictions.append(prediction)
@@ -1050,7 +1086,8 @@ def fetch_current_predictions():
             form_map = build_tennis_form(tour, form_start, today - timedelta(days=1))
             accepted_for_tour = 0
             for event in flatten_tennis_board(board):
-                if event.get("status", {}).get("type", {}).get("completed"):
+                if not is_future_prematch_event(event):
+                    record_rejection(tour, "not future pre-match event")
                     continue
                 valid, reason = tennis_fixture_quality(event)
                 if not valid:
