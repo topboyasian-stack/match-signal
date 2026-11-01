@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-01T15:43:46.467205+00:00",
+  "generated_at": "2026-11-01T16:08:50.026486+00:00",
   "status": "DEGRADED",
   "critical_issues": 0,
   "warning_issues": 2,
@@ -8,7 +8,7 @@
     {
       "engine": "core_prediction_pipeline",
       "status": "PASS",
-      "age_hours": 0.65,
+      "age_hours": 1.07,
       "threshold_hours": 4
     },
     {
@@ -20,7 +20,7 @@
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 0.6,
+      "age_hours": 1.02,
       "threshold_hours": 4
     },
     {
@@ -37,25 +37,25 @@
     },
     {
       "engine": "virtual_participant_history",
-      "status": "PASS",
-      "max_input_age_minutes": 20.5,
-      "virtual_lab_status_age_minutes": 23.4,
+      "status": "STALE",
+      "max_input_age_minutes": 45.5,
+      "virtual_lab_status_age_minutes": 48.5,
       "threshold_minutes": 30.0,
       "stale_inputs": []
     },
     {
       "engine": "tennis_forward_discovery",
       "status": "PASS",
-      "age_hours": 0.6,
+      "age_hours": 1.02,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
-      "status": "STALE",
-      "age_hours": 0.56,
+      "status": "PASS",
+      "age_hours": 0.05,
       "threshold_hours": 0.5,
       "heartbeat_source": "virtual_lab_live.json",
-      "events_count": 652
+      "events_count": 640
     },
     {
       "engine": "nba_live_observation_recorder",
@@ -76,7 +76,7 @@
         },
         "table_tennis_x": {
           "status": "RETIRED",
-          "artifact_at": "2026-11-01T13:51:24.996360+00:00"
+          "artifact_at": "2026-11-01T15:47:54.364568+00:00"
         },
         "basketball_core_moneyline": {
           "status": "RETIRED",
@@ -94,7 +94,7 @@
           "historical_rows_last_success": 61,
           "upcoming_rows_last_success": 3,
           "published_prediction_rows": 0,
-          "last_attempt_at": "2026-11-01T09:13:30.736801+00:00",
+          "last_attempt_at": "2026-11-01T16:02:26.354168+00:00",
           "last_successful_update_at": "2026-10-24T09:41:33.194342+00:00",
           "last_error": "RuntimeError: BetStudy history unavailable: 403 Client Error: Forbidden for url: https://www.betstudy.com/soccer-stats/c/england/u21-professional-development-league-2/d/results/; SofaScore fallback disabled after upstream 403 challenge"
         }
@@ -103,9 +103,9 @@
   ],
   "issues": [
     {
-      "code": "VIRTUAL_LIVE_FEED_STALE",
+      "code": "VIRTUAL_PARTICIPANT_HISTORY_STALE",
       "severity": "warning",
-      "detail": "virtual_lab_live.json age 0.56h exceeds 0.50h; a downstream Unified Upcoming refresh cannot substitute for a fresh source snapshot"
+      "detail": "input older than 30 minutes: participant_lifecycle, collector_status, model_evaluation; oldest participant/settlement/model input is 45.5 minutes old; virtual_lab_status.json is 48.5 minutes old; current eFootball/virtual predictions must remain withheld until the source collector publishes fresh data"
     },
     {
       "code": "NBA_LIVE_OBSERVATION_STALE",
@@ -126,11 +126,11 @@
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
   "paper_only": true,
   "prediction_desk_filters": {
-    "past_kickoff_rows_hidden": 11,
+    "past_kickoff_rows_hidden": 12,
     "stale_live_flags_hidden": 0,
     "expired_settled_rows_hidden": 0,
-    "virtual_market_rows_held_for_kickoff_window": 13,
-    "virtual_rows_held_for_stale_participant_history": 0,
+    "virtual_market_rows_held_for_kickoff_window": 0,
+    "virtual_rows_held_for_stale_participant_history": 4724,
     "virtual_rows_held_for_recent_product_drawdown": 9
   }
 }
