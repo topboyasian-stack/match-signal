@@ -1,5 +1,6 @@
 const ORIGIN='https://match-signal-sportybet-proxy.topboyasian.workers.dev';
 const STANDARD_MARKET_IDS='1,18,10,29,11,26,36,14,60100,186,189,202,204,210';
+// Scope the bounded feed to NBA so NCAA events cannot crowd out market-225 fixtures.
 const NBA_TOURNAMENT_ID='sr:tournament:132';
 function headers(){return {'Content-Type':'application/json; charset=utf-8','Cache-Control':'public, max-age=15, s-maxage=15, stale-while-revalidate=15','Access-Control-Allow-Origin':'*','Access-Control-Allow-Methods':'GET,OPTIONS'}}
 function normMarket(m){
