@@ -122,6 +122,7 @@ class NbaLiveObservationHealthSummaryTests(unittest.TestCase):
             {"updated_at": "2026-10-31T06:00:00Z", "games": {}}, 0.1
         )
         self.assertEqual(check["status"], "PASS")
+        self.assertEqual(check["heartbeat_source"], "nba_live_observations.json.gz")
         self.assertEqual(check["games_tracked"], 0)
         self.assertEqual(issues, [])
 
