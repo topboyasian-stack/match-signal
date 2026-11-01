@@ -1,65 +1,65 @@
 {
-  "generated_at": "2026-11-01T01:23:31.433426+00:00",
+  "generated_at": "2026-11-01T02:34:38.333927+00:00",
   "paper_only": true,
   "evaluation_type": "NBA_TOTALS_WALK_FORWARD_V1",
   "market_id": "225",
   "market_definition": "full_game_total_including_overtime",
   "model_version": "nba-total-v5-pace-efficiency-calibrated",
-  "history_games": 1234,
+  "history_games": 1226,
   "walk_forward": {
     "method": "expanding chronological forecasts; each game uses only strictly earlier completed games",
     "baseline": "mean NBA game total over the preceding 90 days (or all prior games when unavailable)",
-    "development_games": 955,
+    "development_games": 948,
     "holdout": {
-      "n": 239,
-      "mae": 15.4331,
-      "rmse": 20.0688,
-      "bias": -2.029,
+      "n": 238,
+      "mae": 15.3408,
+      "rmse": 19.9641,
+      "bias": -1.8583,
       "uncalibrated": {
-        "n": 239,
-        "mae": 15.435,
-        "rmse": 20.0938,
-        "bias": -2.2626
+        "n": 238,
+        "mae": 15.3417,
+        "rmse": 19.9896,
+        "bias": -2.1147
       },
-      "baseline_mae": 16.4321,
-      "baseline_rmse": 21.4004,
-      "baseline_bias": -3.5917,
-      "mae_improvement_vs_baseline": 0.999,
+      "baseline_mae": 16.3374,
+      "baseline_rmse": 21.2961,
+      "baseline_bias": -3.4429,
+      "mae_improvement_vs_baseline": 0.9966,
       "beats_baseline": true,
-      "pace_feature_games": 239
+      "pace_feature_games": 238
     }
   },
   "model_calibration": {
     "selected_pace_blend_weight": 0.8,
-    "production_bias_correction": -0.2336,
-    "development_n": 955,
-    "development_raw_bias": -0.2336,
-    "pace_feature_development_games": 955,
+    "production_bias_correction": -0.2563,
+    "development_n": 948,
+    "development_raw_bias": -0.2563,
+    "pace_feature_development_games": 948,
     "pace_feature_coverage": 1.0,
     "selection_rule": "minimum development MAE across a predeclared pace blend grid; residual bias estimated on development only"
   },
   "publication_capture": {
     "model_version": "nba-total-v5-pace-efficiency-calibrated",
-    "model_predictions": 50,
-    "predictions_with_fresh_sportybet_market_225_pair": 2,
-    "immutable_fresh_publication_snapshots": 20,
-    "unique_events_with_immutable_snapshots": 8,
-    "snapshot_coverage": 0.16,
-    "directional_pick_snapshots": 9,
-    "no_clear_lean_snapshots": 11,
-    "unpriced_or_unavailable_prediction_count": 48,
+    "model_predictions": 57,
+    "predictions_with_fresh_sportybet_market_225_pair": 3,
+    "immutable_fresh_publication_snapshots": 23,
+    "unique_events_with_immutable_snapshots": 9,
+    "snapshot_coverage": 0.1579,
+    "directional_pick_snapshots": 10,
+    "no_clear_lean_snapshots": 13,
+    "unpriced_or_unavailable_prediction_count": 54,
     "unmatched_fresh_market_predictions": 0,
     "capture_status": "PARTIAL"
   },
-  "verified_market_records": 1,
-  "market_development_records": 0,
+  "verified_market_records": 3,
+  "market_development_records": 2,
   "market_overall": {
-    "n": 1,
-    "wins": 0,
-    "losses": 1,
+    "n": 3,
+    "wins": 1,
+    "losses": 2,
     "pushes": 0,
-    "win_rate": 0.0,
-    "over_under_accuracy": 0.0,
+    "win_rate": 0.3333,
+    "over_under_accuracy": 0.3333,
     "by_pick": {
       "over": {
         "n": 0,
@@ -68,17 +68,17 @@
         "accuracy": null
       },
       "under": {
-        "n": 1,
-        "wins": 0,
-        "losses": 1,
-        "accuracy": 0.0
+        "n": 3,
+        "wins": 1,
+        "losses": 2,
+        "accuracy": 0.3333
       }
     },
-    "profit_units": -1.0,
-    "roi": -1.0,
-    "roi_ci95_lower": null,
-    "market_favorite_roi": -1.0,
-    "roi_vs_market_favorite": 0.0
+    "profit_units": -1.05,
+    "roi": -0.35,
+    "roi_ci95_lower": -1.624,
+    "market_favorite_roi": -0.37,
+    "roi_vs_market_favorite": 0.02
   },
   "market_holdout": {
     "n": 1,
@@ -104,8 +104,8 @@
     "profit_units": -1.0,
     "roi": -1.0,
     "roi_ci95_lower": null,
-    "market_favorite_roi": -1.0,
-    "roi_vs_market_favorite": 0.0
+    "market_favorite_roi": 0.89,
+    "roi_vs_market_favorite": -1.89
   },
   "release_decision": "RESEARCH_ONLY",
   "release_reason": "Not qualified: require at least 100 unseen calibrated forecast games with lower MAE than baseline and absolute bias <=3 points, plus at least 100 settled, immutable, fresh SportyBet market-225 holdout bets with positive ROI, a positive 95% lower confidence bound, and ROI above the market-favourite baseline."
