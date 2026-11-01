@@ -1,8 +1,8 @@
 {
   "status": "GENERATED",
-  "generated_at": "2026-11-01T01:35:16.445063+00:00",
+  "generated_at": "2026-11-01T01:40:22.978495+00:00",
   "horizon_days": 7,
-  "event_count": 3838,
+  "event_count": 3832,
   "live_count": 0,
   "pending_settlement_count": 0,
   "publication_filters": {
@@ -10,56 +10,32 @@
     "stale_live_flags_hidden": 0,
     "expired_settled_rows_hidden": 0,
     "virtual_market_rows_held_for_kickoff_window": 0,
-    "virtual_rows_held_for_stale_participant_history": 3765,
+    "virtual_rows_held_for_stale_participant_history": 3761,
     "virtual_rows_held_for_recent_product_drawdown": 28
   },
   "participant_history_freshness": {
     "fresh": false,
-    "max_age_minutes": 33.1,
+    "max_age_minutes": 38.2,
     "max_age_minutes_allowed": 30,
     "input_age_minutes": {
-      "participant_lifecycle": 33.1,
-      "collector_status": 33.0,
-      "model_evaluation": 26.6
+      "participant_lifecycle": 38.2,
+      "collector_status": 38.2,
+      "model_evaluation": 31.7
     },
     "participant_lifecycle_generated_at": "2026-11-01T01:02:13.313001+00:00",
     "collector_status_updated_at": "2026-11-01T01:02:13.461827+00:00",
     "model_evaluation_generated_at": "2026-11-01T01:08:40.079158+00:00",
-    "reason": "input older than 30 minutes: participant_lifecycle, collector_status"
+    "reason": "input older than 30 minutes: participant_lifecycle, collector_status, model_evaluation"
   },
   "high_line_under_evidence": [
     {
       "product": "efootball_gt",
       "line": 6.5,
       "side": "under",
-      "event_rows": 38,
+      "event_rows": 36,
       "walkforward_n": 489,
       "walkforward_hit_rate": 0.5664621676891616,
       "walkforward_brier": 0.24329830142833667,
-      "walkforward_model_variant": "poisson",
-      "qualification_status": "PARTICIPANT_HISTORY_STALE",
-      "betting_qualified": false
-    },
-    {
-      "product": "efootball_gt",
-      "line": 7.5,
-      "side": "under",
-      "event_rows": 13,
-      "walkforward_n": 208,
-      "walkforward_hit_rate": 0.6490384615384616,
-      "walkforward_brier": 0.2298813461209592,
-      "walkforward_model_variant": "poisson",
-      "qualification_status": "PARTICIPANT_HISTORY_STALE",
-      "betting_qualified": false
-    },
-    {
-      "product": "efootball_gt",
-      "line": 8.5,
-      "side": "under",
-      "event_rows": 12,
-      "walkforward_n": 158,
-      "walkforward_hit_rate": 0.569620253164557,
-      "walkforward_brier": 0.2443567284431151,
       "walkforward_model_variant": "poisson",
       "qualification_status": "PARTICIPANT_HISTORY_STALE",
       "betting_qualified": false
@@ -135,25 +111,49 @@
       "walkforward_model_variant": "poisson",
       "qualification_status": "PARTICIPANT_HISTORY_STALE",
       "betting_qualified": false
+    },
+    {
+      "product": "efootball_gt",
+      "line": 7.5,
+      "side": "under",
+      "event_rows": 12,
+      "walkforward_n": 208,
+      "walkforward_hit_rate": 0.6490384615384616,
+      "walkforward_brier": 0.2298813461209592,
+      "walkforward_model_variant": "poisson",
+      "qualification_status": "PARTICIPANT_HISTORY_STALE",
+      "betting_qualified": false
+    },
+    {
+      "product": "efootball_gt",
+      "line": 8.5,
+      "side": "under",
+      "event_rows": 11,
+      "walkforward_n": 158,
+      "walkforward_hit_rate": 0.569620253164557,
+      "walkforward_brier": 0.2443567284431151,
+      "walkforward_model_variant": "poisson",
+      "qualification_status": "PARTICIPANT_HISTORY_STALE",
+      "betting_qualified": false
     }
   ],
   "prospective_poisson_shadow_coverage": {
     "efootball_gt": {
-      "efootball_rows": 495,
-      "unique_events": 246,
+      "efootball_rows": 491,
+      "unique_events": 243,
       "rows_with_valid_shadow": 37,
       "unique_events_with_valid_shadow": 12,
       "rejection_reason_counts": {
-        "historical_product_fallback_rejected": 458,
+        "historical_product_fallback_rejected": 454,
         "eligible_leave_one_line_out_fit": 37
       },
       "lambda_fit_source_counts_by_side": {
         "over": {
-          "historical_product_lambda_fallback": 458,
+          "historical_product_lambda_fallback": 454,
           "current_market_ladder_leave_one_line_out": 37
         },
         "under": {
-          "historical_product_lambda_fallback": 458,
+          "historical_product_lambda_fallback": 454,
           "current_market_ladder_leave_one_line_out": 37
         }
       },
