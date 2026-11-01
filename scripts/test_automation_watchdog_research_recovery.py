@@ -69,6 +69,10 @@ class EfootballResearchRecoveryTests(unittest.TestCase):
         self.assertIn("LIVE_FEED_DISPATCH_COOLDOWN_MINUTES = 10", WATCHDOG)
         self.assertIn("virtual-lab-live-sync-heartbeat.yml", WATCHDOG)
         self.assertIn("nba-live-observation.yml", WATCHDOG)
+        self.assertIn("import gzip, json, os, subprocess", WATCHDOG)
+        self.assertIn("nba_live = load('data/nba_live_observations.json.gz')", WATCHDOG)
+        self.assertIn("nba_live = load('data/nba_live_observations.json')", WATCHDOG,
+                      "Keep legacy JSON fallback while using the compressed recorder archive first.")
         self.assertIn("Path('data/automation_health.json')", WATCHDOG)
         self.assertNotIn("python scripts/system_health_audit.py", WATCHDOG,
                          "Watchdog must not overwrite the board's shared health artifact.")
