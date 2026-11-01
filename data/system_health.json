@@ -1,26 +1,26 @@
 {
-  "generated_at": "2026-11-01T02:58:25.922448+00:00",
-  "status": "DEGRADED",
-  "critical_issues": 0,
-  "warning_issues": 3,
+  "generated_at": "2026-11-01T04:57:31.557470+00:00",
+  "status": "FAIL",
+  "critical_issues": 2,
+  "warning_issues": 2,
   "info_issues": 1,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
-      "status": "PASS",
-      "age_hours": 3.61,
+      "status": "STALE",
+      "age_hours": 5.59,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.06,
+      "age_hours": 0.04,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 0.4,
+      "age_hours": 2.38,
       "threshold_hours": 4
     },
     {
@@ -32,30 +32,30 @@
     {
       "engine": "prediction_desk_health",
       "status": "PASS",
-      "age_hours": 0.03,
+      "age_hours": 0.04,
       "threshold_hours": 2
     },
     {
       "engine": "virtual_participant_history",
       "status": "STALE",
-      "max_input_age_minutes": 41.3,
-      "virtual_lab_status_age_minutes": 43.3,
+      "max_input_age_minutes": 160.3,
+      "virtual_lab_status_age_minutes": 162.4,
       "threshold_minutes": 30.0,
       "stale_inputs": []
     },
     {
       "engine": "tennis_forward_discovery",
       "status": "PASS",
-      "age_hours": 3.57,
+      "age_hours": 5.55,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
-      "status": "STALE",
-      "age_hours": 0.73,
+      "status": "PASS",
+      "age_hours": 0.05,
       "threshold_hours": 0.5,
       "heartbeat_source": "virtual_lab_live.json",
-      "events_count": 547
+      "events_count": 356
     },
     {
       "engine": "nba_live_observation_recorder",
@@ -72,11 +72,11 @@
       "lanes": {
         "darts_x": {
           "status": "RETIRED",
-          "artifact_at": "2026-11-01T01:40:41.460688+00:00"
+          "artifact_at": "2026-11-01T04:55:53.989896+00:00"
         },
         "table_tennis_x": {
           "status": "RETIRED",
-          "artifact_at": "2026-11-01T01:53:35.509359+00:00"
+          "artifact_at": "2026-11-01T04:55:19.552428+00:00"
         },
         "basketball_core_moneyline": {
           "status": "RETIRED",
@@ -103,14 +103,14 @@
   ],
   "issues": [
     {
-      "code": "VIRTUAL_PARTICIPANT_HISTORY_STALE",
-      "severity": "warning",
-      "detail": "input older than 30 minutes: participant_lifecycle, collector_status, model_evaluation; oldest participant/settlement/model input is 41.3 minutes old; virtual_lab_status.json is 43.3 minutes old; current eFootball/virtual predictions must remain withheld until the source collector publishes fresh data"
+      "code": "STALE_CORE_PREDICTION_PIPELINE",
+      "severity": "critical",
+      "detail": "updated_at age 5.59h exceeds 4h"
     },
     {
-      "code": "VIRTUAL_LIVE_FEED_STALE",
+      "code": "VIRTUAL_PARTICIPANT_HISTORY_STALE",
       "severity": "warning",
-      "detail": "virtual_lab_live.json age 0.73h exceeds 0.50h; a downstream Unified Upcoming refresh cannot substitute for a fresh source snapshot"
+      "detail": "input older than 30 minutes: participant_lifecycle, collector_status, model_evaluation; oldest participant/settlement/model input is 160.3 minutes old; virtual_lab_status.json is 162.4 minutes old; current eFootball/virtual predictions must remain withheld until the source collector publishes fresh data"
     },
     {
       "code": "NBA_LIVE_OBSERVATION_STALE",
@@ -121,6 +121,11 @@
       "code": "PDL_EXPERIMENTAL_FEED_STALE",
       "severity": "info",
       "detail": "PDL experimental source is STALE_SOURCE_UNAVAILABLE; last-success timestamp is 2026-10-24T09:41:33.194342+00:00. The current prediction feed contains no PDL rows, so stale fixtures remain withheld."
+    },
+    {
+      "code": "PIPELINE_STALE",
+      "severity": "critical",
+      "detail": "pipeline_status age 5.59h exceeds 4h"
     }
   ],
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
@@ -130,7 +135,7 @@
     "stale_live_flags_hidden": 0,
     "expired_settled_rows_hidden": 0,
     "virtual_market_rows_held_for_kickoff_window": 0,
-    "virtual_rows_held_for_stale_participant_history": 2832,
+    "virtual_rows_held_for_stale_participant_history": 1395,
     "virtual_rows_held_for_recent_product_drawdown": 27
   }
 }
