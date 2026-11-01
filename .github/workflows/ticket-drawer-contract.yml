@@ -1,0 +1,45 @@
+name: Match Signal Ticket Drawer Contract
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'basketball.html'
+      - 'football.html'
+      - 'tennis.html'
+      - 'odds-builder.html'
+      - 'ticket-drawer.js'
+      - 'ticket-drawer.css'
+      - 'functions/api/sportybet-booking.js'
+      - 'basketball-live.js'
+      - 'scripts/test_ticket_drawer_contract.py'
+      - '.github/workflows/ticket-drawer-contract.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'basketball.html'
+      - 'football.html'
+      - 'tennis.html'
+      - 'odds-builder.html'
+      - 'ticket-drawer.js'
+      - 'ticket-drawer.css'
+      - 'functions/api/sportybet-booking.js'
+      - 'basketball-live.js'
+      - 'scripts/test_ticket_drawer_contract.py'
+      - '.github/workflows/ticket-drawer-contract.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  ticket-drawer-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check drawer and Cloudflare booking handler syntax
+        run: |
+          node --check ticket-drawer.js
+          node --check functions/api/sportybet-booking.js
+      - name: Check live booking and sport-desk contract
+        run: python scripts/test_ticket_drawer_contract.py

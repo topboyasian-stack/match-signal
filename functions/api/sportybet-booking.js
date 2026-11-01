@@ -347,11 +347,13 @@ function findVirtualSelection(leg, event) {
 
 function findWinnerSelection(leg, event) {
   const pick = String(leg?.pick || '').toLowerCase();
+  const sport = String(leg?.sport || '').toLowerCase();
   const markets = Array.isArray(event?.markets) ? event.markets : [];
   const market = markets.find(m => {
     const id = String(m?.id || '');
     const desc = String(m?.desc || m?.name || m?.title || '').toLowerCase();
-    return id === '1' || /3.?way|1x2|match winner|winner/.test(desc);
+    return id === '1' || /3.?way|1x2|match winner|winner/.test(desc) ||
+      (sport === 'tennis' && ['186', '210'].includes(id));
   });
   if (!market) return { error: 'SportyBet winner market is no longer available.' };
 
@@ -362,6 +364,8 @@ function findWinnerSelection(leg, event) {
     const active = o?.isActive == null || Number(o.isActive) === 1 || o.isActive === true;
     if (!active) return false;
     if (pick === 'draw') return /^(draw|x)$/.test(name);
+    if (pick === 'p1') return (targetTeam && name === String(targetTeam).trim().toLowerCase()) || /^(home|1|p1|player 1)$/.test(name);
+    if (pick === 'p2') return (targetTeam && name === String(targetTeam).trim().toLowerCase()) || /^(away|2|p2|player 2)$/.test(name);
     return targetTeam && name === String(targetTeam).trim().toLowerCase();
   });
   if (!outcome) return { error: 'The exact SportyBet winner outcome is no longer available.' };
@@ -396,22 +400,45 @@ async function buildSelection(leg, event) {
 async function handlePost(context) {
   try {
     const body = await context.request.json();
-    const batchId = String(body?.batch_id || '').trim();
-    // Desk research batches are first-class Builder batches too; preserve the existing standard ID contract.
-    if (!/^(?:DESK-)?BATCH-[0-9]{2}$/.test(batchId)) {
-      return json({ ok: false, error: 'INVALID_BATCH_ID' }, 400);
-    }
+    const manualMode = body?.mode === 'manual' || Array.isArray(body?.manual_selections);
+    const batchId = manualMode ? 'MANUAL-TICKET' : String(body?.batch_id || '').trim();
+    let legs = [];
 
-    const builder = await loadBuilder(context);
-    const batches = Array.isArray(builder?.batches) ? builder.batches : [];
-    const batch = batches.find(item => String(item?.batch_id || '') === batchId);
-    if (!batch) {
-      return json({ ok: false, error: 'BATCH_NOT_FOUND', batch_id: batchId }, 404);
-    }
-
-    const legs = Array.isArray(batch?.legs) ? batch.legs : [];
-    if (!legs.length) {
-      return json({ ok: false, error: 'EMPTY_BATCH', batch_id: batchId }, 422);
+    if (manualMode) {
+      const supplied = Array.isArray(body?.manual_selections) ? body.manual_selections : [];
+      if (supplied.length < 2 || supplied.length > 20) {
+        return json({ ok: false, error: 'INVALID_MANUAL_LEG_COUNT', message: 'A manual SportyBet slip needs 2–20 selections.' }, 422);
+      }
+      legs = supplied.map(item => ({
+        event_id: String(item?.event_id || ''),
+        sport: String(item?.sport || '').toLowerCase(),
+        market: String(item?.market || 'winner').toLowerCase(),
+        pick: String(item?.pick || '').toLowerCase(),
+        start_time: String(item?.start_time || ''),
+        player_1: String(item?.player_1 || ''),
+        player_2: String(item?.player_2 || ''),
+        match: String(item?.match || (String(item?.player_1 || '') + ' vs ' + String(item?.player_2 || '')))
+      }));
+      const ids = legs.map(leg => leg.event_id);
+      if (legs.some(leg => !leg.event_id || !leg.player_1 || !leg.player_2 ||
+          !['football', 'tennis'].includes(leg.sport) ||
+          !['winner', '1x2'].includes(leg.market) ||
+          !['p1', 'p2', 'draw'].includes(leg.pick) ||
+          (leg.sport === 'tennis' && leg.pick === 'draw')) ||
+          ids.some(id => !id) || new Set(ids).size !== ids.length) {
+        return json({ ok: false, error: 'INVALID_MANUAL_SELECTION', message: 'Manual slips currently support one winner selection per distinct pre-match football or tennis event.' }, 422);
+      }
+    } else {
+      // Desk research batches remain subject to their existing Builder qualification gates.
+      if (!/^(?:DESK-)?BATCH-[0-9]{2}$/.test(batchId)) {
+        return json({ ok: false, error: 'INVALID_BATCH_ID' }, 400);
+      }
+      const builder = await loadBuilder(context);
+      const batches = Array.isArray(builder?.batches) ? builder.batches : [];
+      const batch = batches.find(item => String(item?.batch_id || '') === batchId);
+      if (!batch) return json({ ok: false, error: 'BATCH_NOT_FOUND', batch_id: batchId }, 404);
+      legs = Array.isArray(batch?.legs) ? batch.legs : [];
+      if (!legs.length) return json({ ok: false, error: 'EMPTY_BATCH', batch_id: batchId }, 422);
     }
     if (legs.length > 20) {
       return json({ ok: false, error: 'TOO_MANY_SELECTIONS', message: 'SportyBet booking codes support at most 20 selections.' }, 422);
@@ -487,6 +514,23 @@ async function handlePost(context) {
       if (!event) {
         validation.push({ event_id: eventId, ok: false, excluded: true, reason: 'Event is no longer present in SportyBet current catalogue.' });
         continue;
+      }
+      if (manualMode) {
+        const canon = value => String(value || '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ');
+        const requestedStart = Date.parse(String(leg?.start_time || ''));
+        const currentStart = Number(event?.estimateStartTime || 0);
+        const namesMatch = [leg.player_1, leg.player_2].every(name =>
+          [event.homeTeamName, event.awayTeamName].some(current => canon(name) === canon(current))
+        );
+        if (!namesMatch || !leg.player_1 || !leg.player_2 || canon(leg.player_1) === canon(leg.player_2)) {
+          validation.push({ event_id: eventId, ok: false, excluded: true, reason: 'Participant identity changed in SportyBet current catalogue.' });
+          continue;
+        }
+        if (Number.isFinite(requestedStart) && currentStart &&
+            Math.abs(requestedStart - currentStart) > 45 * 60 * 1000) {
+          validation.push({ event_id: eventId, ok: false, excluded: true, reason: 'Fixture start time changed by more than 45 minutes; refresh the slip.' });
+          continue;
+        }
       }
       if (!isOpenEvent(event)) {
         validation.push({ event_id: eventId, ok: false, excluded: true, reason: 'Event has started or SportyBet has closed pre-match booking.' });
