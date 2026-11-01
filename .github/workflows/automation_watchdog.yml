@@ -97,19 +97,24 @@ jobs:
         shell: bash
         run: |
           python - <<'PY'
-          import json, os, subprocess
+          import gzip, json, os, subprocess
           from datetime import datetime, timezone
           from pathlib import Path
 
           def load(path):
               try:
-                  return json.loads(Path(path).read_text())
+                  if str(path).endswith('.gz'):
+                      with gzip.open(path, 'rt', encoding='utf-8') as source:
+                          return json.load(source)
+                  return json.loads(Path(path).read_text(encoding='utf-8'))
               except Exception:
                   return {}
 
           now = datetime.now(timezone.utc)
           virtual = load('data/virtual_lab_live.json')
-          nba_live = load('data/nba_live_observations.json')
+          nba_live = load('data/nba_live_observations.json.gz')
+          if not nba_live.get('updated_at'):
+              nba_live = load('data/nba_live_observations.json')
           nba_totals_ledger = load('data/nba_totals_ledger.json')
           virtual_status = load('data/virtual_lab_status.json')
           virtual_lifecycle = load('data/virtual_lab_participant_lifecycle.json')
@@ -444,7 +449,7 @@ jobs:
                       'action':'nba_live_recorder_failsafe_dispatch',
                       'status':'requested' if result.returncode == 0 else 'failed',
                       'detail':result.stderr.strip() if result.returncode else (
-                          'Dispatched because nba_live_observations.json age '
+                          'Dispatched because nba_live_observations.json.gz age '
                           +str(nba_live_age_minutes)+' minutes exceeds '
                           +str(NBA_LIVE_MAX_AGE_MINUTES)+' minutes.'
                       )
