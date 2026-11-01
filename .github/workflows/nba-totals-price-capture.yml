@@ -6,6 +6,12 @@ on:
     # market quotes within the 15-minute audit window without rebuilding history.
     - cron: '7,22,37,52 * * * *'
   workflow_dispatch:
+  workflow_run:
+    # Re-capture prices when the model publishes a new fixture/line set.
+    # This is event-driven on the prediction refresh, not on every board render.
+    workflows:
+      - "Match Signal Live Expansion"
+    types: [completed]
   push:
     branches: [main]
     paths:
@@ -25,6 +31,7 @@ concurrency:
 
 jobs:
   capture:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
