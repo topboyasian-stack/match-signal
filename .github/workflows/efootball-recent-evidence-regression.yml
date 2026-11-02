@@ -1,0 +1,104 @@
+name: Match Signal eFootball Evidence and Booking Regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/efootball_desk_learning.py'
+      - 'scripts/test_efootball_desk_learning.py'
+      - 'scripts/unified_upcoming.py'
+      - 'scripts/test_upcoming_desk_policy.py'
+      - 'scripts/test_virtual_lab_recent_performance_gate.mjs'
+      - 'virtual-lab-app.js'
+      - 'virtual-lab/index.html'
+      - 'ticket-drawer.js'
+      - 'functions/api/sportybet-booking.js'
+      - 'scripts/test_ticket_drawer_contract.py'
+      - 'scripts/test_sportybet_booking_resilience.mjs'
+      - '.github/workflows/efootball-recent-evidence-regression.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  efootball-evidence-and-booking:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Python test dependency
+        run: python -m pip install requests
+      - name: Compile Python evidence and qualification modules
+        run: |
+          python -m py_compile scripts/efootball_desk_learning.py scripts/unified_upcoming.py scripts/test_efootball_desk_learning.py scripts/test_upcoming_desk_policy.py
+      - name: Test recent result counting by independent fixture
+        run: python scripts/test_efootball_desk_learning.py
+      - name: Test backend eFootball qualification policy
+        run: python scripts/test_upcoming_desk_policy.py
+      - name: Reconcile actual settled eFootball evidence by product
+        run: |
+          python scripts/efootball_desk_learning.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report=json.loads(Path('data/efootball_desk_learning.json').read_text())
+          for product in ('efootball_gt','efootball_adriatic'):
+              metrics=(report.get('by_product') or {}).get(product) or {}
+              recent=metrics.get('recent_window') or {}
+              n=int(recent.get('unique_fixtures') or 0)
+              accuracy=recent.get('accuracy')
+              brier=recent.get('brier')
+              passed=(recent.get('window_unit')=='unique_product_fixture_clusters'
+                      and n>=30 and accuracy is not None and accuracy>=0.55
+                      and brier is not None and brier<=0.25)
+              print(json.dumps({
+                  'product':product,
+                  'settled_predictions':metrics.get('settled_predictions',0),
+                  'settled_fixtures':metrics.get('settled_fixtures',0),
+                  'recent_unique_fixtures':n,
+                  'recent_line_decisions':recent.get('decision_count',0),
+                  'recent_accuracy':accuracy,
+                  'recent_brier':brier,
+                  'release_gate':'PASS' if passed else 'PAUSED'
+              },sort_keys=True))
+          PY
+      - name: Test Virtual Lab product-specific gate and quality boundary
+        run: |
+          node --check virtual-lab-app.js
+          node scripts/test_virtual_lab_recent_performance_gate.mjs
+      - name: Test shared Football, Tennis, Basketball and eFootball booking contract
+        run: |
+          node --check ticket-drawer.js
+          node --check functions/api/sportybet-booking.js
+          node --check scripts/test_sportybet_booking_resilience.mjs
+          python scripts/test_ticket_drawer_contract.py
+          node scripts/test_sportybet_booking_resilience.mjs
+      - name: Smoke-test deployed booking endpoint rejects an empty slip safely
+        run: |
+          node --input-type=module <<'NODE'
+          const response = await fetch('https://match-signal.pages.dev/api/sportybet-booking', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'Cache-Control': 'no-store' },
+            body: JSON.stringify({ mode: 'manual', manual_selections: [] }),
+            cache: 'no-store',
+            signal: AbortSignal.timeout(15000)
+          });
+          const raw = await response.text();
+          const contentType = String(response.headers.get('content-type') || '').toLowerCase();
+          let payload = null;
+          try { payload = JSON.parse(raw); } catch {}
+          if (response.status !== 422 ||
+              !contentType.includes('application/json') ||
+              payload?.error !== 'INVALID_MANUAL_LEG_COUNT' ||
+              payload?.booking_code) {
+            throw new Error('Production booking endpoint did not return the expected JSON rejection: HTTP ' +
+              response.status + ', content-type ' + contentType + ', body ' + raw.replace(/\s+/g, ' ').slice(0, 240));
+          }
+          console.log('Production booking endpoint returned HTTP 422 JSON for an empty ticket; no booking code was generated.');
+          NODE

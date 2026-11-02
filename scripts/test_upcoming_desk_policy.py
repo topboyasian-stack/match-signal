@@ -845,23 +845,36 @@ class UpcomingDeskPolicyTests(unittest.TestCase):
 
     def test_efootball_recent_product_drawdown_pauses_qualification(self):
         gate = ns["efootball_recent_performance_gate"]
-        drawdown = {"by_product": {"efootball_gt": {"recent_window": {
-            "n": 50, "accuracy": 0.44, "brier": 0.2516978982
-        }}}}
+        def recent(n, accuracy, brier):
+            return {
+                "n": n, "unique_fixtures": n, "decision_count": n + 12,
+                "accuracy": accuracy, "brier": brier,
+                "window_unit": "unique_product_fixture_clusters",
+            }
+
+        drawdown = {"by_product": {"efootball_gt": {"recent_window": recent(30, 0.44, 0.2516978982)}}}
         paused = gate(drawdown, "efootball_gt")
         self.assertFalse(paused["pass"])
         self.assertEqual(paused["status"], "RECENT_PRODUCT_DRAWDOWN_PAUSE")
-        self.assertEqual(paused["recent_n"], 50)
-        recovered = {"by_product": {"efootball_gt": {"recent_window": {
-            "n": 50, "accuracy": 0.56, "brier": 0.24
-        }}}}
+        self.assertEqual(paused["recent_n"], 30)
+        self.assertEqual(paused["recent_decisions"], 42)
+
+        recovered = {"by_product": {"efootball_gt": {"recent_window": recent(30, 0.56, 0.24)}}}
         self.assertTrue(gate(recovered, "efootball_gt")["pass"])
-        immature = {"by_product": {"efootball_gt": {"recent_window": {
-            "n": 49, "accuracy": 0.70, "brier": 0.18
-        }}}}
+
+        poor_probability_quality = {"by_product": {"efootball_gt": {"recent_window": recent(30, 0.56, 0.26)}}}
+        self.assertFalse(gate(poor_probability_quality, "efootball_gt")["pass"])
+
+        immature = {"by_product": {"efootball_gt": {"recent_window": recent(29, 0.70, 0.18)}}}
         pending = gate(immature, "efootball_gt")
         self.assertFalse(pending["pass"])
         self.assertEqual(pending["status"], "RECENT_PRODUCT_EVIDENCE_PENDING")
+
+        # Legacy decision-counted windows cannot be mistaken for independent fixtures.
+        legacy = {"by_product": {"efootball_gt": {"recent_window": {
+            "n": 50, "accuracy": 0.70, "brier": 0.18
+        }}}}
+        self.assertEqual(gate(legacy, "efootball_gt")["status"], "RECENT_PRODUCT_EVIDENCE_PENDING")
         self.assertEqual(gate({}, "efootball_gt")["status"], "RECENT_PRODUCT_EVIDENCE_PENDING")
 
 

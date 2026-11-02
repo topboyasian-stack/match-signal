@@ -651,6 +651,76 @@ def settled_forecasts(trace):
     return rows
 
 
+def recent_fixture_window(forecasts, window=RECENT_WINDOW):
+    """Measure recent performance by unique product + fixture clusters.
+
+    Multiple totals lines from one match remain visible as decisions, but a
+    match contributes only one equally weighted cluster to the recent accuracy
+    gate. This prevents fixtures with more quoted lines from masquerading as
+    independent settled results.
+    """
+    grouped = {}
+    for row in forecasts:
+        key = fixture_key(row)
+        if key:
+            grouped.setdefault(key, []).append(row)
+
+    def settled_stamp(row):
+        return dt(row.get("settled_at")) or dt(row.get("observed_at"))
+
+    ordered = sorted(
+        grouped.values(),
+        key=lambda group: max(
+            (settled_stamp(row) or datetime.min.replace(tzinfo=timezone.utc) for row in group),
+            default=datetime.min.replace(tzinfo=timezone.utc),
+        ),
+    )
+    selected = ordered[-max(0, int(window)):] if window else []
+    fixture_rates = []
+    fixture_briers = []
+    decision_count = 0
+    wins = 0
+    first_stamp = None
+    last_stamp = None
+
+    for group in selected:
+        decisions = [row for row in group if isinstance(row.get("win"), bool)]
+        if not decisions:
+            continue
+        group_wins = sum(1 for row in decisions if row["win"])
+        decision_count += len(decisions)
+        wins += group_wins
+        fixture_rates.append(group_wins / len(decisions))
+        briers = []
+        for row in decisions:
+            probability = num(row.get("model_probability"))
+            if probability is None or not 0.0 <= probability <= 1.0:
+                continue
+            target = 1.0 if row["win"] else 0.0
+            briers.append((probability - target) ** 2)
+        if briers:
+            fixture_briers.append(sum(briers) / len(briers))
+        stamps = [settled_stamp(row) for row in decisions]
+        stamps = [stamp for stamp in stamps if stamp is not None]
+        if stamps:
+            group_first, group_last = min(stamps), max(stamps)
+            first_stamp = group_first if first_stamp is None else min(first_stamp, group_first)
+            last_stamp = group_last if last_stamp is None else max(last_stamp, group_last)
+
+    fixture_count = len(fixture_rates)
+    return {
+        "n": fixture_count,
+        "unique_fixtures": fixture_count,
+        "decision_count": decision_count,
+        "wins": wins,
+        "accuracy": sum(fixture_rates) / fixture_count if fixture_count else None,
+        "decision_accuracy": wins / decision_count if decision_count else None,
+        "brier": sum(fixture_briers) / len(fixture_briers) if fixture_briers else None,
+        "first_settled_at": first_stamp.isoformat() if first_stamp else None,
+        "last_settled_at": last_stamp.isoformat() if last_stamp else None,
+        "window_unit": "unique_product_fixture_clusters",
+    }
+
 def _probability_quality_metrics(rows, probability_field):
     """Proper-score and calibration metrics for one probability field on fixed settlements."""
     scored = []
@@ -975,42 +1045,28 @@ def main():
     products = sorted(
         {str(r.get("product") or "efootball_gt").strip().lower() for r in settled}
         | {str(r.get("product") or "efootball_gt").strip().lower() for r in trace if isinstance(r, dict)}
+        | {"efootball_gt", "efootball_adriatic"}
     )
     by_product = {}
     for product in products:
         product_settled = [r for r in settled if str(r.get("product") or "efootball_gt").strip().lower() == product]
-        recent = product_settled[-RECENT_WINDOW:]
+        recent = recent_fixture_window(product_settled)
         buckets = calibration(product_settled)
         raw_buckets = calibration(product_settled, probability_field="raw_model_probability")
         exact = exact_profiles(product_settled).get(product, {})
         bucket_active = any(int(b.get("n") or 0) >= MIN_CALIBRATION_N for b in buckets.values())
         raw_bucket_active = any(int(b.get("n") or 0) >= MIN_CALIBRATION_N for b in raw_buckets.values())
         exact_active = any(int(x.get("n") or 0) >= EXACT_MIN_N for x in exact.values())
-        recent_accuracy = (
-            sum(1 for r in recent if r.get("win")) / len(recent)
-            if recent else 0.0
-        )
-        recent_brier = (
-            sum(
-                (float(r.get("model_probability") or 0)
-                 - (1.0 if r.get("win") else 0.0)) ** 2
-                for r in recent
-            ) / len(recent)
-            if recent else None
-        )
         by_product[product] = {
             "active": bucket_active or raw_bucket_active or exact_active,
             "settled_predictions": len(product_settled),
+            "settled_fixtures": len({fixture_key(row) for row in product_settled if fixture_key(row)}),
             "pending_forecasts": sum(
                 1 for r in trace
                 if str(r.get("product") or "efootball_gt").strip().lower() == product
                 and is_pending_forecast(r)
             ),
-            "recent_window": {
-                "n": len(recent),
-                "accuracy": recent_accuracy,
-                "brier": recent_brier,
-            },
+            "recent_window": recent,
             "calibration": {
                 "active": bucket_active,
                 "minimum_bucket_predictions": MIN_CALIBRATION_N,
@@ -1051,6 +1107,8 @@ def main():
             "exact_selection_min_predictions": EXACT_MIN_N,
             "bucket_width": BUCKET_WIDTH,
             "recent_window": RECENT_WINDOW,
+            "recent_window_unit": "unique_product_fixture_clusters",
+            "recent_accuracy_weighting": "each fixture contributes once; multiple line decisions remain diagnostic only",
             "exact_scoring_granularity": "latest pre-kickoff forecast per product + fixture + totals line; different lines are scored independently",
             "future_leakage_protection": "only observations strictly before kickoff can become the scored forecast; settlement is read from independent virtual_lab_history",
             "products_are_never_pooled": True,
@@ -1058,7 +1116,7 @@ def main():
         "settled_predictions": int(gt.get("settled_predictions") or 0),
         "total_settled_predictions": len(settled),
         "pending_forecasts": int(gt.get("pending_forecasts") or 0),
-        "recent_window": gt.get("recent_window") or {"n": 0, "accuracy": 0.0, "brier": None},
+        "recent_window": gt.get("recent_window") or {"n": 0, "unique_fixtures": 0, "decision_count": 0, "accuracy": None, "brier": None, "window_unit": "unique_product_fixture_clusters"},
         "calibration": {
             **gt_calibration,
             "settled_predictions": int(gt.get("settled_predictions") or 0),

@@ -39,7 +39,7 @@ EFOOTBALL_DIRECTION_RECENT_WINDOW=50
 SETTLED_DESK_RETENTION_HOURS=2
 VIRTUAL_PARTICIPANT_INPUT_MAX_AGE_MINUTES=30
 EFOOTBALL_DESK_LEARNING_MIN_CALIBRATION_N=30
-EFOOTBALL_RECENT_WINDOW_MIN_N=50
+EFOOTBALL_RECENT_WINDOW_MIN_N=30
 EFOOTBALL_RECENT_MIN_HIT_RATE=0.55
 EFOOTBALL_RECENT_MAX_BRIER=0.25
 # Match the learner's declared exact_selection_min_predictions policy.
@@ -989,18 +989,26 @@ def efootball_recent_performance_gate(report, product="efootball_gt"):
         product_report = report
     recent = product_report.get("recent_window") if isinstance(product_report, dict) else {}
     recent = recent if isinstance(recent, dict) else {}
-    raw_n = num(recent.get("n"))
+    raw_n = num(recent.get("unique_fixtures"))
     n = int(raw_n) if raw_n is not None and raw_n >= 0 else 0
+    decision_count = int(num(recent.get("decision_count")) or 0)
     accuracy = num(recent.get("accuracy"))
     brier = num(recent.get("brier"))
-    evidence_ready = n >= EFOOTBALL_RECENT_WINDOW_MIN_N and accuracy is not None and brier is not None
+    evidence_ready = (
+        recent.get("window_unit") == "unique_product_fixture_clusters"
+        and n >= EFOOTBALL_RECENT_WINDOW_MIN_N
+        and accuracy is not None
+        and brier is not None
+    )
     passed = bool(evidence_ready and accuracy >= EFOOTBALL_RECENT_MIN_HIT_RATE and brier <= EFOOTBALL_RECENT_MAX_BRIER)
     status = ("RECENT_PRODUCT_EVIDENCE_PENDING" if not evidence_ready else
               "PASS" if passed else "RECENT_PRODUCT_DRAWDOWN_PAUSE")
     return {
         "product": product, "pass": passed, "status": status, "recent_n": n,
+        "recent_decisions": decision_count,
         "recent_accuracy": round(accuracy, 4) if accuracy is not None else None,
         "recent_brier": round(brier, 5) if brier is not None else None,
+        "recent_window_unit": recent.get("window_unit"),
         "minimum_n": EFOOTBALL_RECENT_WINDOW_MIN_N,
         "minimum_accuracy": EFOOTBALL_RECENT_MIN_HIT_RATE,
         "maximum_brier": EFOOTBALL_RECENT_MAX_BRIER,
@@ -1214,10 +1222,10 @@ def build_virtual_events(history, lifecycle, eligibility, participant_history_fr
         if not start or start<NOW-timedelta(minutes=30) or start>HORIZON:
             continue
         product=str(e.get("product") or "")
-        if product not in {"efootball_gt","vfootball"}:
-            # efootball_adriatic/zoom remain preserved in the research collector
-            # but are retired from forward prediction generation until they earn
-            # settled walk-forward evidence.
+        if product not in {"efootball_gt","efootball_adriatic","vfootball"}:
+            # eAdriatic gets its own forward forecast and calibration stream.
+            # Its empty historical record must be allowed to warm up; it never
+            # borrows GT history or bypasses product/model qualification gates.
             continue
         competition=str(e.get("competition") or e.get("tournament") or "Virtual")
         home=str(e.get("participant_1") or e.get("team_1") or e.get("home") or "")

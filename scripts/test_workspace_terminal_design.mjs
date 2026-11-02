@@ -61,7 +61,7 @@ assert.ok(reportsHtml.includes('id="reportGrid"') && reportsHtml.includes('id="r
 for (const mount of ['id="predictionDesk"', 'id="nearQualifiedRadar"', 'id="oddsBuilder"', 'id="labDiagnostics"', 'id="researchConclusion"']) {
   assert.ok(labHtml.includes(mount), "Virtual Lab mount must remain: " + mount);
 }
-assert.ok(labHtml.includes("../virtual-lab-app.js?v=20261031-recent-performance-guard1"), "Virtual Lab engine script must remain");
+assert.match(labHtml, /<script src="\.\.\/virtual-lab-app\.js\?v=[^"]+" defer><\/script>/, "Virtual Lab engine script must remain versioned and loaded");
 assert.ok(labHtml.includes("../virtual-lab-confirmed-watch.js?v=20261011-annotate-fix1"), "Virtual Lab participant monitor must remain");
 
 assert.ok(oddsHtml.includes('class="ob-page-header"') && oddsHtml.includes('class="ob-section-nav"') && oddsHtml.includes('class="ob-guide-grid"'), "Odds Builder must use the reorganized page hierarchy");
