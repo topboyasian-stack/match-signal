@@ -48,7 +48,8 @@ const cloudflare = fs.readFileSync(path.join(workflowsDir, "cloudflare-pages.yml
 assert.match(cloudflare, /name:\s*Deploy Match Signal to Cloudflare Pages/);
 assert.match(cloudflare, /https:\/\/match-signal\.pages\.dev/);
 assert.ok(
-  cloudflare.includes("--exclude='data/nba_live_observations.json'") &&
+  cloudflare.includes("|.github/workflows/efootball-recent-evidence-regression.yml|") &&
+    cloudflare.includes("--exclude='data/nba_live_observations.json'") &&
     cloudflare.includes("test ! -e .pages-deploy/data/nba_live_observations.json"),
   "The private 30-day NBA live-observation archive must stay out of the public Pages asset package.",
 );
@@ -84,6 +85,14 @@ assert.ok(
     cloudflare.includes("NBA live-summary proxy passed"),
   "The eFootball quote-coverage regression, NBA projection test, visual audit and ESPN summary proxy must be explicitly approved and verified.",
 );
+const virtualLabHtml = fs.readFileSync("virtual-lab/index.html", "utf8");
+const virtualLabAppAsset = virtualLabHtml.match(/<script src="(\.\.\/virtual-lab-app\.js\?v=[^"]+)" defer><\/script>/);
+assert.ok(virtualLabAppAsset, "Virtual Lab page must reference a versioned engine script");
+assert.ok(
+  cloudflare.includes(virtualLabAppAsset[1]),
+  "Cloudflare production smoke test must verify the same Virtual Lab app version referenced by the page",
+);
+
 const liveCoverageTest = fs.readFileSync("scripts/test_live_virtual_quote_coverage.mjs", "utf8");
 assert.ok(
   liveCoverageTest.includes("../data/efootball_desk_learning.json") &&
