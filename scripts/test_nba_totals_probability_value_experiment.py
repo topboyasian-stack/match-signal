@@ -6,6 +6,7 @@ from nba_totals_probability_value_experiment import (
     _settlement_probabilities,
     _value_decision,
     snapshot_clv_audit,
+    probability_score_summary,
     run_experiment,
 )
 from nba_totals_walk_forward import EVALUATION_CUTOFF_UTC
@@ -100,6 +101,27 @@ def test_snapshot_clv_excludes_old_update_from_near_close_sample():
     assert report["fixtures"][0]["clv_status"] == "LATER_PREGAME_CAPTURE_OUTSIDE_CLOSE_WINDOW"
 
 
+def test_probability_scores_compare_model_and_no_vig_market_descriptively():
+    rows = [
+        {
+            "event_id": "a", "settled_result": "over",
+            "model_probability": {"over": 0.65, "under": 0.35},
+            "market_no_vig_probability": {"over": 0.50, "under": 0.50},
+        },
+        {
+            "event_id": "b", "settled_result": "under",
+            "model_probability": {"over": 0.40, "under": 0.60},
+            "market_no_vig_probability": {"over": 0.50, "under": 0.50},
+        },
+    ]
+    result = probability_score_summary(rows)
+    assert result["n"] == 2
+    assert result["model_brier"] < result["market_no_vig_brier"]
+    assert result["model_log_loss"] < result["market_no_vig_log_loss"]
+    assert result["sufficient_for_probability_validation"] is False
+    assert len(result["over_probability_buckets"]) == 2
+
+
 def test_value_decision_rejects_calibration_failure():
     result = _value_decision(
         200.0, 200.5, 1.95, 1.95, [5.0] * 100,
@@ -170,8 +192,9 @@ if __name__ == "__main__":
     test_probability_mass_and_integer_push()
     test_snapshot_clv_uses_only_later_exact_pregame_quote()
     test_snapshot_clv_excludes_old_update_from_near_close_sample()
+    test_probability_scores_compare_model_and_no_vig_market_descriptively()
     test_value_decision_rejects_calibration_failure()
     test_value_decision_requires_positive_lower_bound_and_edge()
     test_push_does_not_count_as_a_loss()
     test_full_report_keeps_prospective_holdout_locked()
-    print("NBA totals probability/value experiment tests: PASS (7 groups)")
+    print("NBA totals probability/value experiment tests: PASS (8 groups)")
