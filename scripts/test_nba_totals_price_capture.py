@@ -49,10 +49,27 @@ class PriceCaptureTests(unittest.TestCase):
         page_script = (root / "basketball-live.js").read_text(encoding="utf-8")
         page_html = (root / "basketball.html").read_text(encoding="utf-8")
         proxy_script = (root / "functions" / "api" / "sportybet-basketball.js").read_text(encoding="utf-8")
+        booking_script = (root / "functions" / "api" / "sportybet-booking.js").read_text(encoding="utf-8")
         self.assertIn("tournamentId=sr%3Atournament%3A132", page_script)
         self.assertIn("basketball-live.js?v=20261102-nba-feed-scope2", page_html)
         self.assertIn("u.searchParams.get('tournamentId')||NBA_TOURNAMENT_ID", proxy_script)
         self.assertIn("if(tournamentId!==NBA_TOURNAMENT_ID)", proxy_script)
+
+        # Any slip containing NBA totals must fail closed instead of returning
+        # a share code when either our validation or SportyBet accepts only
+        # part of the requested set of legs.
+        self.assertIn("const hasBasketballLeg = legs.some", booking_script)
+        self.assertIn("if (hasBasketballLeg && preExcluded.length > 0)", booking_script)
+        self.assertIn("BASKETBALL_SLIP_REJECTED_PARTIAL", booking_script)
+        self.assertIn("booking_code_withheld: true", booking_script)
+        self.assertLess(
+            booking_script.index("if (hasBasketballLeg && preExcluded.length > 0)"),
+            booking_script.index("const sharePayload = JSON.stringify"),
+        )
+        self.assertLess(
+            booking_script.index("unavailable.length > 0 ||"),
+            booking_script.index("const deadline = Number(data?.deadline || 0);"),
+        )
 
 
     def setUp(self):
