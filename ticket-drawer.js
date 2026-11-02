@@ -34,3 +34,4 @@
   window.MatchSignalTicket={addSelection:addSelection,open:openDrawer,getSelectionCount:function(){return slip.length;}};
   render();
 })();
+// Production promotion marker: shared cross-sport ticket drawer and selectable-prediction assets are ready for Cloudflare verification (2026-11-02).
