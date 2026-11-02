@@ -92,3 +92,93 @@ jobs:
           set -euo pipefail
           gh workflow run nba-totals-price-capture.yml --ref main
           echo "Dispatched the existing exact SportyBet market-225 capture workflow."
+
+      - name: Count queued or running NBA model refresh workflows
+        id: active_model
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          active="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/live-expansion.yml/runs?branch=main&per_page=20" --jq '[.workflow_runs[] | select(.status == "queued" or .status == "in_progress")] | length')"
+          echo "count=$active" >> "$GITHUB_OUTPUT"
+          echo "Active NBA model refresh runs: $active"
+
+      - name: Decide whether the NBA pre-game model publication is stale
+        id: model_freshness
+        env:
+          ACTIVE_MODEL_RUNS: ${{ steps.active_model.outputs.count }}
+        run: |
+          set -euo pipefail
+          python - <<'PY' | tee -a "$GITHUB_OUTPUT"
+          import json
+          import os
+          import sys
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          sys.path.insert(0, "scripts")
+          from nba_totals_capture_watchdog import (
+              should_dispatch_model_refresh,
+              stale_upcoming_prediction_count,
+          )
+
+          now = datetime.now(timezone.utc)
+          try:
+              predictions = json.loads(Path("data/nba_predictions.json").read_text(encoding="utf-8"))
+          except Exception:
+              predictions = None
+          try:
+              status = json.loads(Path("data/expansion_status.json").read_text(encoding="utf-8"))
+          except Exception:
+              status = {}
+          nba_status = (status.get("competitions") or {}).get("NBA") or {}
+          schedule_count = int(nba_status.get("current_fixtures") or 0)
+          if isinstance(predictions, list):
+              upcoming = []
+              for row in predictions:
+                  if not isinstance(row, dict):
+                      continue
+                  try:
+                      start = datetime.fromisoformat(str(row.get("start_time") or "").replace("Z", "+00:00"))
+                      if start.tzinfo is None:
+                          start = start.replace(tzinfo=timezone.utc)
+                      if start.astimezone(timezone.utc) > now:
+                          upcoming.append(row)
+                  except ValueError:
+                      continue
+              # A known populated NBA schedule with no upcoming forecasts is a stale publication too.
+              if schedule_count > 0 and not upcoming:
+                  predictions = None
+
+          stale_count = stale_upcoming_prediction_count(predictions, now)
+          active = int(os.environ.get("ACTIVE_MODEL_RUNS", "0"))
+          dispatch = should_dispatch_model_refresh(
+              predictions,
+              status.get("updated_at"),
+              now,
+              active_model_runs=active,
+              max_age_hours=6,
+              min_retry_minutes=30,
+          )
+          print(f"stale_upcoming_predictions={stale_count if stale_count is not None else 'unknown'}")
+          print(f"nba_schedule_fixtures={schedule_count}")
+          print(f"active_model_runs={active}")
+          print(f"dispatch={'true' if dispatch else 'false'}")
+          if dispatch:
+              print("reason=stale_or_missing_pregame_model_and_no_active_run_after_retry_cooldown")
+          elif active:
+              print("reason=model_refresh_already_queued_or_running")
+          elif stale_count == 0:
+              print("reason=upcoming_model_projections_within_six_hour_window")
+          else:
+              print("reason=recent_model_attempt_cooldown_or_future_status_clock_skew")
+          PY
+
+      - name: Dispatch NBA pre-game model recovery
+        if: steps.model_freshness.outputs.dispatch == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh workflow run live-expansion.yml --ref main
+          echo "Dispatched the existing NBA model/fixture refresh; basketball release remains research-only."
