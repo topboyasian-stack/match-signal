@@ -80,9 +80,16 @@ def main():
             "Football/Tennis participants must be matched to current SportyBet event identity")
     require("function canonicalParticipant(value)" in api and ".normalize('NFD')" in api,
             "Participant matching must normalize accented player names")
-    require("function sameParticipantPair(first, second, event)" in api and
+    require("function sameParticipantPair(first, event)" in api and
             "sameParticipantPair([first, second], event)" in api,
             "Current Tennis event matching must accept the same two players in either order")
+    require("function participantNameMatches(first, second)" in api and
+            "tokens[1].length === 1" in api and "tokens.reverse()" in api,
+            "Tennis player matching must handle trailing initials such as Surname A.")
+    require("actual half-point total" in api and "explicitLine" in api,
+            "Exact SportyBet total specifiers must override integer base lines")
+    require("specifierText.match(/(?:^|[,\\s;|&])(?:total|line)" in api,
+            "Exact total specifier parsing must use whitespace-aware matching")
     require("selectedIsHome" in api and "selectedIsAway" in api and
             "The exact current SportyBet winner market or selected player outcome" in api,
             "Tennis winner mapping must preserve the selected player after SportyBet reverses participant order")
