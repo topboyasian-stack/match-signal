@@ -2,7 +2,10 @@
 
 from datetime import datetime, timezone
 
-from nba_totals_capture_watchdog import (\n    capture_age_minutes, should_dispatch_capture,\n    stale_upcoming_prediction_count, should_dispatch_model_refresh,\n)
+from nba_totals_capture_watchdog import (
+    capture_age_minutes, should_dispatch_capture,
+    stale_upcoming_prediction_count, should_dispatch_model_refresh,
+)
 
 
 def dt(value):
