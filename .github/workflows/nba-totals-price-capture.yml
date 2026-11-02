@@ -62,6 +62,27 @@ jobs:
       - name: Capture fresh SportyBet market-225 pairs and update the totals audit
         run: PYTHONPATH=scripts python scripts/capture_nba_totals_prices.py
 
+      - name: Verify regenerated fixed-cutoff evaluation report
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path("data/nba_totals_oos_value_test.json").read_text(encoding="utf-8"))
+          expected = "2026-11-02T02:00:00+00:00"
+          assert report.get("evaluation_type") == "NBA_TOTALS_FIXED_CUTOFF_V2"
+          assert report.get("holdout_protocol", {}).get("fixed_cutoff_utc") == expected
+          audit = report.get("market_record_audit")
+          assert isinstance(audit, list), "per-fixture market audit is missing"
+          ids = [row.get("event_id") for row in audit]
+          assert len(ids) == len(set(ids)), "a fixture was counted more than once"
+          assert report.get("market_overall", {}).get("roi_ci_method", "").startswith("deterministic fixture-level percentile bootstrap")
+          assert report.get("paper_only") is True
+          print("Fixed cutoff:", expected)
+          print("Verified market records:", len(audit))
+          print("Market holdout bets:", report.get("market_holdout", {}).get("n"))
+          print("Release decision:", report.get("release_decision"))
+          PY
+
       - name: Publish immutable price snapshots and capture status
         shell: bash
         run: |
