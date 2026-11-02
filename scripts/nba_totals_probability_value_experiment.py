@@ -96,6 +96,123 @@ def _interval_coverage(calibration_residuals, validation_residuals, confidence):
     }
 
 
+def historical_probability_validation(validation_rows, calibration_residuals):
+    """Score residual-derived O/U probabilities on untouched historical validation games.
+
+    Lines are synthetic offsets around each model forecast, not invented bookmaker quotes.
+    This is probability validation of the score model only, never a historical betting ROI test.
+    """
+    offsets = (-7.5, -5.0, -2.5, 0.0, 2.5, 5.0, 7.5)
+    observations = []
+    for row in validation_rows:
+        forecast = float(row["forecast_total"])
+        actual = float(row["actual_total"])
+        for offset in offsets:
+            line = round((forecast + offset) * 2.0) / 2.0
+            model = _settlement_probabilities(forecast, line, calibration_residuals)
+            outcome = (
+                "over" if actual > line
+                else "under" if actual < line
+                else "push"
+            )
+            if outcome == "push":
+                continue
+            total_probability = model["over"] + model["under"]
+            if total_probability <= 0:
+                continue
+            model_over = model["over"] / total_probability
+            actual_over = 1.0 if outcome == "over" else 0.0
+            observations.append({
+                "event_id": row.get("event_id"),
+                "offset_from_forecast": offset,
+                "line": line,
+                "model_over_probability": model_over,
+                "outcome": outcome,
+                "actual_over": actual_over,
+                "model_brier": (model_over - actual_over) ** 2,
+                "coinflip_brier": (0.5 - actual_over) ** 2,
+                "model_log_loss": -math.log(max(1e-12, model_over if actual_over else 1.0 - model_over)),
+                "coinflip_log_loss": -math.log(0.5),
+            })
+
+    def summarize(rows):
+        n = len(rows)
+        if not n:
+            return {"n": 0, "brier": None, "log_loss": None}
+        return {
+            "n": n,
+            "brier": round(sum(row["model_brier"] for row in rows) / n, 6),
+            "log_loss": round(sum(row["model_log_loss"] for row in rows) / n, 6),
+        }
+
+    offset_results = []
+    for offset in offsets:
+        rows = [row for row in observations if row["offset_from_forecast"] == offset]
+        model = summarize(rows)
+        n = len(rows)
+        offset_results.append({
+            "offset_from_model_forecast_points": offset,
+            "n": n,
+            "model_brier": model["brier"],
+            "coinflip_brier": round(sum(row["coinflip_brier"] for row in rows) / n, 6) if n else None,
+            "model_log_loss": model["log_loss"],
+            "coinflip_log_loss": round(sum(row["coinflip_log_loss"] for row in rows) / n, 6) if n else None,
+            "model_brier_improves_on_coinflip": (
+                model["brier"] < sum(row["coinflip_brier"] for row in rows) / n
+                if n else False
+            ),
+        })
+
+    n = len(observations)
+    if n:
+        bins = []
+        for bucket in range(10):
+            lower, upper = bucket / 10.0, (bucket + 1) / 10.0
+            selected = [
+                row for row in observations
+                if lower <= row["model_over_probability"] < upper
+                or (bucket == 9 and row["model_over_probability"] == 1.0)
+            ]
+            if not selected:
+                continue
+            bins.append({
+                "range": f"{lower:.1f}-{upper:.1f}",
+                "n": len(selected),
+                "mean_predicted_over_probability": round(
+                    sum(row["model_over_probability"] for row in selected) / len(selected), 4
+                ),
+                "observed_over_rate": round(
+                    sum(row["actual_over"] for row in selected) / len(selected), 4
+                ),
+            })
+        model_brier = sum(row["model_brier"] for row in observations) / n
+        coinflip_brier = sum(row["coinflip_brier"] for row in observations) / n
+        model_log = sum(row["model_log_loss"] for row in observations) / n
+        coinflip_log = sum(row["coinflip_log_loss"] for row in observations) / n
+    else:
+        bins = []
+        model_brier = coinflip_brier = model_log = coinflip_log = None
+    return {
+        "protocol": "Empirical calibration residuals evaluated on later historical forecast games at seven synthetic half-point line offsets around each forecast. No historical SportyBet lines or odds are assumed.",
+        "unique_validation_games": len(validation_rows),
+        "synthetic_game_line_observations": n,
+        "pushes_excluded": len(validation_rows) * len(offsets) - n,
+        "model_brier": round(model_brier, 6) if model_brier is not None else None,
+        "coinflip_baseline_brier": round(coinflip_brier, 6) if coinflip_brier is not None else None,
+        "model_log_loss": round(model_log, 6) if model_log is not None else None,
+        "coinflip_baseline_log_loss": round(coinflip_log, 6) if coinflip_log is not None else None,
+        "model_brier_improves_on_coinflip": (
+            bool(model_brier < coinflip_brier) if model_brier is not None and coinflip_brier is not None else False
+        ),
+        "model_log_loss_improves_on_coinflip": (
+            bool(model_log < coinflip_log) if model_log is not None and coinflip_log is not None else False
+        ),
+        "probability_reliability_bins": bins,
+        "by_line_offset": offset_results,
+        "not_a_sportybet_market_backtest": True,
+    }
+
+
 def fit_residual_distribution(history):
     forecasts = [
         row for row in build_forecasts(clean_history(history))
@@ -144,6 +261,10 @@ def fit_residual_distribution(history):
         "calibration_n": len(calibration),
         "validation_n": len(validation),
         "calibration_residuals": calibration_residuals,
+        "historical_probability_validation": historical_probability_validation(
+            [{**row, "forecast_total": _prediction(row, weight, bias)} for row in validation],
+            calibration_residuals,
+        ),
         "training_period": {
             "start_utc": training[0]["date"],
             "end_utc": training[-1]["date"],
@@ -545,6 +666,7 @@ def run_experiment(history, ledger, predictions, now=None, snapshots=None):
     now = now or datetime.now(timezone.utc)
     fitted = fit_residual_distribution(history)
     residuals = fitted.pop("calibration_residuals")
+    historical_probability_scores = fitted.pop("historical_probability_validation")
     calibration_ok = (
         fitted["coverage_check"] == "PASS"
         and fitted["calibration_n"] >= MIN_CALIBRATION_RESIDUALS
@@ -640,11 +762,12 @@ def run_experiment(history, ledger, predictions, now=None, snapshots=None):
     return {
         "generated_at": now.isoformat(),
         "paper_only": True,
-        "experiment": "NBA_TOTALS_EMPIRICAL_RESIDUAL_VALUE_V2",
+        "experiment": "NBA_TOTALS_EMPIRICAL_RESIDUAL_VALUE_V3",
         "model_version": "nba-total-v5-pace-efficiency-calibrated",
         "model_projection_market_blind": True,
         "prospective_holdout_cutoff_utc": EVALUATION_CUTOFF_UTC.isoformat(),
         "prospective_holdout_used_for_calibration": False,
+        "historical_probability_validation": historical_probability_scores,
         "calibration_protocol": {
             "train_cutoff_utc": CALIBRATION_TRAIN_CUTOFF_UTC.isoformat(),
             "validation_cutoff_utc": HISTORICAL_VALIDATION_CUTOFF_UTC.isoformat(),
