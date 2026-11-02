@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 """Regression tests for fresh immutable NBA market-225 price capture."""
+import copy
+import json
+import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
 from expansion_pipeline import NBA_TOTALS_MODEL_VERSION
+from live_expansion_pipeline import append_nba_totals_publication_snapshots
 from capture_nba_totals_prices import attach_fresh_quote, capture, capture_timestamp, diagnose_fixture_quote, nearby_feed_events, sportybet_basketball_feed_paged
 
 
@@ -46,7 +50,7 @@ class PriceCaptureTests(unittest.TestCase):
         page_html = (root / "basketball.html").read_text(encoding="utf-8")
         proxy_script = (root / "functions" / "api" / "sportybet-basketball.js").read_text(encoding="utf-8")
         self.assertIn("tournamentId=sr%3Atournament%3A132", page_script)
-        self.assertIn("basketball-live.js?v=20261102-nba-feed-scope1", page_html)
+        self.assertIn("basketball-live.js?v=20261102-nba-feed-scope2", page_html)
         self.assertIn("u.searchParams.get('tournamentId')||NBA_TOURNAMENT_ID", proxy_script)
         self.assertIn("if(tournamentId!==NBA_TOURNAMENT_ID)", proxy_script)
 
@@ -122,6 +126,42 @@ class PriceCaptureTests(unittest.TestCase):
         self.assertEqual(market["projection_edge_points"], 4.0)
         self.assertTrue(prediction["signal_quality"]["total_market_available"])
         self.assertEqual(prediction["markets"]["moneyline"]["home"], 0.55)
+
+    def test_new_quote_timestamp_gets_its_own_immutable_snapshot_not_a_new_bet(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "snapshots.json"
+            prediction = make_prediction(self.now)
+            prediction["generated_at"] = self.now.isoformat()
+            self.assertTrue(attach_fresh_quote(prediction, make_quote(self.now), self.now))
+
+            first_published = self.now + timedelta(seconds=3)
+            first = append_nba_totals_publication_snapshots(
+                [prediction], path, published_at=first_published.isoformat()
+            )
+            self.assertEqual(first["added"], 1)
+
+            revised = copy.deepcopy(prediction)
+            second_quote = self.now + timedelta(minutes=1)
+            revised["markets"]["total_ou"]["quote_timestamp"] = second_quote.isoformat()
+            second_published = second_quote + timedelta(seconds=3)
+            second = append_nba_totals_publication_snapshots(
+                [revised], path, published_at=second_published.isoformat()
+            )
+            self.assertEqual(second["added"], 1)
+
+            duplicate = append_nba_totals_publication_snapshots(
+                [revised], path, published_at=(second_quote + timedelta(seconds=6)).isoformat()
+            )
+            self.assertEqual(duplicate["added"], 0)
+
+            snapshots = json.loads(path.read_text(encoding="utf-8"))
+            self.assertEqual(len(snapshots), 2)
+            self.assertEqual(len({row["publication_snapshot_id"] for row in snapshots}), 2)
+            self.assertEqual({row["event_id"] for row in snapshots}, {"espn-101"})
+            self.assertEqual(
+                {row["markets"]["total_ou"]["quote_timestamp"] for row in snapshots},
+                {self.now.isoformat(), second_quote.isoformat()},
+            )
 
     def test_freezes_both_prices_even_when_there_is_no_directional_lean(self):
         prediction = make_prediction(self.now, expected_total=221.0)

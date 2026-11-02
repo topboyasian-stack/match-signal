@@ -509,6 +509,7 @@ def append_nba_totals_publication_snapshots(predictions, path=None, published_at
             str(market.get("pick") or "no_clear_lean"),
             str(market.get("over_odds") or ""),
             str(market.get("under_odds") or ""),
+            str(market.get("quote_timestamp") or ""),
         )
 
     known = {
