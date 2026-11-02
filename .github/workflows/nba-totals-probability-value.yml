@@ -1,0 +1,91 @@
+name: NBA totals probability and value research
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/nba_totals_probability_value_experiment.py'
+      - 'scripts/test_nba_totals_probability_value_experiment.py'
+      - '.github/workflows/nba-totals-probability-value.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nba-totals-probability-value-research
+  cancel-in-progress: false
+
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 2
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install free research dependencies
+        run: python -m pip install --disable-pip-version-check requests pandas
+
+      - name: Compile and test probability/value logic
+        run: |
+          python -m py_compile scripts/nba_totals_probability_value_experiment.py scripts/test_nba_totals_probability_value_experiment.py
+          PYTHONPATH=scripts python scripts/test_nba_totals_probability_value_experiment.py
+
+      - name: Run residual-calibrated SportyBet value diagnostics
+        run: PYTHONPATH=scripts python scripts/nba_totals_probability_value_experiment.py
+
+      - name: Verify paper-only and holdout restrictions
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path("data/nba_totals_probability_value_experiment.json").read_text(encoding="utf-8"))
+          assert report.get("paper_only") is True
+          assert report.get("prospective_holdout_used_for_calibration") is False
+          assert report.get("prospective_holdout_cutoff_utc") == "2026-11-02T02:00:00+00:00"
+          assert report.get("model_projection_market_blind") is True
+          assert report.get("market_prices_used_as_model_inputs") is False
+          assert report.get("release_decision") == "RESEARCH_ONLY"
+          print("Residual calibration:", report["calibration_protocol"]["coverage_check"])
+          print("Calibration residuals:", report["calibration_protocol"]["calibration_residuals_n"])
+          print("Settled v5 market records:", report["settled_v5_market_count"])
+          print("Fresh exact market-225 diagnostics:", report["upcoming_value_diagnostics_count"])
+          print("Prospective settled bets:", report["prospective_settled_market_bets_after_cutoff"])
+          PY
+
+      - name: Publish value research report without overwriting newer main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+topboyasian-stack@users.noreply.github.com'
+          candidate='/tmp/nba_totals_probability_value_experiment.json'
+          cp data/nba_totals_probability_value_experiment.json "$candidate"
+          for attempt in 1 2 3 4 5; do
+            git fetch origin main
+            git reset --hard origin/main
+            cp "$candidate" data/nba_totals_probability_value_experiment.json
+            git add data/nba_totals_probability_value_experiment.json
+            if git diff --cached --quiet; then
+              echo 'The same NBA probability/value report is already published.'
+              exit 0
+            fi
+            git commit -m 'Publish NBA totals probability and value research'
+            if git push origin HEAD:main; then
+              echo 'NBA probability/value report published.'
+              exit 0
+            fi
+            echo 'Concurrent main update; retrying.'
+            sleep $((attempt * 2))
+          done
+          echo 'Could not publish the NBA probability/value report after five attempts.' >&2
+          exit 1
