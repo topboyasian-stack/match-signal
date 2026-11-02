@@ -78,6 +78,9 @@ def test_full_report_keeps_prospective_holdout_locked():
     assert report["live_value_decisions_authorized"] is False
     assert report["release_decision"] == "RESEARCH_ONLY"
     assert report["settled_v5_market_count"] == 0
+    assert report["historical_value_signal_summary"]["n"] == 0
+    assert report["historical_market_line_backtest_available"] is False
+    assert report["archived_history_rows_with_any_market_data"] == 0
     assert report["model_projection_market_blind"] is True
 
 
