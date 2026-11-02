@@ -1,0 +1,54 @@
+name: Match Signal eFootball Evidence and Booking Regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/efootball_desk_learning.py'
+      - 'scripts/test_efootball_desk_learning.py'
+      - 'scripts/unified_upcoming.py'
+      - 'scripts/test_upcoming_desk_policy.py'
+      - 'scripts/test_virtual_lab_recent_performance_gate.mjs'
+      - 'virtual-lab-app.js'
+      - 'virtual-lab/index.html'
+      - 'ticket-drawer.js'
+      - 'functions/api/sportybet-booking.js'
+      - 'scripts/test_ticket_drawer_contract.py'
+      - 'scripts/test_sportybet_booking_resilience.mjs'
+      - '.github/workflows/efootball-recent-evidence-regression.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  efootball-evidence-and-booking:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Python test dependency
+        run: python -m pip install requests
+      - name: Compile Python evidence and qualification modules
+        run: |
+          python -m py_compile scripts/efootball_desk_learning.py scripts/unified_upcoming.py scripts/test_efootball_desk_learning.py scripts/test_upcoming_desk_policy.py
+      - name: Test recent result counting by independent fixture
+        run: python scripts/test_efootball_desk_learning.py
+      - name: Test backend eFootball qualification policy
+        run: python scripts/test_upcoming_desk_policy.py
+      - name: Test Virtual Lab product-specific gate and quality boundary
+        run: |
+          node --check virtual-lab-app.js
+          node scripts/test_virtual_lab_recent_performance_gate.mjs
+      - name: Test shared Football, Tennis, Basketball and eFootball booking contract
+        run: |
+          node --check ticket-drawer.js
+          node --check functions/api/sportybet-booking.js
+          node --check scripts/test_sportybet_booking_resilience.mjs
+          python scripts/test_ticket_drawer_contract.py
+          node scripts/test_sportybet_booking_resilience.mjs
