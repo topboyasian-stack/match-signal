@@ -288,3 +288,31 @@ The active NBA readiness priority is still **Priority 14: prospective probabilit
 2. Verify a real, nonempty shared ticket is revalidated against the current provider catalogue immediately before code generation; the Worker now serves valid football and tennis catalogues, but no actual user-selected multi-leg share code was requested or fabricated by these tests.
 3. Continue **Priority 14** from exact SportyBet Nigeria market-225 snapshots with official ESPN settlements and immutable linkage. Preserve cutoff `2026-11-02T02:00:00+00:00`; do not count duplicate quotes as independent bets.
 4. Keep NBA `RESEARCH_ONLY` and the Basketball ticket gate locked until every prospective sample, ROI/confidence-bound/favourite-benchmark, genuine later-quote CLV, forecast MAE/bias, and production regression condition independently passes. No auto-betting.
+
+
+## Latest continuation checkpoint — 2026-11-02 14:00 UTC — NBA model freshness recovered
+
+This checkpoint updates production freshness and workflow evidence only. The frozen prospective cutoff remains `2026-11-02T02:00:00+00:00`. First unchecked research priority remains **14 — prospective probability validation**; no release threshold was lowered.
+
+### NBA pre-game stale-publication incident — corrected and verified
+
+- Root cause: `data/nba_predictions.json` retained 54 upcoming projections with generation timestamps older than the Basketball UI's six-hour limit. The quote-capture workflow was freshening prices but was not itself the full model/fixture rebuild. The Live Expansion cron was not running regularly.
+- Re-armed `.github/workflows/live-expansion.yml` at cron `14,44 * * * *` and added a fail-closed publication check that rejects missing, future-dated, post-tip, or greater-than-six-hour upcoming NBA prediction timestamps. A model refresh with stale output cannot pass publication.
+- The model/fixture refresh workflow [run 41457363124](https://github.com/topboyasian-stack/match-signal/actions/runs/41457363124) completed **successfully**. Model generation, freshness guard, settlement, fixed-cutoff evaluation, and artifact publication all passed.
+- Post-publication `data/nba_predictions.json` has 58 rows total, 54 upcoming fixtures, and **0 stale upcoming projections**. The new upcoming model timestamps are `2026-11-02T13:57:15Z`; `data/expansion_status.json` updated at `2026-11-02T13:57:32Z`, with 58 NBA fixtures, 0 NBA collection errors and no NBA source diagnostics.
+- Updated the NBA capture watchdog with stale-model detection, active-run suppression, and a 30-minute retry cooldown. It uses the existing Live Expansion workflow for recovery rather than relaxing the six-hour UI rule. Regression suite [run 41457581116](https://github.com/topboyasian-stack/match-signal/actions/runs/41457581116) passed after correcting the test import. The post-refresh watchdog event [run 41457521837](https://github.com/topboyasian-stack/match-signal/actions/runs/41457521837) passed and logged `stale_upcoming_predictions=0`, `nba_schedule_fixtures=58`, `dispatch=false`, reason `upcoming_model_projections_within_six_hour_window`. The capture branch also logged `dispatch=false` with its latest capture only 0.59 minutes old. Do not dispatch redundant model runs when projections are fresh.
+
+### Cloudflare Pages and shared-ticket status — verified with one remaining limitation
+
+- The earlier Pages deploy [run 41455583821](https://github.com/topboyasian-stack/match-signal/actions/runs/41455583821) uploaded its artifact but failed production smoke because the deployed Unified Upcoming board was more than 30 minutes stale; it was not a verified release.
+- A later manual Pages deployment [run 41456981757](https://github.com/topboyasian-stack/match-signal/actions/runs/41456981757) completed **successfully**. The production smoke passed 20 pages, 52 assets, the NBA ESPN proxy, protected API, ticket tracker, and other required probes; the live site served a fresh Unified Upcoming board. This corrects the previous deployment verification gap.
+- Worker deployment [run 41455605359](https://github.com/topboyasian-stack/match-signal/actions/runs/41455605359) and Worker tests [run 41455605332](https://github.com/topboyasian-stack/match-signal/actions/runs/41455605332) passed; football and tennis shared-ticket catalogue probes returned HTTP 200 JSON. The ticket drawer invalid-slip safety check passed via [run 41455583886](https://github.com/topboyasian-stack/match-signal/actions/runs/41455583886), returning HTTP 422 JSON for an empty invalid ticket with no code.
+- Actual valid shared-ticket code generation is **not yet verified**: the successful Pages smoke explicitly skipped the booking POST because the current Builder artifact had no fully future 2+ leg batch. Do not claim an actual share code was generated or infer success from the OPTIONS check.
+ 
+### Current model and market evidence — still RESEARCH_ONLY
+
+- The recent market capture found 15 exact fresh SportyBet Nigeria market-225 pairs among 54 upcoming model predictions; 37 fixtures were not listed in the current feed and 2 had start-time mismatches. Keep those unmatched fixtures unpriced.
+- Fixed-cutoff OOS report generated `2026-11-02T13:57:22Z`: post-cutoff forecast holdout n=4; model MAE 26.7875 versus baseline MAE 24.75; bias 6.4637 points; settled prospective market-holdout selections n=0. It does not satisfy forecast or betting-value release requirements.
+- Basketball remains `RESEARCH_ONLY`. Keep the ticket release gate locked; do not create qualified NBA legs or mark betting-ready. Preserve Priority 14, immutable market-225 snapshots, official ESPN settlements and all existing frozen thresholds.
+- Next action on resume: verify the user's real multi-leg ticket against current catalogue/odds at code-generation time, and continue Priority 14 evidence collection. The app should be hard-refreshed to fetch the newly published projections; if the old stale banner remains after a hard refresh, inspect the browser-visible response/source timestamp rather than weakening freshness checks.
+
