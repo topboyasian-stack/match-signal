@@ -64,7 +64,7 @@ def main():
 
     require("data-ms-ticket-add" in nba and 'data-ticket-market="total"' in nba,
             "NBA current totals must be selectable into the same ticket")
-    require("nbaTotalsReleaseQualified(S.totalsOos)" in nba and "nbaTotalRowQualified(p,S.totalsOos)" in nba,
+    require("nbaTotalsReleaseQualified(S.totalsOos,S.totalsProbability)" in nba and "nbaTotalRowQualified(p,S.totalsOos,S.totalsProbability,S.totalSnapshots,fresh)" in nba,
             "NBA ticket generation must retain the independent release and per-row gates")
     require("market === 'total' && ['football','tennis'].includes(sport)" in api and "leg.market === 'total'" in api and "leg.market_id !== requiredMarketId" in api,
             "Football/Tennis total selections must revalidate against exact SportyBet full-match O/U market IDs")
