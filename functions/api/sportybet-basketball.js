@@ -24,8 +24,8 @@ export async function onRequestGet(context){
   const pageSize=Math.min(100,Math.max(1,Number(u.searchParams.get('pageSize')||100)));
   const pageNum=Math.max(1,Number(u.searchParams.get('pageNum')||1));
   const timeline=Math.min(168,Math.max(12,Number(u.searchParams.get('timeline')||96)));
-  const tournamentId=String(u.searchParams.get('tournamentId')||'').trim();
-  if(tournamentId && tournamentId!==NBA_TOURNAMENT_ID){
+  const tournamentId=String(u.searchParams.get('tournamentId')||NBA_TOURNAMENT_ID).trim();
+  if(tournamentId!==NBA_TOURNAMENT_ID){
     return new Response(JSON.stringify({ok:false,error:'UNSUPPORTED_TOURNAMENT_ID'}),{status:400,headers:headers()});
   }
   const started=Date.now();
