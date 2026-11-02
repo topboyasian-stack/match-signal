@@ -190,12 +190,34 @@ function installFetchMock({ bundle, events, shareResponse }) {
         status: 200, headers: { 'Content-Type': 'application/json' }
       });
     }
-    if (url.pathname === '/api/sportybet-basketball') {
+    if (url.hostname === 'match-signal-sportybet-proxy.topboyasian.workers.dev' &&
+        url.pathname.startsWith('/api/ng/factsCenter/')) {
       calls.feed++;
+      const providerEvents = events.map(row => {
+        const normalized = sportBetEvent(row);
+        return {
+          eventId: normalized.event_id,
+          homeTeamName: normalized.home,
+          awayTeamName: normalized.away,
+          estimateStartTime: Date.parse(normalized.start_time),
+          matchStatus: 'Not start',
+          markets: normalized.markets.map(m => ({
+            id: m.id,
+            desc: m.name,
+            specifier: m.specifier,
+            status: m.status,
+            outcomes: m.outcomes.map(o => ({
+              id: o.id,
+              desc: o.name,
+              odds: o.odds,
+              isActive: o.active ? 1 : 0
+            }))
+          }))
+        };
+      });
       return new Response(JSON.stringify({
-        ok: true,
-        fetched_at: new Date().toISOString(),
-        events: events.map(sportBetEvent)
+        bizCode: 10000,
+        data: { tournaments: [{ id: 'sr:tournament:132', name: 'NBA', events: providerEvents }] }
       }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
     if (url.origin === 'https://www.sportybet.com' && url.pathname === '/api/ng/orders/share') {
@@ -221,7 +243,7 @@ test('NBA ticket resolves SportyBet event ID separately from ESPN prediction ID 
     });
     const body = await response.json();
     assert.equal(mock.calls.raw, 4, 'all four server-side evidence files must be checked');
-    assert.equal(mock.calls.feed, 1);
+    assert.equal(mock.calls.feed, 3, 'the three bounded NBA catalog queries must use the proxy source');
     assert.equal(mock.calls.share, 0, 'must not request a share code when any NBA leg is missing');
     assert.equal(response.status, 409);
     assert.equal(body.error, 'BASKETBALL_SLIP_REJECTED_PARTIAL');
