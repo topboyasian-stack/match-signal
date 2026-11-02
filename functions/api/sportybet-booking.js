@@ -20,6 +20,42 @@ function json(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });
 }
 
+const NBA_RELEASE_CUTOFF='2026-11-02T02:00:00+00:00';
+const NBA_RELEASE_MODEL='nba-total-v5-pace-efficiency-calibrated';
+function nbaReleaseClose(a,b){return Number.isFinite(Number(a))&&Number.isFinite(Number(b))&&Math.abs(Number(a)-Number(b))<=1e-9;}
+export function nbaTotalsReleaseQualified(e,p){
+ const h=e?.walk_forward?.holdout||{},m=e?.market_holdout||{},c=p?.prospective_pregame_snapshot_coverage||{},s=p?.prospective_probability_score_summary||{},v=p?.prospective_clv_diagnostics||{},cal=p?.calibration_protocol||{};
+ return !!(e?.paper_only===true&&e?.evaluation_type==='NBA_TOTALS_FIXED_CUTOFF_V2'&&e?.holdout_protocol?.fixed_cutoff_utc===NBA_RELEASE_CUTOFF&&e?.market_id==='225'&&e?.market_definition==='full_game_total_including_overtime'&&e?.model_version===NBA_RELEASE_MODEL&&e?.release_decision==='QUALIFIED'&&Number(h.n)>=100&&Number.isFinite(Number(h.mae))&&Number.isFinite(Number(h.baseline_mae))&&Number(h.mae)<Number(h.baseline_mae)&&Number.isFinite(Number(h.bias))&&Math.abs(Number(h.bias))<=3&&Number(m.n)>=100&&Number(m.roi)>0&&Number(m.roi_ci95_lower)>0&&Number(m.roi_vs_market_favorite)>0&&p?.paper_only===true&&p?.experiment==='NBA_TOTALS_EMPIRICAL_RESIDUAL_VALUE_V3'&&p?.model_version===NBA_RELEASE_MODEL&&p?.model_projection_market_blind===true&&p?.prospective_holdout_cutoff_utc===NBA_RELEASE_CUTOFF&&p?.prospective_holdout_used_for_calibration===false&&p?.live_value_decisions_authorized===false&&Number(cal.probability_edge_threshold)===0.04&&Number(cal.expected_value_threshold)===0.03&&c.cutoff_utc===NBA_RELEASE_CUTOFF&&Number(s.n)>=30&&s.sufficient_for_probability_validation===true&&Number(c.prospective_settled_selections_with_exact_snapshot_match)>=30&&Number(c.prospective_settled_selections_missing_or_mismatched_snapshot)===0&&Number(c.prospective_settled_unique_market_selections)>=100&&p?.prospective_minimum_sample_reached===true&&p?.prospective_probability_validation_sample_met===true&&p?.prospective_clv_release_check_passed===true&&v.positive_clv_release_check_passed===true&&Number(v.near_close_observations)>=1&&Number(v.mean_probability_clv)>0&&Number(v.mean_line_clv_points)>0);
+}
+async function readNbaReleaseJson(path){
+ const response=await fetch('https://raw.githubusercontent.com/topboyasian-stack/match-signal/main/'+path+'?v='+Date.now(),{headers:{Accept:'application/json'},cache:'no-store',signal:AbortSignal.timeout(10000)});
+ if(!response.ok)throw new Error(path+' HTTP '+response.status);return response.json();
+}
+async function loadNbaReleaseContext(){
+ const [evidence,probability,predictions,snapshots]=await Promise.all([readNbaReleaseJson('data/nba_totals_oos_value_test.json'),readNbaReleaseJson('data/nba_totals_probability_value_experiment.json'),readNbaReleaseJson('data/nba_predictions.json'),readNbaReleaseJson('data/nba_totals_publication_snapshots.json')]);
+ if(!Array.isArray(predictions)||!Array.isArray(snapshots))throw new Error('Invalid NBA release evidence arrays.');
+ return{evidence,probability,predictions,snapshots};
+}
+export function nbaTotalTicketLegQualified(leg,selection,ctx,now=Date.now()){
+ const fail=reason=>({ok:false,reason});
+ if(!ctx||!nbaTotalsReleaseQualified(ctx.evidence,ctx.probability))return fail('The global NBA totals release gate is locked.');
+ if(leg?.sport!=='basketball'||leg?.market!=='total'||leg?.market_id!=='225'||!['over','under'].includes(leg?.pick)||leg?.model_qualified!==true)return fail('Only a globally qualified market-225 Over/Under leg is allowed.');
+ const id=String(leg.event_id||''),ps=(ctx.predictions||[]).filter(x=>String(x?.event_id||'')===id&&x?.totals_model_version===NBA_RELEASE_MODEL);
+ if(ps.length!==1)return fail('No unique V5 prediction matches this fixture.');
+ const p=ps[0],m=p?.markets?.total_ou||{},start=Date.parse(String(p.start_time||'')),legStart=Date.parse(String(leg.start_time||'')),quote=Date.parse(String(m.quote_timestamp||'')),report=Date.parse(String(ctx.probability?.generated_at||'')),forecast=Number(p.expected_total),line=Number(m.line),over=Number(m.over_odds),under=Number(m.under_odds),side=String(leg.pick);
+ if(p.paper_only!==true||!Number.isFinite(start)||start<=now||legStart!==start||!Number.isFinite(quote)||quote>now+120000||now-quote>900000||quote>=start||!Number.isFinite(report)||report>now+120000||now-report>900000)return fail('Prediction, value report or quote is stale or mismatched.');
+ if(String(m.market_id||'')!=='225'||String(m.source||'').toLowerCase()!=='sportybet nigeria'||m.quote_capture_basis!=='SportyBet API response observed_at'||String(m.pick||'').toLowerCase()!==side||!nbaReleaseClose(leg.line,line)||!Number.isFinite(forecast)||!Number.isFinite(over)||over<=1||!Number.isFinite(under)||under<=1)return fail('The exact market-225 side, line or price pair does not match.');
+ const fetched=Date.parse(String(selection?.fetchedAt||''));
+ if(!selection||String(selection.marketId)!=='225'||String(selection.eventId)!==String(m.sportybet_event_id)||!nbaReleaseClose(selection.line,line)||!nbaReleaseClose(selection.overOdds,over)||!nbaReleaseClose(selection.underOdds,under)||!nbaReleaseClose(selection.odds,side==='over'?over:under)||!Number.isFinite(fetched)||fetched>now+120000||now-fetched>900000||fetched>=start)return fail('The live SportyBet event, line or either side price changed.');
+ const ds=(ctx.probability?.upcoming_exact_fresh_market_225_value_diagnostics||[]).filter(x=>String(x?.event_id||'')===id);if(ds.length!==1)return fail('No unique value diagnostic matches this fixture.');
+ const d=ds[0],lo=d.bootstrap_95_lower_bound||{};
+ if(Date.parse(String(d.start_time||''))!==start||String(d.quote_timestamp||'')!==String(m.quote_timestamp)||!nbaReleaseClose(d.forecast_total,forecast)||!nbaReleaseClose(d.sportybet_line,line)||!nbaReleaseClose(d.over_odds,over)||!nbaReleaseClose(d.under_odds,under)||d.decision!==(side==='over'?'OVER VALUE':'UNDER VALUE')||d.calibration_check!=='PASS'||!Number.isFinite(Number(lo[side+'_probability_edge']))||Number(lo[side+'_probability_edge'])<0.04||!Number.isFinite(Number(lo[side+'_expected_value']))||Number(lo[side+'_expected_value'])<0.03)return fail('The exact quote does not meet the preregistered value thresholds.');
+ const cutoff=Date.parse(NBA_RELEASE_CUTOFF),snaps=(ctx.snapshots||[]).filter(x=>{const sm=x?.markets?.total_ou||{},pub=Date.parse(String(x?.published_at||'')),qt=Date.parse(String(sm.quote_timestamp||''));return x?.publication_snapshot_verified===true&&x?.publication_snapshot_kind==='immutable_sportybet_market_225_revision'&&x?.totals_model_version===NBA_RELEASE_MODEL&&String(x?.event_id||'')===id&&Date.parse(String(x?.start_time||''))===start&&pub>=cutoff&&pub<start&&String(sm.quote_timestamp||'')===String(m.quote_timestamp)&&qt<=pub&&pub-qt<=900000&&now-qt<=900000&&String(sm.market_id||'')==='225'&&String(sm.source||'').toLowerCase()==='sportybet nigeria'&&sm.quote_capture_basis==='SportyBet API response observed_at'&&String(sm.sportybet_event_id||'')===String(m.sportybet_event_id)&&String(sm.pick||'').toLowerCase()===side&&nbaReleaseClose(x?.expected_total,forecast)&&nbaReleaseClose(sm.expected_total,forecast)&&nbaReleaseClose(sm.line,line)&&nbaReleaseClose(sm.over_odds,over)&&nbaReleaseClose(sm.under_odds,under);});
+ if(snaps.length!==1)return fail('No unique immutable fresh snapshot matches the exact NBA quote.');
+ const sid=String(snaps[0].publication_snapshot_id||'');if(!sid||(ctx.snapshots||[]).filter(x=>String(x?.publication_snapshot_id||'')===sid).length!==1)return fail('The immutable snapshot ID is missing or duplicated.');
+ return{ok:true,snapshot_id:sid};
+}
+
 function lineFromMarket(market) {
   // SportyBet may expose an integer base in market.line while its specifier
   // carries the actual half-point total (for example line=25, total=25.5).
@@ -183,7 +219,7 @@ async function collectBasketballEvents(context,targetIds){
         id:String(m?.id||''),name:String(m?.name||''),desc:String(m?.name||''),specifier:m?.specifier??null,status:String(m?.status||''),
         outcomes:(Array.isArray(m?.outcomes)?m.outcomes:[]).map(o=>({id:String(o?.id||''),name:String(o?.name||''),desc:String(o?.name||''),odds:Number(o?.odds),active:o?.active!==false,isActive:o?.active===false?0:1}))
       }));
-      found.set(eventId,{eventId,homeTeamName:String(row?.home||''),awayTeamName:String(row?.away||''),estimateStartTime:Number.isFinite(start)?start:0,matchStatus:'Not start',tournament:String(row?.tournament||''),markets});
+      found.set(eventId,{eventId,homeTeamName:String(row?.home||''),awayTeamName:String(row?.away||''),estimateStartTime:Number.isFinite(start)?start:0,matchStatus:'Not start',tournament:String(row?.tournament||''),fetchedAt:String(row?.fetched_at||payload?.fetched_at||''),markets});
     }
     if(payload.events.length<100)break;
   }
@@ -191,23 +227,19 @@ async function collectBasketballEvents(context,targetIds){
 }
 function findBasketballSelection(leg,event){
   const side=String(leg?.pick||'').toLowerCase(),line=Number(leg?.line);
-  if(!['over','under'].includes(side)||!Number.isFinite(line)||line<100||line>300||String(leg?.market_id||'225')!=='225')return{error:'Only an exact SportyBet full-game market-225 Over/Under selection is supported.'};
+  if(!['over','under'].includes(side)||!Number.isFinite(line)||line<100||line>300||String(leg?.market_id||'225')!=='225')return{error:'Only exact SportyBet market-225 full-game totals are supported.'};
   if(!sameParticipantPair([leg?.player_1,leg?.player_2],event))return{error:'Basketball participants changed in the current SportyBet catalogue.'};
-  const requestedStart=Date.parse(String(leg?.start_time||'')),currentStart=Number(event?.estimateStartTime||0);
-  if(Number.isFinite(requestedStart)&&currentStart&&Math.abs(requestedStart-currentStart)>45*60*1000)return{error:'Basketball fixture start time changed; refresh the ticket.'};
+  const rs=Date.parse(String(leg?.start_time||'')),es=Number(event?.estimateStartTime||0);if(Number.isFinite(rs)&&es&&Math.abs(rs-es)>2700000)return{error:'Basketball fixture start time changed; refresh the ticket.'};
   for(const market of (Array.isArray(event?.markets)?event.markets:[])){
-    const status=String(market?.status||'').trim().toLowerCase();
-    if(String(market?.id||'')!=='225'||/suspend|closed|inactive|settled|unavailable|stop/i.test(status)||(status!==''&&/^\d+$/.test(status)&&status!=='0'))continue;
+    const status=String(market?.status||'').trim().toLowerCase();if(String(market?.id||'')!=='225'||/suspend|closed|inactive|settled|unavailable|stop/i.test(status)||(status!==''&&/^\d+$/.test(status)&&status!=='0'))continue;
     const currentLine=lineFromMarket(market);if(!Number.isFinite(currentLine)||Math.abs(currentLine-line)>1e-9)continue;
-    const outcome=(Array.isArray(market?.outcomes)?market.outcomes:[]).find(o=>{
-      const name=String(o?.desc||o?.name||o?.title||'').toLowerCase(),active=o?.isActive==null?(o?.active!==false):(Number(o.isActive)===1||o.isActive===true);
-      return active&&(side==='over'?/\bover\b/.test(name):/\bunder\b/.test(name))&&Number(o?.odds)>1&&String(o?.id||'');
-    });
-    if(outcome)return{eventId:event.eventId,marketId:'225',specifier:market?.specifier??null,outcomeId:String(outcome.id),outcomeName:String(outcome.desc||outcome.name||side),odds:Number(outcome.odds)};
+    const outcomes=Array.isArray(market?.outcomes)?market.outcomes:[];
+    const active=name=>outcomes.find(o=>{const label=String(o?.desc||o?.name||o?.title||'').toLowerCase(),ok=o?.isActive==null?(o?.active!==false):(Number(o.isActive)===1||o.isActive===true),odds=Number(o?.odds);return ok&&new RegExp('\\b'+name+'\\b').test(label)&&String(o?.id||'')&&Number.isFinite(odds)&&odds>1;});
+    const over=active('over'),under=active('under');if(!over||!under)continue;const out=side==='over'?over:under;
+    return{eventId:event.eventId,marketId:'225',specifier:market?.specifier??null,outcomeId:String(out.id),outcomeName:String(out.desc||out.name||side),odds:Number(out.odds),line:currentLine,overOdds:Number(over.odds),underOdds:Number(under.odds),fetchedAt:String(event?.fetchedAt||''),sportybetEventId:String(event.eventId||'')};
   }
-  return{error:'The exact current SportyBet basketball market-225 line or side is no longer available.'};
+  return{error:'Exact current market-225 line or both side prices are unavailable.'};
 }
-
 function canonicalParticipant(value) {
   let raw = String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   // Some bookmaker feeds return "Surname, Firstname".
@@ -607,6 +639,12 @@ async function handlePost(context) {
     // If an NBA totals leg is present, the shared slip must remain all-or-nothing.
     // Never surface a share code for a mixed or partially accepted NBA ticket.
     const hasBasketballLeg = legs.some(leg => String(leg?.sport || '').toLowerCase() === 'basketball');
+    let nbaReleaseContext = null;
+    if (hasBasketballLeg) {
+      try { nbaReleaseContext = await loadNbaReleaseContext(); }
+      catch (error) { return json({ ok: false, error: 'NBA_RELEASE_EVIDENCE_UNAVAILABLE', message: 'NBA release evidence could not be verified. No ticket code was requested.' }, 503); }
+      if (!nbaTotalsReleaseQualified(nbaReleaseContext.evidence, nbaReleaseContext.probability)) return json({ ok: false, error: 'NBA_RELEASE_GATE_LOCKED', message: 'The independent NBA totals release gate has not passed. No SportyBet ticket code was requested.' }, 423);
+    }
     const virtualIds = new Set(legs.filter(l => productForLeg(l) === 'vfootball').map(l => String(l.event_id || '')));
     const efootballIds = new Set(legs.filter(l => productForLeg(l) === 'efootball').map(l => String(l.event_id || '')));
     const footballIds = new Set(legs.filter(l => String(l?.sport || '').toLowerCase() === 'football').map(l => String(l.event_id || '')));
@@ -708,19 +746,13 @@ async function handlePost(context) {
         validation.push(validationFailure(leg, selection?.error || 'Selection could not be mapped to a live SportyBet market.'));
         continue;
       }
-
+      let nbaQualification = null;
+      if (String(leg?.sport || '').toLowerCase() === 'basketball') {
+        nbaQualification = nbaTotalTicketLegQualified(leg, selection, nbaReleaseContext);
+        if (!nbaQualification.ok) { validation.push(validationFailure(leg, nbaQualification.reason)); continue; }
+      }
       selections.push(selection);
-      validation.push({
-        event_id: eventId,
-        ok: true,
-        resolved_by: resolved.matched_by,
-        resolved_event_id: event.eventId,
-        market_id: selection.marketId,
-        outcome_id: selection.outcomeId,
-        specifier: selection.specifier,
-        outcome: selection.outcomeName,
-        current_odds: selection.odds
-      });
+      validation.push({event_id:eventId,ok:true,resolved_by:resolved.matched_by,resolved_event_id:event.eventId,market_id:selection.marketId,outcome_id:selection.outcomeId,specifier:selection.specifier,outcome:selection.outcomeName,current_odds:selection.odds,current_line:selection.line??null,current_over_odds:selection.overOdds??null,current_under_odds:selection.underOdds??null,publication_snapshot_id:nbaQualification?.snapshot_id||null});
     }
 
     const preExcluded = validation.filter(item => item.ok !== true);
