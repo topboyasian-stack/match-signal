@@ -45,6 +45,12 @@ def main():
             "The builder must be one compact ticket with a maximum of eight selections")
     require("builder_slot" not in drawer and "builderOnly" not in drawer and "iframe" not in drawer,
             "The floating ticket must not contain nested or multiple builders")
+    require("data-ms-ticket-gate" in drawer and "generate.disabled=bookingBusy" in drawer,
+            "The Generate button must remain clickable while showing the exact requirement/release blocker")
+    require("data-ms-ticket-generate]').addEventListener('click',generateCode)" in drawer,
+            "The Generate button must have a direct click handler")
+    require("generate.disabled=bookingBusy||Boolean(lockReason())" not in drawer,
+            "Ticket requirements must not make the Generate button appear dead")
     require("manual_selections" in drawer and "./api/sportybet-booking" in drawer,
             "The shared ticket must submit all selections through the common revalidation API")
     require("market==='total'?line:null" in drawer and "item.market==='total'" in drawer,
