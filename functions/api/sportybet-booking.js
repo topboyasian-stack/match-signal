@@ -684,7 +684,7 @@ async function handlePost(context) {
         const requestedStart = Date.parse(String(leg?.start_time || ''));
         const currentStart = Number(event?.estimateStartTime || 0);
         const namesMatch = sameParticipantPair([leg.player_1, leg.player_2], event);
-        if (!namesMatch || !leg.player_1 || !leg.player_2 || canon(leg.player_1) === canon(leg.player_2)) {
+        if (!namesMatch || !leg.player_1 || !leg.player_2 || canonicalParticipant(leg.player_1) === canonicalParticipant(leg.player_2)) {
           validation.push(validationFailure(leg, 'Participant identity changed in SportyBet current catalogue.'));
           continue;
         }
