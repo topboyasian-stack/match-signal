@@ -104,6 +104,8 @@ assert.ok(!deployPushEvent.includes("      - '.github/workflows/cloudflare-pages
   "Cloudflare workflow edits must wait for a successful Unified Upcoming refresh");
 assert.ok(!deploy.includes("|.github/workflows/cloudflare-pages.yml|"),
   "Cloudflare workflow edits must not bypass the board-first promotion chain");
+assert.ok(deploy.includes("|.github/workflows/efootball-recent-evidence-regression.yml|"),
+  "The PR-only eFootball regression workflow must be permitted by the direct-promotion guard");
 assert.ok(deploy.includes("node scripts/test_workspace_terminal_design.mjs"), "production promotion must run workspace visual regressions");
 for (const marker of [
   "reports-design.css?v=20261014-full-v3",

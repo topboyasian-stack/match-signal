@@ -67,6 +67,24 @@ jobs:
                   'recent_brier':brier,
                   'release_gate':'PASS' if passed else 'PAUSED'
               },sort_keys=True))
+          import sys
+          sys.path.insert(0, 'scripts')
+          import efootball_desk_learning as learner
+          settled_path=Path('data/efootball_desk_settled_observations.json')
+          settled_rows=learner.settled_forecasts(json.loads(settled_path.read_text()))
+          for product in ('efootball_gt','efootball_adriatic'):
+              rows=[row for row in settled_rows if str(row.get('product') or 'efootball_gt').strip().lower()==product]
+              recent30=learner.recent_fixture_window(rows,window=30)
+              print(json.dumps({
+                  'product':product,
+                  'diagnostic_window':'last_30_unique_fixtures',
+                  'unique_fixtures':recent30['unique_fixtures'],
+                  'line_decisions':recent30['decision_count'],
+                  'accuracy':recent30['accuracy'],
+                  'brier':recent30['brier'],
+                  'first_settled_at':recent30['first_settled_at'],
+                  'last_settled_at':recent30['last_settled_at']
+              },sort_keys=True))
           PY
       - name: Test Virtual Lab product-specific gate and quality boundary
         run: |
