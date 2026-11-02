@@ -309,7 +309,7 @@ function resolveCurrentEvent(leg, found) {
     const diff = Number.isFinite(targetStart)
       ? Math.abs(candidateStart - targetStart)
       : 0;
-    if (diff <= 30 * 60 * 1000 && diff < bestDiff) {
+    if (diff <= 45 * 60 * 1000 && diff < bestDiff) {
       best = event;
       bestDiff = diff;
     }
@@ -661,7 +661,8 @@ async function handlePost(context) {
     if (tennisIds.size) {
       const events = await collectEvents({
         sportId: 'sr:sport:5',
-        marketId: '186,210,202,204,189,203,188,187'
+        marketId: '186,210,202,204,189,203,188,187',
+        fallbackPath: '/api/ng/factsCenter/wapConfigurableUpcomingEvents'
       }, tennisIds);
       for (const [id, event] of events) found.set(id, event);
     }
