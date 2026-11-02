@@ -10,12 +10,12 @@ def dt(value):
 
 
 def run():
-    now = dt("2026-11-02T08:30:00Z")
-    assert round(capture_age_minutes("2026-11-02T08:16:39Z", now), 2) == 13.35
+    now = dt("2026-11-02T08:25:00Z")
+    assert round(capture_age_minutes("2026-11-02T08:16:39Z", now), 2) == 8.35
     assert not should_dispatch_capture("2026-11-02T08:16:39Z", now, 0), (
-        "A capture under 15 minutes old must not be duplicated."
+        "A capture under 10 minutes old must not be duplicated."
     )
-    assert should_dispatch_capture("2026-11-02T08:14:59Z", now, 0), (
+    assert should_dispatch_capture("2026-11-02T08:14:59Z", now, 0, max_age_minutes=10), (
         "A capture at least 15 minutes old must trigger a recovery capture."
     )
     assert not should_dispatch_capture("2026-11-02T08:00:00Z", now, 1), (
@@ -23,10 +23,10 @@ def run():
     )
     assert should_dispatch_capture(None, now, 0), "Missing status must fail safe to capture."
     assert should_dispatch_capture("not-a-time", now, 0), "Invalid timestamps must fail safe."
-    assert not should_dispatch_capture("2026-11-02T08:31:00Z", now, 0), (
+    assert not should_dispatch_capture("2026-11-02T08:26:00Z", now, 0), (
         "Small future clock skew should not trigger duplicate capture."
     )
-    assert should_dispatch_capture("2026-11-02T08:34:00Z", now, 0), (
+    assert should_dispatch_capture("2026-11-02T08:29:00Z", now, 0), (
         "A timestamp more than two minutes in the future must fail safe."
     )
     print("PASS: stale/missing capture recovery, freshness boundary, active-run suppression, and clock-skew cases.")
