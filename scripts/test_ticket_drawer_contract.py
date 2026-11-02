@@ -87,6 +87,9 @@ def main():
             "tokens[1].length === 1" in api and "tokens.reverse()" in api and
             "left[0] === right[1] && left[1] === right[0]" in api,
             "Tennis player matching must handle trailing initials and reversed full-name order")
+    require("leftSurname === rightSurname" in api and
+            "leftFirst[0] === rightFirst[0]" in api,
+            "Abbreviated player matches must agree on both surname and first initial")
     require("actual half-point total" in api and "explicitLine" in api,
             "Exact SportyBet total specifiers must override integer base lines")
     require("specifierText.match(/(?:^|[,\\s;|&])(?:total|line)" in api,
