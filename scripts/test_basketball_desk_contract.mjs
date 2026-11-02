@@ -8,10 +8,10 @@ const [html, css, ui, api, workflow, booking, recorder, nbaRecorderWorkflow] = a
 ]);
 assert.ok(html.includes("MS-BASKETBALL-DESK-2026.10.24-V11"), "Basketball must publish the new design marker");
 assert.ok(html.includes("core-workspaces-design.css?v=20261014-full-v1"), "Basketball must use the shared Match Signal design layer");
-assert.ok(html.includes("basketball-live.js?v=20261102-single-ticket1"), "Basketball must load the shared-ticket totals renderer");
+assert.ok(html.includes("basketball-live.js?v=20261102-nba-feed-scope2"), "Basketball must load the shared-ticket totals renderer");
 assert.ok(html.includes("basketball-design.css?v=20261024-builder-dark-v3"), "Basketball must load its latest contrast-corrected scoped design layer");
 assert.ok(workflow.includes("MS-BASKETBALL-DESK-2026.10.24-V11") && workflow.includes("basketball-design.css?v=20261024-builder-dark-v3"), "Pages production smoke markers must match the current Basketball page and CSS versions");
-assert.ok(workflow.includes("basketball-live.js?v=20261102-single-ticket1"), "Pages smoke tests must track the shared-ticket NBA renderer");
+assert.ok(workflow.includes("basketball-live.js?v=20261102-nba-feed-scope2"), "Pages smoke tests must track the shared-ticket NBA renderer");
 assert.ok(html.includes('id="msNav"') && html.includes('workspace-ui.js?v=20261023-basketball-nav1'), "Basketball must use the single shared site navigation");
 for (const id of ["liveGames","upcomingGames","totalsBoard","finalResults","nbaTotalsLedger","performance","marketStatus","totalsStatus"]) assert.ok(html.includes('id="'+id+'"'), "Basketball must preserve renderer mount "+id);
 assert.ok(css.includes("MATCH-SIGNAL-BASKETBALL-DESK-V1"), "Basketball scoped design marker missing");
