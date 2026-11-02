@@ -1,0 +1,36 @@
+name: NBA ticket fail-closed regression tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'functions/api/sportybet-booking.js'
+      - 'scripts/test_nba_ticket_guard.mjs'
+      - '.github/workflows/nba-ticket-guard-tests.yml'
+  pull_request:
+    paths:
+      - 'functions/api/sportybet-booking.js'
+      - 'scripts/test_nba_ticket_guard.mjs'
+      - '.github/workflows/nba-ticket-guard-tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nba-ticket-guard-tests-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  guard-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run all-or-nothing NBA ticket tests
+        run: node --test scripts/test_nba_ticket_guard.mjs
