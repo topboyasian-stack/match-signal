@@ -46,6 +46,10 @@ html.ms-ticket-open .ms-ticket-launcher{display:none}
 @media(prefers-reduced-motion:reduce){.ms-ticket-launcher,.ms-ticket-drawer{transition:none;animation:none}}
 
 /* Single shared ticket builder. */
+/* Visible gate copy prevents the Generate action from appearing dead. */
+.ms-ticket-gate{padding:9px 11px;border:1px solid rgba(237,195,93,.36);border-radius:9px;background:rgba(82,60,18,.28);color:#f6dc9b;font:600 10px/1.45 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.ms-ticket-gate[hidden]{display:none!important}
+
 .ms-ticket-builder{display:flex;flex:1;min-height:0;flex-direction:column;overflow:auto;padding:12px;gap:12px;background:#07111d;color:#eef6ff;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 .ms-ticket-builder-title{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .ms-ticket-builder-title>div{display:grid;gap:4px}
