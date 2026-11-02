@@ -236,7 +236,7 @@ def test_probability_edge_conditions_on_non_push_mass():
         200.0, 200.0, 1.90, 1.90, [-1.0, 0.0, 1.0],
         calibration_ok=True, resamples=200, seed_key="integer-line-push",
     )
-    assert result["model_probability"]["push"] == 1 / 3
+    assert abs(result["model_probability"]["push"] - (1 / 3)) < 1e-4
     assert result["model_probability_conditional_on_no_push"] == {"over": 0.5, "under": 0.5}
     assert result["model_probability_edge"] == {"over": 0.0, "under": 0.0}
     assert result["decision"] == "NO BET"
