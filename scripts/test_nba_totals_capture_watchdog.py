@@ -26,7 +26,7 @@ def run():
     assert not should_dispatch_capture("2026-11-02T08:31:00Z", now, 0), (
         "Small future clock skew should not trigger duplicate capture."
     )
-    assert should_dispatch_capture("2026-11-02T08:26:00Z", now, 0), (
+    assert should_dispatch_capture("2026-11-02T08:34:00Z", now, 0), (
         "A timestamp more than two minutes in the future must fail safe."
     )
     print("PASS: stale/missing capture recovery, freshness boundary, active-run suppression, and clock-skew cases.")
