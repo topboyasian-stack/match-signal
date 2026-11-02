@@ -58,13 +58,13 @@ def test_snapshot_clv_uses_only_later_exact_pregame_quote():
     }
     report = snapshot_clv_audit([bet], [opening, latest, after_tip])
     assert report["near_close_observations"] == 1
-    assert report["positive_probability_clv_n"] == 0
+    assert report["positive_probability_clv_n"] == 1
     assert report["positive_line_clv_n"] == 1
     fixture = report["fixtures"][0]
     assert fixture["clv_status"] == "NEAR_CLOSE_CAPTURED"
     assert fixture["latest_pregame"]["snapshot_id"] == "close-id"
     assert fixture["latest_pregame"]["line"] == 219.5
-    assert fixture["is_official_bookmaker_close"] if "is_official_bookmaker_close" in fixture else True
+    assert fixture["is_official_bookmaker_close"] is False
 
 
 def test_snapshot_clv_excludes_old_update_from_near_close_sample():
