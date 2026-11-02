@@ -6,6 +6,7 @@ from nba_totals_probability_value_experiment import (
     _settlement_probabilities,
     _value_decision,
     snapshot_clv_audit,
+    prospective_snapshot_coverage,
     probability_score_summary,
     historical_probability_validation,
     run_experiment,
@@ -117,8 +118,64 @@ def test_historical_probability_validation_uses_only_synthetic_lines():
     assert result["synthetic_game_line_observations"] + result["pushes_excluded"] == 120 * 7
     assert len(result["by_line_offset"]) == 7
     assert result["not_a_sportybet_market_backtest"] is True
+    clustered = result["event_clustered_score_diagnostics"]
+    assert clustered["unique_validation_games_scored"] == 120
+    assert clustered["synthetic_lines_treated_as_independent_games"] is False
+    assert len(clustered["brier_difference_cluster_bootstrap_95_ci"]) == 2
     assert result["model_brier"] is not None
     assert result["coinflip_baseline_brier"] == 0.25
+
+
+def test_prospective_probability_sample_requires_exact_snapshot_linkage():
+    cutoff = EVALUATION_CUTOFF_UTC
+    published = "2026-11-03T17:00:03+00:00"
+    start = "2026-11-03T20:00:00+00:00"
+    quote_time = "2026-11-03T17:00:00+00:00"
+    snapshot = {
+        "event_id": "event-prospective",
+        "start_time": start,
+        "published_at": published,
+        "totals_model_version": "nba-total-v5-pace-efficiency-calibrated",
+        "publication_snapshot_id": "prospective-snapshot-1",
+        "publication_snapshot_verified": True,
+        "publication_snapshot_kind": "immutable_sportybet_market_225_revision",
+        "markets": {"total_ou": {
+            "market_id": "225",
+            "source": "SportyBet Nigeria",
+            "sportybet_event_id": "sr:match:prospective",
+            "quote_capture_basis": "SportyBet API response observed_at",
+            "quote_timestamp": quote_time,
+            "line": 220.5,
+            "over_odds": 1.91,
+            "under_odds": 1.89,
+        }},
+    }
+    record = {
+        "event_id": "event-prospective",
+        "start_time": start,
+        "published_at": published,
+        "publication_snapshot_id": "prospective-snapshot-1",
+        "quote_timestamp": quote_time,
+        "market_id": "225",
+        "market_source": "SportyBet Nigeria",
+        "sportybet_event_id": "sr:match:prospective",
+        "quote_capture_basis": "SportyBet API response observed_at",
+        "line": 220.5,
+        "over_odds": 1.91,
+        "under_odds": 1.89,
+    }
+    report, event_ids = prospective_snapshot_coverage([record], [snapshot], cutoff)
+    assert event_ids == {"event-prospective"}
+    assert report["prospective_verified_fresh_market_225_snapshot_records"] == 1
+    assert report["prospective_settled_selections_with_exact_snapshot_match"] == 1
+    assert report["prospective_settled_selections_missing_or_mismatched_snapshot"] == 0
+    assert report["cutoff_utc"] == cutoff.isoformat()
+
+    altered_record = {**record, "over_odds": 2.01}
+    bad_report, bad_ids = prospective_snapshot_coverage([altered_record], [snapshot], cutoff)
+    assert bad_ids == set()
+    assert bad_report["prospective_settled_selections_missing_or_mismatched_snapshot"] == 1
+    assert bad_report["snapshot_linkage_failures"][0]["reason"] == "SNAPSHOT_FIELDS_DO_NOT_MATCH_SETTLEMENT_RECORD"
 
 
 def test_probability_scores_compare_model_and_no_vig_market_descriptively():
@@ -206,6 +263,9 @@ def test_full_report_keeps_prospective_holdout_locked():
     assert report["historical_market_line_backtest_available"] is False
     assert report["archived_history_rows_with_any_market_data"] == 0
     assert report["model_projection_market_blind"] is True
+    assert report["prospective_probability_score_summary"]["n"] == 0
+    assert report["prospective_probability_score_summary"]["sufficient_for_probability_validation"] is False
+    assert report["prospective_pregame_snapshot_coverage"]["prospective_settled_selections_with_exact_snapshot_match"] == 0
 
 
 if __name__ == "__main__":
@@ -213,9 +273,10 @@ if __name__ == "__main__":
     test_snapshot_clv_uses_only_later_exact_pregame_quote()
     test_snapshot_clv_excludes_old_update_from_near_close_sample()
     test_historical_probability_validation_uses_only_synthetic_lines()
+    test_prospective_probability_sample_requires_exact_snapshot_linkage()
     test_probability_scores_compare_model_and_no_vig_market_descriptively()
     test_value_decision_rejects_calibration_failure()
     test_value_decision_requires_positive_lower_bound_and_edge()
     test_push_does_not_count_as_a_loss()
     test_full_report_keeps_prospective_holdout_locked()
-    print("NBA totals probability/value experiment tests: PASS (9 groups)")
+    print("NBA totals probability/value experiment tests: PASS (10 groups)")

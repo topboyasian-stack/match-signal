@@ -35,6 +35,7 @@ HISTORICAL_VALIDATION_CUTOFF_UTC = datetime(
 )
 MIN_CALIBRATION_RESIDUALS = 150
 MIN_PROSPECTIVE_SETTLED_BETS = 100
+MIN_PROSPECTIVE_PROBABILITY_SCORE = 30
 MIN_PROBABILITY_EDGE = 0.04
 MIN_EXPECTED_VALUE = 0.03
 BOOTSTRAP_RESAMPLES = 4000
@@ -164,6 +165,58 @@ def historical_probability_validation(validation_rows, calibration_residuals):
         })
 
     n = len(observations)
+    # Seven synthetic offsets from one game are repeated measurements, not seven
+    # independent fixtures. Bootstrap score differences at the unique-game level.
+    scores_by_event = {}
+    for index, row in enumerate(observations):
+        event_key = str(row.get("event_id") or f"row-{index}")
+        scores_by_event.setdefault(event_key, []).append(row)
+    event_score_rows = []
+    for event_key, rows in sorted(scores_by_event.items()):
+        event_score_rows.append({
+            "event_id": event_key,
+            "brier_delta": sum(r["model_brier"] - r["coinflip_brier"] for r in rows) / len(rows),
+            "log_loss_delta": sum(r["model_log_loss"] - r["coinflip_log_loss"] for r in rows) / len(rows),
+        })
+    event_n = len(event_score_rows)
+    clustered_diagnostics = {
+        "independent_unit": "unique NBA game; mean over its non-push synthetic lines",
+        "unique_validation_games_scored": event_n,
+        "synthetic_lines_treated_as_independent_games": False,
+    }
+    if event_n:
+        brier_deltas = [row["brier_delta"] for row in event_score_rows]
+        log_deltas = [row["log_loss_delta"] for row in event_score_rows]
+        mean_brier_delta = sum(brier_deltas) / event_n
+        mean_log_delta = sum(log_deltas) / event_n
+        rng = random.Random(20261102 + event_n)
+        brier_bootstrap, log_bootstrap = [], []
+        for _ in range(BOOTSTRAP_RESAMPLES):
+            indices = [rng.randrange(event_n) for _ in range(event_n)]
+            brier_bootstrap.append(sum(brier_deltas[i] for i in indices) / event_n)
+            log_bootstrap.append(sum(log_deltas[i] for i in indices) / event_n)
+        brier_low, brier_high = _quantile(brier_bootstrap, 0.025), _quantile(brier_bootstrap, 0.975)
+        log_low, log_high = _quantile(log_bootstrap, 0.025), _quantile(log_bootstrap, 0.975)
+        clustered_diagnostics.update({
+            "brier_model_minus_coinflip_mean_per_game": round(mean_brier_delta, 6),
+            "brier_difference_cluster_bootstrap_95_ci": [round(brier_low, 6), round(brier_high, 6)],
+            "brier_model_improves_with_95pct_clustered_support": bool(brier_high < 0),
+            "log_loss_model_minus_coinflip_mean_per_game": round(mean_log_delta, 6),
+            "log_loss_difference_cluster_bootstrap_95_ci": [round(log_low, 6), round(log_high, 6)],
+            "log_loss_model_improves_with_95pct_clustered_support": bool(log_high < 0),
+            "bootstrap_resamples": BOOTSTRAP_RESAMPLES,
+        })
+    else:
+        clustered_diagnostics.update({
+            "brier_model_minus_coinflip_mean_per_game": None,
+            "brier_difference_cluster_bootstrap_95_ci": None,
+            "brier_model_improves_with_95pct_clustered_support": False,
+            "log_loss_model_minus_coinflip_mean_per_game": None,
+            "log_loss_difference_cluster_bootstrap_95_ci": None,
+            "log_loss_model_improves_with_95pct_clustered_support": False,
+            "bootstrap_resamples": BOOTSTRAP_RESAMPLES,
+        })
+
     if n:
         bins = []
         for bucket in range(10):
@@ -208,6 +261,7 @@ def historical_probability_validation(validation_rows, calibration_residuals):
             bool(model_log < coinflip_log) if model_log is not None and coinflip_log is not None else False
         ),
         "probability_reliability_bins": bins,
+        "event_clustered_score_diagnostics": clustered_diagnostics,
         "by_line_offset": offset_results,
         "not_a_sportybet_market_backtest": True,
     }
@@ -579,7 +633,121 @@ def snapshot_clv_audit(settled_rows, snapshots, close_window_minutes=45):
     }
 
 
-def probability_score_summary(settled_audit, minimum_descriptive_sample=30):
+def prospective_snapshot_coverage(settled_rows, snapshots, cutoff=EVALUATION_CUTOFF_UTC):
+    """Measure post-cutoff coverage and require exact linkage to immutable snapshots."""
+    all_snapshots = [row for row in (snapshots or []) if isinstance(row, dict)]
+    snapshot_by_id = {}
+    duplicate_ids = set()
+    for snapshot in all_snapshots:
+        snapshot_id = str(snapshot.get("publication_snapshot_id") or "").strip()
+        if not snapshot_id:
+            continue
+        if snapshot_id in snapshot_by_id:
+            duplicate_ids.add(snapshot_id)
+        else:
+            snapshot_by_id[snapshot_id] = snapshot
+
+    after_cutoff = []
+    verified_fresh = []
+    for snapshot in all_snapshots:
+        if snapshot.get("totals_model_version") != "nba-total-v5-pace-efficiency-calibrated":
+            continue
+        published = parse_time(snapshot.get("published_at"))
+        if not published or published < cutoff:
+            continue
+        after_cutoff.append(snapshot)
+        market = _snapshot_market(snapshot)
+        snapshot_id = str(snapshot.get("publication_snapshot_id") or "").strip()
+        if (
+            snapshot.get("publication_snapshot_verified") is True
+            and snapshot.get("publication_snapshot_kind") == "immutable_sportybet_market_225_revision"
+            and snapshot_id
+            and snapshot_id not in duplicate_ids
+            and str(snapshot.get("event_id") or "").strip()
+            and market is not None
+        ):
+            verified_fresh.append(snapshot)
+
+    settled_prospective = []
+    for row in (settled_rows or []):
+        published = parse_time(row.get("published_at")) if isinstance(row, dict) else None
+        if published and published >= cutoff:
+            settled_prospective.append(row)
+
+    matched_events = set()
+    failures = []
+    for row in settled_prospective:
+        event_id = str(row.get("event_id") or "").strip()
+        snapshot_id = str(row.get("publication_snapshot_id") or "").strip()
+        snapshot = snapshot_by_id.get(snapshot_id)
+        reason = None
+        if not snapshot_id or snapshot is None:
+            reason = "SNAPSHOT_REFERENCE_NOT_FOUND"
+        elif snapshot_id in duplicate_ids:
+            reason = "SNAPSHOT_ID_NOT_UNIQUE"
+        else:
+            market = _snapshot_market(snapshot)
+            row_published = parse_time(row.get("published_at"))
+            row_start = parse_time(row.get("start_time"))
+            snap_published = parse_time(snapshot.get("published_at"))
+            snap_start = parse_time(snapshot.get("start_time"))
+            snap_market = ((snapshot.get("markets") or {}).get("total_ou") or {})
+            row_quote = parse_time(row.get("quote_timestamp"))
+            checks = [
+                snapshot.get("totals_model_version") == "nba-total-v5-pace-efficiency-calibrated",
+                snapshot.get("publication_snapshot_verified") is True,
+                snapshot.get("publication_snapshot_kind") == "immutable_sportybet_market_225_revision",
+                str(snapshot.get("event_id") or "").strip() == event_id,
+                row_published is not None and snap_published == row_published and row_published >= cutoff,
+                row_start is not None and snap_start == row_start,
+                market is not None,
+                str(row.get("market_id") or "") == "225",
+                str(row.get("market_source") or "").strip().lower() == "sportybet nigeria",
+                str(row.get("quote_capture_basis") or "") == "SportyBet API response observed_at",
+                str(row.get("sportybet_event_id") or "").strip() == str(snap_market.get("sportybet_event_id") or "").strip(),
+                row_quote is not None and market is not None and market["quote_time"] == row_quote,
+            ]
+            for field in ("line", "over_odds", "under_odds"):
+                try:
+                    same = math.isclose(float(row.get(field)), float(snap_market.get(field)), rel_tol=0.0, abs_tol=1e-9)
+                except (TypeError, ValueError):
+                    same = False
+                checks.append(same)
+            if not all(checks):
+                reason = "SNAPSHOT_FIELDS_DO_NOT_MATCH_SETTLEMENT_RECORD"
+        if reason:
+            failures.append({"event_id": event_id, "reason": reason})
+        elif event_id:
+            matched_events.add(event_id)
+
+    prospective_event_ids = {
+        str(row.get("event_id") or "").strip()
+        for row in after_cutoff
+        if str(row.get("event_id") or "").strip()
+    }
+    verified_event_ids = {
+        str(row.get("event_id") or "").strip()
+        for row in verified_fresh
+        if str(row.get("event_id") or "").strip()
+    }
+    report = {
+        "cutoff_utc": cutoff.isoformat(),
+        "snapshot_source": "data/nba_totals_publication_snapshots.json",
+        "prospective_v5_snapshot_records": len(after_cutoff),
+        "prospective_unique_fixtures_with_any_snapshot": len(prospective_event_ids),
+        "prospective_verified_fresh_market_225_snapshot_records": len(verified_fresh),
+        "prospective_unique_fixtures_with_verified_fresh_market_225_snapshot": len(verified_event_ids),
+        "prospective_settled_unique_market_selections": len(settled_prospective),
+        "prospective_settled_selections_with_exact_snapshot_match": len(matched_events),
+        "prospective_settled_selections_missing_or_mismatched_snapshot": len(settled_prospective) - len(matched_events),
+        "snapshot_linkage_failures": failures[:10],
+        "target_unique_settled_probability_observations": MIN_PROSPECTIVE_PROBABILITY_SCORE,
+        "snapshot_linked_sample_threshold_met": len(matched_events) >= MIN_PROSPECTIVE_PROBABILITY_SCORE,
+    }
+    return report, matched_events
+
+
+def probability_score_summary(settled_audit, minimum_descriptive_sample=30, cohort_label="selected-v5 historical cohort"):
     """Descriptive Brier/log-loss comparison; never a release gate at tiny n."""
     binary = []
     for row in settled_audit:
@@ -655,7 +823,7 @@ def probability_score_summary(settled_audit, minimum_descriptive_sample=30):
         "sufficient_for_probability_validation": n >= minimum_descriptive_sample,
         "minimum_descriptive_sample": minimum_descriptive_sample,
         "warning": (
-            "Descriptive only. This comparison is based on a tiny selected-v5 historical cohort and does not establish calibration or betting value."
+            f"Descriptive only. This comparison is based on {cohort_label} and does not establish release readiness or betting value."
             if n < minimum_descriptive_sample else
             "Descriptive score only; prospective market validation and release gates still apply."
         ),
@@ -737,7 +905,21 @@ def run_experiment(history, ledger, predictions, now=None, snapshots=None):
             **decision,
         })
 
+    snapshot_coverage, snapshot_linked_event_ids = prospective_snapshot_coverage(
+        v5_settled, snapshots or []
+    )
+    prospective_settled_audit = [
+        row for row in settled_audit
+        if row.get("event_id") in snapshot_linked_event_ids
+        and parse_time(row.get("published_at")) is not None
+        and parse_time(row.get("published_at")) >= EVALUATION_CUTOFF_UTC
+    ]
     probability_scores = probability_score_summary(settled_audit)
+    prospective_probability_scores = probability_score_summary(
+        prospective_settled_audit,
+        minimum_descriptive_sample=MIN_PROSPECTIVE_PROBABILITY_SCORE,
+        cohort_label="post-cutoff prospective cohort with exact linked pregame snapshots",
+    )
     prospective_bets = [
         row for row in settled
         if parse_time(row.get("published_at")) is not None
@@ -789,6 +971,8 @@ def run_experiment(history, ledger, predictions, now=None, snapshots=None):
         "settled_v5_market_count": len(settled_audit),
         "settled_v5_clv_diagnostics": clv_audit,
         "settled_v5_probability_score_summary": probability_scores,
+        "prospective_pregame_snapshot_coverage": snapshot_coverage,
+        "prospective_probability_score_summary": prospective_probability_scores,
         "historical_value_signal_summary": {
             "n": len(historical_value_signals),
             "wins": historical_value_signal_wins,
@@ -802,6 +986,8 @@ def run_experiment(history, ledger, predictions, now=None, snapshots=None):
         "upcoming_predictions_without_exact_fresh_pair": skipped_without_fresh_pair,
         "prospective_settled_market_bets_after_cutoff": len(prospective_bets),
         "prospective_minimum_sample_reached": prospective_minimum_sample_reached,
+        "prospective_probability_scored_unique_fixtures": prospective_probability_scores["n"],
+        "prospective_probability_validation_sample_met": prospective_probability_scores["sufficient_for_probability_validation"],
         "live_value_decisions_authorized": False,
         "release_decision": "RESEARCH_ONLY",
         "release_reason": (
@@ -827,6 +1013,8 @@ def main():
         "upcoming_exact_fresh_market_225_value_diagnostics": report["upcoming_value_diagnostics_count"],
         "upcoming_predictions_without_exact_fresh_pair": report["upcoming_predictions_without_exact_fresh_pair"],
         "prospective_settled_market_bets_after_cutoff": report["prospective_settled_market_bets_after_cutoff"],
+        "prospective_probability_scored_unique_fixtures": report["prospective_probability_scored_unique_fixtures"],
+        "prospective_snapshot_coverage": report["prospective_pregame_snapshot_coverage"],
         "release_decision": report["release_decision"],
         "output": str(OUTPUT.relative_to(ROOT)),
     }, indent=2))

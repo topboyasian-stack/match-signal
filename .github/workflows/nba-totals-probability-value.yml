@@ -2,6 +2,9 @@ name: NBA totals probability and value research
 
 on:
   workflow_dispatch:
+  schedule:
+    # Re-score prospective snapshot and settlement coverage as the free capture jobs run.
+    - cron: '17 * * * *'
   push:
     branches: [main]
     paths:
@@ -58,6 +61,14 @@ jobs:
           assert report.get("live_value_decisions_authorized") is False
           assert "settled_v5_clv_diagnostics" in report
           assert "settled_v5_probability_score_summary" in report
+          assert "prospective_pregame_snapshot_coverage" in report
+          assert "prospective_probability_score_summary" in report
+          prospective = report["prospective_probability_score_summary"]
+          coverage = report["prospective_pregame_snapshot_coverage"]
+          assert prospective.get("n", 0) >= 0
+          assert prospective.get("sufficient_for_probability_validation") is (prospective.get("n", 0) >= 30)
+          assert coverage.get("prospective_settled_selections_with_exact_snapshot_match", 0) <= coverage.get("prospective_settled_unique_market_selections", 0)
+          assert coverage.get("prospective_unique_fixtures_with_verified_fresh_market_225_snapshot", 0) <= coverage.get("prospective_unique_fixtures_with_any_snapshot", 0)
           historical_probability = report.get("historical_probability_validation", {})
           assert historical_probability.get("unique_validation_games", 0) >= 100
           assert len(historical_probability.get("by_line_offset", [])) == 7
@@ -75,6 +86,9 @@ jobs:
           print("Brier score sample:", report["settled_v5_probability_score_summary"]["n"])
           print("Fresh exact market-225 diagnostics:", report["upcoming_value_diagnostics_count"])
           print("Prospective settled bets:", report["prospective_settled_market_bets_after_cutoff"])
+          print("Prospective model probability score sample:", prospective["n"])
+          print("Prospective exact snapshot linkage:", coverage["prospective_settled_selections_with_exact_snapshot_match"])
+          print("Historical event-clustered diagnostics:", historical_probability["event_clustered_score_diagnostics"])
           PY
 
       - name: Publish value research report without overwriting newer main
