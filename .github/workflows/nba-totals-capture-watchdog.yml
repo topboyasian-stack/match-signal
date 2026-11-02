@@ -65,7 +65,7 @@ jobs:
           now = datetime.now(timezone.utc)
           active = int(os.environ.get("ACTIVE_CAPTURE_RUNS", "0"))
           age = capture_age_minutes(checked_at, now)
-          dispatch = should_dispatch_capture(checked_at, now, active_capture_runs=active, max_age_minutes=15)
+          dispatch = should_dispatch_capture(checked_at, now, active_capture_runs=active, max_age_minutes=10)
           print(f"dispatch={'true' if dispatch else 'false'}")
           print(f"capture_age_minutes={age:.2f}" if age is not None else "capture_age_minutes=unknown")
           if dispatch:
