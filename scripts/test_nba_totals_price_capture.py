@@ -44,8 +44,11 @@ class PriceCaptureTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[1]
         page_script = (root / "basketball-live.js").read_text(encoding="utf-8")
         page_html = (root / "basketball.html").read_text(encoding="utf-8")
+        proxy_script = (root / "functions" / "api" / "sportybet-basketball.js").read_text(encoding="utf-8")
         self.assertIn("tournamentId=sr%3Atournament%3A132", page_script)
         self.assertIn("basketball-live.js?v=20261102-nba-feed-scope1", page_html)
+        self.assertIn("u.searchParams.get('tournamentId')||NBA_TOURNAMENT_ID", proxy_script)
+        self.assertIn("if(tournamentId!==NBA_TOURNAMENT_ID)", proxy_script)
 
 
     def setUp(self):
