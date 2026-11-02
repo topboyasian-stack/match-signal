@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import math
+import random
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -23,8 +24,10 @@ SNAPSHOTS = DATA / "nba_totals_publication_snapshots.json"
 PREDICTIONS = DATA / "nba_predictions.json"
 OUTPUT = DATA / "nba_totals_oos_value_test.json"
 MIN_PRIOR_GAMES = 40
-HOLDOUT_FRACTION = 0.20
 BASELINE_DAYS = 90
+# Frozen once v5's prospective validation began. Never roll this date forward.
+EVALUATION_CUTOFF_UTC = datetime(2026, 11, 2, 2, 0, tzinfo=timezone.utc)
+BOOTSTRAP_RESAMPLES = 4000
 MIN_FORECAST_HOLDOUT = 100
 MIN_MARKET_HOLDOUT = 100
 
@@ -154,119 +157,101 @@ def _roi_grade_record(row):
 
 
 def verified_market_records(rows):
-    return sorted(
-        [row for row in rows if _roi_grade_record(row)],
-        key=lambda row: (str(row.get("start_time") or ""), str(row.get("event_id") or "")),
-    )
+    """Return one independently settled, provenance-verified row per fixture."""
+    eligible = [row for row in rows if _roi_grade_record(row)]
+    eligible.sort(key=lambda row: (
+        str(row.get("published_at") or ""),
+        str(row.get("start_time") or ""),
+        str(row.get("event_id") or ""),
+    ))
+    unique = []
+    seen_events = set()
+    for row in eligible:
+        event_id = str(row.get("event_id") or "").strip()
+        if not event_id or event_id in seen_events:
+            continue
+        seen_events.add(event_id)
+        unique.append(row)
+    return unique
 
 
-def publication_capture_metrics(snapshots, predictions=None, as_of=None):
-    """Report immutable revision coverage separately from today's quote availability."""
-    checked_at = parse_time(as_of) if as_of is not None else datetime.now(timezone.utc)
-    if checked_at is None:
-        checked_at = datetime.now(timezone.utc)
+def split_at_fixed_cutoff(rows, timestamp_field):
+    """Split immutable records at the one pre-registered UTC cutoff."""
+    development, holdout = [], []
+    for row in rows or []:
+        stamp = parse_time(row.get(timestamp_field)) if isinstance(row, dict) else None
+        if stamp is None:
+            continue
+        if stamp < EVALUATION_CUTOFF_UTC:
+            development.append(row)
+        else:
+            holdout.append(row)
+    return development, holdout
 
-    current = [
-        row for row in (snapshots or [])
-        if isinstance(row, dict) and row.get("totals_model_version") == NBA_TOTALS_MODEL_VERSION
-    ]
-    valid = []
-    for row in current:
-        market = ((row.get("markets") or {}).get("total_ou") or {})
+
+def market_record_audit(rows):
+    """Expose the exact projection/line/side/price/result for every verified bet."""
+    audit = []
+    for row in rows:
+        pick = str(row.get("pick") or "").lower()
+        expected = finite_number(row.get("expected_total"))
+        line = finite_number(row.get("line"))
+        actual = finite_number(row.get("final_total"))
+        over_odds = finite_number(row.get("over_odds"))
+        under_odds = finite_number(row.get("under_odds"))
+        selected_odds = over_odds if pick == "over" else under_odds
         published = parse_time(row.get("published_at"))
-        start = parse_time(row.get("start_time"))
-        quote = parse_time(market.get("quote_timestamp"))
-        try:
-            line = float(market.get("line"))
-            over = float(market.get("over_odds"))
-            under = float(market.get("under_odds"))
-        except (TypeError, ValueError):
-            continue
-        age = (published - quote).total_seconds() / 60 if published and quote else None
-        if not (
-            row.get("publication_snapshot_verified") is True
-            and str(row.get("publication_snapshot_id") or "").strip()
-            and str(row.get("event_id") or "").strip()
-            and str(market.get("market_id") or "") == "225"
-            and str(market.get("source") or "").strip().lower() == "sportybet nigeria"
-            and str(market.get("sportybet_event_id") or "").strip()
-            and market.get("quote_capture_basis") == "SportyBet API response observed_at"
-            and published is not None and start is not None and quote is not None
-            and quote <= published < start and age is not None and 0 <= age <= 15
-            and 100 <= line <= 300
-            and math.isfinite(over) and over > 1 and math.isfinite(under) and under > 1
-        ):
-            continue
-        valid.append(row)
+        quote = parse_time(row.get("quote_timestamp"))
+        quote_age = (published - quote).total_seconds() / 60 if published and quote else None
+        selected_implied = (1.0 / selected_odds) if selected_odds and selected_odds > 1 else None
+        total_implied = (
+            (1.0 / over_odds) + (1.0 / under_odds)
+            if over_odds and under_odds and over_odds > 1 and under_odds > 1 else None
+        )
+        no_vig_probability = (
+            selected_implied / total_implied
+            if selected_implied is not None and total_implied else None
+        )
+        result = str(row.get("result") or "").lower()
+        won = pick == result
+        audit.append({
+            "event_id": str(row.get("event_id") or ""),
+            "start_time": row.get("start_time"),
+            "matchup": f'{row.get("player_1") or ""} vs {row.get("player_2") or ""}',
+            "model_projection": round(expected, 4) if expected is not None else None,
+            "sportybet_market_225_line": line,
+            "projection_edge_points": round(expected - line, 4) if expected is not None and line is not None else None,
+            "selected_side": pick.upper(),
+            "selected_side_odds": selected_odds,
+            "no_vig_market_probability_for_selected_side": round(no_vig_probability, 4) if no_vig_probability is not None else None,
+            "final_total_including_overtime": actual,
+            "actual_minus_market_line": round(actual - line, 4) if actual is not None and line is not None else None,
+            "model_projection_error": round(expected - actual, 4) if expected is not None and actual is not None else None,
+            "settled_result": result.upper(),
+            "won": won,
+            "diagnosis": "CORRECT" if won else f'{pick.upper()}_PICK_LOST',
+            "quote_age_minutes_at_publication": round(quote_age, 4) if quote_age is not None else None,
+            "published_at": row.get("published_at"),
+            "quote_timestamp": row.get("quote_timestamp"),
+            "publication_snapshot_id": row.get("publication_snapshot_id"),
+        })
+    return audit
 
-    predictions_by_event = {
-        str(row.get("event_id")): row
-        for row in (predictions or [])
-        if isinstance(row, dict)
-        and row.get("totals_model_version") == NBA_TOTALS_MODEL_VERSION
-        and row.get("event_id")
-    }
-    attached_event_ids = set()
-    for event_id, row in predictions_by_event.items():
-        market = ((row.get("markets") or {}).get("total_ou") or {})
-        start = parse_time(row.get("start_time"))
-        stamp = parse_time(market.get("quote_timestamp"))
-        try:
-            line = float(market.get("line"))
-            over = float(market.get("over_odds"))
-            under = float(market.get("under_odds"))
-        except (TypeError, ValueError):
-            continue
-        age = (checked_at - stamp).total_seconds() / 60 if stamp else None
-        if (
-            str(market.get("market_id") or "") == "225"
-            and str(market.get("source") or "").strip().lower() == "sportybet nigeria"
-            and str(market.get("sportybet_event_id") or "").strip()
-            and market.get("quote_capture_basis") == "SportyBet API response observed_at"
-            and stamp is not None and start is not None
-            and stamp <= checked_at < start and age is not None and 0 <= age <= 15
-            and 100 <= line <= 300
-            and math.isfinite(over) and over > 1 and math.isfinite(under) and under > 1
-        ):
-            attached_event_ids.add(event_id)
 
-    snapshot_event_ids = {
-        str(row.get("event_id")) for row in valid
-        if str(row.get("event_id") or "") in predictions_by_event
-    }
-    predicted_event_ids = set(predictions_by_event)
-    unpriced = len(predicted_event_ids - attached_event_ids)
-    unmatched = len(attached_event_ids - snapshot_event_ids)
-    coverage = round(len(snapshot_event_ids) / len(predicted_event_ids), 4) if predicted_event_ids else None
-    picks = [
-        row for row in valid
-        if str(((row.get("markets") or {}).get("total_ou") or {}).get("pick") or "").lower() in {"over", "under"}
-    ]
-    no_lean = [
-        row for row in valid
-        if str(((row.get("markets") or {}).get("total_ou") or {}).get("pick") or "").lower() not in {"over", "under"}
-    ]
-    if not predicted_event_ids:
-        status = "NO_CURRENT_MODEL_PREDICTIONS"
-    elif predicted_event_ids <= snapshot_event_ids and unmatched == 0:
-        status = "CAPTURED"
-    elif valid or attached_event_ids:
-        status = "PARTIAL"
-    else:
-        status = "AWAITING_FRESH_MARKET_225_QUOTES"
-    return {
-        "model_version": NBA_TOTALS_MODEL_VERSION,
-        "model_predictions": len(predicted_event_ids),
-        "predictions_with_fresh_sportybet_market_225_pair": len(attached_event_ids),
-        "immutable_fresh_publication_snapshots": len(valid),
-        "unique_events_with_immutable_snapshots": len(snapshot_event_ids),
-        "snapshot_coverage": coverage,
-        "directional_pick_snapshots": len(picks),
-        "no_clear_lean_snapshots": len(no_lean),
-        "unpriced_or_unavailable_prediction_count": unpriced,
-        "unmatched_fresh_market_predictions": unmatched,
-        "capture_status": status,
-    }
+def _bootstrap_roi_lower_bound(profits, resamples=BOOTSTRAP_RESAMPLES):
+    """Deterministic fixture-level bootstrap lower 95% bound for mean unit ROI."""
+    values = list(profits)
+    n = len(values)
+    if n < 2:
+        return None
+    rng = random.Random(20261102 + n)
+    means = []
+    for _ in range(resamples):
+        sample_total = sum(values[rng.randrange(n)] for _ in range(n))
+        means.append(sample_total / n)
+    means.sort()
+    index = max(0, min(len(means) - 1, int(0.025 * (len(means) - 1))))
+    return means[index]
 
 
 def market_metrics(rows):
@@ -299,13 +284,9 @@ def market_metrics(rows):
 
     n = len(profits)
     roi = sum(profits) / n if n else None
-    if n >= 2:
-        variance = sum((value - roi) ** 2 for value in profits) / (n - 1)
-        lower = roi - 1.96 * math.sqrt(variance / n)
-    else:
-        lower = None
+    lower = _bootstrap_roi_lower_bound(profits)
     favorite_roi = sum(favorite_profits) / len(favorite_profits) if favorite_profits else None
-    for side, values in by_pick.items():
+    for values in by_pick.values():
         values["accuracy"] = round(values["wins"] / values["n"], 4) if values["n"] else None
     return {
         "n": n, "wins": wins, "losses": losses, "pushes": pushes,
@@ -315,9 +296,11 @@ def market_metrics(rows):
         "profit_units": round(sum(profits), 4) if n else 0.0,
         "roi": round(roi, 4) if roi is not None else None,
         "roi_ci95_lower": round(lower, 4) if lower is not None else None,
+        "roi_ci_method": "deterministic fixture-level percentile bootstrap; 4,000 resamples",
         "market_favorite_roi": round(favorite_roi, 4) if favorite_roi is not None else None,
         "roi_vs_market_favorite": round(roi - favorite_roi, 4) if roi is not None and favorite_roi is not None else None,
     }
+
 
 def _blend_total(row, weight):
     base = float(row["base_total"])
@@ -329,10 +312,9 @@ def _blend_total(row, weight):
 
 def evaluate(history, ledger, snapshots=None, predictions=None, as_of=None):
     forecasts = build_forecasts(history)
-    split = int(len(forecasts) * (1.0 - HOLDOUT_FRACTION))
-    development, holdout = forecasts[:split], forecasts[split:]
+    development, holdout = split_at_fixed_cutoff(forecasts, "date")
 
-    # Choose the pace contribution and residual correction on development only.
+    # All tuning remains strictly before the frozen prospective cutoff.
     grid = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
     candidates = []
     for weight in grid:
@@ -367,8 +349,9 @@ def evaluate(history, ledger, snapshots=None, predictions=None, as_of=None):
 
     publication_capture = publication_capture_metrics(snapshots, predictions, as_of=as_of)
     market_rows = verified_market_records(ledger)
-    market_split = int(len(market_rows) * (1.0 - HOLDOUT_FRACTION))
-    market_holdout = market_metrics(market_rows[market_split:])
+    market_development, market_holdout_rows = split_at_fixed_cutoff(market_rows, "published_at")
+    market_holdout = market_metrics(market_holdout_rows)
+    market_development_metrics = market_metrics(market_development)
     market_overall = market_metrics(market_rows)
     pace_development_n = sum(row.get("pace_available") is True for row in development)
     pace_holdout_n = sum(row.get("pace_available") is True for row in holdout)
@@ -386,17 +369,25 @@ def evaluate(history, ledger, snapshots=None, predictions=None, as_of=None):
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "paper_only": True,
-        "evaluation_type": "NBA_TOTALS_WALK_FORWARD_V1",
+        "evaluation_type": "NBA_TOTALS_FIXED_CUTOFF_V2",
         "market_id": "225",
         "market_definition": "full_game_total_including_overtime",
         "model_version": NBA_TOTALS_MODEL_VERSION,
         "history_games": len(clean_history(history)),
+        "holdout_protocol": {
+            "fixed_cutoff_utc": EVALUATION_CUTOFF_UTC.isoformat(),
+            "forecast_timestamp_field": "date",
+            "market_timestamp_field": "published_at",
+            "rule": "Records before the fixed cutoff are development; records at or after it are prospective holdout. The cutoff never rolls forward.",
+            "market_sample_unit": "one verified settled record per unique ESPN fixture ID",
+        },
         "walk_forward": {
-            "method": "expanding chronological forecasts; each game uses only strictly earlier completed games",
+            "method": "expanding chronological forecasts; every game uses only strictly earlier completed games; prospective holdout begins at the fixed cutoff",
             "baseline": "mean NBA game total over the preceding 90 days (or all prior games when unavailable)",
             "development_games": len(development),
             "holdout": {
                 **model_metrics,
+                "start_utc": EVALUATION_CUTOFF_UTC.isoformat(),
                 "uncalibrated": raw_model_metrics,
                 "baseline_mae": baseline_metrics["mae"],
                 "baseline_rmse": baseline_metrics["rmse"],
@@ -413,33 +404,20 @@ def evaluate(history, ledger, snapshots=None, predictions=None, as_of=None):
             "development_raw_bias": round(sum(development_errors) / len(development_errors), 4) if development_errors else None,
             "pace_feature_development_games": pace_development_n,
             "pace_feature_coverage": round(pace_development_n / len(development), 4) if development else 0.0,
-            "selection_rule": "minimum development MAE across a predeclared pace blend grid; residual bias estimated on development only",
+            "selection_rule": "minimum development MAE across a predeclared pace blend grid; residual bias estimated on pre-cutoff development only",
         },
         "publication_capture": publication_capture,
         "verified_market_records": len(market_rows),
-        "market_development_records": market_split,
+        "market_development_records": len(market_development),
+        "market_development": market_development_metrics,
+        "market_holdout_publications": len(market_holdout_rows),
         "market_overall": market_overall,
         "market_holdout": market_holdout,
+        "market_record_audit": market_record_audit(market_rows),
         "release_decision": "QUALIFIED" if forecast_ok and market_ok else "RESEARCH_ONLY",
         "release_reason": (
-            "Chronological calibrated score forecasts beat the rolling baseline and the untouched, model-version-specific SportyBet holdout passed the pre-registered ROI and confidence checks."
+            "The fixed-cutoff prospective forecast holdout beat the rolling baseline and the untouched, model-version-specific SportyBet market-225 holdout passed the pre-registered ROI and bootstrap confidence checks."
             if forecast_ok and market_ok else
-            "Not qualified: require at least 100 unseen calibrated forecast games with lower MAE than baseline and absolute bias <=3 points, plus at least 100 settled, immutable, fresh SportyBet market-225 holdout bets with positive ROI, a positive 95% lower confidence bound, and ROI above the market-favourite baseline."
+            "Not qualified: require at least 100 forecast games after the frozen cutoff with lower MAE than baseline and absolute bias <=3 points, plus at least 100 unique settled, immutable, fresh SportyBet market-225 bets published after that same cutoff with positive ROI, a positive bootstrap 95% lower bound, and ROI above the market-favourite baseline."
         ),
     }
-
-def main():
-    history = json.loads(HISTORY.read_text(encoding="utf-8"))
-    ledger_payload = json.loads(LEDGER.read_text(encoding="utf-8")) if LEDGER.exists() else []
-    ledger = ledger_payload.get("records", []) if isinstance(ledger_payload, dict) else ledger_payload
-    snapshot_rows = json.loads(SNAPSHOTS.read_text(encoding="utf-8")) if SNAPSHOTS.exists() else []
-    prediction_rows = json.loads(PREDICTIONS.read_text(encoding="utf-8")) if PREDICTIONS.exists() else []
-    result = evaluate(history, ledger if isinstance(ledger, list) else [],
-                      snapshot_rows if isinstance(snapshot_rows, list) else [],
-                      prediction_rows if isinstance(prediction_rows, list) else [])
-    OUTPUT.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
-    print(json.dumps(result, indent=2))
-
-
-if __name__ == "__main__":
-    main()
