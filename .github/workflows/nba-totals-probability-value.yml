@@ -47,7 +47,7 @@ jobs:
 
           def cron(path):
               text = Path(path).read_text(encoding="utf-8")
-              match = re.search(r"^\\s+- cron:\\s*['\\\"]([^'\\\"]+)['\\\"]", text, re.MULTILINE)
+              match = re.search(r"cron:\s*'([^']+)'", text)
               assert match, f"Missing explicit schedule in {path}"
               return match.group(1)
 
