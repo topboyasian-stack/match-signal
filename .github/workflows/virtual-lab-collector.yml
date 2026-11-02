@@ -84,6 +84,9 @@ jobs:
       - name: Syntax-check eligibility engine
         run: python -m py_compile scripts/virtual_lab_eligibility.py
 
+      - name: Regression-test bounded exact-scope settlement windows
+        run: python scripts/test_virtual_lab_collector_settlement.py
+
       - name: Run Virtual Lab v1 capture + settlement
         run: python scripts/virtual_lab_collector.py
 
