@@ -76,6 +76,11 @@ def main():
             "The booking endpoint must reject research-only or non-225 NBA selections")
     require("new Set(ids).size !== ids.length" in api,
             "The booking endpoint must reject duplicate fixtures")
+    tennis_resolver = api.split("if (tennisIds.size) {", 1)[1].split("if (basketballIds.size)", 1)[0]
+    require("fallbackPath: '/api/ng/factsCenter/wapConfigurableUpcomingEvents'" in tennis_resolver,
+            "Tennis fixtures must be retried against SportyBet's alternate WAP upcoming catalogue")
+    require("diff <= 45 * 60 * 1000" in api,
+            "Fixture participant fallback must use the same 45-minute tolerance as manual ticket revalidation")
     require("Participant identity changed in SportyBet current catalogue." in api,
             "Football/Tennis participants must be matched to current SportyBet event identity")
     require("function canonicalParticipant(value)" in api and ".normalize('NFD')" in api,
