@@ -129,4 +129,29 @@ jobs:
               throw new Error('Regional Worker rejected the shared ticket ' + sportName + ' sportId/marketIds before reaching SportyBet.');
             }
           }
+
+          const invalidShareResponse = await fetch(base + '/api/ng/orders/share?probe=' + Date.now(), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ selections: [] }),
+            cache: 'no-store',
+            signal: AbortSignal.timeout(10000)
+          });
+          const invalidShareText = await invalidShareResponse.text();
+          const invalidShareContentType = String(invalidShareResponse.headers.get('content-type') || '').toLowerCase();
+          let invalidSharePayload = null;
+          try { invalidSharePayload = JSON.parse(invalidShareText); } catch (_) {}
+          console.log('Regional share POST route invalid-ticket probe:', JSON.stringify({
+            http_status: invalidShareResponse.status,
+            content_type: invalidShareContentType,
+            error: invalidSharePayload?.error,
+            upstream_status_header: invalidShareResponse.headers.get('X-Match-Signal-Upstream-Status')
+          }));
+          if (invalidShareResponse.status !== 422 ||
+              !invalidShareContentType.includes('application/json') ||
+              invalidSharePayload?.error !== 'INVALID_SHARE_SELECTION_COUNT' ||
+              invalidShareResponse.headers.has('X-Match-Signal-Upstream-Status')) {
+            throw new Error('Regional share POST route did not fail closed on an invalid ticket before contacting SportyBet.');
+          }
+          console.log('Regional share POST route passed: invalid slip receives JSON 422 without provider access.');
           NODE
