@@ -55,7 +55,7 @@ Latest inspected artifacts were generated around **2026-11-02 02:00 UTC**:
 11. [x] Implement an empirical residual score distribution with Over/Under probabilities and integer-line push handling as a research experiment. Score-interval coverage passed; market-probability calibration is not established.
 12. [x] Implement exact fresh SportyBet market-225 no-vig probability comparisons and expected-value calculations in the research report only. There are no historic odds in the archived NBA game log.
 13. [x] Add predeclared probability-edge and EV thresholds with a bootstrap lower bound. These classifications are diagnostic only and cannot authorize betting or tickets.
-14. [ ] Establish market-side probability calibration and evaluate Brier score/log loss, Over/Under buckets, line/edge buckets, and genuine closing-line value. This requires saved pregame SportyBet snapshots and subsequent official settlements; do not manufacture historic odds.
+14. [ ] Finish probability validation. Descriptive model-vs-market Brier/log-loss is now emitted, but the five-record v5 comparison is too small and favours market no-vig prices (model Brier 0.309877 vs 0.251600; model log-loss 0.816446 vs 0.696347). A real-snapshot CLV audit is also emitted: only 2/5 had a quote within 45 minutes of tip, 1/2 had positive no-vig probability CLV, and 0/2 had positive line CLV. Continue collecting at least 30 unique market-settled fixtures before interpreting market probability calibration; never call the last captured quote an official bookmaker close.
 
 ### P1 — prospective validation and release gate
 
@@ -87,6 +87,12 @@ Latest inspected artifacts were generated around **2026-11-02 02:00 UTC**:
 - Recent possessions/efficiency also failed to improve validation (MAE 15.3060; RMSE 19.9486). Overall decision: `KEEP_V5_BASELINE_NO_FEATURE_UPGRADE`. Do not promote v6.
 - Latest artifact: `data/nba_totals_v6_feature_experiment.json`.
 
+## Verified snapshot CLV and descriptive probability score checkpoint — 2026-11-02
+
+- The CLV-capable probability report workflow run `41378184275` passed all steps. The audit starts from each bet's exact immutable opening publication snapshot and considers only later exact SportyBet market-225 quotes observed before tip-off.
+- Only **2 of 5** v5 settled fixtures had a later observation within 45 minutes of start. One of those two had positive selected-side no-vig probability movement; **zero of two** had favourable selected-side line movement. This is not an official bookmaker closing line; it is the latest captured pregame quote within a defined 45-minute window.
+- The five-record descriptive comparison returned model Brier **0.309877** vs market no-vig **0.251600**, and model log-loss **0.816446** vs market no-vig **0.696347**. Sample size is 5, so this is a warning only, not a calibrated conclusion.
+
 ## Verified probability/value research checkpoint — 2026-11-02
 
 - Probability/value workflow run `41377767053` passed its tests, experiment, safety checks, and report publication.
@@ -106,4 +112,4 @@ Latest inspected artifacts were generated around **2026-11-02 02:00 UTC**:
 20. [ ] Revalidate every NBA ticket leg against exact fresh SportyBet 225 event/line/side/price immediately before code generation; reject the whole slip if any leg is invalid.
 21. [ ] Unlock NBA ticket selection/code generation only after all prospective gates and production smoke tests pass.
 
-**Next action on resume:** inspect the latest reruns `41377743302` and `41377791827` after they complete, then start priority 14. Never promote a value classification to a betting recommendation from these research artifacts.
+**Next action on resume:** inspect probability/value workflow run `41378471896` and the historical synthetic-line probability validation it publishes. Then continue priority 14 with prospective probability scoring and actual pregame snapshot coverage. Never promote a value classification to a betting recommendation from these research artifacts.
