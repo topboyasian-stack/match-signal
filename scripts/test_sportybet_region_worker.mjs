@@ -39,10 +39,10 @@ try {
   };
 
   const invalidSport = await worker.fetch(new Request(
-    "https://worker.test/api/ng/factsCenter/pcUpcomingEvents?sportId=sr%3Asport%3A5"
+    "https://worker.test/api/ng/factsCenter/pcUpcomingEvents?sportId=sr%3Asport%3A999"
   ));
   assert.equal(invalidSport.status, 400);
-  assert.equal(fetchCount, 0, "unsupported sport ids must not reach the provider");
+  assert.equal(fetchCount, 0, "unknown sport ids must not reach the provider");
 
   const nbaTotals = await worker.fetch(new Request(
     "https://worker.test/api/ng/factsCenter/pcUpcomingEvents?sportId=sr%3Asport%3A2&pageSize=100&pageNum=1&timeline=96&marketId=225&tournamentId=sr%3Atournament%3A132"
@@ -52,6 +52,32 @@ try {
   assert.equal(lastUrl.searchParams.get("marketId"), "225");
   assert.equal(lastUrl.searchParams.get("tournamentId"), "sr:tournament:132");
   assert.equal(fetchCount, 1);
+  fetchCount = 0;
+
+  const football = await worker.fetch(new Request(
+    "https://worker.test/api/ng/factsCenter/pcUpcomingEvents?sportId=sr%3Asport%3A1&pageSize=100&pageNum=1&timeline=168&marketId=1%2C18%2C10%2C14%2C16%2C29%2C45%2C47"
+  ));
+  assert.equal(football.status, 200, "shared ticket football revalidation must pass the source allowlist");
+  assert.equal(lastUrl.searchParams.get("sportId"), "sr:sport:1");
+  assert.equal(lastUrl.searchParams.get("marketId"), "1,18,10,14,16,29,45,47");
+  assert.equal(fetchCount, 1);
+  fetchCount = 0;
+
+  const tennis = await worker.fetch(new Request(
+    "https://worker.test/api/ng/factsCenter/pcUpcomingEvents?sportId=sr%3Asport%3A5&pageSize=100&pageNum=1&timeline=168&marketId=186%2C210%2C202%2C204%2C189%2C203%2C188%2C187"
+  ));
+  assert.equal(tennis.status, 200, "shared ticket tennis revalidation must pass the source allowlist");
+  assert.equal(lastUrl.searchParams.get("sportId"), "sr:sport:5");
+  assert.equal(lastUrl.searchParams.get("marketId"), "186,210,202,204,189,203,188,187");
+  assert.equal(fetchCount, 1);
+  fetchCount = 0;
+
+  const invalidMarket = await worker.fetch(new Request(
+    "https://worker.test/api/ng/factsCenter/pcUpcomingEvents?sportId=sr%3Asport%3A1&pageSize=10&pageNum=1&timeline=168&marketId=9999"
+  ));
+  assert.equal(invalidMarket.status, 400);
+  assert.equal(fetchCount, 0, "market IDs outside the allowlist must still be rejected");
+
   fetchCount = 0;
   const invalidTournament = await worker.fetch(new Request(
     "https://worker.test/api/ng/factsCenter/pcUpcomingEvents?sportId=sr%3Asport%3A2&tournamentId=sr%3Atournament%3A999"
@@ -109,7 +135,7 @@ try {
   assert.match(await blocked.text(), /blocked/);
   assert.equal(blocked.headers.get("Content-Type"), "text/html");
 
-  console.log("Regional SportyBet Worker tests passed: safe routes, input limits, exact parameter forwarding, bounded diagnostics, upstream errors, and HTML blocks.");
+  console.log("Regional SportyBet Worker tests passed: NBA, football and tennis allowlists; exact market forwarding; invalid-input rejection; bounded diagnostics; upstream errors; and HTML blocks.");
 } finally {
   globalThis.fetch = originalFetch;
 }
