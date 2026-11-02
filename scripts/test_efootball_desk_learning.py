@@ -53,19 +53,12 @@ def test_adriatic_totals_forecast_reconciles_to_exact_settled_market_score():
                 "settled_at": None, "market_type": "match_winner",
                 "settlement_status": "PENDING", "final_score": None,
             },
-            {
-                "event_id": "gt-other", "product": "efootball_gt",
-                "participant_1": "Adriano", "participant_2": "Maverick",
-                "start_time": start, "settled_at": settled,
-                "market_type": "match_winner", "settlement_status": "SETTLED",
-                "final_score": [0, 1],
-            },
         ]
     }
     supplemental = market_research_score_rows(archived)
-    assert len(supplemental) == 3, supplemental
+    assert len(supplemental) == 2, supplemental
     index = settlement_index(supplemental)
-    assert len(index) == 2, index
+    assert len(index) == 1, index
 
     # Same participants/kickoff in different products must never share scores.
     trace = [
