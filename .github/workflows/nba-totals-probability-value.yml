@@ -58,9 +58,16 @@ jobs:
           assert report.get("live_value_decisions_authorized") is False
           assert "settled_v5_clv_diagnostics" in report
           assert "settled_v5_probability_score_summary" in report
+          historical_probability = report.get("historical_probability_validation", {})
+          assert historical_probability.get("unique_validation_games", 0) >= 100
+          assert len(historical_probability.get("by_line_offset", [])) == 7
+          assert historical_probability.get("not_a_sportybet_market_backtest") is True
           clv = report["settled_v5_clv_diagnostics"]
           assert clv.get("is_official_bookmaker_close") is not True
           assert all(row.get("is_official_bookmaker_close") is False for row in clv.get("fixtures", []) if "is_official_bookmaker_close" in row)
+          print("Historical probability observations:", historical_probability["synthetic_game_line_observations"])
+          print("Historical probability Brier:", historical_probability["model_brier"])
+          print("Coinflip Brier:", historical_probability["coinflip_baseline_brier"])
           print("Residual calibration:", report["calibration_protocol"]["coverage_check"])
           print("Calibration residuals:", report["calibration_protocol"]["calibration_residuals_n"])
           print("Settled v5 market records:", report["settled_v5_market_count"])
