@@ -1,11 +1,21 @@
 import assert from 'node:assert/strict';
-import { upstream, collectBasketballEvents } from '../functions/api/sportybet-booking.js';
+import { upstream, collectBasketballEvents, onRequest } from '../functions/api/sportybet-booking.js';
 const originalFetch=globalThis.fetch;
 const SPORTYBET='https://www.sportybet.com';
 const PROXY='https://match-signal-sportybet-proxy.topboyasian.workers.dev';
 const jsonResponse=payload=>new Response(JSON.stringify(payload),{status:200,headers:{'content-type':'application/json; charset=utf-8'}});
 const htmlResponse=()=>new Response('<!doctype html><html><body>edge challenge</body></html>',{status:200,headers:{'content-type':'text/html; charset=utf-8'}});
 try {
+  const emptyTicketResponse=await onRequest({request:new Request('https://match-signal.pages.dev/api/sportybet-booking',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({mode:'manual',manual_selections:[]})
+  })});
+  assert.equal(emptyTicketResponse.status,422);
+  assert.match(String(emptyTicketResponse.headers.get('content-type')||''),/application\/json/i);
+  const emptyTicketPayload=await emptyTicketResponse.json();
+  assert.equal(emptyTicketPayload.error,'INVALID_MANUAL_LEG_COUNT');
+  assert.equal(Boolean(emptyTicketPayload.booking_code),false);
+
   const observed=[];
   globalThis.fetch=async input=>{
     const url=new URL(typeof input==='string'?input:input.url);observed.push(url);
