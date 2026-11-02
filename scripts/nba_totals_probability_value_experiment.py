@@ -315,14 +315,26 @@ def run_experiment(history, ledger, predictions, now=None):
             )
         except (KeyError, TypeError, ValueError):
             continue
+        settled_result = str(row.get("result") or "").lower()
+        value_side = (
+            "over" if result["decision"] == "OVER VALUE"
+            else "under" if result["decision"] == "UNDER VALUE" else None
+        )
+        value_signal_outcome = (
+            "NOT_A_SIGNAL" if value_side is None
+            else "WIN" if value_side == settled_result
+            else "PUSH" if settled_result == "push"
+            else "LOSS"
+        )
         settled_audit.append({
             "event_id": str(row.get("event_id") or ""),
             "matchup": f'{row.get("player_1") or ""} vs {row.get("player_2") or ""}',
             "published_at": row.get("published_at"),
-            "settled_result": row.get("result"),
+            "settled_result": settled_result,
             "won_by_original_point_edge_pick": (
-                str(row.get("pick") or "").lower() == str(row.get("result") or "").lower()
+                str(row.get("pick") or "").lower() == settled_result
             ),
+            "research_value_signal_outcome": value_signal_outcome,
             **result,
         })
 
@@ -360,6 +372,19 @@ def run_experiment(history, ledger, predictions, now=None):
     prospective_minimum_sample_reached = (
         len(prospective_bets) >= MIN_PROSPECTIVE_SETTLED_BETS
     )
+    historical_value_signals = [
+        row for row in settled_audit
+        if row["research_value_signal_outcome"] != "NOT_A_SIGNAL"
+    ]
+    historical_value_signal_wins = sum(
+        row["research_value_signal_outcome"] == "WIN" for row in historical_value_signals
+    )
+    historical_value_signal_losses = sum(
+        row["research_value_signal_outcome"] == "LOSS" for row in historical_value_signals
+    )
+    archived_market_line_records = sum(
+        bool(row.get("markets")) for row in (history or []) if isinstance(row, dict)
+    )
     return {
         "generated_at": now.isoformat(),
         "paper_only": True,
@@ -381,11 +406,20 @@ def run_experiment(history, ledger, predictions, now=None):
             "validation_period": fitted["validation_period"],
             "validation_interval_coverage": fitted["validation_interval_coverage"],
             "coverage_check": fitted["coverage_check"],
+            "calibration_scope": "Historical score-residual interval coverage only; this does not establish SportyBet market-probability or betting-value calibration.",
             "probability_edge_threshold": MIN_PROBABILITY_EDGE,
             "expected_value_threshold": MIN_EXPECTED_VALUE,
         },
         "settled_v5_market_audit": settled_audit,
         "settled_v5_market_count": len(settled_audit),
+        "historical_value_signal_summary": {
+            "n": len(historical_value_signals),
+            "wins": historical_value_signal_wins,
+            "losses": historical_value_signal_losses,
+            "insufficient_sample": len(historical_value_signals) < MIN_PROSPECTIVE_SETTLED_BETS,
+        },
+        "archived_history_rows_with_any_market_data": archived_market_line_records,
+        "historical_market_line_backtest_available": archived_market_line_records > 0,
         "upcoming_exact_fresh_market_225_value_diagnostics": upcoming,
         "upcoming_value_diagnostics_count": len(upcoming),
         "upcoming_predictions_without_exact_fresh_pair": skipped_without_fresh_pair,
@@ -394,7 +428,7 @@ def run_experiment(history, ledger, predictions, now=None):
         "live_value_decisions_authorized": False,
         "release_decision": "RESEARCH_ONLY",
         "release_reason": (
-            "This research experiment never authorizes betting or ticket generation; the separate model and market release gates must all pass first. "
+            "This research experiment never authorizes betting or ticket generation; historical score-interval coverage does not calibrate market probabilities, the archived game log contains no historical odds, and the separate prospective model and market release gates must all pass first. "
             "This report is diagnostic only; the shared Basketball ticket gate remains locked."
         ),
         "market_prices_used_as_model_inputs": False,
