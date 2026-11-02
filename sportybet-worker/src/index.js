@@ -4,9 +4,9 @@ const PC_ENDPOINT = "/api/ng/factsCenter/pcUpcomingEvents";
 const WAP_UPCOMING_ENDPOINT = "/api/ng/factsCenter/wapConfigurableUpcomingEvents";
 const WAP_LIVE_ENDPOINT = "/api/ng/factsCenter/wapConfigurableIndexLiveEvents";
 const ALLOWED_ENDPOINTS = new Set([PC_ENDPOINT, WAP_UPCOMING_ENDPOINT, WAP_LIVE_ENDPOINT]);
-const ALLOWED_SPORTS = new Set(["sr:sport:2", "sr:sport:137", "sr:sport:202120001"]);
+const ALLOWED_SPORTS = new Set(["sr:sport:1", "sr:sport:2", "sr:sport:5", "sr:sport:137", "sr:sport:202120001"]);
 const ALLOWED_TOURNAMENTS = new Set(["sr:tournament:132"]);
-const ALLOWED_MARKETS = new Set(["1","18","10","29","11","26","36","14","60100","186","189","202","204","210","219","223","225","227","228"]);
+const ALLOWED_MARKETS = new Set(["1","10","11","14","16","18","26","29","36","45","47","60100","186","187","188","189","202","203","204","210","219","223","225","227","228"]);
 
 const UPSTREAM_HEADERS = {
   "Accept": "application/json, text/plain, */*",
