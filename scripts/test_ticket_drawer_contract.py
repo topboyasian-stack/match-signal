@@ -99,6 +99,9 @@ def main():
             "Tennis winner mapping must preserve the selected player after SportyBet reverses participant order")
     require("function validationFailure(leg, reason)" in api and "validationFailure(leg," in api,
             "Booking failures must identify the exact selection and validation reason")
+    require("canonicalParticipant(leg.player_1) === canonicalParticipant(leg.player_2)" in api and
+            "canon(leg.player_1)" not in api,
+            "Manual participant validation must not call a removed canon helper")
     require("errors.length?errors.join(' | ')" in drawer,
             "The ticket drawer must display leg-specific validation before the generic API error")
     require("isOpenEvent(event)" in api and "buildSelection(leg, event)" in api,
