@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { nbaTotalsReleaseQualified as serverNbaTotalsReleaseQualified, nbaTotalTicketLegQualified as serverNbaTotalTicketLegQualified } from "../functions/api/sportybet-booking.js";
 
 const source = readFileSync("basketball-live.js", "utf8");
 const start = source.indexOf("function statNumber(");
@@ -138,6 +139,14 @@ assert.equal(api.nbaTotalRowQualified(prediction, qualifiedTotalsEvidence, quali
 assert.equal(api.nbaTotalRowQualified(prediction, qualifiedTotalsEvidence, qualifiedProbabilityEvidence, [], currentMarket), false, "an immutable exact quote snapshot is required");
 assert.equal(api.nbaTotalRowQualified(prediction, qualifiedTotalsEvidence, qualifiedProbabilityEvidence, [snapshot], { ...currentMarket, over: 1.90 }), false, "changed live prices must fail closed");
 assert.equal(api.nbaTotalRowQualified(prediction, qualifiedTotalsEvidence, { ...qualifiedProbabilityEvidence, upcoming_exact_fresh_market_225_value_diagnostics: [{ ...diagnostic, decision: "UNDER VALUE" }] }, [snapshot], currentMarket), false, "the side must match the value decision");
+const ticketLeg = { event_id: "nba-1", sport: "basketball", market: "total", pick: "over", line: 220.5, market_id: "225", model_qualified: true, start_time: startTime };
+const liveSelection = { eventId: "sr:match:test", marketId: "225", line: 220.5, overOdds: 1.91, underOdds: 1.89, odds: 1.91, fetchedAt: new Date(now - 30000).toISOString() };
+const releaseContext = { evidence: qualifiedTotalsEvidence, probability: qualifiedProbabilityEvidence, predictions: [prediction], snapshots: [snapshot] };
+assert.equal(serverNbaTotalsReleaseQualified(qualifiedTotalsEvidence, qualifiedProbabilityEvidence), true);
+assert.equal(serverNbaTotalTicketLegQualified(ticketLeg, liveSelection, releaseContext, now).ok, true);
+assert.equal(serverNbaTotalTicketLegQualified(ticketLeg, { ...liveSelection, overOdds: 1.90 }, releaseContext, now).ok, false, "the server must reject a changed current price pair");
+assert.equal(serverNbaTotalTicketLegQualified(ticketLeg, liveSelection, { ...releaseContext, snapshots: [] }, now).ok, false, "the server must require an immutable snapshot");
+assert.equal(serverNbaTotalTicketLegQualified({ ...ticketLeg, pick: "under" }, liveSelection, releaseContext, now).ok, false, "the server must reject a side that differs from the value-qualified side");
 assert.equal(api.nbaTotalRowQualified({ ...prediction, totals_model_version: "old-model" }, qualifiedTotalsEvidence, qualifiedProbabilityEvidence, [snapshot], currentMarket), false);
 assert.equal(api.nbaTotalRowQualified({ ...prediction, markets: { total_ou: { ...prediction.markets.total_ou, quote_timestamp: new Date(now - 16 * 60 * 1000).toISOString() } } }, qualifiedTotalsEvidence, qualifiedProbabilityEvidence, [snapshot], currentMarket), false, "stale quotes must fail closed");
 assert.match(source, /RESEARCH ONLY · NO BETTING LEAN/);
