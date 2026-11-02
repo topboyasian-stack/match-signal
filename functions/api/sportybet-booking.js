@@ -550,7 +550,8 @@ function findVirtualSelection(leg, event) {
   const requestedLine = lineFromLeg(leg);
   const side = pickVirtualSide(leg);
   const sport = String(leg?.sport || '').toLowerCase();
-  const requiredMarketId = sport === 'football' ? '18' : sport === 'tennis' ? '189' : '';
+  const requiredMarketId = sport === 'football' ? '18' : sport === 'tennis' ? '189' : sport === 'efootball' ? String(leg?.market_id || '') : '';
+  if (sport === 'efootball' && !['18', '189'].includes(requiredMarketId)) return { error: 'Only an exact SportyBet eFootball totals market (18 or 189) is supported.' };
   if (!Number.isFinite(requestedLine) || !side) {
     return { error: 'Could not map the Builder O/U selection to an exact line and side.' };
   }
@@ -682,6 +683,7 @@ async function handlePost(context) {
         event_id: String(item?.event_id || ''),
         sportybet_event_id: String(item?.sportybet_event_id || ''),
         sport: String(item?.sport || '').toLowerCase(),
+        product: String(item?.product || '').toLowerCase(),
         market: String(item?.market || 'winner').toLowerCase(),
         pick: String(item?.pick || '').toLowerCase(),
         line: item?.line == null ? null : Number(item.line),
@@ -700,6 +702,13 @@ async function handlePost(context) {
             return leg.market !== 'total' || !['over', 'under'].includes(leg.pick) ||
               !Number.isFinite(Number(leg.line)) || Number(leg.line) < 100 || Number(leg.line) > 300 ||
               leg.market_id !== '225' || !leg.sportybet_event_id || leg.model_qualified !== true;
+          }
+          if (leg.sport === 'efootball') {
+            return !['efootball_gt', 'efootball_adriatic'].includes(leg.product) ||
+              productForLeg(leg) !== 'efootball' || leg.market !== 'total' ||
+              !['over', 'under'].includes(leg.pick) ||
+              !Number.isFinite(Number(leg.line)) || Number(leg.line) <= 0 || Number(leg.line) > 1000 ||
+              !['18', '189'].includes(leg.market_id) || !leg.sportybet_event_id || leg.model_qualified !== true;
           }
           if (!['football', 'tennis'].includes(leg.sport)) return true;
           if (leg.market === 'total') {
@@ -734,6 +743,7 @@ async function handlePost(context) {
     // If an NBA totals leg is present, the shared slip must remain all-or-nothing.
     // Never surface a share code for a mixed or partially accepted NBA ticket.
     const hasBasketballLeg = legs.some(leg => String(leg?.sport || '').toLowerCase() === 'basketball');
+    const hasEfootballLeg = legs.some(leg => productForLeg(leg) === 'efootball');
     let nbaReleaseContext = null;
     if (hasBasketballLeg) {
       try { nbaReleaseContext = await loadNbaReleaseContext(); }
@@ -741,7 +751,7 @@ async function handlePost(context) {
       if (!nbaTotalsReleaseQualified(nbaReleaseContext.evidence, nbaReleaseContext.probability)) return json({ ok: false, error: 'NBA_RELEASE_GATE_LOCKED', message: 'The independent NBA totals release gate has not passed. No SportyBet ticket code was requested.' }, 423);
     }
     const virtualIds = new Set(legs.filter(l => productForLeg(l) === 'vfootball').map(l => String(l.event_id || '')));
-    const efootballIds = new Set(legs.filter(l => productForLeg(l) === 'efootball').map(l => String(l.event_id || '')));
+    const efootballIds = new Set(legs.filter(l => productForLeg(l) === 'efootball').map(l => String(l.sportybet_event_id || l.event_id || '')).filter(Boolean));
     const footballIds = new Set(legs.filter(l => String(l?.sport || '').toLowerCase() === 'football').map(l => String(l.sportybet_event_id || l.event_id || '')).filter(Boolean));
     const tennisIds = new Set(legs.filter(l => String(l?.sport || '').toLowerCase() === 'tennis').map(l => String(l.sportybet_event_id || l.event_id || '')).filter(Boolean));
     const basketballIds = new Set(legs.filter(l => String(l?.sport || '').toLowerCase() === 'basketball').map(l => String(l.sportybet_event_id || '')).filter(Boolean));
@@ -864,6 +874,19 @@ async function handlePost(context) {
         validation
       }, 409);
     }
+    if (hasEfootballLeg && preExcluded.length > 0) {
+      return json({
+        ok: false,
+        error: 'EFOOTBALL_SLIP_REJECTED_PARTIAL',
+        message: 'At least one eFootball leg failed current SportyBet validation. No share code was created. Refresh the whole ticket and add the current qualified selections again.',
+        batch_id: batchId,
+        initial_selection_count: legs.length,
+        requested_selection_count: selections.length,
+        excluded_count: preExcluded.length,
+        booking_code_withheld: true,
+        validation
+      }, 409);
+    }
     if (!selections.length) {
       return json({
         ok: false,
@@ -944,6 +967,24 @@ async function handlePost(context) {
         ok: false,
         error: 'BASKETBALL_SLIP_REJECTED_PARTIAL',
         message: 'SportyBet accepted only part of this NBA-containing ticket. Match Signal has withheld the share code; refresh and rebuild the entire ticket.',
+        batch_id: batchId,
+        initial_selection_count: legs.length,
+        requested_selection_count: selections.length,
+        accepted_selection_count: acceptedCount,
+        unavailable_count: unavailable.length,
+        booking_code_withheld: true,
+        validation
+      }, 409);
+    }
+    if (hasEfootballLeg && (
+      unavailable.length > 0 ||
+      acceptedCount !== legs.length ||
+      (acceptedOutcomes.length > 0 && acceptedOutcomes.length !== selections.length)
+    )) {
+      return json({
+        ok: false,
+        error: 'EFOOTBALL_SLIP_REJECTED_PARTIAL',
+        message: 'SportyBet accepted only part of this eFootball-containing ticket. Match Signal has withheld the share code; refresh and rebuild the entire ticket.',
         batch_id: batchId,
         initial_selection_count: legs.length,
         requested_selection_count: selections.length,
