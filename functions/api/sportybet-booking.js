@@ -112,7 +112,18 @@ export async function upstream(path, params) {
       });
       const body = await response.text();
       const contentType = String(response.headers.get('content-type') || 'unknown');
-      if (!response.ok) throw new Error('HTTP ' + response.status + ' (content-type ' + contentType + ')');
+      if (!response.ok) {
+        let providerError = '';
+        if (contentType.toLowerCase().includes('application/json')) {
+          try {
+            const errorPayload = JSON.parse(body);
+            providerError = [errorPayload?.error, errorPayload?.detail, errorPayload?.message]
+              .filter(value => typeof value === 'string' && value.trim())
+              .join(': ');
+          } catch (_) {}
+        }
+        throw new Error('HTTP ' + response.status + (providerError ? ' (' + providerError + ')' : '') + ' (content-type ' + contentType + ')');
+      }
       if (!body.trim()) throw new Error('empty response (HTTP ' + response.status + ')');
       if (/^\s*</.test(body)) throw new Error('returned HTML instead of JSON (HTTP ' + response.status + ', content-type ' + contentType + ')');
       let payload;
