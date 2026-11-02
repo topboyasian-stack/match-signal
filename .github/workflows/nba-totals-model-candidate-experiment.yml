@@ -1,0 +1,85 @@
+name: NBA totals nonlinear model candidate experiment
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/nba_totals_model_candidate_experiment.py'
+      - 'scripts/test_nba_totals_model_candidate_experiment.py'
+      - '.github/workflows/nba-totals-model-candidate-experiment.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nba-totals-nonlinear-model-candidate
+  cancel-in-progress: false
+
+jobs:
+  experiment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 2
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install free model research dependencies
+        run: python -m pip install --disable-pip-version-check numpy pandas requests scikit-learn
+      - name: Compile and test isolated model candidate
+        run: |
+          python -m py_compile scripts/nba_totals_model_candidate_experiment.py scripts/test_nba_totals_model_candidate_experiment.py
+          PYTHONPATH=scripts python scripts/test_nba_totals_model_candidate_experiment.py
+      - name: Run fixed historical candidate experiment
+        run: PYTHONPATH=scripts python scripts/nba_totals_model_candidate_experiment.py
+      - name: Enforce fixed historical and prospective boundaries
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report=json.loads(Path('data/nba_totals_nonlinear_candidate_experiment.json').read_text())
+          assert report['paper_only'] is True
+          assert report['prospective_holdout_used'] is False
+          assert report['prospective_holdout_cutoff_utc']=='2026-11-02T02:00:00+00:00'
+          assert report['market_prices_used_as_model_inputs'] is False
+          assert report['release_decision']=='RESEARCH_ONLY'
+          assert report['training_period']['n']>=300
+          assert report['historical_validation_period']['n']>=100
+          assert report['historical_validation']['selected_nonlinear_candidate']['paired_mae_stability_vs_v5']['n']==report['historical_validation_period']['n']
+          print('Candidate:',report['historical_validation']['selected_nonlinear_candidate']['name'])
+          print('Decision:',report['candidate_decision'])
+          print('Release:',report['release_decision'])
+          PY
+      - name: Publish nonlinear experiment report without overwriting newer main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+topboyasian-stack@users.noreply.github.com'
+          candidate='/tmp/nba_totals_nonlinear_candidate.json'
+          cp data/nba_totals_nonlinear_candidate_experiment.json "$candidate"
+          for attempt in 1 2 3 4 5; do
+            git fetch origin main
+            git reset --hard origin/main
+            cp "$candidate" data/nba_totals_nonlinear_candidate_experiment.json
+            git add data/nba_totals_nonlinear_candidate_experiment.json
+            if git diff --cached --quiet; then
+              echo 'The same NBA nonlinear candidate report is already published.'
+              exit 0
+            fi
+            git commit -m 'Publish nonlinear NBA totals candidate experiment'
+            if git push origin HEAD:main; then
+              echo 'NBA nonlinear candidate experiment published.'
+              exit 0
+            fi
+            echo 'Concurrent main update; retrying.'
+            sleep $((attempt * 2))
+          done
+          echo 'Could not publish the NBA nonlinear candidate experiment.' >&2
+          exit 1
