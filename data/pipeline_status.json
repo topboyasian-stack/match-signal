@@ -1,40 +1,68 @@
 {
-  "updated_at": "2026-11-01T20:30:25.040971+00:00",
-  "prediction_count": 76,
+  "updated_at": "2026-11-02T00:32:05.311501+00:00",
+  "prediction_count": 95,
   "football_count": 76,
-  "tennis_count": 0,
-  "errors": [
-    "football:La Liga:2026-11-01:403 Client Error: Forbidden for url: https://site.api.espn.com/apis/site/v2/sports/soccer/esp.1/scoreboard?dates=20261101; fallback:403 Client Error: Forbidden for url: https://api.sofascore.com/api/v1/sport/football/scheduled-events/2026-11-01",
-    "tennis:ATP:no actionable singles matches in next 7 days"
-  ],
+  "tennis_count": 19,
+  "errors": [],
   "quality_control": {
-    "rejected_total": 46,
+    "rejected_total": 104,
     "rejected_by_reason": {
-      "missing real player name": 31,
-      "non-singles draw": 15
+      "missing real player name": 62,
+      "non-singles draw": 42
     },
     "rejected_by_tour": {
       "ATP": {
-        "missing real player name": 31,
-        "non-singles draw": 15
+        "missing real player name": 62,
+        "non-singles draw": 42
       }
     },
     "deduplicated_matches": 0,
     "deduplicated_examples": [],
-    "filtered_low_confidence": 0,
-    "filtered_low_confidence_examples": [],
+    "filtered_low_confidence": 5,
+    "filtered_low_confidence_examples": [
+      {
+        "match": "Lorenzo Musetti vs Hubert Hurkacz",
+        "tour": "ATP",
+        "confidence": 0.5132,
+        "signal_components": 4
+      },
+      {
+        "match": "Luca Van Assche vs Mariano Navone",
+        "tour": "ATP",
+        "confidence": 0.5128,
+        "signal_components": 4
+      },
+      {
+        "match": "Alex Molcan vs Titouan Droguet",
+        "tour": "ATP",
+        "confidence": 0.5043,
+        "signal_components": 4
+      },
+      {
+        "match": "Ugo Humbert vs Botic Van De Zandschulp",
+        "tour": "ATP",
+        "confidence": 0.516,
+        "signal_components": 4
+      },
+      {
+        "match": "Jan-Lennard Struff vs Arthur Gea",
+        "tour": "ATP",
+        "confidence": 0.5126,
+        "signal_components": 4
+      }
+    ],
     "fallback_by_league": {}
   },
   "market_data": {
     "provider": "SportyBet NG",
-    "fetched_at": "2026-11-01T20:29:58.531386+00:00",
-    "football_events": 1076,
-    "tennis_events": 280,
-    "matched": 44,
+    "fetched_at": "2026-11-02T00:31:42.236127+00:00",
+    "football_events": 1068,
+    "tennis_events": 304,
+    "matched": 63,
     "unmatched": 32,
     "match_errors": [],
     "fetch_errors": [],
-    "coverage": 0.5789
+    "coverage": 0.6632
   },
   "data_source": "ESPN public scoreboards + ESPN ATP/WTA rankings + recent 60-day results + SportyBet NG live market layer",
   "free_server_cost": true,
