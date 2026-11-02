@@ -57,7 +57,11 @@ jobs:
           assert capture == "7,22,37,52 * * * *", capture
           assert settlement == "10,25,40,55 * * * *", settlement
           assert report == "12,27,42,57 * * * *", report
-          print("Schedule order verified: capture -> settlement -> probability/value report.")
+          settlement_text = Path(".github/workflows/nba-totals-settlement.yml").read_text(encoding="utf-8")
+          assert "workflow_run:" in settlement_text, "Settlement needs an event-driven backup after price capture."
+          assert '"NBA totals SportyBet market-225 price capture"' in settlement_text
+          assert "age_minutes >= 10" in settlement_text, "Capture-triggered settlement must be throttled by ledger freshness."
+          print("Schedule order and event-driven settlement backup verified.")
           PY
 
       - name: Compile and test probability/value logic
