@@ -198,6 +198,17 @@ def build_feature_rows(history):
                 if 75 <= recent_game_pace <= 115 and 75 <= recent_home_eff <= 145 and 75 <= recent_away_eff <= 145:
                     recent_pace_total = recent_game_pace * (recent_home_eff + recent_away_eff) / 100.0
 
+            recent_possessions_total = None
+            if all(home_recent10.get(key) is not None and away_recent10.get(key) is not None
+                   for key in ("possessions", "off_rating", "def_rating")):
+                recent_game_possessions = (
+                    home_recent10["possessions"] + away_recent10["possessions"]
+                ) / 2.0
+                recent_home_eff = (home_recent10["off_rating"] + away_recent10["def_rating"]) / 2.0
+                recent_away_eff = (away_recent10["off_rating"] + home_recent10["def_rating"]) / 2.0
+                if 75 <= recent_game_possessions <= 115 and 75 <= recent_home_eff <= 145 and 75 <= recent_away_eff <= 145:
+                    recent_possessions_total = recent_game_possessions * (recent_home_eff + recent_away_eff) / 100.0
+
             row = dict(forecast)
             row.update({
                 "venue_total": venue_total,
@@ -224,6 +235,11 @@ def build_feature_rows(history):
                 "recent_pace_efficiency_delta": (
                     recent_pace_total - float(forecast["pace_total"])
                     if recent_pace_total is not None and forecast.get("pace_available") is True
+                    else 0.0
+                ),
+                "recent_possessions_efficiency_delta": (
+                    recent_possessions_total - float(forecast["pace_total"])
+                    if recent_possessions_total is not None and forecast.get("pace_available") is True
                     else 0.0
                 ),
             })
@@ -399,6 +415,13 @@ def run_experiment(history):
         "recent10_form_only": ["recent10_form_delta"],
         "recent_form_trend_only": ["recent_form_trend"],
         "recent_pace_efficiency_only": ["recent_pace_efficiency_delta"],
+        "recent_possessions_efficiency_only": ["recent_possessions_efficiency_delta"],
+        "recent_pace_possessions_combined": [
+            "recent_pace_efficiency_delta", "recent_possessions_efficiency_delta",
+        ],
+        "recent_form_possessions_combined": [
+            "recent10_form_delta", "recent_possessions_efficiency_delta",
+        ],
         "recent_form_schedule_combined": [
             "recent5_form_delta", "recent10_form_delta", "recent_form_trend",
             "home_games_last_7d", "away_games_last_7d",
@@ -447,7 +470,7 @@ def run_experiment(history):
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "paper_only": True,
-        "experiment": "NBA_TOTALS_V6_HISTORICAL_FEATURE_ABLATION_V2",
+        "experiment": "NBA_TOTALS_V6_HISTORICAL_FEATURE_ABLATION_V3",
         "production_model_unchanged": "nba-total-v5-pace-efficiency-calibrated",
         "prospective_holdout_cutoff_utc": EVALUATION_CUTOFF_UTC.isoformat(),
         "prospective_holdout_used": False,
