@@ -254,3 +254,37 @@ This is the active resume point. The frozen prospective cutoff remains `2026-11-
 4. Continue collecting exact SportyBet market-225 observations and official ESPN settlements. Do not count repeated quotes as independent fixtures or selections.
 4. Continue priority 14 until at least 30 uniquely settled prospective market-225 fixtures have exact immutable snapshot linkage. Then continue the 100-selection/200-target, positive ROI/positive 95% lower bound/favourite benchmark, authentic later-quote CLV, and 100-game post-cutoff MAE/bias gates. Keep the model unchanged unless a separately preregistered development-only experiment proves an upgrade.
 5. Keep `RESEARCH_ONLY` and the Basketball ticket gate locked. No auto-betting; every future NBA ticket leg must still be freshly revalidated against exact market 225 immediately before code generation.
+
+## Latest continuation checkpoint — 2026-11-02 13:46 UTC — shared ticket SportyBet proxy failure fixed
+
+The active NBA readiness priority is still **Priority 14: prospective probability validation**. The frozen prospective cutoff remains `2026-11-02T02:00:00+00:00`. This ticket-code-generation repair does not qualify NBA for betting and does not change any sample, ROI, CLV, forecast, or freshness threshold.
+
+### Code-generation error and root cause
+
+- The user-facing error combined `HTTP 400 (application/json)` from `match-signal-sportybet-proxy.topboyasian.workers.dev/api/ng/factsCenter/pcUpcomingEvents` with an HTML `HTTP 200` from direct SportyBet.
+- Root cause confirmed in `sportybet-worker/src/index.js`: the regional proxy allowlist allowed `sr:sport:2` (basketball), `sr:sport:137`, and virtual feeds, but rejected the standard shared-ticket revalidation sport IDs `sr:sport:1` (football) and `sr:sport:5` (tennis). The existing ticket handler also asks the football/tennis catalogue for market IDs `16,45,47,203,188,187`, which were absent from its market allowlist. The Worker returned a validation HTTP 400 before reaching SportyBet; the handler then fell through to direct SportyBet, which returned HTML and caused the JSON parse error.
+- The allowlist was extended only to cover the existing shared-ticket sports and explicit market IDs; unsupported sports and market IDs remain rejected. The booking handler also now preserves structured proxy `error/detail/message` text in its diagnostics.
+- Added Worker regressions for exact football and tennis catalogue requests, parameter forwarding, and continued rejection of unknown sports/market IDs. Extended the Worker deployment smoke test to probe football, tennis, and NBA market 225 on the real Worker.
+
+### Verified code/deployment evidence
+
+- Regional Worker deployment [run 41455605359](https://github.com/topboyasian-stack/match-signal/actions/runs/41455605359) **passed**. Live post-deploy probes returned HTTP 200 and JSON from SportyBet for football (`sr:sport:1`, 976 source events), tennis (`sr:sport:5`, 354 source events), and NBA (`sr:sport:2`, market 225). The regional diagnostics also returned JSON with `bizCode: 10000`.
+- Worker source/test workflow [run 41455605332](https://github.com/topboyasian-stack/match-signal/actions/runs/41455605332) **passed**.
+- Shared Ticket Drawer Contract [run 41455583886](https://github.com/topboyasian-stack/match-signal/actions/runs/41455583886) **passed**, including the live invalid-ticket POST check, which verified an HTTP 422 JSON response with no booking code.
+- NBA ticket fail-closed tests [run 41455583890](https://github.com/topboyasian-stack/match-signal/actions/runs/41455583890) **passed**. Whole-slip rejection and the research-only NBA ticket lock remain enforced.
+- Cloudflare Pages deployment [run 41455583821](https://github.com/topboyasian-stack/match-signal/actions/runs/41455583821) deployed its Pages artifact successfully. Its separate production HTTP/asset smoke step was still running at the last observed check; recheck it and the persisted verification record before claiming the full Pages verification passed.
+- Relevant changes: proxy allowlist and market list in `sportybet-worker/src/index.js`; worker contract in `scripts/test_sportybet_region_worker.mjs`; live deploy probes in `.github/workflows/deploy-sportybet-worker.yml`; structured error details in `functions/api/sportybet-booking.js`.
+
+### Current NBA release evidence — remain RESEARCH_ONLY
+
+- Current probability/value report `data/nba_totals_probability_value_experiment.json` (blob `6f6a44a4184f8efaf837ef8ad5a591867c740b42`) was generated at `2026-11-02T11:55:07.142190+00:00` and remains `RESEARCH_ONLY`. It records 420 prospective exact-fresh market-225 snapshot observations over 15 unique fixtures, zero settled prospective selections, zero exact-snapshot-linked settled selections, zero probability-scored fixtures, zero near-close CLV observations, and no linkage failures. Repeated quotes are not independent selections.
+- Current fixed-cutoff OOS report `data/nba_totals_oos_value_test.json` (blob `7ee7c9310b3a08fb1dc0580341653a0c0838a47c`) was generated at `2026-11-02T11:32:09.774076+00:00`: post-cutoff forecast holdout n=4, model MAE 26.7875 versus baseline MAE 24.75, absolute bias 6.4637, and zero settled market-holdout selections. The 100-game forecast condition fails; ROI, ROI 95% lower bound, favourite benchmark and CLV remain unproven.
+- Settlement ledger `data/nba_totals_ledger.json` (blob `75734552a681a52ca241a6877318dabe2fe6e203`) has 70 settled historical records, but the current prospective report has zero post-cutoff settled selections. That historical count does not satisfy the prospective thresholds.
+- The most recently persisted `DEPLOY-VERIFY-CLOUDFLARE.json` is still `VERIFIED_WITH_DIAGNOSTIC_INCOMPLETE` (source `8b56a1cfd340d9267e426b15241697e91882f126`) and says the generic booking POST check is `NO_FUTURE_BATCH`; do not treat it as evidence that a real valid multi-leg SportyBet share-code creation was verified.
+
+### Next action on resume
+
+1. Recheck run 41455583821's final production HTTP/asset smoke result and the newest production verification JSON.
+2. Verify a real, nonempty shared ticket is revalidated against the current provider catalogue immediately before code generation; the Worker now serves valid football and tennis catalogues, but no actual user-selected multi-leg share code was requested or fabricated by these tests.
+3. Continue **Priority 14** from exact SportyBet Nigeria market-225 snapshots with official ESPN settlements and immutable linkage. Preserve cutoff `2026-11-02T02:00:00+00:00`; do not count duplicate quotes as independent bets.
+4. Keep NBA `RESEARCH_ONLY` and the Basketball ticket gate locked until every prospective sample, ROI/confidence-bound/favourite-benchmark, genuine later-quote CLV, forecast MAE/bias, and production regression condition independently passes. No auto-betting.
