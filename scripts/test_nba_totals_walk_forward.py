@@ -219,6 +219,9 @@ def test_fixed_holdout_cutoff_unique_fixture_and_market_audit():
     audit = market_record_audit(eligible)
     assert audit[0]["model_projection_error"] == -5.0
     assert audit[0]["projection_edge_points"] == 4.5
+    assert audit[0]["over_odds"] == 1.9 and audit[0]["under_odds"] == 1.9
+    assert audit[0]["selected_side_profit_units"] == 0.9
+    assert audit[0]["market_favorite_profit_units"] == 0.9
     assert audit[0]["diagnosis"] == "CORRECT"
     metrics = market_metrics(eligible)
     assert metrics["roi_ci_method"].startswith("deterministic fixture-level percentile bootstrap")
