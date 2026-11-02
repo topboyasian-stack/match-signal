@@ -13,9 +13,9 @@ function block(startMarker,endMarker){
 const gateSource=block('function recentProductPerformanceGate(product){','\nfunction qualifiesResearchPick(c){');
 const researchSource=block('function qualifiesResearchPick(c){','\nfunction qualifiesBaseResearchPick(c,e){');
 const baseSource=block('function qualifiesBaseResearchPick(c,e){','\nfunction competitionKey(value){');
-function recentWindow(n,accuracy,decisionCount=n){
+function recentWindow(n,accuracy,decisionCount=n,brier=0.22){
   return {
-    n,unique_fixtures:n,decision_count:decisionCount,accuracy,brier:0.22,
+    n,unique_fixtures:n,decision_count:decisionCount,accuracy,brier,
     window_unit:'unique_product_fixture_clusters'
   };
 }
@@ -59,6 +59,11 @@ assert.equal(recoveredGate('efootball_gt').blocked,false);
 const recoveredQualifiers=qualifiersFor(gtRecovered,recoveredGate);
 assert.equal(recoveredQualifiers.qualifiesResearchPick(goodCandidate),true);
 assert.equal(recoveredQualifiers.qualifiesBaseResearchPick(goodCandidate,{product:'efootball_gt'}),true);
+
+const poorBrier=makeState({efootball_gt:{recent_window:recentWindow(30,0.56,62,0.26)}});
+const poorBrierGate=gateFor(poorBrier);
+assert.equal(poorBrierGate('efootball_gt').blocked,true);
+assert.equal(poorBrierGate('efootball_gt').reason,'RECENT_BRIER_ABOVE_0_25');
 
 const lowSample=makeState({efootball_gt:{recent_window:recentWindow(29,0.70,58)}});
 assert.equal(gateFor(lowSample)('efootball_gt').reason,'RECENT_PERFORMANCE_EVIDENCE_INSUFFICIENT');
