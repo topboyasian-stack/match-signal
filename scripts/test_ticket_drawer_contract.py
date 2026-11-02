@@ -64,7 +64,7 @@ def main():
 
     require("data-ms-ticket-add" in nba and 'data-ticket-market="total"' in nba,
             "NBA current totals must be selectable into the same ticket")
-    require("nbaTotalsReleaseQualified(S.totalsOos)" in nba and "nbaTotalRowQualified(p,S.totalsOos)" in nba,
+    require("nbaTotalsReleaseQualified(S.totalsOos,S.totalsProbability)" in nba and "nbaTotalRowQualified(p,S.totalsOos,S.totalsProbability,S.totalSnapshots,fresh)" in nba,
             "NBA ticket generation must retain the independent release and per-row gates")
     require("market === 'total' && ['football','tennis'].includes(sport)" in api and "leg.market === 'total'" in api and "leg.market_id !== requiredMarketId" in api,
             "Football/Tennis total selections must revalidate against exact SportyBet full-match O/U market IDs")
@@ -72,8 +72,10 @@ def main():
             "The common booking API must resolve and revalidate NBA total markets")
     require("const basketballIds" in api and "collectBasketballEvents(context, basketballIds)" in api,
             "Mixed-sport tickets must fetch the current SportyBet Basketball event")
-    require("leg.model_qualified !== true" in api and "leg.market_id !== '225'" in api,
-            "The booking endpoint must reject research-only or non-225 NBA selections")
+    require("leg.model_qualified !== true" in api and "leg.market_id !== '225'" in api and "NBA_RELEASE_GATE_LOCKED" in api and "nbaTotalTicketLegQualified" in api,
+            "The booking endpoint must independently enforce the global NBA release gate and exact per-leg snapshot qualification")
+    require("hasBasketballLeg && preExcluded.length > 0" in api and "BASKETBALL_SLIP_REJECTED_PARTIAL" in api,
+            "An NBA-containing slip must be rejected whole if any leg fails live validation or SportyBet removes a selection")
     require("new Set(ids).size !== ids.length" in api,
             "The booking endpoint must reject duplicate fixtures")
     tennis_resolver = api.split("if (tennisIds.size) {", 1)[1].split("if (basketballIds.size)", 1)[0]
