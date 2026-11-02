@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-02T10:02:43.342470+00:00",
+  "generated_at": "2026-11-02T10:07:53.657432+00:00",
   "status": "FAIL",
   "critical_issues": 3,
   "warning_issues": 3,
@@ -8,19 +8,19 @@
     {
       "engine": "core_prediction_pipeline",
       "status": "STALE",
-      "age_hours": 4.09,
+      "age_hours": 4.18,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.12,
+      "age_hours": 0.08,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "STALE",
-      "age_hours": 4.01,
+      "age_hours": 4.1,
       "threshold_hours": 4
     },
     {
@@ -32,27 +32,27 @@
     {
       "engine": "prediction_desk_health",
       "status": "PASS",
-      "age_hours": 0.06,
+      "age_hours": 0.05,
       "threshold_hours": 2
     },
     {
       "engine": "virtual_participant_history",
       "status": "STALE",
-      "max_input_age_minutes": 400.1,
-      "virtual_lab_status_age_minutes": 403.5,
+      "max_input_age_minutes": 406.0,
+      "virtual_lab_status_age_minutes": 408.7,
       "threshold_minutes": 30.0,
       "stale_inputs": []
     },
     {
       "engine": "tennis_forward_discovery",
       "status": "PASS",
-      "age_hours": 3.38,
+      "age_hours": 3.47,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
       "status": "STALE",
-      "age_hours": 1.85,
+      "age_hours": 1.93,
       "threshold_hours": 0.5,
       "heartbeat_source": "virtual_lab_live.json",
       "events_count": 697
@@ -60,7 +60,7 @@
     {
       "engine": "nba_live_observation_recorder",
       "status": "STALE",
-      "age_hours": 0.27,
+      "age_hours": 0.36,
       "threshold_hours": 0.25,
       "heartbeat_source": "nba_live_observations.json.gz",
       "games_tracked": 21,
@@ -105,27 +105,27 @@
     {
       "code": "STALE_CORE_PREDICTION_PIPELINE",
       "severity": "critical",
-      "detail": "updated_at age 4.09h exceeds 4h"
+      "detail": "updated_at age 4.18h exceeds 4h"
     },
     {
       "code": "STALE_EXPANSION",
       "severity": "critical",
-      "detail": "updated_at age 4.01h exceeds 4h"
+      "detail": "updated_at age 4.10h exceeds 4h"
     },
     {
       "code": "VIRTUAL_PARTICIPANT_HISTORY_STALE",
       "severity": "warning",
-      "detail": "input older than 30 minutes: participant_lifecycle, collector_status, model_evaluation; oldest participant/settlement/model input is 400.1 minutes old; virtual_lab_status.json is 403.5 minutes old; current eFootball/virtual predictions must remain withheld until the source collector publishes fresh data"
+      "detail": "input older than 30 minutes: participant_lifecycle, collector_status, model_evaluation; oldest participant/settlement/model input is 406.0 minutes old; virtual_lab_status.json is 408.7 minutes old; current eFootball/virtual predictions must remain withheld until the source collector publishes fresh data"
     },
     {
       "code": "VIRTUAL_LIVE_FEED_STALE",
       "severity": "warning",
-      "detail": "virtual_lab_live.json age 1.85h exceeds 0.50h; a downstream Unified Upcoming refresh cannot substitute for a fresh source snapshot"
+      "detail": "virtual_lab_live.json age 1.93h exceeds 0.50h; a downstream Unified Upcoming refresh cannot substitute for a fresh source snapshot"
     },
     {
       "code": "NBA_LIVE_OBSERVATION_STALE",
       "severity": "warning",
-      "detail": "nba_live_observations.json.gz age 0.27h exceeds 0.25h; the in-game observation recorder has not published a recent heartbeat"
+      "detail": "nba_live_observations.json.gz age 0.36h exceeds 0.25h; the in-game observation recorder has not published a recent heartbeat"
     },
     {
       "code": "PDL_EXPERIMENTAL_FEED_STALE",
@@ -135,17 +135,17 @@
     {
       "code": "PIPELINE_STALE",
       "severity": "critical",
-      "detail": "pipeline_status age 4.09h exceeds 4h"
+      "detail": "pipeline_status age 4.18h exceeds 4h"
     }
   ],
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
   "paper_only": true,
   "prediction_desk_filters": {
-    "past_kickoff_rows_hidden": 3,
+    "past_kickoff_rows_hidden": 6,
     "stale_live_flags_hidden": 0,
     "expired_settled_rows_hidden": 0,
     "virtual_market_rows_held_for_kickoff_window": 0,
-    "virtual_rows_held_for_stale_participant_history": 5046,
+    "virtual_rows_held_for_stale_participant_history": 5037,
     "virtual_rows_held_for_recent_product_drawdown": 20
   }
 }
