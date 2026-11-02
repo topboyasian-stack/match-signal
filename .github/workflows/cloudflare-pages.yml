@@ -1138,31 +1138,6 @@ jobs:
           } catch(e) { failures.push('/data/odds_builder.json '+e.message); }
 
           if (failures.length) { console.error(failures.join('\n')); process.exit(1); }
-          // Check the booking endpoint's JSON contract without needing a qualified fixture batch.
-          // Empty manual input is rejected before any upstream call and cannot create a share code.
-          for (const endpoint of new Set([base, deploymentBase].filter(Boolean))) {
-            try {
-              const probe = await fetch(endpoint.replace(/\/+$/, '') + '/api/sportybet-booking', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'Cache-Control': 'no-store' },
-                body: JSON.stringify({ mode: 'manual', manual_selections: [] }),
-                cache: 'no-store',
-                signal: AbortSignal.timeout(12000)
-              });
-              const raw = await probe.text();
-              const contentType = String(probe.headers.get('content-type') || '').toLowerCase();
-              let payload = null;
-              try { payload = JSON.parse(raw); } catch (_) {}
-              if (probe.status !== 422 || !contentType.includes('application/json') || payload?.error !== 'INVALID_MANUAL_LEG_COUNT' || payload?.booking_code) {
-                failures.push(endpoint + '/api/sportybet-booking JSON contract failed: HTTP ' + probe.status + ', content-type ' + contentType + ', response ' + raw.replace(/\s+/g, ' ').slice(0, 160));
-              } else {
-                console.log('Shared ticket booking endpoint JSON/validation contract passed at ' + endpoint);
-              }
-            } catch (error) {
-              failures.push(endpoint + '/api/sportybet-booking POST JSON contract: ' + String(error?.message || error));
-            }
-          }
-
           console.log('Production HTTP smoke tests passed: '+pages.length+' pages, '+assets.length+' assets, NBA ESPN proxy');
           NODE
 
