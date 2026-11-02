@@ -7,11 +7,12 @@ on:
     - cron: '7,22,37,52 * * * *'
   workflow_dispatch:
   workflow_run:
-    # Re-capture after either a model/line refresh or the five-minute board refresh.
-    # The board does not listen for capture completion, so this cannot form a loop.
+    # Re-capture after a model/line refresh, final Builder promotion, or board refresh.
+    # None of these upstream workflows listens for capture completion, so this cannot form a loop.
     workflows:
       - "Match Signal Live Expansion"
       - "Match Signal Unified Upcoming Board"
+      - "Match Signal Builder Production Promotion"
       - "Deploy Match Signal to Cloudflare Pages"
     types: [completed]
   push:
