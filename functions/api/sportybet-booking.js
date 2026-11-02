@@ -429,7 +429,7 @@ async function buildSelection(leg, event) {
 
   const sport = String(leg?.sport || '').toLowerCase();
   const market = String(leg?.market || '').toLowerCase();
-  if (sport === 'basketball') return findBasketballSelection(leg,event);
+  if (sport === 'basketball') return findBasketballSelection(leg,event);\n  if (market === 'total' && ['football','tennis'].includes(sport)) return findVirtualSelection(leg,event);
   if (sport === 'football' || market === '1x2' || market === 'winner') {
     return findWinnerSelection(leg, event);
   }
@@ -474,13 +474,17 @@ async function handlePost(context) {
               !Number.isFinite(Number(leg.line)) || Number(leg.line) < 100 || Number(leg.line) > 300 ||
               leg.market_id !== '225' || leg.model_qualified !== true;
           }
-          return !['football', 'tennis'].includes(leg.sport) ||
-            !['winner', '1x2'].includes(leg.market) ||
+          if (!['football', 'tennis'].includes(leg.sport)) return true;
+          if (leg.market === 'total') {
+            return !['over', 'under'].includes(leg.pick) ||
+              !Number.isFinite(Number(leg.line)) || Number(leg.line) <= 0 || Number(leg.line) > 1000;
+          }
+          return !['winner', '1x2'].includes(leg.market) ||
             !['p1', 'p2', 'draw'].includes(leg.pick) ||
             (leg.sport === 'tennis' && leg.pick === 'draw');
         }) ||
           ids.some(id => !id) || new Set(ids).size !== ids.length) {
-        return json({ ok: false, error: 'INVALID_MANUAL_SELECTION', message: 'Manual slips currently support one winner selection per distinct pre-match football or tennis event.' }, 422);
+        return json({ ok: false, error: 'INVALID_MANUAL_SELECTION', message: 'Manual tickets support football/tennis winners or exact current totals, plus qualified NBA full-game totals.' }, 422);
       }
     } else {
       // Desk research batches remain subject to their existing Builder qualification gates.
