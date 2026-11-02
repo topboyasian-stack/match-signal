@@ -1,0 +1,90 @@
+name: NBA totals v6 historical feature experiment
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/nba_totals_feature_experiment.py'
+      - 'scripts/test_nba_totals_feature_experiment.py'
+      - '.github/workflows/nba-totals-feature-experiment.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nba-totals-v6-historical-feature-experiment
+  cancel-in-progress: false
+
+jobs:
+  experiment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 2
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install free experiment dependencies
+        run: python -m pip install --disable-pip-version-check requests pandas
+
+      - name: Compile and run feature experiment regression tests
+        run: |
+          python -m py_compile scripts/nba_totals_feature_experiment.py scripts/test_nba_totals_feature_experiment.py
+          PYTHONPATH=scripts python scripts/test_nba_totals_feature_experiment.py
+
+      - name: Run historical-only v6 feature ablation
+        run: PYTHONPATH=scripts python scripts/nba_totals_feature_experiment.py
+
+      - name: Verify experiment did not use the prospective holdout
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path("data/nba_totals_v6_feature_experiment.json").read_text(encoding="utf-8"))
+          assert report.get("paper_only") is True
+          assert report.get("prospective_holdout_used") is False
+          assert report.get("prospective_holdout_cutoff_utc") == "2026-11-02T02:00:00+00:00"
+          assert report.get("market_prices_used_as_model_inputs") is False
+          assert report.get("production_model_unchanged") == "nba-total-v5-pace-efficiency-calibrated"
+          assert report.get("historical_validation", {}).get("candidate_features")
+          print("Training:", report["training_period"]["n"])
+          print("Historical validation:", report["historical_validation_period"]["n"])
+          print("Candidate decision:", report["candidate_decision"])
+          print("Best candidate:", report["historical_validation"]["candidate_features"][0]["name"])
+          PY
+
+      - name: Publish v6 experiment report without overwriting newer main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+topboyasian-stack@users.noreply.github.com'
+          candidate='/tmp/nba_totals_v6_feature_experiment.json'
+          cp data/nba_totals_v6_feature_experiment.json "$candidate"
+          for attempt in 1 2 3 4 5; do
+            git fetch origin main
+            git reset --hard origin/main
+            cp "$candidate" data/nba_totals_v6_feature_experiment.json
+            git add data/nba_totals_v6_feature_experiment.json
+            if git diff --cached --quiet; then
+              echo 'The same NBA v6 experiment report is already published.'
+              exit 0
+            fi
+            git commit -m 'Publish historical NBA totals v6 feature experiment'
+            if git push origin HEAD:main; then
+              echo 'NBA v6 historical feature experiment report published.'
+              exit 0
+            fi
+            echo "Concurrent main update; retrying."
+            sleep $((attempt * 2))
+          done
+          echo 'Could not publish the NBA v6 experiment report after five attempts.' >&2
+          exit 1
