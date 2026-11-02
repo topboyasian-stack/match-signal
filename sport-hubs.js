@@ -761,12 +761,24 @@ function ladderRows(rows,anchor){
 function ticketAddMarkup(row){
   const sport=String(row?.sport||"").toLowerCase(),pick=String(row?.pick||row?.selection||"").toLowerCase();
   const eventId=String(row?.event_id||row?.sportybet_event_id||""),p1=String(row?.player_1||row?.home||""),p2=String(row?.player_2||row?.away||""),start=String(row?.start_time||"");
-  if(!["football","tennis"].includes(sport)||!["p1","p2","draw"].includes(pick)||(sport==="tennis"&&pick==="draw")||!eventId||!p1||!p2||!start||Date.parse(start)<=Date.now()+120000)return "";
-  const odds=Number(row?.sportybet_winner_odds?.[pick]??row?.bookmaker_odds??row?.sportybet_odds??NaN);
+  if(!["football","tennis"].includes(sport)||!eventId||!p1||!p2||!start||Date.parse(start)<=Date.now()+120000)return "";
   const safe=v=>String(v??"").replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-  return '<div class="ms-pred-ticket-action"><button type="button" data-ms-ticket-add data-ticket-sport="'+safe(sport)+'" data-ticket-event="'+safe(eventId)+'" data-ticket-market="winner" data-ticket-pick="'+safe(pick)+'" data-ticket-start="'+safe(start)+'" data-ticket-player1="'+safe(p1)+'" data-ticket-player2="'+safe(p2)+'" data-ticket-match="'+safe(p1+' vs '+p2)+'" data-ticket-odds="'+(Number.isFinite(odds)&&odds>1?safe(odds):'')+'">Add prediction to ticket</button></div>';
+  const actions=[];
+  if(["p1","p2","draw"].includes(pick)&&!(sport==="tennis"&&pick==="draw")){
+    const winnerOdds=Number(row?.sportybet_winner_odds?.[pick]??row?.market_insights?.winner?.[pick]??NaN);
+    actions.push('<button type="button" data-ms-ticket-add data-ticket-sport="'+safe(sport)+'" data-ticket-event="'+safe(eventId)+'" data-ticket-market="winner" data-ticket-pick="'+safe(pick)+'" data-ticket-start="'+safe(start)+'" data-ticket-player1="'+safe(p1)+'" data-ticket-player2="'+safe(p2)+'" data-ticket-match="'+safe(p1+' vs '+p2)+'" data-ticket-odds="'+(Number.isFinite(winnerOdds)&&winnerOdds>1?safe(winnerOdds):'')+'">Add prediction to ticket</button>');
+  }
+  const total=sport==="tennis"?(row?.analytics||{}).total_games:(row?.markets||{}).over_under;
+  const totalPick=String(total?.pick||"").toLowerCase(),line=Number(total?.line);
+  if(total&&["over","under"].includes(totalPick)&&Number.isFinite(line)&&line>0&&line<=1000){
+    const marketInsight=row?.market_insights?.total||{};
+    const totalOdds=Number(marketInsight?.book_odds??NaN);
+    const sameMarketLine=marketInsight?.line==null||Math.abs(Number(marketInsight.line)-line)<1e-9;
+    const sameMarketSide=!marketInsight?.pick||String(marketInsight.pick).toLowerCase()===totalPick;
+    actions.push('<button type="button" data-ms-ticket-add data-ticket-sport="'+safe(sport)+'" data-ticket-event="'+safe(eventId)+'" data-ticket-market="total" data-ticket-pick="'+safe(totalPick)+'" data-ticket-line="'+safe(line)+'" data-ticket-market-id="'+safe(total?.market_id||marketInsight?.market_id||'')+'" data-ticket-start="'+safe(start)+'" data-ticket-player1="'+safe(p1)+'" data-ticket-player2="'+safe(p2)+'" data-ticket-match="'+safe(p1+' vs '+p2)+'" data-ticket-odds="'+(Number.isFinite(totalOdds)&&totalOdds>1&&sameMarketLine&&sameMarketSide?safe(totalOdds):'')+'">Add '+totalPick.toUpperCase()+' '+safe(line)+' to ticket</button>');
+  }
+  return actions.length?'<div class="ms-pred-ticket-action">'+actions.join('')+'</div>':'';
 }
-
 function unifiedRow(group){
   const rows=group.rows;
   const x=primaryPrediction(rows);
