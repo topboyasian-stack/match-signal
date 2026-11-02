@@ -833,23 +833,30 @@ function historicalCalibration(product,marketType,pickCode,rawProb,startTime){
 }
 function recentProductPerformanceGate(product){
   const p=String(product||'').toLowerCase();
-  if(!['efootball_gt','efootball_adriatic'].includes(p))return {blocked:false,reason:null,n:0,accuracy:null};
+  if(!['efootball_gt','efootball_adriatic'].includes(p))return {blocked:false,reason:null,n:0,accuracy:null,decisionCount:0};
   const artifact=state.deskLearning||null;
   const generated=Date.parse(String(artifact?.generated_at||''));
   const age=Date.now()-generated;
   if(!Number.isFinite(generated)||age>60*60*1000||age< -120000){
-    return {blocked:true,reason:'RECENT_PERFORMANCE_DATA_UNAVAILABLE',n:0,accuracy:null};
+    return {blocked:true,reason:'RECENT_PERFORMANCE_DATA_UNAVAILABLE',n:0,accuracy:null,decisionCount:0};
   }
   const recent=artifact?.by_product?.[p]?.recent_window||null;
-  const n=Number(recent?.n),accuracy=Number(recent?.accuracy);
-  if(!Number.isFinite(n)||n<30||!Number.isFinite(accuracy)||accuracy<0||accuracy>1){
+  // Only the new cluster-aware artifact is allowed to satisfy this gate.
+  // Legacy "n" counted multiple totals lines from the same fixture as separate results.
+  const n=Number(recent?.unique_fixtures);
+  const accuracy=Number(recent?.accuracy);
+  const decisionCount=Number(recent?.decision_count);
+  const clusterAware=recent?.window_unit==='unique_product_fixture_clusters';
+  if(!clusterAware||!Number.isFinite(n)||n<30||!Number.isFinite(accuracy)||accuracy<0||accuracy>1){
     return {blocked:true,reason:'RECENT_PERFORMANCE_EVIDENCE_INSUFFICIENT',
-      n:Number.isFinite(n)?n:0,accuracy:Number.isFinite(accuracy)?accuracy:null};
+      n:Number.isFinite(n)?n:0,accuracy:Number.isFinite(accuracy)?accuracy:null,
+      decisionCount:Number.isFinite(decisionCount)?decisionCount:0};
   }
   if(accuracy<0.55){
-    return {blocked:true,reason:'RECENT_ACCURACY_BELOW_55_PERCENT',n,accuracy};
+    return {blocked:true,reason:'RECENT_ACCURACY_BELOW_55_PERCENT',n,accuracy,
+      decisionCount:Number.isFinite(decisionCount)?decisionCount:0};
   }
-  return {blocked:false,reason:null,n,accuracy};
+  return {blocked:false,reason:null,n,accuracy,decisionCount:Number.isFinite(decisionCount)?decisionCount:0};
 }
 
 function qualifiesResearchPick(c){
@@ -1250,8 +1257,8 @@ function renderPredictionDesk(){
   const productFilter=$('product')?.value||'';
   const showEfootballGate=['efootball','efootball_gt','efootball_adriatic','all'].includes(productFilter);
   const gtGate=recentProductPerformanceGate('efootball_gt'),adriaticGate=recentProductPerformanceGate('efootball_adriatic');
-  const gateText=(name,g)=>g.reason==='RECENT_ACCURACY_BELOW_55_PERCENT'?name+' '+fmtPct(g.accuracy)+' across last '+g.n+' · below 55%':g.reason==='RECENT_PERFORMANCE_EVIDENCE_INSUFFICIENT'?name+' recent sample insufficient (n='+g.n+')':g.blocked?name+' recent performance data unavailable':'';
-  const gateBanner=showEfootballGate&&(gtGate.blocked||adriaticGate.blocked)?'<div class="vl-recent-performance-gate" role="status"><strong>EFOOTBALL QUALIFICATION PAUSED</strong><span>'+esc([gateText('GT',gtGate),gateText('eAdriatic',adriaticGate)].filter(Boolean).join(' · '))+'</span><small>These markets remain research-only until each product has at least 30 recent settled results and accuracy of 55% or better.</small></div>':'';
+  const gateText=(name,g)=>g.reason==='RECENT_ACCURACY_BELOW_55_PERCENT'?name+' '+fmtPct(g.accuracy)+' across '+g.n+' recent fixtures ('+g.decisionCount+' line decisions) · below 55%':g.reason==='RECENT_PERFORMANCE_EVIDENCE_INSUFFICIENT'?name+' '+g.n+'/30 product-specific settled fixtures ('+g.decisionCount+' line decisions) · sample pending':g.blocked?name+' recent performance data unavailable':'';
+  const gateBanner=showEfootballGate&&(gtGate.blocked||adriaticGate.blocked)?'<div class="vl-recent-performance-gate" role="status"><strong>EFOOTBALL QUALIFICATION PAUSED</strong><span>'+esc([gateText('GT',gtGate),gateText('eAdriatic',adriaticGate)].filter(Boolean).join(' · '))+'</span><small>Each product must independently clear 30 recent settled fixtures and 55% cluster-weighted accuracy, plus its own model and live-price gates. Multiple totals lines from one fixture count as one fixture; GT and eAdriatic results are never pooled.</small></div>':'';
   $('predictionCount').textContent=String(picks.length);
   if(!picks.length){
     const liveCount=state.live.length;
