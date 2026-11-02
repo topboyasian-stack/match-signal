@@ -283,7 +283,7 @@ test('NBA ticket with a partial SportyBet acceptance withholds the provider shar
     });
     const body = await response.json();
     assert.equal(mock.calls.raw, 4);
-    assert.equal(mock.calls.feed, 1);
+    assert.equal(mock.calls.feed, 3, 'the three bounded NBA catalog queries must use the proxy source');
     assert.equal(mock.calls.share, 1);
     assert.equal(response.status, 409);
     assert.equal(body.error, 'BASKETBALL_SLIP_REJECTED_PARTIAL');
