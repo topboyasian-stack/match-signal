@@ -41,6 +41,33 @@ jobs:
         run: python scripts/test_efootball_desk_learning.py
       - name: Test backend eFootball qualification policy
         run: python scripts/test_upcoming_desk_policy.py
+      - name: Reconcile actual settled eFootball evidence by product
+        run: |
+          python scripts/efootball_desk_learning.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report=json.loads(Path('data/efootball_desk_learning.json').read_text())
+          for product in ('efootball_gt','efootball_adriatic'):
+              metrics=(report.get('by_product') or {}).get(product) or {}
+              recent=metrics.get('recent_window') or {}
+              n=int(recent.get('unique_fixtures') or 0)
+              accuracy=recent.get('accuracy')
+              brier=recent.get('brier')
+              passed=(recent.get('window_unit')=='unique_product_fixture_clusters'
+                      and n>=30 and accuracy is not None and accuracy>=0.55
+                      and brier is not None and brier<=0.25)
+              print(json.dumps({
+                  'product':product,
+                  'settled_predictions':metrics.get('settled_predictions',0),
+                  'settled_fixtures':metrics.get('settled_fixtures',0),
+                  'recent_unique_fixtures':n,
+                  'recent_line_decisions':recent.get('decision_count',0),
+                  'recent_accuracy':accuracy,
+                  'recent_brier':brier,
+                  'release_gate':'PASS' if passed else 'PAUSED'
+              },sort_keys=True))
+          PY
       - name: Test Virtual Lab product-specific gate and quality boundary
         run: |
           node --check virtual-lab-app.js
