@@ -2,6 +2,7 @@
 """Regression tests for fresh immutable NBA market-225 price capture."""
 import unittest
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from unittest.mock import patch
 
 from expansion_pipeline import NBA_TOTALS_MODEL_VERSION
@@ -39,6 +40,14 @@ def make_quote(now, **overrides):
 
 
 class PriceCaptureTests(unittest.TestCase):
+    def test_basketball_page_scopes_sportybet_feed_to_nba(self):
+        root = Path(__file__).resolve().parents[1]
+        page_script = (root / "basketball-live.js").read_text(encoding="utf-8")
+        page_html = (root / "basketball.html").read_text(encoding="utf-8")
+        self.assertIn("tournamentId=sr%3Atournament%3A132", page_script)
+        self.assertIn("basketball-live.js?v=20261102-nba-feed-scope1", page_html)
+
+
     def setUp(self):
         self.now = datetime.now(timezone.utc)
 
