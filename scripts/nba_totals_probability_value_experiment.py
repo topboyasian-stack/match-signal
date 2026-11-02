@@ -370,6 +370,10 @@ def _value_decision(forecast, line, over_odds, under_odds, residuals,
     normalizer = implied_over + implied_under
     no_vig_over = implied_over / normalizer
     no_vig_under = implied_under / normalizer
+    non_push_mass = probabilities["over"] + probabilities["under"]
+    # Market prices are conditional on a decisive outcome if the total can push.
+    model_over_no_push = probabilities["over"] / non_push_mass if non_push_mass > 0 else 0.5
+    model_under_no_push = probabilities["under"] / non_push_mass if non_push_mass > 0 else 0.5
 
     over_ev = _ev({"win": probabilities["over"], "loss": probabilities["under"]}, over_odds)
     under_ev = _ev({"win": probabilities["under"], "loss": probabilities["over"]}, under_odds)
@@ -381,8 +385,11 @@ def _value_decision(forecast, line, over_odds, under_odds, residuals,
     for _ in range(max(100, int(resamples))):
         sample = [residuals[rng.randrange(count)] for _ in range(count)]
         p = _settlement_probabilities(forecast, line, sample)
-        over_edge_samples.append(p["over"] - no_vig_over)
-        under_edge_samples.append(p["under"] - no_vig_under)
+        sample_non_push_mass = p["over"] + p["under"]
+        sample_over_no_push = p["over"] / sample_non_push_mass if sample_non_push_mass > 0 else 0.5
+        sample_under_no_push = p["under"] / sample_non_push_mass if sample_non_push_mass > 0 else 0.5
+        over_edge_samples.append(sample_over_no_push - no_vig_over)
+        under_edge_samples.append(sample_under_no_push - no_vig_under)
         over_ev_samples.append(_ev({"win": p["over"], "loss": p["under"]}, over_odds))
         under_ev_samples.append(_ev({"win": p["under"], "loss": p["over"]}, under_odds))
 
@@ -415,9 +422,13 @@ def _value_decision(forecast, line, over_odds, under_odds, residuals,
             "over": round(no_vig_over, 4),
             "under": round(no_vig_under, 4),
         },
+        "model_probability_conditional_on_no_push": {
+            "over": round(model_over_no_push, 4),
+            "under": round(model_under_no_push, 4),
+        },
         "model_probability_edge": {
-            "over": round(probabilities["over"] - no_vig_over, 4),
-            "under": round(probabilities["under"] - no_vig_under, 4),
+            "over": round(model_over_no_push - no_vig_over, 4),
+            "under": round(model_under_no_push - no_vig_under, 4),
         },
         "expected_value_per_unit": {
             "over": round(over_ev, 4),
@@ -757,11 +768,23 @@ def probability_score_summary(settled_audit, minimum_descriptive_sample=30, coho
         model = row.get("model_probability") or {}
         market = row.get("market_no_vig_probability") or {}
         try:
+            model_over_raw = float(model["over"])
+            model_under_raw = float(model["under"])
+            non_push_mass = model_over_raw + model_under_raw
+            if (
+                not math.isfinite(model_over_raw)
+                or not math.isfinite(model_under_raw)
+                or non_push_mass <= 0
+            ):
+                continue
+            market_over = float(market["over"])
+            if not math.isfinite(market_over) or not 0 <= market_over <= 1:
+                continue
             binary.append({
                 "event_id": row.get("event_id"),
                 "outcome": outcome,
-                "model_over": float(model["over"]),
-                "market_over": float(market["over"]),
+                "model_over": model_over_raw / non_push_mass,
+                "market_over": market_over,
             })
         except (KeyError, TypeError, ValueError):
             continue

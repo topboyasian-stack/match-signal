@@ -178,6 +178,18 @@ def test_prospective_probability_sample_requires_exact_snapshot_linkage():
     assert bad_report["snapshot_linkage_failures"][0]["reason"] == "SNAPSHOT_FIELDS_DO_NOT_MATCH_SETTLEMENT_RECORD"
 
 
+def test_probability_score_conditions_on_non_push_mass():
+    result = probability_score_summary([{
+        "event_id": "push-line",
+        "settled_result": "over",
+        "model_probability": {"over": 0.40, "under": 0.40, "push": 0.20},
+        "market_no_vig_probability": {"over": 0.50, "under": 0.50},
+    }])
+    assert result["n"] == 1
+    assert result["model_brier"] == result["market_no_vig_brier"] == 0.25
+    assert result["model_log_loss"] == result["market_no_vig_log_loss"]
+
+
 def test_probability_scores_compare_model_and_no_vig_market_descriptively():
     rows = [
         {
@@ -217,6 +229,17 @@ def test_value_decision_requires_positive_lower_bound_and_edge():
     assert result["decision"] == "OVER VALUE"
     assert result["bootstrap_95_lower_bound"]["over_expected_value"] >= 0.03
     assert result["bootstrap_95_lower_bound"]["over_probability_edge"] >= 0.04
+
+
+def test_probability_edge_conditions_on_non_push_mass():
+    result = _value_decision(
+        200.0, 200.0, 1.90, 1.90, [-1.0, 0.0, 1.0],
+        calibration_ok=True, resamples=200, seed_key="integer-line-push",
+    )
+    assert result["model_probability"]["push"] == 1 / 3
+    assert result["model_probability_conditional_on_no_push"] == {"over": 0.5, "under": 0.5}
+    assert result["model_probability_edge"] == {"over": 0.0, "under": 0.0}
+    assert result["decision"] == "NO BET"
 
 
 def test_push_does_not_count_as_a_loss():
@@ -275,8 +298,10 @@ if __name__ == "__main__":
     test_historical_probability_validation_uses_only_synthetic_lines()
     test_prospective_probability_sample_requires_exact_snapshot_linkage()
     test_probability_scores_compare_model_and_no_vig_market_descriptively()
+    test_probability_score_conditions_on_non_push_mass()
     test_value_decision_rejects_calibration_failure()
     test_value_decision_requires_positive_lower_bound_and_edge()
+    test_probability_edge_conditions_on_non_push_mass()
     test_push_does_not_count_as_a_loss()
     test_full_report_keeps_prospective_holdout_locked()
-    print("NBA totals probability/value experiment tests: PASS (10 groups)")
+    print("NBA totals probability/value experiment tests: PASS (12 groups)")
