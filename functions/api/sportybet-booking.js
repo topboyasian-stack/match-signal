@@ -215,7 +215,12 @@ function canonicalParticipant(value) {
     const parts = raw.split(',').map(part => part.trim()).filter(Boolean);
     if (parts.length === 2) raw = parts[1] + ' ' + parts[0];
   }
-  return raw.replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ');
+  const tokens = raw.replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim().split(/\s+/).filter(Boolean);
+  // Handle the common trailing-initial form "Surname A." as "A Surname".
+  if (tokens.length === 2 && tokens[1].length === 1 && tokens[0].length > 1) {
+    tokens.reverse();
+  }
+  return tokens.join(' ');
 }
 
 function participantNameMatches(first, second) {
