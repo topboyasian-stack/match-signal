@@ -230,6 +230,9 @@ function participantNameMatches(first, second) {
   if (a === b) return true;
   const left = a.split(' ');
   const right = b.split(' ');
+  // Some feeds return the full two-part player name in surname-first order.
+  if (left.length === 2 && right.length === 2 &&
+      left[0] === right[1] && left[1] === right[0]) return true;
   if (left.length < 2 || right.length < 2) return false;
   const leftSurname = left[left.length - 1];
   const rightSurname = right[right.length - 1];
