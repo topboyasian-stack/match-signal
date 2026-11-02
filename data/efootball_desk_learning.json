@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-02T15:10:47.172938+00:00",
+  "generated_at": "2026-11-02T15:14:39.837235+00:00",
   "mode": "PAPER_ONLY",
   "active": true,
   "policy": {
@@ -13,7 +13,7 @@
   },
   "settled_predictions": 6012,
   "total_settled_predictions": 9922,
-  "pending_forecasts": 821,
+  "pending_forecasts": 834,
   "recent_window": {
     "n": 50,
     "accuracy": 0.52,
@@ -658,7 +658,7 @@
     "efootball_gt": {
       "active": true,
       "settled_predictions": 6012,
-      "pending_forecasts": 821,
+      "pending_forecasts": 834,
       "recent_window": {
         "n": 50,
         "accuracy": 0.52,
@@ -1300,20 +1300,20 @@
       },
       "prospective_poisson_shadow_capture": {
         "mode": "PAPER_SHADOW_ONLY",
-        "captured_forecast_revisions": 12082,
-        "unique_events_captured": 5010,
-        "rows_with_valid_poisson_shadow": 2069,
-        "unique_events_with_valid_poisson_shadow": 604,
-        "pending_rows_with_valid_poisson_shadow": 141,
+        "captured_forecast_revisions": 12090,
+        "unique_events_captured": 5012,
+        "rows_with_valid_poisson_shadow": 2078,
+        "unique_events_with_valid_poisson_shadow": 607,
+        "pending_rows_with_valid_poisson_shadow": 150,
         "settled_scored_rows_with_valid_poisson_shadow": 219,
         "rejection_reason_counts": {
           "shadow_reason_not_recorded": 1457,
           "missing_side_components": 32,
-          "historical_product_fallback_rejected": 8524,
-          "eligible_leave_one_line_out_fit": 2069
+          "historical_product_fallback_rejected": 8523,
+          "eligible_leave_one_line_out_fit": 2078
         },
         "valid_shadow_source_counts": {
-          "current_market_ladder_leave_one_line_out": 2069
+          "current_market_ladder_leave_one_line_out": 2078
         },
         "qualification_or_prediction_changes_applied": false,
         "production_qualification_enabled": false
@@ -2252,130 +2252,142 @@
   "settled_observations_artifact": "data/efootball_desk_settled_observations.json",
   "source_settlement": "data/virtual_lab_history.json",
   "reconciliation_diagnostics": {
-    "trace_rows": 50128,
+    "trace_rows": 50016,
     "history_index_fixtures": 8126,
-    "forecast_line_groups": 45533,
+    "forecast_line_groups": 45421,
     "matched_line_groups_exact": 9926,
     "matched_line_groups_near_time": 0,
-    "unmatched_line_groups": 35607,
+    "unmatched_line_groups": 35495,
     "ambiguous_line_groups": 0,
     "scored_forecasts": 9916,
     "unmatched_reason_counts": {
-      "NO_IDENTITY_MATCH": 24119,
-      "TIME_MISMATCH": 11488
+      "TIME_MISMATCH": 11406,
+      "NO_IDENTITY_MATCH": 24089
     },
     "trace_product_counts": {
-      "efootball_gt": 12089,
-      "vfootball": 38039
+      "efootball_gt": 12098,
+      "vfootball": 37918
     },
     "history_index_product_counts": {
       "efootball_gt": 6968,
       "vfootball": 1158
     },
-    "trace_rows_with_identity": 50128,
-    "trace_rows_with_time": 50128,
-    "trace_rows_with_identity_and_time": 50128,
+    "trace_rows_with_identity": 50016,
+    "trace_rows_with_time": 50016,
+    "trace_rows_with_identity_and_time": 50016,
     "history_identity_groups": 969,
     "match_counts_by_product": {
       "efootball_gt": {
-        "forecast_line_groups": 10314,
+        "forecast_line_groups": 10323,
         "matched_exact": 6016,
         "matched_near_time": 0,
-        "unmatched": 4298,
+        "unmatched": 4307,
         "unmatched_reason_counts": {
           "TIME_MISMATCH": 2128,
-          "NO_IDENTITY_MATCH": 2170
+          "NO_IDENTITY_MATCH": 2179
         }
       },
       "vfootball": {
-        "forecast_line_groups": 35219,
+        "forecast_line_groups": 35098,
         "matched_exact": 3910,
         "matched_near_time": 0,
-        "unmatched": 31309,
+        "unmatched": 31188,
         "unmatched_reason_counts": {
-          "NO_IDENTITY_MATCH": 21949,
-          "TIME_MISMATCH": 9360
+          "TIME_MISMATCH": 9278,
+          "NO_IDENTITY_MATCH": 21910
         }
       }
     },
     "unmatched_samples_by_product": {
       "vfootball": [
         {
-          "reason": "NO_IDENTITY_MATCH",
+          "reason": "TIME_MISMATCH",
           "trace_product": "vfootball",
-          "trace_event_id": "sr:match:200026110123499",
+          "trace_event_id": "sr:match:200026110124456",
           "trace_event_id_present": true,
-          "trace_start_time": "2026-11-01T00:16:00+00:00",
+          "trace_start_time": "2026-11-01T00:24:00+00:00",
           "trace_participants_normalized": [
-            "ata",
-            "com"
+            "scf",
+            "svw"
           ],
-          "same_participants_any_product_count": 0,
-          "closest_history_product": null,
-          "closest_history_event_id_present": false,
-          "closest_history_time": null,
-          "closest_history_time_delta_seconds": null,
-          "closest_history_participants_normalized": null,
+          "same_participants_any_product_count": 5,
+          "closest_history_product": "vfootball",
+          "closest_history_event_id_present": true,
+          "closest_history_time": "2026-10-31T06:00:00+00:00",
+          "closest_history_time_delta_seconds": -66240.0,
+          "closest_history_participants_normalized": [
+            "scf",
+            "svw"
+          ],
           "same_product_event_id_history_count": 0,
           "closest_history_time_delta_seconds_by_event_id": null,
           "event_id_candidate_participants_match": false
         },
         {
-          "reason": "NO_IDENTITY_MATCH",
+          "reason": "TIME_MISMATCH",
           "trace_product": "vfootball",
-          "trace_event_id": "sr:match:200026110123499",
+          "trace_event_id": "sr:match:200026110124456",
           "trace_event_id_present": true,
-          "trace_start_time": "2026-11-01T00:16:00+00:00",
+          "trace_start_time": "2026-11-01T00:24:00+00:00",
           "trace_participants_normalized": [
-            "ata",
-            "com"
+            "scf",
+            "svw"
           ],
-          "same_participants_any_product_count": 0,
-          "closest_history_product": null,
-          "closest_history_event_id_present": false,
-          "closest_history_time": null,
-          "closest_history_time_delta_seconds": null,
-          "closest_history_participants_normalized": null,
+          "same_participants_any_product_count": 5,
+          "closest_history_product": "vfootball",
+          "closest_history_event_id_present": true,
+          "closest_history_time": "2026-10-31T06:00:00+00:00",
+          "closest_history_time_delta_seconds": -66240.0,
+          "closest_history_participants_normalized": [
+            "scf",
+            "svw"
+          ],
           "same_product_event_id_history_count": 0,
           "closest_history_time_delta_seconds_by_event_id": null,
           "event_id_candidate_participants_match": false
         },
         {
-          "reason": "NO_IDENTITY_MATCH",
+          "reason": "TIME_MISMATCH",
           "trace_product": "vfootball",
-          "trace_event_id": "sr:match:200026110123499",
+          "trace_event_id": "sr:match:200026110124456",
           "trace_event_id_present": true,
-          "trace_start_time": "2026-11-01T00:16:00+00:00",
+          "trace_start_time": "2026-11-01T00:24:00+00:00",
           "trace_participants_normalized": [
-            "ata",
-            "com"
+            "scf",
+            "svw"
           ],
-          "same_participants_any_product_count": 0,
-          "closest_history_product": null,
-          "closest_history_event_id_present": false,
-          "closest_history_time": null,
-          "closest_history_time_delta_seconds": null,
-          "closest_history_participants_normalized": null,
+          "same_participants_any_product_count": 5,
+          "closest_history_product": "vfootball",
+          "closest_history_event_id_present": true,
+          "closest_history_time": "2026-10-31T06:00:00+00:00",
+          "closest_history_time_delta_seconds": -66240.0,
+          "closest_history_participants_normalized": [
+            "scf",
+            "svw"
+          ],
           "same_product_event_id_history_count": 0,
           "closest_history_time_delta_seconds_by_event_id": null,
           "event_id_candidate_participants_match": false
         },
         {
-          "reason": "NO_IDENTITY_MATCH",
+          "reason": "TIME_MISMATCH",
           "trace_product": "vfootball",
-          "trace_event_id": "sr:match:200026110123499",
+          "trace_event_id": "sr:match:200026110124456",
           "trace_event_id_present": true,
-          "trace_start_time": "2026-11-01T00:16:00+00:00",
+          "trace_start_time": "2026-11-01T00:24:00+00:00",
           "trace_participants_normalized": [
-            "ata",
-            "com"
+            "scf",
+            "svw"
           ],
-          "same_participants_any_product_count": 0,
-          "closest_history_product": null,
-          "closest_history_event_id_present": false,
-          "closest_history_time": null,
-          "closest_history_time_delta_seconds": null,
-          "closest_history_participants_normalized": null,
+          "same_participants_any_product_count": 5,
+          "closest_history_product": "vfootball",
+          "closest_history_event_id_present": true,
+          "closest_history_time": "2026-10-31T06:00:00+00:00",
+          "closest_history_time_delta_seconds": -66240.0,
+          "closest_history_participants_normalized": [
+            "scf",
+            "svw"
+          ],
           "same_product_event_id_history_count": 0,
           "closest_history_time_delta_seconds_by_event_id": null,
           "event_id_candidate_participants_match": false
@@ -2478,168 +2490,192 @@
     },
     "unmatched_samples": [
       {
-        "reason": "NO_IDENTITY_MATCH",
+        "reason": "TIME_MISMATCH",
         "trace_product": "vfootball",
-        "trace_event_id": "sr:match:200026110123499",
+        "trace_event_id": "sr:match:200026110124456",
         "trace_event_id_present": true,
-        "trace_start_time": "2026-11-01T00:16:00+00:00",
+        "trace_start_time": "2026-11-01T00:24:00+00:00",
         "trace_participants_normalized": [
-          "ata",
-          "com"
+          "scf",
+          "svw"
         ],
-        "same_participants_any_product_count": 0,
-        "closest_history_product": null,
-        "closest_history_event_id_present": false,
-        "closest_history_time": null,
-        "closest_history_time_delta_seconds": null,
-        "closest_history_participants_normalized": null,
+        "same_participants_any_product_count": 5,
+        "closest_history_product": "vfootball",
+        "closest_history_event_id_present": true,
+        "closest_history_time": "2026-10-31T06:00:00+00:00",
+        "closest_history_time_delta_seconds": -66240.0,
+        "closest_history_participants_normalized": [
+          "scf",
+          "svw"
+        ],
         "same_product_event_id_history_count": 0,
         "closest_history_time_delta_seconds_by_event_id": null,
         "event_id_candidate_participants_match": false
       },
       {
-        "reason": "NO_IDENTITY_MATCH",
+        "reason": "TIME_MISMATCH",
         "trace_product": "vfootball",
-        "trace_event_id": "sr:match:200026110123499",
+        "trace_event_id": "sr:match:200026110124456",
         "trace_event_id_present": true,
-        "trace_start_time": "2026-11-01T00:16:00+00:00",
+        "trace_start_time": "2026-11-01T00:24:00+00:00",
         "trace_participants_normalized": [
-          "ata",
-          "com"
+          "scf",
+          "svw"
         ],
-        "same_participants_any_product_count": 0,
-        "closest_history_product": null,
-        "closest_history_event_id_present": false,
-        "closest_history_time": null,
-        "closest_history_time_delta_seconds": null,
-        "closest_history_participants_normalized": null,
+        "same_participants_any_product_count": 5,
+        "closest_history_product": "vfootball",
+        "closest_history_event_id_present": true,
+        "closest_history_time": "2026-10-31T06:00:00+00:00",
+        "closest_history_time_delta_seconds": -66240.0,
+        "closest_history_participants_normalized": [
+          "scf",
+          "svw"
+        ],
         "same_product_event_id_history_count": 0,
         "closest_history_time_delta_seconds_by_event_id": null,
         "event_id_candidate_participants_match": false
       },
       {
-        "reason": "NO_IDENTITY_MATCH",
+        "reason": "TIME_MISMATCH",
         "trace_product": "vfootball",
-        "trace_event_id": "sr:match:200026110123499",
+        "trace_event_id": "sr:match:200026110124456",
         "trace_event_id_present": true,
-        "trace_start_time": "2026-11-01T00:16:00+00:00",
+        "trace_start_time": "2026-11-01T00:24:00+00:00",
         "trace_participants_normalized": [
-          "ata",
-          "com"
+          "scf",
+          "svw"
         ],
-        "same_participants_any_product_count": 0,
-        "closest_history_product": null,
-        "closest_history_event_id_present": false,
-        "closest_history_time": null,
-        "closest_history_time_delta_seconds": null,
-        "closest_history_participants_normalized": null,
+        "same_participants_any_product_count": 5,
+        "closest_history_product": "vfootball",
+        "closest_history_event_id_present": true,
+        "closest_history_time": "2026-10-31T06:00:00+00:00",
+        "closest_history_time_delta_seconds": -66240.0,
+        "closest_history_participants_normalized": [
+          "scf",
+          "svw"
+        ],
         "same_product_event_id_history_count": 0,
         "closest_history_time_delta_seconds_by_event_id": null,
         "event_id_candidate_participants_match": false
       },
       {
-        "reason": "NO_IDENTITY_MATCH",
+        "reason": "TIME_MISMATCH",
         "trace_product": "vfootball",
-        "trace_event_id": "sr:match:200026110123499",
+        "trace_event_id": "sr:match:200026110124456",
         "trace_event_id_present": true,
-        "trace_start_time": "2026-11-01T00:16:00+00:00",
+        "trace_start_time": "2026-11-01T00:24:00+00:00",
         "trace_participants_normalized": [
-          "ata",
-          "com"
+          "scf",
+          "svw"
         ],
-        "same_participants_any_product_count": 0,
-        "closest_history_product": null,
-        "closest_history_event_id_present": false,
-        "closest_history_time": null,
-        "closest_history_time_delta_seconds": null,
-        "closest_history_participants_normalized": null,
+        "same_participants_any_product_count": 5,
+        "closest_history_product": "vfootball",
+        "closest_history_event_id_present": true,
+        "closest_history_time": "2026-10-31T06:00:00+00:00",
+        "closest_history_time_delta_seconds": -66240.0,
+        "closest_history_participants_normalized": [
+          "scf",
+          "svw"
+        ],
         "same_product_event_id_history_count": 0,
         "closest_history_time_delta_seconds_by_event_id": null,
         "event_id_candidate_participants_match": false
       },
       {
-        "reason": "NO_IDENTITY_MATCH",
+        "reason": "TIME_MISMATCH",
         "trace_product": "vfootball",
-        "trace_event_id": "sr:match:200026110123499",
+        "trace_event_id": "sr:match:200026110124456",
         "trace_event_id_present": true,
-        "trace_start_time": "2026-11-01T00:16:00+00:00",
+        "trace_start_time": "2026-11-01T00:24:00+00:00",
         "trace_participants_normalized": [
-          "ata",
-          "com"
+          "scf",
+          "svw"
         ],
-        "same_participants_any_product_count": 0,
-        "closest_history_product": null,
-        "closest_history_event_id_present": false,
-        "closest_history_time": null,
-        "closest_history_time_delta_seconds": null,
-        "closest_history_participants_normalized": null,
+        "same_participants_any_product_count": 5,
+        "closest_history_product": "vfootball",
+        "closest_history_event_id_present": true,
+        "closest_history_time": "2026-10-31T06:00:00+00:00",
+        "closest_history_time_delta_seconds": -66240.0,
+        "closest_history_participants_normalized": [
+          "scf",
+          "svw"
+        ],
         "same_product_event_id_history_count": 0,
         "closest_history_time_delta_seconds_by_event_id": null,
         "event_id_candidate_participants_match": false
       },
       {
-        "reason": "NO_IDENTITY_MATCH",
+        "reason": "TIME_MISMATCH",
         "trace_product": "vfootball",
-        "trace_event_id": "sr:match:200026110123499",
+        "trace_event_id": "sr:match:200026110124456",
         "trace_event_id_present": true,
-        "trace_start_time": "2026-11-01T00:16:00+00:00",
+        "trace_start_time": "2026-11-01T00:24:00+00:00",
         "trace_participants_normalized": [
-          "ata",
-          "com"
+          "scf",
+          "svw"
         ],
-        "same_participants_any_product_count": 0,
-        "closest_history_product": null,
-        "closest_history_event_id_present": false,
-        "closest_history_time": null,
-        "closest_history_time_delta_seconds": null,
-        "closest_history_participants_normalized": null,
+        "same_participants_any_product_count": 5,
+        "closest_history_product": "vfootball",
+        "closest_history_event_id_present": true,
+        "closest_history_time": "2026-10-31T06:00:00+00:00",
+        "closest_history_time_delta_seconds": -66240.0,
+        "closest_history_participants_normalized": [
+          "scf",
+          "svw"
+        ],
         "same_product_event_id_history_count": 0,
         "closest_history_time_delta_seconds_by_event_id": null,
         "event_id_candidate_participants_match": false
       },
       {
-        "reason": "NO_IDENTITY_MATCH",
+        "reason": "TIME_MISMATCH",
         "trace_product": "vfootball",
-        "trace_event_id": "sr:match:200026110123499",
+        "trace_event_id": "sr:match:200026110124456",
         "trace_event_id_present": true,
-        "trace_start_time": "2026-11-01T00:16:00+00:00",
+        "trace_start_time": "2026-11-01T00:24:00+00:00",
         "trace_participants_normalized": [
-          "ata",
-          "com"
+          "scf",
+          "svw"
         ],
-        "same_participants_any_product_count": 0,
-        "closest_history_product": null,
-        "closest_history_event_id_present": false,
-        "closest_history_time": null,
-        "closest_history_time_delta_seconds": null,
-        "closest_history_participants_normalized": null,
+        "same_participants_any_product_count": 5,
+        "closest_history_product": "vfootball",
+        "closest_history_event_id_present": true,
+        "closest_history_time": "2026-10-31T06:00:00+00:00",
+        "closest_history_time_delta_seconds": -66240.0,
+        "closest_history_participants_normalized": [
+          "scf",
+          "svw"
+        ],
         "same_product_event_id_history_count": 0,
         "closest_history_time_delta_seconds_by_event_id": null,
         "event_id_candidate_participants_match": false
       },
       {
-        "reason": "NO_IDENTITY_MATCH",
+        "reason": "TIME_MISMATCH",
         "trace_product": "vfootball",
-        "trace_event_id": "sr:match:200026110123499",
+        "trace_event_id": "sr:match:200026110124456",
         "trace_event_id_present": true,
-        "trace_start_time": "2026-11-01T00:16:00+00:00",
+        "trace_start_time": "2026-11-01T00:24:00+00:00",
         "trace_participants_normalized": [
-          "ata",
-          "com"
+          "scf",
+          "svw"
         ],
-        "same_participants_any_product_count": 0,
-        "closest_history_product": null,
-        "closest_history_event_id_present": false,
-        "closest_history_time": null,
-        "closest_history_time_delta_seconds": null,
-        "closest_history_participants_normalized": null,
+        "same_participants_any_product_count": 5,
+        "closest_history_product": "vfootball",
+        "closest_history_event_id_present": true,
+        "closest_history_time": "2026-10-31T06:00:00+00:00",
+        "closest_history_time_delta_seconds": -66240.0,
+        "closest_history_participants_normalized": [
+          "scf",
+          "svw"
+        ],
         "same_product_event_id_history_count": 0,
         "closest_history_time_delta_seconds_by_event_id": null,
         "event_id_candidate_participants_match": false
       }
     ],
-    "expired_unmatched_forecasts": 31979,
-    "captured_new_forecasts": 128,
+    "expired_unmatched_forecasts": 31854,
+    "captured_new_forecasts": 16,
     "settled_ledger_rows": 9932,
     "settled_ledger_added_this_run": 0
   }
