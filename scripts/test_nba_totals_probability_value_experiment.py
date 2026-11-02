@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from nba_totals_probability_value_experiment import (
     _settlement_probabilities,
     _value_decision,
+    snapshot_clv_audit,
     run_experiment,
 )
 from nba_totals_walk_forward import EVALUATION_CUTOFF_UTC
@@ -16,6 +17,87 @@ def test_probability_mass_and_integer_push():
     )
     assert abs(probabilities["over"] + probabilities["under"] + probabilities["push"] - 1.0) < 1e-9
     assert probabilities == {"over": 2 / 6, "under": 2 / 6, "push": 2 / 6}
+
+
+def test_snapshot_clv_uses_only_later_exact_pregame_quote():
+    def snapshot(snapshot_id, published, quote, line, over, under, event="event-clv"):
+        return {
+            "event_id": event,
+            "start_time": "2026-11-03T20:00:00+00:00",
+            "published_at": published,
+            "publication_snapshot_id": snapshot_id,
+            "markets": {"total_ou": {
+                "market_id": "225",
+                "source": "SportyBet Nigeria",
+                "sportybet_event_id": "sr:match:clv",
+                "quote_capture_basis": "SportyBet API response observed_at",
+                "quote_timestamp": quote,
+                "line": line,
+                "over_odds": over,
+                "under_odds": under,
+            }},
+        }
+
+    opening = snapshot(
+        "open-id", "2026-11-03T17:00:03+00:00",
+        "2026-11-03T17:00:00+00:00", 220.5, 1.90, 1.90,
+    )
+    latest = snapshot(
+        "close-id", "2026-11-03T19:30:03+00:00",
+        "2026-11-03T19:30:00+00:00", 219.5, 1.88, 1.92,
+    )
+    after_tip = snapshot(
+        "after-id", "2026-11-03T20:00:03+00:00",
+        "2026-11-03T20:00:00+00:00", 218.5, 1.80, 2.00,
+    )
+    bet = {
+        "event_id": "event-clv",
+        "player_1": "A", "player_2": "B",
+        "pick": "over",
+        "publication_snapshot_id": "open-id",
+    }
+    report = snapshot_clv_audit([bet], [opening, latest, after_tip])
+    assert report["near_close_observations"] == 1
+    assert report["positive_probability_clv_n"] == 0
+    assert report["positive_line_clv_n"] == 1
+    fixture = report["fixtures"][0]
+    assert fixture["clv_status"] == "NEAR_CLOSE_CAPTURED"
+    assert fixture["latest_pregame"]["snapshot_id"] == "close-id"
+    assert fixture["latest_pregame"]["line"] == 219.5
+    assert fixture["is_official_bookmaker_close"] if "is_official_bookmaker_close" in fixture else True
+
+
+def test_snapshot_clv_excludes_old_update_from_near_close_sample():
+    opening = {
+        "event_id": "event-old",
+        "start_time": "2026-11-03T20:00:00+00:00",
+        "published_at": "2026-11-03T17:00:03+00:00",
+        "publication_snapshot_id": "old-open",
+        "markets": {"total_ou": {
+            "market_id": "225", "source": "SportyBet Nigeria",
+            "sportybet_event_id": "sr:match:old",
+            "quote_capture_basis": "SportyBet API response observed_at",
+            "quote_timestamp": "2026-11-03T17:00:00+00:00",
+            "line": 220.5, "over_odds": 1.9, "under_odds": 1.9,
+        }},
+    }
+    update = {
+        **opening,
+        "published_at": "2026-11-03T18:00:03+00:00",
+        "publication_snapshot_id": "old-update",
+        "markets": {"total_ou": {
+            **opening["markets"]["total_ou"],
+            "quote_timestamp": "2026-11-03T18:00:00+00:00",
+            "line": 221.5,
+        }},
+    }
+    report = snapshot_clv_audit(
+        [{"event_id": "event-old", "pick": "under", "publication_snapshot_id": "old-open"}],
+        [opening, update],
+        close_window_minutes=45,
+    )
+    assert report["near_close_observations"] == 0
+    assert report["fixtures"][0]["clv_status"] == "LATER_PREGAME_CAPTURE_OUTSIDE_CLOSE_WINDOW"
 
 
 def test_value_decision_rejects_calibration_failure():
@@ -86,8 +168,10 @@ def test_full_report_keeps_prospective_holdout_locked():
 
 if __name__ == "__main__":
     test_probability_mass_and_integer_push()
+    test_snapshot_clv_uses_only_later_exact_pregame_quote()
+    test_snapshot_clv_excludes_old_update_from_near_close_sample()
     test_value_decision_rejects_calibration_failure()
     test_value_decision_requires_positive_lower_bound_and_edge()
     test_push_does_not_count_as_a_loss()
     test_full_report_keeps_prospective_holdout_locked()
-    print("NBA totals probability/value experiment tests: PASS (5 groups)")
+    print("NBA totals probability/value experiment tests: PASS (7 groups)")
