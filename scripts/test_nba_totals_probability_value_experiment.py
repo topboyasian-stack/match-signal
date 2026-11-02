@@ -7,6 +7,7 @@ from nba_totals_probability_value_experiment import (
     _value_decision,
     snapshot_clv_audit,
     probability_score_summary,
+    historical_probability_validation,
     run_experiment,
 )
 from nba_totals_walk_forward import EVALUATION_CUTOFF_UTC
@@ -101,6 +102,25 @@ def test_snapshot_clv_excludes_old_update_from_near_close_sample():
     assert report["fixtures"][0]["clv_status"] == "LATER_PREGAME_CAPTURE_OUTSIDE_CLOSE_WINDOW"
 
 
+def test_historical_probability_validation_uses_only_synthetic_lines():
+    rows = [
+        {
+            "event_id": f"prob-{i}",
+            "forecast_total": 220.0 + (i % 5),
+            "actual_total": 220.0 + (i % 5) + ((i % 9) - 4),
+        }
+        for i in range(120)
+    ]
+    calibration_residuals = [((i % 15) - 7) * 1.2 for i in range(200)]
+    result = historical_probability_validation(rows, calibration_residuals)
+    assert result["unique_validation_games"] == 120
+    assert result["synthetic_game_line_observations"] + result["pushes_excluded"] == 120 * 7
+    assert len(result["by_line_offset"]) == 7
+    assert result["not_a_sportybet_market_backtest"] is True
+    assert result["model_brier"] is not None
+    assert result["coinflip_baseline_brier"] == 0.25
+
+
 def test_probability_scores_compare_model_and_no_vig_market_descriptively():
     rows = [
         {
@@ -192,9 +212,10 @@ if __name__ == "__main__":
     test_probability_mass_and_integer_push()
     test_snapshot_clv_uses_only_later_exact_pregame_quote()
     test_snapshot_clv_excludes_old_update_from_near_close_sample()
+    test_historical_probability_validation_uses_only_synthetic_lines()
     test_probability_scores_compare_model_and_no_vig_market_descriptively()
     test_value_decision_rejects_calibration_failure()
     test_value_decision_requires_positive_lower_bound_and_edge()
     test_push_does_not_count_as_a_loss()
     test_full_report_keeps_prospective_holdout_locked()
-    print("NBA totals probability/value experiment tests: PASS (8 groups)")
+    print("NBA totals probability/value experiment tests: PASS (9 groups)")
