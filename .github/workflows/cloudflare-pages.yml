@@ -342,7 +342,7 @@ jobs:
           set -euo pipefail
           rm -rf .pages-deploy
           mkdir -p .pages-deploy
-          rsync -a             --exclude='.git/'             --exclude='.pages-deploy/'             --exclude='node_modules/'             --exclude='data/virtual_lab_history.json'             --exclude='data/efootball_desk_prediction_history.json'             --exclude='data/efootball_desk_settled_observations.json' --exclude='data/nba_live_observations.json' --exclude='data/nba_live_observations.json.gz'             ./ .pages-deploy/
+          rsync -a             --exclude='.git/'             --exclude='.pages-deploy/'             --exclude='node_modules/'             --exclude='data/virtual_lab_history.json'             --exclude='data/efootball_desk_prediction_history.json'             --exclude='data/efootball_desk_settled_observations.json'             --exclude='data/efootball_market_research.json' --exclude='data/nba_live_observations.json' --exclude='data/nba_live_observations.json.gz'             ./ .pages-deploy/
           test ! -e .pages-deploy/data/nba_live_observations.json
           test ! -e .pages-deploy/data/nba_live_observations.json.gz
           # The five-minute ESPN event archive is a server-side evaluation source,
@@ -424,6 +424,36 @@ jobs:
           test "$ledger_compressed_bytes" -lt "$MAX_PAGES_FILE_BYTES"
           test -s .pages-deploy/data/efootball_desk_settled_observations.json.gz
           test ! -e .pages-deploy/data/efootball_desk_settled_observations.json
+
+          # Keep the full score archive in Git for collectors, but publish only
+          # its compressed archival asset: the raw JSON has crossed Cloudflare's
+          # 25 MiB per-file upload limit. The app consumes the compact report.
+          gzip -c data/efootball_market_research.json > .pages-deploy/data/efootball_market_research.json.gz
+          research_compressed_bytes=$(stat -c%s .pages-deploy/data/efootball_market_research.json.gz)
+          echo "Compressed eFootball market research archive: $(stat -c%s data/efootball_market_research.json) source bytes -> $research_compressed_bytes Pages bytes"
+          test "$research_compressed_bytes" -lt "$MAX_PAGES_FILE_BYTES"
+          test -s .pages-deploy/data/efootball_market_research.json.gz
+          test ! -e .pages-deploy/data/efootball_market_research.json
+
+          # General guard against a new oversized asset silently failing only at
+          # upload time. Known archival JSON assets are compressed above; fail
+          # early with names and sizes for any remaining unsupported file.
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          root=Path('.pages-deploy')
+          limit=int(os.environ['MAX_PAGES_FILE_BYTES'])
+          oversized=[
+              (str(path),path.stat().st_size)
+              for path in root.rglob('*')
+              if path.is_file() and path.stat().st_size >= limit
+          ]
+          if oversized:
+              for name,size in sorted(oversized,key=lambda x:-x[1]):
+                  print(f'OVERSIZED PAGES ASSET: {name}: {size} bytes (limit {limit})')
+              raise SystemExit('Refusing Cloudflare Pages upload while oversized assets remain.')
+          print('Pages asset-size preflight passed: every staged file is below 25 MiB.')
+          PY
           echo "Cloudflare Pages staging passed the 25 MiB single-file limit."
 
       - name: Regression-test Prediction Desk qualification and best-line selection
@@ -474,7 +504,7 @@ jobs:
           const base = 'https://match-signal.pages.dev';
           const deploymentBase = String(process.env.CLOUDFLARE_DEPLOYMENT_URL || '').replace(/\/+$/, '');
           const pages = ['/', '/upcoming.html', '/qualified-best', '/qualified-best.html', '/odds-builder.html', '/football.html', '/tennis.html', '/basketball.html', '/darts.html', '/table-tennis.html', '/league.html?sport=football&league=England%20Amateur%20-%20U21%20Professional%20Development%20League', '/reports.html', '/live.html', '/api-access.html', '/expansion.html', '/virtual-lab/', '/virtual-lab', '/research.html', '/virtual-lab.html', '/analyst.html'];
-          const assets = ['/api/sportybet-virtual','/api/sportybet-darts','/api/sportybet-table-tennis','/api/virtual-lab-history','/expansion.js', '/expansion-odds-builder.js', '/live-analysis.js', '/live-data-worker.js', '/virtual-lab-app.js', '/virtual-lab-confirmed-watch.js', '/virtual-lab.css', '/_redirects', '/data/predictions.json', '/data/nba_predictions.json', '/data/unified_upcoming.json', '/data/selection_candidates.json', '/data/expansion_status.json', '/data/odds_builder.json', '/data/odds_ticket_tracker.json', '/data/system_health.json', '/data/tennis_forward_status.json', '/data/prediction_desk_health.json', '/data/results_first_evidence_report.json', '/data/virtual_lab_live.json','/data/virtual_lab_model_eval.json','/data/virtual_lab_eligibility.json','/data/virtual_lab_participants/registry.json','/data/virtual_lab_participant_lifecycle.json','/data/virtual_lab_participants/efootball_confirmed_watch.json','/data/efootball_desk_learning.json','/data/efootball_desk_prediction_history.json.gz','/data/club-logo-registry.json','/sport-hubs.js','/ticket-drawer.css','/ticket-drawer.js','/match-signal-ip.js','/basketball-live.js','/api/espn?path=%2Fapis%2Fsite%2Fv2%2Fsports%2Fbasketball%2Fnba%2Fscoreboard%3Fdates%3D20261031','/basketball-design.css','/api/sportybet-basketball','/league-logos.js','/sport-hubs.css','/ms-design-system.css','/core-workspaces-design.css','/qualified-best-design.css','/sport-hubs-design.css','/independent-sport-design.css','/odds-builder-design.css','/reports-design.css','/virtual-lab-terminal.css','/workspace-ui.js','/workspace-ui.css','/analyst.js'];
+          const assets = ['/api/sportybet-virtual','/api/sportybet-darts','/api/sportybet-table-tennis','/api/virtual-lab-history','/expansion.js', '/expansion-odds-builder.js', '/live-analysis.js', '/live-data-worker.js', '/virtual-lab-app.js', '/virtual-lab-confirmed-watch.js', '/virtual-lab.css', '/_redirects', '/data/predictions.json', '/data/nba_predictions.json', '/data/unified_upcoming.json', '/data/selection_candidates.json', '/data/expansion_status.json', '/data/odds_builder.json', '/data/odds_ticket_tracker.json', '/data/system_health.json', '/data/tennis_forward_status.json', '/data/prediction_desk_health.json', '/data/results_first_evidence_report.json', '/data/virtual_lab_live.json','/data/virtual_lab_model_eval.json','/data/virtual_lab_eligibility.json','/data/virtual_lab_participants/registry.json','/data/virtual_lab_participant_lifecycle.json','/data/virtual_lab_participants/efootball_confirmed_watch.json','/data/efootball_desk_learning.json','/data/efootball_desk_prediction_history.json.gz','/data/efootball_market_research.json.gz','/data/club-logo-registry.json','/sport-hubs.js','/ticket-drawer.css','/ticket-drawer.js','/match-signal-ip.js','/basketball-live.js','/api/espn?path=%2Fapis%2Fsite%2Fv2%2Fsports%2Fbasketball%2Fnba%2Fscoreboard%3Fdates%3D20261031','/basketball-design.css','/api/sportybet-basketball','/league-logos.js','/sport-hubs.css','/ms-design-system.css','/core-workspaces-design.css','/qualified-best-design.css','/sport-hubs-design.css','/independent-sport-design.css','/odds-builder-design.css','/reports-design.css','/virtual-lab-terminal.css','/workspace-ui.js','/workspace-ui.css','/analyst.js'];
           const failures = [];
           const sourceBuilderArtifact = JSON.parse(readFileSync('data/odds_builder.json', 'utf8'));
           const sourceBoardArtifact = JSON.parse(readFileSync('data/unified_upcoming.json', 'utf8'));
