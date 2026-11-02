@@ -63,6 +63,8 @@ def test_snapshot_clv_uses_only_later_exact_pregame_quote():
     assert report["near_close_observations"] == 1
     assert report["positive_probability_clv_n"] == 1
     assert report["positive_line_clv_n"] == 1
+    assert report["mean_probability_clv"] > 0
+    assert report["mean_line_clv_points"] == 1.0
     fixture = report["fixtures"][0]
     assert fixture["clv_status"] == "NEAR_CLOSE_CAPTURED"
     assert fixture["latest_pregame"]["snapshot_id"] == "close-id"
@@ -304,6 +306,9 @@ def test_full_report_keeps_prospective_holdout_locked():
     assert report["model_projection_market_blind"] is True
     assert report["prospective_probability_score_summary"]["n"] == 0
     assert report["prospective_probability_score_summary"]["sufficient_for_probability_validation"] is False
+    assert report["prospective_clv_diagnostics"]["near_close_observations"] == 0
+    assert report["prospective_clv_diagnostics"]["mean_line_clv_points"] is None
+    assert report["prospective_clv_release_check_passed"] is False
     assert report["prospective_pregame_snapshot_coverage"]["prospective_settled_selections_with_exact_snapshot_match"] == 0
 
 

@@ -639,6 +639,10 @@ def snapshot_clv_audit(settled_rows, snapshots, close_window_minutes=45):
             round(sum(row["selected_side_no_vig_probability_clv"] for row in near_close_rows) / len(near_close_rows), 6)
             if near_close_rows else None
         ),
+        "mean_line_clv_points": (
+            round(sum(row["selected_side_line_clv_points"] for row in near_close_rows) / len(near_close_rows), 4)
+            if near_close_rows else None
+        ),
         "fixtures": audit,
         "sample_is_sufficient_for_release": False,
     }
@@ -964,6 +968,28 @@ def run_experiment(history, ledger, predictions, now=None, snapshots=None):
     prospective_minimum_sample_reached = (
         len(prospective_bets) >= MIN_PROSPECTIVE_SETTLED_BETS
     )
+    prospective_clv_rows = [
+        row for row in v5_settled
+        if row.get("event_id") in snapshot_linked_event_ids
+        and parse_time(row.get("published_at")) is not None
+        and parse_time(row.get("published_at")) >= EVALUATION_CUTOFF_UTC
+    ]
+    prospective_snapshots = [
+        row for row in (snapshots or [])
+        if isinstance(row, dict)
+        and row.get("totals_model_version") == "nba-total-v5-pace-efficiency-calibrated"
+        and parse_time(row.get("published_at")) is not None
+        and parse_time(row.get("published_at")) >= EVALUATION_CUTOFF_UTC
+    ]
+    prospective_clv = snapshot_clv_audit(prospective_clv_rows, prospective_snapshots)
+    prospective_clv["cohort"] = "post-cutoff prospective v5 selections with exact immutable snapshot linkage"
+    prospective_clv["positive_clv_release_check_passed"] = bool(
+        int(prospective_clv.get("near_close_observations") or 0) > 0
+        and prospective_clv.get("mean_probability_clv") is not None
+        and float(prospective_clv["mean_probability_clv"]) > 0
+        and prospective_clv.get("mean_line_clv_points") is not None
+        and float(prospective_clv["mean_line_clv_points"]) > 0
+    )
     historical_value_signals = [
         row for row in settled_audit
         if row["research_value_signal_outcome"] != "NOT_A_SIGNAL"
@@ -1009,6 +1035,8 @@ def run_experiment(history, ledger, predictions, now=None, snapshots=None):
         "settled_v5_probability_score_summary": probability_scores,
         "prospective_pregame_snapshot_coverage": snapshot_coverage,
         "prospective_probability_score_summary": prospective_probability_scores,
+        "prospective_clv_diagnostics": prospective_clv,
+        "prospective_clv_release_check_passed": prospective_clv["positive_clv_release_check_passed"],
         "historical_value_signal_summary": {
             "n": len(historical_value_signals),
             "wins": historical_value_signal_wins,
@@ -1050,6 +1078,7 @@ def main():
         "upcoming_predictions_without_exact_fresh_pair": report["upcoming_predictions_without_exact_fresh_pair"],
         "prospective_settled_market_bets_after_cutoff": report["prospective_settled_market_bets_after_cutoff"],
         "prospective_probability_scored_unique_fixtures": report["prospective_probability_scored_unique_fixtures"],
+        "prospective_clv_release_check_passed": report["prospective_clv_release_check_passed"],
         "prospective_snapshot_coverage": report["prospective_pregame_snapshot_coverage"],
         "release_decision": report["release_decision"],
         "output": str(OUTPUT.relative_to(ROOT)),
