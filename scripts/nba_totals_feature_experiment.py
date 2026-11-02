@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import math
+import random
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -102,6 +103,47 @@ def venue_total_from_history(home, away, history, cutoff):
     return expected_home + expected_away
 
 
+def recent_team_stats(team, history, cutoff, window=10):
+    """Return last-N team-game PF/PA and pace/efficiency using only pre-tip data."""
+    cut = parse_time(cutoff)
+    if not cut:
+        return None
+    games = []
+    for row in history or []:
+        played = parse_time(row.get("date"))
+        if not played or played >= cut:
+            continue
+        if row.get("home") == team:
+            side = "home"
+            points_for, points_against = row.get("home_score"), row.get("away_score")
+        elif row.get("away") == team:
+            side = "away"
+            points_for, points_against = row.get("away_score"), row.get("home_score")
+        else:
+            continue
+        try:
+            points_for, points_against = float(points_for), float(points_against)
+        except (TypeError, ValueError):
+            continue
+        item = {"pf": points_for, "pa": points_against}
+        for key in ("pace", "off_rating", "def_rating", "possessions"):
+            value = row.get(f"{side}_{key}")
+            try:
+                value = float(value)
+                item[key] = value if math.isfinite(value) else None
+            except (TypeError, ValueError):
+                item[key] = None
+        games.append((played, item))
+    selected = [item for _, item in sorted(games, key=lambda pair: pair[0])[-max(1, int(window)):]]
+    if not selected:
+        return None
+    result = {"games": len(selected)}
+    for key in ("pf", "pa", "pace", "off_rating", "def_rating", "possessions"):
+        values = [item[key] for item in selected if key in item and item[key] is not None]
+        result[key] = sum(values) / len(values) if values else None
+    return result
+
+
 def build_feature_rows(history):
     """Build v5 base features plus candidate pregame-only venue/rest/schedule features."""
     clean = clean_history(history)
@@ -132,6 +174,30 @@ def build_feature_rows(history):
             venue_total = venue_total_from_history(
                 game.get("home"), game.get("away"), prior, cutoff
             )
+            home_recent5 = recent_team_stats(game.get("home"), prior, cutoff, window=5) or {}
+            away_recent5 = recent_team_stats(game.get("away"), prior, cutoff, window=5) or {}
+            home_recent10 = recent_team_stats(game.get("home"), prior, cutoff, window=10) or {}
+            away_recent10 = recent_team_stats(game.get("away"), prior, cutoff, window=10) or {}
+
+            def recent_matchup_total(home_stats, away_stats):
+                required = (home_stats.get("pf"), home_stats.get("pa"), away_stats.get("pf"), away_stats.get("pa"))
+                if any(value is None for value in required):
+                    return None
+                expected_home = (home_stats["pf"] + away_stats["pa"]) / 2.0
+                expected_away = (away_stats["pf"] + home_stats["pa"]) / 2.0
+                return expected_home + expected_away
+
+            recent5_total = recent_matchup_total(home_recent5, away_recent5)
+            recent10_total = recent_matchup_total(home_recent10, away_recent10)
+            recent_pace_total = None
+            if all(home_recent10.get(key) is not None and away_recent10.get(key) is not None
+                   for key in ("pace", "off_rating", "def_rating")):
+                recent_game_pace = (home_recent10["pace"] + away_recent10["pace"]) / 2.0
+                recent_home_eff = (home_recent10["off_rating"] + away_recent10["def_rating"]) / 2.0
+                recent_away_eff = (away_recent10["off_rating"] + home_recent10["def_rating"]) / 2.0
+                if 75 <= recent_game_pace <= 115 and 75 <= recent_home_eff <= 145 and 75 <= recent_away_eff <= 145:
+                    recent_pace_total = recent_game_pace * (recent_home_eff + recent_away_eff) / 100.0
+
             row = dict(forecast)
             row.update({
                 "venue_total": venue_total,
@@ -145,6 +211,21 @@ def build_feature_rows(history):
                 "rest_imbalance": abs(home_rest - away_rest),
                 "home_games_last_7d": home_load,
                 "away_games_last_7d": away_load,
+                "recent5_form_delta": (
+                    recent5_total - float(forecast["base_total"]) if recent5_total is not None else 0.0
+                ),
+                "recent10_form_delta": (
+                    recent10_total - float(forecast["base_total"]) if recent10_total is not None else 0.0
+                ),
+                "recent_form_trend": (
+                    recent5_total - recent10_total
+                    if recent5_total is not None and recent10_total is not None else 0.0
+                ),
+                "recent_pace_efficiency_delta": (
+                    recent_pace_total - float(forecast["pace_total"])
+                    if recent_pace_total is not None and forecast.get("pace_available") is True
+                    else 0.0
+                ),
             })
             feature_rows.append(row)
         prior.append(game)
@@ -216,6 +297,50 @@ def fit_feature_adjustment(training_rows, validation_rows, feature_names, ridge=
     return {"predictions": predictions, "coefficients": coefficients}
 
 
+def paired_mae_stability(rows, baseline_predictions, candidate_predictions, resamples=4000, blocks=4):
+    """Paired fixture bootstrap and ordered-block consistency for MAE improvement."""
+    improvements = [
+        abs(float(row["actual_total"]) - float(base))
+        - abs(float(row["actual_total"]) - float(candidate))
+        for row, base, candidate in zip(rows, baseline_predictions, candidate_predictions)
+    ]
+    if not improvements:
+        return {
+            "n": 0, "mean_mae_improvement": None,
+            "ci95_lower": None, "ci95_upper": None,
+            "positive_chronological_blocks": 0, "chronological_blocks": [],
+        }
+    n = len(improvements)
+    rng = random.Random(20261102 + n)
+    means = sorted(
+        sum(improvements[rng.randrange(n)] for _ in range(n)) / n
+        for _ in range(max(100, int(resamples)))
+    )
+    lower_index = max(0, min(len(means) - 1, int(0.025 * (len(means) - 1))))
+    upper_index = max(0, min(len(means) - 1, int(0.975 * (len(means) - 1))))
+    block_results = []
+    for index in range(max(1, int(blocks))):
+        start = index * n // max(1, int(blocks))
+        end = (index + 1) * n // max(1, int(blocks))
+        values = improvements[start:end]
+        if values:
+            block_results.append({
+                "block": index + 1,
+                "n": len(values),
+                "mae_improvement": round(sum(values) / len(values), 4),
+                "positive": sum(values) > 0,
+            })
+    return {
+        "n": n,
+        "mean_mae_improvement": round(sum(improvements) / n, 4),
+        "ci95_lower": round(means[lower_index], 4),
+        "ci95_upper": round(means[upper_index], 4),
+        "resamples": len(means),
+        "positive_chronological_blocks": sum(row["positive"] for row in block_results),
+        "chronological_blocks": block_results,
+    }
+
+
 def score_predictions(rows, predictions):
     errors = [
         float(prediction) - float(row["actual_total"])
@@ -270,6 +395,14 @@ def run_experiment(history):
         "venue_split_only": ["venue_delta"],
         "rest_only": ["rest_mean", "rest_imbalance"],
         "schedule_density_only": ["home_games_last_7d", "away_games_last_7d"],
+        "recent5_form_only": ["recent5_form_delta"],
+        "recent10_form_only": ["recent10_form_delta"],
+        "recent_form_trend_only": ["recent_form_trend"],
+        "recent_pace_efficiency_only": ["recent_pace_efficiency_delta"],
+        "recent_form_schedule_combined": [
+            "recent5_form_delta", "recent10_form_delta", "recent_form_trend",
+            "home_games_last_7d", "away_games_last_7d",
+        ],
         "venue_rest_schedule_combined": [
             "venue_delta", "rest_mean", "rest_imbalance",
             "home_games_last_7d", "away_games_last_7d",
@@ -279,6 +412,11 @@ def run_experiment(history):
     for name, feature_names in feature_sets.items():
         fitted = fit_feature_adjustment(training, validation, feature_names)
         metrics = score_predictions(validation, fitted["predictions"])
+        stability = paired_mae_stability(
+            validation,
+            [row["v5_prediction"] for row in validation],
+            fitted["predictions"],
+        )
         candidates.append({
             "name": name,
             "features": feature_names,
@@ -286,6 +424,7 @@ def run_experiment(history):
             "validation": metrics,
             "mae_improvement_vs_v5": round(v5_metrics["mae"] - metrics["mae"], 4),
             "rmse_improvement_vs_v5": round(v5_metrics["rmse"] - metrics["rmse"], 4),
+            "paired_mae_stability_vs_v5": stability,
             "abs_bias_within_3_points": abs(metrics["bias"]) <= 3.0,
         })
 
@@ -295,16 +434,20 @@ def run_experiment(history):
         row["name"],
     ))
     best = candidates[0] if candidates else None
+    stability = best.get("paired_mae_stability_vs_v5", {}) if best else {}
     improvement_pass = bool(
         best
         and best["mae_improvement_vs_v5"] > 0
         and best["rmse_improvement_vs_v5"] > 0
         and best["abs_bias_within_3_points"]
+        and stability.get("ci95_lower") is not None
+        and stability["ci95_lower"] > 0
+        and stability.get("positive_chronological_blocks", 0) >= 3
     )
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "paper_only": True,
-        "experiment": "NBA_TOTALS_V6_HISTORICAL_FEATURE_ABLATION_V1",
+        "experiment": "NBA_TOTALS_V6_HISTORICAL_FEATURE_ABLATION_V2",
         "production_model_unchanged": "nba-total-v5-pace-efficiency-calibrated",
         "prospective_holdout_cutoff_utc": EVALUATION_CUTOFF_UTC.isoformat(),
         "prospective_holdout_used": False,
@@ -325,7 +468,7 @@ def run_experiment(history):
             "V6_CANDIDATE_FOR_PROSPECTIVE_REVIEW"
             if improvement_pass else "KEEP_V5_BASELINE_NO_FEATURE_UPGRADE"
         ),
-        "decision_rule": "A feature candidate must improve both MAE and RMSE vs v5 on the fixed historical validation window and have absolute bias <=3 points. Passing only authorizes prospective review; it does not qualify betting or change production.",
+        "decision_rule": "A feature candidate must improve MAE and RMSE vs v5, have absolute bias <=3, a positive lower 95% paired fixture-bootstrap bound for MAE improvement, and positive MAE improvement in at least 3 of 4 chronological validation blocks. Passing only authorizes prospective review; it does not qualify betting or change production.",
         "market_prices_used_as_model_inputs": False,
         "note": "Historical validation is for feature selection only. The fixed post-2026-11-02 prospective holdout remains untouched and the NBA release gate remains RESEARCH_ONLY.",
     }
