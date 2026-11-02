@@ -98,7 +98,7 @@ jobs:
               payload?.error !== 'INVALID_MANUAL_LEG_COUNT' ||
               payload?.booking_code) {
             throw new Error('Production booking endpoint did not return the expected JSON rejection: HTTP ' +
-              response.status + ', content-type ' + contentType + ', body ' + raw.replace(/\\s+/g, ' ').slice(0, 240));
+              response.status + ', content-type ' + contentType + ', body ' + raw.replace(/\s+/g, ' ').slice(0, 240));
           }
           console.log('Production booking endpoint returned HTTP 422 JSON for an empty ticket; no booking code was generated.');
           NODE
