@@ -294,7 +294,171 @@ def _valid_sportybet_market(prediction, now):
     return market, line, over_odds, under_odds, forecast, age / 60.0
 
 
-def run_experiment(history, ledger, predictions, now=None):
+def _snapshot_market(snapshot):
+    if not isinstance(snapshot, dict):
+        return None
+    market = ((snapshot.get("markets") or {}).get("total_ou") or {})
+    if (
+        str(market.get("market_id") or "") != "225"
+        or str(market.get("source") or "").strip().lower() != "sportybet nigeria"
+        or market.get("quote_capture_basis") != "SportyBet API response observed_at"
+        or not str(market.get("sportybet_event_id") or "").strip()
+    ):
+        return None
+    quote_time = parse_time(market.get("quote_timestamp"))
+    published = parse_time(snapshot.get("published_at"))
+    start = parse_time(snapshot.get("start_time"))
+    if not quote_time or not published or not start or quote_time >= start or published >= start:
+        return None
+    age = (published - quote_time).total_seconds()
+    if age < -120 or age > 15 * 60:
+        return None
+    try:
+        line = float(market["line"])
+        over = float(market["over_odds"])
+        under = float(market["under_odds"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    if not all(math.isfinite(value) for value in (line, over, under)) or over <= 1 or under <= 1:
+        return None
+    return {
+        "quote_time": quote_time,
+        "published": published,
+        "start": start,
+        "line": line,
+        "over_odds": over,
+        "under_odds": under,
+        "sportybet_event_id": str(market.get("sportybet_event_id")),
+        "snapshot_id": str(snapshot.get("publication_snapshot_id") or ""),
+    }
+
+
+def _no_vig_probability(side, over_odds, under_odds):
+    over_implied = 1.0 / float(over_odds)
+    under_implied = 1.0 / float(under_odds)
+    total = over_implied + under_implied
+    if side == "over":
+        return over_implied / total
+    return under_implied / total
+
+
+def snapshot_clv_audit(settled_rows, snapshots, close_window_minutes=45):
+    """Compare original immutable v5 quote with the latest captured pre-tip revision.
+
+    'Near-close' is explicitly only the latest captured pregame observation within
+    the configured window. It is not represented as SportyBet's official closing line.
+    """
+    by_id = {
+        str(row.get("publication_snapshot_id")): row
+        for row in (snapshots or [])
+        if isinstance(row, dict) and row.get("publication_snapshot_id")
+    }
+    by_event = {}
+    for snapshot in snapshots or []:
+        if not isinstance(snapshot, dict):
+            continue
+        event_id = str(snapshot.get("event_id") or "")
+        if event_id:
+            by_event.setdefault(event_id, []).append(snapshot)
+
+    audit = []
+    for bet in settled_rows:
+        event_id = str(bet.get("event_id") or "")
+        side = str(bet.get("pick") or "").lower()
+        if side not in ("over", "under"):
+            continue
+        initial = by_id.get(str(bet.get("publication_snapshot_id") or ""))
+        opening = _snapshot_market(initial)
+        if not opening or str(initial.get("event_id") or "") != event_id:
+            audit.append({
+                "event_id": event_id,
+                "clv_status": "MISSING_VERIFIED_OPENING_SNAPSHOT",
+            })
+            continue
+        candidates = []
+        for snapshot in by_event.get(event_id, []):
+            market = _snapshot_market(snapshot)
+            if not market:
+                continue
+            if market["sportybet_event_id"] != opening["sportybet_event_id"]:
+                continue
+            if market["quote_time"] <= opening["quote_time"]:
+                continue
+            if market["quote_time"] >= opening["start"]:
+                continue
+            candidates.append((market["quote_time"], market, snapshot))
+        if not candidates:
+            audit.append({
+                "event_id": event_id,
+                "clv_status": "NO_LATER_VERIFIED_PREGAME_QUOTE",
+                "opening_line": opening["line"],
+                "opening_snapshot_id": opening["snapshot_id"],
+            })
+            continue
+
+        _, latest, latest_snapshot = max(candidates, key=lambda item: (item[0], item[1]["published"]))
+        minutes_to_start = (latest["start"] - latest["quote_time"]).total_seconds() / 60.0
+        opening_no_vig = _no_vig_probability(
+            side, opening["over_odds"], opening["under_odds"]
+        )
+        latest_no_vig = _no_vig_probability(
+            side, latest["over_odds"], latest["under_odds"]
+        )
+        probability_clv = latest_no_vig - opening_no_vig
+        line_clv = (
+            opening["line"] - latest["line"]
+            if side == "over" else latest["line"] - opening["line"]
+        )
+        near_close = minutes_to_start <= float(close_window_minutes)
+        audit.append({
+            "event_id": event_id,
+            "matchup": f'{bet.get("player_1") or ""} vs {bet.get("player_2") or ""}',
+            "selected_side": side.upper(),
+            "clv_status": (
+                "NEAR_CLOSE_CAPTURED"
+                if near_close else "LATER_PREGAME_CAPTURE_OUTSIDE_CLOSE_WINDOW"
+            ),
+            "opening": {
+                "snapshot_id": opening["snapshot_id"],
+                "quote_timestamp": opening["quote_time"].isoformat(),
+                "line": opening["line"],
+                "over_odds": opening["over_odds"],
+                "under_odds": opening["under_odds"],
+                "selected_side_no_vig_probability": round(opening_no_vig, 6),
+            },
+            "latest_pregame": {
+                "snapshot_id": latest["snapshot_id"],
+                "quote_timestamp": latest["quote_time"].isoformat(),
+                "minutes_before_start": round(minutes_to_start, 3),
+                "line": latest["line"],
+                "over_odds": latest["over_odds"],
+                "under_odds": latest["under_odds"],
+                "selected_side_no_vig_probability": round(latest_no_vig, 6),
+            },
+            "selected_side_no_vig_probability_clv": round(probability_clv, 6),
+            "selected_side_line_clv_points": round(line_clv, 4),
+            "positive_probability_clv": probability_clv > 0,
+            "positive_line_clv": line_clv > 0,
+            "is_official_bookmaker_close": False,
+        })
+    near_close_rows = [row for row in audit if row.get("clv_status") == "NEAR_CLOSE_CAPTURED"]
+    return {
+        "definition": "Opening immutable v5 publication quote vs latest captured exact SportyBet market-225 pregame quote; near-close counts only if quote was observed within 45 minutes of tip. This is not an official bookmaker close.",
+        "close_window_minutes": close_window_minutes,
+        "settled_v5_fixtures_audited": len(audit),
+        "near_close_observations": len(near_close_rows),
+        "positive_probability_clv_n": sum(row["positive_probability_clv"] for row in near_close_rows),
+        "positive_line_clv_n": sum(row["positive_line_clv"] for row in near_close_rows),
+        "mean_probability_clv": (
+            round(sum(row["selected_side_no_vig_probability_clv"] for row in near_close_rows) / len(near_close_rows), 6)
+            if near_close_rows else None
+        ),
+        "fixtures": audit,
+        "sample_is_sufficient_for_release": False,
+    }
+
+
+def run_experiment(history, ledger, predictions, now=None, snapshots=None):
     now = now or datetime.now(timezone.utc)
     fitted = fit_residual_distribution(history)
     residuals = fitted.pop("calibration_residuals")
@@ -305,6 +469,7 @@ def run_experiment(history, ledger, predictions, now=None):
 
     settled = verified_market_records(ledger)
     v5_settled = [row for row in settled if row.get("totals_model_version") == "nba-total-v5-pace-efficiency-calibrated"]
+    clv_audit = snapshot_clv_audit(v5_settled, snapshots or [])
     settled_audit = []
     for row in v5_settled:
         try:
@@ -338,6 +503,9 @@ def run_experiment(history, ledger, predictions, now=None):
             **result,
         })
 
+    # The immutable snapshot file is passed separately from current prediction data
+    # by main(); for this intermediate call, a dedicated keyword-free run argument below
+    # is populated from the ledger rows' exact publication snapshot references.
     upcoming = []
     skipped_without_fresh_pair = 0
     for prediction in predictions or []:
@@ -412,6 +580,7 @@ def run_experiment(history, ledger, predictions, now=None):
         },
         "settled_v5_market_audit": settled_audit,
         "settled_v5_market_count": len(settled_audit),
+        "settled_v5_clv_diagnostics": clv_audit,
         "historical_value_signal_summary": {
             "n": len(historical_value_signals),
             "wins": historical_value_signal_wins,
@@ -439,8 +608,9 @@ def main():
     history = json.loads(HISTORY.read_text(encoding="utf-8"))
     ledger = json.loads(LEDGER.read_text(encoding="utf-8"))
     predictions = json.loads(PREDICTIONS.read_text(encoding="utf-8"))
+    snapshots = json.loads((DATA / "nba_totals_publication_snapshots.json").read_text(encoding="utf-8"))
     records = ledger.get("records", []) if isinstance(ledger, dict) else []
-    report = run_experiment(history, records, predictions)
+    report = run_experiment(history, records, predictions, snapshots=snapshots)
     OUTPUT.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({
         "experiment": report["experiment"],
