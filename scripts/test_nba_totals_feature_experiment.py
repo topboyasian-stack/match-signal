@@ -123,7 +123,7 @@ def test_full_experiment_uses_historical_validation_and_preserves_future_holdout
     assert report["historical_validation_period"]["n"] >= 100
     assert report["production_model_unchanged"] == "nba-total-v5-pace-efficiency-calibrated"
     assert report["market_prices_used_as_model_inputs"] is False
-    assert len(report["historical_validation"]["candidate_features"]) == 9
+    assert len(report["historical_validation"]["candidate_features"]) == 12
 
 
 if __name__ == "__main__":
