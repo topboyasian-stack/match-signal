@@ -67,5 +67,9 @@ assert.ok(source.includes('state.builder=(state.builder||[]).filter(p=>!recentPr
 assert.ok(source.includes('candidate_status:status,recent_performance:recentPerformance'));
 assert.ok(source.includes("p.candidate_status==='RECENT_PERFORMANCE_GUARD'"));
 assert.ok(source.includes('EFOOTBALL QUALIFICATION PAUSED'));
+assert.ok(source.includes('no scored desk forecasts in the learning record yet'));
+assert.ok(source.includes('accuracy unknown'));
+assert.ok(source.includes('missing sample is unmeasured, not a failed accuracy test'));
+assert.ok(source.includes('never pooled across products'));
 assert.ok(source.includes('recentGate.blocked'));
 console.log('Virtual Lab eFootball recent-performance guard: 10 assertions passed.');
