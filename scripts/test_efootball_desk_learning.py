@@ -127,6 +127,8 @@ def test_supplemental_event_id_diagnostics_marks_repeated_session_ids_ambiguous(
     assert result["event_ids_with_multiple_score_fixtures"] == 1, result
     assert result["unique_identity_matches_with_kickoff_mismatch"] == 1, result
     assert result["matching_policy"] == "diagnostic_only_no_event_id_fuzzy_settlement", result
+    assert len(result["trace_event_id_samples"]) <= 8, result
+    assert len(result["settled_score_event_id_samples"]) <= 8, result
 
 
 def test_untrusted_market_rows_do_not_enter_the_score_index():
