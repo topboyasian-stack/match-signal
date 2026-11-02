@@ -18,6 +18,16 @@ on:
       - "scripts/test_odds_builder_upcoming_desk_recent_losses.py"
       - "scripts/test_compact_efootball_builder.py"
       - "scripts/test_odds_builder_score_replay.py"
+      # NBA model/runtime and basketball desk changes must use the ordered
+      # board -> Odds Builder -> board -> Builder -> Cloudflare promotion path.
+      - "scripts/expansion_pipeline.py"
+      - "scripts/nba_totals_walk_forward.py"
+      - "scripts/nba_totals_probability_value_experiment.py"
+      - "scripts/capture_nba_totals_prices.py"
+      - "scripts/settle_nba_totals.py"
+      - "basketball-live.js"
+      - "basketball.html"
+      - "functions/api/sportybet-booking.js"
   workflow_dispatch:
 
 permissions:
