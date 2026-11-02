@@ -214,6 +214,12 @@ def market_record_audit(rows):
         )
         result = str(row.get("result") or "").lower()
         won = pick == result
+        is_push = result == "push" or (actual is not None and line is not None and actual == line)
+        favorite_side = "over" if over_odds <= under_odds else "under"
+        favorite_odds = over_odds if favorite_side == "over" else under_odds
+        favorite_won = favorite_side == result
+        selected_profit = 0.0 if is_push else (selected_odds - 1.0 if won else -1.0)
+        favorite_profit = 0.0 if is_push else (favorite_odds - 1.0 if favorite_won else -1.0)
         audit.append({
             "event_id": str(row.get("event_id") or ""),
             "start_time": row.get("start_time"),
@@ -222,7 +228,12 @@ def market_record_audit(rows):
             "sportybet_market_225_line": line,
             "projection_edge_points": round(expected - line, 4) if expected is not None and line is not None else None,
             "selected_side": pick.upper(),
+            "over_odds": over_odds,
+            "under_odds": under_odds,
             "selected_side_odds": selected_odds,
+            "selected_side_profit_units": round(selected_profit, 4),
+            "market_favorite_side": favorite_side.upper(),
+            "market_favorite_profit_units": round(favorite_profit, 4),
             "no_vig_market_probability_for_selected_side": round(no_vig_probability, 4) if no_vig_probability is not None else None,
             "final_total_including_overtime": actual,
             "actual_minus_market_line": round(actual - line, 4) if actual is not None and line is not None else None,
