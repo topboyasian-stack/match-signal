@@ -105,5 +105,71 @@ try {
   assert.match(failedShare.message,/regional proxy or direct endpoint/);
   assert.deepEqual(failedShareRequests.map(u=>u.origin),[PROXY,SPORTYBET]);
 
-  console.log('SportyBet booking resilience: PASS (bounded catalog paging, regional share POST fallback, JSON-safe failures, and exact market-225 pair).');
+  // End-to-end manual slip regression: ordinary Football + Tennis must still work
+  // when a qualified product-scoped eFootball O/U leg is included.
+  const kickoff = Date.now() + 3 * 60 * 60 * 1000;
+  const kickoffIso = new Date(kickoff).toISOString();
+  const makeFixture = (eventId, homeTeamName, awayTeamName, market) => ({
+    eventId, homeTeamName, awayTeamName, estimateStartTime: kickoff,
+    matchStatus: 'Not start', markets: [market]
+  });
+  const mixedCatalog = {
+    'sr:sport:1': [makeFixture('sr:match:fb-ticket-test', 'Home FC', 'Away FC', {
+      id:'1', desc:'3 Way', status:'0', outcomes:[
+        {id:'fb-home',desc:'Home FC',odds:1.82,isActive:1},
+        {id:'fb-draw',desc:'Draw',odds:3.4,isActive:1},
+        {id:'fb-away',desc:'Away FC',odds:4.4,isActive:1}
+      ]
+    })],
+    'sr:sport:5': [makeFixture('sr:match:tennis-ticket-test', 'Player One', 'Player Two', {
+      id:'186', desc:'Match Winner', status:'0', outcomes:[
+        {id:'tennis-home',desc:'Player One',odds:1.71,isActive:1},
+        {id:'tennis-away',desc:'Player Two',odds:2.1,isActive:1}
+      ]
+    })],
+    'sr:sport:137': [makeFixture('sr:match:efootball-ticket-test', 'GT Home (Alpha)', 'GT Away (Beta)', {
+      id:'18', desc:'Total Goals Over/Under', specifier:'total=2.5', status:'0',
+      outcomes:[
+        {id:'ef-over',desc:'Over 2.5',odds:1.9,isActive:1},
+        {id:'ef-under',desc:'Under 2.5',odds:1.85,isActive:1}
+      ]
+    })]
+  };
+  const shareRequests=[];
+  globalThis.fetch=async(input,options={})=>{
+    const url=new URL(typeof input==='string'?input:input.url);
+    if(url.pathname==='/api/sportybet-virtual') return jsonResponse({ok:true,events:[]});
+    if(url.pathname==='/api/ng/orders/share'){
+      shareRequests.push(JSON.parse(options.body));
+      return jsonResponse({bizCode:10000,data:{
+        shareCode:'MIXED-EFOOTBALL-OK',
+        shareURL:'https://www.sportybet.com/ng/?shareCode=MIXED-EFOOTBALL-OK',
+        outcomes:[{odds:1.82},{odds:1.71},{odds:1.9}]
+      }});
+    }
+    const sportId=url.searchParams.get('sportId');
+    if(url.pathname.includes('UpcomingEvents')&&mixedCatalog[sportId]){
+      return jsonResponse({bizCode:10000,data:{tournaments:[{name:'Booking regression',events:mixedCatalog[sportId]}]}});
+    }
+    return jsonResponse({bizCode:10000,data:{tournaments:[]}});
+  };
+  const mixedResponse=await onRequest({request:new Request('https://match-signal.pages.dev/api/sportybet-booking',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({mode:'manual',manual_selections:[
+      {event_id:'prediction-fb-ticket-test',sportybet_event_id:'sr:match:fb-ticket-test',sport:'football',market:'winner',pick:'p1',start_time:kickoffIso,player_1:'Home FC',player_2:'Away FC',match:'Home FC vs Away FC'},
+      {event_id:'prediction-tennis-ticket-test',sportybet_event_id:'sr:match:tennis-ticket-test',sport:'tennis',market:'winner',pick:'p1',start_time:kickoffIso,player_1:'Player One',player_2:'Player Two',match:'Player One vs Player Two'},
+      {event_id:'sr:match:efootball-ticket-test',sportybet_event_id:'sr:match:efootball-ticket-test',sport:'efootball',product:'efootball_gt',market:'total',pick:'over',line:2.5,market_id:'18',model_qualified:true,start_time:kickoffIso,player_1:'GT Home (Alpha)',player_2:'GT Away (Beta)',match:'GT Home (Alpha) vs GT Away (Beta)'}
+    ]})
+  })});
+  const mixedPayload=await mixedResponse.json();
+  assert.equal(mixedResponse.status,200,JSON.stringify(mixedPayload));
+  assert.equal(mixedPayload.ok,true,JSON.stringify(mixedPayload));
+  assert.equal(mixedPayload.booking_code,'MIXED-EFOOTBALL-OK');
+  assert.equal(mixedPayload.selection_count,3);
+  assert.equal(mixedPayload.pre_excluded_count,0);
+  assert.equal(mixedPayload.partial,false);
+  assert.equal(shareRequests.length,1);
+  assert.equal(shareRequests[0].selections.length,3,'the generated SportyBet request must contain all three sports');
+  assert.ok(mixedPayload.selections.every(row=>row.ok===true),'each current fixture/market must be revalidated');
+  console.log('SportyBet booking resilience: PASS (bounded paging, share fallback, exact market-225 pair, and Football/Tennis/eFootball mixed ticket).');
 } finally { globalThis.fetch=originalFetch; }
