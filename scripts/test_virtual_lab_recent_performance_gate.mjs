@@ -13,6 +13,12 @@ function block(startMarker,endMarker){
 const gateSource=block('function recentProductPerformanceGate(product){','\nfunction qualifiesResearchPick(c){');
 const researchSource=block('function qualifiesResearchPick(c){','\nfunction qualifiesBaseResearchPick(c,e){');
 const baseSource=block('function qualifiesBaseResearchPick(c,e){','\nfunction competitionKey(value){');
+function recentWindow(n,accuracy,decisionCount=n){
+  return {
+    n,unique_fixtures:n,decision_count:decisionCount,accuracy,brier:0.22,
+    window_unit:'unique_product_fixture_clusters'
+  };
+}
 function makeState(recent,generatedAt=new Date().toISOString()){
   return {historyLoaded:true,modelGate:true,deskLearning:{
     generated_at:generatedAt,
@@ -28,13 +34,14 @@ function qualifiersFor(state,gate){
   )(state,gate,()=>true,()=>true);
 }
 const goodCandidate={marketType:'ou',eventProduct:'efootball_gt',product:'efootball_gt',calibratedProb:0.8,bookImplied:0.65,calibrationN:50};
-const gtBad=makeState({efootball_gt:{recent_window:{n:50,accuracy:0.50}}});
+const gtBad=makeState({efootball_gt:{recent_window:recentWindow(50,0.50,101)}});
 const gtGate=gateFor(gtBad);
 const gt=gtGate('efootball_gt');
 assert.equal(gt.blocked,true);
 assert.equal(gt.reason,'RECENT_ACCURACY_BELOW_55_PERCENT');
 assert.equal(gt.n,50);
 assert.equal(gt.accuracy,0.50);
+assert.equal(gt.decisionCount,101);
 const gtQualifiers=qualifiersFor(gtBad,gtGate);
 assert.equal(gtQualifiers.qualifiesResearchPick(goodCandidate),false);
 assert.equal(gtQualifiers.qualifiesBaseResearchPick(goodCandidate,{product:'efootball_gt'}),false);
@@ -46,17 +53,20 @@ assert.equal(gateFor(adriaticState)('efootball_adriatic').reason,'RECENT_PERFORM
 const vfootballState=makeState({vfootball:{recent_window:{n:50,accuracy:0.40}}});
 assert.equal(gateFor(vfootballState)('vfootball').blocked,false);
 
-const gtRecovered=makeState({efootball_gt:{recent_window:{n:50,accuracy:0.56}}});
+const gtRecovered=makeState({efootball_gt:{recent_window:recentWindow(50,0.56,97)}});
 const recoveredGate=gateFor(gtRecovered);
 assert.equal(recoveredGate('efootball_gt').blocked,false);
 const recoveredQualifiers=qualifiersFor(gtRecovered,recoveredGate);
 assert.equal(recoveredQualifiers.qualifiesResearchPick(goodCandidate),true);
 assert.equal(recoveredQualifiers.qualifiesBaseResearchPick(goodCandidate,{product:'efootball_gt'}),true);
 
-const lowSample=makeState({efootball_gt:{recent_window:{n:29,accuracy:0.70}}});
+const lowSample=makeState({efootball_gt:{recent_window:recentWindow(29,0.70,58)}});
 assert.equal(gateFor(lowSample)('efootball_gt').reason,'RECENT_PERFORMANCE_EVIDENCE_INSUFFICIENT');
-const stale=makeState({efootball_gt:{recent_window:{n:50,accuracy:0.70}}},new Date(Date.now()-61*60*1000).toISOString());
+const stale=makeState({efootball_gt:{recent_window:recentWindow(50,0.70,100)}},new Date(Date.now()-61*60*1000).toISOString());
 assert.equal(gateFor(stale)('efootball_gt').reason,'RECENT_PERFORMANCE_DATA_UNAVAILABLE');
+const legacyWindow=makeState({efootball_gt:{recent_window:{n:50,accuracy:0.70,brier:0.20}}});
+assert.equal(gateFor(legacyWindow)('efootball_gt').reason,'RECENT_PERFORMANCE_EVIDENCE_INSUFFICIENT',
+  'legacy line-decision windows must not masquerade as unique fixtures');
 const missing=makeState(null);
 assert.equal(gateFor(missing)('efootball_gt').blocked,true);
 
@@ -67,5 +77,8 @@ assert.ok(source.includes('state.builder=(state.builder||[]).filter(p=>!recentPr
 assert.ok(source.includes('candidate_status:status,recent_performance:recentPerformance'));
 assert.ok(source.includes("p.candidate_status==='RECENT_PERFORMANCE_GUARD'"));
 assert.ok(source.includes('EFOOTBALL QUALIFICATION PAUSED'));
+assert.ok(source.includes('recent?.unique_fixtures'));
+assert.ok(source.includes('product-specific settled fixtures'));
+assert.ok(source.includes('GT and eAdriatic results are never pooled'));
 assert.ok(source.includes('recentGate.blocked'));
 console.log('Virtual Lab eFootball recent-performance guard: 10 assertions passed.');
