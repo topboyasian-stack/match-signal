@@ -21,21 +21,22 @@ function json(body, status = 200) {
 }
 
 function lineFromMarket(market) {
-  // A null line is common when SportyBet puts the actual value in specifier.
-  // Number(null) is zero, so only trust a line field when it is really present.
+  // SportyBet may expose an integer base in market.line while its specifier
+  // carries the actual half-point total (for example line=25, total=25.5).
+  const specifierText = [market?.specifier, market?.specifiers, market?.marketSpecifier]
+    .map(value => String(value || '')).join(' ');
+  const explicitLine = specifierText.match(/(?:^|[,\\s;|&])(?:total|line)\\s*=\\s*(-?\\d+(?:\\.\\d+)?)(?=$|[,\\s;|&])/i);
+  if (explicitLine) return Number(explicitLine[1]);
+
   const rawLine = market?.line;
   if (rawLine != null && String(rawLine).trim() !== '') {
     const direct = Number(rawLine);
     if (Number.isFinite(direct)) return direct;
   }
-  const text = [
-    market?.specifier,
-    market?.desc,
-    market?.name,
-    market?.title
-  ].map(value => String(value || '')).join(' ');
-  const match = text.match(/(?:total|line|over|under)[^0-9]{0,8}([0-9]+(?:\.[0-9]+)?)/i)
-    || text.match(/\b([0-9]+(?:\.[0-9]+)?)\b/);
+  const text = [market?.desc, market?.name, market?.title, specifierText]
+    .map(value => String(value || '')).join(' ');
+  const match = text.match(/(?:total|line|over|under)[^0-9]{0,8}([0-9]+(?:\\.[0-9]+)?)/i)
+    || text.match(/\\b([0-9]+(?:\\.[0-9]+)?)\\b/);
   return match ? Number(match[1]) : null;
 }
 
@@ -191,8 +192,7 @@ async function collectBasketballEvents(context,targetIds){
 function findBasketballSelection(leg,event){
   const side=String(leg?.pick||'').toLowerCase(),line=Number(leg?.line);
   if(!['over','under'].includes(side)||!Number.isFinite(line)||line<100||line>300||String(leg?.market_id||'225')!=='225')return{error:'Only an exact SportyBet full-game market-225 Over/Under selection is supported.'};
-  const names=[canonicalParticipant(leg?.player_1),canonicalParticipant(leg?.player_2)].sort(),current=[canonicalParticipant(event?.homeTeamName),canonicalParticipant(event?.awayTeamName)].sort();
-  if(!names[0]||!names[1]||names[0]!==current[0]||names[1]!==current[1])return{error:'Basketball participants changed in the current SportyBet catalogue.'};
+  if(!sameParticipantPair([leg?.player_1,leg?.player_2],event))return{error:'Basketball participants changed in the current SportyBet catalogue.'};
   const requestedStart=Date.parse(String(leg?.start_time||'')),currentStart=Number(event?.estimateStartTime||0);
   if(Number.isFinite(requestedStart)&&currentStart&&Math.abs(requestedStart-currentStart)>45*60*1000)return{error:'Basketball fixture start time changed; refresh the ticket.'};
   for(const market of (Array.isArray(event?.markets)?event.markets:[])){
@@ -209,14 +209,31 @@ function findBasketballSelection(leg,event){
 }
 
 function canonicalParticipant(value) {
-  return String(value || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/&/g, ' and ')
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim()
-    .replace(/\s+/g, ' ');
+  let raw = String(value || '').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase();
+  // Some bookmaker feeds return "Surname, Firstname".
+  if (raw.includes(',')) {
+    const parts = raw.split(',').map(part => part.trim()).filter(Boolean);
+    if (parts.length === 2) raw = parts[1] + ' ' + parts[0];
+  }
+  return raw.replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim().replace(/\\s+/g, ' ');
+}
+
+function participantNameMatches(first, second) {
+  const a = canonicalParticipant(first);
+  const b = canonicalParticipant(second);
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const left = a.split(' ');
+  const right = b.split(' ');
+  if (left.length < 2 || right.length < 2) return false;
+  const leftSurname = left[left.length - 1];
+  const rightSurname = right[right.length - 1];
+  const leftFirst = left[0];
+  const rightFirst = right[0];
+  // Accept a first initial only when both the surname and initial agree.
+  return leftSurname === rightSurname &&
+    (leftFirst.length === 1 || rightFirst.length === 1) &&
+    leftFirst[0] === rightFirst[0];
 }
 
 function legParticipants(leg) {
@@ -232,14 +249,13 @@ function legParticipants(leg) {
   return [first, second];
 }
 
-function sameParticipantPair(first, second, event) {
-  const requested = first.map(canonicalParticipant).sort();
-  const current = [
-    canonicalParticipant(event?.homeTeamName),
-    canonicalParticipant(event?.awayTeamName)
-  ].sort();
-  return Boolean(requested[0] && requested[1] && current[0] && current[1] &&
-    requested[0] === current[0] && requested[1] === current[1]);
+function sameParticipantPair(first, event) {
+  const [a, b] = Array.isArray(first) ? first : [];
+  const home = event?.homeTeamName || '';
+  const away = event?.awayTeamName || '';
+  return Boolean(a && b && home && away &&
+    ((participantNameMatches(a, home) && participantNameMatches(b, away)) ||
+     (participantNameMatches(a, away) && participantNameMatches(b, home))));
 }
 
 function normalizeFixture(value) {
@@ -445,8 +461,8 @@ function findWinnerSelection(leg, event) {
   const selected = canonicalParticipant(selectedName);
   const home = canonicalParticipant(event?.homeTeamName);
   const away = canonicalParticipant(event?.awayTeamName);
-  const selectedIsHome = selected ? selected === home : pick === 'p1';
-  const selectedIsAway = selected ? selected === away : pick === 'p2';
+  const selectedIsHome = selected ? participantNameMatches(selectedName, event?.homeTeamName) : pick === 'p1';
+  const selectedIsAway = selected ? participantNameMatches(selectedName, event?.awayTeamName) : pick === 'p2';
 
   if ((pick === 'p1' || pick === 'p2') && selected && !selectedIsHome && !selectedIsAway) {
     return { error: 'The selected tennis/football participant no longer matches the current SportyBet event.' };
@@ -476,7 +492,7 @@ function findWinnerSelection(leg, event) {
       if (!active || !String(o?.id || '') || !Number.isFinite(odds) || odds <= 1) return false;
 
       if (pick === 'draw') return /^(draw|x)$/.test(name);
-      if (selected && name === selected) return true;
+      if (selected && participantNameMatches(selectedName, rawName)) return true;
       if (pick === 'p1' || pick === 'p2') {
         const homeLabel = /^(home|1|p1|player 1)$/.test(name);
         const awayLabel = /^(away|2|p2|player 2)$/.test(name);
