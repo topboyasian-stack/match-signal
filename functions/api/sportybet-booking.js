@@ -603,7 +603,8 @@ async function handlePost(context) {
         match: String(item?.match || (String(item?.player_1 || '') + ' vs ' + String(item?.player_2 || '')))
       }));
       const ids = legs.map(leg => leg.event_id);
-      if (legs.some(leg => {
+      const basketballProviderIds = legs.filter(leg => leg.sport === 'basketball').map(leg => leg.sportybet_event_id);
+      if (new Set(basketballProviderIds).size !== basketballProviderIds.length || legs.some(leg => {
           if (!leg.event_id || !leg.player_1 || !leg.player_2) return true;
           if (leg.sport === 'basketball') {
             return leg.market !== 'total' || !['over', 'under'].includes(leg.pick) ||
