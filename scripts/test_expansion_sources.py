@@ -161,6 +161,42 @@ def test_v4_uses_strictly_prior_scores_pace_and_efficiency():
         p.NOW=old_now
 
 
+def test_default_nba_prediction_uses_frozen_v51_calibration():
+    from expansion_pipeline import NBA_TOTALS_PACE_BLEND_WEIGHT, NBA_TOTALS_BIAS_CORRECTION
+
+    history = []
+    for i in range(8):
+        home, away = ("Home Team", "Away Team") if i % 2 == 0 else ("Away Team", "Home Team")
+        history.append({
+            "event_id": f"calibration-{i}",
+            "date": f"2026-10-{10 + i:02d}T00:00:00+00:00",
+            "home": home, "away": away,
+            "home_score": 108 + i, "away_score": 104 + i,
+            "home_pace": 99 + (i % 2), "away_pace": 100 - (i % 2),
+            "home_off_rating": 112 + i, "away_off_rating": 110 + i,
+            "home_def_rating": 108 + i, "away_def_rating": 109 + i,
+            "home_possessions": 98, "away_possessions": 99,
+        })
+    fixture = {
+        "event_id": "calibration-live-check",
+        "date": "2026-10-31T00:00:00+00:00",
+        "home": "Home Team", "away": "Away Team",
+    }
+    forecast = p.nba_predict(fixture, history)
+    features = forecast["total_model_features"]
+    assert features["pace_efficiency_available"] is True
+    assert features["pace_blend_weight"] == NBA_TOTALS_PACE_BLEND_WEIGHT == 0.8
+    assert features["bias_correction_points"] == NBA_TOTALS_BIAS_CORRECTION == 0.3542
+    expected = (
+        features["score_form_reference_total"]
+        + NBA_TOTALS_PACE_BLEND_WEIGHT * (
+            features["pace_efficiency_total"] - features["score_form_reference_total"]
+        )
+        - NBA_TOTALS_BIAS_CORRECTION
+    )
+    assert abs(forecast["expected_total"] - expected) < 1e-9
+
+
 def test_v2_normalizer_keeps_only_valid_regular_season_pace_metrics():
     now=datetime(2026,10,31,12,tzinfo=UTC)
     rows=p.normalize_nba_duckdb_rows([

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { onRequest } from '../functions/api/sportybet-booking.js';
 
-const MODEL = 'nba-total-v5-pace-efficiency-calibrated';
+const MODEL = 'nba-total-v5.1-pace-efficiency-calibrated';
 const CUTOFF = '2026-11-02T02:00:00+00:00';
 
 function buildEvidence(fixtures) {

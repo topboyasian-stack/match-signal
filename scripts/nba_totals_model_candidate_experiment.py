@@ -258,7 +258,7 @@ def run_experiment(history):
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "paper_only": True,
         "experiment": "NBA_TOTALS_NONLINEAR_RESIDUAL_CANDIDATE_V1",
-        "production_model_unchanged": "nba-total-v5-pace-efficiency-calibrated",
+        "production_model_unchanged": "nba-total-v5.1-pace-efficiency-calibrated",
         "prospective_holdout_cutoff_utc": EVALUATION_CUTOFF_UTC.isoformat(),
         "prospective_holdout_used": False,
         "market_prices_used_as_model_inputs": False,

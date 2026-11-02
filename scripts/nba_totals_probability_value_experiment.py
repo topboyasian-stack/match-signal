@@ -13,7 +13,7 @@ import random
 from datetime import datetime, timezone
 from pathlib import Path
 
-from expansion_pipeline import dt as parse_time
+from expansion_pipeline import (NBA_TOTALS_MODEL_VERSION, NBA_TOTALS_PACE_BLEND_WEIGHT, NBA_TOTALS_BIAS_CORRECTION, dt as parse_time)
 from nba_totals_walk_forward import (
     EVALUATION_CUTOFF_UTC,
     HISTORY,
@@ -50,20 +50,15 @@ def _blend(row, weight):
 
 
 def _tune_v5(training_rows):
-    grid = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
-    candidates = []
-    for weight in grid:
-        errors = [
-            _blend(row, weight) - float(row["actual_total"])
-            for row in training_rows
-        ]
-        mae = sum(abs(error) for error in errors) / len(errors) if errors else float("inf")
-        rmse = math.sqrt(sum(error * error for error in errors) / len(errors)) if errors else float("inf")
-        candidates.append((mae, rmse, weight))
-    selected = min(candidates)[2] if candidates else 0.0
-    errors = [_blend(row, selected) - float(row["actual_total"]) for row in training_rows]
-    bias = sum(errors) / len(errors) if errors else 0.0
-    return selected, bias
+    """Return the frozen v5.1 production parameters used by every forecast path.
+
+    The parameters were selected on the original pre-2026-02-10 training window
+    and then frozen before calibration/validation observations. Do not retune them
+    on later calibration or prospective holdout outcomes.
+    """
+    if len(training_rows) < 300:
+        raise RuntimeError(f"Insufficient v5.1 training rows: {len(training_rows)}")
+    return NBA_TOTALS_PACE_BLEND_WEIGHT, NBA_TOTALS_BIAS_CORRECTION
 
 
 def _prediction(row, weight, bias):
@@ -665,7 +660,7 @@ def prospective_snapshot_coverage(settled_rows, snapshots, cutoff=EVALUATION_CUT
     after_cutoff = []
     verified_fresh = []
     for snapshot in all_snapshots:
-        if snapshot.get("totals_model_version") != "nba-total-v5-pace-efficiency-calibrated":
+        if snapshot.get("totals_model_version") != "nba-total-v5.1-pace-efficiency-calibrated":
             continue
         published = parse_time(snapshot.get("published_at"))
         if not published or published < cutoff:
@@ -709,8 +704,8 @@ def prospective_snapshot_coverage(settled_rows, snapshots, cutoff=EVALUATION_CUT
             snap_market = ((snapshot.get("markets") or {}).get("total_ou") or {})
             row_quote = parse_time(row.get("quote_timestamp"))
             checks = [
-                row.get("totals_model_version") == "nba-total-v5-pace-efficiency-calibrated",
-                snapshot.get("totals_model_version") == "nba-total-v5-pace-efficiency-calibrated",
+                row.get("totals_model_version") == "nba-total-v5.1-pace-efficiency-calibrated",
+                snapshot.get("totals_model_version") == "nba-total-v5.1-pace-efficiency-calibrated",
                 snapshot.get("publication_snapshot_verified") is True,
                 snapshot.get("publication_snapshot_kind") == "immutable_sportybet_market_225_revision",
                 str(snapshot.get("event_id") or "").strip() == event_id,
@@ -881,7 +876,7 @@ def run_experiment(history, ledger, predictions, now=None, snapshots=None):
     )
 
     settled = verified_market_records(ledger)
-    v5_settled = [row for row in settled if row.get("totals_model_version") == "nba-total-v5-pace-efficiency-calibrated"]
+    v5_settled = [row for row in settled if row.get("totals_model_version") == "nba-total-v5.1-pace-efficiency-calibrated"]
     clv_audit = snapshot_clv_audit(v5_settled, snapshots or [])
     settled_audit = []
     for row in v5_settled:
@@ -924,7 +919,7 @@ def run_experiment(history, ledger, predictions, now=None, snapshots=None):
     for prediction in predictions or []:
         if not isinstance(prediction, dict):
             continue
-        if prediction.get("totals_model_version") != "nba-total-v5-pace-efficiency-calibrated":
+        if prediction.get("totals_model_version") != "nba-total-v5.1-pace-efficiency-calibrated":
             continue
         match = _valid_sportybet_market(prediction, now)
         if not match:
@@ -977,7 +972,7 @@ def run_experiment(history, ledger, predictions, now=None, snapshots=None):
     prospective_snapshots = [
         row for row in (snapshots or [])
         if isinstance(row, dict)
-        and row.get("totals_model_version") == "nba-total-v5-pace-efficiency-calibrated"
+        and row.get("totals_model_version") == "nba-total-v5.1-pace-efficiency-calibrated"
         and parse_time(row.get("published_at")) is not None
         and parse_time(row.get("published_at")) >= EVALUATION_CUTOFF_UTC
     ]
@@ -1007,7 +1002,7 @@ def run_experiment(history, ledger, predictions, now=None, snapshots=None):
         "generated_at": now.isoformat(),
         "paper_only": True,
         "experiment": "NBA_TOTALS_EMPIRICAL_RESIDUAL_VALUE_V3",
-        "model_version": "nba-total-v5-pace-efficiency-calibrated",
+        "model_version": "nba-total-v5.1-pace-efficiency-calibrated",
         "model_projection_market_blind": True,
         "prospective_holdout_cutoff_utc": EVALUATION_CUTOFF_UTC.isoformat(),
         "prospective_holdout_used_for_calibration": False,
@@ -1019,6 +1014,7 @@ def run_experiment(history, ledger, predictions, now=None, snapshots=None):
             "calibration_residuals_n": fitted["calibration_n"],
             "validation_n": fitted["validation_n"],
             "pace_blend_weight": fitted["weight"],
+            "parameter_source": "Frozen v5.1 model parameters shared with production live predictions and fixed-cutoff evaluation",
             "bias_correction_points": round(fitted["bias"], 4),
             "training_period": fitted["training_period"],
             "calibration_period": fitted["calibration_period"],

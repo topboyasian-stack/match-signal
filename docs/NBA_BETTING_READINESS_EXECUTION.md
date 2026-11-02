@@ -206,3 +206,12 @@ This checkpoint supersedes the earlier 03:58 UTC production/ticket notes above. 
 3. Keep the release gate locked. Continue the existing exact market-225 capture and official ESPN settlement process as games become available; preserve immutable snapshots and one observation per unique ESPN fixture.
 4. Continue only evidence-based model research. Do not promote V6/ExtraTrees or change V5 based on a small, statistically unstable historical improvement. Any new candidate must use timestamp-safe features, chronological validation, paired fixture-level uncertainty and no bookmaker-price leakage.
 5. Do not mark betting-ready until the existing 100 prospective settled market selections, 30 unique probability scores, positive ROI/95% lower bound/market-favourite comparison, positive probability and line CLV, and 100-game post-cutoff MAE/bias gates all pass. Do not change the frozen cutoff or thresholds.
+
+
+## Production calibration alignment correction — 2026-11-02
+
+- Corrected a material model-path mismatch: live NBA predictions were calling `nba_predict()` with the uncalibrated defaults (pace blend 0.0, bias correction 0.0), while the probability experiment had been using the frozen calibrated parameters (pace blend 0.8, bias correction 0.3542). Those are different forecast models and must not share one evidence cohort.
+- Introduced model identity `nba-total-v5.1-pace-efficiency-calibrated`. Live publication now defaults to the frozen 0.8 pace/efficiency blend and subtracts 0.3542 points. The fixed-cutoff evaluator and residual-probability calibration use those same frozen parameters; no parameter re-fit occurs on calibration or prospective holdout outcomes.
+- Updated the Basketball client and server booking release checks to require the v5.1 model identity. Historical v5 snapshots/settlements remain historical only and are not relabelled or counted as v5.1 evidence. Fresh v5.1 SportyBet snapshots and settled fixtures form a new, auditable cohort.
+- Added regressions for the live forecast defaults, fixed-cutoff evaluator parameters, residual-calibration parameter identity, and the matching client/server release model version.
+- The frozen prospective cutoff remains `2026-11-02T02:00:00+00:00`; no sample-size or performance gate was relaxed. NBA remains `RESEARCH_ONLY` until the prospective model, probability, ROI, CLV, settlement and booking release gates pass.

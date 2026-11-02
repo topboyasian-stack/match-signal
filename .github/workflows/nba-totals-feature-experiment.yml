@@ -53,7 +53,7 @@ jobs:
           assert report.get("prospective_holdout_used") is False
           assert report.get("prospective_holdout_cutoff_utc") == "2026-11-02T02:00:00+00:00"
           assert report.get("market_prices_used_as_model_inputs") is False
-          assert report.get("production_model_unchanged") == "nba-total-v5-pace-efficiency-calibrated"
+          assert report.get("production_model_unchanged") == "nba-total-v5.1-pace-efficiency-calibrated"
           assert report.get("historical_validation", {}).get("candidate_features")
           print("Training:", report["training_period"]["n"])
           print("Historical validation:", report["historical_validation_period"]["n"])

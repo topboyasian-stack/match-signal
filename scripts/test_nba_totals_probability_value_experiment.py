@@ -3,6 +3,7 @@
 from datetime import datetime, timedelta, timezone
 
 from nba_totals_probability_value_experiment import (
+    _tune_v5,
     _settlement_probabilities,
     _value_decision,
     snapshot_clv_audit,
@@ -12,6 +13,20 @@ from nba_totals_probability_value_experiment import (
     run_experiment,
 )
 from nba_totals_walk_forward import EVALUATION_CUTOFF_UTC
+from expansion_pipeline import NBA_TOTALS_PACE_BLEND_WEIGHT, NBA_TOTALS_BIAS_CORRECTION
+
+
+def test_probability_calibration_uses_the_frozen_production_parameters():
+    training_rows = [
+        {"base_total": 220.0, "pace_total": 222.0, "pace_available": True, "actual_total": 221.0}
+        for _ in range(300)
+    ]
+    assert _tune_v5(training_rows) == (
+        NBA_TOTALS_PACE_BLEND_WEIGHT,
+        NBA_TOTALS_BIAS_CORRECTION,
+    )
+    assert NBA_TOTALS_PACE_BLEND_WEIGHT == 0.8
+    assert NBA_TOTALS_BIAS_CORRECTION == 0.3542
 
 
 def test_probability_mass_and_integer_push():
@@ -137,7 +152,7 @@ def test_prospective_probability_sample_requires_exact_snapshot_linkage():
         "event_id": "event-prospective",
         "start_time": start,
         "published_at": published,
-        "totals_model_version": "nba-total-v5-pace-efficiency-calibrated",
+        "totals_model_version": "nba-total-v5.1-pace-efficiency-calibrated",
         "publication_snapshot_id": "prospective-snapshot-1",
         "publication_snapshot_verified": True,
         "publication_snapshot_kind": "immutable_sportybet_market_225_revision",
@@ -157,7 +172,7 @@ def test_prospective_probability_sample_requires_exact_snapshot_linkage():
     }
     record = {
         "event_id": "event-prospective",
-        "totals_model_version": "nba-total-v5-pace-efficiency-calibrated",
+        "totals_model_version": "nba-total-v5.1-pace-efficiency-calibrated",
         "start_time": start,
         "published_at": published,
         "publication_snapshot_id": "prospective-snapshot-1",
@@ -313,6 +328,7 @@ def test_full_report_keeps_prospective_holdout_locked():
 
 
 if __name__ == "__main__":
+    test_probability_calibration_uses_the_frozen_production_parameters()
     test_probability_mass_and_integer_push()
     test_snapshot_clv_uses_only_later_exact_pregame_quote()
     test_snapshot_clv_excludes_old_update_from_near_close_sample()

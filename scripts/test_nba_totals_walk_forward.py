@@ -6,7 +6,7 @@ from nba_totals_walk_forward import (
     verified_market_records, split_at_fixed_cutoff, market_record_audit,
     EVALUATION_CUTOFF_UTC,
 )
-from expansion_pipeline import NBA_TOTALS_MODEL_VERSION
+from expansion_pipeline import (NBA_TOTALS_MODEL_VERSION, NBA_TOTALS_PACE_BLEND_WEIGHT, NBA_TOTALS_BIAS_CORRECTION)
 
 
 def game(event_id, day, home, away, hs, aws):
@@ -28,6 +28,18 @@ def test_walk_forward_does_not_use_current_or_future_games():
     assert baseline[0]["event_id"] == with_future[0]["event_id"] == "g3"
     assert baseline[0]["model_total"] == with_future[0]["model_total"]
     assert baseline[0]["prior_games"] == 2
+
+
+def test_evaluator_uses_the_same_frozen_v51_parameters_as_live_model():
+    rows = [
+        game(f"cal-{i}", (i % 28) + 1, f"Team {i % 4}", f"Team {(i + 1) % 4}", 105 + i % 7, 102 + i % 5)
+        for i in range(1, 29)
+    ]
+    report = evaluate(rows, [])
+    assert report["model_version"] == NBA_TOTALS_MODEL_VERSION
+    assert report["model_calibration"]["selected_pace_blend_weight"] == NBA_TOTALS_PACE_BLEND_WEIGHT
+    assert report["model_calibration"]["production_bias_correction"] == NBA_TOTALS_BIAS_CORRECTION
+    assert NBA_TOTALS_MODEL_VERSION == "nba-total-v5.1-pace-efficiency-calibrated"
 
 
 def test_market_evidence_rejects_unverified_and_old_model_records():
@@ -237,6 +249,7 @@ def test_evaluator_never_promotes_without_market_holdout():
 
 if __name__ == "__main__":
     test_walk_forward_does_not_use_current_or_future_games()
+    test_evaluator_uses_the_same_frozen_v51_parameters_as_live_model()
     test_market_evidence_rejects_unverified_and_old_model_records()
     test_publication_capture_is_separate_from_settlement_and_roi()
     test_capture_status_is_partial_until_every_v5_forecast_has_a_frozen_price_pair()

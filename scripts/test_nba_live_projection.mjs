@@ -60,7 +60,7 @@ assert.equal(api.verifiedTotalRecord({ ...verified, quote_fresh_at_publication: 
 assert.equal(api.verifiedTotalRecord({ ...verified, sportybet_event_id: "" }), false);
 assert.equal(api.verifiedTotalRecord({ ...verified, quote_capture_basis: "unknown" }), false);
 const cutoff = "2026-11-02T02:00:00+00:00";
-const modelVersion = "nba-total-v5-pace-efficiency-calibrated";
+const modelVersion = "nba-total-v5.1-pace-efficiency-calibrated";
 const now = Date.now();
 const startTime = new Date(now + 2 * 60 * 60 * 1000).toISOString();
 const quoteTimestamp = new Date(now - 2 * 60 * 1000).toISOString();

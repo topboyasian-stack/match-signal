@@ -10,8 +10,10 @@ ROOT=Path(__file__).resolve().parents[1]; DATA=ROOT/'data'; DATA.mkdir(exist_ok=
 BASE='https://site.api.espn.com/apis/site/v2/sports'; NOW=datetime.now(timezone.utc)
 S=requests.Session();S.headers.update({'User-Agent':'Mozilla/5.0 (compatible; MatchSignal/1.0)'})
 NBA_START=datetime(2026,10,20,tzinfo=timezone.utc)
-NBA_TOTALS_MODEL_VERSION="nba-total-v5-pace-efficiency-calibrated"
-NBA_TOTALS_MODEL_LABEL="NBA totals v5: development-calibrated score-form plus team-game pace/efficiency; no bookmaker inputs"
+NBA_TOTALS_MODEL_VERSION="nba-total-v5.1-pace-efficiency-calibrated"
+NBA_TOTALS_MODEL_LABEL="NBA totals v5.1: frozen 0.8 pace/efficiency blend minus 0.3542 points; no bookmaker inputs"
+NBA_TOTALS_PACE_BLEND_WEIGHT=0.8
+NBA_TOTALS_BIAS_CORRECTION=0.3542
 NBA_PARQUET='https://raw.githubusercontent.com/llimllib/nba_data/main/data/gamelogs.parquet'
 NBA_DUCKDB_CATALOG='https://basketball-data.billmill.org/nba/nba.duckdb'
 NBA_ELO_CSV='https://datahub.io/fivethirtyeight/nba-elo/_r/-/data/nbaallelo.csv'
@@ -367,7 +369,7 @@ def nba_total_components(r,hist):
   'recency_half_life_days':30,'recent_team_total_window':12
  }
 
-def nba_predict(r,hist,pace_blend_weight=0.0,bias_adjustment=0.0):
+def nba_predict(r,hist,pace_blend_weight=NBA_TOTALS_PACE_BLEND_WEIGHT,bias_adjustment=NBA_TOTALS_BIAS_CORRECTION):
  components=nba_total_components(r,hist)
  try:weight=max(0.0,min(1.0,float(pace_blend_weight)))
  except (TypeError,ValueError):weight=0.0

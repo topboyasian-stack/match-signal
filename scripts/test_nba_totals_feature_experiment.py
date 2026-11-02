@@ -121,7 +121,7 @@ def test_full_experiment_uses_historical_validation_and_preserves_future_holdout
     assert report["prospective_holdout_cutoff_utc"] == "2026-11-02T02:00:00+00:00"
     assert report["training_period"]["n"] >= 100
     assert report["historical_validation_period"]["n"] >= 100
-    assert report["production_model_unchanged"] == "nba-total-v5-pace-efficiency-calibrated"
+    assert report["production_model_unchanged"] == "nba-total-v5.1-pace-efficiency-calibrated"
     assert report["market_prices_used_as_model_inputs"] is False
     assert len(report["historical_validation"]["candidate_features"]) == 12
 

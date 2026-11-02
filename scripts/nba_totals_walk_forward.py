@@ -14,7 +14,7 @@ import random
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from expansion_pipeline import NBA_TOTALS_MODEL_VERSION, nba_total_components, dt as parse_time
+from expansion_pipeline import (NBA_TOTALS_MODEL_VERSION, NBA_TOTALS_PACE_BLEND_WEIGHT, NBA_TOTALS_BIAS_CORRECTION, nba_total_components, dt as parse_time)
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
@@ -435,22 +435,15 @@ def evaluate(history, ledger, snapshots=None, predictions=None, as_of=None):
     forecasts = build_forecasts(history)
     development, holdout = split_at_fixed_cutoff(forecasts, "date")
 
-    # All tuning remains strictly before the frozen prospective cutoff.
-    grid = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
-    candidates = []
-    for weight in grid:
-        candidate_predictions = [_blend_total(row, weight) for row in development]
-        actuals = [float(row["actual_total"]) for row in development]
-        errors = [prediction - actual for prediction, actual in zip(candidate_predictions, actuals)]
-        mae = sum(abs(error) for error in errors) / len(errors) if errors else float("inf")
-        rmse = math.sqrt(sum(error * error for error in errors) / len(errors)) if errors else float("inf")
-        candidates.append((mae, rmse, weight))
-    selected_weight = min(candidates)[2] if candidates else 0.0
+    # v5.1 is a frozen model specification shared with live publication and
+    # residual-probability calibration. Re-fitting these parameters on the full
+    # development window here would evaluate a different model from production.
+    selected_weight = NBA_TOTALS_PACE_BLEND_WEIGHT
+    bias_correction = NBA_TOTALS_BIAS_CORRECTION
     development_errors = [
         _blend_total(row, selected_weight) - float(row["actual_total"])
         for row in development
     ]
-    bias_correction = sum(development_errors) / len(development_errors) if development_errors else 0.0
 
     raw_holdout = [
         {**row, "forecast_total": _blend_total(row, selected_weight)}
@@ -525,7 +518,7 @@ def evaluate(history, ledger, snapshots=None, predictions=None, as_of=None):
             "development_raw_bias": round(sum(development_errors) / len(development_errors), 4) if development_errors else None,
             "pace_feature_development_games": pace_development_n,
             "pace_feature_coverage": round(pace_development_n / len(development), 4) if development else 0.0,
-            "selection_rule": "minimum development MAE across a predeclared pace blend grid; residual bias estimated on pre-cutoff development only",
+            "selection_rule": "frozen v5.1 production calibration selected on the pre-registered training window; applied identically to live forecasts and holdout evaluation",
         },
         "publication_capture": publication_capture,
         "verified_market_records": len(market_rows),

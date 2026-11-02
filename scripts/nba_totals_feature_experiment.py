@@ -471,7 +471,7 @@ def run_experiment(history):
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "paper_only": True,
         "experiment": "NBA_TOTALS_V6_HISTORICAL_FEATURE_ABLATION_V3",
-        "production_model_unchanged": "nba-total-v5-pace-efficiency-calibrated",
+        "production_model_unchanged": "nba-total-v5.1-pace-efficiency-calibrated",
         "prospective_holdout_cutoff_utc": EVALUATION_CUTOFF_UTC.isoformat(),
         "prospective_holdout_used": False,
         "historical_validation_cutoff_utc": HISTORICAL_VALIDATION_CUTOFF_UTC.isoformat(),
