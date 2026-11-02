@@ -4,8 +4,10 @@ from datetime import datetime, timedelta, timezone
 
 from nba_totals_feature_experiment import (
     venue_total_from_history,
+    recent_team_stats,
     fit_feature_adjustment,
     score_predictions,
+    paired_mae_stability,
     run_experiment,
 )
 from nba_totals_walk_forward import EVALUATION_CUTOFF_UTC
@@ -29,6 +31,42 @@ def test_venue_split_does_not_use_future_games():
         cutoff,
     )
     assert baseline == with_future
+
+
+def test_recent_team_form_ignores_future_games():
+    history = [
+        {"date": "2026-01-01T00:00:00+00:00", "home": "A", "away": "B",
+         "home_score": 110, "away_score": 100, "home_pace": 99, "home_off_rating": 111,
+         "home_def_rating": 108, "home_possessions": 100},
+        {"date": "2026-01-02T00:00:00+00:00", "home": "C", "away": "A",
+         "home_score": 105, "away_score": 115, "away_pace": 101, "away_off_rating": 116,
+         "away_def_rating": 106, "away_possessions": 101},
+    ]
+    cutoff = "2026-01-03T00:00:00+00:00"
+    baseline = recent_team_stats("A", history, cutoff, window=10)
+    with_future = recent_team_stats(
+        "A",
+        history + [{
+            "date": "2026-01-04T00:00:00+00:00", "home": "A", "away": "B",
+            "home_score": 300, "away_score": 300, "home_pace": 120,
+            "home_off_rating": 150, "home_def_rating": 150, "home_possessions": 120,
+        }],
+        cutoff,
+        window=10,
+    )
+    assert baseline == with_future
+    assert baseline["games"] == 2
+    assert baseline["pf"] == 112.5
+
+
+def test_paired_bootstrap_requires_positive_improvement():
+    rows = [{"actual_total": 200.0 + i} for i in range(40)]
+    baseline = [row["actual_total"] + 3.0 for row in rows]
+    candidate = [row["actual_total"] + 1.0 for row in rows]
+    result = paired_mae_stability(rows, baseline, candidate, resamples=1000, blocks=4)
+    assert result["mean_mae_improvement"] == 2.0
+    assert result["ci95_lower"] == 2.0
+    assert result["positive_chronological_blocks"] == 4
 
 
 def test_ridge_feature_adjustment_uses_training_fit():
@@ -90,7 +128,9 @@ def test_full_experiment_uses_historical_validation_and_preserves_future_holdout
 
 if __name__ == "__main__":
     test_venue_split_does_not_use_future_games()
+    test_recent_team_form_ignores_future_games()
     test_ridge_feature_adjustment_uses_training_fit()
+    test_paired_bootstrap_requires_positive_improvement()
     test_metric_calculation_and_frozen_prospective_boundary()
     test_full_experiment_uses_historical_validation_and_preserves_future_holdout()
-    print("NBA totals v6 feature experiment tests: PASS (4 groups)")
+    print("NBA totals v6 feature experiment tests: PASS (6 groups)")
