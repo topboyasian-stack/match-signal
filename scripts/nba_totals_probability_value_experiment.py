@@ -357,9 +357,8 @@ def run_experiment(history, ledger, predictions, now=None):
         if parse_time(row.get("published_at")) is not None
         and parse_time(row.get("published_at")) >= EVALUATION_CUTOFF_UTC
     ]
-    authorized = (
-        calibration_ok
-        and len(prospective_bets) >= MIN_PROSPECTIVE_SETTLED_BETS
+    prospective_minimum_sample_reached = (
+        len(prospective_bets) >= MIN_PROSPECTIVE_SETTLED_BETS
     )
     return {
         "generated_at": now.isoformat(),
@@ -391,10 +390,11 @@ def run_experiment(history, ledger, predictions, now=None):
         "upcoming_value_diagnostics_count": len(upcoming),
         "upcoming_predictions_without_exact_fresh_pair": skipped_without_fresh_pair,
         "prospective_settled_market_bets_after_cutoff": len(prospective_bets),
-        "live_value_decisions_authorized": authorized,
+        "prospective_minimum_sample_reached": prospective_minimum_sample_reached,
+        "live_value_decisions_authorized": False,
         "release_decision": "RESEARCH_ONLY",
         "release_reason": (
-            "Probability calibration and prospective sample thresholds have not authorized NBA betting or ticket generation. "
+            "This research experiment never authorizes betting or ticket generation; the separate model and market release gates must all pass first. "
             "This report is diagnostic only; the shared Basketball ticket gate remains locked."
         ),
         "market_prices_used_as_model_inputs": False,
