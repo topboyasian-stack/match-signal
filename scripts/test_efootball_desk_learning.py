@@ -53,7 +53,8 @@ def main():
         True, "2026-11-01T12:31:00+00:00", probability=0.8,
     ))
 
-    result = recent_fixture_window(rows, window=2)
+    gt_rows = [item for item in rows if item["product"] == "efootball_gt"]
+    result = recent_fixture_window(gt_rows, window=2)
     assert result["n"] == 2, result
     assert result["unique_fixtures"] == 2, result
     assert result["decision_count"] == 4, result
@@ -64,6 +65,13 @@ def main():
     assert result["window_unit"] == "unique_product_fixture_clusters", result
     assert result["first_settled_at"] == "2026-11-01T12:10:00+00:00", result
     assert result["last_settled_at"] == "2026-11-01T12:30:00+00:00", result
+
+    adriatic = recent_fixture_window(
+        [item for item in rows if item["product"] == "efootball_adriatic"], window=50
+    )
+    assert adriatic["n"] == 1 and adriatic["decision_count"] == 1, adriatic
+    mixed = recent_fixture_window(rows, window=50)
+    assert mixed["n"] == 4, mixed  # same names/time in distinct products remain distinct
 
     empty = recent_fixture_window([], window=50)
     assert empty["n"] == 0 and empty["decision_count"] == 0, empty
