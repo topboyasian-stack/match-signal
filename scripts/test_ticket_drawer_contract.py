@@ -78,6 +78,18 @@ def main():
             "The booking endpoint must reject duplicate fixtures")
     require("Participant identity changed in SportyBet current catalogue." in api,
             "Football/Tennis participants must be matched to current SportyBet event identity")
+    require("function canonicalParticipant(value)" in api and ".normalize('NFD')" in api,
+            "Participant matching must normalize accented player names")
+    require("function sameParticipantPair(first, second, event)" in api and
+            "sameParticipantPair([first, second], event)" in api,
+            "Current Tennis event matching must accept the same two players in either order")
+    require("selectedIsHome" in api and "selectedIsAway" in api and
+            "The exact current SportyBet winner market or selected player outcome" in api,
+            "Tennis winner mapping must preserve the selected player after SportyBet reverses participant order")
+    require("function validationFailure(leg, reason)" in api and "validationFailure(leg," in api,
+            "Booking failures must identify the exact selection and validation reason")
+    require("errors.length?errors.join(' | ')" in drawer,
+            "The ticket drawer must display leg-specific validation before the generic API error")
     require("isOpenEvent(event)" in api and "buildSelection(leg, event)" in api,
             "Every selection must be revalidated for current event state and market/outcome IDs")
     require('id="basketball-builders"' not in basketball and "4 Odds Builders" not in basketball,
