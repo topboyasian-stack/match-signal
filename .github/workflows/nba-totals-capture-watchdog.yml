@@ -49,7 +49,8 @@ jobs:
         env:
           ACTIVE_CAPTURE_RUNS: ${{ steps.active_capture.outputs.count }}
         run: |
-          python - <<'PY' >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          python - <<'PY' | tee -a "$GITHUB_OUTPUT"
           import json
           import os
           import sys
