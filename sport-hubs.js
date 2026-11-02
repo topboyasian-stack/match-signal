@@ -775,7 +775,7 @@ function ticketAddMarkup(row){
     const totalOdds=Number(marketInsight?.book_odds??NaN);
     const sameMarketLine=marketInsight?.line==null||Math.abs(Number(marketInsight.line)-line)<1e-9;
     const sameMarketSide=!marketInsight?.pick||String(marketInsight.pick).toLowerCase()===totalPick;
-    actions.push('<button type="button" data-ms-ticket-add data-ticket-sport="'+safe(sport)+'" data-ticket-event="'+safe(eventId)+'" data-ticket-market="total" data-ticket-pick="'+safe(totalPick)+'" data-ticket-line="'+safe(line)+'" data-ticket-market-id="'+safe(total?.market_id||marketInsight?.market_id||'')+'" data-ticket-start="'+safe(start)+'" data-ticket-player1="'+safe(p1)+'" data-ticket-player2="'+safe(p2)+'" data-ticket-match="'+safe(p1+' vs '+p2)+'" data-ticket-odds="'+(Number.isFinite(totalOdds)&&totalOdds>1&&sameMarketLine&&sameMarketSide?safe(totalOdds):'')+'">Add '+totalPick.toUpperCase()+' '+safe(line)+' to ticket</button>');
+    actions.push('<button type="button" data-ms-ticket-add data-ticket-sport="'+safe(sport)+'" data-ticket-event="'+safe(eventId)+'" data-ticket-market="total" data-ticket-pick="'+safe(totalPick)+'" data-ticket-line="'+safe(line)+'" data-ticket-market-id="'+safe(total?.market_id||marketInsight?.market_id||(sport==='football'?'18':'189'))+'" data-ticket-start="'+safe(start)+'" data-ticket-player1="'+safe(p1)+'" data-ticket-player2="'+safe(p2)+'" data-ticket-match="'+safe(p1+' vs '+p2)+'" data-ticket-odds="'+(Number.isFinite(totalOdds)&&totalOdds>1&&sameMarketLine&&sameMarketSide?safe(totalOdds):'')+'">Add '+totalPick.toUpperCase()+' '+safe(line)+' to ticket</button>');
   }
   return actions.length?'<div class="ms-pred-ticket-action">'+actions.join('')+'</div>':'';
 }
