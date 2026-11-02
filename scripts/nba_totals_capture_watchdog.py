@@ -29,7 +29,7 @@ def capture_age_minutes(checked_at, now):
     return (current - checked).total_seconds() / 60
 
 
-def should_dispatch_capture(checked_at, now, active_capture_runs=0, max_age_minutes=15):
+def should_dispatch_capture(checked_at, now, active_capture_runs=0, max_age_minutes=10):
     """Dispatch only when capture evidence is stale and no capture is already active."""
     age = capture_age_minutes(checked_at, now)
     if age is None or age < -2:
