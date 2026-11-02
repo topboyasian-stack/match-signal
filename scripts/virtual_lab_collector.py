@@ -411,14 +411,142 @@ def actual_code(item,final_score):
     return "PUSH"
 
 
+def _settlement_start_ms(item, now_ms=None):
+    """Read the fixture kickoff recorded at capture time, never the collection time."""
+    raw=num(item.get("start_time_ms"))
+    if raw is not None and raw>0:
+        if raw<100000000000:
+            raw*=1000
+        return int(raw)
+    value=item.get("start_time")
+    if value:
+        try:
+            parsed=datetime.fromisoformat(str(value).replace("Z","+00:00"))
+            if parsed.tzinfo is None:
+                parsed=parsed.replace(tzinfo=timezone.utc)
+            return int(parsed.timestamp()*1000)
+        except (TypeError,ValueError,OverflowError):
+            pass
+    return None
+
+
+def _final_result_score(event):
+    """Reject live/incomplete/cancelled scores even if a provider includes score fields."""
+    if not isinstance(event,dict):
+        return None
+    status=str(event.get("matchStatus") or event.get("match_status") or event.get("status") or "").strip().lower()
+    if re.search(r"live|started|running|playing|in.?play|first half|second half|half time|not started|scheduled|upcoming|postponed|cancelled|canceled|abandoned|suspended",status):
+        return None
+    return score(event)
+
+
+def _result_windows_for_scope(items, now_ms):
+    """Partition one saved SportyBet scope into three-hour queries.
+
+    The provider rejects or truncates broad historical ranges. One query per
+    competition spanning its entire pending history silently starves old events.
+    Group decisions by fixture first so several totals lines share one query.
+    """
+    fixtures={}
+    for item in items:
+        event_id=str(item.get("event_id") or "").strip()
+        if not event_id:
+            continue
+        start_ms=_settlement_start_ms(item)
+        # Legacy observations without a recorded kickoff get a bounded fallback;
+        # they are still matched on the exact provider event ID before settlement.
+        if start_ms is None:
+            start_ms=now_ms-24*60*60*1000
+        previous=fixtures.get(event_id)
+        if previous is None:
+            fixtures[event_id]={
+                "event_id":event_id,
+                "start_ms":start_ms,
+                "products":{str(item.get("product") or "")},
+            }
+        else:
+            previous["start_ms"]=min(previous["start_ms"],start_ms)
+            previous["products"].add(str(item.get("product") or ""))
+
+    ordered=sorted(fixtures.values(),key=lambda x:(x["start_ms"],x["event_id"]))
+    buckets=[]
+    current=[]
+    max_span_ms=2*60*60*1000+15*60*1000
+    for fixture in ordered:
+        if current and fixture["start_ms"]-current[0]["start_ms"]>max_span_ms:
+            buckets.append(current)
+            current=[]
+        current.append(fixture)
+    if current:
+        buckets.append(current)
+
+    windows=[]
+    for bucket in buckets:
+        first=min(x["start_ms"] for x in bucket)
+        # Include 15m before the first kickoff and 30m after the latest kickoff.
+        # Buckets span no more than 2h15m, so every provider query is exactly 3h.
+        start_q=first-15*60*1000
+        end_q=start_q+3*60*60*1000
+        products=sorted({p for x in bucket for p in x["products"] if p})
+        windows.append({
+            "key":f"{start_q}|{len(bucket)}|{','.join(sorted(x['event_id'] for x in bucket)[:3])}",
+            "startTime":start_q,
+            "endTime":end_q,
+            "latest_start_ms":max(x["start_ms"] for x in bucket),
+            "products":products,
+            "event_ids":[x["event_id"] for x in bucket],
+        })
+    return windows
+
+
+def _balanced_recent_windows(windows, limit):
+    """Give both eFootball products a turn before a high-volume product fills the budget."""
+    product_order=("efootball_adriatic","efootball_gt","vfootball","zoom")
+    lanes={
+        product:sorted(
+            [w for w in windows if product in w["products"]],
+            key=lambda w:(-w["latest_start_ms"],w["key"])
+        )
+        for product in product_order
+    }
+    selected=[]
+    seen=set()
+    while len(selected)<limit:
+        progress=False
+        for product in product_order:
+            lane=lanes[product]
+            while lane and lane[0]["key"] in seen:
+                lane.pop(0)
+            if lane and len(selected)<limit:
+                window=lane.pop(0)
+                seen.add(window["key"])
+                selected.append(window)
+                progress=True
+        if not progress:
+            break
+    # Preserve any supported legacy/product scopes not named in the priority lanes.
+    extras=sorted(
+        [w for w in windows if w["key"] not in seen],
+        key=lambda w:(-w["latest_start_ms"],w["key"])
+    )
+    selected.extend(extras[:max(0,limit-len(selected))])
+    return selected
+
+
 def settle(pending):
     unresolved=[x for x in pending.values() if not x.get("settled") and x.get("event_id")]
+    empty_meta={
+        "sportybet_settled":0,"conflicts":0,"result_windows_available":0,
+        "recent_windows_queried":0,"historical_windows_queried":0,
+        "result_windows_queried":0,"result_events_seen":0,
+        "settlement_window_cursor":None,
+    }
     if not unresolved:
-        return [],0,[],{"sportybet_settled":0,"conflicts":0}
+        return [],0,[],empty_meta
 
-    # Keep the exact SportyBet result scope captured with the original fixture.
-    # Discovering scopes only from CURRENT upcoming events is unsafe because a
-    # competition disappears from the upcoming feed as soon as its fixtures finish.
+    now_ms=int(time.time()*1000)
+    previous_status=load_json(STATUS_PATH,{})
+    previous_cursor=str(previous_status.get("settlement_window_cursor") or "")
     groups={}
     for item in unresolved:
         source=str(item.get("source") or "")
@@ -429,48 +557,102 @@ def settle(pending):
                 source="vfootball"
         if source not in {"efootball","vfootball"}:
             continue
+        start_ms=_settlement_start_ms(item)
+        # Do not waste result requests on fixtures that have not kicked off yet.
+        if start_ms is not None and start_ms>now_ms-5*60*1000:
+            continue
         category_id=str(item.get("category_id") or "")
         tournament_id=str(item.get("tournament_id") or "")
-        start=int(num(item.get("start_time_ms")) or (time.time()*1000-86400000))
         key=(source,category_id,tournament_id)
-        prev=groups.get(key)
-        groups[key]=(start,start) if prev is None else (min(prev[0],start),max(prev[1],start))
+        groups.setdefault(key,[]).append(item)
+
+    windows=[]
+    for (source,category_id,tournament_id),items in groups.items():
+        for window in _result_windows_for_scope(items,now_ms):
+            window.update({
+                "source":source,
+                "category_id":category_id,
+                "tournament_id":tournament_id,
+                "key":f"{source}|{category_id}|{tournament_id}|{window['key']}",
+            })
+            windows.append(window)
+
+    # Always retry a bounded set of the newest result windows. The remaining
+    # historical backlog rotates by a persisted cursor so old competitions do
+    # not monopolize every run and fresh GT/Adriatic outcomes continue to arrive.
+    recent_cutoff=now_ms-48*60*60*1000
+    recent=[w for w in windows if w["latest_start_ms"]>=recent_cutoff]
+    historical=sorted(
+        [w for w in windows if w["latest_start_ms"]<recent_cutoff],
+        key=lambda w:(w["latest_start_ms"],w["key"])
+    )
+    selected_recent=_balanced_recent_windows(recent,48)
+    selected_historical=[]
+    if historical:
+        keys=[w["key"] for w in historical]
+        try:
+            prior_index=keys.index(previous_cursor)
+            first_index=(prior_index+1)%len(historical)
+        except ValueError:
+            first_index=0
+        take=min(16,len(historical))
+        selected_historical=[historical[(first_index+i)%len(historical)] for i in range(take)]
+    selected_keys={w["key"] for w in selected_recent}
+    selected=[w for w in selected_recent]
+    selected.extend(w for w in selected_historical if w["key"] not in selected_keys)
+    if selected_historical:
+        next_cursor=selected_historical[-1]["key"]
+    else:
+        next_cursor=previous_cursor or None
 
     index={}
     errors=[]
-
-    for (source,category_id,tournament_id),(start,end) in groups.items():
-        start_q=start-6*3600000
-        end_q=max(end+6*3600000,int(time.time()*1000))
+    result_events_seen=0
+    for window in sorted(selected,key=lambda w:(w["latest_start_ms"],w["source"],w["category_id"],w["tournament_id"])):
         for page_num in range(1,9):
             try:
                 params={
-                    "source":source,
+                    "source":window["source"],
                     "pageSize":100,
                     "pageNum":page_num,
-                    "startTime":start_q,
-                    "endTime":end_q,
+                    "startTime":window["startTime"],
+                    "endTime":window["endTime"],
                 }
-                # Critical fix: query the exact result scope saved with the
-                # original event whenever it is available. Fall back to proxy
-                # discovery only for legacy rows that lack scope IDs.
-                if category_id and tournament_id:
-                    params["categoryId"]=category_id
-                    params["tournamentId"]=tournament_id
+                # Query the exact result scope saved at capture time. The source
+                # proxy must not guess from today's upcoming fixtures.
+                if window["category_id"] and window["tournament_id"]:
+                    params["categoryId"]=window["category_id"]
+                    params["tournamentId"]=window["tournament_id"]
                 body=proxy_json(RESULT_API,params)
                 batch=result_events(body)
+                result_events_seen+=len(batch)
                 for event in batch:
                     event_id=str(event.get("eventId") or event.get("event_id") or "").strip()
-                    if event_id:
+                    if not event_id:
+                        continue
+                    current_score=_final_result_score(event)
+                    existing=index.get(event_id)
+                    existing_score=_final_result_score(existing) if existing else None
+                    if existing is None or current_score is not None or existing_score is None:
                         index[event_id]=event
                 if len(batch)<100:
                     break
             except Exception as exc:
                 errors.append(
-                    f"{source} results scope={category_id}/{tournament_id} "
-                    f"page {page_num}: {exc}"
+                    f"{window['source']} results scope={window['category_id']}/{window['tournament_id']} "
+                    f"window={window['startTime']}..{window['endTime']} page {page_num}: {exc}"
                 )
                 break
+
+    settlement_meta={
+        "sportybet_settled":0,"conflicts":0,
+        "result_windows_available":len(windows),
+        "recent_windows_queried":len(selected_recent),
+        "historical_windows_queried":len(selected_historical),
+        "result_windows_queried":len(selected),
+        "result_events_seen":result_events_seen,
+        "settlement_window_cursor":next_cursor,
+    }
 
     history=[]
     settled_count=0
@@ -478,7 +660,7 @@ def settle(pending):
 
     for item in unresolved:
         primary_event=index.get(str(item.get("event_id")))
-        primary_score=score(primary_event) if primary_event else None
+        primary_score=_final_result_score(primary_event) if primary_event else None
         if primary_score is None:
             continue
 
@@ -532,7 +714,9 @@ def settle(pending):
         })
         settled_count+=1
 
-    return history,settled_count,errors,{"sportybet_settled":settled_count,"conflicts":conflicts}
+    settlement_meta["sportybet_settled"]=settled_count
+    settlement_meta["conflicts"]=conflicts
+    return history,settled_count,errors,settlement_meta
 
 def stable_participant_identity(product, raw_name):
     name=" ".join(str(raw_name or "").split()).strip()
@@ -1024,6 +1208,12 @@ def main():
         "archive_new_records":archived_new,
         "sportybet_settled":settlement_meta["sportybet_settled"],
         "settlement_conflicts":settlement_meta["conflicts"],
+        "result_windows_available":settlement_meta.get("result_windows_available",0),
+        "recent_windows_queried":settlement_meta.get("recent_windows_queried",0),
+        "historical_windows_queried":settlement_meta.get("historical_windows_queried",0),
+        "result_windows_queried":settlement_meta.get("result_windows_queried",0),
+        "result_events_seen":settlement_meta.get("result_events_seen",0),
+        "settlement_window_cursor":settlement_meta.get("settlement_window_cursor"),
         "participant_fingerprint_count":len(participant_rows),
         "participant_lifecycle_count":lifecycle["participant_count"],
         "participant_lifecycle_active":lifecycle["active_count"],

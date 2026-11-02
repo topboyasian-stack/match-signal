@@ -405,8 +405,26 @@ def fetch_results(pending,now):
             if err:errors.append(err)
             if rows:events.extend(rows)
 
-    ordered=sorted(scopes.items(),key=lambda x:min(dt(s.get("start_time")) or now for s in x[1]))
-    for (cat,tour),samples in ordered[:12]:
+    # Keep the result-query budget bounded, but never let older GT scopes
+    # consume all 12 slots before eAdriatic is queried. Interleave scopes by
+    # product, oldest first within each product, so both feeds get settlements.
+    by_product=defaultdict(list)
+    for scope_key,samples in scopes.items():
+        counts=defaultdict(int)
+        for sample in samples:
+            product=str(sample.get("product") or "")
+            if product in {"efootball_gt","efootball_adriatic"}:
+                counts[product]+=1
+        product=max(("efootball_adriatic","efootball_gt"),key=lambda p:counts.get(p,0)) if counts else "efootball_gt"
+        by_product[product].append((scope_key,samples))
+    for product in by_product:
+        by_product[product].sort(key=lambda x:min(dt(s.get("start_time")) or now for s in x[1]))
+    ordered=[]
+    while len(ordered)<12 and any(by_product.values()):
+        for product in ("efootball_adriatic","efootball_gt"):
+            if by_product.get(product) and len(ordered)<12:
+                ordered.append(by_product[product].pop(0))
+    for (cat,tour),samples in ordered:
         base={"source":"efootball","categoryId":cat,"tournamentId":tour,"pageSize":100,"pageNum":1}
         for index,(start,end,bucket) in enumerate(result_windows(samples,now),1):
             filtered={**base,"startTime":int(start.timestamp()*1000),"endTime":int(end.timestamp()*1000)}

@@ -199,6 +199,37 @@ def test_result_queries_bucket_stale_observations_with_three_hour_windows():
  assert not errors,errors
  assert len(calls)==2,len(calls)
  assert all(x["categoryId"]=="cat-1" and x["tournamentId"]=="tour-1" for x in calls)
+def test_result_scope_budget_always_includes_eadriatic_when_gt_has_more_than_twelve_scopes():
+ now=datetime(2026,11,2,19,0,tzinfo=timezone.utc)
+ samples=[]
+ # Thirteen older GT competitions used to fill ordered[:12], starving the
+ # single active Adriatic result scope even though both products share the API.
+ for i in range(13):
+  samples.append({
+   "event_id":f"gt-{i}","product":"efootball_gt",
+   "category_id":f"gt-cat-{i}","tournament_id":f"gt-tour-{i}",
+   "start_time":(now-timedelta(days=2,minutes=i)).isoformat(),
+  })
+ samples.append({
+  "event_id":"adriatic-current","product":"efootball_adriatic",
+  "category_id":"adriatic-cat","tournament_id":"adriatic-tour",
+  "start_time":(now-timedelta(minutes=20)).isoformat(),
+ })
+ queried=[]
+ class FakeResponse:
+  def raise_for_status(self):pass
+  def json(self):return {"events":[]}
+ def fake_get(url,params,timeout):
+  queried.append(params.copy())
+  return FakeResponse()
+ with patch.object(mod.requests,"get",side_effect=fake_get):
+  rows,errors=mod.fetch_results(samples,now)
+ assert not rows and not errors,(rows,errors)
+ scopes={(x.get("categoryId"),x.get("tournamentId")) for x in queried}
+ assert ("adriatic-cat","adriatic-tour") in scopes,scopes
+ assert len(scopes)<=12,len(scopes)
+
+
 def test_settlement_coverage_reports_partial_and_overdue_results():
  now=datetime(2026,10,11,11,0,tzinfo=timezone.utc)
  pending=[
@@ -268,5 +299,5 @@ def test_efootball_display_calibration_is_applied():
  assert 'if(["efootball_gt","efootball_adriatic"].includes(product)&&isOverUnderPrediction(x))return null;' in source
 
 if __name__=="__main__":
- test_live_feed_compaction_preserves_scope_ids();test_markets();test_capture();test_live_snapshot_freshness_gate();test_live_market_coverage_reports_actual_btts_availability();test_settlement_and_summary();test_settlement_accepts_provider_final_set_score();test_legacy_missing_scope_uses_bounded_discovery();test_draw_and_append_only_merge();test_settlement_due_uses_elapsed_time_not_exact_minute();test_scoped_result_lookup_uses_bounded_time_window();test_legacy_scope_discovery_uses_bounded_time_window();test_result_queries_bucket_stale_observations_with_three_hour_windows();test_settlement_coverage_reports_partial_and_overdue_results();test_result_proxy_upstream_errors_are_preserved();test_efootball_display_calibration_is_applied()
+ test_live_feed_compaction_preserves_scope_ids();test_markets();test_capture();test_live_snapshot_freshness_gate();test_live_market_coverage_reports_actual_btts_availability();test_settlement_and_summary();test_settlement_accepts_provider_final_set_score();test_legacy_missing_scope_uses_bounded_discovery();test_draw_and_append_only_merge();test_settlement_due_uses_elapsed_time_not_exact_minute();test_scoped_result_lookup_uses_bounded_time_window();test_legacy_scope_discovery_uses_bounded_time_window();test_result_queries_bucket_stale_observations_with_three_hour_windows();test_result_scope_budget_always_includes_eadriatic_when_gt_has_more_than_twelve_scopes();test_settlement_coverage_reports_partial_and_overdue_results();test_result_proxy_upstream_errors_are_preserved();test_efootball_display_calibration_is_applied()
  print("eFootball winner/BTTS research tests: PASS (15 groups)")
