@@ -1,0 +1,85 @@
+name: NBA totals capture freshness watchdog
+
+on:
+  schedule:
+    # Check five minutes after the regular :07/:22/:37/:52 capture slots.
+    # If cron delivery is missed, recover only when the last capture is stale.
+    - cron: '12,27,42,57 * * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/nba_totals_capture_watchdog.py'
+      - 'scripts/test_nba_totals_capture_watchdog.py'
+      - '.github/workflows/nba-totals-capture-watchdog.yml'
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: nba-totals-capture-freshness-watchdog
+  cancel-in-progress: false
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Test stale-capture recovery policy
+        run: PYTHONPATH=scripts python scripts/test_nba_totals_capture_watchdog.py
+
+      - name: Count queued or running capture workflows
+        id: active_capture
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          active="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/nba-totals-price-capture.yml/runs?branch=main&per_page=20" --jq '[.workflow_runs[] | select(.status == "queued" or .status == "in_progress")] | length')"
+          echo "count=$active" >> "$GITHUB_OUTPUT"
+          echo "Active NBA price-capture runs: $active"
+
+      - name: Decide whether a recovery capture is needed
+        id: freshness
+        env:
+          ACTIVE_CAPTURE_RUNS: ${{ steps.active_capture.outputs.count }}
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          import os
+          import sys
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          sys.path.insert(0, "scripts")
+          from nba_totals_capture_watchdog import capture_age_minutes, should_dispatch_capture
+
+          status = json.loads(Path("data/nba_totals_price_capture_status.json").read_text(encoding="utf-8"))
+          checked_at = status.get("checked_at")
+          now = datetime.now(timezone.utc)
+          active = int(os.environ.get("ACTIVE_CAPTURE_RUNS", "0"))
+          age = capture_age_minutes(checked_at, now)
+          dispatch = should_dispatch_capture(checked_at, now, active_capture_runs=active, max_age_minutes=15)
+          print(f"dispatch={'true' if dispatch else 'false'}")
+          print(f"capture_age_minutes={age:.2f}" if age is not None else "capture_age_minutes=unknown")
+          if dispatch:
+              print("reason=stale_capture_and_no_active_capture_run")
+          elif active:
+              print("reason=capture_already_queued_or_running")
+          else:
+              print("reason=latest_capture_within_freshness_window")
+          PY
+
+      - name: Dispatch recovery capture
+        if: steps.freshness.outputs.dispatch == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh workflow run nba-totals-price-capture.yml --ref main
+          echo "Dispatched the existing exact SportyBet market-225 capture workflow."
