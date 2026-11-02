@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-02T14:24:47.202019+00:00",
+  "generated_at": "2026-11-02T14:30:37.024068+00:00",
   "engine_version": "V6.1-RESEARCH-GATED",
   "mode": "PAPER_ONLY",
   "target_legs": "Upcoming Desk is primary only after its own settled-ticket sample (n≥10) and realized flat-stake ROI ≥2% pass; otherwise use a separately qualified fallback or NO_BET. Desk 2–4 legs target 3.00x–4.00x with exact-line walk-forward and fresh-price gates; standard fallback 2.80x minimum / 2.80x preferred; compact eFootball 2.00x+ only when all gates pass",
@@ -72,9 +72,9 @@
       "status": "ok",
       "stats": {
         "provider": "SportyBet NG",
-        "fetched_at": "2026-11-02T14:24:47.325085+00:00",
-        "football_events": 1175,
-        "tennis_events": 356,
+        "fetched_at": "2026-11-02T14:30:37.281151+00:00",
+        "football_events": 699,
+        "tennis_events": 354,
         "matched": 60,
         "unmatched": 40,
         "match_errors": [],
@@ -94,21 +94,21 @@
   },
   "candidate_diagnostics": {
     "football_candidates": 0,
-    "tennis_candidates": 5,
+    "tennis_candidates": 4,
     "virtual_candidates": 1,
     "virtual_gate_diagnostics": {
-      "seen": 344,
-      "qualified": 344,
+      "seen": 324,
+      "qualified": 324,
       "evidence_pass": 0,
-      "rejected_evidence": 679,
+      "rejected_evidence": 639,
       "rejected_ticket_performance": 0,
       "rejected_results_first": 0,
-      "current_feed_events": 622,
+      "current_feed_events": 609,
       "model_templates": 22,
-      "current_market_candidates": 688,
+      "current_market_candidates": 648,
       "evidence_value_candidates": 1,
       "reasons": {
-        "recent_evidence_below_threshold": 679,
+        "recent_evidence_below_threshold": 639,
         "no_exact_line_model": 8,
         "efootball_evidence_value_lane": 1
       },
@@ -123,8 +123,8 @@
         ],
         "research_only_counts": {
           "vfootball": {
-            "market_rows": 4486,
-            "unique_events": 452
+            "market_rows": 4430,
+            "unique_events": 443
           },
           "zoom": {
             "market_rows": 0,
@@ -281,7 +281,7 @@
       ],
       "discovery_universe": {
         "scope": "all current SportyBet eFootball events and every observed O/U line inside the Builder horizon",
-        "events_scanned": 170,
+        "events_scanned": 166,
         "product_line_pairs_scanned": 14,
         "modelable_product_line_side_pairs": 22,
         "product_line_side_pairs_without_8_settled_observations": 6,
@@ -289,35 +289,35 @@
         "note": "No-evidence lines remain discovery-only. Thin eFootball half-line keys may use one outcome per unique settled score when fewer than 8 direct exact-line/side rows exist; current exact-line SportyBet price and all existing gates remain mandatory."
       },
       "current_product_counts": {
-        "efootball_gt": 344
+        "efootball_gt": 324
       },
       "current_market_line_counts": {
-        "efootball_gt|2.5": 78,
-        "efootball_gt|3.5": 79,
-        "efootball_gt|4.5": 50,
-        "efootball_gt|5.5": 48,
-        "efootball_gt|6.5": 20,
+        "efootball_gt|4.5": 45,
+        "efootball_gt|5.5": 41,
         "efootball_gt|1.5": 28,
+        "efootball_gt|2.5": 74,
+        "efootball_gt|3.5": 75,
+        "efootball_gt|6.5": 18,
         "efootball_gt|7.5": 10,
         "efootball_gt|8.5": 11,
-        "efootball_gt|9.5": 10,
+        "efootball_gt|9.5": 11,
         "efootball_gt|4": 2,
         "efootball_gt|7": 1,
         "efootball_gt|6": 1,
-        "efootball_gt|10.5": 5,
+        "efootball_gt|10.5": 6,
         "efootball_gt|11.5": 1
       },
       "price_snapshot_sources": {
-        "fresh_direct_sportybet_match": 336,
-        "fresh_unified_sportybet_snapshot": 8
+        "fresh_direct_sportybet_match": 321,
+        "fresh_unified_sportybet_snapshot": 3
       },
       "live_quote_refresh": {
         "source": null,
-        "live_events": 629,
-        "matched_by_id": 4766,
+        "live_events": 632,
+        "matched_by_id": 4751,
         "matched_by_match": 0,
         "matched_by_participant_time": 0,
-        "unmatched": 178
+        "unmatched": 95
       },
       "upcoming_desk_research": {
         "enabled": true,
@@ -330,42 +330,41 @@
         "max_combined_odds": 4.0,
         "max_legs": 4,
         "rejections": {
-          "outside_active_efootball_scope": 4486,
-          "model_competition_not_qualified": 167,
-          "desk_probability_below_0_60": 164,
-          "insufficient_exact_line_walkforward_sample": 12,
-          "outside_builder_horizon": 7,
-          "recent_settled_line_side_loss_streak": 1
+          "outside_active_efootball_scope": 4430,
+          "model_competition_not_qualified": 162,
+          "desk_probability_below_0_60": 149,
+          "outside_builder_horizon": 19,
+          "insufficient_exact_line_walkforward_sample": 13
         },
         "policy": "paper-only Desk lane; base model and model-qualified competition + active Desk calibration + >=100 exact-line walk-forward rows at >=60%; exact-line research can cross the official raw model-line allowlist without changing official qualification; current SportyBet quote and standard Builder price/edge gates remain mandatory"
       },
       "quote_join": {
-        "live_events": 629,
-        "live_match_keys": 627,
-        "live_pair_keys": 615,
-        "matched_by_id": 4766,
+        "live_events": 632,
+        "live_match_keys": 630,
+        "live_pair_keys": 618,
+        "matched_by_id": 4751,
         "matched_by_match": 0,
         "matched_by_participant_time": 0,
-        "unmatched": 178,
+        "unmatched": 95,
         "samples": [
           {
-            "event_id": "sr:match:76309610",
+            "event_id": "sr:match:76309390",
             "match": null,
-            "participant_1": "FC Barcelona (Hulk)",
-            "participant_2": "FC Bayern Munich (Rossi)",
-            "source": "cloudflare_proxy"
-          },
-          {
-            "event_id": "sr:match:76309334",
-            "match": null,
-            "participant_1": "Paris Saint Germain (Viper)",
+            "participant_1": "Arsenal FC (Eminem)",
             "participant_2": "FC Inter Milano (Vito)",
             "source": "cloudflare_proxy"
           },
           {
-            "event_id": "sr:match:76309336",
+            "event_id": "sr:match:76309766",
             "match": null,
-            "participant_1": "SSC Napoli (Monster)",
+            "participant_1": "FC Barcelona (Hulk)",
+            "participant_2": "Paris Saint Germain (Viper)",
+            "source": "cloudflare_proxy"
+          },
+          {
+            "event_id": "sr:match:76309574",
+            "match": null,
+            "participant_1": "Manchester City FC (Troy)",
             "participant_2": "Borussia Dortmund (Thunder)",
             "source": "cloudflare_proxy"
           }
@@ -375,7 +374,7 @@
       "current_feed_is_price_authority": true,
       "price_authority": "fresh SportyBet snapshot collected in-process immediately before Builder qualification"
     },
-    "evaluated": 6,
+    "evaluated": 5,
     "individual_leg_diagnostics": {
       "builder_eligible_leg_count": 1,
       "efootball_exact_evidence_leg_candidates": 1,
@@ -387,7 +386,7 @@
       "note": "Individual leg eligibility is not a qualified ticket. Whole-ticket odds, ROI, timing, correlation, exact evidence, and current quote gates still apply."
     },
     "rejections": {
-      "REJECTED": 5,
+      "REJECTED": 4,
       "LIVE_VALUE": 1
     },
     "selection_diversity": {
@@ -1582,9 +1581,9 @@
   },
   "candidates_considered": {
     "football": 0,
-    "tennis": 5,
+    "tennis": 4,
     "virtual": 1,
-    "all_built": 6
+    "all_built": 5
   },
   "qualified_legs": [],
   "best_available_legs": [
@@ -1662,7 +1661,7 @@
       "product": "efootball_gt",
       "edge_percent": 17.11,
       "odds_fresh": true,
-      "market_odds_age_seconds": 18.0,
+      "market_odds_age_seconds": 19.7,
       "data_quality": 0.75,
       "uncertainty": 0.087,
       "market_complete": true,
@@ -1773,7 +1772,7 @@
         "historical_breaks": 0,
         "reason": "no_current_opposite_side_streak_break"
       },
-      "market_odds_timestamp": "2026-11-02T14:25:17.911588+00:00",
+      "market_odds_timestamp": "2026-11-02T14:30:57.617059+00:00",
       "sportybet_event_id": "sr:match:BAaGZ0lVNfrWWNoe|6af6|w",
       "sportybet_market_id": "18",
       "sportybet_specifier": "total=11.5",
@@ -2075,89 +2074,6 @@
   "batches": [],
   "phase2_cyclical_loop_batches": [],
   "rejected_candidates": [
-    {
-      "sport": "tennis",
-      "competition": "ATP",
-      "event_id": "186460",
-      "start_time": "2026-11-02T14:30Z",
-      "match": "Kyrian Jacquet vs Tomas Machac",
-      "market": "total_games",
-      "pick": "Kyrian Jacquet vs Tomas Machac — Total Games over 19.5",
-      "line": null,
-      "builder_pick": "over",
-      "participant_1": "Kyrian Jacquet",
-      "participant_2": "Tomas Machac",
-      "model_probability": 0.8322,
-      "desk_calibrated_probability": null,
-      "settled_side_probability_cap": {
-        "applied": false,
-        "reason": "product_out_of_scope",
-        "model_probability": 0.8322,
-        "effective_probability": 0.8322,
-        "settled_sample_n": 0,
-        "settled_wins": 0
-      },
-      "raw_model_probability": null,
-      "walkforward_exact_line_n": null,
-      "walkforward_exact_line_hit_rate": null,
-      "desk_learning_adjustment_source": null,
-      "desk_official_qualification_pass": false,
-      "desk_official_qualification_status": "candidate",
-      "upcoming_desk_research_only": false,
-      "model_fair_odds": 1.202,
-      "bookmaker_odds": null,
-      "market_implied_probability": null,
-      "de_vig_probability": null,
-      "model_edge": null,
-      "expected_value": null,
-      "efootball_value_gate": {
-        "applied": false,
-        "minimum_expected_return": null,
-        "expected_return_passed": null,
-        "minimum_margin_adjusted_edge": 0.025,
-        "margin_adjusted_edge_passed": false
-      },
-      "participant_history": {
-        "available": false,
-        "score": 0.5,
-        "participants": []
-      },
-      "participant_history_bonus": 0.0,
-      "evidence_score": null,
-      "selection_score": -1.0,
-      "product": null,
-      "edge_percent": null,
-      "odds_fresh": false,
-      "market_odds_age_seconds": null,
-      "data_quality": 0.8,
-      "uncertainty": 0.116,
-      "market_complete": false,
-      "builder_eligible": false,
-      "real_money_eligible": false,
-      "paper_only": true,
-      "status": "REJECTED",
-      "source": "ATP/WTA ranking + recent form",
-      "market_source": "SportyBet NG",
-      "recent_evidence": null,
-      "evidence_source": "direct_exact_line_side_settlements",
-      "score_derived_evidence": false,
-      "evidence_sample_n": 0,
-      "direct_exact_sample_n": 0,
-      "results_first": null,
-      "qualification_lane": null,
-      "phase2_cyclical_loop": {
-        "enabled": true,
-        "flagged": false,
-        "confidence": 0.0,
-        "reason": "not_virtual"
-      },
-      "market_odds_timestamp": null,
-      "sportybet_event_id": "186460",
-      "sportybet_market_id": "189",
-      "sportybet_specifier": "total=19.5",
-      "sportybet_outcome_id": "",
-      "sportybet_outcome_name": null
-    },
     {
       "sport": "tennis",
       "competition": "ATP",
@@ -2564,7 +2480,7 @@
       "product": "efootball_gt",
       "edge_percent": 17.11,
       "odds_fresh": true,
-      "market_odds_age_seconds": 18.0,
+      "market_odds_age_seconds": 19.7,
       "data_quality": 0.75,
       "uncertainty": 0.087,
       "market_complete": true,
@@ -2675,7 +2591,7 @@
         "historical_breaks": 0,
         "reason": "no_current_opposite_side_streak_break"
       },
-      "market_odds_timestamp": "2026-11-02T14:25:17.911588+00:00",
+      "market_odds_timestamp": "2026-11-02T14:30:57.617059+00:00",
       "sportybet_event_id": "sr:match:BAaGZ0lVNfrWWNoe|6af6|w",
       "sportybet_market_id": "18",
       "sportybet_specifier": "total=11.5",
