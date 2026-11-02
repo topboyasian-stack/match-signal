@@ -48,7 +48,9 @@ const cloudflare = fs.readFileSync(path.join(workflowsDir, "cloudflare-pages.yml
 assert.match(cloudflare, /name:\s*Deploy Match Signal to Cloudflare Pages/);
 assert.match(cloudflare, /https:\/\/match-signal\.pages\.dev/);
 assert.ok(
-  cloudflare.includes("--exclude='data/nba_live_observations.json'") &&
+  cloudflare.includes("|.github/workflows/cloudflare-pages.yml|") &&
+    cloudflare.includes("|.github/workflows/efootball-recent-evidence-regression.yml|") &&
+    cloudflare.includes("--exclude='data/nba_live_observations.json'") &&
     cloudflare.includes("test ! -e .pages-deploy/data/nba_live_observations.json"),
   "The private 30-day NBA live-observation archive must stay out of the public Pages asset package.",
 );
