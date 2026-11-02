@@ -102,6 +102,16 @@ Latest inspected artifacts were generated around **2026-11-02 02:00 UTC**:
 - The research report checked 11 exact fresh market-225 upcoming pairs; 43 of 54 upcoming predictions remained without an exact fresh pair. It never authorizes betting or ticket generation.
 - Latest report: `data/nba_totals_probability_value_experiment.json`. Production remains v5, Basketball ticket gate remains locked, and release remains `RESEARCH_ONLY`.
 
+## Verified prospective probability scoring and snapshot-linkage checkpoint — 2026-11-02
+
+- Commit `d7a78cc9027f8df2ed79816464efdf75a0ef19c4` passed probability/value workflow run `41379322954`, including compile, all probability/value regression tests, report generation, fixed-cutoff/paper-only assertions, and publication.
+- The refreshed historical synthetic-line report evaluates 239 unique validation games across 1,652 non-push game/line observations. A 4,000-resample game-clustered bootstrap reports model-minus-coinflip Brier difference `-0.011014` (95% CI `[-0.017559, -0.004461]`) and log-loss difference `-0.022337` (95% CI `[-0.035958, -0.008706]`). Repeated synthetic lines are treated as measurements within each game, not independent games. This remains a historical synthetic-line test, not a SportyBet market backtest.
+- The report now separately audits post-cutoff records against the exact immutable `data/nba_totals_publication_snapshots.json` entry, matching event ID, snapshot ID, publication/start/quote times, SportyBet event ID, market 225, line and both prices. It emits separate prospective probability scores only for uniquely settled records whose exact snapshot linkage passes.
+- First refreshed report (generated `2026-11-02T02:45:21Z`) showed **7 prospective fresh market-225 snapshot records across 7 unique fixtures**, all passing snapshot verification; **0** prospective settled market selections and **0** post-cutoff probability-scored fixtures. The 30-fixture minimum is not met; this is correct, not a workflow failure.
+- The probability/value workflow is scheduled hourly to refresh prospective coverage as the free quote-capture and settlement jobs run.
+- Follow-up commit `af3f2bf5c51484fb98f2b024ecc4610bd6c04a05` normalizes Over/Under probabilities conditional on no push before comparison with market no-vig probability and adds integer-line push regression tests. Workflow run `41379497595` was queued/in progress when this checkpoint was written; do not mark the probability-scoring fix verified until its tests and report-publication steps pass.
+- Release is still `RESEARCH_ONLY`; Basketball ticket selection/code generation remains locked. Do not treat historical synthetic-line metrics or fresh but unsettled snapshots as betting proof.
+
 ## Next execution priorities
 
 15. [ ] Collect at least 100 unique prospective settled market-225 selections; target 200. Every bet needs a fresh exact snapshot and official ESPN result.
@@ -112,4 +122,4 @@ Latest inspected artifacts were generated around **2026-11-02 02:00 UTC**:
 20. [ ] Revalidate every NBA ticket leg against exact fresh SportyBet 225 event/line/side/price immediately before code generation; reject the whole slip if any leg is invalid.
 21. [ ] Unlock NBA ticket selection/code generation only after all prospective gates and production smoke tests pass.
 
-**Next action on resume:** inspect probability/value workflow run `41378471896` and the historical synthetic-line probability validation it publishes. Then continue priority 14 with prospective probability scoring and actual pregame snapshot coverage. Never promote a value classification to a betting recommendation from these research artifacts.
+**Next action on resume:** inspect workflow run `41379497595` for commit `af3f2bf5c51484fb98f2b024ecc4610bd6c04a05`; confirm the push-normalization regression tests, fixed cutoff and snapshot-linkage assertions pass and the updated report is published. Then re-read `data/nba_totals_probability_value_experiment.json`, confirm actual post-cutoff snapshot/settlement counts, and continue priority 14 until at least 30 unique exact-snapshot-linked prospective selections can be scored. Do not mark probability calibration complete from synthetic lines or from unsettled fixtures; keep `RESEARCH_ONLY` and the NBA ticket gate locked.
