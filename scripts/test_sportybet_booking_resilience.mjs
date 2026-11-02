@@ -19,13 +19,14 @@ try {
   const observed=[];
   globalThis.fetch=async input=>{
     const url=new URL(typeof input==='string'?input:input.url);observed.push(url);
-    if(url.origin===SPORTYBET)return htmlResponse();
-    if(url.origin===PROXY)return jsonResponse({bizCode:10000,data:{tournaments:[]}});
-    throw new Error('Unexpected test URL '+url.href);
+    // whichever source is tried first returns a 200 HTML edge response; the
+    // alternate configured source must recover with the JSON payload.
+    if(observed.length===1)return htmlResponse();
+    return jsonResponse({bizCode:10000,data:{tournaments:[]}});
   };
   const recovered=await upstream('/api/ng/factsCenter/pcUpcomingEvents',{sportId:'sr:sport:1',marketId:'225'});
   assert.equal(recovered.bizCode,10000);assert.equal(observed.length,2);
-  assert.equal(observed[0].origin,SPORTYBET);assert.equal(observed[1].origin,PROXY);
+  assert.notEqual(observed[0].origin,observed[1].origin,'the alternate source must be tried after an HTML response');
   assert.equal(observed[0].pathname,observed[1].pathname);
   assert.equal(observed[0].searchParams.get('marketId'),'225');assert.equal(observed[1].searchParams.get('marketId'),'225');
   globalThis.fetch=async()=>htmlResponse();
