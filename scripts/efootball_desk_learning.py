@@ -21,6 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
 UNIFIED = DATA / "unified_upcoming.json"
 HISTORY = DATA / "virtual_lab_history.json"
+MARKET_RESEARCH_ARCHIVE = DATA / "efootball_market_research.json"
 TRACE = DATA / "efootball_desk_prediction_history.json"
 SETTLED_LEDGER = DATA / "efootball_desk_settled_observations.json"
 OUTPUT = DATA / "efootball_desk_learning.json"
@@ -136,17 +137,76 @@ def exact_key(row):
     return f"{base}|{line:g}"
 
 
-def settlement_index(history):
-    """Index only settled, score-verifiable O/U outcomes.
+def market_research_score_rows(archive):
+    """Convert settled, exact-event-ID eFootball market records into score evidence.
 
-    A final score plus an explicit settled_at timestamp is sufficient even if a
-    particular market-line row omits its win flag. Older canonical rows without
-    settled_at retain the legacy win-flag requirement. Conflicting scores at the
-    same latest settlement timestamp are excluded rather than guessed.
+    The market-research archive is settled from SportyBet's event-result endpoint
+    by exact provider event ID. Its winner/BTTS rows contain the same fixture's
+    final score, kickoff and participants, so they can verify a totals forecast
+    without reusing that market's pick/probability as totals-model evidence.
+    """
+    observations = archive.get("observations") if isinstance(archive, dict) else []
+    out = []
+    for row in observations if isinstance(observations, list) else []:
+        if not isinstance(row, dict):
+            continue
+        product = str(row.get("product") or "").strip().lower()
+        if product not in {"efootball_gt", "efootball_adriatic"}:
+            continue
+        if str(row.get("settlement_status") or "").strip().upper() != "SETTLED":
+            continue
+        if str(row.get("market_type") or "").strip().lower() not in {"match_winner", "btts"}:
+            continue
+        start = dt(row.get("start_time"))
+        settled_at = dt(row.get("settled_at"))
+        participant_1 = str(row.get("participant_1") or "").strip()
+        participant_2 = str(row.get("participant_2") or "").strip()
+        event_id = str(row.get("event_id") or "").strip()
+        if start is None or settled_at is None or not event_id or not participant_1 or not participant_2:
+            continue
+        raw_score = row.get("final_score") or row.get("score")
+        if isinstance(raw_score, (list, tuple)) and len(raw_score) == 2:
+            raw_score = f"{raw_score[0]}:{raw_score[1]}"
+        parsed = score_pair(raw_score)
+        if not parsed:
+            continue
+        out.append({
+            "product": product,
+            "provider": "SportyBet NG",
+            "event_id": event_id,
+            "timestamp": start.isoformat(),
+            "start_time": start.isoformat(),
+            "participant_1": participant_1,
+            "participant_2": participant_2,
+            "market": "score_result",
+            "source_market_type": str(row.get("market_type") or "").strip().lower(),
+            "score": parsed[0],
+            "settled_at": settled_at.isoformat(),
+            "settlement_source": "SportyBet NG eventResultList via exact-event-ID eFootball market research",
+            "_supplemental_score_result": True,
+        })
+    return out
+
+
+def settlement_index(history):
+    """Index verified final scores without mixing products or forecast markets.
+
+    The primary source is the canonical Virtual Lab O/U settlement history.
+    Settled eFootball winner/BTTS rows may supplement it only when explicitly
+    converted by market_research_score_rows(), which requires exact provider
+    event-ID settlement plus a full score, kickoff and both participants.
+    These rows supply the score only; their winner/BTTS prediction is not reused.
+    Conflicting latest scores are excluded rather than guessed.
     """
     candidates = {}
     for row in history if isinstance(history, list) else []:
-        if not isinstance(row, dict) or row.get("market") != "ou":
+        if not isinstance(row, dict):
+            continue
+        is_primary_ou = row.get("market") == "ou"
+        is_verified_supplement = row.get("_supplemental_score_result") is True
+        if not (is_primary_ou or is_verified_supplement):
+            continue
+        if is_verified_supplement and not row.get("settlement_source"):
             continue
         raw_score = row.get("score") or row.get("final_score")
         parsed_score = score_pair(raw_score)
@@ -1031,8 +1091,16 @@ def main():
         settled_ledger = []
 
     captured = capture(trace, board)
-    history_index = settlement_index(history)
+    supplemental_score_rows = market_research_score_rows(load(MARKET_RESEARCH_ARCHIVE, {}))
+    combined_score_history = list(history) if isinstance(history, list) else []
+    combined_score_history.extend(supplemental_score_rows)
+    history_index = settlement_index(combined_score_history)
     reconciliation = reconcile(trace, history_index)
+    reconciliation["supplemental_market_score_rows_available"] = len(supplemental_score_rows)
+    reconciliation["supplemental_market_score_rows_by_product"] = {
+        product: sum(1 for row in supplemental_score_rows if row.get("product") == product)
+        for product in ("efootball_gt", "efootball_adriatic")
+    }
     settled_ledger, ledger_added = merge_settled_observations(settled_ledger, trace)
     reconciliation["captured_new_forecasts"] = captured
     reconciliation["settled_ledger_rows"] = len(settled_ledger)
