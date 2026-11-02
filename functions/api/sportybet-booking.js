@@ -44,7 +44,7 @@ export function nbaTotalTicketLegQualified(leg,selection,ctx,now=Date.now()){
  if(ps.length!==1)return fail('No unique V5 prediction matches this fixture.');
  const p=ps[0],m=p?.markets?.total_ou||{},start=Date.parse(String(p.start_time||'')),legStart=Date.parse(String(leg.start_time||'')),quote=Date.parse(String(m.quote_timestamp||'')),report=Date.parse(String(ctx.probability?.generated_at||'')),forecast=Number(p.expected_total),line=Number(m.line),over=Number(m.over_odds),under=Number(m.under_odds),side=String(leg.pick);
  if(p.paper_only!==true||!Number.isFinite(start)||start<=now||legStart!==start||!Number.isFinite(quote)||quote>now+120000||now-quote>900000||quote>=start||!Number.isFinite(report)||report>now+120000||now-report>900000)return fail('Prediction, value report or quote is stale or mismatched.');
- if(String(m.market_id||'')!=='225'||String(m.source||'').toLowerCase()!=='sportybet nigeria'||m.quote_capture_basis!=='SportyBet API response observed_at'||String(m.pick||'').toLowerCase()!==side||!nbaReleaseClose(leg.line,line)||!Number.isFinite(forecast)||!Number.isFinite(over)||over<=1||!Number.isFinite(under)||under<=1)return fail('The exact market-225 side, line or price pair does not match.');
+ if(String(m.market_id||'')!=='225'||String(m.source||'').toLowerCase()!=='sportybet nigeria'||m.quote_capture_basis!=='SportyBet API response observed_at'||String(leg.sportybet_event_id||'')!==String(m.sportybet_event_id||'')||String(m.pick||'').toLowerCase()!==side||!nbaReleaseClose(leg.line,line)||!Number.isFinite(forecast)||!Number.isFinite(over)||over<=1||!Number.isFinite(under)||under<=1)return fail('The exact market-225 side, line or price pair does not match.');
  const fetched=Date.parse(String(selection?.fetchedAt||''));
  if(!selection||String(selection.marketId)!=='225'||String(selection.eventId)!==String(m.sportybet_event_id)||!nbaReleaseClose(selection.line,line)||!nbaReleaseClose(selection.overOdds,over)||!nbaReleaseClose(selection.underOdds,under)||!nbaReleaseClose(selection.odds,side==='over'?over:under)||!Number.isFinite(fetched)||fetched>now+120000||now-fetched>900000||fetched>=start)return fail('The live SportyBet event, line or either side price changed.');
  const ds=(ctx.probability?.upcoming_exact_fresh_market_225_value_diagnostics||[]).filter(x=>String(x?.event_id||'')===id);if(ds.length!==1)return fail('No unique value diagnostic matches this fixture.');
@@ -309,10 +309,13 @@ function normalizeFixture(value) {
 function resolveCurrentEvent(leg, found) {
   const [first, second] = legParticipants(leg);
   const hasParticipants = Boolean(first && second);
-  const direct = found.get(String(leg?.event_id || ''));
-  // Do not trust a reused/stale provider ID when its participants differ.
+  const sportybetId = String(leg?.sportybet_event_id || '');
+  const directProvider = sportybetId ? found.get(sportybetId) : null;
+  const direct = directProvider || found.get(String(leg?.event_id || ''));
+  // Resolve the current catalogue by the provider ID, but keep the ESPN ID
+  // reserved for the prediction/settlement cohort. Verify participants either way.
   if (direct && (!hasParticipants || sameParticipantPair([first, second], direct))) {
-    return { event: direct, matched_by: 'event_id' };
+    return { event: direct, matched_by: directProvider ? 'sportybet_event_id' : 'event_id' };
   }
 
   const targetMatch = normalizeFixture(
@@ -587,6 +590,7 @@ async function handlePost(context) {
       }
       legs = supplied.map(item => ({
         event_id: String(item?.event_id || ''),
+        sportybet_event_id: String(item?.sportybet_event_id || ''),
         sport: String(item?.sport || '').toLowerCase(),
         market: String(item?.market || 'winner').toLowerCase(),
         pick: String(item?.pick || '').toLowerCase(),
@@ -604,7 +608,7 @@ async function handlePost(context) {
           if (leg.sport === 'basketball') {
             return leg.market !== 'total' || !['over', 'under'].includes(leg.pick) ||
               !Number.isFinite(Number(leg.line)) || Number(leg.line) < 100 || Number(leg.line) > 300 ||
-              leg.market_id !== '225' || leg.model_qualified !== true;
+              leg.market_id !== '225' || !leg.sportybet_event_id || leg.model_qualified !== true;
           }
           if (!['football', 'tennis'].includes(leg.sport)) return true;
           if (leg.market === 'total') {
@@ -649,7 +653,7 @@ async function handlePost(context) {
     const efootballIds = new Set(legs.filter(l => productForLeg(l) === 'efootball').map(l => String(l.event_id || '')));
     const footballIds = new Set(legs.filter(l => String(l?.sport || '').toLowerCase() === 'football').map(l => String(l.event_id || '')));
     const tennisIds = new Set(legs.filter(l => String(l?.sport || '').toLowerCase() === 'tennis').map(l => String(l.event_id || '')));
-    const basketballIds = new Set(legs.filter(l => String(l?.sport || '').toLowerCase() === 'basketball').map(l => String(l.event_id || '')));
+    const basketballIds = new Set(legs.filter(l => String(l?.sport || '').toLowerCase() === 'basketball').map(l => String(l.sportybet_event_id || '')).filter(Boolean));
 
     const found = new Map();
 
