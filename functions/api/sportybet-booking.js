@@ -192,7 +192,8 @@ function findBasketballSelection(leg,event){
   const requestedStart=Date.parse(String(leg?.start_time||'')),currentStart=Number(event?.estimateStartTime||0);
   if(Number.isFinite(requestedStart)&&currentStart&&Math.abs(requestedStart-currentStart)>45*60*1000)return{error:'Basketball fixture start time changed; refresh the ticket.'};
   for(const market of (Array.isArray(event?.markets)?event.markets:[])){
-    if(String(market?.id||'')!=='225'||/suspend|closed|inactive|settled|unavailable|stop/i.test(String(market?.status||'')))continue;
+    const status=String(market?.status||'').trim().toLowerCase();
+    if(String(market?.id||'')!=='225'||/suspend|closed|inactive|settled|unavailable|stop/i.test(status)||(status!==''&&/^\d+$/.test(status)&&status!=='0'))continue;
     const currentLine=lineFromMarket(market);if(!Number.isFinite(currentLine)||Math.abs(currentLine-line)>1e-9)continue;
     const outcome=(Array.isArray(market?.outcomes)?market.outcomes:[]).find(o=>{
       const name=String(o?.desc||o?.name||o?.title||'').toLowerCase(),active=o?.isActive==null?(o?.active!==false):(Number(o.isActive)===1||o.isActive===true);
