@@ -101,7 +101,7 @@ export async function upstream(path, params) {
   const failures = [];
   // SportyBet sometimes answers JSON API requests with an HTML edge/challenge
   // page. Retry the same catalogue query through the Match Signal proxy.
-  for (const origin of [ORIGIN, SPORTYBET_PROXY_ORIGIN]) {
+  for (const origin of [SPORTYBET_PROXY_ORIGIN, ORIGIN]) {
     try {
       const url = new URL(origin + path);
       for (const [key, value] of Object.entries(params || {})) {
