@@ -8,7 +8,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from scripts.efootball_desk_learning import recent_fixture_window
+from scripts.efootball_desk_learning import (
+    market_research_score_rows, recent_fixture_window, reconcile, settlement_index,
+)
 
 
 def row(product, start, home, away, win, settled, probability=0.6, line=2.5):
@@ -23,6 +25,84 @@ def row(product, start, home, away, win, settled, probability=0.6, line=2.5):
         "model_probability": probability,
         "line": line,
     }
+
+
+def test_adriatic_totals_forecast_reconciles_to_exact_settled_market_score():
+    start = "2026-11-01T10:00:00+00:00"
+    settled = "2026-11-01T10:08:00+00:00"
+    archived = {
+        "observations": [
+            {
+                "event_id": "adriatic-100", "product": "efootball_adriatic",
+                "participant_1": "Adriano", "participant_2": "Maverick",
+                "start_time": start, "settled_at": settled,
+                "market_type": "match_winner", "settlement_status": "SETTLED",
+                "final_score": [3, 1],
+            },
+            {
+                "event_id": "adriatic-100", "product": "efootball_adriatic",
+                "participant_1": "Adriano", "participant_2": "Maverick",
+                "start_time": start, "settled_at": settled,
+                "market_type": "btts", "settlement_status": "SETTLED",
+                "final_score": [3, 1],
+            },
+            {
+                "event_id": "adriatic-pending", "product": "efootball_adriatic",
+                "participant_1": "Cleo", "participant_2": "Logan",
+                "start_time": "2026-11-01T10:10:00+00:00",
+                "settled_at": None, "market_type": "match_winner",
+                "settlement_status": "PENDING", "final_score": None,
+            },
+            {
+                "event_id": "gt-other", "product": "efootball_gt",
+                "participant_1": "Adriano", "participant_2": "Maverick",
+                "start_time": start, "settled_at": settled,
+                "market_type": "match_winner", "settlement_status": "SETTLED",
+                "final_score": [0, 1],
+            },
+        ]
+    }
+    supplemental = market_research_score_rows(archived)
+    assert len(supplemental) == 3, supplemental
+    index = settlement_index(supplemental)
+    assert len(index) == 2, index
+
+    # Same participants/kickoff in different products must never share scores.
+    trace = [
+        {
+            "product": "efootball_adriatic", "event_id": "desk-adriatic-100",
+            "start_time": start, "timestamp": start,
+            "participant_1": "Adriano", "participant_2": "Maverick",
+            "line": 2.5, "pick": "over", "model_probability": 0.65,
+            "observed_at": "2026-11-01T09:55:00+00:00", "settled": False,
+        },
+        {
+            "product": "efootball_gt", "event_id": "desk-gt-100",
+            "start_time": start, "timestamp": start,
+            "participant_1": "Adriano", "participant_2": "Maverick",
+            "line": 2.5, "pick": "under", "model_probability": 0.61,
+            "observed_at": "2026-11-01T09:55:00+00:00", "settled": False,
+        },
+    ]
+    diagnostics = reconcile(trace, index)
+    assert trace[0].get("scored_forecast") is True, trace[0]
+    assert trace[0].get("win") is True, trace[0]
+    assert trace[0].get("score") == "3:1", trace[0]
+    assert trace[1].get("scored_forecast") is not True, trace[1]
+    assert diagnostics["match_counts_by_product"]["efootball_adriatic"]["matched_exact"] == 1
+    assert diagnostics["match_counts_by_product"]["efootball_gt"]["unmatched"] == 1
+
+
+def test_untrusted_market_rows_do_not_enter_the_score_index():
+    row = {
+        "product": "efootball_adriatic", "event_id": "untrusted",
+        "participant_1": "Alpha", "participant_2": "Beta",
+        "start_time": "2026-11-01T10:00:00+00:00",
+        "timestamp": "2026-11-01T10:00:00+00:00",
+        "settled_at": "2026-11-01T10:05:00+00:00",
+        "market": "match_winner", "score": "5:0", "win": True,
+    }
+    assert settlement_index([row]) == {}
 
 
 def main():
@@ -75,7 +155,9 @@ def main():
 
     empty = recent_fixture_window([], window=50)
     assert empty["n"] == 0 and empty["decision_count"] == 0, empty
-    print("eFootball desk recent fixture window: 9 assertions passed.")
+    test_adriatic_totals_forecast_reconciles_to_exact_settled_market_score()
+    test_untrusted_market_rows_do_not_enter_the_score_index()
+    print("eFootball desk fixture windows and cross-market score reconciliation tests passed.")
 
 
 if __name__ == "__main__":
