@@ -255,9 +255,27 @@ def supplemental_event_id_diagnostics(trace, supplemental_score_rows):
                                 "trace_fixture_count_for_event_id": len(traces),
                                 "score_fixture_count_for_event_id": len(scores),
                             })
+        def id_samples(index, expected_product):
+            rows = []
+            for (row_product, event_id), fixtures in index.items():
+                if row_product != expected_product:
+                    continue
+                for row in fixtures.values():
+                    start = dt(row.get("start_time") or row.get("timestamp"))
+                    rows.append({
+                        "event_id": event_id,
+                        "start_time": start.isoformat() if start else None,
+                        "participant_1": str(row.get("participant_1") or ""),
+                        "participant_2": str(row.get("participant_2") or ""),
+                    })
+            rows.sort(key=lambda row: row["start_time"] or "", reverse=True)
+            return rows[:8]
+
         output[product] = {
             "trace_unique_product_event_ids": len(trace_keys),
             "settled_score_product_event_ids": len(score_keys),
+            "trace_event_id_samples": id_samples(trace_index, product),
+            "settled_score_event_id_samples": id_samples(score_index, product),
             "shared_product_event_ids": len(shared_ids),
             "exact_fixture_id_matches": exact_fixture_ids,
             "same_product_event_id_and_participant_matches": same_identity_ids,
