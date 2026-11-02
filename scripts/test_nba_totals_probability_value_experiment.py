@@ -139,12 +139,14 @@ def test_prospective_probability_sample_requires_exact_snapshot_linkage():
         "publication_snapshot_id": "prospective-snapshot-1",
         "publication_snapshot_verified": True,
         "publication_snapshot_kind": "immutable_sportybet_market_225_revision",
+        "expected_total": 221.0,
         "markets": {"total_ou": {
             "market_id": "225",
             "source": "SportyBet Nigeria",
             "sportybet_event_id": "sr:match:prospective",
             "quote_capture_basis": "SportyBet API response observed_at",
             "quote_timestamp": quote_time,
+            "pick": "over",
             "line": 220.5,
             "over_odds": 1.91,
             "under_odds": 1.89,
@@ -155,6 +157,8 @@ def test_prospective_probability_sample_requires_exact_snapshot_linkage():
         "start_time": start,
         "published_at": published,
         "publication_snapshot_id": "prospective-snapshot-1",
+        "expected_total": 221.0,
+        "pick": "over",
         "quote_timestamp": quote_time,
         "market_id": "225",
         "market_source": "SportyBet Nigeria",
@@ -176,6 +180,11 @@ def test_prospective_probability_sample_requires_exact_snapshot_linkage():
     assert bad_ids == set()
     assert bad_report["prospective_settled_selections_missing_or_mismatched_snapshot"] == 1
     assert bad_report["snapshot_linkage_failures"][0]["reason"] == "SNAPSHOT_FIELDS_DO_NOT_MATCH_SETTLEMENT_RECORD"
+
+    altered_pick = {**record, "pick": "under"}
+    pick_report, pick_ids = prospective_snapshot_coverage([altered_pick], [snapshot], cutoff)
+    assert pick_ids == set()
+    assert pick_report["prospective_settled_selections_missing_or_mismatched_snapshot"] == 1
 
 
 def test_probability_score_conditions_on_non_push_mass():

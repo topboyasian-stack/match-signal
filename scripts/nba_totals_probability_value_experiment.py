@@ -705,6 +705,7 @@ def prospective_snapshot_coverage(settled_rows, snapshots, cutoff=EVALUATION_CUT
             snap_market = ((snapshot.get("markets") or {}).get("total_ou") or {})
             row_quote = parse_time(row.get("quote_timestamp"))
             checks = [
+                row.get("totals_model_version") == "nba-total-v5-pace-efficiency-calibrated",
                 snapshot.get("totals_model_version") == "nba-total-v5-pace-efficiency-calibrated",
                 snapshot.get("publication_snapshot_verified") is True,
                 snapshot.get("publication_snapshot_kind") == "immutable_sportybet_market_225_revision",
@@ -716,9 +717,10 @@ def prospective_snapshot_coverage(settled_rows, snapshots, cutoff=EVALUATION_CUT
                 str(row.get("market_source") or "").strip().lower() == "sportybet nigeria",
                 str(row.get("quote_capture_basis") or "") == "SportyBet API response observed_at",
                 str(row.get("sportybet_event_id") or "").strip() == str(snap_market.get("sportybet_event_id") or "").strip(),
+                str(row.get("pick") or "").strip().lower() == str(snap_market.get("pick") or "").strip().lower(),
                 row_quote is not None and market is not None and market["quote_time"] == row_quote,
             ]
-            for field in ("line", "over_odds", "under_odds"):
+            for field in ("expected_total", "line", "over_odds", "under_odds"):
                 try:
                     same = math.isclose(float(row.get(field)), float(snap_market.get(field)), rel_tol=0.0, abs_tol=1e-9)
                 except (TypeError, ValueError):
