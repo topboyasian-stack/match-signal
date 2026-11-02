@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """Offline regression tests for the NBA totals walk-forward evaluator."""
 from datetime import datetime, timezone
-from nba_totals_walk_forward import build_forecasts, evaluate, market_metrics, publication_capture_metrics, verified_market_records
+from nba_totals_walk_forward import (
+    build_forecasts, evaluate, market_metrics, publication_capture_metrics,
+    verified_market_records, split_at_fixed_cutoff, market_record_audit,
+    EVALUATION_CUTOFF_UTC,
+)
 from expansion_pipeline import NBA_TOTALS_MODEL_VERSION
 
 
@@ -162,6 +166,65 @@ def test_capture_status_is_partial_until_every_v5_forecast_has_a_frozen_price_pa
     assert full_report["publication_capture"]["immutable_fresh_publication_snapshots"] == 1
 
 
+def test_fixed_holdout_cutoff_unique_fixture_and_market_audit():
+    base = {
+        "totals_model_version": NBA_TOTALS_MODEL_VERSION,
+        "settled": True, "publication_snapshot_verified": True, "roi_eligible": True,
+        "quote_fresh_at_publication": True, "price_pair_valid": True, "price_source_verified": True,
+        "market_id": "225", "market_source": "SportyBet Nigeria",
+        "sportybet_event_id": "sr:match:fixed-cutoff-test",
+        "quote_capture_basis": "SportyBet API response observed_at",
+        "settlement_source": "ESPN official scoreboard event ID",
+        "published_at": "2026-01-01T10:00:00+00:00",
+        "start_time": "2026-01-01T11:00:00+00:00",
+        "quote_timestamp": "2026-01-01T09:55:00+00:00",
+        "line": 200.5, "over_odds": 1.9, "under_odds": 1.9,
+        "final_score": [110, 100], "final_total": 210,
+        "result": "over", "pick": "over", "event_id": "fixed-past",
+        "expected_total": 205.0, "player_1": "Team A", "player_2": "Team B",
+        "publication_snapshot_id": "nba-total-pub:fixed-past",
+    }
+    duplicate = dict(
+        base,
+        published_at="2026-01-01T10:01:00+00:00",
+        quote_timestamp="2026-01-01T10:00:00+00:00",
+        publication_snapshot_id="nba-total-pub:fixed-past-revision",
+    )
+    future = dict(
+        base,
+        event_id="fixed-future",
+        sportybet_event_id="sr:match:fixed-future",
+        published_at="2026-11-03T10:00:00+00:00",
+        start_time="2026-11-03T11:00:00+00:00",
+        quote_timestamp="2026-11-03T09:55:00+00:00",
+        pick="under",
+        publication_snapshot_id="nba-total-pub:fixed-future",
+    )
+
+    eligible = verified_market_records([base, duplicate, future])
+    assert [row["event_id"] for row in eligible] == ["fixed-past", "fixed-future"], (
+        "multiple price revisions for one fixture must never become multiple settled bets"
+    )
+    development, holdout = split_at_fixed_cutoff(eligible, "published_at")
+    assert EVALUATION_CUTOFF_UTC.isoformat() == "2026-11-02T02:00:00+00:00"
+    assert [row["event_id"] for row in development] == ["fixed-past"]
+    assert [row["event_id"] for row in holdout] == ["fixed-future"]
+
+    result = evaluate([], [base, duplicate, future])
+    assert result["market_development_records"] == 1
+    assert result["market_holdout_publications"] == 1
+    assert result["market_holdout"]["n"] == 1
+    assert result["release_decision"] == "RESEARCH_ONLY"
+
+    audit = market_record_audit(eligible)
+    assert audit[0]["model_projection_error"] == -5.0
+    assert audit[0]["projection_edge_points"] == 4.5
+    assert audit[0]["diagnosis"] == "CORRECT"
+    metrics = market_metrics(eligible)
+    assert metrics["roi_ci_method"].startswith("deterministic fixture-level percentile bootstrap")
+    assert metrics["roi_ci95_lower"] is not None
+
+
 def test_evaluator_never_promotes_without_market_holdout():
     rows = [game(f"g{i}", (i % 28) + 1, "A", "B", 100 + i % 5, 98 + i % 7) for i in range(1, 29)]
     result = evaluate(rows, [])
@@ -174,5 +237,6 @@ if __name__ == "__main__":
     test_market_evidence_rejects_unverified_and_old_model_records()
     test_publication_capture_is_separate_from_settlement_and_roi()
     test_capture_status_is_partial_until_every_v5_forecast_has_a_frozen_price_pair()
+    test_fixed_holdout_cutoff_unique_fixture_and_market_audit()
     test_evaluator_never_promotes_without_market_holdout()
-    print("NBA totals walk-forward regression tests: PASS (5 groups)")
+    print("NBA totals walk-forward regression tests: PASS (6 groups)")
