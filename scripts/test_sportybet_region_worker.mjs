@@ -103,6 +103,14 @@ try {
   assert.equal(fetchCount, 1);
 
   fetchCount = 0;
+
+  const pageSix = await worker.fetch(new Request(
+    "https://worker.test/api/ng/factsCenter/pcUpcomingEvents?sportId=sr%3Asport%3A1&pageSize=100&pageNum=6&timeline=168&marketId=1%2C18"
+  ));
+  assert.equal(pageSix.status, 400);
+  assert.equal((await pageSix.json()).error, "INVALID_QUERY");
+  assert.equal(fetchCount, 0, "page 6 must be rejected before calling SportyBet");
+
   const diagnostic = await worker.fetch(new Request("https://worker.test/__diagnostics"));
   const diagnostics = await diagnostic.json();
   assert.equal(diagnostic.status, 200);
@@ -114,6 +122,46 @@ try {
   ]);
   assert.deepEqual(diagnostics.probes.map(item => item.event_count), [1, 1]);
   assert.equal(fetchCount, 2, "the probe must perform only two bounded requests");
+
+
+  fetchCount = 0;
+  const shareSelections = [
+    { eventId: "sr:match:football-test-1", marketId: "18", specifier: "total=2.5", outcomeId: "under" },
+    { eventId: "sr:match:tennis-test-2", marketId: "186", specifier: null, outcomeId: "home" }
+  ];
+  const sharePost = await worker.fetch(new Request("https://worker.test/api/ng/orders/share", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ selections: shareSelections })
+  }));
+  assert.equal(sharePost.status, 200, "bounded SportyBet share POST must reach the fixed upstream");
+  assert.equal(sharePost.headers.get("X-Match-Signal-Upstream-Endpoint"), "/api/ng/orders/share");
+  assert.equal(lastUrl.origin, "https://www.sportybet.com");
+  assert.equal(lastUrl.pathname, "/api/ng/orders/share");
+  assert.equal(lastOptions.method, "POST");
+  assert.deepEqual(JSON.parse(lastOptions.body), { selections: shareSelections });
+  assert.equal(fetchCount, 1);
+
+  fetchCount = 0;
+  const invalidShare = await worker.fetch(new Request("https://worker.test/api/ng/orders/share", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ selections: [{ eventId: "one" }] })
+  }));
+  assert.equal(invalidShare.status, 422);
+  assert.equal(fetchCount, 0, "invalid share slips must be rejected before provider access");
+
+  globalThis.fetch = async () => new Response("<!doctype html><html>challenge</html>", {
+    status: 200, headers: { "Content-Type": "text/html; charset=utf-8" }
+  });
+  const shareHtml = await worker.fetch(new Request("https://worker.test/api/ng/orders/share", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ selections: shareSelections })
+  }));
+  assert.equal(shareHtml.status, 502);
+  const shareHtmlBody = await shareHtml.json();
+  assert.equal(shareHtmlBody.error, "SPORTYBET_SHARE_NON_JSON");
+  assert.match(shareHtmlBody.detail, /non-JSON content/);
 
   globalThis.fetch = async () => {
     throw new Error("synthetic network failure");
