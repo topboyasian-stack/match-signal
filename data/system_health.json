@@ -1,26 +1,26 @@
 {
-  "generated_at": "2026-11-02T14:36:20.039286+00:00",
+  "generated_at": "2026-11-02T14:39:55.224436+00:00",
   "status": "FAIL",
   "critical_issues": 2,
-  "warning_issues": 2,
+  "warning_issues": 3,
   "info_issues": 1,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
       "status": "STALE",
-      "age_hours": 8.65,
+      "age_hours": 8.71,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.1,
+      "age_hours": 0.05,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 0.65,
+      "age_hours": 0.71,
       "threshold_hours": 4
     },
     {
@@ -38,21 +38,21 @@
     {
       "engine": "virtual_participant_history",
       "status": "STALE",
-      "max_input_age_minutes": 268.3,
-      "virtual_lab_status_age_minutes": 271.4,
+      "max_input_age_minutes": 272.0,
+      "virtual_lab_status_age_minutes": 275.0,
       "threshold_minutes": 30.0,
       "stale_inputs": []
     },
     {
       "engine": "tennis_forward_discovery",
-      "status": "PASS",
-      "age_hours": 7.94,
+      "status": "STALE",
+      "age_hours": 8.0,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
       "status": "STALE",
-      "age_hours": 6.41,
+      "age_hours": 6.47,
       "threshold_hours": 0.5,
       "heartbeat_source": "virtual_lab_live.json",
       "events_count": 697
@@ -60,11 +60,11 @@
     {
       "engine": "nba_live_observation_recorder",
       "status": "PASS",
-      "age_hours": 0.01,
+      "age_hours": 0.02,
       "threshold_hours": 0.25,
       "heartbeat_source": "nba_live_observations.json.gz",
       "games_tracked": 21,
-      "snapshots_recorded": 1978
+      "snapshots_recorded": 1990
     },
     {
       "engine": "engine_lifecycle",
@@ -105,17 +105,22 @@
     {
       "code": "STALE_CORE_PREDICTION_PIPELINE",
       "severity": "critical",
-      "detail": "updated_at age 8.65h exceeds 4h"
+      "detail": "updated_at age 8.71h exceeds 4h"
     },
     {
       "code": "VIRTUAL_PARTICIPANT_HISTORY_STALE",
       "severity": "warning",
-      "detail": "input older than 30 minutes: participant_lifecycle, collector_status, model_evaluation; oldest participant/settlement/model input is 268.3 minutes old; virtual_lab_status.json is 271.4 minutes old; current eFootball/virtual predictions must remain withheld until the source collector publishes fresh data"
+      "detail": "input older than 30 minutes: participant_lifecycle, collector_status, model_evaluation; oldest participant/settlement/model input is 272.0 minutes old; virtual_lab_status.json is 275.0 minutes old; current eFootball/virtual predictions must remain withheld until the source collector publishes fresh data"
+    },
+    {
+      "code": "TENNIS_FORWARD_DISCOVERY_STALE",
+      "severity": "warning",
+      "detail": "tennis_forward_status age 8.00h exceeds the 8h threshold; the discovery result is too old to confirm current fixture coverage"
     },
     {
       "code": "VIRTUAL_LIVE_FEED_STALE",
       "severity": "warning",
-      "detail": "virtual_lab_live.json age 6.41h exceeds 0.50h; a downstream Unified Upcoming refresh cannot substitute for a fresh source snapshot"
+      "detail": "virtual_lab_live.json age 6.47h exceeds 0.50h; a downstream Unified Upcoming refresh cannot substitute for a fresh source snapshot"
     },
     {
       "code": "PDL_EXPERIMENTAL_FEED_STALE",
@@ -125,7 +130,7 @@
     {
       "code": "PIPELINE_STALE",
       "severity": "critical",
-      "detail": "pipeline_status age 8.65h exceeds 4h"
+      "detail": "pipeline_status age 8.71h exceeds 4h"
     }
   ],
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
@@ -135,7 +140,7 @@
     "stale_live_flags_hidden": 0,
     "expired_settled_rows_hidden": 0,
     "virtual_market_rows_held_for_kickoff_window": 0,
-    "virtual_rows_held_for_stale_participant_history": 4797,
+    "virtual_rows_held_for_stale_participant_history": 4690,
     "virtual_rows_held_for_recent_product_drawdown": 13
   }
 }
