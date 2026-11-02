@@ -27,7 +27,7 @@ async function refreshSportyBet(){
     for(var page=1;page<=5;page++){
       var d;
       try{
-        d=await readJson('./api/sportybet-basketball?pageSize=100&timeline=168&pageNum='+page);
+        d=await readJson('./api/sportybet-basketball?pageSize=100&timeline=168&pageNum='+page+'&tournamentId=sr%3Atournament%3A132');
         if(!d||d.ok!==true||!Array.isArray(d.events))throw Error(d&&d.error||'SportyBet basketball feed unavailable');
       }catch(pageError){
         feedError='SportyBet page '+page+': '+String(pageError&&pageError.message||pageError);
