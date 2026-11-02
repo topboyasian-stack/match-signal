@@ -25,7 +25,7 @@ function lineFromMarket(market) {
   // carries the actual half-point total (for example line=25, total=25.5).
   const specifierText = [market?.specifier, market?.specifiers, market?.marketSpecifier]
     .map(value => String(value || '')).join(' ');
-  const explicitLine = specifierText.match(/(?:^|[,\\s;|&])(?:total|line)\\s*=\\s*(-?\\d+(?:\\.\\d+)?)(?=$|[,\\s;|&])/i);
+  const explicitLine = specifierText.match(/(?:^|[,\s;|&])(?:total|line)\s*=\s*(-?\d+(?:\.\d+)?)(?=$|[,\s;|&])/i);
   if (explicitLine) return Number(explicitLine[1]);
 
   const rawLine = market?.line;
@@ -35,8 +35,8 @@ function lineFromMarket(market) {
   }
   const text = [market?.desc, market?.name, market?.title, specifierText]
     .map(value => String(value || '')).join(' ');
-  const match = text.match(/(?:total|line|over|under)[^0-9]{0,8}([0-9]+(?:\\.[0-9]+)?)/i)
-    || text.match(/\\b([0-9]+(?:\\.[0-9]+)?)\\b/);
+  const match = text.match(/(?:total|line|over|under)[^0-9]{0,8}([0-9]+(?:\.[0-9]+)?)/i)
+    || text.match(/\b([0-9]+(?:\.[0-9]+)?)\b/);
   return match ? Number(match[1]) : null;
 }
 
@@ -209,15 +209,14 @@ function findBasketballSelection(leg,event){
 }
 
 function canonicalParticipant(value) {
-  let raw = String(value || '').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase();
+  let raw = String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   // Some bookmaker feeds return "Surname, Firstname".
   if (raw.includes(',')) {
     const parts = raw.split(',').map(part => part.trim()).filter(Boolean);
     if (parts.length === 2) raw = parts[1] + ' ' + parts[0];
   }
-  return raw.replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim().replace(/\\s+/g, ' ');
+  return raw.replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ');
 }
-
 
 function participantNameMatches(first, second) {
   const a = canonicalParticipant(first);
