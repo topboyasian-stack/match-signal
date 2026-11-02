@@ -26,6 +26,8 @@ def main():
     css = (ROOT / "ticket-drawer.css").read_text(encoding="utf-8")
     hub = (ROOT / "sport-hubs.js").read_text(encoding="utf-8")
     nba = (ROOT / "basketball-live.js").read_text(encoding="utf-8")
+    lab_html = (ROOT / "virtual-lab" / "index.html").read_text(encoding="utf-8")
+    lab_app = (ROOT / "virtual-lab-app.js").read_text(encoding="utf-8")
     api = (ROOT / "functions" / "api" / "sportybet-booking.js").read_text(encoding="utf-8")
 
     require('data-sport="basketball"' in basketball, "Basketball page lost its sport identity")
@@ -55,14 +57,18 @@ def main():
             "The Generate button must have a direct click handler")
     require("generate.disabled=bookingBusy||Boolean(lockReason())" not in drawer,
             "Ticket requirements must not make the Generate button appear dead")
-    require("manual_selections" in drawer and "./api/sportybet-booking" in drawer,
-            "The shared ticket must submit all selections through the common revalidation API")
+    require("manual_selections" in drawer and "/api/sportybet-booking" in drawer,
+            "The shared ticket must submit all selections through the root-relative common revalidation API")
     require("market==='total'?line:null" in drawer and "item.market==='total'" in drawer,
             "Football, Tennis and Basketball total legs must retain their exact line and side")
     require("data-ms-ticket-remove" in drawer and "data-ms-ticket-clear" in drawer,
             "Selections must be removable individually and as a full ticket")
     require("data-ticket-market-id" in drawer and "model_qualified" in drawer and "sportybet_event_id" in drawer,
             "Basketball market identity and release status must travel with each ticket leg")
+    require("product:item.product||null" in drawer and "product:target.getAttribute('data-ticket-product')" in drawer,
+            "Product-specific eFootball identity must survive add-to-ticket and server submission")
+    require("efootball_gt" in drawer and "efootball_adriatic" in drawer and "item.sport==='efootball'" in drawer,
+            "Only the two supported eFootball product lanes may be restored into the shared ticket")
     require("ms-ticket-builder" in css and "ms-pred-ticket-action" in css,
             "The shared builder and prediction actions need their styles")
 
@@ -70,8 +76,20 @@ def main():
             "NBA current totals must be selectable into the same ticket")
     require("nbaTotalsReleaseQualified(S.totalsOos,S.totalsProbability)" in nba and "nbaTotalRowQualified(p,S.totalsOos,S.totalsProbability,S.totalSnapshots,fresh)" in nba,
             "NBA ticket generation must retain the independent release and per-row gates")
+    require("../ticket-drawer.css?v=20261102-efootball-shared-ticket1" in lab_html and "../ticket-drawer.js?v=20261102-efootball-shared-ticket1" in lab_html,
+            "Virtual Lab must load the shared floating ticket from its nested route")
+    require("data-ms-ticket-add" in lab_app and 'data-ticket-sport="efootball"' in lab_app and "data-ticket-product" in lab_app and "efootballTicketReady" in lab_app,
+            "Only qualified eFootball GT/eAdriatic exact-line prediction cards may add to the shared ticket")
+    require("QUALIFIED_BASE_EVIDENCE" in lab_app and "QUALIFIED_PARTICIPANT_ENHANCED" in lab_app and "p.primary.marketType==='ou'" in lab_app,
+            "eFootball ticket actions must keep the existing product/model qualification gates and totals-only boundary")
     require("market === 'total' && ['football','tennis'].includes(sport)" in api and "leg.market === 'total'" in api and "leg.market_id !== requiredMarketId" in api,
             "Football/Tennis total selections must revalidate against exact SportyBet full-match O/U market IDs")
+    require("if (leg.sport === 'efootball')" in api and "productForLeg(leg) !== 'efootball'" in api and "leg.model_qualified !== true" in api,
+            "The booking API must accept only product-tagged, qualified eFootball O/U legs")
+    require("const requiredMarketId = sport === 'football' ? '18' : sport === 'tennis' ? '189' : sport === 'efootball' ? String(leg?.market_id || '')" in api,
+            "eFootball booking must revalidate the exact market ID passed by Virtual Lab")
+    require("map(l => String(l.sportybet_event_id || l.event_id || '')).filter(Boolean)" in api and "const hasEfootballLeg" in api and "EFOOTBALL_SLIP_REJECTED_PARTIAL" in api,
+            "eFootball revalidation must use the SportyBet provider ID and reject partial mixed slips")
     require("function collectBasketballEvents" in api and "function findBasketballSelection" in api,
             "The common booking API must resolve and revalidate NBA total markets")
     require("import { onRequestGet as getSportyBetBasketballFeed } from './sportybet-basketball.js';" in api and "getSportyBetBasketballFeed({request:feedRequest" in api,
