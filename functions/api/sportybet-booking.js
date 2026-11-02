@@ -604,6 +604,9 @@ async function handlePost(context) {
       return json({ ok: false, error: 'TOO_MANY_SELECTIONS', message: 'SportyBet booking codes support at most 20 selections.' }, 422);
     }
 
+    // If an NBA totals leg is present, the shared slip must remain all-or-nothing.
+    // Never surface a share code for a mixed or partially accepted NBA ticket.
+    const hasBasketballLeg = legs.some(leg => String(leg?.sport || '').toLowerCase() === 'basketball');
     const virtualIds = new Set(legs.filter(l => productForLeg(l) === 'vfootball').map(l => String(l.event_id || '')));
     const efootballIds = new Set(legs.filter(l => productForLeg(l) === 'efootball').map(l => String(l.event_id || '')));
     const footballIds = new Set(legs.filter(l => String(l?.sport || '').toLowerCase() === 'football').map(l => String(l.event_id || '')));
@@ -721,6 +724,19 @@ async function handlePost(context) {
     }
 
     const preExcluded = validation.filter(item => item.ok !== true);
+    if (hasBasketballLeg && preExcluded.length > 0) {
+      return json({
+        ok: false,
+        error: 'BASKETBALL_SLIP_REJECTED_PARTIAL',
+        message: 'At least one NBA leg failed current SportyBet validation. No booking code was created or returned. Refresh the whole ticket and validate every leg again.',
+        batch_id: batchId,
+        initial_selection_count: legs.length,
+        requested_selection_count: selections.length,
+        excluded_count: preExcluded.length,
+        booking_code_withheld: true,
+        validation
+      }, 409);
+    }
     if (!selections.length) {
       return json({
         ok: false,
@@ -858,6 +874,25 @@ async function handlePost(context) {
     const shareCode = String(data?.shareCode || '').trim().toUpperCase();
     const unavailable = Array.isArray(data?.unavailableOutcomes) ? data.unavailableOutcomes : [];
     const acceptedOutcomes = Array.isArray(data?.outcomes) ? data.outcomes : [];
+    const acceptedCount = acceptedOutcomes.length || Math.max(0, selections.length - unavailable.length);
+    if (hasBasketballLeg && (
+      unavailable.length > 0 ||
+      acceptedCount !== legs.length ||
+      (acceptedOutcomes.length > 0 && acceptedOutcomes.length !== selections.length)
+    )) {
+      return json({
+        ok: false,
+        error: 'BASKETBALL_SLIP_REJECTED_PARTIAL',
+        message: 'SportyBet accepted only part of this NBA-containing ticket. Match Signal has withheld the share code; refresh and rebuild the entire ticket.',
+        batch_id: batchId,
+        initial_selection_count: legs.length,
+        requested_selection_count: selections.length,
+        accepted_selection_count: acceptedCount,
+        unavailable_count: unavailable.length,
+        booking_code_withheld: true,
+        validation
+      }, 409);
+    }
     if (!shareCode) {
       return json({
         ok: false,
@@ -873,7 +908,6 @@ async function handlePost(context) {
       }, 502);
     }
 
-    const acceptedCount = acceptedOutcomes.length || Math.max(0, selections.length - unavailable.length);
     const partial = preExcluded.length > 0 || unavailable.length > 0 || acceptedCount < legs.length;
     const combinedOddsSource = acceptedOutcomes.length ? acceptedOutcomes : selections;
     const combinedOdds = combinedOddsSource.length
