@@ -135,12 +135,12 @@ try {
       ]
     })]
   };
-  const shareRequests=[];
+  const mixedShareRequests=[];
   globalThis.fetch=async(input,options={})=>{
     const url=new URL(typeof input==='string'?input:input.url);
     if(url.pathname==='/api/sportybet-virtual') return jsonResponse({ok:true,events:[]});
     if(url.pathname==='/api/ng/orders/share'){
-      shareRequests.push(JSON.parse(options.body));
+      mixedShareRequests.push(JSON.parse(options.body));
       return jsonResponse({bizCode:10000,data:{
         shareCode:'MIXED-EFOOTBALL-OK',
         shareURL:'https://www.sportybet.com/ng/?shareCode=MIXED-EFOOTBALL-OK',
@@ -168,8 +168,8 @@ try {
   assert.equal(mixedPayload.selection_count,3);
   assert.equal(mixedPayload.pre_excluded_count,0);
   assert.equal(mixedPayload.partial,false);
-  assert.equal(shareRequests.length,1);
-  assert.equal(shareRequests[0].selections.length,3,'the generated SportyBet request must contain all three sports');
+  assert.equal(mixedShareRequests.length,1);
+  assert.equal(mixedShareRequests[0].selections.length,3,'the generated SportyBet request must contain all three sports');
   assert.ok(mixedPayload.selections.every(row=>row.ok===true),'each current fixture/market must be revalidated');
   console.log('SportyBet booking resilience: PASS (bounded paging, share fallback, exact market-225 pair, and Football/Tennis/eFootball mixed ticket).');
 } finally { globalThis.fetch=originalFetch; }
