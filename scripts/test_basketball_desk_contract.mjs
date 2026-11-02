@@ -8,10 +8,10 @@ const [html, css, ui, api, workflow, booking, recorder, nbaRecorderWorkflow] = a
 ]);
 assert.ok(html.includes("MS-BASKETBALL-DESK-2026.10.24-V11"), "Basketball must publish the new design marker");
 assert.ok(html.includes("core-workspaces-design.css?v=20261014-full-v1"), "Basketball must use the shared Match Signal design layer");
-assert.ok(html.includes("basketball-live.js?v=20261101-sportybet-pages-v16"), "Basketball must cache-bust the paginated live SportyBet quote refresh and visible booking error/retry logic");
+assert.ok(html.includes("basketball-live.js?v=20261102-single-ticket1"), "Basketball must load the shared-ticket totals renderer");
 assert.ok(html.includes("basketball-design.css?v=20261024-builder-dark-v3"), "Basketball must load its latest contrast-corrected scoped design layer");
 assert.ok(workflow.includes("MS-BASKETBALL-DESK-2026.10.24-V11") && workflow.includes("basketball-design.css?v=20261024-builder-dark-v3"), "Pages production smoke markers must match the current Basketball page and CSS versions");
-assert.ok(workflow.includes("basketball-live.js?v=20261101-sportybet-pages-v16"), "Pages smoke tests must track the latest NBA live desk release-gate asset");
+assert.ok(workflow.includes("basketball-live.js?v=20261102-single-ticket1"), "Pages smoke tests must track the shared-ticket NBA renderer");
 assert.ok(html.includes('id="msNav"') && html.includes('workspace-ui.js?v=20261023-basketball-nav1'), "Basketball must use the single shared site navigation");
 for (const id of ["liveGames","upcomingGames","totalsBoard","finalResults","nbaTotalsLedger","performance","marketStatus","totalsStatus"]) assert.ok(html.includes('id="'+id+'"'), "Basketball must preserve renderer mount "+id);
 assert.ok(css.includes("MATCH-SIGNAL-BASKETBALL-DESK-V1"), "Basketball scoped design marker missing");
@@ -23,7 +23,7 @@ assert.ok(ui.includes("return nbaPredictionFresh(p,now).fresh&&!(e&&(e.completed
 assert.ok(ui.includes("function mergeScoreboardDate(date,events)") && ui.includes("if(etDate(entry[1].date)===key)S.scores.delete(entry[0]);"), "A successful ESPN date refresh must replace that date's prior events so games cannot remain stuck in Upcoming or Live after provider status changes.");
 assert.ok(ui.includes("function bestSportyBetTotalMarket(markets)") && ui.includes("String(m.id)") && ui.includes("225"), "Totals must select the explicit SportyBet market ID for full-game O/U including overtime");
 assert.ok(ui.includes("function sportyBetTotalMarkets(markets)") && ui.includes("data-total-line-choice") && ui.includes("SELECTED_TOTAL_LINES"), "Basketball totals must expose live-feed alternative lines and use the selected line for the card and builder");
-assert.ok(ui.includes("length>8") && ui.includes("length>=8") && ui.includes("not verified by SportyBet"), "Basketball builders must enforce the eight-leg limit and withhold unverified combined odds");
+assert.ok(ui.includes("data-ms-ticket-add") && ui.includes("data-ticket-market=\"total\""), "NBA total selections must route into the single shared ticket");
 assert.ok(ui.includes("Math.abs(a-b)<=45*60*1000"), "SportyBet quotes must match exact teams and near-identical kickoff times");
 assert.ok(ui.includes("replace(/\\s+/g,' ')"), "NBA team-name normalization must collapse whitespace rather than match a literal backslash-s sequence");
 assert.ok(ui.includes("Date.now()-fetched<=15*60*1000") && ui.includes("fresh:Number.isFinite(fetched)"), "Stale SportyBet quotes must be withheld while fresh quotes remain eligible");
@@ -43,16 +43,16 @@ assert.ok(workflow.includes("timeout-minutes: 5"), "Production smoke job must ha
 assert.ok(workflow.includes("const LIVE_RESULTS_TIMEOUT_MS = 45000") && workflow.includes("LIVE_RESULTS_TIMEOUT_MS)"), "Slow historical result-provider checks must get their own bounded 45-second budget.");
 
 assert.ok(html.includes("How to read this — one clear decision") && html.includes("Model at least 3 points above line"), "Totals page must explain how to choose Over, Under or no clear lean");
-assert.ok(html.includes('id="basketball-builders"') && html.includes('id="basketballBuilderWorkspace"'), "Basketball page must expose its four-builder workspace");
+assert.ok(!html.includes('id="basketball-builders"') && !html.includes('id="basketballBuilderWorkspace"') && !html.includes("4 Odds Builders"), "Basketball must expose only the single floating ticket, not a separate multi-builder section");
 assert.ok(ui.includes("function totalsLedgerHtml()") && ui.includes("data/nba_totals_ledger.json") && ui.includes("verifiedTotalRecord"), "NBA totals must read persistent settlement records and calculate accuracy only from decided settlements");
 assert.ok(html.includes("PERSISTENT SETTLEMENT LEDGER"), "Basketball desk must expose retained totals settlements");
-assert.ok(ui.includes("function renderBuilders()") && ui.includes("BASKETBALL_BUILDERS=[[],[],[],[]]") && ui.includes("data-builder-generate"), "Four independent builder cards must be rendered");
-assert.ok(ui.includes("BUILDER_ERRORS") && ui.includes("Code not generated") && ui.includes("data-builder-retry"), "Booking failures must remain visible in the relevant builder with a retry action");
-assert.ok(ui.includes("Booking API returned non-JSON (HTTP ") && ui.includes("await response.text()"), "Browser must surface diagnostics if the booking API itself returns non-JSON");
+assert.ok(!ui.includes("BASKETBALL_BUILDERS") && !ui.includes("renderBuilders()") && !ui.includes("bindBasketballBuilders()"), "The old four-builder implementation must be removed");
+assert.ok(ui.includes("function bindTotalLineChoices()") && ui.includes("data-total-line-choice"), "Alternative current SportyBet lines must remain selectable after removing the four builder slots");
+assert.ok(ui.includes("data-ticket-model-qualified") && ui.includes("nbaTotalsReleaseQualified(S.totalsOos)"), "The shared ticket must carry the NBA release decision with each selected total");
 assert.ok(booking.includes("hosts=['https://mobile.sportybet.com','https://lite.sportybet.com','https://www.sportybet.com']") && booking.includes("official web hosts") && booking.includes("content-type") && booking.includes("unavailable_count"), "Share generation must try official SportyBet host variants sequentially and report diagnostics without fabricating codes");
 assert.ok(booking.includes("fallback_direct_origin:true") && booking.includes("fallback_selections"), "Basketball booking must return verified selections for the same direct-origin fallback pattern as eFootball");
-assert.ok(!ui.includes("directOriginBasketballShare") && ui.includes("data.message||data.error"), "Basketball UI must surface the server's official-host diagnostics instead of repeating a browser request blocked by CORS");
-assert.ok(ui.includes("./api/sportybet-basketball-booking"), "Builder UI must request a live-validated SportyBet booking code");
+assert.ok(!ui.includes("directOriginBasketballShare") && ui.includes("canGenerate=qualified&&releaseQualified"), "Basketball selection must use the shared ticket and keep NBA release qualification enforced");
+assert.ok(ui.includes("data-ms-ticket-add") && ui.includes("data-ticket-market=\"total\""), "NBA prediction cards must add their exact total selection to the common ticket");
 assert.ok(booking.includes("host+'/api/ng/orders/share") && booking.includes("booking_code:share.code"), "Basketball booking endpoint must request and return a genuine SportyBet share code through official host variants");
 assert.ok(booking.includes("leg.market_id||'225'") && booking.includes("SELECTIONS_CHANGED") && booking.includes("NON_STAKING_BETSLIP_PREPARATION"), "Basketball code generation must revalidate exact total market 225 and fail closed without staking");
 
@@ -65,9 +65,9 @@ assert.ok(ui.includes("function liveTotalProjection") && ui.includes("OVERTIME_C
 assert.ok(ui.includes("publication_snapshot_verified===true") && ui.includes("roi_eligible===true") && ui.includes("quote_fresh_at_publication===true") && ui.includes("Legacy result-only accuracy"), "Legacy NBA total outcomes must remain separate from verified snapshot accuracy and ROI.");
 assert.ok(ui.includes("function nbaTotalsReleaseQualified(evidence)") && ui.includes("nba_totals_oos_value_test.json") && ui.includes("NBA_TOTALS_WALK_FORWARD_V1") && ui.includes("roi_ci95_lower") && ui.includes("roi_vs_market_favorite") && !ui.includes("nba_oos_value_test.json"), "NBA totals must use totals-only, version-matched walk-forward evidence with a positive 95% ROI lower bound.");
 assert.ok(ui.includes("function nbaTotalRowQualified(prediction,evidence)") && ui.includes('status==="BETTING_QUALIFIED"'), "Each NBA totals selection must be explicitly betting-qualified after the global release gate.");
-assert.ok(ui.includes("lean=qualified&&edge!=null") && ui.includes("RESEARCH ONLY · NO BETTING LEAN"), "Unreleased NBA model projections must never be rendered as Over/Under betting leans.");
-assert.ok(ui.includes("canAdd=!!(qualified&&fresh") && ui.includes("!nbaTotalsReleaseQualified(S.totalsOos)"), "NBA SportyBet builders must remain unavailable until both release and per-row qualification pass.");
-assert.ok(html.includes("The four builders remain locked while NBA totals are research-only"), "Basketball page must explain why builders remain locked.");
+assert.ok(ui.includes("lean=canGenerate&&edge!=null") && ui.includes("RESEARCH ONLY · NO BETTING LEAN"), "Unreleased NBA model projections must never be rendered as Over/Under betting leans.");
+assert.ok(ui.includes("canGenerate=qualified&&releaseQualified") && ui.includes("data-ticket-model-qualified"), "NBA ticket legs must require the global release gate and per-row qualification before code generation.");
+assert.ok(!html.includes("4 Odds Builders") && html.includes("ticket-drawer.js?v=20261102-single-ticket1"), "Basketball must present the shared floating ticket as its only builder.");
 assert.ok(ui.includes("uses_live_boxscore_stats") && ui.includes("home_possessions") && ui.includes("FGA, FTA, offensive rebounds and turnovers"), "Live desk must expose whether the total estimate actually consumed both teams’ live box-score possession inputs.");
 assert.ok(ui.includes("Live behavior snapshot is stale or unavailable") && ui.includes("12*60*1000"), "Live insights must fail closed when the observation artifact is stale.");
 assert.ok(ui.includes("Pregame probability is unchanged") && ui.includes("Paper research only"), "Live insights must preserve the pre-game forecast and research-only boundary.");

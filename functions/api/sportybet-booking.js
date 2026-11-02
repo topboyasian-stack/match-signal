@@ -161,6 +161,49 @@ async function collectEvents({ sportId, marketId, timeline = 168, pageSize = 100
   return found;
 }
 
+
+async function collectBasketballEvents(context,targetIds){
+  const found=new Map();if(!targetIds.size)return found;
+  for(let page=1;page<=4&&found.size<targetIds.size;page++){
+    const url=new URL('/api/sportybet-basketball?pageSize=100&timeline=168&pageNum='+page+'&_t='+Date.now(),context.request.url);
+    const response=await fetch(url.toString(),{headers:{'Accept':'application/json','Cache-Control':'no-cache'},cache:'no-store',signal:AbortSignal.timeout(18000)});
+    if(!response.ok)throw new Error('Current SportyBet basketball feed HTTP '+response.status);
+    const payload=await response.json();
+    if(payload?.ok!==true||!Array.isArray(payload.events))throw new Error(payload?.error||'Current SportyBet basketball feed unavailable');
+    for(const row of payload.events){
+      const eventId=String(row?.event_id||'');if(!eventId||!targetIds.has(eventId))continue;
+      const start=Date.parse(String(row?.start_time||''));
+      const markets=(Array.isArray(row?.markets)?row.markets:[]).map(m=>({
+        id:String(m?.id||''),name:String(m?.name||''),desc:String(m?.name||''),specifier:m?.specifier??null,status:String(m?.status||''),
+        outcomes:(Array.isArray(m?.outcomes)?m.outcomes:[]).map(o=>({id:String(o?.id||''),name:String(o?.name||''),desc:String(o?.name||''),odds:Number(o?.odds),active:o?.active!==false,isActive:o?.active===false?0:1}))
+      }));
+      found.set(eventId,{eventId,homeTeamName:String(row?.home||''),awayTeamName:String(row?.away||''),estimateStartTime:Number.isFinite(start)?start:0,matchStatus:'Not start',tournament:String(row?.tournament||''),markets});
+    }
+    if(payload.events.length<100)break;
+  }
+  return found;
+}
+function findBasketballSelection(leg,event){
+  const side=String(leg?.pick||'').toLowerCase(),line=Number(leg?.line);
+  if(!['over','under'].includes(side)||!Number.isFinite(line)||line<100||line>300||String(leg?.market_id||'225')!=='225')return{error:'Only an exact SportyBet full-game market-225 Over/Under selection is supported.'};
+  const canon=value=>String(value||'').toLowerCase().replace(/&/g,' and ').replace(/[^a-z0-9]+/g,' ').trim().replace(/\s+/g,' ');
+  const names=[canon(leg?.player_1),canon(leg?.player_2)].sort(),current=[canon(event?.homeTeamName),canon(event?.awayTeamName)].sort();
+  if(!names[0]||!names[1]||names[0]!==current[0]||names[1]!==current[1])return{error:'Basketball participants changed in the current SportyBet catalogue.'};
+  const requestedStart=Date.parse(String(leg?.start_time||'')),currentStart=Number(event?.estimateStartTime||0);
+  if(Number.isFinite(requestedStart)&&currentStart&&Math.abs(requestedStart-currentStart)>45*60*1000)return{error:'Basketball fixture start time changed; refresh the ticket.'};
+  for(const market of (Array.isArray(event?.markets)?event.markets:[])){
+    const status=String(market?.status||'').trim().toLowerCase();
+    if(String(market?.id||'')!=='225'||/suspend|closed|inactive|settled|unavailable|stop/i.test(status)||(status!==''&&/^\d+$/.test(status)&&status!=='0'))continue;
+    const currentLine=lineFromMarket(market);if(!Number.isFinite(currentLine)||Math.abs(currentLine-line)>1e-9)continue;
+    const outcome=(Array.isArray(market?.outcomes)?market.outcomes:[]).find(o=>{
+      const name=String(o?.desc||o?.name||o?.title||'').toLowerCase(),active=o?.isActive==null?(o?.active!==false):(Number(o.isActive)===1||o.isActive===true);
+      return active&&(side==='over'?/\bover\b/.test(name):/\bunder\b/.test(name))&&Number(o?.odds)>1&&String(o?.id||'');
+    });
+    if(outcome)return{eventId:event.eventId,marketId:'225',specifier:market?.specifier??null,outcomeId:String(outcome.id),outcomeName:String(outcome.desc||outcome.name||side),odds:Number(outcome.odds)};
+  }
+  return{error:'The exact current SportyBet basketball market-225 line or side is no longer available.'};
+}
+
 function normalizeFixture(value) {
   return String(value || '')
     .toLowerCase()
@@ -300,47 +343,39 @@ function lineFromLeg(leg) {
 function findVirtualSelection(leg, event) {
   const requestedLine = lineFromLeg(leg);
   const side = pickVirtualSide(leg);
+  const sport = String(leg?.sport || '').toLowerCase();
+  const requiredMarketId = sport === 'football' ? '18' : sport === 'tennis' ? '189' : '';
   if (!Number.isFinite(requestedLine) || !side) {
     return { error: 'Could not map the Builder O/U selection to an exact line and side.' };
   }
-
+  if (requiredMarketId && String(leg?.market_id || '') !== requiredMarketId) {
+    return { error: 'The requested sport total market ID does not match the supported full-match market.' };
+  }
   const markets = Array.isArray(event?.markets) ? event.markets : [];
   for (const market of markets) {
     const marketId = String(market?.id || '');
-    const desc = [
-      market?.desc,
-      market?.name,
-      market?.title,
-      market?.specifier
-    ].map(value => String(value || '')).join(' ').toLowerCase();
+    const status = String(market?.status || '').trim().toLowerCase();
+    if (/suspend|closed|inactive|settled|unavailable|stop/i.test(status) ||
+        (status !== '' && /^\d+$/.test(status) && status !== '0')) continue;
+    const desc = [market?.desc,market?.name,market?.title,market?.specifier]
+      .map(value => String(value || '')).join(' ').toLowerCase();
     const line = lineFromMarket(market);
-    const isOu = marketId === '189' || /over\s*\/?\s*under|over.?under|total|\bou\b/.test(desc);
+    const isOu = requiredMarketId
+      ? marketId === requiredMarketId
+      : (marketId === '189' || /over\s*\/?\s*under|over.?under|total|\bou\b/.test(desc));
     if (!isOu || line == null || Math.abs(line - requestedLine) > 1e-9) continue;
-
     const outcomes = Array.isArray(market?.outcomes) ? market.outcomes : [];
     const outcome = outcomes.find(o => {
       const rawName = String(o?.desc || o?.name || o?.title || '').toLowerCase().trim();
       const normalized = rawName.replace(/[^a-z0-9]+/g, ' ');
-      const active = o?.isActive == null
-        ? (o?.active == null || o.active !== false)
-        : Number(o.isActive) === 1 || o.isActive === true;
-      const sideMatch = side === 'under'
-        ? /\bunder\b/.test(normalized) || /^u\b/.test(normalized)
-        : /\bover\b/.test(normalized) || /^o\b/.test(normalized);
+      const active = o?.isActive == null ? (o?.active == null || o.active !== false) : Number(o.isActive) === 1 || o.isActive === true;
+      const sideMatch = side === 'under' ? /\bunder\b/.test(normalized) || /^u\b/.test(normalized) : /\bover\b/.test(normalized) || /^o\b/.test(normalized);
       const outcomeLine = lineFromMarket(o);
       const lineMatch = outcomeLine == null || Math.abs(Number(outcomeLine) - requestedLine) < 1e-9;
       return active && sideMatch && lineMatch;
     });
     if (!outcome) continue;
-
-    return {
-      eventId: event.eventId,
-      marketId,
-      specifier: market?.specifier ?? null,
-      outcomeId: String(outcome?.id || ''),
-      outcomeName: String(outcome?.desc || outcome?.name || outcome?.title || ''),
-      odds: Number(outcome?.odds || 0)
-    };
+    return { eventId:event.eventId,marketId,specifier:market?.specifier??null,outcomeId:String(outcome?.id||''),outcomeName:String(outcome?.desc||outcome?.name||outcome?.title||''),odds:Number(outcome?.odds||0) };
   }
   return { error: 'The exact SportyBet O/U line or selected side is no longer available.' };
 }
@@ -386,6 +421,8 @@ async function buildSelection(leg, event) {
 
   const sport = String(leg?.sport || '').toLowerCase();
   const market = String(leg?.market || '').toLowerCase();
+  if (sport === 'basketball') return findBasketballSelection(leg,event);
+  if (market === 'total' && ['football','tennis'].includes(sport)) return findVirtualSelection(leg,event);
   if (sport === 'football' || market === '1x2' || market === 'winner') {
     return findWinnerSelection(leg, event);
   }
@@ -414,19 +451,35 @@ async function handlePost(context) {
         sport: String(item?.sport || '').toLowerCase(),
         market: String(item?.market || 'winner').toLowerCase(),
         pick: String(item?.pick || '').toLowerCase(),
+        line: item?.line == null ? null : Number(item.line),
+        market_id: String(item?.market_id || ''),
+        model_qualified: item?.model_qualified === true,
         start_time: String(item?.start_time || ''),
         player_1: String(item?.player_1 || ''),
         player_2: String(item?.player_2 || ''),
         match: String(item?.match || (String(item?.player_1 || '') + ' vs ' + String(item?.player_2 || '')))
       }));
       const ids = legs.map(leg => leg.event_id);
-      if (legs.some(leg => !leg.event_id || !leg.player_1 || !leg.player_2 ||
-          !['football', 'tennis'].includes(leg.sport) ||
-          !['winner', '1x2'].includes(leg.market) ||
-          !['p1', 'p2', 'draw'].includes(leg.pick) ||
-          (leg.sport === 'tennis' && leg.pick === 'draw')) ||
+      if (legs.some(leg => {
+          if (!leg.event_id || !leg.player_1 || !leg.player_2) return true;
+          if (leg.sport === 'basketball') {
+            return leg.market !== 'total' || !['over', 'under'].includes(leg.pick) ||
+              !Number.isFinite(Number(leg.line)) || Number(leg.line) < 100 || Number(leg.line) > 300 ||
+              leg.market_id !== '225' || leg.model_qualified !== true;
+          }
+          if (!['football', 'tennis'].includes(leg.sport)) return true;
+          if (leg.market === 'total') {
+            const requiredMarketId = leg.sport === 'football' ? '18' : '189';
+            return !['over', 'under'].includes(leg.pick) ||
+              !Number.isFinite(Number(leg.line)) || Number(leg.line) <= 0 || Number(leg.line) > 1000 ||
+              leg.market_id !== requiredMarketId;
+          }
+          return !['winner', '1x2'].includes(leg.market) ||
+            !['p1', 'p2', 'draw'].includes(leg.pick) ||
+            (leg.sport === 'tennis' && leg.pick === 'draw');
+        }) ||
           ids.some(id => !id) || new Set(ids).size !== ids.length) {
-        return json({ ok: false, error: 'INVALID_MANUAL_SELECTION', message: 'Manual slips currently support one winner selection per distinct pre-match football or tennis event.' }, 422);
+        return json({ ok: false, error: 'INVALID_MANUAL_SELECTION', message: 'Manual tickets support football/tennis winners or exact current totals, plus qualified NBA full-game totals.' }, 422);
       }
     } else {
       // Desk research batches remain subject to their existing Builder qualification gates.
@@ -448,6 +501,7 @@ async function handlePost(context) {
     const efootballIds = new Set(legs.filter(l => productForLeg(l) === 'efootball').map(l => String(l.event_id || '')));
     const footballIds = new Set(legs.filter(l => String(l?.sport || '').toLowerCase() === 'football').map(l => String(l.event_id || '')));
     const tennisIds = new Set(legs.filter(l => String(l?.sport || '').toLowerCase() === 'tennis').map(l => String(l.event_id || '')));
+    const basketballIds = new Set(legs.filter(l => String(l?.sport || '').toLowerCase() === 'basketball').map(l => String(l.event_id || '')));
 
     const found = new Map();
 
@@ -502,6 +556,10 @@ async function handlePost(context) {
         sportId: 'sr:sport:5',
         marketId: '186,210,202,204,189,203,188,187'
       }, tennisIds);
+      for (const [id, event] of events) found.set(id, event);
+    }
+    if (basketballIds.size) {
+      const events = await collectBasketballEvents(context, basketballIds);
       for (const [id, event] of events) found.set(id, event);
     }
 
