@@ -4,6 +4,11 @@ on:
     # Settle shortly after each quarter-hour price capture, before the research report refresh.
     - cron: '10,25,40,55 * * * *'
   workflow_dispatch:
+  workflow_run:
+    # Backup reconciliation after successful exact-market price capture. Cron remains the normal cadence.
+    workflows:
+      - "NBA totals SportyBet market-225 price capture"
+    types: [completed]
   push:
     branches: [main]
     paths:
@@ -17,6 +22,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   settle:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
@@ -30,9 +36,43 @@ jobs:
         run: python -m pip install --disable-pip-version-check requests
       - name: Run settlement tests
         run: python scripts/test_settle_nba_totals.py
+      - name: Gate duplicate capture-triggered settlement
+        id: settlement_due
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          import os
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          event_name = os.environ.get("EVENT_NAME", "")
+          if event_name != "workflow_run":
+              print("run=true")
+              print("reason=scheduled_manual_or_push")
+              raise SystemExit(0)
+
+          age_minutes = float("inf")
+          try:
+              ledger = json.loads(Path("data/nba_totals_ledger.json").read_text(encoding="utf-8"))
+              updated = datetime.fromisoformat(str(ledger.get("updated_at", "")).replace("Z", "+00:00"))
+              if updated.tzinfo is None:
+                  updated = updated.replace(tzinfo=timezone.utc)
+              age_minutes = (datetime.now(timezone.utc) - updated.astimezone(timezone.utc)).total_seconds() / 60
+          except (OSError, ValueError, TypeError):
+              pass
+
+          should_run = age_minutes >= 10
+          print(f"run={'true' if should_run else 'false'}")
+          print(f"ledger_age_minutes={age_minutes:.2f}" if age_minutes != float("inf") else "ledger_age_minutes=unknown")
+          print("reason=ledger_older_than_10_minutes" if should_run else "reason=ledger_refreshed_within_10_minutes")
+          PY
       - name: Reconcile official final scores
+        if: steps.settlement_due.outputs.run == 'true'
         run: python scripts/settle_nba_totals.py
       - name: Persist ledger with bounded concurrent-main retries
+        if: steps.settlement_due.outputs.run == 'true'
         shell: bash
         run: |
           set -euo pipefail
