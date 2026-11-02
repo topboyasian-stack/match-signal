@@ -218,6 +218,7 @@ function canonicalParticipant(value) {
   return raw.replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim().replace(/\\s+/g, ' ');
 }
 
+
 function participantNameMatches(first, second) {
   const a = canonicalParticipant(first);
   const b = canonicalParticipant(second);
