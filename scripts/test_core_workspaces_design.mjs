@@ -37,7 +37,7 @@ for (const group of selectors) {
 for (const [name, html, marker, script, sport] of [
   ["Main Desk", index, "MS-DESK-2026.10.14-V1", /sport-hubs\.js\?v=[^"']+/, null],
   ["Football", football, "MS-FOOTBALL-DESK-2026.10.14-V1", "league-logos.js?v=20261013-competition-logos2", "football"],
-  ["Tennis", tennis, "MS-TENNIS-DESK-2026.10.14-V1", "sport-hubs.js?v=20261013-qualified-best-kickoff-sort1", "tennis"]
+  ["Tennis", tennis, "MS-TENNIS-DESK-2026.10.14-V1", "sport-hubs.js?v=20261102-single-ticket1", "tennis"]
 ]) {
   assert.ok(html.includes(marker), name + " must declare the new page design marker");
   assert.ok(html.includes("core-workspaces-design.css?v=20261014-full-v1"), name + " must load the full-recomposition style");
