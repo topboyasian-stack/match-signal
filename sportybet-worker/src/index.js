@@ -3,6 +3,7 @@ const PLACEMENT_HINT = "aws:eu-west-1";
 const PC_ENDPOINT = "/api/ng/factsCenter/pcUpcomingEvents";
 const WAP_UPCOMING_ENDPOINT = "/api/ng/factsCenter/wapConfigurableUpcomingEvents";
 const WAP_LIVE_ENDPOINT = "/api/ng/factsCenter/wapConfigurableIndexLiveEvents";
+const SHARE_ENDPOINT = "/api/ng/orders/share";
 const ALLOWED_ENDPOINTS = new Set([PC_ENDPOINT, WAP_UPCOMING_ENDPOINT, WAP_LIVE_ENDPOINT]);
 const ALLOWED_SPORTS = new Set(["sr:sport:1", "sr:sport:2", "sr:sport:5", "sr:sport:137", "sr:sport:202120001"]);
 const ALLOWED_TOURNAMENTS = new Set(["sr:tournament:132"]);
@@ -24,7 +25,7 @@ function json(body, status = 200) {
       "Content-Type": "application/json; charset=utf-8",
       "Cache-Control": "no-store",
       "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET,OPTIONS",
+      "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type"
     }
   });
@@ -67,6 +68,93 @@ function readSafeParams(url, path) {
     params.set("marketId", [...new Set(ids)].join(","));
   }
   return params;
+}
+
+
+async function proxyShareRequest(request) {
+  let raw;
+  try {
+    raw = await request.text();
+  } catch (_) {
+    return json({ ok: false, error: "INVALID_SHARE_PAYLOAD" }, 400);
+  }
+  if (raw.length > 32768) return json({ ok: false, error: "SHARE_PAYLOAD_TOO_LARGE" }, 413);
+
+  let body;
+  try {
+    body = JSON.parse(raw);
+  } catch (_) {
+    return json({ ok: false, error: "INVALID_SHARE_JSON" }, 400);
+  }
+  const selections = body && body.selections;
+  if (!Array.isArray(selections) || selections.length < 2 || selections.length > 20) {
+    return json({ ok: false, error: "INVALID_SHARE_SELECTION_COUNT", detail: "A share request requires 2 to 20 selections." }, 422);
+  }
+
+  const clean = [];
+  for (const item of selections) {
+    const eventId = String(item?.eventId ?? "").trim();
+    const marketId = String(item?.marketId ?? "").trim();
+    const outcomeId = String(item?.outcomeId ?? "").trim();
+    const specifier = item?.specifier == null ? null : String(item.specifier);
+    if (!eventId || eventId.length > 128 || /[\r\n]/.test(eventId) ||
+        !outcomeId || outcomeId.length > 128 || /[\r\n]/.test(outcomeId) ||
+        !ALLOWED_MARKETS.has(marketId) ||
+        (specifier !== null && (specifier.length > 256 || /[\r\n]/.test(specifier)))) {
+      return json({ ok: false, error: "INVALID_SHARE_SELECTION", detail: "Each selection must contain a valid eventId, allowlisted marketId, outcomeId, and optional bounded specifier." }, 422);
+    }
+    clean.push({ eventId, marketId, specifier, outcomeId });
+  }
+
+  const url = new URL(ORIGIN + SHARE_ENDPOINT);
+  url.searchParams.set("_t", String(Date.now()));
+  try {
+    const upstream = await fetch(url.toString(), {
+      method: "POST",
+      headers: {
+        ...UPSTREAM_HEADERS,
+        "Accept-Language": "en-NG,en;q=0.9",
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache",
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-origin"
+      },
+      body: JSON.stringify({ selections: clean }),
+      cache: "no-store",
+      redirect: "follow",
+      signal: AbortSignal.timeout(15000)
+    });
+    const contentType = String(upstream.headers.get("content-type") || "unknown");
+    const text = await upstream.text();
+    let payload = null;
+    try { payload = JSON.parse(text); } catch (_) {}
+    if (!payload) {
+      return json({
+        ok: false,
+        error: "SPORTYBET_SHARE_NON_JSON",
+        detail: "SportyBet share endpoint returned non-JSON content (HTTP " + upstream.status + ", content-type " + contentType + ")."
+      }, 502);
+    }
+    return new Response(JSON.stringify(payload), {
+      status: upstream.status,
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+        "X-Match-Signal-Upstream-Status": String(upstream.status),
+        "X-Match-Signal-Upstream-Endpoint": SHARE_ENDPOINT
+      }
+    });
+  } catch (error) {
+    return json({
+      ok: false,
+      error: "SPORTYBET_SHARE_UPSTREAM_FAILED",
+      detail: String(error?.message || error || "share upstream request failed").slice(0, 200)
+    }, 502);
+  }
 }
 
 function eventCounts(payload) {
@@ -131,6 +219,10 @@ export default {
   async fetch(request) {
     const url = new URL(request.url);
     if (request.method === "OPTIONS") return json({ ok: true });
+    if (url.pathname === SHARE_ENDPOINT) {
+      if (request.method !== "POST") return json({ ok: false, error: "METHOD_NOT_ALLOWED" }, 405);
+      return proxyShareRequest(request);
+    }
     if (request.method !== "GET") return json({ ok: false, error: "METHOD_NOT_ALLOWED" }, 405);
 
     if (url.pathname === "/health") {
