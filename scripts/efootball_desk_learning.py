@@ -188,6 +188,88 @@ def market_research_score_rows(archive):
     return out
 
 
+def supplemental_event_id_diagnostics(trace, supplemental_score_rows):
+    """Measure source event-ID overlap without allowing ID-only settlement."""
+    from collections import defaultdict
+
+    trace_index = defaultdict(dict)
+    score_index = defaultdict(dict)
+    for row in trace if isinstance(trace, list) else []:
+        if not isinstance(row, dict):
+            continue
+        product = str(row.get("product") or "").strip().lower()
+        event_id = str(row.get("event_id") or "").strip()
+        key = fixture_key(row)
+        if product not in {"efootball_gt", "efootball_adriatic"} or not event_id or not key:
+            continue
+        trace_index[(product, event_id)][key] = row
+
+    for row in supplemental_score_rows if isinstance(supplemental_score_rows, list) else []:
+        if not isinstance(row, dict):
+            continue
+        product = str(row.get("product") or "").strip().lower()
+        event_id = str(row.get("event_id") or "").strip()
+        key = fixture_key(row)
+        if product not in {"efootball_gt", "efootball_adriatic"} or not event_id or not key:
+            continue
+        score_index[(product, event_id)][key] = row
+
+    output = {}
+    for product in ("efootball_gt", "efootball_adriatic"):
+        trace_keys = {key for key in trace_index if key[0] == product}
+        score_keys = {key for key in score_index if key[0] == product}
+        shared_ids = trace_keys & score_keys
+        exact_fixture_ids = 0
+        same_identity_ids = 0
+        unique_mismatch_ids = 0
+        ambiguous_trace_ids = 0
+        ambiguous_score_ids = 0
+        samples = []
+        for product_event_key in sorted(shared_ids):
+            traces = trace_index[product_event_key]
+            scores = score_index[product_event_key]
+            if len(traces) > 1:
+                ambiguous_trace_ids += 1
+            if len(scores) > 1:
+                ambiguous_score_ids += 1
+            for trace_fixture, trace_row in traces.items():
+                identity = fixture_identity(trace_row)
+                for score_fixture, score_row in scores.items():
+                    if trace_fixture == score_fixture:
+                        exact_fixture_ids += 1
+                    if identity is None or fixture_identity(score_row) != identity:
+                        continue
+                    same_identity_ids += 1
+                    if trace_fixture != score_fixture and len(traces) == 1 and len(scores) == 1:
+                        unique_mismatch_ids += 1
+                        if len(samples) < 8:
+                            trace_start = dt(trace_row.get("start_time") or trace_row.get("timestamp"))
+                            score_start = dt(score_row.get("start_time") or score_row.get("timestamp"))
+                            samples.append({
+                                "event_id": product_event_key[1],
+                                "product": product,
+                                "participants": list(identity[1]),
+                                "trace_start_time": trace_start.isoformat() if trace_start else None,
+                                "score_start_time": score_start.isoformat() if score_start else None,
+                                "kickoff_delta_seconds": round((score_start-trace_start).total_seconds(), 1) if trace_start and score_start else None,
+                                "trace_fixture_count_for_event_id": len(traces),
+                                "score_fixture_count_for_event_id": len(scores),
+                            })
+        output[product] = {
+            "trace_unique_product_event_ids": len(trace_keys),
+            "settled_score_product_event_ids": len(score_keys),
+            "shared_product_event_ids": len(shared_ids),
+            "exact_fixture_id_matches": exact_fixture_ids,
+            "same_product_event_id_and_participant_matches": same_identity_ids,
+            "unique_identity_matches_with_kickoff_mismatch": unique_mismatch_ids,
+            "event_ids_with_multiple_trace_fixtures": ambiguous_trace_ids,
+            "event_ids_with_multiple_score_fixtures": ambiguous_score_ids,
+            "kickoff_mismatch_samples": samples,
+            "matching_policy": "diagnostic_only_no_event_id_fuzzy_settlement",
+        }
+    return output
+
+
 def settlement_index(history):
     """Index verified final scores without mixing products or forecast markets.
 
@@ -1101,6 +1183,7 @@ def main():
         product: sum(1 for row in supplemental_score_rows if row.get("product") == product)
         for product in ("efootball_gt", "efootball_adriatic")
     }
+    reconciliation["supplemental_event_id_diagnostics"] = supplemental_event_id_diagnostics(trace, supplemental_score_rows)
     settled_ledger, ledger_added = merge_settled_observations(settled_ledger, trace)
     reconciliation["captured_new_forecasts"] = captured
     reconciliation["settled_ledger_rows"] = len(settled_ledger)
@@ -1217,6 +1300,7 @@ def main():
             }
             for product, metrics in by_product.items()
         },
+        "supplemental_event_id_diagnostics": reconciliation["supplemental_event_id_diagnostics"],
     }, indent=2))
 
 
