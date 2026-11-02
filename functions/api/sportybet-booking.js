@@ -21,8 +21,13 @@ function json(body, status = 200) {
 }
 
 function lineFromMarket(market) {
-  const direct = Number(market?.line);
-  if (Number.isFinite(direct)) return direct;
+  // A null line is common when SportyBet puts the actual value in specifier.
+  // Number(null) is zero, so only trust a line field when it is really present.
+  const rawLine = market?.line;
+  if (rawLine != null && String(rawLine).trim() !== '') {
+    const direct = Number(rawLine);
+    if (Number.isFinite(direct)) return direct;
+  }
   const text = [
     market?.specifier,
     market?.desc,
@@ -186,8 +191,7 @@ async function collectBasketballEvents(context,targetIds){
 function findBasketballSelection(leg,event){
   const side=String(leg?.pick||'').toLowerCase(),line=Number(leg?.line);
   if(!['over','under'].includes(side)||!Number.isFinite(line)||line<100||line>300||String(leg?.market_id||'225')!=='225')return{error:'Only an exact SportyBet full-game market-225 Over/Under selection is supported.'};
-  const canon=value=>String(value||'').toLowerCase().replace(/&/g,' and ').replace(/[^a-z0-9]+/g,' ').trim().replace(/\s+/g,' ');
-  const names=[canon(leg?.player_1),canon(leg?.player_2)].sort(),current=[canon(event?.homeTeamName),canon(event?.awayTeamName)].sort();
+  const names=[canonicalParticipant(leg?.player_1),canonicalParticipant(leg?.player_2)].sort(),current=[canonicalParticipant(event?.homeTeamName),canonicalParticipant(event?.awayTeamName)].sort();
   if(!names[0]||!names[1]||names[0]!==current[0]||names[1]!==current[1])return{error:'Basketball participants changed in the current SportyBet catalogue.'};
   const requestedStart=Date.parse(String(leg?.start_time||'')),currentStart=Number(event?.estimateStartTime||0);
   if(Number.isFinite(requestedStart)&&currentStart&&Math.abs(requestedStart-currentStart)>45*60*1000)return{error:'Basketball fixture start time changed; refresh the ticket.'};
@@ -204,6 +208,40 @@ function findBasketballSelection(leg,event){
   return{error:'The exact current SportyBet basketball market-225 line or side is no longer available.'};
 }
 
+function canonicalParticipant(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+function legParticipants(leg) {
+  let first = String(leg?.player_1 || leg?.home || '').trim();
+  let second = String(leg?.player_2 || leg?.away || '').trim();
+  if ((!first || !second) && (leg?.match || leg?.fixture)) {
+    const parts = String(leg.match || leg.fixture).split(/\s+(?:vs?\.?)\s+/i);
+    if (parts.length === 2) {
+      first = first || parts[0].trim();
+      second = second || parts[1].trim();
+    }
+  }
+  return [first, second];
+}
+
+function sameParticipantPair(first, second, event) {
+  const requested = first.map(canonicalParticipant).sort();
+  const current = [
+    canonicalParticipant(event?.homeTeamName),
+    canonicalParticipant(event?.awayTeamName)
+  ].sort();
+  return Boolean(requested[0] && requested[1] && current[0] && current[1] &&
+    requested[0] === current[0] && requested[1] === current[1]);
+}
+
 function normalizeFixture(value) {
   return String(value || '')
     .toLowerCase()
@@ -213,25 +251,30 @@ function normalizeFixture(value) {
 }
 
 function resolveCurrentEvent(leg, found) {
+  const [first, second] = legParticipants(leg);
+  const hasParticipants = Boolean(first && second);
   const direct = found.get(String(leg?.event_id || ''));
-  if (direct) return { event: direct, matched_by: 'event_id' };
+  // Do not trust a reused/stale provider ID when its participants differ.
+  if (direct && (!hasParticipants || sameParticipantPair([first, second], direct))) {
+    return { event: direct, matched_by: 'event_id' };
+  }
 
   const targetMatch = normalizeFixture(
     leg?.match ||
     leg?.fixture ||
     String(leg?.pick || '').split('—')[0]
   );
-  if (!targetMatch) return { event: null, matched_by: 'none' };
+  if (!hasParticipants && !targetMatch) return { event: null, matched_by: 'none' };
 
   const targetStart = Date.parse(String(leg?.start_time || ''));
   let best = null;
   let bestDiff = Infinity;
 
   for (const event of found.values()) {
-    const candidateMatch = normalizeFixture(
-      String(event?.homeTeamName || '') + ' vs ' + String(event?.awayTeamName || '')
-    );
-    if (!candidateMatch || candidateMatch !== targetMatch) continue;
+    const participantsMatch = hasParticipants
+      ? sameParticipantPair([first, second], event)
+      : normalizeFixture(String(event?.homeTeamName || '') + ' vs ' + String(event?.awayTeamName || '')) === targetMatch;
+    if (!participantsMatch) continue;
 
     const candidateStart = Number(event?.estimateStartTime || 0);
     if (!candidateStart) {
@@ -248,7 +291,7 @@ function resolveCurrentEvent(leg, found) {
     }
   }
 
-  return { event: best, matched_by: best ? 'fixture_time' : 'none' };
+  return { event: best, matched_by: best ? 'fixture_participants_time' : 'none' };
 }
 
 async function collectVirtualEventsFromLiveFeed(context, targetIds, sources = 'efootball,vfootball') {
@@ -292,6 +335,20 @@ async function collectVirtualEventsFromLiveFeed(context, targetIds, sources = 'e
     // Existing SportyBet catalogue lookup remains the primary path.
   }
   return found;
+}
+
+function validationFailure(leg, reason) {
+  return {
+    event_id: String(leg?.event_id || ''),
+    sport: String(leg?.sport || ''),
+    match: String(leg?.match || (String(leg?.player_1 || '') + ' vs ' + String(leg?.player_2 || ''))),
+    market: String(leg?.market || ''),
+    pick: String(leg?.pick || ''),
+    line: leg?.line ?? null,
+    ok: false,
+    excluded: true,
+    reason
+  };
 }
 
 function productForLeg(leg) {
@@ -383,38 +440,64 @@ function findVirtualSelection(leg, event) {
 function findWinnerSelection(leg, event) {
   const pick = String(leg?.pick || '').toLowerCase();
   const sport = String(leg?.sport || '').toLowerCase();
+  const selectedName = pick === 'p1' ? String(leg?.player_1 || '') :
+    pick === 'p2' ? String(leg?.player_2 || '') : '';
+  const selected = canonicalParticipant(selectedName);
+  const home = canonicalParticipant(event?.homeTeamName);
+  const away = canonicalParticipant(event?.awayTeamName);
+  const selectedIsHome = selected ? selected === home : pick === 'p1';
+  const selectedIsAway = selected ? selected === away : pick === 'p2';
+
+  if ((pick === 'p1' || pick === 'p2') && selected && !selectedIsHome && !selectedIsAway) {
+    return { error: 'The selected tennis/football participant no longer matches the current SportyBet event.' };
+  }
+
   const markets = Array.isArray(event?.markets) ? event.markets : [];
-  const market = markets.find(m => {
-    const id = String(m?.id || '');
-    const desc = String(m?.desc || m?.name || m?.title || '').toLowerCase();
-    return id === '1' || /3.?way|1x2|match winner|winner/.test(desc) ||
-      (sport === 'tennis' && ['186', '210'].includes(id));
-  });
-  if (!market) return { error: 'SportyBet winner market is no longer available.' };
+  for (const market of markets) {
+    const id = String(market?.id || '');
+    const desc = String(market?.desc || market?.name || market?.title || '').toLowerCase();
+    const status = String(market?.status || '').trim().toLowerCase();
+    const closed = /suspend|closed|inactive|settled|unavailable|stop/i.test(status) ||
+      (status !== '' && /^\d+$/.test(status) && status !== '0');
+    if (closed) continue;
 
-  const targetTeam = pick === 'p1' ? event.homeTeamName : pick === 'p2' ? event.awayTeamName : '';
-  const outcomes = Array.isArray(market?.outcomes) ? market.outcomes : [];
-  const outcome = outcomes.find(o => {
-    const name = String(o?.desc || o?.name || o?.title || '').trim().toLowerCase();
-    const active = o?.isActive == null || Number(o.isActive) === 1 || o.isActive === true;
-    if (!active) return false;
-    if (pick === 'draw') return /^(draw|x)$/.test(name);
-    if (pick === 'p1') return (targetTeam && name === String(targetTeam).trim().toLowerCase()) || /^(home|1|p1|player 1)$/.test(name);
-    if (pick === 'p2') return (targetTeam && name === String(targetTeam).trim().toLowerCase()) || /^(away|2|p2|player 2)$/.test(name);
-    return targetTeam && name === String(targetTeam).trim().toLowerCase();
-  });
-  if (!outcome) return { error: 'The exact SportyBet winner outcome is no longer available.' };
+    const isWinnerMarket = sport === 'tennis'
+      ? ['186', '210'].includes(id) || /match winner|winner|to win/.test(desc)
+      : id === '1' || /3.?way|1x2|match winner|winner/.test(desc);
+    if (!isWinnerMarket) continue;
 
-  return {
-    eventId: event.eventId,
-    marketId: String(market?.id || '1'),
-    specifier: market?.specifier ?? null,
-    outcomeId: String(outcome?.id || ''),
-    outcomeName: String(outcome?.desc || outcome?.name || outcome?.title || ''),
-    odds: Number(outcome?.odds || 0)
-  };
+    const outcomes = Array.isArray(market?.outcomes) ? market.outcomes : [];
+    const outcome = outcomes.find(o => {
+      const rawName = String(o?.desc || o?.name || o?.title || '').trim();
+      const name = canonicalParticipant(rawName);
+      const active = o?.isActive == null ? o?.active !== false :
+        (Number(o.isActive) === 1 || o.isActive === true);
+      const odds = Number(o?.odds);
+      if (!active || !String(o?.id || '') || !Number.isFinite(odds) || odds <= 1) return false;
+
+      if (pick === 'draw') return /^(draw|x)$/.test(name);
+      if (selected && name === selected) return true;
+      if (pick === 'p1' || pick === 'p2') {
+        const homeLabel = /^(home|1|p1|player 1)$/.test(name);
+        const awayLabel = /^(away|2|p2|player 2)$/.test(name);
+        return (homeLabel && selectedIsHome) || (awayLabel && selectedIsAway);
+      }
+      return false;
+    });
+    if (!outcome) continue;
+
+    return {
+      eventId: event.eventId,
+      marketId: String(market?.id || (sport === 'tennis' ? '186' : '1')),
+      specifier: market?.specifier ?? null,
+      outcomeId: String(outcome?.id || ''),
+      outcomeName: String(outcome?.desc || outcome?.name || outcome?.title || ''),
+      odds: Number(outcome?.odds)
+    };
+  }
+
+  return { error: 'The exact current SportyBet winner market or selected player outcome is no longer available.' };
 }
-
 async function buildSelection(leg, event) {
   const product = productForLeg(leg);
   if (product === 'vfootball' || product === 'efootball') return findVirtualSelection(leg, event);
@@ -570,34 +653,31 @@ async function handlePost(context) {
       const resolved = resolveCurrentEvent(leg, found);
       const event = resolved.event;
       if (!event) {
-        validation.push({ event_id: eventId, ok: false, excluded: true, reason: 'Event is no longer present in SportyBet current catalogue.' });
+        validation.push(validationFailure(leg, 'Event is no longer present in SportyBet current catalogue.'));
         continue;
       }
       if (manualMode) {
-        const canon = value => String(value || '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ');
         const requestedStart = Date.parse(String(leg?.start_time || ''));
         const currentStart = Number(event?.estimateStartTime || 0);
-        const namesMatch = [leg.player_1, leg.player_2].every(name =>
-          [event.homeTeamName, event.awayTeamName].some(current => canon(name) === canon(current))
-        );
+        const namesMatch = sameParticipantPair([leg.player_1, leg.player_2], event);
         if (!namesMatch || !leg.player_1 || !leg.player_2 || canon(leg.player_1) === canon(leg.player_2)) {
-          validation.push({ event_id: eventId, ok: false, excluded: true, reason: 'Participant identity changed in SportyBet current catalogue.' });
+          validation.push(validationFailure(leg, 'Participant identity changed in SportyBet current catalogue.'));
           continue;
         }
         if (Number.isFinite(requestedStart) && currentStart &&
             Math.abs(requestedStart - currentStart) > 45 * 60 * 1000) {
-          validation.push({ event_id: eventId, ok: false, excluded: true, reason: 'Fixture start time changed by more than 45 minutes; refresh the slip.' });
+          validation.push(validationFailure(leg, 'Fixture start time changed by more than 45 minutes; refresh the slip.'));
           continue;
         }
       }
       if (!isOpenEvent(event)) {
-        validation.push({ event_id: eventId, ok: false, excluded: true, reason: 'Event has started or SportyBet has closed pre-match booking.' });
+        validation.push(validationFailure(leg, 'Event has started or SportyBet has closed pre-match booking.'));
         continue;
       }
 
       const selection = await buildSelection(leg, event);
       if (selection?.error || !selection?.marketId || !selection?.outcomeId) {
-        validation.push({ event_id: eventId, ok: false, excluded: true, reason: selection?.error || 'Selection could not be mapped to a live SportyBet market.' });
+        validation.push(validationFailure(leg, selection?.error || 'Selection could not be mapped to a live SportyBet market.'));
         continue;
       }
 
