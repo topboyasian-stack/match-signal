@@ -103,15 +103,16 @@ def build_nonlinear_feature_rows(history):
     by_event = {row["event_id"]: row for row in clean}
     base_rows = {row["event_id"]: row for row in build_feature_rows(clean)}
     enriched = []
+    prior = []
 
     for game in clean:
         row = base_rows.get(game["event_id"])
         if row is not None:
             cutoff = game["date"]
-            h5 = recent_team_stats(game["home"], clean[:clean.index(game)], cutoff, window=5) or {}
-            a5 = recent_team_stats(game["away"], clean[:clean.index(game)], cutoff, window=5) or {}
-            h10 = recent_team_stats(game["home"], clean[:clean.index(game)], cutoff, window=10) or {}
-            a10 = recent_team_stats(game["away"], clean[:clean.index(game)], cutoff, window=10) or {}
+            h5 = recent_team_stats(game["home"], prior, cutoff, window=5) or {}
+            a5 = recent_team_stats(game["away"], prior, cutoff, window=5) or {}
+            h10 = recent_team_stats(game["home"], prior, cutoff, window=10) or {}
+            a10 = recent_team_stats(game["away"], prior, cutoff, window=10) or {}
             item = dict(row)
             for side, stats in (("home_recent5", h5), ("away_recent5", a5)):
                 for key in ("pf", "pa"):
@@ -135,6 +136,7 @@ def build_nonlinear_feature_rows(history):
             else:
                 item["recent10_pace_efficiency_total"] = None
             enriched.append(item)
+        prior.append(game)
 
     return sorted(enriched, key=lambda row: (str(row["date"]), str(row["event_id"])))
 
