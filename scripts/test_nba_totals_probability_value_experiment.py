@@ -154,6 +154,7 @@ def test_prospective_probability_sample_requires_exact_snapshot_linkage():
     }
     record = {
         "event_id": "event-prospective",
+        "totals_model_version": "nba-total-v5-pace-efficiency-calibrated",
         "start_time": start,
         "published_at": published,
         "publication_snapshot_id": "prospective-snapshot-1",
