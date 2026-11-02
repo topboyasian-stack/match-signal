@@ -10,6 +10,7 @@ sys.path.insert(0, str(ROOT))
 
 from scripts.efootball_desk_learning import (
     market_research_score_rows, recent_fixture_window, reconcile, settlement_index,
+    supplemental_event_id_diagnostics,
 )
 
 
@@ -86,6 +87,48 @@ def test_adriatic_totals_forecast_reconciles_to_exact_settled_market_score():
     assert diagnostics["match_counts_by_product"]["efootball_gt"]["unmatched"] == 1
 
 
+def test_supplemental_event_id_diagnostics_marks_repeated_session_ids_ambiguous():
+    trace = [
+        {
+            "product": "efootball_adriatic", "event_id": "reused-id",
+            "participant_1": "Alpha", "participant_2": "Beta",
+            "start_time": "2026-11-01T10:00:00+00:00",
+            "timestamp": "2026-11-01T10:00:00+00:00", "line": 2.5,
+        },
+        {
+            "product": "efootball_adriatic", "event_id": "unique-id",
+            "participant_1": "Gamma", "participant_2": "Delta",
+            "start_time": "2026-11-01T11:00:00+00:00",
+            "timestamp": "2026-11-01T11:00:00+00:00", "line": 2.5,
+        },
+    ]
+    scores = [
+        {
+            "product": "efootball_adriatic", "event_id": "reused-id",
+            "participant_1": "Alpha", "participant_2": "Beta",
+            "start_time": "2026-11-01T09:00:00+00:00",
+            "timestamp": "2026-11-01T09:00:00+00:00", "score": "3:1",
+        },
+        {
+            "product": "efootball_adriatic", "event_id": "reused-id",
+            "participant_1": "Alpha", "participant_2": "Beta",
+            "start_time": "2026-11-01T08:00:00+00:00",
+            "timestamp": "2026-11-01T08:00:00+00:00", "score": "2:0",
+        },
+        {
+            "product": "efootball_adriatic", "event_id": "unique-id",
+            "participant_1": "Gamma", "participant_2": "Delta",
+            "start_time": "2026-11-01T10:58:00+00:00",
+            "timestamp": "2026-11-01T10:58:00+00:00", "score": "4:2",
+        },
+    ]
+    result = supplemental_event_id_diagnostics(trace, scores)["efootball_adriatic"]
+    assert result["shared_product_event_ids"] == 2, result
+    assert result["event_ids_with_multiple_score_fixtures"] == 1, result
+    assert result["unique_identity_matches_with_kickoff_mismatch"] == 1, result
+    assert result["matching_policy"] == "diagnostic_only_no_event_id_fuzzy_settlement", result
+
+
 def test_untrusted_market_rows_do_not_enter_the_score_index():
     row = {
         "product": "efootball_adriatic", "event_id": "untrusted",
@@ -150,7 +193,8 @@ def main():
     assert empty["n"] == 0 and empty["decision_count"] == 0, empty
     test_adriatic_totals_forecast_reconciles_to_exact_settled_market_score()
     test_untrusted_market_rows_do_not_enter_the_score_index()
-    print("eFootball desk fixture windows and cross-market score reconciliation tests passed.")
+    test_supplemental_event_id_diagnostics_marks_repeated_session_ids_ambiguous()
+    print("eFootball desk fixture windows, cross-market score reconciliation and source-ID diagnostics tests passed.")
 
 
 if __name__ == "__main__":
