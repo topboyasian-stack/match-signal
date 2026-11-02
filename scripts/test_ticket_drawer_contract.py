@@ -12,7 +12,7 @@ def require(condition, message):
 
 def main():
     css_version = "ticket-drawer.css?v=20261102-single-ticket1"
-    js_version = "ticket-drawer.js?v=20261102-single-ticket1"
+    js_version = "ticket-drawer.js?v=20261102-split-event-identifiers1"
     pages = ("basketball.html", "football.html", "tennis.html", "league.html", "index.html", "upcoming.html", "qualified-best.html")
     for page in pages:
         source = (ROOT / page).read_text(encoding="utf-8")
@@ -57,12 +57,12 @@ def main():
             "Football, Tennis and Basketball total legs must retain their exact line and side")
     require("data-ms-ticket-remove" in drawer and "data-ms-ticket-clear" in drawer,
             "Selections must be removable individually and as a full ticket")
-    require("data-ticket-market-id" in drawer and "model_qualified" in drawer,
+    require("data-ticket-market-id" in drawer and "model_qualified" in drawer and "sportybet_event_id" in drawer,
             "Basketball market identity and release status must travel with each ticket leg")
     require("ms-ticket-builder" in css and "ms-pred-ticket-action" in css,
             "The shared builder and prediction actions need their styles")
 
-    require("data-ms-ticket-add" in nba and 'data-ticket-market="total"' in nba,
+    require("data-ms-ticket-add" in nba and 'data-ticket-market="total"' in nba and "data-ticket-sportybet-event" in nba and "predictionId=String(p.event_id||'')" in nba and "sportybetId=String(event.event_id||'')" in nba,
             "NBA current totals must be selectable into the same ticket")
     require("nbaTotalsReleaseQualified(S.totalsOos,S.totalsProbability)" in nba and "nbaTotalRowQualified(p,S.totalsOos,S.totalsProbability,S.totalSnapshots,fresh)" in nba,
             "NBA ticket generation must retain the independent release and per-row gates")
@@ -70,9 +70,9 @@ def main():
             "Football/Tennis total selections must revalidate against exact SportyBet full-match O/U market IDs")
     require("function collectBasketballEvents" in api and "function findBasketballSelection" in api,
             "The common booking API must resolve and revalidate NBA total markets")
-    require("const basketballIds" in api and "collectBasketballEvents(context, basketballIds)" in api,
+    require("const basketballIds" in api and "map(l => String(l.sportybet_event_id || '')).filter(Boolean)" in api and "collectBasketballEvents(context, basketballIds)" in api and "directProvider = sportybetId ? found.get(sportybetId) : null" in api,
             "Mixed-sport tickets must fetch the current SportyBet Basketball event")
-    require("leg.model_qualified !== true" in api and "leg.market_id !== '225'" in api and "NBA_RELEASE_GATE_LOCKED" in api and "nbaTotalTicketLegQualified" in api,
+    require("leg.model_qualified !== true" in api and "leg.market_id !== '225'" in api and "!leg.sportybet_event_id" in api and "NBA_RELEASE_GATE_LOCKED" in api and "nbaTotalTicketLegQualified" in api,
             "The booking endpoint must independently enforce the global NBA release gate and exact per-leg snapshot qualification")
     require("hasBasketballLeg && preExcluded.length > 0" in api and "BASKETBALL_SLIP_REJECTED_PARTIAL" in api,
             "An NBA-containing slip must be rejected whole if any leg fails live validation or SportyBet removes a selection")
