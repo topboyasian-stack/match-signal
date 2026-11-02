@@ -77,6 +77,12 @@ def main():
             "NBA feed revalidation must handle non-JSON responses explicitly and avoid same-origin HTML fallbacks")
     require("export async function upstream(path, params)" in api and "SPORTYBET_PROXY_ORIGIN" in api and "returned HTML instead of JSON" in api,
             "Shared SportyBet catalogue lookup must retry the same source via the configured proxy when the public host returns HTML")
+    require("export async function collectEvents" in api and "maxPages = 5" in api,
+            "Shared ticket catalogue scans must stop at the regional proxy's supported fifth page")
+    require("export async function requestSportyBetShare" in api and
+            "for (const origin of [SPORTYBET_PROXY_ORIGIN, ORIGIN])" in api and
+            "const shareResult = await requestSportyBetShare(selections)" in api,
+            "Share-code creation must try the regional POST proxy before direct SportyBet and return consistent JSON failures")
     require("const basketballIds" in api and "map(l => String(l.sportybet_event_id || '')).filter(Boolean)" in api and "collectBasketballEvents(context, basketballIds)" in api and "directProvider = sportybetId ? found.get(sportybetId) : null" in api,
             "Mixed-sport tickets must fetch the current SportyBet Basketball event")
     require("leg.model_qualified !== true" in api and "leg.market_id !== '225'" in api and "!leg.sportybet_event_id" in api and "NBA_RELEASE_GATE_LOCKED" in api and "nbaTotalTicketLegQualified" in api,
