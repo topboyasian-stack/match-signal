@@ -1,26 +1,26 @@
 {
-  "generated_at": "2026-11-02T17:29:46.929079+00:00",
+  "generated_at": "2026-11-02T17:40:00.257547+00:00",
   "status": "FAIL",
   "critical_issues": 2,
-  "warning_issues": 2,
+  "warning_issues": 3,
   "info_issues": 1,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
       "status": "STALE",
-      "age_hours": 11.55,
+      "age_hours": 11.72,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.09,
+      "age_hours": 0.13,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 3.54,
+      "age_hours": 3.71,
       "threshold_hours": 4
     },
     {
@@ -37,22 +37,22 @@
     },
     {
       "engine": "virtual_participant_history",
-      "status": "PASS",
-      "max_input_age_minutes": 22.6,
-      "virtual_lab_status_age_minutes": 25.4,
+      "status": "STALE",
+      "max_input_age_minutes": 32.5,
+      "virtual_lab_status_age_minutes": 35.6,
       "threshold_minutes": 30.0,
       "stale_inputs": []
     },
     {
       "engine": "tennis_forward_discovery",
       "status": "STALE",
-      "age_hours": 10.83,
+      "age_hours": 11.0,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
       "status": "STALE",
-      "age_hours": 9.3,
+      "age_hours": 9.47,
       "threshold_hours": 0.5,
       "heartbeat_source": "virtual_lab_live.json",
       "events_count": 697
@@ -60,11 +60,11 @@
     {
       "engine": "nba_live_observation_recorder",
       "status": "PASS",
-      "age_hours": 0.1,
+      "age_hours": 0.11,
       "threshold_hours": 0.25,
       "heartbeat_source": "nba_live_observations.json.gz",
       "games_tracked": 21,
-      "snapshots_recorded": 2130
+      "snapshots_recorded": 2138
     },
     {
       "engine": "engine_lifecycle",
@@ -105,17 +105,22 @@
     {
       "code": "STALE_CORE_PREDICTION_PIPELINE",
       "severity": "critical",
-      "detail": "updated_at age 11.55h exceeds 4h"
+      "detail": "updated_at age 11.72h exceeds 4h"
+    },
+    {
+      "code": "VIRTUAL_PARTICIPANT_HISTORY_STALE",
+      "severity": "warning",
+      "detail": "input older than 30 minutes: participant_lifecycle, collector_status; oldest participant/settlement/model input is 32.5 minutes old; virtual_lab_status.json is 35.6 minutes old; current eFootball/virtual predictions must remain withheld until the source collector publishes fresh data"
     },
     {
       "code": "TENNIS_FORWARD_DISCOVERY_STALE",
       "severity": "warning",
-      "detail": "tennis_forward_status age 10.83h exceeds the 8h threshold; the discovery result is too old to confirm current fixture coverage"
+      "detail": "tennis_forward_status age 11.00h exceeds the 8h threshold; the discovery result is too old to confirm current fixture coverage"
     },
     {
       "code": "VIRTUAL_LIVE_FEED_STALE",
       "severity": "warning",
-      "detail": "virtual_lab_live.json age 9.30h exceeds 0.50h; a downstream Unified Upcoming refresh cannot substitute for a fresh source snapshot"
+      "detail": "virtual_lab_live.json age 9.47h exceeds 0.50h; a downstream Unified Upcoming refresh cannot substitute for a fresh source snapshot"
     },
     {
       "code": "PDL_EXPERIMENTAL_FEED_STALE",
@@ -125,7 +130,7 @@
     {
       "code": "PIPELINE_STALE",
       "severity": "critical",
-      "detail": "pipeline_status age 11.55h exceeds 4h"
+      "detail": "pipeline_status age 11.72h exceeds 4h"
     }
   ],
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
@@ -134,8 +139,8 @@
     "past_kickoff_rows_hidden": 14,
     "stale_live_flags_hidden": 0,
     "expired_settled_rows_hidden": 0,
-    "virtual_market_rows_held_for_kickoff_window": 18,
-    "virtual_rows_held_for_stale_participant_history": 0,
+    "virtual_market_rows_held_for_kickoff_window": 0,
+    "virtual_rows_held_for_stale_participant_history": 4897,
     "virtual_rows_held_for_recent_product_drawdown": 8
   }
 }
