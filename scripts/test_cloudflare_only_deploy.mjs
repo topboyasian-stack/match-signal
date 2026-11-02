@@ -100,6 +100,15 @@ assert.ok(
   "The eFootball quote-coverage VM must load its product-specific learning artifact before evaluating production qualification functions.",
 );
 
+assert.ok(
+  cloudflare.includes("gzip -c data/efootball_market_research.json > .pages-deploy/data/efootball_market_research.json.gz") &&
+    cloudflare.includes("--exclude='data/efootball_market_research.json'") &&
+    cloudflare.includes("test ! -e .pages-deploy/data/efootball_market_research.json") &&
+    cloudflare.includes("/data/efootball_market_research.json.gz") &&
+    cloudflare.includes("Refusing Cloudflare Pages upload while oversized assets remain."),
+  "Keep the full research archive in Git, publish its compressed Pages copy, and fail preflight before uploading oversized assets.",
+);
+
 const monitor = fs.readFileSync(path.join(workflowsDir, "qualified-best-production-watch.yml"), "utf8");
 assert.match(
   monitor,
