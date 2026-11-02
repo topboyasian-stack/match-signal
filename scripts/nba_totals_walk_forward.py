@@ -254,6 +254,116 @@ def _bootstrap_roi_lower_bound(profits, resamples=BOOTSTRAP_RESAMPLES):
     return means[index]
 
 
+def publication_capture_metrics(snapshots, predictions=None, as_of=None):
+    """Report immutable revision coverage separately from today's quote availability."""
+    checked_at = parse_time(as_of) if as_of is not None else datetime.now(timezone.utc)
+    if checked_at is None:
+        checked_at = datetime.now(timezone.utc)
+
+    current = [
+        row for row in (snapshots or [])
+        if isinstance(row, dict) and row.get("totals_model_version") == NBA_TOTALS_MODEL_VERSION
+    ]
+    valid = []
+    for row in current:
+        market = ((row.get("markets") or {}).get("total_ou") or {})
+        published = parse_time(row.get("published_at"))
+        start = parse_time(row.get("start_time"))
+        quote = parse_time(market.get("quote_timestamp"))
+        try:
+            line = float(market.get("line"))
+            over = float(market.get("over_odds"))
+            under = float(market.get("under_odds"))
+        except (TypeError, ValueError):
+            continue
+        age = (published - quote).total_seconds() / 60 if published and quote else None
+        if not (
+            row.get("publication_snapshot_verified") is True
+            and str(row.get("publication_snapshot_id") or "").strip()
+            and str(row.get("event_id") or "").strip()
+            and str(market.get("market_id") or "") == "225"
+            and str(market.get("source") or "").strip().lower() == "sportybet nigeria"
+            and str(market.get("sportybet_event_id") or "").strip()
+            and market.get("quote_capture_basis") == "SportyBet API response observed_at"
+            and published is not None and start is not None and quote is not None
+            and quote <= published < start and age is not None and 0 <= age <= 15
+            and 100 <= line <= 300
+            and math.isfinite(over) and over > 1 and math.isfinite(under) and under > 1
+        ):
+            continue
+        valid.append(row)
+
+    predictions_by_event = {
+        str(row.get("event_id")): row
+        for row in (predictions or [])
+        if isinstance(row, dict)
+        and row.get("totals_model_version") == NBA_TOTALS_MODEL_VERSION
+        and row.get("event_id")
+    }
+    attached_event_ids = set()
+    for event_id, row in predictions_by_event.items():
+        market = ((row.get("markets") or {}).get("total_ou") or {})
+        start = parse_time(row.get("start_time"))
+        stamp = parse_time(market.get("quote_timestamp"))
+        try:
+            line = float(market.get("line"))
+            over = float(market.get("over_odds"))
+            under = float(market.get("under_odds"))
+        except (TypeError, ValueError):
+            continue
+        age = (checked_at - stamp).total_seconds() / 60 if stamp else None
+        if (
+            str(market.get("market_id") or "") == "225"
+            and str(market.get("source") or "").strip().lower() == "sportybet nigeria"
+            and str(market.get("sportybet_event_id") or "").strip()
+            and market.get("quote_capture_basis") == "SportyBet API response observed_at"
+            and stamp is not None and start is not None
+            and stamp <= checked_at < start and age is not None and 0 <= age <= 15
+            and 100 <= line <= 300
+            and math.isfinite(over) and over > 1 and math.isfinite(under) and under > 1
+        ):
+            attached_event_ids.add(event_id)
+
+    snapshot_event_ids = {
+        str(row.get("event_id")) for row in valid
+        if str(row.get("event_id") or "") in predictions_by_event
+    }
+    predicted_event_ids = set(predictions_by_event)
+    unpriced = len(predicted_event_ids - attached_event_ids)
+    unmatched = len(attached_event_ids - snapshot_event_ids)
+    coverage = round(len(snapshot_event_ids) / len(predicted_event_ids), 4) if predicted_event_ids else None
+    picks = [
+        row for row in valid
+        if str(((row.get("markets") or {}).get("total_ou") or {}).get("pick") or "").lower() in {"over", "under"}
+    ]
+    no_lean = [
+        row for row in valid
+        if str(((row.get("markets") or {}).get("total_ou") or {}).get("pick") or "").lower() not in {"over", "under"}
+    ]
+    if not predicted_event_ids:
+        status = "NO_CURRENT_MODEL_PREDICTIONS"
+    elif predicted_event_ids <= snapshot_event_ids and unmatched == 0:
+        status = "CAPTURED"
+    elif valid or attached_event_ids:
+        status = "PARTIAL"
+    else:
+        status = "AWAITING_FRESH_MARKET_225_QUOTES"
+    return {
+        "model_version": NBA_TOTALS_MODEL_VERSION,
+        "model_predictions": len(predicted_event_ids),
+        "predictions_with_fresh_sportybet_market_225_pair": len(attached_event_ids),
+        "immutable_fresh_publication_snapshots": len(valid),
+        "unique_events_with_immutable_snapshots": len(snapshot_event_ids),
+        "snapshot_coverage": coverage,
+        "directional_pick_snapshots": len(picks),
+        "no_clear_lean_snapshots": len(no_lean),
+        "unpriced_or_unavailable_prediction_count": unpriced,
+        "unmatched_fresh_market_predictions": unmatched,
+        "capture_status": status,
+    }
+
+
+
 def market_metrics(rows):
     profits, favorite_profits = [], []
     wins = losses = pushes = 0
