@@ -458,6 +458,89 @@ def snapshot_clv_audit(settled_rows, snapshots, close_window_minutes=45):
     }
 
 
+def probability_score_summary(settled_audit, minimum_descriptive_sample=30):
+    """Descriptive Brier/log-loss comparison; never a release gate at tiny n."""
+    binary = []
+    for row in settled_audit:
+        outcome = str(row.get("settled_result") or "").lower()
+        if outcome not in ("over", "under"):
+            continue
+        model = row.get("model_probability") or {}
+        market = row.get("market_no_vig_probability") or {}
+        try:
+            binary.append({
+                "event_id": row.get("event_id"),
+                "outcome": outcome,
+                "model_over": float(model["over"]),
+                "market_over": float(market["over"]),
+            })
+        except (KeyError, TypeError, ValueError):
+            continue
+
+    n = len(binary)
+    if not n:
+        return {
+            "n": 0, "model_brier": None, "market_no_vig_brier": None,
+            "model_log_loss": None, "market_no_vig_log_loss": None,
+            "over_probability_buckets": [],
+            "sufficient_for_probability_validation": False,
+        }
+
+    model_brier = market_brier = model_log = market_log = 0.0
+    bucket_map = {}
+    epsilon = 1e-12
+    for row in binary:
+        actual = 1.0 if row["outcome"] == "over" else 0.0
+        for prefix, probability in (
+            ("model", row["model_over"]),
+            ("market", row["market_over"]),
+        ):
+            clipped = min(1.0 - epsilon, max(epsilon, probability))
+            brier = (clipped - actual) ** 2
+            log_loss = -(
+                actual * math.log(clipped) + (1.0 - actual) * math.log(1.0 - clipped)
+            )
+            if prefix == "model":
+                model_brier += brier
+                model_log += log_loss
+            else:
+                market_brier += brier
+                market_log += log_loss
+
+        bucket = min(9, max(0, int(row["model_over"] * 10)))
+        bucket_map.setdefault(bucket, []).append(row)
+
+    buckets = []
+    for bucket, values in sorted(bucket_map.items()):
+        buckets.append({
+            "range": f"{bucket / 10:.1f}-{(bucket + 1) / 10:.1f}",
+            "n": len(values),
+            "mean_model_over_probability": round(
+                sum(row["model_over"] for row in values) / len(values), 4
+            ),
+            "observed_over_rate": round(
+                sum(row["outcome"] == "over" for row in values) / len(values), 4
+            ),
+        })
+
+    return {
+        "n": n,
+        "pushes_excluded_from_binary_metrics": len(settled_audit) - n,
+        "model_brier": round(model_brier / n, 6),
+        "market_no_vig_brier": round(market_brier / n, 6),
+        "model_log_loss": round(model_log / n, 6),
+        "market_no_vig_log_loss": round(market_log / n, 6),
+        "over_probability_buckets": buckets,
+        "sufficient_for_probability_validation": n >= minimum_descriptive_sample,
+        "minimum_descriptive_sample": minimum_descriptive_sample,
+        "warning": (
+            "Descriptive only. This comparison is based on a tiny selected-v5 historical cohort and does not establish calibration or betting value."
+            if n < minimum_descriptive_sample else
+            "Descriptive score only; prospective market validation and release gates still apply."
+        ),
+    }
+
+
 def run_experiment(history, ledger, predictions, now=None, snapshots=None):
     now = now or datetime.now(timezone.utc)
     fitted = fit_residual_distribution(history)
@@ -532,6 +615,7 @@ def run_experiment(history, ledger, predictions, now=None, snapshots=None):
             **decision,
         })
 
+    probability_scores = probability_score_summary(settled_audit)
     prospective_bets = [
         row for row in settled
         if parse_time(row.get("published_at")) is not None
@@ -556,7 +640,7 @@ def run_experiment(history, ledger, predictions, now=None, snapshots=None):
     return {
         "generated_at": now.isoformat(),
         "paper_only": True,
-        "experiment": "NBA_TOTALS_EMPIRICAL_RESIDUAL_VALUE_V1",
+        "experiment": "NBA_TOTALS_EMPIRICAL_RESIDUAL_VALUE_V2",
         "model_version": "nba-total-v5-pace-efficiency-calibrated",
         "model_projection_market_blind": True,
         "prospective_holdout_cutoff_utc": EVALUATION_CUTOFF_UTC.isoformat(),
@@ -581,6 +665,7 @@ def run_experiment(history, ledger, predictions, now=None, snapshots=None):
         "settled_v5_market_audit": settled_audit,
         "settled_v5_market_count": len(settled_audit),
         "settled_v5_clv_diagnostics": clv_audit,
+        "settled_v5_probability_score_summary": probability_scores,
         "historical_value_signal_summary": {
             "n": len(historical_value_signals),
             "wins": historical_value_signal_wins,
