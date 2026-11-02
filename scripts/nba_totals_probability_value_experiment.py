@@ -720,7 +720,18 @@ def prospective_snapshot_coverage(settled_rows, snapshots, cutoff=EVALUATION_CUT
                 str(row.get("pick") or "").strip().lower() == str(snap_market.get("pick") or "").strip().lower(),
                 row_quote is not None and market is not None and market["quote_time"] == row_quote,
             ]
-            for field in ("expected_total", "line", "over_odds", "under_odds"):
+            # The model projection is present on both the immutable prediction
+            # and its market-attached audit record; require both to match settlement.
+            for frozen_forecast in (snapshot.get("expected_total"), snap_market.get("expected_total")):
+                try:
+                    same = math.isclose(
+                        float(row.get("expected_total")), float(frozen_forecast),
+                        rel_tol=0.0, abs_tol=1e-9,
+                    )
+                except (TypeError, ValueError):
+                    same = False
+                checks.append(same)
+            for field in ("line", "over_odds", "under_odds"):
                 try:
                     same = math.isclose(float(row.get(field)), float(snap_market.get(field)), rel_tol=0.0, abs_tol=1e-9)
                 except (TypeError, ValueError):

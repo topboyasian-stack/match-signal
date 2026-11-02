@@ -146,6 +146,7 @@ def test_prospective_probability_sample_requires_exact_snapshot_linkage():
             "sportybet_event_id": "sr:match:prospective",
             "quote_capture_basis": "SportyBet API response observed_at",
             "quote_timestamp": quote_time,
+            "expected_total": 221.0,
             "pick": "over",
             "line": 220.5,
             "over_odds": 1.91,
@@ -186,6 +187,11 @@ def test_prospective_probability_sample_requires_exact_snapshot_linkage():
     pick_report, pick_ids = prospective_snapshot_coverage([altered_pick], [snapshot], cutoff)
     assert pick_ids == set()
     assert pick_report["prospective_settled_selections_missing_or_mismatched_snapshot"] == 1
+
+    altered_projection = {**record, "expected_total": 222.0}
+    projection_report, projection_ids = prospective_snapshot_coverage([altered_projection], [snapshot], cutoff)
+    assert projection_ids == set()
+    assert projection_report["prospective_settled_selections_missing_or_mismatched_snapshot"] == 1
 
 
 def test_probability_score_conditions_on_non_push_mass():
