@@ -343,47 +343,39 @@ function lineFromLeg(leg) {
 function findVirtualSelection(leg, event) {
   const requestedLine = lineFromLeg(leg);
   const side = pickVirtualSide(leg);
+  const sport = String(leg?.sport || '').toLowerCase();
+  const requiredMarketId = sport === 'football' ? '18' : sport === 'tennis' ? '189' : '';
   if (!Number.isFinite(requestedLine) || !side) {
     return { error: 'Could not map the Builder O/U selection to an exact line and side.' };
   }
-
+  if (requiredMarketId && String(leg?.market_id || '') !== requiredMarketId) {
+    return { error: 'The requested sport total market ID does not match the supported full-match market.' };
+  }
   const markets = Array.isArray(event?.markets) ? event.markets : [];
   for (const market of markets) {
     const marketId = String(market?.id || '');
-    const desc = [
-      market?.desc,
-      market?.name,
-      market?.title,
-      market?.specifier
-    ].map(value => String(value || '')).join(' ').toLowerCase();
+    const status = String(market?.status || '').trim().toLowerCase();
+    if (/suspend|closed|inactive|settled|unavailable|stop/i.test(status) ||
+        (status !== '' && /^\d+$/.test(status) && status !== '0')) continue;
+    const desc = [market?.desc,market?.name,market?.title,market?.specifier]
+      .map(value => String(value || '')).join(' ').toLowerCase();
     const line = lineFromMarket(market);
-    const isOu = marketId === '189' || /over\s*\/?\s*under|over.?under|total|\bou\b/.test(desc);
+    const isOu = requiredMarketId
+      ? marketId === requiredMarketId
+      : (marketId === '189' || /over\s*\/?\s*under|over.?under|total|\bou\b/.test(desc));
     if (!isOu || line == null || Math.abs(line - requestedLine) > 1e-9) continue;
-
     const outcomes = Array.isArray(market?.outcomes) ? market.outcomes : [];
     const outcome = outcomes.find(o => {
       const rawName = String(o?.desc || o?.name || o?.title || '').toLowerCase().trim();
       const normalized = rawName.replace(/[^a-z0-9]+/g, ' ');
-      const active = o?.isActive == null
-        ? (o?.active == null || o.active !== false)
-        : Number(o.isActive) === 1 || o.isActive === true;
-      const sideMatch = side === 'under'
-        ? /\bunder\b/.test(normalized) || /^u\b/.test(normalized)
-        : /\bover\b/.test(normalized) || /^o\b/.test(normalized);
+      const active = o?.isActive == null ? (o?.active == null || o.active !== false) : Number(o.isActive) === 1 || o.isActive === true;
+      const sideMatch = side === 'under' ? /\bunder\b/.test(normalized) || /^u\b/.test(normalized) : /\bover\b/.test(normalized) || /^o\b/.test(normalized);
       const outcomeLine = lineFromMarket(o);
       const lineMatch = outcomeLine == null || Math.abs(Number(outcomeLine) - requestedLine) < 1e-9;
       return active && sideMatch && lineMatch;
     });
     if (!outcome) continue;
-
-    return {
-      eventId: event.eventId,
-      marketId,
-      specifier: market?.specifier ?? null,
-      outcomeId: String(outcome?.id || ''),
-      outcomeName: String(outcome?.desc || outcome?.name || outcome?.title || ''),
-      odds: Number(outcome?.odds || 0)
-    };
+    return { eventId:event.eventId,marketId,specifier:market?.specifier??null,outcomeId:String(outcome?.id||''),outcomeName:String(outcome?.desc||outcome?.name||outcome?.title||''),odds:Number(outcome?.odds||0) };
   }
   return { error: 'The exact SportyBet O/U line or selected side is no longer available.' };
 }
@@ -476,8 +468,10 @@ async function handlePost(context) {
           }
           if (!['football', 'tennis'].includes(leg.sport)) return true;
           if (leg.market === 'total') {
+            const requiredMarketId = leg.sport === 'football' ? '18' : '189';
             return !['over', 'under'].includes(leg.pick) ||
-              !Number.isFinite(Number(leg.line)) || Number(leg.line) <= 0 || Number(leg.line) > 1000;
+              !Number.isFinite(Number(leg.line)) || Number(leg.line) <= 0 || Number(leg.line) > 1000 ||
+              leg.market_id !== requiredMarketId;
           }
           return !['winner', '1x2'].includes(leg.market) ||
             !['p1', 'p2', 'draw'].includes(leg.pick) ||
