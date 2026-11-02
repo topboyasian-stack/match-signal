@@ -37,6 +37,10 @@ def main():
             "Upcoming and league prediction rows must both connect to the ticket")
     require("data-ms-ticket-add" in hub and 'data-ticket-market="total"' in hub and "row?.analytics||{}).total_games" in hub and "(sport==='football'?'18':'189')" in hub,
             "Football/Tennis winner and Over/Under predictions must submit structured selections")
+    require("sportybetEventId=String(row?.sportybet_event_id||" in hub and hub.count("data-ticket-sportybet-event") >= 2,
+            "Football/Tennis winner and total actions must carry a separate SportyBet provider event ID when available")
+    require("sportybet_event_id:sportybetEventId||null" in drawer,
+            "The shared ticket must retain separate provider IDs for Football/Tennis as well as Basketball")
     require("window.MatchSignalTicket" in drawer and "function addSelection(raw)" in drawer,
             "The shared ticket selection API is missing")
     require("match-signal:sportybet-manual-ticket:v2" in drawer,
@@ -85,6 +89,9 @@ def main():
             "Share-code creation must try the regional POST proxy before direct SportyBet and return consistent JSON failures")
     require("const basketballIds" in api and "map(l => String(l.sportybet_event_id || '')).filter(Boolean)" in api and "collectBasketballEvents(context, basketballIds)" in api and "directProvider = sportybetId ? found.get(sportybetId) : null" in api,
             "Mixed-sport tickets must fetch the current SportyBet Basketball event")
+    require("const footballIds = new Set(legs.filter(l => String(l?.sport || '').toLowerCase() === 'football').map(l => String(l.sportybet_event_id || l.event_id || '')).filter(Boolean));" in api and
+            "const tennisIds = new Set(legs.filter(l => String(l?.sport || '').toLowerCase() === 'tennis').map(l => String(l.sportybet_event_id || l.event_id || '')).filter(Boolean));" in api,
+            "Football and Tennis catalogue scans must target the current provider ID rather than only the model/prediction ID")
     require("leg.model_qualified !== true" in api and "leg.market_id !== '225'" in api and "!leg.sportybet_event_id" in api and "NBA_RELEASE_GATE_LOCKED" in api and "nbaTotalTicketLegQualified" in api,
             "The booking endpoint must independently enforce the global NBA release gate and exact per-leg snapshot qualification")
     require("hasBasketballLeg && preExcluded.length > 0" in api and "BASKETBALL_SLIP_REJECTED_PARTIAL" in api,
