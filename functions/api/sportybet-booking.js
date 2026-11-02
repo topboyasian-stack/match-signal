@@ -138,7 +138,69 @@ export async function upstream(path, params) {
   throw new Error('SportyBet catalogue unavailable for ' + path + ': ' + failures.join(' || ').slice(0, 700));
 }
 
-async function collectEvents({ sportId, marketId, timeline = 168, pageSize = 100, maxPages = 8, primaryPath = '/api/ng/factsCenter/pcUpcomingEvents', fallbackPath = null, fallbackParams = {} }, targetIds) {
+
+export async function requestSportyBetShare(selections) {
+  const failures = [];
+  const payload = JSON.stringify({
+    selections: selections.map(selection => ({
+      eventId: String(selection.eventId),
+      marketId: String(selection.marketId),
+      specifier: selection.specifier ?? null,
+      outcomeId: String(selection.outcomeId)
+    }))
+  });
+
+  // Route the fixed SportyBet share POST through the regional Worker first.
+  // Fall back to the direct origin only if the proxy did not return usable JSON.
+  // A valid provider business rejection is authoritative and is not retried.
+  for (const origin of [SPORTYBET_PROXY_ORIGIN, ORIGIN]) {
+    const url = origin + '/api/ng/orders/share?_t=' + Date.now();
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          ...BROWSER_HEADERS,
+          'Accept-Language': 'en-NG,en;q=0.9',
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
+          'Sec-Fetch-Dest': 'empty',
+          'Sec-Fetch-Mode': 'cors',
+          'Sec-Fetch-Site': 'same-origin'
+        },
+        body: payload,
+        cache: 'no-store',
+        redirect: 'follow',
+        signal: AbortSignal.timeout(15000)
+      });
+      const text = await response.text();
+      const contentType = String(response.headers.get('content-type') || 'unknown');
+      let parsed = null;
+      try { parsed = JSON.parse(text); } catch (_) {}
+
+      if (parsed && parsed.bizCode != null && Number(parsed.bizCode) !== 10000) {
+        return { status: response.status, payload: parsed, origin, contentType };
+      }
+      if (response.ok && parsed && !/^\s*</.test(text)) {
+        return { status: response.status, payload: parsed, origin, contentType };
+      }
+
+      const upstreamError = parsed
+        ? [parsed.error, parsed.detail, parsed.message].filter(v => typeof v === 'string' && v.trim()).join(': ')
+        : 'returned non-JSON response';
+      failures.push(origin + ': HTTP ' + response.status + ' (' + upstreamError + '; content-type ' + contentType + ')');
+    } catch (error) {
+      failures.push(origin + ': ' + String(error?.message || error).slice(0, 180));
+    }
+  }
+
+  return {
+    error: 'SPORTYBET_SHARE_UPSTREAM_UNAVAILABLE',
+    message: 'SportyBet could not return a JSON share response through the regional proxy or direct endpoint: ' + failures.join(' || ').slice(0, 700),
+    attempts: failures
+  };
+}
+
+export async function collectEvents({ sportId, marketId, timeline = 168, pageSize = 100, maxPages = 5, primaryPath = '/api/ng/factsCenter/pcUpcomingEvents', fallbackPath = null, fallbackParams = {} }, targetIds) {
   const found = new Map();
   const matchedTargets = new Set();
   let page = 1;
@@ -841,97 +903,30 @@ async function handlePost(context) {
       }))
     });
 
-    // SportyBet's undocumented share endpoint occasionally returns an HTML
-    // 5xx edge page instead of JSON. Retry only transient upstream failures;
-    // never retry validation/rejection responses. The operation only creates a
-    // non-staking share code, so a successful response remains safe to replace
-    // with the most recent valid code.
-    const transientStatuses = new Set([502, 503, 504]);
-    let shareResponse = null;
-    let shareText = '';
-    let lastStatus = null;
-    let lastBody = '';
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      const shareUrl = ORIGIN + '/api/ng/orders/share?_t=' + Date.now();
-      const requestHeaders = {
-        ...BROWSER_HEADERS,
-        'Accept-Language': 'en-NG,en;q=0.9',
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache',
-        'Sec-Fetch-Dest': 'empty',
-        'Sec-Fetch-Mode': 'cors',
-        'Sec-Fetch-Site': 'same-origin'
-      };
-      try {
-        shareResponse = await fetch(shareUrl, {
-          method: 'POST',
-          headers: requestHeaders,
-          body: sharePayload,
-          cache: 'no-store',
-          redirect: 'follow',
-          signal: AbortSignal.timeout(15000)
-        });
-        shareText = await shareResponse.text();
-        lastStatus = shareResponse.status;
-        lastBody = shareText.slice(0, 320);
-        if (shareResponse.ok || !transientStatuses.has(shareResponse.status)) break;
-      } catch (error) {
-        lastStatus = null;
-        lastBody = String(error?.message || error).slice(0, 320);
-        if (attempt === 3) {
-          return json({
-            ok: false,
-            error: 'SPORTYBET_BOOKING_NETWORK',
-            message: lastBody
-          }, 502);
-        }
-      }
-      if (attempt < 3) {
-        const delayMs = 400 * Math.pow(2, attempt - 1);
-        await new Promise(resolve => setTimeout(resolve, delayMs));
-      }
-    }
-
-    if (!shareResponse) {
+    const shareResult = await requestSportyBetShare(selections);
+    if (shareResult.error) {
       return json({
         ok: false,
-        error: 'SPORTYBET_BOOKING_NO_RESPONSE'
+        error: shareResult.error,
+        message: shareResult.message,
+        attempts: shareResult.attempts
       }, 502);
     }
-
-    if (!shareResponse.ok) {
-      const fallbackSelections = selections.map(selection => ({
-        eventId: selection.eventId,
-        marketId: selection.marketId,
-        specifier: selection.specifier,
-        outcomeId: selection.outcomeId
-      }));
+    const share = shareResult.payload;
+    if (shareResult.status < 200 || shareResult.status >= 300) {
       return json({
         ok: false,
-        error: 'SPORTYBET_BOOKING_HTTP_' + shareResponse.status,
-        body_prefix: lastBody,
-        attempts: 3,
-        fallback_direct_origin: true,
-        fallback_selections: fallbackSelections
-      }, 502);
-    }
-
-    let share;
-    try {
-      share = JSON.parse(shareText);
-    } catch (error) {
-      return json({
-        ok: false,
-        error: 'SPORTYBET_BOOKING_MALFORMED_RESPONSE',
-        message: 'SportyBet returned a non-JSON response after a successful HTTP status.',
-        body_prefix: shareText.slice(0, 240)
-      }, 502);
+        error: 'SPORTYBET_BOOKING_HTTP_' + shareResult.status,
+        message: String(share?.message || share?.detail || share?.error || 'SportyBet rejected the share request.'),
+        content_type: shareResult.contentType
+      }, shareResult.status >= 400 && shareResult.status < 500 ? 409 : 502);
     }
     if (share?.bizCode != null && Number(share.bizCode) !== 10000) {
       return json({
         ok: false,
         error: 'SPORTYBET_BOOKING_REJECTED',
-        biz_code: share.bizCode
+        biz_code: share.bizCode,
+        message: String(share?.message || share?.detail || 'SportyBet rejected the requested selections.')
       }, 409);
     }
 
