@@ -160,3 +160,49 @@ This checkpoint supersedes the earlier “Next action on resume” paragraph. Th
 1. Re-read this file, current main, the latest probability/value and OOS reports, the settlement ledger, fresh market-225 snapshots, and current Actions/deployment state.
 2. Confirm the queued deployment and Builder Promotion statuses; verify any subsequent capture-triggered settlement/report runs and confirm the report timestamp is newer than the latest capture and ledger timestamps.
 3. Continue Priority 14 only: collect genuinely prospective, exact-market-225 selections and settle them only from official ESPN results. Do not start Priority 15 until at least 30 unique prospective market-225 fixtures have settled and every other release condition is independently proven. Keep RESEARCH_ONLY and the Basketball ticket gate locked.
+
+## Latest verified continuation checkpoint — 2026-11-02 04:30 UTC
+
+This checkpoint supersedes the earlier 03:58 UTC production/ticket notes above. The fixed prospective cutoff remains `2026-11-02T02:00:00+00:00`. No release threshold was relaxed.
+
+### Production ticket identity defect fixed and deployed
+
+- Fixed the NBA ticket identifier contract. Basketball ticket markup now sends the ESPN prediction ID in `event_id` and the exact SportyBet provider event ID separately in `sportybet_event_id`.
+- The shared ticket drawer stores and submits both IDs, rejects legacy NBA ticket rows without the provider ID, and retains the ESPN ID for prediction/settlement identity.
+- The server resolves current SportyBet catalogue events by `sportybet_event_id`, retains ESPN `event_id` for the unique V5 prediction lookup, confirms that the provider ID equals the immutable quote's SportyBet event ID, and rejects duplicate provider IDs in a manual NBA slip.
+- Current main implementations: `basketball-live.js`, `ticket-drawer.js`, `functions/api/sportybet-booking.js`; page references use `ticket-drawer.js?v=20261102-split-event-identifiers1` and Basketball's script uses `ids=20261102-split-event-identifiers3`.
+- Replaced the dedicated server guard regression cases with tests for distinct ESPN/SportyBet identifiers, whole-slip rejection when one NBA leg cannot be resolved, code withholding after partial SportyBet acceptance, and the locked `RESEARCH_ONLY` release gate.
+- Regression evidence: NBA ticket fail-closed workflow [41387172963](https://github.com/topboyasian-stack/match-signal/actions/runs/41387172963) passed; shared Ticket Drawer Contract workflow [41387404347](https://github.com/topboyasian-stack/match-signal/actions/runs/41387404347) passed; deployment's Basketball desk, NBA live projection/release-gate and shared ticket checks all passed.
+- Updated the Cloudflare production smoke-test markers to expect the new shared drawer asset. Used the ordered Builder Production Promotion path: pre-build board -> Builder -> post-build board -> child Builder -> Pages deploy. The child board correctly set `SKIP_PROMOTION=true` and dispatched its required Builder handoff; this was not a recursive promotion loop.
+- Cloudflare production workflow [41388664157](https://github.com/topboyasian-stack/match-signal/actions/runs/41388664157) completed **successfully** at 2026-11-02T04:30:04Z. Its steps passed artifact verification, Pages deploy, production HTTP/asset smoke tests, live-source diagnostic, production verification record, and final checkout.
+- Production verification file `DEPLOY-VERIFY-CLOUDFLARE.json` is `VERIFIED_WITH_DIAGNOSTIC_INCOMPLETE`: core pages verified; Qualified Best diagnostic is `VALID_ZERO` (239 candidate rows, 0 model-qualified); booking API diagnostic is `NO_FUTURE_BATCH` because no fully future 2+ leg batch was available to exercise a production POST. No live booking code was fabricated or requested.
+- Important: software ticket identity/validation is fixed and deployed; successful end-to-end NBA code generation is still not production-verified because the global release gate is locked and no qualified NBA batch exists. Do not mark the NBA booking POST path fully proven.
+
+### Model challenger result — no production promotion
+
+- Added an isolated nonlinear residual challenger experiment, with chronological training folds and the same frozen historical validation interval. It does not use bookmaker prices, does not touch the live V5 model, and does not use the prospective holdout for tuning.
+- Experiment workflow [41387639127](https://github.com/topboyasian-stack/match-signal/actions/runs/41387639127) passed. It used 949 training games and 239 historical validation games.
+- V5 validation: MAE 15.2774, RMSE 19.8615, bias -1.3826. Best ExtraTrees residual candidate: MAE 15.1759, RMSE 19.7986, bias -0.985. MAE improvement was only 0.1015 points, and its paired fixture-bootstrap 95% CI for the improvement was -0.1576 to +0.3660. The confidence interval crosses zero.
+- Decision: `KEEP_V5_NO_NONLINEAR_PROMOTION`. ExtraTrees is not promoted. Production remains `nba-total-v5-pace-efficiency-calibrated`; no evidence supports claiming a reliable model improvement.
+
+### Latest prospective evidence — still not betting-ready
+
+- Latest fixed-cutoff OOS report: generated `2026-11-02T04:25:54.902934Z`; release remains `RESEARCH_ONLY`.
+  - Post-cutoff forecast holdout: 0 games; MAE, bias and baseline comparison unavailable.
+  - Post-cutoff settled market holdout: 0 selections.
+  - Development market cohort: 6 selections, 2 wins / 4 losses, -2.12 units, -35.33% flat-stake ROI, bootstrap lower bound -100%.
+  - Publication capture summary: 64 model predictions; 13 exact fresh SportyBet market-225 pairs; 258 immutable fresh snapshots across 23 unique snapshot events; 51 predictions unpriced/unavailable; capture status PARTIAL.
+- Latest probability/value report: generated `2026-11-02T04:26:49.201831Z`; release remains `RESEARCH_ONLY`.
+  - 168 verified fresh prospective snapshots across 13 unique fixtures.
+  - 0 prospective settled market selections; 0 exact-snapshot-linked settled selections; 0 linkage mismatches.
+  - 0 prospective probability-scored fixtures; 0 near-close CLV observations.
+- Latest price-capture status: `2026-11-02T04:25:48.797946Z`: 13 exact fresh matches among 54 upcoming V5 predictions, from 13 feed events with market 225. Unmatched diagnoses: 39 not listed in the current feed and 2 start-time mismatches; do not mislabel these as 41 confirmed code defects.
+- The next NBA slate has not yet settled relative to the frozen cutoff. Re-running capture, settlement or report workflows cannot create settled prospective evidence before official final scores exist.
+
+### First execution priority on resume
+
+1. Re-read this file, latest `main`, latest OOS/probability/capture reports, settlement ledger and current Actions/Cloudflare state.
+2. Preserve the new ESPN/SportyBet dual-ID ticket contract and its regression tests. Do not roll back to a single event ID.
+3. Keep the release gate locked. Continue the existing exact market-225 capture and official ESPN settlement process as games become available; preserve immutable snapshots and one observation per unique ESPN fixture.
+4. Continue only evidence-based model research. Do not promote V6/ExtraTrees or change V5 based on a small, statistically unstable historical improvement. Any new candidate must use timestamp-safe features, chronological validation, paired fixture-level uncertainty and no bookmaker-price leakage.
+5. Do not mark betting-ready until the existing 100 prospective settled market selections, 30 unique probability scores, positive ROI/95% lower bound/market-favourite comparison, positive probability and line CLV, and 100-game post-cutoff MAE/bias gates all pass. Do not change the frozen cutoff or thresholds.
