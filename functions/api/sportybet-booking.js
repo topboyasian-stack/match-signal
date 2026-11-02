@@ -742,8 +742,8 @@ async function handlePost(context) {
     }
     const virtualIds = new Set(legs.filter(l => productForLeg(l) === 'vfootball').map(l => String(l.event_id || '')));
     const efootballIds = new Set(legs.filter(l => productForLeg(l) === 'efootball').map(l => String(l.event_id || '')));
-    const footballIds = new Set(legs.filter(l => String(l?.sport || '').toLowerCase() === 'football').map(l => String(l.event_id || '')));
-    const tennisIds = new Set(legs.filter(l => String(l?.sport || '').toLowerCase() === 'tennis').map(l => String(l.event_id || '')));
+    const footballIds = new Set(legs.filter(l => String(l?.sport || '').toLowerCase() === 'football').map(l => String(l.sportybet_event_id || l.event_id || '')).filter(Boolean));
+    const tennisIds = new Set(legs.filter(l => String(l?.sport || '').toLowerCase() === 'tennis').map(l => String(l.sportybet_event_id || l.event_id || '')).filter(Boolean));
     const basketballIds = new Set(legs.filter(l => String(l?.sport || '').toLowerCase() === 'basketball').map(l => String(l.sportybet_event_id || '')).filter(Boolean));
 
     const found = new Map();
