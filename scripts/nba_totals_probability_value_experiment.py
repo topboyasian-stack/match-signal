@@ -624,7 +624,7 @@ def snapshot_clv_audit(settled_rows, snapshots, close_window_minutes=45):
         })
     near_close_rows = [row for row in audit if row.get("clv_status") == "NEAR_CLOSE_CAPTURED"]
     return {
-        "definition": "Opening immutable v5 publication quote vs latest captured exact SportyBet market-225 pregame quote; near-close counts only if quote was observed within 45 minutes of tip. This is not an official bookmaker close.",
+        "definition": "Opening immutable v5.1 publication quote vs latest captured exact SportyBet market-225 pregame quote; near-close counts only if quote was observed within 45 minutes of tip. This is not an official bookmaker close.",
         "close_window_minutes": close_window_minutes,
         "settled_v5_fixtures_audited": len(audit),
         "near_close_observations": len(near_close_rows),
@@ -770,7 +770,7 @@ def prospective_snapshot_coverage(settled_rows, snapshots, cutoff=EVALUATION_CUT
     return report, matched_events
 
 
-def probability_score_summary(settled_audit, minimum_descriptive_sample=30, cohort_label="selected-v5 historical cohort"):
+def probability_score_summary(settled_audit, minimum_descriptive_sample=30, cohort_label="selected-v5.1 historical cohort"):
     """Descriptive Brier/log-loss comparison; never a release gate at tiny n."""
     binary = []
     for row in settled_audit:
@@ -977,7 +977,7 @@ def run_experiment(history, ledger, predictions, now=None, snapshots=None):
         and parse_time(row.get("published_at")) >= EVALUATION_CUTOFF_UTC
     ]
     prospective_clv = snapshot_clv_audit(prospective_clv_rows, prospective_snapshots)
-    prospective_clv["cohort"] = "post-cutoff prospective v5 selections with exact immutable snapshot linkage"
+    prospective_clv["cohort"] = "post-cutoff prospective v5.1 selections with exact immutable snapshot linkage"
     prospective_clv["positive_clv_release_check_passed"] = bool(
         int(prospective_clv.get("near_close_observations") or 0) > 0
         and prospective_clv.get("mean_probability_clv") is not None
