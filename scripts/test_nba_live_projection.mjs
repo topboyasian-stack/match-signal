@@ -77,6 +77,7 @@ assert.equal(api.nbaTotalRowQualified({ totals_model_version: "nba-total-v5-pace
 assert.equal(api.nbaTotalRowQualified({ totals_model_version: "nba-total-v5-pace-efficiency-calibrated", prediction_status: "BETTING_QUALIFIED", markets: { total_ou: { market_id: "225", prediction_status: "BETTING_QUALIFIED" } } }, { ...qualifiedTotalsEvidence, release_decision: "RESEARCH_ONLY" }), false);
 assert.equal(api.nbaTotalRowQualified({ totals_model_version: "nba-total-v5-pace-efficiency-calibrated", prediction_status: "BETTING_QUALIFIED", markets: { total_ou: { market_id: "225", prediction_status: "BETTING_QUALIFIED" } } }, qualifiedTotalsEvidence), true);
 assert.match(source, /RESEARCH ONLY · NO BETTING LEAN/);
-assert.match(source, /Research-only model: no betting lean or builder action/);
-assert.match(source, /NBA totals are research-only; this builder stays locked until the model passes strict out-of-sample validation\./);
+assert.match(source, /Independent NBA release\/row gate has not passed/);
+assert.match(source, /data-ticket-model-qualified/);
+assert.match(source, /canGenerate=qualified&&releaseQualified/);
 console.log("NBA live projection and verified totals tests passed.");
