@@ -47,3 +47,26 @@ jobs:
         run: |
           python scripts/test_ticket_drawer_contract.py
           node scripts/test_sportybet_booking_resilience.mjs
+      - name: Verify production booking endpoint returns JSON for rejected tickets
+        run: |
+          node --input-type=module <<'NODE'
+          const response = await fetch('https://match-signal.pages.dev/api/sportybet-booking', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'Cache-Control': 'no-store' },
+            body: JSON.stringify({ mode: 'manual', manual_selections: [] }),
+            cache: 'no-store',
+            signal: AbortSignal.timeout(15000)
+          });
+          const raw = await response.text();
+          const contentType = String(response.headers.get('content-type') || '').toLowerCase();
+          let payload = null;
+          try { payload = JSON.parse(raw); } catch {}
+          if (response.status !== 422 ||
+              !contentType.includes('application/json') ||
+              payload?.error !== 'INVALID_MANUAL_LEG_COUNT' ||
+              payload?.booking_code) {
+            throw new Error('Production booking endpoint did not return the expected JSON validation response: HTTP ' +
+              response.status + ', content-type ' + contentType + ', body ' + raw.replace(/\\s+/g, ' ').slice(0, 240));
+          }
+          console.log('Production booking endpoint returned HTTP 422 JSON; invalid/empty ticket was rejected and no code was generated.');
+          NODE
