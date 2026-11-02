@@ -111,4 +111,22 @@ jobs:
           if (nbaResponse.status === 400 && !nbaResponse.headers.has('X-Match-Signal-Upstream-Status')) {
             throw new Error('Regional Worker rejected the NBA sportId or marketId before reaching SportyBet.');
           }
+
+          for (const [sportName, sportId, marketIds] of [
+            ['football', 'sr%3Asport%3A1', '1%2C18%2C10%2C14%2C16%2C29%2C45%2C47'],
+            ['tennis', 'sr%3Asport%3A5', '186%2C210%2C202%2C204%2C189%2C203%2C188%2C187']
+          ]) {
+            const url = base + '/api/ng/factsCenter/pcUpcomingEvents?sportId=' + sportId +
+              '&pageSize=5&pageNum=1&todayGames=false&timeline=168&marketId=' + marketIds + '&probe=' + Date.now();
+            const response = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(15000) });
+            const text = await response.text();
+            console.log('Shared ticket ' + sportName + ' proxy probe:', JSON.stringify({
+              http_status: response.status,
+              upstream_status: response.headers.get('X-Match-Signal-Upstream-Status'),
+              body: text.replace(/\\s+/g, ' ').slice(0, 260)
+            }));
+            if (response.status === 400 && !response.headers.has('X-Match-Signal-Upstream-Status')) {
+              throw new Error('Regional Worker rejected the shared ticket ' + sportName + ' sportId/marketIds before reaching SportyBet.');
+            }
+          }
           NODE
