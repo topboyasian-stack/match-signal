@@ -18,6 +18,8 @@ on:
     branches: [main]
     paths:
       - 'scripts/capture_nba_totals_prices.py'
+      - 'scripts/nba_totals_walk_forward.py'
+      - 'scripts/test_nba_totals_walk_forward.py'
       - 'scripts/test_nba_totals_price_capture.py'
       - 'scripts/live_expansion_pipeline.py'
       - 'scripts/test_nba_sportybet_totals.py'
@@ -53,7 +55,8 @@ jobs:
 
       - name: Compile capture code and run regression tests
         run: |
-          python -m py_compile scripts/capture_nba_totals_prices.py scripts/test_nba_totals_price_capture.py
+          python -m py_compile scripts/capture_nba_totals_prices.py scripts/nba_totals_walk_forward.py scripts/test_nba_totals_price_capture.py scripts/test_nba_totals_walk_forward.py
+          PYTHONPATH=scripts python scripts/test_nba_totals_walk_forward.py
           PYTHONPATH=scripts python scripts/test_nba_totals_price_capture.py
 
       - name: Capture fresh SportyBet market-225 pairs and update the totals audit
