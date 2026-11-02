@@ -1,3 +1,5 @@
+import { onRequestGet as getSportyBetBasketballFeed } from './sportybet-basketball.js';
+
 const JSON_HEADERS = {
   'Content-Type': 'application/json; charset=utf-8',
   'Cache-Control': 'no-store',
@@ -7,6 +9,7 @@ const JSON_HEADERS = {
 };
 
 const ORIGIN = 'https://www.sportybet.com';
+const SPORTYBET_PROXY_ORIGIN = 'https://match-signal-sportybet-proxy.topboyasian.workers.dev';
 const BROWSER_HEADERS = {
   'Accept': 'application/json, text/plain, */*',
   'Content-Type': 'application/json',
@@ -29,7 +32,9 @@ export function nbaTotalsReleaseQualified(e,p){
 }
 async function readNbaReleaseJson(path){
  const response=await fetch('https://raw.githubusercontent.com/topboyasian-stack/match-signal/main/'+path+'?v='+Date.now(),{headers:{Accept:'application/json'},cache:'no-store',signal:AbortSignal.timeout(10000)});
- if(!response.ok)throw new Error(path+' HTTP '+response.status);return response.json();
+ const body=await response.text();
+ if(!response.ok)throw new Error(path+' HTTP '+response.status);
+ try{return JSON.parse(body);}catch(_){throw new Error(path+' returned non-JSON release evidence (HTTP '+response.status+', content-type '+String(response.headers.get('content-type')||'unknown')+').');}
 }
 async function loadNbaReleaseContext(){
  const [evidence,probability,predictions,snapshots]=await Promise.all([readNbaReleaseJson('data/nba_totals_oos_value_test.json'),readNbaReleaseJson('data/nba_totals_probability_value_experiment.json'),readNbaReleaseJson('data/nba_predictions.json'),readNbaReleaseJson('data/nba_totals_publication_snapshots.json')]);
@@ -92,26 +97,34 @@ function normalizeEvent(event, tournament) {
   };
 }
 
-async function upstream(path, params) {
-  const url = new URL(ORIGIN + path);
-  for (const [key, value] of Object.entries(params || {})) {
-    if (value != null) url.searchParams.set(key, String(value));
+export async function upstream(path, params) {
+  const failures = [];
+  // SportyBet sometimes answers JSON API requests with an HTML edge/challenge
+  // page. Retry the same catalogue query through the Match Signal proxy.
+  for (const origin of [ORIGIN, SPORTYBET_PROXY_ORIGIN]) {
+    try {
+      const url = new URL(origin + path);
+      for (const [key, value] of Object.entries(params || {})) {
+        if (value != null) url.searchParams.set(key, String(value));
+      }
+      const response = await fetch(url.toString(), {
+        headers: BROWSER_HEADERS, cache: 'no-store', signal: AbortSignal.timeout(12000)
+      });
+      const body = await response.text();
+      const contentType = String(response.headers.get('content-type') || 'unknown');
+      if (!response.ok) throw new Error('HTTP ' + response.status + ' (content-type ' + contentType + ')');
+      if (!body.trim()) throw new Error('empty response (HTTP ' + response.status + ')');
+      if (/^\s*</.test(body)) throw new Error('returned HTML instead of JSON (HTTP ' + response.status + ', content-type ' + contentType + ')');
+      let payload;
+      try { payload = JSON.parse(body); }
+      catch (_) { throw new Error('returned malformed JSON (HTTP ' + response.status + ', content-type ' + contentType + ')'); }
+      if (payload?.bizCode != null && Number(payload.bizCode) !== 10000) throw new Error('bizCode ' + payload.bizCode);
+      return payload;
+    } catch (error) {
+      failures.push(origin + ': ' + String(error?.message || error));
+    }
   }
-  const response = await fetch(url.toString(), {
-    headers: BROWSER_HEADERS,
-    cache: 'no-store',
-    signal: AbortSignal.timeout(12000)
-  });
-  const text = await response.text();
-  if (!response.ok) {
-    throw new Error(path + ' HTTP ' + response.status + ' ' + text.slice(0, 200));
-  }
-  if (!text.trim()) throw new Error(path + ' empty response');
-  const payload = JSON.parse(text);
-  if (payload?.bizCode != null && Number(payload.bizCode) !== 10000) {
-    throw new Error(path + ' bizCode ' + payload.bizCode);
-  }
-  return payload;
+  throw new Error('SportyBet catalogue unavailable for ' + path + ': ' + failures.join(' || ').slice(0, 700));
 }
 
 async function collectEvents({ sportId, marketId, timeline = 168, pageSize = 100, maxPages = 8, primaryPath = '/api/ng/factsCenter/pcUpcomingEvents', fallbackPath = null, fallbackParams = {} }, targetIds) {
@@ -204,13 +217,17 @@ async function collectEvents({ sportId, marketId, timeline = 168, pageSize = 100
 }
 
 
-async function collectBasketballEvents(context,targetIds){
+export async function collectBasketballEvents(context,targetIds){
   const found=new Map();if(!targetIds.size)return found;
   for(let page=1;page<=4&&found.size<targetIds.size;page++){
     const url=new URL('/api/sportybet-basketball?pageSize=100&timeline=168&pageNum='+page+'&_t='+Date.now(),context.request.url);
-    const response=await fetch(url.toString(),{headers:{'Accept':'application/json','Cache-Control':'no-cache'},cache:'no-store',signal:AbortSignal.timeout(18000)});
+    // Call the sibling Pages Function directly; do not HTTP self-fetch the public hostname.
+    const feedRequest=new Request(url.toString(),{headers:{'Accept':'application/json','Cache-Control':'no-cache'}});
+    const response=await getSportyBetBasketballFeed({request:feedRequest,env:context.env,params:context.params,data:context.data});
+    const body=await response.text();
     if(!response.ok)throw new Error('Current SportyBet basketball feed HTTP '+response.status);
-    const payload=await response.json();
+    let payload;
+    try{payload=JSON.parse(body);}catch(_){throw new Error('Current SportyBet basketball feed returned non-JSON content (HTTP '+response.status+', content-type '+String(response.headers.get('content-type')||'unknown')+').');}
     if(payload?.ok!==true||!Array.isArray(payload.events))throw new Error(payload?.error||'Current SportyBet basketball feed unavailable');
     for(const row of payload.events){
       const eventId=String(row?.event_id||'');if(!eventId||!targetIds.has(eventId))continue;

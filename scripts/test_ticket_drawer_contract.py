@@ -70,6 +70,13 @@ def main():
             "Football/Tennis total selections must revalidate against exact SportyBet full-match O/U market IDs")
     require("function collectBasketballEvents" in api and "function findBasketballSelection" in api,
             "The common booking API must resolve and revalidate NBA total markets")
+    require("import { onRequestGet as getSportyBetBasketballFeed } from './sportybet-basketball.js';" in api and "getSportyBetBasketballFeed({request:feedRequest" in api,
+            "NBA revalidation must invoke the sibling SportyBet feed function directly instead of self-fetching its Pages URL")
+    basketball_collector = api.split("export async function collectBasketballEvents", 1)[1].split("function findBasketballSelection", 1)[0]
+    require("await fetch(url.toString()" not in basketball_collector and "response.json()" not in basketball_collector and "returned non-JSON content" in basketball_collector,
+            "NBA feed revalidation must handle non-JSON responses explicitly and avoid same-origin HTML fallbacks")
+    require("export async function upstream(path, params)" in api and "SPORTYBET_PROXY_ORIGIN" in api and "returned HTML instead of JSON" in api,
+            "Shared SportyBet catalogue lookup must retry the same source via the configured proxy when the public host returns HTML")
     require("const basketballIds" in api and "map(l => String(l.sportybet_event_id || '')).filter(Boolean)" in api and "collectBasketballEvents(context, basketballIds)" in api and "directProvider = sportybetId ? found.get(sportybetId) : null" in api,
             "Mixed-sport tickets must fetch the current SportyBet Basketball event")
     require("leg.model_qualified !== true" in api and "leg.market_id !== '225'" in api and "!leg.sportybet_event_id" in api and "NBA_RELEASE_GATE_LOCKED" in api and "nbaTotalTicketLegQualified" in api,
