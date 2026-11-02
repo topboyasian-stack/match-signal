@@ -44,18 +44,18 @@ Latest inspected artifacts were generated around **2026-11-02 02:00 UTC**:
 
 ### P0 — build a stronger score model using historical development data only
 
-6. [ ] Build v6 as a separately versioned candidate; do not silently modify or relabel v5.
-7. [ ] Backtest candidate features individually and in combinations against the same pre-cutoff historical development set: opponent-adjusted pace, home/away offense and defense splits, rest days/back-to-backs/schedule density, recent offense and defense form, and turnover/rebound/possession profiles where the historical data is complete.
-8. [ ] Use player availability/starting-lineup information only if a free, reliable, timestamped pregame source is available and its historical availability can be reproduced. Otherwise omit it; do not use post-tip information.
-9. [ ] Compare every candidate against v5 and the rolling 90-day baseline using chronological splits. Retain a feature only when it produces repeatable out-of-time improvement. Do not use SportyBet prices as model projection inputs.
-10. [ ] Preserve the frozen prospective cutoff for the final test. Any candidate tuning after looking at prospective outcomes invalidates that holdout and requires a new, explicitly registered future cutoff.
+6. [x] Screen v6 separately from v5. The experiment has not found an upgrade that passes the robustness gate; production remains v5.
+7. [x] Backtest venue splits, rest, schedule density, recent team scoring/defense form, recent pace/efficiency, and recent possession/efficiency individually and in combinations. No candidate passed the robustness gate. The archive has no turnover or rebound fields.
+8. [x] Omit injury and starting-lineup features from this experiment: the existing historical archive has no timestamped player-availability or lineup fields, so those features cannot be reproduced from it.
+9. [x] Compare candidates against v5 and the 90-day baseline using the fixed historical window, four chronological blocks, and paired bootstrap. No candidate passed; no feature retained.
+10. [x] Preserve the frozen prospective cutoff. All v6 experiments exclude games at or after 2026-11-02 02:00 UTC.
 
 ### P1 — replace point-edge picks with probability and value decisions
 
-11. [ ] Estimate a calibrated total-score uncertainty distribution from development residuals and derive calibrated P(Over) and P(Under), including half-point and integer-line push treatment.
-12. [ ] Convert the exact fresh SportyBet Over/Under pair to no-vig market probabilities. Compare model probabilities with those market probabilities and calculate expected value using the saved selected-side price.
-13. [ ] Require a predeclared probability/value margin that survives calibration uncertainty. The output must be OVER VALUE, UNDER VALUE, or NO BET; a fixed ±3-point projection gap alone is not a betting signal.
-14. [ ] Check probability calibration, Brier score/log loss, side-specific performance, line/edge buckets, and closing-line value. All analysis must use pregame snapshots and unique fixtures.
+11. [x] Implement an empirical residual score distribution with Over/Under probabilities and integer-line push handling as a research experiment. Score-interval coverage passed; market-probability calibration is not established.
+12. [x] Implement exact fresh SportyBet market-225 no-vig probability comparisons and expected-value calculations in the research report only. There are no historic odds in the archived NBA game log.
+13. [x] Add predeclared probability-edge and EV thresholds with a bootstrap lower bound. These classifications are diagnostic only and cannot authorize betting or tickets.
+14. [ ] Establish market-side probability calibration and evaluate Brier score/log loss, Over/Under buckets, line/edge buckets, and genuine closing-line value. This requires saved pregame SportyBet snapshots and subsequent official settlements; do not manufacture historic odds.
 
 ### P1 — prospective validation and release gate
 
@@ -79,11 +79,31 @@ Latest inspected artifacts were generated around **2026-11-02 02:00 UTC**:
 - The current evaluation JSON reports 1,188 pre-cutoff forecast development games, zero post-cutoff completed forecast games, five verified v5 market selections (one win/four losses), and zero prospective settled market bets. Release remains `RESEARCH_ONLY`.
 - Latest live price capture classified 54 upcoming predictions as 11 exact market-225 matches, 40 fixtures not listed in SportyBet's feed, one matched fixture with market 225 not offered, and two start-time mismatches over 45 minutes. The feed returned 12 events, 11 with market 225, without a provider error. These remain unpriced rather than guessed.
 
-## Current v6 experiment checkpoint
+## Verified v6 feature-experiment checkpoint — 2026-11-02
 
-- `scripts/nba_totals_feature_experiment.py` adds a separate historical-only v6 ablation (venue splits, rest balance, seven-day team schedule density, and their combination). It fits corrections on a historical training block and scores a fixed historical validation block, while excluding the prospective holdout and all bookmaker inputs.
-- `scripts/test_nba_totals_feature_experiment.py` checks future-data exclusion, ridge fitting, metric calculations, and full-experiment holdout isolation.
-- `.github/workflows/nba-totals-feature-experiment.yml` runs the tests, executes the historical experiment, verifies holdout isolation, and publishes the experiment report.
-- Latest experiment run at this checkpoint: `41376835265` (in progress when this file was updated).
+- V3 workflow run `41377733780` passed, including its regression suite and report publication.
+- Fixed historical blocks: 949 training games (2025-11-08 through 2026-03-25) and 239 validation games (2026-03-26 through 2026-11-01). The prospective cutoff at 2026-11-02 02:00 UTC was not used.
+- V5 validation: MAE 15.2774, RMSE 19.8615, bias -1.3826. Best candidate remained seven-day schedule density (MAE 15.2590; gain 0.0184), but paired 95% CI was -0.0391 to 0.0747 and it improved only 2/4 chronological blocks.
+- Recent possessions/efficiency also failed to improve validation (MAE 15.3060; RMSE 19.9486). Overall decision: `KEEP_V5_BASELINE_NO_FEATURE_UPGRADE`. Do not promote v6.
+- Latest artifact: `data/nba_totals_v6_feature_experiment.json`.
 
-**Next action on resume:** inspect run `41376835265` and read `data/nba_totals_v6_feature_experiment.json` if published. Fix any failing test or experiment issue. Do not change production v5 or promote v6 based only on historical feature validation.
+## Verified probability/value research checkpoint — 2026-11-02
+
+- Probability/value workflow run `41377767053` passed its tests, experiment, safety checks, and report publication.
+- Empirical residual calibration used 658 training games, 291 calibration residuals, and 239 later validation games. Observed validation coverage was 51.05% for nominal 50%, 77.82% for nominal 80%, and 85.36% for nominal 90%. This checks score-residual intervals only; it does not prove market probability calibration.
+- On the five verified v5 settled market-225 records, the research layer issued two value classifications; both lost. The other three were `NO BET`. Treat this as adverse but very small evidence, not a performance estimate.
+- The archived 1,228-game history has empty market objects on all rows: no historical SportyBet lines or odds exist for a meaningful historical ROI or CLV backtest. Current work must build prospective immutable evidence instead.
+- The research report checked 11 exact fresh market-225 upcoming pairs; 43 of 54 upcoming predictions remained without an exact fresh pair. It never authorizes betting or ticket generation.
+- Latest report: `data/nba_totals_probability_value_experiment.json`. Production remains v5, Basketball ticket gate remains locked, and release remains `RESEARCH_ONLY`.
+
+## Next execution priorities
+
+15. [ ] Collect at least 100 unique prospective settled market-225 selections; target 200. Every bet needs a fresh exact snapshot and official ESPN result.
+16. [ ] Require positive ROI, positive bootstrapped 95% lower bound, ROI above the market-favourite baseline, and positive closing-line value where a later real quote exists.
+17. [ ] Require at least 100 post-cutoff forecast games with lower MAE than the development baseline and absolute bias no greater than 3 points.
+18. [ ] Keep `RESEARCH_ONLY` until every forecast and market gate passes.
+19. [ ] Run Basketball page, live feed, settled results, odds display, and ticket-builder regression tests against latest main.
+20. [ ] Revalidate every NBA ticket leg against exact fresh SportyBet 225 event/line/side/price immediately before code generation; reject the whole slip if any leg is invalid.
+21. [ ] Unlock NBA ticket selection/code generation only after all prospective gates and production smoke tests pass.
+
+**Next action on resume:** inspect the latest reruns `41377743302` and `41377791827` after they complete, then start priority 14. Never promote a value classification to a betting recommendation from these research artifacts.
