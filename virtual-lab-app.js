@@ -1250,8 +1250,13 @@ function renderPredictionDesk(){
   const productFilter=$('product')?.value||'';
   const showEfootballGate=['efootball','efootball_gt','efootball_adriatic','all'].includes(productFilter);
   const gtGate=recentProductPerformanceGate('efootball_gt'),adriaticGate=recentProductPerformanceGate('efootball_adriatic');
-  const gateText=(name,g)=>g.reason==='RECENT_ACCURACY_BELOW_55_PERCENT'?name+' '+fmtPct(g.accuracy)+' across last '+g.n+' · below 55%':g.reason==='RECENT_PERFORMANCE_EVIDENCE_INSUFFICIENT'?name+' recent sample insufficient (n='+g.n+')':g.blocked?name+' recent performance data unavailable':'';
-  const gateBanner=showEfootballGate&&(gtGate.blocked||adriaticGate.blocked)?'<div class="vl-recent-performance-gate" role="status"><strong>EFOOTBALL QUALIFICATION PAUSED</strong><span>'+esc([gateText('GT',gtGate),gateText('eAdriatic',adriaticGate)].filter(Boolean).join(' · '))+'</span><small>These markets remain research-only until each product has at least 30 recent settled results and accuracy of 55% or better.</small></div>':'';
+  const gateText=(name,g)=>{
+    if(g.reason==='RECENT_ACCURACY_BELOW_55_PERCENT')return name+': '+g.n+' recent settled desk forecasts · '+fmtPct(g.accuracy)+' hit rate · below 55%';
+    if(g.reason==='RECENT_PERFORMANCE_EVIDENCE_INSUFFICIENT'&&g.n>0)return name+': '+g.n+' recent settled desk forecasts · sample below 30';
+    if(g.reason==='RECENT_PERFORMANCE_EVIDENCE_INSUFFICIENT'&&g.n===0)return name+': no scored desk forecasts in the learning record yet (n=0) · accuracy unknown';
+    return g.blocked?name+': recent performance data unavailable':'';
+  };
+  const gateBanner=showEfootballGate&&(gtGate.blocked||adriaticGate.blocked)?'<div class="vl-recent-performance-gate" role="status"><strong>EFOOTBALL QUALIFICATION PAUSED</strong><span>'+esc([gateText('GT',gtGate),gateText('eAdriatic',adriaticGate)].filter(Boolean).join(' · '))+'</span><small>Each product is assessed separately. It needs at least 30 recent settled desk forecasts and 55% accuracy. A missing sample is unmeasured, not a failed accuracy test; results are never pooled across products.</small></div>':'';
   $('predictionCount').textContent=String(picks.length);
   if(!picks.length){
     const liveCount=state.live.length;
