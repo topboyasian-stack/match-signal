@@ -84,8 +84,9 @@ def main():
             "sameParticipantPair([first, second], event)" in api,
             "Current Tennis event matching must accept the same two players in either order")
     require("function participantNameMatches(first, second)" in api and
-            "tokens[1].length === 1" in api and "tokens.reverse()" in api,
-            "Tennis player matching must handle trailing initials such as Surname A.")
+            "tokens[1].length === 1" in api and "tokens.reverse()" in api and
+            "left[0] === right[1] && left[1] === right[0]" in api,
+            "Tennis player matching must handle trailing initials and reversed full-name order")
     require("actual half-point total" in api and "explicitLine" in api,
             "Exact SportyBet total specifiers must override integer base lines")
     require("specifierText.match(/(?:^|[,\\s;|&])(?:total|line)" in api,
