@@ -35,7 +35,7 @@ def main():
             "Football/Tennis prediction cards must expose a selectable ticket action")
     require("ticketAddMarkup(x)" in hub and "ticketAddMarkup(p)" in hub,
             "Upcoming and league prediction rows must both connect to the ticket")
-    require("data-ms-ticket-add" in hub and 'data-ticket-market="total"' in hub and "row?.analytics||{}).total_games" in hub,
+    require("data-ms-ticket-add" in hub and 'data-ticket-market="total"' in hub and "row?.analytics||{}).total_games" in hub and "(sport==='football'?'18':'189')" in hub,
             "Football/Tennis winner and Over/Under predictions must submit structured selections")
     require("window.MatchSignalTicket" in drawer and "function addSelection(raw)" in drawer,
             "The shared ticket selection API is missing")
@@ -60,8 +60,8 @@ def main():
             "NBA current totals must be selectable into the same ticket")
     require("nbaTotalsReleaseQualified(S.totalsOos)" in nba and "nbaTotalRowQualified(p,S.totalsOos)" in nba,
             "NBA ticket generation must retain the independent release and per-row gates")
-    require("market === 'total' && ['football','tennis'].includes(sport)" in api and "leg.market === 'total'" in api,
-            "Football/Tennis total selections must revalidate against current SportyBet O/U lines")
+    require("market === 'total' && ['football','tennis'].includes(sport)" in api and "leg.market === 'total'" in api and "leg.market_id !== requiredMarketId" in api,
+            "Football/Tennis total selections must revalidate against exact SportyBet full-match O/U market IDs")
     require("function collectBasketballEvents" in api and "function findBasketballSelection" in api,
             "The common booking API must resolve and revalidate NBA total markets")
     require("const basketballIds" in api and "collectBasketballEvents(context, basketballIds)" in api,
