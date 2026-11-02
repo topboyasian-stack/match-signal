@@ -55,9 +55,17 @@ jobs:
           assert report.get("model_projection_market_blind") is True
           assert report.get("market_prices_used_as_model_inputs") is False
           assert report.get("release_decision") == "RESEARCH_ONLY"
+          assert report.get("live_value_decisions_authorized") is False
+          assert "settled_v5_clv_diagnostics" in report
+          assert "settled_v5_probability_score_summary" in report
+          clv = report["settled_v5_clv_diagnostics"]
+          assert clv.get("is_official_bookmaker_close") is not True
+          assert all(row.get("is_official_bookmaker_close") is False for row in clv.get("fixtures", []) if "is_official_bookmaker_close" in row)
           print("Residual calibration:", report["calibration_protocol"]["coverage_check"])
           print("Calibration residuals:", report["calibration_protocol"]["calibration_residuals_n"])
           print("Settled v5 market records:", report["settled_v5_market_count"])
+          print("Near-close observations:", clv["near_close_observations"])
+          print("Brier score sample:", report["settled_v5_probability_score_summary"]["n"])
           print("Fresh exact market-225 diagnostics:", report["upcoming_value_diagnostics_count"])
           print("Prospective settled bets:", report["prospective_settled_market_bets_after_cutoff"])
           PY
