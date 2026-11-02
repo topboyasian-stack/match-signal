@@ -722,7 +722,7 @@ async function handlePost(context) {
             (leg.sport === 'tennis' && leg.pick === 'draw');
         }) ||
           ids.some(id => !id) || new Set(ids).size !== ids.length) {
-        return json({ ok: false, error: 'INVALID_MANUAL_SELECTION', message: 'Manual tickets support football/tennis winners or exact current totals, plus qualified NBA full-game totals.' }, 422);
+        return json({ ok: false, error: 'INVALID_MANUAL_SELECTION', message: 'Manual tickets support Football/Tennis winners and exact totals, qualified eFootball GT/eAdriatic totals, and release-qualified NBA full-game totals.' }, 422);
       }
     } else {
       // Desk research batches remain subject to their existing Builder qualification gates.
