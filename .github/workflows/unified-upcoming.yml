@@ -172,20 +172,24 @@ jobs:
         run: python scripts/test_efootball_desk_learning.py
       - name: Test the Virtual Lab product-specific performance gate
         run: node scripts/test_virtual_lab_recent_performance_gate.mjs
-      - name: Validate freshness deployment ordering
+      - name: Test workflow trigger boundaries
+        run: python scripts/test_workflow_trigger_boundaries.py
+      - name: Test Pages deployment freshness ordering
+        run: python scripts/test_deploy_freshness_order.py
+      - name: Test system health audit library
+        run: python scripts/test_system_health_audit_lib.py
+      - name: Test board concurrency and stale-publication guard
         run: |
-          python scripts/test_workflow_trigger_boundaries.py
-          python scripts/test_deploy_freshness_order.py
-          python scripts/test_system_health_audit_lib.py
           python - <<'PY'
           from pathlib import Path
           source = Path('.github/workflows/unified-upcoming.yml').read_text(encoding='utf-8')
           concurrency = source.rsplit('\nconcurrency:\n', 1)[1].split('\njobs:\n', 1)[0]
           assert "group: match-signal-unified-upcoming-" in concurrency and "'promotion'" in concurrency
+          assert "github.event.workflow_run.name" in concurrency
           publish = source.rsplit('      - name: Publish unified board and health', 1)[1]
           assert 'Newer unified board already published; skipping stale candidate.' in publish
           assert publish.index('if ! git rebase origin/main; then') < publish.index('Newer unified board already published; skipping stale candidate.')
-          print('Publication skips a stale candidate when main already has a newer board.')
+          print('Board event queues and stale-publication guard passed.')
           PY
       - name: Test settled expiry and eFootball reconciliation
         run: python scripts/test_upcoming_settlement_retention.py
