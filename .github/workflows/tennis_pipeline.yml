@@ -299,16 +299,17 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/predictions.json data/prediction_pool.json data/selection_candidates.json data/selection_gate.json data/selection_gate_selected.json data/value_signal_status.json data/value_trial_ledger.json data/prediction_history.json data/football_performance.json data/pipeline_status.json data/risk_gate.json data/calibration.json data/football_team_history.json data/behavior_profiles.json data/individual_behavior.json data/behavior_validation.json data/v4_paper_ledger.json data/v4_validation.json data/prediction_breakdown.json data/sports_evaluation.json data/sportybet_odds_snapshot.json qa/report.json
+          git add data/predictions.json data/prediction_pool.json data/value_signal_status.json data/value_trial_ledger.json data/prediction_history.json data/football_performance.json data/pipeline_status.json data/risk_gate.json data/calibration.json data/football_team_history.json data/behavior_profiles.json data/individual_behavior.json data/behavior_validation.json data/v4_paper_ledger.json data/v4_validation.json data/prediction_breakdown.json data/sports_evaluation.json data/sportybet_odds_snapshot.json qa/report.json
           # Keep independently refreshed aggregate-performance snapshots from
-          # concurrent writers on main. Replaying these three generated reports
-          # caused rebase conflicts and prevented the fresh predictions and
-          # selected-gate artifacts from publishing. The current risk/calibration
-          # decisions used by this run are still published with the predictions.
+          # concurrent writers on main. Replaying these generated reports
+          # caused rebase conflicts and prevented publication.
           git restore --source=HEAD --staged --worktree -- data/accuracy.json data/current_performance.json data/tennis_performance.json
-          # Stage the pipeline's other tracked generated artifacts, excluding
-          # the three shared aggregate snapshots retained from main.
+          # Unified Upcoming is the sole publisher for these three artifacts:
+          # it must derive the gate/candidate pool from the prediction commit
+          # that has just landed. If the model pipeline also commits them, its
+          # push races the board and leaves the public board stale indefinitely.
           git add -u data qa scripts/expansion_pipeline.py
+          git restore --source=HEAD --staged --worktree -- data/selection_candidates.json data/selection_gate.json data/selection_gate_selected.json
           if [ -f data/nba_fallback.json ]; then git add data/nba_fallback.json; fi
           if git diff --cached --quiet; then
             echo "No generated data or QA changes."
