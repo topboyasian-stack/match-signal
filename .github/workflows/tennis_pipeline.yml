@@ -300,6 +300,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/predictions.json data/prediction_pool.json data/selection_candidates.json data/selection_gate.json data/selection_gate_selected.json data/value_signal_status.json data/value_trial_ledger.json data/prediction_history.json data/accuracy.json data/tennis_performance.json data/football_performance.json data/pipeline_status.json data/risk_gate.json data/calibration.json data/football_team_history.json data/behavior_profiles.json data/individual_behavior.json data/behavior_validation.json data/current_performance.json data/v4_paper_ledger.json data/v4_validation.json data/prediction_breakdown.json data/sports_evaluation.json data/sportybet_odds_snapshot.json qa/report.json
+          # The pipeline also refreshes tracked research artifacts not in the fixed list above (notably football_model_council.json). Stage all tracked generated changes before any retry/rebase, or a normal concurrent push race leaves the checkout dirty and makes rebase fail before conflict handling.
+          git add -u data qa scripts/expansion_pipeline.py
+          if [ -f data/nba_fallback.json ]; then git add data/nba_fallback.json; fi
           if git diff --cached --quiet; then
             echo "No generated data or QA changes."
             exit 0
