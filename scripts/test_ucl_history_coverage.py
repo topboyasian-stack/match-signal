@@ -2,6 +2,7 @@
 """Contract tests for alternative domestic-history coverage."""
 from __future__ import annotations
 
+import json
 import sys
 import unittest
 from datetime import datetime, timezone
@@ -85,6 +86,31 @@ class DomesticFallbackTests(unittest.TestCase):
             CUTOFF,
         )
         self.assertIsNone(row)
+
+
+
+    def test_curated_overrides_cover_all_missing_domestic_leagues_without_mixing_competitions(self):
+        rows = json.loads((ROOT / "data" / "football_team_history_overrides.json").read_text(encoding="utf-8"))
+        expected = {
+            "Ukrainian Premier League": ("Shakhtar Donetsk",),
+            "Slovak Super Liga": ("Slovan Bratislava",),
+            "Czech First League": ("Slavia Prague",),
+            "Azerbaijan Premier League": ("Sabah FK",),
+        }
+        for league, teams in expected.items():
+            selected = [row for row in rows if row["league"] == league]
+            self.assertGreaterEqual(len(selected), 4, f"insufficient {league} rows")
+            self.assertTrue(all(row["settled"] is True and row["final_score"] for row in selected))
+            self.assertTrue(all(row.get("source_url", "").startswith("https://") for row in selected))
+            for team in teams:
+                self.assertTrue(
+                    any(team.casefold() in (r["player_1"] + " " + r["player_2"]).casefold() for r in selected),
+                    f"{team} has no domestic result in {league}",
+                )
+            self.assertFalse(any("champions league" in row["league"].casefold() for row in selected))
+            self.assertFalse(any("cup" in row["source"].casefold() for row in selected))
+        keys = [(row["league"], row["event_id"]) for row in rows]
+        self.assertEqual(len(keys), len(set(keys)), "override rows must have unique competition/event IDs")
 
     def test_unfinished_or_future_rows_are_rejected(self):
         unfinished = event(6, "Shakhtar Donetsk", "Dynamo Kyiv", 1, 0, "Ukraine", "Premier League")

@@ -243,6 +243,18 @@ def main():
     except Exception:
         prior_history = []
 
+    # Some leagues are not available through ESPN's scoreboard API. Keep a
+    # separate, auditable file for individually verified finished domestic
+    # results from official club/league pages and reputable result listings.
+    # These entries are reloaded on every refresh and never include cup/UCL rows.
+    overrides_path = DATA / "football_team_history_overrides.json"
+    try:
+        override_history = json.loads(overrides_path.read_text(encoding="utf-8"))
+        if not isinstance(override_history, list):
+            override_history = []
+    except Exception:
+        override_history = []
+
     # Existing competitions get a 14-day incremental refresh. Each newly added
     # domestic league receives its own 365-day backfill even when other leagues
     # already have a populated artifact.
@@ -312,7 +324,7 @@ def main():
                 errors.append(error)
 
     by_event = {}
-    for row in prior_history + history:
+    for row in prior_history + history + override_history:
         event_id = str(row.get("event_id") or "")
         league = _canonical_history_league(row.get("league"))
         if event_id:
@@ -336,6 +348,7 @@ def main():
     print(json.dumps({
         "status": "ok",
         "refresh_policy": "1095-day UCL backfill for multi-season European history; 365-day domestic backfill for new competitions; 14-day incremental refresh otherwise",
+        "curated_verified_domestic_overrides": len(override_history),
         "sofascore_fallback_matches_by_team": sofascore_coverage,
         "lookback_days_by_league": lookback_days_by_league,
         "date_ranges_by_league": date_ranges_by_league,
