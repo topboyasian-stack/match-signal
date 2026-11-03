@@ -5,11 +5,15 @@ on:
     branches: [main]
     paths:
       - 'functions/api/sportybet-booking.js'
+      - 'functions/api/sportybet-basketball-booking.js'
+      - 'scripts/test_basketball_booking_guard.mjs'
       - 'scripts/test_nba_ticket_guard.mjs'
       - '.github/workflows/nba-ticket-guard-tests.yml'
   pull_request:
     paths:
       - 'functions/api/sportybet-booking.js'
+      - 'functions/api/sportybet-basketball-booking.js'
+      - 'scripts/test_basketball_booking_guard.mjs'
       - 'scripts/test_nba_ticket_guard.mjs'
       - '.github/workflows/nba-ticket-guard-tests.yml'
   workflow_dispatch:
@@ -33,4 +37,4 @@ jobs:
         with:
           node-version: '22'
       - name: Run all-or-nothing NBA ticket tests
-        run: node --test scripts/test_nba_ticket_guard.mjs
+        run: node --test scripts/test_nba_ticket_guard.mjs scripts/test_basketball_booking_guard.mjs
