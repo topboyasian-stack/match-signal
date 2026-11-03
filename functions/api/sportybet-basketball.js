@@ -46,7 +46,8 @@ export async function onRequestGet(context){
           const url=new URL(origin+request.path);
           const params={sportId:'sr:sport:2',pageSize:String(pageSize),pageNum:String(pageNum),todayGames:'false',timeline:String(timeline),_t:String(Date.now())};
           if(request.marketId)params.marketId=request.marketId;
-          if(tournamentId)params.tournamentId=tournamentId;
+          // SportyBet's tournamentId filter truncates the NBA result to five rows.
+          // Pull the paged basketball feed unfiltered, then keep exact NBA IDs below.
           Object.entries(params).forEach(([k,v])=>url.searchParams.set(k,v));
           const r=await fetch(url.toString(),{
             headers:{'Accept':'application/json, text/plain, */*','Current-Country':'NG'},
@@ -77,11 +78,14 @@ export async function onRequestGet(context){
             event_count:count,
             response_shape:!tournamentArrayPresent?'TOURNAMENTS_FIELD_MISSING':tournaments.length?'TOURNAMENTS_PRESENT':'TOURNAMENTS_ARRAY_EMPTY'
           };
+          const emptyPaginationPage=request.path==='/api/ng/factsCenter/pcUpcomingEvents'&&pageNum>1&&payload?.bizCode===10000&&payload?.data&&typeof payload.data==='object'&&!Array.isArray(payload.data)&&Object.keys(payload.data).length===0;
+          if(emptyPaginationPage)diagnostic.response_shape='PAGINATION_END_EMPTY_DATA';
           diagnostics.push(diagnostic);
           if(payload?.bizCode!==undefined&&payload.bizCode!==10000)throw new Error('bizCode '+payload.bizCode);
           if(payload?.ok===false)throw new Error(String(payload?.detail||payload?.error||'source rejected query'));
-          if(!tournamentArrayPresent)throw new Error('response omitted data.tournaments; metadata='+JSON.stringify(diagnostic));
-          return {request,payload,error:null,event_count:count,source_origin:origin,diagnostics};
+          if(!tournamentArrayPresent&&!emptyPaginationPage)throw new Error('response omitted data.tournaments; metadata='+JSON.stringify(diagnostic));
+          const usablePayload=emptyPaginationPage?{...payload,data:{tournaments:[]}}:payload;
+          return {request,payload:usablePayload,error:null,event_count:count,source_origin:origin,diagnostics};
         }catch(error){
           const message=String(error?.message||error);
           if(!diagnostic)diagnostics.push({
@@ -102,6 +106,8 @@ export async function onRequestGet(context){
     for(const attempt of attempts){
       if(!attempt.payload)continue;
       for(const t of getTournaments(attempt.payload))for(const e of (Array.isArray(t?.events)?t.events:[])){
+        const eventTournamentId=String(t?.id??t?.tournamentId??e?.tournamentId??'');
+        if(eventTournamentId!==NBA_TOURNAMENT_ID)continue;
         const id=String(e?.eventId??e?.id??'');
         const start=Number(e?.estimateStartTime??e?.startTime??e?.start_time_ms);
         if(!id||!Number.isFinite(start))continue;
