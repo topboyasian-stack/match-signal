@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-03T07:16:10.458040+00:00",
+  "generated_at": "2026-11-03T07:35:09.864251+00:00",
   "paper_only": true,
   "evaluation_type": "NBA_TOTALS_FIXED_CUTOFF_V2",
   "market_id": "225",
@@ -8,41 +8,42 @@
   "history_games": 1224,
   "holdout_protocol": {
     "fixed_cutoff_utc": "2026-11-02T02:00:00+00:00",
-    "forecast_timestamp_field": "date",
+    "forecast_timestamp_field": "forecast_timestamp",
     "market_timestamp_field": "published_at",
     "rule": "Records before the fixed cutoff are development; records at or after it are prospective holdout. The cutoff never rolls forward.",
+    "date_only_source_rule": "For NBA team-game-log rows without an exact tip timestamp, use the earliest possible tip time at local midnight America/New_York for cutoff classification; a game date that could include pre-cutoff games is conservatively kept in development.",
     "market_sample_unit": "one verified settled record per unique ESPN fixture ID"
   },
   "walk_forward": {
     "method": "expanding chronological forecasts; every game uses only strictly earlier completed games; prospective holdout begins at the fixed cutoff",
     "baseline": "mean NBA game total over the preceding 90 days (or all prior games when unavailable)",
-    "development_games": 1180,
+    "development_games": 1184,
     "holdout": {
-      "n": 4,
-      "mae": 26.7875,
-      "rmse": 29.0434,
-      "bias": 6.4636,
+      "n": 0,
+      "mae": null,
+      "rmse": null,
+      "bias": null,
       "start_utc": "2026-11-02T02:00:00+00:00",
       "uncalibrated": {
-        "n": 4,
-        "mae": 26.7875,
-        "rmse": 29.1242,
-        "bias": 6.8178
+        "n": 0,
+        "mae": null,
+        "rmse": null,
+        "bias": null
       },
-      "baseline_mae": 24.75,
-      "baseline_rmse": 27.1959,
-      "baseline_bias": 6.3977,
-      "mae_improvement_vs_baseline": -2.0375,
+      "baseline_mae": null,
+      "baseline_rmse": null,
+      "baseline_bias": null,
+      "mae_improvement_vs_baseline": null,
       "beats_baseline": false,
-      "pace_feature_games": 4
+      "pace_feature_games": 0
     }
   },
   "model_calibration": {
     "selected_pace_blend_weight": 0.8,
     "production_bias_correction": 0.3542,
-    "development_n": 1180,
-    "development_raw_bias": -0.6917,
-    "pace_feature_development_games": 1180,
+    "development_n": 1184,
+    "development_raw_bias": -0.6664,
+    "pace_feature_development_games": 1184,
     "pace_feature_coverage": 1.0,
     "selection_rule": "frozen v5.1 production calibration selected on the pre-registered training window; applied identically to live forecasts and holdout evaluation"
   },
@@ -50,11 +51,11 @@
     "model_version": "nba-total-v5.1-pace-efficiency-calibrated",
     "model_predictions": 62,
     "predictions_with_fresh_sportybet_market_225_pair": 4,
-    "immutable_fresh_publication_snapshots": 1334,
+    "immutable_fresh_publication_snapshots": 1338,
     "unique_events_with_immutable_snapshots": 19,
     "snapshot_coverage": 0.3065,
-    "directional_pick_snapshots": 649,
-    "no_clear_lean_snapshots": 685,
+    "directional_pick_snapshots": 652,
+    "no_clear_lean_snapshots": 686,
     "unpriced_or_unavailable_prediction_count": 58,
     "unmatched_fresh_market_predictions": 0,
     "capture_status": "PARTIAL"
