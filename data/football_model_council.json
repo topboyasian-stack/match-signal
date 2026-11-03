@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-11-03T19:56:10.168680+00:00",
+  "updated_at": "2026-11-03T20:13:53.399747+00:00",
   "mode": "PAPER_RESEARCH_ONLY",
   "model_version": "FOOTBALL-STAT-COUNCIL-V2-DUAL-COMPETITION",
   "method": "competition-specific domestic form plus separately normalized Champions League form, venue-aware Poisson/Dixon-Coles",
@@ -30,14 +30,14 @@
     "Ukrainian Premier League"
   ],
   "overall": {
-    "settled_evaluated": 300,
+    "settled_evaluated": 302,
     "skipped": 0,
     "excluded_no_history": 170,
-    "published_accuracy": 0.5433,
-    "independent_accuracy": 0.5067,
-    "published_brier": 0.5828,
-    "independent_brier": 0.6002,
-    "pick_agreement_rate": 0.7367,
+    "published_accuracy": 0.543,
+    "independent_accuracy": 0.5099,
+    "published_brier": 0.5826,
+    "independent_brier": 0.5988,
+    "pick_agreement_rate": 0.7351,
     "independent_beats_published_accuracy": false,
     "independent_beats_published_brier": false
   },
@@ -51,12 +51,12 @@
       "pick_agreement_rate": 0.7778
     },
     "Champions League": {
-      "settled_evaluated": 46,
-      "published_accuracy": 0.6522,
-      "independent_accuracy": 0.5217,
-      "published_brier": 0.5251,
-      "independent_brier": 0.6007,
-      "pick_agreement_rate": 0.6739
+      "settled_evaluated": 48,
+      "published_accuracy": 0.6458,
+      "independent_accuracy": 0.5417,
+      "published_brier": 0.526,
+      "independent_brier": 0.592,
+      "pick_agreement_rate": 0.6667
     },
     "Eredivisie": {
       "settled_evaluated": 18,
@@ -102,9 +102,9 @@
   "published_probability_bands": [
     {
       "label": "50-55%",
-      "settled": 40,
-      "correct": 23,
-      "accuracy": 0.575
+      "settled": 41,
+      "correct": 24,
+      "accuracy": 0.5854
     },
     {
       "label": "55-60%",
@@ -158,9 +158,9 @@
     },
     {
       "label": "60-65%",
-      "settled": 28,
-      "correct": 17,
-      "accuracy": 0.6071
+      "settled": 29,
+      "correct": 18,
+      "accuracy": 0.6207
     },
     {
       "label": "65-70%",
@@ -188,42 +188,6 @@
     }
   ],
   "latest_evaluated": [
-    {
-      "league": "Bundesliga",
-      "event_id": "401884757",
-      "start_time": "2026-10-24T13:30Z",
-      "published_prob": 0.5187,
-      "independent_prob": 0.478497,
-      "published_pick": "p1",
-      "independent_pick": "p1",
-      "actual": "p2",
-      "published_correct": false,
-      "independent_correct": false,
-      "published_brier": 0.850371,
-      "independent_brier": 0.800421,
-      "independent_effective_sample": 5.498,
-      "independent_xg_home": 1.8354,
-      "independent_xg_away": 1.373,
-      "agreement": true
-    },
-    {
-      "league": "Bundesliga",
-      "event_id": "401884762",
-      "start_time": "2026-10-24T13:30Z",
-      "published_prob": 0.3679,
-      "independent_prob": 0.657295,
-      "published_pick": "p1",
-      "independent_pick": "p1",
-      "actual": "p1",
-      "published_correct": true,
-      "independent_correct": true,
-      "published_brier": 0.599328,
-      "independent_brier": 0.17628,
-      "independent_effective_sample": 2.498,
-      "independent_xg_home": 2.5354,
-      "independent_xg_away": 1.2199,
-      "agreement": true
-    },
     {
       "league": "Bundesliga",
       "event_id": "401884755",
@@ -1087,6 +1051,42 @@
       "independent_xg_home": 1.8851,
       "independent_xg_away": 1.0058,
       "agreement": true
+    },
+    {
+      "league": "Champions League",
+      "event_id": "401915311",
+      "start_time": "2026-11-03T17:45Z",
+      "published_prob": 0.5241,
+      "independent_prob": 0.619956,
+      "published_pick": "p1",
+      "independent_pick": "p1",
+      "actual": "p1",
+      "published_correct": true,
+      "independent_correct": true,
+      "published_brier": 0.341185,
+      "independent_brier": 0.217159,
+      "independent_effective_sample": 7.934,
+      "independent_xg_home": 2.9175,
+      "independent_xg_away": 1.7195,
+      "agreement": true
+    },
+    {
+      "league": "Champions League",
+      "event_id": "401915310",
+      "start_time": "2026-11-03T17:45Z",
+      "published_prob": 0.4078,
+      "independent_prob": 0.392789,
+      "published_pick": "p1",
+      "independent_pick": "p2",
+      "actual": "p2",
+      "published_correct": false,
+      "independent_correct": true,
+      "published_brier": 0.751513,
+      "independent_brier": 0.567396,
+      "independent_effective_sample": 6.579,
+      "independent_xg_home": 1.96,
+      "independent_xg_away": 1.9716,
+      "agreement": false
     }
   ],
   "promotion_policy": "Do not let the independent model override production or Builder qualification until it demonstrates a stable walk-forward advantage on accuracy/Brier across multiple settled windows."
