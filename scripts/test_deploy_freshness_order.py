@@ -73,6 +73,16 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             with self.subTest(path=path):
                 self.assertIn("|" + path + "|", match.group(1))
 
+    def test_live_sportybet_timestamp_fix_paths_are_allowlisted(self):
+        match = re.search(r"allowed='([^']+)'", PAGES_WORKFLOW)
+        self.assertIsNotNone(match, "Pages direct-promotion guard must expose its explicit allowlist")
+        for path in (
+            "scripts/predict_today.py",
+            "scripts/test_predict_today_market_matching.py",
+        ):
+            with self.subTest(path=path):
+                self.assertIn("|" + path + "|", match.group(1))
+
     def test_virtual_qualified_rows_wait_for_the_next_60_minute_window(self):
         upcoming = runpy.run_path(str(ROOT / "scripts" / "unified_upcoming.py"))
         gate = upcoming["apply_virtual_kickoff_window_gate"]

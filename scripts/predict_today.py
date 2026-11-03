@@ -537,6 +537,14 @@ def attach_sportybet_market_layer(predictions):
             snapshot = _sportybet_market_snapshot(event, sport)
             snapshot["available"] = True
             snapshot["match"] = match
+            # The Builder's 15-minute freshness gate reads odds_timestamp /
+            # market_odds_timestamp. Stamp those fields from this exact live
+            # SportyBet snapshot after old timestamps have been cleared above;
+            # market_insights.snapshot_at alone is not consumed by odds_age().
+            snapshot_at = str(snapshot.get("fetched_at") or fetched_at)
+            snapshot["fetched_at"] = snapshot_at
+            prediction["market_odds_timestamp"] = snapshot_at
+            prediction["odds_timestamp"] = snapshot_at
             prediction["sportybet_market"] = snapshot
             prediction["sportybet_winner_odds"] = {}
             winner = snapshot.get("winner") or {}

@@ -48,7 +48,9 @@ const cloudflare = fs.readFileSync(path.join(workflowsDir, "cloudflare-pages.yml
 assert.match(cloudflare, /name:\s*Deploy Match Signal to Cloudflare Pages/);
 assert.match(cloudflare, /https:\/\/match-signal\.pages\.dev/);
 assert.ok(
-  cloudflare.includes("|.github/workflows/efootball-recent-evidence-regression.yml|") &&
+  cloudflare.includes("|scripts/predict_today.py|") &&
+    cloudflare.includes("|scripts/test_predict_today_market_matching.py|") &&
+    cloudflare.includes("|.github/workflows/efootball-recent-evidence-regression.yml|") &&
     cloudflare.includes("|.github/workflows/single-selection-gate-regression.yml|") &&
     cloudflare.includes("|scripts/test_selection_gate_contract.py|") &&
     cloudflare.includes("|scripts/test_single_selection_gate_bridge.mjs|") &&
