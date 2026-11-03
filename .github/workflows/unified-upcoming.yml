@@ -149,7 +149,7 @@ jobs:
     # Serialize the actual publish job across event types while preserving the
     # event-specific workflow queues below.
     concurrency:
-      group: match-signal-unified-board-publisher-v5
+      group: match-signal-unified-board-publisher-v5-${{ inputs.promotion_child == true && 'promotion' || 'normal' }}
       cancel-in-progress: false
     steps:
       - name: Checkout latest main
@@ -192,7 +192,7 @@ jobs:
           assert "group: match-signal-unified-upcoming-" in concurrency and "'promotion'" in concurrency
           assert "github.event.workflow_run.name" in concurrency
           unified_job = source.split("\n  unified:\n", 1)[1]
-          assert "    concurrency:\n      group: match-signal-unified-board-publisher-v5\n      cancel-in-progress: false" in unified_job
+          assert "    concurrency:\n      group: match-signal-unified-board-publisher-v5-" in unified_job
           publish = source.rsplit('      - name: Publish unified board and health', 1)[1]
           assert 'Newer unified board already published; skipping stale candidate.' in publish
           assert publish.index('if ! git rebase origin/main; then') < publish.index('Newer unified board already published; skipping stale candidate.')
