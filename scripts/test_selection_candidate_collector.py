@@ -232,6 +232,71 @@ class SelectionCandidateQuotePreservationTests(unittest.TestCase):
             "p2": 3.60,
         })
 
+    def test_derives_exact_tennis_winner_price_and_value_from_market_insights(self):
+        timestamp = (NOW - timedelta(minutes=1)).isoformat()
+        result = collector.compact(
+            base_row(
+                sport="tennis",
+                product=None,
+                market="winner",
+                line=None,
+                pick="p1",
+                probability=0.7074,
+                bookmaker_odds=None,
+                sportybet_odds=None,
+                sportybet_odds_market=None,
+                sportybet_odds_side=None,
+                sportybet_winner_odds={"p1": 1.39, "p2": 3.15, "market_id": "186"},
+                market_odds_timestamp=timestamp,
+                odds_timestamp=timestamp,
+                market_insights={
+                    "snapshot_at": timestamp,
+                    "winner_book_odds": 1.39,
+                    "winner_model_edge_vs_market": 0.099467,
+                    "winner_expected_value": 0.102687,
+                    "winner_value_signal": True,
+                },
+            ),
+            NOW,
+        )
+        self.assertIsNotNone(result)
+        self.assertEqual(result["bookmaker_odds"], 1.39)
+        self.assertEqual(result["sportybet_odds_market"], "winner")
+        self.assertEqual(result["sportybet_odds_side"], "p1")
+        self.assertEqual(result["sportybet_odds_line"], None)
+        self.assertEqual(result["sportybet_market_id"], "186")
+        self.assertAlmostEqual(result["model_edge_vs_market"], 0.099467)
+        self.assertAlmostEqual(result["expected_value"], 0.102687)
+        self.assertTrue(result["value_signal"])
+        self.assertEqual(result["market_odds_timestamp"], timestamp)
+
+    def test_derives_exact_tennis_winner_price_from_nested_snapshot(self):
+        timestamp = (NOW - timedelta(minutes=1)).isoformat()
+        result = collector.compact(
+            base_row(
+                sport="tennis",
+                product=None,
+                market="winner",
+                line=None,
+                pick="p2",
+                bookmaker_odds=None,
+                sportybet_odds_market=None,
+                sportybet_odds_side=None,
+                sportybet_winner_odds=None,
+                market_odds_timestamp=timestamp,
+                sportybet_market={
+                    "fetched_at": timestamp,
+                    "winner": {"p1_book": 1.45, "p2_book": 2.85, "market_id": "186"},
+                },
+                market_insights={"snapshot_at": timestamp},
+            ),
+            NOW,
+        )
+        self.assertIsNotNone(result)
+        self.assertEqual(result["bookmaker_odds"], 2.85)
+        self.assertEqual(result["sportybet_odds_market"], "winner")
+        self.assertEqual(result["sportybet_odds_side"], "p2")
+
     def test_invalid_or_non_decimal_winner_prices_are_not_copied(self):
         result = collector.compact(
             base_row(
