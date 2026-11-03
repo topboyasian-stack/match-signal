@@ -1,6 +1,7 @@
 """Regression tests for the NBA market-225 capture freshness watchdog."""
 
 from datetime import datetime, timezone
+from pathlib import Path
 
 from nba_totals_capture_watchdog import (
     capture_age_minutes, should_dispatch_capture,
@@ -13,13 +14,23 @@ def dt(value):
 
 
 def run():
+    root = Path(__file__).resolve().parents[1]
+    capture_workflow = (root / ".github/workflows/nba-totals-price-capture.yml").read_text(encoding="utf-8")
+    watchdog_workflow = (root / ".github/workflows/nba-totals-capture-watchdog.yml").read_text(encoding="utf-8")
+    assert "cron: '*/10 * * * *'" in capture_workflow, (
+        "NBA SportyBet market-225 capture must run every 10 minutes to protect the 15-minute quote freshness gate."
+    )
+    assert "cron: '5,15,25,35,45,55 * * * *'" in watchdog_workflow, (
+        "The freshness watchdog must run halfway between the 10-minute capture slots."
+    )
+
     now = dt("2026-11-02T08:25:00Z")
     assert round(capture_age_minutes("2026-11-02T08:16:39Z", now), 2) == 8.35
     assert not should_dispatch_capture("2026-11-02T08:16:39Z", now, 0), (
         "A capture under 10 minutes old must not be duplicated."
     )
     assert should_dispatch_capture("2026-11-02T08:14:59Z", now, 0, max_age_minutes=10), (
-        "A capture at least 15 minutes old must trigger a recovery capture."
+        "A capture at least 10 minutes old must trigger a recovery capture."
     )
     assert not should_dispatch_capture("2026-11-02T08:00:00Z", now, 1), (
         "An already queued/running capture must suppress a duplicate dispatch."

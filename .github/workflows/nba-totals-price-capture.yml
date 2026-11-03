@@ -2,9 +2,9 @@ name: NBA totals SportyBet market-225 price capture
 
 on:
   schedule:
-    # Capture independently of the full prediction rebuild every 15 minutes, keeping
-    # market quotes within the 15-minute audit window without rebuilding history.
-    - cron: '7,22,37,52 * * * *'
+    # Capture every 10 minutes so the full 15-minute quote-validity window survives
+    # schedule delays, model rebuilds, and repository publication contention.
+    - cron: '*/10 * * * *'
   workflow_dispatch:
   workflow_run:
     # Re-capture after a model/line refresh, final Builder promotion, or board refresh.
