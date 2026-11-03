@@ -87,26 +87,30 @@ const selectedGateRow = {
     winner_value_signal: true
   }
 };
+const staleTimestamp = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
 const exactCandidate = {
   sport: "tennis",
   event_id: "186477",
   market: "winner",
   pick: "p1",
-  bookmaker_odds: 1.39,
+  bookmaker_odds: 1.11,
   sportybet_odds_market: "winner",
   sportybet_odds_side: "p1",
-  sportybet_winner_odds: { p1: 1.39, p2: 3.15 },
-  market_odds_timestamp: freshTimestamp,
-  model_edge_vs_market: 0.099467,
-  expected_value: 0.102687,
-  value_signal: true
+  sportybet_winner_odds: { p1: 1.11, p2: 8.0 },
+  market_odds_timestamp: staleTimestamp,
+  odds_timestamp: staleTimestamp,
+  model_edge_vs_market: -0.2,
+  expected_value: -0.3,
+  value_signal: false
 };
 evidenceContext.attachSingleSelectionMarketEvidence(displayRow, selectedGateRow, exactCandidate);
 assert.equal(displayRow.bookmaker_odds, 1.39);
 assert.equal(displayRow.sportybet_odds_market, "winner");
 assert.equal(displayRow.sportybet_odds_side, "p1");
 assert.equal(displayRow.market_odds_timestamp, freshTimestamp);
+assert.equal(displayRow.odds_timestamp, freshTimestamp);
 assert.equal(displayRow.sportybet_winner_odds.p2, 3.15);
+assert.equal(displayRow.value_signal, true);
 assert.ok(displayRow.model_edge_vs_market > 0);
 assert.ok(displayRow.expected_value > 0);
 const exactQuote = evidenceContext.exactSportyBetQuote(displayRow);
