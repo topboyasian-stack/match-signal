@@ -1,70 +1,70 @@
 {
-  "generated_at": "2026-11-03T16:08:34.040930+00:00",
-  "status": "DEGRADED",
+  "generated_at": "2026-11-03T20:37:20.802764+00:00",
+  "status": "HEALTHY",
   "critical_issues": 0,
-  "warning_issues": 1,
+  "warning_issues": 0,
   "info_issues": 1,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
       "status": "PASS",
-      "age_hours": 0.45,
+      "age_hours": 0.14,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.29,
+      "age_hours": 0.06,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 0.39,
+      "age_hours": 0.07,
       "threshold_hours": 4
     },
     {
       "engine": "unified_upcoming",
       "status": "PASS",
-      "age_hours": 0.01,
+      "age_hours": 0.03,
       "threshold_hours": 2
     },
     {
       "engine": "prediction_desk_health",
       "status": "PASS",
-      "age_hours": 0.05,
+      "age_hours": 0.07,
       "threshold_hours": 2
     },
     {
       "engine": "virtual_participant_history",
-      "status": "STALE",
-      "max_input_age_minutes": 27.8,
-      "virtual_lab_status_age_minutes": 30.6,
+      "status": "PASS",
+      "max_input_age_minutes": 16.8,
+      "virtual_lab_status_age_minutes": 21.0,
       "threshold_minutes": 30.0,
       "stale_inputs": []
     },
     {
       "engine": "tennis_forward_discovery",
       "status": "PASS",
-      "age_hours": 0.4,
+      "age_hours": 0.06,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 0.13,
+      "age_hours": 0.19,
       "threshold_hours": 0.5,
       "heartbeat_source": "virtual_lab_live.json",
-      "events_count": 750
+      "events_count": 746
     },
     {
       "engine": "nba_live_observation_recorder",
       "status": "PASS",
-      "age_hours": 0.14,
+      "age_hours": 0.15,
       "threshold_hours": 0.25,
       "heartbeat_source": "nba_live_observations.json.gz",
       "games_tracked": 36,
-      "snapshots_recorded": 3930
+      "snapshots_recorded": 4155
     },
     {
       "engine": "engine_lifecycle",
@@ -72,11 +72,11 @@
       "lanes": {
         "darts_x": {
           "status": "RETIRED",
-          "artifact_at": "2026-11-03T14:44:11.578647+00:00"
+          "artifact_at": "2026-11-03T20:00:55.658698+00:00"
         },
         "table_tennis_x": {
           "status": "RETIRED",
-          "artifact_at": "2026-11-03T14:22:30.898667+00:00"
+          "artifact_at": "2026-11-03T19:07:16.333853+00:00"
         },
         "basketball_core_moneyline": {
           "status": "RETIRED",
@@ -94,7 +94,7 @@
           "historical_rows_last_success": 68,
           "upcoming_rows_last_success": 3,
           "published_prediction_rows": 0,
-          "last_attempt_at": "2026-11-03T10:24:15.786909+00:00",
+          "last_attempt_at": "2026-11-03T17:57:44.741199+00:00",
           "last_successful_update_at": "2026-11-02T21:14:33.462592+00:00",
           "last_error": "RuntimeError: BetStudy history unavailable: 403 Client Error: Forbidden for url: https://www.betstudy.com/soccer-stats/c/england/u21-professional-development-league-2/d/results/; SofaScore fallback disabled after upstream 403 challenge"
         }
@@ -102,11 +102,6 @@
     }
   ],
   "issues": [
-    {
-      "code": "VIRTUAL_PARTICIPANT_HISTORY_STALE",
-      "severity": "warning",
-      "detail": "virtual_lab_status.json is 30.6 minutes old; current eFootball/virtual predictions must remain withheld until the source collector publishes fresh data"
-    },
     {
       "code": "PDL_EXPERIMENTAL_FEED_STALE",
       "severity": "info",
@@ -116,11 +111,11 @@
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
   "paper_only": true,
   "prediction_desk_filters": {
-    "past_kickoff_rows_hidden": 29,
+    "past_kickoff_rows_hidden": 136,
     "stale_live_flags_hidden": 0,
     "expired_settled_rows_hidden": 0,
-    "virtual_market_rows_held_for_kickoff_window": 266,
+    "virtual_market_rows_held_for_kickoff_window": 263,
     "virtual_rows_held_for_stale_participant_history": 0,
-    "virtual_rows_held_for_recent_product_drawdown": 76
+    "virtual_rows_held_for_recent_product_drawdown": 62
   }
 }
