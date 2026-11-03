@@ -42,6 +42,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+      - name: Install prediction test dependency
+        run: python -m pip install --upgrade requests
       - name: Compile and test the independent paper gate
         run: |
           python -m py_compile scripts/selective_prediction_gate.py scripts/test_selection_gate_contract.py scripts/predict_today.py scripts/test_predict_today_market_matching.py
