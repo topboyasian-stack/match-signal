@@ -1,26 +1,26 @@
 {
-  "generated_at": "2026-11-03T08:14:49.273882+00:00",
-  "status": "HEALTHY",
+  "generated_at": "2026-11-03T08:20:28.264690+00:00",
+  "status": "DEGRADED",
   "critical_issues": 0,
-  "warning_issues": 0,
+  "warning_issues": 1,
   "info_issues": 1,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
       "status": "PASS",
-      "age_hours": 1.08,
+      "age_hours": 1.18,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.04,
+      "age_hours": 0.08,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 0.38,
+      "age_hours": 0.47,
       "threshold_hours": 4
     },
     {
@@ -38,21 +38,21 @@
     {
       "engine": "virtual_participant_history",
       "status": "PASS",
-      "max_input_age_minutes": 20.4,
-      "virtual_lab_status_age_minutes": 23.2,
+      "max_input_age_minutes": 25.9,
+      "virtual_lab_status_age_minutes": 28.8,
       "threshold_minutes": 30.0,
       "stale_inputs": []
     },
     {
       "engine": "tennis_forward_discovery",
       "status": "PASS",
-      "age_hours": 1.09,
+      "age_hours": 1.19,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
-      "status": "PASS",
-      "age_hours": 0.49,
+      "status": "STALE",
+      "age_hours": 0.59,
       "threshold_hours": 0.5,
       "heartbeat_source": "virtual_lab_live.json",
       "events_count": 576
@@ -60,7 +60,7 @@
     {
       "engine": "nba_live_observation_recorder",
       "status": "PASS",
-      "age_hours": 0.03,
+      "age_hours": 0.12,
       "threshold_hours": 0.25,
       "heartbeat_source": "nba_live_observations.json.gz",
       "games_tracked": 36,
@@ -102,6 +102,11 @@
     }
   ],
   "issues": [
+    {
+      "code": "VIRTUAL_LIVE_FEED_STALE",
+      "severity": "warning",
+      "detail": "virtual_lab_live.json age 0.59h exceeds 0.50h; a downstream Unified Upcoming refresh cannot substitute for a fresh source snapshot"
+    },
     {
       "code": "PDL_EXPERIMENTAL_FEED_STALE",
       "severity": "info",
