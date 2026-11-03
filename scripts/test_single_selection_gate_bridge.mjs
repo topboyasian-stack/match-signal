@@ -68,6 +68,6 @@ assert.match(source, /get\('\.\/data\/selection_gate_selected\.json'\)/);
 assert.match(source, /qualifiedBestSourceIsFresh\(singleSelectionGateStatus\?\.generated_at\)/);
 assert.match(source, /singleSelectionGateMap\.get\(singleSelectionGateKey\(x\)\)/);
 assert.match(source, /singleSelectionGatePassed=x\?\.single_selection_gate\?\.status==="passed"/);
-assert.match(source, /singleSelectionGatePassed&&x\?\.single_selection_gate\?\.mode==="PAPER_ONLY"/);
+assert.match(source, /const singleSelectionGatePassed=x\?\.single_selection_gate\?\.status==="passed"&&x\?\.single_selection_gate\?\.mode==="PAPER_ONLY"/);
 
 console.log("Independent single-selection gate exact-identity and isolation tests passed.");
