@@ -117,7 +117,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         # GitHub replaces older pending runs within one concurrency group. The Builder's
         # pre/post refresh must therefore use a dedicated group and exact dispatch filtering.
         self.assertIn(
-            "group: match-signal-unified-upcoming-v4-${{ github.event_name }}-",
+            "group: match-signal-unified-upcoming-v5-${{ github.event_name }}-",
             BOARD_WORKFLOW,
             "push/schedule/dispatch/upstream events must not compete for one pending board slot",
         )
@@ -372,7 +372,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
 
     def test_builder_promotion_waits_for_each_board_triggered_builder_before_pages(self):
         self.assertIn("uses: actions/checkout@v4", PROMOTION_WORKFLOW)
-        self.assertIn("group: builder-production-promotion-v3", PROMOTION_WORKFLOW)
+        self.assertIn("group: builder-production-promotion-v4", PROMOTION_WORKFLOW)
         self.assertIn("timeout-minutes: 60", PROMOTION_WORKFLOW)
         self.assertIn("Refresh Unified Upcoming before rebuilding the Builder", PROMOTION_WORKFLOW)
         self.assertEqual(PROMOTION_WORKFLOW.count("gh workflow run unified-upcoming.yml --ref main -f promotion_child=true"), 2)
@@ -415,7 +415,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn("GH_TOKEN: ${{ github.token }}", BUILDER_WORKFLOW[dispatch_step:])
         self.assertIn("gh workflow run builder-production-promotion.yml --ref main", BUILDER_WORKFLOW[dispatch_step:])
         self.assertIn("  workflow_dispatch:", PROMOTION_WORKFLOW)
-        self.assertIn("group: builder-production-promotion-v3", PROMOTION_WORKFLOW)
+        self.assertIn("group: builder-production-promotion-v4", PROMOTION_WORKFLOW)
         self.assertIn("cancel-in-progress: false", PROMOTION_WORKFLOW)
         self.assertIn("skip_promotion:", BUILDER_WORKFLOW)
         self.assertIn("inputs.skip_promotion != true", BUILDER_WORKFLOW)
@@ -500,9 +500,9 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
 
     def test_publishing_refresh_is_not_cancelled_or_dispatched_twice(self):
         self.assertIn("cancel-in-progress: false", BOARD_WORKFLOW, "scheduled board refreshes must be allowed to publish before the next run")
-        self.assertIn("group: match-signal-unified-board-publisher-v4", BOARD_WORKFLOW)
+        self.assertIn("group: match-signal-unified-board-publisher-v5", BOARD_WORKFLOW)
         self.assertIn(
-            "    concurrency:\n      group: match-signal-unified-board-publisher-v4\n      cancel-in-progress: false",
+            "    concurrency:\n      group: match-signal-unified-board-publisher-v5\n      cancel-in-progress: false",
             BOARD_WORKFLOW,
         )
         self.assertNotIn("gh workflow run cloudflare-pages.yml", BOARD_WORKFLOW)
