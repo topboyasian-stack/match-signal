@@ -186,6 +186,67 @@ def compact(row, now):
     status = "BETTING_QUALIFIED_PAPER" if qualified else candidate_band(p)
     sportybet_over_odds, sportybet_under_odds = totals_sides_for_line(row)
     sportybet_winner_odds = winner_market_sides(row)
+    insights = row.get("market_insights") if isinstance(row.get("market_insights"), dict) else {}
+    total_insights = insights.get("total") if isinstance(insights.get("total"), dict) else {}
+    pick = str(row.get("pick") or row.get("selection") or "").strip().lower()
+    market = str(row.get("market") or "winner").strip().lower()
+    snapshot = row.get("sportybet_market") if isinstance(row.get("sportybet_market"), dict) else {}
+    snapshot_winner = snapshot.get("winner") if isinstance(snapshot.get("winner"), dict) else {}
+    snapshot_fetched_at = snapshot.get("fetched_at")
+    winner_price = (
+        num(row.get("bookmaker_odds"))
+        or num(row.get("sportybet_odds"))
+        or num(row.get("book_odds"))
+        or num(insights.get("winner_book_odds"))
+        or num((sportybet_winner_odds or {}).get(pick))
+        or num(snapshot_winner.get(f"{pick}_book"))
+    )
+    total_price = sportybet_over_odds if pick == "over" else sportybet_under_odds if pick == "under" else None
+    if market == "over_under":
+        selected_price = (
+            num(row.get("bookmaker_odds"))
+            or num(row.get("sportybet_odds"))
+            or num(row.get("book_odds"))
+            or num(total_insights.get("book_odds"))
+            or num(total_price)
+        )
+        selected_market = "total" if selected_price is not None and row.get("line") is not None else None
+        selected_side = pick if selected_market and pick in {"over", "under"} else None
+        selected_line = num(row.get("line")) if selected_market else None
+        model_edge = num(row.get("model_edge_vs_market") or row.get("model_edge") or row.get("edge"))
+        if model_edge is None:
+            model_edge = num(total_insights.get("model_edge_vs_market"))
+        expected_value = num(row.get("expected_value"))
+        if expected_value is None:
+            expected_value = num(total_insights.get("expected_value"))
+        value_signal = total_insights.get("value_signal")
+    else:
+        selected_price = winner_price
+        selected_market = "winner" if selected_price is not None and pick in {"p1", "p2", "draw"} else None
+        selected_side = pick if selected_market else None
+        selected_line = None
+        model_edge = num(row.get("model_edge_vs_market") or row.get("model_edge") or row.get("edge"))
+        if model_edge is None:
+            model_edge = num(insights.get("winner_model_edge_vs_market"))
+        expected_value = num(row.get("expected_value"))
+        if expected_value is None:
+            expected_value = num(insights.get("winner_expected_value"))
+        value_signal = insights.get("winner_value_signal")
+    quote_timestamp = (
+        row.get("market_odds_timestamp")
+        or row.get("odds_timestamp")
+        or insights.get("snapshot_at")
+        or snapshot_fetched_at
+    )
+    winner_snapshot = row.get("sportybet_winner_odds") if isinstance(row.get("sportybet_winner_odds"), dict) else {}
+    total_market_id = row.get("sportybet_market_id")
+    if not total_market_id and isinstance(row.get("sportybet_total_market"), dict):
+        total_market_id = row["sportybet_total_market"].get("market_id")
+    winner_market_id = (
+        winner_snapshot.get("market_id")
+        or snapshot_winner.get("market_id")
+        or row.get("sportybet_market_id")
+    )
     candidate_id = "|".join([
         str(row.get("event_id") or ""),
         str(row.get("market") or "winner"),
@@ -201,24 +262,27 @@ def compact(row, now):
         "league": row.get("league") or row.get("competition") or row.get("tournament"),
         "player_1": p1,
         "player_2": p2,
-        "market": str(row.get("market") or "winner"),
+        "market": market,
         "line": row.get("line"),
         "selection": market_label(row),
         "pick": row.get("pick") or row.get("selection"),
         "model_probability": round(p, 6),
         "model_rating": round(p * 100, 2),
         "model_fair_odds": num(row.get("model_fair_odds") or row.get("fair_odds")),
-        "bookmaker_odds": num(row.get("bookmaker_odds") or row.get("sportybet_odds") or row.get("book_odds")),
-        "sportybet_odds_market": row.get("sportybet_odds_market"),
-        "sportybet_odds_line": num(row.get("sportybet_odds_line")),
-        "sportybet_odds_side": row.get("sportybet_odds_side"),
+        "bookmaker_odds": selected_price,
+        "sportybet_odds_market": selected_market,
+        "sportybet_odds_line": selected_line,
+        "sportybet_odds_side": selected_side,
         # Preserve both current market sides: the browser independently de-vigs
         # these prices and will fail closed if either side is missing.
         "sportybet_over_odds": sportybet_over_odds,
         "sportybet_under_odds": sportybet_under_odds,
         "sportybet_winner_odds": sportybet_winner_odds,
-        "market_odds_timestamp": row.get("market_odds_timestamp") or row.get("odds_timestamp"),
-        "model_edge_vs_market": num(row.get("model_edge_vs_market") or row.get("model_edge") or row.get("edge")),
+        "sportybet_market_id": winner_market_id if market != "over_under" else total_market_id,
+        "market_odds_timestamp": quote_timestamp,
+        "model_edge_vs_market": model_edge,
+        "expected_value": expected_value,
+        "value_signal": value_signal,
         "walkforward_exact_line_n": num(row.get("walkforward_exact_line_n")),
         "walkforward_exact_line_hit_rate": num(row.get("walkforward_exact_line_hit_rate")),
         "walkforward_exact_line_brier": num(row.get("walkforward_exact_line_brier")),
