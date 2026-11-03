@@ -77,6 +77,61 @@ function singleSelectionGateKey(x){
   const line=total?String(x?.line??x?.analytics?.total_games?.line??x?.markets?.total_ou?.line??x?.markets?.over_under?.line??""):"";
   return [sport,event,market,line,pick].join("|");
 }
+function attachSingleSelectionMarketEvidence(row, gate, candidate){
+  // The UI price gate evaluates the Unified Upcoming row, not the separate
+  // candidate artifact. Carry the exact identity-matched candidate quote onto
+  // that row before running exactSportyBetQuote/current-edge checks.
+  const sources=[candidate,gate].filter(Boolean);
+  const fields=[
+    "bookmaker_odds","sportybet_odds","book_odds",
+    "sportybet_odds_market","sportybet_odds_line","sportybet_odds_side",
+    "sportybet_winner_odds","sportybet_total_games_odds",
+    "sportybet_over_odds","sportybet_under_odds","sportybet_market_id",
+    "market_odds_timestamp","odds_timestamp",
+    "model_edge_vs_market","expected_value","value_signal",
+    "model_probability","model_fair_odds"
+  ];
+  for(const field of fields){
+    for(const source of sources){
+      const value=source?.[field];
+      if(value!==undefined&&value!==null&&value!==""){
+        row[field]=value;
+        break;
+      }
+    }
+  }
+  const pick=String(row?.pick||row?.selection||"").toLowerCase();
+  const total=isOverUnderPrediction(row)||pick==="over"||pick==="under";
+  const insights=gate?.market_insights&&typeof gate.market_insights==="object"?gate.market_insights:{};
+  if(total){
+    const totalInsight=insights.total&&typeof insights.total==="object"?insights.total:{};
+    const price=Number(totalInsight.book_odds);
+    if(!(Number(row.bookmaker_odds)>1)&&Number.isFinite(price)&&price>1)row.bookmaker_odds=price;
+    if(!row.sportybet_odds_market&&Number(row.bookmaker_odds)>1)row.sportybet_odds_market="total";
+    if(!row.sportybet_odds_side&&["over","under"].includes(pick))row.sportybet_odds_side=pick;
+    if(row.sportybet_odds_line==null&&row.line!=null)row.sportybet_odds_line=row.line;
+    if(row.model_edge_vs_market==null&&totalInsight.model_edge_vs_market!=null)row.model_edge_vs_market=totalInsight.model_edge_vs_market;
+    if(row.expected_value==null&&totalInsight.expected_value!=null)row.expected_value=totalInsight.expected_value;
+    if(row.value_signal==null&&totalInsight.value_signal!=null)row.value_signal=totalInsight.value_signal;
+  }else{
+    const winner=gate?.sportybet_winner_odds&&typeof gate.sportybet_winner_odds==="object"?gate.sportybet_winner_odds:{};
+    const marketWinner=gate?.sportybet_market?.winner&&typeof gate.sportybet_market.winner==="object"?gate.sportybet_market.winner:{};
+    const price=Number(insights.winner_book_odds??winner[pick]??marketWinner[pick+"_book"]);
+    if(!(Number(row.bookmaker_odds)>1)&&Number.isFinite(price)&&price>1)row.bookmaker_odds=price;
+    if(!row.sportybet_odds_market&&Number(row.bookmaker_odds)>1)row.sportybet_odds_market="winner";
+    if(!row.sportybet_odds_side&&["p1","p2","draw"].includes(pick))row.sportybet_odds_side=pick;
+    if(!row.sportybet_winner_odds&&Object.keys(winner).length)row.sportybet_winner_odds=winner;
+    if(row.model_edge_vs_market==null&&insights.winner_model_edge_vs_market!=null)row.model_edge_vs_market=insights.winner_model_edge_vs_market;
+    if(row.expected_value==null&&insights.winner_expected_value!=null)row.expected_value=insights.winner_expected_value;
+    if(row.value_signal==null&&insights.winner_value_signal!=null)row.value_signal=insights.winner_value_signal;
+  }
+  if(!row.market_odds_timestamp){
+    row.market_odds_timestamp=gate?.market_odds_timestamp||gate?.odds_timestamp||
+      insights.snapshot_at||gate?.sportybet_market?.fetched_at||null;
+  }
+  if(!row.odds_timestamp&&row.market_odds_timestamp)row.odds_timestamp=row.market_odds_timestamp;
+  return row;
+}
 function exactVirtualMarketLine(market){
   // SportyBet's numeric "line" may be the integer base (for example 9)
   // while its explicit total specifier carries the actual half-goal market
@@ -963,6 +1018,9 @@ async function renderUnifiedBoard(){
         .filter(x=>x?.selection_gate?.status==="passed")
         .map(x=>[singleSelectionGateKey(x),x])
     );
+    const singleSelectionCandidateMap=new Map(
+      selectedRows.map(x=>[singleSelectionGateKey(x),x])
+    );
 
     // The core prediction feed intentionally does not contain Virtual/eFootball.
     // Bring the existing evidence-backed eFootball candidate lane onto the
@@ -1214,8 +1272,11 @@ async function renderUnifiedBoard(){
       }).filter(Boolean);
     }
     const annotate=(x)=>{
-      const selectedGate=singleSelectionGateMap.get(singleSelectionGateKey(x));
+      const selectionKey=singleSelectionGateKey(x);
+      const selectedGate=singleSelectionGateMap.get(selectionKey);
+      const selectedCandidate=singleSelectionCandidateMap.get(selectionKey);
       if(selectedGate){
+        attachSingleSelectionMarketEvidence(x,selectedGate,selectedCandidate);
         x.single_selection_gate={
           ...selectedGate.selection_gate,
           status:"passed",
