@@ -182,23 +182,56 @@ async function probe(path, params) {
     let bizCode = null;
     let tournamentCount = null;
     let eventCount = null;
+    let topLevelKeys = [];
+    let dataKeys = [];
+    let totalNum = null;
+    let tournamentNames = [];
+    let tournamentIds = [];
+    let responseShape = "NON_JSON";
     try {
       const payload = JSON.parse(body);
       isJson = true;
       bizCode = payload?.bizCode ?? null;
+      const data = payload?.data && typeof payload.data === "object" ? payload.data : {};
+      const tournaments = Array.isArray(data.tournaments) ? data.tournaments : [];
       const counts = eventCounts(payload);
       tournamentCount = counts.tournament_count;
       eventCount = counts.event_count;
+      topLevelKeys = Object.keys(payload || {}).slice(0, 12);
+      dataKeys = Object.keys(data).slice(0, 12);
+      const rawTotal = data.totalNum ?? data.totalEvents ?? data.totalCount ?? payload?.totalNum ?? null;
+      const parsedTotal = rawTotal === null ? null : Number(rawTotal);
+      totalNum = Number.isFinite(parsedTotal) ? parsedTotal : null;
+      tournamentNames = tournaments.map(item => String(item?.name ?? item?.tournamentName ?? "")).filter(Boolean).slice(0, 12);
+      tournamentIds = tournaments.map(item => String(item?.id ?? item?.tournamentId ?? "")).filter(Boolean).slice(0, 12);
+      responseShape = !Array.isArray(data.tournaments)
+        ? "TOURNAMENTS_FIELD_MISSING"
+        : tournaments.length ? "TOURNAMENTS_PRESENT" : "TOURNAMENTS_ARRAY_EMPTY";
     } catch (_) {}
     return {
       endpoint: path,
+      query: {
+        sport_id: String(params.sportId || ""),
+        page_size: Number(params.pageSize || 0),
+        page_num: Number(params.pageNum || 0),
+        timeline: Number(params.timeline || 0),
+        today_games: String(params.todayGames ?? "false"),
+        market_id: params.marketId == null ? null : String(params.marketId),
+        tournament_id: params.tournamentId == null ? null : String(params.tournamentId)
+      },
       status: response.status,
       ok: response.ok,
       content_type: contentType,
       is_json: isJson,
       biz_code: bizCode,
+      total_num: totalNum,
+      top_level_keys: topLevelKeys,
+      data_keys: dataKeys,
       tournament_count: tournamentCount,
+      tournament_names: tournamentNames,
+      tournament_ids: tournamentIds,
       event_count: eventCount,
+      response_shape: responseShape,
       body_prefix: body.replace(/\s+/g, " ").slice(0, 200),
       elapsed_ms: Date.now() - started
     };
@@ -258,6 +291,52 @@ export default {
         request_ingress: ingressMetadata(request),
         note: "request_ingress identifies the visitor-to-Worker entry colo; placement_hint identifies the configured back-end placement target.",
         probes: [primary, fallback],
+        checked_at: new Date().toISOString()
+      });
+    }
+
+    if (url.pathname === "/__nba-diagnostics") {
+      const variants = [
+        {
+          variant: "timeline168_with_nba_tournament",
+          params: {
+            sportId: "sr:sport:2", pageSize: 100, pageNum: 1,
+            todayGames: "false", timeline: 168, marketId: "225",
+            tournamentId: "sr:tournament:132", _t: Date.now()
+          }
+        },
+        {
+          variant: "timeline168_without_tournament_filter",
+          params: {
+            sportId: "sr:sport:2", pageSize: 100, pageNum: 1,
+            todayGames: "false", timeline: 168, marketId: "225", _t: Date.now()
+          }
+        },
+        {
+          variant: "timeline720_with_nba_tournament",
+          params: {
+            sportId: "sr:sport:2", pageSize: 100, pageNum: 1,
+            todayGames: "false", timeline: 720, marketId: "225",
+            tournamentId: "sr:tournament:132", _t: Date.now()
+          }
+        },
+        {
+          variant: "timeline720_without_tournament_filter",
+          params: {
+            sportId: "sr:sport:2", pageSize: 100, pageNum: 1,
+            todayGames: "false", timeline: 720, marketId: "225", _t: Date.now()
+          }
+        }
+      ];
+      const probes = await Promise.all(variants.map(async item => ({
+        variant: item.variant,
+        ...(await probe(PC_ENDPOINT, item.params))
+      })));
+      return json({
+        ok: true,
+        diagnostic: "sportybet-nba-query-variants-v1",
+        note: "Bounded read-only source diagnostics. Counts and response shape only; no raw fixtures or prices are exposed beyond the existing body prefix.",
+        probes,
         checked_at: new Date().toISOString()
       });
     }
