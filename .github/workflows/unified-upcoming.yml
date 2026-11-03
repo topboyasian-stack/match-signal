@@ -25,6 +25,10 @@ on:
       - 'scripts/test_upcoming_desk_policy.py'
       - 'scripts/selection_candidate_collector.py'
       - 'scripts/test_selection_candidate_collector.py'
+      - 'scripts/selective_prediction_gate.py'
+      - 'scripts/test_selection_gate_contract.py'
+      - 'scripts/test_single_selection_gate_bridge.mjs'
+      - 'data/selection_gate_selected.json'
       - 'scripts/efootball_desk_learning.py'
       - 'scripts/test_efootball_desk_learning.py'
       - 'scripts/test_virtual_lab_recent_performance_gate.mjs'
@@ -162,7 +166,7 @@ jobs:
       - name: Test automation trigger boundaries
         run: python scripts/test_workflow_trigger_boundaries.py
       - name: Compile unified engines
-        run: python -m py_compile scripts/unified_upcoming.py scripts/unified_upcoming_cleanup.py scripts/selection_candidate_collector.py scripts/test_selection_candidate_collector.py scripts/efootball_desk_learning.py scripts/test_efootball_desk_learning.py scripts/test_upcoming_settlement_retention.py scripts/test_upcoming_desk_policy.py scripts/system_health_audit.py scripts/predict_today.py scripts/virtual_lab_model_eval.py scripts/test_virtual_lab_model_eval.py scripts/system_health_audit_lib.py scripts/test_system_health_audit_lib.py
+        run: python -m py_compile scripts/unified_upcoming.py scripts/unified_upcoming_cleanup.py scripts/selection_candidate_collector.py scripts/test_selection_candidate_collector.py scripts/selective_prediction_gate.py scripts/test_selection_gate_contract.py scripts/efootball_desk_learning.py scripts/test_efootball_desk_learning.py scripts/test_upcoming_settlement_retention.py scripts/test_upcoming_desk_policy.py scripts/system_health_audit.py scripts/predict_today.py scripts/virtual_lab_model_eval.py scripts/test_virtual_lab_model_eval.py scripts/system_health_audit_lib.py scripts/test_system_health_audit_lib.py
       - name: Test recent eFootball window counts unique fixtures
         run: python scripts/test_efootball_desk_learning.py
       - name: Test the Virtual Lab product-specific performance gate
@@ -200,6 +204,12 @@ jobs:
         run: python scripts/unified_upcoming_cleanup.py
       - name: Test exact two-sided SportyBet quote preservation
         run: python scripts/test_selection_candidate_collector.py
+      - name: Build independent paper single-selection gate
+        run: python scripts/selective_prediction_gate.py
+      - name: Test independent single-selection gate bridge
+        run: |
+          python scripts/test_selection_gate_contract.py
+          node scripts/test_single_selection_gate_bridge.mjs
       - name: Collect model-first selection candidates
         run: python scripts/selection_candidate_collector.py
       - name: Capture the final eFootball desk forecast snapshot
@@ -214,7 +224,7 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/unified_upcoming.json data/prediction_desk_health.json data/selection_candidates.json data/selection_candidate_status.json data/system_health.json data/efootball_desk_learning.json data/efootball_desk_prediction_history.json data/efootball_desk_settled_observations.json
+          git add data/unified_upcoming.json data/prediction_desk_health.json data/selection_candidates.json data/selection_candidate_status.json data/selection_gate.json data/selection_gate_selected.json data/system_health.json data/efootball_desk_learning.json data/efootball_desk_prediction_history.json data/efootball_desk_settled_observations.json
           if git diff --cached --quiet; then
             echo "Unified board already current."
             exit 0
@@ -265,10 +275,13 @@ jobs:
               fi
               python scripts/unified_upcoming.py
               python scripts/unified_upcoming_cleanup.py
+              python scripts/selective_prediction_gate.py
+              python scripts/test_selection_gate_contract.py
+              node scripts/test_single_selection_gate_bridge.mjs
               python scripts/selection_candidate_collector.py
               python scripts/efootball_desk_learning.py
               python scripts/system_health_audit.py
-              git add data/unified_upcoming.json data/prediction_desk_health.json data/selection_candidates.json data/selection_candidate_status.json data/system_health.json data/efootball_desk_learning.json data/efootball_desk_prediction_history.json data/efootball_desk_settled_observations.json
+              git add data/unified_upcoming.json data/prediction_desk_health.json data/selection_candidates.json data/selection_candidate_status.json data/selection_gate.json data/selection_gate_selected.json data/system_health.json data/efootball_desk_learning.json data/efootball_desk_prediction_history.json data/efootball_desk_settled_observations.json
               if git diff --cached --quiet; then
                 echo "Latest main already contains the current generated board."
                 exit 0
