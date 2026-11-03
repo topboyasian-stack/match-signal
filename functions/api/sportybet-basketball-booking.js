@@ -1,3 +1,5 @@
+import { NBA_RELEASE_MODEL, loadNbaReleaseContext, nbaTotalsReleaseQualified, nbaTotalTicketLegQualified } from './sportybet-booking.js';
+
 const ORIGIN = 'https://www.sportybet.com';
 const HEADERS = {
   'Accept': 'application/json, text/plain, */*',
@@ -32,7 +34,7 @@ async function liveEvents(request){
   if(data?.ok!==true || !Array.isArray(data.events)) throw new Error(data?.error||'Current SportyBet basketball feed unavailable');
   const fetched=Date.parse(data.fetched_at||'');
   if(!Number.isFinite(fetched)||Date.now()-fetched>15*60*1000||fetched>Date.now()+120000) throw new Error('SportyBet market feed is stale; refresh before generating a code.');
-  return data.events;
+  return data.events.map(event => ({...event, __sportybet_fetched_at:data.fetched_at}));
 }
 function mapLeg(leg,event){
   const requestedLine=Number(leg.line), side=String(leg.side||'').toLowerCase();
@@ -48,8 +50,14 @@ function mapLeg(leg,event){
   for(const m of markets){
     const line=lineOf(m);
     if(!Number.isFinite(line)||Math.abs(line-requestedLine)>1e-9) continue;
-    const outcome=(m.outcomes||[]).find(o=>active(o) && (side==='over'?/\bover\b/i.test(String(o.name||'')):/\bunder\b/i.test(String(o.name||''))) && Number(o.odds)>1 && String(o.id||''));
-    if(outcome){found={eventId:String(event.event_id),marketId:'225',specifier:m.specifier??null,outcomeId:String(outcome.id),outcomeName:String(outcome.name||side),odds:Number(outcome.odds),line,side,fixture:event.home+' vs '+event.away};break;}
+    const outcomes=(m.outcomes||[]).filter(active);
+    const overOutcome=outcomes.find(o=>/\bover\b/i.test(String(o.name||'')) && Number(o.odds)>1 && String(o.id||''));
+    const underOutcome=outcomes.find(o=>/\bunder\b/i.test(String(o.name||'')) && Number(o.odds)>1 && String(o.id||''));
+    const outcome=side==='over'?overOutcome:underOutcome;
+    if(outcome&&overOutcome&&underOutcome){
+      found={eventId:String(event.event_id),marketId:'225',specifier:m.specifier??null,outcomeId:String(outcome.id),outcomeName:String(outcome.name||side),odds:Number(outcome.odds),line,side,fixture:event.home+' vs '+event.away,overOdds:Number(overOutcome.odds),underOdds:Number(underOutcome.odds),fetchedAt:String(event.__sportybet_fetched_at||'')};
+      break;
+    }
   }
   return found||{error:'Exact SportyBet market 225, line and side are no longer available.'};
 }
@@ -121,6 +129,15 @@ export async function onRequestPost(context){
     if(legs.length<2||legs.length>8) return json({ok:false,error:'INVALID_LEG_COUNT',message:'Each slip needs 2–8 selections.'},422);
     const ids=legs.map(l=>String(l.event_id||''));
     if(ids.some(id=>!id)||new Set(ids).size!==ids.length) return json({ok:false,error:'DUPLICATE_OR_MISSING_EVENT',message:'Each builder must contain different, identified events.'},422);
+    let releaseContext;
+    try {
+      releaseContext=await loadNbaReleaseContext();
+    } catch(error) {
+      return json({ok:false,error:'NBA_RELEASE_EVIDENCE_UNAVAILABLE',booking_code_withheld:true,message:'NBA release evidence could not be verified. No booking code was generated.'},503);
+    }
+    if(!nbaTotalsReleaseQualified(releaseContext.evidence,releaseContext.probability)) {
+      return json({ok:false,error:'NBA_RELEASE_GATE_LOCKED',booking_code_withheld:true,message:'NBA totals ticket generation remains locked until fixed-cutoff forecasting, prospective market ROI, snapshot coverage, probability validation and closing-line-value gates all pass. No booking code was generated.'},423);
+    }
     const events=await liveEvents(context.request);
     const validation=[],selections=[];
     for(const leg of legs){
@@ -128,9 +145,34 @@ export async function onRequestPost(context){
       if(!event){validation.push({event_id:leg.event_id,ok:false,reason:'Fixture no longer exists in current SportyBet feed.'});continue;}
       const selection=mapLeg(leg,event);
       if(selection.error){validation.push({event_id:leg.event_id,ok:false,reason:selection.error});continue;}
-      selections.push(selection);validation.push({event_id:leg.event_id,ok:true,fixture:selection.fixture,side:selection.side,line:selection.line,odds:selection.odds});
+      const predictions=(releaseContext.predictions||[]).filter(p=>
+        String(p?.totals_model_version||'')===NBA_RELEASE_MODEL &&
+        String(p?.markets?.total_ou?.sportybet_event_id||'')===String(selection.eventId) &&
+        Date.parse(String(p?.start_time||''))===Date.parse(String(event.start_time||''))
+      );
+      if(predictions.length!==1){
+        validation.push({event_id:leg.event_id,ok:false,reason:'No unique current V5 market-225 prediction matches this SportyBet fixture.'});
+        continue;
+      }
+      const prediction=predictions[0];
+      const gate=nbaTotalTicketLegQualified({
+        sport:'basketball',market:'total',market_id:'225',pick:selection.side,
+        model_qualified:true,event_id:String(prediction.event_id),
+        start_time:String(prediction.start_time),line:selection.line,
+        sportybet_event_id:String(selection.eventId)
+      },{
+        marketId:String(selection.marketId),eventId:String(selection.eventId),
+        line:selection.line,overOdds:selection.overOdds,underOdds:selection.underOdds,
+        odds:selection.odds,fetchedAt:selection.fetchedAt
+      },releaseContext);
+      if(!gate.ok){
+        validation.push({event_id:leg.event_id,ok:false,reason:gate.reason});
+        continue;
+      }
+      selections.push(selection);
+      validation.push({event_id:leg.event_id,ok:true,fixture:selection.fixture,side:selection.side,line:selection.line,odds:selection.odds,publication_snapshot_id:gate.snapshot_id});
     }
-    if(selections.length!==legs.length) return json({ok:false,error:'SELECTIONS_CHANGED',message:'One or more legs failed live revalidation. No booking code was created; remove or refresh the flagged selection.',validation},409);
+    if(selections.length!==legs.length) return json({ok:false,error:'SELECTIONS_CHANGED',booking_code_withheld:true,message:'One or more legs failed live market or model-value revalidation. No booking code was created; remove or refresh the flagged selection.',validation},409);
     const share=await createShare(selections);
     if(share?.fallback_direct_origin===true) return json({ok:false,error:'SPORTYBET_DIRECT_FALLBACK_REQUIRED',message:'SportyBet returned an HTML/edge response to Match Signal. Retrying the verified slip directly from your browser.',fallback_direct_origin:true,diagnostic:share.diagnostic,fallback_selections:share.fallback_selections,validation},502);
     return json({ok:true,mode:'NON_STAKING_BETSLIP_PREPARATION',builder_slot:slot,booking_code:share.code,share_url:share.url,accepted_count:share.accepted_count,initial_selection_count:legs.length,combined_odds:share.combined_odds,unavailable_count:share.unavailable_count,validation,message:'SportyBet returned a share/booking code only. No stake, payment or wager was placed.'});
