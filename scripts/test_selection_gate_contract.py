@@ -48,7 +48,8 @@ print("Selection Gate artifact separation and summary contract passed.")
 # bridge. It must not be converted into an Odds Builder eligibility flag.
 hub_source = (ROOT / "sport-hubs.js").read_text(encoding="utf-8")
 assert "function singleSelectionGateKey(x)" in hub_source
-assert "singleSelectionGateMap.get(singleSelectionGateKey(x))" in hub_source
+assert "singleSelectionGateMap.get(selectionKey)" in hub_source
+assert "const selectionKey=singleSelectionGateKey(x);" in hub_source
 assert "qualifiedBestSourceIsFresh(singleSelectionGateStatus?.generated_at)" in hub_source
 assert 'x?.single_selection_gate?.status==="passed"' in hub_source
 assert 'x?.single_selection_gate?.mode==="PAPER_ONLY"' in hub_source
