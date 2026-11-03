@@ -241,6 +241,21 @@ jobs:
       - name: Record clean V4 paper ledger and validation metrics
         continue-on-error: true
         run: PYTHONPATH=. python scripts/v4_validation.py
+      - name: Rebuild walk-forward Football council on refreshed domestic and Champions League history
+        run: python scripts/football_model_council.py
+      - name: Assert model-council remains research-only unless evidence passes
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          council = json.loads(Path("data/football_model_council.json").read_text(encoding="utf-8"))
+          assert council.get("mode") == "PAPER_RESEARCH_ONLY", "Football council must remain paper/research only"
+          assert council.get("production_pick_unchanged") is True, "Council changed the published production pick contract"
+          assert council.get("builder_eligibility_unchanged") is True, "Council changed ticket eligibility"
+          overall = council.get("overall") or {}
+          ucl = council.get("by_league", {}).get("Champions League") or {}
+          print(json.dumps({"overall": overall, "champions_league": ucl}, indent=2))
+          PY
       - name: Run empirical model risk gate
         continue-on-error: true
         run: python scripts/model_guard.py
