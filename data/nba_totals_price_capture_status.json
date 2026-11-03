@@ -1,10 +1,205 @@
 {
-  "checked_at": "2026-11-03T10:44:10.037450+00:00",
+  "checked_at": "2026-11-03T10:46:36.141343+00:00",
   "paper_only": true,
   "model_version": "nba-total-v5.1-pace-efficiency-calibrated",
   "source": "SportyBet Nigeria public NBA feed via Match Signal regional proxy",
-  "feed_error": "page 2: SportyBet NBA feed returned no events. /api/ng/factsCenter/pcUpcomingEvents marketId=1,18,10,29,11,26,36,14,60100,186,189,202,204,210: https://match-signal-sportybet-proxy.topboyasian.workers.dev: response omitted data.tournaments || https://www.sportybet.com: returned non-JSON data; /api/ng/factsCenter/pcUpcomingEvents marketId=225: https://match-signal-sportybet-proxy.topboyasian.workers.dev: response omitted data.tournaments || https://www.sportybet.com: returned non-JSON data; /api/ng/factsCenter/wapConfigurableUpcomingEvents marketId=default: https://match-signal-sportybet-proxy.topboyasian.workers.dev: response omitted data.tournaments || https://www.sportybet.com: returned non-JSON data",
-  "feed_diagnostics": [],
+  "feed_error": "page 2: SportyBet NBA feed returned no usable event-list response. /api/ng/factsCenter/pcUpcomingEvents marketId=1,18,10,29,11,26,36,14,60100,186,189,202,204,210: https://match-signal-sportybet-proxy.topboyasian.workers.dev: response omitted data.tournaments; metadata={\"endpoint\":\"/api/ng/factsCenter/pcUpcomingEvents\",\"market_id\":\"1,18,10,29,11,26,36,14,60100,186,189,202,204,210\",\"page_num\":2,\"page_size\":100,\"timeline_hours\":168,\"source_origin\":\"https://match-signal-sportybet-proxy.topboyasian.workers.dev\",\"http_status\":200,\"biz_code\":10000,\"top_level_keys\":[\"bizCode\",\"message\",\"data\"],\"data_keys\":[],\"upstream_total_events\":null,\"tournament_count\":0,\"event_count\":0,\"response_shape\":\"TOURNAMENTS_FIELD_MISSING\"} || https://www.sportybet.com: returned non-JSON data; /api/ng/factsCenter/pcUpcomingEvents marketId=225: https://match-signal-sportybet-proxy.topboyasian.workers.dev: response omitted data.tournaments; metadata={\"endpoint\":\"/api/ng/factsCenter/pcUpcomingEvents\",\"market_id\":\"225\",\"page_num\":2,\"page_size\":100,\"timeline_hours\":168,\"source_origin\":\"https://match-signal-sportybet-proxy.topboyasian.workers.dev\",\"http_status\":200,\"biz_code\":10000,\"top_level_keys\":[\"bizCode\",\"message\",\"data\"],\"data_keys\":[],\"upstream_total_events\":null,\"tournament_count\":0,\"event_count\":0,\"response_shape\":\"TOURNAMENTS_FIELD_MISSING\"} || https://www.sportybet.com: returned non-JSON data; /api/ng/factsCenter/wapConfigurableUpcomingEvents marketId=default: https://match-signal-sportybet-proxy.topboyasian.workers.dev: response omitted data.tournaments; metadata={\"endpoint\":\"/api/ng/factsCenter/wapConfigurableUpcomingEvents\",\"market_id\":null,\"page_num\":2,\"page_size\":100,\"timeline_hours\":168,\"source_origin\":\"https://match-signal-sportybet-proxy.topboyasian.workers.dev\",\"http_status\":200,\"biz_code\":10000,\"top_level_keys\":[\"bizCode\",\"message\",\"data\"],\"data_keys\":[\"0\",\"1\",\"2\",\"3\",\"4\",\"5\",\"6\",\"7\",\"8\",\"9\"],\"upstream_total_events\":null,\"tournament_count\":0,\"event_count\":0,\"response_shape\":\"TOURNAMENTS_FIELD_MISSING\"} || https://www.sportybet.com: returned non-JSON data",
+  "feed_diagnostics": [
+    {
+      "collector_page_num": 1,
+      "endpoint": "/api/ng/factsCenter/pcUpcomingEvents",
+      "market_id": "1,18,10,29,11,26,36,14,60100,186,189,202,204,210",
+      "page_num": 1,
+      "page_size": 100,
+      "timeline_hours": 168,
+      "source_origin": "https://match-signal-sportybet-proxy.topboyasian.workers.dev",
+      "http_status": 200,
+      "biz_code": 10000,
+      "top_level_keys": [
+        "bizCode",
+        "message",
+        "data"
+      ],
+      "data_keys": [
+        "totalNum",
+        "tournaments"
+      ],
+      "upstream_total_events": 5,
+      "tournament_count": 1,
+      "event_count": 5,
+      "response_shape": "TOURNAMENTS_PRESENT"
+    },
+    {
+      "collector_page_num": 1,
+      "endpoint": "/api/ng/factsCenter/pcUpcomingEvents",
+      "market_id": "225",
+      "page_num": 1,
+      "page_size": 100,
+      "timeline_hours": 168,
+      "source_origin": "https://match-signal-sportybet-proxy.topboyasian.workers.dev",
+      "http_status": 200,
+      "biz_code": 10000,
+      "top_level_keys": [
+        "bizCode",
+        "message",
+        "data"
+      ],
+      "data_keys": [
+        "totalNum",
+        "tournaments"
+      ],
+      "upstream_total_events": 5,
+      "tournament_count": 1,
+      "event_count": 5,
+      "response_shape": "TOURNAMENTS_PRESENT"
+    },
+    {
+      "collector_page_num": 1,
+      "endpoint": "/api/ng/factsCenter/wapConfigurableUpcomingEvents",
+      "market_id": null,
+      "page_num": 1,
+      "page_size": 100,
+      "timeline_hours": 168,
+      "source_origin": "https://match-signal-sportybet-proxy.topboyasian.workers.dev",
+      "http_status": 200,
+      "biz_code": 10000,
+      "top_level_keys": [
+        "bizCode",
+        "message",
+        "data"
+      ],
+      "data_keys": [
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9"
+      ],
+      "upstream_total_events": null,
+      "tournament_count": 0,
+      "event_count": 0,
+      "response_shape": "TOURNAMENTS_FIELD_MISSING"
+    },
+    {
+      "collector_page_num": 1,
+      "endpoint": "/api/ng/factsCenter/wapConfigurableUpcomingEvents",
+      "market_id": null,
+      "page_num": 1,
+      "page_size": 100,
+      "timeline_hours": 168,
+      "source_origin": "https://www.sportybet.com",
+      "request_error": "returned non-JSON data"
+    },
+    {
+      "collector_page_num": 2,
+      "endpoint": "/api/ng/factsCenter/pcUpcomingEvents",
+      "market_id": "1,18,10,29,11,26,36,14,60100,186,189,202,204,210",
+      "page_num": 2,
+      "page_size": 100,
+      "timeline_hours": 168,
+      "source_origin": "https://match-signal-sportybet-proxy.topboyasian.workers.dev",
+      "http_status": 200,
+      "biz_code": 10000,
+      "top_level_keys": [
+        "bizCode",
+        "message",
+        "data"
+      ],
+      "data_keys": [],
+      "upstream_total_events": null,
+      "tournament_count": 0,
+      "event_count": 0,
+      "response_shape": "TOURNAMENTS_FIELD_MISSING"
+    },
+    {
+      "collector_page_num": 2,
+      "endpoint": "/api/ng/factsCenter/pcUpcomingEvents",
+      "market_id": "1,18,10,29,11,26,36,14,60100,186,189,202,204,210",
+      "page_num": 2,
+      "page_size": 100,
+      "timeline_hours": 168,
+      "source_origin": "https://www.sportybet.com",
+      "request_error": "returned non-JSON data"
+    },
+    {
+      "collector_page_num": 2,
+      "endpoint": "/api/ng/factsCenter/pcUpcomingEvents",
+      "market_id": "225",
+      "page_num": 2,
+      "page_size": 100,
+      "timeline_hours": 168,
+      "source_origin": "https://match-signal-sportybet-proxy.topboyasian.workers.dev",
+      "http_status": 200,
+      "biz_code": 10000,
+      "top_level_keys": [
+        "bizCode",
+        "message",
+        "data"
+      ],
+      "data_keys": [],
+      "upstream_total_events": null,
+      "tournament_count": 0,
+      "event_count": 0,
+      "response_shape": "TOURNAMENTS_FIELD_MISSING"
+    },
+    {
+      "collector_page_num": 2,
+      "endpoint": "/api/ng/factsCenter/pcUpcomingEvents",
+      "market_id": "225",
+      "page_num": 2,
+      "page_size": 100,
+      "timeline_hours": 168,
+      "source_origin": "https://www.sportybet.com",
+      "request_error": "returned non-JSON data"
+    },
+    {
+      "collector_page_num": 2,
+      "endpoint": "/api/ng/factsCenter/wapConfigurableUpcomingEvents",
+      "market_id": null,
+      "page_num": 2,
+      "page_size": 100,
+      "timeline_hours": 168,
+      "source_origin": "https://match-signal-sportybet-proxy.topboyasian.workers.dev",
+      "http_status": 200,
+      "biz_code": 10000,
+      "top_level_keys": [
+        "bizCode",
+        "message",
+        "data"
+      ],
+      "data_keys": [
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9"
+      ],
+      "upstream_total_events": null,
+      "tournament_count": 0,
+      "event_count": 0,
+      "response_shape": "TOURNAMENTS_FIELD_MISSING"
+    },
+    {
+      "collector_page_num": 2,
+      "endpoint": "/api/ng/factsCenter/wapConfigurableUpcomingEvents",
+      "market_id": null,
+      "page_num": 2,
+      "page_size": 100,
+      "timeline_hours": 168,
+      "source_origin": "https://www.sportybet.com",
+      "request_error": "returned non-JSON data"
+    }
+  ],
   "feed_events": 5,
   "feed_events_with_market_225": 5,
   "model_predictions_checked": 62,
@@ -34,7 +229,7 @@
           "start_time": "2026-11-05T00:00:00+00:00",
           "minutes_from_fixture": 0.0,
           "market_225_present": true,
-          "fetched_at": "2026-11-03T10:44:09.608Z"
+          "fetched_at": "2026-11-03T10:46:35.480Z"
         },
         {
           "event_id": "sr:match:73719522",
@@ -45,7 +240,7 @@
           "start_time": "2026-11-05T00:30:00+00:00",
           "minutes_from_fixture": 30.0,
           "market_225_present": true,
-          "fetched_at": "2026-11-03T10:44:09.608Z"
+          "fetched_at": "2026-11-03T10:46:35.480Z"
         },
         {
           "event_id": "sr:match:73719530",
@@ -56,7 +251,7 @@
           "start_time": "2026-11-05T01:00:00+00:00",
           "minutes_from_fixture": 60.0,
           "market_225_present": true,
-          "fetched_at": "2026-11-03T10:44:09.608Z"
+          "fetched_at": "2026-11-03T10:46:35.480Z"
         }
       ]
     },
@@ -76,7 +271,7 @@
           "start_time": "2026-11-05T00:30:00+00:00",
           "minutes_from_fixture": 0.0,
           "market_225_present": true,
-          "fetched_at": "2026-11-03T10:44:09.608Z"
+          "fetched_at": "2026-11-03T10:46:35.480Z"
         },
         {
           "event_id": "sr:match:73719516",
@@ -87,7 +282,7 @@
           "start_time": "2026-11-05T00:00:00+00:00",
           "minutes_from_fixture": 30.0,
           "market_225_present": true,
-          "fetched_at": "2026-11-03T10:44:09.608Z"
+          "fetched_at": "2026-11-03T10:46:35.480Z"
         },
         {
           "event_id": "sr:match:73719530",
@@ -98,7 +293,7 @@
           "start_time": "2026-11-05T01:00:00+00:00",
           "minutes_from_fixture": 30.0,
           "market_225_present": true,
-          "fetched_at": "2026-11-03T10:44:09.608Z"
+          "fetched_at": "2026-11-03T10:46:35.480Z"
         }
       ]
     },
@@ -118,7 +313,7 @@
           "start_time": "2026-11-05T00:30:00+00:00",
           "minutes_from_fixture": 0.0,
           "market_225_present": true,
-          "fetched_at": "2026-11-03T10:44:09.608Z"
+          "fetched_at": "2026-11-03T10:46:35.480Z"
         },
         {
           "event_id": "sr:match:73719516",
@@ -129,7 +324,7 @@
           "start_time": "2026-11-05T00:00:00+00:00",
           "minutes_from_fixture": 30.0,
           "market_225_present": true,
-          "fetched_at": "2026-11-03T10:44:09.608Z"
+          "fetched_at": "2026-11-03T10:46:35.480Z"
         },
         {
           "event_id": "sr:match:73719530",
@@ -140,7 +335,7 @@
           "start_time": "2026-11-05T01:00:00+00:00",
           "minutes_from_fixture": 30.0,
           "market_225_present": true,
-          "fetched_at": "2026-11-03T10:44:09.608Z"
+          "fetched_at": "2026-11-03T10:46:35.480Z"
         }
       ]
     },
@@ -160,7 +355,7 @@
           "start_time": "2026-11-05T01:00:00+00:00",
           "minutes_from_fixture": 0.0,
           "market_225_present": true,
-          "fetched_at": "2026-11-03T10:44:09.608Z"
+          "fetched_at": "2026-11-03T10:46:35.480Z"
         },
         {
           "event_id": "sr:match:73719522",
@@ -171,7 +366,7 @@
           "start_time": "2026-11-05T00:30:00+00:00",
           "minutes_from_fixture": 30.0,
           "market_225_present": true,
-          "fetched_at": "2026-11-03T10:44:09.608Z"
+          "fetched_at": "2026-11-03T10:46:35.480Z"
         },
         {
           "event_id": "sr:match:73719532",
@@ -182,7 +377,7 @@
           "start_time": "2026-11-05T01:30:00+00:00",
           "minutes_from_fixture": 30.0,
           "market_225_present": true,
-          "fetched_at": "2026-11-03T10:44:09.608Z"
+          "fetched_at": "2026-11-03T10:46:35.480Z"
         }
       ]
     },
@@ -202,7 +397,7 @@
           "start_time": "2026-11-05T01:00:00+00:00",
           "minutes_from_fixture": 0.0,
           "market_225_present": true,
-          "fetched_at": "2026-11-03T10:44:09.608Z"
+          "fetched_at": "2026-11-03T10:46:35.480Z"
         },
         {
           "event_id": "sr:match:73719522",
@@ -213,7 +408,7 @@
           "start_time": "2026-11-05T00:30:00+00:00",
           "minutes_from_fixture": 30.0,
           "market_225_present": true,
-          "fetched_at": "2026-11-03T10:44:09.608Z"
+          "fetched_at": "2026-11-03T10:46:35.480Z"
         },
         {
           "event_id": "sr:match:73719532",
@@ -224,7 +419,7 @@
           "start_time": "2026-11-05T01:30:00+00:00",
           "minutes_from_fixture": 30.0,
           "market_225_present": true,
-          "fetched_at": "2026-11-03T10:44:09.608Z"
+          "fetched_at": "2026-11-03T10:46:35.480Z"
         }
       ]
     },
@@ -244,7 +439,7 @@
           "start_time": "2026-11-05T01:30:00+00:00",
           "minutes_from_fixture": 30.0,
           "market_225_present": true,
-          "fetched_at": "2026-11-03T10:44:09.608Z"
+          "fetched_at": "2026-11-03T10:46:35.480Z"
         },
         {
           "event_id": "sr:match:73719538",
@@ -255,7 +450,7 @@
           "start_time": "2026-11-05T02:30:00+00:00",
           "minutes_from_fixture": 30.0,
           "market_225_present": true,
-          "fetched_at": "2026-11-03T10:44:09.608Z"
+          "fetched_at": "2026-11-03T10:46:35.480Z"
         },
         {
           "event_id": "sr:match:73719530",
@@ -266,7 +461,7 @@
           "start_time": "2026-11-05T01:00:00+00:00",
           "minutes_from_fixture": 60.0,
           "market_225_present": true,
-          "fetched_at": "2026-11-03T10:44:09.608Z"
+          "fetched_at": "2026-11-03T10:46:35.480Z"
         }
       ]
     },
@@ -286,7 +481,7 @@
           "start_time": "2026-11-05T01:30:00+00:00",
           "minutes_from_fixture": 30.0,
           "market_225_present": true,
-          "fetched_at": "2026-11-03T10:44:09.608Z"
+          "fetched_at": "2026-11-03T10:46:35.480Z"
         },
         {
           "event_id": "sr:match:73719538",
@@ -297,7 +492,7 @@
           "start_time": "2026-11-05T02:30:00+00:00",
           "minutes_from_fixture": 30.0,
           "market_225_present": true,
-          "fetched_at": "2026-11-03T10:44:09.608Z"
+          "fetched_at": "2026-11-03T10:46:35.480Z"
         },
         {
           "event_id": "sr:match:73719530",
@@ -308,7 +503,7 @@
           "start_time": "2026-11-05T01:00:00+00:00",
           "minutes_from_fixture": 60.0,
           "market_225_present": true,
-          "fetched_at": "2026-11-03T10:44:09.608Z"
+          "fetched_at": "2026-11-03T10:46:35.480Z"
         }
       ]
     },
@@ -328,7 +523,7 @@
           "start_time": "2026-11-05T02:30:00+00:00",
           "minutes_from_fixture": 30.0,
           "market_225_present": true,
-          "fetched_at": "2026-11-03T10:44:09.608Z"
+          "fetched_at": "2026-11-03T10:46:35.480Z"
         },
         {
           "event_id": "sr:match:73719532",
@@ -339,7 +534,7 @@
           "start_time": "2026-11-05T01:30:00+00:00",
           "minutes_from_fixture": 90.0,
           "market_225_present": true,
-          "fetched_at": "2026-11-03T10:44:09.608Z"
+          "fetched_at": "2026-11-03T10:46:35.480Z"
         },
         {
           "event_id": "sr:match:73719530",
@@ -350,7 +545,7 @@
           "start_time": "2026-11-05T01:00:00+00:00",
           "minutes_from_fixture": 120.0,
           "market_225_present": true,
-          "fetched_at": "2026-11-03T10:44:09.608Z"
+          "fetched_at": "2026-11-03T10:46:35.480Z"
         }
       ]
     },
@@ -370,7 +565,7 @@
           "start_time": "2026-11-05T02:30:00+00:00",
           "minutes_from_fixture": 60.0,
           "market_225_present": true,
-          "fetched_at": "2026-11-03T10:44:09.608Z"
+          "fetched_at": "2026-11-03T10:46:35.480Z"
         },
         {
           "event_id": "sr:match:73719532",
@@ -381,7 +576,7 @@
           "start_time": "2026-11-05T01:30:00+00:00",
           "minutes_from_fixture": 120.0,
           "market_225_present": true,
-          "fetched_at": "2026-11-03T10:44:09.608Z"
+          "fetched_at": "2026-11-03T10:46:35.480Z"
         },
         {
           "event_id": "sr:match:73719530",
@@ -392,7 +587,7 @@
           "start_time": "2026-11-05T01:00:00+00:00",
           "minutes_from_fixture": 150.0,
           "market_225_present": true,
-          "fetched_at": "2026-11-03T10:44:09.608Z"
+          "fetched_at": "2026-11-03T10:46:35.480Z"
         }
       ]
     },
@@ -661,18 +856,18 @@
       "nearby_feed_candidates": []
     }
   ],
-  "immutable_snapshot_count_before": 1714,
-  "immutable_snapshot_count_after": 1719,
+  "immutable_snapshot_count_before": 1719,
+  "immutable_snapshot_count_after": 1724,
   "immutable_snapshots_added": 5,
   "publication_capture": {
     "model_version": "nba-total-v5.1-pace-efficiency-calibrated",
     "model_predictions": 62,
     "predictions_with_fresh_sportybet_market_225_pair": 5,
-    "immutable_fresh_publication_snapshots": 1448,
+    "immutable_fresh_publication_snapshots": 1453,
     "unique_events_with_immutable_snapshots": 20,
     "snapshot_coverage": 0.3226,
-    "directional_pick_snapshots": 737,
-    "no_clear_lean_snapshots": 711,
+    "directional_pick_snapshots": 741,
+    "no_clear_lean_snapshots": 712,
     "unpriced_or_unavailable_prediction_count": 57,
     "unmatched_fresh_market_predictions": 0,
     "capture_status": "PARTIAL"
