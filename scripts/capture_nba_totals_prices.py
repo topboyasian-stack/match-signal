@@ -34,6 +34,7 @@ def sportybet_basketball_feed_paged(max_pages=25):
     url = "https://match-signal.pages.dev/api/sportybet-basketball"
     events_by_id = {}
     page_errors = []
+    page_diagnostics = []
     # Guard the request count even if a caller passes an unexpectedly large value.
     for page in range(1, min(25, max(1, int(max_pages))) + 1):
         try:
@@ -44,6 +45,9 @@ def sportybet_basketball_feed_paged(max_pages=25):
             )
             response.raise_for_status()
             payload = response.json()
+            for diagnostic in payload.get("source_diagnostics") or []:
+                if isinstance(diagnostic, dict):
+                    page_diagnostics.append({"collector_page_num": page, **diagnostic})
             if payload.get("ok") is not True:
                 raise RuntimeError(payload.get("error") or "SportyBet source did not return ok=true")
             page_events = payload.get("events")
@@ -52,7 +56,7 @@ def sportybet_basketball_feed_paged(max_pages=25):
         except Exception as exc:
             page_errors.append(f"page {page}: {exc}")
             if page == 1:
-                return [], "SportyBet feed unavailable: " + "; ".join(page_errors)
+                return [], "SportyBet feed unavailable: " + "; ".join(page_errors), page_diagnostics
             break
 
         new_ids = 0
@@ -94,9 +98,9 @@ def sportybet_basketball_feed_paged(max_pages=25):
 
     if not events_by_id:
         detail = "; ".join(page_errors) if page_errors else "SportyBet source returned zero upcoming basketball events"
-        return [], detail
+        return [], detail, page_diagnostics
     error = "; ".join(page_errors) if page_errors else None
-    return list(events_by_id.values()), error
+    return list(events_by_id.values()), error, page_diagnostics
 
 
 
@@ -346,7 +350,7 @@ def main():
     if not isinstance(history, list):
         history = []
 
-    feed, feed_error = sportybet_basketball_feed_paged()
+    feed, feed_error, feed_diagnostics = sportybet_basketball_feed_paged()
     now = capture_timestamp(feed, datetime.now(timezone.utc))
     snapshot_candidates, stats = capture(predictions, feed, now)
     before_count = len(snapshots)
@@ -367,6 +371,7 @@ def main():
         "model_version": NBA_TOTALS_MODEL_VERSION,
         "source": "SportyBet Nigeria public NBA feed via Match Signal regional proxy",
         "feed_error": feed_error,
+        "feed_diagnostics": feed_diagnostics,
         "feed_events": len(feed),
         "feed_events_with_market_225": sum(
             any(str(m.get("id")) == "225" for m in (event.get("markets") or []))

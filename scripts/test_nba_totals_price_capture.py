@@ -54,6 +54,11 @@ class PriceCaptureTests(unittest.TestCase):
         self.assertIn("basketball-live.js?v=20261102-nba-feed-scope2", page_html)
         self.assertIn("u.searchParams.get('tournamentId')||NBA_TOURNAMENT_ID", proxy_script)
         self.assertIn("if(tournamentId!==NBA_TOURNAMENT_ID)", proxy_script)
+        self.assertIn("source_diagnostics", proxy_script)
+        self.assertIn("upstream_total_events", proxy_script)
+        self.assertIn("data_keys", proxy_script)
+        self.assertIn("TOURNAMENTS_ARRAY_EMPTY", proxy_script)
+        self.assertIn("hasValidTournamentArray", proxy_script)
 
         # Any slip containing NBA totals must fail closed instead of returning
         # a share code when either our validation or SportyBet accepts only
@@ -103,7 +108,7 @@ class PriceCaptureTests(unittest.TestCase):
         with patch("capture_nba_totals_prices.S.get", side_effect=[
             Response(first_page), Response(second_page), Response([])
         ]) as feed_get:
-            events, error = sportybet_basketball_feed_paged(max_pages=5)
+            events, error, diagnostics = sportybet_basketball_feed_paged(max_pages=5)
 
         self.assertIsNone(error)
         self.assertEqual([call.kwargs["params"]["pageNum"] for call in feed_get.call_args_list], [1, 2, 3])
@@ -136,28 +141,46 @@ class PriceCaptureTests(unittest.TestCase):
         with patch("capture_nba_totals_prices.S.get", side_effect=[
             Response(first_page), Response(second_page), Response([])
         ]) as feed_get:
-            events, error = sportybet_basketball_feed_paged(max_pages=5)
+            events, error, diagnostics = sportybet_basketball_feed_paged(max_pages=5)
 
         self.assertIsNone(error)
         self.assertEqual([call.kwargs["params"]["pageNum"] for call in feed_get.call_args_list], [1, 2, 3])
         self.assertEqual({row["event_id"] for row in events}, {"short-0", "short-1", "short-2", "later-0", "later-1"})
 
-    def test_feed_returns_partial_pages_when_a_later_page_fails(self):
+    def test_feed_returns_partial_pages_and_retains_upstream_diagnostics(self):
         class Response:
+            def __init__(self, events, ok=True, error=None, source_diagnostics=None):
+                self.events = events
+                self.ok = ok
+                self.error = error
+                self.source_diagnostics = source_diagnostics or []
             def raise_for_status(self):
                 return None
             def json(self):
-                return {"ok": True, "events": [
-                    {"event_id": f"event-{i}", "markets": []} for i in range(100)
-                ]}
+                return {
+                    "ok": self.ok, "events": self.events, "error": self.error,
+                    "source_diagnostics": self.source_diagnostics,
+                }
 
+        first_page = [
+            {"event_id": f"event-{i}", "markets": []} for i in range(3)
+        ]
         with patch("capture_nba_totals_prices.S.get", side_effect=[
-            Response(), RuntimeError("page two unavailable")
+            Response(first_page, source_diagnostics=[{
+                "page_num": 1, "upstream_total_events": 37, "event_count": 3,
+                "response_shape": "TOURNAMENTS_PRESENT",
+            }]),
+            Response([], ok=False, error="page two has no tournament data", source_diagnostics=[{
+                "page_num": 2, "upstream_total_events": None, "event_count": 0,
+                "response_shape": "TOURNAMENTS_MISSING",
+            }]),
         ]):
-            events, error = sportybet_basketball_feed_paged(max_pages=3)
+            events, error, diagnostics = sportybet_basketball_feed_paged(max_pages=3)
 
-        self.assertEqual(len(events), 100)
+        self.assertEqual(len(events), 3)
         self.assertIn("page 2", error)
+        self.assertEqual([row["upstream_total_events"] for row in diagnostics], [37, None])
+        self.assertEqual([row["collector_page_num"] for row in diagnostics], [1, 2])
 
     def test_captures_exact_fresh_pair_and_calculates_direction(self):
         prediction = make_prediction(self.now)
