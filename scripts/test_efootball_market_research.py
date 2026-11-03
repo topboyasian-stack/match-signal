@@ -272,27 +272,29 @@ def test_efootball_display_calibration_is_applied():
  gt=learning["by_product"]["efootball_gt"]
  recent=gt["recent_window"]
  buckets=gt["raw_probability_calibration"]["buckets"]
- assert recent["n"]>=30 and recent["accuracy"]<0.55,recent
- assert buckets["0.8"]["n"]>=30 and buckets["0.8"]["calibrated_probability"]<0.60,buckets["0.8"]
- assert buckets["0.85"]["n"]>=30 and buckets["0.85"]["calibrated_probability"]<0.55,buckets["0.85"]
+
+ # Live evidence is allowed to improve. Validate the artifact contract, not a
+ # hard-coded historical failure rate or particular calibrated probability.
+ assert recent.get("window_unit")=="unique_product_fixture_clusters",recent
+ assert recent.get("n")==recent.get("unique_fixtures"),recent
+ accuracy=recent.get("accuracy")
+ brier=recent.get("brier")
+ assert isinstance(accuracy,(int,float)) and 0<=accuracy<=1,recent
+ assert isinstance(brier,(int,float)) and brier>=0,recent
+ assert isinstance(buckets,dict) and buckets,buckets
+ for label,bucket in buckets.items():
+  assert isinstance(bucket,dict),(label,bucket)
+  assert isinstance(bucket.get("n"),(int,float)) and bucket["n"]>=0,(label,bucket)
+  calibrated=bucket.get("calibrated_probability")
+  if calibrated is not None:
+   assert isinstance(calibrated,(int,float)) and 0<=calibrated<=1,(label,bucket)
+
+ # The client must apply product-wide calibration and keep the live freshness
+ # and recent-accuracy guard; runtime behaviour is covered by JS gate tests.
+ assert "function probabilityCalibrationInfo(x)" in source
+ assert "function probabilityValue(x)" in source
  assert "product_wide_raw_probability_bucket" in source
  assert "function isVirtualDeskCandidate(row)" in source and "const probability=probabilityValue(row);" in source
- assert "efootball_desk_learning.json" in source and "60*60*1000" in source
- assert "RECENT_PRODUCT_ACCURACY_BELOW_55_PERCENT" in source
- assert "product-wide settled calibration" in source
- assert 'if(["efootball_gt","efootball_adriatic"].includes(product)&&isOverUnderPrediction(x))return null;' in source
-
-def test_efootball_display_calibration_is_applied():
- root=Path(__file__).resolve().parents[1]
- source=(root/"sport-hubs.js").read_text(encoding="utf-8")
- learning=json.loads((root/"data"/"efootball_desk_learning.json").read_text(encoding="utf-8"))
- gt=learning["by_product"]["efootball_gt"]
- recent=gt["recent_window"]
- buckets=gt["raw_probability_calibration"]["buckets"]
- assert recent["n"]>=30 and recent["accuracy"]<0.55,recent
- assert buckets["0.8"]["n"]>=30 and buckets["0.8"]["calibrated_probability"]<0.60,buckets["0.8"]
- assert buckets["0.85"]["n"]>=30 and buckets["0.85"]["calibrated_probability"]<0.55,buckets["0.85"]
- assert "product_wide_raw_probability_bucket" in source
  assert "efootball_desk_learning.json" in source and "60*60*1000" in source
  assert "RECENT_PRODUCT_ACCURACY_BELOW_55_PERCENT" in source
  assert "product-wide settled calibration" in source
