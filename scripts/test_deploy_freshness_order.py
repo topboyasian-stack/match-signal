@@ -523,7 +523,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "data/selection_gate_selected.json",
         ):
             with self.subTest(path=path):
-                explicit_add = staged.split("git add ", 1)[1].split("\\n", 1)[0]
+                explicit_add = staged.split("git add ", 1)[1].split("\n", 1)[0]
                 self.assertNotIn(path, explicit_add)
         self.assertIn(
             "git restore --source=HEAD --staged --worktree -- data/selection_candidates.json data/selection_gate.json data/selection_gate_selected.json",
