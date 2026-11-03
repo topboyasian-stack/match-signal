@@ -2,8 +2,11 @@
 """Regression tests for preserving exact two-sided SportyBet quotes in Desk candidates."""
 from __future__ import annotations
 
+import json
 import sys
+import tempfile
 import unittest
+from unittest import mock
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -41,6 +44,59 @@ def base_row(**overrides):
 
 
 class SelectionCandidateQuotePreservationTests(unittest.TestCase):
+    def test_duplicate_event_prefers_newest_sportybet_snapshot(self):
+        now = datetime.now(timezone.utc)
+        start = (now + timedelta(hours=2)).isoformat()
+        old_quote = (now - timedelta(hours=1)).isoformat()
+        fresh_quote = (now - timedelta(minutes=2)).isoformat()
+        old_row = base_row(
+            sport="tennis",
+            product=None,
+            start_time=start,
+            market="winner",
+            line=None,
+            pick="p1",
+            probability=0.7933,
+            bookmaker_odds=1.39,
+            sportybet_odds_market="winner",
+            sportybet_odds_line=None,
+            sportybet_odds_side="p1",
+            sportybet_winner_odds={"p1": 1.39, "draw": None, "p2": 3.15},
+            sportybet_over_odds=None,
+            sportybet_under_odds=None,
+            market_odds_timestamp=old_quote,
+        )
+        fresh_row = dict(old_row)
+        fresh_row.update({
+            "bookmaker_odds": 1.45,
+            "sportybet_winner_odds": {"p1": 1.45, "draw": None, "p2": 2.95},
+            "market_odds_timestamp": fresh_quote,
+        })
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            unified_path = root / "unified_upcoming.json"
+            predictions_path = root / "predictions.json"
+            output_path = root / "selection_candidates.json"
+            status_path = root / "selection_candidate_status.json"
+            unified_path.write_text(json.dumps({"events": [old_row]}), encoding="utf-8")
+            predictions_path.write_text(json.dumps([fresh_row]), encoding="utf-8")
+
+            with (
+                mock.patch.object(collector, "UNIFIED", unified_path),
+                mock.patch.object(collector, "PREDICTIONS", predictions_path),
+                mock.patch.object(collector, "OUT", output_path),
+                mock.patch.object(collector, "STATUS_OUT", status_path),
+            ):
+                collector.main()
+
+            rows = json.loads(output_path.read_text(encoding="utf-8"))
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0]["market_odds_timestamp"], fresh_quote)
+            self.assertEqual(rows[0]["bookmaker_odds"], 1.45)
+            self.assertEqual(rows[0]["sportybet_winner_odds"]["p1"], 1.45)
+
+
     def test_preserves_participant_history_freshness_into_candidate_pool(self):
         row = base_row()
         row.update({
