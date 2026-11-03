@@ -124,7 +124,7 @@ def _team_key(value):
     text = "".join(ch for ch in text if not unicodedata.combining(ch)).lower()
     text = text.replace("&", " and ")
     text = re.sub(r"[^a-z0-9]+", " ", text)
-    ignored = {"fc", "afc", "cf", "sc", "club", "the", "ac", "as", "vfb", "vfl", "sk", "cp"}
+    ignored = {"fc", "afc", "cf", "sc", "club", "the", "ac", "as", "vfb", "vfl", "sk", "cp", "fk", "istanbul", "1907"}
     text = " ".join(token for token in text.split() if token not in ignored)
     aliases = {
         "internazionale": "inter",
@@ -149,6 +149,9 @@ def _team_key(value):
         "barcelona": "barcelona",
         "man utd": "manchester united",
         "manchester utd": "manchester united",
+        "man city": "manchester city",
+        "racing de lens": "lens",
+        "galatasaray istanbul": "galatasaray",
     }
     return aliases.get(text, text)
 

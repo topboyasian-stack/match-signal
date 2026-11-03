@@ -160,7 +160,7 @@ def main():
     )
     print(json.dumps({
         "status": "ok",
-        "date_range": date_range,
+        "refresh_policy": "365-day backfill for each newly added competition; 14-day incremental refresh for populated competitions",
         "lookback_days_by_league": lookback_days_by_league,
         "date_ranges_by_league": date_ranges_by_league,
         "matches": len(history),
