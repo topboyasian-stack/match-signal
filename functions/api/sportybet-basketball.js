@@ -34,11 +34,14 @@ export async function onRequestGet(context){
     {path:'/api/ng/factsCenter/pcUpcomingEvents',marketId:'225'},
     {path:'/api/ng/factsCenter/wapConfigurableUpcomingEvents',marketId:null}
   ];
+  let attempts=[];
   try{
     const origins=[ORIGIN,'https://www.sportybet.com'];
-    const attempts=await Promise.all(requests.map(async request=>{
+    attempts=await Promise.all(requests.map(async request=>{
       const errors=[];
+      const diagnostics=[];
       for(const origin of origins){
+        let diagnostic=null;
         try{
           const url=new URL(origin+request.path);
           const params={sportId:'sr:sport:2',pageSize:String(pageSize),pageNum:String(pageNum),todayGames:'false',timeline:String(timeline),_t:String(Date.now())};
@@ -52,16 +55,47 @@ export async function onRequestGet(context){
           const body=await r.text();
           if(!r.ok)throw new Error('HTTP '+r.status+' '+body.slice(0,160));
           let payload;try{payload=JSON.parse(body)}catch(_){throw new Error('returned non-JSON data')}
+          const tournaments=getTournaments(payload);
+          const data=payload?.data&&typeof payload.data==='object'?payload.data:{};
+          const rawTotal=data.totalNum??data.totalEvents??data.totalCount??payload?.totalNum??null;
+          const parsedTotal=rawTotal===null?null:Number(rawTotal);
+          const count=tournaments.reduce((n,t)=>n+(Array.isArray(t?.events)?t.events.length:0),0);
+          diagnostic={
+            endpoint:request.path,
+            market_id:request.marketId||null,
+            page_num:pageNum,
+            page_size:pageSize,
+            timeline_hours:timeline,
+            source_origin:origin,
+            http_status:r.status,
+            biz_code:payload?.bizCode??null,
+            top_level_keys:Object.keys(payload||{}).slice(0,12),
+            data_keys:Object.keys(data).slice(0,12),
+            upstream_total_events:Number.isFinite(parsedTotal)?parsedTotal:null,
+            tournament_count:tournaments.length,
+            event_count:count,
+            response_shape:tournaments.length?'TOURNAMENTS_PRESENT':'TOURNAMENTS_MISSING'
+          };
+          diagnostics.push(diagnostic);
           if(payload?.bizCode!==undefined&&payload.bizCode!==10000)throw new Error('bizCode '+payload.bizCode);
           if(payload?.ok===false)throw new Error(String(payload?.detail||payload?.error||'source rejected query'));
-          const count=getTournaments(payload).reduce((n,t)=>n+(Array.isArray(t?.events)?t.events.length:0),0);
-          if(!getTournaments(payload).length)throw new Error('response omitted data.tournaments');
-          return {request,payload,error:null,event_count:count,source_origin:origin};
+          if(!tournaments.length)throw new Error('response omitted data.tournaments; metadata='+JSON.stringify(diagnostic));
+          return {request,payload,error:null,event_count:count,source_origin:origin,diagnostics};
         }catch(error){
-          errors.push(origin+': '+String(error?.message||error));
+          const message=String(error?.message||error);
+          if(!diagnostic)diagnostics.push({
+            endpoint:request.path,
+            market_id:request.marketId||null,
+            page_num:pageNum,
+            page_size:pageSize,
+            timeline_hours:timeline,
+            source_origin:origin,
+            request_error:message
+          });
+          errors.push(origin+': '+message);
         }
       }
-      return {request,payload:null,error:errors.join(' || '),event_count:0};
+      return {request,payload:null,error:errors.join(' || '),event_count:0,diagnostics};
     }));
     const eventMap=new Map();
     for(const attempt of attempts){
@@ -101,9 +135,10 @@ export async function onRequestGet(context){
       source_origins:Array.from(new Set(attempts.filter(a=>a.payload).map(a=>a.source_origin))),
       market_contract:{winner_including_overtime:'219',handicap_including_overtime:'223',total_including_overtime:'225',team_total_points:['227','228']},
       fetched_at:new Date().toISOString(),elapsed_ms:Date.now()-started,event_count:events.length,
-      total_market_event_count:totalMarketEvents,source_errors:sourceErrors,events
+      total_market_event_count:totalMarketEvents,source_errors:sourceErrors,
+      source_diagnostics:attempts.flatMap(a=>a.diagnostics||[]),events
     }),{status:200,headers:headers()});
   }catch(error){
-    return new Response(JSON.stringify({ok:false,source:'SportyBet Nigeria',error:String(error?.message||error),fetched_at:new Date().toISOString(),event_count:0,total_market_event_count:0,events:[]}),{status:200,headers:{...headers(),'Cache-Control':'no-store'}});
+    return new Response(JSON.stringify({ok:false,source:'SportyBet Nigeria',error:String(error?.message||error),fetched_at:new Date().toISOString(),event_count:0,total_market_event_count:0,source_diagnostics:attempts.flatMap(a=>a.diagnostics||[]),events:[]}),{status:200,headers:{...headers(),'Cache-Control':'no-store'}});
   }
 }
