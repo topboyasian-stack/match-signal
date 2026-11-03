@@ -56,6 +56,7 @@ export async function onRequestGet(context){
           if(!r.ok)throw new Error('HTTP '+r.status+' '+body.slice(0,160));
           let payload;try{payload=JSON.parse(body)}catch(_){throw new Error('returned non-JSON data')}
           const tournaments=getTournaments(payload);
+          const tournamentArrayPresent=Array.isArray(payload?.data?.tournaments);
           const data=payload?.data&&typeof payload.data==='object'?payload.data:{};
           const rawTotal=data.totalNum??data.totalEvents??data.totalCount??payload?.totalNum??null;
           const parsedTotal=rawTotal===null?null:Number(rawTotal);
@@ -74,12 +75,12 @@ export async function onRequestGet(context){
             upstream_total_events:Number.isFinite(parsedTotal)?parsedTotal:null,
             tournament_count:tournaments.length,
             event_count:count,
-            response_shape:tournaments.length?'TOURNAMENTS_PRESENT':'TOURNAMENTS_MISSING'
+            response_shape:!tournamentArrayPresent?'TOURNAMENTS_FIELD_MISSING':tournaments.length?'TOURNAMENTS_PRESENT':'TOURNAMENTS_ARRAY_EMPTY'
           };
           diagnostics.push(diagnostic);
           if(payload?.bizCode!==undefined&&payload.bizCode!==10000)throw new Error('bizCode '+payload.bizCode);
           if(payload?.ok===false)throw new Error(String(payload?.detail||payload?.error||'source rejected query'));
-          if(!tournaments.length)throw new Error('response omitted data.tournaments; metadata='+JSON.stringify(diagnostic));
+          if(!tournamentArrayPresent)throw new Error('response omitted data.tournaments; metadata='+JSON.stringify(diagnostic));
           return {request,payload,error:null,event_count:count,source_origin:origin,diagnostics};
         }catch(error){
           const message=String(error?.message||error);
@@ -126,9 +127,10 @@ export async function onRequestGet(context){
     const events=Array.from(eventMap.values());
     const totalMarketEvents=events.filter(e=>e.markets.some(m=>String(m.id)==='225')).length;
     const sourceErrors=attempts.filter(a=>a.error).map(a=>a.error);
-    if(!events.length){
+    const hasValidTournamentArray=attempts.some(a=>a.payload&&Array.isArray(a.payload?.data?.tournaments));
+    if(!events.length&&!hasValidTournamentArray){
       const attemptsSummary=attempts.map(a=>a.request.path+' marketId='+(a.request.marketId||'default')+': '+(a.error||('events='+a.event_count))).join('; ');
-      throw new Error('SportyBet NBA feed returned no events. '+attemptsSummary);
+      throw new Error('SportyBet NBA feed returned no usable event-list response. '+attemptsSummary);
     }
     return new Response(JSON.stringify({
       ok:true,source:'SportyBet Nigeria',
