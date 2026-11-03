@@ -77,9 +77,23 @@ def clean_history(rows):
         if not stamp or not forecast_stamp or not home or not away or hs is None or aws is None or hs < 0 or aws < 0:
             continue
         event_id = str(row.get("event_id") or f"{stamp.isoformat()}|{home}|{away}")
+        source = str(row.get("source") or "")
+        if source == "nba_data_v2_team_game_logs":
+            # Team-game logs expose a local game date, not a reliable tip time.
+            # For prior-history grouping, every record from that local date must
+            # be held until the whole date batch is forecast. Keep the separate
+            # forecast_timestamp untouched for frozen-cutoff classification.
+            local_date = stamp.astimezone(ZoneInfo("America/New_York")).date()
+            group_start = datetime.combine(
+                local_date, time.min, tzinfo=ZoneInfo("America/New_York")
+            ).astimezone(timezone.utc)
+        else:
+            group_start = forecast_stamp
         clean_row = {
             "event_id": event_id, "date": stamp.isoformat(),
             "forecast_timestamp": forecast_stamp.isoformat(),
+            "forecast_group_timestamp": group_start.isoformat(),
+            "source": source,
             "home": home, "away": away,
             "home_score": hs, "away_score": aws,
         }
@@ -89,25 +103,42 @@ def clean_history(rows):
         ):
             clean_row[key] = finite_number(row.get(key))
         clean[event_id] = clean_row
-    return sorted(clean.values(), key=lambda row: (row["date"], row["event_id"]))
+    return sorted(clean.values(), key=lambda row: (row["forecast_group_timestamp"], row["forecast_timestamp"], row["date"], row["event_id"]))
 
 
 def build_forecasts(history, min_prior_games=MIN_PRIOR_GAMES):
-    """Build expanding-window total components; every forecast uses only pre-tip games."""
+    """Build expanding-window totals; tied forecast timestamps share the same prior-only history."""
     rows = clean_history(history)
     prior = []
     forecasts = []
-    for game in rows:
-        tip = parse_time(game["date"])
+    position = 0
+    while position < len(rows):
+        timestamp_key = rows[position]["forecast_group_timestamp"]
+        tip = parse_time(timestamp_key)
+        group = []
+        while position < len(rows) and rows[position]["forecast_group_timestamp"] == timestamp_key:
+            group.append(rows[position])
+            position += 1
+
+        # Date-only NBA game logs are normalized to the end of the local game
+        # date, while their forecast timestamp is the earliest possible local
+        # tip. Treat all rows with that timestamp as one batch: no final score
+        # from the same uncertain date can leak into another game's projection.
         if len(prior) >= min_prior_games:
-            components = nba_total_components(game, prior)
-            base_total = finite_number(components.get("base_total"))
-            if base_total is not None:
+            for game in group:
+                components = nba_total_components(game, prior)
+                base_total = finite_number(components.get("base_total"))
+                if base_total is None:
+                    continue
                 cutoff = tip - timedelta(days=BASELINE_DAYS)
-                recent = [item for item in prior if cutoff <= parse_time(item["date"]) < tip]
+                recent = [
+                    item for item in prior
+                    if cutoff <= parse_time(item["date"]) < tip
+                ]
                 baseline_rows = recent or prior
                 baseline_total = sum(
-                    float(item["home_score"]) + float(item["away_score"]) for item in baseline_rows
+                    float(item["home_score"]) + float(item["away_score"])
+                    for item in baseline_rows
                 ) / len(baseline_rows)
                 forecasts.append({
                     "event_id": game["event_id"], "date": game["date"],
@@ -120,7 +151,11 @@ def build_forecasts(history, min_prior_games=MIN_PRIOR_GAMES):
                     "actual_total": float(game["home_score"]) + float(game["away_score"]),
                     "prior_games": len(prior),
                 })
-        prior.append(game)
+
+        # Add all games only after every projection in this timestamp group has
+        # been computed. All equal-time/ambiguous-time forecasts see identical
+        # history, including games supplied by date-only archives.
+        prior.extend(group)
     return forecasts
 
 def regression_metrics(rows, forecast_key):

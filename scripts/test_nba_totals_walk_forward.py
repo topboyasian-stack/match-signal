@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Offline regression tests for the NBA totals walk-forward evaluator."""
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from unittest.mock import patch
+import nba_totals_walk_forward as evaluator
 from nba_totals_walk_forward import (
     build_forecasts, clean_history, evaluate, market_metrics, publication_capture_metrics,
     verified_market_records, split_at_fixed_cutoff, market_record_audit,
@@ -28,6 +30,49 @@ def test_walk_forward_does_not_use_current_or_future_games():
     assert baseline[0]["event_id"] == with_future[0]["event_id"] == "g3"
     assert baseline[0]["model_total"] == with_future[0]["model_total"]
     assert baseline[0]["prior_games"] == 2
+
+
+
+def test_same_date_games_share_a_prior_only_history_snapshot():
+    rows = []
+    base_day = datetime(2026, 1, 1, 12, tzinfo=timezone.utc)
+    for i in range(40):
+        day = base_day + timedelta(days=i)
+        rows.append({
+            "event_id": f"prior-{i}",
+            "date": day.isoformat(),
+            "home": f"Home{i}", "away": f"Away{i}",
+            "home_score": 100 + i % 8, "away_score": 95 + i % 7,
+        })
+    # Team-game logs contain the same end-of-day stamp for every game on a
+    # local date. Their conservative evaluation timestamps therefore tie.
+    same_day_date = "2026-02-11T04:59:59.999999+00:00"
+    rows.extend([
+        {"event_id":"same-day-a","date":same_day_date,"source":"nba_data_v2_team_game_logs",
+         "home":"A","away":"B","home_score":250,"away_score":240},
+        {"event_id":"same-day-b","date":same_day_date,"source":"nba_data_v2_team_game_logs",
+         "home":"C","away":"D","home_score":80,"away_score":75},
+    ])
+    observed_prior = {}
+    def capture_components(game_row, prior_rows):
+        observed_prior[game_row["event_id"]] = [row["event_id"] for row in prior_rows]
+        return {"base_total": 220.0, "pace_total": None, "pace_available": False}
+
+    with patch.object(evaluator, "nba_total_components", side_effect=capture_components):
+        forecasts = evaluator.build_forecasts(rows, min_prior_games=40)
+
+    same_day_forecasts = {
+        row["event_id"]: row for row in forecasts
+        if row["event_id"] in {"same-day-a", "same-day-b"}
+    }
+    assert set(same_day_forecasts) == {"same-day-a", "same-day-b"}
+    assert same_day_forecasts["same-day-a"]["prior_games"] == 40
+    assert same_day_forecasts["same-day-b"]["prior_games"] == 40
+    assert observed_prior["same-day-a"] == observed_prior["same-day-b"]
+    assert "same-day-a" not in observed_prior["same-day-a"]
+    assert "same-day-b" not in observed_prior["same-day-a"]
+    assert "same-day-a" not in observed_prior["same-day-b"]
+    assert "same-day-b" not in observed_prior["same-day-b"]
 
 
 
@@ -59,6 +104,11 @@ def test_date_only_nba_game_dates_cannot_cross_the_frozen_cutoff():
         },
     ]
     cleaned = clean_history(rows)
+    cleaned_by_id = {row["event_id"]: row for row in cleaned}
+    assert (
+        cleaned_by_id["nba-date-only-before-cutoff"]["forecast_group_timestamp"]
+        == cleaned_by_id["nba-exact-start-after-cutoff"]["forecast_group_timestamp"]
+    ), "same uncertain local game date must share prior-history grouping"
     development, holdout = split_at_fixed_cutoff(cleaned, "forecast_timestamp")
     assert [row["event_id"] for row in development] == ["nba-date-only-before-cutoff"]
     assert {row["event_id"] for row in holdout} == {
@@ -293,10 +343,11 @@ def test_evaluator_never_promotes_without_market_holdout():
 
 if __name__ == "__main__":
     test_walk_forward_does_not_use_current_or_future_games()
+    test_same_date_games_share_a_prior_only_history_snapshot()
     test_evaluator_uses_the_same_frozen_v51_parameters_as_live_model()
     test_market_evidence_rejects_unverified_and_old_model_records()
     test_publication_capture_is_separate_from_settlement_and_roi()
     test_capture_status_is_partial_until_every_v5_forecast_has_a_frozen_price_pair()
     test_fixed_holdout_cutoff_unique_fixture_and_market_audit()
     test_evaluator_never_promotes_without_market_holdout()
-    print("NBA totals walk-forward regression tests: PASS (6 groups)")
+    print("NBA totals walk-forward regression tests: PASS (8 groups)")
