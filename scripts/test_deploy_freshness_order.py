@@ -62,6 +62,17 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn("basketball-live.js", paths)
         self.assertIn("basketball.html", paths)
 
+    def test_single_selection_gate_regression_files_are_allowed_with_safe_ui_promotion(self):
+        match = re.search(r"allowed='([^']+)'", PAGES_WORKFLOW)
+        self.assertIsNotNone(match, "Pages direct-promotion guard must expose its explicit allowlist")
+        for path in (
+            ".github/workflows/single-selection-gate-regression.yml",
+            "scripts/test_selection_gate_contract.py",
+            "scripts/test_single_selection_gate_bridge.mjs",
+        ):
+            with self.subTest(path=path):
+                self.assertIn("|" + path + "|", match.group(1))
+
     def test_virtual_qualified_rows_wait_for_the_next_60_minute_window(self):
         upcoming = runpy.run_path(str(ROOT / "scripts" / "unified_upcoming.py"))
         gate = upcoming["apply_virtual_kickoff_window_gate"]
