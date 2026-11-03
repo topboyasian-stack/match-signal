@@ -11,8 +11,9 @@ from __future__ import annotations
 import json
 import math
 import random
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, time, timedelta, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from expansion_pipeline import (NBA_TOTALS_MODEL_VERSION, NBA_TOTALS_PACE_BLEND_WEIGHT, NBA_TOTALS_BIAS_CORRECTION, nba_total_components, dt as parse_time)
 
@@ -40,19 +41,46 @@ def finite_number(value):
         return None
 
 
+def forecast_evaluation_timestamp(row):
+    """Return a conservative timestamp for frozen-cutoff forecast classification.
+
+    The NBA team-game-log source exposes a local game_date, not a tip timestamp.
+    Its normalized date is intentionally the end of that Eastern calendar day
+    to prevent same-day score leakage. That end-of-day value must not be used to
+    decide whether a forecast was prospective: when a local game date spans the
+    frozen cutoff, classify it as development unless an exact start time exists.
+    """
+    exact_start = parse_time(row.get("start_time") or row.get("forecast_timestamp"))
+    if exact_start is not None:
+        return exact_start
+    stamp = parse_time(row.get("date"))
+    if stamp is None:
+        return None
+    if str(row.get("source") or "") == "nba_data_v2_team_game_logs":
+        local_date = stamp.astimezone(ZoneInfo("America/New_York")).date()
+        earliest_possible_tip = datetime.combine(
+            local_date, time.min, tzinfo=ZoneInfo("America/New_York")
+        )
+        return earliest_possible_tip.astimezone(timezone.utc)
+    return stamp
+
+
 def clean_history(rows):
     clean = {}
     for row in rows if isinstance(rows, list) else []:
         if not isinstance(row, dict):
             continue
         stamp = parse_time(row.get("date"))
+        forecast_stamp = forecast_evaluation_timestamp(row)
         home, away = str(row.get("home") or "").strip(), str(row.get("away") or "").strip()
         hs, aws = finite_number(row.get("home_score")), finite_number(row.get("away_score"))
-        if not stamp or not home or not away or hs is None or aws is None or hs < 0 or aws < 0:
+        if not stamp or not forecast_stamp or not home or not away or hs is None or aws is None or hs < 0 or aws < 0:
             continue
         event_id = str(row.get("event_id") or f"{stamp.isoformat()}|{home}|{away}")
         clean_row = {
-            "event_id": event_id, "date": stamp.isoformat(), "home": home, "away": away,
+            "event_id": event_id, "date": stamp.isoformat(),
+            "forecast_timestamp": forecast_stamp.isoformat(),
+            "home": home, "away": away,
             "home_score": hs, "away_score": aws,
         }
         for key in (
@@ -83,6 +111,7 @@ def build_forecasts(history, min_prior_games=MIN_PRIOR_GAMES):
                 ) / len(baseline_rows)
                 forecasts.append({
                     "event_id": game["event_id"], "date": game["date"],
+                    "forecast_timestamp": game["forecast_timestamp"],
                     "base_total": base_total,
                     "pace_total": finite_number(components.get("pace_total")),
                     "pace_available": components.get("pace_available") is True,
@@ -433,7 +462,9 @@ def _blend_total(row, weight):
 
 def evaluate(history, ledger, snapshots=None, predictions=None, as_of=None):
     forecasts = build_forecasts(history)
-    development, holdout = split_at_fixed_cutoff(forecasts, "date")
+    # Use a conservative forecast-time field, not the source's end-of-game-day
+    # normalization, which can move pre-cutoff games across the frozen boundary.
+    development, holdout = split_at_fixed_cutoff(forecasts, "forecast_timestamp")
 
     # v5.1 is a frozen model specification shared with live publication and
     # residual-probability calibration. Re-fitting these parameters on the full
@@ -490,9 +521,10 @@ def evaluate(history, ledger, snapshots=None, predictions=None, as_of=None):
         "history_games": len(clean_history(history)),
         "holdout_protocol": {
             "fixed_cutoff_utc": EVALUATION_CUTOFF_UTC.isoformat(),
-            "forecast_timestamp_field": "date",
+            "forecast_timestamp_field": "forecast_timestamp",
             "market_timestamp_field": "published_at",
             "rule": "Records before the fixed cutoff are development; records at or after it are prospective holdout. The cutoff never rolls forward.",
+            "date_only_source_rule": "For NBA team-game-log rows without an exact tip timestamp, use the earliest possible tip time at local midnight America/New_York for cutoff classification; a game date that could include pre-cutoff games is conservatively kept in development.",
             "market_sample_unit": "one verified settled record per unique ESPN fixture ID",
         },
         "walk_forward": {
