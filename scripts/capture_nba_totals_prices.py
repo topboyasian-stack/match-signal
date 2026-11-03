@@ -29,12 +29,13 @@ STATUS = DATA / "nba_totals_price_capture_status.json"
 NBA_TOURNAMENT_ID = "sr:tournament:132"
 
 
-def sportybet_basketball_feed_paged(max_pages=5):
-    """Read up to five seven-day SportyBet pages and merge events without duplicates."""
+def sportybet_basketball_feed_paged(max_pages=25):
+    """Read up to 25 seven-day SportyBet pages, merging duplicate event IDs."""
     url = "https://match-signal.pages.dev/api/sportybet-basketball"
     events_by_id = {}
     page_errors = []
-    for page in range(1, max(1, int(max_pages)) + 1):
+    # Guard the request count even if a caller passes an unexpectedly large value.
+    for page in range(1, min(25, max(1, int(max_pages))) + 1):
         try:
             response = S.get(
                 url,
@@ -85,9 +86,10 @@ def sportybet_basketball_feed_paged(max_pages=5):
                     market_map[key] = market
             current["markets"] = list(market_map.values())
 
-        # A short page is the provider's end marker. If pageNum is ignored or
-        # returns a repeated page, stop instead of wasting more feed requests.
-        if len(page_events) < 100 or new_ids == 0:
+        # Do not treat a short page as the end: the proxy/upstream can return
+        # fewer than pageSize events while still exposing later pages. Continue
+        # until the page is empty or pageNum repeats only previously seen IDs.
+        if not page_events or new_ids == 0:
             break
 
     if not events_by_id:
