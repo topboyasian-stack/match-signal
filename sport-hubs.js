@@ -82,10 +82,13 @@ function attachSingleSelectionMarketEvidence(row, gate, candidate){
   // candidate artifact. Use the newest timestamp among exact identity-matched
   // sources so an old candidate snapshot cannot overwrite a fresher gate quote.
   const quoteTime=source=>{
-    const raw=source?.market_odds_timestamp||source?.odds_timestamp||
-      source?.market_insights?.snapshot_at||source?.sportybet_market?.fetched_at;
-    const parsed=Date.parse(String(raw||""));
-    return Number.isFinite(parsed)?parsed:-Infinity;
+    const timestamps=[
+      source?.market_odds_timestamp,
+      source?.odds_timestamp,
+      source?.market_insights?.snapshot_at,
+      source?.sportybet_market?.fetched_at
+    ].map(raw=>Date.parse(String(raw||""))).filter(Number.isFinite);
+    return timestamps.length?Math.max(...timestamps):-Infinity;
   };
   const candidateTime=quoteTime(candidate),gateTime=quoteTime(gate),rowTime=quoteTime(row);
   const gateIsFresher=gateTime>candidateTime;
