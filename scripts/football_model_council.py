@@ -229,8 +229,8 @@ def build():
     payload = {
         "updated_at": datetime.now(timezone.utc).isoformat(),
         "mode": "PAPER_RESEARCH_ONLY",
-        "model_version": "FOOTBALL-STAT-COUNCIL-V1",
-        "method": "venue-aware recency-weighted team attack/defence + league scoring baseline + Poisson/Dixon-Coles",
+        "model_version": "FOOTBALL-STAT-COUNCIL-V2-DUAL-COMPETITION",
+        "method": "competition-specific domestic form plus separately normalized Champions League form, venue-aware Poisson/Dixon-Coles",
         "market_independent": True,
         "production_pick_unchanged": True,
         "builder_eligibility_unchanged": True,

@@ -7,7 +7,7 @@ from value_decision import edge_and_ev, decision
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
-MODEL_VERSION = "4.4-venue-aware-dixon-coles"
+MODEL_VERSION = "4.5-ucl-dual-competition"
 
 
 def load(path, default):
@@ -178,6 +178,18 @@ def main():
                 row["decision"] = "PAPER ONLY"
                 row["decision_reason"] = "no_contemporaneous_market_data"
 
+            if str(row.get("league") or "").strip().lower() == "champions league":
+                form_status = independent.get("competition_form_status") or "PARTIAL_HISTORY"
+                row["ucl_form_gate"] = {
+                    "eligible": form_status == "COMPLETE",
+                    "status": form_status,
+                    "reason": None if form_status == "COMPLETE" else "domestic_or_champions_league_venue_history_incomplete",
+                }
+                if form_status != "COMPLETE":
+                    row["decision"] = "PAPER ONLY"
+                    row["decision_reason"] = "ucl_dual_competition_history_incomplete"
+            row["competition_form"] = independent.get("competition_form")
+            row["competition_form_status"] = independent.get("competition_form_status")
             row["independent_diagnostics"] = {
                 "sample_home": independent.get("sample_home", 0),
                 "sample_away": independent.get("sample_away", 0),
@@ -195,6 +207,8 @@ def main():
                 "league_home_xg": independent.get("league_home_xg"),
                 "league_away_xg": independent.get("league_away_xg"),
                 "market_available": bool(market),
+                "competition_form_status": independent.get("competition_form_status"),
+                "competition_form": independent.get("competition_form"),
             }
             upgraded += 1
         except Exception as exc:
