@@ -28,10 +28,12 @@ try {
   let fetchCount = 0;
   let lastUrl = null;
   let lastOptions = null;
+  let seenUrls = [];
   globalThis.fetch = async (input, options = {}) => {
     fetchCount += 1;
     lastUrl = new URL(String(input));
     lastOptions = options;
+    seenUrls.push(lastUrl);
     return new Response(JSON.stringify(jsonPayload), {
       status: 200,
       headers: { "Content-Type": "application/json; charset=utf-8" }
@@ -123,6 +125,33 @@ try {
   assert.deepEqual(diagnostics.probes.map(item => item.event_count), [1, 1]);
   assert.equal(fetchCount, 2, "the probe must perform only two bounded requests");
 
+  fetchCount = 0;
+  seenUrls = [];
+  const nbaQueryDiagnostic = await worker.fetch(new Request("https://worker.test/__nba-diagnostics"));
+  const nbaQueryDiagnosticBody = await nbaQueryDiagnostic.json();
+  assert.equal(nbaQueryDiagnostic.status, 200);
+  assert.equal(nbaQueryDiagnosticBody.ok, true);
+  assert.equal(nbaQueryDiagnosticBody.diagnostic, "sportybet-nba-query-variants-v1");
+  assert.equal(nbaQueryDiagnosticBody.probes.length, 4);
+  assert.deepEqual(nbaQueryDiagnosticBody.probes.map(item => item.variant), [
+    "timeline168_with_nba_tournament",
+    "timeline168_without_tournament_filter",
+    "timeline720_with_nba_tournament",
+    "timeline720_without_tournament_filter"
+  ]);
+  assert.deepEqual(nbaQueryDiagnosticBody.probes.map(item => item.query.timeline), [168, 168, 720, 720]);
+  assert.deepEqual(nbaQueryDiagnosticBody.probes.map(item => item.query.tournament_id), [
+    "sr:tournament:132", null, "sr:tournament:132", null
+  ]);
+  assert.deepEqual(nbaQueryDiagnosticBody.probes.map(item => item.query.market_id), ["225", "225", "225", "225"]);
+  assert.ok(nbaQueryDiagnosticBody.probes.every(item => item.status === 200 && item.is_json));
+  assert.equal(fetchCount, 4, "NBA diagnostic route must make exactly four bounded upstream probes");
+  assert.deepEqual(seenUrls.map(requestUrl => Number(requestUrl.searchParams.get("timeline"))), [168, 168, 720, 720]);
+  assert.deepEqual(seenUrls.map(requestUrl => requestUrl.searchParams.get("tournamentId")), [
+    "sr:tournament:132", null, "sr:tournament:132", null
+  ]);
+  assert.ok(nbaQueryDiagnosticBody.probes.every(item => item.data_keys.includes("tournaments")));
+  assert.ok(nbaQueryDiagnosticBody.probes.every(item => item.response_shape === "TOURNAMENTS_PRESENT"));
 
   fetchCount = 0;
   const shareSelections = [
