@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-03T02:25:13.679600+00:00",
+  "generated_at": "2026-11-03T02:45:15.876136+00:00",
   "paper_only": true,
   "experiment": "NBA_TOTALS_EMPIRICAL_RESIDUAL_VALUE_V3",
   "model_version": "nba-total-v5.1-pace-efficiency-calibrated",
@@ -186,62 +186,184 @@
     "probability_edge_threshold": 0.04,
     "expected_value_threshold": 0.03
   },
-  "settled_v5_market_audit": [],
-  "settled_v5_market_count": 0,
+  "settled_v5_market_audit": [
+    {
+      "event_id": "401909907",
+      "matchup": "Cleveland Cavaliers vs Oklahoma City Thunder",
+      "published_at": "2026-11-02T05:09:07.155311+00:00",
+      "settled_result": "over",
+      "won_by_original_point_edge_pick": false,
+      "research_value_signal_outcome": "NOT_A_SIGNAL",
+      "forecast_total": 224.5326,
+      "sportybet_line": 228.5,
+      "over_odds": 1.91,
+      "under_odds": 1.9,
+      "model_probability": {
+        "over": 0.4605,
+        "under": 0.5395,
+        "push": 0.0
+      },
+      "market_no_vig_probability": {
+        "over": 0.4987,
+        "under": 0.5013
+      },
+      "model_probability_conditional_on_no_push": {
+        "over": 0.4605,
+        "under": 0.5395
+      },
+      "model_probability_edge": {
+        "over": -0.0382,
+        "under": 0.0382
+      },
+      "expected_value_per_unit": {
+        "over": -0.1205,
+        "under": 0.0251
+      },
+      "bootstrap_95_lower_bound": {
+        "over_probability_edge": -0.0932,
+        "under_probability_edge": -0.0169,
+        "over_expected_value": -0.2255,
+        "under_expected_value": -0.0795,
+        "method": "deterministic paired empirical-residual bootstrap; 4,000 resamples"
+      },
+      "calibration_check": "PASS",
+      "decision": "NO BET",
+      "decision_is_authorized_for_betting": false
+    }
+  ],
+  "settled_v5_market_count": 1,
   "settled_v5_clv_diagnostics": {
     "definition": "Opening immutable v5.1 publication quote vs latest captured exact SportyBet market-225 pregame quote; near-close counts only if quote was observed within 45 minutes of tip. This is not an official bookmaker close.",
     "close_window_minutes": 45,
-    "settled_v5_fixtures_audited": 0,
+    "settled_v5_fixtures_audited": 1,
     "near_close_observations": 0,
     "positive_probability_clv_n": 0,
     "positive_line_clv_n": 0,
     "mean_probability_clv": null,
     "mean_line_clv_points": null,
-    "fixtures": [],
+    "fixtures": [
+      {
+        "event_id": "401909907",
+        "matchup": "Cleveland Cavaliers vs Oklahoma City Thunder",
+        "selected_side": "UNDER",
+        "clv_status": "LATER_PREGAME_CAPTURE_OUTSIDE_CLOSE_WINDOW",
+        "opening": {
+          "snapshot_id": "nba-total-pub:a79b41ca2dc779c9135c3065",
+          "quote_timestamp": "2026-11-02T05:09:06.621000+00:00",
+          "line": 228.5,
+          "over_odds": 1.91,
+          "under_odds": 1.9,
+          "selected_side_no_vig_probability": 0.501312
+        },
+        "latest_pregame": {
+          "snapshot_id": "nba-total-pub:ceea96365f9cfff49f7e9823",
+          "quote_timestamp": "2026-11-02T22:51:52.697000+00:00",
+          "minutes_before_start": 68.122,
+          "line": 229.5,
+          "over_odds": 1.96,
+          "under_odds": 1.89,
+          "selected_side_no_vig_probability": 0.509091
+        },
+        "selected_side_no_vig_probability_clv": 0.007779,
+        "selected_side_line_clv_points": 1.0,
+        "positive_probability_clv": true,
+        "positive_line_clv": true,
+        "is_official_bookmaker_close": false
+      }
+    ],
     "sample_is_sufficient_for_release": false
   },
   "settled_v5_probability_score_summary": {
-    "n": 0,
-    "model_brier": null,
-    "market_no_vig_brier": null,
-    "model_log_loss": null,
-    "market_no_vig_log_loss": null,
-    "over_probability_buckets": [],
-    "sufficient_for_probability_validation": false
+    "n": 1,
+    "pushes_excluded_from_binary_metrics": 0,
+    "model_brier": 0.29106,
+    "market_no_vig_brier": 0.251302,
+    "model_log_loss": 0.775442,
+    "market_no_vig_log_loss": 0.695751,
+    "over_probability_buckets": [
+      {
+        "range": "0.4-0.5",
+        "n": 1,
+        "mean_model_over_probability": 0.4605,
+        "observed_over_rate": 1.0
+      }
+    ],
+    "sufficient_for_probability_validation": false,
+    "minimum_descriptive_sample": 30,
+    "warning": "Descriptive only. This comparison is based on selected-v5.1 historical cohort and does not establish release readiness or betting value."
   },
   "prospective_pregame_snapshot_coverage": {
     "cutoff_utc": "2026-11-02T02:00:00+00:00",
     "snapshot_source": "data/nba_totals_publication_snapshots.json",
-    "prospective_v5_snapshot_records": 1309,
+    "prospective_v5_snapshot_records": 1318,
     "prospective_unique_fixtures_with_any_snapshot": 15,
-    "prospective_verified_fresh_market_225_snapshot_records": 1309,
+    "prospective_verified_fresh_market_225_snapshot_records": 1318,
     "prospective_unique_fixtures_with_verified_fresh_market_225_snapshot": 15,
-    "prospective_settled_unique_market_selections": 0,
-    "prospective_settled_selections_with_exact_snapshot_match": 0,
+    "prospective_settled_unique_market_selections": 1,
+    "prospective_settled_selections_with_exact_snapshot_match": 1,
     "prospective_settled_selections_missing_or_mismatched_snapshot": 0,
     "snapshot_linkage_failures": [],
     "target_unique_settled_probability_observations": 30,
     "snapshot_linked_sample_threshold_met": false
   },
   "prospective_probability_score_summary": {
-    "n": 0,
-    "model_brier": null,
-    "market_no_vig_brier": null,
-    "model_log_loss": null,
-    "market_no_vig_log_loss": null,
-    "over_probability_buckets": [],
-    "sufficient_for_probability_validation": false
+    "n": 1,
+    "pushes_excluded_from_binary_metrics": 0,
+    "model_brier": 0.29106,
+    "market_no_vig_brier": 0.251302,
+    "model_log_loss": 0.775442,
+    "market_no_vig_log_loss": 0.695751,
+    "over_probability_buckets": [
+      {
+        "range": "0.4-0.5",
+        "n": 1,
+        "mean_model_over_probability": 0.4605,
+        "observed_over_rate": 1.0
+      }
+    ],
+    "sufficient_for_probability_validation": false,
+    "minimum_descriptive_sample": 30,
+    "warning": "Descriptive only. This comparison is based on post-cutoff prospective cohort with exact linked pregame snapshots and does not establish release readiness or betting value."
   },
   "prospective_clv_diagnostics": {
     "definition": "Opening immutable v5.1 publication quote vs latest captured exact SportyBet market-225 pregame quote; near-close counts only if quote was observed within 45 minutes of tip. This is not an official bookmaker close.",
     "close_window_minutes": 45,
-    "settled_v5_fixtures_audited": 0,
+    "settled_v5_fixtures_audited": 1,
     "near_close_observations": 0,
     "positive_probability_clv_n": 0,
     "positive_line_clv_n": 0,
     "mean_probability_clv": null,
     "mean_line_clv_points": null,
-    "fixtures": [],
+    "fixtures": [
+      {
+        "event_id": "401909907",
+        "matchup": "Cleveland Cavaliers vs Oklahoma City Thunder",
+        "selected_side": "UNDER",
+        "clv_status": "LATER_PREGAME_CAPTURE_OUTSIDE_CLOSE_WINDOW",
+        "opening": {
+          "snapshot_id": "nba-total-pub:a79b41ca2dc779c9135c3065",
+          "quote_timestamp": "2026-11-02T05:09:06.621000+00:00",
+          "line": 228.5,
+          "over_odds": 1.91,
+          "under_odds": 1.9,
+          "selected_side_no_vig_probability": 0.501312
+        },
+        "latest_pregame": {
+          "snapshot_id": "nba-total-pub:ceea96365f9cfff49f7e9823",
+          "quote_timestamp": "2026-11-02T22:51:52.697000+00:00",
+          "minutes_before_start": 68.122,
+          "line": 229.5,
+          "over_odds": 1.96,
+          "under_odds": 1.89,
+          "selected_side_no_vig_probability": 0.509091
+        },
+        "selected_side_no_vig_probability_clv": 0.007779,
+        "selected_side_line_clv_points": 1.0,
+        "positive_probability_clv": true,
+        "positive_line_clv": true,
+        "is_official_bookmaker_close": false
+      }
+    ],
     "sample_is_sufficient_for_release": false,
     "cohort": "post-cutoff prospective v5.1 selections with exact immutable snapshot linkage",
     "positive_clv_release_check_passed": false
@@ -260,8 +382,8 @@
       "event_id": "401909919",
       "matchup": "Golden State Warriors vs Phoenix Suns",
       "start_time": "2026-11-03T03:00:00+00:00",
-      "quote_timestamp": "2026-11-03T02:24:04.811000+00:00",
-      "quote_age_minutes": 1.1478,
+      "quote_timestamp": "2026-11-03T02:44:18.743000+00:00",
+      "quote_age_minutes": 0.9522,
       "forecast_total": 233.4705,
       "sportybet_line": 227.5,
       "over_odds": 1.95,
@@ -302,38 +424,38 @@
       "event_id": "401909920",
       "matchup": "LA Clippers vs Toronto Raptors",
       "start_time": "2026-11-03T03:00:00+00:00",
-      "quote_timestamp": "2026-11-03T02:24:04.811000+00:00",
-      "quote_age_minutes": 1.1478,
+      "quote_timestamp": "2026-11-03T02:44:18.743000+00:00",
+      "quote_age_minutes": 0.9522,
       "forecast_total": 224.9567,
       "sportybet_line": 219.5,
-      "over_odds": 1.93,
-      "under_odds": 1.92,
+      "over_odds": 1.94,
+      "under_odds": 1.91,
       "model_probability": {
         "over": 0.6529,
         "under": 0.3471,
         "push": 0.0
       },
       "market_no_vig_probability": {
-        "over": 0.4987,
-        "under": 0.5013
+        "over": 0.4961,
+        "under": 0.5039
       },
       "model_probability_conditional_on_no_push": {
         "over": 0.6529,
         "under": 0.3471
       },
       "model_probability_edge": {
-        "over": 0.1542,
-        "under": -0.1542
+        "over": 0.1568,
+        "under": -0.1568
       },
       "expected_value_per_unit": {
-        "over": 0.2601,
-        "under": -0.3336
+        "over": 0.2667,
+        "under": -0.3371
       },
       "bootstrap_95_lower_bound": {
-        "over_probability_edge": 0.0992,
-        "under_probability_edge": -0.2092,
-        "over_expected_value": 0.154,
-        "under_expected_value": -0.4392,
+        "over_probability_edge": 0.1018,
+        "under_probability_edge": -0.2118,
+        "over_expected_value": 0.16,
+        "under_expected_value": -0.4421,
         "method": "deterministic paired empirical-residual bootstrap; 4,000 resamples"
       },
       "calibration_check": "PASS",
@@ -344,38 +466,38 @@
       "event_id": "401909921",
       "matchup": "Los Angeles Lakers vs Miami Heat",
       "start_time": "2026-11-03T03:00:00+00:00",
-      "quote_timestamp": "2026-11-03T02:24:04.811000+00:00",
-      "quote_age_minutes": 1.1478,
+      "quote_timestamp": "2026-11-03T02:44:18.743000+00:00",
+      "quote_age_minutes": 0.9522,
       "forecast_total": 237.3433,
-      "sportybet_line": 236.5,
-      "over_odds": 1.92,
-      "under_odds": 1.92,
+      "sportybet_line": 237.5,
+      "over_odds": 1.97,
+      "under_odds": 1.88,
       "model_probability": {
-        "over": 0.5636,
-        "under": 0.4364,
+        "over": 0.5533,
+        "under": 0.4467,
         "push": 0.0
       },
       "market_no_vig_probability": {
-        "over": 0.5,
-        "under": 0.5
+        "over": 0.4883,
+        "under": 0.5117
       },
       "model_probability_conditional_on_no_push": {
-        "over": 0.5636,
-        "under": 0.4364
+        "over": 0.5533,
+        "under": 0.4467
       },
       "model_probability_edge": {
-        "over": 0.0636,
-        "under": -0.0636
+        "over": 0.065,
+        "under": -0.065
       },
       "expected_value_per_unit": {
-        "over": 0.0821,
-        "under": -0.1621
+        "over": 0.0899,
+        "under": -0.1601
       },
       "bootstrap_95_lower_bound": {
-        "over_probability_edge": 0.0086,
-        "under_probability_edge": -0.1186,
-        "over_expected_value": -0.0235,
-        "under_expected_value": -0.2678,
+        "over_probability_edge": 0.0099,
+        "under_probability_edge": -0.12,
+        "over_expected_value": -0.0186,
+        "under_expected_value": -0.2637,
         "method": "deterministic paired empirical-residual bootstrap; 4,000 resamples"
       },
       "calibration_check": "PASS",
@@ -385,9 +507,9 @@
   ],
   "upcoming_value_diagnostics_count": 3,
   "upcoming_predictions_without_exact_fresh_pair": 47,
-  "prospective_settled_market_bets_after_cutoff": 0,
+  "prospective_settled_market_bets_after_cutoff": 1,
   "prospective_minimum_sample_reached": false,
-  "prospective_probability_scored_unique_fixtures": 0,
+  "prospective_probability_scored_unique_fixtures": 1,
   "prospective_probability_validation_sample_met": false,
   "live_value_decisions_authorized": false,
   "release_decision": "RESEARCH_ONLY",
