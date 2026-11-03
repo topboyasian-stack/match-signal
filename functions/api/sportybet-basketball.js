@@ -17,7 +17,28 @@ function normMarket(m){
     })).filter(o=>Number.isFinite(o.odds)&&o.odds>1&&o.active)
   };
 }
-function getTournaments(payload){return Array.isArray(payload?.data?.tournaments)?payload.data.tournaments:[]}
+function getEventTournamentId(event){
+  return String(event?.tournamentId??event?.tournament_id??event?.tournament?.id??event?.tournamentInfo?.id??event?.tournament?.tournamentId??'');
+}
+function eventTournamentName(event){
+  return String(event?.tournamentName??event?.tournament_name??event?.tournament?.name??event?.tournamentInfo?.name??'');
+}
+function getTournaments(payload){
+  if(Array.isArray(payload?.data?.tournaments))return payload.data.tournaments;
+  // WAP upcoming uses data:[event,...], not data.tournaments.
+  // Normalize only events carrying their own tournament identity so NBA filtering
+  // below still requires the exact upstream NBA tournament ID.
+  if(!Array.isArray(payload?.data))return [];
+  const grouped=new Map();
+  for(const event of payload.data){
+    if(!event||typeof event!=='object')continue;
+    const id=getEventTournamentId(event);
+    if(!id)continue;
+    if(!grouped.has(id))grouped.set(id,{id,name:eventTournamentName(event),events:[]});
+    grouped.get(id).events.push(event);
+  }
+  return Array.from(grouped.values());
+}
 export async function onRequestOptions(){return new Response(null,{status:204,headers:headers()})}
 export async function onRequestGet(context){
   const u=new URL(context.request.url);
@@ -58,6 +79,7 @@ export async function onRequestGet(context){
           let payload;try{payload=JSON.parse(body)}catch(_){throw new Error('returned non-JSON data')}
           const tournaments=getTournaments(payload);
           const tournamentArrayPresent=Array.isArray(payload?.data?.tournaments);
+          const flatEventArrayPresent=request.path==='/api/ng/factsCenter/wapConfigurableUpcomingEvents'&&Array.isArray(payload?.data);
           const data=payload?.data&&typeof payload.data==='object'?payload.data:{};
           const rawTotal=data.totalNum??data.totalEvents??data.totalCount??payload?.totalNum??null;
           const parsedTotal=rawTotal===null?null:Number(rawTotal);
@@ -72,20 +94,26 @@ export async function onRequestGet(context){
             http_status:r.status,
             biz_code:payload?.bizCode??null,
             top_level_keys:Object.keys(payload||{}).slice(0,12),
-            data_keys:Object.keys(data).slice(0,12),
+            data_keys:Array.isArray(data)?['[flat event array]']:Object.keys(data).slice(0,12),
             upstream_total_events:Number.isFinite(parsedTotal)?parsedTotal:null,
+            flat_event_array_length:Array.isArray(data)?data.length:null,
             tournament_count:tournaments.length,
             event_count:count,
-            response_shape:!tournamentArrayPresent?'TOURNAMENTS_FIELD_MISSING':tournaments.length?'TOURNAMENTS_PRESENT':'TOURNAMENTS_ARRAY_EMPTY'
+            response_shape:flatEventArrayPresent?(data.length?'FLAT_EVENTS_ARRAY':'FLAT_EVENTS_ARRAY_EMPTY'):!tournamentArrayPresent?'TOURNAMENTS_FIELD_MISSING':tournaments.length?'TOURNAMENTS_PRESENT':'TOURNAMENTS_ARRAY_EMPTY'
           };
-          const emptyPaginationPage=request.path==='/api/ng/factsCenter/pcUpcomingEvents'&&pageNum>1&&payload?.bizCode===10000&&payload?.data&&typeof payload.data==='object'&&!Array.isArray(payload.data)&&Object.keys(payload.data).length===0;
+          const emptyPaginationPage=pageNum>1&&payload?.bizCode===10000&&(
+            (request.path==='/api/ng/factsCenter/pcUpcomingEvents'&&payload?.data&&typeof payload.data==='object'&&!Array.isArray(payload.data)&&Object.keys(payload.data).length===0)||
+            (request.path==='/api/ng/factsCenter/wapConfigurableUpcomingEvents'&&Array.isArray(payload?.data)&&payload.data.length===0)
+          );
           if(emptyPaginationPage)diagnostic.response_shape='PAGINATION_END_EMPTY_DATA';
           diagnostics.push(diagnostic);
           if(payload?.bizCode!==undefined&&payload.bizCode!==10000)throw new Error('bizCode '+payload.bizCode);
           if(payload?.ok===false)throw new Error(String(payload?.detail||payload?.error||'source rejected query'));
-          if(!tournamentArrayPresent&&!emptyPaginationPage)throw new Error('response omitted data.tournaments; metadata='+JSON.stringify(diagnostic));
-          const usablePayload=emptyPaginationPage?{...payload,data:{tournaments:[]}}:payload;
-          return {request,payload:usablePayload,error:null,event_count:count,source_origin:origin,diagnostics};
+          if(!tournamentArrayPresent&&!flatEventArrayPresent&&!emptyPaginationPage)throw new Error('response omitted a recognized event list; metadata='+JSON.stringify(diagnostic));
+          const usablePayload=emptyPaginationPage
+            ?{...payload,data:request.path==='/api/ng/factsCenter/wapConfigurableUpcomingEvents'?[]:{tournaments:[]}}
+            :payload;
+          return {request,payload:usablePayload,error:null,event_count:count,diagnostics};
         }catch(error){
           const message=String(error?.message||error);
           if(!diagnostic)diagnostics.push({
@@ -106,7 +134,7 @@ export async function onRequestGet(context){
     for(const attempt of attempts){
       if(!attempt.payload)continue;
       for(const t of getTournaments(attempt.payload))for(const e of (Array.isArray(t?.events)?t.events:[])){
-        const eventTournamentId=String(t?.id??t?.tournamentId??e?.tournamentId??'');
+        const eventTournamentId=String(t?.id??t?.tournamentId??getEventTournamentId(e));
         if(eventTournamentId!==NBA_TOURNAMENT_ID)continue;
         const id=String(e?.eventId??e?.id??'');
         const start=Number(e?.estimateStartTime??e?.startTime??e?.start_time_ms);
@@ -133,8 +161,17 @@ export async function onRequestGet(context){
     const events=Array.from(eventMap.values());
     const totalMarketEvents=events.filter(e=>e.markets.some(m=>String(m.id)==='225')).length;
     const sourceErrors=attempts.filter(a=>a.error).map(a=>a.error);
-    const hasValidTournamentArray=attempts.some(a=>a.payload&&Array.isArray(a.payload?.data?.tournaments));
-    if(!events.length&&!hasValidTournamentArray){
+    const allDiagnostics=attempts.flatMap(a=>a.diagnostics||[]);
+    const upstreamTotals=allDiagnostics.map(d=>Number(d.upstream_total_events)).filter(n=>Number.isFinite(n)&&n>=0);
+    const sourceTotalEvents=upstreamTotals.length?Math.max(...upstreamTotals):null;
+    const sourceHasMorePages=sourceTotalEvents!==null
+      ? sourceTotalEvents>pageNum*pageSize
+      : allDiagnostics.some(d=>Number(d.flat_event_array_length??d.event_count)>=pageSize);
+    const hasValidEventList=attempts.some(a=>a.payload&&(
+      Array.isArray(a.payload?.data?.tournaments)||
+      (a.request.path==='/api/ng/factsCenter/wapConfigurableUpcomingEvents'&&Array.isArray(a.payload?.data))
+    ));
+    if(!events.length&&!hasValidEventList){
       const attemptsSummary=attempts.map(a=>a.request.path+' marketId='+(a.request.marketId||'default')+': '+(a.error||('events='+a.event_count))).join('; ');
       throw new Error('SportyBet NBA feed returned no usable event-list response. '+attemptsSummary);
     }
@@ -144,7 +181,8 @@ export async function onRequestGet(context){
       market_contract:{winner_including_overtime:'219',handicap_including_overtime:'223',total_including_overtime:'225',team_total_points:['227','228']},
       fetched_at:new Date().toISOString(),elapsed_ms:Date.now()-started,event_count:events.length,
       total_market_event_count:totalMarketEvents,source_errors:sourceErrors,
-      source_diagnostics:attempts.flatMap(a=>a.diagnostics||[]),events
+      source_total_events:sourceTotalEvents,source_page_size:pageSize,source_has_more_pages:sourceHasMorePages,
+      source_diagnostics:allDiagnostics,events
     }),{status:200,headers:headers()});
   }catch(error){
     return new Response(JSON.stringify({ok:false,source:'SportyBet Nigeria',error:String(error?.message||error),fetched_at:new Date().toISOString(),event_count:0,total_market_event_count:0,source_diagnostics:attempts.flatMap(a=>a.diagnostics||[]),events:[]}),{status:200,headers:{...headers(),'Cache-Control':'no-store'}});

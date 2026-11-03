@@ -90,9 +90,15 @@ def sportybet_basketball_feed_paged(max_pages=25):
                     market_map[key] = market
             current["markets"] = list(market_map.values())
 
-        # Do not treat a short page as the end: the proxy/upstream can return
-        # fewer than pageSize events while still exposing later pages. Continue
-        # until the page is empty or pageNum repeats only previously seen IDs.
+        # Use provider pagination metadata before judging this NBA-filtered page.
+        # A basketball page can contain zero NBA fixtures and still have later
+        # upstream pages. Keep going while any source reports more raw pages.
+        source_has_more = payload.get("source_has_more_pages")
+        if source_has_more is False:
+            break
+        if source_has_more is True:
+            continue
+        # Backwards-compatible fallback for feeds without paging metadata.
         if not page_events or new_ids == 0:
             break
 
