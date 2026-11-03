@@ -79,9 +79,32 @@ function singleSelectionGateKey(x){
 }
 function attachSingleSelectionMarketEvidence(row, gate, candidate){
   // The UI price gate evaluates the Unified Upcoming row, not the separate
-  // candidate artifact. Carry the exact identity-matched candidate quote onto
-  // that row before running exactSportyBetQuote/current-edge checks.
-  const sources=[candidate,gate].filter(Boolean);
+  // candidate artifact. Use the newest timestamp among exact identity-matched
+  // sources so an old candidate snapshot cannot overwrite a fresher gate quote.
+  const quoteTime=source=>{
+    const raw=source?.market_odds_timestamp||source?.odds_timestamp||
+      source?.market_insights?.snapshot_at||source?.sportybet_market?.fetched_at;
+    const parsed=Date.parse(String(raw||""));
+    return Number.isFinite(parsed)?parsed:-Infinity;
+  };
+  const candidateTime=quoteTime(candidate),gateTime=quoteTime(gate),rowTime=quoteTime(row);
+  const gateIsFresher=gateTime>candidateTime;
+  const sources=(gateIsFresher?[gate,candidate]:[candidate,gate]).filter(Boolean);
+  const preferredTime=Math.max(candidateTime,gateTime);
+  const quoteBoundFields=new Set([
+    "bookmaker_odds","sportybet_odds","book_odds",
+    "sportybet_winner_odds","sportybet_total_games_odds",
+    "sportybet_over_odds","sportybet_under_odds",
+    "market_odds_timestamp","odds_timestamp",
+    "model_edge_vs_market","expected_value","value_signal",
+    "model_probability","model_fair_odds"
+  ]);
+  // If either matched artifact has a newer quote than the board row, discard
+  // the row's stale quote/value payload before applying the preferred source.
+  if(preferredTime>rowTime){
+    for(const field of quoteBoundFields)row[field]=null;
+  }
+  const useGateMarketInsights=gateTime>=candidateTime;
   const fields=[
     "bookmaker_odds","sportybet_odds","book_odds",
     "sportybet_odds_market","sportybet_odds_line","sportybet_odds_side",
@@ -93,6 +116,8 @@ function attachSingleSelectionMarketEvidence(row, gate, candidate){
   ];
   for(const field of fields){
     for(const source of sources){
+      // Do not use price or value fields from the older quote snapshot.
+      if(source!==sources[0]&&quoteTime(source)<quoteTime(sources[0])&&quoteBoundFields.has(field))continue;
       const value=source?.[field];
       if(value!==undefined&&value!==null&&value!==""){
         row[field]=value;
@@ -102,7 +127,7 @@ function attachSingleSelectionMarketEvidence(row, gate, candidate){
   }
   const pick=String(row?.pick||row?.selection||"").toLowerCase();
   const total=isOverUnderPrediction(row)||pick==="over"||pick==="under";
-  const insights=gate?.market_insights&&typeof gate.market_insights==="object"?gate.market_insights:{};
+  const insights=useGateMarketInsights&&gate?.market_insights&&typeof gate.market_insights==="object"?gate.market_insights:{};
   if(total){
     const totalInsight=insights.total&&typeof insights.total==="object"?insights.total:{};
     const price=Number(totalInsight.book_odds);
@@ -114,8 +139,8 @@ function attachSingleSelectionMarketEvidence(row, gate, candidate){
     if(row.expected_value==null&&totalInsight.expected_value!=null)row.expected_value=totalInsight.expected_value;
     if(row.value_signal==null&&totalInsight.value_signal!=null)row.value_signal=totalInsight.value_signal;
   }else{
-    const winner=gate?.sportybet_winner_odds&&typeof gate.sportybet_winner_odds==="object"?gate.sportybet_winner_odds:{};
-    const marketWinner=gate?.sportybet_market?.winner&&typeof gate.sportybet_market.winner==="object"?gate.sportybet_market.winner:{};
+    const winner=useGateMarketInsights&&gate?.sportybet_winner_odds&&typeof gate.sportybet_winner_odds==="object"?gate.sportybet_winner_odds:{};
+    const marketWinner=useGateMarketInsights&&gate?.sportybet_market?.winner&&typeof gate.sportybet_market.winner==="object"?gate.sportybet_market.winner:{};
     const price=Number(insights.winner_book_odds??winner[pick]??marketWinner[pick+"_book"]);
     if(!(Number(row.bookmaker_odds)>1)&&Number.isFinite(price)&&price>1)row.bookmaker_odds=price;
     if(!row.sportybet_odds_market&&Number(row.bookmaker_odds)>1)row.sportybet_odds_market="winner";
