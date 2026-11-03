@@ -514,6 +514,22 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
 
 
 
+    def test_prediction_pipeline_leaves_selection_artifacts_to_board_publisher(self):
+        source = (ROOT / ".github/workflows/tennis_pipeline.yml").read_text(encoding="utf-8")
+        staged = source.split("      - name: Commit generated data and QA report", 1)[1].split("# Operational heartbeat", 1)[0]
+        for path in (
+            "data/selection_candidates.json",
+            "data/selection_gate.json",
+            "data/selection_gate_selected.json",
+        ):
+            with self.subTest(path=path):
+                explicit_add = staged.split("git add ", 1)[1].split("\\n", 1)[0]
+                self.assertNotIn(path, explicit_add)
+        self.assertIn(
+            "git restore --source=HEAD --staged --worktree -- data/selection_candidates.json data/selection_gate.json data/selection_gate_selected.json",
+            staged,
+        )
+
     def test_unified_board_publish_rebases_before_bounded_pushes(self):
         source = (ROOT / ".github/workflows/unified-upcoming.yml").read_text(encoding="utf-8")
         self.assertIn("timeout --signal=TERM --kill-after=10s 45s git fetch origin main", source)
