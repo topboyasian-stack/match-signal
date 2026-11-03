@@ -500,6 +500,11 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
 
     def test_publishing_refresh_is_not_cancelled_or_dispatched_twice(self):
         self.assertIn("cancel-in-progress: false", BOARD_WORKFLOW, "scheduled board refreshes must be allowed to publish before the next run")
+        self.assertIn("group: match-signal-unified-board-publisher-v1", BOARD_WORKFLOW)
+        self.assertIn(
+            "    concurrency:\\n      group: match-signal-unified-board-publisher-v1\\n      cancel-in-progress: false",
+            BOARD_WORKFLOW,
+        )
         self.assertNotIn("gh workflow run cloudflare-pages.yml", BOARD_WORKFLOW)
         self.assertIn(
             "the refreshed Builder will hand off to the ordered production-promotion workflow.",
