@@ -90,6 +90,7 @@ class DomesticFallbackTests(unittest.TestCase):
         unfinished = event(6, "Shakhtar Donetsk", "Dynamo Kyiv", 1, 0, "Ukraine", "Premier League")
         unfinished["status"] = {"code": 0, "type": "inprogress"}
         future = event(7, "Shakhtar Donetsk", "Dynamo Kyiv", 1, 0, "Ukraine", "Premier League", day=3)
+        future["startTimestamp"] = datetime(2026, 11, 4, 12, 0, tzinfo=timezone.utc).timestamp()
         self.assertIsNone(normalize_sofascore_domestic_event(unfinished, "Shakhtar Donetsk", SOFASCORE_TEAM_FALLBACKS["Shakhtar Donetsk"], CUTOFF))
         self.assertIsNone(normalize_sofascore_domestic_event(future, "Shakhtar Donetsk", SOFASCORE_TEAM_FALLBACKS["Shakhtar Donetsk"], CUTOFF))
 
