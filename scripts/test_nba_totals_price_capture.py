@@ -58,6 +58,11 @@ class PriceCaptureTests(unittest.TestCase):
         self.assertIn("const eventTournamentId=String(t?.id??t?.tournamentId??e?.tournamentId??'')", proxy_script)
         self.assertIn("if(eventTournamentId!==NBA_TOURNAMENT_ID)continue;", proxy_script)
         self.assertIn("PAGINATION_END_EMPTY_DATA", proxy_script)
+        self.assertIn("function getEventTournamentId(event)", proxy_script)
+        self.assertIn("WAP upcoming uses data:[event,...]", proxy_script)
+        self.assertIn("FLAT_EVENTS_ARRAY", proxy_script)
+        self.assertIn("source_has_more_pages", proxy_script)
+        self.assertIn("source_has_more = payload.get(\"source_has_more_pages\")", (root / "scripts" / "capture_nba_totals_prices.py").read_text(encoding="utf-8"))
         self.assertIn("source_diagnostics", proxy_script)
         self.assertIn("upstream_total_events", proxy_script)
         self.assertIn("data_keys", proxy_script)
@@ -150,6 +155,35 @@ class PriceCaptureTests(unittest.TestCase):
         self.assertIsNone(error)
         self.assertEqual([call.kwargs["params"]["pageNum"] for call in feed_get.call_args_list], [1, 2, 3])
         self.assertEqual({row["event_id"] for row in events}, {"short-0", "short-1", "short-2", "later-0", "later-1"})
+
+    def test_feed_continues_when_a_page_has_no_nba_matches_but_source_has_more(self):
+        class Response:
+            def __init__(self, payload):
+                self.payload = payload
+            def raise_for_status(self):
+                return None
+            def json(self):
+                return self.payload
+
+        later_nba = {
+            "event_id": "nba-page-two",
+            "tournament": "NBA",
+            "tournament_id": "sr:tournament:132",
+            "home": "NBA Home",
+            "away": "NBA Away",
+            "start_time": (self.now + timedelta(hours=5)).isoformat(),
+            "fetched_at": self.now.isoformat(),
+            "markets": [{"id": "225", "specifier": "total=221.5", "outcomes": []}],
+        }
+        with patch("capture_nba_totals_prices.S.get", side_effect=[
+            Response({"ok": True, "events": [], "source_has_more_pages": True}),
+            Response({"ok": True, "events": [later_nba], "source_has_more_pages": False}),
+        ]) as feed_get:
+            events, error, diagnostics = sportybet_basketball_feed_paged(max_pages=5)
+
+        self.assertIsNone(error)
+        self.assertEqual([call.kwargs["params"]["pageNum"] for call in feed_get.call_args_list], [1, 2])
+        self.assertEqual([row["event_id"] for row in events], ["nba-page-two"])
 
     def test_feed_returns_partial_pages_and_retains_upstream_diagnostics(self):
         class Response:
