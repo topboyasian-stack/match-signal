@@ -428,50 +428,107 @@ class UpcomingDeskPolicyTests(unittest.TestCase):
         self.assertEqual(result["variant"], "poisson")
 
     def test_directional_gate_uses_the_same_model_variant_as_live_forecast(self):
-        def metric(n, brier, log_loss, ece):
-            return {"n": n, "brier": brier, "log_loss": log_loss, "ece": ece}
+        def metric(n, brier, log_loss, ece, hit_rate=0.60):
+            return {"n": n, "brier": brier, "log_loss": log_loss, "ece": ece, "hit_rate": hit_rate}
+
+        product_metrics = {
+            "market": metric(1000, .30, .80, .10),
+            "poisson": metric(1000, .20, .50, .02),
+            "poisson_prior": metric(1000, .22, .55, .03),
+            "efootball_shape": metric(1000, .23, .57, .04),
+            "participant_model": metric(1000, .24, .59, .05),
+        }
         artifact = {
             "participant_feature_gate": {"pass": True},
-            "by_product": {"efootball_gt": {
-                "market": metric(1000, .30, .80, .10),
-                "poisson": metric(1000, .20, .50, .02),
-                "poisson_prior": metric(1000, .22, .55, .03),
-                "efootball_shape": metric(1000, .23, .57, .04),
-                "participant_model": metric(1000, .24, .59, .05),
-            }},
-            "holdout_metrics": {
-                "market": metric(1000, .30, .80, .10),
-                "poisson": metric(1000, .20, .50, .02),
-                "poisson_prior": metric(1000, .22, .55, .03),
-                "efootball_shape": metric(1000, .23, .57, .04),
-                "participant_model": metric(1000, .24, .59, .05),
+            "by_product": {"efootball_gt": product_metrics},
+            "holdout_metrics": product_metrics,
+            "by_product_selection_line": {
+                "efootball_gt": {
+                    "u7.5": {
+                        "poisson": metric(100, .24, .60, .03, .60),
+                        "participant_model": metric(100, .10, .40, .01, .99),
+                    }
+                }
             },
-            "efootball_gt_diagnostics": {"selection": {"u7.5": {"7.5": {
-                "poisson": {"n": 100, "hit_rate": .60, "brier": .24},
-                "participant_model": {"n": 100, "hit_rate": .99, "brier": .10},
-            }}}}
         }
         history = []
         for i in range(40):
-            stamp = self.now - timedelta(minutes=40-i)
+            stamp = self.now - timedelta(minutes=90 - i)
             history.append({
-                "product": "efootball_gt",
-                "market": "ou",
-                "line": 7.5,
-                "selection": "under",
-                "win": True,
-                "score": "2:2",
-                "timestamp": stamp.isoformat(),
-                "settled_at": stamp.isoformat(),
+                "product": "efootball_gt", "market": "ou", "line": 7.5,
+                "selection": "under", "win": True, "score": "2:2",
+                "timestamp": stamp.isoformat(), "settled_at": stamp.isoformat(),
                 "start_time": stamp.isoformat(),
                 "participant_1": f"Alpha{i} (player-a{i})",
                 "participant_2": f"Beta{i} (player-b{i})",
             })
-        result = ns["build_efootball_directional_gate"](artifact, history)[(7.5, "under")]
+        result = ns["build_efootball_directional_gate"](artifact, history)[("efootball_gt", 7.5, "under")]
+        # The live evaluator selects Poisson because the participant overlay does
+        # not pass independently; its inflated legacy participant score is ignored.
+        self.assertEqual(result["model_variant"], "poisson")
         self.assertEqual(result["holdout_n"], 100)
         self.assertAlmostEqual(result["holdout_hit_rate"], .60)
+        self.assertEqual(result["recent_n"], 40)
         self.assertFalse(result["pass"])
 
+    def test_efootball_directional_gate_never_borrows_gt_line_evidence_for_adriatic(self):
+        def metric(n, brier, log_loss, ece, hit_rate=0.70):
+            return {"n": n, "brier": brier, "log_loss": log_loss, "ece": ece, "hit_rate": hit_rate}
+
+        valid_product_metrics = {
+            "market": metric(100, .30, .80, .10),
+            "poisson": metric(100, .20, .50, .02),
+            "poisson_prior": metric(100, .22, .55, .03),
+            "efootball_shape": metric(100, .23, .57, .04),
+            "participant_model": metric(100, .24, .59, .05),
+        }
+        artifact = {
+            "participant_feature_gate": {"pass": False},
+            "by_product": {
+                "efootball_gt": {**valid_product_metrics, "poisson": metric(100, .20, .50, .02, .60)},
+                "efootball_adriatic": valid_product_metrics,
+            },
+            "holdout_metrics": valid_product_metrics,
+            "by_product_selection_line": {
+                "efootball_gt": {
+                    "u7.5": {"poisson": metric(100, .20, .50, .02, .60)},
+                },
+                "efootball_adriatic": {
+                    "u7.5": {"poisson": metric(100, .20, .50, .02, .70)},
+                },
+            },
+        }
+        history = []
+        for product, score, won in (
+            ("efootball_gt", "8:1", False),
+            ("efootball_adriatic", "2:2", True),
+        ):
+            for i in range(40):
+                stamp = self.now - timedelta(minutes=90 - i)
+                history.append({
+                    "product": product, "market": "ou", "line": 7.5,
+                    "selection": "under", "win": won, "score": score,
+                    "timestamp": stamp.isoformat(), "settled_at": stamp.isoformat(),
+                    "start_time": stamp.isoformat(),
+                    "participant_1": f"Alpha{i} (player-a{i})",
+                    "participant_2": f"Beta{i} (player-b{i})",
+                })
+
+        results = ns["build_efootball_directional_gate"](artifact, history)
+        gt = results[("efootball_gt", 7.5, "under")]
+        adriatic = results[("efootball_adriatic", 7.5, "under")]
+        self.assertEqual(gt["recent_n"], 40)
+        self.assertEqual(gt["recent_hit_rate"], 0.0)
+        self.assertFalse(gt["pass"], "GT losses must not be hidden by Adriatic results")
+        self.assertEqual(adriatic["recent_n"], 40)
+        self.assertEqual(adriatic["recent_hit_rate"], 1.0)
+        self.assertTrue(adriatic["pass"], "Adriatic must use its own valid holdout and recent fixtures")
+
+        # Removing the Adriatic exact-line holdout must keep it ineligible even
+        # when GT has a favourable line result; aggregate accuracy is not enough.
+        artifact["by_product_selection_line"]["efootball_adriatic"] = {}
+        results_without_adriatic_oos = ns["build_efootball_directional_gate"](artifact, history)
+        self.assertNotIn(("efootball_adriatic", 7.5, "under"), results_without_adriatic_oos)
 
     def test_product_bootstrap_cannot_bypass_exact_line_direction_validation(self):
         resolve = ns["resolve_efootball_qualification_status"]
