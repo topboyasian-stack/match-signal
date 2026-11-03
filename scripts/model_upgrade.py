@@ -104,6 +104,69 @@ def _apply_independent_probability_fields(row, independent, calibrated, calibrat
     }
 
 
+
+def _record_ucl_shadow_fields(row, independent, calibrated, market, calibration):
+    """Store dual-competition UCL probabilities without replacing the published pick."""
+    keys = ("p1", "draw", "p2")
+    raw = {key: round(float(independent[key]), 6) for key in keys}
+    shadow_calibrated = {
+        key: round(float(value), 6)
+        for key, value in zip(keys, calibrated)
+    }
+    pick = max(keys, key=lambda key: shadow_calibrated[key])
+    row["independent_probabilities"] = raw
+    row["independent_calibrated_probabilities"] = shadow_calibrated
+    row["independent_shadow_pick"] = pick
+    row["independent_shadow_confidence"] = shadow_calibrated[pick]
+    row["independent_shadow_model_version"] = MODEL_VERSION
+    row["independent_shadow_model_method"] = independent.get("method")
+    row["independent_competition_form"] = independent.get("competition_form")
+    row["independent_shadow_status"] = independent.get("competition_form_status") or "PARTIAL_HISTORY"
+    row["independent_shadow_history_complete"] = row["independent_shadow_status"] == "COMPLETE"
+    row["independent_shadow_use_for_tickets"] = False
+    row["independent_shadow_promotion_status"] = "NOT_PROMOTED"
+    row["independent_shadow_expected_goals"] = {
+        "home": independent.get("xg_home"),
+        "away": independent.get("xg_away"),
+        "total": round(float(independent.get("xg_home") or 0) + float(independent.get("xg_away") or 0), 4),
+    }
+    row["independent_shadow_market"] = None
+    if market:
+        odds = [float(value) for value in market["odds"]]
+        index = keys.index(pick)
+        edge, expected_value = edge_and_ev(shadow_calibrated[pick], odds[index])
+        row["independent_shadow_market"] = {
+            "source": market.get("source"),
+            "probabilities": {key: round(float(market[key]), 6) for key in keys},
+            "odds": odds,
+            "pick_edge": edge,
+            "pick_expected_value": expected_value,
+            "pick_odds": odds[index],
+        }
+    row["independent_diagnostics"] = {
+        "sample_home": independent.get("sample_home", 0),
+        "sample_away": independent.get("sample_away", 0),
+        "effective_sample": independent.get("effective_sample", 0),
+        "history_sufficient": independent.get("sample_home", 0) >= 2 and independent.get("sample_away", 0) >= 2,
+        "history_source": "ESPN completed scoreboards + settled paper ledger",
+        "recency_half_life_days": 120,
+        "venue_aware": True,
+        "dixon_coles": True,
+        "dixon_coles_rho": independent.get("dixon_coles_rho"),
+        "home_attack": independent.get("home_attack"),
+        "home_defence": independent.get("home_defence"),
+        "away_attack": independent.get("away_attack"),
+        "away_defence": independent.get("away_defence"),
+        "league_home_xg": independent.get("league_home_xg"),
+        "league_away_xg": independent.get("league_away_xg"),
+        "market_available": bool(market),
+        "competition_form_status": independent.get("competition_form_status"),
+        "competition_form": independent.get("competition_form"),
+        "production_pick_changed": False,
+        "ticket_qualification_changed": False,
+    }
+
+
 def main():
     pred_path = DATA / "predictions.json"
     history_path = DATA / "prediction_history.json"
@@ -120,6 +183,9 @@ def main():
     paper_value = 0
     no_history = 0
     no_market = 0
+    ucl_shadowed = 0
+    ucl_shadow_complete = 0
+    ucl_shadow_partial = 0
 
     for row in predictions:
         if row.get("sport") != "football":
@@ -145,6 +211,25 @@ def main():
             raw = [independent["p1"], independent["draw"], independent["p2"]]
             calibrated = softmax_temperature(raw, calibration_temperature(calibration, "football"))
             market = valid_market(row)
+
+            # The independent dual-competition model has not yet beaten the
+            # published UCL model on walk-forward evidence. Keep its forecast
+            # as a research shadow; never replace the active published pick,
+            # probabilities, market decision, or Builder/ticket qualification.
+            if str(row.get("league") or "").strip().lower() == "champions league":
+                _record_ucl_shadow_fields(row, independent, calibrated, market, calibration)
+                row["architecture"] = "published UCL prediction retained; domestic + Champions League model stored as paper shadow"
+                row["live_eligible"] = False
+                row["testing_mode"] = "paper"
+                ucl_shadowed += 1
+                if row["independent_shadow_history_complete"]:
+                    ucl_shadow_complete += 1
+                else:
+                    ucl_shadow_partial += 1
+                if not market:
+                    no_market += 1
+                upgraded += 1
+                continue
 
             _apply_independent_probability_fields(row, independent, calibrated, calibration)
             row["expected_goals"] = {"p1": independent["xg_home"], "p2": independent["xg_away"], "total": round(independent["xg_home"] + independent["xg_away"], 4)}
@@ -224,6 +309,10 @@ def main():
         "warnings": warnings,
         "football_without_sufficient_team_history": no_history,
         "football_without_contemporaneous_market": no_market,
+        "ucl_shadow_predictions": ucl_shadowed,
+        "ucl_shadow_complete_history": ucl_shadow_complete,
+        "ucl_shadow_partial_history": ucl_shadow_partial,
+        "ucl_shadow_policy": "research-only; published pick/probabilities/decision and ticket qualification are preserved",
         "external_team_history_rows": len(external_team_history),
     }, indent=2))
 
