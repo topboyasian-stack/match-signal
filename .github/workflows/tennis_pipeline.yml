@@ -303,7 +303,7 @@ jobs:
           # Keep independently refreshed aggregate-performance snapshots from
           # concurrent writers on main. Replaying these generated reports
           # caused rebase conflicts and prevented publication.
-          git restore --source=HEAD --staged --worktree -- data/accuracy.json data/current_performance.json data/tennis_performance.json
+          git restore --source=HEAD --staged --worktree -- data/accuracy.json data/current_performance.json data/tennis_performance.json data/football_model_council.json
           # Unified Upcoming is the sole publisher for these three artifacts:
           # it must derive the gate/candidate pool from the prediction commit
           # that has just landed. If the model pipeline also commits them, its

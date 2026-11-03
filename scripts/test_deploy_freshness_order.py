@@ -530,6 +530,15 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             staged,
         )
 
+    def test_prediction_pipeline_preserves_concurrently_refreshed_model_council(self):
+        source = (ROOT / ".github/workflows/tennis_pipeline.yml").read_text(encoding="utf-8")
+        staged = source.split("      - name: Commit generated data and QA report", 1)[1].split("# Operational heartbeat", 1)[0]
+        self.assertIn(
+            "git restore --source=HEAD --staged --worktree -- data/accuracy.json data/current_performance.json data/tennis_performance.json data/football_model_council.json",
+            staged,
+        )
+        self.assertIn('git add -u data qa scripts/expansion_pipeline.py', staged)
+
     def test_unified_board_publish_rebases_before_bounded_pushes(self):
         source = (ROOT / ".github/workflows/unified-upcoming.yml").read_text(encoding="utf-8")
         self.assertIn("timeout --signal=TERM --kill-after=10s 45s git fetch origin main", source)
