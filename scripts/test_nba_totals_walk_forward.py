@@ -104,6 +104,11 @@ def test_date_only_nba_game_dates_cannot_cross_the_frozen_cutoff():
         },
     ]
     cleaned = clean_history(rows)
+    cleaned_by_id = {row["event_id"]: row for row in cleaned}
+    assert (
+        cleaned_by_id["nba-date-only-before-cutoff"]["forecast_group_timestamp"]
+        == cleaned_by_id["nba-exact-start-after-cutoff"]["forecast_group_timestamp"]
+    ), "same uncertain local game date must share prior-history grouping"
     development, holdout = split_at_fixed_cutoff(cleaned, "forecast_timestamp")
     assert [row["event_id"] for row in development] == ["nba-date-only-before-cutoff"]
     assert {row["event_id"] for row in holdout} == {
