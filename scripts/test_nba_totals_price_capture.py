@@ -55,7 +55,7 @@ class PriceCaptureTests(unittest.TestCase):
         self.assertIn("u.searchParams.get('tournamentId')||NBA_TOURNAMENT_ID", proxy_script)
         self.assertIn("if(tournamentId!==NBA_TOURNAMENT_ID)", proxy_script)
         self.assertNotIn("if(tournamentId)params.tournamentId=tournamentId;", proxy_script)
-        self.assertIn("const eventTournamentId=String(t?.id??t?.tournamentId??e?.tournamentId??'')", proxy_script)
+        self.assertIn("const eventTournamentId=String(t?.id??t?.tournamentId??getEventTournamentId(e))", proxy_script)
         self.assertIn("if(eventTournamentId!==NBA_TOURNAMENT_ID)continue;", proxy_script)
         self.assertIn("PAGINATION_END_EMPTY_DATA", proxy_script)
         self.assertIn("function getEventTournamentId(event)", proxy_script)
