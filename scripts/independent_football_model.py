@@ -83,6 +83,7 @@ DOMESTIC_COMPETITIONS = frozenset({
     "Czech First League",
     "Ukrainian Premier League",
     "Super League Greece",
+    "Azerbaijan Premier League",
     "Scottish Premiership",
     "Swiss Super League",
     "Danish Superliga",
@@ -144,6 +145,8 @@ def _team_key(value):
         "borussia dortmund": "borussia dortmund",
         "slovan bratislava": "slovan bratislava",
         "shakhtar donetsk": "shakhtar donetsk",
+        "slavia praha": "slavia prague",
+        "slavia prague": "slavia prague",
         "porto": "porto",
         "benfica": "benfica",
         "barcelona": "barcelona",
@@ -161,6 +164,9 @@ def _empty_team():
         "gf": 0.0,
         "ga": 0.0,
         "n": 0.0,
+        "games": 0,
+        "home_games": 0,
+        "away_games": 0,
         "home_gf": 0.0,
         "home_ga": 0.0,
         "home_n": 0.0,
@@ -204,7 +210,8 @@ def _team_stats(history, cutoff, competition_filter=None):
         event_dt = _parse_dt(row.get("calculated_at") or row.get("start_time"))
         if not event_dt or event_dt >= cutoff_dt:
             continue
-        if (cutoff_dt - event_dt).total_seconds() > 365 * 86400:
+        history_days = 1095 if competition == "Champions League" else 365
+        if (cutoff_dt - event_dt).total_seconds() > history_days * 86400:
             continue
         home = _team_key(row.get("player_1"))
         away = _team_key(row.get("player_2"))
@@ -231,6 +238,8 @@ def _team_stats(history, cutoff, competition_filter=None):
         hs["gf"] += weight * hg
         hs["ga"] += weight * ag
         hs["n"] += weight
+        hs["games"] += 1
+        hs["home_games"] += 1
         hs["home_gf"] += weight * hg
         hs["home_ga"] += weight * ag
         hs["home_n"] += weight
@@ -239,6 +248,8 @@ def _team_stats(history, cutoff, competition_filter=None):
         aws["gf"] += weight * ag
         aws["ga"] += weight * hg
         aws["n"] += weight
+        aws["games"] += 1
+        aws["away_games"] += 1
         aws["away_gf"] += weight * ag
         aws["away_ga"] += weight * hg
         aws["away_n"] += weight
@@ -398,7 +409,18 @@ def independent_prediction(event, league, history, cutoff=None):
 
         home_n = round(home_dn + home_un, 3)
         away_n = round(away_dn + away_un, 3)
-        complete = home_dn >= 2.0 and away_dn >= 2.0 and home_un >= 1.0 and away_un >= 1.0
+        home_ucl_team = ucl_stats.get(_team_key(home_name), _empty_team())
+        away_ucl_team = ucl_stats.get(_team_key(away_name), _empty_team())
+        home_ucl_games = int(home_ucl_team.get("games", 0))
+        away_ucl_games = int(away_ucl_team.get("games", 0))
+        # Venue rates shrink toward all-venue team form. A single prior UCL
+        # match remains valid European evidence even when its decayed same-venue
+        # effective sample is less than 1.0.
+        complete = (
+            home_dom is not None and away_dom is not None
+            and home_dn >= 2.0 and away_dn >= 2.0
+            and home_ucl_games >= 1 and away_ucl_games >= 1
+        )
         competition_form = {
             "mode": "domestic_plus_champions_league",
             "status": "COMPLETE" if complete else "PARTIAL_HISTORY",
@@ -408,6 +430,9 @@ def independent_prediction(event, league, history, cutoff=None):
                 "domestic_competition": home_dom,
                 "domestic_venue_sample": home_dn,
                 "champions_league_venue_sample": home_un,
+                "champions_league_matches_total": home_ucl_games,
+                "champions_league_home_matches": int(home_ucl_team.get("home_games", 0)),
+                "champions_league_away_matches": int(home_ucl_team.get("away_games", 0)),
                 "champions_league_blend_weight": round(home_ucl_weight, 4),
                 "domestic_attack": round(home_da, 4),
                 "champions_league_attack": round(home_ua, 4),
@@ -420,6 +445,9 @@ def independent_prediction(event, league, history, cutoff=None):
                 "domestic_competition": away_dom,
                 "domestic_venue_sample": away_dn,
                 "champions_league_venue_sample": away_un,
+                "champions_league_matches_total": away_ucl_games,
+                "champions_league_home_matches": int(away_ucl_team.get("home_games", 0)),
+                "champions_league_away_matches": int(away_ucl_team.get("away_games", 0)),
                 "champions_league_blend_weight": round(away_ucl_weight, 4),
                 "domestic_attack": round(away_da, 4),
                 "champions_league_attack": round(away_ua, 4),
@@ -428,7 +456,7 @@ def independent_prediction(event, league, history, cutoff=None):
                 "champions_league_defence": round(away_ud, 4),
                 "combined_defence": round(ad, 4),
             },
-            "policy": "Domestic competition form is the anchor; UCL form is normalized to the UCL scoring baseline and blended by recency-weighted same-venue sample, capped at 30%.",
+            "policy": "Domestic competition form is the anchor; all prior UCL results are included, venue-specific rates shrink toward all-venue strength, and the recency-weighted UCL blend is capped at 30%. COMPLETE requires domestic form for each club plus at least one prior settled UCL match per club.",
         }
         home_base, away_base = ucl_home_base, ucl_away_base
         effective_n = min(home_n, away_n)

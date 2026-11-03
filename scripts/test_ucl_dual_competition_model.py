@@ -154,6 +154,30 @@ class UCLDualCompetitionModelTests(unittest.TestCase):
         self.assertEqual(_team_key("FC Barcelona"), _team_key("Barcelona"))
         self.assertEqual(_team_key("Villarreal CF"), _team_key("Villarreal"))
 
+
+    def test_a_real_ucl_match_at_the_opposite_venue_counts_as_ucl_coverage(self):
+        history = sample_history()
+        history = [
+            row for row in history
+            if not (
+                row["league"] == "Champions League"
+                and (row["player_1"] == "Arsenal" or row["player_2"] == "Bayern Munich")
+                and row["event_id"].startswith(("ars-ucl-", "bay-ucl-"))
+            )
+        ]
+        # Arsenal's single UCL sample is away; Bayern's single UCL sample is home.
+        history.append(game("Champions League", "ars-only-away", "UCL Rival", "Arsenal", 1, 2, 18))
+        history.append(game("Champions League", "bay-only-home", "Bayern Munich", "UCL Rival", 2, 0, 18))
+        result = self.predict(history)
+        self.assertEqual(result["competition_form_status"], "COMPLETE")
+        home = result["competition_form"]["home"]
+        away = result["competition_form"]["away"]
+        self.assertEqual(home["champions_league_matches_total"], 1)
+        self.assertEqual(away["champions_league_matches_total"], 1)
+        self.assertEqual(home["champions_league_venue_sample"], 0)
+        self.assertEqual(away["champions_league_venue_sample"], 0)
+        self.assertTrue(result["competition_form"]["release_eligible"])
+
     def test_missing_domestic_or_ucl_history_is_marked_partial(self):
         history = [
             row for row in sample_history()
