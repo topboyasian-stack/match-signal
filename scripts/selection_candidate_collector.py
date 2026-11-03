@@ -253,6 +253,27 @@ def compact(row, now):
     }
 
 
+def prefer_candidate(candidate, previous):
+    """Prefer the duplicate carrying the newest exact SportyBet snapshot.
+
+    Unified Upcoming is deliberately loaded before the core prediction feed.
+    When both contain the same event/market/line/side, the core prediction
+    frequently has a newer SportyBet quote. Keep that quote even when the
+    model probability ties; when quote times tie or are both absent, preserve
+    the original probability-ranking behavior.
+    """
+    candidate_quote = dt(candidate.get("market_odds_timestamp"))
+    previous_quote = dt(previous.get("market_odds_timestamp"))
+    if candidate_quote is not None or previous_quote is not None:
+        if candidate_quote is None:
+            return False
+        if previous_quote is None:
+            return True
+        if candidate_quote != previous_quote:
+            return candidate_quote > previous_quote
+    return float(candidate.get("model_probability") or 0) > float(previous.get("model_probability") or 0)
+
+
 def main():
     now = datetime.now(timezone.utc)
     sources = []
@@ -290,7 +311,7 @@ def main():
             continue
         key = item["candidate_id"]
         previous = seen.get(key)
-        if previous is None or float(item["model_probability"]) > float(previous["model_probability"]):
+        if previous is None or prefer_candidate(item, previous):
             seen[key] = item
 
     rows = list(seen.values())
