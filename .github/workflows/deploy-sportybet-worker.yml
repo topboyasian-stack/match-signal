@@ -112,6 +112,41 @@ jobs:
             throw new Error('Regional Worker rejected the NBA sportId or marketId before reaching SportyBet.');
           }
 
+          const nbaVariantsResponse = await fetch(base + '/__nba-diagnostics?probe=' + Date.now(), {
+            cache: 'no-store',
+            signal: AbortSignal.timeout(40000)
+          });
+          const nbaVariantsText = await nbaVariantsResponse.text();
+          let nbaVariants = null;
+          try { nbaVariants = JSON.parse(nbaVariantsText); } catch (_) {}
+          console.log('NBA source query-window diagnostics:', JSON.stringify({
+            http_status: nbaVariantsResponse.status,
+            diagnostic: nbaVariants?.diagnostic,
+            checked_at: nbaVariants?.checked_at,
+            probes: (nbaVariants?.probes || []).map(item => ({
+              variant: item.variant,
+              query: item.query,
+              status: item.status,
+              ok: item.ok,
+              is_json: item.is_json,
+              biz_code: item.biz_code,
+              total_num: item.total_num,
+              tournament_count: item.tournament_count,
+              tournament_names: item.tournament_names,
+              tournament_ids: item.tournament_ids,
+              event_count: item.event_count,
+              response_shape: item.response_shape,
+              data_keys: item.data_keys,
+              elapsed_ms: item.elapsed_ms,
+              error: item.error
+            }))
+          }, null, 2));
+          if (!nbaVariantsResponse.ok ||
+              nbaVariants?.diagnostic !== 'sportybet-nba-query-variants-v1' ||
+              !Array.isArray(nbaVariants.probes) || nbaVariants.probes.length !== 4) {
+            throw new Error('NBA source query-window diagnostic endpoint was invalid.');
+          }
+
           for (const [sportName, sportId, marketIds] of [
             ['football', 'sr%3Asport%3A1', '1%2C18%2C10%2C14%2C16%2C29%2C45%2C47'],
             ['tennis', 'sr%3Asport%3A5', '186%2C210%2C202%2C204%2C189%2C203%2C188%2C187']
