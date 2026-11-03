@@ -77,9 +77,23 @@ def clean_history(rows):
         if not stamp or not forecast_stamp or not home or not away or hs is None or aws is None or hs < 0 or aws < 0:
             continue
         event_id = str(row.get("event_id") or f"{stamp.isoformat()}|{home}|{away}")
+        source = str(row.get("source") or "")
+        if source == "nba_data_v2_team_game_logs":
+            # Team-game logs expose a local game date, not a reliable tip time.
+            # For prior-history grouping, every record from that local date must
+            # be held until the whole date batch is forecast. Keep the separate
+            # forecast_timestamp untouched for frozen-cutoff classification.
+            local_date = stamp.astimezone(ZoneInfo("America/New_York")).date()
+            group_start = datetime.combine(
+                local_date, time.min, tzinfo=ZoneInfo("America/New_York")
+            ).astimezone(timezone.utc)
+        else:
+            group_start = forecast_stamp
         clean_row = {
             "event_id": event_id, "date": stamp.isoformat(),
             "forecast_timestamp": forecast_stamp.isoformat(),
+            "forecast_group_timestamp": group_start.isoformat(),
+            "source": source,
             "home": home, "away": away,
             "home_score": hs, "away_score": aws,
         }
@@ -89,7 +103,7 @@ def clean_history(rows):
         ):
             clean_row[key] = finite_number(row.get(key))
         clean[event_id] = clean_row
-    return sorted(clean.values(), key=lambda row: (row["forecast_timestamp"], row["date"], row["event_id"]))
+    return sorted(clean.values(), key=lambda row: (row["forecast_group_timestamp"], row["forecast_timestamp"], row["date"], row["event_id"]))
 
 
 def build_forecasts(history, min_prior_games=MIN_PRIOR_GAMES):
@@ -99,10 +113,10 @@ def build_forecasts(history, min_prior_games=MIN_PRIOR_GAMES):
     forecasts = []
     position = 0
     while position < len(rows):
-        timestamp_key = rows[position]["forecast_timestamp"]
+        timestamp_key = rows[position]["forecast_group_timestamp"]
         tip = parse_time(timestamp_key)
         group = []
-        while position < len(rows) and rows[position]["forecast_timestamp"] == timestamp_key:
+        while position < len(rows) and rows[position]["forecast_group_timestamp"] == timestamp_key:
             group.append(rows[position])
             position += 1
 
