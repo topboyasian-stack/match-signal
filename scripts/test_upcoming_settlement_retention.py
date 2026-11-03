@@ -420,12 +420,12 @@ def check_half_line_directional_gate_uses_unique_scores_and_excludes_conflicts()
             "efootball_shape": metric(1000, .22, .56, .04),
             "participant_model": metric(1000, .20, .50, .04),
         }},
-        "efootball_gt_diagnostics": {"selection": {
-            "u7.5": {"7.5": {"participant_model": {"n": 30, "hit_rate": 0.70}}}
+        "by_product_selection_line": {"efootball_gt": {
+            "u7.5": {"participant_model": {"n": 30, "hit_rate": 0.70, "brier": 0.20, "log_loss": 0.50, "ece": 0.04}}
         }},
     }
-    gate = upcoming.build_efootball_directional_gate(eval_art, history)[(7.5, "under")]
-    assert gate["recent_evidence_source"] == "UNIQUE_SETTLED_SCORE_REPLAY"
+    gate = upcoming.build_efootball_directional_gate(eval_art, history)[("efootball_gt", 7.5, "under")]
+    assert gate["recent_evidence_source"] == "UNIQUE_SAME_PRODUCT_SETTLED_SCORE_REPLAY"
     assert gate["recent_n"] == 31, "32 unique events minus one conflicting event; duplicate rows must not count"
     assert gate["recent_hit_rate"] == 1.0
     assert gate["excluded_conflicting_score_fixtures"] == 1
