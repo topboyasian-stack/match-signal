@@ -101,17 +101,46 @@ class PriceCaptureTests(unittest.TestCase):
                 return {"ok": True, "events": self.events}
 
         with patch("capture_nba_totals_prices.S.get", side_effect=[
-            Response(first_page), Response(second_page)
+            Response(first_page), Response(second_page), Response([])
         ]) as feed_get:
             events, error = sportybet_basketball_feed_paged(max_pages=5)
 
         self.assertIsNone(error)
-        self.assertEqual([call.kwargs["params"]["pageNum"] for call in feed_get.call_args_list], [1, 2])
+        self.assertEqual([call.kwargs["params"]["pageNum"] for call in feed_get.call_args_list], [1, 2, 3])
         self.assertTrue(all(call.kwargs["params"]["timeline"] == 168 for call in feed_get.call_args_list))
         self.assertTrue(all(call.kwargs["params"]["tournamentId"] == "sr:tournament:132" for call in feed_get.call_args_list))
         self.assertEqual(len(events), 101)
         duplicate = next(row for row in events if row["event_id"] == "event-0")
         self.assertEqual({market["specifier"] for market in duplicate["markets"]}, {"total=221.5"})
+
+    def test_feed_continues_after_a_short_nonfinal_page(self):
+        first_page = [
+            {"event_id": f"short-{i}", "home": f"Home {i}", "away": f"Away {i}",
+             "fetched_at": self.now.isoformat(), "markets": []}
+            for i in range(3)
+        ]
+        second_page = [
+            {"event_id": f"later-{i}", "home": f"Later Home {i}", "away": f"Later Away {i}",
+             "fetched_at": self.now.isoformat(), "markets": []}
+            for i in range(2)
+        ]
+
+        class Response:
+            def __init__(self, events):
+                self.events = events
+            def raise_for_status(self):
+                return None
+            def json(self):
+                return {"ok": True, "events": self.events}
+
+        with patch("capture_nba_totals_prices.S.get", side_effect=[
+            Response(first_page), Response(second_page), Response([])
+        ]) as feed_get:
+            events, error = sportybet_basketball_feed_paged(max_pages=5)
+
+        self.assertIsNone(error)
+        self.assertEqual([call.kwargs["params"]["pageNum"] for call in feed_get.call_args_list], [1, 2, 3])
+        self.assertEqual({row["event_id"] for row in events}, {"short-0", "short-1", "short-2", "later-0", "later-1"})
 
     def test_feed_returns_partial_pages_when_a_later_page_fails(self):
         class Response:
