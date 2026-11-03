@@ -2,7 +2,7 @@
 """Offline regression tests for the NBA totals walk-forward evaluator."""
 from datetime import datetime, timezone
 from nba_totals_walk_forward import (
-    build_forecasts, evaluate, market_metrics, publication_capture_metrics,
+    build_forecasts, clean_history, evaluate, market_metrics, publication_capture_metrics,
     verified_market_records, split_at_fixed_cutoff, market_record_audit,
     EVALUATION_CUTOFF_UTC,
 )
@@ -28,6 +28,50 @@ def test_walk_forward_does_not_use_current_or_future_games():
     assert baseline[0]["event_id"] == with_future[0]["event_id"] == "g3"
     assert baseline[0]["model_total"] == with_future[0]["model_total"]
     assert baseline[0]["prior_games"] == 2
+
+
+
+def test_date_only_nba_game_dates_cannot_cross_the_frozen_cutoff():
+    # The upstream NBA team-game-log feed exposes a local game date, which is
+    # normalized to end-of-day Eastern to avoid same-day score leakage. The
+    # cutoff is 2026-11-02 02:00 UTC (21:00 ET on Nov 1), so treating that
+    # end-of-day timestamp as the forecast timestamp wrongly promotes Nov 1
+    # games that may have tipped before the cutoff.
+    rows = [
+        {
+            "event_id": "nba-date-only-before-cutoff",
+            "date": "2026-11-02T04:59:59.999999+00:00",
+            "source": "nba_data_v2_team_game_logs",
+            "home": "A", "away": "B", "home_score": 100, "away_score": 90,
+        },
+        {
+            "event_id": "nba-exact-start-after-cutoff",
+            "date": "2026-11-02T04:59:59.999999+00:00",
+            "start_time": "2026-11-02T02:30:00+00:00",
+            "source": "nba_data_v2_team_game_logs",
+            "home": "C", "away": "D", "home_score": 105, "away_score": 95,
+        },
+        {
+            "event_id": "nba-next-local-day",
+            "date": "2026-11-03T04:59:59.999999+00:00",
+            "source": "nba_data_v2_team_game_logs",
+            "home": "E", "away": "F", "home_score": 110, "away_score": 100,
+        },
+    ]
+    cleaned = clean_history(rows)
+    development, holdout = split_at_fixed_cutoff(cleaned, "forecast_timestamp")
+    assert [row["event_id"] for row in development] == ["nba-date-only-before-cutoff"]
+    assert {row["event_id"] for row in holdout} == {
+        "nba-exact-start-after-cutoff", "nba-next-local-day"
+    }
+    assert all(
+        datetime.fromisoformat(row["forecast_timestamp"]) < EVALUATION_CUTOFF_UTC
+        for row in development
+    )
+    assert all(
+        datetime.fromisoformat(row["forecast_timestamp"]) >= EVALUATION_CUTOFF_UTC
+        for row in holdout
+    )
 
 
 def test_evaluator_uses_the_same_frozen_v51_parameters_as_live_model():
