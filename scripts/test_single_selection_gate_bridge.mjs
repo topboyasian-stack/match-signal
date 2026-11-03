@@ -46,7 +46,8 @@ assert.notEqual(key(candidateWinner), key({ ...candidateWinner, event_id: "18647
 
 assert.match(source, /get\('\.\/data\/selection_gate_selected\.json'\)/);
 assert.match(source, /qualifiedBestSourceIsFresh\(singleSelectionGateStatus\?\.generated_at\)/);
-assert.match(source, /singleSelectionGateMap\.get\(singleSelectionGateKey\(x\)\)/);
+assert.match(source, /const selectionKey=singleSelectionGateKey\(x\);/);
+assert.match(source, /singleSelectionGateMap\.get\(selectionKey\)/);
 assert.match(source, /const singleSelectionGatePassed=x\?\.single_selection_gate\?\.status==="passed"&&x\?\.single_selection_gate\?\.mode==="PAPER_ONLY"/);
 
 // The candidate quote must be copied onto the Unified Upcoming row before
