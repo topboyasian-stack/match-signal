@@ -63,7 +63,7 @@ def main():
         "The five-minute Upcoming schedule must not cancel an active slow board build before publication."
     )
     unified_job = board.split("\n  unified:\n", 1)[1]
-    assert "group: match-signal-unified-board-publisher-v4" in unified_job, (
+    assert "group: match-signal-unified-board-publisher-v5" in unified_job, (
         "All trigger types must serialize board publication to prevent competing generated-data pushes."
     )
     assert "cancel-in-progress: false" in unified_job, (
