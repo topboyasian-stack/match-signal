@@ -866,117 +866,189 @@ def load_virtual_history():
     return [r for r in history if isinstance(r,dict) and r.get("market")=="ou" and r.get("win") is not None]
 
 def build_efootball_directional_gate(eval_art, history):
-    """Build granular O/U qualification evidence without counting duplicate scores.
+    """Build independent product + exact-line + direction evidence for eFootball.
 
-    Qualification still requires >=30 untouched out-of-sample rows at >=65%
-    AND >=30 recent settled outcomes at >=65%. Half-goal lines (for example
-    7.5) use one verified final score per unique fixture so a single event
-    repeated across multiple O/U rows cannot inflate the recent sample. Integer
-    lines retain direct exact-line outcomes to preserve explicit push handling.
+    Each product uses its own chronological walk-forward selection-line metrics
+    and its own settled fixture history. Product-wide scores, another product's
+    line results, repeated forecast rows and ambiguous settled scores never
+    satisfy this gate. Both the holdout and recent window retain the existing
+    >=30 rows / >=65% thresholds.
     """
-    out={}
-    by_key=defaultdict(list)
-    score_candidates={}
-    score_conflicts=set()
+    out = {}
+    supported_products = {"efootball_gt", "efootball_adriatic"}
+    by_key = defaultdict(dict)
+    score_candidates = {}
+    score_conflicts = set()
+    direct_conflicts = set()
 
     def score_total(value):
         if value is None:
             return None
-        parts=str(value).replace(" ","").split(":")
-        if len(parts)!=2:
+        parts = str(value).replace(" ", "").split(":")
+        if len(parts) != 2:
             return None
-        values=[num(part) for part in parts]
-        if any(v is None or v<0 or not float(v).is_integer() for v in values):
+        values = [num(part) for part in parts]
+        if any(v is None or v < 0 or not float(v).is_integer() for v in values):
             return None
-        return int(values[0])+int(values[1])
+        return int(values[0]) + int(values[1])
 
-    for r in history if isinstance(history,list) else []:
-        if not isinstance(r,dict) or r.get("product")!="efootball_gt" or r.get("market")!="ou" or r.get("win") is None:
+    def selected_side(row):
+        selection = str(row.get("selection") or "").strip().lower()
+        if selection.startswith(("over", "o " , "o")):
+            return "over"
+        if selection.startswith(("under", "u ", "u")):
+            return "under"
+        return ""
+
+    for row in history if isinstance(history, list) else []:
+        if not isinstance(row, dict):
+            continue
+        product = str(row.get("product") or "").strip().lower()
+        if product not in supported_products or row.get("market") != "ou" or row.get("win") is None:
             continue
         try:
-            line=float(r.get("line"))
-        except (TypeError,ValueError):
+            line = float(row.get("line"))
+        except (TypeError, ValueError):
             continue
-        selection=str(r.get("selection") or "").upper()
-        side="over" if selection.startswith("O") else "under" if selection.startswith("U") else ""
-        if not side:
+        if not math.isfinite(line):
             continue
-        stamp=dt(r.get("settled_at") or r.get("timestamp"))
-        by_key[(line,side)].append({"win":bool(r.get("win")),"timestamp":stamp})
+        side = selected_side(row)
+        if side not in {"over", "under"}:
+            continue
+        stamp = dt(row.get("settled_at") or row.get("timestamp"))
+        fixture = virtual_fixture_key(row)
+        # A recent result is useful only if it can be assigned to one uniquely
+        # identified product fixture. Event IDs alone can recur across sessions.
+        if stamp is None or not fixture:
+            continue
+        total = score_total(row.get("score") or row.get("final_score"))
+        key = (product, line, side)
+        record = {"win": bool(row.get("win")), "timestamp": stamp, "total": total}
+        current = by_key[key].get(fixture)
+        if current is None or stamp > current["timestamp"]:
+            by_key[key][fixture] = record
+            direct_conflicts.discard((key, fixture))
+        elif stamp == current["timestamp"] and (
+            record["win"] != current["win"] or (
+                total is not None and current.get("total") is not None and total != current["total"]
+            )
+        ):
+            direct_conflicts.add((key, fixture))
 
-        total=score_total(r.get("score") or r.get("final_score"))
-        fixture=virtual_fixture_key(r)
-        if total is None or not fixture or stamp is None:
+        if total is None:
             continue
-        current=score_candidates.get(fixture)
-        if current is None or stamp>current["timestamp"]:
-            score_candidates[fixture]={"total":total,"timestamp":stamp,"fixture_key":fixture}
+        current_score = score_candidates.get(fixture)
+        if current_score is None or stamp > current_score["timestamp"]:
+            score_candidates[fixture] = {"total": total, "timestamp": stamp, "fixture_key": fixture}
             score_conflicts.discard(fixture)
-        elif stamp==current["timestamp"] and total!=current["total"]:
+        elif stamp == current_score["timestamp"] and total != current_score["total"]:
             score_conflicts.add(fixture)
 
-    # Any conflict at the latest settlement timestamp is excluded. This is
-    # intentionally fail-closed rather than choosing whichever duplicate row
-    # happens to occur last in the archive.
-    unique_scores={key:value for key,value in score_candidates.items() if key not in score_conflicts}
+    # If the latest settled score is contradictory, exclude that fixture rather
+    # than taking whichever duplicate row happens to appear last in the ledger.
+    unique_scores = {
+        key: value for key, value in score_candidates.items()
+        if key not in score_conflicts
+    }
 
-    selection_eval=((eval_art.get("efootball_gt_diagnostics") or {}).get("selection") or {}) if isinstance(eval_art,dict) else {}
-    for selection_key, line_map in selection_eval.items():
-        key_text=str(selection_key).lower()
-        side="over" if key_text.startswith("o") else "under" if key_text.startswith("u") else ""
-        if not side:
-            continue
-        try:
-            line=float(key_text[1:])
-        except (TypeError,ValueError):
-            continue
-        report=(line_map or {}).get(str(line)) if isinstance(line_map,dict) else None
-        # Directional qualification must use the same model family selected for
-        # the live probability; a stronger-looking participant metric cannot
-        # qualify a line while the participant overlay is held out of production.
-        participant_enabled=bool((eval_art.get("participant_feature_gate") or {}).get("pass"))
-        selected_variant=select_validated_virtual_model_variant(
-            eval_art, "efootball_gt", participant_enabled=participant_enabled
+    participant_enabled = bool((eval_art.get("participant_feature_gate") or {}).get("pass")) if isinstance(eval_art, dict) else False
+    for product in sorted(supported_products):
+        product_selection_rows = (
+            ((eval_art.get("by_product_selection_line") or {}).get(product) or {})
+            if isinstance(eval_art, dict) else {}
         )
-        poisson=(report or {}).get(selected_variant) if isinstance(report,dict) else None
-        if not isinstance(poisson,dict):
-            continue
+        candidate_keys = set(product_selection_rows) if isinstance(product_selection_rows, dict) else set()
 
-        is_half_line=abs((line % 1.0)-0.5)<1e-9
-        if is_half_line:
-            recent=[
-                {"win":(record["total"]>line if side=="over" else record["total"]<line),"timestamp":record["timestamp"]}
-                for record in unique_scores.values()
-            ]
-            recent.sort(key=lambda x:x.get("timestamp") or datetime.min.replace(tzinfo=timezone.utc))
-            recent=recent[-min(EFOOTBALL_DIRECTION_RECENT_WINDOW,len(recent)):] if recent else []
-            recent_source="UNIQUE_SETTLED_SCORE_REPLAY"
-        else:
-            arr=sorted(by_key.get((line,side),[]),key=lambda x:x.get("timestamp") or datetime.min.replace(tzinfo=timezone.utc))
-            recent=arr[-min(EFOOTBALL_DIRECTION_RECENT_WINDOW,len(arr)):] if arr else []
-            recent_source="DIRECT_EXACT_LINE"
+        # Legacy GT-only diagnostics are a compatibility fallback for older
+        # artifacts. Never use them to manufacture Adriatic line evidence.
+        legacy_gt_rows = {}
+        if product == "efootball_gt" and isinstance(eval_art, dict):
+            legacy_gt_rows = ((eval_art.get("efootball_gt_diagnostics") or {}).get("selection") or {})
+            if isinstance(legacy_gt_rows, dict):
+                candidate_keys.update(legacy_gt_rows)
 
-        holdout_n=int(poisson.get("n") or 0)
-        holdout_hit=float(poisson.get("hit_rate") or 0)
-        recent_n=len(recent)
-        recent_hit=(sum(1 for x in recent if x.get("win"))/recent_n) if recent_n else 0.0
-        passed=(
-            holdout_n>=EFOOTBALL_DIRECTION_MIN_HOLDOUT_ROWS and
-            holdout_hit>=EFOOTBALL_DIRECTION_MIN_HIT_RATE and
-            recent_n>=EFOOTBALL_DIRECTION_MIN_RECENT_ROWS and
-            recent_hit>=EFOOTBALL_DIRECTION_MIN_HIT_RATE
-        )
-        out[(line,side)]={
-            "pass":passed,
-            "holdout_n":holdout_n,
-            "holdout_hit_rate":round(holdout_hit,4),
-            "recent_n":recent_n,
-            "recent_hit_rate":round(recent_hit,4),
-            "threshold":EFOOTBALL_DIRECTION_MIN_HIT_RATE,
-            "recent_evidence_source":recent_source,
-            "excluded_conflicting_score_fixtures":len(score_conflicts),
-            "basis":"strict chronological holdout + recent unique settled-score replay for half-goal lines; direct exact-line outcomes for integer lines",
-        }
+        for selection_key in sorted(candidate_keys):
+            match = re.fullmatch(r"\s*([ou])\s*(\d+(?:\.\d+)?)\s*", str(selection_key).lower())
+            if not match:
+                continue
+            side = "over" if match.group(1) == "o" else "under"
+            line = float(match.group(2))
+
+            # Canonical source: strict chronological metrics for this product,
+            # this exact line and this exact side, using the same selected model
+            # variant as the live forecast.
+            evidence = exact_line_direction_oos(eval_art, product, line, side)
+            holdout_n = int(evidence.get("n") or 0)
+            holdout_hit = num(evidence.get("hit_rate"))
+
+            # Compatibility with the older GT-only diagnostic shape. There is
+            # deliberately no analogous cross-product fallback for Adriatic.
+            if holdout_n <= 0 and product == "efootball_gt":
+                legacy_line = legacy_gt_rows.get(str(selection_key)) if isinstance(legacy_gt_rows, dict) else None
+                legacy_record = legacy_line.get(f"{line:g}") if isinstance(legacy_line, dict) else None
+                variant = select_validated_virtual_model_variant(
+                    eval_art, product, participant_enabled=participant_enabled
+                )
+                legacy_metrics = legacy_record.get(variant) if isinstance(legacy_record, dict) else None
+                if isinstance(legacy_metrics, dict):
+                    holdout_n = int(legacy_metrics.get("n") or 0)
+                    holdout_hit = num(legacy_metrics.get("hit_rate"))
+
+            is_half_line = abs((line % 1.0) - 0.5) < 1e-9
+            if is_half_line:
+                # Replay one actual score per fixture, but only from the same
+                # product. This avoids counting several market-line rows from
+                # one match as several recent outcomes.
+                recent = [
+                    {
+                        "win": record["total"] > line if side == "over" else record["total"] < line,
+                        "timestamp": record["timestamp"],
+                    }
+                    for record in unique_scores.values()
+                    if record["fixture_key"].split("|", 1)[0] == product
+                ]
+                recent.sort(key=lambda row: row.get("timestamp") or datetime.min.replace(tzinfo=timezone.utc))
+                recent = recent[-EFOOTBALL_DIRECTION_RECENT_WINDOW:]
+                recent_source = "UNIQUE_SAME_PRODUCT_SETTLED_SCORE_REPLAY"
+            else:
+                exact_rows = []
+                fixture_rows = by_key.get((product, line, side), {})
+                for fixture, record in fixture_rows.items():
+                    if ( (product, line, side), fixture) in direct_conflicts:
+                        continue
+                    # Integer goal lines can push. Require the verified score
+                    # so pushes are excluded rather than silently counted as losses.
+                    if record.get("total") is None or record["total"] == line:
+                        continue
+                    exact_rows.append({"win": record["win"], "timestamp": record["timestamp"]})
+                exact_rows.sort(key=lambda row: row.get("timestamp") or datetime.min.replace(tzinfo=timezone.utc))
+                recent = exact_rows[-EFOOTBALL_DIRECTION_RECENT_WINDOW:]
+                recent_source = "UNIQUE_SAME_PRODUCT_EXACT_LINE_DIRECTION"
+
+            recent_n = len(recent)
+            recent_hit = (sum(1 for row in recent if row.get("win")) / recent_n) if recent_n else 0.0
+            valid_holdout_hit = holdout_hit if holdout_hit is not None else 0.0
+            passed = (
+                holdout_n >= EFOOTBALL_DIRECTION_MIN_HOLDOUT_ROWS
+                and valid_holdout_hit >= EFOOTBALL_DIRECTION_MIN_HIT_RATE
+                and recent_n >= EFOOTBALL_DIRECTION_MIN_RECENT_ROWS
+                and recent_hit >= EFOOTBALL_DIRECTION_MIN_HIT_RATE
+            )
+            out[(product, line, side)] = {
+                "product": product,
+                "line": line,
+                "side": side,
+                "pass": passed,
+                "holdout_n": holdout_n,
+                "holdout_hit_rate": round(valid_holdout_hit, 4) if holdout_hit is not None else None,
+                "model_variant": evidence.get("variant"),
+                "recent_n": recent_n,
+                "recent_hit_rate": round(recent_hit, 4),
+                "threshold": EFOOTBALL_DIRECTION_MIN_HIT_RATE,
+                "recent_evidence_source": recent_source,
+                "excluded_conflicting_score_fixtures": len(score_conflicts),
+                "basis": "strict product-specific chronological holdout plus recent unique same-product fixture outcomes; integer-line pushes excluded",
+            }
     return out
 
 
@@ -1374,7 +1446,7 @@ def build_virtual_events(history, lifecycle, eligibility, participant_history_fr
             model_comp=comp_key in product_model_comp.get(product,set())
             model_line=float(line) in product_model_line.get(product,set())
 
-            directional_key=(float(line),chosen_pick)
+            directional_key=(product,float(line),chosen_pick)
             directional=directional_gate.get(directional_key,{})
             exact_oos=exact_line_direction_oos(eval_art,product,line,chosen_pick)
             high_vfootball_under_pending=high_vfootball_under_requires_research(
@@ -1537,6 +1609,7 @@ def build_virtual_events(history, lifecycle, eligibility, participant_history_fr
         "base_model_gate":base_model_gate,
         "participant_enhancement_gate":participant_gate,
         "efootball_gt_recent_performance_gate":efootball_recent_performance_gate(desk_learning,"efootball_gt"),
+        "efootball_adriatic_recent_performance_gate":efootball_recent_performance_gate(desk_learning,"efootball_adriatic"),
         "participant_history_freshness":participant_freshness or {"fresh":bool(participant_history_fresh)},
         "live_refresh":live_refresh_meta,
         "prospective_poisson_shadow_coverage":shadow_coverage,
