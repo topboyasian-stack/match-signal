@@ -17,7 +17,7 @@ function normMarket(m){
     })).filter(o=>Number.isFinite(o.odds)&&o.odds>1&&o.active)
   };
 }
-function eventTournamentId(event){
+function getEventTournamentId(event){
   return String(event?.tournamentId??event?.tournament_id??event?.tournament?.id??event?.tournamentInfo?.id??event?.tournament?.tournamentId??'');
 }
 function eventTournamentName(event){
@@ -32,7 +32,7 @@ function getTournaments(payload){
   const grouped=new Map();
   for(const event of payload.data){
     if(!event||typeof event!=='object')continue;
-    const id=eventTournamentId(event);
+    const id=getEventTournamentId(event);
     if(!id)continue;
     if(!grouped.has(id))grouped.set(id,{id,name:eventTournamentName(event),events:[]});
     grouped.get(id).events.push(event);
@@ -134,7 +134,7 @@ export async function onRequestGet(context){
     for(const attempt of attempts){
       if(!attempt.payload)continue;
       for(const t of getTournaments(attempt.payload))for(const e of (Array.isArray(t?.events)?t.events:[])){
-        const eventTournamentId=String(t?.id??t?.tournamentId??eventTournamentId(e));
+        const eventTournamentId=String(t?.id??t?.tournamentId??getEventTournamentId(e));
         if(eventTournamentId!==NBA_TOURNAMENT_ID)continue;
         const id=String(e?.eventId??e?.id??'');
         const start=Number(e?.estimateStartTime??e?.startTime??e?.start_time_ms);
