@@ -30,7 +30,7 @@ BUCKET_WIDTH = 0.05
 MIN_CALIBRATION_N = 30
 EXACT_MIN_N = 20
 RECENT_WINDOW = 50
-TRACE_CAP = 50000
+TRACE_CAP = 20000
 SETTLEMENT_RECONCILIATION_GRACE_HOURS = 2
 CAPTURE_PROBABILITY_DELTA = 0.01
 CAPTURE_ODDS_DELTA = 0.01
@@ -1106,8 +1106,8 @@ def main():
     reconciliation["settled_ledger_rows"] = len(settled_ledger)
     reconciliation["settled_ledger_added_this_run"] = ledger_added
 
-    # The active trace is a bounded work queue; settled rows are retained there
-    # when capacity allows and are always preserved in the append-only ledger.
+    # The active trace is a bounded work queue sized to keep routine board
+    # publication manageable. Scored outcomes remain in the append-only ledger.
     trace = bound_trace(trace)
     settled = settled_forecasts(settled_ledger)
     products = sorted(

@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from scripts.efootball_desk_learning import (
+    TRACE_CAP, bound_trace, merge_settled_observations,
     market_research_score_rows, recent_fixture_window, reconcile, settlement_index,
 )
 
@@ -25,6 +26,42 @@ def row(product, start, home, away, win, settled, probability=0.6, line=2.5):
         "model_probability": probability,
         "line": line,
     }
+
+
+
+def test_trace_is_bounded_and_scored_settlements_remain_in_durable_ledger():
+    assert TRACE_CAP == 20000
+    now_text = "2026-11-03T20:00:00+00:00"
+    from datetime import datetime
+    trace = [
+        {
+            "event_id": f"pending-{i}",
+            "product": "efootball_gt",
+            "start_time": "2026-11-04T00:00:00+00:00",
+            "participant_1": f"home-{i}",
+            "participant_2": f"away-{i}",
+            "observed_at": now_text,
+            "settled": False,
+        }
+        for i in range(TRACE_CAP + 25)
+    ]
+    assert len(bound_trace(trace, now=datetime.fromisoformat(now_text))) <= TRACE_CAP
+
+    scored = {
+        "event_id": "settled-ledger-row",
+        "product": "efootball_gt",
+        "participant_1": "home",
+        "participant_2": "away",
+        "start_time": "2026-11-03T10:00:00+00:00",
+        "settled_at": "2026-11-03T10:05:00+00:00",
+        "settled": True,
+        "scored_forecast": True,
+        "actual_result": "WON",
+    }
+    ledger, added = merge_settled_observations([], [scored])
+    assert added == 1
+    assert len(ledger) == 1
+    assert ledger[0]["event_id"] == "settled-ledger-row"
 
 
 def test_adriatic_totals_forecast_reconciles_to_exact_settled_market_score():
