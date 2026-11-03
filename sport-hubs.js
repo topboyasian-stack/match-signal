@@ -68,6 +68,15 @@ function isOverUnderPrediction(x){
     ["over_under","total_goals_over_under","total_games","totals","total"].includes(market) ||
     ((side==="over"||side==="under")&&x?.line!=null);
 }
+function singleSelectionGateKey(x){
+  const sport=String(x?.sport||"").toLowerCase();
+  const event=String(x?.event_id||x?.id||"");
+  const pick=String(x?.pick||x?.selection||"").toLowerCase();
+  const total=isOverUnderPrediction(x)||pick==="over"||pick==="under";
+  const market=total?"over_under":"winner";
+  const line=total?String(x?.line??x?.analytics?.total_games?.line??x?.markets?.total_ou?.line??x?.markets?.over_under?.line??""):"";
+  return [sport,event,market,line,pick].join("|");
+}
 function exactVirtualMarketLine(market){
   // SportyBet's numeric "line" may be the integer base (for example 9)
   // while its explicit total specifier carries the actual half-goal market
@@ -362,7 +371,8 @@ function exactMarketExpectedReturn(x,quote){
 function qualificationState(x){
   const raw=String(x?.qualification_status||"").trim();
   const veto=qualificationVetoReason(x);
-  const modelQualified=!veto&&(Boolean(x?.betting_qualified)||Boolean(x?.qualified_for_builder)||raw.startsWith("BETTING_QUALIFIED"));
+  const singleSelectionGatePassed=x?.single_selection_gate?.status==="passed"&&x?.single_selection_gate?.mode==="PAPER_ONLY";
+  const modelQualified=!veto&&(Boolean(x?.betting_qualified)||Boolean(x?.qualified_for_builder)||raw.startsWith("BETTING_QUALIFIED")||singleSelectionGatePassed);
   const product=String(x?.product||"").toLowerCase();
   const exactLineCalibration=probabilityCalibrationInfo(x);
   const recentCalibration=efootballDeskLearning?.by_product?.[product]?.recent_window||null;
@@ -827,16 +837,22 @@ async function renderUnifiedBoard(){
     let selectionCandidatesLoaded=false;
     let selectionCandidatesError=null;
     let riskGate=null;
+    let singleSelectionGateRows=[];
+    let singleSelectionGateStatus=null;
     try{
-      const [sel,rg,learning]=await Promise.all([
+      const [sel,rg,learning,singleGateRows,singleGateStatus]=await Promise.all([
         get('./data/selection_candidates.json'),
         get('./data/risk_gate.json'),
-        get('./data/efootball_desk_learning.json').catch(()=>null)
+        get('./data/efootball_desk_learning.json').catch(()=>null),
+        get('./data/selection_gate_selected.json').catch(()=>[]),
+        get('./data/selection_gate.json').catch(()=>null)
       ]);
       selectedRows=Array.isArray(sel)?sel:[];
       selectionCandidatesLoaded=Array.isArray(sel);
       riskGate=rg;
       efootballDeskLearning=learning&&typeof learning==="object"?learning:null;
+      singleSelectionGateRows=Array.isArray(singleGateRows)?singleGateRows:[];
+      singleSelectionGateStatus=singleGateStatus&&typeof singleGateStatus==="object"?singleGateStatus:null;
     }catch(error){
       selectionCandidatesError=String(error?.message||error||"candidate source unavailable");
     }
@@ -937,6 +953,16 @@ async function renderUnifiedBoard(){
       const line=x?.line==null?"":String(x.line);
       return [event+"|"+pick+"|"+line,x];
     }));
+    // The single-selection gate is a separate paper-only path from the
+    // multi-leg Odds Builder. Import only exact event + market + line + side
+    // matches, and only from a recently generated gate report. The normal
+    // live quote, edge and expected-return checks still run below for every row.
+    const singleSelectionGateFresh=qualifiedBestSourceIsFresh(singleSelectionGateStatus?.generated_at);
+    const singleSelectionGateMap=new Map(
+      (singleSelectionGateFresh?singleSelectionGateRows:[])
+        .filter(x=>x?.selection_gate?.status==="passed")
+        .map(x=>[singleSelectionGateKey(x),x])
+    );
 
     // The core prediction feed intentionally does not contain Virtual/eFootball.
     // Bring the existing evidence-backed eFootball candidate lane onto the
@@ -1188,6 +1214,18 @@ async function renderUnifiedBoard(){
       }).filter(Boolean);
     }
     const annotate=(x)=>{
+      const selectedGate=singleSelectionGateMap.get(singleSelectionGateKey(x));
+      if(selectedGate){
+        x.single_selection_gate={
+          ...selectedGate.selection_gate,
+          status:"passed",
+          mode:"PAPER_ONLY",
+          source:"data/selection_gate_selected.json",
+          generated_at:singleSelectionGateStatus?.generated_at||null
+        };
+      }else{
+        delete x.single_selection_gate;
+      }
       const event=String(x?.event_id||"");
       const pick=String(x?.pick||x?.selection||"");
       const line=x?.line==null?"":String(x.line);
