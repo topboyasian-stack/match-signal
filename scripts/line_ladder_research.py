@@ -53,6 +53,18 @@ def number(value):
         return None
 
 
+def text_value(row, *keys):
+    """Return the first non-empty textual value from a source row."""
+    for key in keys:
+        value = row.get(key)
+        if value is None:
+            continue
+        text = " ".join(str(value).split())
+        if text:
+            return text
+    return ""
+
+
 def timestamp(value):
     try:
         return datetime.fromisoformat(
@@ -351,13 +363,43 @@ def current_anchors(builder, desk=None):
             if key in seen:
                 continue
             seen.add(key)
+            competition = (
+                text_value(
+                    row,
+                    "competition",
+                    "league",
+                    "competition_name",
+                    "tournament",
+                )
+                or "Unknown"
+            )
+            match = text_value(row, "match", "fixture", "event_name", "name")
+            if not match:
+                home = text_value(
+                    row,
+                    "participant_1",
+                    "player_1",
+                    "team_1",
+                    "home",
+                    "home_team",
+                )
+                away = text_value(
+                    row,
+                    "participant_2",
+                    "player_2",
+                    "team_2",
+                    "away",
+                    "away_team",
+                )
+                if home and away:
+                    match = f"{home} vs {away}"
             rows.append(
                 {
                     "source": source,
                     "product": product,
-                    "competition": str(row.get("competition") or "Unknown"),
+                    "competition": competition,
                     "event_id": event_id,
-                    "match": row.get("match") or row.get("fixture") or "",
+                    "match": match,
                     "anchor_line": float(line),
                     "anchor_side": side,
                     "anchor_model_probability": float(probability),

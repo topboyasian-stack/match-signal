@@ -29,6 +29,7 @@ on:
       - 'data/sportybet_odds_snapshot.json'
       - 'data/virtual_lab_live.json'
       - 'scripts/line_ladder_research.py'
+      - 'scripts/test_line_ladder_research.py'
       - '.github/workflows/odds_builder.yml'
   workflow_run:
     workflows:
@@ -101,6 +102,8 @@ jobs:
         run: python scripts/test_compact_efootball_builder.py
       - name: Syntax-check shadow line-ladder module
         run: python -m py_compile scripts/line_ladder_research.py
+      - name: Regression-test shadow anchor fixture identity mapping
+        run: python scripts/test_line_ladder_research.py
       - name: Run shadow directional line-ladder research
         run: python scripts/line_ladder_research.py
       - name: Validate shadow line-ladder report
