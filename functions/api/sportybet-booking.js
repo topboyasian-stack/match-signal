@@ -24,7 +24,7 @@ function json(body, status = 200) {
 }
 
 const NBA_RELEASE_CUTOFF='2026-11-02T02:00:00+00:00';
-const NBA_RELEASE_MODEL='nba-total-v5.1-pace-efficiency-calibrated';
+export const NBA_RELEASE_MODEL='nba-total-v5.1-pace-efficiency-calibrated';
 function nbaReleaseClose(a,b){return Number.isFinite(Number(a))&&Number.isFinite(Number(b))&&Math.abs(Number(a)-Number(b))<=1e-9;}
 export function nbaTotalsReleaseQualified(e,p){
  const h=e?.walk_forward?.holdout||{},m=e?.market_holdout||{},c=p?.prospective_pregame_snapshot_coverage||{},s=p?.prospective_probability_score_summary||{},v=p?.prospective_clv_diagnostics||{},cal=p?.calibration_protocol||{};
@@ -36,7 +36,7 @@ async function readNbaReleaseJson(path){
  if(!response.ok)throw new Error(path+' HTTP '+response.status);
  try{return JSON.parse(body);}catch(_){throw new Error(path+' returned non-JSON release evidence (HTTP '+response.status+', content-type '+String(response.headers.get('content-type')||'unknown')+').');}
 }
-async function loadNbaReleaseContext(){
+export async function loadNbaReleaseContext(){
  const [evidence,probability,predictions,snapshots]=await Promise.all([readNbaReleaseJson('data/nba_totals_oos_value_test.json'),readNbaReleaseJson('data/nba_totals_probability_value_experiment.json'),readNbaReleaseJson('data/nba_predictions.json'),readNbaReleaseJson('data/nba_totals_publication_snapshots.json')]);
  if(!Array.isArray(predictions)||!Array.isArray(snapshots))throw new Error('Invalid NBA release evidence arrays.');
  return{evidence,probability,predictions,snapshots};
