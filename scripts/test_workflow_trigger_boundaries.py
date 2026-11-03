@@ -50,6 +50,15 @@ def main():
     collector_paths = push_paths("virtual-lab-collector.yml")
     autopilot_paths = push_paths("autopilot-refresh.yml")
     board_concurrency = board.split("\nconcurrency:\n", 1)[1].split("\njobs:\n", 1)[0]
+    assert "github.event_name" in board_concurrency, (
+        "Push and upstream-completion board refreshes need separate pending queues."
+    )
+    assert "github.event.workflow_run.name" in board_concurrency, (
+        "An unrelated upstream completion must not replace the live-prediction board refresh."
+    )
+    assert "inputs.promotion_child" in board_concurrency, (
+        "Ordered Builder promotion children must remain isolated from normal board refreshes."
+    )
     assert "cancel-in-progress: false" in board_concurrency, (
         "The five-minute Upcoming schedule must not cancel an active slow board build before publication."
     )

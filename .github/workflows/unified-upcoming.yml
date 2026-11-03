@@ -137,7 +137,8 @@ concurrency:
   # Let a board build finish. Cancelling an active refresh every five minutes prevented
   # the slower model + publication steps from ever updating the canonical board.
   # Promotion-child refreshes remain isolated from the normal schedule.
-  group: match-signal-unified-upcoming-${{ github.event_name == 'workflow_dispatch' && inputs.promotion_child && 'promotion' || 'normal' }}
+  # Keep push, scheduled, manual-promotion, and each upstream completion in separate pending queues. GitHub retains only one pending run per concurrency group; shared normal groups silently replaced the prediction-pipeline board run with unrelated completion events.
+  group: match-signal-unified-upcoming-${{ github.event_name }}-${{ github.event_name == 'workflow_run' && github.event.workflow_run.name || github.event_name == 'workflow_dispatch' && inputs.promotion_child && 'promotion' || 'normal' }}
   cancel-in-progress: false
 
 jobs:
