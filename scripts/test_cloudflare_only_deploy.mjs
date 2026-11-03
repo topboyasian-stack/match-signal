@@ -114,6 +114,14 @@ assert.ok(
   "Keep the full research archive in Git, publish its compressed Pages copy, and fail preflight before uploading oversized assets.",
 );
 
+assert.ok(
+  cloudflare.includes("gzip -c data/efootball_desk_prediction_history.json > .pages-deploy/data/efootball_desk_prediction_history.json.gz") &&
+    cloudflare.includes("test ! -e .pages-deploy/data/efootball_desk_prediction_history.json") &&
+    cloudflare.includes('test "$desk_compressed_bytes" -lt "$MAX_PAGES_FILE_BYTES"') &&
+    !cloudflare.includes('test "$desk_original_bytes" -gt "$MAX_PAGES_FILE_BYTES"'),
+  "The eFootball desk archive must always have a bounded compressed Pages copy; deployment must not fail when the canonical source shrinks below the provider file-size limit.",
+);
+
 const monitor = fs.readFileSync(path.join(workflowsDir, "qualified-best-production-watch.yml"), "utf8");
 assert.match(
   monitor,
