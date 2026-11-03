@@ -327,5 +327,77 @@ class FuturePrematchFilterTests(unittest.TestCase):
         ))
 
 
+
+
+class CurrentSportyBetQuoteTimestampTests(unittest.TestCase):
+    def test_matched_live_snapshot_sets_builder_freshness_fields(self):
+        prediction_row = prediction()
+        prediction_row.update({
+            "pick": "p1",
+            "probabilities": {"p1": 0.70, "draw": 0.15, "p2": 0.15},
+            "market_odds_timestamp": "2026-11-03T12:00:00+00:00",
+            "odds_timestamp": "2026-11-03T12:00:00+00:00",
+        })
+        event = sporty_event(tournament="UEFA Champions League")
+        fetched_at = "2026-11-03T16:00:00+00:00"
+        snapshot = {
+            "provider": "SportyBet NG",
+            "event_id": "sr:match:fixture",
+            "tournament": "UEFA Champions League",
+            "category": "International Clubs",
+            "winner": {
+                "p1_book": 1.90, "draw_book": 3.40, "p2_book": 4.10,
+                "p1_fair_prob": 0.50, "draw_fair_prob": 0.28, "p2_fair_prob": 0.22,
+                "p1_fair_odds": 2.00, "draw_fair_odds": 3.57, "p2_fair_odds": 4.55,
+                "market_id": "1", "overround": 0.04,
+                "raw_outcomes": [
+                    {"id": "4", "name": "Home"},
+                    {"id": "X", "name": "Draw"},
+                    {"id": "5", "name": "Away"},
+                ],
+            },
+            "totals": [],
+            "fetched_at": fetched_at,
+        }
+        with (
+            mock.patch.object(
+                predict_today,
+                "fetch_sportybet_events",
+                side_effect=lambda sport_id, markets: [event] if sport_id == "sr:sport:1" else [],
+            ),
+            mock.patch.object(
+                predict_today, "_find_sportybet_match",
+                return_value=(event, {"method": "direct", "score": 1.0}),
+            ),
+            mock.patch.object(predict_today, "_sportybet_market_snapshot", return_value=snapshot),
+            mock.patch.object(predict_today, "_pick_sporty_total", return_value=None),
+        ):
+            stats = predict_today.attach_sportybet_market_layer([prediction_row])
+
+        self.assertEqual(stats["matched"], 1)
+        self.assertEqual(prediction_row["market_odds_timestamp"], fetched_at)
+        self.assertEqual(prediction_row["odds_timestamp"], fetched_at)
+        self.assertEqual(prediction_row["sportybet_market"]["fetched_at"], fetched_at)
+        self.assertEqual(prediction_row["market_insights"]["snapshot_at"], fetched_at)
+
+    def test_unmatched_fixture_does_not_keep_old_quote_timestamp(self):
+        prediction_row = prediction()
+        prediction_row.update({
+            "market_odds_timestamp": "2026-11-03T12:00:00+00:00",
+            "odds_timestamp": "2026-11-03T12:00:00+00:00",
+        })
+        with mock.patch.object(predict_today, "fetch_sportybet_events", return_value=[]):
+            stats = predict_today.attach_sportybet_market_layer([prediction_row])
+
+        self.assertEqual(stats["matched"], 0)
+        self.assertNotIn("market_odds_timestamp", prediction_row)
+        self.assertNotIn("odds_timestamp", prediction_row)
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
