@@ -242,7 +242,7 @@ test('NBA ticket resolves SportyBet event ID separately from ESPN prediction ID 
       request: requestFor([manualLeg(one), manualLeg(two)])
     });
     const body = await response.json();
-    assert.equal(mock.calls.raw, 4, 'all four server-side evidence files must be checked');
+    assert.equal(mock.calls.raw, 0, 'manual share-code requests must not be blocked by the model release report');
     assert.equal(mock.calls.feed, 3, 'the three bounded NBA catalog queries must use the proxy source');
     assert.equal(mock.calls.share, 0, 'must not request a share code when any NBA leg is missing');
     assert.equal(response.status, 409);
@@ -282,7 +282,7 @@ test('NBA ticket with a partial SportyBet acceptance withholds the provider shar
       request: requestFor([manualLeg(one), manualLeg(two)])
     });
     const body = await response.json();
-    assert.equal(mock.calls.raw, 4);
+    assert.equal(mock.calls.raw, 0, 'manual slip creation must not require the global model release report');
     assert.equal(mock.calls.feed, 3, 'the three bounded NBA catalog queries must use the proxy source');
     assert.equal(mock.calls.share, 1);
     assert.equal(response.status, 409);
@@ -297,22 +297,35 @@ test('NBA ticket with a partial SportyBet acceptance withholds the provider shar
   }
 });
 
-test('NBA code generation remains locked while the real release report is research-only', async () => {
-  const row = fixture('espn-one', 'sr:match:one', 'Boston Celtics', 'New York Knicks');
-  const bundle = buildEvidence([row]);
+test('manual NBA share-code preparation works while the model release report remains research-only', async () => {
+  const one = fixture('espn-one', 'sr:match:one', 'Boston Celtics', 'New York Knicks');
+  const two = fixture('espn-two', 'sr:match:two', 'Cleveland Cavaliers', 'Chicago Bulls', 30);
+  const bundle = buildEvidence([one, two]);
   bundle.evidence.release_decision = 'RESEARCH_ONLY';
-  const mock = installFetchMock({ bundle, events: [row] });
+  const mock = installFetchMock({
+    bundle,
+    events: [one, two],
+    shareResponse: {
+      bizCode: 10000,
+      data: {
+        shareCode: 'MANUALNBA99',
+        outcomes: [{ eventId: one.sportybetId, odds: 1.91 }, { eventId: two.sportybetId, odds: 1.91 }]
+      }
+    }
+  });
 
   try {
-    const response = await onRequest({ request: requestFor([manualLeg(row), {
-      ...manualLeg(row), event_id: 'espn-two', sportybet_event_id: 'sr:match:two',
-      player_1: 'Cleveland Cavaliers', player_2: 'Chicago Bulls'
-    }]) });
+    const response = await onRequest({ request: requestFor([manualLeg(one), manualLeg(two)]) });
     const body = await response.json();
-    assert.equal(response.status, 423);
-    assert.equal(body.error, 'NBA_RELEASE_GATE_LOCKED');
-    assert.equal(mock.calls.feed, 0, 'the locked release gate must stop before live selection resolution');
-    assert.equal(mock.calls.share, 0, 'the locked release gate must never request a code');
+    assert.equal(mock.calls.raw, 0, 'manual slip creation must not require the global model release report');
+    assert.equal(mock.calls.feed, 3, 'both fixtures must still be rechecked against current SportyBet catalogues');
+    assert.equal(mock.calls.share, 1, 'share-code creation follows only after both live selections validate');
+    assert.equal(response.status, 200, JSON.stringify(body));
+    assert.equal(body.ok, true);
+    assert.equal(body.booking_code, 'MANUALNBA99');
+    assert.equal(body.selection_count, 2);
+    assert.equal(body.partial, false);
+    assert.ok(body.selections.every(row => row.ok === true), 'each current fixture/market must be revalidated');
   } finally {
     mock.restore();
   }
