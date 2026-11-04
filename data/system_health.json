@@ -1,26 +1,26 @@
 {
-  "generated_at": "2026-11-04T16:52:47.538992+00:00",
+  "generated_at": "2026-11-04T17:01:51.506437+00:00",
   "status": "FAIL",
   "critical_issues": 2,
-  "warning_issues": 2,
+  "warning_issues": 3,
   "info_issues": 1,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
       "status": "STALE",
-      "age_hours": 4.81,
+      "age_hours": 4.97,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.17,
+      "age_hours": 0.14,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 1.13,
+      "age_hours": 1.29,
       "threshold_hours": 4
     },
     {
@@ -38,29 +38,29 @@
     {
       "engine": "virtual_participant_history",
       "status": "STALE",
-      "max_input_age_minutes": 362.3,
-      "virtual_lab_status_age_minutes": 365.0,
+      "max_input_age_minutes": 371.0,
+      "virtual_lab_status_age_minutes": 374.1,
       "threshold_minutes": 30.0,
       "stale_inputs": []
     },
     {
       "engine": "tennis_forward_discovery",
       "status": "PASS",
-      "age_hours": 4.75,
+      "age_hours": 4.9,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
       "status": "STALE",
-      "age_hours": 1.16,
+      "age_hours": 1.31,
       "threshold_hours": 0.5,
       "heartbeat_source": "virtual_lab_live.json",
       "events_count": 617
     },
     {
       "engine": "nba_live_observation_recorder",
-      "status": "PASS",
-      "age_hours": 0.16,
+      "status": "STALE",
+      "age_hours": 0.31,
       "threshold_hours": 0.25,
       "heartbeat_source": "nba_live_observations.json.gz",
       "games_tracked": 36,
@@ -105,17 +105,22 @@
     {
       "code": "STALE_CORE_PREDICTION_PIPELINE",
       "severity": "critical",
-      "detail": "updated_at age 4.81h exceeds 4h"
+      "detail": "updated_at age 4.97h exceeds 4h"
     },
     {
       "code": "VIRTUAL_PARTICIPANT_HISTORY_STALE",
       "severity": "warning",
-      "detail": "input older than 30 minutes: participant_lifecycle, collector_status, model_evaluation; oldest participant/settlement/model input is 362.3 minutes old; virtual_lab_status.json is 365.0 minutes old; current eFootball/virtual predictions must remain withheld until the source collector publishes fresh data"
+      "detail": "input older than 30 minutes: participant_lifecycle, collector_status, model_evaluation; oldest participant/settlement/model input is 371.0 minutes old; virtual_lab_status.json is 374.1 minutes old; current eFootball/virtual predictions must remain withheld until the source collector publishes fresh data"
     },
     {
       "code": "VIRTUAL_LIVE_FEED_STALE",
       "severity": "warning",
-      "detail": "virtual_lab_live.json age 1.16h exceeds 0.50h; a downstream Unified Upcoming refresh cannot substitute for a fresh source snapshot"
+      "detail": "virtual_lab_live.json age 1.31h exceeds 0.50h; a downstream Unified Upcoming refresh cannot substitute for a fresh source snapshot"
+    },
+    {
+      "code": "NBA_LIVE_OBSERVATION_STALE",
+      "severity": "warning",
+      "detail": "nba_live_observations.json.gz age 0.31h exceeds 0.25h; the in-game observation recorder has not published a recent heartbeat"
     },
     {
       "code": "PDL_EXPERIMENTAL_FEED_STALE",
@@ -125,7 +130,7 @@
     {
       "code": "PIPELINE_STALE",
       "severity": "critical",
-      "detail": "pipeline_status age 4.81h exceeds 4h"
+      "detail": "pipeline_status age 4.97h exceeds 4h"
     }
   ],
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
@@ -135,7 +140,7 @@
     "stale_live_flags_hidden": 0,
     "expired_settled_rows_hidden": 0,
     "virtual_market_rows_held_for_kickoff_window": 0,
-    "virtual_rows_held_for_stale_participant_history": 4702,
-    "virtual_rows_held_for_recent_product_drawdown": 55
+    "virtual_rows_held_for_stale_participant_history": 4901,
+    "virtual_rows_held_for_recent_product_drawdown": 62
   }
 }
