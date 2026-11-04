@@ -1014,7 +1014,7 @@ def prospective_probability_fixture_audit(probability_records, snapshots, calibr
     return audit_rows, coverage
 
 
-def run_experiment(history, ledger, predictions, now=None, snapshots=None):
+def run_experiment(history, ledger, predictions, now=None, snapshots=None, probability_settlements=None):
     now = now or datetime.now(timezone.utc)
     fitted = fit_residual_distribution(history)
     residuals = fitted.pop("calibration_residuals")
@@ -1092,17 +1092,14 @@ def run_experiment(history, ledger, predictions, now=None, snapshots=None):
     snapshot_coverage, snapshot_linked_event_ids = prospective_snapshot_coverage(
         v5_settled, snapshots or []
     )
-    prospective_settled_audit = [
-        row for row in settled_audit
-        if row.get("event_id") in snapshot_linked_event_ids
-        and parse_time(row.get("published_at")) is not None
-        and parse_time(row.get("published_at")) >= EVALUATION_CUTOFF_UTC
-    ]
+    prospective_probability_audit, prospective_probability_coverage = prospective_probability_fixture_audit(
+        probability_settlements or [], snapshots or [], residuals
+    )
     probability_scores = probability_score_summary(settled_audit)
     prospective_probability_scores = probability_score_summary(
-        prospective_settled_audit,
+        prospective_probability_audit,
         minimum_descriptive_sample=MIN_PROSPECTIVE_PROBABILITY_SCORE,
-        cohort_label="post-cutoff prospective cohort with exact linked pregame snapshots",
+        cohort_label="post-cutoff unique settled market-225 fixtures with exact immutable opening snapshots",
     )
     prospective_bets = [
         row for row in settled
@@ -1179,6 +1176,8 @@ def run_experiment(history, ledger, predictions, now=None, snapshots=None):
         "settled_v5_clv_diagnostics": clv_audit,
         "settled_v5_probability_score_summary": probability_scores,
         "prospective_pregame_snapshot_coverage": snapshot_coverage,
+        "prospective_probability_fixture_coverage": prospective_probability_coverage,
+        "prospective_probability_fixture_audit": prospective_probability_audit,
         "prospective_probability_score_summary": prospective_probability_scores,
         "prospective_clv_diagnostics": prospective_clv,
         "prospective_clv_release_check_passed": prospective_clv["positive_clv_release_check_passed"],
@@ -1196,7 +1195,11 @@ def run_experiment(history, ledger, predictions, now=None, snapshots=None):
         "prospective_settled_market_bets_after_cutoff": len(prospective_bets),
         "prospective_minimum_sample_reached": prospective_minimum_sample_reached,
         "prospective_probability_scored_unique_fixtures": prospective_probability_scores["n"],
-        "prospective_probability_validation_sample_met": prospective_probability_scores["sufficient_for_probability_validation"],
+        "prospective_probability_settled_unique_fixtures": prospective_probability_coverage["valid_unique_settled_fixtures"],
+        "prospective_probability_validation_sample_met": bool(
+            prospective_probability_coverage["sample_threshold_met"]
+            and prospective_probability_scores["sufficient_for_probability_validation"]
+        ),
         "live_value_decisions_authorized": False,
         "release_decision": "RESEARCH_ONLY",
         "release_reason": (
@@ -1212,8 +1215,15 @@ def main():
     ledger = json.loads(LEDGER.read_text(encoding="utf-8"))
     predictions = json.loads(PREDICTIONS.read_text(encoding="utf-8"))
     snapshots = json.loads((DATA / "nba_totals_publication_snapshots.json").read_text(encoding="utf-8"))
+    probability_payload = json.loads(
+        (DATA / "nba_totals_probability_settlements.json").read_text(encoding="utf-8")
+    ) if (DATA / "nba_totals_probability_settlements.json").exists() else {}
+    probability_records = probability_payload.get("records", []) if isinstance(probability_payload, dict) else []
     records = ledger.get("records", []) if isinstance(ledger, dict) else []
-    report = run_experiment(history, records, predictions, snapshots=snapshots)
+    report = run_experiment(
+        history, records, predictions, snapshots=snapshots,
+        probability_settlements=probability_records,
+    )
     OUTPUT.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({
         "experiment": report["experiment"],
