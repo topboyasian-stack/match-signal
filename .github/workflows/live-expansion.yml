@@ -32,7 +32,9 @@ permissions:
   contents: write
 
 concurrency:
-  group: match-signal-pipeline
+  # Keep scheduled NBA forecast refreshes separate from push/manual runs so
+  # repository activity cannot replace the periodic model-refresh slot.
+  group: match-signal-pipeline-${{ github.event_name == 'schedule' && 'scheduled' || 'event-driven' }}
   cancel-in-progress: false
 
 jobs:
