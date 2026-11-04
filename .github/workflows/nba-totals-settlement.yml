@@ -18,7 +18,9 @@ on:
 permissions:
   contents: write
 concurrency:
-  group: nba-totals-settlement-ledger
+  # Keep the scheduled reconciliation lane independent of capture-triggered runs;
+  # otherwise a pending cron run can be replaced by workflow_run queue churn.
+  group: nba-totals-settlement-ledger-${{ github.event_name == 'schedule' && 'scheduled' || 'event-driven' }}
   cancel-in-progress: false
 jobs:
   settle:
