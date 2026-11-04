@@ -1,0 +1,68 @@
+name: Core Reliability Regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "functions/api/sportybet-booking.js"
+      - "ticket-drawer.js"
+      - "ticket-drawer.css"
+      - "scripts/test_sportybet_booking_resilience.mjs"
+      - "scripts/test_ticket_drawer_contract.py"
+      - "scripts/test_upcoming_desk_policy.py"
+      - "scripts/test_upcoming_settlement_retention.py"
+      - "scripts/test_odds_builder_upcoming_desk_recent_losses.py"
+      - "scripts/test_ticket_calibration_history.py"
+      - "scripts/test_efootball_desk_learning.py"
+      - "scripts/unified_upcoming.py"
+      - "scripts/odds_builder_core.py"
+      - "scripts/efootball_desk_learning.py"
+      - "docs/CORE_RELIABILITY_GUARDRAILS.md"
+      - ".github/workflows/core-reliability-regression.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: core-reliability-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  deterministic-regression:
+    name: Deterministic core contracts (no production services)
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Check out proposed revision
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Verify shared ticket API and mixed-sport regressions
+        run: node scripts/test_sportybet_booking_resilience.mjs
+
+      - name: Verify shared ticket UI contract
+        run: python scripts/test_ticket_drawer_contract.py
+
+      - name: Verify upcoming desk publication/evidence rules
+        run: python scripts/test_upcoming_desk_policy.py
+
+      - name: Verify settlement retention and idempotency contracts
+        run: python scripts/test_upcoming_settlement_retention.py
+
+      - name: Verify Odds Builder settled-history gates
+        run: python scripts/test_odds_builder_upcoming_desk_recent_losses.py
+
+      - name: Verify ticket calibration history
+        run: python scripts/test_ticket_calibration_history.py
+
+      - name: Verify eFootball exact-product settlement reconciliation
+        run: python scripts/test_efootball_desk_learning.py
