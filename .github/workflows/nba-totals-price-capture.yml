@@ -31,7 +31,9 @@ permissions:
   contents: write
 
 concurrency:
-  group: nba-totals-price-capture
+  # GitHub permits only one pending run per concurrency group. Keep the cron
+  # lane separate so event-driven board/Builder completions cannot replace it.
+  group: nba-totals-price-capture-${{ github.event_name == 'schedule' && 'scheduled' || 'event-driven' }}
   cancel-in-progress: false
 
 jobs:
