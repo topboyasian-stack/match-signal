@@ -14,6 +14,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 import predict_today
+import settle_same_day
 from prediction_identity import (
     append_new_predictions,
     football_result_participants_match,
@@ -116,6 +117,60 @@ class PredictionIdentityTests(unittest.TestCase):
         self.assertEqual(settled[1]["actual"], "p2")
         self.assertTrue(settled[1]["correct"])
 
+    def test_summary_settlement_also_scopes_same_event_id_by_competition(self):
+        event_id = "same-summary-id"
+        ucl_event = scoreboard_event(event_id, "Borussia Dortmund", "Real Betis", 2, 1)
+        domestic_event = scoreboard_event(event_id, "Bayern Munich", "RB Leipzig", 0, 3)
+        rows = [
+            {
+                "sport": "football", "league": "Champions League", "event_id": event_id,
+                "player_1": "Borussia Dortmund", "player_2": "Real Betis", "pick": "p1",
+                "probabilities": {"p1": 0.60, "draw": 0.25, "p2": 0.15},
+                "markets": {"over_under": {"line": 2.5}},
+            },
+            {
+                "sport": "football", "league": "Bundesliga", "event_id": event_id,
+                "player_1": "Bayern Munich", "player_2": "RB Leipzig", "pick": "p2",
+                "probabilities": {"p1": 0.25, "draw": 0.25, "p2": 0.50},
+                "markets": {"over_under": {"line": 2.5}},
+            },
+        ]
+
+        def fake_summary(sport, league, requested_id):
+            self.assertEqual(requested_id, event_id)
+            event = ucl_event if league == "uefa.champions" else domestic_event if league == "ger.1" else None
+            return {"header": {"competitions": [event]}} if event else {"header": {"competitions": []}}
+
+        with patch.object(settle_same_day, "event_summary", side_effect=fake_summary):
+            count, _ = settle_same_day.settle(rows)
+
+        self.assertEqual(count, 2)
+        self.assertEqual(rows[0]["final_score"], [2, 1])
+        self.assertEqual(rows[0]["actual"], "p1")
+        self.assertTrue(rows[0]["correct"])
+        self.assertEqual(rows[1]["final_score"], [0, 3])
+        self.assertEqual(rows[1]["actual"], "p2")
+        self.assertTrue(rows[1]["correct"])
+
+    def test_wrong_competitor_pair_remains_unsettled(self):
+        today = datetime.now(timezone.utc).date().isoformat()
+        event_id = "mismatched-provider-event-id"
+        wrong_event = scoreboard_event(event_id, "Another Club", "Real Betis", 2, 1)
+        row = {
+            "sport": "football", "league": "Champions League", "event_id": event_id,
+            "start_time": today + "T18:00:00Z", "player_1": "Borussia Dortmund",
+            "player_2": "Real Betis", "pick": "p1",
+            "probabilities": {"p1": 0.60, "draw": 0.25, "p2": 0.15},
+            "markets": {"over_under": {"line": 2.5}},
+        }
+
+        def fake_scoreboard(sport, league, date):
+            return {"events": [wrong_event]} if sport == "soccer" and league == "uefa.champions" else {"events": []}
+
+        with patch.object(predict_today, "fetch_scoreboard", side_effect=fake_scoreboard):
+            settled = predict_today.settle_predictions([row])
+        self.assertFalse(settled[0].get("settled", False))
+        self.assertNotIn("final_score", settled[0])
     def test_prediction_and_settlement_writers_do_not_truncate_history(self):
         prediction_source = (SCRIPTS / "predict_today.py").read_text(encoding="utf-8")
         settlement_source = (SCRIPTS / "settle_same_day.py").read_text(encoding="utf-8")
