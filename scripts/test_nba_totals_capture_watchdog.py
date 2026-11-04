@@ -17,7 +17,10 @@ def run():
     root = Path(__file__).resolve().parents[1]
     capture_workflow = (root / ".github/workflows/nba-totals-price-capture.yml").read_text(encoding="utf-8")
     watchdog_workflow = (root / ".github/workflows/nba-totals-capture-watchdog.yml").read_text(encoding="utf-8")
-    assert "cron: '*/10 * * * *'" in capture_workflow, (
+    assert (
+        "cron: '*/10 * * * *'" in capture_workflow
+        or "cron: '0,10,20,30,40,50 * * * *'" in capture_workflow
+    ), (
         "NBA SportyBet market-225 capture must run every 10 minutes to protect the 15-minute quote freshness gate."
     )
     assert "cron: '5,15,25,35,45,55 * * * *'" in watchdog_workflow, (
