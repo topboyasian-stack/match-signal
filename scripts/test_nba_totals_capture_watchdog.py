@@ -6,7 +6,7 @@ from pathlib import Path
 from nba_totals_capture_watchdog import (
     capture_age_minutes, should_dispatch_capture,
     stale_upcoming_prediction_count, should_dispatch_model_refresh,
-    should_dispatch_research_refresh,
+    should_dispatch_settlement, should_dispatch_probability_report,
 )
 
 
@@ -63,24 +63,57 @@ def run():
 
 
     model_now = dt("2026-11-02T13:55:00Z")
-    assert should_dispatch_research_refresh(
-        "2026-11-02T13:35:00Z", model_now, active_research_runs=0
-    ), "A report at the 20-minute stale boundary must trigger research recovery."
-    assert not should_dispatch_research_refresh(
-        "2026-11-02T13:40:00Z", model_now, active_research_runs=0
-    ), "A report under the 20-minute recovery boundary must not be duplicated."
-    assert not should_dispatch_research_refresh(
-        "2026-11-02T13:00:00Z", model_now, active_research_runs=1
-    ), "An active/queued report refresh must suppress a recovery dispatch."
-    assert should_dispatch_research_refresh(
-        None, model_now, active_research_runs=0
-    ), "A missing report timestamp must fail safe to research recovery."
-    assert not should_dispatch_research_refresh(
-        "2026-11-02T13:58:00Z", model_now, active_research_runs=0
+    assert should_dispatch_settlement(
+        "2026-11-02T13:39:59Z", model_now, active_settlement_runs=0, max_age_minutes=15
+    ), "A settlement ledger at the 15-minute stale boundary must trigger official ESPN settlement recovery."
+    assert not should_dispatch_settlement(
+        "2026-11-02T13:40:01Z", model_now, active_settlement_runs=0, max_age_minutes=15
+    ), "A fresh settlement ledger must not be duplicated."
+    assert not should_dispatch_settlement(
+        "2026-11-02T13:00:00Z", model_now, active_settlement_runs=1, max_age_minutes=15
+    ), "An active settlement run must suppress duplicate settlement recovery."
+    assert should_dispatch_settlement(None, model_now, active_settlement_runs=0), (
+        "A missing settlement ledger timestamp must fail safe to official settlement recovery."
+    )
+
+    assert should_dispatch_probability_report(
+        "2026-11-02T13:35:00Z", "2026-11-02T13:50:00Z", model_now,
+        active_research_runs=0, active_settlement_runs=0, max_age_minutes=15
+    ), "A stale report with newer capture/settlement evidence must trigger research recovery."
+    assert not should_dispatch_probability_report(
+        "2026-11-02T13:45:00Z", "2026-11-02T13:50:00Z", model_now,
+        active_research_runs=0, active_settlement_runs=0, max_age_minutes=15
+    ), "A report under the 15-minute recovery boundary must not be duplicated."
+    assert not should_dispatch_probability_report(
+        "2026-11-02T13:00:00Z", "2026-11-02T13:50:00Z", model_now,
+        active_research_runs=1, active_settlement_runs=0, max_age_minutes=15
+    ), "An active research run must suppress duplicate recovery."
+    assert not should_dispatch_probability_report(
+        "2026-11-02T13:00:00Z", "2026-11-02T13:50:00Z", model_now,
+        active_research_runs=0, active_settlement_runs=1, max_age_minutes=15
+    ), "An active settlement run must finish before report recovery."
+    assert not should_dispatch_probability_report(
+        "2026-11-02T13:00:00Z", "2026-11-02T13:50:00Z", model_now,
+        active_research_runs=0, active_settlement_runs=0, settlement_dispatched=True,
+        max_age_minutes=15
+    ), "A just-dispatched settlement must finish before report recovery."
+    assert not should_dispatch_probability_report(
+        "2026-11-02T13:50:00Z", "2026-11-02T13:40:00Z", model_now,
+        active_research_runs=0, active_settlement_runs=0, max_age_minutes=15
+    ), "Older source evidence must not cause a needless report refresh."
+    assert not should_dispatch_probability_report(
+        "2026-11-02T13:58:00Z", "2026-11-02T13:50:00Z", model_now,
+        active_research_runs=0, active_settlement_runs=0, max_age_minutes=15
     ), "Small future clock skew must not cause a report refresh loop."
-    assert "Dispatch stale NBA totals research report recovery" in watchdog_workflow
+
+    assert '"NBA totals SportyBet market-225 price capture"' in watchdog_workflow, (
+        "Capture completion must trigger settlement/report recovery even when a schedule is missed."
+    )
+    assert "Dispatch stale official ESPN settlement recovery" in watchdog_workflow
+    assert "gh workflow run nba-totals-settlement.yml --ref main" in watchdog_workflow
+    assert "should_dispatch_probability_report" in watchdog_workflow
     assert "gh workflow run nba-totals-probability-value.yml --ref main" in watchdog_workflow, (
-        "The watchdog must recover missed report schedules using the existing research workflow."
+        "The watchdog must recover missed report refreshes without changing qualification thresholds."
     )
     assert 'sys.path.insert(0, "scripts")' in watchdog_workflow, (
         "The inline watchdog recovery step must import its tested policy from the scripts directory."
@@ -119,7 +152,7 @@ def run():
         "Missing prediction content and model status must fail safe to recovery."
     )
 
-    print("PASS: capture/model/report recovery, 20-minute report boundary, active-run suppression, and clock-skew cases.")
+    print("PASS: capture, model, ESPN settlement, and probability-report recovery; freshness boundaries, active-run suppression, and clock-skew cases.")
 
 
 if __name__ == "__main__":
