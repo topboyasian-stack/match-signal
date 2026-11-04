@@ -1,8 +1,9 @@
 """Regression tests for event-driven NBA totals report refresh timing."""
 
 from datetime import datetime, timezone
+from pathlib import Path
 
-from nba_totals_report_refresh_gate import should_refresh_report
+from nba_totals_report_refresh_gate import latest_snapshot_evidence_time, should_refresh_report
 
 
 def dt(value):
@@ -10,6 +11,36 @@ def dt(value):
 
 
 def run():
+
+    # A repeated quote revision retains the original publication time; the later
+    # quote timestamp must still make the research report stale for CLV purposes.
+    quote_revisions = [
+        {
+            "totals_model_version": "nba-total-v5.1-pace-efficiency-calibrated",
+            "event_id": "401909922",
+            "published_at": "2026-11-02T05:00:00Z",
+            "quote_timestamp": "2026-11-02T05:00:00Z",
+        },
+        {
+            "totals_model_version": "nba-total-v5.1-pace-efficiency-calibrated",
+            "event_id": "401909922",
+            "published_at": "2026-11-02T05:00:00Z",
+            "quote_timestamp": "2026-11-02T06:53:33Z",
+        },
+        {
+            "totals_model_version": "other-model",
+            "published_at": "2026-11-02T07:00:00Z",
+            "quote_timestamp": "2026-11-02T07:00:00Z",
+        },
+    ]
+    assert latest_snapshot_evidence_time(
+        quote_revisions, "nba-total-v5.1-pace-efficiency-calibrated"
+    ) == dt("2026-11-02T06:53:33Z"), (
+        "A newer exact SportyBet quote revision must refresh CLV diagnostics even "
+        "when it does not create a new publication, bet, or fixture."
+    )
+    assert latest_snapshot_evidence_time([], "nba-total-v5.1-pace-efficiency-calibrated") is None
+
     now = dt("2026-11-02T06:53:45Z")
     prior_report = dt("2026-11-02T06:49:43Z")
     new_capture = dt("2026-11-02T06:53:33Z")
@@ -43,7 +74,12 @@ def run():
         now,
     ), "A report newer than all evidence must not rerun."
 
-    print("PASS: event-driven evidence refresh, duplicate suppression, schedule throttle, and missing-report cases.")
+    workflow = (Path(__file__).resolve().parents[1] / ".github/workflows/nba-totals-probability-value.yml").read_text(encoding="utf-8")
+    assert "latest_snapshot_evidence_time" in workflow and "quote_timestamp" in workflow, (
+        "The scheduled/event-driven workflow must include newer immutable quote revisions in its report-refresh decision."
+    )
+
+    print("PASS: quote-revision evidence freshness, event-driven refresh, duplicate suppression, schedule throttle, and missing-report cases.")
 
 
 if __name__ == "__main__":
