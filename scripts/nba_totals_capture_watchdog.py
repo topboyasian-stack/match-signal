@@ -66,6 +66,51 @@ def should_dispatch_research_refresh(
     return age >= float(max_age_minutes)
 
 
+def should_dispatch_settlement(
+    ledger_updated_at,
+    now,
+    active_settlement_runs=0,
+    max_age_minutes=15,
+):
+    """Recover official ESPN settlement polling when the ledger has gone stale."""
+    age = capture_age_minutes(ledger_updated_at, now)
+    stale = age is None or age < -2 or age >= float(max_age_minutes)
+    try:
+        active = int(active_settlement_runs)
+    except (TypeError, ValueError):
+        active = 1
+    return stale and active <= 0
+
+
+def should_dispatch_probability_report(
+    report_generated_at,
+    latest_source_updated_at,
+    now,
+    active_research_runs=0,
+    active_settlement_runs=0,
+    settlement_dispatched=False,
+    max_age_minutes=15,
+):
+    """Refresh a stale prospective report only after newer evidence is available."""
+    current = _utc(now)
+    if current is None or settlement_dispatched:
+        return False
+    try:
+        if int(active_research_runs) > 0 or int(active_settlement_runs) > 0:
+            return False
+    except (TypeError, ValueError):
+        return False
+
+    report = _utc(report_generated_at)
+    source = _utc(latest_source_updated_at)
+    if report is None:
+        return True
+    age = (current - report).total_seconds() / 60
+    if age < -2 or age < float(max_age_minutes):
+        return False
+    return source is None or source > report
+
+
 def stale_upcoming_prediction_count(predictions, now, max_age_hours=6):
     """Count upcoming NBA rows the client must withhold as stale pre-game baselines.
 
