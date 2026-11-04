@@ -198,3 +198,65 @@ jobs:
           set -euo pipefail
           gh workflow run live-expansion.yml --ref main
           echo "Dispatched the existing NBA model/fixture refresh; basketball release remains research-only."
+
+      - name: Count queued or running NBA totals research refreshes
+        id: active_research
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          active="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/nba-totals-probability-value.yml/runs?branch=main&per_page=20" --jq '[.workflow_runs[] | select(.status == "queued" or .status == "in_progress")] | length')"
+          echo "count=$active" >> "$GITHUB_OUTPUT"
+          echo "Active NBA totals research refreshes: $active"
+
+      - name: Decide whether the NBA totals research report is stale
+        id: research_freshness
+        env:
+          ACTIVE_RESEARCH_RUNS: ${{ steps.active_research.outputs.count }}
+          MODEL_REFRESH_DISPATCHED: ${{ steps.model_freshness.outputs.dispatch }}
+        run: |
+          set -euo pipefail
+          python - <<'PY' | tee -a "$GITHUB_OUTPUT"
+          import json
+          import os
+          from datetime import datetime, timezone
+          from pathlib import Path
+          from nba_totals_capture_watchdog import (
+              capture_age_minutes,
+              should_dispatch_research_refresh,
+          )
+
+          now = datetime.now(timezone.utc)
+          try:
+              report = json.loads(Path("data/nba_totals_probability_value_experiment.json").read_text(encoding="utf-8"))
+              generated_at = report.get("generated_at")
+          except Exception:
+              generated_at = None
+          active = int(os.environ.get("ACTIVE_RESEARCH_RUNS", "0"))
+          model_dispatched = os.environ.get("MODEL_REFRESH_DISPATCHED", "").lower() == "true"
+          age = capture_age_minutes(generated_at, now)
+          dispatch = should_dispatch_research_refresh(
+              generated_at, now, active_research_runs=active, max_age_minutes=20
+          ) and not model_dispatched
+          print(f"report_age_minutes={age:.2f}" if age is not None else "report_age_minutes=unknown")
+          print(f"active_research_runs={active}")
+          print(f"model_refresh_dispatched={str(model_dispatched).lower()}")
+          print(f"dispatch={'true' if dispatch else 'false'}")
+          if dispatch:
+              print("reason=report_missing_or_at_least_20_minutes_old_and_no_active_refresh")
+          elif active:
+              print("reason=research_refresh_already_queued_or_running")
+          elif model_dispatched:
+              print("reason=wait_for_new_model_publication_before_refreshing_report")
+          else:
+              print("reason=report_within_recovery_window")
+          PY
+
+      - name: Dispatch stale NBA totals research report recovery
+        if: steps.research_freshness.outputs.dispatch == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh workflow run nba-totals-probability-value.yml --ref main
+          echo "Dispatched the existing NBA totals probability/value research workflow; all release gates remain unchanged."
