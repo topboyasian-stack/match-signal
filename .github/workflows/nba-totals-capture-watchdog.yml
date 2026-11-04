@@ -39,6 +39,22 @@ jobs:
         with:
           ref: main
 
+      - name: Re-enable NBA research and capture schedules after delivery gaps
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for workflow in \
+            nba-totals-price-capture.yml \
+            nba-totals-probability-value.yml \
+            nba-totals-settlement.yml \
+            nba-totals-capture-watchdog.yml \
+            live-expansion.yml; do
+            echo "Ensuring scheduled workflow is enabled: $workflow"
+            gh workflow enable "$workflow" --repo "$GITHUB_REPOSITORY"
+          done
+
       - name: Test stale-capture recovery policy
         run: PYTHONPATH=scripts python scripts/test_nba_totals_capture_watchdog.py
 
