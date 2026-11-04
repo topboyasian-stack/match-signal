@@ -6,6 +6,7 @@ from pathlib import Path
 from nba_totals_capture_watchdog import (
     capture_age_minutes, should_dispatch_capture,
     stale_upcoming_prediction_count, should_dispatch_model_refresh,
+    should_dispatch_research_refresh,
 )
 
 
@@ -60,6 +61,27 @@ def run():
         "A timestamp more than two minutes in the future must fail safe."
     )
 
+
+    assert should_dispatch_research_refresh(
+        "2026-11-02T13:35:00Z", model_now, active_research_runs=0
+    ), "A report at the 20-minute stale boundary must trigger research recovery."
+    assert not should_dispatch_research_refresh(
+        "2026-11-02T13:40:00Z", model_now, active_research_runs=0
+    ), "A report under the 20-minute recovery boundary must not be duplicated."
+    assert not should_dispatch_research_refresh(
+        "2026-11-02T13:00:00Z", model_now, active_research_runs=1
+    ), "An active/queued report refresh must suppress a recovery dispatch."
+    assert should_dispatch_research_refresh(
+        None, model_now, active_research_runs=0
+    ), "A missing report timestamp must fail safe to research recovery."
+    assert not should_dispatch_research_refresh(
+        "2026-11-02T13:58:00Z", model_now, active_research_runs=0
+    ), "Small future clock skew must not cause a report refresh loop."
+    assert "Dispatch stale NBA totals research report recovery" in watchdog_workflow
+    assert "gh workflow run nba-totals-probability-value.yml --ref main" in watchdog_workflow, (
+        "The watchdog must recover missed report schedules using the existing research workflow."
+    )
+
     model_now = dt("2026-11-02T13:55:00Z")
     fresh_upcoming = [{
         "event_id": "fresh-1", "start_time": "2026-11-02T20:00:00Z",
@@ -94,7 +116,7 @@ def run():
         "Missing prediction content and model status must fail safe to recovery."
     )
 
-    print("PASS: stale/missing capture and NBA model recovery, freshness boundary, active-run suppression, and clock-skew cases.")
+    print("PASS: capture/model/report recovery, 20-minute report boundary, active-run suppression, and clock-skew cases.")
 
 
 if __name__ == "__main__":
