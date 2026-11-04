@@ -2,8 +2,15 @@
 
 from datetime import datetime, timezone
 from pathlib import Path
+import tempfile
 
-from nba_totals_report_refresh_gate import latest_snapshot_evidence_time, should_refresh_report
+from nba_totals_report_refresh_gate import (
+    SOURCE_DATA_FILES,
+    latest_snapshot_evidence_time,
+    report_source_fingerprint_matches,
+    should_refresh_report,
+    source_data_fingerprint,
+)
 
 
 def dt(value):
@@ -41,6 +48,30 @@ def run():
     )
     assert latest_snapshot_evidence_time([], "nba-total-v5.1-pace-efficiency-calibrated") is None
 
+
+    # A report generated after a capture can still have used an older checkout.
+    # Fingerprints, not generated_at alone, must detect that race.
+    with tempfile.TemporaryDirectory() as temp_dir:
+        root = Path(temp_dir)
+        for relative in SOURCE_DATA_FILES:
+            path = root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("version-one", encoding="utf-8")
+        first_fingerprint = source_data_fingerprint(root)
+        assert report_source_fingerprint_matches(
+            {"source_data_fingerprint": first_fingerprint}, first_fingerprint
+        )
+        assert not report_source_fingerprint_matches({}, first_fingerprint), (
+            "Reports without source fingerprints must be treated as unverified inputs."
+        )
+        changed_path = root / "data/nba_totals_probability_settlements.json"
+        changed_path.write_text("version-two", encoding="utf-8")
+        second_fingerprint = source_data_fingerprint(root)
+        assert second_fingerprint != first_fingerprint
+        assert not report_source_fingerprint_matches(
+            {"source_data_fingerprint": first_fingerprint}, second_fingerprint
+        )
+
     now = dt("2026-11-02T06:53:45Z")
     prior_report = dt("2026-11-02T06:49:43Z")
     new_capture = dt("2026-11-02T06:53:33Z")
@@ -73,13 +104,22 @@ def run():
         dt("2026-11-02T06:52:00Z"),
         now,
     ), "A report newer than all evidence must not rerun."
+    assert should_refresh_report(
+        "workflow_run", now, new_capture, now, source_fingerprint_matches=False
+    ), "A capture committed during report generation must force a fresh-input rerun even when generated_at is later."
+    assert not should_refresh_report(
+        "schedule", now, new_capture, now, source_fingerprint_matches=False
+    ), "Periodic schedule refreshes must keep the ten-minute throttle."
 
     workflow = (Path(__file__).resolve().parents[1] / ".github/workflows/nba-totals-probability-value.yml").read_text(encoding="utf-8")
     assert "latest_snapshot_evidence_time" in workflow, (
         "The scheduled/event-driven workflow must include newer immutable quote revisions in its report-refresh decision."
     )
+    assert "source_data_fingerprint" in workflow and "report_source_fingerprint_matches" in workflow, (
+        "The workflow must detect source files that changed after a run checked out main."
+    )
 
-    print("PASS: quote-revision evidence freshness, event-driven refresh, duplicate suppression, schedule throttle, and missing-report cases.")
+    print("PASS: quote-revision freshness, source fingerprint race recovery, duplicate suppression, schedule throttle, and missing-report cases.")
 
 
 if __name__ == "__main__":
