@@ -2,9 +2,10 @@ name: NBA totals SportyBet market-225 price capture
 
 on:
   schedule:
-    # Explicit equivalent of */10: re-arm the scheduled capture while retaining
-    # the 10-minute cadence and the existing 15-minute quote-freshness contract.
-    - cron: '0,10,20,30,40,50 * * * *'
+    # Offset the 10-minute capture cadence to re-arm schedule delivery away
+    # from the busiest minute boundaries; the 15-minute quote-freshness contract
+    # is unchanged and event-driven recovery remains enabled.
+    - cron: '1,11,21,31,41,51 * * * *'
   workflow_dispatch:
   workflow_run:
     # Re-capture after a model/line refresh, final Builder promotion, or board refresh.
