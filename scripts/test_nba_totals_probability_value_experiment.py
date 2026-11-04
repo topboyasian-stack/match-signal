@@ -255,6 +255,8 @@ def test_probability_validation_includes_neutral_fixtures_once_with_exact_snapsh
         "start_time": start,
         "published_at": published,
         "publication_snapshot_id": "snapshot-neutral-open",
+        "publication_snapshot_verified": True,
+        "publication_snapshot_kind": "immutable_sportybet_market_225_revision",
         "expected_total": 221.0,
         "market_id": "225",
         "market_source": "SportyBet Nigeria",
