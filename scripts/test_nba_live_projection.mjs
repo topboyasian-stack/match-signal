@@ -87,8 +87,12 @@ const qualifiedProbabilityEvidence = {
   calibration_protocol: { probability_edge_threshold: 0.04, expected_value_threshold: 0.03 },
   prospective_pregame_snapshot_coverage: {
     cutoff_utc: cutoff, prospective_settled_unique_market_selections: 120,
-    prospective_settled_selections_with_exact_snapshot_match: 30,
+    prospective_settled_selections_with_exact_snapshot_match: 120,
     prospective_settled_selections_missing_or_mismatched_snapshot: 0
+  },
+  prospective_probability_fixture_coverage: {
+    valid_unique_settled_fixtures: 30, binary_scored_unique_fixtures: 30,
+    snapshot_linkage_failure_count: 0, sample_threshold_met: true
   },
   prospective_probability_score_summary: { n: 30, sufficient_for_probability_validation: true },
   prospective_minimum_sample_reached: true, prospective_probability_validation_sample_met: true,
