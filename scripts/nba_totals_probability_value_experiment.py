@@ -865,6 +865,155 @@ def probability_score_summary(settled_audit, minimum_descriptive_sample=30, coho
     }
 
 
+
+def prospective_probability_fixture_audit(probability_records, snapshots, calibration_residuals, cutoff=EVALUATION_CUTOFF_UTC):
+    """Score one immutable opening market snapshot per settled fixture, including neutral no-bet fixtures."""
+    all_snapshots = [row for row in (snapshots or []) if isinstance(row, dict)]
+    snapshot_by_id = {}
+    snapshot_id_counts = {}
+    for snapshot in all_snapshots:
+        snapshot_id = str(snapshot.get("publication_snapshot_id") or "").strip()
+        if snapshot_id:
+            snapshot_id_counts[snapshot_id] = snapshot_id_counts.get(snapshot_id, 0) + 1
+            snapshot_by_id.setdefault(snapshot_id, snapshot)
+    duplicate_snapshot_ids = {sid for sid, count in snapshot_id_counts.items() if count > 1}
+
+    candidates = []
+    for row in (probability_records or []):
+        if not isinstance(row, dict):
+            continue
+        if row.get("totals_model_version") != "nba-total-v5.1-pace-efficiency-calibrated":
+            continue
+        published = parse_time(row.get("published_at"))
+        if published is not None and published >= cutoff:
+            candidates.append(row)
+    event_counts = {}
+    for row in candidates:
+        event_id = str(row.get("event_id") or "").strip()
+        if event_id:
+            event_counts[event_id] = event_counts.get(event_id, 0) + 1
+    duplicate_events = {event_id for event_id, count in event_counts.items() if count > 1}
+
+    audit_rows = []
+    failures = []
+    valid_events = set()
+    neutral_events = set()
+    directional_events = set()
+    push_events = set()
+    for row in candidates:
+        event_id = str(row.get("event_id") or "").strip()
+        snapshot_id = str(row.get("publication_snapshot_id") or "").strip()
+        reason = None
+        if not event_id:
+            reason = "MISSING_EVENT_ID"
+        elif event_id in duplicate_events:
+            reason = "DUPLICATE_PROBABILITY_FIXTURE"
+        elif not snapshot_id or snapshot_id not in snapshot_by_id:
+            reason = "SNAPSHOT_REFERENCE_NOT_FOUND"
+        elif snapshot_id in duplicate_snapshot_ids:
+            reason = "SNAPSHOT_ID_NOT_UNIQUE"
+        elif row.get("probability_validation_only") is not True or row.get("settled") is not True:
+            reason = "NOT_AN_OFFICIAL_PROBABILITY_SETTLEMENT"
+        elif row.get("settlement_source") != "ESPN official scoreboard event ID; final score includes overtime":
+            reason = "SETTLEMENT_SOURCE_NOT_OFFICIAL_ESPN_EVENT_ID"
+        else:
+            snapshot = snapshot_by_id[snapshot_id]
+            market = ((snapshot.get("markets") or {}).get("total_ou") or {})
+            published = parse_time(row.get("published_at"))
+            snap_published = parse_time(snapshot.get("published_at"))
+            start = parse_time(row.get("start_time"))
+            snap_start = parse_time(snapshot.get("start_time"))
+            quote = parse_time(row.get("quote_timestamp"))
+            snap_quote = parse_time(market.get("quote_timestamp"))
+            try:
+                line = float(row.get("line"))
+                snap_line = float(market.get("line"))
+                over_odds = float(row.get("over_odds"))
+                snap_over = float(market.get("over_odds"))
+                under_odds = float(row.get("under_odds"))
+                snap_under = float(market.get("under_odds"))
+                forecast = float(row.get("expected_total"))
+                snap_forecast = float(snapshot.get("expected_total"))
+                final_total = float(row.get("final_total"))
+                final_score = row.get("final_score")
+                score_total = float(final_score[0]) + float(final_score[1])
+            except (TypeError, ValueError, KeyError, IndexError):
+                reason = "INVALID_NUMERIC_SETTLEMENT_OR_MARKET_FIELDS"
+            if reason is None:
+                checks = [
+                    snapshot.get("totals_model_version") == "nba-total-v5.1-pace-efficiency-calibrated",
+                    snapshot.get("publication_snapshot_verified") is True,
+                    snapshot.get("publication_snapshot_kind") == "immutable_sportybet_market_225_revision",
+                    str(snapshot.get("event_id") or "").strip() == event_id,
+                    published is not None and snap_published == published and published >= cutoff,
+                    start is not None and snap_start == start and published is not None and published < start,
+                    quote is not None and snap_quote == quote and published is not None
+                        and 0 <= (published - quote).total_seconds() <= 15 * 60
+                        and start is not None and quote < start,
+                    str(row.get("market_id") or "") == "225",
+                    str(market.get("market_id") or "") == "225",
+                    str(row.get("market_source") or "").strip().lower() == "sportybet nigeria",
+                    str(market.get("source") or "").strip().lower() == "sportybet nigeria",
+                    str(row.get("sportybet_event_id") or "").strip()
+                        == str(market.get("sportybet_event_id") or "").strip()
+                        and bool(str(row.get("sportybet_event_id") or "").strip()),
+                    row.get("quote_capture_basis") == "SportyBet API response observed_at",
+                    market.get("quote_capture_basis") == "SportyBet API response observed_at",
+                    math.isclose(line, snap_line, rel_tol=0.0, abs_tol=1e-9),
+                    math.isclose(over_odds, snap_over, rel_tol=0.0, abs_tol=1e-9),
+                    math.isclose(under_odds, snap_under, rel_tol=0.0, abs_tol=1e-9),
+                    math.isclose(forecast, snap_forecast, rel_tol=0.0, abs_tol=1e-9),
+                    math.isclose(final_total, score_total, rel_tol=0.0, abs_tol=1e-9),
+                    100 <= line <= 300 and over_odds > 1 and under_odds > 1,
+                    math.isfinite(forecast) and math.isfinite(final_total),
+                    row.get("result") == ("over" if final_total > line else "under" if final_total < line else "push"),
+                ]
+                if not all(checks):
+                    reason = "SNAPSHOT_FIELDS_OR_OFFICIAL_RESULT_DO_NOT_MATCH"
+        if reason:
+            failures.append({"event_id": event_id or None, "snapshot_id": snapshot_id or None, "reason": reason})
+            continue
+
+        valid_events.add(event_id)
+        if row.get("result") == "push":
+            push_events.add(event_id)
+        elif row.get("pick") in {"over", "under"}:
+            directional_events.add(event_id)
+        else:
+            neutral_events.add(event_id)
+
+        probabilities = _settlement_probabilities(forecast, line, calibration_residuals)
+        market_over = _no_vig_probability("over", over_odds, under_odds)
+        market_under = _no_vig_probability("under", over_odds, under_odds)
+        audit_rows.append({
+            "event_id": event_id,
+            "settled_result": str(row.get("result") or "").lower(),
+            "model_probability": probabilities,
+            "market_no_vig_probability": {"over": market_over, "under": market_under},
+            "publication_snapshot_id": snapshot_id,
+            "line": line,
+            "pick": row.get("pick"),
+            "probability_validation_only": True,
+        })
+
+    binary_n = sum(row.get("settled_result") in {"over", "under"} for row in audit_rows)
+    coverage = {
+        "cutoff_utc": cutoff.isoformat(),
+        "source": "data/nba_totals_probability_settlements.json",
+        "candidate_unique_events": len(event_counts),
+        "valid_unique_settled_fixtures": len(valid_events),
+        "binary_scored_unique_fixtures": binary_n,
+        "push_fixtures_excluded_from_binary_scores": len(push_events),
+        "neutral_no_bet_fixtures_included": len(neutral_events),
+        "directional_selection_fixtures_also_tracked_in_bet_ledger": len(directional_events),
+        "snapshot_linkage_failures": failures[:20],
+        "snapshot_linkage_failure_count": len(failures),
+        "target_unique_settled_probability_observations": MIN_PROSPECTIVE_PROBABILITY_SCORE,
+        "sample_threshold_met": binary_n >= MIN_PROSPECTIVE_PROBABILITY_SCORE,
+    }
+    return audit_rows, coverage
+
+
 def run_experiment(history, ledger, predictions, now=None, snapshots=None):
     now = now or datetime.now(timezone.utc)
     fitted = fit_residual_distribution(history)
