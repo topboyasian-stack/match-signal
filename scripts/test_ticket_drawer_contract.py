@@ -57,6 +57,9 @@ def main():
             "The Generate button must have a direct click handler")
     require("generate.disabled=bookingBusy||Boolean(lockReason())" not in drawer,
             "Ticket requirements must not make the Generate button appear dead")
+    require("const catalogueResults = await Promise.all(catalogueTasks)" in api and
+            "if (catalogueFailure && !manualMode) throw catalogueFailure.error;" in api,
+            "Independent sport catalogues must be checked concurrently without changing automated error handling")
     require(api.count("MANUAL_TICKET_REJECTED_PARTIAL") >= 2 and
             "if (manualMode && preExcluded.length > 0)" in api and
             "if (manualMode && (" in api,
