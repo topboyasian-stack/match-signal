@@ -883,6 +883,22 @@ async function handlePost(context) {
     }
 
     const preExcluded = validation.filter(item => item.ok !== true);
+    // Manual tickets are one shared slip across every sport. Never return a
+    // reduced football/tennis code while rejecting NBA/eFootball partial slips.
+    // Automated Builder batches retain their separate legacy policy below.
+    if (manualMode && preExcluded.length > 0) {
+      return json({
+        ok: false,
+        error: 'MANUAL_TICKET_REJECTED_PARTIAL',
+        message: 'At least one selection failed current SportyBet validation. The entire manual ticket was rejected and no share code was requested. Refresh every leg and try again.',
+        batch_id: batchId,
+        initial_selection_count: legs.length,
+        requested_selection_count: selections.length,
+        excluded_count: preExcluded.length,
+        booking_code_withheld: true,
+        validation
+      }, 409);
+    }
     if (hasBasketballLeg && preExcluded.length > 0) {
       return json({
         ok: false,
@@ -980,6 +996,26 @@ async function handlePost(context) {
     const unavailable = Array.isArray(data?.unavailableOutcomes) ? data.unavailableOutcomes : [];
     const acceptedOutcomes = Array.isArray(data?.outcomes) ? data.outcomes : [];
     const acceptedCount = acceptedOutcomes.length || Math.max(0, selections.length - unavailable.length);
+    // Apply the same all-or-nothing rule to provider-side partial acceptance
+    // for every manual sport, not only the NBA/eFootball special cases.
+    if (manualMode && (
+      unavailable.length > 0 ||
+      acceptedCount !== legs.length ||
+      (acceptedOutcomes.length > 0 && acceptedOutcomes.length !== selections.length)
+    )) {
+      return json({
+        ok: false,
+        error: 'MANUAL_TICKET_REJECTED_PARTIAL',
+        message: 'SportyBet accepted only part of this manual ticket. Match Signal has withheld the share code; refresh and rebuild the entire ticket.',
+        batch_id: batchId,
+        initial_selection_count: legs.length,
+        requested_selection_count: selections.length,
+        accepted_selection_count: acceptedCount,
+        unavailable_count: unavailable.length,
+        booking_code_withheld: true,
+        validation
+      }, 409);
+    }
     if (hasBasketballLeg && (
       unavailable.length > 0 ||
       acceptedCount !== legs.length ||
