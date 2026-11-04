@@ -1,5 +1,10 @@
 import unittest
-from settle_nba_totals import result_for, price_audit_fields, candidate_key, ledger_key, select_settlement_snapshot, matching_snapshot_for_ledger
+from pathlib import Path
+from settle_nba_totals import (
+    result_for, price_audit_fields, candidate_key, ledger_key,
+    select_settlement_snapshot, matching_snapshot_for_ledger,
+    valid_probability_snapshot, select_probability_snapshot, probability_result_for,
+)
 
 def prediction(**overrides):
     p = {"event_id":"abc","start_time":"2026-10-25T20:00:00+00:00",
@@ -18,6 +23,34 @@ def event(**overrides):
          "competitions":[{"competitors":[{"homeAway":"home","score":"110"},{"homeAway":"away","score":"111"}]}]}
     e.update(overrides)
     return e
+
+
+def prospective_probability_snapshot(**overrides):
+    p = prediction(
+        event_id="abc",
+        start_time="2026-11-03T00:00:00+00:00",
+        prediction_created_at="2026-11-02T05:08:55+00:00",
+        published_at="2026-11-02T05:09:07+00:00",
+        expected_total=220.5,
+        totals_model_version="nba-total-v5.1-pace-efficiency-calibrated",
+        publication_snapshot_id="nba-total-pub:abc",
+        publication_snapshot_verified=True,
+        publication_snapshot_kind="immutable_sportybet_market_225_revision",
+    )
+    p["markets"]["total_ou"].update({
+        "market_id": "225",
+        "source": "SportyBet Nigeria",
+        "sportybet_event_id": "sr:match:abc",
+        "quote_capture_basis": "SportyBet API response observed_at",
+        "quote_timestamp": "2026-11-02T05:09:06+00:00",
+        "line": 220.5,
+        "over_odds": 1.91,
+        "under_odds": 1.89,
+        "pick": None,
+    })
+    p.update(overrides)
+    return p
+
 
 class SettlementTests(unittest.TestCase):
     def test_over_win_includes_final_points(self):
@@ -151,6 +184,61 @@ class SettlementTests(unittest.TestCase):
         second["markets"]["total_ou"]["pick"] = None
         self.assertEqual(select_settlement_snapshot([second, first])["publication_snapshot_id"], "neutral-first")
 
+
+
+    def test_neutral_fixture_is_settled_for_probability_without_becoming_a_bet(self):
+        snapshot = prospective_probability_snapshot()
+        self.assertTrue(valid_probability_snapshot(snapshot))
+        row = probability_result_for(snapshot, event())
+        self.assertIsNotNone(row)
+        self.assertEqual(row["result"], "over")
+        self.assertIsNone(row["pick"])
+        self.assertTrue(row["probability_validation_only"])
+        self.assertEqual(row["publication_snapshot_id"], "nba-total-pub:abc")
+        self.assertEqual(row["settlement_source"], "ESPN official scoreboard event ID; final score includes overtime")
+        self.assertNotIn("roi_eligible", row, "Probability-only fixtures must never enter ROI accounting.")
+
+    def test_probability_validation_uses_first_snapshot_even_if_it_is_neutral(self):
+        neutral = prospective_probability_snapshot()
+        later = prospective_probability_snapshot(
+            published_at="2026-11-02T05:10:00+00:00",
+            publication_snapshot_id="nba-total-pub:later",
+        )
+        later["markets"]["total_ou"]["pick"] = "under"
+        chosen = select_probability_snapshot([later, neutral])
+        self.assertEqual(chosen["publication_snapshot_id"], "nba-total-pub:abc")
+        self.assertIsNone(chosen["markets"]["total_ou"]["pick"])
+
+    def test_probability_fixture_requires_fresh_exact_market_225_prices(self):
+        stale = prospective_probability_snapshot()
+        stale["markets"]["total_ou"]["quote_timestamp"] = "2026-11-02T04:50:00+00:00"
+        self.assertFalse(valid_probability_snapshot(stale))
+        after_publication = prospective_probability_snapshot()
+        after_publication["markets"]["total_ou"]["quote_timestamp"] = "2026-11-02T05:10:00+00:00"
+        self.assertFalse(valid_probability_snapshot(after_publication))
+        wrong_market = prospective_probability_snapshot()
+        wrong_market["markets"]["total_ou"]["market_id"] = "18"
+        self.assertFalse(valid_probability_snapshot(wrong_market))
+        no_under_price = prospective_probability_snapshot()
+        no_under_price["markets"]["total_ou"].pop("under_odds")
+        self.assertFalse(valid_probability_snapshot(no_under_price))
+        unverified = prospective_probability_snapshot(publication_snapshot_verified=False)
+        self.assertFalse(valid_probability_snapshot(unverified))
+
+    def test_probability_fixture_obeys_frozen_cutoff_and_exact_espn_event(self):
+        before_cutoff = prospective_probability_snapshot(published_at="2026-11-02T01:59:59+00:00")
+        self.assertFalse(valid_probability_snapshot(before_cutoff))
+        self.assertIsNone(probability_result_for(prospective_probability_snapshot(), event(id="other")))
+        unfinished = event(status={"type": {"completed": False, "state": "in"}})
+        self.assertIsNone(probability_result_for(prospective_probability_snapshot(), unfinished))
+
+    def test_probability_settlement_artifact_is_persisted_separately_from_bet_ledger(self):
+        workflow = (
+            Path(__file__).resolve().parents[1]
+            / ".github/workflows/nba-totals-settlement.yml"
+        ).read_text(encoding="utf-8")
+        self.assertIn("data/nba_totals_probability_settlements.json", workflow)
+        self.assertIn("git add data/nba_totals_ledger.json data/nba_totals_probability_settlements.json", workflow)
 
     def test_legacy_ledger_cannot_borrow_v5_publication_snapshot(self):
         legacy_key = ("abc", "legacy")
