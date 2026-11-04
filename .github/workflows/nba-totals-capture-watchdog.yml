@@ -221,6 +221,8 @@ jobs:
           import os
           from datetime import datetime, timezone
           from pathlib import Path
+          import sys
+          sys.path.insert(0, "scripts")
           from nba_totals_capture_watchdog import (
               capture_age_minutes,
               should_dispatch_research_refresh,
