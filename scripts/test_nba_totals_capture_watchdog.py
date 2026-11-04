@@ -61,7 +61,6 @@ def run():
          "nba-totals-settlement-ledger-", "settlement"),
         ((root / ".github/workflows/nba-totals-probability-value.yml").read_text(encoding="utf-8"),
          "nba-totals-probability-value-research-", "probability report"),
-        (watchdog_workflow, "nba-totals-capture-freshness-watchdog-", "capture watchdog"),
         ((root / ".github/workflows/live-expansion.yml").read_text(encoding="utf-8"),
          "match-signal-pipeline-", "model refresh"),
     ):
@@ -69,6 +68,10 @@ def run():
         assert expected_group in workflow_text, (
             f"Scheduled {name} must be isolated from event-driven concurrency to prevent cron starvation."
         )
+    watchdog_group = "group: nba-totals-capture-freshness-watchdog-${{ github.event_name == 'schedule' && 'scheduled' || (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && 'recovery' || 'event-driven' }}"
+    assert watchdog_group in watchdog_workflow, (
+        "Scheduled freshness checks and push/manual schedule-state recovery must each have a protected concurrency lane."
+    )
 
     now = dt("2026-11-02T08:25:00Z")
     assert round(capture_age_minutes("2026-11-02T08:16:39Z", now), 2) == 8.35
