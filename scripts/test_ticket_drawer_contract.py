@@ -103,8 +103,8 @@ def main():
     basketball_collector = api.split("export async function collectBasketballEvents", 1)[1].split("function findBasketballSelection", 1)[0]
     require("await fetch(url.toString()" not in basketball_collector and "response.json()" not in basketball_collector and "returned non-JSON content" in basketball_collector,
             "NBA feed revalidation must handle non-JSON responses explicitly and avoid same-origin HTML fallbacks")
-    require("export async function upstream(path, params)" in api and "SPORTYBET_PROXY_ORIGIN" in api and "returned HTML instead of JSON" in api,
-            "Shared SportyBet catalogue lookup must retry the same source via the configured proxy when the public host returns HTML")
+    require("export async function upstream(path, params, { timeoutMs = 6000, deadlineAt = null } = {})" in api and "SPORTYBET_PROXY_ORIGIN" in api and "returned HTML instead of JSON" in api,
+            "Shared SportyBet catalogue lookup must keep proxy recovery while exposing bounded request deadlines")
     require("export async function collectEvents" in api and "maxPages = 5" in api,
             "Shared ticket catalogue scans must stop at the regional proxy's supported fifth page")
     require("export async function requestSportyBetShare" in api and
