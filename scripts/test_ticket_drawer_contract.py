@@ -57,6 +57,10 @@ def main():
             "The Generate button must have a direct click handler")
     require("generate.disabled=bookingBusy||Boolean(lockReason())" not in drawer,
             "Ticket requirements must not make the Generate button appear dead")
+    require(api.count("MANUAL_TICKET_REJECTED_PARTIAL") >= 2 and
+            "if (manualMode && preExcluded.length > 0)" in api and
+            "if (manualMode && (" in api,
+            "Every manual sport must use the same all-or-nothing pre-validation and provider-acceptance contract")
     require("manual_selections" in drawer and "/api/sportybet-booking" in drawer,
             "The shared ticket must submit all selections through the root-relative common revalidation API")
     require("AbortSignal.timeout(26000)" in drawer and "Your ticket is still saved; no code is assumed to exist." in drawer,
