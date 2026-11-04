@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { onRequestPost } from '../functions/api/sportybet-basketball-booking.js';
+import { nbaTotalsReleaseQualified } from '../functions/api/sportybet-booking.js';
 
 const oos = {
   paper_only: true,
@@ -40,6 +41,55 @@ const probability = {
   },
   calibration_protocol: { probability_edge_threshold: 0.04, expected_value_threshold: 0.03 }
 };
+
+
+test('the probability sample counts unique settled fixtures separately from 100 ROI-grade selections', () => {
+  const qualifiedEvidence = {
+    ...oos,
+    release_decision: 'QUALIFIED',
+    walk_forward: { holdout: { n: 100, mae: 20, baseline_mae: 21, bias: 0.5 } },
+    market_holdout: { n: 100, roi: 0.08, roi_ci95_lower: 0.02, roi_vs_market_favorite: 0.01 }
+  };
+  const qualifiedProbability = {
+    ...probability,
+    prospective_minimum_sample_reached: true,
+    prospective_probability_validation_sample_met: true,
+    prospective_clv_release_check_passed: true,
+    prospective_pregame_snapshot_coverage: {
+      cutoff_utc: '2026-11-02T02:00:00+00:00',
+      prospective_settled_selections_with_exact_snapshot_match: 100,
+      prospective_settled_selections_missing_or_mismatched_snapshot: 0,
+      prospective_settled_unique_market_selections: 100
+    },
+    prospective_probability_score_summary: { n: 30, sufficient_for_probability_validation: true },
+    prospective_probability_fixture_coverage: {
+      cutoff_utc: '2026-11-02T02:00:00+00:00',
+      valid_unique_settled_fixtures: 30,
+      binary_scored_unique_fixtures: 30,
+      snapshot_linkage_failure_count: 0,
+      sample_threshold_met: true
+    },
+    prospective_clv_diagnostics: {
+      positive_clv_release_check_passed: true,
+      near_close_observations: 1,
+      mean_probability_clv: 0.01,
+      mean_line_clv_points: 0.5
+    }
+  };
+  assert.equal(nbaTotalsReleaseQualified(qualifiedEvidence, qualifiedProbability), true);
+  const underSampled = {
+    ...qualifiedProbability,
+    prospective_probability_validation_sample_met: false,
+    prospective_probability_score_summary: { n: 29, sufficient_for_probability_validation: false },
+    prospective_probability_fixture_coverage: {
+      ...qualifiedProbability.prospective_probability_fixture_coverage,
+      valid_unique_settled_fixtures: 29,
+      binary_scored_unique_fixtures: 29,
+      sample_threshold_met: false
+    }
+  };
+  assert.equal(nbaTotalsReleaseQualified(qualifiedEvidence, underSampled), false);
+});
 
 test('basketball-specific booking POST refuses to bypass the research-only NBA release gate', async () => {
   const originalFetch = globalThis.fetch;
