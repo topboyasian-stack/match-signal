@@ -935,6 +935,7 @@ def prospective_probability_fixture_audit(probability_records, snapshots, calibr
                 snap_under = float(market.get("under_odds"))
                 forecast = float(row.get("expected_total"))
                 snap_forecast = float(snapshot.get("expected_total"))
+                market_forecast = float(market.get("expected_total"))
                 final_total = float(row.get("final_total"))
                 final_score = row.get("final_score")
                 score_total = float(final_score[0]) + float(final_score[1])
@@ -943,6 +944,8 @@ def prospective_probability_fixture_audit(probability_records, snapshots, calibr
             if reason is None:
                 checks = [
                     snapshot.get("totals_model_version") == "nba-total-v5.1-pace-efficiency-calibrated",
+                    row.get("publication_snapshot_verified") is True,
+                    row.get("publication_snapshot_kind") == "immutable_sportybet_market_225_revision",
                     snapshot.get("publication_snapshot_verified") is True,
                     snapshot.get("publication_snapshot_kind") == "immutable_sportybet_market_225_revision",
                     str(snapshot.get("event_id") or "").strip() == event_id,
@@ -964,6 +967,9 @@ def prospective_probability_fixture_audit(probability_records, snapshots, calibr
                     math.isclose(over_odds, snap_over, rel_tol=0.0, abs_tol=1e-9),
                     math.isclose(under_odds, snap_under, rel_tol=0.0, abs_tol=1e-9),
                     math.isclose(forecast, snap_forecast, rel_tol=0.0, abs_tol=1e-9),
+                    math.isclose(forecast, market_forecast, rel_tol=0.0, abs_tol=1e-9),
+                    str(row.get("pick") or "").strip().lower()
+                        == str(market.get("pick") or "").strip().lower(),
                     math.isclose(final_total, score_total, rel_tol=0.0, abs_tol=1e-9),
                     100 <= line <= 300 and over_odds > 1 and under_odds > 1,
                     math.isfinite(forecast) and math.isfinite(final_total),
