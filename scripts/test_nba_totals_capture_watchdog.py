@@ -26,6 +26,16 @@ def run():
     assert "cron: '5,15,25,35,45,55 * * * *'" in watchdog_workflow, (
         "The freshness watchdog must run halfway between the 10-minute capture slots."
     )
+    for workflow in (
+        "nba-totals-price-capture.yml",
+        "nba-totals-probability-value.yml",
+        "nba-totals-settlement.yml",
+        "nba-totals-capture-watchdog.yml",
+        "live-expansion.yml",
+    ):
+        assert f'gh workflow enable "{workflow}"' in watchdog_workflow, (
+            f"NBA recovery watchdog must re-enable scheduled workflow {workflow} after delivery gaps."
+        )
 
     now = dt("2026-11-02T08:25:00Z")
     assert round(capture_age_minutes("2026-11-02T08:16:39Z", now), 2) == 8.35
