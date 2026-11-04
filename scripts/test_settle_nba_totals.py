@@ -4,6 +4,7 @@ from settle_nba_totals import (
     result_for, price_audit_fields, candidate_key, ledger_key,
     select_settlement_snapshot, matching_snapshot_for_ledger,
     valid_probability_snapshot, select_probability_snapshot, probability_result_for,
+    PROSPECTIVE_CUTOFF_UTC,
 )
 
 def prediction(**overrides):
@@ -226,7 +227,11 @@ class SettlementTests(unittest.TestCase):
         self.assertFalse(valid_probability_snapshot(unverified))
 
     def test_probability_fixture_obeys_frozen_cutoff_and_exact_espn_event(self):
-        before_cutoff = prospective_probability_snapshot(published_at="2026-11-02T01:59:59+00:00")
+        self.assertEqual(PROSPECTIVE_CUTOFF_UTC.isoformat(), "2026-11-02T02:00:00+00:00")
+        before_cutoff = prospective_probability_snapshot(
+            published_at="2026-11-02T01:59:59+00:00"
+        )
+        before_cutoff["markets"]["total_ou"]["quote_timestamp"] = "2026-11-02T01:59:58+00:00"
         self.assertFalse(valid_probability_snapshot(before_cutoff))
         self.assertIsNone(probability_result_for(prospective_probability_snapshot(), event(id="other")))
         unfinished = event(status={"type": {"completed": False, "state": "in"}})
