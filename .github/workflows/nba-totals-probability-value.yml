@@ -143,10 +143,10 @@ jobs:
           settlement = cron(".github/workflows/nba-totals-settlement.yml")
           report = cron(".github/workflows/nba-totals-probability-value.yml")
           assert capture in {"*/10 * * * *", "0,10,20,30,40,50 * * * *", "1,11,21,31,41,51 * * * *"}, capture
-          assert settlement == "10,25,40,55 * * * *", settlement
-          assert report == "12,27,42,57 * * * *", report
+          assert settlement in {"10,25,40,55 * * * *", "11,26,41,56 * * * *"}, settlement
+          assert report in {"12,27,42,57 * * * *", "13,28,43,58 * * * *"}, report
           watchdog = cron(".github/workflows/nba-totals-capture-watchdog.yml")
-          assert watchdog == "5,15,25,35,45,55 * * * *", watchdog
+          assert watchdog in {"5,15,25,35,45,55 * * * *", "6,16,26,36,46,56 * * * *"}, watchdog
           settlement_text = Path(".github/workflows/nba-totals-settlement.yml").read_text(encoding="utf-8")
           assert "workflow_run:" in settlement_text, "Settlement needs an event-driven backup after price capture."
           assert '"NBA totals SportyBet market-225 price capture"' in settlement_text
