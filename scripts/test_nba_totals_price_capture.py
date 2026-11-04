@@ -51,7 +51,7 @@ class PriceCaptureTests(unittest.TestCase):
         proxy_script = (root / "functions" / "api" / "sportybet-basketball.js").read_text(encoding="utf-8")
         booking_script = (root / "functions" / "api" / "sportybet-booking.js").read_text(encoding="utf-8")
         self.assertIn("tournamentId=sr%3Atournament%3A132", page_script)
-        self.assertIn("basketball-live.js?v=20261102-nba-feed-scope2", page_html)
+        self.assertIn("basketball-live.js?v=20261104-nba-probability-cohort1", page_html)
         self.assertIn("u.searchParams.get('tournamentId')||NBA_TOURNAMENT_ID", proxy_script)
         self.assertIn("if(tournamentId!==NBA_TOURNAMENT_ID)", proxy_script)
         self.assertNotIn("if(tournamentId)params.tournamentId=tournamentId;", proxy_script)
