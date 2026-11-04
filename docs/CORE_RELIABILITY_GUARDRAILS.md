@@ -5,10 +5,10 @@ These rules are shared contracts, not sport-specific suggestions. Changes to a m
 ## Prediction and result integrity
 
 - A published forecast is an immutable, timestamped decision snapshot. Later model refreshes must not rewrite the probability, market, side, line, or price that was visible before kickoff.
-- Join a final result to its forecast through a stable internal fixture identity. Provider event IDs are namespaced by provider and product and are not sufficient by themselves when a provider can recycle IDs.
+- Join a final result to its forecast through a stable internal fixture identity. In the ESPN prediction ledger, the canonical key includes sport + competition + event ID; never key football results by sport + event ID alone. Provider event IDs are namespaced by provider and product and are not sufficient by themselves when a provider can recycle IDs.
 - A fallback match is allowed only when product/competition, normalized participant identity, and kickoff time identify exactly one fixture within the documented tolerance.
-- Missing, conflicting, or ambiguous results remain explicitly unmatched. Never guess, silently discard the forecast, backdate a prediction, or use a later price to reconstruct the pre-match decision.
-- Settlement runs are idempotent. Replaying the same final result cannot duplicate wins, losses, pushes, or accuracy denominators.
+- Missing, conflicting, or ambiguous results remain explicitly unmatched. Football result participants must match the saved home/away prediction identities before scoring. Never guess, silently discard the forecast, backdate a prediction, or use a later price to reconstruct the pre-match decision.
+- Settlement runs are idempotent. Replaying the same final result cannot duplicate wins, losses, pushes, or accuracy denominators. Canonical settled history is append-only and must not be truncated to a rolling row limit; rolling windows belong only in derived reports.
 - Current and archived histories are merged through one canonical deduplication rule. Conflicting outcomes are excluded and diagnosed, not resolved by choosing whichever record is convenient.
 
 ## Sport and market boundaries
