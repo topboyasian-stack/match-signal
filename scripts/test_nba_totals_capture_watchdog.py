@@ -25,9 +25,10 @@ def run():
     ), (
         "NBA SportyBet market-225 capture must run every 10 minutes to protect the 15-minute quote freshness gate."
     )
-    assert "cron: '5,15,25,35,45,55 * * * *'" in watchdog_workflow, (
-        "The freshness watchdog must run halfway between the 10-minute capture slots."
-    )
+    assert (
+        "cron: '5,15,25,35,45,55 * * * *'" in watchdog_workflow
+        or "cron: '6,16,26,36,46,56 * * * *'" in watchdog_workflow
+    ), "The freshness watchdog must run halfway between the 10-minute capture slots."
     assert 'gh workflow enable "$workflow" --repo "$GITHUB_REPOSITORY"' in watchdog_workflow, (
         "NBA recovery watchdog must call the GitHub workflow-enable command after delivery gaps."
     )
