@@ -30,6 +30,16 @@ def run():
     assert 'gh workflow enable "$workflow" --repo "$GITHUB_REPOSITORY"' in watchdog_workflow, (
         "NBA recovery watchdog must call the GitHub workflow-enable command after delivery gaps."
     )
+
+    assert "workflow_state=\"$(gh api \"repos/$GITHUB_REPOSITORY/actions/workflows/$workflow\" --jq '.state')\"" in watchdog_workflow, (
+        "Recovery must read the authoritative GitHub Actions workflow state."
+    )
+    assert 'if [ "$workflow_state" != "active" ]; then' in watchdog_workflow, (
+        "Recovery must re-enable workflows that are not active."
+    )
+    assert 'Verified active scheduled workflow:' in watchdog_workflow, (
+        "A successful enable command alone must not be treated as proof of active scheduling."
+    )
     for workflow in (
         "nba-totals-price-capture.yml",
         "nba-totals-probability-value.yml",
