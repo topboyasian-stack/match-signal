@@ -14,6 +14,14 @@ on:
       - "scripts/test_odds_builder_upcoming_desk_recent_losses.py"
       - "scripts/test_ticket_calibration_history.py"
       - "scripts/test_efootball_desk_learning.py"
+      - "scripts/prediction_identity.py"
+      - "scripts/predict_today.py"
+      - "scripts/settle_same_day.py"
+      - "scripts/verify_performance_ledger.py"
+      - "scripts/test_prediction_history_identity.py"
+      - "scripts/test_ucl_dual_competition_model.py"
+      - "scripts/test_predict_today_market_matching.py"
+      - "scripts/test_settlement_publication.py"
       - "scripts/unified_upcoming.py"
       - "scripts/odds_builder_core.py"
       - "scripts/efootball_desk_learning.py"
@@ -46,6 +54,9 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install Python test dependency
+        run: python -m pip install --disable-pip-version-check requests
+
       - name: Verify shared ticket API and mixed-sport regressions
         run: node scripts/test_sportybet_booking_resilience.mjs
 
@@ -66,3 +77,17 @@ jobs:
 
       - name: Verify eFootball exact-product settlement reconciliation
         run: python scripts/test_efootball_desk_learning.py
+      - name: Verify UCL domestic-plus-European model history
+        run: python scripts/test_ucl_dual_competition_model.py
+
+      - name: Verify competition-scoped prediction identity and settlement
+        run: python scripts/test_prediction_history_identity.py
+
+      - name: Verify football market identity guards
+        run: python scripts/test_predict_today_market_matching.py
+
+      - name: Verify append-only settlement publication contract
+        run: python scripts/test_settlement_publication.py
+
+      - name: Compile changed history and settlement modules
+        run: python -m py_compile scripts/prediction_identity.py scripts/predict_today.py scripts/settle_same_day.py scripts/verify_performance_ledger.py
