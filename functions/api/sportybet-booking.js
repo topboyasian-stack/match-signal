@@ -770,75 +770,91 @@ async function handlePost(context) {
     const tennisIds = new Set(legs.filter(l => String(l?.sport || '').toLowerCase() === 'tennis').map(l => String(l.sportybet_event_id || l.event_id || '')).filter(Boolean));
     const basketballIds = new Set(legs.filter(l => String(l?.sport || '').toLowerCase() === 'basketball').map(l => String(l.sportybet_event_id || '')).filter(Boolean));
 
-    const found = new Map();
+    // Independent sport adapters are read-only lookups. Run them concurrently
+    // so a mixed-sport manual slip does not spend the shared 22-second budget
+    // waiting for one sport's pagination before the next sport even starts.
+    const catalogueTasks = [];
+    const queueCatalogue = (name, promise) => {
+      catalogueTasks.push(
+        Promise.resolve(promise)
+          .then(events => ({ name, events }))
+          .catch(error => ({ name, events: new Map(), error }))
+      );
+    };
 
     if (virtualIds.size) {
-      const events = await collectEvents({
+      queueCatalogue('virtual', collectEvents({
         sportId: 'sr:sport:202120001',
         marketId: '1,18,10,29,11,26,36,14,60100,186,189,202,204,210',
         primaryPath: '/api/ng/factsCenter/wapConfigurableUpcomingEvents',
         fallbackPath: '/api/ng/factsCenter/pcUpcomingEvents',
         deadlineAt: manualDeadlineAt,
         requestTimeoutMs: manualMode ? 3500 : 6000
-      }, virtualIds);
-      for (const [id, event] of events) found.set(id, event);
+      }, virtualIds));
     }
 
     if (efootballIds.size) {
-      const events = await collectEvents({
+      queueCatalogue('efootball', collectEvents({
         sportId: 'sr:sport:137',
         marketId: '1,18,10,29,11,26,36,14,60100,186,189,202,204,210',
         deadlineAt: manualDeadlineAt,
         requestTimeoutMs: manualMode ? 3500 : 6000
-      }, efootballIds);
-      for (const [id, event] of events) found.set(id, event);
+      }, efootballIds));
     }
 
-    // The Builder's prices and exact O/U ladders come from the normalized
-    // read-only virtual feed. Prefer that representation whenever it is
-    // available, instead of trusting a separate catalogue that may expose
-    // stale/different virtual market variants. The catalogue remains the
-    // fallback for events absent from the live normalized feed.
     const allVirtualIds = new Set([...virtualIds, ...efootballIds]);
     if (allVirtualIds.size) {
-      const liveFeedEvents = await collectVirtualEventsFromLiveFeed(context, allVirtualIds, 'efootball,vfootball', manualDeadlineAt);
-      for (const [id, event] of liveFeedEvents) {
-        const current = found.get(id);
-        const hasOu = Array.isArray(event?.markets) && event.markets.some(m => {
-          const desc = String(m?.desc || m?.name || m?.title || m?.specifier || '').toLowerCase();
-          return String(m?.id || '') === '18' || String(m?.id || '') === '189' || /over.?under|total|\bou\b/.test(desc);
-        });
-        if (!current || hasOu) {
-          found.set(id, event);
-        }
-      }
+      queueCatalogue('virtual-live', collectVirtualEventsFromLiveFeed(
+        context, allVirtualIds, 'efootball,vfootball', manualDeadlineAt
+      ));
     }
 
     if (footballIds.size) {
-      const events = await collectEvents({
+      queueCatalogue('football', collectEvents({
         sportId: 'sr:sport:1',
         marketId: '1,18,10,14,16,29,45,47',
         deadlineAt: manualDeadlineAt,
         requestTimeoutMs: manualMode ? 3500 : 6000
-      }, footballIds);
-      for (const [id, event] of events) found.set(id, event);
+      }, footballIds));
     }
 
     if (tennisIds.size) {
-      const events = await collectEvents({
+      queueCatalogue('tennis', collectEvents({
         sportId: 'sr:sport:5',
         marketId: '186,210,202,204,189,203,188,187',
         fallbackPath: '/api/ng/factsCenter/wapConfigurableUpcomingEvents',
         deadlineAt: manualDeadlineAt,
         requestTimeoutMs: manualMode ? 3500 : 6000
-      }, tennisIds);
-      for (const [id, event] of events) found.set(id, event);
-    }
-    if (basketballIds.size) {
-      const events = await collectBasketballEvents(context, basketballIds);
-      for (const [id, event] of events) found.set(id, event);
+      }, tennisIds));
     }
 
+    if (basketballIds.size) {
+      queueCatalogue('basketball', collectBasketballEvents(context, basketballIds));
+    }
+
+    const catalogueResults = await Promise.all(catalogueTasks);
+    const catalogueFailure = catalogueResults.find(result => result.error);
+    if (catalogueFailure && !manualMode) throw catalogueFailure.error;
+    const found = new Map();
+    // Merge normal catalogue results first, then apply the live virtual feed
+    // using the same market-preference rule as the previous sequential flow.
+    for (const result of catalogueResults) {
+      if (result.name === 'virtual-live') continue;
+      for (const [id, event] of result.events) found.set(id, event);
+    }
+    const liveVirtualResult = catalogueResults.find(result => result.name === 'virtual-live');
+    if (liveVirtualResult) {
+      for (const [id, event] of liveVirtualResult.events) {
+        const current = found.get(id);
+        const hasOu = Array.isArray(event?.markets) && event.markets.some(m => {
+          const desc = String(m?.desc || m?.name || m?.title || m?.specifier || '').toLowerCase();
+          return String(m?.id || '') === '18' || String(m?.id || '') === '189' || /over.?under|total|\bou\b/.test(desc);
+        });
+        if (!current || hasOu) found.set(id, event);
+      }
+    }
+    // Keep bounded diagnostics internal; missing/failed adapters are surfaced
+    // through the leg-level validation below, and no code is requested.
     const selections = [];
     const validation = [];
     for (const leg of legs) {
@@ -883,6 +899,22 @@ async function handlePost(context) {
     }
 
     const preExcluded = validation.filter(item => item.ok !== true);
+    // Manual tickets are one shared slip across every sport. Never return a
+    // reduced football/tennis code while rejecting NBA/eFootball partial slips.
+    // Automated Builder batches retain their separate legacy policy below.
+    if (manualMode && preExcluded.length > 0) {
+      return json({
+        ok: false,
+        error: 'MANUAL_TICKET_REJECTED_PARTIAL',
+        message: 'At least one selection failed current SportyBet validation. The entire manual ticket was rejected and no share code was requested. Refresh every leg and try again.',
+        batch_id: batchId,
+        initial_selection_count: legs.length,
+        requested_selection_count: selections.length,
+        excluded_count: preExcluded.length,
+        booking_code_withheld: true,
+        validation
+      }, 409);
+    }
     if (hasBasketballLeg && preExcluded.length > 0) {
       return json({
         ok: false,
@@ -980,6 +1012,26 @@ async function handlePost(context) {
     const unavailable = Array.isArray(data?.unavailableOutcomes) ? data.unavailableOutcomes : [];
     const acceptedOutcomes = Array.isArray(data?.outcomes) ? data.outcomes : [];
     const acceptedCount = acceptedOutcomes.length || Math.max(0, selections.length - unavailable.length);
+    // Apply the same all-or-nothing rule to provider-side partial acceptance
+    // for every manual sport, not only the NBA/eFootball special cases.
+    if (manualMode && (
+      unavailable.length > 0 ||
+      acceptedCount !== legs.length ||
+      (acceptedOutcomes.length > 0 && acceptedOutcomes.length !== selections.length)
+    )) {
+      return json({
+        ok: false,
+        error: 'MANUAL_TICKET_REJECTED_PARTIAL',
+        message: 'SportyBet accepted only part of this manual ticket. Match Signal has withheld the share code; refresh and rebuild the entire ticket.',
+        batch_id: batchId,
+        initial_selection_count: legs.length,
+        requested_selection_count: selections.length,
+        accepted_selection_count: acceptedCount,
+        unavailable_count: unavailable.length,
+        booking_code_withheld: true,
+        validation
+      }, 409);
+    }
     if (hasBasketballLeg && (
       unavailable.length > 0 ||
       acceptedCount !== legs.length ||
