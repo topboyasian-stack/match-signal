@@ -12,6 +12,7 @@ on:
       - "Match Signal Unified Upcoming Board"
       - "Deploy Match Signal to Cloudflare Pages"
       - "NBA totals settlement ledger"
+      - "NBA totals SportyBet market-225 price capture"
     types: [completed]
   push:
     branches: [main]
@@ -30,7 +31,7 @@ concurrency:
 
 jobs:
   guard:
-    if: ${{ github.event_name != 'workflow_run' || (github.event.workflow_run.name == 'Match Signal Live Expansion' && github.event.workflow_run.conclusion == 'success') || (github.event.workflow_run.name == 'Match Signal Unified Upcoming Board' && github.event.workflow_run.conclusion == 'success') || github.event.workflow_run.name == 'Deploy Match Signal to Cloudflare Pages' || (github.event.workflow_run.name == 'NBA totals settlement ledger' && github.event.workflow_run.conclusion == 'success') }}
+    if: ${{ github.event_name != 'workflow_run' || (github.event.workflow_run.name == 'Match Signal Live Expansion' && github.event.workflow_run.conclusion == 'success') || (github.event.workflow_run.name == 'Match Signal Unified Upcoming Board' && github.event.workflow_run.conclusion == 'success') || github.event.workflow_run.name == 'Deploy Match Signal to Cloudflare Pages' || (github.event.workflow_run.name == 'NBA totals settlement ledger' && github.event.workflow_run.conclusion == 'success') || (github.event.workflow_run.name == 'NBA totals SportyBet market-225 price capture' && github.event.workflow_run.conclusion == 'success') }}
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
@@ -199,6 +200,63 @@ jobs:
           gh workflow run live-expansion.yml --ref main
           echo "Dispatched the existing NBA model/fixture refresh; basketball release remains research-only."
 
+      - name: Count queued or running ESPN settlement workflows
+        id: active_settlement
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          active="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/nba-totals-settlement.yml/runs?branch=main&per_page=20" --jq '[.workflow_runs[] | select(.status == "queued" or .status == "in_progress")] | length')"
+          echo "count=$active" >> "$GITHUB_OUTPUT"
+          echo "Active official ESPN settlement runs: $active"
+
+      - name: Decide whether official ESPN settlement is stale
+        id: settlement_freshness
+        env:
+          ACTIVE_SETTLEMENT_RUNS: ${{ steps.active_settlement.outputs.count }}
+        run: |
+          set -euo pipefail
+          python - <<'PY' | tee -a "$GITHUB_OUTPUT"
+          import json
+          import os
+          import sys
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          sys.path.insert(0, "scripts")
+          from nba_totals_capture_watchdog import capture_age_minutes, should_dispatch_settlement
+
+          try:
+              ledger = json.loads(Path("data/nba_totals_ledger.json").read_text(encoding="utf-8"))
+          except Exception:
+              ledger = {}
+          updated_at = ledger.get("updated_at")
+          now = datetime.now(timezone.utc)
+          active = int(os.environ.get("ACTIVE_SETTLEMENT_RUNS", "0"))
+          age = capture_age_minutes(updated_at, now)
+          dispatch = should_dispatch_settlement(
+              updated_at, now, active_settlement_runs=active, max_age_minutes=15
+          )
+          print(f"dispatch={'true' if dispatch else 'false'}")
+          print(f"ledger_age_minutes={age:.2f}" if age is not None else "ledger_age_minutes=unknown")
+          print(f"active_settlement_runs={active}")
+          if dispatch:
+              print("reason=ledger_stale_and_no_active_settlement_run")
+          elif active:
+              print("reason=settlement_already_queued_or_running")
+          else:
+              print("reason=settlement_ledger_within_15_minute_window")
+          PY
+
+      - name: Dispatch stale official ESPN settlement recovery
+        if: steps.settlement_freshness.outputs.dispatch == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh workflow run nba-totals-settlement.yml --ref main
+          echo "Dispatched the existing official ESPN settlement workflow; no synthetic settlements were added."
+
       - name: Count queued or running NBA totals research refreshes
         id: active_research
         env:
@@ -213,19 +271,22 @@ jobs:
         id: research_freshness
         env:
           ACTIVE_RESEARCH_RUNS: ${{ steps.active_research.outputs.count }}
+          ACTIVE_SETTLEMENT_RUNS: ${{ steps.active_settlement.outputs.count }}
+          SETTLEMENT_DISPATCHED: ${{ steps.settlement_freshness.outputs.dispatch }}
           MODEL_REFRESH_DISPATCHED: ${{ steps.model_freshness.outputs.dispatch }}
         run: |
           set -euo pipefail
           python - <<'PY' | tee -a "$GITHUB_OUTPUT"
           import json
           import os
+          import sys
           from datetime import datetime, timezone
           from pathlib import Path
-          import sys
+
           sys.path.insert(0, "scripts")
           from nba_totals_capture_watchdog import (
               capture_age_minutes,
-              should_dispatch_research_refresh,
+              should_dispatch_probability_report,
           )
 
           now = datetime.now(timezone.utc)
@@ -234,24 +295,57 @@ jobs:
               generated_at = report.get("generated_at")
           except Exception:
               generated_at = None
-          active = int(os.environ.get("ACTIVE_RESEARCH_RUNS", "0"))
+
+          source_values = []
+          for path, key in (
+              ("data/nba_totals_price_capture_status.json", "checked_at"),
+              ("data/nba_totals_ledger.json", "updated_at"),
+              ("data/nba_totals_oos_value_test.json", "generated_at"),
+          ):
+              try:
+                  payload = json.loads(Path(path).read_text(encoding="utf-8"))
+                  value = payload.get(key)
+                  parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+                  if parsed.tzinfo is None:
+                      parsed = parsed.replace(tzinfo=timezone.utc)
+                  source_values.append(parsed.astimezone(timezone.utc))
+              except Exception:
+                  continue
+          latest_source = max(source_values) if source_values else None
+          source_updated_at = latest_source.isoformat() if latest_source else None
+
+          active_research = int(os.environ.get("ACTIVE_RESEARCH_RUNS", "0"))
+          active_settlement = int(os.environ.get("ACTIVE_SETTLEMENT_RUNS", "0"))
+          settlement_dispatched = os.environ.get("SETTLEMENT_DISPATCHED", "").lower() == "true"
           model_dispatched = os.environ.get("MODEL_REFRESH_DISPATCHED", "").lower() == "true"
           age = capture_age_minutes(generated_at, now)
-          dispatch = should_dispatch_research_refresh(
-              generated_at, now, active_research_runs=active, max_age_minutes=20
+          dispatch = should_dispatch_probability_report(
+              generated_at,
+              source_updated_at,
+              now,
+              active_research_runs=active_research,
+              active_settlement_runs=active_settlement,
+              settlement_dispatched=settlement_dispatched,
+              max_age_minutes=15,
           ) and not model_dispatched
+
           print(f"report_age_minutes={age:.2f}" if age is not None else "report_age_minutes=unknown")
-          print(f"active_research_runs={active}")
+          print(f"latest_source_updated_at={source_updated_at or 'unknown'}")
+          print(f"active_research_runs={active_research}")
+          print(f"active_settlement_runs={active_settlement}")
+          print(f"settlement_dispatched={str(settlement_dispatched).lower()}")
           print(f"model_refresh_dispatched={str(model_dispatched).lower()}")
           print(f"dispatch={'true' if dispatch else 'false'}")
           if dispatch:
-              print("reason=report_missing_or_at_least_20_minutes_old_and_no_active_refresh")
-          elif active:
+              print("reason=report_at_least_15_minutes_old_and_newer_capture_or_settlement_evidence_exists")
+          elif active_research:
               print("reason=research_refresh_already_queued_or_running")
+          elif active_settlement or settlement_dispatched:
+              print("reason=wait_for_official_ESPN_settlement_before_report_refresh")
           elif model_dispatched:
               print("reason=wait_for_new_model_publication_before_refreshing_report")
           else:
-              print("reason=report_within_recovery_window")
+              print("reason=report_current_for_latest_evidence")
           PY
 
       - name: Dispatch stale NBA totals research report recovery
