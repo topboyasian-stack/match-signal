@@ -115,10 +115,12 @@ def main():
     require("prospective_probability_fixture_coverage" in api and
             "valid_unique_settled_fixtures" in api and "binary_scored_unique_fixtures" in api and
             "snapshot_linkage_failure_count" in api and
+            "Number(c.prospective_settled_selections_with_exact_snapshot_match)>=100" in api and
             "prospective_settled_selections_with_exact_snapshot_match)>=30" not in api,
             "The backend must validate 30 unique settled fixtures separately from the 100 selected market bets")
     require("prospective_probability_fixture_coverage" in nba and
             "valid_unique_settled_fixtures" in nba and "binary_scored_unique_fixtures" in nba and
+            "Number(c.prospective_settled_selections_with_exact_snapshot_match)>=100" in nba and
             "prospective_settled_selections_with_exact_snapshot_match)>=30" not in nba,
             "The Basketball UI must use the same fixture-level probability sample as the backend")
     require("v=20261104-nba-probability-cohort1" in basketball,
