@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from expansion_pipeline import (NBA_TOTALS_MODEL_VERSION, NBA_TOTALS_PACE_BLEND_WEIGHT, NBA_TOTALS_BIAS_CORRECTION, dt as parse_time)
+from nba_totals_report_refresh_gate import source_data_fingerprint
 from nba_totals_walk_forward import (
     EVALUATION_CUTOFF_UTC,
     HISTORY,
@@ -1231,6 +1232,9 @@ def main():
         history, records, predictions, snapshots=snapshots,
         probability_settlements=probability_records,
     )
+    # Fingerprint the exact source files used. A capture/settlement commit that lands
+    # during this run will then be detected even if generated_at is later than its data.
+    report["source_data_fingerprint"] = source_data_fingerprint(ROOT)
     OUTPUT.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({
         "experiment": report["experiment"],
