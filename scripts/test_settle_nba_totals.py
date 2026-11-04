@@ -244,6 +244,7 @@ class SettlementTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn("data/nba_totals_probability_settlements.json", workflow)
         self.assertIn("git add data/nba_totals_ledger.json data/nba_totals_probability_settlements.json", workflow)
+        self.assertIn("requests pandas", workflow, "Settlement CI must install pandas required by the import chain.")
 
     def test_legacy_ledger_cannot_borrow_v5_publication_snapshot(self):
         legacy_key = ("abc", "legacy")
