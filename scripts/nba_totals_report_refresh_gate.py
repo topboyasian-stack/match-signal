@@ -21,6 +21,28 @@ def _utc(value):
     return parsed.astimezone(timezone.utc)
 
 
+
+def latest_snapshot_evidence_time(snapshots, model_version):
+    """Return the newest publication or quote timestamp for this frozen model.
+
+    A new immutable quote revision keeps its original prediction publication time.
+    Considering only published_at therefore hides newer market observations from the
+    CLV report refresh gate. Quote timestamps are evidence timestamps too, but they
+    never create additional bets or independent fixtures.
+    """
+    if not isinstance(snapshots, list):
+        return None
+    candidates = []
+    for row in snapshots:
+        if not isinstance(row, dict) or row.get("totals_model_version") != model_version:
+            continue
+        for field in ("published_at", "quote_timestamp"):
+            stamp = _utc(row.get(field))
+            if stamp is not None:
+                candidates.append(stamp)
+    return max(candidates, default=None)
+
+
 def should_refresh_report(event_name, report_time, newest_data_time, now, min_age_minutes=10):
     """Refresh immediately on new evidence events; throttle only periodic schedules.
 
