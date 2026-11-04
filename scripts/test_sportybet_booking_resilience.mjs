@@ -171,5 +171,67 @@ try {
   assert.equal(mixedShareRequests.length,1);
   assert.equal(mixedShareRequests[0].selections.length,3,'the generated SportyBet request must contain all three sports');
   assert.ok(mixedPayload.selections.every(row=>row.ok===true),'each current fixture/market must be revalidated');
+  // Manual Football/Tennis slips are also all-or-nothing. A missing leg must
+  // prevent the share endpoint from being called at all.
+  const missingLegShareCalls=[];
+  globalThis.fetch=async(input,options={})=>{
+    const url=new URL(typeof input==='string'?input:input.url);
+    if(url.pathname==='/api/ng/orders/share'){
+      missingLegShareCalls.push(JSON.parse(options.body));
+      return jsonResponse({bizCode:10000,data:{shareCode:'MUST-NOT-BE-REQUESTED'}});
+    }
+    const sportId=url.searchParams.get('sportId');
+    if(url.pathname.includes('UpcomingEvents')&&mixedCatalog[sportId]){
+      return jsonResponse({bizCode:10000,data:{tournaments:[{name:'Booking regression',events:mixedCatalog[sportId]}]}});
+    }
+    return jsonResponse({bizCode:10000,data:{tournaments:[]}});
+  };
+  const missingLegResponse=await onRequest({request:new Request('https://match-signal.pages.dev/api/sportybet-booking',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({mode:'manual',manual_selections:[
+      {event_id:'prediction-fb-ticket-test',sportybet_event_id:'sr:match:fb-ticket-test',sport:'football',market:'winner',pick:'p1',start_time:kickoffIso,player_1:'Home FC',player_2:'Away FC',match:'Home FC vs Away FC'},
+      {event_id:'prediction-tennis-missing',sportybet_event_id:'sr:match:tennis-missing',sport:'tennis',market:'winner',pick:'p1',start_time:kickoffIso,player_1:'Player One',player_2:'Player Two',match:'Player One vs Player Two'}
+    ]})}
+  })});
+  const missingLegPayload=await missingLegResponse.json();
+  assert.equal(missingLegResponse.status,409,JSON.stringify(missingLegPayload));
+  assert.equal(missingLegPayload.error,'MANUAL_TICKET_REJECTED_PARTIAL');
+  assert.equal(missingLegPayload.booking_code_withheld,true);
+  assert.equal(Boolean(missingLegPayload.booking_code),false);
+  assert.equal(missingLegShareCalls.length,0,'a manual slip with any failed leg must not reach the share endpoint');
+
+  // Even when all legs revalidate, a provider response accepting only part of a
+  // plain Football/Tennis ticket must not leak a reduced share code.
+  const partialProviderCalls=[];
+  globalThis.fetch=async(input,options={})=>{
+    const url=new URL(typeof input==='string'?input:input.url);
+    if(url.pathname==='/api/ng/orders/share'){
+      partialProviderCalls.push(JSON.parse(options.body));
+      return jsonResponse({bizCode:10000,data:{
+        shareCode:'PARTIAL-FOOTBALL-TENNIS-MUST-BE-WITHHELD',
+        outcomes:[{odds:1.82}]
+      }});
+    }
+    const sportId=url.searchParams.get('sportId');
+    if(url.pathname.includes('UpcomingEvents')&&mixedCatalog[sportId]){
+      return jsonResponse({bizCode:10000,data:{tournaments:[{name:'Booking regression',events:mixedCatalog[sportId]}]}});
+    }
+    return jsonResponse({bizCode:10000,data:{tournaments:[]}});
+  };
+  const providerPartialResponse=await onRequest({request:new Request('https://match-signal.pages.dev/api/sportybet-booking',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({mode:'manual',manual_selections:[
+      {event_id:'prediction-fb-ticket-test',sportybet_event_id:'sr:match:fb-ticket-test',sport:'football',market:'winner',pick:'p1',start_time:kickoffIso,player_1:'Home FC',player_2:'Away FC',match:'Home FC vs Away FC'},
+      {event_id:'prediction-tennis-ticket-test',sportybet_event_id:'sr:match:tennis-ticket-test',sport:'tennis',market:'winner',pick:'p1',start_time:kickoffIso,player_1:'Player One',player_2:'Player Two',match:'Player One vs Player Two'}
+    ]})}
+  })});
+  const providerPartialPayload=await providerPartialResponse.json();
+  assert.equal(providerPartialResponse.status,409,JSON.stringify(providerPartialPayload));
+  assert.equal(providerPartialPayload.error,'MANUAL_TICKET_REJECTED_PARTIAL');
+  assert.equal(providerPartialPayload.booking_code_withheld,true);
+  assert.equal(Boolean(providerPartialPayload.booking_code),false);
+  assert.equal(partialProviderCalls.length,1);
+  assert.equal(partialProviderCalls[0].selections.length,2);
+
   console.log('SportyBet booking resilience: PASS (bounded paging, share fallback, exact market-225 pair, and Football/Tennis/eFootball mixed ticket).');
 } finally { globalThis.fetch=originalFetch; }
