@@ -41,6 +41,25 @@ def run():
             f"NBA recovery watchdog must include scheduled workflow {workflow} in its re-enable list."
         )
 
+    # A scheduled run can be the only source of new prospective evidence when
+    # event-driven runs are quiet. GitHub retains only one pending run per
+    # concurrency group, so workflow_run/push activity must use a separate lane.
+    scheduled_lane = "${{ github.event_name == 'schedule' && 'scheduled' || 'event-driven' }}"
+    for workflow_text, group_prefix, name in (
+        (capture_workflow, "nba-totals-price-capture-", "price capture"),
+        ((root / ".github/workflows/nba-totals-settlement.yml").read_text(encoding="utf-8"),
+         "nba-totals-settlement-ledger-", "settlement"),
+        ((root / ".github/workflows/nba-totals-probability-value.yml").read_text(encoding="utf-8"),
+         "nba-totals-probability-value-research-", "probability report"),
+        (watchdog_workflow, "nba-totals-capture-freshness-watchdog-", "capture watchdog"),
+        ((root / ".github/workflows/live-expansion.yml").read_text(encoding="utf-8"),
+         "match-signal-pipeline-", "model refresh"),
+    ):
+        expected_group = f"group: {group_prefix}{scheduled_lane}"
+        assert expected_group in workflow_text, (
+            f"Scheduled {name} must be isolated from event-driven concurrency to prevent cron starvation."
+        )
+
     now = dt("2026-11-02T08:25:00Z")
     assert round(capture_age_minutes("2026-11-02T08:16:39Z", now), 2) == 8.35
     assert not should_dispatch_capture("2026-11-02T08:16:39Z", now, 0), (
