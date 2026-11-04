@@ -21,6 +21,7 @@ def run():
     assert (
         "cron: '*/10 * * * *'" in capture_workflow
         or "cron: '0,10,20,30,40,50 * * * *'" in capture_workflow
+        or "cron: '1,11,21,31,41,51 * * * *'" in capture_workflow
     ), (
         "NBA SportyBet market-225 capture must run every 10 minutes to protect the 15-minute quote freshness gate."
     )
