@@ -246,6 +246,12 @@ class SettlementTests(unittest.TestCase):
         self.assertIn("data/nba_totals_probability_settlements.json", workflow)
         self.assertIn("git add data/nba_totals_ledger.json data/nba_totals_probability_settlements.json", workflow)
         self.assertIn("requests pandas", workflow, "Settlement CI must install pandas required by the import chain.")
+        push_paths = workflow.split("  push:", 1)[1].split("permissions:", 1)[0]
+        self.assertNotIn(
+            "data/nba_totals_probability_settlements.json",
+            push_paths,
+            "Settlement output commits must not retrigger the settlement workflow through push paths.",
+        )
 
     def test_legacy_ledger_cannot_borrow_v5_publication_snapshot(self):
         legacy_key = ("abc", "legacy")
