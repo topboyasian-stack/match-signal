@@ -335,7 +335,7 @@ function findBasketballSelection(leg,event){
     const status=String(market?.status||'').trim().toLowerCase();if(String(market?.id||'')!=='225'||/suspend|closed|inactive|settled|unavailable|stop/i.test(status)||(status!==''&&/^\d+$/.test(status)&&status!=='0'))continue;
     const currentLine=lineFromMarket(market);if(!Number.isFinite(currentLine)||Math.abs(currentLine-line)>1e-9)continue;
     const outcomes=Array.isArray(market?.outcomes)?market.outcomes:[];
-    const active=name=>outcomes.find(o=>{const label=String(o?.desc||o?.name||o?.title||'').toLowerCase(),ok=o?.isActive==null?(o?.active!==false):(Number(o.isActive)===1||o.isActive===true),odds=Number(o?.odds);return ok&&new RegExp('\\b'+name+'\\b').test(label)&&String(o?.id||'')&&Number.isFinite(odds)&&odds>1;});
+    const active=name=>outcomes.find(o=>{const label=String(o?.desc||o?.name||o?.title||'').toLowerCase(),ok=o?.isActive==null?(o?.active!==false):(Number(o.isActive)===1||o.isActive===true),odds=Number(o?.odds);return ok&&new RegExp('\b'+name+'\b').test(label)&&String(o?.id||'')&&Number.isFinite(odds)&&odds>1;});
     const over=active('over'),under=active('under');if(!over||!under)continue;const out=side==='over'?over:under;
     return{eventId:event.eventId,marketId:'225',specifier:market?.specifier??null,outcomeId:String(out.id),outcomeName:String(out.desc||out.name||side),odds:Number(out.odds),line:currentLine,overOdds:Number(over.odds),underOdds:Number(under.odds),fetchedAt:String(event?.fetchedAt||''),sportybetEventId:String(event.eventId||'')};
   }
@@ -833,6 +833,8 @@ async function handlePost(context) {
     }
 
     const catalogueResults = await Promise.all(catalogueTasks);
+    const catalogueFailure = catalogueResults.find(result => result.error);
+    if (catalogueFailure && !manualMode) throw catalogueFailure.error;
     const found = new Map();
     // Merge normal catalogue results first, then apply the live virtual feed
     // using the same market-preference rule as the previous sequential flow.
@@ -846,7 +848,7 @@ async function handlePost(context) {
         const current = found.get(id);
         const hasOu = Array.isArray(event?.markets) && event.markets.some(m => {
           const desc = String(m?.desc || m?.name || m?.title || m?.specifier || '').toLowerCase();
-          return String(m?.id || '') === '18' || String(m?.id || '') === '189' || /over.?under|total|\\bou\\b/.test(desc);
+          return String(m?.id || '') === '18' || String(m?.id || '') === '189' || /over.?under|total|\bou\b/.test(desc);
         });
         if (!current || hasOu) found.set(id, event);
       }
