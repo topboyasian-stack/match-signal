@@ -173,6 +173,8 @@ try {
   assert.ok(mixedPayload.selections.every(row=>row.ok===true),'each current fixture/market must be revalidated');
   // Manual Football/Tennis slips are also all-or-nothing. A missing leg must
   // prevent the share endpoint from being called at all.
+  const savedTennisCatalogue = mixedCatalog['sr:sport:5'];
+  mixedCatalog['sr:sport:5'] = [];
   const missingLegShareCalls=[];
   globalThis.fetch=async(input,options={})=>{
     const url=new URL(typeof input==='string'?input:input.url);
@@ -199,6 +201,7 @@ try {
   assert.equal(missingLegPayload.booking_code_withheld,true);
   assert.equal(Boolean(missingLegPayload.booking_code),false);
   assert.equal(missingLegShareCalls.length,0,'a manual slip with any failed leg must not reach the share endpoint');
+  mixedCatalog['sr:sport:5'] = savedTennisCatalogue;
 
   // Even when all legs revalidate, a provider response accepting only part of a
   // plain Football/Tennis ticket must not leak a reduced share code.
