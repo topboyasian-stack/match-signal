@@ -167,6 +167,7 @@ def test_prospective_probability_sample_requires_exact_snapshot_linkage():
             "expected_total": 221.0,
             "pick": "over",
             "line": 220.5,
+            "expected_total": 221.0,
             "over_odds": 1.91,
             "under_odds": 1.89,
         }},
