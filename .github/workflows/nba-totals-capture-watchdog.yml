@@ -55,7 +55,16 @@ jobs:
             nba-totals-capture-watchdog.yml \
             live-expansion.yml; do
             echo "Ensuring scheduled workflow is enabled: $workflow"
-            gh workflow enable "$workflow" --repo "$GITHUB_REPOSITORY"
+            workflow_state="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow" --jq '.state')"
+            if [ "$workflow_state" != "active" ]; then
+              gh workflow enable "$workflow" --repo "$GITHUB_REPOSITORY"
+            fi
+            workflow_state="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow" --jq '.state')"
+            if [ "$workflow_state" != "active" ]; then
+              echo "Scheduled workflow is not active after recovery: $workflow (state=$workflow_state)" >&2
+              exit 1
+            fi
+            echo "Verified active scheduled workflow: $workflow"
           done
 
       - name: Test stale-capture recovery policy
