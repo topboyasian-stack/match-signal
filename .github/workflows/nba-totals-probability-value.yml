@@ -142,7 +142,7 @@ jobs:
           capture = cron(".github/workflows/nba-totals-price-capture.yml")
           settlement = cron(".github/workflows/nba-totals-settlement.yml")
           report = cron(".github/workflows/nba-totals-probability-value.yml")
-          assert capture in {"*/10 * * * *", "0,10,20,30,40,50 * * * *"}, capture
+          assert capture in {"*/10 * * * *", "0,10,20,30,40,50 * * * *", "1,11,21,31,41,51 * * * *"}, capture
           assert settlement == "10,25,40,55 * * * *", settlement
           assert report == "12,27,42,57 * * * *", report
           watchdog = cron(".github/workflows/nba-totals-capture-watchdog.yml")
