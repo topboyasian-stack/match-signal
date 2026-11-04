@@ -99,18 +99,22 @@ function normalizeEvent(event, tournament) {
   };
 }
 
-export async function upstream(path, params) {
+export async function upstream(path, params, { timeoutMs = 6000, deadlineAt = null } = {}) {
   const failures = [];
   // SportyBet sometimes answers JSON API requests with an HTML edge/challenge
   // page. Retry the same catalogue query through the Match Signal proxy.
   for (const origin of [SPORTYBET_PROXY_ORIGIN, ORIGIN]) {
+    if (deadlineAt != null && deadlineAt - Date.now() < 250) {
+      failures.push('manual booking time budget exhausted before next catalogue source');
+      break;
+    }
     try {
       const url = new URL(origin + path);
       for (const [key, value] of Object.entries(params || {})) {
         if (value != null) url.searchParams.set(key, String(value));
       }
       const response = await fetch(url.toString(), {
-        headers: BROWSER_HEADERS, cache: 'no-store', signal: AbortSignal.timeout(12000)
+        headers: BROWSER_HEADERS, cache: 'no-store', signal: AbortSignal.timeout(Math.max(250, Math.min(timeoutMs, deadlineAt == null ? timeoutMs : deadlineAt - Date.now())))
       });
       const body = await response.text();
       const contentType = String(response.headers.get('content-type') || 'unknown');
@@ -141,7 +145,7 @@ export async function upstream(path, params) {
 }
 
 
-export async function requestSportyBetShare(selections) {
+export async function requestSportyBetShare(selections, { deadlineAt = null, timeoutMs = 6500 } = {}) {
   const failures = [];
   const payload = JSON.stringify({
     selections: selections.map(selection => ({
@@ -156,6 +160,11 @@ export async function requestSportyBetShare(selections) {
   // Fall back to the direct origin only if the proxy did not return usable JSON.
   // A valid provider business rejection is authoritative and is not retried.
   for (const origin of [SPORTYBET_PROXY_ORIGIN, ORIGIN]) {
+    const remainingMs = deadlineAt == null ? timeoutMs : Math.min(timeoutMs, deadlineAt - Date.now());
+    if (remainingMs < 250) {
+      failures.push(origin + ': manual booking time budget exhausted before share response');
+      break;
+    }
     const url = origin + '/api/ng/orders/share?_t=' + Date.now();
     try {
       const response = await fetch(url, {
@@ -172,7 +181,7 @@ export async function requestSportyBetShare(selections) {
         body: payload,
         cache: 'no-store',
         redirect: 'follow',
-        signal: AbortSignal.timeout(15000)
+        signal: AbortSignal.timeout(remainingMs)
       });
       const text = await response.text();
       const contentType = String(response.headers.get('content-type') || 'unknown');
@@ -202,7 +211,7 @@ export async function requestSportyBetShare(selections) {
   };
 }
 
-export async function collectEvents({ sportId, marketId, timeline = 168, pageSize = 100, maxPages = 5, primaryPath = '/api/ng/factsCenter/pcUpcomingEvents', fallbackPath = null, fallbackParams = {} }, targetIds) {
+export async function collectEvents({ sportId, marketId, timeline = 168, pageSize = 100, maxPages = 5, primaryPath = '/api/ng/factsCenter/pcUpcomingEvents', fallbackPath = null, fallbackParams = {}, deadlineAt = null, requestTimeoutMs = 6000 }, targetIds) {
   const found = new Map();
   const matchedTargets = new Set();
   let page = 1;
@@ -222,7 +231,7 @@ export async function collectEvents({ sportId, marketId, timeline = 168, pageSiz
         _t: Date.now(),
         ...fallbackParams
       };
-      data = await upstream(path, params);
+      data = await upstream(path, params, { timeoutMs: requestTimeoutMs, deadlineAt });
     } catch (error) {
       if (!usedFallback && fallbackPath) {
         usedFallback = true;
@@ -268,7 +277,7 @@ export async function collectEvents({ sportId, marketId, timeline = 168, pageSiz
           timeline,
           _t: Date.now(),
           ...fallbackParams
-        });
+        }, { timeoutMs: requestTimeoutMs, deadlineAt });
       } catch (error) {
         break;
       }
@@ -445,7 +454,7 @@ function resolveCurrentEvent(leg, found) {
   return { event: best, matched_by: best ? 'fixture_participants_time' : 'none' };
 }
 
-async function collectVirtualEventsFromLiveFeed(context, targetIds, sources = 'efootball,vfootball') {
+async function collectVirtualEventsFromLiveFeed(context, targetIds, sources = 'efootball,vfootball', deadlineAt = null) {
   const found = new Map();
   if (!targetIds || !targetIds.size) return found;
   try {
@@ -458,7 +467,7 @@ async function collectVirtualEventsFromLiveFeed(context, targetIds, sources = 'e
     const response = await fetch(url.toString(), {
       headers: { 'Accept': 'application/json', 'Cache-Control': 'no-cache' },
       cache: 'no-store',
-      signal: AbortSignal.timeout(15000)
+      signal: AbortSignal.timeout(Math.max(250, Math.min(5000, deadlineAt == null ? 15000 : deadlineAt - Date.now())))
     });
     if (!response.ok) return found;
     const payload = await response.json();
@@ -674,6 +683,9 @@ async function handlePost(context) {
     const body = await context.request.json();
     const manualMode = body?.mode === 'manual' || Array.isArray(body?.manual_selections);
     const batchId = manualMode ? 'MANUAL-TICKET' : String(body?.batch_id || '').trim();
+    // Keep browser-driven manual tickets inside a bounded request window. A slow
+    // catalogue scan/share origin must return JSON before the browser drops fetch.
+    const manualDeadlineAt = manualMode ? Date.now() + 22000 : null;
     let legs = [];
 
     if (manualMode) {
@@ -765,7 +777,9 @@ async function handlePost(context) {
         sportId: 'sr:sport:202120001',
         marketId: '1,18,10,29,11,26,36,14,60100,186,189,202,204,210',
         primaryPath: '/api/ng/factsCenter/wapConfigurableUpcomingEvents',
-        fallbackPath: '/api/ng/factsCenter/pcUpcomingEvents'
+        fallbackPath: '/api/ng/factsCenter/pcUpcomingEvents',
+        deadlineAt: manualDeadlineAt,
+        requestTimeoutMs: manualMode ? 3500 : 6000
       }, virtualIds);
       for (const [id, event] of events) found.set(id, event);
     }
@@ -773,7 +787,9 @@ async function handlePost(context) {
     if (efootballIds.size) {
       const events = await collectEvents({
         sportId: 'sr:sport:137',
-        marketId: '1,18,10,29,11,26,36,14,60100,186,189,202,204,210'
+        marketId: '1,18,10,29,11,26,36,14,60100,186,189,202,204,210',
+        deadlineAt: manualDeadlineAt,
+        requestTimeoutMs: manualMode ? 3500 : 6000
       }, efootballIds);
       for (const [id, event] of events) found.set(id, event);
     }
@@ -785,7 +801,7 @@ async function handlePost(context) {
     // fallback for events absent from the live normalized feed.
     const allVirtualIds = new Set([...virtualIds, ...efootballIds]);
     if (allVirtualIds.size) {
-      const liveFeedEvents = await collectVirtualEventsFromLiveFeed(context, allVirtualIds, 'efootball,vfootball');
+      const liveFeedEvents = await collectVirtualEventsFromLiveFeed(context, allVirtualIds, 'efootball,vfootball', manualDeadlineAt);
       for (const [id, event] of liveFeedEvents) {
         const current = found.get(id);
         const hasOu = Array.isArray(event?.markets) && event.markets.some(m => {
@@ -801,7 +817,9 @@ async function handlePost(context) {
     if (footballIds.size) {
       const events = await collectEvents({
         sportId: 'sr:sport:1',
-        marketId: '1,18,10,14,16,29,45,47'
+        marketId: '1,18,10,14,16,29,45,47',
+        deadlineAt: manualDeadlineAt,
+        requestTimeoutMs: manualMode ? 3500 : 6000
       }, footballIds);
       for (const [id, event] of events) found.set(id, event);
     }
@@ -810,7 +828,9 @@ async function handlePost(context) {
       const events = await collectEvents({
         sportId: 'sr:sport:5',
         marketId: '186,210,202,204,189,203,188,187',
-        fallbackPath: '/api/ng/factsCenter/wapConfigurableUpcomingEvents'
+        fallbackPath: '/api/ng/factsCenter/wapConfigurableUpcomingEvents',
+        deadlineAt: manualDeadlineAt,
+        requestTimeoutMs: manualMode ? 3500 : 6000
       }, tennisIds);
       for (const [id, event] of events) found.set(id, event);
     }
@@ -928,7 +948,7 @@ async function handlePost(context) {
       }))
     });
 
-    const shareResult = await requestSportyBetShare(selections);
+    const shareResult = await requestSportyBetShare(selections, { deadlineAt: manualDeadlineAt, timeoutMs: manualMode ? 6500 : 12000 });
     if (shareResult.error) {
       return json({
         ok: false,

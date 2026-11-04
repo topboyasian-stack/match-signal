@@ -59,6 +59,10 @@ def main():
             "Ticket requirements must not make the Generate button appear dead")
     require("manual_selections" in drawer and "/api/sportybet-booking" in drawer,
             "The shared ticket must submit all selections through the root-relative common revalidation API")
+    require("AbortSignal.timeout(26000)" in drawer and "Your ticket is still saved; no code is assumed to exist." in drawer,
+            "Manual ticket network timeouts must preserve the slip and avoid implying a code was created")
+    require("manualDeadlineAt = manualMode ? Date.now() + 22000 : null" in api and "requestTimeoutMs: manualMode ? 3500 : 6000" in api and "deadlineAt: manualDeadlineAt, timeoutMs: manualMode ? 6500 : 12000" in api,
+            "Manual multi-leg revalidation and share requests must have a bounded request budget")
     require("market==='total'?line:null" in drawer and "item.market==='total'" in drawer,
             "Football, Tennis and Basketball total legs must retain their exact line and side")
     require("data-ms-ticket-remove" in drawer and "data-ms-ticket-clear" in drawer,
@@ -99,14 +103,14 @@ def main():
     basketball_collector = api.split("export async function collectBasketballEvents", 1)[1].split("function findBasketballSelection", 1)[0]
     require("await fetch(url.toString()" not in basketball_collector and "response.json()" not in basketball_collector and "returned non-JSON content" in basketball_collector,
             "NBA feed revalidation must handle non-JSON responses explicitly and avoid same-origin HTML fallbacks")
-    require("export async function upstream(path, params)" in api and "SPORTYBET_PROXY_ORIGIN" in api and "returned HTML instead of JSON" in api,
-            "Shared SportyBet catalogue lookup must retry the same source via the configured proxy when the public host returns HTML")
+    require("export async function upstream(path, params, { timeoutMs = 6000, deadlineAt = null } = {})" in api and "SPORTYBET_PROXY_ORIGIN" in api and "returned HTML instead of JSON" in api,
+            "Shared SportyBet catalogue lookup must keep proxy recovery while exposing bounded request deadlines")
     require("export async function collectEvents" in api and "maxPages = 5" in api,
             "Shared ticket catalogue scans must stop at the regional proxy's supported fifth page")
     require("export async function requestSportyBetShare" in api and
             "for (const origin of [SPORTYBET_PROXY_ORIGIN, ORIGIN])" in api and
-            "const shareResult = await requestSportyBetShare(selections)" in api,
-            "Share-code creation must try the regional POST proxy before direct SportyBet and return consistent JSON failures")
+            "const shareResult = await requestSportyBetShare(selections, { deadlineAt: manualDeadlineAt, timeoutMs: manualMode ? 6500 : 12000 })" in api,
+            "Share-code creation must try both SportyBet sources within the manual request deadline and return JSON failures")
     require("const basketballIds" in api and "map(l => String(l.sportybet_event_id || '')).filter(Boolean)" in api and "collectBasketballEvents(context, basketballIds)" in api and "directProvider = sportybetId ? found.get(sportybetId) : null" in api,
             "Mixed-sport tickets must fetch the current SportyBet Basketball event")
     require("const footballIds = new Set(legs.filter(l => String(l?.sport || '').toLowerCase() === 'football').map(l => String(l.sportybet_event_id || l.event_id || '')).filter(Boolean));" in api and
