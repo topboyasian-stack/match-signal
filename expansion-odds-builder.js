@@ -862,7 +862,7 @@
         '<span style="font-size:8px;font-weight:900;letter-spacing:.06em;color:#ffd166;border:1px solid rgba(255,209,102,.2);border-radius:999px;padding:4px 6px">'+badge+'</span></div>'+
         '<div style="margin-top:4px;font-size:9px;color:var(--ms-muted);line-height:1.45">'+esc(x.pick||'Candidate line unavailable')+'</div>'+
         '<div style="margin-top:8px;font-size:9px;line-height:1.7">'+esc(facts.join(' · '))+'</div>'+
-        '<div style="margin-top:7px;font-size:8px;line-height:1.55;color:var(--ms-muted)"><b>Why it is not a qualified batch:</b> '+esc(blockers.join(' '))+'</div>'+
+        '<div style="margin-top:7px;font-size:8px;line-height:1.55;color:var(--ms-muted)"><b>Why it is not a qualified batch:</b> '+esc(blockers.join(' '))+'</div>'+manualEfootballTicketButton(x)+
         '</div>';
     }).join('');
     var empty='<div class="empty">No current individual candidate passed all leg-level gates. The system will continue scanning; no ticket is forced.</div>';
@@ -920,7 +920,42 @@
                 : (data.status||'—');
 
     var settlementIndex=buildSettlementIndex(tracker,settledLegs);
-    function legCard(l,i,batchIndex){
+    function manualEfootballTicketButton(leg) {
+      var x=leg||{}, product=String(x.product||'').toLowerCase();
+      var pick=String(x.builder_pick||x.pick||'').toLowerCase();
+      if(pick!=='over'&&pick!=='under'){
+        var found=String(x.pick||'').match(/\\b(over|under)\\s+([0-9]+(?:\\.[0-9]+)?)/i);
+        if(found)pick=found[1].toLowerCase();
+      }
+      var eventId=String(x.event_id||'').trim();
+      var providerId=String(x.sportybet_event_id||x.event_id||'').trim();
+      var line=Number(x.line), marketId=String(x.sportybet_market_id||x.market_id||'');
+      var odds=Number(x.bookmaker_odds), age=Number(x.market_odds_age_seconds);
+      var start=Date.parse(String(x.start_time||'')), now=Date.now();
+      if(!['efootball_gt','efootball_adriatic'].includes(product)||!eventId||!providerId||
+        !['over','under'].includes(pick)||!Number.isFinite(line)||line<=0||
+        !['18','189'].includes(marketId)||x.odds_fresh!==true||x.market_complete!==true||
+        !Number.isFinite(odds)||odds<=1||!Number.isFinite(age)||age<0||age>900||
+        !Number.isFinite(start)||start<=now+120000||effectiveSettlement(x)?.finished) return '';
+      var home=String(x.participant_1||x.player_1||'').trim();
+      var away=String(x.participant_2||x.player_2||'').trim();
+      if(!home||!away)return '';
+      var match=String(x.match||home+' vs '+away);
+      return '<div class="manual-ticket-add-wrap" style="margin-top:9px">'+
+        '<button type="button" class="booking-btn" data-ms-ticket-add'+
+        ' data-ticket-sport="efootball"'+
+        ' data-ticket-event="'+esc(eventId)+'"'+
+        ' data-ticket-sportybet-event="'+esc(providerId)+'"'+
+        ' data-ticket-market="total" data-ticket-pick="'+esc(pick)+'"'+
+        ' data-ticket-line="'+esc(line)+'" data-ticket-market-id="'+esc(marketId)+'"'+
+        ' data-ticket-odds="'+esc(odds)+'" data-ticket-start="'+esc(x.start_time)+'"'+
+        ' data-ticket-player1="'+esc(home)+'" data-ticket-player2="'+esc(away)+'"'+
+        ' data-ticket-match="'+esc(match)+'" data-ticket-product="'+esc(product)+'"'+
+        ' data-ticket-model-qualified="'+(x.desk_official_qualification_pass===true?'true':'false')+'">'+
+        'Add to shared ticket · live recheck required</button></div>';
+    }
+
+  function legCard(l,i,batchIndex){
       var viewLeg=withTrackerSettlement(l,settlementIndex);
       var settled=effectiveSettlement(viewLeg),isSettled=!!(settled&&settled.finished);
       var resultText=settled&&settled.correct===true?'✓ WON':settled&&settled.correct===false?'✕ LOST':settled&&settled.status==='VOID'?'↔ VOID':'ENDED';
@@ -952,7 +987,7 @@
           evidenceHtml='<div class="row"><span>Evidence basis</span><b>'+esc(evidenceLabel)+'</b></div><div class="row"><span>Evidence sample</span><b>'+esc(evidenceDetail)+'</b></div>';
         }
       }
-      return '<article class="card '+(isSettled?'settled-card':'')+'"><div class="meta"><span>Leg '+(i+1)+' · '+esc(product)+' · '+esc(viewLeg.competition||'—')+'</span><span>'+(isSettled?'<b class="result-badge '+resultClass+'">'+resultText+'</b>':'SportyBet '+esc(viewLeg.bookmaker_odds==null?'—':viewLeg.bookmaker_odds))+'</span></div><div class="teams">'+esc(viewLeg.match||'—')+'</div><div class="pick">Selection: <b>'+esc(viewLeg.pick||'—')+'</b><span class="conf">Model '+pct(viewLeg.model_probability)+'</span></div>'+timer(viewLeg.start_time,viewLeg)+liveTrackerHtml(viewLeg)+'<div class="startTime">'+(isSettled?'Result confirmed'+(settled.result?' · '+esc(settled.result):'')+' · '+esc(local(viewLeg.start_time)):'Start: '+esc(local(viewLeg.start_time))+' <span>· your browser time</span>')+'</div><div class="section"><div class="row"><span>Market</span><b>'+esc(viewLeg.market||'—')+'</b></div><div class="row"><span>Model probability</span><b>'+pct(viewLeg.model_probability)+'</b></div><div class="row"><span>Model fair odds</span><b>'+esc(viewLeg.model_fair_odds==null?'—':viewLeg.model_fair_odds)+'</b></div><div class="row"><span>SportyBet price</span><b>'+esc(viewLeg.bookmaker_odds==null?'—':viewLeg.bookmaker_odds)+'</b></div><div class="row"><span>Model edge vs market</span><b>'+esc(viewLeg.model_edge==null?'—':pct(viewLeg.model_edge))+'</b></div><div class="row"><span>Market price age</span><b>'+esc(viewLeg.market_odds_age_seconds==null?'—':Math.round(Number(viewLeg.market_odds_age_seconds))+'s')+'</b></div>'+evidenceHtml+'<div class="row"><span>Result</span><b class="'+(isSettled?(settled.status==='VOID'?'void-text':settled.correct===true?'won-text':'lost-text'):'')+'">'+(isSettled?resultText:'Pending')+'</b></div></div></article>';
+      return '<article class="card '+(isSettled?'settled-card':'')+'"><div class="meta"><span>Leg '+(i+1)+' · '+esc(product)+' · '+esc(viewLeg.competition||'—')+'</span><span>'+(isSettled?'<b class="result-badge '+resultClass+'">'+resultText+'</b>':'SportyBet '+esc(viewLeg.bookmaker_odds==null?'—':viewLeg.bookmaker_odds))+'</span></div><div class="teams">'+esc(viewLeg.match||'—')+'</div><div class="pick">Selection: <b>'+esc(viewLeg.pick||'—')+'</b><span class="conf">Model '+pct(viewLeg.model_probability)+'</span></div>'+timer(viewLeg.start_time,viewLeg)+liveTrackerHtml(viewLeg)+'<div class="startTime">'+(isSettled?'Result confirmed'+(settled.result?' · '+esc(settled.result):'')+' · '+esc(local(viewLeg.start_time)):'Start: '+esc(local(viewLeg.start_time))+' <span>· your browser time</span>')+'</div><div class="section"><div class="row"><span>Market</span><b>'+esc(viewLeg.market||'—')+'</b></div><div class="row"><span>Model probability</span><b>'+pct(viewLeg.model_probability)+'</b></div><div class="row"><span>Model fair odds</span><b>'+esc(viewLeg.model_fair_odds==null?'—':viewLeg.model_fair_odds)+'</b></div><div class="row"><span>SportyBet price</span><b>'+esc(viewLeg.bookmaker_odds==null?'—':viewLeg.bookmaker_odds)+'</b></div><div class="row"><span>Model edge vs market</span><b>'+esc(viewLeg.model_edge==null?'—':pct(viewLeg.model_edge))+'</b></div><div class="row"><span>Market price age</span><b>'+esc(viewLeg.market_odds_age_seconds==null?'—':Math.round(Number(viewLeg.market_odds_age_seconds))+'s')+'</b></div>'+evidenceHtml+'<div class="row"><span>Result</span><b class="'+(isSettled?(settled.status==='VOID'?'void-text':settled.correct===true?'won-text':'lost-text'):'')+'">'+(isSettled?resultText:'Pending')+'</b></div></div>'+manualEfootballTicketButton(viewLeg)+'</article>';
     }
 
     function batchCard(b,idx){
