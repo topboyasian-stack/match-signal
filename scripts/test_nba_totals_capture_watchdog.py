@@ -26,6 +26,9 @@ def run():
     assert "cron: '5,15,25,35,45,55 * * * *'" in watchdog_workflow, (
         "The freshness watchdog must run halfway between the 10-minute capture slots."
     )
+    assert 'gh workflow enable "$workflow" --repo "$GITHUB_REPOSITORY"' in watchdog_workflow, (
+        "NBA recovery watchdog must call the GitHub workflow-enable command after delivery gaps."
+    )
     for workflow in (
         "nba-totals-price-capture.yml",
         "nba-totals-probability-value.yml",
@@ -33,8 +36,8 @@ def run():
         "nba-totals-capture-watchdog.yml",
         "live-expansion.yml",
     ):
-        assert f'gh workflow enable "{workflow}"' in watchdog_workflow, (
-            f"NBA recovery watchdog must re-enable scheduled workflow {workflow} after delivery gaps."
+        assert workflow in watchdog_workflow, (
+            f"NBA recovery watchdog must include scheduled workflow {workflow} in its re-enable list."
         )
 
     now = dt("2026-11-02T08:25:00Z")
