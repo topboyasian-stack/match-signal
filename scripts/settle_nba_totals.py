@@ -7,11 +7,13 @@ from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 from pathlib import Path
 import requests
+from nba_totals_walk_forward import EVALUATION_CUTOFF_UTC
 
 ROOT = Path(__file__).resolve().parents[1]
 PREDICTIONS = ROOT / "data" / "nba_predictions.json"
 SNAPSHOTS = ROOT / "data" / "nba_totals_publication_snapshots.json"
 LEDGER = ROOT / "data" / "nba_totals_ledger.json"
+PROBABILITY_SETTLEMENTS = ROOT / "data" / "nba_totals_probability_settlements.json"
 BASE = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba"
 SESSION = requests.Session()
 SESSION.headers.update({"User-Agent": "MatchSignalResearch/1.0 (paper-only NBA totals ledger)"})
@@ -185,6 +187,128 @@ def select_settlement_snapshot(rows):
         if str(market.get("pick") or "").strip().lower() in {"over", "under"}:
             return row
     return ordered[0]
+
+
+
+def valid_probability_snapshot(prediction, cutoff=EVALUATION_CUTOFF_UTC):
+    """Validate one immutable exact-market snapshot for fixture-level probability scoring."""
+    if not isinstance(prediction, dict):
+        return False
+    if prediction.get("totals_model_version") != "nba-total-v5.1-pace-efficiency-calibrated":
+        return False
+    published = parse_time(prediction.get("published_at"))
+    start = parse_time(prediction.get("start_time"))
+    if not published or not start or published < cutoff or published >= start:
+        return False
+    snapshot_id = str(prediction.get("publication_snapshot_id") or "").strip()
+    if (
+        not snapshot_id
+        or prediction.get("publication_snapshot_verified") is not True
+        or prediction.get("publication_snapshot_kind") != "immutable_sportybet_market_225_revision"
+    ):
+        return False
+    market = ((prediction.get("markets") or {}).get("total_ou") or {})
+    if str(market.get("market_id") or "") != "225":
+        return False
+    try:
+        expected_total = float(prediction.get("expected_total"))
+        line = float(market.get("line"))
+    except (TypeError, ValueError):
+        return False
+    if not (math.isfinite(expected_total) and math.isfinite(line) and 100 <= line <= 300):
+        return False
+    audit = price_audit_fields(prediction, market, published)
+    return bool(audit.get("roi_eligible"))
+
+
+def select_probability_snapshot(rows, cutoff=EVALUATION_CUTOFF_UTC):
+    """Freeze the first eligible market-225 snapshot per event, regardless of bet direction."""
+    eligible = [row for row in (rows or []) if valid_probability_snapshot(row, cutoff)]
+    if not eligible:
+        return None
+    return min(
+        eligible,
+        key=lambda row: (
+            parse_time(row.get("published_at")),
+            parse_time(((row.get("markets") or {}).get("total_ou") or {}).get("quote_timestamp")),
+            str(row.get("publication_snapshot_id") or ""),
+        ),
+    )
+
+
+def probability_result_for(prediction, event, cutoff=EVALUATION_CUTOFF_UTC):
+    """Settle one prospective fixture for probability validation, including neutral/no-bet rows.
+
+    These records are deliberately separate from the selection/ROI ledger. They
+    contribute one binary probability observation per fixture, never a stake or bet.
+    """
+    if not valid_probability_snapshot(prediction, cutoff):
+        return None
+    event_id = str(prediction.get("event_id") or "")
+    if not event_id or event_id != str(event.get("id") or ""):
+        return None
+    status = (event.get("status") or {}).get("type") or {}
+    if not (status.get("completed") or status.get("state") == "post"):
+        return None
+    comp = (event.get("competitions") or [{}])[0]
+    teams = comp.get("competitors") or []
+    home = next((x for x in teams if x.get("homeAway") == "home"), None)
+    away = next((x for x in teams if x.get("homeAway") == "away"), None)
+    if not home or not away:
+        return None
+    try:
+        hs, aws = float(home["score"]), float(away["score"])
+        final_total = hs + aws
+        market = ((prediction.get("markets") or {}).get("total_ou") or {})
+        line = float(market["line"])
+        expected_total = float(prediction["expected_total"])
+        over_odds = float(market["over_odds"])
+        under_odds = float(market["under_odds"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    if (
+        not all(math.isfinite(value) for value in (hs, aws, final_total, line, expected_total, over_odds, under_odds))
+        or hs < 0 or aws < 0 or over_odds <= 1 or under_odds <= 1
+    ):
+        return None
+    outcome = "over" if final_total > line else "under" if final_total < line else "push"
+    pick = str(market.get("pick") or "").strip().lower()
+    return {
+        "event_id": event_id,
+        "totals_model_version": prediction.get("totals_model_version"),
+        "start_time": prediction.get("start_time"),
+        "published_at": prediction.get("published_at"),
+        "prediction_created_at": prediction.get("prediction_created_at"),
+        "publication_snapshot_id": prediction.get("publication_snapshot_id"),
+        "publication_snapshot_verified": True,
+        "publication_snapshot_kind": prediction.get("publication_snapshot_kind"),
+        "expected_total": expected_total,
+        "market_id": "225",
+        "market_source": market.get("source"),
+        "sportybet_event_id": market.get("sportybet_event_id"),
+        "quote_capture_basis": market.get("quote_capture_basis"),
+        "quote_timestamp": market.get("quote_timestamp"),
+        "line": line,
+        "over_odds": over_odds,
+        "under_odds": under_odds,
+        "pick": pick if pick in {"over", "under"} else None,
+        "selection_status": "DIRECTIONAL_SELECTION_ALSO_IN_BET_LEDGER" if pick in {"over", "under"} else "NEUTRAL_NO_BET",
+        "final_score": [int(hs) if hs.is_integer() else hs, int(aws) if aws.is_integer() else aws],
+        "final_total": final_total,
+        "result": outcome,
+        "settled": True,
+        "settled_at": datetime.now(timezone.utc).isoformat(),
+        "settlement_source": "ESPN official scoreboard event ID; final score includes overtime",
+        "probability_validation_only": True,
+        "paper_only": True,
+    }
+
+
+def probability_key(row):
+    return (
+        str(row.get("event_id") or ""),
+        str(row.get("totals_model_version") or ""),
+    )
 
 
 def matching_snapshot_for_ledger(snapshots_by_key, key):
