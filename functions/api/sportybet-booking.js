@@ -335,7 +335,7 @@ function findBasketballSelection(leg,event){
     const status=String(market?.status||'').trim().toLowerCase();if(String(market?.id||'')!=='225'||/suspend|closed|inactive|settled|unavailable|stop/i.test(status)||(status!==''&&/^\d+$/.test(status)&&status!=='0'))continue;
     const currentLine=lineFromMarket(market);if(!Number.isFinite(currentLine)||Math.abs(currentLine-line)>1e-9)continue;
     const outcomes=Array.isArray(market?.outcomes)?market.outcomes:[];
-    const active=name=>outcomes.find(o=>{const label=String(o?.desc||o?.name||o?.title||'').toLowerCase(),ok=o?.isActive==null?(o?.active!==false):(Number(o.isActive)===1||o.isActive===true),odds=Number(o?.odds);return ok&&new RegExp('\b'+name+'\b').test(label)&&String(o?.id||'')&&Number.isFinite(odds)&&odds>1;});
+    const active=name=>outcomes.find(o=>{const label=String(o?.desc||o?.name||o?.title||'').toLowerCase(),ok=o?.isActive==null?(o?.active!==false):(Number(o.isActive)===1||o.isActive===true),odds=Number(o?.odds);return ok&&new RegExp('\\b'+name+'\\b').test(label)&&String(o?.id||'')&&Number.isFinite(odds)&&odds>1;});
     const over=active('over'),under=active('under');if(!over||!under)continue;const out=side==='over'?over:under;
     return{eventId:event.eventId,marketId:'225',specifier:market?.specifier??null,outcomeId:String(out.id),outcomeName:String(out.desc||out.name||side),odds:Number(out.odds),line:currentLine,overOdds:Number(over.odds),underOdds:Number(under.odds),fetchedAt:String(event?.fetchedAt||''),sportybetEventId:String(event.eventId||'')};
   }
