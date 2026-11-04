@@ -924,7 +924,7 @@
       var x=leg||{}, product=String(x.product||'').toLowerCase();
       var pick=String(x.builder_pick||x.pick||'').toLowerCase();
       if(pick!=='over'&&pick!=='under'){
-        var found=String(x.pick||'').match(/\\b(over|under)\\s+([0-9]+(?:\\.[0-9]+)?)/i);
+        var found=String(x.pick||'').match(/\b(over|under)\s+([0-9]+(?:\.[0-9]+)?)/i);
         if(found)pick=found[1].toLowerCase();
       }
       var eventId=String(x.event_id||'').trim();
