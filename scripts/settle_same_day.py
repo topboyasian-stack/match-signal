@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
+from prediction_identity import football_result_participants_match, prediction_identity_key
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
@@ -88,7 +89,7 @@ def settle(history):
         league = FOOTBALL_LEAGUES.get(label) if sport == "football" else TENNIS_LEAGUES.get(label)
         if not league:
             continue
-        key = f"{sport}:{league}:{prediction.get('event_id')}"
+        key = prediction_identity_key(prediction)
         if key in competitions:
             continue
         provider_sport = "soccer" if sport == "football" else "tennis"
@@ -119,7 +120,7 @@ def settle(history):
         league = FOOTBALL_LEAGUES.get(label) if sport == "football" else TENNIS_LEAGUES.get(label)
         if not league:
             continue
-        competition = competitions.get(f"{sport}:{league}:{prediction.get('event_id')}")
+        competition = competitions.get(prediction_identity_key(prediction))
         if not competition:
             continue
         status_type = (competition.get("status") or {}).get("type") or {}
@@ -130,6 +131,9 @@ def settle(history):
             continue
         try:
             if sport == "football":
+                if not football_result_participants_match(prediction, competition):
+                    print(f"Unmatched football result identity for {label} {prediction.get('event_id')}; retaining forecast as pending.")
+                    continue
                 home = next(c for c in competitors if c.get("homeAway") == "home")
                 away = next(c for c in competitors if c.get("homeAway") == "away")
                 hs, ass = float(home.get("score", 0)), float(away.get("score", 0))
@@ -238,7 +242,8 @@ def main():
             "accuracy": round(sum(bool(p.get("correct")) for p in group) / len(group), 4) if group else 0.0,
         }
     tennis_performance = build_tennis_performance(settled)
-    save(history_path, history[-2500:])
+    # Preserve the complete append-only prediction ledger; summaries may be rolling, history is not.
+    save(history_path, history)
     save(accuracy_path, {"updated_at": datetime.now(timezone.utc).isoformat(), "summary": summary, "recent_settled": [p for p in history if p.get("settled")][-50:]})
     save(performance_path, tennis_performance)
     print(f"Settlement complete: {count} newly settled | total settled {summary['settled']} | tennis newly settled {settlement_stats['tennis_newly_settled']} | tennis O/U {settlement_stats['tennis_ou_settled']}")
