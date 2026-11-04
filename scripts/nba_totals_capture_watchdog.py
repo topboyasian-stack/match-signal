@@ -43,6 +43,29 @@ def should_dispatch_capture(checked_at, now, active_capture_runs=0, max_age_minu
     return stale and active <= 0
 
 
+
+def should_dispatch_research_refresh(
+    report_generated_at,
+    now,
+    active_research_runs=0,
+    max_age_minutes=20,
+):
+    """Recover a missed/stuck scheduled research refresh without duplicate runs."""
+    try:
+        active = int(active_research_runs)
+    except (TypeError, ValueError):
+        active = 1
+    if active > 0:
+        return False
+
+    age = capture_age_minutes(report_generated_at, now)
+    if age is None:
+        return True
+    if age < -2:
+        return False
+    return age >= float(max_age_minutes)
+
+
 def stale_upcoming_prediction_count(predictions, now, max_age_hours=6):
     """Count upcoming NBA rows the client must withhold as stale pre-game baselines.
 
