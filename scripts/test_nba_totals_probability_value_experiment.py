@@ -9,6 +9,7 @@ from nba_totals_probability_value_experiment import (
     snapshot_clv_audit,
     prospective_snapshot_coverage,
     probability_score_summary,
+    prospective_probability_fixture_audit,
     historical_probability_validation,
     run_experiment,
 )
@@ -211,6 +212,96 @@ def test_prospective_probability_sample_requires_exact_snapshot_linkage():
     assert projection_report["prospective_settled_selections_missing_or_mismatched_snapshot"] == 1
 
 
+
+def test_probability_validation_includes_neutral_fixtures_once_with_exact_snapshot_linkage():
+    published = "2026-11-03T17:00:03+00:00"
+    start = "2026-11-03T20:00:00+00:00"
+    quote = "2026-11-03T17:00:00+00:00"
+    snapshot = {
+        "event_id": "event-neutral",
+        "start_time": start,
+        "published_at": published,
+        "totals_model_version": "nba-total-v5.1-pace-efficiency-calibrated",
+        "publication_snapshot_id": "snapshot-neutral-open",
+        "publication_snapshot_verified": True,
+        "publication_snapshot_kind": "immutable_sportybet_market_225_revision",
+        "expected_total": 221.0,
+        "markets": {"total_ou": {
+            "market_id": "225",
+            "source": "SportyBet Nigeria",
+            "sportybet_event_id": "sr:match:neutral",
+            "quote_capture_basis": "SportyBet API response observed_at",
+            "quote_timestamp": quote,
+            "line": 220.5,
+            "over_odds": 1.91,
+            "under_odds": 1.89,
+            "pick": None,
+        }},
+    }
+    later_revision = {
+        **snapshot,
+        "publication_snapshot_id": "snapshot-neutral-later",
+        "published_at": "2026-11-03T18:00:03+00:00",
+        "markets": {"total_ou": {
+            **snapshot["markets"]["total_ou"],
+            "quote_timestamp": "2026-11-03T18:00:00+00:00",
+            "line": 219.5,
+            "pick": "over",
+        }},
+    }
+    record = {
+        "event_id": "event-neutral",
+        "totals_model_version": "nba-total-v5.1-pace-efficiency-calibrated",
+        "start_time": start,
+        "published_at": published,
+        "publication_snapshot_id": "snapshot-neutral-open",
+        "expected_total": 221.0,
+        "market_id": "225",
+        "market_source": "SportyBet Nigeria",
+        "sportybet_event_id": "sr:match:neutral",
+        "quote_capture_basis": "SportyBet API response observed_at",
+        "quote_timestamp": quote,
+        "line": 220.5,
+        "over_odds": 1.91,
+        "under_odds": 1.89,
+        "pick": None,
+        "final_score": [110, 111],
+        "final_total": 221,
+        "result": "over",
+        "settled": True,
+        "probability_validation_only": True,
+        "settlement_source": "ESPN official scoreboard event ID; final score includes overtime",
+    }
+    rows, coverage = prospective_probability_fixture_audit(
+        [record], [snapshot, later_revision], [-12, -8, -4, -1, 1, 4, 8, 12]
+    )
+    assert len(rows) == 1, "Repeated quote revisions must never create extra probability observations."
+    assert rows[0]["publication_snapshot_id"] == "snapshot-neutral-open"
+    assert rows[0]["pick"] is None
+    assert coverage["valid_unique_settled_fixtures"] == 1
+    assert coverage["binary_scored_unique_fixtures"] == 1
+    assert coverage["neutral_no_bet_fixtures_included"] == 1
+    assert coverage["directional_selection_fixtures_also_tracked_in_bet_ledger"] == 0
+    assert coverage["sample_threshold_met"] is False
+
+    duplicated_rows, duplicated_coverage = prospective_probability_fixture_audit(
+        [record, record], [snapshot], [-12, -8, -4, -1, 1, 4, 8, 12]
+    )
+    assert duplicated_rows == []
+    assert duplicated_coverage["snapshot_linkage_failure_count"] == 2
+    assert all(
+        item["reason"] == "DUPLICATE_PROBABILITY_FIXTURE"
+        for item in duplicated_coverage["snapshot_linkage_failures"]
+    )
+
+    altered = {**record, "under_odds": 2.01}
+    bad_rows, bad_coverage = prospective_probability_fixture_audit(
+        [altered], [snapshot], [-12, -8, -4, -1, 1, 4, 8, 12]
+    )
+    assert bad_rows == []
+    assert bad_coverage["snapshot_linkage_failures"][0]["reason"] == "SNAPSHOT_FIELDS_OR_OFFICIAL_RESULT_DO_NOT_MATCH"
+
+
 def test_probability_score_conditions_on_non_push_mass():
     result = probability_score_summary([{
         "event_id": "push-line",
@@ -334,6 +425,7 @@ if __name__ == "__main__":
     test_snapshot_clv_excludes_old_update_from_near_close_sample()
     test_historical_probability_validation_uses_only_synthetic_lines()
     test_prospective_probability_sample_requires_exact_snapshot_linkage()
+    test_probability_validation_includes_neutral_fixtures_once_with_exact_snapshot_linkage()
     test_probability_scores_compare_model_and_no_vig_market_descriptively()
     test_probability_score_conditions_on_non_push_mass()
     test_value_decision_rejects_calibration_failure()
@@ -341,4 +433,4 @@ if __name__ == "__main__":
     test_probability_edge_conditions_on_non_push_mass()
     test_push_does_not_count_as_a_loss()
     test_full_report_keeps_prospective_holdout_locked()
-    print("NBA totals probability/value experiment tests: PASS (12 groups)")
+    print("NBA totals probability/value experiment tests: PASS (13 groups)")
