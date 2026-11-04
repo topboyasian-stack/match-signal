@@ -234,6 +234,7 @@ def test_probability_validation_includes_neutral_fixtures_once_with_exact_snapsh
             "quote_capture_basis": "SportyBet API response observed_at",
             "quote_timestamp": quote,
             "line": 220.5,
+            "expected_total": 221.0,
             "over_odds": 1.91,
             "under_odds": 1.89,
             "pick": None,
