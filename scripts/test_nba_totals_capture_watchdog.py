@@ -62,6 +62,7 @@ def run():
     )
 
 
+    model_now = dt("2026-11-02T13:55:00Z")
     assert should_dispatch_research_refresh(
         "2026-11-02T13:35:00Z", model_now, active_research_runs=0
     ), "A report at the 20-minute stale boundary must trigger research recovery."
@@ -82,7 +83,6 @@ def run():
         "The watchdog must recover missed report schedules using the existing research workflow."
     )
 
-    model_now = dt("2026-11-02T13:55:00Z")
     fresh_upcoming = [{
         "event_id": "fresh-1", "start_time": "2026-11-02T20:00:00Z",
         "generated_at": "2026-11-02T10:00:00Z"
