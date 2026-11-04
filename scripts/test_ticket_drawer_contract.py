@@ -112,8 +112,10 @@ def main():
     require("const footballIds = new Set(legs.filter(l => String(l?.sport || '').toLowerCase() === 'football').map(l => String(l.sportybet_event_id || l.event_id || '')).filter(Boolean));" in api and
             "const tennisIds = new Set(legs.filter(l => String(l?.sport || '').toLowerCase() === 'tennis').map(l => String(l.sportybet_event_id || l.event_id || '')).filter(Boolean));" in api,
             "Football and Tennis catalogue scans must target the current provider ID rather than only the model/prediction ID")
-    require("leg.model_qualified !== true" in api and "leg.market_id !== '225'" in api and "!leg.sportybet_event_id" in api and "NBA_RELEASE_GATE_LOCKED" in api and "nbaTotalTicketLegQualified" in api,
-            "The booking endpoint must independently enforce the global NBA release gate and exact per-leg snapshot qualification")
+    require("leg?.model_qualified!==true" in api and "leg?.market_id!=='225'" in api and
+            "!leg.sportybet_event_id" in api and "NBA_RELEASE_GATE_LOCKED" in api and
+            "nbaTotalTicketLegQualified" in api and "if (hasBasketballLeg && !manualMode)" in api,
+            "Automated NBA batches must keep the release and snapshot gate while manual slips use live quote revalidation")
     require("prospective_probability_fixture_coverage" in api and
             "valid_unique_settled_fixtures" in api and "binary_scored_unique_fixtures" in api and
             "snapshot_linkage_failure_count" in api and
