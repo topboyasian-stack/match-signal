@@ -57,6 +57,8 @@ def main():
         "An unrelated upstream completion must not replace the live-prediction board refresh."
     )
     assert "inputs.promotion_child" in board_concurrency, (
+        "Promotion-child discriminator must be included in the board concurrency key."
+    )
     assert "'promotion' || 'normal'" in board_concurrency, (
         "Ordered Builder promotion children must remain isolated from normal board refreshes."
     )
