@@ -112,6 +112,17 @@ def main():
             "Football and Tennis catalogue scans must target the current provider ID rather than only the model/prediction ID")
     require("leg.model_qualified !== true" in api and "leg.market_id !== '225'" in api and "!leg.sportybet_event_id" in api and "NBA_RELEASE_GATE_LOCKED" in api and "nbaTotalTicketLegQualified" in api,
             "The booking endpoint must independently enforce the global NBA release gate and exact per-leg snapshot qualification")
+    require("prospective_probability_fixture_coverage" in api and
+            "valid_unique_settled_fixtures" in api and "binary_scored_unique_fixtures" in api and
+            "snapshot_linkage_failure_count" in api and
+            "prospective_settled_selections_with_exact_snapshot_match)>=30" not in api,
+            "The backend must validate 30 unique settled fixtures separately from the 100 selected market bets")
+    require("prospective_probability_fixture_coverage" in nba and
+            "valid_unique_settled_fixtures" in nba and "binary_scored_unique_fixtures" in nba and
+            "prospective_settled_selections_with_exact_snapshot_match)>=30" not in nba,
+            "The Basketball UI must use the same fixture-level probability sample as the backend")
+    require("v=20261104-nba-probability-cohort1" in basketball,
+            "The Basketball UI must bust its cache when the probability-sample gate changes")
     require("hasBasketballLeg && preExcluded.length > 0" in api and "BASKETBALL_SLIP_REJECTED_PARTIAL" in api,
             "An NBA-containing slip must be rejected whole if any leg fails live validation or SportyBet removes a selection")
     require("new Set(ids).size !== ids.length" in api,
