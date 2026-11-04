@@ -82,6 +82,9 @@ def run():
     assert "gh workflow run nba-totals-probability-value.yml --ref main" in watchdog_workflow, (
         "The watchdog must recover missed report schedules using the existing research workflow."
     )
+    assert 'sys.path.insert(0, "scripts")' in watchdog_workflow, (
+        "The inline watchdog recovery step must import its tested policy from the scripts directory."
+    )
 
     fresh_upcoming = [{
         "event_id": "fresh-1", "start_time": "2026-11-02T20:00:00Z",
