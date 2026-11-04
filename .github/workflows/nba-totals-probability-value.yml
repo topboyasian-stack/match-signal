@@ -25,7 +25,9 @@ permissions:
   contents: write
 
 concurrency:
-  group: nba-totals-probability-value-research
+  # Preserve the periodic evidence-refresh lane when capture/settlement events
+  # arrive in bursts; scheduled work must not be superseded while pending.
+  group: nba-totals-probability-value-research-${{ github.event_name == 'schedule' && 'scheduled' || 'event-driven' }}
   cancel-in-progress: false
 
 jobs:
