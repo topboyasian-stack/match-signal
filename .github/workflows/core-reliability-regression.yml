@@ -1,0 +1,109 @@
+name: Core Reliability Regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "functions/api/sportybet-booking.js"
+      - "ticket-drawer.js"
+      - "ticket-drawer.css"
+      - "scripts/test_sportybet_booking_resilience.mjs"
+      - "scripts/test_ticket_drawer_contract.py"
+      - "scripts/test_upcoming_desk_policy.py"
+      - "scripts/test_upcoming_settlement_retention.py"
+      - "scripts/test_odds_builder_upcoming_desk_recent_losses.py"
+      - "scripts/test_ticket_calibration_history.py"
+      - "scripts/test_basketball_booking_guard.mjs"
+      - "scripts/test_basketball_desk_contract.mjs"
+      - "scripts/test_nba_ticket_guard.mjs"
+      - "scripts/test_virtual_lab_collector_settlement.py"
+      - "scripts/test_tennis_forward_publication.py"
+      - "scripts/test_efootball_desk_learning.py"
+      - "scripts/prediction_identity.py"
+      - "scripts/predict_today.py"
+      - "scripts/settle_same_day.py"
+      - "scripts/verify_performance_ledger.py"
+      - "scripts/test_prediction_history_identity.py"
+      - "scripts/test_ucl_dual_competition_model.py"
+      - "scripts/test_predict_today_market_matching.py"
+      - "scripts/test_settlement_publication.py"
+      - "scripts/unified_upcoming.py"
+      - "scripts/odds_builder_core.py"
+      - "scripts/efootball_desk_learning.py"
+      - "docs/CORE_RELIABILITY_GUARDRAILS.md"
+      - ".github/workflows/core-reliability-regression.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: core-reliability-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  deterministic-regression:
+    name: Deterministic core contracts (no production services)
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Check out proposed revision
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python test dependency
+        run: python -m pip install --disable-pip-version-check requests
+
+      - name: Verify shared ticket API and mixed-sport regressions
+        run: node scripts/test_sportybet_booking_resilience.mjs
+
+      - name: Verify shared ticket UI contract
+        run: python scripts/test_ticket_drawer_contract.py
+
+      - name: Verify Basketball booking and desk contracts
+        run: |
+          node scripts/test_basketball_booking_guard.mjs
+          node scripts/test_basketball_desk_contract.mjs
+          node scripts/test_nba_ticket_guard.mjs
+
+      - name: Verify Virtual Lab settlement recovery
+        run: python scripts/test_virtual_lab_collector_settlement.py
+
+      - name: Verify tennis publication ordering
+        run: python scripts/test_tennis_forward_publication.py
+      - name: Verify upcoming desk publication/evidence rules
+        run: python scripts/test_upcoming_desk_policy.py
+
+      - name: Verify settlement retention and idempotency contracts
+        run: python scripts/test_upcoming_settlement_retention.py
+
+      - name: Verify Odds Builder settled-history gates
+        run: python scripts/test_odds_builder_upcoming_desk_recent_losses.py
+
+      - name: Verify ticket calibration history
+        run: python scripts/test_ticket_calibration_history.py
+
+      - name: Verify eFootball exact-product settlement reconciliation
+        run: python scripts/test_efootball_desk_learning.py
+      - name: Verify UCL domestic-plus-European model history
+        run: python scripts/test_ucl_dual_competition_model.py
+
+      - name: Verify competition-scoped prediction identity and settlement
+        run: python scripts/test_prediction_history_identity.py
+
+      - name: Verify football market identity guards
+        run: python scripts/test_predict_today_market_matching.py
+
+      - name: Verify append-only settlement publication contract
+        run: python scripts/test_settlement_publication.py
+
+      - name: Compile changed history and settlement modules
+        run: python -m py_compile scripts/prediction_identity.py scripts/predict_today.py scripts/settle_same_day.py scripts/verify_performance_ledger.py
