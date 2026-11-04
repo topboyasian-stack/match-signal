@@ -363,9 +363,36 @@ def main():
             candidates_by_key[key] = chosen
     candidates = list(candidates_by_key.values())
 
+    # Probability validation uses the first exact fresh market-225 snapshot for
+    # each prospective fixture, even when the frozen model made no bet selection.
+    snapshot_id_counts = {}
+    for snapshot in snapshots:
+        snapshot_id = str(snapshot.get("publication_snapshot_id") or "").strip() if isinstance(snapshot, dict) else ""
+        if snapshot_id:
+            snapshot_id_counts[snapshot_id] = snapshot_id_counts.get(snapshot_id, 0) + 1
+    duplicate_snapshot_ids = {snapshot_id for snapshot_id, count in snapshot_id_counts.items() if count > 1}
+    probability_candidates = []
+    for revisions in snapshot_groups.values():
+        unique_revisions = [
+            row for row in revisions
+            if str(row.get("publication_snapshot_id") or "").strip() not in duplicate_snapshot_ids
+        ]
+        chosen = select_probability_snapshot(unique_revisions)
+        if chosen is not None:
+            probability_candidates.append(chosen)
+
     old = load(LEDGER, {"records": []})
     records = old.get("records", []) if isinstance(old, dict) else []
     by_key = {ledger_key(row): row for row in records if row.get("event_id")}
+    old_probability = load(PROBABILITY_SETTLEMENTS, {"records": []})
+    old_probability_records = (
+        old_probability.get("records", []) if isinstance(old_probability, dict) else []
+    )
+    probability_by_key = {
+        probability_key(row): row
+        for row in old_probability_records
+        if isinstance(row, dict) and row.get("event_id")
+    }
 
     # Add price audit metadata only to legacy rows which predate audit columns.
     # Settled outcomes are never overwritten and never borrow another model's quote.
@@ -412,11 +439,12 @@ def main():
             })
 
     dates = set()
-    for prediction in candidates:
+    for prediction in candidates + probability_candidates:
         stamp = parse_time(prediction.get("start_time"))
         if stamp:
             dates.add(stamp.astimezone(ZoneInfo("America/New_York")).strftime("%Y%m%d"))
     added = 0
+    added_probability = 0
     for day in sorted(dates):
         try:
             response = SESSION.get(BASE + "/scoreboard", params={"dates": day}, timeout=20)
@@ -436,6 +464,63 @@ def main():
             if row:
                 by_key[key] = row
                 added += 1
+
+        for prediction in probability_candidates:
+            event_id = str(prediction.get("event_id") or "")
+            key = probability_key(prediction)
+            event = event_by_id.get(event_id)
+            if not event or key in probability_by_key:
+                continue
+            row = probability_result_for(prediction, event)
+            if row:
+                probability_by_key[key] = row
+                added_probability += 1
+
+    probability_records = sorted(
+        probability_by_key.values(),
+        key=lambda row: (
+            str(row.get("start_time") or ""),
+            str(row.get("event_id") or ""),
+            str(row.get("totals_model_version") or ""),
+        ),
+    )
+    probability_now = datetime.now(timezone.utc).isoformat()
+    probability_payload = {
+        "updated_at": probability_now,
+        "generated_at": probability_now,
+        "cutoff_utc": EVALUATION_CUTOFF_UTC.isoformat(),
+        "source": "ESPN public NBA scoreboard joined by exact event ID",
+        "market_definition": "SportyBet Nigeria market 225 full-game totals, Over/Under including overtime",
+        "paper_only": True,
+        "probability_validation_only": True,
+        "summary": {
+            "settled_unique_fixtures": len({
+                row.get("event_id") for row in probability_records
+                if row.get("totals_model_version") == "nba-total-v5.1-pace-efficiency-calibrated"
+            }),
+            "settled_binary_fixtures": sum(
+                row.get("result") in {"over", "under"}
+                for row in probability_records
+                if row.get("totals_model_version") == "nba-total-v5.1-pace-efficiency-calibrated"
+            ),
+            "pushes": sum(
+                row.get("result") == "push"
+                for row in probability_records
+                if row.get("totals_model_version") == "nba-total-v5.1-pace-efficiency-calibrated"
+            ),
+            "directional_selection_fixtures": sum(
+                row.get("selection_status") == "DIRECTIONAL_SELECTION_ALSO_IN_BET_LEDGER"
+                for row in probability_records
+                if row.get("totals_model_version") == "nba-total-v5.1-pace-efficiency-calibrated"
+            ),
+            "neutral_no_bet_fixtures": sum(
+                row.get("selection_status") == "NEUTRAL_NO_BET"
+                for row in probability_records
+                if row.get("totals_model_version") == "nba-total-v5.1-pace-efficiency-calibrated"
+            ),
+        },
+        "records": probability_records,
+    }
 
     records = sorted(
         by_key.values(),
@@ -506,7 +591,17 @@ def main():
         "records": records,
     }
     LEDGER.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    print(json.dumps({"new_settlements": added, **payload["summary"], "updated_at": payload["updated_at"]}))
+    PROBABILITY_SETTLEMENTS.write_text(
+        json.dumps(probability_payload, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    print(json.dumps({
+        "new_settlements": added,
+        "new_probability_settlements": added_probability,
+        "probability_settlement_summary": probability_payload["summary"],
+        **payload["summary"],
+        "updated_at": payload["updated_at"],
+    }))
 
 
 if __name__ == "__main__":
