@@ -7,7 +7,6 @@ from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 from pathlib import Path
 import requests
-from nba_totals_walk_forward import EVALUATION_CUTOFF_UTC
 
 ROOT = Path(__file__).resolve().parents[1]
 PREDICTIONS = ROOT / "data" / "nba_predictions.json"
@@ -15,6 +14,7 @@ SNAPSHOTS = ROOT / "data" / "nba_totals_publication_snapshots.json"
 LEDGER = ROOT / "data" / "nba_totals_ledger.json"
 PROBABILITY_SETTLEMENTS = ROOT / "data" / "nba_totals_probability_settlements.json"
 BASE = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba"
+PROSPECTIVE_CUTOFF_UTC = datetime(2026, 11, 2, 2, 0, tzinfo=timezone.utc)
 SESSION = requests.Session()
 SESSION.headers.update({"User-Agent": "MatchSignalResearch/1.0 (paper-only NBA totals ledger)"})
 
@@ -190,7 +190,7 @@ def select_settlement_snapshot(rows):
 
 
 
-def valid_probability_snapshot(prediction, cutoff=EVALUATION_CUTOFF_UTC):
+def valid_probability_snapshot(prediction, cutoff=PROSPECTIVE_CUTOFF_UTC):
     """Validate one immutable exact-market snapshot for fixture-level probability scoring."""
     if not isinstance(prediction, dict):
         return False
@@ -488,7 +488,7 @@ def main():
     probability_payload = {
         "updated_at": probability_now,
         "generated_at": probability_now,
-        "cutoff_utc": EVALUATION_CUTOFF_UTC.isoformat(),
+        "cutoff_utc": PROSPECTIVE_CUTOFF_UTC.isoformat(),
         "source": "ESPN public NBA scoreboard joined by exact event ID",
         "market_definition": "SportyBet Nigeria market 225 full-game totals, Over/Under including overtime",
         "paper_only": True,
