@@ -764,8 +764,9 @@ def prospective_snapshot_coverage(settled_rows, snapshots, cutoff=EVALUATION_CUT
         "prospective_settled_selections_with_exact_snapshot_match": len(matched_events),
         "prospective_settled_selections_missing_or_mismatched_snapshot": len(settled_prospective) - len(matched_events),
         "snapshot_linkage_failures": failures[:10],
-        "target_unique_settled_probability_observations": MIN_PROSPECTIVE_PROBABILITY_SCORE,
-        "snapshot_linked_sample_threshold_met": len(matched_events) >= MIN_PROSPECTIVE_PROBABILITY_SCORE,
+        "target_unique_settled_selections_for_roi": MIN_PROSPECTIVE_SETTLED_BETS,
+        "snapshot_linkage_complete_for_settled_selections": len(matched_events) == len(settled_prospective),
+        "probability_validation_sample_reported_separately": True,
     }
     return report, matched_events
 
