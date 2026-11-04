@@ -109,8 +109,8 @@ def main():
             "Shared ticket catalogue scans must stop at the regional proxy's supported fifth page")
     require("export async function requestSportyBetShare" in api and
             "for (const origin of [SPORTYBET_PROXY_ORIGIN, ORIGIN])" in api and
-            "const shareResult = await requestSportyBetShare(selections)" in api,
-            "Share-code creation must try the regional POST proxy before direct SportyBet and return consistent JSON failures")
+            "const shareResult = await requestSportyBetShare(selections, { deadlineAt: manualDeadlineAt, timeoutMs: manualMode ? 6500 : 12000 })" in api,
+            "Share-code creation must try both SportyBet sources within the manual request deadline and return JSON failures")
     require("const basketballIds" in api and "map(l => String(l.sportybet_event_id || '')).filter(Boolean)" in api and "collectBasketballEvents(context, basketballIds)" in api and "directProvider = sportybetId ? found.get(sportybetId) : null" in api,
             "Mixed-sport tickets must fetch the current SportyBet Basketball event")
     require("const footballIds = new Set(legs.filter(l => String(l?.sport || '').toLowerCase() === 'football').map(l => String(l.sportybet_event_id || l.event_id || '')).filter(Boolean));" in api and
