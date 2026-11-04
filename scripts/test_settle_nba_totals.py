@@ -227,6 +227,11 @@ class SettlementTests(unittest.TestCase):
         unverified = prospective_probability_snapshot(publication_snapshot_verified=False)
         self.assertFalse(valid_probability_snapshot(unverified))
 
+    def test_probability_fixture_rejects_market_projection_mismatch(self):
+        snapshot = prospective_probability_snapshot()
+        snapshot["markets"]["total_ou"]["expected_total"] = 221.0
+        self.assertFalse(valid_probability_snapshot(snapshot))
+
     def test_probability_fixture_obeys_frozen_cutoff_and_exact_espn_event(self):
         self.assertEqual(PROSPECTIVE_CUTOFF_UTC.isoformat(), "2026-11-02T02:00:00+00:00")
         before_cutoff = prospective_probability_snapshot(
