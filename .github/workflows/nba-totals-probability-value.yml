@@ -63,7 +63,9 @@ jobs:
           sys.path.insert(0, "scripts")
           from nba_totals_report_refresh_gate import (
               latest_snapshot_evidence_time,
+              report_source_fingerprint_matches,
               should_refresh_report,
+              source_data_fingerprint,
           )
 
           def parse(value):
@@ -81,15 +83,19 @@ jobs:
 
           report = json.loads(Path("data/nba_totals_probability_value_experiment.json").read_text(encoding="utf-8"))
           ledger = json.loads(Path("data/nba_totals_ledger.json").read_text(encoding="utf-8"))
+          probability_settlements = json.loads(Path("data/nba_totals_probability_settlements.json").read_text(encoding="utf-8"))
           price_status = json.loads(Path("data/nba_totals_price_capture_status.json").read_text(encoding="utf-8"))
           snapshots = json.loads(Path("data/nba_totals_publication_snapshots.json").read_text(encoding="utf-8"))
           report_time = parse(report.get("generated_at"))
+          current_fingerprint = source_data_fingerprint(Path("."))
+          fingerprint_matches = report_source_fingerprint_matches(report, current_fingerprint)
           snapshot_evidence_time = latest_snapshot_evidence_time(
               snapshots, "nba-total-v5.1-pace-efficiency-calibrated"
           )
           newest_data_time = max(
               (stamp for stamp in (
                   parse(ledger.get("updated_at")),
+                  parse(probability_settlements.get("updated_at")),
                   parse(price_status.get("checked_at")),
                   snapshot_evidence_time,
               ) if stamp is not None),
@@ -98,11 +104,17 @@ jobs:
           now = datetime.now(timezone.utc)
           age_minutes = (now - report_time).total_seconds() / 60 if report_time else float("inf")
           stale = report_time is None or (newest_data_time is not None and newest_data_time > report_time)
-          should_run = should_refresh_report(event_name, report_time, newest_data_time, now)
+          should_run = should_refresh_report(
+              event_name, report_time, newest_data_time, now,
+              source_fingerprint_matches=fingerprint_matches,
+          )
           print(f"run={'true' if should_run else 'false'}")
           print(f"report_age_minutes={age_minutes:.2f}" if report_time else "report_age_minutes=unknown")
           print(f"newest_snapshot_evidence_at={snapshot_evidence_time.isoformat()}" if snapshot_evidence_time else "newest_snapshot_evidence_at=unknown")
-          if should_run and event_name == "workflow_run" and stale:
+          print(f"source_fingerprint_matches={'true' if fingerprint_matches else 'false'}")
+          if should_run and not fingerprint_matches:
+              print("reason=source_fingerprint_mismatch")
+          elif should_run and event_name == "workflow_run" and stale:
               print("reason=event_driven_refresh_on_newer_evidence")
           else:
               print("reason=stale_evidence_and_report_at_least_10_minutes_old" if should_run else "reason=report_fresh_or_refresh_throttled")
