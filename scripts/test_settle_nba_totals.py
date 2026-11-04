@@ -45,6 +45,7 @@ def prospective_probability_snapshot(**overrides):
         "quote_capture_basis": "SportyBet API response observed_at",
         "quote_timestamp": "2026-11-02T05:09:06+00:00",
         "line": 220.5,
+        "expected_total": 220.5,
         "over_odds": 1.91,
         "under_odds": 1.89,
         "pick": None,
