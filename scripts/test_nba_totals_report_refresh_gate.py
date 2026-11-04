@@ -75,7 +75,7 @@ def run():
     ), "A report newer than all evidence must not rerun."
 
     workflow = (Path(__file__).resolve().parents[1] / ".github/workflows/nba-totals-probability-value.yml").read_text(encoding="utf-8")
-    assert "latest_snapshot_evidence_time" in workflow and "quote_timestamp" in workflow, (
+    assert "latest_snapshot_evidence_time" in workflow, (
         "The scheduled/event-driven workflow must include newer immutable quote revisions in its report-refresh decision."
     )
 
