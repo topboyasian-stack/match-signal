@@ -703,14 +703,14 @@ async function handlePost(context) {
           if (leg.sport === 'basketball') {
             return leg.market !== 'total' || !['over', 'under'].includes(leg.pick) ||
               !Number.isFinite(Number(leg.line)) || Number(leg.line) < 100 || Number(leg.line) > 300 ||
-              leg.market_id !== '225' || !leg.sportybet_event_id || leg.model_qualified !== true;
+              leg.market_id !== '225' || !leg.sportybet_event_id;
           }
           if (leg.sport === 'efootball') {
             return !['efootball_gt', 'efootball_adriatic'].includes(leg.product) ||
               productForLeg(leg) !== 'efootball' || leg.market !== 'total' ||
               !['over', 'under'].includes(leg.pick) ||
               !Number.isFinite(Number(leg.line)) || Number(leg.line) <= 0 || Number(leg.line) > 1000 ||
-              !['18', '189'].includes(leg.market_id) || !leg.sportybet_event_id || leg.model_qualified !== true;
+              !['18', '189'].includes(leg.market_id) || !leg.sportybet_event_id;
           }
           if (!['football', 'tennis'].includes(leg.sport)) return true;
           if (leg.market === 'total') {
@@ -724,7 +724,7 @@ async function handlePost(context) {
             (leg.sport === 'tennis' && leg.pick === 'draw');
         }) ||
           ids.some(id => !id) || new Set(ids).size !== ids.length) {
-        return json({ ok: false, error: 'INVALID_MANUAL_SELECTION', message: 'Manual tickets support Football/Tennis winners and exact totals, qualified eFootball GT/eAdriatic totals, and release-qualified NBA full-game totals.' }, 422);
+        return json({ ok: false, error: 'INVALID_MANUAL_SELECTION', message: 'Manual tickets support Football/Tennis winners and exact totals, plus experimental eFootball GT/eAdriatic and NBA market-225 totals. Every leg must still match a currently open SportyBet event, exact line and live odds.' }, 422);
       }
     } else {
       // Desk research batches remain subject to their existing Builder qualification gates.
@@ -747,7 +747,7 @@ async function handlePost(context) {
     const hasBasketballLeg = legs.some(leg => String(leg?.sport || '').toLowerCase() === 'basketball');
     const hasEfootballLeg = legs.some(leg => productForLeg(leg) === 'efootball');
     let nbaReleaseContext = null;
-    if (hasBasketballLeg) {
+    if (hasBasketballLeg && !manualMode) {
       try { nbaReleaseContext = await loadNbaReleaseContext(); }
       catch (error) { return json({ ok: false, error: 'NBA_RELEASE_EVIDENCE_UNAVAILABLE', message: 'NBA release evidence could not be verified. No ticket code was requested.' }, 503); }
       if (!nbaTotalsReleaseQualified(nbaReleaseContext.evidence, nbaReleaseContext.probability)) return json({ ok: false, error: 'NBA_RELEASE_GATE_LOCKED', message: 'The independent NBA totals release gate has not passed. No SportyBet ticket code was requested.' }, 423);
@@ -854,7 +854,7 @@ async function handlePost(context) {
         continue;
       }
       let nbaQualification = null;
-      if (String(leg?.sport || '').toLowerCase() === 'basketball') {
+      if (!manualMode && String(leg?.sport || '').toLowerCase() === 'basketball') {
         nbaQualification = nbaTotalTicketLegQualified(leg, selection, nbaReleaseContext);
         if (!nbaQualification.ok) { validation.push(validationFailure(leg, nbaQualification.reason)); continue; }
       }

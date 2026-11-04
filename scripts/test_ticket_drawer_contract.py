@@ -84,8 +84,10 @@ def main():
             "eFootball ticket actions must keep the existing product/model qualification gates and totals-only boundary")
     require("market === 'total' && ['football','tennis'].includes(sport)" in api and "leg.market === 'total'" in api and "leg.market_id !== requiredMarketId" in api,
             "Football/Tennis total selections must revalidate against exact SportyBet full-match O/U market IDs")
-    require("if (leg.sport === 'efootball')" in api and "productForLeg(leg) !== 'efootball'" in api and "leg.model_qualified !== true" in api,
-            "The booking API must accept only product-tagged, qualified eFootball O/U legs")
+    require("if (leg.sport === 'efootball')" in api and "productForLeg(leg) !== 'efootball'" in api and
+            "!['efootball_gt', 'efootball_adriatic'].includes(leg.product)" in api and
+            "if (hasEfootballLeg && preExcluded.length > 0)" in api,
+            "Manual eFootball O/U legs must be product-tagged and still fail closed when live SportyBet validation rejects any leg")
     require("const requiredMarketId = sport === 'football' ? '18' : sport === 'tennis' ? '189' : sport === 'efootball' ? String(leg?.market_id || '')" in api,
             "eFootball booking must revalidate the exact market ID passed by Virtual Lab")
     require("map(l => String(l.sportybet_event_id || l.event_id || '')).filter(Boolean)" in api and "const hasEfootballLeg" in api and "EFOOTBALL_SLIP_REJECTED_PARTIAL" in api,
@@ -110,8 +112,10 @@ def main():
     require("const footballIds = new Set(legs.filter(l => String(l?.sport || '').toLowerCase() === 'football').map(l => String(l.sportybet_event_id || l.event_id || '')).filter(Boolean));" in api and
             "const tennisIds = new Set(legs.filter(l => String(l?.sport || '').toLowerCase() === 'tennis').map(l => String(l.sportybet_event_id || l.event_id || '')).filter(Boolean));" in api,
             "Football and Tennis catalogue scans must target the current provider ID rather than only the model/prediction ID")
-    require("leg.model_qualified !== true" in api and "leg.market_id !== '225'" in api and "!leg.sportybet_event_id" in api and "NBA_RELEASE_GATE_LOCKED" in api and "nbaTotalTicketLegQualified" in api,
-            "The booking endpoint must independently enforce the global NBA release gate and exact per-leg snapshot qualification")
+    require("leg?.model_qualified!==true" in api and "leg?.market_id!=='225'" in api and
+            "!leg.sportybet_event_id" in api and "NBA_RELEASE_GATE_LOCKED" in api and
+            "nbaTotalTicketLegQualified" in api and "if (hasBasketballLeg && !manualMode)" in api,
+            "Automated NBA batches must keep the release and snapshot gate while manual slips use live quote revalidation")
     require("prospective_probability_fixture_coverage" in api and
             "valid_unique_settled_fixtures" in api and "binary_scored_unique_fixtures" in api and
             "snapshot_linkage_failure_count" in api and
