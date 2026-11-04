@@ -158,7 +158,7 @@ try {
     body:JSON.stringify({mode:'manual',manual_selections:[
       {event_id:'prediction-fb-ticket-test',sportybet_event_id:'sr:match:fb-ticket-test',sport:'football',market:'winner',pick:'p1',start_time:kickoffIso,player_1:'Home FC',player_2:'Away FC',match:'Home FC vs Away FC'},
       {event_id:'prediction-tennis-ticket-test',sportybet_event_id:'sr:match:tennis-ticket-test',sport:'tennis',market:'winner',pick:'p1',start_time:kickoffIso,player_1:'Player One',player_2:'Player Two',match:'Player One vs Player Two'},
-      {event_id:'sr:match:efootball-ticket-test',sportybet_event_id:'sr:match:efootball-ticket-test',sport:'efootball',product:'efootball_gt',market:'total',pick:'over',line:2.5,market_id:'18',model_qualified:true,start_time:kickoffIso,player_1:'GT Home (Alpha)',player_2:'GT Away (Beta)',match:'GT Home (Alpha) vs GT Away (Beta)'}
+      {event_id:'sr:match:efootball-ticket-test',sportybet_event_id:'sr:match:efootball-ticket-test',sport:'efootball',product:'efootball_gt',market:'total',pick:'over',line:2.5,market_id:'18',model_qualified:false,start_time:kickoffIso,player_1:'GT Home (Alpha)',player_2:'GT Away (Beta)',match:'GT Home (Alpha) vs GT Away (Beta)'}
     ]})
   })});
   const mixedPayload=await mixedResponse.json();
