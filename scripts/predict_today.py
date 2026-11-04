@@ -11,6 +11,7 @@ import requests
 from football_competition_match import football_market_identity_matches, football_market_identity_metadata
 
 from calibration import calibrate_prediction, calibrate_binary_market
+from prediction_identity import append_new_predictions, football_result_participants_match, prediction_identity_key
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
@@ -1142,19 +1143,19 @@ def settle_predictions(history):
         for label, league in FOOTBALL_LEAGUES.items():
             try:
                 for event in fetch_scoreboard("soccer", league, date).get("events", []):
-                    boards["football:" + str(event["id"])] = event
+                    boards[prediction_identity_key({"sport": "football", "league": label, "event_id": event.get("id")})] = event
             except Exception:
                 pass
         for tour in TENNIS_LEAGUES:
             try:
                 for event in flatten_tennis_board(fetch_scoreboard("tennis", tour.lower(), date)):
-                    boards["tennis:" + str(event["id"])] = event
+                    boards[prediction_identity_key({"sport": "tennis", "league": tour, "event_id": event.get("id")})] = event
             except Exception:
                 pass
     for prediction in history:
         if prediction.get("settled"):
             continue
-        event = boards.get(f"{prediction['sport']}:{prediction['event_id']}")
+        event = boards.get(prediction_identity_key(prediction))
         if not event or not event.get("status", {}).get("type", {}).get("completed"):
             continue
         competitors = event.get("competitors", [])
@@ -1162,6 +1163,8 @@ def settle_predictions(history):
             continue
         try:
             if prediction["sport"] == "football":
+                if not football_result_participants_match(prediction, event):
+                    continue
                 home = next(c for c in competitors if c.get("homeAway") == "home")
                 away = next(c for c in competitors if c.get("homeAway") == "away")
                 hs, ass = float(home.get("score", 0)), float(away.get("score", 0))
@@ -1267,11 +1270,10 @@ def main():
                 total["pick"] = "over" if total["over"] >= total["under"] else "under"
 
         prediction["calculated_at"] = calibration_now.isoformat()
-    existing_ids = {p.get("event_id") for p in history if not p.get("settled")}
-    for prediction in predictions:
-        if prediction["event_id"] not in existing_ids:
-            history.append(prediction.copy())
-    history = history[-2500:]
+    # Forecast history is append-only and keyed by sport + competition + event ID.
+    # Never suppress a competition because a provider reused an event ID, and never
+    # truncate older settled decisions to a rolling window.
+    append_new_predictions(history, predictions)
     summary = accuracy_summary(history)
     save_json(DATA / "predictions.json", predictions)
     save_json(history_path, history)
