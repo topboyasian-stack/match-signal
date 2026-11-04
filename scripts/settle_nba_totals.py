@@ -221,7 +221,7 @@ def valid_probability_snapshot(prediction, cutoff=PROSPECTIVE_CUTOFF_UTC):
     return bool(audit.get("roi_eligible"))
 
 
-def select_probability_snapshot(rows, cutoff=EVALUATION_CUTOFF_UTC):
+def select_probability_snapshot(rows, cutoff=PROSPECTIVE_CUTOFF_UTC):
     """Freeze the first eligible market-225 snapshot per event, regardless of bet direction."""
     eligible = [row for row in (rows or []) if valid_probability_snapshot(row, cutoff)]
     if not eligible:
@@ -236,7 +236,7 @@ def select_probability_snapshot(rows, cutoff=EVALUATION_CUTOFF_UTC):
     )
 
 
-def probability_result_for(prediction, event, cutoff=EVALUATION_CUTOFF_UTC):
+def probability_result_for(prediction, event, cutoff=PROSPECTIVE_CUTOFF_UTC):
     """Settle one prospective fixture for probability validation, including neutral/no-bet rows.
 
     These records are deliberately separate from the selection/ROI ledger. They
