@@ -106,9 +106,13 @@ def should_dispatch_probability_report(
     if report is None:
         return True
     age = (current - report).total_seconds() / 60
-    if age < -2 or age < float(max_age_minutes):
+    if age < -2:
         return False
-    return source is None or source > report
+    # Newer source evidence must be reflected immediately, even when the
+    # report itself is younger than the periodic stale-age threshold.
+    if source is not None and source > report:
+        return True
+    return age >= float(max_age_minutes)
 
 
 def stale_upcoming_prediction_count(predictions, now, max_age_hours=6):

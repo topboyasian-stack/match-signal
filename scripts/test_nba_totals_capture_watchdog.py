@@ -80,10 +80,14 @@ def run():
         "2026-11-02T13:35:00Z", "2026-11-02T13:50:00Z", model_now,
         active_research_runs=0, active_settlement_runs=0, max_age_minutes=15
     ), "A stale report with newer capture/settlement evidence must trigger research recovery."
-    assert not should_dispatch_probability_report(
-        "2026-11-02T13:45:00Z", "2026-11-02T13:50:00Z", model_now,
+    assert should_dispatch_probability_report(
+        "2026-11-02T13:53:00Z", "2026-11-02T13:54:00Z", model_now,
         active_research_runs=0, active_settlement_runs=0, max_age_minutes=15
-    ), "A report under the 15-minute recovery boundary must not be duplicated."
+    ), "New settlement/capture evidence must refresh a recent report immediately."
+    assert should_dispatch_probability_report(
+        "2026-11-02T13:35:00Z", "2026-11-02T13:30:00Z", model_now,
+        active_research_runs=0, active_settlement_runs=0, max_age_minutes=15
+    ), "A report older than 15 minutes must refresh even if source timestamps are unchanged."
     assert not should_dispatch_probability_report(
         "2026-11-02T13:00:00Z", "2026-11-02T13:50:00Z", model_now,
         active_research_runs=1, active_settlement_runs=0, max_age_minutes=15
