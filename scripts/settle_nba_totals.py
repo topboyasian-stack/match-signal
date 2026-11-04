@@ -212,10 +212,17 @@ def valid_probability_snapshot(prediction, cutoff=PROSPECTIVE_CUTOFF_UTC):
         return False
     try:
         expected_total = float(prediction.get("expected_total"))
+        market_expected_total = float(market.get("expected_total"))
         line = float(market.get("line"))
     except (TypeError, ValueError):
         return False
-    if not (math.isfinite(expected_total) and math.isfinite(line) and 100 <= line <= 300):
+    if not (
+        math.isfinite(expected_total)
+        and math.isfinite(market_expected_total)
+        and math.isclose(expected_total, market_expected_total, rel_tol=0.0, abs_tol=1e-9)
+        and math.isfinite(line)
+        and 100 <= line <= 300
+    ):
         return False
     audit = price_audit_fields(prediction, market, published)
     return bool(audit.get("roi_eligible"))
