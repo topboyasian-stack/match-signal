@@ -28,7 +28,7 @@ permissions:
 concurrency:
   # Keep the cron watchdog in its own queue. Workflow-run recovery events can
   # arrive in bursts and must not cancel a pending scheduled freshness check.
-  group: nba-totals-capture-freshness-watchdog-${{ github.event_name == 'schedule' && 'scheduled' || 'event-driven' }}
+  group: nba-totals-capture-freshness-watchdog-${{ github.event_name == 'schedule' && 'scheduled' || (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && 'recovery' || 'event-driven' }}
   cancel-in-progress: false
 
 jobs:
