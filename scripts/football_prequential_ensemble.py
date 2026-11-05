@@ -472,7 +472,7 @@ def global_blend_scope_gate(candidate, baseline, development_n, holdout_n):
         "holdout_sample_passed": enough_holdout,
         "minimum_brier_improvement": SCOPE_MIN_BRIER_LIFT,
         "maximum_accuracy_regression": SCOPE_MAX_ACCURACY_REGRESSION,
-        "holdout_sample_passed": enough,
+        "holdout_sample_passed": enough_holdout,
         "brier_passed": brier_ok,
         "log_loss_passed": loss_ok,
         "accuracy_passed": accuracy_ok,
