@@ -28,6 +28,9 @@ on:
       - 'scripts/build_football_performance.py'
       - 'scripts/calibrate_models.py'
       - 'scripts/model_upgrade.py'
+      - 'scripts/football_prequential_ensemble.py'
+      - 'scripts/test_football_prequential_ensemble.py'
+      - 'scripts/test_model_upgrade_football_ensemble.py'
       - 'scripts/model_guard.py'
       - 'scripts/build_behavior_profiles.py'
       - 'scripts/build_individual_behavior.py'
@@ -87,6 +90,11 @@ jobs:
         run: PYTHONPATH=scripts python scripts/test_ucl_shadow_contract.py
       - name: Test alternate domestic-history fallback and competition isolation
         run: PYTHONPATH=scripts:. python scripts/test_ucl_history_coverage.py
+      - name: Test competition-scoped football ensemble and fail-closed model updates
+        run: |
+          python -m py_compile scripts/football_prequential_ensemble.py scripts/model_upgrade.py scripts/test_football_prequential_ensemble.py scripts/test_model_upgrade_football_ensemble.py
+          PYTHONPATH=scripts python scripts/test_football_prequential_ensemble.py
+          PYTHONPATH=scripts python scripts/test_model_upgrade_football_ensemble.py
       # Optional NBA history enrichment is currently unavailable upstream (HTTP 404).
       # Basketball remains a separate paper-only experimental lane; this must not block
       # the canonical football/tennis refresh when that optional source is missing.
