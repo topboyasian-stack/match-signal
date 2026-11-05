@@ -15,6 +15,9 @@ def fixture(index, *, tour="ATP", actual=None):
         "league": tour,
         "event_id": f"{tour}-{index}",
         "start_time": start.isoformat(),
+        "calculated_at": (start - timedelta(hours=2)).isoformat(),
+        "evaluation_eligible": True,
+        "capture_status": "PRE_EVENT",
         "player_1": f"Player {index % 9} A",
         "player_2": f"Player {(index + 2) % 9} B",
         "settled": True,
@@ -24,6 +27,23 @@ def fixture(index, *, tour="ATP", actual=None):
         "confidence": 0.62 if index % 3 else 0.58,
     }
 
+
+
+def test_unclassified_late_and_post_event_rows_are_not_training_data():
+    valid = fixture(1)
+    missing_classification = fixture(2)
+    missing_classification.pop("evaluation_eligible")
+    missing_classification.pop("capture_status")
+    late = fixture(3)
+    late["evaluation_eligible"] = False
+    late["capture_status"] = "LATE_CAPTURE"
+    post_event = fixture(4)
+    post_event["calculated_at"] = post_event["start_time"]
+
+    assert MODEL["valid_record"](valid) is True
+    assert MODEL["valid_record"](missing_classification) is False
+    assert MODEL["valid_record"](late) is False
+    assert MODEL["valid_record"](post_event) is False
 
 def test_weight_selection_uses_only_prior_rows():
     records = [fixture(i) for i in range(36)]
@@ -132,6 +152,7 @@ def test_apply_model_changes_atp_but_leaves_wta_untouched():
     assert predictions[1] == before_wta
 
 
+test_unclassified_late_and_post_event_rows_are_not_training_data()
 test_weight_selection_uses_only_prior_rows()
 test_current_fixture_outcome_cannot_change_its_own_forecast()
 test_future_outcomes_do_not_rewrite_earlier_forecasts()
