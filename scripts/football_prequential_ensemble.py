@@ -418,6 +418,54 @@ def fit_development_blend(rows):
     }
 
 
+
+def fit_development_accuracy_blend(rows):
+    """Fit a convex blend using development top-pick accuracy, Brier as tie-breaker."""
+    if len(rows) < MIN_DEVELOPMENT_ROWS:
+        return {
+            "weights": [1.0, 0.0, 0.0],
+            "development_n": len(rows),
+            "reason": "insufficient_development_sample",
+        }
+    candidates = []
+    steps = round(1.0 / BLEND_STEP)
+    for published_step in range(steps + 1):
+        for dixon_step in range(steps - published_step + 1):
+            elo_step = steps - published_step - dixon_step
+            weights = [published_step / steps, dixon_step / steps, elo_step / steps]
+            brier_scores = []
+            hits = []
+            for row in rows:
+                combined = blend_probs(
+                    [row["published"], row["dixon_coles"], row["elo"]],
+                    weights,
+                )
+                brier_scores.append(brier(combined, row["actual"]))
+                hits.append(pick_from_probs(combined) == row["actual"])
+            candidates.append({
+                "weights": weights,
+                "accuracy": sum(hits) / len(hits),
+                "brier": sum(brier_scores) / len(brier_scores),
+            })
+    best = max(
+        candidates,
+        key=lambda item: (
+            item["accuracy"],
+            -item["brier"],
+            item["weights"][0],
+            item["weights"][1],
+        ),
+    )
+    return {
+        "weights": best["weights"],
+        "development_n": len(rows),
+        "development_accuracy": round(best["accuracy"], 5),
+        "development_brier": round(best["brier"], 5),
+        "candidate_count": len(candidates),
+        "objective": "maximum development top-pick accuracy; multiclass Brier tie-breaker",
+    }
+
+
 def apply_blend(row, weights):
     return blend_probs(
         [row["published"], row["dixon_coles"], row["elo"]],
@@ -503,17 +551,19 @@ def build_report(prediction_history, team_history):
     for row in development:
         enriched = dict(row)
         enriched["fitted_blend"] = apply_blend(row, weights)
+        enriched["accuracy_fitted_blend"] = apply_blend(row, accuracy_weights)
         development_enriched.append(enriched)
 
     holdout_enriched = []
     for row in holdout:
         enriched = dict(row)
         enriched["fitted_blend"] = apply_blend(row, weights)
+        enriched["accuracy_fitted_blend"] = apply_blend(row, accuracy_weights)
         holdout_enriched.append(enriched)
 
     metrics = {
         name: _score_rows(holdout_enriched, name)
-        for name in ("published", "dixon_coles", "elo", "dixon_elo_blend", "fitted_blend")
+        for name in ("published", "dixon_coles", "elo", "dixon_elo_blend", "fitted_blend", "accuracy_fitted_blend")
     }
 
     dev_by_competition = defaultdict(list)
@@ -549,7 +599,7 @@ def build_report(prediction_history, team_history):
             continue
         test_metrics = {
             name: _score_rows(test_rows, name)
-            for name in ("published", "dixon_coles", "elo", "dixon_elo_blend", "fitted_blend")
+            for name in ("published", "dixon_coles", "elo", "dixon_elo_blend", "fitted_blend", "accuracy_fitted_blend")
         }
         selected_metrics = test_metrics[selected_model]
         published_metrics = test_metrics["published"]
@@ -674,6 +724,7 @@ def build_report(prediction_history, team_history):
         "holdout_fraction": HOLDOUT_FRACTION,
         "exclusions": exclusions,
         "development_fit": fit,
+        "development_accuracy_fit": accuracy_fit,
         "development_by_league": development_by_league,
         "holdout_metrics": metrics,
         "holdout_by_league": holdout_by_league,
