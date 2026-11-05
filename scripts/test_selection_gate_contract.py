@@ -16,7 +16,9 @@ assert collector["OUT"] == ROOT / "data" / "selection_candidates.json"
 assert gate["SELECTED"] != collector["OUT"]
 
 gate_source = (ROOT / "scripts" / "selective_prediction_gate.py").read_text(encoding="utf-8")
-assert '"generated_at": datetime.now(timezone.utc).isoformat()' in gate_source
+assert '"generated_at": now.isoformat()' in gate_source
+assert "MAX_MARKET_AGE_SECONDS = 15 * 60" in gate_source
+assert "MAX_SELECTION_HORIZON_MINUTES = 12 * 60" in gate_source
 assert '"selected_artifact": "data/selection_gate_selected.json"' in gate_source
 assert '"candidate_pool_artifact": "data/selection_candidates.json"' in gate_source
 assert '"filtered_predictions": len(predictions) - len(selected)' in gate_source
