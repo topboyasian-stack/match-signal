@@ -105,18 +105,21 @@ def test_competition_model_choice_uses_development_rows_only():
 def test_global_blend_scope_requires_independent_competition_evidence():
     published = {"brier": 0.60, "log_loss": 1.0, "accuracy": 0.55}
     improving = {"brier": 0.58, "log_loss": 0.98, "accuracy": 0.55}
-    passed = global_blend_scope_gate(improving, published, 25)
+    passed = global_blend_scope_gate(improving, published, 30, 25)
     assert passed["passed"] is True
 
     accuracy_drop = {"brier": 0.57, "log_loss": 0.95, "accuracy": 0.53}
-    failed = global_blend_scope_gate(accuracy_drop, published, 25)
+    failed = global_blend_scope_gate(accuracy_drop, published, 30, 25)
     assert failed["passed"] is False
     assert failed["accuracy_passed"] is False
 
-    small_sample = global_blend_scope_gate(improving, published, 19)
-    assert small_sample["passed"] is False
-    assert small_sample["holdout_sample_passed"] is False
+    small_development = global_blend_scope_gate(improving, published, 29, 25)
+    assert small_development["passed"] is False
+    assert small_development["development_sample_passed"] is False
 
+    small_holdout = global_blend_scope_gate(improving, published, 30, 19)
+    assert small_holdout["passed"] is False
+    assert small_holdout["holdout_sample_passed"] is False
 
 if __name__ == "__main__":
     test_probability_vectors_are_normalized()
