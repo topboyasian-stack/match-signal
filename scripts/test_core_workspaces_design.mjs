@@ -81,9 +81,9 @@ const [headers, sharedRenderer, workspaceUi, nbaClient, builderClient, virtualLa
 ]);
 assert.match(headers, /^\/api\/\*\n  Cache-Control: no-store, no-cache, must-revalidate, max-age=0/m,
   "live API responses must never be cached");
-assert.match(headers, /^\/\*\.js\n  Cache-Control: public, max-age=3600, stale-while-revalidate=86400/m,
+assert.match(headers, /^\/\*\.js\n  Cache-Control: public, max-age=300, stale-while-revalidate=300/m,
   "static JavaScript should be reused during workspace navigation");
-assert.match(headers, /^\/\*\.css\n  Cache-Control: public, max-age=3600, stale-while-revalidate=86400/m,
+assert.match(headers, /^\/\*\.css\n  Cache-Control: public, max-age=300, stale-while-revalidate=300/m,
   "static stylesheets should be reused during workspace navigation");
 assert.match(headers, /^\/data\/\*\n  Cache-Control: public, max-age=30, stale-while-revalidate=60/m,
   "published data should have only a short bounded browser/edge cache");
@@ -111,6 +111,9 @@ assert.ok(virtualLabClient.includes("fetch(DESK_LEARNING,{cache:'default'") &&
   "Virtual Lab published artifacts should use the short shared data cache");
 assert.ok(virtualLabClient.includes("fetch(base+'?'+params.toString(),{cache:'no-store'"),
   "Virtual Lab's live SportyBet feed must remain uncached");
+assert.match(virtualLabClient, /await Promise\.all\(\[\s*loadDeskLearning\(\),\s*loadModelEvaluation\(\),\s*loadConfirmedWatch\(\),\s*loadParticipantProfiles\(\),\s*loadParticipantH2H\(\),\s*loadExternalH2H\(\)\s*\]\)/,
+  "Virtual Lab should load independent evidence artifacts concurrently instead of serially delaying first render");
+
 assert.match(livePage, /function getJson\(url\).*cache:isStatic\?'default':'no-store'/,
   "Live desk should reuse cached prediction snapshots but keep live API calls fresh");
 
