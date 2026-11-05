@@ -545,6 +545,8 @@ def build_report(prediction_history, team_history):
     development, holdout = rows[:split], rows[split:]
     fit = fit_development_blend(development)
     weights = fit["weights"]
+    accuracy_fit = fit_development_accuracy_blend(development)
+    accuracy_weights = accuracy_fit["weights"]
 
     # The global blend is fitted only on the development window.
     development_enriched = []
