@@ -28,17 +28,18 @@ def fixture(index, *, tour="ATP", actual=None):
 def test_weight_selection_uses_only_prior_rows():
     records = [fixture(i) for i in range(36)]
     observed = []
-    original = MODEL["choose_elo_weight"]
+    namespace = MODEL["build_prequential_walkforward"].__globals__
+    original = namespace["choose_elo_weight"]
 
     def fake_choose(prior):
         observed.append([row["event_id"] for row in prior])
         return 0.25, {"selected": {"elo_weight": 0.25}}
 
-    MODEL["choose_elo_weight"] = fake_choose
+    namespace["choose_elo_weight"] = fake_choose
     try:
         scored, _, _, choices = MODEL["build_prequential_walkforward"](records)
     finally:
-        MODEL["choose_elo_weight"] = original
+        namespace["choose_elo_weight"] = original
 
     assert len(scored) == len(records)
     assert all(item["elo_weight"] == 0.0 for item in choices[:30])
@@ -53,13 +54,14 @@ def test_current_fixture_outcome_cannot_change_its_own_forecast():
     records_b = copy.deepcopy(records_a)
     records_b[-1]["actual"] = "p2" if records_a[-1]["actual"] == "p1" else "p1"
 
-    original = MODEL["choose_elo_weight"]
-    MODEL["choose_elo_weight"] = lambda prior: (0.5, {"selected": {"elo_weight": 0.5}})
+    namespace = MODEL["build_prequential_walkforward"].__globals__
+    original = namespace["choose_elo_weight"]
+    namespace["choose_elo_weight"] = lambda prior: (0.5, {"selected": {"elo_weight": 0.5}})
     try:
         scored_a, _, _, _ = MODEL["build_prequential_walkforward"](records_a)
         scored_b, _, _, _ = MODEL["build_prequential_walkforward"](records_b)
     finally:
-        MODEL["choose_elo_weight"] = original
+        namespace["choose_elo_weight"] = original
 
     assert scored_a[-1][1] == scored_b[-1][1]
     assert scored_a[-1][3] == scored_b[-1][3]
@@ -71,13 +73,14 @@ def test_future_outcomes_do_not_rewrite_earlier_forecasts():
     for row in changed[35:]:
         row["actual"] = "p2" if row["actual"] == "p1" else "p1"
 
-    original = MODEL["choose_elo_weight"]
-    MODEL["choose_elo_weight"] = lambda prior: (0.5, {"selected": {"elo_weight": 0.5}})
+    namespace = MODEL["build_prequential_walkforward"].__globals__
+    original = namespace["choose_elo_weight"]
+    namespace["choose_elo_weight"] = lambda prior: (0.5, {"selected": {"elo_weight": 0.5}})
     try:
         a, _, _, _ = MODEL["build_prequential_walkforward"](records)
         b, _, _, _ = MODEL["build_prequential_walkforward"](changed)
     finally:
-        MODEL["choose_elo_weight"] = original
+        namespace["choose_elo_weight"] = original
 
     for index in range(35):
         assert a[index][1] == b[index][1]
@@ -91,13 +94,14 @@ def test_wta_history_is_not_pooled_into_active_atp_training():
     active_b = MODEL["active_tour_records"](atp + wta, "ATP")
     assert [x["event_id"] for x in active_a] == [x["event_id"] for x in active_b]
 
-    original = MODEL["choose_elo_weight"]
-    MODEL["choose_elo_weight"] = lambda prior: (0.25, {"selected": {"elo_weight": 0.25}})
+    namespace = MODEL["build_prequential_walkforward"].__globals__
+    original = namespace["choose_elo_weight"]
+    namespace["choose_elo_weight"] = lambda prior: (0.25, {"selected": {"elo_weight": 0.25}})
     try:
         a, _, _, _ = MODEL["build_prequential_walkforward"](active_a)
         b, _, _, _ = MODEL["build_prequential_walkforward"](active_b)
     finally:
-        MODEL["choose_elo_weight"] = original
+        namespace["choose_elo_weight"] = original
     assert [x[1] for x in a] == [x[1] for x in b]
 
 
