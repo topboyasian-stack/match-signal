@@ -1458,7 +1458,7 @@ async function fetchLiveRemote(){
 }
 async function fetchLiveSnapshot(){
   const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),8000);
-  let r;try{r=await fetch(SNAPSHOT,{cache:'no-store',signal:controller.signal});}finally{clearTimeout(timeout)}
+  let r;try{r=await fetch(SNAPSHOT,{cache:'default',signal:controller.signal});}finally{clearTimeout(timeout)}
   if(!r.ok)throw new Error('Live snapshot HTTP '+r.status);
   const body=await r.json();
   const events=(Array.isArray(body.events)?body.events:[]).map(e=>({
@@ -1654,7 +1654,7 @@ async function loadDeskLearning(){
   const beforeGT=state._deskLearningGateGT??recentProductPerformanceGate('efootball_gt').blocked;
   const beforeAdriatic=state._deskLearningGateAdriatic??recentProductPerformanceGate('efootball_adriatic').blocked;
   try{
-    const r=await fetch(DESK_LEARNING+'?t='+Date.now(),{cache:'no-store',headers:{'Accept':'application/json'}});
+    const r=await fetch(DESK_LEARNING,{cache:'default',headers:{'Accept':'application/json'}});
     if(!r.ok)throw new Error('eFootball recent-performance artifact HTTP '+r.status);
     const d=await r.json();
     state.deskLearning=d&&typeof d==='object'?d:null;
@@ -1681,7 +1681,7 @@ async function loadDeskLearning(){
 }
 async function loadConfirmedWatch(){
   try{
-    const r=await fetch(CONFIRMED_WATCH+'?t='+Date.now(),{cache:'no-store',headers:{'Accept':'application/json'}});
+    const r=await fetch(CONFIRMED_WATCH,{cache:'default',headers:{'Accept':'application/json'}});
     if(!r.ok)throw new Error('confirmed watch HTTP '+r.status);
     state.confirmedWatch=await r.json();
     if(state.confirmedWatch && Array.isArray(state.confirmedWatch.participants))state.confirmedWatch.participants=state.confirmedWatch.participants.filter(x=>x&&x.product==='efootball_gt');
@@ -1691,7 +1691,7 @@ async function loadConfirmedWatch(){
 }
 async function loadParticipantH2H(){
   try{
-    const r=await fetch(PARTICIPANT_H2H+'?t='+Date.now(),{cache:'no-store',headers:{'Accept':'application/json'}});
+    const r=await fetch(PARTICIPANT_H2H,{cache:'default',headers:{'Accept':'application/json'}});
     if(!r.ok)throw new Error('participant H2H HTTP '+r.status);
     state.participantH2H=await r.json();
     state._participantH2HIndex=null;
@@ -1701,7 +1701,7 @@ async function loadParticipantH2H(){
 }
 async function loadExternalH2H(){
   try{
-    const r=await fetch(EXTERNAL_H2H+'?t='+Date.now(),{cache:'no-store',headers:{'Accept':'application/json'}});
+    const r=await fetch(EXTERNAL_H2H,{cache:'default',headers:{'Accept':'application/json'}});
     if(!r.ok)throw new Error('external H2H HTTP '+r.status);
     state.externalH2H=await r.json();
     state.predictionCache.clear();
@@ -1710,7 +1710,7 @@ async function loadExternalH2H(){
 }
 async function loadParticipantProfiles(){
   try{
-    const r=await fetch(PARTICIPANT_PROFILES+'?t='+Date.now(),{cache:'no-store',headers:{'Accept':'application/json'}});
+    const r=await fetch(PARTICIPANT_PROFILES,{cache:'default',headers:{'Accept':'application/json'}});
     if(!r.ok)throw new Error('participant profiles HTTP '+r.status);
     state.participantProfiles=await r.json();
     state.participantLifecycle=state.participantProfiles;
@@ -1721,7 +1721,7 @@ async function loadParticipantProfiles(){
 }
 async function loadEligibility(){
   try{
-    const r=await fetch(ELIGIBILITY+'?t='+Date.now(),{cache:'no-store',headers:{'Accept':'application/json'}});
+    const r=await fetch(ELIGIBILITY,{cache:'default',headers:{'Accept':'application/json'}});
     if(!r.ok)throw new Error('eligibility HTTP '+r.status);
     const d=await r.json();
     if(Array.isArray(d.eligible_competitions))state.eligibility.eligible_competitions=d.eligible_competitions;
@@ -1746,7 +1746,7 @@ function renderEligibilityNotice(){
 }
 async function loadModelEvaluation(){
   try{
-    const r=await fetch(MODEL_EVAL+'?t='+Date.now(),{cache:'no-store',headers:{'Accept':'application/json'}});
+    const r=await fetch(MODEL_EVAL,{cache:'default',headers:{'Accept':'application/json'}});
     if(!r.ok)throw new Error('model eval HTTP '+r.status);
     state.modelEvaluation=await r.json();
     const artifact=state.modelEvaluation||{};
@@ -1775,7 +1775,9 @@ async function loadHistory(){
   let lastError=null;
   for(const url of urls){
     try{
-      const r=await fetch(url+'?t='+Date.now(),{cache:'no-store',headers:{'Accept':'application/json'}});
+      const isStatic=url.startsWith('/data/');
+      const target=isStatic?url:url+'?t='+Date.now();
+      const r=await fetch(target,{cache:isStatic?'default':'no-store',headers:{'Accept':'application/json'}});
       if(!r.ok)throw new Error(url+' HTTP '+r.status);
       const data=await r.json();
       const arr=Array.isArray(data)?data:(Array.isArray(data.rows)?data.rows:[]);
