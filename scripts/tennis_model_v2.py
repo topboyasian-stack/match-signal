@@ -5,7 +5,8 @@ from pathlib import Path
 
 import requests
 
-# Automated prediction-cycle trigger: keep this model in the scheduled pipeline.
+# ATP is the active tennis product. WTA remains archived/research-only and is
+# deliberately excluded from active model fitting and release evaluation.
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
 PREDICTIONS_PATH = DATA / "predictions.json"
@@ -13,13 +14,16 @@ ARCHIVE_PATH = DATA / "tennis_prediction_archive.json"
 REPORT_PATH = DATA / "tennis_model_v2.json"
 PRECISION_PATH = DATA / "tennis_precision_gate.json"
 
-V2_VERSION = "2026-09-17-walkforward-calibrated"
+V2_VERSION = "2026-11-05-atp-prequential-walkforward"
+ACTIVE_TOUR = "ATP"
 INITIAL_ELO = 1500.0
 K_FACTOR = 24.0
 MIN_TRAIN = 30
 RECENT_WINDOW = 80
 MIN_CALIBRATION_BIN = 8
 MIN_PRECISION_N = 12
+MIN_PREQUENTIAL_EVALUATION = 20
+ELO_WEIGHTS = [0.0, 0.25, 0.5, 0.75]
 RANKINGS_URL = "https://site.web.api.espn.com/apis/site/v2/sports/tennis/{tour}/rankings?region=us&lang=en"
 
 
@@ -40,6 +44,10 @@ def norm_name(value):
     return " ".join(str(value or "").lower().replace("-", " ").split())
 
 
+def tour_of(row):
+    return str(row.get("league") or row.get("tour") or "").strip().upper()
+
+
 def elo_prob(a, b):
     return 1.0 / (1.0 + 10.0 ** ((b - a) / 400.0))
 
@@ -52,25 +60,34 @@ def rank_prob(rank1, rank2):
 
 
 def fetch_current_rankings():
+    """Fetch only the active ATP ranking table."""
     result = {}
     coverage = {}
-    for tour in ("atp", "wta"):
-        try:
-            response = requests.get(RANKINGS_URL.format(tour=tour), timeout=30, headers={"User-Agent": "MatchSignal/4.0"})
-            response.raise_for_status()
-            payload = response.json()
-            ranks = (payload.get("rankings") or [{}])[0].get("ranks") or []
-            count = 0
-            for item in ranks:
-                athlete = item.get("athlete") or {}
-                name = norm_name(athlete.get("displayName") or item.get("displayName") or athlete.get("fullName"))
-                current = item.get("current") or item.get("rank")
-                if name and current:
-                    result[name] = int(current)
-                    count += 1
-            coverage[tour.upper()] = count
-        except Exception as exc:
-            coverage[tour.upper()] = f"error:{type(exc).__name__}"
+    tour = ACTIVE_TOUR.lower()
+    try:
+        response = requests.get(
+            RANKINGS_URL.format(tour=tour),
+            timeout=30,
+            headers={"User-Agent": "MatchSignal/4.0"},
+        )
+        response.raise_for_status()
+        payload = response.json()
+        ranks = (payload.get("rankings") or [{}])[0].get("ranks") or []
+        count = 0
+        for item in ranks:
+            athlete = item.get("athlete") or {}
+            name = norm_name(
+                athlete.get("displayName")
+                or item.get("displayName")
+                or athlete.get("fullName")
+            )
+            current = item.get("current") or item.get("rank")
+            if name and current:
+                result[name] = int(current)
+                count += 1
+        coverage[ACTIVE_TOUR] = count
+    except Exception as exc:
+        coverage[ACTIVE_TOUR] = f"error:{type(exc).__name__}"
     return result, coverage
 
 
@@ -97,7 +114,19 @@ def valid_record(row):
     return True
 
 
+def active_tour_records(rows, tour=ACTIVE_TOUR):
+    """Keep tour histories independent; never pool WTA outcomes into ATP."""
+    return sorted(
+        [
+            row for row in rows
+            if valid_record(row) and tour_of(row) == str(tour).upper()
+        ],
+        key=lambda row: parse_dt(row.get("start_time")),
+    )
+
+
 def build_walkforward(records, elo_weight):
+    """Evaluate one fixed weight sequentially on a supplied historical window."""
     ratings = {}
     scored = []
     for row in sorted(records, key=lambda x: parse_dt(x.get("start_time"))):
@@ -130,6 +159,14 @@ def brier(items):
     return sum((p - actual) ** 2 for _, p, actual, _, _ in items) / len(items)
 
 
+def item_metrics(items):
+    return {
+        "n": len(items),
+        "accuracy": round(accuracy(items), 4) if items else None,
+        "brier": round(brier(items), 5) if items else None,
+    }
+
+
 def baseline_metrics(records):
     items = []
     for row in records:
@@ -137,20 +174,31 @@ def baseline_metrics(records):
         actual = outcome_from_record(row)
         if actual is not None:
             items.append((row, p, actual, 0.5, p))
-    return {"accuracy": round(accuracy(items), 4), "brier": round(brier(items), 4), "n": len(items)}
+    return item_metrics(items)
 
 
 def choose_elo_weight(records):
+    """Select a weight using outcomes available before the next forecast only."""
     if len(records) < MIN_TRAIN:
-        return 0.5, {"reason": "insufficient_history", "baseline": baseline_metrics(records)}
-    candidates = [0.25, 0.5, 0.75]
-    window = records[-RECENT_WINDOW:]
-    results = []
-    for weight in candidates:
+        return 0.0, {
+            "reason": "insufficient_prior_history",
+            "prior_records": len(records),
+            "selected": {"elo_weight": 0.0},
+        }
+    candidates = []
+    window = sorted(records, key=lambda x: parse_dt(x.get("start_time")))[-RECENT_WINDOW:]
+    for weight in ELO_WEIGHTS:
         items, _ = build_walkforward(window, weight)
-        results.append({"elo_weight": weight, "accuracy": round(accuracy(items), 4), "brier": round(brier(items), 4), "n": len(items)})
-    best = max(results, key=lambda x: (x["accuracy"], -x["brier"]))
-    return best["elo_weight"], {"selection_window": len(window), "baseline": baseline_metrics(window), "candidates": results, "selected": best}
+        metrics = item_metrics(items)
+        candidates.append({"elo_weight": weight, **metrics})
+    # Probability quality is primary; hit rate is only a tie-breaker.
+    best = min(candidates, key=lambda x: (x["brier"], -x["accuracy"], x["elo_weight"]))
+    return float(best["elo_weight"]), {
+        "selection_window": len(window),
+        "candidates": candidates,
+        "selected": best,
+        "objective": "minimum chronological-window Brier; accuracy tie-breaker",
+    }
 
 
 def build_current_ratings(records):
@@ -170,6 +218,64 @@ def build_current_ratings(records):
     return ratings
 
 
+def build_prequential_walkforward(records):
+    """Forecast each ATP result using only earlier ATP results and earlier model choices.
+
+    The row being forecast is never used to select its weight or update its Elo
+    state. The outcome is added to the training state only after its forecast
+    has been recorded.
+    """
+    ordered = sorted(records, key=lambda x: parse_dt(x.get("start_time")))
+    ratings = {}
+    prior = []
+    scored = []
+    choices = []
+
+    for row in ordered:
+        p1 = norm_name(row.get("player_1"))
+        p2 = norm_name(row.get("player_2"))
+        if not p1 or not p2:
+            continue
+
+        if len(prior) >= MIN_TRAIN:
+            weight, selection = choose_elo_weight(prior[-RECENT_WINDOW:])
+        else:
+            weight = 0.0
+            selection = {
+                "reason": "minimum_prior_history_not_met",
+                "prior_records": len(prior),
+                "selected": {"elo_weight": 0.0},
+            }
+
+        r1 = ratings.get(p1, INITIAL_ELO)
+        r2 = ratings.get(p2, INITIAL_ELO)
+        ep = elo_prob(r1, r2)
+        base = clamp(float((row.get("probabilities") or {}).get("p1", 0.5)))
+        forecast = clamp((1.0 - weight) * base + weight * ep)
+        actual = outcome_from_record(row)
+
+        scored.append((row, forecast, actual, ep, base))
+        choices.append({
+            "event_id": row.get("event_id"),
+            "start_time": row.get("start_time"),
+            "prior_records": len(prior),
+            "elo_weight": weight,
+            "selection_reason": selection.get("reason") or "prior_only_chronological_selection",
+        })
+
+        # The result is revealed only after the forecast is fixed.
+        change = K_FACTOR * (actual - ep)
+        ratings[p1] = r1 + change
+        ratings[p2] = r2 - change
+        prior.append(row)
+
+    baseline_items = [
+        (row, base, actual, ep, base)
+        for row, _, actual, ep, base in scored
+    ]
+    return scored, baseline_items, ratings, choices
+
+
 def build_probability_calibration(items):
     bins = [0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95, 1.001]
     rows = []
@@ -180,9 +286,21 @@ def build_probability_calibration(items):
         if n >= MIN_CALIBRATION_BIN:
             raw_conf = sum(max(item[1], 1.0 - item[1]) for item in selected) / n
             observed = (correct + 2.0 * raw_conf) / (n + 2.0)
-            rows.append({"low": low, "high": high, "n": n, "accuracy": round(correct / n, 4), "calibrated_confidence": round(observed, 4)})
+            rows.append({
+                "low": low,
+                "high": high,
+                "n": n,
+                "accuracy": round(correct / n, 4),
+                "calibrated_confidence": round(observed, 4),
+            })
         else:
-            rows.append({"low": low, "high": high, "n": n, "accuracy": None, "calibrated_confidence": None})
+            rows.append({
+                "low": low,
+                "high": high,
+                "n": n,
+                "accuracy": None,
+                "calibrated_confidence": None,
+            })
     return rows
 
 
@@ -213,80 +331,78 @@ def build_precision_gate(items):
         n = len(selected)
         correct = sum(((item[1] >= 0.5) == bool(item[2])) for item in selected)
         acc = correct / n if n else 0.0
-        rows.append({"threshold": threshold, "n": n, "correct": correct, "accuracy": round(acc, 4) if n else None, "wilson_lower_90": round(wilson_lower(correct, n), 4) if n else None})
+        rows.append({
+            "threshold": threshold,
+            "n": n,
+            "correct": correct,
+            "accuracy": round(acc, 4) if n else None,
+            "wilson_lower_90": round(wilson_lower(correct, n), 4) if n else None,
+        })
     eligible = [r for r in rows if r["n"] >= MIN_PRECISION_N]
-    selected = max(eligible, key=lambda r: (r["wilson_lower_90"], r["accuracy"], r["n"])) if eligible else {"threshold": 0.65, "reason": "insufficient_sample"}
-    return {"minimum_sample": MIN_PRECISION_N, "candidates": rows, "selected": selected, "mode": "PAPER_ONLY"}
-
-
-def build_ou_empirical(records):
-    bins = {"low": [0, 0], "mid": [0, 0], "high": [0, 0]}
-    for row in records:
-        actual_markets = row.get("actual_markets") or {}
-        result = actual_markets.get("total_games_result")
-        analytics = row.get("analytics") or {}
-        three = analytics.get("three_sets")
-        if result not in {"over", "under"} or three is None:
-            continue
-        key = "low" if float(three) < 0.46 else "high" if float(three) > 0.56 else "mid"
-        bucket = bins[key]
-        bucket[0] += 1
-        bucket[1] += result == "over"
-    rates = {key: (over + 2) / (n + 4) if n else 0.5 for key, (n, over) in bins.items()}
-    return {"bins": bins, "over_rates": rates}
+    selected = max(eligible, key=lambda r: (r["wilson_lower_90"], r["accuracy"], r["n"])) if eligible else {
+        "threshold": 0.65,
+        "reason": "insufficient_sample",
+    }
+    return {
+        "minimum_sample": MIN_PRECISION_N,
+        "candidates": rows,
+        "selected": selected,
+        "mode": "PAPER_ONLY",
+    }
 
 
 def apply_model(predictions, ratings, elo_weight, current_rankings, calibration):
+    """Apply only the feature tested in the ATP prequential experiment."""
     changed = 0
     ranking_enriched = 0
     for row in predictions:
-        if row.get("sport") != "tennis":
+        if row.get("sport") != "tennis" or tour_of(row) != ACTIVE_TOUR:
             continue
         p1, p2 = norm_name(row.get("player_1")), norm_name(row.get("player_2"))
+        if not p1 or not p2:
+            continue
         r1 = ratings.get(p1, INITIAL_ELO)
         r2 = ratings.get(p2, INITIAL_ELO)
         ep = elo_prob(r1, r2)
         probs = row.get("probabilities") or {}
         base = clamp(float(probs.get("p1", 0.5)))
+        has_history = p1 in ratings or p2 in ratings
+
+        # Rankings remain visible as context, but do not affect probabilities
+        # until their incremental benefit is independently walk-forward tested.
         rank1 = current_rankings.get(norm_name(p1))
         rank2 = current_rankings.get(norm_name(p2))
-        rp = rank_prob(rank1, rank2)
-        has_history = p1 in ratings or p2 in ratings
-        if rp is not None and has_history:
-            raw = clamp(0.50 * base + 0.30 * ep + 0.20 * rp)
+        if rank1 is not None or rank2 is not None:
             ranking_enriched += 1
-        elif has_history:
-            raw = clamp((1.0 - elo_weight) * base + elo_weight * ep)
-        elif rp is not None:
-            raw = clamp(0.70 * base + 0.30 * rp)
-            ranking_enriched += 1
-        else:
-            raw = base
+
+        raw = clamp((1.0 - elo_weight) * base + elo_weight * ep) if has_history else base
         updated = calibrate_probability(raw, calibration)
         row.setdefault("probabilities", {})["p1"] = round(updated, 4)
         row["probabilities"]["p2"] = round(1.0 - updated, 4)
         row["pick"] = "p1" if updated >= 0.5 else "p2"
         row["confidence"] = round(max(updated, 1.0 - updated), 4)
-        row["rankings"] = {"p1": rank1, "p2": rank2, "gap": (rank2 - rank1) if rank1 and rank2 else None}
-        row.setdefault("analytics", {})["elo"] = {"p1": round(r1, 1), "p2": round(r2, 1), "p1_win_prob": round(ep, 4), "weight": elo_weight}
+        row["rankings"] = {
+            "p1": rank1,
+            "p2": rank2,
+            "gap": (rank2 - rank1) if rank1 and rank2 else None,
+        }
+        row.setdefault("analytics", {})["elo"] = {
+            "p1": round(r1, 1),
+            "p2": round(r2, 1),
+            "p1_win_prob": round(ep, 4),
+            "weight": elo_weight if has_history else 0.0,
+        }
         row["analytics"]["walkforward_raw_p1"] = round(raw, 4)
         row["analytics"]["walkforward_calibrated_p1"] = round(updated, 4)
-        if rp is not None:
-            row["analytics"]["ranking_probability"] = round(rp, 4)
-        quality = row.get("signal_quality") or {}
-        quality["elo_available"] = has_history
-        quality["elo_gap"] = round(r1 - r2, 1) if has_history else None
-        quality["ranking_available"] = rp is not None
-        quality["components"] = max(int(quality.get("components") or 0), 1 + int(has_history) + int(rp is not None))
-        row["signal_quality"] = quality
-        row["model"] = "ESPN + ranking/form base + walk-forward player Elo + current ATP/WTA rank + walk-forward probability calibration"
+        row["model"] = "ESPN ATP base + prequential player Elo + chronological probability calibration"
         row["model_version"] = V2_VERSION
         changed += 1
+
         total = row.get("analytics", {}).get("total_games") or {}
         if total.get("line") == 22.5:
-            prior = float(total.get("base_model_over", total.get("over", 0.5)) or 0.5)
-            total["base_model_over"] = round(prior, 4)
-            total["base_model_under"] = round(1.0 - prior, 4)
+            prior_total = float(total.get("base_model_over", total.get("over", 0.5)) or 0.5)
+            total["base_model_over"] = round(prior_total, 4)
+            total["base_model_under"] = round(1.0 - prior_total, 4)
             total["pre_calibration_source"] = "walk-forward tennis set/game model"
             row["analytics"]["total_games"] = total
     return changed, ranking_enriched
@@ -295,41 +411,92 @@ def apply_model(predictions, ratings, elo_weight, current_rankings, calibration)
 def main():
     predictions = json.loads(PREDICTIONS_PATH.read_text())
     archive = json.loads(ARCHIVE_PATH.read_text()) if ARCHIVE_PATH.exists() else []
-    records = sorted([r for r in archive if valid_record(r)], key=lambda x: parse_dt(x.get("start_time")))
-    elo_weight, selection = choose_elo_weight(records)
+    all_records = [r for r in archive if valid_record(r)]
+    records = active_tour_records(all_records, ACTIVE_TOUR)
+    inactive_tours = sorted({
+        tour_of(row) for row in all_records
+        if tour_of(row) and tour_of(row) != ACTIVE_TOUR
+    })
+
+    walkforward_items, baseline_items, walkforward_ratings, weight_history = build_prequential_walkforward(records)
+    walkforward_comparison = {
+        "active_scope": ACTIVE_TOUR,
+        "prequential_model": item_metrics(walkforward_items),
+        "raw_base_model": item_metrics(baseline_items),
+        "brier_improved": (
+            bool(walkforward_items)
+            and brier(walkforward_items) < brier(baseline_items)
+        ),
+        "evaluation": "each fixture is forecast using only earlier ATP results; ELO weight is reselected from prior results only",
+    }
+
+    candidate_weight, weight_selection = choose_elo_weight(records)
+    has_minimum_oos = len(walkforward_items) >= MIN_PREQUENTIAL_EVALUATION
+    model_improved = walkforward_comparison["brier_improved"]
+    effective_weight = candidate_weight if has_minimum_oos and model_improved else 0.0
+    weight_selection.update({
+        "current_candidate_weight": candidate_weight,
+        "effective_weight": effective_weight,
+        "effective_weight_reason": (
+            "prequential_brier_beats_raw_base"
+            if effective_weight > 0
+            else "hold_elo_to_raw_base_until_prequential_brier_improves"
+        ),
+        "oos_minimum_required": MIN_PREQUENTIAL_EVALUATION,
+    })
+
     ratings = build_current_ratings(records)
     current_rankings, ranking_coverage = fetch_current_rankings()
-    walkforward_items, _ = build_walkforward(records, elo_weight)
     calibration = build_probability_calibration(walkforward_items)
     precision_gate = build_precision_gate(walkforward_items)
-    changed, ranking_enriched = apply_model(predictions, ratings, elo_weight, current_rankings, calibration)
-    PREDICTIONS_PATH.write_text(json.dumps(predictions, indent=2, ensure_ascii=False) + "\n")
+    changed, ranking_enriched = apply_model(
+        predictions, ratings, effective_weight, current_rankings, calibration
+    )
+
+    PREDICTIONS_PATH.write_text(
+        json.dumps(predictions, indent=2, ensure_ascii=False) + "\n"
+    )
     report = {
         "updated_at": datetime.now(timezone.utc).isoformat(),
         "model_version": V2_VERSION,
         "status": "PAPER_RESEARCH_ONLY",
+        "active_scope": ACTIVE_TOUR,
         "training_records": len(records),
-        "elo_weight": elo_weight,
-        "weight_selection": selection,
+        "archived_valid_records_all_tours": len(all_records),
+        "inactive_tours_retained_as_research": inactive_tours,
+        "elo_weight": effective_weight,
+        "weight_selection": weight_selection,
+        "prequential_walkforward": walkforward_comparison,
+        "prequential_weight_history": weight_history,
         "players_in_elo": len(ratings),
         "ranking_coverage": ranking_coverage,
         "current_predictions_with_rank_enrichment": ranking_enriched,
+        "current_active_predictions_rewritten": changed,
         "walkforward_probability_calibration": calibration,
         "precision_gate": precision_gate,
-        "current_tennis_predictions_rewritten": changed,
         "guardrails": [
-            "No future results are used for a fixture before its start time.",
-            "Late-captured predictions are excluded from walk-forward model evaluation.",
-            "Unseen players retain the existing model probability unless a current official ESPN rank is available.",
-            "Current rankings are used only for future fixtures and are not used to score the historical walk-forward test.",
-            "Probability calibration is learned only from historical walk-forward predictions and is conservatively shrunk toward raw model probabilities.",
-            "Precision thresholds are research filters, not guarantees of future accuracy.",
-            "O/U calibration remains research-only and separate from live-money execution."
-        ]
+            "Active tennis model scope is ATP singles only; WTA is retained as inactive research history and never pooled into ATP.",
+            "Each historical forecast is generated using only results and model-selection outcomes available before that fixture.",
+            "ELO weight is selected chronologically from prior results only; baseline weight 0.0 is an explicit candidate.",
+            "ELO is applied to current ATP forecasts only when its prequential Brier score beats the raw base model on at least 20 prior ATP forecasts.",
+            "Current official ATP ranks are context only and do not alter model probabilities until their incremental value is separately validated.",
+            "Late-captured or explicitly ineligible records are excluded from model evaluation.",
+            "Probability calibration is learned from prequential ATP forecasts only.",
+            "Precision thresholds are paper-research filters, not guarantees of future accuracy.",
+            "O/U calibration remains research-only and separate from betting execution.",
+        ],
     }
     REPORT_PATH.write_text(json.dumps(report, indent=2) + "\n")
     PRECISION_PATH.write_text(json.dumps(precision_gate, indent=2) + "\n")
-    print(json.dumps(report, indent=2))
+    print(json.dumps({
+        "status": report["status"],
+        "active_scope": ACTIVE_TOUR,
+        "training_records": len(records),
+        "prequential_walkforward": walkforward_comparison,
+        "weight_selection": weight_selection,
+        "precision_gate": precision_gate,
+        "current_active_predictions_rewritten": changed,
+    }, indent=2))
 
 
 if __name__ == "__main__":
