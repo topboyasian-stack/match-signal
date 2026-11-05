@@ -96,6 +96,9 @@ def exact_snapshot_from_prediction(row, fetched_at):
         "captured_at": fetched_at,
         "quote_age_seconds": round(float(age_seconds), 3),
         "market_id": market_id,
+        "last_odds_change_time": (
+            row.get("sportybet_winner_odds") or {}
+        ).get("lastOddsChangeTime"),
         "source": "SportyBet NG",
         "match_type": (row.get("sportybet_market_snapshot") or {}).get("match_type"),
         "sportybet_event_id": (
