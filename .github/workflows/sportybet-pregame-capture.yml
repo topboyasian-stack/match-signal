@@ -26,7 +26,7 @@ jobs:
   capture-pregame-quotes:
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 15
     steps:
       - name: Check out latest main
         uses: actions/checkout@v4
@@ -44,32 +44,38 @@ jobs:
 
       - name: Validate exact pregame snapshot contracts
         run: |
-          python -m py_compile scripts/market_snapshot_freshness.py scripts/capture_sportybet_pregame_snapshots.py scripts/model_guard.py scripts/test_sportybet_pregame_capture_workflow.py
+          python -m py_compile scripts/market_snapshot_freshness.py scripts/capture_sportybet_pregame_snapshots.py scripts/merge_sportybet_pregame_snapshots.py scripts/model_guard.py scripts/test_sportybet_pregame_capture_workflow.py
           python scripts/test_market_snapshot_freshness.py
           python scripts/test_capture_sportybet_pregame_snapshots.py
+          python scripts/test_merge_sportybet_pregame_snapshots.py
           python scripts/test_sportybet_pregame_capture_workflow.py
           python scripts/test_model_guard_active_scope.py
 
-      - name: Capture exact SportyBet football and ATP prices
-        run: python scripts/capture_sportybet_pregame_snapshots.py
+      - name: Capture exact SportyBet football and ATP prices once
+        run: |
+          python scripts/capture_sportybet_pregame_snapshots.py
+          cp data/sportybet_pregame_snapshots.json /tmp/sportybet_pregame_captured.json
 
-      - name: Rebuild active risk metrics from immutable settled evidence
-        run: python scripts/model_guard.py
-
-      - name: Publish append-only quote ledger and risk artifacts
+      - name: Publish append-only quote ledger and risk artifacts with race-safe retry
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          for attempt in 1 2 3; do
+          # Preserve the original captured timestamps outside the worktree.
+          # If another publisher wins the main-branch race, merge these exact
+          # observations into the newest ledger; never refetch and retimestamp.
+          for attempt in 1 2 3 4 5; do
+            echo "Pregame ledger publication attempt ${attempt}/5"
             git fetch origin main
             git reset --hard origin/main
 
-            python scripts/capture_sportybet_pregame_snapshots.py
-            python scripts/model_guard.py
+            python scripts/merge_sportybet_pregame_snapshots.py \
+              --incoming /tmp/sportybet_pregame_captured.json \
+              --target data/sportybet_pregame_snapshots.json
 
+            python scripts/model_guard.py
             git add data/sportybet_pregame_snapshots.json data/risk_gate.json data/value_trial_ledger.json
             if git diff --cached --quiet; then
               echo "No new qualifying pregame snapshots or risk-evidence changes."
@@ -82,10 +88,11 @@ jobs:
               exit 0
             fi
 
-            if [ "${attempt}" -eq 3 ]; then
-              echo "Could not publish the pregame snapshot ledger after three attempts." >&2
+            if [ "${attempt}" -eq 5 ]; then
+              echo "Could not publish the pregame snapshot ledger after five attempts." >&2
               exit 1
             fi
-            echo "main moved during quote capture; refreshing and rebuilding against the newest main."
+            echo "main advanced during publication; preserving the original quote timestamps and merging onto latest main."
+            sleep $((attempt * 2))
           done
           exit 1

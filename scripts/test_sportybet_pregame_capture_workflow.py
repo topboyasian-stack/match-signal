@@ -11,7 +11,15 @@ WORKFLOW_SOURCE = WORKFLOW.read_text(encoding="utf-8")
 assert "*/10 * * * *" in WORKFLOW_SOURCE
 assert "group: match-signal-data-publish" in WORKFLOW_SOURCE
 assert "cancel-in-progress: false" in WORKFLOW_SOURCE
-assert "python scripts/capture_sportybet_pregame_snapshots.py" in WORKFLOW_SOURCE
+# The market scan runs once; publication retries only merge its cached result.
+assert WORKFLOW_SOURCE.count("python scripts/capture_sportybet_pregame_snapshots.py") == 1
+assert "cp data/sportybet_pregame_snapshots.json /tmp/sportybet_pregame_captured.json" in WORKFLOW_SOURCE
+assert "scripts/merge_sportybet_pregame_snapshots.py" in WORKFLOW_SOURCE
+assert "for attempt in 1 2 3 4 5; do" in WORKFLOW_SOURCE
+assert "git fetch origin main" in WORKFLOW_SOURCE
+assert "git reset --hard origin/main" in WORKFLOW_SOURCE
+assert "/tmp/sportybet_pregame_captured.json" in WORKFLOW_SOURCE
+assert "sleep $((attempt * 2))" in WORKFLOW_SOURCE
 assert "python scripts/model_guard.py" in WORKFLOW_SOURCE
 assert "data/sportybet_pregame_snapshots.json" in WORKFLOW_SOURCE
 assert "data/risk_gate.json" in WORKFLOW_SOURCE
