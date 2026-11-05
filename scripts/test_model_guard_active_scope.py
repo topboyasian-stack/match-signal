@@ -7,6 +7,7 @@ GUARD = runpy.run_path("scripts/model_guard.py")
 evaluate = GUARD["evaluate"]
 value_trial = GUARD["value_trial"]
 value_testing = GUARD["value_testing"]
+capture_value_trials = GUARD["capture_value_trials"]
 in_scope = GUARD["in_scope"]
 
 NOW = datetime(2026, 11, 5, 12, 0, tzinfo=timezone.utc)
