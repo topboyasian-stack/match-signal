@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { onRequestPost } from '../functions/api/sportybet-basketball-booking.js';
 import { nbaTotalsReleaseQualified } from '../functions/api/sportybet-booking.js';
 
@@ -14,6 +15,22 @@ const oos = {
   walk_forward: { holdout: { n: 4, mae: 26.7, baseline_mae: 24.75, bias: 6.4 } },
   market_holdout: { n: 0, roi: null, roi_ci95_lower: null, roi_vs_market_favorite: null }
 };
+
+
+const currentMainOos = JSON.parse(readFileSync(new URL('../data/nba_totals_oos_value_test.json', import.meta.url), 'utf8'));
+const currentMainProbability = JSON.parse(readFileSync(new URL('../data/nba_totals_probability_value_experiment.json', import.meta.url), 'utf8'));
+
+test('checked-in latest-main NBA reports agree with the strict release gate', () => {
+  const gateQualified = nbaTotalsReleaseQualified(currentMainOos, currentMainProbability);
+  const reportsDeclareQualified =
+    currentMainOos.release_decision === 'QUALIFIED' &&
+    currentMainProbability.release_decision === 'QUALIFIED';
+  assert.equal(
+    gateQualified,
+    reportsDeclareQualified,
+    'Current main evidence must not unlock the ticket gate unless both release reports and every independent gate predicate pass.'
+  );
+});
 
 const probability = {
   paper_only: true,
