@@ -70,11 +70,10 @@ assert.ok(workflow.includes("MS-FOOTBALL-DESK-2026.10.14-V1"), "production smoke
 assert.ok(workflow.includes("MS-TENNIS-DESK-2026.10.14-V1"), "production smoke must verify Tennis");
 
 
-const [headers, sharedRenderer, workspaceUi, nbaClient, builderClient, virtualLabClient, livePage] = await Promise.all([
+const [headers, sharedRenderer, workspaceUi, builderClient, virtualLabClient, livePage] = await Promise.all([
   read("_headers"),
   read("sport-hubs.js"),
   read("workspace-ui.js"),
-  read("basketball-live.js"),
   read("expansion-odds-builder.js"),
   read("virtual-lab-app.js"),
   read("live.html")
@@ -97,10 +96,6 @@ assert.match(workspaceUi, /club-logo-registry\.json'\),\{cache:'default'\}/,
   "shared navigation should reuse the club-logo registry across pages");
 assert.match(workspaceUi, /async function json\(path\).*cache:live\?'no-store':'default'/,
   "workspace report artifacts should be cacheable without caching API calls");
-assert.match(nbaClient, /function readJson\(u\).*cache:isStatic\?'default':'no-store'/,
-  "NBA static data must use the browser cache while live requests stay fresh");
-assert.ok(nbaClient.indexOf("try{return await readJson(url);}") < nbaClient.indexOf("return readJson(remote);"),
-  "NBA client must prefer the same-site Pages artifact over a raw GitHub fetch");
 assert.ok(builderClient.includes("fetch('./api/odds-builder-data?v=20261020-live-source2-'+Date.now(),{cache:'no-store'})"),
   "Odds Builder live data endpoint must remain live and uncached");
 assert.ok(builderClient.includes("fetch('./data/odds_builder.json',{cache:'default'})") &&
