@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """Shared pregame price snapshot freshness contract tests."""
 from datetime import datetime, timedelta, timezone
-from scripts.market_snapshot_freshness import (
+from pathlib import Path
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+from market_snapshot_freshness import (
     is_fresh_pregame_snapshot,
     pregame_snapshot_age_seconds,
 )
