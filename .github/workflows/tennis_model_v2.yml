@@ -54,6 +54,31 @@ jobs:
         run: |
           python -m py_compile scripts/tennis_model_v2.py scripts/test_tennis_model_prequential.py
           python scripts/test_tennis_model_prequential.py
+      - name: Execute ATP prequential evaluation against committed historical archive
+        run: |
+          python scripts/tennis_model_v2.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report=json.loads(Path('data/tennis_model_v2.json').read_text())
+          result=report['prequential_walkforward']
+          assert report['active_scope']=='ATP'
+          assert result['active_scope']=='ATP'
+          assert result['raw_base_model']['n']==report['training_records']
+          assert result['prequential_model']['n']==report['training_records']
+          assert report['status']=='PAPER_RESEARCH_ONLY'
+          print(json.dumps({
+            'active_scope':report['active_scope'],
+            'training_records':report['training_records'],
+            'prequential_model':result['prequential_model'],
+            'raw_base_model':result['raw_base_model'],
+            'brier_improved':result['brier_improved'],
+            'candidate_weight':report['weight_selection']['current_candidate_weight'],
+            'effective_weight':report['weight_selection']['effective_weight'],
+            'effective_weight_reason':report['weight_selection']['effective_weight_reason'],
+            'precision_gate':report['precision_gate']
+          },indent=2))
+          PY
 
   improve-tennis-model:
     if: ${{ github.event_name != 'pull_request' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push' || github.event.workflow_run.conclusion == 'success') }}
