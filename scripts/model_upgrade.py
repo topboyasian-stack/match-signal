@@ -514,7 +514,7 @@ def main():
     pred_path.write_text(json.dumps(predictions, indent=2, ensure_ascii=False), encoding="utf-8")
     audit = build_validation_audit(validation_report, upgraded, validated_updates, validated_scope_counts, warnings)
     audit_path = DATA / "football_prequential_validation.json"
-    audit_path.write_text(json.dumps(audit, indent=2, ensure_ascii=False) + "\\n", encoding="utf-8")
+    audit_path.write_text(json.dumps(audit, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(json.dumps({
         "status": "ok",
         "audit_path": str(audit_path.relative_to(ROOT)),
