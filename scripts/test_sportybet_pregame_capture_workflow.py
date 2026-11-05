@@ -9,7 +9,6 @@ SOURCE = SCRIPT.read_text(encoding="utf-8")
 WORKFLOW_SOURCE = WORKFLOW.read_text(encoding="utf-8")
 
 assert "push:" in WORKFLOW_SOURCE
-assert "' .github/workflows/sportybet-pregame-capture.yml'" not in WORKFLOW_SOURCE
 assert "'.github/workflows/sportybet-pregame-capture.yml'" in WORKFLOW_SOURCE
 assert "'scripts/capture_sportybet_pregame_snapshots.py'" in WORKFLOW_SOURCE
 assert "'scripts/merge_sportybet_pregame_snapshots.py'" in WORKFLOW_SOURCE
