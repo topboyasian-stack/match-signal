@@ -490,6 +490,21 @@ def attach_sportybet_market_layer(predictions):
         "unmatched": 0,
         "match_errors": [],
         "fetch_errors": [],
+        "per_sport": {
+            sport: {
+                "predictions_seen": 0,
+                "events_fetched": 0,
+                "matched_events": 0,
+                "unmatched_events": 0,
+                "winner_market_available": 0,
+                "total_market_available": 0,
+                "unmatched_reason_counts": {},
+                "market_id_counts": {},
+                "match_examples": [],
+                "unmatched_examples": [],
+            }
+            for sport in ("football", "tennis")
+        },
     }
     batches = {}
     for sport, sport_id in (("football", "sr:sport:1"), ("tennis", "sr:sport:5")):
@@ -497,8 +512,10 @@ def attach_sportybet_market_layer(predictions):
             events = fetch_sportybet_events(sport_id, SPORTYBET_MARKETS[sport])
             batches[sport] = events
             stats[f"{sport}_events"] = len(events)
+            stats["per_sport"][sport]["events_fetched"] = len(events)
         except Exception as exc:
             batches[sport] = []
+            stats["per_sport"][sport]["fetch_error"] = str(exc)[:240]
             stats["fetch_errors"].append(f"{sport}: {exc}")
 
     fetched_at = stats["fetched_at"]
@@ -512,6 +529,10 @@ def attach_sportybet_market_layer(predictions):
         ):
             prediction.pop(stale_key, None)
         sport = prediction.get("sport")
+        if sport not in stats["per_sport"]:
+            continue
+        sport_diag = stats["per_sport"][sport]
+        sport_diag["predictions_seen"] += 1
         events = batches.get(sport) or []
         if not events:
             prediction["sportybet_market"] = {
@@ -522,10 +543,65 @@ def attach_sportybet_market_layer(predictions):
             }
             prediction["market_insights"] = {"provider": "SportyBet NG", "available": False}
             stats["unmatched"] += 1
+            sport_diag["unmatched_events"] += 1
+            reason = "market_feed_empty"
+            reasons = sport_diag["unmatched_reason_counts"]
+            reasons[reason] = reasons.get(reason, 0) + 1
+            if len(sport_diag["unmatched_examples"]) < 5:
+                sport_diag["unmatched_examples"].append({
+                    "event_id": prediction.get("event_id"),
+                    "league": prediction.get("league"),
+                    "player_1": prediction.get("player_1"),
+                    "player_2": prediction.get("player_2"),
+                    "start_time": prediction.get("start_time"),
+                    "reason": reason,
+                })
             continue
         try:
             event, match = _find_sportybet_match(prediction, events)
             if not event:
+                stats["unmatched"] += 1
+                sport_diag["unmatched_events"] += 1
+                reason = "no_sufficient_fixture_match"
+                reasons = sport_diag["unmatched_reason_counts"]
+                reasons[reason] = reasons.get(reason, 0) + 1
+                if len(sport_diag["unmatched_examples"]) < 5:
+                    nearest = []
+                    for candidate_event in events:
+                        score, direct_score, reverse_score = _pair_match_score(prediction, candidate_event)
+                        start_ms = candidate_event.get("start_time_ms")
+                        try:
+                            predicted_start = _parse_dt(prediction.get("start_time"))
+                            market_start = datetime.fromtimestamp(float(start_ms) / 1000, tz=timezone.utc) if start_ms else None
+                            delta_minutes = abs((market_start - predicted_start).total_seconds()) / 60 if market_start and predicted_start else None
+                        except (TypeError, ValueError, OverflowError):
+                            delta_minutes = None
+                        competition_ok = (
+                            _football_market_fixture_valid(prediction, candidate_event)
+                            if sport == "football" else True
+                        )
+                        nearest.append({
+                            "event_id": candidate_event.get("event_id"),
+                            "home": candidate_event.get("home"),
+                            "away": candidate_event.get("away"),
+                            "tournament": candidate_event.get("tournament"),
+                            "start_time_ms": start_ms,
+                            "kickoff_delta_minutes": round(delta_minutes, 1) if delta_minutes is not None else None,
+                            "name_direct": round(direct_score, 4),
+                            "name_reverse": round(reverse_score, 4),
+                            "combined_score": round(score, 4),
+                            "competition_identity_ok": competition_ok,
+                        })
+                    nearest.sort(key=lambda row: row["combined_score"], reverse=True)
+                    sport_diag["unmatched_examples"].append({
+                        "event_id": prediction.get("event_id"),
+                        "league": prediction.get("league"),
+                        "player_1": prediction.get("player_1"),
+                        "player_2": prediction.get("player_2"),
+                        "start_time": prediction.get("start_time"),
+                        "reason": reason,
+                        "nearest_markets": nearest[:3],
+                    })
                 prediction["sportybet_market"] = {
                     "available": False,
                     "provider": "SportyBet NG",
@@ -533,9 +609,38 @@ def attach_sportybet_market_layer(predictions):
                     "fetched_at": fetched_at,
                 }
                 prediction["market_insights"] = {"provider": "SportyBet NG", "available": False}
-                stats["unmatched"] += 1
                 continue
+            sport_diag["matched_events"] += 1
             snapshot = _sportybet_market_snapshot(event, sport)
+            market_ids = sorted({str(market.get("id") or "") for market in snapshot.get("markets") or [] if market.get("id")})
+            for market_id in market_ids:
+                market_counts = sport_diag["market_id_counts"]
+                market_counts[market_id] = market_counts.get(market_id, 0) + 1
+            has_winner = bool(snapshot.get("winner"))
+            total_count = len(snapshot.get("totals") or [])
+            sport_diag["winner_market_available"] += int(has_winner)
+            sport_diag["total_market_available"] += int(total_count > 0)
+            if len(sport_diag["match_examples"]) < 8:
+                sport_diag["match_examples"].append({
+                    "prediction_event_id": prediction.get("event_id"),
+                    "sportybet_event_id": event.get("event_id"),
+                    "league": prediction.get("league"),
+                    "sportybet_tournament": event.get("tournament"),
+                    "match": f"{event.get('home')} vs {event.get('away')}",
+                    "kickoff_delta_minutes": (
+                        round(abs((_parse_dt(prediction.get("start_time")) - datetime.fromtimestamp(event.get("start_time_ms") / 1000, tz=timezone.utc)).total_seconds()) / 60, 1)
+                        if prediction.get("start_time") and event.get("start_time_ms") else None
+                    ),
+                    "match_score": match.get("score"),
+                    "match_method": match.get("method"),
+                    "market_ids": market_ids,
+                    "winner_market_available": has_winner,
+                    "total_market_count": total_count,
+                })
+            if not has_winner and total_count == 0:
+                reason = "matched_event_without_supported_winner_or_total_market"
+                reasons = sport_diag["unmatched_reason_counts"]
+                reasons[reason] = reasons.get(reason, 0) + 1
             snapshot["available"] = True
             snapshot["match"] = match
             # The Builder's 15-minute freshness gate reads odds_timestamp /
@@ -687,7 +792,28 @@ def attach_sportybet_market_layer(predictions):
             prediction["market_insights"] = {"provider": "SportyBet NG", "available": False, "error": str(exc)}
             stats["match_errors"].append(f"{prediction.get('sport')}:{prediction.get('event_id')}: {exc}")
             stats["unmatched"] += 1
+            sport_diag["unmatched_events"] += 1
+            reason = "market_enrichment_exception"
+            reasons = sport_diag["unmatched_reason_counts"]
+            reasons[reason] = reasons.get(reason, 0) + 1
+            if len(sport_diag["unmatched_examples"]) < 5:
+                sport_diag["unmatched_examples"].append({
+                    "event_id": prediction.get("event_id"),
+                    "league": prediction.get("league"),
+                    "player_1": prediction.get("player_1"),
+                    "player_2": prediction.get("player_2"),
+                    "start_time": prediction.get("start_time"),
+                    "reason": reason,
+                    "detail": str(exc)[:180],
+                })
     stats["coverage"] = round(stats["matched"] / max(1, len(predictions)), 4)
+    for sport_diag in stats["per_sport"].values():
+        sport_diag["match_rate"] = round(
+            sport_diag["matched_events"] / max(1, sport_diag["predictions_seen"]), 4
+        )
+        sport_diag["winner_price_coverage"] = round(
+            sport_diag["winner_market_available"] / max(1, sport_diag["matched_events"]), 4
+        )
     return stats
 
 
