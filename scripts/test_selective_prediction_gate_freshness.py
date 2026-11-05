@@ -10,12 +10,14 @@ current_market_evidence = GATE["current_market_evidence"]
 NOW = datetime(2026, 11, 5, 12, 0, tzinfo=timezone.utc)
 
 
-def row(*, quote_age_minutes=10, kickoff_minutes=60, edge=0.08, ev=0.12):
+def row(*, quote_age_minutes=10, kickoff_minutes=60, model_age_minutes=30, edge=0.08, ev=0.12):
     quote_at = NOW - timedelta(minutes=quote_age_minutes)
     kickoff = NOW + timedelta(minutes=kickoff_minutes)
+    calculated_at = NOW - timedelta(minutes=model_age_minutes)
     return {
         "sport": "tennis",
         "start_time": kickoff.isoformat(),
+        "calculated_at": calculated_at.isoformat(),
         "odds_timestamp": quote_at.isoformat(),
         "market_insights": {
             "snapshot_at": quote_at.isoformat(),
@@ -60,4 +62,22 @@ legacy["sportybet_market_snapshot"] = {"fetched_at": legacy["odds_timestamp"]}
 ok, source, reason = explicit_value_signal(legacy, now=NOW)
 assert ok is True and source == "frozen_market_edge_ev"
 
-print("Selective gate freshness and kickoff-horizon regressions passed.")
+stale_model = row(model_age_minutes=13 * 60)
+ok, source, reason = explicit_value_signal(stale_model, now=NOW)
+assert ok is False and source is None
+assert reason == "model_prediction_older_than_12h"
+
+missing_model_time = row()
+missing_model_time.pop("calculated_at")
+ok, source, reason = explicit_value_signal(missing_model_time, now=NOW)
+assert ok is False and source is None
+assert reason == "missing_or_invalid_model_prediction_time"
+
+after_kickoff_model = row()
+after_kickoff_model["calculated_at"] = (NOW + timedelta(hours=2)).isoformat()
+ok, source, reason = explicit_value_signal(after_kickoff_model, now=NOW)
+assert ok is False and source is None
+assert reason == "model_prediction_after_kickoff"
+
+
+print("Selective gate quote, model-age and kickoff-horizon regressions passed.")
