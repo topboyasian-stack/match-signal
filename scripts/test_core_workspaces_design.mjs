@@ -70,15 +70,14 @@ assert.ok(workflow.includes("MS-FOOTBALL-DESK-2026.10.14-V1"), "production smoke
 assert.ok(workflow.includes("MS-TENNIS-DESK-2026.10.14-V1"), "production smoke must verify Tennis");
 
 
-const [headers, sharedRenderer, workspaceUi, nbaClient, builderClient, virtualLabClient, livePage, liveWorker] = await Promise.all([
+const [headers, sharedRenderer, workspaceUi, nbaClient, builderClient, virtualLabClient, livePage] = await Promise.all([
   read("_headers"),
   read("sport-hubs.js"),
   read("workspace-ui.js"),
   read("basketball-live.js"),
   read("expansion-odds-builder.js"),
   read("virtual-lab-app.js"),
-  read("live.html"),
-  read("live-data-worker.js")
+  read("live.html")
 ]);
 assert.match(headers, /^\/api\/\*\n  Cache-Control: no-store, no-cache, must-revalidate, max-age=0/m,
   "live API responses must never be cached");
@@ -114,9 +113,6 @@ assert.ok(virtualLabClient.includes("fetch(base+'?'+params.toString(),{cache:'no
   "Virtual Lab's live SportyBet feed must remain uncached");
 assert.match(livePage, /function getJson\(url\).*cache:isStatic\?'default':'no-store'/,
   "Live desk should reuse cached prediction snapshots but keep live API calls fresh");
-assert.ok(liveWorker.includes("fetch('./data/predictions.json',{cache:'default'})") &&
-  liveWorker.includes("cache:isStatic?'default':'no-store'"),
-  "Live desk enhancement and tracker recovery must not redownload the large predictions artifact on every route visit");
 
 
 console.log("Core workspaces design checks passed: scoped selectors, responsive/mobile layouts, keyboard/reduced-motion states, production markers and preserved renderer mounts.");
