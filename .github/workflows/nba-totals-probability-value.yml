@@ -8,10 +8,9 @@ on:
       - "NBA totals settlement ledger"
     types: [completed]
   schedule:
-    # SportyBet capture runs every 10 minutes (:00/:10/:20/:30/:40/:50);
-    # settlement runs at :10/:25/:40/:55; report refresh follows at :12/:27/:42/:57.
-    # Capture/settlement completion events also refresh immediately when newer evidence publishes.
-    - cron: '13,28,43,58 * * * *'
+    # Stagger report recovery after backup settlement slots; successful capture or
+    # settlement completion also refreshes immediately when newer evidence publishes.
+    - cron: '8,23,38,53 * * * *'
   push:
     branches: [main]
     paths:

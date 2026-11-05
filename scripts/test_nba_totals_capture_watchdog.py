@@ -18,17 +18,24 @@ def run():
     root = Path(__file__).resolve().parents[1]
     capture_workflow = (root / ".github/workflows/nba-totals-price-capture.yml").read_text(encoding="utf-8")
     watchdog_workflow = (root / ".github/workflows/nba-totals-capture-watchdog.yml").read_text(encoding="utf-8")
-    assert (
-        "cron: '*/10 * * * *'" in capture_workflow
-        or "cron: '0,10,20,30,40,50 * * * *'" in capture_workflow
-        or "cron: '1,11,21,31,41,51 * * * *'" in capture_workflow
-    ), (
-        "NBA SportyBet market-225 capture must run every 10 minutes to protect the 15-minute quote freshness gate."
+    settlement_workflow = (root / ".github/workflows/nba-totals-settlement.yml").read_text(encoding="utf-8")
+    probability_workflow = (root / ".github/workflows/nba-totals-probability-value.yml").read_text(encoding="utf-8")
+    live_expansion_workflow = (root / ".github/workflows/live-expansion.yml").read_text(encoding="utf-8")
+    assert "cron: '2,12,22,32,42,52 * * * *'" in capture_workflow, (
+        "NBA SportyBet market-225 capture must run every 10 minutes after the schedule re-arm."
     )
-    assert (
-        "cron: '5,15,25,35,45,55 * * * *'" in watchdog_workflow
-        or "cron: '6,16,26,36,46,56 * * * *'" in watchdog_workflow
-    ), "The freshness watchdog must run halfway between the 10-minute capture slots."
+    assert "cron: '5,20,35,50 * * * *'" in settlement_workflow, (
+        "Official ESPN settlement backup must remain scheduled and staggered between capture slots."
+    )
+    assert "cron: '8,23,38,53 * * * *'" in probability_workflow, (
+        "Probability/value evidence must refresh on its staggered backup schedule."
+    )
+    assert "cron: '7,17,27,37,47,57 * * * *'" in watchdog_workflow, (
+        "The freshness watchdog must run halfway between the 10-minute capture slots."
+    )
+    assert "cron: '9,39 * * * *'" in live_expansion_workflow, (
+        "The NBA forecast refresh schedule must be re-armed without changing model thresholds."
+    )
     assert 'gh workflow enable "$workflow" --repo "$GITHUB_REPOSITORY"' in watchdog_workflow, (
         "NBA recovery watchdog must call the GitHub workflow-enable command after delivery gaps."
     )
@@ -59,12 +66,9 @@ def run():
     scheduled_lane = "${{ github.event_name == 'schedule' && 'scheduled' || 'event-driven' }}"
     for workflow_text, group_prefix, name in (
         (capture_workflow, "nba-totals-price-capture-", "price capture"),
-        ((root / ".github/workflows/nba-totals-settlement.yml").read_text(encoding="utf-8"),
-         "nba-totals-settlement-ledger-", "settlement"),
-        ((root / ".github/workflows/nba-totals-probability-value.yml").read_text(encoding="utf-8"),
-         "nba-totals-probability-value-research-", "probability report"),
-        ((root / ".github/workflows/live-expansion.yml").read_text(encoding="utf-8"),
-         "match-signal-pipeline-", "model refresh"),
+        (settlement_workflow, "nba-totals-settlement-ledger-", "settlement"),
+        (probability_workflow, "nba-totals-probability-value-research-", "probability report"),
+        (live_expansion_workflow, "match-signal-pipeline-", "model refresh"),
     ):
         expected_group = f"group: {group_prefix}{scheduled_lane}"
         assert expected_group in workflow_text, (

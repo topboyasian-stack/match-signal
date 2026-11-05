@@ -1,8 +1,9 @@
 name: NBA totals settlement ledger
 on:
   schedule:
-    # Settle shortly after each quarter-hour price capture, before the research report refresh.
-    - cron: '11,26,41,56 * * * *'
+    # Stagger backup reconciliation between price captures; successful capture completion
+    # also triggers settlement immediately.
+    - cron: '5,20,35,50 * * * *'
   workflow_dispatch:
   workflow_run:
     # Backup reconciliation after successful exact-market price capture. Cron remains the normal cadence.

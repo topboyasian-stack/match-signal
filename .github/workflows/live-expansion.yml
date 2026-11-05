@@ -4,10 +4,10 @@ name: Match Signal Live Expansion
 
 on:
   schedule:
-    # Offset from the hour to reduce GitHub Actions schedule-load delays.
+    # Re-arm scheduled delivery after the observed multi-hour gap.
     # Changing this cron also re-enables a previously disabled scheduled workflow.
-    # Offset from the hour to reduce GitHub Actions schedule-load delays.
-    - cron: '8,38 * * * *'
+    # Keep the 30-minute heartbeat while offsetting the previous schedule.
+    - cron: '9,39 * * * *'
   workflow_dispatch:
   push:
     branches: [main]

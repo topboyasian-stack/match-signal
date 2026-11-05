@@ -2,9 +2,9 @@ name: NBA totals capture freshness watchdog
 
 on:
   schedule:
-    # Run halfway between 10-minute capture slots; recover only when the last
-    # exact SportyBet market-225 capture is stale and no capture is active.
-    - cron: '6,16,26,36,46,56 * * * *'
+    # Run five minutes after capture slots; recover only when the last exact
+    # SportyBet market-225 capture is stale and no capture is active.
+    - cron: '7,17,27,37,47,57 * * * *'
   workflow_dispatch:
   workflow_run:
     workflows:
