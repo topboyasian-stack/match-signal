@@ -69,4 +69,50 @@ assert.ok(workflow.includes("MS-DESK-2026.10.14-V1"), "production smoke must ver
 assert.ok(workflow.includes("MS-FOOTBALL-DESK-2026.10.14-V1"), "production smoke must verify Football");
 assert.ok(workflow.includes("MS-TENNIS-DESK-2026.10.14-V1"), "production smoke must verify Tennis");
 
+
+const [headers, sharedRenderer, workspaceUi, builderClient, virtualLabClient, livePage] = await Promise.all([
+  read("_headers"),
+  read("sport-hubs.js"),
+  read("workspace-ui.js"),
+  read("expansion-odds-builder.js"),
+  read("virtual-lab-app.js"),
+  read("live.html")
+]);
+assert.match(headers, /^\/api\/\*\n  Cache-Control: no-store, no-cache, must-revalidate, max-age=0/m,
+  "live API responses must never be cached");
+assert.match(headers, /^\/\*\.js\n  Cache-Control: public, max-age=30, must-revalidate/m,
+  "static JavaScript should be reused during workspace navigation");
+assert.match(headers, /^\/\*\.css\n  Cache-Control: public, max-age=30, must-revalidate/m,
+  "static stylesheets should be reused during workspace navigation");
+assert.match(headers, /^\/data\/\*\n  Cache-Control: public, max-age=30, stale-while-revalidate=60/m,
+  "published data should have only a short bounded browser/edge cache");
+assert.match(headers, /^\/assets\/\*\n  Cache-Control: public, max-age=31536000, immutable/m,
+  "licensed static logo artwork should be cached immutably");
+assert.match(headers, /^\/index\.html\n  Cache-Control: no-store, no-cache, must-revalidate, max-age=0/m,
+  "HTML routes must remain immediately revalidated after a deployment");
+assert.match(sharedRenderer, /async function get\(path\)\{const url=String\(path\),live=.*cache:live\?'no-store':'default'/,
+  "shared renderer must cache static artifacts but revalidate API routes");
+assert.doesNotMatch(sharedRenderer, /async function get\(path\)\{[^}]*Date\.now\(\)[^}]*cache:'no-store'/,
+  "shared renderer must not uniquely cache-bust all static data");
+assert.match(workspaceUi, /club-logo-registry\.json'\),\{cache:'default'\}/,
+  "shared navigation should reuse the club-logo registry across pages");
+assert.match(workspaceUi, /async function json\(path\).*cache:live\?'no-store':'default'/,
+  "workspace report artifacts should be cacheable without caching API calls");
+assert.ok(builderClient.includes("fetch('./api/odds-builder-data?v=20261020-live-source2-'+Date.now(),{cache:'no-store'})"),
+  "Odds Builder live data endpoint must remain live and uncached");
+assert.ok(builderClient.includes("fetch('./data/odds_builder.json',{cache:'default'})") &&
+  builderClient.includes("fetch('./data/odds_ticket_tracker.json',{cache:'default'})"),
+  "Odds Builder static fallback/ledger artifacts should use the short shared data cache");
+assert.ok(virtualLabClient.includes("fetch(DESK_LEARNING,{cache:'default'") &&
+  virtualLabClient.includes("fetch(SNAPSHOT,{cache:'default'"),
+  "Virtual Lab published artifacts should use the short shared data cache");
+assert.ok(virtualLabClient.includes("fetch(base+'?'+params.toString(),{cache:'no-store'"),
+  "Virtual Lab's live SportyBet feed must remain uncached");
+assert.match(virtualLabClient, /await Promise\.all\(\[\s*loadDeskLearning\(\),\s*loadModelEvaluation\(\),\s*loadConfirmedWatch\(\),\s*loadParticipantProfiles\(\),\s*loadParticipantH2H\(\),\s*loadExternalH2H\(\)\s*\]\)/,
+  "Virtual Lab should load independent evidence artifacts concurrently instead of serially delaying first render");
+
+assert.match(livePage, /function getJson\(url\).*cache:isStatic\?'default':'no-store'/,
+  "Live desk should reuse cached prediction snapshots but keep live API calls fresh");
+
+
 console.log("Core workspaces design checks passed: scoped selectors, responsive/mobile layouts, keyboard/reduced-motion states, production markers and preserved renderer mounts.");

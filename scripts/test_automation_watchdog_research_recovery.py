@@ -126,7 +126,7 @@ class EfootballResearchRecoveryTests(unittest.TestCase):
         self.assertIn("'nba_totals_ledger_recovery_status': nba_totals_ledger_recovery_status", WATCHDOG)
 
     def test_nba_settlement_heartbeat_and_ledger_publication_are_recoverable(self):
-        self.assertIn("cron: '11,26,41,56 * * * *'", NBA_SETTLEMENT)
+        self.assertIn("cron: '5,20,35,50 * * * *'", NBA_SETTLEMENT)
         self.assertIn("for attempt in 1 2 3 4 5; do", NBA_SETTLEMENT)
         self.assertIn("git reset --hard origin/main", NBA_SETTLEMENT)
         self.assertIn("A newer/equal ledger is already published; preserving it.", NBA_SETTLEMENT)

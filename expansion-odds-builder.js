@@ -1096,11 +1096,11 @@
       fetch('./api/odds-builder-data?v=20261020-live-source2-'+Date.now(),{cache:'no-store'})
         .then(function(r){if(!r.ok)throw new Error('live odds_builder API HTTP '+r.status);return r.json();})
         .catch(function(liveError){
-          return fetch('./data/odds_builder.json?v=20261020-desk-guard-'+Date.now(),{cache:'no-store'})
+          return fetch('./data/odds_builder.json',{cache:'default'})
             .then(function(r){if(!r.ok)throw liveError;return r.json();})
             .catch(function(){throw liveError;});
         }),
-      fetch('./data/odds_ticket_tracker.json?v=20261020-desk-guard-'+Date.now(),{cache:'no-store'}).then(function(r){
+      fetch('./data/odds_ticket_tracker.json',{cache:'default'}).then(function(r){
         if(!r.ok)return {tickets:[],summary:{},ledger_error:'HTTP '+r.status+' while reading the paper settlement ledger.'};
         return r.text().then(function(text){
           try{return text?JSON.parse(text):{tickets:[],summary:{},ledger_error:'The paper settlement ledger returned an empty response.'};}
