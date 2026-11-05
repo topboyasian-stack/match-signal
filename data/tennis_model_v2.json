@@ -1,82 +1,1398 @@
 {
-  "updated_at": "2026-11-05T01:22:42.168759+00:00",
-  "model_version": "2026-09-17-walkforward-calibrated",
+  "updated_at": "2026-11-05T01:25:52.004494+00:00",
+  "model_version": "2026-11-05-atp-prequential-walkforward",
   "status": "PAPER_RESEARCH_ONLY",
-  "training_records": 341,
+  "active_scope": "ATP",
+  "training_records": 184,
+  "archived_valid_records_all_tours": 341,
+  "inactive_tours_retained_as_research": [
+    "WTA"
+  ],
   "elo_weight": 0.75,
   "weight_selection": {
     "selection_window": 80,
-    "baseline": {
-      "accuracy": 0.425,
-      "brier": 0.2851,
-      "n": 80
-    },
     "candidates": [
       {
+        "elo_weight": 0.0,
+        "n": 80,
+        "accuracy": 0.425,
+        "brier": 0.28506
+      },
+      {
         "elo_weight": 0.25,
+        "n": 80,
         "accuracy": 0.45,
-        "brier": 0.2725,
-        "n": 80
+        "brier": 0.27252
       },
       {
         "elo_weight": 0.5,
+        "n": 80,
         "accuracy": 0.4875,
-        "brier": 0.2619,
-        "n": 80
+        "brier": 0.26189
       },
       {
         "elo_weight": 0.75,
+        "n": 80,
         "accuracy": 0.5,
-        "brier": 0.2532,
-        "n": 80
+        "brier": 0.25317
       }
     ],
     "selected": {
       "elo_weight": 0.75,
+      "n": 80,
       "accuracy": 0.5,
-      "brier": 0.2532,
-      "n": 80
-    }
+      "brier": 0.25317
+    },
+    "objective": "minimum chronological-window Brier; accuracy tie-breaker",
+    "current_candidate_weight": 0.75,
+    "effective_weight": 0.75,
+    "effective_weight_reason": "prequential_brier_beats_raw_base",
+    "oos_minimum_required": 20
   },
-  "players_in_elo": 349,
+  "prequential_walkforward": {
+    "active_scope": "ATP",
+    "prequential_model": {
+      "n": 184,
+      "accuracy": 0.5109,
+      "brier": 0.25479
+    },
+    "raw_base_model": {
+      "n": 184,
+      "accuracy": 0.4402,
+      "brier": 0.28561
+    },
+    "brier_improved": true,
+    "evaluation": "each fixture is forecast using only earlier ATP results; ELO weight is reselected from prior results only"
+  },
+  "prequential_weight_history": [
+    {
+      "event_id": "182553",
+      "start_time": "2026-09-10T23:00Z",
+      "prior_records": 0,
+      "elo_weight": 0.0,
+      "selection_reason": "minimum_prior_history_not_met"
+    },
+    {
+      "event_id": "182551",
+      "start_time": "2026-09-11T00:30Z",
+      "prior_records": 1,
+      "elo_weight": 0.0,
+      "selection_reason": "minimum_prior_history_not_met"
+    },
+    {
+      "event_id": "186136",
+      "start_time": "2026-09-22T07:00Z",
+      "prior_records": 2,
+      "elo_weight": 0.0,
+      "selection_reason": "minimum_prior_history_not_met"
+    },
+    {
+      "event_id": "183356",
+      "start_time": "2026-09-24T06:30Z",
+      "prior_records": 3,
+      "elo_weight": 0.0,
+      "selection_reason": "minimum_prior_history_not_met"
+    },
+    {
+      "event_id": "183351",
+      "start_time": "2026-09-24T06:30Z",
+      "prior_records": 4,
+      "elo_weight": 0.0,
+      "selection_reason": "minimum_prior_history_not_met"
+    },
+    {
+      "event_id": "183360",
+      "start_time": "2026-09-24T07:00Z",
+      "prior_records": 5,
+      "elo_weight": 0.0,
+      "selection_reason": "minimum_prior_history_not_met"
+    },
+    {
+      "event_id": "183407",
+      "start_time": "2026-09-24T07:00Z",
+      "prior_records": 6,
+      "elo_weight": 0.0,
+      "selection_reason": "minimum_prior_history_not_met"
+    },
+    {
+      "event_id": "183405",
+      "start_time": "2026-09-24T07:30Z",
+      "prior_records": 7,
+      "elo_weight": 0.0,
+      "selection_reason": "minimum_prior_history_not_met"
+    },
+    {
+      "event_id": "183397",
+      "start_time": "2026-09-24T07:30Z",
+      "prior_records": 8,
+      "elo_weight": 0.0,
+      "selection_reason": "minimum_prior_history_not_met"
+    },
+    {
+      "event_id": "183358",
+      "start_time": "2026-09-24T08:00Z",
+      "prior_records": 9,
+      "elo_weight": 0.0,
+      "selection_reason": "minimum_prior_history_not_met"
+    },
+    {
+      "event_id": "183404",
+      "start_time": "2026-09-24T09:00Z",
+      "prior_records": 10,
+      "elo_weight": 0.0,
+      "selection_reason": "minimum_prior_history_not_met"
+    },
+    {
+      "event_id": "183396",
+      "start_time": "2026-09-24T10:40Z",
+      "prior_records": 11,
+      "elo_weight": 0.0,
+      "selection_reason": "minimum_prior_history_not_met"
+    },
+    {
+      "event_id": "183411",
+      "start_time": "2026-09-25T05:00Z",
+      "prior_records": 12,
+      "elo_weight": 0.0,
+      "selection_reason": "minimum_prior_history_not_met"
+    },
+    {
+      "event_id": "183412",
+      "start_time": "2026-09-25T05:00Z",
+      "prior_records": 13,
+      "elo_weight": 0.0,
+      "selection_reason": "minimum_prior_history_not_met"
+    },
+    {
+      "event_id": "183366",
+      "start_time": "2026-09-25T05:30Z",
+      "prior_records": 14,
+      "elo_weight": 0.0,
+      "selection_reason": "minimum_prior_history_not_met"
+    },
+    {
+      "event_id": "183413",
+      "start_time": "2026-09-25T06:30Z",
+      "prior_records": 15,
+      "elo_weight": 0.0,
+      "selection_reason": "minimum_prior_history_not_met"
+    },
+    {
+      "event_id": "183355",
+      "start_time": "2026-09-25T07:00Z",
+      "prior_records": 16,
+      "elo_weight": 0.0,
+      "selection_reason": "minimum_prior_history_not_met"
+    },
+    {
+      "event_id": "183410",
+      "start_time": "2026-09-25T08:30Z",
+      "prior_records": 17,
+      "elo_weight": 0.0,
+      "selection_reason": "minimum_prior_history_not_met"
+    },
+    {
+      "event_id": "183368",
+      "start_time": "2026-09-25T10:30Z",
+      "prior_records": 18,
+      "elo_weight": 0.0,
+      "selection_reason": "minimum_prior_history_not_met"
+    },
+    {
+      "event_id": "183416",
+      "start_time": "2026-09-26T05:00Z",
+      "prior_records": 19,
+      "elo_weight": 0.0,
+      "selection_reason": "minimum_prior_history_not_met"
+    },
+    {
+      "event_id": "183359",
+      "start_time": "2026-09-26T05:30Z",
+      "prior_records": 20,
+      "elo_weight": 0.0,
+      "selection_reason": "minimum_prior_history_not_met"
+    },
+    {
+      "event_id": "183417",
+      "start_time": "2026-09-26T06:30Z",
+      "prior_records": 21,
+      "elo_weight": 0.0,
+      "selection_reason": "minimum_prior_history_not_met"
+    },
+    {
+      "event_id": "183409",
+      "start_time": "2026-09-26T06:30Z",
+      "prior_records": 22,
+      "elo_weight": 0.0,
+      "selection_reason": "minimum_prior_history_not_met"
+    },
+    {
+      "event_id": "183357",
+      "start_time": "2026-09-26T07:00Z",
+      "prior_records": 23,
+      "elo_weight": 0.0,
+      "selection_reason": "minimum_prior_history_not_met"
+    },
+    {
+      "event_id": "183347",
+      "start_time": "2026-09-26T08:30Z",
+      "prior_records": 24,
+      "elo_weight": 0.0,
+      "selection_reason": "minimum_prior_history_not_met"
+    },
+    {
+      "event_id": "183408",
+      "start_time": "2026-09-26T08:30Z",
+      "prior_records": 25,
+      "elo_weight": 0.0,
+      "selection_reason": "minimum_prior_history_not_met"
+    },
+    {
+      "event_id": "183361",
+      "start_time": "2026-09-26T11:30Z",
+      "prior_records": 26,
+      "elo_weight": 0.0,
+      "selection_reason": "minimum_prior_history_not_met"
+    },
+    {
+      "event_id": "183371",
+      "start_time": "2026-09-27T05:30Z",
+      "prior_records": 27,
+      "elo_weight": 0.0,
+      "selection_reason": "minimum_prior_history_not_met"
+    },
+    {
+      "event_id": "183419",
+      "start_time": "2026-09-27T06:30Z",
+      "prior_records": 28,
+      "elo_weight": 0.0,
+      "selection_reason": "minimum_prior_history_not_met"
+    },
+    {
+      "event_id": "183370",
+      "start_time": "2026-09-27T07:00Z",
+      "prior_records": 29,
+      "elo_weight": 0.0,
+      "selection_reason": "minimum_prior_history_not_met"
+    },
+    {
+      "event_id": "183414",
+      "start_time": "2026-09-27T08:00Z",
+      "prior_records": 30,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186248",
+      "start_time": "2026-09-28T02:00Z",
+      "prior_records": 31,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186226",
+      "start_time": "2026-09-28T03:00Z",
+      "prior_records": 32,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186216",
+      "start_time": "2026-09-28T03:00Z",
+      "prior_records": 33,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186222",
+      "start_time": "2026-09-28T03:00Z",
+      "prior_records": 34,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186254",
+      "start_time": "2026-09-28T03:00Z",
+      "prior_records": 35,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186257",
+      "start_time": "2026-09-28T03:00Z",
+      "prior_records": 36,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186243",
+      "start_time": "2026-09-28T03:30Z",
+      "prior_records": 37,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186245",
+      "start_time": "2026-09-28T03:30Z",
+      "prior_records": 38,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186242",
+      "start_time": "2026-09-28T03:30Z",
+      "prior_records": 39,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186253",
+      "start_time": "2026-09-28T04:30Z",
+      "prior_records": 40,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186237",
+      "start_time": "2026-09-28T04:30Z",
+      "prior_records": 41,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186225",
+      "start_time": "2026-09-28T04:30Z",
+      "prior_records": 42,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186255",
+      "start_time": "2026-09-28T04:30Z",
+      "prior_records": 43,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186247",
+      "start_time": "2026-09-28T05:30Z",
+      "prior_records": 44,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186250",
+      "start_time": "2026-09-28T06:00Z",
+      "prior_records": 45,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186246",
+      "start_time": "2026-09-28T06:30Z",
+      "prior_records": 46,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186251",
+      "start_time": "2026-09-28T07:30Z",
+      "prior_records": 47,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186252",
+      "start_time": "2026-09-28T07:30Z",
+      "prior_records": 48,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186229",
+      "start_time": "2026-09-28T07:30Z",
+      "prior_records": 49,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186236",
+      "start_time": "2026-09-28T07:30Z",
+      "prior_records": 50,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186256",
+      "start_time": "2026-09-28T08:00Z",
+      "prior_records": 51,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "183421",
+      "start_time": "2026-09-28T09:00Z",
+      "prior_records": 52,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "183374",
+      "start_time": "2026-09-28T09:30Z",
+      "prior_records": 53,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "183422",
+      "start_time": "2026-09-29T11:00Z",
+      "prior_records": 54,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "183376",
+      "start_time": "2026-09-29T11:30Z",
+      "prior_records": 55,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "183489",
+      "start_time": "2026-09-30T07:00Z",
+      "prior_records": 56,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "183495",
+      "start_time": "2026-09-30T08:30Z",
+      "prior_records": 57,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "183491",
+      "start_time": "2026-10-01T02:00Z",
+      "prior_records": 58,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "183485",
+      "start_time": "2026-10-01T02:00Z",
+      "prior_records": 59,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "183492",
+      "start_time": "2026-10-01T02:00Z",
+      "prior_records": 60,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "183486",
+      "start_time": "2026-10-01T02:00Z",
+      "prior_records": 61,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "183493",
+      "start_time": "2026-10-01T06:30Z",
+      "prior_records": 62,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "183497",
+      "start_time": "2026-10-01T07:00Z",
+      "prior_records": 63,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "183499",
+      "start_time": "2026-10-01T08:00Z",
+      "prior_records": 64,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "183498",
+      "start_time": "2026-10-01T08:30Z",
+      "prior_records": 65,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "183502",
+      "start_time": "2026-10-02T07:00Z",
+      "prior_records": 66,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "183507",
+      "start_time": "2026-10-03T07:00Z",
+      "prior_records": 67,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "183504",
+      "start_time": "2026-10-03T08:30Z",
+      "prior_records": 68,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "183510",
+      "start_time": "2026-10-04T02:00Z",
+      "prior_records": 69,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "183511",
+      "start_time": "2026-10-04T04:00Z",
+      "prior_records": 70,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "183508",
+      "start_time": "2026-10-04T07:00Z",
+      "prior_records": 71,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "183509",
+      "start_time": "2026-10-04T08:30Z",
+      "prior_records": 72,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186313",
+      "start_time": "2026-10-05T04:00Z",
+      "prior_records": 73,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186305",
+      "start_time": "2026-10-05T05:30Z",
+      "prior_records": 74,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "184327",
+      "start_time": "2026-10-05T05:45Z",
+      "prior_records": 75,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "184328",
+      "start_time": "2026-10-05T06:15Z",
+      "prior_records": 76,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "183512",
+      "start_time": "2026-10-05T07:00Z",
+      "prior_records": 77,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "183466",
+      "start_time": "2026-10-05T07:00Z",
+      "prior_records": 78,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186294",
+      "start_time": "2026-10-05T08:30Z",
+      "prior_records": 79,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "184331",
+      "start_time": "2026-10-05T08:30Z",
+      "prior_records": 80,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "183513",
+      "start_time": "2026-10-05T09:00Z",
+      "prior_records": 81,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "183467",
+      "start_time": "2026-10-05T11:00Z",
+      "prior_records": 82,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186320",
+      "start_time": "2026-10-06T04:00Z",
+      "prior_records": 83,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186316",
+      "start_time": "2026-10-06T04:00Z",
+      "prior_records": 84,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186325",
+      "start_time": "2026-10-06T05:30Z",
+      "prior_records": 85,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186321",
+      "start_time": "2026-10-06T05:30Z",
+      "prior_records": 86,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186317",
+      "start_time": "2026-10-06T05:30Z",
+      "prior_records": 87,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186326",
+      "start_time": "2026-10-06T07:30Z",
+      "prior_records": 88,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186318",
+      "start_time": "2026-10-06T07:30Z",
+      "prior_records": 89,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "183514",
+      "start_time": "2026-10-06T09:00Z",
+      "prior_records": 90,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "184850",
+      "start_time": "2026-10-07T04:00Z",
+      "prior_records": 91,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "184840",
+      "start_time": "2026-10-07T04:00Z",
+      "prior_records": 92,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "184849",
+      "start_time": "2026-10-07T04:00Z",
+      "prior_records": 93,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "184867",
+      "start_time": "2026-10-07T04:00Z",
+      "prior_records": 94,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "184885",
+      "start_time": "2026-10-07T04:00Z",
+      "prior_records": 95,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "184869",
+      "start_time": "2026-10-07T04:00Z",
+      "prior_records": 96,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "184877",
+      "start_time": "2026-10-07T04:00Z",
+      "prior_records": 97,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "184868",
+      "start_time": "2026-10-07T04:00Z",
+      "prior_records": 98,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "184882",
+      "start_time": "2026-10-07T04:00Z",
+      "prior_records": 99,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "184863",
+      "start_time": "2026-10-07T04:00Z",
+      "prior_records": 100,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "184841",
+      "start_time": "2026-10-07T04:00Z",
+      "prior_records": 101,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "184857",
+      "start_time": "2026-10-07T04:00Z",
+      "prior_records": 102,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "184889",
+      "start_time": "2026-10-07T04:00Z",
+      "prior_records": 103,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "184858",
+      "start_time": "2026-10-07T04:00Z",
+      "prior_records": 104,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "184892",
+      "start_time": "2026-10-07T04:00Z",
+      "prior_records": 105,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "184878",
+      "start_time": "2026-10-07T04:00Z",
+      "prior_records": 106,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "184346",
+      "start_time": "2026-10-07T06:15Z",
+      "prior_records": 107,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "184938",
+      "start_time": "2026-10-12T06:00Z",
+      "prior_records": 108,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "184939",
+      "start_time": "2026-10-12T06:30Z",
+      "prior_records": 109,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "184934",
+      "start_time": "2026-10-12T07:00Z",
+      "prior_records": 110,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "184937",
+      "start_time": "2026-10-12T08:30Z",
+      "prior_records": 111,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "184941",
+      "start_time": "2026-10-12T10:00Z",
+      "prior_records": 112,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "184940",
+      "start_time": "2026-10-12T11:30Z",
+      "prior_records": 113,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "184950",
+      "start_time": "2026-10-13T04:00Z",
+      "prior_records": 114,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "184952",
+      "start_time": "2026-10-13T11:50Z",
+      "prior_records": 115,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "184949",
+      "start_time": "2026-10-14T10:00Z",
+      "prior_records": 116,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "184957",
+      "start_time": "2026-10-16T10:00Z",
+      "prior_records": 117,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186975",
+      "start_time": "2026-10-18T06:00Z",
+      "prior_records": 118,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186977",
+      "start_time": "2026-10-18T07:30Z",
+      "prior_records": 119,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186974",
+      "start_time": "2026-10-18T10:00Z",
+      "prior_records": 120,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186987",
+      "start_time": "2026-10-18T13:00Z",
+      "prior_records": 121,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186989",
+      "start_time": "2026-10-18T14:00Z",
+      "prior_records": 122,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "185005",
+      "start_time": "2026-10-19T09:30Z",
+      "prior_records": 123,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "185037",
+      "start_time": "2026-10-19T10:00Z",
+      "prior_records": 124,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186998",
+      "start_time": "2026-10-19T10:00Z",
+      "prior_records": 125,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "187001",
+      "start_time": "2026-10-19T10:30Z",
+      "prior_records": 126,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "187000",
+      "start_time": "2026-10-19T11:30Z",
+      "prior_records": 127,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "185042",
+      "start_time": "2026-10-19T13:30Z",
+      "prior_records": 128,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "185057",
+      "start_time": "2026-10-20T04:00Z",
+      "prior_records": 129,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "185013",
+      "start_time": "2026-10-20T10:30Z",
+      "prior_records": 130,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "185055",
+      "start_time": "2026-10-20T11:00Z",
+      "prior_records": 131,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "185100",
+      "start_time": "2026-10-20T14:45Z",
+      "prior_records": 132,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "185059",
+      "start_time": "2026-10-20T16:00Z",
+      "prior_records": 133,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "185006",
+      "start_time": "2026-10-21T09:00Z",
+      "prior_records": 134,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "184993",
+      "start_time": "2026-10-21T09:30Z",
+      "prior_records": 135,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "185050",
+      "start_time": "2026-10-21T09:30Z",
+      "prior_records": 136,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "185053",
+      "start_time": "2026-10-21T11:00Z",
+      "prior_records": 137,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "184995",
+      "start_time": "2026-10-21T14:30Z",
+      "prior_records": 138,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "185046",
+      "start_time": "2026-10-22T15:00Z",
+      "prior_records": 139,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "185017",
+      "start_time": "2026-10-23T06:30Z",
+      "prior_records": 140,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "185018",
+      "start_time": "2026-10-23T08:00Z",
+      "prior_records": 141,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "185020",
+      "start_time": "2026-10-24T10:00Z",
+      "prior_records": 142,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "187218",
+      "start_time": "2026-10-24T10:30Z",
+      "prior_records": 143,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "185019",
+      "start_time": "2026-10-24T13:00Z",
+      "prior_records": 144,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "187217",
+      "start_time": "2026-10-24T13:30Z",
+      "prior_records": 145,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "185066",
+      "start_time": "2026-10-24T14:00Z",
+      "prior_records": 146,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "185021",
+      "start_time": "2026-10-25T10:00Z",
+      "prior_records": 147,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "187223",
+      "start_time": "2026-10-25T11:00Z",
+      "prior_records": 148,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "187221",
+      "start_time": "2026-10-25T12:00Z",
+      "prior_records": 149,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "187222",
+      "start_time": "2026-10-25T12:30Z",
+      "prior_records": 150,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "185113",
+      "start_time": "2026-10-25T13:30Z",
+      "prior_records": 151,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "185182",
+      "start_time": "2026-10-26T12:30Z",
+      "prior_records": 152,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "185131",
+      "start_time": "2026-10-26T12:30Z",
+      "prior_records": 153,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "185176",
+      "start_time": "2026-10-26T16:30Z",
+      "prior_records": 154,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "185197",
+      "start_time": "2026-10-26T16:30Z",
+      "prior_records": 155,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "185177",
+      "start_time": "2026-10-26T18:00Z",
+      "prior_records": 156,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "185192",
+      "start_time": "2026-10-27T12:30Z",
+      "prior_records": 157,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "185134",
+      "start_time": "2026-10-27T14:30Z",
+      "prior_records": 158,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "185181",
+      "start_time": "2026-10-27T14:30Z",
+      "prior_records": 159,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "185186",
+      "start_time": "2026-10-27T15:30Z",
+      "prior_records": 160,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "185135",
+      "start_time": "2026-10-28T11:30Z",
+      "prior_records": 161,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "185189",
+      "start_time": "2026-10-28T12:30Z",
+      "prior_records": 162,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "185191",
+      "start_time": "2026-10-28T12:30Z",
+      "prior_records": 163,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "185142",
+      "start_time": "2026-10-28T13:00Z",
+      "prior_records": 164,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "185185",
+      "start_time": "2026-10-28T15:30Z",
+      "prior_records": 165,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "185179",
+      "start_time": "2026-10-28T16:30Z",
+      "prior_records": 166,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "185147",
+      "start_time": "2026-10-29T11:00Z",
+      "prior_records": 167,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "185190",
+      "start_time": "2026-10-29T12:30Z",
+      "prior_records": 168,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "185193",
+      "start_time": "2026-10-29T15:25Z",
+      "prior_records": 169,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "185150",
+      "start_time": "2026-10-29T15:30Z",
+      "prior_records": 170,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "185148",
+      "start_time": "2026-10-29T15:30Z",
+      "prior_records": 171,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "185194",
+      "start_time": "2026-10-29T16:00Z",
+      "prior_records": 172,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "185199",
+      "start_time": "2026-10-30T16:30Z",
+      "prior_records": 173,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "185155",
+      "start_time": "2026-10-30T17:00Z",
+      "prior_records": 174,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "185156",
+      "start_time": "2026-10-30T18:30Z",
+      "prior_records": 175,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "187349",
+      "start_time": "2026-11-01T10:00Z",
+      "prior_records": 176,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "187354",
+      "start_time": "2026-11-01T10:00Z",
+      "prior_records": 177,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "187348",
+      "start_time": "2026-11-01T11:00Z",
+      "prior_records": 178,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "187350",
+      "start_time": "2026-11-01T11:30Z",
+      "prior_records": 179,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "187351",
+      "start_time": "2026-11-01T11:30Z",
+      "prior_records": 180,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "187353",
+      "start_time": "2026-11-01T13:00Z",
+      "prior_records": 181,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "185205",
+      "start_time": "2026-11-01T13:00Z",
+      "prior_records": 182,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "187352",
+      "start_time": "2026-11-01T13:30Z",
+      "prior_records": 183,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    }
+  ],
+  "players_in_elo": 149,
   "ranking_coverage": {
-    "ATP": 150,
-    "WTA": 150
+    "ATP": 150
   },
   "current_predictions_with_rank_enrichment": 8,
+  "current_active_predictions_rewritten": 8,
   "walkforward_probability_calibration": [
     {
       "low": 0.5,
       "high": 0.55,
-      "n": 303,
-      "accuracy": 0.505,
-      "calibrated_confidence": 0.505
+      "n": 136,
+      "accuracy": 0.5221,
+      "calibrated_confidence": 0.522
     },
     {
       "low": 0.55,
       "high": 0.6,
-      "n": 36,
-      "accuracy": 0.4167,
-      "calibrated_confidence": 0.4246
+      "n": 34,
+      "accuracy": 0.4706,
+      "calibrated_confidence": 0.4761
     },
     {
       "low": 0.6,
       "high": 0.65,
-      "n": 2,
+      "n": 3,
       "accuracy": null,
       "calibrated_confidence": null
     },
     {
       "low": 0.65,
       "high": 0.7,
-      "n": 0,
+      "n": 7,
       "accuracy": null,
       "calibrated_confidence": null
     },
     {
       "low": 0.7,
       "high": 0.75,
-      "n": 0,
+      "n": 3,
       "accuracy": null,
       "calibrated_confidence": null
     },
@@ -97,7 +1413,7 @@
     {
       "low": 0.85,
       "high": 0.9,
-      "n": 0,
+      "n": 1,
       "accuracy": null,
       "calibrated_confidence": null
     },
@@ -121,54 +1437,58 @@
     "candidates": [
       {
         "threshold": 0.6,
-        "n": 2,
+        "n": 14,
+        "correct": 7,
+        "accuracy": 0.5,
+        "wilson_lower_90": 0.2988
+      },
+      {
+        "threshold": 0.65,
+        "n": 11,
+        "correct": 6,
+        "accuracy": 0.5455,
+        "wilson_lower_90": 0.3151
+      },
+      {
+        "threshold": 0.7,
+        "n": 4,
+        "correct": 2,
+        "accuracy": 0.5,
+        "wilson_lower_90": 0.1824
+      },
+      {
+        "threshold": 0.75,
+        "n": 1,
         "correct": 0,
         "accuracy": 0.0,
         "wilson_lower_90": 0.0
       },
       {
-        "threshold": 0.65,
-        "n": 0,
-        "correct": 0,
-        "accuracy": null,
-        "wilson_lower_90": null
-      },
-      {
-        "threshold": 0.7,
-        "n": 0,
-        "correct": 0,
-        "accuracy": null,
-        "wilson_lower_90": null
-      },
-      {
-        "threshold": 0.75,
-        "n": 0,
-        "correct": 0,
-        "accuracy": null,
-        "wilson_lower_90": null
-      },
-      {
         "threshold": 0.8,
-        "n": 0,
+        "n": 1,
         "correct": 0,
-        "accuracy": null,
-        "wilson_lower_90": null
+        "accuracy": 0.0,
+        "wilson_lower_90": 0.0
       }
     ],
     "selected": {
-      "threshold": 0.65,
-      "reason": "insufficient_sample"
+      "threshold": 0.6,
+      "n": 14,
+      "correct": 7,
+      "accuracy": 0.5,
+      "wilson_lower_90": 0.2988
     },
     "mode": "PAPER_ONLY"
   },
-  "current_tennis_predictions_rewritten": 8,
   "guardrails": [
-    "No future results are used for a fixture before its start time.",
-    "Late-captured predictions are excluded from walk-forward model evaluation.",
-    "Unseen players retain the existing model probability unless a current official ESPN rank is available.",
-    "Current rankings are used only for future fixtures and are not used to score the historical walk-forward test.",
-    "Probability calibration is learned only from historical walk-forward predictions and is conservatively shrunk toward raw model probabilities.",
-    "Precision thresholds are research filters, not guarantees of future accuracy.",
-    "O/U calibration remains research-only and separate from live-money execution."
+    "Active tennis model scope is ATP singles only; WTA is retained as inactive research history and never pooled into ATP.",
+    "Each historical forecast is generated using only results and model-selection outcomes available before that fixture.",
+    "ELO weight is selected chronologically from prior results only; baseline weight 0.0 is an explicit candidate.",
+    "ELO is applied to current ATP forecasts only when its prequential Brier score beats the raw base model on at least 20 prior ATP forecasts.",
+    "Current official ATP ranks are context only and do not alter model probabilities until their incremental value is separately validated.",
+    "Late-captured or explicitly ineligible records are excluded from model evaluation.",
+    "Probability calibration is learned from prequential ATP forecasts only.",
+    "Precision thresholds are paper-research filters, not guarantees of future accuracy.",
+    "O/U calibration remains research-only and separate from betting execution."
   ]
 }
