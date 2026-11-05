@@ -122,7 +122,7 @@ console.log('Odds Builder UI freshness passed: desk-only 60% gate, artifact expi
 const liveSourcePath = new URL('../functions/api/odds-builder-data.js', import.meta.url);
 const liveSource = readFileSync(fileURLToPath(liveSourcePath), 'utf8');
 assert.ok(source.includes("fetch('./api/odds-builder-data?v=20261020-live-source2-'"), 'Builder must request the latest committed artifact through the same-site API');
-assert.ok(source.includes("fetch('./data/odds_builder.json?v=20261020-desk-guard-'"), 'Static Builder JSON must remain as an outage fallback');
+assert.ok(source.includes("fetch('./data/odds_builder.json',{cache:'default'})"), 'Static Builder JSON must remain as a bounded-cache outage fallback');
 assert.ok(liveSource.includes('raw.githubusercontent.com/topboyasian-stack/match-signal/main/data/odds_builder.json'), 'Live Builder API must read the canonical main-branch artifact');
 assert.ok(liveSource.includes("Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0'"), 'Live Builder API must not cache old snapshots');
 assert.ok(liveSource.includes("data.engine_version !== 'V6.1-RESEARCH-GATED'"), 'Live Builder API must validate the artifact contract');
