@@ -10,6 +10,7 @@ from football_prequential_ensemble import (  # noqa: E402
     blend_probs,
     fit_development_blend,
     normalize_probs,
+    safe_history_cutoff,
     _model_name_for_development,
 )
 
@@ -18,6 +19,12 @@ def test_probability_vectors_are_normalized():
     result = normalize_probs({"p1": 2, "draw": 1, "p2": 1})
     assert abs(sum(result.values()) - 1.0) < 1e-12
     assert result["p1"] == 0.5
+
+def test_history_cutoff_uses_conservative_settlement_buffer():
+    forecast_at = datetime(2026, 11, 5, 12, 0, tzinfo=timezone.utc)
+    cutoff = safe_history_cutoff(forecast_at)
+    assert cutoff == forecast_at - timedelta(hours=4)
+    assert safe_history_cutoff(None) is None
 
 
 def test_elo_does_not_use_same_kickoff_or_future_results():
@@ -95,6 +102,7 @@ def test_competition_model_choice_uses_development_rows_only():
 
 if __name__ == "__main__":
     test_probability_vectors_are_normalized()
+    test_history_cutoff_uses_conservative_settlement_buffer()
     test_elo_does_not_use_same_kickoff_or_future_results()
     test_blend_weights_are_probabilities_and_apply_consistently()
     test_development_fit_uses_only_passed_development_rows()
