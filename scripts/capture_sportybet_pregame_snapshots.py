@@ -251,17 +251,15 @@ def main():
     fetched_at = datetime.now(timezone.utc).isoformat()
     result = build_current_snapshots(predictions, fetched_at)
 
-    if result["pregame_snapshot_count"]:
-        ledger = load_json(LEDGER_PATH, {"version": 1, "snapshots": []})
-        ledger, added = append_snapshots(ledger, result["pregame_snapshots"])
-        if added:
-            ledger["updated_at"] = fetched_at
-            LEDGER_PATH.write_text(
-                json.dumps(ledger, indent=2, ensure_ascii=False) + "\n",
-                encoding="utf-8",
-            )
-    else:
-        added = 0
+    ledger_existed = LEDGER_PATH.exists()
+    ledger = load_json(LEDGER_PATH, {"version": 1, "snapshots": []})
+    ledger, added = append_snapshots(ledger, result["pregame_snapshots"])
+    if added or not ledger_existed:
+        ledger["updated_at"] = result["fetched_at"]
+        LEDGER_PATH.write_text(
+            json.dumps(ledger, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
 
     print(json.dumps({
         "status": "ok" if not result["sportybet_fetch_errors"] else "partial",
