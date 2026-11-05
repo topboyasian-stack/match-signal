@@ -18,6 +18,13 @@ on:
     workflows: ["Match Signal Live Prediction Pipeline"]
     types: [completed]
   workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/tennis_model_v2.py'
+      - 'scripts/test_tennis_model_prequential.py'
+      - '.github/workflows/tennis_model_v2.yml'
+      - '.github/workflows/tennis-model-prequential-regression.yml'
 
 permissions:
   contents: write
@@ -28,8 +35,28 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  prequential-regression:
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install model dependency
+        run: python -m pip install --disable-pip-version-check requests
+      - name: Compile and run ATP chronological regressions
+        run: |
+          python -m py_compile scripts/tennis_model_v2.py scripts/test_tennis_model_prequential.py
+          python scripts/test_tennis_model_prequential.py
+
   improve-tennis-model:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'push' || github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name != 'pull_request' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push' || github.event.workflow_run.conclusion == 'success') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
