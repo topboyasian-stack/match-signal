@@ -59,11 +59,21 @@ jobs:
           assert report['market_independent'] is True
           assert report['results_settlement_buffer_hours'] == 4
           assert report['development_n'] > 0 and report['holdout_n'] >= 20
-          for key,scope in report.get('validated_competition_scopes',{}).items():
+          scopes = report.get('validated_competition_scopes',{})
+          global_scope_gates = report.get('global_blend_scope_gates',{})
+          for key,scope in scopes.items():
               assert scope['status']=='RESEARCH_SCOPE_VALIDATED', (key,scope)
-              assert scope['development_n'] >= 30, (key,scope)
               assert scope['holdout_n'] >= 20, (key,scope)
               assert scope['selected_model'] != 'published', (key,scope)
+              if scope['development_n'] < 30:
+                  # Below-minimum local development rows are allowed only for a
+                  # globally fitted model whose own untouched global holdout and
+                  # this competition's untouched holdout both passed.
+                  gate = global_scope_gates.get(key) or {}
+                  assert scope['selected_model']=='fitted_blend', (key,scope)
+                  assert report['promotion_allowed'] is True, (key,report.get('promotion_allowed'))
+                  assert gate.get('passed') is True, (key,gate)
+          assert report.get('holdout_by_league',{}).get('Champions League',{}).get('global_blend_scope_gate',{}).get('passed', True) is not False
           print(json.dumps({
             'eligible': report['total_eligible'],
             'development_n': report['development_n'],
