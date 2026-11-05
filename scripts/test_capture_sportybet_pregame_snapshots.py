@@ -7,7 +7,11 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from capture_sportybet_pregame_snapshots import exact_snapshot_from_prediction, append_snapshots
+from capture_sportybet_pregame_snapshots import (
+    exact_snapshot_from_prediction,
+    append_snapshots,
+    event_matches_prediction_time,
+)
 
 
 NOW = datetime(2026, 11, 5, 12, 0, tzinfo=timezone.utc)
@@ -80,5 +84,16 @@ assert len(ledger["snapshots"]) == 1
 ledger, added = append_snapshots(ledger, [good])
 assert added == 0
 assert len(ledger["snapshots"]) == 1
+
+
+kickoff = datetime.fromisoformat(football_row()["start_time"])
+event_ms = int(kickoff.timestamp() * 1000)
+same_fixture = {"estimateStartTime": event_ms}
+nearby_fixture = {"estimateStartTime": event_ms + 4 * 60 * 1000}
+wrong_fixture = {"estimateStartTime": event_ms + 6 * 60 * 1000}
+assert event_matches_prediction_time(football_row(), same_fixture)
+assert event_matches_prediction_time(football_row(), nearby_fixture)
+assert not event_matches_prediction_time(football_row(), wrong_fixture)
+assert not event_matches_prediction_time(football_row(), {"estimateStartTime": "bad"})
 
 print("Immutable SportyBet pregame capture regressions passed.")
