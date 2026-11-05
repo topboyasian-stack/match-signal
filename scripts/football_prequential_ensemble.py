@@ -490,10 +490,17 @@ def _model_name_for_development(rows):
 
 
 def global_blend_scope_gate(candidate, baseline, development_n, holdout_n):
-    """Assess a global challenger on independently sufficient competition data."""
+    """Test a globally fitted blend against a competition's untouched holdout.
+
+    The blend weights are estimated on the *global* development window, not on
+    this competition's small slice of that window. Requiring a separate
+    per-competition development minimum here would hold back a competition
+    even when the global model and that competition's independent holdout both
+    pass. Per-competition fitted-model selection keeps its own development
+    minimum in build_report().
+    """
     dev_n = int(development_n or 0)
     n = int(holdout_n or 0)
-    enough_development = dev_n >= SCOPE_MIN_DEVELOPMENT
     enough_holdout = n >= SCOPE_MIN_HOLDOUT
     brier_ok = (
         candidate.get("brier") is not None
@@ -511,21 +518,20 @@ def global_blend_scope_gate(candidate, baseline, development_n, holdout_n):
         and candidate["accuracy"] >= baseline["accuracy"] - SCOPE_MAX_ACCURACY_REGRESSION
     )
     return {
-        "passed": bool(enough_development and enough_holdout and brier_ok and loss_ok and accuracy_ok),
-        "development_n": dev_n,
-        "minimum_development": SCOPE_MIN_DEVELOPMENT,
-        "development_sample_passed": enough_development,
+        "passed": bool(enough_holdout and brier_ok and loss_ok and accuracy_ok),
+        "competition_development_n": dev_n,
+        "competition_development_minimum": SCOPE_MIN_DEVELOPMENT,
+        "competition_development_sample_required": False,
+        "competition_development_sample_informational_passed": dev_n >= SCOPE_MIN_DEVELOPMENT,
         "holdout_n": n,
         "minimum_holdout": SCOPE_MIN_HOLDOUT,
         "holdout_sample_passed": enough_holdout,
         "minimum_brier_improvement": SCOPE_MIN_BRIER_LIFT,
         "maximum_accuracy_regression": SCOPE_MAX_ACCURACY_REGRESSION,
-        "holdout_sample_passed": enough_holdout,
         "brier_passed": brier_ok,
         "log_loss_passed": loss_ok,
         "accuracy_passed": accuracy_ok,
     }
-
 
 
 def build_report(prediction_history, team_history):
@@ -749,11 +755,14 @@ def build_report(prediction_history, team_history):
         "promotion_policy": (
             f"Global fitted blend requires untouched chronological holdout n>={global_holdout_minimum}; "
             "Brier improvement >=0.005, log loss not worse, and accuracy within one percentage point. "
-            f"Competition scopes require development n>={SCOPE_MIN_DEVELOPMENT}, holdout n>={SCOPE_MIN_HOLDOUT}, "
-            "development-only model selection, holdout Brier improvement >=0.005, non-worse log loss, "
-            "and accuracy within one percentage point. All earlier results also require a four-hour kickoff-to-forecast buffer because "
-            "the archive does not preserve exact result-observation timestamps. All approvals are research-model scope approvals, "
-            "not live-money or Builder approval."
+            f"Independently selected per-competition challengers require development n>={SCOPE_MIN_DEVELOPMENT} and "
+            f"holdout n>={SCOPE_MIN_HOLDOUT}. The globally fitted blend can pass a competition on its own untouched "
+            f"holdout n>={SCOPE_MIN_HOLDOUT} because its weights were fit on the global development set. "
+            "Both competition paths require holdout Brier improvement >=0.005, non-worse log loss, and accuracy within "
+            "one percentage point. Applying any validated model to a fixture additionally requires that fixture's own "
+            "competition-form history status to be COMPLETE. Incomplete fixtures retain their published forecasts and do "
+            "not block ready fixtures. The four-hour kickoff-to-forecast buffer remains because the archive does not "
+            "preserve exact result-observation timestamps. Scope approval never grants live-money or Builder approval."
         ),
     }
 
