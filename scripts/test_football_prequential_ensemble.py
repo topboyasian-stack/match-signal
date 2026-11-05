@@ -9,6 +9,7 @@ from football_prequential_ensemble import (  # noqa: E402
     apply_blend,
     blend_probs,
     fit_development_blend,
+    fit_development_accuracy_blend,
     normalize_probs,
     safe_history_cutoff,
     _model_name_for_development,
@@ -85,6 +86,25 @@ def test_development_fit_uses_only_passed_development_rows():
     assert abs(sum(fit["weights"]) - 1.0) < 1e-12
     assert fit["weights"][1] >= fit["weights"][0]
 
+
+def test_accuracy_first_blend_fits_on_development_rows_only():
+    rows = []
+    for index in range(40):
+        rows.append({
+            "published": {"p1": 0.40, "draw": 0.30, "p2": 0.30},
+            "dixon_coles": {"p1": 0.60, "draw": 0.20, "p2": 0.20},
+            "elo": {"p1": 0.70, "draw": 0.15, "p2": 0.15},
+            "actual": "p1" if index < 24 else "draw",
+        })
+    fit = fit_development_accuracy_blend(rows)
+    assert fit["development_n"] == 40
+    assert len(fit["weights"]) == 3
+    assert abs(sum(fit["weights"]) - 1.0) < 1e-12
+    assert fit["candidate_count"] == 66
+    assert fit["objective"].startswith("maximum development top-pick accuracy")
+
+
+
 def test_competition_model_choice_uses_development_rows_only():
     rows = []
     for index in range(40):
@@ -127,6 +147,7 @@ if __name__ == "__main__":
     test_elo_does_not_use_same_kickoff_or_future_results()
     test_blend_weights_are_probabilities_and_apply_consistently()
     test_development_fit_uses_only_passed_development_rows()
+    test_accuracy_first_blend_fits_on_development_rows_only()
     test_competition_model_choice_uses_development_rows_only()
     test_global_blend_scope_requires_independent_competition_evidence()
     print("Football prequential ensemble tests passed.")
