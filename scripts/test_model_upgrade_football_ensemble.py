@@ -8,6 +8,7 @@ from model_upgrade import (  # noqa: E402
     _competition_elo_probabilities,
     apply_validated_competition_probabilities,
     build_validation_audit,
+    fixture_model_release_decision,
 )
 
 
@@ -70,6 +71,37 @@ def test_unvalidated_scope_does_not_change_published_prediction():
     assert row == original
 
 
+def test_fixture_release_is_independent_and_preserves_incomplete_fixture_baseline():
+    scope = {
+        "status": "RESEARCH_SCOPE_VALIDATED",
+        "selected_model": "fitted_blend",
+        "weights": [0.7, 0.0, 0.3],
+    }
+    selected = {"p1": 0.55, "draw": 0.25, "p2": 0.20}
+
+    complete_fixture = {"competition_form_status": "COMPLETE"}
+    ready = fixture_model_release_decision(scope, selected, complete_fixture)
+    assert ready["status"] == "VALIDATED_MODEL_READY"
+    assert ready["use_validated_model"] is True
+    assert ready["ticket_release_approved"] is False
+
+    incomplete_fixture = {"competition_form_status": "PARTIAL_HISTORY"}
+    held = fixture_model_release_decision(scope, selected, incomplete_fixture)
+    assert held["status"] == "PUBLISHED_BASELINE_ONLY"
+    assert held["use_validated_model"] is False
+    assert held["prediction_remains_visible"] is True
+    assert "Fixture-specific" in held["reason"]
+
+    # The incomplete fixture must not invalidate the independent ready fixture.
+    assert fixture_model_release_decision(scope, selected, complete_fixture)["use_validated_model"] is True
+
+    no_scope = fixture_model_release_decision(
+        {"status": "RESEARCH_ONLY"}, selected, complete_fixture
+    )
+    assert no_scope["use_validated_model"] is False
+    assert no_scope["prediction_remains_visible"] is True
+
+
 def test_elo_requires_actual_forecast_timestamp_and_excludes_same_time_results():
     cutoff = datetime(2026, 11, 5, 12, 0, tzinfo=timezone.utc)
     history = [
@@ -129,8 +161,10 @@ def test_validation_audit_is_fresh_and_never_approves_ticket_release():
     generated = datetime.fromisoformat(audit["generated_at_utc"])
     assert generated.tzinfo is not None
     assert audit["mode"] == "PAPER_RESEARCH_ONLY"
-    assert audit["model_version"] == "5.0-prequential-competition-validated"
+    assert audit["model_version"] == "5.1-fixture-ready-prequential-ensemble"
     assert audit["validated_scope_prediction_counts"] == {"Bundesliga": 4}
+    assert audit["fixture_model_readiness_counts"] == {}
+    assert audit["global_blend_scope_gates"] == {}
     assert audit["validated_model_prediction_updates"] == 4
     assert audit["live_money_approved"] is False
     assert audit["ticket_release_approved"] is False
@@ -140,6 +174,7 @@ def test_validation_audit_is_fresh_and_never_approves_ticket_release():
 if __name__ == "__main__":
     test_validated_scope_updates_forecast_but_preserves_all_release_flags()
     test_unvalidated_scope_does_not_change_published_prediction()
+    test_fixture_release_is_independent_and_preserves_incomplete_fixture_baseline()
     test_elo_requires_actual_forecast_timestamp_and_excludes_same_time_results()
     test_validation_audit_is_fresh_and_never_approves_ticket_release()
     print("Validated football model integration contracts passed.")

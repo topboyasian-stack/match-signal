@@ -122,22 +122,31 @@ def test_competition_model_choice_uses_development_rows_only():
 
 
 
-def test_global_blend_scope_requires_independent_competition_evidence():
-    published = {"brier": 0.60, "log_loss": 1.0, "accuracy": 0.55}
-    improving = {"brier": 0.58, "log_loss": 0.98, "accuracy": 0.55}
-    passed = global_blend_scope_gate(improving, published, 30, 25)
-    assert passed["passed"] is True
+def test_global_blend_scope_uses_global_fit_and_independent_holdout_not_local_dev_count():
+    published = {"brier": 0.62, "log_loss": 1.08, "accuracy": 0.50}
+    improving = {"brier": 0.59, "log_loss": 1.02, "accuracy": 0.50}
 
-    accuracy_drop = {"brier": 0.57, "log_loss": 0.95, "accuracy": 0.53}
-    failed = global_blend_scope_gate(accuracy_drop, published, 30, 25)
-    assert failed["passed"] is False
-    assert failed["accuracy_passed"] is False
+    # The model weights came from the global development set. A competition can
+    # use them with a sufficient independent holdout even when its own slice of
+    # the development data is smaller than the per-competition-fit minimum.
+    ucl_like = global_blend_scope_gate(improving, published, 24, 36)
+    assert ucl_like["passed"] is True
+    assert ucl_like["competition_development_n"] == 24
+    assert ucl_like["competition_development_sample_required"] is False
+    assert ucl_like["competition_development_sample_informational_passed"] is False
+    assert ucl_like["holdout_n"] == 36
 
-    small_development = global_blend_scope_gate(improving, published, 29, 25)
-    assert small_development["passed"] is False
-    assert small_development["development_sample_passed"] is False
+    accuracy_drop = {"brier": 0.57, "log_loss": 0.95, "accuracy": 0.48}
+    failed_accuracy = global_blend_scope_gate(accuracy_drop, published, 24, 36)
+    assert failed_accuracy["passed"] is False
+    assert failed_accuracy["accuracy_passed"] is False
 
-    small_holdout = global_blend_scope_gate(improving, published, 30, 19)
+    no_brier_lift = {"brier": 0.618, "log_loss": 1.0, "accuracy": 0.50}
+    failed_brier = global_blend_scope_gate(no_brier_lift, published, 24, 36)
+    assert failed_brier["passed"] is False
+    assert failed_brier["brier_passed"] is False
+
+    small_holdout = global_blend_scope_gate(improving, published, 100, 19)
     assert small_holdout["passed"] is False
     assert small_holdout["holdout_sample_passed"] is False
 
@@ -149,5 +158,5 @@ if __name__ == "__main__":
     test_development_fit_uses_only_passed_development_rows()
     test_accuracy_first_blend_fits_on_development_rows_only()
     test_competition_model_choice_uses_development_rows_only()
-    test_global_blend_scope_requires_independent_competition_evidence()
+    test_global_blend_scope_uses_global_fit_and_independent_holdout_not_local_dev_count()
     print("Football prequential ensemble tests passed.")
