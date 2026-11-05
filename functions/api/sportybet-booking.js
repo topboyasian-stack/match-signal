@@ -23,6 +23,18 @@ function json(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });
 }
 
+export function ticketCatalogueTimeline(legs, now = Date.now(), maxHours = 720) {
+  const starts = (Array.isArray(legs) ? legs : [])
+    .map(leg => Date.parse(String(leg?.start_time || '')))
+    .filter(start => Number.isFinite(start) && start > now);
+  if (!starts.length) return 168;
+  // SportyBet's timeline parameter is expressed in hours. Add one day of
+  // headroom so the catalogue query includes the full kickoff date, not merely
+  // the exact kickoff timestamp.
+  const requiredHours = Math.ceil((Math.max(...starts) - now) / 3600000) + 24;
+  return Math.max(168, Math.min(720, requiredHours));
+}
+
 const NBA_RELEASE_CUTOFF='2026-11-02T02:00:00+00:00';
 export const NBA_RELEASE_MODEL='nba-total-v5.1-pace-efficiency-calibrated';
 function nbaReleaseClose(a,b){return Number.isFinite(Number(a))&&Number.isFinite(Number(b))&&Math.abs(Number(a)-Number(b))<=1e-9;}
@@ -301,10 +313,10 @@ export async function collectEvents({ sportId, marketId, timeline = 168, pageSiz
 }
 
 
-export async function collectBasketballEvents(context,targetIds){
+export async function collectBasketballEvents(context,targetIds,timeline=168){
   const found=new Map();if(!targetIds.size)return found;
   for(let page=1;page<=4&&found.size<targetIds.size;page++){
-    const url=new URL('/api/sportybet-basketball?pageSize=100&timeline=168&pageNum='+page+'&_t='+Date.now(),context.request.url);
+    const url=new URL('/api/sportybet-basketball?pageSize=100&timeline='+encodeURIComponent(String(timeline))+'&pageNum='+page+'&_t='+Date.now(),context.request.url);
     // Call the sibling Pages Function directly; do not HTTP self-fetch the public hostname.
     const feedRequest=new Request(url.toString(),{headers:{'Accept':'application/json','Cache-Control':'no-cache'}});
     const response=await getSportyBetBasketballFeed({request:feedRequest,env:context.env,params:context.params,data:context.data});
@@ -758,6 +770,9 @@ async function handlePost(context) {
     // Never surface a share code for a mixed or partially accepted NBA ticket.
     const hasBasketballLeg = legs.some(leg => String(leg?.sport || '').toLowerCase() === 'basketball');
     const hasEfootballLeg = legs.some(leg => productForLeg(leg) === 'efootball');
+    // Manual selections can be scheduled beyond the feed's seven-day default.
+    // Keep the lookup bounded by SportyBet's supported 30-day catalogue window.
+    const catalogueTimeline = manualMode ? ticketCatalogueTimeline(legs) : 168;
     let nbaReleaseContext = null;
     if (hasBasketballLeg && !manualMode) {
       try { nbaReleaseContext = await loadNbaReleaseContext(); }
@@ -776,6 +791,7 @@ async function handlePost(context) {
       const events = await collectEvents({
         sportId: 'sr:sport:202120001',
         marketId: '1,18,10,29,11,26,36,14,60100,186,189,202,204,210',
+        timeline: catalogueTimeline,
         primaryPath: '/api/ng/factsCenter/wapConfigurableUpcomingEvents',
         fallbackPath: '/api/ng/factsCenter/pcUpcomingEvents',
         deadlineAt: manualDeadlineAt,
@@ -788,6 +804,7 @@ async function handlePost(context) {
       const events = await collectEvents({
         sportId: 'sr:sport:137',
         marketId: '1,18,10,29,11,26,36,14,60100,186,189,202,204,210',
+        timeline: catalogueTimeline,
         deadlineAt: manualDeadlineAt,
         requestTimeoutMs: manualMode ? 3500 : 6000
       }, efootballIds);
@@ -818,6 +835,7 @@ async function handlePost(context) {
       const events = await collectEvents({
         sportId: 'sr:sport:1',
         marketId: '1,18,10,14,16,29,45,47',
+        timeline: catalogueTimeline,
         deadlineAt: manualDeadlineAt,
         requestTimeoutMs: manualMode ? 3500 : 6000
       }, footballIds);
@@ -828,6 +846,7 @@ async function handlePost(context) {
       const events = await collectEvents({
         sportId: 'sr:sport:5',
         marketId: '186,210,202,204,189,203,188,187',
+        timeline: catalogueTimeline,
         fallbackPath: '/api/ng/factsCenter/wapConfigurableUpcomingEvents',
         deadlineAt: manualDeadlineAt,
         requestTimeoutMs: manualMode ? 3500 : 6000
@@ -835,7 +854,7 @@ async function handlePost(context) {
       for (const [id, event] of events) found.set(id, event);
     }
     if (basketballIds.size) {
-      const events = await collectBasketballEvents(context, basketballIds);
+      const events = await collectBasketballEvents(context, basketballIds, catalogueTimeline);
       for (const [id, event] of events) found.set(id, event);
     }
 
