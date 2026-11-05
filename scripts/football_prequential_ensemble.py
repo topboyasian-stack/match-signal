@@ -227,6 +227,27 @@ class CompetitionElo:
         })
 
 
+def probabilities_for_scope(scope, published, dixon_coles, elo):
+    """Return the model selected on development data for a validated scope."""
+    if not isinstance(scope, dict) or scope.get("status") != "RESEARCH_SCOPE_VALIDATED":
+        return None
+    selected = scope.get("selected_model")
+    if selected == "published":
+        return normalize_probs(published)
+    if selected == "dixon_coles":
+        return normalize_probs(dixon_coles)
+    if selected == "elo":
+        return normalize_probs(elo)
+    if selected == "dixon_elo_blend":
+        return blend_probs([dixon_coles, elo], [0.5, 0.5])
+    if selected == "fitted_blend":
+        weights = scope.get("weights")
+        if not isinstance(weights, list) or len(weights) != 3:
+            return None
+        return blend_probs([published, dixon_coles, elo], weights)
+    return None
+
+
 def _published_probabilities(row):
     raw = row.get("calibrated_probabilities") or row.get("probabilities")
     if not isinstance(raw, dict) or not all(key in raw for key in ("p1", "draw", "p2")):
@@ -513,6 +534,8 @@ def build_report(prediction_history, team_history):
         if passed:
             validated_scopes[competition] = {
                 "selected_model": selected_model,
+                "weights": weights if selected_model == "fitted_blend" else None,
+                "status": "RESEARCH_SCOPE_VALIDATED",
                 "development_n": len(dev_rows),
                 "holdout_n": len(test_rows),
                 "development_metrics": dev_metrics.get(selected_model),
