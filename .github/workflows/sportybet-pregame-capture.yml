@@ -44,9 +44,10 @@ jobs:
 
       - name: Validate exact pregame snapshot contracts
         run: |
-          python -m py_compile scripts/market_snapshot_freshness.py scripts/capture_sportybet_pregame_snapshots.py scripts/model_guard.py scripts/test_sportybet_pregame_capture_workflow.py
+          python -m py_compile scripts/market_snapshot_freshness.py scripts/capture_sportybet_pregame_snapshots.py scripts/merge_sportybet_pregame_snapshots.py scripts/model_guard.py scripts/test_sportybet_pregame_capture_workflow.py
           python scripts/test_market_snapshot_freshness.py
           python scripts/test_capture_sportybet_pregame_snapshots.py
+          python scripts/test_merge_sportybet_pregame_snapshots.py
           python scripts/test_sportybet_pregame_capture_workflow.py
           python scripts/test_model_guard_active_scope.py
 
@@ -70,51 +71,9 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
 
-            python - <<'PY'
-          import json
-          from datetime import datetime, timezone
-          from pathlib import Path
-
-          target = Path("data/sportybet_pregame_snapshots.json")
-          incoming_path = Path("/tmp/sportybet_pregame_captured.json")
-          incoming = json.loads(incoming_path.read_text(encoding="utf-8"))
-          remote = json.loads(target.read_text(encoding="utf-8")) if target.exists() else {"version": 1, "snapshots": []}
-
-          remote_rows = remote.get("snapshots") if isinstance(remote.get("snapshots"), list) else []
-          incoming_rows = incoming.get("snapshots") if isinstance(incoming.get("snapshots"), list) else []
-          keys = {
-              (str(row.get("event_id")), str(row.get("market_id")), str(row.get("captured_at")))
-              for row in remote_rows if isinstance(row, dict)
-          }
-          added = 0
-          for row in incoming_rows:
-              if not isinstance(row, dict):
-                  continue
-              key = (str(row.get("event_id")), str(row.get("market_id")), str(row.get("captured_at")))
-              if key in keys:
-                  continue
-              remote_rows.append(row)
-              keys.add(key)
-              added += 1
-
-          remote_rows.sort(key=lambda row: (str(row.get("captured_at") or ""), str(row.get("event_id") or "")))
-          remote_rows = remote_rows[-12000:]
-          remote["version"] = 1
-          remote["policy"] = incoming.get("policy") or remote.get("policy") or (
-              "Append-only SportyBet NG exact winner snapshots; football market 1, "
-              "ATP market 186; captured 0..15 minutes before kickoff only."
-          )
-          remote["snapshots"] = remote_rows
-          if added or not target.exists():
-              remote["updated_at"] = datetime.now(timezone.utc).isoformat()
-          target.write_text(json.dumps(remote, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-          print(json.dumps({
-              "remote_snapshots": len(remote_rows) - added,
-              "captured_snapshots": len(incoming_rows),
-              "new_snapshots_merged": added,
-              "total_snapshots": len(remote_rows)
-          }, indent=2))
-          PY
+            python scripts/merge_sportybet_pregame_snapshots.py \
+              --incoming /tmp/sportybet_pregame_captured.json \
+              --target data/sportybet_pregame_snapshots.json
 
             python scripts/model_guard.py
             git add data/sportybet_pregame_snapshots.json data/risk_gate.json data/value_trial_ledger.json
