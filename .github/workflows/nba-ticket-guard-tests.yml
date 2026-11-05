@@ -4,17 +4,35 @@ on:
   push:
     branches: [main]
     paths:
+      - 'basketball.html'
+      - 'basketball-design.css'
+      - 'basketball-live.js'
       - 'functions/api/sportybet-booking.js'
+      - 'functions/api/sportybet-basketball.js'
       - 'functions/api/sportybet-basketball-booking.js'
       - 'scripts/test_basketball_booking_guard.mjs'
       - 'scripts/test_nba_ticket_guard.mjs'
+      - 'scripts/test_basketball_desk_contract.mjs'
+      - '.github/workflows/nba-totals-price-capture.yml'
+      - '.github/workflows/nba-totals-settlement.yml'
+      - '.github/workflows/nba-totals-probability-value.yml'
+      - '.github/workflows/nba-totals-capture-watchdog.yml'
       - '.github/workflows/nba-ticket-guard-tests.yml'
   pull_request:
     paths:
+      - 'basketball.html'
+      - 'basketball-design.css'
+      - 'basketball-live.js'
       - 'functions/api/sportybet-booking.js'
+      - 'functions/api/sportybet-basketball.js'
       - 'functions/api/sportybet-basketball-booking.js'
       - 'scripts/test_basketball_booking_guard.mjs'
       - 'scripts/test_nba_ticket_guard.mjs'
+      - 'scripts/test_basketball_desk_contract.mjs'
+      - '.github/workflows/nba-totals-price-capture.yml'
+      - '.github/workflows/nba-totals-settlement.yml'
+      - '.github/workflows/nba-totals-probability-value.yml'
+      - '.github/workflows/nba-totals-capture-watchdog.yml'
       - '.github/workflows/nba-ticket-guard-tests.yml'
   workflow_dispatch:
 
@@ -38,3 +56,5 @@ jobs:
           node-version: '22'
       - name: Run all-or-nothing NBA ticket tests
         run: node --test scripts/test_nba_ticket_guard.mjs scripts/test_basketball_booking_guard.mjs
+      - name: Run Basketball page, live feed, odds-display and shared-ticket contract
+        run: node scripts/test_basketball_desk_contract.mjs
