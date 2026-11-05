@@ -246,7 +246,7 @@ test('NBA ticket resolves SportyBet event ID separately from ESPN prediction ID 
     assert.equal(mock.calls.feed, 3, 'the three bounded NBA catalog queries must use the proxy source');
     assert.equal(mock.calls.share, 0, 'must not request a share code when any NBA leg is missing');
     assert.equal(response.status, 409);
-    assert.equal(body.error, 'BASKETBALL_SLIP_REJECTED_PARTIAL');
+    assert.equal(body.error, 'MANUAL_TICKET_REJECTED_PARTIAL');
     assert.equal(body.booking_code_withheld, true);
     assert.equal(body.excluded_count, 1);
     const valid = body.validation.find(row => row.event_id === one.espnId);
@@ -286,7 +286,7 @@ test('NBA ticket with a partial SportyBet acceptance withholds the provider shar
     assert.equal(mock.calls.feed, 3, 'the three bounded NBA catalog queries must use the proxy source');
     assert.equal(mock.calls.share, 1);
     assert.equal(response.status, 409);
-    assert.equal(body.error, 'BASKETBALL_SLIP_REJECTED_PARTIAL');
+    assert.equal(body.error, 'MANUAL_TICKET_REJECTED_PARTIAL');
     assert.equal(body.booking_code_withheld, true);
     assert.equal(body.accepted_selection_count, 1);
     assert.equal(body.unavailable_count, 1);

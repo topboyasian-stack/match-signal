@@ -6,6 +6,8 @@ import json
 import subprocess
 from pathlib import Path
 
+from prediction_identity import prediction_identity_key
+
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
 
@@ -16,7 +18,7 @@ def load(name, default=None):
         return default
 
 def key(row):
-    return f"{row.get('sport')}:{row.get('league')}:{row.get('event_id')}"
+    return prediction_identity_key(row)
 
 def main():
     history = load("prediction_history.json", [])
@@ -29,6 +31,8 @@ def main():
 
     settled = [r for r in history if isinstance(r, dict) and r.get("settled") and r.get("correct") is not None]
     ids = [key(r) for r in settled]
+    if any(not value for value in ids):
+        raise SystemExit("A settled prediction is missing sport, competition, or event identity")
     if len(ids) != len(set(ids)):
         raise SystemExit("Duplicate settled prediction keys detected")
 

@@ -67,8 +67,11 @@ def test_old_fixtures_in_same_scope_are_queried_in_bounded_windows():
                     })
         return {"ok":True,"events":rows,"errors":[]}
 
-    with patch.object(collector,"proxy_json",side_effect=fake_proxy), \
-         patch.object(collector,"STATUS_PATH",Path("/tmp/match-signal-settlement-test-missing-status.json")):
+    with (
+        patch.object(collector,"proxy_json",side_effect=fake_proxy),
+        patch.object(collector,"STATUS_PATH",Path("/tmp/match-signal-settlement-test-missing-status.json")),
+        patch.object(collector.time,"time",return_value=now.timestamp()),
+    ):
         settled, count, errors, meta=collector.settle(pending)
 
     assert not errors,errors
