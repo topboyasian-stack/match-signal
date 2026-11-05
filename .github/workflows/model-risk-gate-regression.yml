@@ -32,3 +32,17 @@ jobs:
         run: |
           python -m py_compile scripts/model_guard.py scripts/test_model_guard_active_scope.py
           python scripts/test_model_guard_active_scope.py
+      - name: Rebuild active risk gate against committed settled history
+        run: |
+          python scripts/model_guard.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('data/risk_gate.json').read_text())
+          print(json.dumps({
+            'football':d['gate']['football'],
+            'tennis':d['gate']['tennis'],
+            'football_metrics':d['metrics']['football'],
+            'active_tennis_metrics':d['metrics']['tennis'],
+          },indent=2))
+          PY
