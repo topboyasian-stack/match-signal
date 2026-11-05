@@ -7,6 +7,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from model_upgrade import (  # noqa: E402
     _competition_elo_probabilities,
     apply_validated_competition_probabilities,
+    build_validation_audit,
 )
 
 
@@ -113,8 +114,32 @@ def test_elo_requires_actual_forecast_timestamp_and_excludes_same_time_results()
     assert state.index == 1  # only the safely old event was applied; within-buffer, same-time and future rows are excluded
 
 
+def test_validation_audit_is_fresh_and_never_approves_ticket_release():
+    report = {
+        "status": "ok",
+        "total_eligible": 90,
+        "development_n": 63,
+        "holdout_n": 27,
+        "promotion_allowed": False,
+        "validated_competition_scopes": {
+            "Bundesliga": {"status": "RESEARCH_SCOPE_VALIDATED"}
+        },
+    }
+    audit = build_validation_audit(report, 20, 4, {"Bundesliga": 4}, 1)
+    generated = datetime.fromisoformat(audit["generated_at_utc"])
+    assert generated.tzinfo is not None
+    assert audit["mode"] == "PAPER_RESEARCH_ONLY"
+    assert audit["model_version"] == "5.0-prequential-competition-validated"
+    assert audit["validated_scope_prediction_counts"] == {"Bundesliga": 4}
+    assert audit["validated_model_prediction_updates"] == 4
+    assert audit["live_money_approved"] is False
+    assert audit["ticket_release_approved"] is False
+    assert audit["release_gates_changed"] is False
+
+
 if __name__ == "__main__":
     test_validated_scope_updates_forecast_but_preserves_all_release_flags()
     test_unvalidated_scope_does_not_change_published_prediction()
     test_elo_requires_actual_forecast_timestamp_and_excludes_same_time_results()
+    test_validation_audit_is_fresh_and_never_approves_ticket_release()
     print("Validated football model integration contracts passed.")
