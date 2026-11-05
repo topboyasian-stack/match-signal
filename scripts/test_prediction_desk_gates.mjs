@@ -8,10 +8,29 @@ const entryPages = await Promise.all(["../index.html", "../upcoming.html", "../q
 ));
 const headerRules = await readFile(new URL("../_headers", import.meta.url), "utf8");
 const deployWorkflow = await readFile(new URL("../.github/workflows/cloudflare-pages.yml", import.meta.url), "utf8");
+const [workspaceUi, builderUi, virtualLabUi, livePage] = await Promise.all([
+  readFile(new URL("../workspace-ui.js", import.meta.url), "utf8"),
+  readFile(new URL("../expansion-odds-builder.js", import.meta.url), "utf8"),
+  readFile(new URL("../virtual-lab-app.js", import.meta.url), "utf8"),
+  readFile(new URL("../live.html", import.meta.url), "utf8")
+]);
 assert.match(headerRules,/\/upcoming\.html\s*\n\s*Cache-Control:\s*no-store, no-cache, must-revalidate, max-age=0/,"the Upcoming entry HTML must not remain cached after a renderer deployment");
 assert.match(headerRules,/\/qualified-best\.html\s*\n\s*Cache-Control:\s*no-store, no-cache, must-revalidate, max-age=0/,"the standalone Qualified Best HTML must not remain cached after a renderer deployment");
 assert.match(headerRules,/\/qualified-best\*\s*\n\s*Cache-Control:\s*no-store, no-cache, must-revalidate, max-age=0/,"the canonical clean Qualified Best URL must revalidate through its route pattern");
 assert.match(headerRules,/\/\*\.js\s*\n\s*Cache-Control:\s*public, max-age=300, stale-while-revalidate=300/,"the shared Prediction Desk renderer should be reusable for navigation while revalidating within five minutes");
+assert.match(headerRules,/\/\*\.css\s*\n\s*Cache-Control:\s*public, max-age=300, stale-while-revalidate=300/,"shared stylesheets should be reused across workspace navigation");
+assert.match(headerRules,/\/data\/\*\s*\n\s*Cache-Control:\s*public, max-age=30, stale-while-revalidate=60/,"published data snapshots should have only a short bounded cache");
+assert.match(headerRules,/\/api\/\*\s*\n\s*Cache-Control:\s*no-store, no-cache, must-revalidate, max-age=0/,"live API routes must remain uncached");
+assert.match(source,/async function get\(path\)\{const url=String\(path\),live=.*cache:live\?'no-store':'default'/,"shared renderer should cache published JSON while revalidating API requests");
+assert.match(workspaceUi,/club-logo-registry\.json'\),\{cache:'default'\}/,"navigation should reuse the club-logo registry across pages");
+assert.match(workspaceUi,/async function json\(path\).*cache:live\?'no-store':'default'/,"workspace reports should reuse static artifacts without caching APIs");
+assert.ok(builderUi.includes("fetch('./api/odds-builder-data?v=20261020-live-source2-'+Date.now(),{cache:'no-store'})"),"Odds Builder live data stays uncached");
+assert.ok(builderUi.includes("fetch('./data/odds_builder.json',{cache:'default'})") && builderUi.includes("fetch('./data/odds_ticket_tracker.json',{cache:'default'})"),"Odds Builder static fallback/ledger reads should be reused");
+assert.ok(virtualLabUi.includes("fetch(DESK_LEARNING,{cache:'default'") && virtualLabUi.includes("fetch(SNAPSHOT,{cache:'default'"),"Virtual Lab published artifacts should be reused");
+assert.ok(virtualLabUi.includes("fetch(base+'?'+params.toString(),{cache:'no-store'"),"Virtual Lab live SportyBet requests must remain uncached");
+assert.match(virtualLabUi,/await Promise\.all\(\[\s*loadDeskLearning\(\),\s*loadModelEvaluation\(\),\s*loadConfirmedWatch\(\),\s*loadParticipantProfiles\(\),\s*loadParticipantH2H\(\),\s*loadExternalH2H\(\)\s*\]\)/,"independent Virtual Lab startup artifacts should load in parallel");
+assert.match(livePage,/function getJson\(url\).*cache:isStatic\?'default':'no-store'/,"Live desk should cache published snapshots but keep dynamic API feeds fresh");
+
 assert.ok(deployWorkflow.includes("'/qualified-best'") && deployWorkflow.includes("'/qualified-best.html'"), "Cloudflare smoke tests must inspect both clean and .html Qualified Best routes");
 assert.ok(deployWorkflow.includes("cacheControl.includes('no-store')") && deployWorkflow.includes("cacheControl.includes('no-cache')"), "Cloudflare smoke tests must reject stale cache headers on both Qualified Best routes");
 const rendererVersions = entryPages.map(html =>
