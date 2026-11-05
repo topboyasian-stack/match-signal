@@ -20,12 +20,112 @@ EVAL = DATA / "sports_evaluation.json"
 PRECISION = DATA / "tennis_precision_gate.json"
 DEFAULT_MIN_CONFIDENCE = 0.65
 
+# A "current value" flag must never survive on the strength of an old quote or
+# a fixture outside the normal 12-hour Odds Builder horizon.
+MAX_MARKET_AGE_SECONDS = 15 * 60
+MAX_FUTURE_SNAPSHOT_SKEW_SECONDS = 120
+MAX_SELECTION_HORIZON_MINUTES = 12 * 60
+
 
 def load(path, default):
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except (FileNotFoundError, json.JSONDecodeError):
         return default
+
+
+def parse_utc(value):
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+    except (TypeError, ValueError, OverflowError):
+        return None
+
+
+def current_market_evidence(row, now=None):
+    """Validate quote freshness and kickoff horizon before considering its EV."""
+    now = now or datetime.now(timezone.utc)
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    now = now.astimezone(timezone.utc)
+
+    start_at = parse_utc(row.get("start_time"))
+    if start_at is None:
+        return False, "missing_or_invalid_kickoff_time"
+    minutes_to_start = (start_at - now).total_seconds() / 60.0
+    if minutes_to_start <= 0:
+        return False, "fixture_already_started"
+    if minutes_to_start > MAX_SELECTION_HORIZON_MINUTES:
+        return False, "fixture_outside_12h_builder_horizon"
+
+    insights = row.get("market_insights") or {}
+    snapshot = row.get("sportybet_market_snapshot") or {}
+    snapshot_at = insights.get("snapshot_at") or snapshot.get("fetched_at") or row.get("odds_timestamp")
+    quote_at = parse_utc(snapshot_at)
+    if quote_at is None:
+        return False, "missing_or_invalid_sportybet_snapshot_time"
+
+    age_seconds = (now - quote_at).total_seconds()
+    if age_seconds < -MAX_FUTURE_SNAPSHOT_SKEW_SECONDS:
+        return False, "sportybet_snapshot_timestamp_in_future"
+    if age_seconds > MAX_MARKET_AGE_SECONDS:
+        return False, "sportybet_quote_older_than_15m"
+    return True, None
+
+
+def explicit_value_signal(row, now=None):
+    """Return (value_ok, evidence_source, rejection_reason).
+
+    Snapshot presence alone is not proof of a current price. Both market-value
+    branches use the same 15-minute freshness and 12-hour kickoff checks.
+    """
+    current, reason = current_market_evidence(row, now=now)
+    if not current:
+        return False, None, reason
+
+    insights = row.get("market_insights") or {}
+    snapshot_at = insights.get("snapshot_at")
+    if snapshot_at:
+        winner_edge = insights.get("winner_model_edge_vs_market")
+        winner_ev = insights.get("winner_expected_value")
+        if (
+            isinstance(winner_edge, (int, float))
+            and float(winner_edge) >= 0.035
+            and isinstance(winner_ev, (int, float))
+            and float(winner_ev) >= 0.05
+        ):
+            return True, "current_sportybet_winner_edge_ev", None
+        total = insights.get("total") if isinstance(insights, dict) else None
+        total_edge = total.get("model_edge_vs_market") if isinstance(total, dict) else None
+        total_ev = total.get("expected_value") if isinstance(total, dict) else None
+        if (
+            isinstance(total_edge, (int, float))
+            and float(total_edge) >= 0.035
+            and isinstance(total_ev, (int, float))
+            and float(total_ev) >= 0.05
+        ):
+            return True, "current_sportybet_total_edge_ev", None
+        return False, None, "current_quote_has_no_qualifying_value"
+
+    # Legacy fallback requires its own frozen snapshot and the same validated
+    # quote timestamp; stale legacy edge fields must not qualify a new market.
+    row_edge = row.get("edge")
+    row_value = row.get("value") or {}
+    row_ev = row_value.get("expected_value") if isinstance(row_value, dict) else None
+    snapshot = row.get("sportybet_market_snapshot") or {}
+    if (
+        isinstance(row_edge, (int, float))
+        and float(row_edge) >= 0.035
+        and isinstance(row_ev, (int, float))
+        and float(row_ev) >= 0.05
+        and snapshot.get("fetched_at")
+    ):
+        return True, "frozen_market_edge_ev", None
+    return False, None, "no_current_value_signal"
 
 
 def tournament(row):
@@ -55,6 +155,7 @@ def tennis_threshold():
 
 
 def main():
+    now = datetime.now(timezone.utc)
     predictions = load(PREDICTIONS, [])
     evaluation = load(EVAL, {})
     if not isinstance(predictions, list):
@@ -62,62 +163,23 @@ def main():
 
     POOL.write_text(json.dumps(predictions, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
-    qualified_tournaments = evaluation.get("qualified_tournaments", {})
     qualified_selections = evaluation.get("qualified_selections", {})
-    qualified_pairs = {sport: {(x.get("tournament"), x.get("selection")) for x in rows} for sport, rows in qualified_selections.items()}
-    qualified_tour = {sport: {x.get("tournament") for x in rows} for sport, rows in qualified_tournaments.items()}
+    qualified_tournaments = evaluation.get("qualified_tournaments", {})
+    qualified_pairs = {
+        sport: {(x.get("tournament"), x.get("selection")) for x in rows}
+        for sport, rows in qualified_selections.items()
+    }
+    qualified_tour = {
+        sport: {x.get("tournament") for x in rows}
+        for sport, rows in qualified_tournaments.items()
+    }
     tennis_min_confidence, tennis_threshold_source = tennis_threshold()
 
     selected = []
     research_candidates = []
     rejected = 0
     reasons = {}
-    paper_value_count = 0
     evidence_validated_count = 0
-
-    def explicit_value_signal(row):
-        # Current contemporaneous market data is authoritative. A stale legacy
-        # row.edge/value field must never qualify a newer market snapshot.
-        insights = row.get("market_insights") or {}
-        snapshot_at = insights.get("snapshot_at")
-        if snapshot_at:
-            winner_edge = insights.get("winner_model_edge_vs_market")
-            winner_ev = insights.get("winner_expected_value")
-            if (
-                isinstance(winner_edge, (int, float))
-                and float(winner_edge) >= 0.035
-                and isinstance(winner_ev, (int, float))
-                and float(winner_ev) >= 0.05
-            ):
-                return True, "current_sportybet_winner_edge_ev"
-            total = insights.get("total") if isinstance(insights, dict) else None
-            total_edge = total.get("model_edge_vs_market") if isinstance(total, dict) else None
-            total_ev = total.get("expected_value") if isinstance(total, dict) else None
-            if (
-                isinstance(total_edge, (int, float))
-                and float(total_edge) >= 0.035
-                and isinstance(total_ev, (int, float))
-                and float(total_ev) >= 0.05
-            ):
-                return True, "current_sportybet_total_edge_ev"
-            return False, None
-
-        # Only a row with its own explicit frozen snapshot may use the legacy
-        # edge/value fallback.
-        row_edge = row.get("edge")
-        row_value = row.get("value") or {}
-        row_ev = row_value.get("expected_value") if isinstance(row_value, dict) else None
-        snapshot = row.get("sportybet_market_snapshot") or {}
-        if (
-            isinstance(row_edge, (int, float))
-            and float(row_edge) >= 0.035
-            and isinstance(row_ev, (int, float))
-            and float(row_ev) >= 0.05
-            and snapshot.get("fetched_at")
-        ):
-            return True, "frozen_market_edge_ev"
-        return False, None
-
 
     for original in predictions:
         row = dict(original)
@@ -129,10 +191,8 @@ def main():
         qualified_tour_flag = tour in qualified_tour.get(sport, set())
         qualified_selection_flag = (tour, pick) in qualified_pairs.get(sport, set())
         confidence_ok = isinstance(conf, (int, float)) and float(conf) >= threshold
-        value_ok, value_source = explicit_value_signal(row)
+        value_ok, value_source, value_reason = explicit_value_signal(row, now=now)
 
-        # Evidence tier: historical tournament/selection track record increases
-        # confidence in a candidate but does not make it a prerequisite.
         if qualified_selection_flag:
             evidence_tier = "VALIDATED_SEGMENT"
             evidence_validated_count += 1
@@ -145,7 +205,6 @@ def main():
         reasons_list = []
         if not confidence_ok:
             reasons_list.append(f"confidence_below_{threshold:.2f}")
-
         if confidence_ok:
             research_candidates.append(row)
 
@@ -156,15 +215,17 @@ def main():
                 "confidence_ok": True,
                 "value_ok": True,
                 "value_source": value_source,
+                "quote_max_age_seconds": MAX_MARKET_AGE_SECONDS,
+                "kickoff_horizon_minutes": MAX_SELECTION_HORIZON_MINUTES,
                 "evidence_tier": evidence_tier,
                 "tournament_gate_non_blocking": True,
                 "selection_gate_non_blocking": True,
             }
             selected.append(row)
-            paper_value_count += 1
         else:
             row["candidate_status"] = "RESEARCH_CANDIDATE" if confidence_ok else "RESEARCH_FILTERED"
             row["live_eligible"] = False
+            rejection = value_reason or "no_current_value_signal"
             row["qualification_basis"] = {
                 "confidence_ok": confidence_ok,
                 "value_ok": value_ok,
@@ -172,11 +233,11 @@ def main():
                 "evidence_tier": evidence_tier,
                 "tournament_gate_non_blocking": True,
                 "selection_gate_non_blocking": True,
-                "not_selected_reasons": reasons_list + ([] if value_ok else ["no_current_value_signal"]),
+                "not_selected_reasons": reasons_list + ([] if value_ok else [rejection]),
             }
             rejected += 0 if confidence_ok else 1
             if not confidence_ok or not value_ok:
-                key = " + ".join(reasons_list + ([] if value_ok else ["no_current_value_signal"]))
+                key = " + ".join(reasons_list + ([] if value_ok else [rejection]))
                 reasons[key] = reasons.get(key, 0) + 1
 
         row["selection_gate"] = {
@@ -188,21 +249,23 @@ def main():
             "threshold_source": tennis_threshold_source if sport == "tennis" else "default",
             "mode": "PAPER_ONLY",
             "evidence_tier": evidence_tier,
+            "quote_max_age_seconds": MAX_MARKET_AGE_SECONDS,
+            "kickoff_horizon_minutes": MAX_SELECTION_HORIZON_MINUTES,
             "tournament_gate_non_blocking": True,
             "selection_gate_non_blocking": True,
-            "reasons": reasons_list + ([] if value_ok else ["no_current_value_signal"]),
+            "reasons": reasons_list + ([] if value_ok else [value_reason or "no_current_value_signal"]),
         }
 
     PREDICTIONS.write_text(json.dumps(predictions, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     SELECTED.write_text(json.dumps(selected, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
     summary = {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": now.isoformat(),
         "status": "ok",
         "mode": "PAPER_ONLY",
         "input_predictions": len(predictions),
         "selected_predictions": len(selected),
-        "paper_betting_qualified": paper_value_count,
+        "paper_betting_qualified": len(selected),
         "research_candidates": len(research_candidates),
         "filtered_predictions": len(predictions) - len(selected),
         "confidence_filtered_predictions": rejected,
@@ -212,12 +275,14 @@ def main():
         "public_feed_preserved": True,
         "tennis_confidence_threshold": tennis_min_confidence,
         "tennis_threshold_source": tennis_threshold_source,
+        "market_quote_max_age_seconds": MAX_MARKET_AGE_SECONDS,
+        "maximum_kickoff_horizon_minutes": MAX_SELECTION_HORIZON_MINUTES,
         "selected_artifact": "data/selection_gate_selected.json",
         "candidate_pool_artifact": "data/selection_candidates.json",
         "candidate_pool_independent": True,
-        "policy": "Tournament/selection history is an evidence tier, not a hard prerequisite. Betting-qualified PAPER selections require current model confidence plus an independent current value signal. Live-money approval remains a separate risk gate.",
+        "policy": "PAPER ONLY. Selection requires confidence, positive current model-vs-SportyBet value, a quote no older than 15 minutes, and kickoff within 12 hours. Live eligibility remains a separate risk gate.",
     }
-    (DATA / "selection_gate.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    (DATA / "selection_gate.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(summary, indent=2))
 
 

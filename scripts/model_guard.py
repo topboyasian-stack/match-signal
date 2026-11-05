@@ -1,7 +1,8 @@
 """Empirical risk gate for Match Signal.
 
-Adds walk-forward-style diagnostics and a hard paper-trading gate. It never
-replaces model probabilities; it annotates current picks with live eligibility.
+Evaluation is time-safe and product-scoped. WTA is retained as research history,
+but only the active ATP singles lane contributes to the tennis release gate.
+This module never turns on live betting or changes model probabilities.
 """
 import json, math
 from datetime import datetime, timezone
@@ -10,10 +11,40 @@ ROOT=Path(__file__).resolve().parents[1]; DATA=ROOT/'data'
 MIN_SETTLED=100
 MIN_VALUE_TRIALS=30
 MIN_VALUE_ROI=0.0
+ACTIVE_LEAGUE_BY_SPORT={'tennis':'ATP'}
+
 
 def load(name, default):
     try: return json.loads((DATA/name).read_text(encoding='utf-8'))
     except Exception: return default
+
+
+def parse_utc(value):
+    if not value:
+        return None
+    try:
+        dt=datetime.fromisoformat(str(value).replace('Z','+00:00'))
+        if dt.tzinfo is None:
+            dt=dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+    except (TypeError,ValueError,OverflowError):
+        return None
+
+
+def evaluation_eligible(row):
+    """Reject late or explicitly invalid captures from model/value evidence."""
+    if not isinstance(row,dict):
+        return False
+    if row.get('capture_status') == 'LATE_CAPTURE':
+        return False
+    if row.get('evaluation_eligible') is False:
+        return False
+    if row.get('settled') is not True:
+        return False
+    if row.get('actual') not in {'p1','p2','draw'}:
+        return False
+    return True
+
 
 def brier(p):
     q=p.get('probabilities') or {}; sport=str(p.get('sport','')).lower(); actual=p.get('actual')
@@ -21,8 +52,17 @@ def brier(p):
     idx={'p1':0,'draw':1,'p2':2}.get(actual)
     return None if idx is None else sum((v-(i==idx))**2 for i,v in enumerate(vals))
 
-def evaluate(rows,sport):
-    r=[p for p in rows if str(p.get('sport','')).lower()==sport and p.get('settled') and p.get('actual') in {'p1','p2','draw'}]
+
+def in_scope(row, sport, league=None):
+    if str(row.get('sport','')).lower()!=sport or not evaluation_eligible(row):
+        return False
+    if league is not None and str(row.get('league') or row.get('tour') or '').upper()!=str(league).upper():
+        return False
+    return True
+
+
+def evaluate(rows,sport,league=None):
+    r=[p for p in rows if in_scope(p,sport,league)]
     baseline=2/3 if sport=='football' else .5
     if not r: return {'settled':0,'accuracy':None,'brier':None,'baseline_brier':baseline,'bins':[]}
     acc=sum(p.get('pick')==p.get('actual') for p in r)/len(r); bs=[brier(p) for p in r]; bs=[x for x in bs if x is not None]
@@ -42,15 +82,10 @@ def american_to_decimal(odds):
         return None
     return None
 
-def value_trial(row):
-    """Enroll a paper value trial when odds are frozen and the prediction is valid.
 
-    Enrollment is deliberately broader than the final value-selection hurdle.
-    This creates a precommitted out-of-sample trial population rather than a
-    circular sample containing only bets that already passed the target edge/EV.
-    Live approval still requires >=30 trials and realized ROI >0.
-    """
-    if not row.get('settled') or row.get('actual') not in {'p1','p2','draw'}:
+def value_trial(row):
+    """Enroll a frozen pregame value trial; never backfill a post-kickoff quote."""
+    if not evaluation_eligible(row):
         return None
     pick=str(row.get('pick') or '')
     if pick not in {'p1','p2','draw'}:
@@ -58,6 +93,10 @@ def value_trial(row):
     insights=row.get('market_insights') or {}
     winner_odds=row.get('sportybet_winner_odds') or {}
     snapshot_at=insights.get('snapshot_at') or (row.get('sportybet_market_snapshot') or {}).get('fetched_at')
+    start_at=parse_utc(row.get('start_time'))
+    quote_at=parse_utc(snapshot_at)
+    if start_at is None or quote_at is None or quote_at >= start_at:
+        return None
     odds_map={'p1':winner_odds.get('p1'),'p2':winner_odds.get('p2'),'draw':winner_odds.get('draw')}
     book=odds_map.get(pick)
     model_prob=(row.get('probabilities') or {}).get(pick)
@@ -75,10 +114,9 @@ def value_trial(row):
     except (TypeError,ValueError):
         conf=None
 
-    # Precommitted paper-trial enrollment: valid probability, contemporaneous
-    # frozen odds, and at least moderate model confidence. This is NOT a live
-    # approval threshold and does not assert positive value.
-    if not snapshot_at or dec is None or prob is None or prob<=0 or prob>=1:
+    # Precommitted cohort includes all moderate-confidence picks with valid
+    # pregame prices; it is not filtered by whether the price later proved +EV.
+    if dec is None or prob is None or prob<=0 or prob>=1:
         return None
     if conf is None or conf < 0.55:
         return None
@@ -88,39 +126,45 @@ def value_trial(row):
     expected_value=prob*dec-1.0
     realized_roi=(dec-1.0) if row.get('actual')==pick else -1.0
     return {
-        'event_id':row.get('event_id'),'sport':row.get('sport'),'league':row.get('league'),
+        'event_id':row.get('event_id'),'sport':row.get('sport'),'league':row.get('league') or row.get('tour'),
         'pick':pick,'roi':realized_roi,'won':row.get('actual')==pick,
         'model_probability':round(prob,6),'confidence':round(conf,6),
         'edge':round(book_edge,6),'expected_value':round(expected_value,6),
-        'frozen_odds':float(book),'frozen_odds_at':snapshot_at,
+        'frozen_odds':float(book),'frozen_odds_at':quote_at.isoformat(),
+        'kickoff_at':start_at.isoformat(),
         'source':'SportyBet NG frozen winner snapshot',
-        'trial_enrollment':'precommitted_confidence_0.55_plus_frozen_odds',
-        'approval_hurdle':'30_trials_and_positive_realized_roi'
+        'trial_enrollment':'precommitted_confidence_0.55_plus_frozen_pregame_odds',
+        'approval_hurdle':'30_active_scope_trials_and_positive_realized_roi'
     }
 
-def value_testing(rows,sport):
-    trials=[x for r in rows if str(r.get('sport','')).lower()==sport for x in [value_trial(r)] if x]
+
+def value_testing(rows,sport,league=None):
+    trials=[x for r in rows if in_scope(r,sport,league) for x in [value_trial(r)] if x]
     if not trials:
         return {'trials':0,'wins':0,'roi_units':0.0,'roi':None,'status':'NO_VALUE_TRIALS','required_trials':MIN_VALUE_TRIALS}
     units=sum(x['roi'] for x in trials)
     roi=units/len(trials)
     return {'trials':len(trials),'wins':sum(bool(x['won']) for x in trials),'roi_units':round(units,6),'roi':round(roi,6),'status':'PASS' if len(trials)>=MIN_VALUE_TRIALS and roi>MIN_VALUE_ROI else 'INSUFFICIENT_OR_NONPOSITIVE','required_trials':MIN_VALUE_TRIALS,'latest_frozen_snapshot':max((x.get('frozen_odds_at') or '' for x in trials),default=None)}
 
+
 def main():
     history=load('prediction_history.json',[])+load('basketball_history.json',[])
-    metrics={s:evaluate(history,s) for s in ('football','tennis','basketball')}
+    metrics={}
     gate={}
-    for sport,m in metrics.items():
-        enough=m['settled']>=MIN_SETTLED
-        better=m['brier'] is not None and m['brier']<m['baseline_brier']
-        value=value_testing(history,sport)
+    scope_diagnostics={}
+    for sport in ('football','tennis','basketball'):
+        active_league=ACTIVE_LEAGUE_BY_SPORT.get(sport)
+        metrics[sport]=evaluate(history,sport,league=active_league)
+        value=value_testing(history,sport,league=active_league)
+        enough=metrics[sport]['settled']>=MIN_SETTLED
+        better=metrics[sport]['brier'] is not None and metrics[sport]['brier']<metrics[sport]['baseline_brier']
         reasons=[]
         if not enough:
-            reasons.append(f"need >={MIN_SETTLED} settled picks (have {m['settled']})")
-        if m['brier'] is not None and not better:
-            reasons.append(f"Brier {m['brier']} has not beaten baseline {m['baseline_brier']}")
+            reasons.append(f"need >={MIN_SETTLED} settled picks in active scope (have {metrics[sport]['settled']})")
+        if metrics[sport]['brier'] is not None and not better:
+            reasons.append(f"Brier {metrics[sport]['brier']} has not beaten baseline {metrics[sport]['baseline_brier']}")
         if value['trials']<MIN_VALUE_TRIALS:
-            reasons.append(f"need >={MIN_VALUE_TRIALS} settled value trials with frozen odds/value evidence (have {value['trials']})")
+            reasons.append(f"need >={MIN_VALUE_TRIALS} settled active-scope value trials with frozen pregame odds (have {value['trials']})")
         elif value['roi'] is None or value['roi']<=MIN_VALUE_ROI:
             reasons.append(f"value-test realized ROI {value['roi']} is not > {MIN_VALUE_ROI}")
         model_risk_approval_passed=bool(
@@ -128,6 +172,7 @@ def main():
             value['roi'] is not None and value['roi']>MIN_VALUE_ROI
         )
         gate[sport]={
+            'active_scope':active_league or 'all',
             'live_eligible':False,
             'model_risk_approval_passed':model_risk_approval_passed,
             'live_trading_enabled':False,
@@ -135,6 +180,18 @@ def main():
             'value_testing':value,
             'reasons':reasons,
         }
+        if active_league:
+            inactive={}
+            seen=sorted({str(r.get('league') or r.get('tour') or '').upper() for r in history if str(r.get('sport') or '').lower()==sport})
+            for tour in seen:
+                if tour and tour!=active_league.upper():
+                    inactive[tour]={
+                        'metrics':evaluate(history,sport,league=tour),
+                        'value_testing':value_testing(history,sport,league=tour),
+                        'status':'RESEARCH_ONLY_INACTIVE_SCOPE'
+                    }
+            scope_diagnostics[sport]={'active_scope':active_league,'inactive_scopes':inactive,'pooling_disabled':True}
+
     for name in ('predictions.json','basketball_predictions.json'):
         path=DATA/name; rows=load(name,[])
         for p in rows:
@@ -142,8 +199,8 @@ def main():
             p['live_eligible']=bool(g['live_eligible']); p['testing_mode']='paper'
         path.write_text(json.dumps(rows,indent=2,ensure_ascii=False),encoding='utf-8')
     trial_ledger=[x for r in history for x in [value_trial(r)] if x]
-    (DATA/'value_trial_ledger.json').write_text(json.dumps({'generated_at':datetime.now(timezone.utc).isoformat(),'mode':'PAPER_ONLY','policy':'Frozen SportyBet value evidence; never modifies settled outcomes or model probabilities.','trials':trial_ledger},indent=2,ensure_ascii=False),encoding='utf-8')
-    out={'generated_at':datetime.now(timezone.utc).isoformat(),'mode':'PAPER_ONLY','metrics':metrics,'gate':gate}
-    (DATA/'risk_gate.json').write_text(json.dumps(out,indent=2,ensure_ascii=False),encoding='utf-8')
+    (DATA/'value_trial_ledger.json').write_text(json.dumps({'generated_at':datetime.now(timezone.utc).isoformat(),'mode':'PAPER_ONLY','policy':'Frozen SportyBet prices strictly before kickoff; late/ineligible captures excluded. Active tennis qualification uses ATP only; WTA remains separately reported research evidence.','trials':trial_ledger},indent=2,ensure_ascii=False),encoding='utf-8')
+    out={'generated_at':datetime.now(timezone.utc).isoformat(),'mode':'PAPER_ONLY','metrics':metrics,'scope_diagnostics':scope_diagnostics,'gate':gate}
+    (DATA/'risk_gate.json').write_text(json.dumps(out,indent=2),encoding='utf-8')
     print(json.dumps(out,indent=2))
 if __name__=='__main__': main()
