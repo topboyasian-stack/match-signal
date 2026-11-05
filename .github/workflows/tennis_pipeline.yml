@@ -245,7 +245,7 @@ jobs:
           age_seconds = (datetime.now(timezone.utc) - generated.astimezone(timezone.utc)).total_seconds()
           if age_seconds < -30 or age_seconds > 600:
               raise SystemExit(f"ABORT: football ensemble audit is stale or future-dated ({age_seconds:.1f}s)")
-          if audit.get("model_version") != "5.0-prequential-competition-validated":
+          if audit.get("model_version") != "5.1-fixture-ready-prequential-ensemble":
               raise SystemExit("ABORT: unexpected football ensemble model version")
           if audit.get("mode") != "PAPER_RESEARCH_ONLY":
               raise SystemExit("ABORT: football ensemble audit must remain research-only")
@@ -254,12 +254,19 @@ jobs:
           for key in ("live_money_approved", "ticket_release_approved", "release_gates_changed"):
               if audit.get(key) is not False:
                   raise SystemExit(f"ABORT: football ensemble changed release policy ({key})")
+          scopes = audit.get("validated_competition_scopes") or {}
+          for league, gate in (audit.get("global_blend_scope_gates") or {}).items():
+              if gate.get("passed") and league not in scopes:
+                  raise SystemExit(f"ABORT: {league} passed its global-model holdout but was not released into validated scopes")
           print(json.dumps({
               "generated_at_utc": audit["generated_at_utc"],
               "validation_report_status": audit.get("validation_report_status"),
+              "validated_competition_scopes": scopes,
+              "global_blend_scope_gates": audit.get("global_blend_scope_gates"),
               "validated_scope_prediction_counts": audit.get("validated_scope_prediction_counts"),
+              "fixture_model_readiness_counts": audit.get("fixture_model_readiness_counts"),
               "validated_model_prediction_updates": audit.get("validated_model_prediction_updates"),
-              "release_policy": "paper-only; no ticket or real-money approval",
+              "release_policy": "publish each ready fixture independently; paper-only; no ticket or real-money approval",
           }, indent=2))
           PY
       - name: Finalize current SportyBet model edge and EV signals
