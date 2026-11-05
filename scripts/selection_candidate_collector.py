@@ -299,9 +299,6 @@ def compact(row, now):
         "independent_shadow_pick": row.get("independent_shadow_pick"),
         "independent_shadow_calibrated_probabilities": row.get("independent_calibrated_probabilities"),
         "independent_competition_form": row.get("independent_competition_form"),
-        "fixture_model_readiness": row.get("fixture_model_readiness"),
-        "football_model_validation": row.get("football_model_validation"),
-        "competition_form_status": row.get("competition_form_status"),
         "qualification_status": row.get("qualification_status"),
         "qualified_for_builder": bool(row.get("qualified_for_builder")),
         "participant_status": row.get("participant_status"),
@@ -378,19 +375,8 @@ def main():
             continue
         key = item["candidate_id"]
         previous = seen.get(key)
-        if previous is None:
+        if previous is None or prefer_candidate(item, previous):
             seen[key] = item
-            continue
-        if prefer_candidate(item, previous):
-            preferred, fallback = item, previous
-        else:
-            preferred, fallback = previous, item
-        # Keep fixture readiness/model-validation metadata even when the board
-        # copy wins because it carries a newer exact market quote.
-        for readiness_key in ("fixture_model_readiness", "football_model_validation", "competition_form_status"):
-            if not preferred.get(readiness_key) and fallback.get(readiness_key):
-                preferred[readiness_key] = fallback[readiness_key]
-        seen[key] = preferred
 
     rows = list(seen.values())
     quotas = {"football": 180, "tennis": 140, "efootball": 180, "other": 60}
