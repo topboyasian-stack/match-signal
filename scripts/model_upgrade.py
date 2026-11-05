@@ -8,6 +8,7 @@ from football_prequential_ensemble import (
     build_report as build_football_validation_report,
     normalize_probs,
     probabilities_for_scope,
+    safe_history_cutoff,
 )
 from value_decision import edge_and_ev, decision
 
@@ -242,10 +243,10 @@ def apply_validated_competition_probabilities(row, published, selected, scope):
 def _competition_elo_probabilities(history, row, cache):
     # Never substitute kickoff for a missing forecast timestamp: doing so could
     # admit results observed after the original prediction was made.
-    cutoff = row.get("calculated_at")
-    if not cutoff:
+    cutoff = safe_history_cutoff(row.get("calculated_at"))
+    if cutoff is None:
         return None
-    key = str(cutoff)
+    key = cutoff.isoformat()
     if key not in cache:
         model = CompetitionElo(history)
         model.advance_before(cutoff)
@@ -301,11 +302,18 @@ def main():
             continue
 
         try:
+            history_cutoff = safe_history_cutoff(row.get("calculated_at"))
+            if history_cutoff is None:
+                warnings += 1
+                row.setdefault("upgrade_warnings", []).append(
+                    "missing forecast timestamp; statistical challenger not applied"
+                )
+                continue
             independent = independent_prediction(
                 row_to_event(row),
                 row.get("league") or "global",
                 model_history,
-                cutoff=row.get("calculated_at") or row.get("start_time"),
+                cutoff=history_cutoff,
             )
             if not independent:
                 warnings += 1
