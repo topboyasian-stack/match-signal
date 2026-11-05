@@ -236,5 +236,74 @@ try {
   assert.equal(partialProviderCalls.length,1);
   assert.equal(partialProviderCalls[0].selections.length,2);
 
+  // Manual tickets must search beyond the seven-day default when their
+  // selected fixtures are further ahead (the 19-day production regression).
+  const futureNow = Date.now();
+  const futureKickoff = futureNow + 19 * 24 * 60 * 60 * 1000 + 60 * 60 * 1000;
+  const futureKickoffIso = new Date(futureKickoff).toISOString();
+  const futureTimelineObserved = [];
+  const futureShareRequests = [];
+  const futureCatalog = [
+    {
+      eventId: 'sr:match:future-19d-home',
+      homeTeamName: 'Future Home FC',
+      awayTeamName: 'Future Away FC',
+      estimateStartTime: futureKickoff,
+      matchStatus: 'Not start',
+      markets: [{ id: '1', desc: '3 Way', status: '0', outcomes: [
+        { id: 'future-home', desc: 'Future Home FC', odds: 1.84, isActive: 1 },
+        { id: 'future-draw', desc: 'Draw', odds: 3.4, isActive: 1 },
+        { id: 'future-away', desc: 'Future Away FC', odds: 4.2, isActive: 1 }
+      ] }]
+    },
+    {
+      eventId: 'sr:match:future-19d-second',
+      homeTeamName: 'Second Home FC',
+      awayTeamName: 'Second Away FC',
+      estimateStartTime: futureKickoff + 90 * 60 * 1000,
+      matchStatus: 'Not start',
+      markets: [{ id: '1', desc: '3 Way', status: '0', outcomes: [
+        { id: 'second-home', desc: 'Second Home FC', odds: 1.92, isActive: 1 },
+        { id: 'second-draw', desc: 'Draw', odds: 3.3, isActive: 1 },
+        { id: 'second-away', desc: 'Second Away FC', odds: 3.9, isActive: 1 }
+      ] }]
+    }
+  ];
+  globalThis.fetch = async (input, options = {}) => {
+    const url = new URL(typeof input === 'string' ? input : input.url);
+    if (url.pathname === '/api/ng/orders/share') {
+      futureShareRequests.push(JSON.parse(options.body));
+      return jsonResponse({ bizCode: 10000, data: {
+        shareCode: 'FUTURE-19-DAY-LOOKAHEAD-OK',
+        outcomes: [{ odds: 1.84 }, { odds: 1.92 }]
+      } });
+    }
+    if (url.pathname.endsWith('/pcUpcomingEvents') &&
+        url.searchParams.get('sportId') === 'sr:sport:1') {
+      futureTimelineObserved.push(Number(url.searchParams.get('timeline')));
+      return jsonResponse({ bizCode: 10000, data: {
+        tournaments: [{ name: 'Future booking regression', events: futureCatalog }]
+      } });
+    }
+    return jsonResponse({ bizCode: 10000, data: { tournaments: [] } });
+  };
+  const futureTicketResponse = await onRequest({ request: new Request('https://match-signal.pages.dev/api/sportybet-booking', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mode: 'manual', manual_selections: [
+      { event_id: 'prediction-future-19d-home', sportybet_event_id: 'sr:match:future-19d-home', sport: 'football', market: 'winner', pick: 'p1', start_time: futureKickoffIso, player_1: 'Future Home FC', player_2: 'Future Away FC', match: 'Future Home FC vs Future Away FC' },
+      { event_id: 'prediction-future-19d-second', sportybet_event_id: 'sr:match:future-19d-second', sport: 'football', market: 'winner', pick: 'p1', start_time: new Date(futureKickoff + 90 * 60 * 1000).toISOString(), player_1: 'Second Home FC', player_2: 'Second Away FC', match: 'Second Home FC vs Second Away FC' }
+    ] })
+  }) });
+  const futureTicketPayload = await futureTicketResponse.json();
+  assert.equal(futureTicketResponse.status, 200, JSON.stringify(futureTicketPayload));
+  assert.equal(futureTicketPayload.booking_code, 'FUTURE-19-DAY-LOOKAHEAD-OK');
+  assert.ok(futureTimelineObserved.length > 0, 'future football catalogue must be queried');
+  assert.ok(futureTimelineObserved.every(hours => hours >= 19 * 24 && hours <= 720),
+    'manual football catalogue lookahead must cover the 19-day fixture horizon and stay within 30 days');
+  assert.equal(futureShareRequests.length, 1, 'the share endpoint is called only after both future legs validate');
+  assert.equal(futureShareRequests[0].selections.length, 2);
+  assert.ok(futureTicketPayload.selections.every(row => row.ok === true));
+
   console.log('SportyBet booking resilience: PASS (bounded paging, share fallback, exact market-225 pair, and Football/Tennis/eFootball mixed ticket).');
 } finally { globalThis.fetch=originalFetch; }
