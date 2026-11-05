@@ -62,7 +62,7 @@ const cache=new Map(),entries=new Map(),queue=[];let busy=false;const prefix='ma
 let teamRegistry={};
 const registryReady=(async()=>{
   try{
-    const response=await fetch(route('/data/club-logo-registry.json')+'?v='+Date.now(),{cache:'no-store'});
+    const response=await fetch(route('/data/club-logo-registry.json'),{cache:'default'});
     if(!response.ok)return;
     const payload=await response.json();
     if(payload&&payload.teams&&typeof payload.teams==='object')teamRegistry=payload.teams;
@@ -271,7 +271,7 @@ decorateVirtualFixtureCards(document);scan(document);
 new MutationObserver(rs=>{let removedMediaSlot=false;rs.forEach(r=>{r.addedNodes.forEach(n=>{if(n.nodeType===1){decorateVirtualFixtureCards(n);scan(n);}});r.removedNodes.forEach(n=>{if(n.nodeType===1&&(n.matches?.('[data-ws-media-kind][data-ws-media-name]')||n.querySelector?.('[data-ws-media-kind][data-ws-media-name]')))removedMediaSlot=true;});});if(removedMediaSlot)updateMediaCoverage();}).observe(document.documentElement,{childList:true,subtree:true});
 function ageLabel(v){const t=Date.parse(v||'');if(!Number.isFinite(t))return 'timestamp unavailable';const m=Math.max(0,Math.round((Date.now()-t)/60000));return m<60?m+'m ago':(m/60).toFixed(1)+'h ago';}
 function ageM(v){const t=Date.parse(v||'');return Number.isFinite(t)?Math.max(0,(Date.now()-t)/60000):Infinity;}
-async function json(path){const r=await fetch(route(path)+'?v='+Date.now(),{cache:'no-store'});if(!r.ok)throw Error();return r.json();}
+async function json(path){const url=route(path),live=/(?:^|\/)api\//.test(String(path)),target=live?url+(url.includes('?')?'&':'?')+'_t='+Date.now():url;const r=await fetch(target,{cache:live?'no-store':'default'});if(!r.ok)throw Error();return r.json();}
 function metric(a,b,c){return '<article class="ws-metric-card"><small>'+esc(a)+'</small><strong>'+esc(b)+'</strong><p>'+esc(c)+'</p></article>';}
 function badge(a,c){return '<span class="ws-status-badge '+c+'">'+esc(a)+'</span>';}
 async function reportSummary(){
