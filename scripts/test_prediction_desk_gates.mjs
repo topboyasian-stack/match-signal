@@ -17,8 +17,8 @@ const [workspaceUi, builderUi, virtualLabUi, livePage] = await Promise.all([
 assert.match(headerRules,/\/upcoming\.html\s*\n\s*Cache-Control:\s*no-store, no-cache, must-revalidate, max-age=0/,"the Upcoming entry HTML must not remain cached after a renderer deployment");
 assert.match(headerRules,/\/qualified-best\.html\s*\n\s*Cache-Control:\s*no-store, no-cache, must-revalidate, max-age=0/,"the standalone Qualified Best HTML must not remain cached after a renderer deployment");
 assert.match(headerRules,/\/qualified-best\*\s*\n\s*Cache-Control:\s*no-store, no-cache, must-revalidate, max-age=0/,"the canonical clean Qualified Best URL must revalidate through its route pattern");
-assert.match(headerRules,/\/\*\.js\s*\n\s*Cache-Control:\s*public, max-age=300, stale-while-revalidate=300/,"the shared Prediction Desk renderer should be reusable for navigation while revalidating within five minutes");
-assert.match(headerRules,/\/\*\.css\s*\n\s*Cache-Control:\s*public, max-age=300, stale-while-revalidate=300/,"shared stylesheets should be reused across workspace navigation");
+assert.match(headerRules,/\/\*\.js\s*\n\s*Cache-Control:\s*public, max-age=30, must-revalidate/,"the shared Prediction Desk renderer should be reused for repeat navigation but revalidated after a short deployment-safe window");
+assert.match(headerRules,/\/\*\.css\s*\n\s*Cache-Control:\s*public, max-age=30, must-revalidate/,"shared stylesheets should be reused briefly across workspace navigation");
 assert.match(headerRules,/\/data\/\*\s*\n\s*Cache-Control:\s*public, max-age=30, stale-while-revalidate=60/,"published data snapshots should have only a short bounded cache");
 assert.match(headerRules,/\/api\/\*\s*\n\s*Cache-Control:\s*no-store, no-cache, must-revalidate, max-age=0/,"live API routes must remain uncached");
 assert.match(source,/async function get\(path\)\{const url=String\(path\),live=.*cache:live\?'no-store':'default'/,"shared renderer should cache published JSON while revalidating API requests");
