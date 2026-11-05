@@ -357,6 +357,7 @@ class CurrentSportyBetQuoteTimestampTests(unittest.TestCase):
                 ],
             },
             "totals": [],
+            "markets": [{"id": "1", "name": "1X2"}],
             "fetched_at": fetched_at,
         }
         with (
@@ -375,6 +376,11 @@ class CurrentSportyBetQuoteTimestampTests(unittest.TestCase):
             stats = predict_today.attach_sportybet_market_layer([prediction_row])
 
         self.assertEqual(stats["matched"], 1)
+        self.assertEqual(stats["per_sport"]["football"]["predictions_seen"], 1)
+        self.assertEqual(stats["per_sport"]["football"]["events_fetched"], 1)
+        self.assertEqual(stats["per_sport"]["football"]["matched_events"], 1)
+        self.assertEqual(stats["per_sport"]["football"]["winner_market_available"], 1)
+        self.assertEqual(stats["per_sport"]["football"]["market_id_counts"], {"1": 1})
         self.assertEqual(prediction_row["market_odds_timestamp"], fetched_at)
         self.assertEqual(prediction_row["odds_timestamp"], fetched_at)
         self.assertEqual(prediction_row["sportybet_market"]["fetched_at"], fetched_at)
@@ -390,8 +396,112 @@ class CurrentSportyBetQuoteTimestampTests(unittest.TestCase):
             stats = predict_today.attach_sportybet_market_layer([prediction_row])
 
         self.assertEqual(stats["matched"], 0)
+        self.assertEqual(stats["per_sport"]["football"]["predictions_seen"], 1)
+        self.assertEqual(stats["per_sport"]["football"]["unmatched_events"], 1)
+        self.assertEqual(stats["per_sport"]["football"]["unmatched_reason_counts"], {"market_feed_empty": 1})
         self.assertNotIn("market_odds_timestamp", prediction_row)
         self.assertNotIn("odds_timestamp", prediction_row)
+
+
+class CoreSportMarketBreakdownTests(unittest.TestCase):
+    def test_atp_matching_and_winner_market_coverage_are_reported_separately(self):
+        tennis_prediction = {
+            "sport": "tennis",
+            "league": "ATP",
+            "event_id": "espn:atp:fixture",
+            "start_time": KICKOFF,
+            "player_1": "Ben Shelton",
+            "player_2": "Arthur Rinderknech",
+            "pick": "p1",
+            "probabilities": {"p1": 0.68, "p2": 0.32},
+        }
+        event = sporty_event(
+            tournament="ATP",
+            category="ATP",
+            home="Ben Shelton",
+            away="Arthur Rinderknech",
+            event_id="sr:match:atp-fixture",
+        )
+        snapshot = {
+            "provider": "SportyBet NG",
+            "event_id": "sr:match:atp-fixture",
+            "tournament": "ATP",
+            "category": "ATP",
+            "winner": {
+                "p1_book": 1.70, "p2_book": 2.20,
+                "p1_fair_prob": 0.56, "p2_fair_prob": 0.44,
+                "p1_fair_odds": 1.79, "p2_fair_odds": 2.27,
+                "market_id": "186", "overround": 0.05,
+                "raw_outcomes": [
+                    {"id": "4", "name": "Ben Shelton"},
+                    {"id": "5", "name": "Arthur Rinderknech"},
+                ],
+            },
+            "totals": [],
+            "markets": [{"id": "186", "name": "Winner"}],
+            "fetched_at": "2026-11-03T16:00:00+00:00",
+        }
+        with (
+            mock.patch.object(
+                predict_today,
+                "fetch_sportybet_events",
+                side_effect=lambda sport_id, markets: [event] if sport_id == "sr:sport:5" else [],
+            ),
+            mock.patch.object(
+                predict_today, "_find_sportybet_match",
+                return_value=(event, {"method": "direct", "score": 1.0}),
+            ),
+            mock.patch.object(predict_today, "_sportybet_market_snapshot", return_value=snapshot),
+            mock.patch.object(predict_today, "_pick_sporty_total", return_value=None),
+        ):
+            stats = predict_today.attach_sportybet_market_layer([tennis_prediction])
+
+        tennis = stats["per_sport"]["tennis"]
+        self.assertEqual(tennis["predictions_seen"], 1)
+        self.assertEqual(tennis["events_fetched"], 1)
+        self.assertEqual(tennis["matched_events"], 1)
+        self.assertEqual(tennis["winner_market_available"], 1)
+        self.assertEqual(tennis["market_id_counts"], {"186": 1})
+        self.assertEqual(tennis["match_examples"][0]["match_score"], 1.0)
+        self.assertEqual(tennis_prediction["sportybet_winner_odds"]["market_id"], "186")
+
+    def test_unmatched_tennis_row_reports_nearest_fixture_candidates(self):
+        tennis_prediction = {
+            "sport": "tennis",
+            "league": "ATP",
+            "event_id": "espn:atp:missing",
+            "start_time": KICKOFF,
+            "player_1": "Ben Shelton",
+            "player_2": "Arthur Rinderknech",
+        }
+        near = sporty_event(
+            tournament="ATP",
+            category="ATP",
+            home="Ben Shelton",
+            away="Arthur Rinderknech",
+            event_id="sr:match:near",
+        )
+        with (
+            mock.patch.object(
+                predict_today,
+                "fetch_sportybet_events",
+                side_effect=lambda sport_id, markets: [near] if sport_id == "sr:sport:5" else [],
+            ),
+            mock.patch.object(predict_today, "_find_sportybet_match", return_value=(None, None)),
+        ):
+            stats = predict_today.attach_sportybet_market_layer([tennis_prediction])
+
+        tennis = stats["per_sport"]["tennis"]
+        self.assertEqual(tennis["unmatched_events"], 1)
+        self.assertEqual(tennis["unmatched_reason_counts"], {"no_sufficient_fixture_match": 1})
+        self.assertEqual(
+            tennis["unmatched_examples"][0]["nearest_markets"][0]["event_id"],
+            "sr:match:near",
+        )
+        self.assertEqual(
+            tennis["unmatched_examples"][0]["nearest_markets"][0]["competition_identity_ok"],
+            True,
+        )
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
