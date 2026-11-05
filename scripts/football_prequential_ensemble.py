@@ -519,6 +519,7 @@ def global_blend_scope_gate(candidate, baseline, development_n, holdout_n):
     )
     return {
         "passed": bool(enough_holdout and brier_ok and loss_ok and accuracy_ok),
+        "development_n": dev_n,
         "competition_development_n": dev_n,
         "competition_development_minimum": SCOPE_MIN_DEVELOPMENT,
         "competition_development_sample_required": False,
