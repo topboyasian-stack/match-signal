@@ -162,8 +162,108 @@ def value_trial(row):
     }
 
 
-def value_testing(rows,sport,league=None):
-    trials=[x for r in rows if in_scope(r,sport,league) for x in [value_trial(r)] if x]
+def capture_value_trials(rows, snapshots):
+    """Join immutable final-15-minute quote snapshots to settled results."""
+    settled_by_event = {}
+    for row in rows:
+        if not evaluation_eligible(row):
+            continue
+        event_id = str(row.get('event_id') or '')
+        if not event_id:
+            continue
+        prior = settled_by_event.get(event_id)
+        if prior is None or str(row.get('settled_at') or '') > str(prior.get('settled_at') or ''):
+            settled_by_event[event_id] = row
+
+    latest_by_event = {}
+    for snapshot in snapshots if isinstance(snapshots, list) else []:
+        if not isinstance(snapshot, dict):
+            continue
+        event_id = str(snapshot.get('event_id') or '')
+        if not event_id or event_id not in settled_by_event:
+            continue
+        actual_row = settled_by_event[event_id]
+        sport = str(snapshot.get('sport') or '').lower()
+        if str(actual_row.get('sport') or '').lower() != sport:
+            continue
+        if str(snapshot.get('league') or '').upper() != str(actual_row.get('league') or actual_row.get('tour') or '').upper():
+            continue
+        market_id = str(snapshot.get('market_id') or '')
+        if market_id != EXPECTED_WINNER_MARKET_ID.get(sport):
+            continue
+        captured_at = parse_utc(snapshot.get('captured_at'))
+        start_at = parse_utc(snapshot.get('start_time'))
+        result_start = parse_utc(actual_row.get('start_time'))
+        if captured_at is None or start_at is None or result_start is None:
+            continue
+        age = (start_at - captured_at).total_seconds()
+        if age < 0 or age > MAX_TRIAL_QUOTE_AGE_SECONDS:
+            continue
+        # The bookmaker fixture must resolve to the same scheduled event in
+        # the settled ledger, not merely to a similar player/team name.
+        if abs((start_at - result_start).total_seconds()) > 120:
+            continue
+        if str(snapshot.get('source') or '').lower() != 'sportybet ng':
+            continue
+        pick = str(snapshot.get('pick') or '')
+        if pick not in {'p1', 'p2', 'draw'} or (sport == 'tennis' and pick == 'draw'):
+            continue
+        try:
+            probability = float(snapshot.get('model_probability'))
+            confidence = float(snapshot.get('confidence'))
+            price = float((snapshot.get('prices') or {}).get(pick))
+        except (TypeError, ValueError):
+            continue
+        if not (0 < probability < 1 and 0 < confidence <= 1 and price > 1):
+            continue
+        if confidence < 0.55:
+            continue
+
+        candidate = {
+            'event_id': event_id,
+            'sport': sport,
+            'league': snapshot.get('league'),
+            'pick': pick,
+            'roi': (price - 1.0) if actual_row.get('actual') == pick else -1.0,
+            'won': actual_row.get('actual') == pick,
+            'model_probability': round(probability, 6),
+            'confidence': round(confidence, 6),
+            'edge': round(probability - (1.0 / price), 6),
+            'expected_value': round(probability * price - 1.0, 6),
+            'frozen_odds': price,
+            'frozen_odds_at': captured_at.isoformat(),
+            'kickoff_at': start_at.isoformat(),
+            'quote_age_seconds': round(age, 3),
+            'market_id': market_id,
+            'source': 'SportyBet NG immutable pregame capture ledger',
+            'trial_enrollment': 'precommitted_confidence_0.55_plus_final_15m_quote',
+            'approval_hurdle': '30_active_scope_trials_and_positive_realized_roi',
+        }
+        prior = latest_by_event.get(event_id)
+        if prior is None or candidate['frozen_odds_at'] > prior['frozen_odds_at']:
+            latest_by_event[event_id] = candidate
+
+    return list(latest_by_event.values())
+
+
+def merge_unique_trials(*trial_groups):
+    latest_by_event = {}
+    for group in trial_groups:
+        for trial in group or []:
+            event_id = str(trial.get('event_id') or '')
+            if not event_id:
+                continue
+            prior = latest_by_event.get(event_id)
+            stamp = str(trial.get('frozen_odds_at') or '')
+            if prior is None or stamp > str(prior.get('frozen_odds_at') or ''):
+                latest_by_event[event_id] = trial
+    return list(latest_by_event.values())
+
+
+def value_testing(rows,sport,league=None,captured_trials=None):
+    legacy=[x for r in rows if in_scope(r,sport,league) for x in [value_trial(r)] if x]
+    captured=[x for x in (captured_trials or []) if str(x.get('sport') or '').lower()==sport and (league is None or str(x.get('league') or '').upper()==str(league).upper())]
+    trials=merge_unique_trials(legacy,captured)
     if not trials:
         return {'trials':0,'wins':0,'roi_units':0.0,'roi':None,'status':'NO_VALUE_TRIALS','required_trials':MIN_VALUE_TRIALS}
     units=sum(x['roi'] for x in trials)
@@ -173,13 +273,16 @@ def value_testing(rows,sport,league=None):
 
 def main():
     history=load('prediction_history.json',[])+load('basketball_history.json',[])
+    capture_ledger=load('sportybet_pregame_snapshots.json',{})
+    capture_snapshots=capture_ledger.get('snapshots',[]) if isinstance(capture_ledger,dict) else []
+    captured_trials=capture_value_trials(history,capture_snapshots)
     metrics={}
     gate={}
     scope_diagnostics={}
     for sport in ('football','tennis','basketball'):
         active_league=ACTIVE_LEAGUE_BY_SPORT.get(sport)
         metrics[sport]=evaluate(history,sport,league=active_league)
-        value=value_testing(history,sport,league=active_league)
+        value=value_testing(history,sport,league=active_league,captured_trials=captured_trials)
         enough=metrics[sport]['settled']>=MIN_SETTLED
         better=metrics[sport]['brier'] is not None and metrics[sport]['brier']<metrics[sport]['baseline_brier']
         reasons=[]
@@ -211,7 +314,7 @@ def main():
                 if tour and tour!=active_league.upper():
                     inactive[tour]={
                         'metrics':evaluate(history,sport,league=tour),
-                        'value_testing':value_testing(history,sport,league=tour),
+                        'value_testing':value_testing(history,sport,league=tour,captured_trials=captured_trials),
                         'status':'RESEARCH_ONLY_INACTIVE_SCOPE'
                     }
             scope_diagnostics[sport]={'active_scope':active_league,'inactive_scopes':inactive,'pooling_disabled':True}
@@ -222,8 +325,9 @@ def main():
             g=gate.get(str(p.get('sport','')).lower(),{'live_eligible':False})
             p['live_eligible']=bool(g['live_eligible']); p['testing_mode']='paper'
         path.write_text(json.dumps(rows,indent=2,ensure_ascii=False),encoding='utf-8')
-    trial_ledger=[x for r in history for x in [value_trial(r)] if x]
-    (DATA/'value_trial_ledger.json').write_text(json.dumps({'generated_at':datetime.now(timezone.utc).isoformat(),'mode':'PAPER_ONLY','policy':'Frozen SportyBet prices strictly before kickoff; late/ineligible captures excluded. Active tennis qualification uses ATP only; WTA remains separately reported research evidence.','trials':trial_ledger},indent=2,ensure_ascii=False),encoding='utf-8')
+    legacy_trials=[x for r in history for x in [value_trial(r)] if x]
+    trial_ledger=merge_unique_trials(legacy_trials,captured_trials)
+    (DATA/'value_trial_ledger.json').write_text(json.dumps({'generated_at':datetime.now(timezone.utc).isoformat(),'mode':'PAPER_ONLY','policy':'Frozen SportyBet prices strictly within the final 15 minutes before kickoff; late/ineligible captures excluded. Immutable capture-ledger snapshots are joined by exact event identity to settled outcomes. Active tennis qualification uses ATP only; WTA remains separately reported research evidence.','trials':trial_ledger},indent=2,ensure_ascii=False),encoding='utf-8')
     out={'generated_at':datetime.now(timezone.utc).isoformat(),'mode':'PAPER_ONLY','metrics':metrics,'scope_diagnostics':scope_diagnostics,'gate':gate}
     (DATA/'risk_gate.json').write_text(json.dumps(out,indent=2),encoding='utf-8')
     print(json.dumps(out,indent=2))
