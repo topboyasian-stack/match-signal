@@ -124,12 +124,17 @@ def fetch_current_events(sport):
 
 def build_current_snapshots(predictions, fetched_at):
     events_by_sport = {}
+    capture_times = {}
     fetch_errors = {}
     for sport in ("football", "tennis"):
         try:
             events_by_sport[sport], _ = fetch_current_events(sport)
+            # Stamp after the exact market catalogue has been received, never
+            # before the network request begins.
+            capture_times[sport] = datetime.now(timezone.utc).isoformat()
         except Exception as exc:
             events_by_sport[sport] = []
+            capture_times[sport] = None
             fetch_errors[sport] = f"{type(exc).__name__}: {exc}"
 
     candidates = 0
@@ -161,13 +166,18 @@ def build_current_snapshots(predictions, fetched_at):
             "match_type": match_type,
             "sportybet_event_id": event.get("eventId"),
         }
-        snapshot = exact_snapshot_from_prediction(row, fetched_at)
+        captured_at = capture_times.get(sport)
+        if not captured_at:
+            continue
+        row["sportybet_market_snapshot"]["fetched_at"] = captured_at
+        snapshot = exact_snapshot_from_prediction(row, captured_at)
         if snapshot is not None:
             snapshots.append(snapshot)
             matched += 1
 
     return {
-        "fetched_at": fetched_at,
+        "fetched_at": datetime.now(timezone.utc).isoformat(),
+        "capture_times_by_sport": capture_times,
         "candidates_seen": candidates,
         "pregame_snapshots": snapshots,
         "pregame_snapshot_count": matched,
