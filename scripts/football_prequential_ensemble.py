@@ -10,7 +10,7 @@ import argparse
 import json
 import math
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from independent_football_model import (
@@ -31,6 +31,10 @@ HOLDOUT_FRACTION = 0.30
 BLEND_STEP = 0.10
 ELO_K = 22.0
 ELO_HOME_ADVANTAGE = 55.0
+# History artifacts store kickoff rather than actual result-observation time.
+# Exclude matches starting within four hours before a forecast to avoid using
+# results that may still have been in progress at the historical forecast time.
+RESULTS_SETTLEMENT_BUFFER_HOURS = 4
 
 
 def parse_dt(value):
@@ -41,6 +45,14 @@ def parse_dt(value):
         return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
     except (TypeError, ValueError):
         return None
+
+
+def safe_history_cutoff(forecast_timestamp):
+    """Conservative cutoff for results likely to have been final and observable."""
+    forecast_at = parse_dt(forecast_timestamp)
+    if forecast_at is None:
+        return None
+    return forecast_at - timedelta(hours=RESULTS_SETTLEMENT_BUFFER_HOURS)
 
 
 def actual_from_row(row):
@@ -260,7 +272,7 @@ def _published_probabilities(row):
 
 def build_evaluation_rows(prediction_history, team_history):
     """Create pre-kickoff rows; all model features are based on prior results."""
-    elo = CompetitionElo(team_history)
+    elo_cache = {}
     source_history = [
         row for row in (team_history or [])
         if isinstance(row, dict) and row.get("sport") == "football"
@@ -287,8 +299,12 @@ def build_evaluation_rows(prediction_history, team_history):
         if forecast_at is None:
             exclusions["missing_forecast_timestamp"] += 1
             continue
-        if forecast_at > kickoff:
-            exclusions["forecast_created_after_kickoff"] += 1
+        if forecast_at >= kickoff:
+            exclusions["forecast_created_at_or_after_kickoff"] += 1
+            continue
+        history_cutoff = safe_history_cutoff(forecast_at)
+        if history_cutoff is None:
+            exclusions["invalid_history_cutoff"] += 1
             continue
         actual = actual_from_row(row)
         published = _published_probabilities(row)
@@ -305,13 +321,17 @@ def build_evaluation_rows(prediction_history, team_history):
             continue
         seen.add(identity)
 
-        elo.advance_before(kickoff)
+        cutoff_key = history_cutoff.isoformat()
+        if cutoff_key not in elo_cache:
+            elo_state = CompetitionElo(team_history)
+            elo_state.advance_before(history_cutoff)
+            elo_cache[cutoff_key] = elo_state
         event = event_from_row(row)
         dixon = independent_prediction(
             event,
             row.get("league") or "global",
             source_history,
-            cutoff=kickoff,
+            cutoff=history_cutoff,
         )
         if not dixon:
             exclusions["dixon_coles_unavailable"] += 1
@@ -321,7 +341,7 @@ def build_evaluation_rows(prediction_history, team_history):
         except (TypeError, ValueError, ZeroDivisionError):
             exclusions["invalid_dixon_coles_probabilities"] += 1
             continue
-        elo_probs = elo.predict(row.get("league"), row.get("player_1"), row.get("player_2"))
+        elo_probs = elo_cache[cutoff_key].predict(row.get("league"), row.get("player_1"), row.get("player_2"))
         rows.append({
             "league": str(row.get("league") or "Unknown"),
             "event_id": event_id,
@@ -564,6 +584,7 @@ def build_report(prediction_history, team_history):
         "market_independent": True,
         "forecast_timestamp_required": True,
         "strict_pre_kickoff_cutoff": True,
+        "results_settlement_buffer_hours": RESULTS_SETTLEMENT_BUFFER_HOURS,
         "total_eligible": len(rows),
         "development_n": len(development_enriched),
         "holdout_n": len(holdout_enriched),
@@ -593,7 +614,8 @@ def build_report(prediction_history, team_history):
             "Brier improvement >=0.005, log loss not worse, and accuracy within one percentage point. "
             f"Competition scopes require development n>={SCOPE_MIN_DEVELOPMENT}, holdout n>={SCOPE_MIN_HOLDOUT}, "
             "development-only model selection, holdout Brier improvement >=0.005, non-worse log loss, "
-            "and accuracy within one percentage point. All approvals are research-model scope approvals, "
+            "and accuracy within one percentage point. All earlier results also require a four-hour kickoff-to-forecast buffer because "
+            "the archive does not preserve exact result-observation timestamps. All approvals are research-model scope approvals, "
             "not live-money or Builder approval."
         ),
     }
