@@ -61,6 +61,7 @@ jobs:
           assert report['development_n'] > 0 and report['holdout_n'] >= 20
           for key,scope in report.get('validated_competition_scopes',{}).items():
               assert scope['status']=='RESEARCH_SCOPE_VALIDATED', (key,scope)
+              assert scope['development_n'] >= 30, (key,scope)
               assert scope['holdout_n'] >= 20, (key,scope)
               assert scope['selected_model'] != 'published', (key,scope)
           print(json.dumps({
