@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+from market_snapshot_freshness import is_fresh_pregame_snapshot, parse_utc
 
 ROOT=Path(__file__).resolve().parents[1]
 DATA=ROOT/"data"
@@ -139,21 +140,41 @@ for row in predictions:
     eid=str(row.get("event_id") or "")
     archived=history_by_event.get(eid)
     if archived is not None:
-        for key in (
-            "sportybet_winner_odds",
-            "sportybet_total_games_odds",
-            "sportybet_market_snapshot",
-            "odds_timestamp",
-            "market_insights",
-        ):
-            if key in row:
-                archived[key]=row.get(key)
-        archived["value_evidence_frozen_at"]=(
+        # Keep only the latest exact SportyBet snapshot observed in the final
+        # 15 minutes before scheduled kickoff. A later in-play refresh must
+        # never overwrite the pregame price that will be scored in the ledger.
+        snapshot_at=(
             (row.get("market_insights") or {}).get("snapshot_at")
+            or (row.get("sportybet_market_snapshot") or {}).get("fetched_at")
             or row.get("odds_timestamp")
-            or datetime.now(timezone.utc).isoformat()
         )
-        history_synced+=1
+        start_time=archived.get("start_time") or row.get("start_time")
+        if is_fresh_pregame_snapshot(snapshot_at,start_time):
+            existing_at=(
+                archived.get("value_evidence_frozen_at")
+                or (archived.get("market_insights") or {}).get("snapshot_at")
+                or (archived.get("sportybet_market_snapshot") or {}).get("fetched_at")
+            )
+            existing_is_fresh=is_fresh_pregame_snapshot(existing_at,start_time)
+            current_dt=parse_utc(snapshot_at)
+            existing_dt=parse_utc(existing_at)
+            should_replace=(
+                not existing_is_fresh
+                or existing_dt is None
+                or (current_dt is not None and current_dt > existing_dt)
+            )
+            if should_replace:
+                for key in (
+                    "sportybet_winner_odds",
+                    "sportybet_total_games_odds",
+                    "sportybet_market_snapshot",
+                    "odds_timestamp",
+                    "market_insights",
+                ):
+                    if key in row:
+                        archived[key]=row.get(key)
+                archived["value_evidence_frozen_at"]=parse_utc(snapshot_at).isoformat()
+                history_synced+=1
 
 (DATA/"predictions.json").write_text(json.dumps(predictions,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
 (DATA/"prediction_history.json").write_text(json.dumps(history,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
