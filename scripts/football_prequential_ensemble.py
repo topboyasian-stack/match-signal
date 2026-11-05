@@ -438,6 +438,39 @@ def _model_name_for_development(rows):
     return selected, metrics
 
 
+def global_blend_scope_gate(candidate, baseline, holdout_n):
+    """Assess one competition against a globally fitted challenger on its holdout."""
+    n = int(holdout_n or 0)
+    enough = n >= SCOPE_MIN_HOLDOUT
+    brier_ok = (
+        candidate.get("brier") is not None
+        and baseline.get("brier") is not None
+        and candidate["brier"] <= baseline["brier"] - SCOPE_MIN_BRIER_LIFT
+    )
+    loss_ok = (
+        candidate.get("log_loss") is not None
+        and baseline.get("log_loss") is not None
+        and candidate["log_loss"] <= baseline["log_loss"]
+    )
+    accuracy_ok = (
+        candidate.get("accuracy") is not None
+        and baseline.get("accuracy") is not None
+        and candidate["accuracy"] >= baseline["accuracy"] - SCOPE_MAX_ACCURACY_REGRESSION
+    )
+    return {
+        "passed": bool(enough and brier_ok and loss_ok and accuracy_ok),
+        "holdout_n": n,
+        "minimum_holdout": SCOPE_MIN_HOLDOUT,
+        "minimum_brier_improvement": SCOPE_MIN_BRIER_LIFT,
+        "maximum_accuracy_regression": SCOPE_MAX_ACCURACY_REGRESSION,
+        "holdout_sample_passed": enough,
+        "brier_passed": brier_ok,
+        "log_loss_passed": loss_ok,
+        "accuracy_passed": accuracy_ok,
+    }
+
+
+
 def build_report(prediction_history, team_history):
     rows, exclusions = build_evaluation_rows(prediction_history, team_history)
     if len(rows) < 2:
@@ -585,45 +618,24 @@ def build_report(prediction_history, team_history):
         for competition, detail in holdout_by_league.items():
             candidate = detail["candidate_metrics"]["fitted_blend"]
             baseline = detail["candidate_metrics"]["published"]
-            n = int(detail.get("holdout_n") or 0)
-            enough = n >= SCOPE_MIN_HOLDOUT
-            brier_ok = (
-                candidate.get("brier") is not None
-                and baseline.get("brier") is not None
-                and candidate["brier"] <= baseline["brier"] - SCOPE_MIN_BRIER_LIFT
+            gate = global_blend_scope_gate(
+                candidate,
+                baseline,
+                detail.get("holdout_n") or 0,
             )
-            loss_ok = (
-                candidate.get("log_loss") is not None
-                and baseline.get("log_loss") is not None
-                and candidate["log_loss"] <= baseline["log_loss"]
-            )
-            accuracy_ok = (
-                candidate.get("accuracy") is not None
-                and baseline.get("accuracy") is not None
-                and candidate["accuracy"] >= baseline["accuracy"] - SCOPE_MAX_ACCURACY_REGRESSION
-            )
-            passed = bool(enough and brier_ok and loss_ok and accuracy_ok)
-            gate = {
-                "holdout_n": n,
-                "minimum_holdout": SCOPE_MIN_HOLDOUT,
-                "minimum_brier_improvement": SCOPE_MIN_BRIER_LIFT,
-                "maximum_accuracy_regression": SCOPE_MAX_ACCURACY_REGRESSION,
-                "holdout_sample_passed": enough,
-                "brier_passed": brier_ok,
-                "log_loss_passed": loss_ok,
-                "accuracy_passed": accuracy_ok,
+            gate.update({
                 "global_blend_weights": weights,
                 "global_holdout_n": len(holdout_enriched),
                 "global_model_passed": True,
-            }
+            })
             global_blend_scope_gates[competition] = gate
-            if passed and competition not in validated_scopes:
+            if gate["passed"] and competition not in validated_scopes:
                 validated_scopes[competition] = {
                     "status": "RESEARCH_SCOPE_VALIDATED",
                     "selected_model": "fitted_blend",
                     "weights": weights,
                     "development_n": len(development_enriched),
-                    "holdout_n": n,
+                    "holdout_n": gate["holdout_n"],
                     "development_metrics": fit,
                     "holdout_metrics": candidate,
                     "published_holdout_metrics": baseline,
