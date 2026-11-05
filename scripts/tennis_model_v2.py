@@ -103,7 +103,13 @@ def outcome_from_record(row):
 def valid_record(row):
     if row.get("sport") != "tennis" or not row.get("settled"):
         return False
-    if row.get("capture_status") == "LATE_CAPTURE" or row.get("evaluation_eligible") is False:
+    # The archive reconciler classifies each prediction before settlement.
+    # Missing classification is not proof of a pre-event capture.
+    if row.get("evaluation_eligible") is not True or row.get("capture_status") != "PRE_EVENT":
+        return False
+    start_at = parse_dt(row.get("start_time"))
+    calculated_at = parse_dt(row.get("calculated_at"))
+    if calculated_at >= start_at:
         return False
     if outcome_from_record(row) is None:
         return False
