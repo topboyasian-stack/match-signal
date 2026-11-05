@@ -11,6 +11,8 @@ ROOT=Path(__file__).resolve().parents[1]; DATA=ROOT/'data'
 MIN_SETTLED=100
 MIN_VALUE_TRIALS=30
 MIN_VALUE_ROI=0.0
+MAX_TRIAL_QUOTE_AGE_SECONDS=15*60
+EXPECTED_WINNER_MARKET_ID={'football':'1','tennis':'186'}
 ACTIVE_LEAGUE_BY_SPORT={'tennis':'ATP'}
 
 
@@ -92,10 +94,30 @@ def value_trial(row):
         return None
     insights=row.get('market_insights') or {}
     winner_odds=row.get('sportybet_winner_odds') or {}
-    snapshot_at=insights.get('snapshot_at') or (row.get('sportybet_market_snapshot') or {}).get('fetched_at')
+    snapshot_at=(
+        insights.get('snapshot_at')
+        or (row.get('sportybet_market_snapshot') or {}).get('fetched_at')
+        or row.get('value_evidence_frozen_at')
+    )
     start_at=parse_utc(row.get('start_time'))
     quote_at=parse_utc(snapshot_at)
-    if start_at is None or quote_at is None or quote_at >= start_at:
+    sport=str(row.get('sport') or '').lower()
+    expected_market=EXPECTED_WINNER_MARKET_ID.get(sport)
+    market_id=str(winner_odds.get('market_id') or '')
+    source=str(insights.get('source') or row.get('market_source') or '')
+    if (
+        start_at is None
+        or quote_at is None
+        or not expected_market
+        or market_id != expected_market
+        or 'sportybet' not in source.lower()
+    ):
+        return None
+    quote_age_seconds=(start_at-quote_at).total_seconds()
+    # Only exact SportyBet winner quotes captured during the final 15 minutes
+    # before the scheduled start count as a settled value trial. Historical
+    # odds fields without a source timestamp are not retroactively accepted.
+    if quote_age_seconds < 0 or quote_age_seconds > MAX_TRIAL_QUOTE_AGE_SECONDS:
         return None
     odds_map={'p1':winner_odds.get('p1'),'p2':winner_odds.get('p2'),'draw':winner_odds.get('draw')}
     book=odds_map.get(pick)
@@ -132,6 +154,8 @@ def value_trial(row):
         'edge':round(book_edge,6),'expected_value':round(expected_value,6),
         'frozen_odds':float(book),'frozen_odds_at':quote_at.isoformat(),
         'kickoff_at':start_at.isoformat(),
+        'quote_age_seconds':round(quote_age_seconds,3),
+        'market_id':market_id,
         'source':'SportyBet NG frozen winner snapshot',
         'trial_enrollment':'precommitted_confidence_0.55_plus_frozen_pregame_odds',
         'approval_hurdle':'30_active_scope_trials_and_positive_realized_roi'
