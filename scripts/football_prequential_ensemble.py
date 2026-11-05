@@ -271,23 +271,19 @@ def _published_probabilities(row):
 
 
 def build_evaluation_rows(prediction_history, team_history):
-    """Create pre-kickoff rows; all model features are based on prior results."""
-    elo_cache = {}
+    """Build forecasts using only results safely observable before each forecast."""
     source_history = [
         row for row in (team_history or [])
         if isinstance(row, dict) and row.get("sport") == "football"
         and row.get("settled") and row.get("final_score")
     ]
-    predictions = sorted(
-        [
-            row for row in (prediction_history or [])
-            if isinstance(row, dict) and row.get("sport") == "football"
-            and row.get("settled") and row.get("final_score")
-        ],
-        key=lambda row: parse_dt(row.get("start_time")) or datetime.max.replace(tzinfo=timezone.utc),
-    )
+    predictions = [
+        row for row in (prediction_history or [])
+        if isinstance(row, dict) and row.get("sport") == "football"
+        and row.get("settled") and row.get("final_score")
+    ]
 
-    rows = []
+    prepared = []
     exclusions = defaultdict(int)
     seen = set()
     for row in predictions:
@@ -320,12 +316,16 @@ def build_evaluation_rows(prediction_history, team_history):
             exclusions["duplicate_fixture"] += 1
             continue
         seen.add(identity)
+        prepared.append((history_cutoff, kickoff, row, actual, published, event_id))
 
-        cutoff_key = history_cutoff.isoformat()
-        if cutoff_key not in elo_cache:
-            elo_state = CompetitionElo(team_history)
-            elo_state.advance_before(history_cutoff)
-            elo_cache[cutoff_key] = elo_state
+    # One chronological rating pass is both faster and safer than rebuilding
+    # Elo from scratch for each historical fixture. The test split is sorted
+    # back by match kickoff after each forecast has been scored.
+    prepared.sort(key=lambda item: (item[0], item[1], item[5]))
+    elo = CompetitionElo(team_history)
+    rows = []
+    for history_cutoff, kickoff, row, actual, published, event_id in prepared:
+        elo.advance_before(history_cutoff)
         event = event_from_row(row)
         dixon = independent_prediction(
             event,
@@ -341,18 +341,21 @@ def build_evaluation_rows(prediction_history, team_history):
         except (TypeError, ValueError, ZeroDivisionError):
             exclusions["invalid_dixon_coles_probabilities"] += 1
             continue
-        elo_probs = elo_cache[cutoff_key].predict(row.get("league"), row.get("player_1"), row.get("player_2"))
+        elo_probs = elo.predict(row.get("league"), row.get("player_1"), row.get("player_2"))
         rows.append({
             "league": str(row.get("league") or "Unknown"),
             "event_id": event_id,
             "start_time": kickoff.isoformat(),
-            "forecast_at": forecast_at.isoformat(),
+            "forecast_at": parse_dt(row.get("calculated_at") or row.get("created_at") or row.get("prediction_timestamp")).isoformat(),
+            "history_cutoff": history_cutoff.isoformat(),
             "actual": actual,
             "published": published,
             "dixon_coles": dixon_probs,
             "elo": elo_probs,
             "dixon_elo_blend": blend_probs([dixon_probs, elo_probs], [0.5, 0.5]),
         })
+
+    rows.sort(key=lambda row: parse_dt(row["start_time"]))
     return rows, dict(exclusions)
 
 
