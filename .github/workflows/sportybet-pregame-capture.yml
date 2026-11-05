@@ -1,0 +1,90 @@
+name: Match Signal SportyBet Pregame Snapshot Capture
+
+on:
+  schedule:
+    # Capture only during the final 15 minutes before kickoff; ten-minute
+    # cadence provides repeated chances to observe each exact market price.
+    - cron: '*/10 * * * *'
+  workflow_run:
+    workflows:
+      - "Match Signal Live Prediction Pipeline"
+      - "Match Signal Unified Upcoming Board"
+      - "Match Signal Tennis Model V2"
+      - "Match Signal Result Settlement"
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  # Serialize the immutable quote ledger with other main-branch data publishers.
+  group: match-signal-data-publish
+  cancel-in-progress: false
+
+jobs:
+  capture-pregame-quotes:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Check out latest main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 2
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install capture dependencies
+        run: python -m pip install --disable-pip-version-check --no-input requests curl_cffi
+
+      - name: Validate exact pregame snapshot contracts
+        run: |
+          python -m py_compile scripts/market_snapshot_freshness.py scripts/capture_sportybet_pregame_snapshots.py scripts/model_guard.py
+          python scripts/test_market_snapshot_freshness.py
+          python scripts/test_capture_sportybet_pregame_snapshots.py
+          python scripts/test_model_guard_active_scope.py
+
+      - name: Capture exact SportyBet football and ATP prices
+        run: python scripts/capture_sportybet_pregame_snapshots.py
+
+      - name: Rebuild active risk metrics from immutable settled evidence
+        run: python scripts/model_guard.py
+
+      - name: Publish append-only quote ledger and risk artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          for attempt in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+
+            python scripts/capture_sportybet_pregame_snapshots.py
+            python scripts/model_guard.py
+
+            git add data/sportybet_pregame_snapshots.json data/risk_gate.json data/value_trial_ledger.json
+            if git diff --cached --quiet; then
+              echo "No new qualifying pregame snapshots or risk-evidence changes."
+              exit 0
+            fi
+
+            git commit -m "📈 Record immutable SportyBet pregame snapshots"
+            if git push origin main; then
+              echo "Pregame snapshot ledger published on attempt ${attempt}."
+              exit 0
+            fi
+
+            if [ "${attempt}" -eq 3 ]; then
+              echo "Could not publish the pregame snapshot ledger after three attempts." >&2
+              exit 1
+            fi
+            echo "main moved during quote capture; refreshing and rebuilding against the newest main."
+          done
+          exit 1
