@@ -7,6 +7,7 @@ on:
       - 'scripts/model_guard.py'
       - 'scripts/capture_sportybet_pregame_snapshots.py'
       - 'scripts/test_capture_sportybet_pregame_snapshots.py'
+      - 'scripts/test_sportybet_pregame_capture_workflow.py'
       - '.github/workflows/sportybet-pregame-capture.yml'
       - 'scripts/finalize_value_signals.py'
       - 'scripts/market_snapshot_freshness.py'
@@ -36,9 +37,10 @@ jobs:
           python-version: '3.12'
       - name: Compile model-risk guard and run evidence-scope regressions
         run: |
-          python -m py_compile scripts/model_guard.py scripts/finalize_value_signals.py scripts/market_snapshot_freshness.py scripts/capture_sportybet_pregame_snapshots.py scripts/test_market_snapshot_freshness.py scripts/test_capture_sportybet_pregame_snapshots.py scripts/test_model_guard_active_scope.py
+          python -m py_compile scripts/model_guard.py scripts/finalize_value_signals.py scripts/market_snapshot_freshness.py scripts/capture_sportybet_pregame_snapshots.py scripts/test_market_snapshot_freshness.py scripts/test_capture_sportybet_pregame_snapshots.py scripts/test_sportybet_pregame_capture_workflow.py scripts/test_model_guard_active_scope.py
           python scripts/test_market_snapshot_freshness.py
           python scripts/test_capture_sportybet_pregame_snapshots.py
+          python scripts/test_sportybet_pregame_capture_workflow.py
           python scripts/test_model_guard_active_scope.py
       - name: Rebuild active risk gate against committed settled history
         run: |
