@@ -32,6 +32,35 @@ _YOUTH_MARKER_RE = re.compile(
     re.IGNORECASE,
 )
 _TEAM_STOPWORDS = {"fc", "afc", "sc", "cf", "ac", "club", "the"}
+
+# Exact, well-established provider naming variants. These aliases collapse
+# only names that refer to the same senior club; they do not lower the fuzzy
+# participant threshold or infer a match from one shared club.
+_TEAM_ALIASES = {
+    "athletic club": "athletic bilbao",
+    "athletic bilbao": "athletic bilbao",
+    "paris saint germain": "psg",
+    "paris sg": "psg",
+    "psg": "psg",
+    "stade rennais": "rennes",
+    "rennes": "rennes",
+    "estac troyes": "troyes",
+    "es troyes": "troyes",
+    "troyes": "troyes",
+}
+
+# Short forms that are ambiguous outside a named competition are deliberately
+# scoped. In La Liga, the provider's "Deportivo" refers to RC Deportivo de La
+# Coruna; "Betis" refers to Real Betis. No global "Deportivo" shortcut exists.
+_COMPETITION_TEAM_ALIASES = {
+    "la liga": {
+        "deportivo": "deportivo la coruna",
+        "rc deportivo de a coruna": "deportivo la coruna",
+        "real club deportivo de la coruna": "deportivo la coruna",
+        "betis": "real betis",
+        "real betis": "real betis",
+    },
+}
 _IDENTITY_METADATA_KEYS = {
     "league", "leaguename", "league_name",
     "competition", "competitionname", "competition_name", "competitiondisplayname",
@@ -126,19 +155,34 @@ def _cohort_profile(competition, category=None, teams=(), metadata=None):
     return youth, frozenset(ages)
 
 
-def _team_key(value):
-    """Normalize participant labels while preserving meaningful team-name tokens."""
+def _raw_team_key(value):
     text = unicodedata.normalize("NFKD", str(value or ""))
     text = "".join(ch for ch in text if not unicodedata.combining(ch)).lower()
     text = text.replace("&", " and ")
-    text = re.sub(r"[^a-z0-9]+", " ", text)
-    return " ".join(token for token in text.split() if token not in _TEAM_STOPWORDS)
+    return " ".join(re.sub(r"[^a-z0-9]+", " ", text).split())
 
 
-def _team_similarity(left, right):
+def _team_key(value):
+    """Normalize participant labels while preserving meaningful team-name tokens."""
+    raw = _raw_team_key(value)
+    text = re.sub(r"[^a-z0-9]+", " ", raw)
+    key = " ".join(token for token in text.split() if token not in _TEAM_STOPWORDS)
+    return _TEAM_ALIASES.get(raw, _TEAM_ALIASES.get(key, key))
+
+
+def _competition_team_key(value, competition):
+    """Apply only explicit club aliases valid in the identified competition."""
+    raw = _raw_team_key(value)
+    key = _team_key(value)
+    comp = competition_key(competition)
+    aliases = _COMPETITION_TEAM_ALIASES.get(comp, {})
+    return aliases.get(raw, aliases.get(key, key))
+
+
+def _team_similarity(left, right, competition=None):
     """Conservative fuzzy score; missing participant names never match."""
-    a = _team_key(left)
-    b = _team_key(right)
+    a = _competition_team_key(left, competition) if competition else _team_key(left)
+    b = _competition_team_key(right, competition) if competition else _team_key(right)
     if not a or not b:
         return 0.0
     if a == b:
@@ -150,19 +194,19 @@ def _team_similarity(left, right):
     return max(ratio, 0.75 * overlap + 0.25 * ratio)
 
 
-def _participants_match(prediction_teams, market_teams, minimum_similarity=0.78):
+def _participants_match(prediction_teams, market_teams, minimum_similarity=0.78, competition=None):
     """Require both clubs to match; one exact club cannot compensate for a wrong rival."""
     if len(prediction_teams or ()) != 2 or len(market_teams or ()) != 2:
         return False
     p1, p2 = prediction_teams
     m1, m2 = market_teams
     direct = (
-        _team_similarity(p1, m1) >= minimum_similarity
-        and _team_similarity(p2, m2) >= minimum_similarity
+        _team_similarity(p1, m1, competition) >= minimum_similarity
+        and _team_similarity(p2, m2, competition) >= minimum_similarity
     )
     reverse = (
-        _team_similarity(p1, m2) >= minimum_similarity
-        and _team_similarity(p2, m1) >= minimum_similarity
+        _team_similarity(p1, m2, competition) >= minimum_similarity
+        and _team_similarity(p2, m1, competition) >= minimum_similarity
     )
     return direct or reverse
 
@@ -203,6 +247,10 @@ def football_market_identity_matches(
     if prediction_ages != market_ages:
         return False
 
-    if not _participants_match(prediction_teams, market_teams):
+    if not _participants_match(
+        prediction_teams,
+        market_teams,
+        competition=prediction_competition,
+    ):
         return False
     return True
