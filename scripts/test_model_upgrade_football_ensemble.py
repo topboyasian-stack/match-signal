@@ -79,6 +79,12 @@ def test_elo_requires_actual_forecast_timestamp_and_excludes_same_time_results()
             "final_score": [4, 0], "settled": True,
         },
         {
+            "sport": "football", "league": "Champions League", "event_id": "within-buffer",
+            "start_time": (cutoff - timedelta(hours=1)).isoformat(),
+            "player_1": "Arsenal", "player_2": "Bayern Munich",
+            "final_score": [0, 5], "settled": True,
+        },
+        {
             "sport": "football", "league": "Champions League", "event_id": "same",
             "start_time": cutoff.isoformat(),
             "player_1": "Arsenal", "player_2": "Bayern Munich",
@@ -104,7 +110,7 @@ def test_elo_requires_actual_forecast_timestamp_and_excludes_same_time_results()
     assert probabilities is not None
     assert len(cache) == 1
     state = next(iter(cache.values()))
-    assert state.index == 1  # only the prior event was applied
+    assert state.index == 1  # only the safely old event was applied; within-buffer, same-time and future rows are excluded
 
 
 if __name__ == "__main__":
