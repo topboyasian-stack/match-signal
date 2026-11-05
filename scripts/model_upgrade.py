@@ -1,5 +1,6 @@
 import json
 import math
+from datetime import datetime, timezone
 from pathlib import Path
 
 from independent_football_model import independent_prediction, _canonical_competition
@@ -259,6 +260,28 @@ def _competition_elo_probabilities(history, row, cache):
 
 
 
+def build_validation_audit(validation_report, football_upgraded, validated_updates, validated_scope_counts, warnings):
+    """Build a timestamped, explicit audit of the prequential model run."""
+    return {
+        "generated_at_utc": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+        "mode": "PAPER_RESEARCH_ONLY",
+        "model_version": MODEL_VERSION,
+        "validation_report_status": validation_report.get("status"),
+        "validation_total_eligible": int(validation_report.get("total_eligible", 0) or 0),
+        "validation_development_n": int(validation_report.get("development_n", 0) or 0),
+        "validation_holdout_n": int(validation_report.get("holdout_n", 0) or 0),
+        "global_blend_promotion_allowed": bool(validation_report.get("promotion_allowed", False)),
+        "validated_competition_scopes": validation_report.get("validated_competition_scopes") or {},
+        "validated_scope_prediction_counts": dict(validated_scope_counts),
+        "validated_model_prediction_updates": int(validated_updates),
+        "football_predictions_processed": int(football_upgraded),
+        "warnings": int(warnings),
+        "live_money_approved": False,
+        "ticket_release_approved": False,
+        "release_gates_changed": False,
+    }
+
+
 def main():
     pred_path = DATA / "predictions.json"
     history_path = DATA / "prediction_history.json"
@@ -489,8 +512,13 @@ def main():
             row.setdefault("upgrade_warnings", []).append(str(exc)[:180])
 
     pred_path.write_text(json.dumps(predictions, indent=2, ensure_ascii=False), encoding="utf-8")
+    audit = build_validation_audit(validation_report, upgraded, validated_updates, validated_scope_counts, warnings)
+    audit_path = DATA / "football_prequential_validation.json"
+    audit_path.write_text(json.dumps(audit, indent=2, ensure_ascii=False) + "\\n", encoding="utf-8")
     print(json.dumps({
         "status": "ok",
+        "audit_path": str(audit_path.relative_to(ROOT)),
+        "audit_generated_at_utc": audit["generated_at_utc"],
         "model_version": MODEL_VERSION,
         "football_upgraded": upgraded,
         "validated_model_prediction_updates": validated_updates,
