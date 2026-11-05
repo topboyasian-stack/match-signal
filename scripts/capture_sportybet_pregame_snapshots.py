@@ -17,7 +17,7 @@ PREDICTIONS_PATH = DATA / "predictions.json"
 LEDGER_PATH = DATA / "sportybet_pregame_snapshots.json"
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from market_snapshot_freshness import is_fresh_pregame_snapshot, pregame_snapshot_age_seconds
+from market_snapshot_freshness import is_fresh_pregame_snapshot, parse_utc, pregame_snapshot_age_seconds
 import enrich_sportybet_odds as sportybet
 
 
@@ -122,6 +122,23 @@ def fetch_current_events(sport):
     return list(unique.values()), errors
 
 
+def event_matches_prediction_time(prediction, event, tolerance_seconds=300):
+    """Reject same-name fixtures whose scheduled kickoff does not match."""
+    predicted_start = parse_utc(prediction.get("start_time"))
+    try:
+        raw_start = float(event.get("estimateStartTime") or 0)
+        if raw_start <= 0:
+            return False
+        seconds = raw_start / 1000 if raw_start >= 100000000000 else raw_start
+        market_start = datetime.fromtimestamp(seconds, tz=timezone.utc)
+    except (TypeError, ValueError, OverflowError, OSError):
+        return False
+    return (
+        predicted_start is not None
+        and abs((market_start - predicted_start).total_seconds()) <= tolerance_seconds
+    )
+
+
 def build_current_snapshots(predictions, fetched_at):
     events_by_sport = {}
     capture_times = {}
@@ -151,6 +168,11 @@ def build_current_snapshots(predictions, fetched_at):
         candidates += 1
         event, match_type = sportybet.find_event(original, events_by_sport.get(sport, []))
         if event is None:
+            continue
+        # The generic tennis matcher allows a broad 72-hour name/time window
+        # for discovery. Evidence capture is stricter: a market may only be
+        # frozen for the exact scheduled fixture within five minutes.
+        if not event_matches_prediction_time(original, event):
             continue
         winner, _totals = sportybet.extract_markets(original, event)
         if not winner:
