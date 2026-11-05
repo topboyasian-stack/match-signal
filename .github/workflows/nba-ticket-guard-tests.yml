@@ -34,6 +34,11 @@ on:
       - '.github/workflows/nba-totals-probability-value.yml'
       - '.github/workflows/nba-totals-capture-watchdog.yml'
       - '.github/workflows/nba-ticket-guard-tests.yml'
+  workflow_run:
+    workflows:
+      - "NBA totals probability and value research"
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -45,6 +50,7 @@ concurrency:
 
 jobs:
   guard-tests:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
