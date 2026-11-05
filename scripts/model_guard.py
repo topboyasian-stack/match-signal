@@ -327,8 +327,21 @@ def main():
         path.write_text(json.dumps(rows,indent=2,ensure_ascii=False),encoding='utf-8')
     legacy_trials=[x for r in history for x in [value_trial(r)] if x]
     trial_ledger=merge_unique_trials(legacy_trials,captured_trials)
-    (DATA/'value_trial_ledger.json').write_text(json.dumps({'generated_at':datetime.now(timezone.utc).isoformat(),'mode':'PAPER_ONLY','policy':'Frozen SportyBet prices strictly within the final 15 minutes before kickoff; late/ineligible captures excluded. Immutable capture-ledger snapshots are joined by exact event identity to settled outcomes. Active tennis qualification uses ATP only; WTA remains separately reported research evidence.','trials':trial_ledger},indent=2,ensure_ascii=False),encoding='utf-8')
-    out={'generated_at':datetime.now(timezone.utc).isoformat(),'mode':'PAPER_ONLY','metrics':metrics,'scope_diagnostics':scope_diagnostics,'gate':gate}
+    now=datetime.now(timezone.utc).isoformat()
+    ledger_path=DATA/'value_trial_ledger.json'
+    ledger={'generated_at':now,'mode':'PAPER_ONLY','policy':'Frozen SportyBet prices strictly within the final 15 minutes before kickoff; late/ineligible captures excluded. Immutable capture-ledger snapshots are joined by exact event identity to settled outcomes. Active tennis qualification uses ATP only; WTA remains separately reported research evidence.','trials':trial_ledger}
+    prior_ledger=load('value_trial_ledger.json',{})
+    if isinstance(prior_ledger,dict) and prior_ledger.get('trials')==ledger['trials'] and prior_ledger.get('policy')==ledger['policy']:
+        ledger['generated_at']=prior_ledger.get('generated_at') or now
+    ledger_path.write_text(json.dumps(ledger,indent=2,ensure_ascii=False),encoding='utf-8')
+
+    out={'generated_at':now,'mode':'PAPER_ONLY','metrics':metrics,'scope_diagnostics':scope_diagnostics,'gate':gate}
+    prior_gate=load('risk_gate.json',{})
+    if isinstance(prior_gate,dict):
+        old_comparison=dict(prior_gate); old_comparison.pop('generated_at',None)
+        new_comparison=dict(out); new_comparison.pop('generated_at',None)
+        if old_comparison==new_comparison:
+            out['generated_at']=prior_gate.get('generated_at') or now
     (DATA/'risk_gate.json').write_text(json.dumps(out,indent=2),encoding='utf-8')
     print(json.dumps(out,indent=2))
 if __name__=='__main__': main()
