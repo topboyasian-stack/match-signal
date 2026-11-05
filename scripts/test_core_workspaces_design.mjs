@@ -80,12 +80,14 @@ const [headers, sharedRenderer, workspaceUi, builderClient, virtualLabClient, li
 ]);
 assert.match(headers, /^\/api\/\*\n  Cache-Control: no-store, no-cache, must-revalidate, max-age=0/m,
   "live API responses must never be cached");
-assert.match(headers, /^\/\*\.js\n  Cache-Control: public, max-age=300, stale-while-revalidate=300/m,
+assert.match(headers, /^\/\*\.js\n  Cache-Control: public, max-age=30, must-revalidate/m,
   "static JavaScript should be reused during workspace navigation");
-assert.match(headers, /^\/\*\.css\n  Cache-Control: public, max-age=300, stale-while-revalidate=300/m,
+assert.match(headers, /^\/\*\.css\n  Cache-Control: public, max-age=30, must-revalidate/m,
   "static stylesheets should be reused during workspace navigation");
 assert.match(headers, /^\/data\/\*\n  Cache-Control: public, max-age=30, stale-while-revalidate=60/m,
   "published data should have only a short bounded browser/edge cache");
+assert.match(headers, /^\/assets\/\*\n  Cache-Control: public, max-age=31536000, immutable/m,
+  "licensed static logo artwork should be cached immutably");
 assert.match(headers, /^\/index\.html\n  Cache-Control: no-store, no-cache, must-revalidate, max-age=0/m,
   "HTML routes must remain immediately revalidated after a deployment");
 assert.match(sharedRenderer, /async function get\(path\)\{const url=String\(path\),live=.*cache:live\?'no-store':'default'/,
