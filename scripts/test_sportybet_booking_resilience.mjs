@@ -303,7 +303,7 @@ try {
     'manual football catalogue lookahead must cover the 19-day fixture horizon and stay within 30 days');
   assert.equal(futureShareRequests.length, 1, 'the share endpoint is called only after both future legs validate');
   assert.equal(futureShareRequests[0].selections.length, 2);
-  assert.ok(futureTicketPayload.validation.every(row => row.ok === true));
+  assert.ok(futureTicketPayload.selections.every(row => row.ok === true));
 
   console.log('SportyBet booking resilience: PASS (bounded paging, share fallback, exact market-225 pair, and Football/Tennis/eFootball mixed ticket).');
 } finally { globalThis.fetch=originalFetch; }
