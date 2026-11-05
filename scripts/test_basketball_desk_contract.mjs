@@ -6,7 +6,10 @@ const [html, css, ui, api, workflow, booking, recorder, nbaRecorderWorkflow] = a
   read("basketball.html"), read("basketball-design.css"), read("basketball-live.js"),
   read("functions/api/sportybet-basketball.js"), read(".github/workflows/cloudflare-pages.yml"), read("functions/api/sportybet-basketball-booking.js"), read("scripts/record_nba_live_behavior.py"), read(".github/workflows/nba-live-observation.yml")
 ]);
+const sharedBooking = await read("functions/api/sportybet-booking.js");
 assert.ok(html.includes("MS-BASKETBALL-DESK-2026.10.24-V11"), "Basketball must publish the new design marker");
+assert.ok(ui.includes("https://raw.githubusercontent.com/topboyasian-stack/match-signal/main/") && ui.includes("cache:'no-store'"), "Basketball must prefer current main predictions and totals evidence over stale static deployment copies");
+assert.ok(sharedBooking.includes("https://raw.githubusercontent.com/topboyasian-stack/match-signal/main/") && sharedBooking.includes("loadNbaReleaseContext"), "NBA ticket release checks must read the current main evidence and remain fail-closed when evidence cannot be loaded");
 assert.ok(html.includes("core-workspaces-design.css?v=20261014-full-v1"), "Basketball must use the shared Match Signal design layer");
 assert.ok(html.includes("basketball-live.js?v=20261104-nba-probability-cohort1"), "Basketball must load the shared-ticket totals renderer");
 assert.ok(html.includes("basketball-design.css?v=20261024-builder-dark-v3"), "Basketball must load its latest contrast-corrected scoped design layer");
