@@ -576,6 +576,66 @@ def build_report(prediction_history, team_history):
         and fitted["accuracy"] >= published["accuracy"] - 0.01
     )
 
+    # A globally fitted blend may be used in an individual competition only
+    # when the global model passes and that competition's holdout independently
+    # confirms lower Brier, non-worse log loss, preserved top-pick accuracy,
+    # and a minimum competition-specific test sample.
+    global_blend_scope_gates = {}
+    if promotion_allowed:
+        for competition, detail in holdout_by_league.items():
+            candidate = detail["candidate_metrics"]["fitted_blend"]
+            baseline = detail["candidate_metrics"]["published"]
+            n = int(detail.get("holdout_n") or 0)
+            enough = n >= SCOPE_MIN_HOLDOUT
+            brier_ok = (
+                candidate.get("brier") is not None
+                and baseline.get("brier") is not None
+                and candidate["brier"] <= baseline["brier"] - SCOPE_MIN_BRIER_LIFT
+            )
+            loss_ok = (
+                candidate.get("log_loss") is not None
+                and baseline.get("log_loss") is not None
+                and candidate["log_loss"] <= baseline["log_loss"]
+            )
+            accuracy_ok = (
+                candidate.get("accuracy") is not None
+                and baseline.get("accuracy") is not None
+                and candidate["accuracy"] >= baseline["accuracy"] - SCOPE_MAX_ACCURACY_REGRESSION
+            )
+            passed = bool(enough and brier_ok and loss_ok and accuracy_ok)
+            gate = {
+                "holdout_n": n,
+                "minimum_holdout": SCOPE_MIN_HOLDOUT,
+                "minimum_brier_improvement": SCOPE_MIN_BRIER_LIFT,
+                "maximum_accuracy_regression": SCOPE_MAX_ACCURACY_REGRESSION,
+                "holdout_sample_passed": enough,
+                "brier_passed": brier_ok,
+                "log_loss_passed": loss_ok,
+                "accuracy_passed": accuracy_ok,
+                "global_blend_weights": weights,
+                "global_holdout_n": len(holdout_enriched),
+                "global_model_passed": True,
+            }
+            global_blend_scope_gates[competition] = gate
+            if passed and competition not in validated_scopes:
+                validated_scopes[competition] = {
+                    "status": "RESEARCH_SCOPE_VALIDATED",
+                    "selected_model": "fitted_blend",
+                    "weights": weights,
+                    "development_n": len(development_enriched),
+                    "holdout_n": n,
+                    "development_metrics": fit,
+                    "holdout_metrics": candidate,
+                    "published_holdout_metrics": baseline,
+                    "evidence": "global development-fitted blend passed global holdout and this competition's predeclared holdout guard",
+                }
+                detail["global_blend_scope_status"] = "RESEARCH_SCOPE_VALIDATED"
+                detail["global_blend_scope_gate"] = gate
+                detail["status"] = "RESEARCH_SCOPE_VALIDATED_GLOBAL_BLEND"
+            else:
+                detail["global_blend_scope_status"] = "RESEARCH_ONLY"
+                detail["global_blend_scope_gate"] = gate
+
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "mode": "PAPER_RESEARCH_ONLY",
@@ -595,6 +655,7 @@ def build_report(prediction_history, team_history):
         "holdout_metrics": metrics,
         "holdout_by_league": holdout_by_league,
         "validated_competition_scopes": validated_scopes,
+        "global_blend_scope_gates": global_blend_scope_gates,
         "holdout_latest_50": [
             {
                 "league": row["league"],
