@@ -441,10 +441,12 @@ def _model_name_for_development(rows):
     return selected, metrics
 
 
-def global_blend_scope_gate(candidate, baseline, holdout_n):
-    """Assess one competition against a globally fitted challenger on its holdout."""
+def global_blend_scope_gate(candidate, baseline, development_n, holdout_n):
+    """Assess a global challenger on independently sufficient competition data."""
+    dev_n = int(development_n or 0)
     n = int(holdout_n or 0)
-    enough = n >= SCOPE_MIN_HOLDOUT
+    enough_development = dev_n >= SCOPE_MIN_DEVELOPMENT
+    enough_holdout = n >= SCOPE_MIN_HOLDOUT
     brier_ok = (
         candidate.get("brier") is not None
         and baseline.get("brier") is not None
@@ -461,9 +463,13 @@ def global_blend_scope_gate(candidate, baseline, holdout_n):
         and candidate["accuracy"] >= baseline["accuracy"] - SCOPE_MAX_ACCURACY_REGRESSION
     )
     return {
-        "passed": bool(enough and brier_ok and loss_ok and accuracy_ok),
+        "passed": bool(enough_development and enough_holdout and brier_ok and loss_ok and accuracy_ok),
+        "development_n": dev_n,
+        "minimum_development": SCOPE_MIN_DEVELOPMENT,
+        "development_sample_passed": enough_development,
         "holdout_n": n,
         "minimum_holdout": SCOPE_MIN_HOLDOUT,
+        "holdout_sample_passed": enough_holdout,
         "minimum_brier_improvement": SCOPE_MIN_BRIER_LIFT,
         "maximum_accuracy_regression": SCOPE_MAX_ACCURACY_REGRESSION,
         "holdout_sample_passed": enough,
@@ -569,6 +575,7 @@ def build_report(prediction_history, team_history):
             and brier_improved and log_loss_not_worse and accuracy_preserved
         )
         holdout_by_league[competition] = {
+            "development_n": len(dev_rows),
             "holdout_n": len(test_rows),
             "selected_development_model": selected_model,
             "selected_model_metrics": selected_metrics,
@@ -624,6 +631,7 @@ def build_report(prediction_history, team_history):
             gate = global_blend_scope_gate(
                 candidate,
                 baseline,
+                detail.get("development_n") or 0,
                 detail.get("holdout_n") or 0,
             )
             gate.update({
@@ -637,7 +645,7 @@ def build_report(prediction_history, team_history):
                     "status": "RESEARCH_SCOPE_VALIDATED",
                     "selected_model": "fitted_blend",
                     "weights": weights,
-                    "development_n": len(development_enriched),
+                    "development_n": gate["development_n"],
                     "holdout_n": gate["holdout_n"],
                     "development_metrics": fit,
                     "holdout_metrics": candidate,
