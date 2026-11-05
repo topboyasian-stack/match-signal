@@ -1092,7 +1092,7 @@
     document.querySelectorAll('[data-builder-refresh]').forEach(function(btn){btn.disabled=true;btn.textContent='Refreshing…';});
     if(!oddsBuilderHasRendered)target.innerHTML='<div class="empty">Loading Odds Builder data…</div>';
     Promise.all([
-      // Read the latest committed artifact through the same-site Pages API; static JSON is outage fallback only.
+      // Keep live API uncached; the static outage fallback uses bounded cache headers for fast workspace navigation.
       fetch('./api/odds-builder-data?v=20261020-live-source2-'+Date.now(),{cache:'no-store'})
         .then(function(r){if(!r.ok)throw new Error('live odds_builder API HTTP '+r.status);return r.json();})
         .catch(function(liveError){
