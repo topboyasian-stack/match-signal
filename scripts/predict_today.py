@@ -653,6 +653,7 @@ def attach_sportybet_market_layer(predictions):
             prediction["odds_timestamp"] = snapshot_at
             prediction["sportybet_market"] = snapshot
             prediction["sportybet_winner_odds"] = {}
+            model_probs = prediction.get("probabilities") or {}
             winner = snapshot.get("winner") or {}
             if winner:
                 p1_book = winner.get("p1_book")
@@ -695,7 +696,6 @@ def attach_sportybet_market_layer(predictions):
                 if isinstance(selected_outcome, dict):
                     prediction["sportybet_outcome_id"] = str(selected_outcome.get("id") or "")
                     prediction["sportybet_outcome_name"] = selected_outcome.get("name")
-                model_probs = prediction.get("probabilities") or {}
             market_winner = prediction.get("sportybet_winner_odds") or {}
             pick = prediction.get("pick")
             model_pick_prob = model_probs.get(pick)
