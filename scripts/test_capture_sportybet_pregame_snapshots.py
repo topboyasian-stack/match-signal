@@ -25,6 +25,7 @@ def football_row():
         "player_1": "Home FC",
         "player_2": "Away FC",
         "start_time": (NOW + timedelta(minutes=10)).isoformat(),
+        "calculated_at": (NOW - timedelta(minutes=2)).isoformat(),
         "pick": "p1",
         "confidence": 0.66,
         "probabilities": {"p1": 0.66, "draw": 0.20, "p2": 0.14},
@@ -63,6 +64,20 @@ assert exact_snapshot_from_prediction(wrong_market, NOW.isoformat()) is None
 missing_draw = football_row()
 missing_draw["sportybet_winner_odds"].pop("draw")
 assert exact_snapshot_from_prediction(missing_draw, NOW.isoformat()) is None
+
+stale_prediction = football_row()
+stale_prediction["calculated_at"] = (
+    NOW - timedelta(hours=13)
+).isoformat()
+assert exact_snapshot_from_prediction(stale_prediction, NOW.isoformat()) is None
+
+late_prediction = football_row()
+late_prediction["calculated_at"] = (
+    datetime.fromisoformat(late_prediction["start_time"].replace("Z", "+00:00"))
+    + timedelta(seconds=1)
+).isoformat()
+assert exact_snapshot_from_prediction(late_prediction, NOW.isoformat()) is None
+
 
 wta = football_row()
 wta.update({"sport": "tennis", "league": "WTA"})
