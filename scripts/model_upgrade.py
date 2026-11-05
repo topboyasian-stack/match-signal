@@ -2,12 +2,19 @@ import json
 import math
 from pathlib import Path
 
-from independent_football_model import independent_prediction
+from independent_football_model import independent_prediction, _canonical_competition
+from football_prequential_ensemble import (
+    CompetitionElo,
+    build_report as build_football_validation_report,
+    normalize_probs,
+    probabilities_for_scope,
+    safe_history_cutoff,
+)
 from value_decision import edge_and_ev, decision
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
-MODEL_VERSION = "4.5-ucl-dual-competition"
+MODEL_VERSION = "5.0-prequential-competition-validated"
 
 
 def load(path, default):
@@ -167,6 +174,91 @@ def _record_ucl_shadow_fields(row, independent, calibrated, market, calibration)
     }
 
 
+
+def apply_validated_competition_probabilities(row, published, selected, scope):
+    """Apply only a competition model independently selected and validated on holdout.
+
+    This updates the forecast itself, but does not grant money, Builder, or ticket
+    eligibility. All such fields are deliberately left untouched.
+    """
+    if not isinstance(scope, dict) or scope.get("status") != "RESEARCH_SCOPE_VALIDATED":
+        return False
+    if not isinstance(selected, dict) or not all(k in selected for k in ("p1", "draw", "p2")):
+        return False
+
+    selected = normalize_probs(selected)
+    baseline = normalize_probs(published)
+    protected = {
+        key: row.get(key)
+        for key in (
+            "live_eligible",
+            "betting_qualified",
+            "qualified_for_builder",
+            "builder_eligible",
+            "real_money_eligible",
+            "paper_only",
+        )
+        if key in row
+    }
+    row.setdefault("published_model_probabilities", {
+        key: round(float(baseline[key]), 6) for key in ("p1", "draw", "p2")
+    })
+    row["probabilities"] = {key: round(float(selected[key]), 6) for key in ("p1", "draw", "p2")}
+    row["calibrated_probabilities"] = dict(row["probabilities"])
+    row["pick"] = max(("p1", "draw", "p2"), key=lambda key: row["probabilities"][key])
+    row["confidence"] = round(row["probabilities"][row["pick"]], 4)
+    row["calibrated_confidence"] = row["confidence"]
+    row["football_model_version"] = MODEL_VERSION
+    row["football_model_validation"] = {
+        "status": "RESEARCH_SCOPE_VALIDATED",
+        "selected_model": scope.get("selected_model"),
+        "development_n": scope.get("development_n"),
+        "holdout_n": scope.get("holdout_n"),
+        "development_metrics": scope.get("development_metrics"),
+        "holdout_metrics": scope.get("holdout_metrics"),
+        "published_holdout_metrics": scope.get("published_holdout_metrics"),
+        "evidence": scope.get("evidence"),
+        "market_independent": True,
+        "live_money_approved": False,
+        "ticket_release_approved": False,
+    }
+    row["model"] = f"Chronological competition model: {scope.get('selected_model')}"
+    row["model_version"] = MODEL_VERSION
+    row["architecture"] = "development-selected competition model + untouched chronological holdout + SportyBet value benchmark"
+    row["calibration"] = {
+        "market": "football:1X2",
+        "method": "native model probabilities; scope selected on development and passed untouched holdout",
+        "temperature": None,
+        "raw": row["confidence"],
+        "calibrated": row["confidence"],
+        "version": MODEL_VERSION,
+    }
+    row["live_eligible"] = False
+    row["testing_mode"] = "paper"
+    for key, value in protected.items():
+        row[key] = value
+    return True
+
+
+def _competition_elo_probabilities(history, row, cache):
+    # Never substitute kickoff for a missing forecast timestamp: doing so could
+    # admit results that were not safely observable before the original forecast.
+    cutoff = safe_history_cutoff(row.get("calculated_at"))
+    if cutoff is None:
+        return None
+    key = cutoff.isoformat()
+    if key not in cache:
+        model = CompetitionElo(history)
+        model.advance_before(cutoff)
+        cache[key] = model
+    return cache[key].predict(
+        row.get("league") or "global",
+        row.get("player_1") or "Home",
+        row.get("player_2") or "Away",
+    )
+
+
+
 def main():
     pred_path = DATA / "predictions.json"
     history_path = DATA / "prediction_history.json"
@@ -176,29 +268,52 @@ def main():
     history = load(history_path, [])
     external_team_history = load(team_history_path, [])
     calibration = load(calibration_path, {})
-    model_history = history + external_team_history
+
+    # Re-evaluate model choice using only pre-kickoff historical predictions.
+    # A competition becomes eligible for a prediction-model update only when
+    # its own development-selected challenger passes its own untouched holdout.
+    try:
+        validation_report = build_football_validation_report(history, external_team_history)
+    except Exception as exc:
+        validation_report = {
+            "status": "VALIDATION_ERROR",
+            "validated_competition_scopes": {},
+            "validation_error": str(exc)[:240],
+        }
+    validated_scopes = validation_report.get("validated_competition_scopes") or {}
+    model_history = external_team_history
+    elo_cache = {}
 
     upgraded = 0
     warnings = 0
     paper_value = 0
     no_history = 0
     no_market = 0
+    validated_updates = 0
+    validated_scope_counts = {}
     ucl_shadowed = 0
     ucl_shadow_complete = 0
     ucl_shadow_partial = 0
 
     for row in predictions:
         if row.get("sport") != "football":
-            row.setdefault("architecture", "independent statistical + market benchmark + calibration + value")
+            row.setdefault("architecture", "competition statistical model + current market benchmark + calibration + value")
             row.setdefault("decision", "PAPER ONLY")
             continue
 
         try:
+            history_cutoff = safe_history_cutoff(row.get("calculated_at"))
+            if history_cutoff is None:
+                warnings += 1
+                row.setdefault("upgrade_warnings", []).append(
+                    "missing forecast timestamp; statistical challenger not applied"
+                )
+                continue
             independent = independent_prediction(
                 row_to_event(row),
                 row.get("league") or "global",
                 model_history,
-                cutoff=row.get("calculated_at") or row.get("start_time"),
+                cutoff=history_cutoff,
             )
             if not independent:
                 warnings += 1
@@ -208,71 +323,65 @@ def main():
             if independent.get("sample_home", 0) < 2 or independent.get("sample_away", 0) < 2:
                 no_history += 1
 
-            raw = [independent["p1"], independent["draw"], independent["p2"]]
-            calibrated = softmax_temperature(raw, calibration_temperature(calibration, "football"))
-            market = valid_market(row)
+            dixon_probs = normalize_probs({
+                "p1": independent["p1"],
+                "draw": independent["draw"],
+                "p2": independent["p2"],
+            })
+            elo_probs = _competition_elo_probabilities(model_history, row, elo_cache)
+            baseline_source = (
+                row.get("published_model_probabilities")
+                or row.get("calibrated_probabilities")
+                or row.get("probabilities")
+            )
+            if not isinstance(baseline_source, dict):
+                raise ValueError("published football probability vector is missing")
+            published_probs = normalize_probs(baseline_source)
 
-            # The independent dual-competition model has not yet beaten the
-            # published UCL model on walk-forward evidence. Keep its forecast
-            # as a research shadow; never replace the active published pick,
-            # probabilities, market decision, or Builder/ticket qualification.
-            if str(row.get("league") or "").strip().lower() == "champions league":
-                _record_ucl_shadow_fields(row, independent, calibrated, market, calibration)
-                row["architecture"] = "published UCL prediction retained; domestic + Champions League model stored as paper shadow"
-                row["live_eligible"] = False
-                row["testing_mode"] = "paper"
+            market = valid_market(row)
+            competition = _canonical_competition(row.get("league") or "global")
+            scope = validated_scopes.get(competition)
+            selected_probs = None
+            if scope and elo_probs:
+                selected_probs = probabilities_for_scope(
+                    scope,
+                    published_probs,
+                    dixon_probs,
+                    elo_probs,
+                )
+
+            # Keep dual-competition UCL diagnostics visible, but never give them
+            # ticket eligibility or bypass the competition-specific holdout.
+            if competition == "Champions League":
+                shadow_calibrated = softmax_temperature(
+                    [dixon_probs["p1"], dixon_probs["draw"], dixon_probs["p2"]],
+                    calibration_temperature(calibration, "football"),
+                )
+                _record_ucl_shadow_fields(
+                    row,
+                    independent,
+                    shadow_calibrated,
+                    market,
+                    calibration,
+                )
                 ucl_shadowed += 1
                 if row["independent_shadow_history_complete"]:
                     ucl_shadow_complete += 1
                 else:
                     ucl_shadow_partial += 1
-                if not market:
-                    no_market += 1
-                upgraded += 1
-                continue
 
-            _apply_independent_probability_fields(row, independent, calibrated, calibration)
-            row["expected_goals"] = {"p1": independent["xg_home"], "p2": independent["xg_away"], "total": round(independent["xg_home"] + independent["xg_away"], 4)}
-            row["architecture"] = "independent statistical + market benchmark + calibration + value"
-            row["model"] = independent["method"]
-            row["model_version"] = MODEL_VERSION
-            row["calibration_version"] = calibration.get("version")
-            row["live_eligible"] = False
-            row["testing_mode"] = "paper"
-
-            if market:
-                row["market_probabilities"] = {"p1": round(market["p1"], 4), "draw": round(market["draw"], 4), "p2": round(market["p2"], 4)}
-                row["market_odds"] = market["odds"]
-                row["market_source"] = market.get("source") or row.get("market_source") or "stored contemporaneous market"
-                pick_idx = calibrated.index(max(calibrated))
-                edge, ev = edge_and_ev(calibrated[pick_idx], market["odds"][pick_idx])
-                row["edge"] = edge
-                row["value"] = {"expected_value": ev, "odds": market["odds"][pick_idx], "market_implied": market[["p1", "draw", "p2"][pick_idx]]}
-                dec = decision(calibrated[pick_idx], market["odds"][pick_idx], sample_ok=False)
-                row["decision"] = dec["decision"]
-                row["decision_reason"] = dec["reason"]
-                if edge is not None and edge >= 0.035 and ev is not None and ev >= 0.05:
-                    paper_value += 1
-            else:
-                no_market += 1
-                row["market_probabilities"] = None
-                row["market_odds"] = None
-                row["market_source"] = None
-                row["edge"] = None
-                row["value"] = {"expected_value": None, "odds": None, "market_implied": None}
-                row["decision"] = "PAPER ONLY"
-                row["decision_reason"] = "no_contemporaneous_market_data"
-
-            if str(row.get("league") or "").strip().lower() == "champions league":
-                form_status = independent.get("competition_form_status") or "PARTIAL_HISTORY"
-                row["ucl_form_gate"] = {
-                    "eligible": form_status == "COMPLETE",
-                    "status": form_status,
-                    "reason": None if form_status == "COMPLETE" else "domestic_or_champions_league_venue_history_incomplete",
+            row["independent_probabilities"] = {
+                key: round(float(dixon_probs[key]), 6) for key in ("p1", "draw", "p2")
+            }
+            if elo_probs:
+                row["football_elo_probabilities"] = {
+                    key: round(float(elo_probs[key]), 6) for key in ("p1", "draw", "p2")
                 }
-                if form_status != "COMPLETE":
-                    row["decision"] = "PAPER ONLY"
-                    row["decision_reason"] = "ucl_dual_competition_history_incomplete"
+            row["expected_goals"] = {
+                "p1": independent["xg_home"],
+                "p2": independent["xg_away"],
+                "total": round(independent["xg_home"] + independent["xg_away"], 4),
+            }
             row["competition_form"] = independent.get("competition_form")
             row["competition_form_status"] = independent.get("competition_form_status")
             row["independent_diagnostics"] = {
@@ -295,6 +404,85 @@ def main():
                 "competition_form_status": independent.get("competition_form_status"),
                 "competition_form": independent.get("competition_form"),
             }
+
+            model_applied = False
+            if scope and selected_probs:
+                model_applied = apply_validated_competition_probabilities(
+                    row,
+                    published_probs,
+                    selected_probs,
+                    scope,
+                )
+            if model_applied:
+                validated_updates += 1
+                validated_scope_counts[competition] = validated_scope_counts.get(competition, 0) + 1
+                if competition == "Champions League":
+                    row["independent_shadow_promotion_status"] = "RESEARCH_SCOPE_VALIDATED"
+                    row["independent_shadow_use_for_tickets"] = False
+            else:
+                # Preserve the published prediction outside every validated scope.
+                row["probabilities"] = {
+                    key: round(float(published_probs[key]), 6) for key in ("p1", "draw", "p2")
+                }
+                row["calibrated_probabilities"] = dict(row["probabilities"])
+                row["pick"] = max(("p1", "draw", "p2"), key=lambda key: row["probabilities"][key])
+                row["confidence"] = round(row["probabilities"][row["pick"]], 4)
+                row["calibrated_confidence"] = row["confidence"]
+                row["football_model_validation"] = {
+                    "status": "RESEARCH_ONLY",
+                    "selected_model": None,
+                    "reason": "no competition-specific challenger passed development-selected untouched holdout",
+                    "validation_status": validation_report.get("status"),
+                    "live_money_approved": False,
+                    "ticket_release_approved": False,
+                }
+                row["live_eligible"] = False
+                row["testing_mode"] = "paper"
+
+            final_probs = row["probabilities"]
+            final_vector = [final_probs["p1"], final_probs["draw"], final_probs["p2"]]
+            row["calibration_version"] = calibration.get("version")
+            row["model_version"] = MODEL_VERSION if model_applied else row.get("model_version", "published")
+            row["architecture"] = "competition-specific validated prediction model + SportyBet value benchmark + independent research challengers"
+            if not model_applied:
+                row["model"] = row.get("model") or "published model retained; statistical challengers are research-only"
+
+            # Current bookmaker prices are used only to calculate a paper value
+            # signal. They cannot change any eligibility or ticket-release gate.
+            if market:
+                row["market_probabilities"] = {
+                    "p1": round(market["p1"], 4),
+                    "draw": round(market["draw"], 4),
+                    "p2": round(market["p2"], 4),
+                }
+                row["market_odds"] = market["odds"]
+                row["market_source"] = market.get("source") or row.get("market_source") or "stored contemporaneous market"
+                pick_key = row["pick"]
+                pick_idx = ("p1", "draw", "p2").index(pick_key)
+                edge, ev = edge_and_ev(final_vector[pick_idx], market["odds"][pick_idx])
+                row["edge"] = edge
+                row["value"] = {
+                    "expected_value": ev,
+                    "odds": market["odds"][pick_idx],
+                    "market_implied": market[pick_key],
+                }
+                dec = decision(final_vector[pick_idx], market["odds"][pick_idx], sample_ok=False)
+                row["decision"] = dec["decision"]
+                row["decision_reason"] = dec["reason"]
+                if edge is not None and edge >= 0.035 and ev is not None and ev >= 0.05:
+                    paper_value += 1
+            else:
+                no_market += 1
+                row["market_probabilities"] = None
+                row["market_odds"] = None
+                row["market_source"] = None
+                row["edge"] = None
+                row["value"] = {"expected_value": None, "odds": None, "market_implied": None}
+                row["decision"] = "PAPER ONLY"
+                row["decision_reason"] = "no_contemporaneous_market_data"
+
+            row["live_eligible"] = False
+            row["testing_mode"] = "paper"
             upgraded += 1
         except Exception as exc:
             warnings += 1
@@ -305,6 +493,14 @@ def main():
         "status": "ok",
         "model_version": MODEL_VERSION,
         "football_upgraded": upgraded,
+        "validated_model_prediction_updates": validated_updates,
+        "validated_scope_counts": validated_scope_counts,
+        "validated_competition_scopes": validated_scopes,
+        "validation_report_status": validation_report.get("status"),
+        "validation_total_eligible": validation_report.get("total_eligible", 0),
+        "validation_development_n": validation_report.get("development_n", 0),
+        "validation_holdout_n": validation_report.get("holdout_n", 0),
+        "global_blend_promotion_allowed": validation_report.get("promotion_allowed", False),
         "positive_edge_paper_candidates": paper_value,
         "warnings": warnings,
         "football_without_sufficient_team_history": no_history,
@@ -312,7 +508,7 @@ def main():
         "ucl_shadow_predictions": ucl_shadowed,
         "ucl_shadow_complete_history": ucl_shadow_complete,
         "ucl_shadow_partial_history": ucl_shadow_partial,
-        "ucl_shadow_policy": "research-only; published pick/probabilities/decision and ticket qualification are preserved",
+        "ucl_shadow_policy": "research shadow remains non-ticket eligible; approved scope model update does not alter release gates",
         "external_team_history_rows": len(external_team_history),
     }, indent=2))
 
