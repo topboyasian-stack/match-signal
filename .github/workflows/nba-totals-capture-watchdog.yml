@@ -56,10 +56,12 @@ jobs:
             live-expansion.yml; do
             echo "Ensuring scheduled workflow is enabled: $workflow"
             workflow_state="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow" --jq '.state')"
-            if [ "$workflow_state" != "active" ]; then
-              gh workflow enable "$workflow" --repo "$GITHUB_REPOSITORY"
-            fi
+            echo "Workflow state before schedule re-arm: $workflow_state"
+            # Reassert the active state even when GitHub reports active; schedule delivery
+            # can lag behind the workflow metadata after long gaps.
+            gh workflow enable "$workflow" --repo "$GITHUB_REPOSITORY"
             workflow_state="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow" --jq '.state')"
+            echo "Workflow state after schedule re-arm: $workflow_state"
             if [ "$workflow_state" != "active" ]; then
               echo "Scheduled workflow is not active after recovery: $workflow (state=$workflow_state)" >&2
               exit 1

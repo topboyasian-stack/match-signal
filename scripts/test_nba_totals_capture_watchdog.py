@@ -37,6 +37,9 @@ def run():
         "The NBA forecast refresh schedule must be re-armed without changing model thresholds."
     )
     assert 'gh workflow enable "$workflow" --repo "$GITHUB_REPOSITORY"' in watchdog_workflow, (
+        "Schedule recovery must reassert enable state even when GitHub still reports the workflow active."
+    )
+    assert 'gh workflow enable "$workflow" --repo "$GITHUB_REPOSITORY"' in watchdog_workflow, (
         "NBA recovery watchdog must call the GitHub workflow-enable command after delivery gaps."
     )
 
