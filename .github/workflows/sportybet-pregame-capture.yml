@@ -44,9 +44,10 @@ jobs:
 
       - name: Validate exact pregame snapshot contracts
         run: |
-          python -m py_compile scripts/market_snapshot_freshness.py scripts/capture_sportybet_pregame_snapshots.py scripts/model_guard.py
+          python -m py_compile scripts/market_snapshot_freshness.py scripts/capture_sportybet_pregame_snapshots.py scripts/model_guard.py scripts/test_sportybet_pregame_capture_workflow.py
           python scripts/test_market_snapshot_freshness.py
           python scripts/test_capture_sportybet_pregame_snapshots.py
+          python scripts/test_sportybet_pregame_capture_workflow.py
           python scripts/test_model_guard_active_scope.py
 
       - name: Capture exact SportyBet football and ATP prices
