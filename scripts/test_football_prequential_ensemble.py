@@ -158,5 +158,5 @@ if __name__ == "__main__":
     test_development_fit_uses_only_passed_development_rows()
     test_accuracy_first_blend_fits_on_development_rows_only()
     test_competition_model_choice_uses_development_rows_only()
-    test_global_blend_scope_requires_independent_competition_evidence()
+    test_global_blend_scope_uses_global_fit_and_independent_holdout_not_local_dev_count()
     print("Football prequential ensemble tests passed.")
