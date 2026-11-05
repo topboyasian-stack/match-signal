@@ -1,70 +1,70 @@
 {
-  "generated_at": "2026-11-05T11:01:23.762801+00:00",
-  "status": "HEALTHY",
-  "critical_issues": 0,
+  "generated_at": "2026-11-05T11:48:20.113695+00:00",
+  "status": "FAIL",
+  "critical_issues": 2,
   "warning_issues": 0,
   "info_issues": 2,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
-      "status": "PASS",
-      "age_hours": 3.27,
+      "status": "STALE",
+      "age_hours": 4.05,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.14,
+      "age_hours": 0.13,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 0.1,
+      "age_hours": 0.89,
       "threshold_hours": 4
     },
     {
       "engine": "unified_upcoming",
       "status": "PASS",
-      "age_hours": 0.01,
+      "age_hours": 0.0,
       "threshold_hours": 2
     },
     {
       "engine": "prediction_desk_health",
       "status": "PASS",
-      "age_hours": 0.05,
+      "age_hours": 0.04,
       "threshold_hours": 2
     },
     {
       "engine": "virtual_participant_history",
       "status": "PASS",
-      "max_input_age_minutes": 12.2,
-      "virtual_lab_status_age_minutes": 15.2,
+      "max_input_age_minutes": 4.6,
+      "virtual_lab_status_age_minutes": 6.8,
       "threshold_minutes": 30.0,
       "stale_inputs": []
     },
     {
       "engine": "tennis_forward_discovery",
       "status": "PASS",
-      "age_hours": 3.21,
+      "age_hours": 4.0,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 0.26,
+      "age_hours": 0.18,
       "threshold_hours": 0.5,
       "heartbeat_source": "virtual_lab_live.json",
-      "events_count": 688
+      "events_count": 668
     },
     {
       "engine": "nba_live_observation_recorder",
       "status": "PASS",
-      "age_hours": 0.1,
+      "age_hours": 0.18,
       "threshold_hours": 0.25,
       "heartbeat_source": "nba_live_observations.json.gz",
       "games_tracked": 50,
-      "snapshots_recorded": 5346
+      "snapshots_recorded": 5360
     },
     {
       "engine": "engine_lifecycle",
@@ -72,11 +72,11 @@
       "lanes": {
         "darts_x": {
           "status": "RETIRED",
-          "artifact_at": "2026-11-05T09:14:45.646875+00:00"
+          "artifact_at": "2026-11-05T11:37:57.250936+00:00"
         },
         "table_tennis_x": {
           "status": "RETIRED",
-          "artifact_at": "2026-11-05T09:00:10.290085+00:00"
+          "artifact_at": "2026-11-05T11:38:16.830986+00:00"
         },
         "basketball_core_moneyline": {
           "status": "RETIRED",
@@ -94,7 +94,7 @@
           "historical_rows_last_success": 68,
           "upcoming_rows_last_success": 3,
           "published_prediction_rows": 0,
-          "last_attempt_at": "2026-11-05T03:43:37.783595+00:00",
+          "last_attempt_at": "2026-11-05T11:32:47.192797+00:00",
           "last_successful_update_at": "2026-11-02T21:14:33.462592+00:00",
           "last_error": "RuntimeError: BetStudy history unavailable: 403 Client Error: Forbidden for url: https://www.betstudy.com/soccer-stats/c/england/u21-professional-development-league-2/d/results/; SofaScore fallback disabled after upstream 403 challenge"
         }
@@ -102,6 +102,11 @@
     }
   ],
   "issues": [
+    {
+      "code": "STALE_CORE_PREDICTION_PIPELINE",
+      "severity": "critical",
+      "detail": "updated_at age 4.05h exceeds 4h"
+    },
     {
       "code": "PDL_EXPERIMENTAL_FEED_STALE",
       "severity": "info",
@@ -111,16 +116,21 @@
       "code": "SELECTION_GATE_EMPTY",
       "severity": "info",
       "detail": "Current prediction feed exists but the selected-candidate layer returned zero qualified selections; no gate was weakened"
+    },
+    {
+      "code": "PIPELINE_STALE",
+      "severity": "critical",
+      "detail": "pipeline_status age 4.05h exceeds 4h"
     }
   ],
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
   "paper_only": true,
   "prediction_desk_filters": {
-    "past_kickoff_rows_hidden": 2,
+    "past_kickoff_rows_hidden": 3,
     "stale_live_flags_hidden": 0,
     "expired_settled_rows_hidden": 0,
-    "virtual_market_rows_held_for_kickoff_window": 235,
+    "virtual_market_rows_held_for_kickoff_window": 244,
     "virtual_rows_held_for_stale_participant_history": 0,
-    "virtual_rows_held_for_recent_product_drawdown": 108
+    "virtual_rows_held_for_recent_product_drawdown": 80
   }
 }
