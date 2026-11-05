@@ -20,6 +20,7 @@ assert.match(headerRules,/\/qualified-best\*\s*\n\s*Cache-Control:\s*no-store, n
 assert.match(headerRules,/\/\*\.js\s*\n\s*Cache-Control:\s*public, max-age=30, must-revalidate/,"the shared Prediction Desk renderer should be reused for repeat navigation but revalidated after a short deployment-safe window");
 assert.match(headerRules,/\/\*\.css\s*\n\s*Cache-Control:\s*public, max-age=30, must-revalidate/,"shared stylesheets should be reused briefly across workspace navigation");
 assert.match(headerRules,/\/data\/\*\s*\n\s*Cache-Control:\s*public, max-age=30, stale-while-revalidate=60/,"published data snapshots should have only a short bounded cache");
+assert.match(headerRules,/^\/data\/nba_predictions\.json\n  ! Cache-Control\n  Cache-Control: no-store, no-cache, must-revalidate, max-age=0$/m,"NBA prediction snapshots must retain their strict no-store freshness policy despite the bounded static data cache");
 assert.match(headerRules,/\/api\/\*\s*\n\s*Cache-Control:\s*no-store, no-cache, must-revalidate, max-age=0/,"live API routes must remain uncached");
 assert.match(source,/async function get\(path\)\{const url=String\(path\),live=.*cache:live\?'no-store':'default'/,"shared renderer should cache published JSON while revalidating API requests");
 assert.match(workspaceUi,/club-logo-registry\.json'\),\{cache:'default'\}/,"navigation should reuse the club-logo registry across pages");
