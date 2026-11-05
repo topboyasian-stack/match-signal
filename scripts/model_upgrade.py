@@ -240,7 +240,9 @@ def apply_validated_competition_probabilities(row, published, selected, scope):
 
 
 def _competition_elo_probabilities(history, row, cache):
-    cutoff = row.get("calculated_at") or row.get("start_time")
+    # Never substitute kickoff for a missing forecast timestamp: doing so could
+    # admit results observed after the original prediction was made.
+    cutoff = row.get("calculated_at")
     if not cutoff:
         return None
     key = str(cutoff)
@@ -269,7 +271,14 @@ def main():
     # Re-evaluate model choice using only pre-kickoff historical predictions.
     # A competition becomes eligible for a prediction-model update only when
     # its own development-selected challenger passes its own untouched holdout.
-    validation_report = build_football_validation_report(history, external_team_history)
+    try:
+        validation_report = build_football_validation_report(history, external_team_history)
+    except Exception as exc:
+        validation_report = {
+            "status": "VALIDATION_ERROR",
+            "validated_competition_scopes": {},
+            "validation_error": str(exc)[:240],
+        }
     validated_scopes = validation_report.get("validated_competition_scopes") or {}
     model_history = external_team_history
     elo_cache = {}
