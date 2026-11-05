@@ -25,6 +25,7 @@ EXPECTED_MARKET_ID = {"football": "1", "tennis": "186"}
 ACTIVE_TENNIS_TOUR = "ATP"
 PAGE_LIMIT = 10
 MAX_LEDGER_ROWS = 12000
+MAX_MODEL_PREDICTION_AGE_SECONDS = 12 * 60 * 60
 
 
 def load_json(path: Path, default):
@@ -46,7 +47,14 @@ def exact_snapshot_from_prediction(row, fetched_at):
 
     event_id = str(row.get("event_id") or "")
     start_time = row.get("start_time")
+    calculated_at = parse_utc(row.get("calculated_at"))
+    start_at = parse_utc(start_time)
     if not event_id or not is_fresh_pregame_snapshot(fetched_at, start_time):
+        return None
+    if calculated_at is None or start_at is None:
+        return None
+    model_age_seconds = (start_at - calculated_at).total_seconds()
+    if model_age_seconds < 0 or model_age_seconds > MAX_MODEL_PREDICTION_AGE_SECONDS:
         return None
 
     winner = row.get("sportybet_winner_odds") or {}
@@ -94,6 +102,8 @@ def exact_snapshot_from_prediction(row, fetched_at):
         "player_2": row.get("player_2") or row.get("away_team"),
         "start_time": start_time,
         "captured_at": fetched_at,
+        "model_calculated_at": calculated_at.isoformat(),
+        "model_age_seconds": round(float(model_age_seconds), 3),
         "quote_age_seconds": round(float(age_seconds), 3),
         "market_id": market_id,
         "last_odds_change_time": (
