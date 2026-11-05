@@ -230,8 +230,38 @@ jobs:
         continue-on-error: true
         run: PYTHONPATH=. python scripts/calibrate_models.py
       - name: Apply independent statistical model, market benchmark and value layer
-        continue-on-error: true
         run: PYTHONPATH=. python scripts/model_upgrade.py
+      - name: Assert football ensemble audit is fresh and paper-only
+        run: |
+          python - <<'PY'
+          import json
+          from datetime import datetime, timezone
+          from pathlib import Path
+          path = Path("data/football_prequential_validation.json")
+          if not path.exists():
+              raise SystemExit("ABORT: football ensemble validation audit was not generated")
+          audit = json.loads(path.read_text(encoding="utf-8"))
+          generated = datetime.fromisoformat(audit["generated_at_utc"])
+          age_seconds = (datetime.now(timezone.utc) - generated.astimezone(timezone.utc)).total_seconds()
+          if age_seconds < -30 or age_seconds > 600:
+              raise SystemExit(f"ABORT: football ensemble audit is stale or future-dated ({age_seconds:.1f}s)")
+          if audit.get("model_version") != "5.0-prequential-competition-validated":
+              raise SystemExit("ABORT: unexpected football ensemble model version")
+          if audit.get("mode") != "PAPER_RESEARCH_ONLY":
+              raise SystemExit("ABORT: football ensemble audit must remain research-only")
+          if audit.get("validation_report_status") == "VALIDATION_ERROR":
+              raise SystemExit("ABORT: football ensemble validation failed; refusing silent publication")
+          for key in ("live_money_approved", "ticket_release_approved", "release_gates_changed"):
+              if audit.get(key) is not False:
+                  raise SystemExit(f"ABORT: football ensemble changed release policy ({key})")
+          print(json.dumps({
+              "generated_at_utc": audit["generated_at_utc"],
+              "validation_report_status": audit.get("validation_report_status"),
+              "validated_scope_prediction_counts": audit.get("validated_scope_prediction_counts"),
+              "validated_model_prediction_updates": audit.get("validated_model_prediction_updates"),
+              "release_policy": "paper-only; no ticket or real-money approval",
+          }, indent=2))
+          PY
       - name: Finalize current SportyBet model edge and EV signals
         run: python scripts/finalize_value_signals.py
       - name: Build reusable team and player behavior profiles
@@ -307,7 +337,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/predictions.json data/prediction_pool.json data/value_signal_status.json data/value_trial_ledger.json data/prediction_history.json data/football_performance.json data/pipeline_status.json data/risk_gate.json data/calibration.json data/football_team_history.json data/behavior_profiles.json data/individual_behavior.json data/behavior_validation.json data/v4_paper_ledger.json data/v4_validation.json data/prediction_breakdown.json data/sports_evaluation.json data/sportybet_odds_snapshot.json qa/report.json
+          git add data/predictions.json data/prediction_pool.json data/value_signal_status.json data/value_trial_ledger.json data/prediction_history.json data/football_performance.json data/pipeline_status.json data/risk_gate.json data/calibration.json data/football_team_history.json data/behavior_profiles.json data/individual_behavior.json data/behavior_validation.json data/v4_paper_ledger.json data/v4_validation.json data/prediction_breakdown.json data/sports_evaluation.json data/sportybet_odds_snapshot.json data/football_prequential_validation.json qa/report.json
           # Keep independently refreshed aggregate-performance snapshots from
           # concurrent writers on main. Replaying these generated reports
           # caused rebase conflicts and prevented publication.
