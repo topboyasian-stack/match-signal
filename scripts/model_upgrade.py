@@ -15,7 +15,7 @@ from value_decision import edge_and_ev, decision
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
-MODEL_VERSION = "5.0-prequential-competition-validated"
+MODEL_VERSION = "5.1-fixture-ready-prequential-ensemble"
 
 
 def load(path, default):
@@ -260,7 +260,63 @@ def _competition_elo_probabilities(history, row, cache):
 
 
 
-def build_validation_audit(validation_report, football_upgraded, validated_updates, validated_scope_counts, warnings):
+def fixture_model_release_decision(scope, selected_probs, independent):
+    """Decide model replacement for one fixture without hiding its published pick.
+
+    A competition-level model scope and that fixture's own history are separate
+    gates. An incomplete fixture keeps its published forecast; it does not block
+    a different fixture whose history is complete.
+    """
+    history_status = (
+        independent.get("competition_form_status")
+        if isinstance(independent, dict)
+        else None
+    )
+    if history_status != "COMPLETE":
+        return {
+            "status": "PUBLISHED_BASELINE_ONLY",
+            "use_validated_model": False,
+            "history_status": history_status or "UNKNOWN",
+            "reason": "Fixture-specific competition-form history is incomplete; keep this published prediction visible.",
+            "prediction_remains_visible": True,
+            "ticket_release_approved": False,
+        }
+
+    if not isinstance(scope, dict) or scope.get("status") != "RESEARCH_SCOPE_VALIDATED":
+        return {
+            "status": "PUBLISHED_BASELINE_ONLY",
+            "use_validated_model": False,
+            "history_status": history_status,
+            "reason": "This competition has not passed its independent chronological holdout guard; keep the published prediction visible.",
+            "prediction_remains_visible": True,
+            "ticket_release_approved": False,
+        }
+
+    if not isinstance(selected_probs, dict) or not all(
+        key in selected_probs for key in ("p1", "draw", "p2")
+    ):
+        return {
+            "status": "PUBLISHED_BASELINE_ONLY",
+            "use_validated_model": False,
+            "history_status": history_status,
+            "reason": "Validated competition model probabilities are unavailable for this fixture; keep the published prediction visible.",
+            "prediction_remains_visible": True,
+            "ticket_release_approved": False,
+        }
+
+    return {
+        "status": "VALIDATED_MODEL_READY",
+        "use_validated_model": True,
+        "history_status": history_status,
+        "competition_scope_status": scope.get("status"),
+        "selected_model": scope.get("selected_model"),
+        "reason": "Fixture history is complete and its competition model passed the untouched holdout guard.",
+        "prediction_remains_visible": True,
+        "ticket_release_approved": False,
+    }
+
+
+def build_validation_audit(validation_report, football_upgraded, validated_updates, validated_scope_counts, warnings, fixture_readiness_counts=None):
     """Build a timestamped, explicit audit of the prequential model run."""
     return {
         "generated_at_utc": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
@@ -271,8 +327,10 @@ def build_validation_audit(validation_report, football_upgraded, validated_updat
         "validation_development_n": int(validation_report.get("development_n", 0) or 0),
         "validation_holdout_n": int(validation_report.get("holdout_n", 0) or 0),
         "global_blend_promotion_allowed": bool(validation_report.get("promotion_allowed", False)),
+        "global_blend_scope_gates": validation_report.get("global_blend_scope_gates") or {},
         "validated_competition_scopes": validation_report.get("validated_competition_scopes") or {},
         "validated_scope_prediction_counts": dict(validated_scope_counts),
+        "fixture_model_readiness_counts": dict(fixture_readiness_counts or {}),
         "validated_model_prediction_updates": int(validated_updates),
         "football_predictions_processed": int(football_upgraded),
         "warnings": int(warnings),
@@ -314,6 +372,7 @@ def main():
     no_market = 0
     validated_updates = 0
     validated_scope_counts = {}
+    fixture_readiness_counts = {}
     ucl_shadowed = 0
     ucl_shadow_complete = 0
     ucl_shadow_partial = 0
@@ -328,6 +387,15 @@ def main():
             history_cutoff = safe_history_cutoff(row.get("calculated_at"))
             if history_cutoff is None:
                 warnings += 1
+                row["fixture_model_readiness"] = {
+                    "status": "PUBLISHED_BASELINE_ONLY",
+                    "use_validated_model": False,
+                    "history_status": "UNKNOWN",
+                    "reason": "Forecast timestamp is missing; the published prediction remains visible, but the challenger cannot be applied safely.",
+                    "prediction_remains_visible": True,
+                    "ticket_release_approved": False,
+                }
+                fixture_readiness_counts["PUBLISHED_BASELINE_ONLY"] = fixture_readiness_counts.get("PUBLISHED_BASELINE_ONLY", 0) + 1
                 row.setdefault("upgrade_warnings", []).append(
                     "missing forecast timestamp; statistical challenger not applied"
                 )
@@ -340,6 +408,15 @@ def main():
             )
             if not independent:
                 warnings += 1
+                row["fixture_model_readiness"] = {
+                    "status": "PUBLISHED_BASELINE_ONLY",
+                    "use_validated_model": False,
+                    "history_status": "UNKNOWN",
+                    "reason": "The challenger could not calculate this fixture; the published prediction remains visible.",
+                    "prediction_remains_visible": True,
+                    "ticket_release_approved": False,
+                }
+                fixture_readiness_counts["PUBLISHED_BASELINE_ONLY"] = fixture_readiness_counts.get("PUBLISHED_BASELINE_ONLY", 0) + 1
                 row.setdefault("upgrade_warnings", []).append("independent model returned no prediction")
                 continue
 
@@ -428,8 +505,13 @@ def main():
                 "competition_form": independent.get("competition_form"),
             }
 
+            fixture_release = fixture_model_release_decision(scope, selected_probs, independent)
+            row["fixture_model_readiness"] = fixture_release
+            readiness_status = fixture_release["status"]
+            fixture_readiness_counts[readiness_status] = fixture_readiness_counts.get(readiness_status, 0) + 1
+
             model_applied = False
-            if scope and selected_probs:
+            if fixture_release["use_validated_model"]:
                 model_applied = apply_validated_competition_probabilities(
                     row,
                     published_probs,
@@ -454,7 +536,10 @@ def main():
                 row["football_model_validation"] = {
                     "status": "RESEARCH_ONLY",
                     "selected_model": None,
-                    "reason": "no competition-specific challenger passed development-selected untouched holdout",
+                    "reason": fixture_release.get("reason") or "No validated challenger was applied to this fixture.",
+                    "fixture_history_status": fixture_release.get("history_status"),
+                    "fixture_readiness_status": fixture_release.get("status"),
+                    "competition_scope_status": (scope or {}).get("status", "RESEARCH_ONLY"),
                     "validation_status": validation_report.get("status"),
                     "live_money_approved": False,
                     "ticket_release_approved": False,
@@ -466,7 +551,7 @@ def main():
             final_vector = [final_probs["p1"], final_probs["draw"], final_probs["p2"]]
             row["calibration_version"] = calibration.get("version")
             row["model_version"] = MODEL_VERSION if model_applied else row.get("model_version", "published")
-            row["architecture"] = "competition-specific validated prediction model + SportyBet value benchmark + independent research challengers"
+            row["architecture"] = "globally or competition-validated model + fixture-specific history readiness + current SportyBet value benchmark"
             if not model_applied:
                 row["model"] = row.get("model") or "published model retained; statistical challengers are research-only"
 
@@ -512,7 +597,7 @@ def main():
             row.setdefault("upgrade_warnings", []).append(str(exc)[:180])
 
     pred_path.write_text(json.dumps(predictions, indent=2, ensure_ascii=False), encoding="utf-8")
-    audit = build_validation_audit(validation_report, upgraded, validated_updates, validated_scope_counts, warnings)
+    audit = build_validation_audit(validation_report, upgraded, validated_updates, validated_scope_counts, warnings, fixture_readiness_counts)
     audit_path = DATA / "football_prequential_validation.json"
     audit_path.write_text(json.dumps(audit, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(json.dumps({
@@ -524,6 +609,8 @@ def main():
         "validated_model_prediction_updates": validated_updates,
         "validated_scope_counts": validated_scope_counts,
         "validated_competition_scopes": validated_scopes,
+        "global_blend_scope_gates": validation_report.get("global_blend_scope_gates") or {},
+        "fixture_model_readiness_counts": fixture_readiness_counts,
         "validation_report_status": validation_report.get("status"),
         "validation_total_eligible": validation_report.get("total_eligible", 0),
         "validation_development_n": validation_report.get("development_n", 0),
