@@ -193,7 +193,7 @@ try {
     body:JSON.stringify({mode:'manual',manual_selections:[
       {event_id:'prediction-fb-ticket-test',sportybet_event_id:'sr:match:fb-ticket-test',sport:'football',market:'winner',pick:'p1',start_time:kickoffIso,player_1:'Home FC',player_2:'Away FC',match:'Home FC vs Away FC'},
       {event_id:'prediction-tennis-missing',sportybet_event_id:'sr:match:tennis-missing',sport:'tennis',market:'winner',pick:'p1',start_time:kickoffIso,player_1:'Player One',player_2:'Player Two',match:'Player One vs Player Two'}
-    ]})}
+    ]})
   })});
   const missingLegPayload=await missingLegResponse.json();
   assert.equal(missingLegResponse.status,409,JSON.stringify(missingLegPayload));
@@ -226,7 +226,7 @@ try {
     body:JSON.stringify({mode:'manual',manual_selections:[
       {event_id:'prediction-fb-ticket-test',sportybet_event_id:'sr:match:fb-ticket-test',sport:'football',market:'winner',pick:'p1',start_time:kickoffIso,player_1:'Home FC',player_2:'Away FC',match:'Home FC vs Away FC'},
       {event_id:'prediction-tennis-ticket-test',sportybet_event_id:'sr:match:tennis-ticket-test',sport:'tennis',market:'winner',pick:'p1',start_time:kickoffIso,player_1:'Player One',player_2:'Player Two',match:'Player One vs Player Two'}
-    ]})}
+    ]})
   })});
   const providerPartialPayload=await providerPartialResponse.json();
   assert.equal(providerPartialResponse.status,409,JSON.stringify(providerPartialPayload));
