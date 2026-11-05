@@ -9,11 +9,12 @@ value_trial = GUARD["value_trial"]
 value_testing = GUARD["value_testing"]
 capture_value_trials = GUARD["capture_value_trials"]
 in_scope = GUARD["in_scope"]
+evaluation_eligible_fn = GUARD["evaluation_eligible"]
 
 NOW = datetime(2026, 11, 5, 12, 0, tzinfo=timezone.utc)
 
 
-def settled_row(*, league="ATP", capture_status=None, evaluation_eligible=True, quote_before_kickoff=True):
+def settled_row(*, league="ATP", capture_status="PRE_EVENT", evaluation_eligible=True, quote_before_kickoff=True):
     kickoff = NOW + timedelta(hours=2)
     quote_at = kickoff - timedelta(minutes=10)
     if not quote_before_kickoff:
@@ -23,6 +24,7 @@ def settled_row(*, league="ATP", capture_status=None, evaluation_eligible=True, 
         "league": league,
         "event_id": f"{league}-{capture_status or 'valid'}-{quote_before_kickoff}",
         "start_time": kickoff.isoformat(),
+        "calculated_at": (NOW - timedelta(minutes=10)).isoformat(),
         "settled": True,
         "actual": "p1",
         "pick": "p1",
@@ -57,6 +59,21 @@ assert value_trial(wta) is not None  # retained as a separate research record
 assert value_trial(late) is None
 assert value_trial(invalid) is None
 assert value_trial(post_kickoff_price) is None
+
+stale_model = settled_row()
+stale_model["calculated_at"] = (
+    datetime.fromisoformat(stale_model["start_time"].replace("Z", "+00:00"))
+    - timedelta(hours=13)
+).isoformat()
+assert evaluation_eligible_fn(stale_model) is False
+assert value_trial(stale_model) is None
+
+unclassified = settled_row()
+unclassified.pop("evaluation_eligible")
+unclassified.pop("capture_status")
+assert evaluation_eligible_fn(unclassified) is False
+assert value_trial(unclassified) is None
+
 
 # value_evidence_frozen_at is a supported immutable fallback only when it is
 # paired with an exact winner market and a quote from the final 15 minutes.
