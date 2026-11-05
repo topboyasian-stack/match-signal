@@ -1,6 +1,12 @@
 name: Match Signal SportyBet Pregame Snapshot Capture
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/sportybet-pregame-capture.yml'
+      - 'scripts/capture_sportybet_pregame_snapshots.py'
+      - 'scripts/merge_sportybet_pregame_snapshots.py'
   schedule:
     # Capture only during the final 15 minutes before kickoff; ten-minute
     # cadence provides repeated chances to observe each exact market price.
