@@ -25,6 +25,7 @@ DEFAULT_MIN_CONFIDENCE = 0.65
 MAX_MARKET_AGE_SECONDS = 15 * 60
 MAX_FUTURE_SNAPSHOT_SKEW_SECONDS = 120
 MAX_SELECTION_HORIZON_MINUTES = 12 * 60
+MAX_MODEL_PREDICTION_AGE_SECONDS = 12 * 60 * 60
 
 
 def load(path, default):
@@ -61,6 +62,18 @@ def current_market_evidence(row, now=None):
         return False, "fixture_already_started"
     if minutes_to_start > MAX_SELECTION_HORIZON_MINUTES:
         return False, "fixture_outside_12h_builder_horizon"
+
+    # A fresh bookmaker quote cannot make an old model forecast current. Require
+    # the probability itself to have been generated before kickoff and within
+    # the same 12-hour actionable window used by the Builder.
+    calculated_at = parse_utc(row.get("calculated_at"))
+    if calculated_at is None:
+        return False, "missing_or_invalid_model_prediction_time"
+    model_age_seconds = (start_at - calculated_at).total_seconds()
+    if model_age_seconds < 0:
+        return False, "model_prediction_after_kickoff"
+    if model_age_seconds > MAX_MODEL_PREDICTION_AGE_SECONDS:
+        return False, "model_prediction_older_than_12h"
 
     insights = row.get("market_insights") or {}
     snapshot = row.get("sportybet_market_snapshot") or {}
@@ -251,6 +264,7 @@ def main():
             "evidence_tier": evidence_tier,
             "quote_max_age_seconds": MAX_MARKET_AGE_SECONDS,
             "kickoff_horizon_minutes": MAX_SELECTION_HORIZON_MINUTES,
+            "model_prediction_max_age_seconds": MAX_MODEL_PREDICTION_AGE_SECONDS,
             "tournament_gate_non_blocking": True,
             "selection_gate_non_blocking": True,
             "reasons": reasons_list + ([] if value_ok else [value_reason or "no_current_value_signal"]),
@@ -277,10 +291,11 @@ def main():
         "tennis_threshold_source": tennis_threshold_source,
         "market_quote_max_age_seconds": MAX_MARKET_AGE_SECONDS,
         "maximum_kickoff_horizon_minutes": MAX_SELECTION_HORIZON_MINUTES,
+        "maximum_model_prediction_age_seconds": MAX_MODEL_PREDICTION_AGE_SECONDS,
         "selected_artifact": "data/selection_gate_selected.json",
         "candidate_pool_artifact": "data/selection_candidates.json",
         "candidate_pool_independent": True,
-        "policy": "PAPER ONLY. Selection requires confidence, positive current model-vs-SportyBet value, a quote no older than 15 minutes, and kickoff within 12 hours. Live eligibility remains a separate risk gate.",
+        "policy": "PAPER ONLY. Selection requires a model prediction generated within 12 hours before kickoff, positive current model-vs-SportyBet value, a quote no older than 15 minutes, and kickoff within 12 hours. Live eligibility remains a separate risk gate.",
     }
     (DATA / "selection_gate.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(summary, indent=2))

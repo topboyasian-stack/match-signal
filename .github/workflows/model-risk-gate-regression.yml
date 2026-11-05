@@ -5,6 +5,13 @@ on:
     branches: [main]
     paths:
       - 'scripts/model_guard.py'
+      - 'scripts/capture_sportybet_pregame_snapshots.py'
+      - 'scripts/test_capture_sportybet_pregame_snapshots.py'
+      - 'scripts/test_sportybet_pregame_capture_workflow.py'
+      - '.github/workflows/sportybet-pregame-capture.yml'
+      - 'scripts/finalize_value_signals.py'
+      - 'scripts/market_snapshot_freshness.py'
+      - 'scripts/test_market_snapshot_freshness.py'
       - 'scripts/test_model_guard_active_scope.py'
       - '.github/workflows/model-risk-gate-regression.yml'
   push:
@@ -28,7 +35,26 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Install SportyBet matcher test dependency
+        run: python -m pip install --disable-pip-version-check requests
       - name: Compile model-risk guard and run evidence-scope regressions
         run: |
-          python -m py_compile scripts/model_guard.py scripts/test_model_guard_active_scope.py
+          python -m py_compile scripts/model_guard.py scripts/finalize_value_signals.py scripts/market_snapshot_freshness.py scripts/capture_sportybet_pregame_snapshots.py scripts/test_market_snapshot_freshness.py scripts/test_capture_sportybet_pregame_snapshots.py scripts/test_sportybet_pregame_capture_workflow.py scripts/test_model_guard_active_scope.py
+          python scripts/test_market_snapshot_freshness.py
+          python scripts/test_capture_sportybet_pregame_snapshots.py
+          python scripts/test_sportybet_pregame_capture_workflow.py
           python scripts/test_model_guard_active_scope.py
+      - name: Rebuild active risk gate against committed settled history
+        run: |
+          python scripts/model_guard.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('data/risk_gate.json').read_text())
+          print(json.dumps({
+            'football':d['gate']['football'],
+            'tennis':d['gate']['tennis'],
+            'football_metrics':d['metrics']['football'],
+            'active_tennis_metrics':d['metrics']['tennis'],
+          },indent=2))
+          PY
