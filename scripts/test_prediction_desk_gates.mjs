@@ -11,7 +11,7 @@ const deployWorkflow = await readFile(new URL("../.github/workflows/cloudflare-p
 assert.match(headerRules,/\/upcoming\.html\s*\n\s*Cache-Control:\s*no-store, no-cache, must-revalidate, max-age=0/,"the Upcoming entry HTML must not remain cached after a renderer deployment");
 assert.match(headerRules,/\/qualified-best\.html\s*\n\s*Cache-Control:\s*no-store, no-cache, must-revalidate, max-age=0/,"the standalone Qualified Best HTML must not remain cached after a renderer deployment");
 assert.match(headerRules,/\/qualified-best\*\s*\n\s*Cache-Control:\s*no-store, no-cache, must-revalidate, max-age=0/,"the canonical clean Qualified Best URL must revalidate through its route pattern");
-assert.match(headerRules,/\/sport-hubs\.js\s*\n\s*Cache-Control:\s*no-store, no-cache, must-revalidate, max-age=0/,"the shared Prediction Desk renderer must revalidate after deployments");
+assert.match(headerRules,/\/sport-hubs\.js\s*\n\s*Cache-Control:\s*public, max-age=300, stale-while-revalidate=300/,"the shared Prediction Desk renderer should be reusable for navigation while revalidating within five minutes");
 assert.ok(deployWorkflow.includes("'/qualified-best'") && deployWorkflow.includes("'/qualified-best.html'"), "Cloudflare smoke tests must inspect both clean and .html Qualified Best routes");
 assert.ok(deployWorkflow.includes("cacheControl.includes('no-store')") && deployWorkflow.includes("cacheControl.includes('no-cache')"), "Cloudflare smoke tests must reject stale cache headers on both Qualified Best routes");
 const rendererVersions = entryPages.map(html =>
