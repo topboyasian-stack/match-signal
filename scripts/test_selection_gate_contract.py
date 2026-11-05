@@ -28,6 +28,8 @@ collector_source = (ROOT / "scripts" / "selection_candidate_collector.py").read_
 assert 'OUT = DATA / "selection_candidates.json"' in collector_source
 assert '"purpose": "model-first current candidate pool; independent from Odds Builder value/results qualification"' in collector_source
 assert '"candidate_qualification_scope": "upstream_prediction_flags_only" if qualified else "model_estimate_only"' in collector_source
+assert '"fixture_model_readiness": row.get("fixture_model_readiness")' in collector_source
+assert 'for readiness_key in ("fixture_model_readiness", "football_model_validation", "competition_form_status")' in collector_source
 assert '"qualification_semantics": "Counts candidates carrying an upstream betting_qualified/qualified_for_builder flag; this is not the selective prediction gate count and does not override current exact-line price, value, freshness, results, or Odds Builder gates."' in collector_source
 
 parser = argparse.ArgumentParser()
