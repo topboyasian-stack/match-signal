@@ -15,6 +15,9 @@ on:
       - 'scripts/value_decision.py'
       - 'scripts/calibration.py'
       - 'scripts/tennis_total_model.py'
+      - 'scripts/football_prequential_ensemble.py'
+      - 'scripts/test_football_prequential_ensemble.py'
+      - 'scripts/test_model_upgrade_football_ensemble.py'
       - '.github/workflows/football-market-identity-regression.yml'
   workflow_dispatch:
 
@@ -24,7 +27,7 @@ permissions:
 jobs:
   football-market-identity:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -38,3 +41,42 @@ jobs:
         run: python scripts/test_predict_today_market_matching.py
       - name: Compile the changed identity and matcher modules
         run: python -m py_compile scripts/football_competition_match.py scripts/predict_today.py scripts/enrich_sportybet_odds.py scripts/test_predict_today_market_matching.py
+
+      - name: Compile and test football prequential model selection and production integration
+        run: |
+          python -m py_compile scripts/football_prequential_ensemble.py scripts/model_upgrade.py scripts/test_football_prequential_ensemble.py scripts/test_model_upgrade_football_ensemble.py
+          PYTHONPATH=scripts python scripts/test_football_prequential_ensemble.py
+          PYTHONPATH=scripts python scripts/test_model_upgrade_football_ensemble.py
+      - name: Run actual football development and untouched holdout evaluation
+        run: |
+          python scripts/football_prequential_ensemble.py --output /tmp/football-prequential-ensemble.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report=json.loads(Path('/tmp/football-prequential-ensemble.json').read_text())
+          assert report['mode']=='PAPER_RESEARCH_ONLY'
+          assert report['strict_pre_kickoff_cutoff'] is True
+          assert report['market_independent'] is True
+          assert report['results_settlement_buffer_hours'] == 4
+          assert report['development_n'] > 0 and report['holdout_n'] >= 20
+          for key,scope in report.get('validated_competition_scopes',{}).items():
+              assert scope['status']=='RESEARCH_SCOPE_VALIDATED', (key,scope)
+              assert scope['development_n'] >= 30, (key,scope)
+              assert scope['holdout_n'] >= 20, (key,scope)
+              assert scope['selected_model'] != 'published', (key,scope)
+          print(json.dumps({
+            'eligible': report['total_eligible'],
+            'development_n': report['development_n'],
+            'holdout_n': report['holdout_n'],
+            'development_fit': report['development_fit'],
+            'holdout_metrics': report['holdout_metrics'],
+            'validated_competition_scopes': report.get('validated_competition_scopes',{}),
+            'global_blend_scope_gates': report.get('global_blend_scope_gates',{})
+          }, indent=2))
+          PY
+      - name: Preserve football ensemble validation report
+        uses: actions/upload-artifact@v4
+        with:
+          name: football-scope-validated-ensemble-report
+          path: /tmp/football-prequential-ensemble.json
+          if-no-files-found: error
