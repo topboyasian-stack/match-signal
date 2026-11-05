@@ -15,6 +15,8 @@ on:
       - 'scripts/value_decision.py'
       - 'scripts/calibration.py'
       - 'scripts/tennis_total_model.py'
+      - 'scripts/football_prequential_ensemble.py'
+      - 'scripts/test_football_prequential_ensemble.py'
       - '.github/workflows/football-market-identity-regression.yml'
   workflow_dispatch:
 
@@ -24,7 +26,7 @@ permissions:
 jobs:
   football-market-identity:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -38,3 +40,34 @@ jobs:
         run: python scripts/test_predict_today_market_matching.py
       - name: Compile the changed identity and matcher modules
         run: python -m py_compile scripts/football_competition_match.py scripts/predict_today.py scripts/enrich_sportybet_odds.py scripts/test_predict_today_market_matching.py
+
+      - name: Compile and run football ensemble regressions
+        run: |
+          python -m py_compile scripts/football_prequential_ensemble.py scripts/test_football_prequential_ensemble.py
+          python scripts/test_football_prequential_ensemble.py
+      - name: Run strict chronological football development and holdout evaluation
+        run: |
+          python scripts/football_prequential_ensemble.py --output /tmp/football-prequential-ensemble.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report=json.loads(Path('/tmp/football-prequential-ensemble.json').read_text())
+          assert report['mode']=='PAPER_RESEARCH_ONLY'
+          assert report['strict_pre_kickoff_cutoff'] is True
+          assert report['market_independent'] is True
+          assert report['development_n'] > 0 and report['holdout_n'] > 0
+          print(json.dumps({
+            'eligible': report['total_eligible'],
+            'development_n': report['development_n'],
+            'holdout_n': report['holdout_n'],
+            'development_fit': report['development_fit'],
+            'holdout_metrics': report['holdout_metrics'],
+            'promotion_allowed': report['promotion_allowed']
+          }, indent=2))
+          PY
+      - name: Preserve football ensemble experiment report
+        uses: actions/upload-artifact@v4
+        with:
+          name: football-prequential-ensemble-report
+          path: /tmp/football-prequential-ensemble.json
+          if-no-files-found: error
