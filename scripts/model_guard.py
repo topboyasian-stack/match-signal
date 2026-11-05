@@ -12,6 +12,7 @@ MIN_SETTLED=100
 MIN_VALUE_TRIALS=30
 MIN_VALUE_ROI=0.0
 MAX_TRIAL_QUOTE_AGE_SECONDS=15*60
+MAX_MODEL_PREDICTION_AGE_SECONDS=12*60*60
 EXPECTED_WINNER_MARKET_ID={'football':'1','tennis':'186'}
 ACTIVE_LEAGUE_BY_SPORT={'tennis':'ATP'}
 
@@ -33,17 +34,33 @@ def parse_utc(value):
         return None
 
 
+def settlement_record_eligible(row):
+    """Validate the settled outcome independently of the forecast snapshot."""
+    return bool(
+        isinstance(row,dict)
+        and row.get('settled') is True
+        and row.get('actual') in {'p1','p2','draw'}
+        and str(row.get('event_id') or '')
+    )
+
+
 def evaluation_eligible(row):
-    """Reject late or explicitly invalid captures from model/value evidence."""
-    if not isinstance(row,dict):
+    """Only score model forecasts made before kickoff and within 12 hours."""
+    if not settlement_record_eligible(row):
         return False
-    if row.get('capture_status') == 'LATE_CAPTURE':
+    start_at=parse_utc(row.get('start_time'))
+    calculated_at=parse_utc(row.get('calculated_at'))
+    if start_at is None or calculated_at is None:
         return False
-    if row.get('evaluation_eligible') is False:
+    model_age=(start_at-calculated_at).total_seconds()
+    if model_age < 0 or model_age > MAX_MODEL_PREDICTION_AGE_SECONDS:
         return False
-    if row.get('settled') is not True:
-        return False
-    if row.get('actual') not in {'p1','p2','draw'}:
+    if str(row.get('sport') or '').lower()=='tennis':
+        # Tennis archive classification is immutable; unknown/late captures
+        # cannot enter the active ATP training or performance sample.
+        if row.get('evaluation_eligible') is not True or row.get('capture_status')!='PRE_EVENT':
+            return False
+    elif row.get('evaluation_eligible') is False or row.get('capture_status')=='LATE_CAPTURE':
         return False
     return True
 
@@ -154,6 +171,7 @@ def value_trial(row):
         'edge':round(book_edge,6),'expected_value':round(expected_value,6),
         'frozen_odds':float(book),'frozen_odds_at':quote_at.isoformat(),
         'kickoff_at':start_at.isoformat(),
+        'model_age_seconds':round((start_at-parse_utc(row.get('calculated_at'))).total_seconds(),3),
         'quote_age_seconds':round(quote_age_seconds,3),
         'market_id':market_id,
         'source':'SportyBet NG frozen winner snapshot',
@@ -166,7 +184,7 @@ def capture_value_trials(rows, snapshots):
     """Join immutable final-15-minute quote snapshots to settled results."""
     settled_by_event = {}
     for row in rows:
-        if not evaluation_eligible(row):
+        if not settlement_record_eligible(row):
             continue
         event_id = str(row.get('event_id') or '')
         if not event_id:
@@ -194,10 +212,14 @@ def capture_value_trials(rows, snapshots):
         captured_at = parse_utc(snapshot.get('captured_at'))
         start_at = parse_utc(snapshot.get('start_time'))
         result_start = parse_utc(actual_row.get('start_time'))
-        if captured_at is None or start_at is None or result_start is None:
+        model_calculated_at = parse_utc(snapshot.get('model_calculated_at'))
+        if captured_at is None or start_at is None or result_start is None or model_calculated_at is None:
             continue
         age = (start_at - captured_at).total_seconds()
+        model_age = (start_at - model_calculated_at).total_seconds()
         if age < 0 or age > MAX_TRIAL_QUOTE_AGE_SECONDS:
+            continue
+        if model_age < 0 or model_age > MAX_MODEL_PREDICTION_AGE_SECONDS:
             continue
         # The bookmaker fixture must resolve to the same scheduled event in
         # the settled ledger, not merely to a similar player/team name.
