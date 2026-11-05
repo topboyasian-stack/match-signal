@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-05T00:54:53.413918+00:00",
+  "generated_at": "2026-11-05T00:59:22.213653+00:00",
   "mode": "PAPER_ONLY",
   "metrics": {
     "football": {
@@ -47,46 +47,46 @@
       ]
     },
     "tennis": {
-      "settled": 434,
-      "accuracy": 0.4816,
-      "brier": 0.5111,
+      "settled": 32,
+      "accuracy": 0.5312,
+      "brier": 0.5187,
       "baseline_brier": 0.5,
       "bins": [
         {
           "range": "0.50-0.55",
-          "n": 255,
-          "accuracy": 0.451,
-          "mean_confidence": 0.51
+          "n": 15,
+          "accuracy": 0.4,
+          "mean_confidence": 0.5199
         },
         {
           "range": "0.55-0.60",
-          "n": 115,
-          "accuracy": 0.5478,
-          "mean_confidence": 0.5762
+          "n": 6,
+          "accuracy": 0.6667,
+          "mean_confidence": 0.5793
         },
         {
           "range": "0.60-0.65",
-          "n": 43,
-          "accuracy": 0.4651,
-          "mean_confidence": 0.6221
+          "n": 2,
+          "accuracy": 0.5,
+          "mean_confidence": 0.6311
         },
         {
           "range": "0.65-0.70",
-          "n": 13,
-          "accuracy": 0.5385,
-          "mean_confidence": 0.6774
+          "n": 6,
+          "accuracy": 0.6667,
+          "mean_confidence": 0.6822
         },
         {
           "range": "0.70-0.80",
-          "n": 5,
-          "accuracy": 0.6,
-          "mean_confidence": 0.7335
+          "n": 2,
+          "accuracy": 1.0,
+          "mean_confidence": 0.7334
         },
         {
           "range": "0.80-1.00",
-          "n": 3,
-          "accuracy": 0.3333,
-          "mean_confidence": 0.8398
+          "n": 1,
+          "accuracy": 0.0,
+          "mean_confidence": 0.8641
         }
       ]
     },
@@ -98,8 +98,73 @@
       "bins": []
     }
   },
+  "scope_diagnostics": {
+    "tennis": {
+      "active_scope": "ATP",
+      "inactive_scopes": {
+        "WTA": {
+          "metrics": {
+            "settled": 288,
+            "accuracy": 0.4792,
+            "brier": 0.5053,
+            "baseline_brier": 0.5,
+            "bins": [
+              {
+                "range": "0.50-0.55",
+                "n": 206,
+                "accuracy": 0.4466,
+                "mean_confidence": 0.5061
+              },
+              {
+                "range": "0.55-0.60",
+                "n": 58,
+                "accuracy": 0.569,
+                "mean_confidence": 0.5785
+              },
+              {
+                "range": "0.60-0.65",
+                "n": 17,
+                "accuracy": 0.5882,
+                "mean_confidence": 0.6219
+              },
+              {
+                "range": "0.65-0.70",
+                "n": 3,
+                "accuracy": 0.6667,
+                "mean_confidence": 0.6833
+              },
+              {
+                "range": "0.70-0.80",
+                "n": 3,
+                "accuracy": 0.3333,
+                "mean_confidence": 0.7336
+              },
+              {
+                "range": "0.80-1.00",
+                "n": 1,
+                "accuracy": 0.0,
+                "mean_confidence": 0.8445
+              }
+            ]
+          },
+          "value_testing": {
+            "trials": 14,
+            "wins": 8,
+            "roi_units": -0.98,
+            "roi": -0.07,
+            "status": "INSUFFICIENT_OR_NONPOSITIVE",
+            "required_trials": 30,
+            "latest_frozen_snapshot": "2026-09-25T12:25:51.846258+00:00"
+          },
+          "status": "RESEARCH_ONLY_INACTIVE_SCOPE"
+        }
+      },
+      "pooling_disabled": true
+    }
+  },
   "gate": {
     "football": {
+      "active_scope": "all",
       "live_eligible": false,
       "model_risk_approval_passed": false,
       "live_trading_enabled": false,
@@ -113,29 +178,32 @@
         "required_trials": 30
       },
       "reasons": [
-        "need >=30 settled value trials with frozen odds/value evidence (have 0)"
+        "need >=30 settled active-scope value trials with frozen pregame odds (have 0)"
       ]
     },
     "tennis": {
+      "active_scope": "ATP",
       "live_eligible": false,
       "model_risk_approval_passed": false,
       "live_trading_enabled": false,
       "paper_only": true,
       "value_testing": {
-        "trials": 29,
-        "wins": 19,
-        "roi_units": 4.02,
-        "roi": 0.138621,
+        "trials": 13,
+        "wins": 9,
+        "roi_units": 3.8,
+        "roi": 0.292308,
         "status": "INSUFFICIENT_OR_NONPOSITIVE",
         "required_trials": 30,
         "latest_frozen_snapshot": "2026-09-25T12:25:51.956367+00:00"
       },
       "reasons": [
-        "Brier 0.5111 has not beaten baseline 0.5",
-        "need >=30 settled value trials with frozen odds/value evidence (have 29)"
+        "need >=100 settled picks in active scope (have 32)",
+        "Brier 0.5187 has not beaten baseline 0.5",
+        "need >=30 settled active-scope value trials with frozen pregame odds (have 13)"
       ]
     },
     "basketball": {
+      "active_scope": "all",
       "live_eligible": false,
       "model_risk_approval_passed": false,
       "live_trading_enabled": false,
@@ -149,8 +217,8 @@
         "required_trials": 30
       },
       "reasons": [
-        "need >=100 settled picks (have 0)",
-        "need >=30 settled value trials with frozen odds/value evidence (have 0)"
+        "need >=100 settled picks in active scope (have 0)",
+        "need >=30 settled active-scope value trials with frozen pregame odds (have 0)"
       ]
     }
   }
