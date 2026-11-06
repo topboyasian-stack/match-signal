@@ -144,9 +144,19 @@ export async function onRequestGet(context){
       market_contract:{winner_including_overtime:'219',handicap_including_overtime:'223',total_including_overtime:'225',team_total_points:['227','228']},
       fetched_at:new Date().toISOString(),elapsed_ms:Date.now()-started,event_count:events.length,
       total_market_event_count:totalMarketEvents,source_errors:sourceErrors,
+      // Raw upstream catalogue pages may be full while the filtered NBA result
+      // contains only a few fixtures. Expose pagination separately from the
+      // post-filtered events.length so the booking lookup can reach later pages.
+      catalogue_page_has_more:attempts.some(attempt=>{
+        if(!attempt.payload)return false;
+        const diagnostic=(attempt.diagnostics||[]).find(item=>item.source_origin===attempt.source_origin);
+        const total=Number(diagnostic?.upstream_total_events);
+        return Number(attempt.event_count)>=pageSize||
+          (Number.isFinite(total)&&total>pageNum*pageSize);
+      }),
       source_diagnostics:attempts.flatMap(a=>a.diagnostics||[]),events
     }),{status:200,headers:headers()});
   }catch(error){
-    return new Response(JSON.stringify({ok:false,source:'SportyBet Nigeria',error:String(error?.message||error),fetched_at:new Date().toISOString(),event_count:0,total_market_event_count:0,source_diagnostics:attempts.flatMap(a=>a.diagnostics||[]),events:[]}),{status:200,headers:{...headers(),'Cache-Control':'no-store'}});
+    return new Response(JSON.stringify({ok:false,source:'SportyBet Nigeria',error:String(error?.message||error),fetched_at:new Date().toISOString(),event_count:0,total_market_event_count:0,catalogue_page_has_more:false,source_diagnostics:attempts.flatMap(a=>a.diagnostics||[]),events:[]}),{status:200,headers:{...headers(),'Cache-Control':'no-store'}});
   }
 }
