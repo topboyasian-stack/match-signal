@@ -37,6 +37,19 @@ def run():
     assert "cron: '5,20,35,50 * * * *'" in settlement_workflow, (
         "Official ESPN settlement backup must remain scheduled and staggered between capture slots."
     )
+
+    assert "actions: write" in settlement_workflow, (
+        "The settlement workflow needs Actions write permission for its explicit report handoff."
+    )
+    assert "Dispatch probability/value report after new official settlement evidence" in settlement_workflow, (
+        "New official settlement records must explicitly refresh probability/value research."
+    )
+    assert "steps.persist.outputs.changed == 'true'" in settlement_workflow, (
+        "Settlement should dispatch a report only when new ledger artifacts were published."
+    )
+    assert "gh workflow run nba-totals-probability-value.yml --ref main" in settlement_workflow, (
+        "The settlement-to-report handoff must use the existing research workflow."
+    )
     assert "cron: '8,23,38,53 * * * *'" in probability_workflow, (
         "Probability/value evidence must refresh on its staggered backup schedule."
     )
