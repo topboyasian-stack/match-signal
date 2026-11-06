@@ -15,6 +15,8 @@ on:
       - 'data/sportybet_odds_snapshot.json'
       - 'data/predictions.json'
       - 'scripts/odds_builder.py'
+      - 'scripts/tennis_market_reassessment.py'
+      - 'scripts/test_tennis_market_alternatives.py'
       - 'scripts/odds_builder_core.py'
       - 'scripts/test_odds_builder_efootball_spoiler.py'
       - 'scripts/test_odds_builder_upcoming_desk_recent_losses.py'
@@ -80,6 +82,10 @@ jobs:
         run: python -m pip install --upgrade requests
       - name: Run tennis total challenger research
         run: python scripts/tennis_total_research.py
+      - name: Regression-check continuous tennis market reassessment
+        run: |
+          python -m py_compile scripts/odds_builder.py scripts/tennis_market_reassessment.py scripts/test_tennis_market_alternatives.py
+          python scripts/test_tennis_market_alternatives.py
       - name: Validate tennis research artifact
         run: |
           python - <<'PY'
