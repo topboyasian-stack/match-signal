@@ -290,6 +290,11 @@ def _football_options(core: Any, now: datetime, rows: list[dict[str, Any]]) -> t
         probabilities = row.get("calibrated_probabilities") or row.get("probabilities") or {}
         winner_market = _find_market(row, lambda m: _market_is_winner(m, "football"))
         if winner_market:
+            published_winner_odds = row.get("sportybet_winner_odds") or {}
+            winner_market_complete = all(
+                (_num(published_winner_odds.get(side)) or 0) > 1
+                for side in ("p1", "draw", "p2")
+            )
             winner_sides = []
             for side in ("p1", "draw", "p2"):
                 p = _num(probabilities.get(side))
@@ -314,7 +319,11 @@ def _football_options(core: Any, now: datetime, rows: list[dict[str, Any]]) -> t
                         {"side": s["side"], "odds": s["odds"]} for s in winner_sides
                     ]
                 audit.append(candidate)
-                if is_fresh and p >= float(core.MIN_PROB) and outcome and outcome.get("id"):
+                if (
+                    is_fresh and winner_market_complete
+                    and p >= float(core.MIN_PROB)
+                    and outcome and outcome.get("id")
+                ):
                     active.append(candidate)
 
         # Full-match football goal totals: compare every exact currently offered half-line.
@@ -405,7 +414,7 @@ def _football_options(core: Any, now: datetime, rows: list[dict[str, Any]]) -> t
                 )
                 candidate["reassessment_market_rows"] = complete_rows
                 audit.append(candidate)
-                if is_fresh and p >= float(core.MIN_PROB) and outcome.get("id") and len(complete_rows) >= 2:
+                if is_fresh and p >= float(core.MIN_PROB) and outcome.get("id") and len(complete_rows) == 3:
                     active.append(candidate)
     return active, audit
 
@@ -443,6 +452,11 @@ def _tennis_options(core: Any, now: datetime, rows: list[dict[str, Any]], baseli
         probs = row.get("calibrated_probabilities") or row.get("probabilities") or {}
         winner_market = _find_market(row, lambda m: _market_is_winner(m, "tennis"))
         if winner_market:
+            published_winner_odds = row.get("sportybet_winner_odds") or {}
+            winner_market_complete = all(
+                (_num(published_winner_odds.get(side)) or 0) > 1
+                for side in ("p1", "p2")
+            )
             winner_rows = []
             for side in ("p1", "p2"):
                 p = _num(probs.get(side))
@@ -461,7 +475,11 @@ def _tennis_options(core: Any, now: datetime, rows: list[dict[str, Any]], baseli
                     for s in ("p1", "p2") if _num((row.get("sportybet_winner_odds") or {}).get(s)) is not None
                 ] or winner_rows
                 audit.append(candidate)
-                if is_fresh and p >= float(core.MIN_PROB) and outcome and outcome.get("id"):
+                if (
+                    is_fresh and winner_market_complete
+                    and 0 < p < 1.0 and p >= float(core.MIN_PROB)
+                    and outcome and outcome.get("id")
+                ):
                     active.append(candidate)
 
         # Recalculate every current full-match half-line, not the model's legacy single line.
