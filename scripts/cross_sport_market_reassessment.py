@@ -350,7 +350,7 @@ def _football_options(core: Any, now: datetime, rows: list[dict[str, Any]]) -> t
                     candidate = _decorate_candidate(
                         row, sport="football", market="total_goals", side=side, probability=probability,
                         market_obj=market_obj, odds_rows=complete_rows, line=line,
-                        outcome=outcomes[side], model_source="independent Poisson total from published model expected goals",
+                        outcome=outcomes[side], model_source="Poisson total-goals probability from existing published expected-goals projection",
                         exact_market_id=market_id,
                     )
                     candidate["reassessment_market_rows"] = complete_rows
