@@ -381,6 +381,12 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn("Wait for Builder refresh triggered by the pre-build board", PROMOTION_WORKFLOW)
         self.assertIn("Publish the rebuilt Builder through Unified Upcoming", PROMOTION_WORKFLOW)
         self.assertIn("Wait for Builder refresh triggered by the post-build board", PROMOTION_WORKFLOW)
+        self.assertIn('board_published_at="$(', PROMOTION_WORKFLOW)
+        self.assertIn("BOARD_PUBLISHED_AT: ${{ steps.pre-build-board.outputs.board_published_at }}", PROMOTION_WORKFLOW)
+        self.assertIn("BOARD_PUBLISHED_AT: ${{ steps.post-build-board.outputs.board_published_at }}", PROMOTION_WORKFLOW)
+        self.assertGreaterEqual(PROMOTION_WORKFLOW.count('.created_at >= \\\"$BOARD_PUBLISHED_AT\\\"'), 2)
+        self.assertNotIn("compare/$BOARD_PUBLISHED_SHA...$candidate_sha", PROMOTION_WORKFLOW,
+                         "Builder event SHAs can lag concurrent main commits; wait by publication time instead.")
         self.assertIn("Dispatch Cloudflare Pages after post-build board and Builder publication", PROMOTION_WORKFLOW)
         self.assertIn("gh workflow run unified-upcoming.yml --ref main -f promotion_child=true", PROMOTION_WORKFLOW)
         self.assertNotIn("gh workflow run odds_builder.yml", PROMOTION_WORKFLOW)
