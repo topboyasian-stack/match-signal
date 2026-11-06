@@ -2,14 +2,9 @@ name: NBA totals probability and value research
 
 on:
   workflow_dispatch:
-  workflow_run:
-    workflows:
-      - "NBA totals SportyBet market-225 price capture"
-      - "NBA totals settlement ledger"
-    types: [completed]
   schedule:
-    # Stagger report recovery after backup settlement slots; successful capture or
-    # settlement completion also refreshes immediately when newer evidence publishes.
+    # Backup cadence; capture and settlement workflows explicitly dispatch a report
+    # only after new immutable quotes or new official settlement evidence is published.
     - cron: '8,23,38,53 * * * *'
   push:
     branches: [main]
