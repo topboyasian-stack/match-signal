@@ -401,7 +401,7 @@ export async function collectBasketballEvents(context, targetIds, timeline = 168
     const url = new URL('/api/sportybet-basketball?pageSize=100&timeline=' + encodeURIComponent(String(timeline)) + '&pageNum=' + page + '&_t=' + Date.now(), context.request.url);
     // Call the sibling Pages Function directly; do not HTTP self-fetch the public hostname.
     const feedRequest = new Request(url.toString(), { headers: { 'Accept': 'application/json', 'Cache-Control': 'no-cache' } });
-    const response = await getSportyBetBasketballFeed({ request: feedRequest, env: context.env, params: context.params, data: context.data });
+    const response=await getSportyBetBasketballFeed({request:feedRequest,env:context.env,params:context.params,data:context.data});
     const body = await response.text();
     if (!response.ok) throw new Error('Current SportyBet basketball feed HTTP ' + response.status);
     let payload;
