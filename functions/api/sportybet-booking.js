@@ -361,9 +361,20 @@ export async function collectEvents({
   return found;
 }
 
-export async function collectBasketballEvents(context,targetIds,timeline=168){
-  const found=new Map();if(!targetIds.size)return found;
-  for(let page=1;page<=4&&found.size<targetIds.size;page++){
+export async function collectBasketballEvents(context,targetIds,timeline=168,targetLegs=[]){
+  const found=new Map();
+  if(!targetIds.size)return found;
+  const fixtureTargets=Array.isArray(targetLegs)?targetLegs:[];
+  const matchedFixtureTargets=new Set();
+  const matchedIds=new Set();
+  const targetsComplete=()=>fixtureTargets.length
+    ? matchedFixtureTargets.size>=fixtureTargets.length
+    : matchedIds.size>=targetIds.size;
+
+  // Basketball selections can carry a prediction-time SportyBet ID that has
+  // since changed. Recover only by the exact participant pair and kickoff
+  // window; market 225, line and both prices are revalidated afterwards.
+  for(let page=1;page<=5&&!targetsComplete();page++){
     const url=new URL('/api/sportybet-basketball?pageSize=100&timeline='+encodeURIComponent(String(timeline))+'&pageNum='+page+'&_t='+Date.now(),context.request.url);
     // Call the sibling Pages Function directly; do not HTTP self-fetch the public hostname.
     const feedRequest=new Request(url.toString(),{headers:{'Accept':'application/json','Cache-Control':'no-cache'}});
@@ -374,15 +385,41 @@ export async function collectBasketballEvents(context,targetIds,timeline=168){
     try{payload=JSON.parse(body);}catch(_){throw new Error('Current SportyBet basketball feed returned non-JSON content (HTTP '+response.status+', content-type '+String(response.headers.get('content-type')||'unknown')+').');}
     if(payload?.ok!==true||!Array.isArray(payload.events))throw new Error(payload?.error||'Current SportyBet basketball feed unavailable');
     for(const row of payload.events){
-      const eventId=String(row?.event_id||'');if(!eventId||!targetIds.has(eventId))continue;
+      const eventId=String(row?.event_id||'');
+      if(!eventId)continue;
       const start=Date.parse(String(row?.start_time||''));
-      const markets=(Array.isArray(row?.markets)?row.markets:[]).map(m=>({
-        id:String(m?.id||''),name:String(m?.name||''),desc:String(m?.name||''),specifier:m?.specifier??null,status:String(m?.status||''),
-        outcomes:(Array.isArray(m?.outcomes)?m.outcomes:[]).map(o=>({id:String(o?.id||''),name:String(o?.name||''),desc:String(o?.name||''),odds:Number(o?.odds),active:o?.active!==false,isActive:o?.active===false?0:1}))
-      }));
-      found.set(eventId,{eventId,homeTeamName:String(row?.home||''),awayTeamName:String(row?.away||''),estimateStartTime:Number.isFinite(start)?start:0,matchStatus:'Not start',tournament:String(row?.tournament||''),fetchedAt:String(row?.fetched_at||payload?.fetched_at||''),markets});
+      const normalized={
+        eventId,
+        homeTeamName:String(row?.home||''),
+        awayTeamName:String(row?.away||''),
+        estimateStartTime:Number.isFinite(start)?start:0,
+        matchStatus:'Not start',
+        tournament:String(row?.tournament||''),
+        fetchedAt:String(row?.fetched_at||payload?.fetched_at||''),
+        markets:(Array.isArray(row?.markets)?row.markets:[]).map(m=>({
+          id:String(m?.id||''),name:String(m?.name||''),desc:String(m?.name||''),specifier:m?.specifier??null,status:String(m?.status||''),
+          outcomes:(Array.isArray(m?.outcomes)?m.outcomes:[]).map(o=>({id:String(o?.id||''),name:String(o?.name||''),desc:String(o?.name||''),odds:Number(o?.odds),active:o?.active!==false,isActive:o?.active===false?0:1}))
+        }))
+      };
+      if(targetIds.has(eventId)){
+        matchedIds.add(eventId);
+        found.set(eventId,normalized);
+      }
+      fixtureTargets.forEach((leg,index)=>{
+        const requestedStart=Date.parse(String(leg?.start_time||''));
+        const fixtureMatches=sameParticipantPair([leg?.player_1,leg?.player_2],normalized)&&
+          Number.isFinite(requestedStart)&&normalized.estimateStartTime>0&&
+          Math.abs(requestedStart-normalized.estimateStartTime)<=45*60*1000;
+        if(fixtureMatches){
+          matchedFixtureTargets.add(index);
+          found.set(eventId,normalized);
+        }
+      });
     }
-    if(payload.events.length<100)break;
+    // The feed filters its returned event list to NBA after fetching each
+    // upstream catalogue page. Its NBA event count can therefore be <100 even
+    // when the upstream page is full and later pages still contain NBA games.
+    if(payload.catalogue_page_has_more!==true)break;
   }
   return found;
 }
@@ -827,11 +864,20 @@ async function handlePost(context) {
       catch (error) { return json({ ok: false, error: 'NBA_RELEASE_EVIDENCE_UNAVAILABLE', message: 'NBA release evidence could not be verified. No ticket code was requested.' }, 503); }
       if (!nbaTotalsReleaseQualified(nbaReleaseContext.evidence, nbaReleaseContext.probability)) return json({ ok: false, error: 'NBA_RELEASE_GATE_LOCKED', message: 'The independent NBA totals release gate has not passed. No SportyBet ticket code was requested.' }, 423);
     }
-    const virtualIds = new Set(legs.filter(l => productForLeg(l) === 'vfootball').map(l => String(l.event_id || '')));
-    const efootballIds = new Set(legs.filter(l => productForLeg(l) === 'efootball').map(l => String(l.sportybet_event_id || l.event_id || '')).filter(Boolean));
-    const footballIds = new Set(legs.filter(l => String(l?.sport || '').toLowerCase() === 'football').map(l => String(l.sportybet_event_id || l.event_id || '')).filter(Boolean));
-    const tennisIds = new Set(legs.filter(l => String(l?.sport || '').toLowerCase() === 'tennis').map(l => String(l.sportybet_event_id || l.event_id || '')).filter(Boolean));
-    const basketballIds = new Set(legs.filter(l => String(l?.sport || '').toLowerCase() === 'basketball').map(l => String(l.sportybet_event_id || '')).filter(Boolean));
+    // Do not spend catalogue lookups on already-started selections. They are
+    // rejected explicitly below, while still allowing future legs to recheck.
+    const lookupLegs = manualMode ? legs.filter(leg => {
+      const start = Date.parse(String(leg?.start_time || ''));
+      return !Number.isFinite(start) || start > Date.now();
+    }) : legs;
+    const virtualIds = new Set(lookupLegs.filter(l => productForLeg(l) === 'vfootball').map(l => String(l.event_id || '')));
+    const efootballIds = new Set(lookupLegs.filter(l => productForLeg(l) === 'efootball').map(l => String(l.sportybet_event_id || l.event_id || '')).filter(Boolean));
+    const footballLegs = lookupLegs.filter(l => String(l?.sport || '').toLowerCase() === 'football');
+    const tennisLegs = lookupLegs.filter(l => String(l?.sport || '').toLowerCase() === 'tennis');
+    const basketballLegs = lookupLegs.filter(l => String(l?.sport || '').toLowerCase() === 'basketball');
+    const footballIds = new Set(footballLegs.map(l => String(l.sportybet_event_id || l.event_id || '')).filter(Boolean));
+    const tennisIds = new Set(tennisLegs.map(l => String(l.sportybet_event_id || l.event_id || '')).filter(Boolean));
+    const basketballIds = new Set(basketballLegs.map(l => String(l.sportybet_event_id || '')).filter(Boolean));
 
     const found = new Map();
 
@@ -887,7 +933,7 @@ async function handlePost(context) {
         fallbackPath: '/api/ng/factsCenter/wapConfigurableUpcomingEvents',
         deadlineAt: manualDeadlineAt,
         requestTimeoutMs: manualMode ? 3500 : 6000
-      }, footballIds, legs.filter(leg => String(leg?.sport || '').toLowerCase() === 'football'));
+      }, footballIds, footballLegs);
       for (const [id, event] of events) found.set(id, event);
     }
 
@@ -899,11 +945,11 @@ async function handlePost(context) {
         fallbackPath: '/api/ng/factsCenter/wapConfigurableUpcomingEvents',
         deadlineAt: manualDeadlineAt,
         requestTimeoutMs: manualMode ? 3500 : 6000
-      }, tennisIds);
+      }, tennisIds, tennisLegs);
       for (const [id, event] of events) found.set(id, event);
     }
     if (basketballIds.size) {
-      const events = await collectBasketballEvents(context, basketballIds, catalogueTimeline);
+      const events = await collectBasketballEvents(context, basketballIds, catalogueTimeline, basketballLegs);
       for (const [id, event] of events) found.set(id, event);
     }
 
@@ -911,6 +957,17 @@ async function handlePost(context) {
     const validation = [];
     for (const leg of legs) {
       const eventId = String(leg?.event_id || '');
+      if (manualMode) {
+        const requestedStart = Date.parse(String(leg?.start_time || ''));
+        if (!Number.isFinite(requestedStart)) {
+          validation.push(validationFailure(leg, 'Fixture start time is missing or invalid; refresh this selection.'));
+          continue;
+        }
+        if (requestedStart <= Date.now()) {
+          validation.push(validationFailure(leg, 'Fixture start time has passed; pre-match SportyBet booking is closed.'));
+          continue;
+        }
+      }
       const resolved = resolveCurrentEvent(leg, found);
       const event = resolved.event;
       if (!event) {
