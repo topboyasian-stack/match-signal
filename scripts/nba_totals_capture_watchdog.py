@@ -88,15 +88,20 @@ def should_dispatch_probability_report(
     now,
     active_research_runs=0,
     active_settlement_runs=0,
+    active_capture_runs=0,
     settlement_dispatched=False,
     max_age_minutes=15,
 ):
-    """Refresh a stale prospective report only after newer evidence is available."""
+    """Refresh a stale prospective report only after capture and settlement finish."""
     current = _utc(now)
     if current is None or settlement_dispatched:
         return False
     try:
-        if int(active_research_runs) > 0 or int(active_settlement_runs) > 0:
+        if (
+            int(active_research_runs) > 0
+            or int(active_settlement_runs) > 0
+            or int(active_capture_runs) > 0
+        ):
             return False
     except (TypeError, ValueError):
         return False
