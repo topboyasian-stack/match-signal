@@ -8,6 +8,14 @@ on:
     # Changing this cron also re-enables a previously disabled scheduled workflow.
     # Keep the 30-minute heartbeat while offsetting the previous schedule.
     - cron: '9,39 * * * *'
+  workflow_run:
+    # A failed production deployment can be caused by stale NBA pre-game rows.
+    # Recover via the existing model publisher, then let the normal board/Builder
+    # promotion sequence retry deployment. Successful deploys do not re-trigger it.
+    workflows:
+      - "Deploy Match Signal to Cloudflare Pages"
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
   push:
     branches: [main]
@@ -23,6 +31,7 @@ on:
       - 'scripts/test_nba_sportybet_totals.py'
       - 'scripts/nba_totals_walk_forward.py'
       - 'scripts/test_nba_totals_walk_forward.py'
+      - 'scripts/test_workflow_trigger_boundaries.py'
       - 'scripts/nba_live_totals_walk_forward.py'
       - 'scripts/test_nba_live_totals_walk_forward.py'
       - '.github/workflows/live-expansion.yml'
@@ -39,6 +48,7 @@ concurrency:
 
 jobs:
   live-expansion:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'failure' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -59,6 +69,9 @@ jobs:
         run: |
           git fetch origin main
           git reset --hard origin/main
+
+      - name: Test workflow recovery boundaries
+        run: python scripts/test_workflow_trigger_boundaries.py
 
       - name: Test bounded NBA history collection and season isolation
         run: python scripts/test_expansion_sources.py
