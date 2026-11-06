@@ -131,6 +131,13 @@ class CrossSportReassessmentTests(unittest.TestCase):
             self.assertTrue(candidate.get("sportybet_outcome_id"))
             self.assertTrue(candidate.get("reassessment_market_rows"))
 
+    def test_partial_1x2_price_pair_is_not_promoted_as_an_alternative(self):
+        row = sample_football(self.now, include_btts=False, include_double_chance=False)
+        row["sportybet_winner_odds"].pop("draw")
+        active, audit = reassessment._football_options(FakeCore(), self.now, [row])
+        self.assertTrue(any(x["builder_market"] == "1X2" for x in audit))
+        self.assertFalse(any(x["builder_market"] == "1X2" for x in active))
+
     def test_integer_total_lines_are_never_substituted_for_half_lines(self):
         row = sample_football(self.now)
         active, audit = reassessment._football_options(FakeCore(), self.now, [row])
