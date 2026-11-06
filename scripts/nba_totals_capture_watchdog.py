@@ -82,6 +82,26 @@ def should_dispatch_settlement(
     return stale and active <= 0
 
 
+def settlement_evidence_changed(candidate_ledger, live_ledger, candidate_probability, live_probability):
+    """Return true only when official settled records or their summaries changed.
+
+    Ignore updated_at-only changes: those record a reconciliation check, not new
+    settled evidence, and must not cause redundant probability report runs.
+    """
+    def projection(payload):
+        if not isinstance(payload, dict):
+            payload = {}
+        return {
+            "records": payload.get("records") if isinstance(payload.get("records"), list) else [],
+            "summary": payload.get("summary") if isinstance(payload.get("summary"), dict) else {},
+        }
+
+    return (
+        projection(candidate_ledger) != projection(live_ledger)
+        or projection(candidate_probability) != projection(live_probability)
+    )
+
+
 def should_dispatch_probability_report(
     report_generated_at,
     latest_source_updated_at,
