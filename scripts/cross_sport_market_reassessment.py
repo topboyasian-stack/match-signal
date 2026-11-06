@@ -56,12 +56,16 @@ def _fresh_quote(row: dict[str, Any], now: datetime) -> tuple[bool, float | None
     stamp = (
         row.get("market_odds_timestamp")
         or row.get("odds_timestamp")
+        or row.get("quote_timestamp")
         or snapshot.get("fetched_at")
     )
     parsed = _dt(stamp)
     if parsed is None:
         return False, None, str(stamp) if stamp else None
-    age = max(0.0, (now - parsed).total_seconds())
+    age = (now - parsed).total_seconds()
+    # A timestamp in the future is a clock/data integrity problem, not a fresh quote.
+    if age < 0:
+        return False, age, parsed.isoformat()
     return age <= MAX_QUOTE_AGE_SECONDS, age, parsed.isoformat()
 
 
@@ -830,12 +834,24 @@ def _make_audit_record(core: Any, row: dict[str, Any], now: datetime) -> dict[st
     except Exception as exc:
         leg = {"builder_eligible": False, "status": "REJECTED", "audit_error": str(exc)[:160]}
     model_floor = p is not None and p >= float(core.MIN_PROB)
-    quote_exact = price is not None and price > 1 and bool(
-        row.get("sportybet_market_id")
-        or row.get("sportybet_outcome_id")
-        or row.get("sportybet_event_id")
-        or row.get("product")
-    )
+    if str(row.get("sport") or "").lower() == "virtual":
+        # Virtual products lack bookmaker outcome IDs in some feeds; exact product
+        # plus line/side and direct settled-line evidence is their identity contract.
+        quote_exact = (
+            price is not None and price > 1
+            and bool(row.get("product"))
+            and line is not None
+            and side in {"over", "under"}
+            and bool(row.get("evidence_source") or row.get("evidence_sample_n") or row.get("direct_exact_sample_n"))
+        )
+    else:
+        # Real-sport evidence must bind both the exact market and its exact outcome.
+        quote_exact = (
+            price is not None and price > 1
+            and bool(row.get("sportybet_market_id"))
+            and bool(row.get("sportybet_outcome_id"))
+            and bool(row.get("sportybet_event_id"))
+        )
     if not model_floor:
         status = "BELOW_MODEL_PROBABILITY_FLOOR"
     elif not quote_exact:
@@ -1037,6 +1053,11 @@ def _write_reassessment_artifact(core: Any, now: datetime) -> dict[str, Any]:
             "market": "total_ou",
             "sport": "basketball",
             "candidate_status": row.get("candidate_status"),
+            "market_odds_timestamp": row.get("quote_timestamp"),
+            "fresh_exact_quote": True,  # _nba_options only emits verified fresh exact market-225 price pairs.
+            "sportybet_market_id": "225",
+            "sportybet_event_id": row.get("sportybet_event_id"),
+            "exact_market_pair": True,
             "settlement_status": "PENDING",
             "settlement_result": None,
             "observed_at": now.isoformat(),
