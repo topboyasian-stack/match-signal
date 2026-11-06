@@ -154,6 +154,12 @@ def run():
     assert '"NBA totals SportyBet market-225 price capture"' in watchdog_workflow, (
         "Capture completion must trigger settlement/report recovery even when a schedule is missed."
     )
+    assert '"NBA totals probability and value research"' in watchdog_workflow, (
+        "A successful report refresh must also run the freshness watchdog so a missed capture schedule can recover."
+    )
+    assert "github.event.workflow_run.name == 'NBA totals probability and value research' && github.event.workflow_run.conclusion == 'success'" in watchdog_workflow, (
+        "Only successful probability report completion should trigger the additional freshness check."
+    )
     assert "Dispatch stale official ESPN settlement recovery" in watchdog_workflow
     assert "gh workflow run nba-totals-settlement.yml --ref main" in watchdog_workflow
     assert "should_dispatch_probability_report" in watchdog_workflow
