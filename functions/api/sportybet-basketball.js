@@ -17,7 +17,17 @@ function normMarket(m){
     })).filter(o=>Number.isFinite(o.odds)&&o.odds>1&&o.active)
   };
 }
-function getTournaments(payload){return Array.isArray(payload?.data?.tournaments)?payload.data.tournaments:[]}
+function getTournaments(payload){
+  const data=payload?.data;
+  // WAP configurable-upcoming responses may carry the event list directly
+  // in data[], while PC upcoming groups events by tournament.
+  if(Array.isArray(data)){
+    return data.some(item=>Array.isArray(item?.events))?data:[{name:'',events:data}];
+  }
+  if(Array.isArray(data?.tournaments))return data.tournaments;
+  if(Array.isArray(data?.events))return [{name:String(data?.name||''),events:data.events}];
+  return [];
+}
 export async function onRequestOptions(){return new Response(null,{status:204,headers:headers()})}
 export async function onRequestGet(context){
   const u=new URL(context.request.url);
