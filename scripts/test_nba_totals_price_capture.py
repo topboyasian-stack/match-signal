@@ -62,7 +62,11 @@ class PriceCaptureTests(unittest.TestCase):
         self.assertIn("upstream_total_events", proxy_script)
         self.assertIn("data_keys", proxy_script)
         self.assertIn("TOURNAMENTS_ARRAY_EMPTY", proxy_script)
-        self.assertIn("hasValidTournamentArray", proxy_script)
+        # The public feed accepts both grouped PC events and flat WAP event arrays.
+        self.assertIn("const hasValidEventList=attempts.some", proxy_script)
+        self.assertIn("Array.isArray(a.payload?.data)", proxy_script)
+        self.assertIn("catalogue_page_has_more", proxy_script)
+        self.assertIn("Number(attempt.event_count)>=pageSize", proxy_script)
 
         # Any slip containing NBA totals must fail closed instead of returning
         # a share code when either our validation or SportyBet accepts only
