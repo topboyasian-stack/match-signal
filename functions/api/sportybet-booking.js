@@ -95,18 +95,34 @@ function lineFromMarket(market) {
   return match ? Number(match[1]) : null;
 }
 
+function catalogueTournaments(payload) {
+  const data = payload?.data;
+  // pcUpcomingEvents groups fixtures under data.tournaments. The WAP
+  // configurable-upcoming endpoint can instead return data as a flat event
+  // array, so normalize both response shapes before scanning.
+  if (Array.isArray(data)) {
+    return data.some(item => Array.isArray(item?.events))
+      ? data
+      : [{ name: '', events: data }];
+  }
+  if (Array.isArray(data?.tournaments)) return data.tournaments;
+  if (Array.isArray(data?.events)) return [{ name: String(data?.name || ''), events: data.events }];
+  if (Array.isArray(payload?.events)) return [{ name: '', events: payload.events }];
+  return [];
+}
+
 function normalizeEvent(event, tournament) {
-  const rawStart = Number(event?.estimateStartTime || 0);
+  const rawStart = Number(event?.estimateStartTime ?? event?.startTime ?? event?.start_time_ms ?? 0);
   const estimateStartTime = Number.isFinite(rawStart) && rawStart > 0
     ? (rawStart < 100000000000 ? rawStart * 1000 : rawStart)
     : 0;
   return {
-    eventId: String(event?.eventId || ''),
-    homeTeamName: String(event?.homeTeamName || ''),
-    awayTeamName: String(event?.awayTeamName || ''),
+    eventId: String(event?.eventId || event?.id || ''),
+    homeTeamName: String(event?.homeTeamName || event?.homeTeam?.name || event?.home || ''),
+    awayTeamName: String(event?.awayTeamName || event?.awayTeam?.name || event?.away || ''),
     estimateStartTime,
-    matchStatus: String(event?.matchStatus || 'Not start'),
-    tournament: String(tournament?.name || ''),
+    matchStatus: String(event?.matchStatus || event?.status || 'Not start'),
+    tournament: String(tournament?.name || event?.tournamentName || ''),
     markets: Array.isArray(event?.markets) ? event.markets : []
   };
 }
@@ -277,7 +293,7 @@ export async function collectEvents({
     : matchedTargets.size >= targetIds.size;
 
   function addCataloguePage(data) {
-    const tournaments = Array.isArray(data?.data?.tournaments) ? data.data.tournaments : [];
+    const tournaments = catalogueTournaments(data);
     let count = 0;
     for (const tournament of tournaments) {
       for (const event of Array.isArray(tournament?.events) ? tournament.events : []) {
@@ -361,28 +377,86 @@ export async function collectEvents({
   return found;
 }
 
-export async function collectBasketballEvents(context,targetIds,timeline=168){
-  const found=new Map();if(!targetIds.size)return found;
-  for(let page=1;page<=4&&found.size<targetIds.size;page++){
-    const url=new URL('/api/sportybet-basketball?pageSize=100&timeline='+encodeURIComponent(String(timeline))+'&pageNum='+page+'&_t='+Date.now(),context.request.url);
+function targetBasketballFixtureMatches(leg, event) {
+  const [first, second] = legParticipants(leg);
+  if (!sameParticipantPair([first, second], event)) return false;
+  const requestedStart = Date.parse(String(leg?.start_time || ''));
+  const currentStart = Number(event?.estimateStartTime || 0);
+  return !(Number.isFinite(requestedStart) && currentStart &&
+    Math.abs(requestedStart - currentStart) > 45 * 60 * 1000);
+}
+
+export async function collectBasketballEvents(context, targetIds, timeline = 168, targetLegs = []) {
+  const found = new Map();
+  const ids = targetIds instanceof Set ? targetIds : new Set();
+  const targets = Array.isArray(targetLegs) ? targetLegs : [];
+  const matchedTargets = new Set();
+  if (!ids.size && !targets.length) return found;
+
+  const targetsComplete = () => targets.length
+    ? matchedTargets.size >= targets.length
+    : [...ids].every(id => found.has(id));
+
+  for (let page = 1; page <= 4 && !targetsComplete(); page++) {
+    const url = new URL('/api/sportybet-basketball?pageSize=100&timeline=' + encodeURIComponent(String(timeline)) + '&pageNum=' + page + '&_t=' + Date.now(), context.request.url);
     // Call the sibling Pages Function directly; do not HTTP self-fetch the public hostname.
-    const feedRequest=new Request(url.toString(),{headers:{'Accept':'application/json','Cache-Control':'no-cache'}});
-    const response=await getSportyBetBasketballFeed({request:feedRequest,env:context.env,params:context.params,data:context.data});
-    const body=await response.text();
-    if(!response.ok)throw new Error('Current SportyBet basketball feed HTTP '+response.status);
+    const feedRequest = new Request(url.toString(), { headers: { 'Accept': 'application/json', 'Cache-Control': 'no-cache' } });
+    const response = await getSportyBetBasketballFeed({ request: feedRequest, env: context.env, params: context.params, data: context.data });
+    const body = await response.text();
+    if (!response.ok) throw new Error('Current SportyBet basketball feed HTTP ' + response.status);
     let payload;
-    try{payload=JSON.parse(body);}catch(_){throw new Error('Current SportyBet basketball feed returned non-JSON content (HTTP '+response.status+', content-type '+String(response.headers.get('content-type')||'unknown')+').');}
-    if(payload?.ok!==true||!Array.isArray(payload.events))throw new Error(payload?.error||'Current SportyBet basketball feed unavailable');
-    for(const row of payload.events){
-      const eventId=String(row?.event_id||'');if(!eventId||!targetIds.has(eventId))continue;
-      const start=Date.parse(String(row?.start_time||''));
-      const markets=(Array.isArray(row?.markets)?row.markets:[]).map(m=>({
-        id:String(m?.id||''),name:String(m?.name||''),desc:String(m?.name||''),specifier:m?.specifier??null,status:String(m?.status||''),
-        outcomes:(Array.isArray(m?.outcomes)?m.outcomes:[]).map(o=>({id:String(o?.id||''),name:String(o?.name||''),desc:String(o?.name||''),odds:Number(o?.odds),active:o?.active!==false,isActive:o?.active===false?0:1}))
-      }));
-      found.set(eventId,{eventId,homeTeamName:String(row?.home||''),awayTeamName:String(row?.away||''),estimateStartTime:Number.isFinite(start)?start:0,matchStatus:'Not start',tournament:String(row?.tournament||''),fetchedAt:String(row?.fetched_at||payload?.fetched_at||''),markets});
+    try {
+      payload = JSON.parse(body);
+    } catch (_) {
+      throw new Error('Current SportyBet basketball feed returned non-JSON content (HTTP ' + response.status + ', content-type ' + String(response.headers.get('content-type') || 'unknown') + ').');
     }
-    if(payload.events.length<100)break;
+    if (payload?.ok !== true || !Array.isArray(payload.events)) {
+      throw new Error(payload?.error || 'Current SportyBet basketball feed unavailable');
+    }
+
+    for (const row of payload.events) {
+      const eventId = String(row?.event_id || '');
+      if (!eventId) continue;
+      const start = Date.parse(String(row?.start_time || ''));
+      const markets = (Array.isArray(row?.markets) ? row.markets : []).map(m => ({
+        id: String(m?.id || ''),
+        name: String(m?.name || ''),
+        desc: String(m?.name || ''),
+        specifier: m?.specifier ?? null,
+        status: String(m?.status || ''),
+        outcomes: (Array.isArray(m?.outcomes) ? m.outcomes : []).map(o => ({
+          id: String(o?.id || ''),
+          name: String(o?.name || ''),
+          desc: String(o?.name || ''),
+          odds: Number(o?.odds),
+          active: o?.active !== false,
+          isActive: o?.active === false ? 0 : 1
+        }))
+      }));
+      const event = {
+        eventId,
+        homeTeamName: String(row?.home || ''),
+        awayTeamName: String(row?.away || ''),
+        estimateStartTime: Number.isFinite(start) ? start : 0,
+        matchStatus: 'Not start',
+        tournament: String(row?.tournament || ''),
+        fetchedAt: String(row?.fetched_at || payload?.fetched_at || ''),
+        markets
+      };
+      const matchingIndexes = targets
+        .map((leg, index) => ({ leg, index }))
+        .filter(({ leg }) => {
+          const providerId = String(leg?.sportybet_event_id || '');
+          const predictionId = String(leg?.event_id || '');
+          return (providerId && providerId === eventId) ||
+            (predictionId && predictionId === eventId) ||
+            targetBasketballFixtureMatches(leg, event);
+        })
+        .map(({ index }) => index);
+      if (ids.has(eventId) || matchingIndexes.length) found.set(eventId, event);
+      matchingIndexes.forEach(index => matchedTargets.add(index));
+    }
+    if (payload.events.length < 100) break;
   }
   return found;
 }
@@ -769,13 +843,13 @@ async function handlePost(context) {
         match: String(item?.match || (String(item?.player_1 || '') + ' vs ' + String(item?.player_2 || '')))
       }));
       const ids = legs.map(leg => leg.event_id);
-      const basketballProviderIds = legs.filter(leg => leg.sport === 'basketball').map(leg => leg.sportybet_event_id);
+      const basketballProviderIds = legs.filter(leg => leg.sport === 'basketball').map(leg => leg.sportybet_event_id).filter(Boolean);
       if (new Set(basketballProviderIds).size !== basketballProviderIds.length || legs.some(leg => {
           if (!leg.event_id || !leg.player_1 || !leg.player_2) return true;
           if (leg.sport === 'basketball') {
             return leg.market !== 'total' || !['over', 'under'].includes(leg.pick) ||
               !Number.isFinite(Number(leg.line)) || Number(leg.line) < 100 || Number(leg.line) > 300 ||
-              leg.market_id !== '225' || !leg.sportybet_event_id;
+              leg.market_id !== '225';
           }
           if (leg.sport === 'efootball') {
             return !['efootball_gt', 'efootball_adriatic'].includes(leg.product) ||
@@ -831,7 +905,8 @@ async function handlePost(context) {
     const efootballIds = new Set(legs.filter(l => productForLeg(l) === 'efootball').map(l => String(l.sportybet_event_id || l.event_id || '')).filter(Boolean));
     const footballIds = new Set(legs.filter(l => String(l?.sport || '').toLowerCase() === 'football').map(l => String(l.sportybet_event_id || l.event_id || '')).filter(Boolean));
     const tennisIds = new Set(legs.filter(l => String(l?.sport || '').toLowerCase() === 'tennis').map(l => String(l.sportybet_event_id || l.event_id || '')).filter(Boolean));
-    const basketballIds = new Set(legs.filter(l => String(l?.sport || '').toLowerCase() === 'basketball').map(l => String(l.sportybet_event_id || '')).filter(Boolean));
+    const basketballLegs = legs.filter(l => String(l?.sport || '').toLowerCase() === 'basketball');
+    const basketballIds = new Set(basketballLegs.flatMap(l => [l.sportybet_event_id, l.event_id]).map(String).filter(Boolean));
 
     const found = new Map();
 
@@ -903,7 +978,7 @@ async function handlePost(context) {
       for (const [id, event] of events) found.set(id, event);
     }
     if (basketballIds.size) {
-      const events = await collectBasketballEvents(context, basketballIds, catalogueTimeline);
+      const events = await collectBasketballEvents(context, basketballIds, catalogueTimeline, basketballLegs);
       for (const [id, event] of events) found.set(id, event);
     }
 
