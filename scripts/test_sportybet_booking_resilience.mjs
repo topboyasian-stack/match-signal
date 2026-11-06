@@ -33,24 +33,116 @@ try {
   await assert.rejects(()=>upstream('/api/ng/factsCenter/pcUpcomingEvents',{marketId:'225'}),
     error=>/returned HTML instead of JSON/.test(error.message)&&!/Unexpected token/.test(error.message));
 
-  const sportPayload={bizCode:10000,data:{tournaments:[{id:'sr:tournament:132',name:'NBA',events:[{
-    eventId:'sr:match:booking-feed-test',homeTeamName:'Fixture Home',awayTeamName:'Fixture Away',estimateStartTime:Date.now()+3600000,matchStatus:'Not start',
+  const basketballKickoff = Date.now() + 3600000;
+  const sportPayload={bizCode:10000,data:[{
+    eventId:'sr:match:booking-feed-test',tournamentId:'sr:tournament:132',homeTeamName:'Fixture Home',awayTeamName:'Fixture Away',estimateStartTime:basketballKickoff,matchStatus:'Not start',
     markets:[{id:'225',desc:'Full Game Total incl. OT',specifier:'total=220.5',status:'0',outcomes:[
       {id:'over',desc:'Over 220.5',odds:1.93,isActive:1},{id:'under',desc:'Under 220.5',odds:1.88,isActive:1}
     ]}]
-  }]}]}};
+  }]};
   const requested=[];
   globalThis.fetch=async input=>{
     const url=new URL(typeof input==='string'?input:input.url);requested.push(url);
     assert.ok(url.origin===SPORTYBET||url.origin===PROXY,'No self-fetch to Match Signal Pages is allowed');
     return jsonResponse(sportPayload);
   };
-  const found=await collectBasketballEvents({request:new Request('https://match-signal.pages.dev/api/sportybet-booking')},new Set(['sr:match:booking-feed-test']));
-  const event=found.get('sr:match:booking-feed-test');assert.ok(event);
+  const basketballTargetLeg = {
+    event_id:'espn:source-basketball-fixture',
+    sportybet_event_id:'sr:match:old-provider-basketball-id',
+    player_1:'Fixture Home',
+    player_2:'Fixture Away',
+    start_time:new Date(basketballKickoff).toISOString()
+  };
+  const found=await collectBasketballEvents(
+    {request:new Request('https://match-signal.pages.dev/api/sportybet-booking')},
+    new Set([basketballTargetLeg.event_id,basketballTargetLeg.sportybet_event_id]),
+    168,
+    [basketballTargetLeg]
+  );
+  const event=found.get('sr:match:booking-feed-test');assert.ok(event,'basketball fixture must resolve by participants/time when provider ID changes');
   const market=event.markets.find(m=>String(m.id)==='225');assert.ok(market);
   assert.equal(market.specifier,'total=220.5');
   assert.deepEqual(market.outcomes.map(o=>Number(o.odds)).sort((a,b)=>a-b),[1.88,1.93]);
   assert.ok(requested.length>0&&requested.every(u=>u.origin===SPORTYBET||u.origin===PROXY));
+
+  // Recover NBA fixtures when SportyBet rotates provider event IDs and when
+  // page 1 is full upstream but contains no NBA rows after the feed's filter.
+  const nbaKickoffA=Date.now()+3*60*60*1000;
+  const nbaKickoffB=Date.now()+4*60*60*1000;
+  const nbaCurrentEvents=[
+    {eventId:'sr:match:current-phx-orl',homeTeamName:'Phoenix Suns',awayTeamName:'Orlando Magic',estimateStartTime:nbaKickoffA,matchStatus:'Not start',markets:[
+      {id:'225',desc:'Full Game Total incl. OT',specifier:'total=210.5',status:'0',outcomes:[
+        {id:'phx-over',desc:'Over 210.5',odds:1.91,isActive:1},{id:'phx-under',desc:'Under 210.5',odds:1.87,isActive:1}
+      ]}
+    ]},
+    {eventId:'sr:match:current-gsw-mia',homeTeamName:'Golden State Warriors',awayTeamName:'Miami Heat',estimateStartTime:nbaKickoffB,matchStatus:'Not start',markets:[
+      {id:'225',desc:'Full Game Total incl. OT',specifier:'total=224.5',status:'0',outcomes:[
+        {id:'gsw-over',desc:'Over 224.5',odds:1.93,isActive:1},{id:'gsw-under',desc:'Under 224.5',odds:1.89,isActive:1}
+      ]}
+    ]}
+  ];
+  const fullNonNbaPage=Array.from({length:100},(_,i)=>({
+    eventId:'sr:match:non-nba-'+i,homeTeamName:'Non NBA Home '+i,awayTeamName:'Non NBA Away '+i,
+    estimateStartTime:Date.now()+3600000,matchStatus:'Not start',markets:[]
+  }));
+  const nbaPageRequests=[];
+  globalThis.fetch=async(input,options={})=>{
+    const url=new URL(typeof input==='string'?input:input.url);
+    nbaPageRequests.push(url);
+    assert.ok(url.origin===SPORTYBET||url.origin===PROXY,'NBA live feed must use SportyBet source hosts');
+    if(url.pathname==='/api/ng/orders/share'){
+      return jsonResponse({bizCode:10000,data:{shareCode:'NBA-ROTATED-EVENT-ID-RECOVERY',outcomes:[{odds:1.91},{odds:1.93}]}});
+    }
+    const page=Number(url.searchParams.get('pageNum')||1);
+    return jsonResponse({bizCode:10000,data:{tournaments:[{
+      id:page===1?'sr:tournament:999':'sr:tournament:132',
+      name:page===1?'Other basketball':'NBA',
+      events:page===1?fullNonNbaPage:nbaCurrentEvents
+    }]}});
+  };
+  const nbaRecoveryResponse=await onRequest({request:new Request('https://match-signal.pages.dev/api/sportybet-booking',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({mode:'manual',manual_selections:[
+      {event_id:'prediction-phx-orl',sportybet_event_id:'sr:match:old-phx-orl',sport:'basketball',market:'total',pick:'over',line:210.5,market_id:'225',start_time:new Date(nbaKickoffA).toISOString(),player_1:'Phoenix Suns',player_2:'Orlando Magic',match:'Phoenix Suns vs Orlando Magic'},
+      {event_id:'prediction-gsw-mia',sportybet_event_id:'sr:match:old-gsw-mia',sport:'basketball',market:'total',pick:'over',line:224.5,market_id:'225',start_time:new Date(nbaKickoffB).toISOString(),player_1:'Golden State Warriors',player_2:'Miami Heat',match:'Golden State Warriors vs Miami Heat'}
+    ]})
+  })});
+  const nbaRecoveryPayload=await nbaRecoveryResponse.json();
+  assert.equal(nbaRecoveryResponse.status,200,JSON.stringify(nbaRecoveryPayload));
+  assert.equal(nbaRecoveryPayload.ok,true,JSON.stringify(nbaRecoveryPayload));
+  assert.equal(nbaRecoveryPayload.booking_code,'NBA-ROTATED-EVENT-ID-RECOVERY');
+  assert.equal(nbaRecoveryPayload.selection_count,2);
+  assert.deepEqual(nbaRecoveryPayload.selections.map(x=>x.resolved_by),[
+    'fixture_participants_time','fixture_participants_time'
+  ]);
+  assert.deepEqual(nbaRecoveryPayload.selections.map(x=>x.resolved_event_id),[
+    'sr:match:current-phx-orl','sr:match:current-gsw-mia'
+  ]);
+  assert.ok(nbaPageRequests.some(u=>Number(u.searchParams.get('pageNum'))===1));
+  assert.ok(nbaPageRequests.some(u=>Number(u.searchParams.get('pageNum'))===2),
+    'the booking lookup must continue when page 1 is full upstream but has zero filtered NBA events');
+  assert.ok(nbaPageRequests.every(u=>Number(u.searchParams.get('pageNum'))<=5));
+
+  // Already-started selections are rejected explicitly and never trigger an
+  // upcoming-catalogue lookup or a share-code request.
+  const staleCatalogueRequests=[];
+  globalThis.fetch=async input=>{
+    staleCatalogueRequests.push(new URL(typeof input==='string'?input:input.url));
+    throw new Error('A started fixture must not be queried as upcoming.');
+  };
+  const staleStart=new Date(Date.now()-60*60*1000).toISOString();
+  const staleTicketResponse=await onRequest({request:new Request('https://match-signal.pages.dev/api/sportybet-booking',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({mode:'manual',manual_selections:[
+      {event_id:'stale-phx',sportybet_event_id:'old-phx',sport:'basketball',market:'total',pick:'over',line:210.5,market_id:'225',start_time:staleStart,player_1:'Phoenix Suns',player_2:'Orlando Magic',match:'Phoenix Suns vs Orlando Magic'},
+      {event_id:'stale-gsw',sportybet_event_id:'old-gsw',sport:'basketball',market:'total',pick:'over',line:224.5,market_id:'225',start_time:staleStart,player_1:'Golden State Warriors',player_2:'Miami Heat',match:'Golden State Warriors vs Miami Heat'}
+    ]})
+  })});
+  const staleTicketPayload=await staleTicketResponse.json();
+  assert.equal(staleTicketResponse.status,409,JSON.stringify(staleTicketPayload));
+  assert.equal(staleTicketPayload.booking_code_withheld,true);
+  assert.ok(staleTicketPayload.validation.every(x=>/start time has passed/.test(x.reason)));
+  assert.equal(staleCatalogueRequests.length,0,'already-started fixtures must not be looked up or sent to SportyBet share');
 
   // Catalogue scans must honor the Worker’s strict pageNum 1..5 contract.
   requested.length=0;
@@ -135,7 +227,7 @@ try {
     }
     if(url.pathname.endsWith('/wapConfigurableUpcomingEvents')&&url.searchParams.get('sportId')==='sr:sport:1') {
       u21CatalogueCalls.push({source:'wap',page:Number(url.searchParams.get('pageNum'))});
-      return jsonResponse({bizCode:10000,data:{tournaments:[{name:'WAP academy fixtures',events:u21CurrentEvents}]}});
+      return jsonResponse({bizCode:10000,data:u21CurrentEvents});
     }
     return jsonResponse({bizCode:10000,data:{tournaments:[]}});
   };

@@ -17,7 +17,17 @@ function normMarket(m){
     })).filter(o=>Number.isFinite(o.odds)&&o.odds>1&&o.active)
   };
 }
-function getTournaments(payload){return Array.isArray(payload?.data?.tournaments)?payload.data.tournaments:[]}
+function getTournaments(payload){
+  const data=payload?.data;
+  // WAP configurable-upcoming responses may carry the event list directly
+  // in data[], while PC upcoming groups events by tournament.
+  if(Array.isArray(data)){
+    return data.some(item=>Array.isArray(item?.events))?data:[{name:'',events:data}];
+  }
+  if(Array.isArray(data?.tournaments))return data.tournaments;
+  if(Array.isArray(data?.events))return [{name:String(data?.name||''),events:data.events}];
+  return [];
+}
 export async function onRequestOptions(){return new Response(null,{status:204,headers:headers()})}
 export async function onRequestGet(context){
   const u=new URL(context.request.url);
@@ -58,7 +68,8 @@ export async function onRequestGet(context){
           let payload;try{payload=JSON.parse(body)}catch(_){throw new Error('returned non-JSON data')}
           const tournaments=getTournaments(payload);
           const tournamentArrayPresent=Array.isArray(payload?.data?.tournaments);
-          const data=payload?.data&&typeof payload.data==='object'?payload.data:{};
+          const flatEventArrayPresent=Array.isArray(payload?.data)||Array.isArray(payload?.data?.events)||Array.isArray(payload?.events);
+          const data=payload?.data&&typeof payload.data==='object'&&!Array.isArray(payload.data)?payload.data:{};
           const rawTotal=data.totalNum??data.totalEvents??data.totalCount??payload?.totalNum??null;
           const parsedTotal=rawTotal===null?null:Number(rawTotal);
           const count=tournaments.reduce((n,t)=>n+(Array.isArray(t?.events)?t.events.length:0),0);
@@ -76,14 +87,14 @@ export async function onRequestGet(context){
             upstream_total_events:Number.isFinite(parsedTotal)?parsedTotal:null,
             tournament_count:tournaments.length,
             event_count:count,
-            response_shape:!tournamentArrayPresent?'TOURNAMENTS_FIELD_MISSING':tournaments.length?'TOURNAMENTS_PRESENT':'TOURNAMENTS_ARRAY_EMPTY'
+            response_shape:tournamentArrayPresent?(tournaments.length?'TOURNAMENTS_PRESENT':'TOURNAMENTS_ARRAY_EMPTY'):flatEventArrayPresent?'FLAT_EVENT_ARRAY_PRESENT':'TOURNAMENTS_FIELD_MISSING'
           };
           const emptyPaginationPage=request.path==='/api/ng/factsCenter/pcUpcomingEvents'&&pageNum>1&&payload?.bizCode===10000&&payload?.data&&typeof payload.data==='object'&&!Array.isArray(payload.data)&&Object.keys(payload.data).length===0;
           if(emptyPaginationPage)diagnostic.response_shape='PAGINATION_END_EMPTY_DATA';
           diagnostics.push(diagnostic);
           if(payload?.bizCode!==undefined&&payload.bizCode!==10000)throw new Error('bizCode '+payload.bizCode);
           if(payload?.ok===false)throw new Error(String(payload?.detail||payload?.error||'source rejected query'));
-          if(!tournamentArrayPresent&&!emptyPaginationPage)throw new Error('response omitted data.tournaments; metadata='+JSON.stringify(diagnostic));
+          if(!tournamentArrayPresent&&!flatEventArrayPresent&&!emptyPaginationPage)throw new Error('response omitted both data.tournaments and supported event arrays; metadata='+JSON.stringify(diagnostic));
           const usablePayload=emptyPaginationPage?{...payload,data:{tournaments:[]}}:payload;
           return {request,payload:usablePayload,error:null,event_count:count,source_origin:origin,diagnostics};
         }catch(error){
@@ -133,8 +144,13 @@ export async function onRequestGet(context){
     const events=Array.from(eventMap.values());
     const totalMarketEvents=events.filter(e=>e.markets.some(m=>String(m.id)==='225')).length;
     const sourceErrors=attempts.filter(a=>a.error).map(a=>a.error);
-    const hasValidTournamentArray=attempts.some(a=>a.payload&&Array.isArray(a.payload?.data?.tournaments));
-    if(!events.length&&!hasValidTournamentArray){
+    const hasValidEventList=attempts.some(a=>a.payload&&(
+      Array.isArray(a.payload?.data?.tournaments)||
+      Array.isArray(a.payload?.data)||
+      Array.isArray(a.payload?.data?.events)||
+      Array.isArray(a.payload?.events)
+    ));
+    if(!events.length&&!hasValidEventList){
       const attemptsSummary=attempts.map(a=>a.request.path+' marketId='+(a.request.marketId||'default')+': '+(a.error||('events='+a.event_count))).join('; ');
       throw new Error('SportyBet NBA feed returned no usable event-list response. '+attemptsSummary);
     }
@@ -144,9 +160,18 @@ export async function onRequestGet(context){
       market_contract:{winner_including_overtime:'219',handicap_including_overtime:'223',total_including_overtime:'225',team_total_points:['227','228']},
       fetched_at:new Date().toISOString(),elapsed_ms:Date.now()-started,event_count:events.length,
       total_market_event_count:totalMarketEvents,source_errors:sourceErrors,
+      // Raw upstream pages can be full while the post-filtered NBA result has
+      // fewer than 100 rows. Preserve the raw page's pagination signal.
+      catalogue_page_has_more:attempts.some(attempt=>{
+        if(!attempt.payload)return false;
+        const diagnostic=(attempt.diagnostics||[]).find(item=>item.source_origin===attempt.source_origin);
+        const total=Number(diagnostic?.upstream_total_events);
+        return Number(attempt.event_count)>=pageSize||
+          (Number.isFinite(total)&&total>pageNum*pageSize);
+      }),
       source_diagnostics:attempts.flatMap(a=>a.diagnostics||[]),events
     }),{status:200,headers:headers()});
   }catch(error){
-    return new Response(JSON.stringify({ok:false,source:'SportyBet Nigeria',error:String(error?.message||error),fetched_at:new Date().toISOString(),event_count:0,total_market_event_count:0,source_diagnostics:attempts.flatMap(a=>a.diagnostics||[]),events:[]}),{status:200,headers:{...headers(),'Cache-Control':'no-store'}});
+    return new Response(JSON.stringify({ok:false,source:'SportyBet Nigeria',error:String(error?.message||error),fetched_at:new Date().toISOString(),event_count:0,total_market_event_count:0,catalogue_page_has_more:false,source_diagnostics:attempts.flatMap(a=>a.diagnostics||[]),events:[]}),{status:200,headers:{...headers(),'Cache-Control':'no-store'}});
   }
 }
