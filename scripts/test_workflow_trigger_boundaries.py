@@ -183,6 +183,14 @@ def main():
     assert "- cron: '5-59/5 * * * *'" in board, (
         "The five-minute Unified Upcoming refresh must remain active."
     )
+    # A failed Cloudflare production pre-deploy freshness check must wake the
+    # existing NBA model publisher once. Successful deploys must not create a
+    # deployment -> expansion -> board -> Builder -> deployment success loop.
+    live_expansion = (WORKFLOWS / "live-expansion.yml").read_text(encoding="utf-8")
+    assert '"Deploy Match Signal to Cloudflare Pages"' in live_expansion
+    assert "types: [completed]" in live_expansion
+    assert "github.event.workflow_run.conclusion == 'failure'" in live_expansion
+    assert "Test workflow recovery boundaries" in live_expansion
     assert '"Match Signal Live Prediction Pipeline"' in board
     assert '"Match Signal Virtual Lab Collector"' in board
     assert '"Match Signal Virtual Lab Live Sync"' in board
