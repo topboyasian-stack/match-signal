@@ -218,8 +218,12 @@ def _decorate_candidate(
         or candidate.get("sportybet_event_id")
         or candidate.get("event_id")
     )
-    candidate["sportybet_specifier"] = f"total={line:g}" if line is not None and market in {"total_goals", "total_games"} else (
-        f"market={market_id}" if market_id else None
+    # SportyBet's non-line markets are identified by market/outcome IDs; adding
+    # a made-up specifier can make an otherwise valid selection unbookable.
+    candidate["sportybet_specifier"] = (
+        f"total={line:g}"
+        if line is not None and market in {"total_goals", "total_games"}
+        else None
     )
     candidate["sportybet_outcome_id"] = str((outcome or {}).get("id") or "") or None
     candidate["sportybet_outcome_name"] = str((outcome or {}).get("name") or "") or None
@@ -993,7 +997,9 @@ def _evidence_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
     for key, rows in groups.items():
         # Repeated 15-minute snapshots of one fixture are not independent samples.
         settled_by_event: dict[str, dict[str, Any]] = {}
-        for row in sorted(rows, key=lambda x: str(x.get("quote_timestamp") or x.get("observed_at") or "")):
+        # Score the latest pre-match snapshot for each event/market/line/side,
+        # while retaining every revision in the ledger for movement analysis.
+        for row in sorted(rows, key=lambda x: str(x.get("quote_timestamp") or x.get("observed_at") or ""), reverse=True):
             result = row.get("settlement_result")
             if row.get("settlement_status") != "SETTLED" or result not in {"yes", "no", "over", "under", "push"}:
                 continue
