@@ -382,8 +382,8 @@ function targetBasketballFixtureMatches(leg, event) {
   if (!sameParticipantPair([first, second], event)) return false;
   const requestedStart = Date.parse(String(leg?.start_time || ''));
   const currentStart = Number(event?.estimateStartTime || 0);
-  return !(Number.isFinite(requestedStart) && currentStart &&
-    Math.abs(requestedStart - currentStart) > 45 * 60 * 1000);
+  return Number.isFinite(requestedStart) && currentStart > 0 &&
+    Math.abs(requestedStart - currentStart) <= 45 * 60 * 1000;
 }
 
 export async function collectBasketballEvents(context, targetIds, timeline = 168, targetLegs = []) {
@@ -397,7 +397,7 @@ export async function collectBasketballEvents(context, targetIds, timeline = 168
     ? matchedTargets.size >= targets.length
     : [...ids].every(id => found.has(id));
 
-  for (let page = 1; page <= 4 && !targetsComplete(); page++) {
+  for (let page = 1; page <= 5 && !targetsComplete(); page++) {
     const url = new URL('/api/sportybet-basketball?pageSize=100&timeline=' + encodeURIComponent(String(timeline)) + '&pageNum=' + page + '&_t=' + Date.now(), context.request.url);
     // Call the sibling Pages Function directly; do not HTTP self-fetch the public hostname.
     const feedRequest = new Request(url.toString(), { headers: { 'Accept': 'application/json', 'Cache-Control': 'no-cache' } });
@@ -456,7 +456,7 @@ export async function collectBasketballEvents(context, targetIds, timeline = 168
       if (ids.has(eventId) || matchingIndexes.length) found.set(eventId, event);
       matchingIndexes.forEach(index => matchedTargets.add(index));
     }
-    if (payload.events.length < 100) break;
+    if (payload.catalogue_page_has_more !== true) break;
   }
   return found;
 }
@@ -901,11 +901,19 @@ async function handlePost(context) {
       catch (error) { return json({ ok: false, error: 'NBA_RELEASE_EVIDENCE_UNAVAILABLE', message: 'NBA release evidence could not be verified. No ticket code was requested.' }, 503); }
       if (!nbaTotalsReleaseQualified(nbaReleaseContext.evidence, nbaReleaseContext.probability)) return json({ ok: false, error: 'NBA_RELEASE_GATE_LOCKED', message: 'The independent NBA totals release gate has not passed. No SportyBet ticket code was requested.' }, 423);
     }
-    const virtualIds = new Set(legs.filter(l => productForLeg(l) === 'vfootball').map(l => String(l.event_id || '')));
-    const efootballIds = new Set(legs.filter(l => productForLeg(l) === 'efootball').map(l => String(l.sportybet_event_id || l.event_id || '')).filter(Boolean));
-    const footballIds = new Set(legs.filter(l => String(l?.sport || '').toLowerCase() === 'football').map(l => String(l.sportybet_event_id || l.event_id || '')).filter(Boolean));
-    const tennisIds = new Set(legs.filter(l => String(l?.sport || '').toLowerCase() === 'tennis').map(l => String(l.sportybet_event_id || l.event_id || '')).filter(Boolean));
-    const basketballLegs = legs.filter(l => String(l?.sport || '').toLowerCase() === 'basketball');
+    // Started selections cannot be pre-match bookable. Avoid looking them up
+    // as upcoming fixtures; final validation reports the precise reason.
+    const lookupLegs = manualMode ? legs.filter(leg => {
+      const start = Date.parse(String(leg?.start_time || ''));
+      return !Number.isFinite(start) || start > Date.now();
+    }) : legs;
+    const virtualIds = new Set(lookupLegs.filter(l => productForLeg(l) === 'vfootball').map(l => String(l.event_id || '')));
+    const efootballIds = new Set(lookupLegs.filter(l => productForLeg(l) === 'efootball').map(l => String(l.sportybet_event_id || l.event_id || '')).filter(Boolean));
+    const footballLegs = lookupLegs.filter(l => String(l?.sport || '').toLowerCase() === 'football');
+    const tennisLegs = lookupLegs.filter(l => String(l?.sport || '').toLowerCase() === 'tennis');
+    const basketballLegs = lookupLegs.filter(l => String(l?.sport || '').toLowerCase() === 'basketball');
+    const footballIds = new Set(footballLegs.map(l => String(l.sportybet_event_id || l.event_id || '')).filter(Boolean));
+    const tennisIds = new Set(tennisLegs.map(l => String(l.sportybet_event_id || l.event_id || '')).filter(Boolean));
     const basketballIds = new Set(basketballLegs.flatMap(l => [l.sportybet_event_id, l.event_id]).map(String).filter(Boolean));
 
     const found = new Map();
@@ -962,7 +970,7 @@ async function handlePost(context) {
         fallbackPath: '/api/ng/factsCenter/wapConfigurableUpcomingEvents',
         deadlineAt: manualDeadlineAt,
         requestTimeoutMs: manualMode ? 3500 : 6000
-      }, footballIds, legs.filter(leg => String(leg?.sport || '').toLowerCase() === 'football'));
+      }, footballIds, footballLegs);
       for (const [id, event] of events) found.set(id, event);
     }
 
@@ -974,7 +982,7 @@ async function handlePost(context) {
         fallbackPath: '/api/ng/factsCenter/wapConfigurableUpcomingEvents',
         deadlineAt: manualDeadlineAt,
         requestTimeoutMs: manualMode ? 3500 : 6000
-      }, tennisIds);
+      }, tennisIds, tennisLegs);
       for (const [id, event] of events) found.set(id, event);
     }
     if (basketballIds.size) {
@@ -986,6 +994,17 @@ async function handlePost(context) {
     const validation = [];
     for (const leg of legs) {
       const eventId = String(leg?.event_id || '');
+      if (manualMode) {
+        const requestedStart = Date.parse(String(leg?.start_time || ''));
+        if (!Number.isFinite(requestedStart)) {
+          validation.push(validationFailure(leg, 'Fixture start time is missing or invalid; refresh this selection.'));
+          continue;
+        }
+        if (requestedStart <= Date.now()) {
+          validation.push(validationFailure(leg, 'Fixture start time has passed; pre-match SportyBet booking is closed.'));
+          continue;
+        }
+      }
       const resolved = resolveCurrentEvent(leg, found);
       const event = resolved.event;
       if (!event) {
