@@ -21,6 +21,7 @@ on:
       - '.github/workflows/nba-totals-probability-value.yml'
 
 permissions:
+  actions: write
   contents: write
 
 concurrency:
@@ -237,3 +238,12 @@ jobs:
           done
           echo 'Could not publish the NBA probability/value report after five attempts.' >&2
           exit 1
+
+      - name: Dispatch latest-main NBA ticket gate regression after report publication
+        if: steps.refresh_gate.outputs.run == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh workflow run nba-ticket-guard-tests.yml --ref main
+          echo "Dispatched fail-closed Basketball gate tests against the latest main reports."
