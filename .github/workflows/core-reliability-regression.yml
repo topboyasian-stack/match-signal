@@ -42,6 +42,8 @@ on:
       - "scripts/test_tennis_market_alternatives.py"
       - "scripts/cross_sport_market_reassessment.py"
       - "scripts/test_cross_sport_market_reassessment.py"
+      - "scripts/sync_cross_sport_private_evidence.py"
+      - "functions/api/analyst/market-evidence.js"
       - ".github/workflows/core-reliability-regression.yml"
       - ".github/workflows/live-expansion.yml"
       - "scripts/test_workflow_trigger_boundaries.py"
@@ -115,7 +117,7 @@ jobs:
 
       - name: Verify cross-sport market reassessment and exact-quote gates
         run: |
-          python -m py_compile scripts/cross_sport_market_reassessment.py scripts/test_cross_sport_market_reassessment.py scripts/odds_builder.py
+          python -m py_compile scripts/cross_sport_market_reassessment.py scripts/test_cross_sport_market_reassessment.py scripts/sync_cross_sport_private_evidence.py scripts/odds_builder.py
           python scripts/test_cross_sport_market_reassessment.py
 
       - name: Verify ticket calibration history

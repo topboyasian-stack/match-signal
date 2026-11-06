@@ -110,6 +110,14 @@ class CrossSportReassessmentTests(unittest.TestCase):
         self.now = datetime(2026, 11, 6, 12, 0, tzinfo=timezone.utc)
         reassessment._RUN_OPTIONS.clear()
 
+    def test_raw_reassessment_artifacts_are_routed_to_ignored_private_store(self):
+        private_dir = reassessment.DATA / "calibration_private"
+        self.assertEqual(reassessment.OUTPUT.parent, private_dir)
+        self.assertEqual(reassessment.HISTORY_OUTPUT.parent, private_dir)
+        self.assertEqual(reassessment.REVISION_PATH.parent, private_dir)
+        self.assertNotEqual(reassessment.OUTPUT.parent, reassessment.DATA)
+        self.assertNotEqual(reassessment.HISTORY_OUTPUT.parent, reassessment.DATA)
+
     def test_poisson_recalculates_half_line_and_rejects_push_line(self):
         self.assertAlmostEqual(reassessment._poisson_over_probability(3.0, 2.5), 0.5768099, places=5)
         self.assertIsNone(reassessment._poisson_over_probability(3.0, 2.0))

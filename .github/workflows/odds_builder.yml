@@ -19,6 +19,8 @@ on:
       - 'scripts/test_tennis_market_alternatives.py'
       - 'scripts/cross_sport_market_reassessment.py'
       - 'scripts/test_cross_sport_market_reassessment.py'
+      - 'scripts/sync_cross_sport_private_evidence.py'
+      - 'functions/api/analyst/market-evidence.js'
       - 'scripts/odds_builder_core.py'
       - 'scripts/test_odds_builder_efootball_spoiler.py'
       - 'scripts/test_odds_builder_upcoming_desk_recent_losses.py'
@@ -82,6 +84,11 @@ jobs:
           python-version: '3.12'
       - name: Install runtime dependency
         run: python -m pip install --upgrade requests
+      - name: Restore private cross-sport evidence ledger
+        env:
+          MATCH_SIGNAL_ANALYST_TOKEN: ${{ secrets.MATCH_SIGNAL_ANALYST_TOKEN }}
+          MATCH_SIGNAL_PRIVATE_EVIDENCE_URL: https://match-signal.pages.dev/api/analyst/market-evidence
+        run: python scripts/sync_cross_sport_private_evidence.py restore
       - name: Run tennis total challenger research
         run: python scripts/tennis_total_research.py
       - name: Regression-check continuous tennis market reassessment
@@ -90,7 +97,7 @@ jobs:
           python scripts/test_tennis_market_alternatives.py
       - name: Regression-check cross-sport market reassessment and evidence snapshots
         run: |
-          python -m py_compile scripts/cross_sport_market_reassessment.py scripts/test_cross_sport_market_reassessment.py
+          python -m py_compile scripts/cross_sport_market_reassessment.py scripts/test_cross_sport_market_reassessment.py scripts/sync_cross_sport_private_evidence.py
           python scripts/test_cross_sport_market_reassessment.py
       - name: Validate tennis research artifact
         run: |
@@ -104,6 +111,11 @@ jobs:
           PY
       - name: Run daily mixed accumulator builder
         run: python scripts/odds_builder.py
+      - name: Persist cross-sport evidence to private KV
+        env:
+          MATCH_SIGNAL_ANALYST_TOKEN: ${{ secrets.MATCH_SIGNAL_ANALYST_TOKEN }}
+          MATCH_SIGNAL_PRIVATE_EVIDENCE_URL: https://match-signal.pages.dev/api/analyst/market-evidence
+        run: python scripts/sync_cross_sport_private_evidence.py publish
       - name: Regression-check eFootball recent spoiler guard
         run: python scripts/test_odds_builder_efootball_spoiler.py
       - name: Regression-check Upcoming Desk recent settled-line losses
@@ -360,8 +372,6 @@ jobs:
           cp data/tennis_total_research.json "$output_dir/tennis_total_research.json"
           cp data/results_first_evidence_report.json "$output_dir/results_first_evidence_report.json"
           cp data/line_ladder_research.json "$output_dir/line_ladder_research.json"
-          cp data/cross_sport_market_reassessment.json "$output_dir/cross_sport_market_reassessment.json"
-          cp data/cross_sport_market_reassessment_history.json "$output_dir/cross_sport_market_reassessment_history.json"
 
           for attempt in 1 2 3 4; do
             echo "Publishing Builder artifacts (attempt ${attempt}/4)."
@@ -374,9 +384,7 @@ jobs:
             cp "$output_dir/tennis_total_research.json" data/tennis_total_research.json
             cp "$output_dir/results_first_evidence_report.json" data/results_first_evidence_report.json
             cp "$output_dir/line_ladder_research.json" data/line_ladder_research.json
-            cp "$output_dir/cross_sport_market_reassessment.json" data/cross_sport_market_reassessment.json
-            cp "$output_dir/cross_sport_market_reassessment_history.json" data/cross_sport_market_reassessment_history.json
-            git add data/odds_builder.json data/tennis_total_research.json data/results_first_evidence_report.json data/line_ladder_research.json data/cross_sport_market_reassessment.json data/cross_sport_market_reassessment_history.json
+            git add data/odds_builder.json data/tennis_total_research.json data/results_first_evidence_report.json data/line_ladder_research.json
 
             if git diff --cached --quiet; then
               echo "No accumulator changes to publish."
