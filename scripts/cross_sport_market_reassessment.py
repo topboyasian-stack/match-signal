@@ -250,18 +250,24 @@ def _dedupe_candidates(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     for row in rows:
         if not isinstance(row, dict):
             continue
+        line = _num(row.get("line"))
         key = (
             str(row.get("sport") or ""),
             str(row.get("event_id") or ""),
             str(row.get("builder_market") or ""),
-            "" if row.get("line") is None else f"{_num(row.get('line')):g}",
+            "" if line is None else f"{line:g}",
             str(row.get("builder_pick") or ""),
         )
         current = indexed.get(key)
-        if current is None or (row.get("market_reassessment") and not current.get("market_reassessment")):
+        new_meta = row.get("market_reassessment") or {}
+        old_meta = (current or {}).get("market_reassessment") or {}
+        new_is_cross_sport = new_meta.get("strategy") == "cross_sport_market_reassessment_v1"
+        old_is_cross_sport = old_meta.get("strategy") == "cross_sport_market_reassessment_v1"
+        if current is None or (new_is_cross_sport and not old_is_cross_sport) or (
+            bool(new_meta) and not bool(old_meta)
+        ):
             indexed[key] = row
     return list(indexed.values())
-
 
 def _football_options(core: Any, now: datetime, rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     active: list[dict[str, Any]] = []
@@ -565,6 +571,31 @@ def _nba_options(now: datetime) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     }
     if not predictions:
         return [], diagnostics
+    has_fresh_pair = False
+    for row in predictions:
+        if str(row.get("sport") or "").lower() != "basketball":
+            continue
+        start = _dt(row.get("start_time"))
+        if start is None or start <= now or (start - now).total_seconds() > 12 * 3600:
+            continue
+        market = (row.get("markets") or {}).get("total_ou") or {}
+        quote_stamp = _dt(market.get("quote_timestamp"))
+        if (
+            str(market.get("market_id") or "") == "225"
+            and "sportybet" in str(market.get("source") or "").lower()
+            and quote_stamp is not None
+            and 0 <= (now - quote_stamp).total_seconds() <= MAX_QUOTE_AGE_SECONDS
+            and (_num(market.get("over_odds")) or 0) > 1
+            and (_num(market.get("under_odds")) or 0) > 1
+            and _num(market.get("line")) is not None
+            and _num(row.get("expected_total")) is not None
+        ):
+            has_fresh_pair = True
+            break
+    if not has_fresh_pair:
+        diagnostics["calibration_status"] = "SKIPPED_NO_FRESH_EXACT_QUOTES"
+        diagnostics["promotion_reason"] = "No upcoming NBA fixture currently has a fresh exact market-225 price pair"
+        return [], diagnostics
     calibrated = None
     residuals: list[float] = []
     try:
@@ -724,6 +755,10 @@ def _settle_result(record: dict[str, Any], settled_by_event: dict[tuple[str, str
         if outcome in {"p1", "draw", "p2"}:
             result = "yes" if (side == "1x" and outcome in {"p1", "draw"}) or (side == "12" and outcome in {"p1", "p2"}) or (side == "x2" and outcome in {"draw", "p2"}) else "no"
     else:
+        if record.get("sport") == "football" and market in {"1X2", "winner"} and isinstance(final_score, list) and len(final_score) >= 2:
+            vals = [_num(x) for x in final_score]
+            if all(x is not None for x in vals):
+                actual = "p1" if vals[0] > vals[1] else "p2" if vals[1] > vals[0] else "draw"
         if actual in {"p1", "p2", "draw", "1", "2", "x", "home", "away"}:
             if actual in {"1", "home"}:
                 actual = "p1"
@@ -934,28 +969,50 @@ def _evidence_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
     for row in records:
         if not isinstance(row, dict):
             continue
-        key = f"{row.get('sport')}:{row.get('market')}"
+        line = _num(row.get("line"))
+        line_key = "none" if line is None else f"{line:g}"
+        key = f"{row.get('sport')}:{row.get('market')}:{line_key}:{row.get('pick')}"
         groups.setdefault(key, []).append(row)
     summary = {}
     for key, rows in groups.items():
-        settled = [x for x in rows if x.get("settlement_status") == "SETTLED" and x.get("settlement_result") in {"yes", "no", "over", "under"}]
-        wins = sum(
-            1 for x in settled
-            if (x.get("pick") in {"yes", "over"} and x.get("settlement_result") in {"yes", "over"})
-            or (x.get("pick") in {"no", "under"} and x.get("settlement_result") in {"no", "under"})
-            or (x.get("market") in {"1X2", "winner"} and x.get("settlement_result") == "yes")
-        )
+        # Repeated 15-minute snapshots of one fixture are not independent samples.
+        settled_by_event: dict[str, dict[str, Any]] = {}
+        for row in sorted(rows, key=lambda x: str(x.get("quote_timestamp") or x.get("observed_at") or "")):
+            result = row.get("settlement_result")
+            if row.get("settlement_status") != "SETTLED" or result not in {"yes", "no", "over", "under", "push"}:
+                continue
+            event_id = str(row.get("event_id") or "")
+            if event_id and event_id not in settled_by_event:
+                settled_by_event[event_id] = row
+        settled = [x for x in settled_by_event.values() if x.get("settlement_result") != "push"]
+        wins = 0
+        brier_values = []
+        for row in settled:
+            pick = str(row.get("pick") or "").lower()
+            result = str(row.get("settlement_result") or "").lower()
+            won = (
+                (pick in {"yes", "over"} and result in {"yes", "over"})
+                or (pick in {"no", "under"} and result in {"no", "under"})
+                or (pick in {"p1", "p2", "draw"} and result == "yes")
+            )
+            wins += int(won)
+            probability = _num(row.get("model_probability"))
+            if probability is not None:
+                brier_values.append((probability - (1.0 if won else 0.0)) ** 2)
+        all_events = {str(x.get("event_id") or "") for x in rows if x.get("event_id")}
+        settled_events = set(settled_by_event)
         summary[key] = {
             "snapshot_rows": len(rows),
-            "settled_n": len(settled),
+            "unique_events": len(all_events),
+            "settled_unique_events": len(settled),
             "wins": wins,
             "losses": max(0, len(settled) - wins),
             "hit_rate": round(wins / len(settled), 4) if settled else None,
-            "pending_n": sum(x.get("settlement_status") != "SETTLED" for x in rows),
-            "note": "Repeated snapshots of the same event are not independent games; evaluation must cluster by event_id.",
+            "brier_score": round(sum(brier_values) / len(brier_values), 6) if brier_values else None,
+            "pending_unique_events": len(all_events - settled_events),
+            "note": "One earliest scored snapshot per event/market/line/side; alternatives from the same fixture remain correlated across different lines and markets.",
         }
     return summary
-
 
 def _write_reassessment_artifact(core: Any, now: datetime) -> dict[str, Any]:
     global _LAST_DIAGNOSTICS
