@@ -24,6 +24,16 @@ def run():
     assert "cron: '2,12,22,32,42,52 * * * *'" in capture_workflow, (
         "NBA SportyBet market-225 capture must run every 10 minutes after the schedule re-arm."
     )
+
+    assert "actions: write" in capture_workflow, (
+        "Capture must be allowed to dispatch a follow-up evidence refresh with GITHUB_TOKEN."
+    )
+    assert "Dispatch NBA probability/value refresh when new immutable quotes were added" in capture_workflow, (
+        "Fresh quote revisions must explicitly trigger probability/value report refresh rather than relying only on workflow_run delivery."
+    )
+    assert "gh workflow run nba-totals-probability-value.yml --ref main" in capture_workflow and "immutable_snapshots_added" in capture_workflow, (
+        "Only a capture that adds immutable market-225 quote snapshots should dispatch the research report."
+    )
     assert "cron: '5,20,35,50 * * * *'" in settlement_workflow, (
         "Official ESPN settlement backup must remain scheduled and staggered between capture slots."
     )
