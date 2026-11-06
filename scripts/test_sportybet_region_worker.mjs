@@ -109,9 +109,25 @@ try {
   const pageSix = await worker.fetch(new Request(
     "https://worker.test/api/ng/factsCenter/pcUpcomingEvents?sportId=sr%3Asport%3A1&pageSize=100&pageNum=6&timeline=168&marketId=1%2C18"
   ));
-  assert.equal(pageSix.status, 400);
-  assert.equal((await pageSix.json()).error, "INVALID_QUERY");
-  assert.equal(fetchCount, 0, "page 6 must be rejected before calling SportyBet");
+  assert.equal(pageSix.status, 200, "football catalogue pages beyond page 5 must be available to bounded manual ticket lookup");
+  assert.equal(lastUrl.searchParams.get("pageNum"), "6");
+  assert.equal(fetchCount, 1);
+
+  fetchCount = 0;
+  const pageTwenty = await worker.fetch(new Request(
+    "https://worker.test/api/ng/factsCenter/pcUpcomingEvents?sportId=sr%3Asport%3A1&pageSize=100&pageNum=20&timeline=168&marketId=1%2C18"
+  ));
+  assert.equal(pageTwenty.status, 200, "the twentieth bounded football catalogue page must pass");
+  assert.equal(lastUrl.searchParams.get("pageNum"), "20");
+  assert.equal(fetchCount, 1);
+
+  fetchCount = 0;
+  const pageTwentyOne = await worker.fetch(new Request(
+    "https://worker.test/api/ng/factsCenter/pcUpcomingEvents?sportId=sr%3Asport%3A1&pageSize=100&pageNum=21&timeline=168&marketId=1%2C18"
+  ));
+  assert.equal(pageTwentyOne.status, 400);
+  assert.equal((await pageTwentyOne.json()).error, "INVALID_QUERY");
+  assert.equal(fetchCount, 0, "page 21 must remain outside the bounded proxy window");
 
   const diagnostic = await worker.fetch(new Request("https://worker.test/__diagnostics"));
   const diagnostics = await diagnostic.json();
