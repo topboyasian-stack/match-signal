@@ -160,6 +160,28 @@ class CrossSportReassessmentTests(unittest.TestCase):
         self.assertEqual(active, [])
         self.assertEqual(audit, [])
 
+
+    def test_future_quote_timestamp_fails_closed(self):
+        row = sample_football(self.now, quote_age_seconds=0)
+        future = self.now + timedelta(seconds=5)
+        row["market_odds_timestamp"] = future.isoformat()
+        fresh, age, stamp = reassessment._fresh_quote(row, self.now)
+        self.assertFalse(fresh)
+        self.assertLess(age, 0)
+        self.assertEqual(stamp, future.isoformat())
+
+    def test_nba_quote_timestamp_is_supported_by_common_freshness_check(self):
+        row = {
+            "quote_timestamp": (self.now - timedelta(seconds=30)).isoformat(),
+            "sport": "basketball",
+            "market_id": "225",
+            "line": 226.5,
+        }
+        fresh, age, stamp = reassessment._fresh_quote(row, self.now)
+        self.assertTrue(fresh)
+        self.assertEqual(age, 30.0)
+        self.assertEqual(stamp, row["quote_timestamp"])
+
     def test_fingerprint_changes_when_price_or_model_probability_changes(self):
         base = {
             "sport": "football", "event_id": "evt", "market": "total_goals", "line": 2.5,
