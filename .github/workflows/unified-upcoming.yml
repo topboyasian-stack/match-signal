@@ -250,13 +250,13 @@ jobs:
           PY
           )"
           export GIT_TERMINAL_PROMPT=0
-          for attempt in 1 2 3 4 5 6; do
+          for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
             # Fetch before a large push so a rejected upload does not burn two
             # minutes before we discover that main moved.
             if ! timeout --signal=TERM --kill-after=10s 45s git fetch origin main; then
               echo "Could not fetch current main before board publish attempt $attempt." >&2
-              if [ "$attempt" -eq 6 ]; then exit 1; fi
-              sleep "$attempt"
+              if [ "$attempt" -eq 12 ]; then exit 1; fi
+              sleep "$((attempt * 2))"
               continue
             fi
 
@@ -320,10 +320,10 @@ jobs:
               echo "Unified board published after latest-main rebase; the refreshed Builder will hand off to the ordered production-promotion workflow."
               exit 0
             fi
-            echo "Board publish attempt $attempt failed after a latest-main rebase; retrying without unnecessary delay."
-            if [ "$attempt" -lt 6 ]; then sleep "$attempt"; fi
+            echo "Board publish attempt $attempt failed after a latest-main rebase; waiting for competing publishers before retry."
+            if [ "$attempt" -lt 12 ]; then sleep "$((attempt * 2))"; fi
           done
-          echo "Failed to publish generated Prediction Desk data after six synchronized attempts." >&2
+          echo "Failed to publish generated Prediction Desk data after twelve synchronized attempts." >&2
           exit 1
       - name: Ensure Odds Builder refresh follows board publication
         continue-on-error: true
