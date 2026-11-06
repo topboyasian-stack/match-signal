@@ -33,20 +33,33 @@ try {
   await assert.rejects(()=>upstream('/api/ng/factsCenter/pcUpcomingEvents',{marketId:'225'}),
     error=>/returned HTML instead of JSON/.test(error.message)&&!/Unexpected token/.test(error.message));
 
-  const sportPayload={bizCode:10000,data:{tournaments:[{id:'sr:tournament:132',name:'NBA',events:[{
-    eventId:'sr:match:booking-feed-test',homeTeamName:'Fixture Home',awayTeamName:'Fixture Away',estimateStartTime:Date.now()+3600000,matchStatus:'Not start',
+  const basketballKickoff = Date.now() + 3600000;
+  const sportPayload={bizCode:10000,data:[{
+    eventId:'sr:match:booking-feed-test',tournamentId:'sr:tournament:132',homeTeamName:'Fixture Home',awayTeamName:'Fixture Away',estimateStartTime:basketballKickoff,matchStatus:'Not start',
     markets:[{id:'225',desc:'Full Game Total incl. OT',specifier:'total=220.5',status:'0',outcomes:[
       {id:'over',desc:'Over 220.5',odds:1.93,isActive:1},{id:'under',desc:'Under 220.5',odds:1.88,isActive:1}
     ]}]
-  }]}]}};
+  }]};
   const requested=[];
   globalThis.fetch=async input=>{
     const url=new URL(typeof input==='string'?input:input.url);requested.push(url);
     assert.ok(url.origin===SPORTYBET||url.origin===PROXY,'No self-fetch to Match Signal Pages is allowed');
     return jsonResponse(sportPayload);
   };
-  const found=await collectBasketballEvents({request:new Request('https://match-signal.pages.dev/api/sportybet-booking')},new Set(['sr:match:booking-feed-test']));
-  const event=found.get('sr:match:booking-feed-test');assert.ok(event);
+  const basketballTargetLeg = {
+    event_id:'espn:source-basketball-fixture',
+    sportybet_event_id:'sr:match:old-provider-basketball-id',
+    player_1:'Fixture Home',
+    player_2:'Fixture Away',
+    start_time:new Date(basketballKickoff).toISOString()
+  };
+  const found=await collectBasketballEvents(
+    {request:new Request('https://match-signal.pages.dev/api/sportybet-booking')},
+    new Set([basketballTargetLeg.event_id,basketballTargetLeg.sportybet_event_id]),
+    168,
+    [basketballTargetLeg]
+  );
+  const event=found.get('sr:match:booking-feed-test');assert.ok(event,'basketball fixture must resolve by participants/time when provider ID changes');
   const market=event.markets.find(m=>String(m.id)==='225');assert.ok(market);
   assert.equal(market.specifier,'total=220.5');
   assert.deepEqual(market.outcomes.map(o=>Number(o.odds)).sort((a,b)=>a-b),[1.88,1.93]);
@@ -135,7 +148,7 @@ try {
     }
     if(url.pathname.endsWith('/wapConfigurableUpcomingEvents')&&url.searchParams.get('sportId')==='sr:sport:1') {
       u21CatalogueCalls.push({source:'wap',page:Number(url.searchParams.get('pageNum'))});
-      return jsonResponse({bizCode:10000,data:{tournaments:[{name:'WAP academy fixtures',events:u21CurrentEvents}]}});
+      return jsonResponse({bizCode:10000,data:u21CurrentEvents});
     }
     return jsonResponse({bizCode:10000,data:{tournaments:[]}});
   };
