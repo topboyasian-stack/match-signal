@@ -115,8 +115,10 @@ def main():
             "for (const origin of [SPORTYBET_PROXY_ORIGIN, ORIGIN])" in api and
             "const shareResult = await requestSportyBetShare(selections, { deadlineAt: manualDeadlineAt, timeoutMs: manualMode ? 6500 : 12000 })" in api,
             "Share-code creation must try both SportyBet sources within the manual request deadline and return JSON failures")
-    require("const basketballIds" in api and "map(l => String(l.sportybet_event_id || '')).filter(Boolean)" in api and "collectBasketballEvents(context, basketballIds, catalogueTimeline)" in api and "directProvider = sportybetId ? found.get(sportybetId) : null" in api,
-            "Mixed-sport tickets must fetch the current SportyBet Basketball event")
+    require("const basketballLegs = legs.filter" in api and "flatMap(l => [l.sportybet_event_id, l.event_id])" in api and
+            "collectBasketballEvents(context, basketballIds, catalogueTimeline, basketballLegs)" in api and
+            "targetBasketballFixtureMatches" in api and "directProvider = sportybetId ? found.get(sportybetId) : null" in api,
+            "Mixed-sport tickets must fetch current Basketball fixtures by provider ID or verified participants and kickoff")
     require("const footballIds = new Set(legs.filter(l => String(l?.sport || '').toLowerCase() === 'football').map(l => String(l.sportybet_event_id || l.event_id || '')).filter(Boolean));" in api and
             "const tennisIds = new Set(legs.filter(l => String(l?.sport || '').toLowerCase() === 'tennis').map(l => String(l.sportybet_event_id || l.event_id || '')).filter(Boolean));" in api,
             "Football and Tennis catalogue scans must target the current provider ID rather than only the model/prediction ID")
