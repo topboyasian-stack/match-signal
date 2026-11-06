@@ -37,6 +37,10 @@ on:
       - "scripts/test_predict_today_market_matching.py"
       - "scripts/test_settlement_publication.py"
       - "scripts/unified_upcoming.py"
+      - "scripts/odds_builder.py"
+      - "scripts/tennis_market_reassessment.py"
+      - "scripts/test_tennis_market_alternatives.py"
+      - ".github/workflows/core-reliability-regression.yml"
       - "scripts/odds_builder_core.py"
       - "scripts/efootball_desk_learning.py"
       - "docs/CORE_RELIABILITY_GUARDRAILS.md"
@@ -96,6 +100,11 @@ jobs:
 
       - name: Verify Odds Builder settled-history gates
         run: python scripts/test_odds_builder_upcoming_desk_recent_losses.py
+
+      - name: Verify exact-line tennis market reassessment
+        run: |
+          python -m py_compile scripts/odds_builder.py scripts/tennis_market_reassessment.py scripts/test_tennis_market_alternatives.py
+          python scripts/test_tennis_market_alternatives.py
 
       - name: Verify ticket calibration history
         run: python scripts/test_ticket_calibration_history.py
