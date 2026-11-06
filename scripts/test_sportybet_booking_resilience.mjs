@@ -159,10 +159,10 @@ try {
   assert.deepEqual(requested.map(u=>Number(u.searchParams.get('pageNum'))),[1,2,3,4,5]);
   assert.ok(requested.every(u=>Number(u.searchParams.get('pageNum'))<=5));
 
-  // U21 events can be present in SportyBet's configurable WAP catalogue while
-  // absent from the PC upcoming catalogue. Search WAP first so a five-page PC
-  // scan cannot consume the manual request's bounded time budget. PC remains
-  // the fallback for ordinary fixtures not present in WAP.
+  // The scheduled football market collector scans up to 20 PC catalogue
+  // pages, but manual booking previously stopped at page 5. Put both U21
+  // fixtures on page 12 to prove the manual lookup reaches the same catalogue
+  // depth before returning "Event is no longer present".
   const u21KickoffA = Date.now() + 4 * 60 * 60 * 1000;
   const u21KickoffB = Date.now() + 9.5 * 60 * 60 * 1000;
   const u21Legs = [
@@ -225,12 +225,14 @@ try {
       }});
     }
     if(url.pathname.endsWith('/pcUpcomingEvents')&&url.searchParams.get('sportId')==='sr:sport:1') {
-      u21CatalogueCalls.push({source:'pc',page:Number(url.searchParams.get('pageNum'))});
-      return jsonResponse({bizCode:10000,data:{tournaments:[{name:'PC catalogue page',events:unrelatedFullPage}]}});
+      const page=Number(url.searchParams.get('pageNum'));
+      u21CatalogueCalls.push({source:'pc',page});
+      const events=page===12?u21CurrentEvents:unrelatedFullPage;
+      return jsonResponse({bizCode:10000,data:{tournaments:[{name:'PC catalogue page',events}]}});
     }
     if(url.pathname.endsWith('/wapConfigurableUpcomingEvents')&&url.searchParams.get('sportId')==='sr:sport:1') {
       u21CatalogueCalls.push({source:'wap',page:Number(url.searchParams.get('pageNum'))});
-      return jsonResponse({bizCode:10000,data:u21CurrentEvents});
+      return jsonResponse({bizCode:10000,data:[]});
     }
     return jsonResponse({bizCode:10000,data:{tournaments:[]}});
   };
@@ -256,10 +258,12 @@ try {
   assert.equal(u21TicketPayload.ok,true,JSON.stringify(u21TicketPayload));
   assert.equal(u21TicketPayload.booking_code,'U21-CATALOGUE-FALLBACK-OK');
   assert.equal(u21TicketPayload.selection_count,2);
-  assert.deepEqual(u21CatalogueCalls.filter(x=>x.source==='wap').map(x=>x.page),[1],
-    'the primary WAP catalogue must be searched first and stop when both U21 fixtures are found');
-  assert.equal(u21CatalogueCalls.filter(x=>x.source==='pc').length,0,
-    'a slow PC scan must not run before U21 fixtures already found in WAP');
+  const scannedPcPages=u21CatalogueCalls.filter(x=>x.source==='pc').map(x=>x.page).sort((a,b)=>a-b);
+  assert.ok(scannedPcPages.includes(12),
+    'the manual booking lookup must reach page 12, matching the 20-page production football market collector');
+  assert.ok(scannedPcPages.includes(1)&&scannedPcPages.includes(11));
+  assert.equal(u21CatalogueCalls.filter(x=>x.source==='wap').length,0,
+    'the exact U21 fixtures were found in the production PC catalogue before WAP fallback');
   assert.equal(u21TicketPayload.selections.length,2);
   assert.ok(u21TicketPayload.selections.every(row=>row.ok===true));
   assert.deepEqual(u21TicketPayload.selections.map(row=>row.resolved_by),[
@@ -270,29 +274,29 @@ try {
     'millwall-over-2-5','swansea-over-2-5'
   ]);
 
-  // PC must still recover fixtures when the WAP-first catalogue does not
-  // contain them. This protects normal football coverage after the lookup
-  // order is changed for academy/U21 fixtures.
-  const pcFallbackCalls=[];
+  // The configurable WAP catalogue remains a safe fallback when the PC
+  // source is empty or unavailable.
+  const wapFallbackCalls=[];
   globalThis.fetch=async input=>{
     const url=new URL(typeof input==='string'?input:input.url);
-    if(url.pathname.endsWith('/wapConfigurableUpcomingEvents')&&url.searchParams.get('sportId')==='sr:sport:1'){
-      pcFallbackCalls.push('wap');
-      return jsonResponse({bizCode:10000,data:[]});
-    }
     if(url.pathname.endsWith('/pcUpcomingEvents')&&url.searchParams.get('sportId')==='sr:sport:1'){
-      pcFallbackCalls.push('pc');
-      return jsonResponse({bizCode:10000,data:{tournaments:[{name:'PC fallback',events:u21CurrentEvents}]}});
+      wapFallbackCalls.push('pc');
+      return jsonResponse({bizCode:10000,data:{tournaments:[]}});
+    }
+    if(url.pathname.endsWith('/wapConfigurableUpcomingEvents')&&url.searchParams.get('sportId')==='sr:sport:1'){
+      wapFallbackCalls.push('wap');
+      return jsonResponse({bizCode:10000,data:u21CurrentEvents});
     }
     return jsonResponse({bizCode:10000,data:{tournaments:[]}});
   };
-  const pcFallbackFound=await collectEvents({
+  const wapFallbackFound=await collectEvents({
     sportId:'sr:sport:1',marketId:'1,18',timeline:168,pageSize:100,
-    primaryPath:'/api/ng/factsCenter/wapConfigurableUpcomingEvents',
-    fallbackPath:'/api/ng/factsCenter/pcUpcomingEvents'
+    maxPages:20,
+    primaryPath:'/api/ng/factsCenter/pcUpcomingEvents',
+    fallbackPath:'/api/ng/factsCenter/wapConfigurableUpcomingEvents'
   },new Set(u21Legs.map(leg=>leg.event_id)),u21Legs);
-  assert.equal(pcFallbackFound.size,2,'PC must recover both fixtures when WAP has no matches');
-  assert.deepEqual(pcFallbackCalls,['wap','pc'],'WAP should run first and PC should run only as fallback');
+  assert.equal(wapFallbackFound.size,2,'WAP must recover both fixtures when the PC catalogue is empty');
+  assert.deepEqual(wapFallbackCalls,['pc','wap'],'PC should be searched first and WAP used only as fallback');
 
   // A regional share POST should recover via direct origin only when the Worker
   // cannot produce JSON; the selection body is unchanged between attempts.

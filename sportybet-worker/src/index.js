@@ -50,7 +50,7 @@ function readSafeParams(url, path) {
   if (tournamentId && !ALLOWED_TOURNAMENTS.has(tournamentId)) throw new Error("Unsupported tournamentId");
   if (tournamentId && sportId !== "sr:sport:2") throw new Error("Tournament filtering is only allowed for basketball");
   if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > 100) throw new Error("pageSize must be an integer from 1 to 100");
-  if (!Number.isInteger(pageNum) || pageNum < 1 || pageNum > 5) throw new Error("pageNum must be an integer from 1 to 5");
+  if (!Number.isInteger(pageNum) || pageNum < 1 || pageNum > 20) throw new Error("pageNum must be an integer from 1 to 20");
   if (!Number.isInteger(timeline) || timeline < 12 || timeline > 720) throw new Error("timeline must be an integer from 12 to 720");
   const params = new URLSearchParams({
     sportId,
