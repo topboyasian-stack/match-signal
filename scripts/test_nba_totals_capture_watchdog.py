@@ -149,6 +149,11 @@ def run():
     ), "An active settlement run must finish before report recovery."
     assert not should_dispatch_probability_report(
         "2026-11-02T13:00:00Z", "2026-11-02T13:50:00Z", model_now,
+        active_research_runs=0, active_settlement_runs=0, active_capture_runs=1,
+        max_age_minutes=15
+    ), "An active exact-market capture must finish before the report refreshes, so the report includes its new immutable snapshots."
+    assert not should_dispatch_probability_report(
+        "2026-11-02T13:00:00Z", "2026-11-02T13:50:00Z", model_now,
         active_research_runs=0, active_settlement_runs=0, settlement_dispatched=True,
         max_age_minutes=15
     ), "A just-dispatched settlement must finish before report recovery."
@@ -175,6 +180,12 @@ def run():
     assert "should_dispatch_probability_report" in watchdog_workflow
     assert "gh workflow run nba-totals-probability-value.yml --ref main" in watchdog_workflow, (
         "The watchdog must recover missed report refreshes without changing qualification thresholds."
+    )
+    assert "ACTIVE_CAPTURE_RUNS: ${{ steps.active_capture.outputs.count }}" in watchdog_workflow, (
+        "The report freshness decision must know when a fresh immutable quote capture is still running."
+    )
+    assert "active_capture_runs=active_capture" in watchdog_workflow, (
+        "The report watchdog must defer its own dispatch until the active capture finishes."
     )
     assert 'sys.path.insert(0, "scripts")' in watchdog_workflow, (
         "The inline watchdog recovery step must import its tested policy from the scripts directory."
