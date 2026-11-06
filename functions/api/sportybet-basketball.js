@@ -68,7 +68,8 @@ export async function onRequestGet(context){
           let payload;try{payload=JSON.parse(body)}catch(_){throw new Error('returned non-JSON data')}
           const tournaments=getTournaments(payload);
           const tournamentArrayPresent=Array.isArray(payload?.data?.tournaments);
-          const data=payload?.data&&typeof payload.data==='object'?payload.data:{};
+          const flatEventArrayPresent=Array.isArray(payload?.data)||Array.isArray(payload?.data?.events)||Array.isArray(payload?.events);
+          const data=payload?.data&&typeof payload.data==='object'&&!Array.isArray(payload.data)?payload.data:{};
           const rawTotal=data.totalNum??data.totalEvents??data.totalCount??payload?.totalNum??null;
           const parsedTotal=rawTotal===null?null:Number(rawTotal);
           const count=tournaments.reduce((n,t)=>n+(Array.isArray(t?.events)?t.events.length:0),0);
@@ -86,14 +87,14 @@ export async function onRequestGet(context){
             upstream_total_events:Number.isFinite(parsedTotal)?parsedTotal:null,
             tournament_count:tournaments.length,
             event_count:count,
-            response_shape:!tournamentArrayPresent?'TOURNAMENTS_FIELD_MISSING':tournaments.length?'TOURNAMENTS_PRESENT':'TOURNAMENTS_ARRAY_EMPTY'
+            response_shape:tournamentArrayPresent?(tournaments.length?'TOURNAMENTS_PRESENT':'TOURNAMENTS_ARRAY_EMPTY'):flatEventArrayPresent?'FLAT_EVENT_ARRAY_PRESENT':'TOURNAMENTS_FIELD_MISSING'
           };
           const emptyPaginationPage=request.path==='/api/ng/factsCenter/pcUpcomingEvents'&&pageNum>1&&payload?.bizCode===10000&&payload?.data&&typeof payload.data==='object'&&!Array.isArray(payload.data)&&Object.keys(payload.data).length===0;
           if(emptyPaginationPage)diagnostic.response_shape='PAGINATION_END_EMPTY_DATA';
           diagnostics.push(diagnostic);
           if(payload?.bizCode!==undefined&&payload.bizCode!==10000)throw new Error('bizCode '+payload.bizCode);
           if(payload?.ok===false)throw new Error(String(payload?.detail||payload?.error||'source rejected query'));
-          if(!tournamentArrayPresent&&!emptyPaginationPage)throw new Error('response omitted data.tournaments; metadata='+JSON.stringify(diagnostic));
+          if(!tournamentArrayPresent&&!flatEventArrayPresent&&!emptyPaginationPage)throw new Error('response omitted both data.tournaments and supported event arrays; metadata='+JSON.stringify(diagnostic));
           const usablePayload=emptyPaginationPage?{...payload,data:{tournaments:[]}}:payload;
           return {request,payload:usablePayload,error:null,event_count:count,source_origin:origin,diagnostics};
         }catch(error){
@@ -143,8 +144,13 @@ export async function onRequestGet(context){
     const events=Array.from(eventMap.values());
     const totalMarketEvents=events.filter(e=>e.markets.some(m=>String(m.id)==='225')).length;
     const sourceErrors=attempts.filter(a=>a.error).map(a=>a.error);
-    const hasValidTournamentArray=attempts.some(a=>a.payload&&Array.isArray(a.payload?.data?.tournaments));
-    if(!events.length&&!hasValidTournamentArray){
+    const hasValidEventList=attempts.some(a=>a.payload&&(
+      Array.isArray(a.payload?.data?.tournaments)||
+      Array.isArray(a.payload?.data)||
+      Array.isArray(a.payload?.data?.events)||
+      Array.isArray(a.payload?.events)
+    ));
+    if(!events.length&&!hasValidEventList){
       const attemptsSummary=attempts.map(a=>a.request.path+' marketId='+(a.request.marketId||'default')+': '+(a.error||('events='+a.event_count))).join('; ');
       throw new Error('SportyBet NBA feed returned no usable event-list response. '+attemptsSummary);
     }
