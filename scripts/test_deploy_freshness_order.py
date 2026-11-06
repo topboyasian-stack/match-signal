@@ -384,7 +384,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn('board_published_at="$(', PROMOTION_WORKFLOW)
         self.assertIn("BOARD_PUBLISHED_AT: ${{ steps.pre-build-board.outputs.board_published_at }}", PROMOTION_WORKFLOW)
         self.assertIn("BOARD_PUBLISHED_AT: ${{ steps.post-build-board.outputs.board_published_at }}", PROMOTION_WORKFLOW)
-        self.assertEqual(len(re.findall(r"\\.created_at >= .*BOARD_PUBLISHED_AT", PROMOTION_WORKFLOW)), 2)
+        self.assertEqual(len(re.findall(r"\.created_at >= .*BOARD_PUBLISHED_AT", PROMOTION_WORKFLOW)), 2)
         self.assertNotIn("compare/$BOARD_PUBLISHED_SHA...$candidate_sha", PROMOTION_WORKFLOW,
                          "Builder event SHAs can lag concurrent main commits; wait by publication time instead.")
         self.assertIn("Dispatch Cloudflare Pages after post-build board and Builder publication", PROMOTION_WORKFLOW)
