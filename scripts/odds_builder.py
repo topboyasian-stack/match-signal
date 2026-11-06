@@ -50,6 +50,8 @@ def _upcoming_desk_recent_result_guard(product, line, side, tracker=None, min_lo
 _core._upcoming_desk_recent_result_guard = _upcoming_desk_recent_result_guard
 import tennis_market_reassessment as _tennis_market_reassessment
 _tennis_market_reassessment.install(_core)
+import cross_sport_market_reassessment as _cross_sport_market_reassessment
+_cross_sport_market_reassessment.install(_core)
 if __name__ == "__main__":
     raise SystemExit(_core.main())
 else:
