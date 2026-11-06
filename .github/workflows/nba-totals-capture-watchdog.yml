@@ -284,6 +284,7 @@ jobs:
       - name: Decide whether the NBA totals research report is stale
         id: research_freshness
         env:
+          ACTIVE_CAPTURE_RUNS: ${{ steps.active_capture.outputs.count }}
           ACTIVE_RESEARCH_RUNS: ${{ steps.active_research.outputs.count }}
           ACTIVE_SETTLEMENT_RUNS: ${{ steps.active_settlement.outputs.count }}
           SETTLEMENT_DISPATCHED: ${{ steps.settlement_freshness.outputs.dispatch }}
@@ -328,6 +329,7 @@ jobs:
           latest_source = max(source_values) if source_values else None
           source_updated_at = latest_source.isoformat() if latest_source else None
 
+          active_capture = int(os.environ.get("ACTIVE_CAPTURE_RUNS", "0"))
           active_research = int(os.environ.get("ACTIVE_RESEARCH_RUNS", "0"))
           active_settlement = int(os.environ.get("ACTIVE_SETTLEMENT_RUNS", "0"))
           settlement_dispatched = os.environ.get("SETTLEMENT_DISPATCHED", "").lower() == "true"
@@ -339,12 +341,14 @@ jobs:
               now,
               active_research_runs=active_research,
               active_settlement_runs=active_settlement,
+              active_capture_runs=active_capture,
               settlement_dispatched=settlement_dispatched,
               max_age_minutes=15,
           ) and not model_dispatched
 
           print(f"report_age_minutes={age:.2f}" if age is not None else "report_age_minutes=unknown")
           print(f"latest_source_updated_at={source_updated_at or 'unknown'}")
+          print(f"active_capture_runs={active_capture}")
           print(f"active_research_runs={active_research}")
           print(f"active_settlement_runs={active_settlement}")
           print(f"settlement_dispatched={str(settlement_dispatched).lower()}")
@@ -352,6 +356,8 @@ jobs:
           print(f"dispatch={'true' if dispatch else 'false'}")
           if dispatch:
               print("reason=report_at_least_15_minutes_old_and_newer_capture_or_settlement_evidence_exists")
+          elif active_capture:
+              print("reason=wait_for_fresh_immutable_capture_before_report_refresh")
           elif active_research:
               print("reason=research_refresh_already_queued_or_running")
           elif active_settlement or settlement_dispatched:
