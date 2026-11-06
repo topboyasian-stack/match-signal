@@ -535,7 +535,9 @@ def _tennis_options(core: Any, now: datetime, rows: list[dict[str, Any]], baseli
     return [x for x in all_rows if x.get("sport") == "tennis"], audit
 
 
-def _virtual_options(core: Any, now: datetime):
+def _virtual_options(now: datetime):
+    # The core calls this as virtual_candidates(now); keep the wrapped function's
+    # public signature identical to the existing Builder contract.
     result = _ORIGINALS["virtual_candidates"](now)
     rows = result[0] if isinstance(result, tuple) and result else result
     if isinstance(rows, list):
