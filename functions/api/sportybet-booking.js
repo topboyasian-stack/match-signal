@@ -276,18 +276,16 @@ export async function collectEvents({
   fallbackPath = null,
   fallbackParams = {},
   deadlineAt = null,
-  requestTimeoutMs = 6000
+  requestTimeoutMs = 6000,
+  pageBatchSize = 5
 }, targetIds, targetLegs = []) {
   const found = new Map();
   const matchedTargets = new Set();
   const fixtureTargets = Array.isArray(targetLegs) ? targetLegs : [];
   const matchedFixtureTargets = new Set();
-  let page = 1;
-  let usedFallback = false;
 
   // A prediction's source event ID is not always SportyBet's current event ID.
-  // In manual slips, stop as soon as each requested fixture is found by either
-  // exact provider/prediction ID or the participant pair plus kickoff window.
+  // In manual slips, resolve by exact provider ID or participant pair + kickoff.
   const targetsComplete = () => fixtureTargets.length
     ? matchedFixtureTargets.size >= fixtureTargets.length
     : matchedTargets.size >= targetIds.size;
@@ -317,62 +315,64 @@ export async function collectEvents({
     return count;
   }
 
-  while (page <= maxPages && !targetsComplete()) {
-    let data;
-    try {
-      const path = usedFallback && fallbackPath ? fallbackPath : primaryPath;
-      const params = {
-        sportId,
-        marketId,
-        pageSize,
-        pageNum: page,
-        todayGames: 'false',
-        timeline,
-        _t: Date.now(),
-        ...fallbackParams
-      };
-      data = await upstream(path, params, { timeoutMs: requestTimeoutMs, deadlineAt });
-    } catch (error) {
-      if (!usedFallback && fallbackPath) {
-        usedFallback = true;
-        page = 1;
-        continue;
-      }
-      throw error;
-    }
-
-    const count = addCataloguePage(data);
-    if (count < pageSize) break;
-    page++;
-  }
-
-  // The PC catalogue can omit or paginate academy fixtures differently from
-  // SportyBet's configurable WAP upcoming catalogue. Search the alternate
-  // source before declaring a fixture missing. The same participant and
-  // kickoff checks are used to detect a match when provider IDs differ.
-  if (!targetsComplete() && fallbackPath && !usedFallback) {
-    usedFallback = true;
-    page = 1;
-    while (page <= maxPages && !targetsComplete()) {
-      let data;
-      try {
-        data = await upstream(fallbackPath, {
+  async function scanPath(path) {
+    let hadRequestError = false;
+    let nextPage = 1;
+    while (nextPage <= maxPages && !targetsComplete()) {
+      // Read page 1 alone to avoid fan-out when a source is empty. Once a
+      // full page is confirmed, read bounded groups concurrently. The
+      // football catalogue can exceed 1,000 fixtures; sequential page scans
+      // previously found only the first five hundred, while the canonical
+      // prediction market collector searches up to twenty pages.
+      const batch = nextPage === 1
+        ? [1]
+        : Array.from({ length: Math.min(pageBatchSize, maxPages - nextPage + 1) }, (_, i) => nextPage + i);
+      const results = await Promise.all(batch.map(async pageNum => {
+        const params = {
           sportId,
           marketId,
           pageSize,
-          pageNum: page,
+          pageNum,
           todayGames: 'false',
           timeline,
           _t: Date.now(),
           ...fallbackParams
-        }, { timeoutMs: requestTimeoutMs, deadlineAt });
-      } catch (error) {
-        break;
+        };
+        try {
+          const data = await upstream(path, params, { timeoutMs: requestTimeoutMs, deadlineAt });
+          return { pageNum, data, error: null };
+        } catch (error) {
+          return { pageNum, data: null, error };
+        }
+      }));
+
+      let reachedEnd = false;
+      for (const result of results.sort((x, y) => x.pageNum - y.pageNum)) {
+        if (result.error) {
+          hadRequestError = true;
+          continue;
+        }
+        const count = addCataloguePage(result.data);
+        if (count < pageSize) {
+          reachedEnd = true;
+          break;
+        }
+        if (targetsComplete()) break;
       }
-      const count = addCataloguePage(data);
-      if (count < pageSize) break;
-      page++;
+      if (targetsComplete() || reachedEnd) break;
+      nextPage += batch.length;
     }
+    return hadRequestError;
+  }
+
+  // Football's current SportyBet PC feed is the source used by the scheduled
+  // market collector. It can place academy/U21 fixtures beyond page 5, so use
+  // the full 20-page bounded window before declaring a selected fixture absent.
+  const primaryHadErrors = await scanPath(primaryPath);
+  if (!targetsComplete() && fallbackPath) {
+    // The configurable WAP endpoint remains a secondary catalogue, useful
+    // when the PC endpoint is unavailable or omits a supported competition.
+    await scanPath(fallbackPath);
   }
   return found;
 }
@@ -972,10 +972,12 @@ async function handlePost(context) {
         sportId: 'sr:sport:1',
         marketId: '1,18,10,14,16,29,45,47',
         timeline: catalogueTimeline,
-        primaryPath: '/api/ng/factsCenter/wapConfigurableUpcomingEvents',
-        fallbackPath: '/api/ng/factsCenter/pcUpcomingEvents',
+        maxPages: manualMode ? 20 : 5,
+        primaryPath: '/api/ng/factsCenter/pcUpcomingEvents',
+        fallbackPath: '/api/ng/factsCenter/wapConfigurableUpcomingEvents',
         deadlineAt: manualDeadlineAt,
-        requestTimeoutMs: manualMode ? 3500 : 6000
+        requestTimeoutMs: manualMode ? 3500 : 6000,
+        pageBatchSize: 5
       }, footballIds, footballLegs);
       for (const [id, event] of events) found.set(id, event);
     }
