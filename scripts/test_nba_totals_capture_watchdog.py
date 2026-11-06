@@ -7,6 +7,7 @@ from nba_totals_capture_watchdog import (
     capture_age_minutes, should_dispatch_capture,
     stale_upcoming_prediction_count, should_dispatch_model_refresh,
     should_dispatch_settlement, should_dispatch_probability_report,
+    settlement_evidence_changed,
 )
 
 
@@ -46,6 +47,12 @@ def run():
     )
     assert "steps.persist.outputs.changed == 'true'" in settlement_workflow, (
         "Settlement should dispatch a report only when new ledger artifacts were published."
+    )
+    assert 'echo "changed=false" >> "$GITHUB_OUTPUT"' in settlement_workflow and 'echo "changed=$evidence_changed" >> "$GITHUB_OUTPUT"' in settlement_workflow, (
+        "The settlement publication output must distinguish new settled records from timestamp-only checks."
+    )
+    assert "settlement_evidence_changed" in settlement_workflow, (
+        "The settlement workflow must compare official records and summaries, ignoring updated_at-only changes."
     )
     assert "gh workflow run nba-totals-probability-value.yml --ref main" in settlement_workflow, (
         "The settlement-to-report handoff must use the existing research workflow."
@@ -138,6 +145,18 @@ def run():
     ), "An active settlement run must suppress duplicate settlement recovery."
     assert should_dispatch_settlement(None, model_now, active_settlement_runs=0), (
         "A missing settlement ledger timestamp must fail safe to official settlement recovery."
+    )
+
+    base_ledger = {"updated_at": "2026-11-02T13:00:00Z", "records": [{"event_id": "game-1", "result": "over"}], "summary": {"settled": 1}}
+    checked_ledger = {"updated_at": "2026-11-02T13:15:00Z", "records": [{"event_id": "game-1", "result": "over"}], "summary": {"settled": 1}}
+    base_probability = {"updated_at": "2026-11-02T13:00:00Z", "records": [{"event_id": "game-1", "total": 225}], "summary": {"settled_unique_fixtures": 1}}
+    checked_probability = {"updated_at": "2026-11-02T13:15:00Z", "records": [{"event_id": "game-1", "total": 225}], "summary": {"settled_unique_fixtures": 1}}
+    assert not settlement_evidence_changed(base_ledger, checked_ledger, base_probability, checked_probability), (
+        "Updated timestamps alone are not new official settlement evidence and must not dispatch another report."
+    )
+    new_ledger = {"updated_at": "2026-11-02T13:20:00Z", "records": [{"event_id": "game-1", "result": "over"}, {"event_id": "game-2", "result": "under"}], "summary": {"settled": 2}}
+    assert settlement_evidence_changed(new_ledger, checked_ledger, checked_probability, base_probability), (
+        "A newly settled official fixture must trigger a report refresh."
     )
 
     assert should_dispatch_probability_report(
