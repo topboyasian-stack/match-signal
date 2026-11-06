@@ -132,6 +132,9 @@ def run():
     assert "workflow_dispatch:" in guard_workflow, (
         "The NBA ticket guard must support the explicit report-completion dispatch."
     )
+    assert "workflow_run:" not in guard_workflow, (
+        "Use the explicit post-publication dispatch as the single handoff; do not queue a duplicate automatic workflow_run test."
+    )
 
     print("PASS: quote-revision freshness, source fingerprint race recovery, duplicate suppression, schedule throttle, and missing-report cases.")
 
