@@ -182,6 +182,21 @@ class CrossSportReassessmentTests(unittest.TestCase):
         self.assertEqual(age, 30.0)
         self.assertEqual(stamp, row["quote_timestamp"])
 
+    def test_virtual_wrapper_preserves_builder_signature_and_records_candidates(self):
+        old = reassessment._ORIGINALS.get("virtual_candidates")
+        try:
+            candidate = {"sport": "virtual", "event_id": "virtual-1", "builder_market": "virtual_total"}
+            reassessment._ORIGINALS["virtual_candidates"] = lambda now: [candidate]
+            reassessment._RUN_OPTIONS.clear()
+            result = reassessment._virtual_options(self.now)
+            self.assertEqual(result, [candidate])
+            self.assertEqual(reassessment._RUN_OPTIONS, [candidate])
+        finally:
+            if old is None:
+                reassessment._ORIGINALS.pop("virtual_candidates", None)
+            else:
+                reassessment._ORIGINALS["virtual_candidates"] = old
+
     def test_fingerprint_changes_when_price_or_model_probability_changes(self):
         base = {
             "sport": "football", "event_id": "evt", "market": "total_goals", "line": 2.5,
