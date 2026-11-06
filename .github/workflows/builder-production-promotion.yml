@@ -34,9 +34,9 @@ permissions:
   actions: write
   contents: read
 
-# Fresh concurrency namespace releases ordered deployment from an abandoned v3 run.
+# Fresh concurrency namespace releases the stalled v4 waiter that used the stale Builder-SHA match.
 concurrency:
-  group: builder-production-promotion-v4
+  group: builder-production-promotion-v5
   cancel-in-progress: false
 
 jobs:
@@ -91,29 +91,29 @@ jobs:
           if [ -z "$board_published_sha" ]; then
             board_published_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
           fi
+          board_published_at="$(gh api "repos/$GITHUB_REPOSITORY/commits/$board_published_sha" --jq '.commit.committer.date')"
           echo "board_run_id=$board_run_id" >> "$GITHUB_OUTPUT"
           echo "board_published_sha=$board_published_sha" >> "$GITHUB_OUTPUT"
-          echo "Pre-build board run $board_run_id succeeded; published source $board_published_sha."
+          echo "board_published_at=$board_published_at" >> "$GITHUB_OUTPUT"
+          echo "Pre-build board run $board_run_id succeeded; published source $board_published_sha at $board_published_at."
 
       - name: Wait for Builder refresh triggered by the pre-build board
         id: pre-build-builder
         env:
           GH_TOKEN: ${{ github.token }}
           DISPATCHED_AT: ${{ steps.pre-build-board.outputs.dispatched_at }}
-          BOARD_PUBLISHED_SHA: ${{ steps.pre-build-board.outputs.board_published_sha }}
+          BOARD_PUBLISHED_AT: ${{ steps.pre-build-board.outputs.board_published_at }}
         run: |
           set -euo pipefail
           test -n "$DISPATCHED_AT"
-          test -n "$BOARD_PUBLISHED_SHA"
+          test -n "$BOARD_PUBLISHED_AT"
           builder_run_id=""
           for attempt in $(seq 1 180); do
-            candidates="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/odds_builder.yml/runs?branch=main&event=workflow_dispatch&per_page=30" --jq ".workflow_runs[] | select(.event == \"workflow_dispatch\" and .head_branch == \"main\" and .created_at >= \"$DISPATCHED_AT\") | [.id, .head_sha] | @tsv")"
+            candidates="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/odds_builder.yml/runs?branch=main&event=workflow_dispatch&per_page=30" --jq ".workflow_runs[] | select(.event == \"workflow_dispatch\" and .head_branch == \"main\" and .created_at >= \"$BOARD_PUBLISHED_AT\") | [.id, .head_sha] | @tsv")"
             while IFS=$'\t' read -r candidate_id candidate_sha; do
               [ -n "$candidate_id" ] || continue
-              merge_base="$(gh api "repos/$GITHUB_REPOSITORY/compare/$BOARD_PUBLISHED_SHA...$candidate_sha" --jq '.merge_base_commit.sha' 2>/dev/null || true)"
-              if [ "$merge_base" != "$BOARD_PUBLISHED_SHA" ]; then
-                continue
-              fi
+              # Builder runs sync latest main before generation; event head_sha can lag
+              # concurrent commits even when this run starts after the board publication.
               builder_status="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$candidate_id" --jq '.status')"
               if [ "$builder_status" = "completed" ]; then
                 builder_conclusion="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$candidate_id" --jq '.conclusion')"
@@ -190,29 +190,29 @@ jobs:
           if [ -z "$board_published_sha" ]; then
             board_published_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
           fi
+          board_published_at="$(gh api "repos/$GITHUB_REPOSITORY/commits/$board_published_sha" --jq '.commit.committer.date')"
           echo "board_run_id=$board_run_id" >> "$GITHUB_OUTPUT"
           echo "board_published_sha=$board_published_sha" >> "$GITHUB_OUTPUT"
-          echo "Post-build board run $board_run_id succeeded; published source $board_published_sha."
+          echo "board_published_at=$board_published_at" >> "$GITHUB_OUTPUT"
+          echo "Post-build board run $board_run_id succeeded; published source $board_published_sha at $board_published_at."
 
       - name: Wait for Builder refresh triggered by the post-build board
         id: post-build-builder
         env:
           GH_TOKEN: ${{ github.token }}
           DISPATCHED_AT: ${{ steps.post-build-board.outputs.dispatched_at }}
-          BOARD_PUBLISHED_SHA: ${{ steps.post-build-board.outputs.board_published_sha }}
+          BOARD_PUBLISHED_AT: ${{ steps.post-build-board.outputs.board_published_at }}
         run: |
           set -euo pipefail
           test -n "$DISPATCHED_AT"
-          test -n "$BOARD_PUBLISHED_SHA"
+          test -n "$BOARD_PUBLISHED_AT"
           builder_run_id=""
           for attempt in $(seq 1 180); do
-            candidates="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/odds_builder.yml/runs?branch=main&event=workflow_dispatch&per_page=30" --jq ".workflow_runs[] | select(.event == \"workflow_dispatch\" and .head_branch == \"main\" and .created_at >= \"$DISPATCHED_AT\") | [.id, .head_sha] | @tsv")"
+            candidates="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/odds_builder.yml/runs?branch=main&event=workflow_dispatch&per_page=30" --jq ".workflow_runs[] | select(.event == \"workflow_dispatch\" and .head_branch == \"main\" and .created_at >= \"$BOARD_PUBLISHED_AT\") | [.id, .head_sha] | @tsv")"
             while IFS=$'\t' read -r candidate_id candidate_sha; do
               [ -n "$candidate_id" ] || continue
-              merge_base="$(gh api "repos/$GITHUB_REPOSITORY/compare/$BOARD_PUBLISHED_SHA...$candidate_sha" --jq '.merge_base_commit.sha' 2>/dev/null || true)"
-              if [ "$merge_base" != "$BOARD_PUBLISHED_SHA" ]; then
-                continue
-              fi
+              # Builder runs sync latest main before generation; event head_sha can lag
+              # concurrent commits even when this run starts after the board publication.
               builder_status="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$candidate_id" --jq '.status')"
               if [ "$builder_status" = "completed" ]; then
                 builder_conclusion="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$candidate_id" --jq '.conclusion')"
