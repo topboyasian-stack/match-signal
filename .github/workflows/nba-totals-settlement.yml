@@ -17,6 +17,7 @@ on:
       - 'scripts/test_settle_nba_totals.py'
       - '.github/workflows/nba-totals-settlement.yml'
 permissions:
+  actions: write
   contents: write
 concurrency:
   # Keep the scheduled reconciliation lane independent of capture-triggered runs;
@@ -75,10 +76,12 @@ jobs:
         if: steps.settlement_due.outputs.run == 'true'
         run: python scripts/settle_nba_totals.py
       - name: Persist ledger with bounded concurrent-main retries
+        id: persist
         if: steps.settlement_due.outputs.run == 'true'
         shell: bash
         run: |
           set -euo pipefail
+          echo "changed=false" >> "$GITHUB_OUTPUT"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           candidate='/tmp/nba_totals_ledger_candidate.json'
@@ -126,6 +129,7 @@ jobs:
             git commit -m 'Record verified NBA totals and probability settlements'
             if git push origin HEAD:main; then
               echo "NBA totals ledger publication succeeded."
+              echo "changed=true" >> "$GITHUB_OUTPUT"
               exit 0
             fi
             echo "Concurrent main update detected; retrying on the latest main."
@@ -133,3 +137,12 @@ jobs:
           done
           echo "NBA totals ledger could not publish after five retries." >&2
           exit 1
+
+      - name: Dispatch probability/value report after new official settlement evidence
+        if: steps.persist.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh workflow run nba-totals-probability-value.yml --ref main
+          echo "Dispatched probability/value research after publishing new official ESPN settlement evidence."
