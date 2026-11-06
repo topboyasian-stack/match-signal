@@ -963,11 +963,17 @@ async function handlePost(context) {
     }
 
     if (footballIds.size) {
+      // The configurable WAP catalogue is the first lookup for Football
+      // manual slips because academy/U21 fixtures can be absent from PC
+      // upcoming results. Searching five PC pages first can consume the
+      // 22-second manual request budget before the WAP fallback is reached.
+      // Keep PC as the fallback so mainstream fixtures remain supported.
       const events = await collectEvents({
         sportId: 'sr:sport:1',
         marketId: '1,18,10,14,16,29,45,47',
         timeline: catalogueTimeline,
-        fallbackPath: '/api/ng/factsCenter/wapConfigurableUpcomingEvents',
+        primaryPath: '/api/ng/factsCenter/wapConfigurableUpcomingEvents',
+        fallbackPath: '/api/ng/factsCenter/pcUpcomingEvents',
         deadlineAt: manualDeadlineAt,
         requestTimeoutMs: manualMode ? 3500 : 6000
       }, footballIds, footballLegs);
