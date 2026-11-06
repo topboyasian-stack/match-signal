@@ -119,6 +119,20 @@ def run():
         "The workflow must detect source files that changed after a run checked out main."
     )
 
+    assert "actions: write" in workflow, (
+        "The evidence workflow needs Actions write permission to dispatch the post-publication release-gate regression."
+    )
+    assert "Dispatch latest-main NBA ticket gate regression after report publication" in workflow, (
+        "Every refreshed evidence report must explicitly trigger the latest-main fail-closed gate regression."
+    )
+    assert "gh workflow run nba-ticket-guard-tests.yml --ref main" in workflow, (
+        "The report-to-gate handoff must run against main after the report has been published."
+    )
+    guard_workflow = (Path(__file__).resolve().parents[1] / ".github/workflows/nba-ticket-guard-tests.yml").read_text(encoding="utf-8")
+    assert "workflow_dispatch:" in guard_workflow, (
+        "The NBA ticket guard must support the explicit report-completion dispatch."
+    )
+
     print("PASS: quote-revision freshness, source fingerprint race recovery, duplicate suppression, schedule throttle, and missing-report cases.")
 
 
