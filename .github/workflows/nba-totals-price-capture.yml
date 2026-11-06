@@ -28,6 +28,7 @@ on:
       - '.github/workflows/nba-totals-price-capture.yml'
 
 permissions:
+  actions: write
   contents: write
 
 concurrency:
@@ -120,3 +121,24 @@ jobs:
           done
           echo 'Could not publish NBA totals price capture after retries.' >&2
           exit 1
+
+      - name: Dispatch NBA probability/value refresh when new immutable quotes were added
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          added="$(python - <<'PY'
+          import json
+          from pathlib import Path
+          status = json.loads(Path("data/nba_totals_price_capture_status.json").read_text(encoding="utf-8"))
+          print(int(status.get("immutable_snapshots_added") or 0))
+          PY
+          )"
+          echo "New immutable SportyBet market-225 snapshots: $added"
+          if [ "$added" -gt 0 ]; then
+            gh workflow run nba-totals-probability-value.yml --ref main
+            echo "Dispatched probability/value research after new immutable quote evidence."
+          else
+            echo "No new immutable quote snapshots; no report refresh dispatch needed."
+          fi
