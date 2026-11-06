@@ -516,7 +516,7 @@ def _tennis_options(core: Any, now: datetime, rows: list[dict[str, Any]], baseli
                         meta["reassessment_market_rows"] = complete_rows
                         meta["line"] = float(line)
                         audit.append(meta)
-                        if is_fresh and p >= float(core.MIN_PROB) and outcomes[side].get("id"):
+                        if is_fresh and 0 < p < 1.0 and p >= float(core.MIN_PROB) and outcomes[side].get("id"):
                             active.append(meta)
 
     # Reuse the existing tennis recalculation output, preferring it where it already has the same exact option.
