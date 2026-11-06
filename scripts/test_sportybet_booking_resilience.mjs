@@ -67,6 +67,115 @@ try {
   assert.deepEqual(requested.map(u=>Number(u.searchParams.get('pageNum'))),[1,2,3,4,5]);
   assert.ok(requested.every(u=>Number(u.searchParams.get('pageNum'))<=5));
 
+  // U21 events can be present in SportyBet's configurable WAP catalogue while
+  // absent from the PC upcoming catalogue. The manual ticket must search that
+  // second source and match changed provider IDs only by participants + kickoff.
+  const u21KickoffA = Date.now() + 4 * 60 * 60 * 1000;
+  const u21KickoffB = Date.now() + 9.5 * 60 * 60 * 1000;
+  const u21Legs = [
+    {
+      event_id: 'espn:millwall-cardiff-prediction',
+      sportybet_event_id: 'sr:match:old-millwall-cardiff-id',
+      player_1: 'Millwall U21',
+      player_2: 'Cardiff City U21',
+      start_time: new Date(u21KickoffA).toISOString()
+    },
+    {
+      event_id: 'espn:swansea-bristol-prediction',
+      sportybet_event_id: 'sr:match:old-swansea-bristol-id',
+      player_1: 'Swansea City U21',
+      player_2: 'Bristol City U21',
+      start_time: new Date(u21KickoffB).toISOString()
+    }
+  ];
+  const unrelatedFullPage = Array.from({length:100},(_,i)=>({
+    eventId:'sr:match:unrelated-u21-'+i,
+    homeTeamName:'Unrelated Home '+i,
+    awayTeamName:'Unrelated Away '+i,
+    estimateStartTime:Date.now()+3600000,
+    matchStatus:'Not start',
+    markets:[]
+  }));
+  const u21CatalogueCalls = [];
+  const u21CurrentEvents = [
+    {
+      eventId:'sr:match:current-millwall-cardiff',
+      homeTeamName:'Millwall U21',
+      awayTeamName:'Cardiff City U21',
+      estimateStartTime:u21KickoffA,
+      matchStatus:'Not start',
+      markets:[{id:'18',desc:'Total Goals Over/Under',specifier:'total=2.5',status:'0',outcomes:[
+        {id:'millwall-over-2-5',desc:'Over 2.5',odds:1.91,isActive:1},
+        {id:'millwall-under-2-5',desc:'Under 2.5',odds:1.87,isActive:1}
+      ]}]
+    },
+    {
+      eventId:'sr:match:current-swansea-bristol',
+      homeTeamName:'Swansea City U21',
+      awayTeamName:'Bristol City U21',
+      estimateStartTime:u21KickoffB,
+      matchStatus:'Not start',
+      markets:[{id:'18',desc:'Total Goals Over/Under',specifier:'total=2.5',status:'0',outcomes:[
+        {id:'swansea-over-2-5',desc:'Over 2.5',odds:1.88,isActive:1},
+        {id:'swansea-under-2-5',desc:'Under 2.5',odds:1.92,isActive:1}
+      ]}]
+    }
+  ];
+  globalThis.fetch=async(input,options={})=>{
+    const url=new URL(typeof input==='string'?input:input.url);
+    if(url.pathname==='/api/ng/orders/share') {
+      return jsonResponse({bizCode:10000,data:{
+        shareCode:'U21-CATALOGUE-FALLBACK-OK',
+        outcomes:[{odds:1.91},{odds:1.88}]
+      }});
+    }
+    if(url.pathname.endsWith('/pcUpcomingEvents')&&url.searchParams.get('sportId')==='sr:sport:1') {
+      u21CatalogueCalls.push({source:'pc',page:Number(url.searchParams.get('pageNum'))});
+      return jsonResponse({bizCode:10000,data:{tournaments:[{name:'PC catalogue page',events:unrelatedFullPage}]}});
+    }
+    if(url.pathname.endsWith('/wapConfigurableUpcomingEvents')&&url.searchParams.get('sportId')==='sr:sport:1') {
+      u21CatalogueCalls.push({source:'wap',page:Number(url.searchParams.get('pageNum'))});
+      return jsonResponse({bizCode:10000,data:{tournaments:[{name:'WAP academy fixtures',events:u21CurrentEvents}]}});
+    }
+    return jsonResponse({bizCode:10000,data:{tournaments:[]}});
+  };
+  const u21TicketResponse=await onRequest({request:new Request('https://match-signal.pages.dev/api/sportybet-booking',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({mode:'manual',manual_selections:[
+      {
+        event_id:u21Legs[0].event_id,sportybet_event_id:u21Legs[0].sportybet_event_id,
+        sport:'football',market:'total',pick:'over',line:2.5,market_id:'18',
+        start_time:u21Legs[0].start_time,player_1:u21Legs[0].player_1,player_2:u21Legs[0].player_2,
+        match:'Millwall U21 vs Cardiff City U21'
+      },
+      {
+        event_id:u21Legs[1].event_id,sportybet_event_id:u21Legs[1].sportybet_event_id,
+        sport:'football',market:'total',pick:'over',line:2.5,market_id:'18',
+        start_time:u21Legs[1].start_time,player_1:u21Legs[1].player_1,player_2:u21Legs[1].player_2,
+        match:'Swansea City U21 vs Bristol City U21'
+      }
+    ]})
+  })});
+  const u21TicketPayload=await u21TicketResponse.json();
+  assert.equal(u21TicketResponse.status,200,JSON.stringify(u21TicketPayload));
+  assert.equal(u21TicketPayload.ok,true,JSON.stringify(u21TicketPayload));
+  assert.equal(u21TicketPayload.booking_code,'U21-CATALOGUE-FALLBACK-OK');
+  assert.equal(u21TicketPayload.selection_count,2);
+  assert.ok(u21CatalogueCalls.filter(x=>x.source==='pc').length===5,
+    'the configured PC catalogue must be exhausted before declaring the U21 fixtures absent');
+  assert.deepEqual(u21CatalogueCalls.filter(x=>x.source==='pc').map(x=>x.page),[1,2,3,4,5]);
+  assert.deepEqual(u21CatalogueCalls.filter(x=>x.source==='wap').map(x=>x.page),[1],
+    'the WAP catalogue must be searched and stop immediately when both target fixtures are found');
+  assert.equal(u21TicketPayload.selections.length,2);
+  assert.ok(u21TicketPayload.selections.every(row=>row.ok===true));
+  assert.deepEqual(u21TicketPayload.selections.map(row=>row.resolved_by),[
+    'fixture_participants_time','fixture_participants_time'
+  ]);
+  assert.deepEqual(u21TicketPayload.selections.map(row=>row.market_id),['18','18']);
+  assert.deepEqual(u21TicketPayload.selections.map(row=>row.outcome_id),[
+    'millwall-over-2-5','swansea-over-2-5'
+  ]);
+
   // A regional share POST should recover via direct origin only when the Worker
   // cannot produce JSON; the selection body is unchanged between attempts.
   const shareSelections=[

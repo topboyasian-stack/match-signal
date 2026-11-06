@@ -223,13 +223,85 @@ export async function requestSportyBetShare(selections, { deadlineAt = null, tim
   };
 }
 
-export async function collectEvents({ sportId, marketId, timeline = 168, pageSize = 100, maxPages = 5, primaryPath = '/api/ng/factsCenter/pcUpcomingEvents', fallbackPath = null, fallbackParams = {}, deadlineAt = null, requestTimeoutMs = 6000 }, targetIds) {
+function targetFixtureMatches(leg, event) {
+  const participants = legParticipants(leg);
+  const hasParticipants = Boolean(participants[0] && participants[1]);
+  const expectedIds = [
+    String(leg?.sportybet_event_id || ''),
+    String(leg?.event_id || '')
+  ].filter(Boolean);
+  if (hasParticipants) {
+    if (!sameParticipantPair(participants, event)) return false;
+  } else if (!expectedIds.includes(String(event?.eventId || ''))) {
+    return false;
+  }
+
+  const requestedStart = Date.parse(String(leg?.start_time || ''));
+  const currentStart = Number(event?.estimateStartTime || 0);
+  if (Number.isFinite(requestedStart) && currentStart &&
+      Math.abs(requestedStart - currentStart) > 45 * 60 * 1000) return false;
+
+  // A fixture match alone is not enough to stop discovery: the exact requested
+  // market, line and active side must also be present in this catalogue record.
+  const selection = String(leg?.market || '').toLowerCase() === 'total'
+    ? findVirtualSelection(leg, event)
+    : findWinnerSelection(leg, event);
+  return Boolean(selection && !selection.error && selection.outcomeId &&
+    Number.isFinite(Number(selection.odds)) && Number(selection.odds) > 1);
+}
+
+export async function collectEvents({
+  sportId,
+  marketId,
+  timeline = 168,
+  pageSize = 100,
+  maxPages = 5,
+  primaryPath = '/api/ng/factsCenter/pcUpcomingEvents',
+  fallbackPath = null,
+  fallbackParams = {},
+  deadlineAt = null,
+  requestTimeoutMs = 6000
+}, targetIds, targetLegs = []) {
   const found = new Map();
   const matchedTargets = new Set();
+  const fixtureTargets = Array.isArray(targetLegs) ? targetLegs : [];
+  const matchedFixtureTargets = new Set();
   let page = 1;
   let usedFallback = false;
 
-  while (page <= maxPages && matchedTargets.size < targetIds.size) {
+  // A prediction's source event ID is not always SportyBet's current event ID.
+  // In manual slips, stop as soon as each requested fixture is found by either
+  // exact provider/prediction ID or the participant pair plus kickoff window.
+  const targetsComplete = () => fixtureTargets.length
+    ? matchedFixtureTargets.size >= fixtureTargets.length
+    : matchedTargets.size >= targetIds.size;
+
+  function addCataloguePage(data) {
+    const tournaments = Array.isArray(data?.data?.tournaments) ? data.data.tournaments : [];
+    let count = 0;
+    for (const tournament of tournaments) {
+      for (const event of Array.isArray(tournament?.events) ? tournament.events : []) {
+        const normalized = normalizeEvent(event, tournament);
+        if (normalized.eventId) {
+          found.set(normalized.eventId, normalized);
+          if (targetIds.has(normalized.eventId)) matchedTargets.add(normalized.eventId);
+          fixtureTargets.forEach((leg, index) => {
+            const expectedIds = [
+              String(leg?.sportybet_event_id || ''),
+              String(leg?.event_id || '')
+            ].filter(Boolean);
+            if (expectedIds.includes(normalized.eventId) || targetFixtureMatches(leg, normalized)) {
+              matchedFixtureTargets.add(index);
+            }
+          });
+        }
+        count++;
+      }
+    }
+    return count;
+  }
+
+  while (page <= maxPages && !targetsComplete()) {
     let data;
     try {
       const path = usedFallback && fallbackPath ? fallbackPath : primaryPath;
@@ -253,31 +325,19 @@ export async function collectEvents({ sportId, marketId, timeline = 168, pageSiz
       throw error;
     }
 
-    const tournaments = Array.isArray(data?.data?.tournaments) ? data.data.tournaments : [];
-    let count = 0;
-    for (const tournament of tournaments) {
-      for (const event of Array.isArray(tournament?.events) ? tournament.events : []) {
-        const normalized = normalizeEvent(event, tournament);
-        if (normalized.eventId) {
-          found.set(normalized.eventId, normalized);
-          if (targetIds.has(normalized.eventId)) matchedTargets.add(normalized.eventId);
-        }
-        count++;
-      }
-    }
-
+    const count = addCataloguePage(data);
     if (count < pageSize) break;
     page++;
   }
-  // A valid Builder event can disappear from the first WAP pages while the
-  // current catalogue is reordered. If the bounded primary scan did not find
-  // every target, rescan the fallback catalogue from page 1 before declaring
-  // the leg unavailable. This preserves the bounded request budget without
-  // making stale event IDs synonymous with unavailable fixtures.
-  if (matchedTargets.size < targetIds.size && fallbackPath && !usedFallback) {
+
+  // The PC catalogue can omit or paginate academy fixtures differently from
+  // SportyBet's configurable WAP upcoming catalogue. Search the alternate
+  // source before declaring a fixture missing. The same participant and
+  // kickoff checks are used to detect a match when provider IDs differ.
+  if (!targetsComplete() && fallbackPath && !usedFallback) {
     usedFallback = true;
     page = 1;
-    while (page <= maxPages && matchedTargets.size < targetIds.size) {
+    while (page <= maxPages && !targetsComplete()) {
       let data;
       try {
         data = await upstream(fallbackPath, {
@@ -293,25 +353,13 @@ export async function collectEvents({ sportId, marketId, timeline = 168, pageSiz
       } catch (error) {
         break;
       }
-      const tournaments = Array.isArray(data?.data?.tournaments) ? data.data.tournaments : [];
-      let count = 0;
-      for (const tournament of tournaments) {
-        for (const event of Array.isArray(tournament?.events) ? tournament.events : []) {
-          const normalized = normalizeEvent(event, tournament);
-          if (normalized.eventId) {
-            found.set(normalized.eventId, normalized);
-            if (targetIds.has(normalized.eventId)) matchedTargets.add(normalized.eventId);
-          }
-          count++;
-        }
-      }
+      const count = addCataloguePage(data);
       if (count < pageSize) break;
       page++;
     }
   }
   return found;
 }
-
 
 export async function collectBasketballEvents(context,targetIds,timeline=168){
   const found=new Map();if(!targetIds.size)return found;
@@ -836,9 +884,10 @@ async function handlePost(context) {
         sportId: 'sr:sport:1',
         marketId: '1,18,10,14,16,29,45,47',
         timeline: catalogueTimeline,
+        fallbackPath: '/api/ng/factsCenter/wapConfigurableUpcomingEvents',
         deadlineAt: manualDeadlineAt,
         requestTimeoutMs: manualMode ? 3500 : 6000
-      }, footballIds);
+      }, footballIds, legs.filter(leg => String(leg?.sport || '').toLowerCase() === 'football'));
       for (const [id, event] of events) found.set(id, event);
     }
 
