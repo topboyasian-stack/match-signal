@@ -17,6 +17,10 @@ on:
       - 'scripts/odds_builder.py'
       - 'scripts/tennis_market_reassessment.py'
       - 'scripts/test_tennis_market_alternatives.py'
+      - 'scripts/cross_sport_market_reassessment.py'
+      - 'scripts/test_cross_sport_market_reassessment.py'
+      - 'data/cross_sport_market_reassessment.json'
+      - 'data/cross_sport_market_reassessment_history.json'
       - 'scripts/odds_builder_core.py'
       - 'scripts/test_odds_builder_efootball_spoiler.py'
       - 'scripts/test_odds_builder_upcoming_desk_recent_losses.py'
@@ -86,6 +90,10 @@ jobs:
         run: |
           python -m py_compile scripts/odds_builder.py scripts/tennis_market_reassessment.py scripts/test_tennis_market_alternatives.py
           python scripts/test_tennis_market_alternatives.py
+      - name: Regression-check cross-sport market reassessment and evidence snapshots
+        run: |
+          python -m py_compile scripts/cross_sport_market_reassessment.py scripts/test_cross_sport_market_reassessment.py
+          python scripts/test_cross_sport_market_reassessment.py
       - name: Validate tennis research artifact
         run: |
           python - <<'PY'
@@ -354,6 +362,8 @@ jobs:
           cp data/tennis_total_research.json "$output_dir/tennis_total_research.json"
           cp data/results_first_evidence_report.json "$output_dir/results_first_evidence_report.json"
           cp data/line_ladder_research.json "$output_dir/line_ladder_research.json"
+          cp data/cross_sport_market_reassessment.json "$output_dir/cross_sport_market_reassessment.json"
+          cp data/cross_sport_market_reassessment_history.json "$output_dir/cross_sport_market_reassessment_history.json"
 
           for attempt in 1 2 3 4; do
             echo "Publishing Builder artifacts (attempt ${attempt}/4)."
@@ -366,7 +376,9 @@ jobs:
             cp "$output_dir/tennis_total_research.json" data/tennis_total_research.json
             cp "$output_dir/results_first_evidence_report.json" data/results_first_evidence_report.json
             cp "$output_dir/line_ladder_research.json" data/line_ladder_research.json
-            git add data/odds_builder.json data/tennis_total_research.json data/results_first_evidence_report.json data/line_ladder_research.json
+            cp "$output_dir/cross_sport_market_reassessment.json" data/cross_sport_market_reassessment.json
+            cp "$output_dir/cross_sport_market_reassessment_history.json" data/cross_sport_market_reassessment_history.json
+            git add data/odds_builder.json data/tennis_total_research.json data/results_first_evidence_report.json data/line_ladder_research.json data/cross_sport_market_reassessment.json data/cross_sport_market_reassessment_history.json
 
             if git diff --cached --quiet; then
               echo "No accumulator changes to publish."
