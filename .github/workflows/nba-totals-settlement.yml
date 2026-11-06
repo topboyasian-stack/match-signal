@@ -95,6 +95,20 @@ jobs:
             echo "Publishing NBA totals ledger (attempt ${attempt}/5)."
             git fetch origin main
             git reset --hard origin/main
+            evidence_changed="$(python - "$candidate" "$probability_candidate" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          sys.path.insert(0, "scripts")
+          from nba_totals_capture_watchdog import settlement_evidence_changed
+          candidate_ledger = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          candidate_probability = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
+          live_ledger = json.loads(Path("data/nba_totals_ledger.json").read_text(encoding="utf-8"))
+          live_probability = json.loads(Path("data/nba_totals_probability_settlements.json").read_text(encoding="utf-8"))
+          print("true" if settlement_evidence_changed(candidate_ledger, live_ledger, candidate_probability, live_probability) else "false")
+          PY
+            )"
+            echo "Candidate adds new official settlement evidence: $evidence_changed"
             if python - <<'PY'
           import json
           from datetime import datetime
@@ -129,7 +143,7 @@ jobs:
             git commit -m 'Record verified NBA totals and probability settlements'
             if git push origin HEAD:main; then
               echo "NBA totals ledger publication succeeded."
-              echo "changed=true" >> "$GITHUB_OUTPUT"
+              echo "changed=$evidence_changed" >> "$GITHUB_OUTPUT"
               exit 0
             fi
             echo "Concurrent main update detected; retrying on the latest main."
