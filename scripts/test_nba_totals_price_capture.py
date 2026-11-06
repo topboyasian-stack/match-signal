@@ -62,7 +62,9 @@ class PriceCaptureTests(unittest.TestCase):
         self.assertIn("upstream_total_events", proxy_script)
         self.assertIn("data_keys", proxy_script)
         self.assertIn("TOURNAMENTS_ARRAY_EMPTY", proxy_script)
-        self.assertIn("hasValidTournamentArray", proxy_script)
+        self.assertIn("hasValidEventList", proxy_script)
+        self.assertIn("flatEventArrayPresent", proxy_script)
+        self.assertIn("Array.isArray(a.payload?.data)", proxy_script)
 
         # Any slip containing NBA totals must fail closed instead of returning
         # a share code when either our validation or SportyBet accepts only
