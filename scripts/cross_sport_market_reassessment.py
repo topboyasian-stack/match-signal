@@ -951,7 +951,12 @@ def _append_history(new_records: list[dict[str, Any]], now: datetime) -> dict[st
     except (OSError, json.JSONDecodeError):
         payload = None
     if not isinstance(payload, dict):
-        payload = {"generated_at": now.isoformat(), "mode": "PAPER_ONLY", "records": []}
+        payload = {
+            "record_type": "cross_sport_market_reassessment",
+            "generated_at": now.isoformat(),
+            "mode": "PAPER_ONLY",
+            "records": [],
+        }
     records = payload.get("records")
     if not isinstance(records, list):
         records = []
@@ -1258,13 +1263,11 @@ def install(core: Any) -> None:
                 diagnostics["cross_sport_market_reassessment"] = {
                     "status": "ACTIVE_PAPER_REASSESSMENT",
                     "mode": "PAPER_ONLY",
-                    "details_stored_privately": True,
                 }
                 policy = artifact.setdefault("selection_policy", {})
                 policy["cross_sport_market_reassessment"] = {
                     "enabled": True,
                     "mode": "PAPER_ONLY",
-                    "details_stored_privately": True,
                     "all_existing_builder_gates_preserved": True,
                     "real_money_execution": False,
                 }
