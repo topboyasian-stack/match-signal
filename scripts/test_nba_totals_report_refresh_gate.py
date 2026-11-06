@@ -118,6 +118,9 @@ def run():
     assert "source_data_fingerprint" in workflow and "report_source_fingerprint_matches" in workflow, (
         "The workflow must detect source files that changed after a run checked out main."
     )
+    assert "  workflow_run:" not in workflow, (
+        "Capture and settlement must explicitly dispatch the report after new evidence is published; remove duplicate workflow_run handoffs."
+    )
 
     assert "actions: write" in workflow, (
         "The evidence workflow needs Actions write permission to dispatch the post-publication release-gate regression."
