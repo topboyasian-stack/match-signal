@@ -172,6 +172,11 @@ def main():
     assert '"Match Signal Unified Upcoming Board"' not in builder, (
         "Avoid starting the expensive Builder after every five-minute board refresh; use its 15-minute schedule plus artifact-age recovery."
     )
+    # Concurrent generated-data writers can advance main between a board
+    # rebase and push. Keep a bounded but resilient retry budget with backoff.
+    assert "for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do" in board
+    assert 'sleep "$((attempt * 2))"' in board
+    assert "after twelve synchronized attempts" in board
     assert "Ensure Odds Builder refresh follows board publication" in board, (
         "The board must retain its stale-artifact recovery step after publishing outputs."
     )
