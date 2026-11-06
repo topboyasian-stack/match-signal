@@ -40,6 +40,8 @@ on:
       - "scripts/odds_builder.py"
       - "scripts/tennis_market_reassessment.py"
       - "scripts/test_tennis_market_alternatives.py"
+      - "scripts/cross_sport_market_reassessment.py"
+      - "scripts/test_cross_sport_market_reassessment.py"
       - ".github/workflows/core-reliability-regression.yml"
       - ".github/workflows/live-expansion.yml"
       - "scripts/test_workflow_trigger_boundaries.py"
@@ -110,6 +112,11 @@ jobs:
         run: |
           python -m py_compile scripts/odds_builder.py scripts/tennis_market_reassessment.py scripts/test_tennis_market_alternatives.py
           python scripts/test_tennis_market_alternatives.py
+
+      - name: Verify cross-sport market reassessment and exact-quote gates
+        run: |
+          python -m py_compile scripts/cross_sport_market_reassessment.py scripts/test_cross_sport_market_reassessment.py scripts/odds_builder.py
+          python scripts/test_cross_sport_market_reassessment.py
 
       - name: Verify ticket calibration history
         run: python scripts/test_ticket_calibration_history.py
