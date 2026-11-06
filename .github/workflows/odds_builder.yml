@@ -86,8 +86,9 @@ jobs:
         run: python -m pip install --upgrade requests
       - name: Restore private cross-sport evidence ledger
         env:
-          MATCH_SIGNAL_ANALYST_TOKEN: ${{ secrets.MATCH_SIGNAL_ANALYST_TOKEN }}
-          MATCH_SIGNAL_PRIVATE_EVIDENCE_URL: https://match-signal.pages.dev/api/analyst/market-evidence
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          MATCH_SIGNAL_EVIDENCE_KV_NAMESPACE_ID: ${{ vars.MATCH_SIGNAL_EVIDENCE_KV_NAMESPACE_ID }}
         run: python scripts/sync_cross_sport_private_evidence.py restore
       - name: Run tennis total challenger research
         run: python scripts/tennis_total_research.py
@@ -113,8 +114,9 @@ jobs:
         run: python scripts/odds_builder.py
       - name: Persist cross-sport evidence to private KV
         env:
-          MATCH_SIGNAL_ANALYST_TOKEN: ${{ secrets.MATCH_SIGNAL_ANALYST_TOKEN }}
-          MATCH_SIGNAL_PRIVATE_EVIDENCE_URL: https://match-signal.pages.dev/api/analyst/market-evidence
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          MATCH_SIGNAL_EVIDENCE_KV_NAMESPACE_ID: ${{ vars.MATCH_SIGNAL_EVIDENCE_KV_NAMESPACE_ID }}
         run: python scripts/sync_cross_sport_private_evidence.py publish
       - name: Regression-check eFootball recent spoiler guard
         run: python scripts/test_odds_builder_efootball_spoiler.py
