@@ -19,8 +19,12 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
-OUTPUT = DATA / "cross_sport_market_reassessment.json"
-HISTORY_OUTPUT = DATA / "cross_sport_market_reassessment_history.json"
+PRIVATE_DIR = DATA / "calibration_private"
+# These detailed probabilities, prices, edges and settled research remain private.
+# The workflow synchronizes the history to the authenticated private KV endpoint.
+OUTPUT = PRIVATE_DIR / "cross_sport_market_reassessment_private.json"
+HISTORY_OUTPUT = PRIVATE_DIR / "cross_sport_market_reassessment_history.json"
+REVISION_PATH = PRIVATE_DIR / ".cross_sport_market_reassessment_revision"
 MAX_QUOTE_AGE_SECONDS = 900
 MAX_HISTORY_RECORDS = 12000
 MIN_NBA_EDGE = 0.04
@@ -1000,6 +1004,7 @@ def _append_history(new_records: list[dict[str, Any]], now: datetime) -> dict[st
             "paper_only": True,
         },
     })
+    PRIVATE_DIR.mkdir(parents=True, exist_ok=True)
     HISTORY_OUTPUT.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     return {"record_count": len(records), "new_snapshots_added": added, "new_settlements_recorded": settled_updated, "path": str(HISTORY_OUTPUT.relative_to(ROOT))}
 
@@ -1178,6 +1183,7 @@ def _write_reassessment_artifact(core: Any, now: datetime) -> dict[str, Any]:
             "real_money_execution": False,
         },
     }
+    PRIVATE_DIR.mkdir(parents=True, exist_ok=True)
     OUTPUT.write_text(json.dumps(artifact, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     return _LAST_DIAGNOSTICS
 
@@ -1247,20 +1253,19 @@ def install(core: Any) -> None:
             summary = _write_reassessment_artifact(core, now)
             if isinstance(artifact, dict):
                 diagnostics = artifact.setdefault("candidate_diagnostics", {})
-                diagnostics["cross_sport_market_reassessment"] = summary
+                # This artifact is served to clients; expose status only, never raw
+                # prices, model probabilities, edge/EV, outcome IDs or candidate lists.
+                diagnostics["cross_sport_market_reassessment"] = {
+                    "status": "ACTIVE_PAPER_REASSESSMENT",
+                    "mode": "PAPER_ONLY",
+                    "details_stored_privately": True,
+                }
                 policy = artifact.setdefault("selection_policy", {})
                 policy["cross_sport_market_reassessment"] = {
                     "enabled": True,
-                    "sports": ["football", "tennis", "virtual", "basketball"],
-                    "football_alternative_markets": ["1X2", "total goals", "both teams to score", "double chance"],
-                    "tennis_alternative_markets": ["winner sides", "exact full-match total-games lines"],
-                    "virtual_alternative_markets": ["existing exact-line settled-evidence candidates"],
-                    "basketball_alternative_markets": ["NBA market 225 both sides at exact fresh line"],
-                    "nba_general_builder_promotion": False,
+                    "mode": "PAPER_ONLY",
+                    "details_stored_privately": True,
                     "all_existing_builder_gates_preserved": True,
-                    "snapshots_append_only": True,
-                    "quote_freshness_seconds": MAX_QUOTE_AGE_SECONDS,
-                    "paper_only": True,
                     "real_money_execution": False,
                 }
                 core.OUTPUT.write_text(json.dumps(artifact, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
