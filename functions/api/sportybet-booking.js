@@ -225,11 +225,29 @@ export async function requestSportyBetShare(selections, { deadlineAt = null, tim
 
 function targetFixtureMatches(leg, event) {
   const participants = legParticipants(leg);
-  if (!sameParticipantPair(participants, event)) return false;
+  const hasParticipants = Boolean(participants[0] && participants[1]);
+  const expectedIds = [
+    String(leg?.sportybet_event_id || ''),
+    String(leg?.event_id || '')
+  ].filter(Boolean);
+  if (hasParticipants) {
+    if (!sameParticipantPair(participants, event)) return false;
+  } else if (!expectedIds.includes(String(event?.eventId || ''))) {
+    return false;
+  }
+
   const requestedStart = Date.parse(String(leg?.start_time || ''));
   const currentStart = Number(event?.estimateStartTime || 0);
-  return !Number.isFinite(requestedStart) || !currentStart ||
-    Math.abs(requestedStart - currentStart) <= 45 * 60 * 1000;
+  if (Number.isFinite(requestedStart) && currentStart &&
+      Math.abs(requestedStart - currentStart) > 45 * 60 * 1000) return false;
+
+  // A fixture match alone is not enough to stop discovery: the exact requested
+  // market, line and active side must also be present in this catalogue record.
+  const selection = String(leg?.market || '').toLowerCase() === 'total'
+    ? findVirtualSelection(leg, event)
+    : findWinnerSelection(leg, event);
+  return Boolean(selection && !selection.error && selection.outcomeId &&
+    Number.isFinite(Number(selection.odds)) && Number(selection.odds) > 1);
 }
 
 export async function collectEvents({
