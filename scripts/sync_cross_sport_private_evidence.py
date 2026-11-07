@@ -25,7 +25,7 @@ NAMESPACE_PATH = PRIVATE_DIR / ".cross_sport_evidence_namespace_id"
 EVIDENCE_KEY = "private-cross-sport-market-reassessment-v1"
 CF_API = "https://api.cloudflare.com/client/v4"
 PROJECT_NAME = "match-signal"
-MAX_BYTES = 12 * 1024 * 1024
+MAX_BYTES = 24 * 1024 * 1024  # Stay below Cloudflare KV's 25 MiB per-value ceiling.
 
 
 def _warning(message: str) -> None:
