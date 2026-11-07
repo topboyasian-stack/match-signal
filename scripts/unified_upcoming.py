@@ -1649,6 +1649,23 @@ def core_feed_stale(generated_at, now):
     return stamp is None or stamp < now - timedelta(hours=4)
 
 
+def merge_live_core_refresh(rows, refreshed_rows):
+    """Replace stale core copies with fresh model rows for the same fixture."""
+    refreshed_ids = {
+        str(row.get("event_id") or "")
+        for row in refreshed_rows if isinstance(row, dict) and row.get("event_id")
+    }
+    retained = [
+        row for row in rows
+        if not (
+            isinstance(row, dict)
+            and str(row.get("source_engine") or "") == "core_prediction_engine"
+            and str(row.get("event_id") or "") in refreshed_ids
+        )
+    ]
+    return retained + [row for row in refreshed_rows if isinstance(row, dict)]
+
+
 def main():
     rows=[]
     for key in DESK_FILTER_STATS:
@@ -1683,17 +1700,16 @@ def main():
         try:
             from predict_today import fetch_current_predictions
             live_predictions, live_errors, _qc = fetch_current_predictions(include_watch=True)
-            existing_ids={str(r.get("event_id") or "") for r in rows}
+            refreshed_rows=[]
             for r in live_predictions:
-                if str(r.get("event_id") or "") in existing_ids:continue
                 x=dict(r)
                 x["source_engine"]="unified_live_refresh"
                 x["projection_tier"]="deep_model"
                 x["evidence_depth"]="fresh_public_schedule_plus_model"
                 x["paper_only"]=True
-                add(rows,x)
-                existing_ids.add(str(x.get("event_id") or ""))
-            live_meta={"attempted":True,"rows":len(live_predictions),"errors":live_errors}
+                add(refreshed_rows,x)
+            rows=merge_live_core_refresh(rows,refreshed_rows)
+            live_meta={"attempted":True,"rows":len(live_predictions),"refreshed_rows":len(refreshed_rows),"replaced_stale_core_rows":len(refreshed_rows),"errors":live_errors}
         except Exception as exc:
             live_meta={"attempted":True,"rows":0,"errors":[str(exc)]}
     else:
