@@ -233,10 +233,12 @@ export function evaluatePick(pick, line, score, market = VALID_MARKET) {
 
 export function classifyLineAdjustment(desk, actual) {
   if (!desk || typeof desk !== "object") return "desk_snapshot_missing";
-  if (!VALID_PICKS.has(desk.pick) || !VALID_MARKETS.has(desk.market)) return "desk_snapshot_incomplete";
-  if (desk.market !== actual.market) return "market_changed";
+  const deskMarket = desk.market || VALID_MARKET;
+  const actualMarket = actual.market || VALID_MARKET;
+  if (!VALID_PICKS.has(desk.pick) || !VALID_MARKETS.has(deskMarket)) return "desk_snapshot_incomplete";
+  if (deskMarket !== actualMarket) return "market_changed";
   if (desk.pick !== actual.pick) return "side_changed";
-  if (!isTotalMarket(actual.market)) return "unchanged";
+  if (!isTotalMarket(actualMarket)) return "unchanged";
   if (!finiteNumber(desk.line) || !finiteNumber(actual.line)) return "desk_snapshot_incomplete";
   if (Math.abs(desk.line - actual.line) < 1e-9) return "unchanged";
   const easier = actual.pick === "over" ? actual.line < desk.line : actual.line > desk.line;
