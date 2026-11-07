@@ -2,8 +2,10 @@ export const REVIEW_KEY = "private-user-ticket-review-v1";
 export const MAX_REVIEW_BYTES = 250000;
 export const AI_DAILY_LIMIT = 25;
 export const DEFAULT_AI_MODEL = "@cf/meta/llama-3.1-8b-instruct-fast";
-export const VALID_PICKS = new Set(["over", "under"]);
+export const VALID_PICKS = new Set(["over", "under", "p1", "p2", "draw", "other"]);
 export const VALID_OUTCOMES = new Set(["PENDING", "WON", "LOST", "VOID"]);
+export const VALID_LEG_OUTCOMES = new Set(["PENDING", "WON", "LOST", "PUSH", "VOID"]);
+export const VALID_MARKETS = new Set(["total_goals_over_under", "total_games_over_under", "match_winner", "basketball_total_points", "other"]);
 export const VALID_MARKET = "total_goals_over_under";
 
 export function jsonResponse(payload, status = 200) {
@@ -77,17 +79,27 @@ function checkKnownKeys(value, allowed, where, errors) {
     errors.push(where + " contains unsupported properties");
   }
 }
-function validateSelection(value, where, errors) {
+function isTotalMarket(market) {
+  return ["total_goals_over_under", "total_games_over_under", "basketball_total_points"].includes(market);
+}
+function validateSelection(value, where, errors, extraKeys = []) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     errors.push(where + " must be an object");
     return;
   }
-  checkKnownKeys(value, new Set(["market", "pick", "line", "odds"]), where, errors);
-  if (value.market !== VALID_MARKET) errors.push(where + ".market is invalid");
+  checkKnownKeys(value, new Set(["market", "pick", "line", "odds", ...extraKeys]), where, errors);
+  if (!VALID_MARKETS.has(value.market)) errors.push(where + ".market is invalid");
   if (!VALID_PICKS.has(value.pick)) errors.push(where + ".pick is invalid");
-  if (!finiteNumber(value.line) || value.line < 0) errors.push(where + ".line is invalid");
-  if (!finiteNumber(value.odds) || value.odds <= 1) errors.push(where + ".odds is invalid");
+  if (isTotalMarket(value.market)) {
+    if (!["over", "under"].includes(value.pick)) errors.push(where + ".pick must be over or under for a total market");
+    if (!finiteNumber(value.line) || value.line < 0) errors.push(where + ".line is required for a total market");
+  } else {
+    if (value.line !== undefined && value.line !== null && (!finiteNumber(value.line) || value.line < 0)) errors.push(where + ".line is invalid");
+    if (value.market === "match_winner" && !["p1", "p2", "draw"].includes(value.pick)) errors.push(where + ".pick must identify a participant or draw for a winner market");
+  }
+  if (value.odds !== undefined && value.odds !== null && (!finiteNumber(value.odds) || value.odds <= 1)) errors.push(where + ".odds must be greater than 1 when supplied");
 }
+
 
 export function validateReviewDocument(document) {
   const errors = [];
@@ -129,7 +141,7 @@ export function validateReviewDocument(document) {
         errors.push(lw + " must be an object");
         return;
       }
-      checkKnownKeys(leg, new Set(["leg_ref", "product", "competition", "match", "event_id", "kickoff_at", "desk_snapshot", "actual_selection", "final_score", "settled_at"]), lw, errors);
+      checkKnownKeys(leg, new Set(["leg_ref", "product", "competition", "match", "event_id", "kickoff_at", "desk_snapshot", "actual_selection", "final_score", "settled_at", "leg_outcome", "leg_outcome_source", "leg_outcome_captured_at", "qualification_state", "qualification_captured_at"]), lw, errors);
       if (!validRef(leg.leg_ref)) errors.push(lw + ".leg_ref is invalid");
       else if (legRefs.has(leg.leg_ref)) errors.push(lw + " has a duplicate leg_ref");
       else legRefs.add(leg.leg_ref);
@@ -139,18 +151,19 @@ export function validateReviewDocument(document) {
       if (leg.event_id !== undefined && (typeof leg.event_id !== "string" || leg.event_id.length > 160)) errors.push(lw + ".event_id is invalid");
       if (leg.kickoff_at !== undefined && !validDateTime(leg.kickoff_at)) errors.push(lw + ".kickoff_at is invalid");
       validateSelection(leg.actual_selection, lw + ".actual_selection", errors);
+      if (leg.leg_outcome !== undefined && !VALID_LEG_OUTCOMES.has(leg.leg_outcome)) errors.push(lw + ".leg_outcome is invalid");
+      if (leg.leg_outcome_source !== undefined && !["user_reported", "official_score", "system_calculated"].includes(leg.leg_outcome_source)) errors.push(lw + ".leg_outcome_source is invalid");
+      if (leg.leg_outcome_captured_at !== undefined && leg.leg_outcome_captured_at !== null && !validDateTime(leg.leg_outcome_captured_at)) errors.push(lw + ".leg_outcome_captured_at is invalid");
+      if (leg.qualification_state !== undefined && !["QUALIFIED", "NOT_QUALIFIED", "UNKNOWN"].includes(leg.qualification_state)) errors.push(lw + ".qualification_state is invalid");
+      if (leg.qualification_captured_at !== undefined && leg.qualification_captured_at !== null && !validDateTime(leg.qualification_captured_at)) errors.push(lw + ".qualification_captured_at is invalid");
       if (leg.desk_snapshot !== undefined && leg.desk_snapshot !== null) {
         const desk = leg.desk_snapshot;
         if (!desk || typeof desk !== "object" || Array.isArray(desk)) errors.push(lw + ".desk_snapshot must be an object");
         else {
-          checkKnownKeys(desk, new Set(["prediction_id", "model_version", "market", "pick", "line", "odds", "model_probability", "captured_at", "provenance"]), lw + ".desk_snapshot", errors);
+          validateSelection(desk, lw + ".desk_snapshot", errors, ["model_probability", "captured_at", "provenance", "prediction_id", "model_version"]);
           if (desk.provenance !== "user_reported") errors.push(lw + ".desk_snapshot.provenance must be user_reported until the source is independently verified");
-          if (desk.market !== VALID_MARKET) errors.push(lw + ".desk_snapshot.market is invalid");
-          if (!VALID_PICKS.has(desk.pick)) errors.push(lw + ".desk_snapshot.pick is invalid");
-          if (!finiteNumber(desk.line) || desk.line < 0) errors.push(lw + ".desk_snapshot.line is invalid");
-          if (desk.odds !== undefined && desk.odds !== null && (!finiteNumber(desk.odds) || desk.odds <= 1)) errors.push(lw + ".desk_snapshot.odds is invalid");
-          if (desk.model_probability !== undefined && desk.model_probability !== null && (!finiteNumber(desk.model_probability) || desk.model_probability < 0 || desk.model_probability > 1)) errors.push(lw + ".desk_snapshot.model_probability is invalid");
           if (!validDateTime(desk.captured_at)) errors.push(lw + ".desk_snapshot.captured_at must be a date-time");
+          if (desk.model_probability !== undefined && desk.model_probability !== null && (!finiteNumber(desk.model_probability) || desk.model_probability < 0 || desk.model_probability > 1)) errors.push(lw + ".desk_snapshot.model_probability is invalid");
           if (desk.prediction_id !== undefined && (typeof desk.prediction_id !== "string" || desk.prediction_id.length > 160)) errors.push(lw + ".desk_snapshot.prediction_id is invalid");
           if (desk.model_version !== undefined && (typeof desk.model_version !== "string" || desk.model_version.length > 100)) errors.push(lw + ".desk_snapshot.model_version is invalid");
         }
@@ -159,8 +172,24 @@ export function validateReviewDocument(document) {
         const score = leg.final_score;
         if (!score || typeof score !== "object" || Array.isArray(score)) errors.push(lw + ".final_score must be an object");
         else {
-          checkKnownKeys(score, new Set(["home", "away"]), lw + ".final_score", errors);
-          for (const side of ["home", "away"]) if (!finiteNumber(score[side]) || score[side] < 0) errors.push(lw + ".final_score." + side + " is invalid");
+          checkKnownKeys(score, new Set(["home", "away", "sets", "winner"]), lw + ".final_score", errors);
+          const hasHome = score.home !== undefined, hasAway = score.away !== undefined;
+          if (hasHome !== hasAway) errors.push(lw + ".final_score must include both home and away scores");
+          if (hasHome && (!finiteNumber(score.home) || score.home < 0)) errors.push(lw + ".final_score.home is invalid");
+          if (hasAway && (!finiteNumber(score.away) || score.away < 0)) errors.push(lw + ".final_score.away is invalid");
+          if (score.winner !== undefined && !["p1", "p2", "draw"].includes(score.winner)) errors.push(lw + ".final_score.winner is invalid");
+          if (score.sets !== undefined) {
+            if (!Array.isArray(score.sets) || !score.sets.length || score.sets.length > 5) errors.push(lw + ".final_score.sets must contain 1 to 5 set scores");
+            else score.sets.forEach(function(set, si) {
+              const sw = lw + ".final_score.sets[" + si + "]";
+              if (!set || typeof set !== "object" || Array.isArray(set)) errors.push(sw + " must be an object");
+              else {
+                checkKnownKeys(set, new Set(["home", "away"]), sw, errors);
+                for (const side of ["home", "away"]) if (!finiteNumber(set[side]) || set[side] < 0) errors.push(sw + "." + side + " is invalid");
+              }
+            });
+          }
+          if (!hasHome && !score.sets && !score.winner) errors.push(lw + ".final_score has no score or result");
         }
       }
       if (leg.settled_at !== undefined && leg.settled_at !== null && !validDateTime(leg.settled_at)) errors.push(lw + ".settled_at is invalid");
@@ -169,9 +198,33 @@ export function validateReviewDocument(document) {
   return errors;
 }
 
-export function evaluatePick(pick, line, score) {
-  if (!score || !finiteNumber(score.home) || !finiteNumber(score.away) || !finiteNumber(line)) return null;
-  const total = score.home + score.away;
+export function evaluatePick(pick, line, score, market = VALID_MARKET) {
+  if (!score || typeof score !== "object") return null;
+  if (market === "match_winner") {
+    let winner = score.winner;
+    if (!winner && Array.isArray(score.sets) && score.sets.length) {
+      let p1Sets = 0, p2Sets = 0;
+      for (const set of score.sets) {
+        if (!finiteNumber(set?.home) || !finiteNumber(set?.away)) return null;
+        if (set.home > set.away) p1Sets += 1;
+        else if (set.away > set.home) p2Sets += 1;
+      }
+      winner = p1Sets === p2Sets ? "draw" : (p1Sets > p2Sets ? "p1" : "p2");
+    }
+    if (!winner && finiteNumber(score.home) && finiteNumber(score.away)) winner = score.home === score.away ? "draw" : (score.home > score.away ? "p1" : "p2");
+    return winner && ["p1", "p2", "draw"].includes(winner) ? (winner === pick ? "WON" : "LOST") : null;
+  }
+  let total = null;
+  if (market === "total_games_over_under") {
+    if (Array.isArray(score.sets) && score.sets.length && score.sets.every(set => finiteNumber(set?.home) && finiteNumber(set?.away))) {
+      total = score.sets.reduce((sum, set) => sum + set.home + set.away, 0);
+    } else if (finiteNumber(score.home) && finiteNumber(score.away)) {
+      total = score.home + score.away;
+    }
+  } else if (["total_goals_over_under", "basketball_total_points"].includes(market) && finiteNumber(score.home) && finiteNumber(score.away)) {
+    total = score.home + score.away;
+  }
+  if (!Number.isFinite(total) || !finiteNumber(line)) return null;
   if (Math.abs(total - line) < 1e-9) return "PUSH";
   if (pick === "over") return total > line ? "WON" : "LOST";
   if (pick === "under") return total < line ? "WON" : "LOST";
@@ -180,17 +233,26 @@ export function evaluatePick(pick, line, score) {
 
 export function classifyLineAdjustment(desk, actual) {
   if (!desk || typeof desk !== "object") return "desk_snapshot_missing";
-  if (!VALID_PICKS.has(desk.pick) || !finiteNumber(desk.line)) return "desk_snapshot_incomplete";
+  if (!VALID_PICKS.has(desk.pick) || !VALID_MARKETS.has(desk.market)) return "desk_snapshot_incomplete";
+  if (desk.market !== actual.market) return "market_changed";
   if (desk.pick !== actual.pick) return "side_changed";
+  if (!isTotalMarket(actual.market)) return "unchanged";
+  if (!finiteNumber(desk.line) || !finiteNumber(actual.line)) return "desk_snapshot_incomplete";
   if (Math.abs(desk.line - actual.line) < 1e-9) return "unchanged";
   const easier = actual.pick === "over" ? actual.line < desk.line : actual.line > desk.line;
   return easier ? "user_line_easier" : "user_line_harder";
 }
 
+function resolvedLegOutcome(leg) {
+  if (leg && VALID_LEG_OUTCOMES.has(leg.leg_outcome)) return leg.leg_outcome;
+  const actual = leg?.actual_selection;
+  return actual ? evaluatePick(actual.pick, actual.line, leg.final_score, actual.market || VALID_MARKET) : null;
+}
+
 export function analyzeLeg(leg) {
   const actual = leg.actual_selection, desk = leg.desk_snapshot;
-  const actualResult = evaluatePick(actual.pick, actual.line, leg.final_score);
-  const deskResult = desk ? evaluatePick(desk.pick, desk.line, leg.final_score) : null;
+  const actualResult = resolvedLegOutcome(leg);
+  const deskResult = desk ? evaluatePick(desk.pick, desk.line, leg.final_score, desk.market || actual.market || VALID_MARKET) : null;
   let deskSnapshotTiming = "desk_snapshot_missing";
   if (desk) {
     const kickoffMs = leg.kickoff_at ? Date.parse(leg.kickoff_at) : NaN;
@@ -201,7 +263,7 @@ export function analyzeLeg(leg) {
     else deskSnapshotTiming = "user_reported_pre_kickoff_time_unverified";
   }
   let counterfactual = "not_comparable";
-  if (actualResult !== null && deskResult !== null) {
+  if (actualResult !== null && actualResult !== "PENDING" && deskResult !== null) {
     if (actualResult === "WON" && deskResult !== "WON") counterfactual = "actual_selection_won_desk_did_not";
     else if (deskResult === "WON" && actualResult !== "WON") counterfactual = "desk_selection_won_actual_did_not";
     else if (actualResult === "WON" && deskResult === "WON") counterfactual = "both_won";
@@ -210,8 +272,12 @@ export function analyzeLeg(leg) {
   }
   return {
     product: String(leg.product || "unknown").trim().toLowerCase(),
-    actual_pick: actual.pick, actual_line: Number(actual.line), actual_odds: Number(actual.odds),
-    actual_result: actualResult, desk_pick: desk ? desk.pick : null,
+    market: String(actual.market || VALID_MARKET),
+    actual_pick: actual.pick, actual_line: finiteNumber(actual.line) ? Number(actual.line) : null,
+    actual_odds: finiteNumber(actual.odds) ? Number(actual.odds) : null,
+    actual_result: actualResult, actual_result_source: leg.leg_outcome ? (leg.leg_outcome_source || "user_reported") : (actualResult ? "score_derived" : "unsettled_or_missing_score"),
+    qualification_state: ["QUALIFIED", "NOT_QUALIFIED"].includes(leg.qualification_state) ? leg.qualification_state : "UNKNOWN",
+    desk_pick: desk ? desk.pick : null,
     desk_line: desk && finiteNumber(desk.line) ? Number(desk.line) : null,
     desk_result: deskResult, line_adjustment: classifyLineAdjustment(desk, actual), desk_snapshot_timing: deskSnapshotTiming, counterfactual: counterfactual
   };
@@ -220,19 +286,26 @@ export function analyzeLeg(leg) {
 export function summarizeReviewDocument(document) {
   const analyses = [];
   for (const ticket of document.tickets || []) for (const leg of ticket.legs || []) analyses.push(analyzeLeg(leg));
-  const outcomes = { WON: 0, LOST: 0, PUSH: 0, UNSETTLED_OR_MISSING_SCORE: 0 };
+  const outcomes = { WON: 0, LOST: 0, PUSH: 0, VOID: 0, PENDING: 0, UNSETTLED_OR_MISSING_SCORE: 0 };
+  const byQualification = {
+    QUALIFIED: { WON: 0, LOST: 0, PUSH: 0, VOID: 0, PENDING: 0, UNSETTLED_OR_MISSING_SCORE: 0 },
+    NOT_QUALIFIED: { WON: 0, LOST: 0, PUSH: 0, VOID: 0, PENDING: 0, UNSETTLED_OR_MISSING_SCORE: 0 },
+    UNKNOWN: { WON: 0, LOST: 0, PUSH: 0, VOID: 0, PENDING: 0, UNSETTLED_OR_MISSING_SCORE: 0 }
+  };
   const lineAdjustments = {}, deskTiming = {}, groups = new Map(), comparisons = {};
   for (const item of analyses) {
-    if (item.actual_result === null) outcomes.UNSETTLED_OR_MISSING_SCORE += 1;
-    else outcomes[item.actual_result] += 1;
+    const bucket = item.actual_result === null ? "UNSETTLED_OR_MISSING_SCORE" : item.actual_result;
+    outcomes[bucket] = (outcomes[bucket] || 0) + 1;
+    byQualification[item.qualification_state][bucket] = (byQualification[item.qualification_state][bucket] || 0) + 1;
     lineAdjustments[item.line_adjustment] = (lineAdjustments[item.line_adjustment] || 0) + 1;
     deskTiming[item.desk_snapshot_timing] = (deskTiming[item.desk_snapshot_timing] || 0) + 1;
-    const key = JSON.stringify([item.product, item.actual_pick, item.actual_line]);
-    if (!groups.has(key)) groups.set(key, { product: item.product, pick: item.actual_pick, line: item.actual_line, settled_non_push: 0, wins: 0, losses: 0, pushes: 0 });
+    const key = JSON.stringify([item.product, item.market, item.actual_pick, item.actual_line]);
+    if (!groups.has(key)) groups.set(key, { product: item.product, market: item.market, pick: item.actual_pick, line: item.actual_line, settled_non_push: 0, wins: 0, losses: 0, pushes: 0, voids: 0 });
     const group = groups.get(key);
     if (item.actual_result === "WON") { group.settled_non_push += 1; group.wins += 1; }
     else if (item.actual_result === "LOST") { group.settled_non_push += 1; group.losses += 1; }
     else if (item.actual_result === "PUSH") group.pushes += 1;
+    else if (item.actual_result === "VOID") group.voids += 1;
     if (item.counterfactual !== "not_comparable") {
       comparisons.comparable_legs = (comparisons.comparable_legs || 0) + 1;
       comparisons[item.counterfactual] = (comparisons[item.counterfactual] || 0) + 1;
@@ -242,19 +315,21 @@ export function summarizeReviewDocument(document) {
     group.hit_rate_excluding_pushes = group.settled_non_push ? Number((group.wins / group.settled_non_push).toFixed(4)) : null;
     return group;
   }).sort(function(a, b) {
-    return a.product.localeCompare(b.product) || a.pick.localeCompare(b.pick) || a.line - b.line;
+    return a.product.localeCompare(b.product) || a.market.localeCompare(b.market) || a.pick.localeCompare(b.pick) || (Number(a.line) || 0) - (Number(b.line) || 0);
   });
   const n = outcomes.WON + outcomes.LOST;
   return {
     schema_version: 1, mode: "PRIVATE_USER_EVIDENCE", privacy: "AGGREGATE_ONLY",
     ticket_count: (document.tickets || []).length, leg_count: analyses.length,
-    scored_leg_count: outcomes.WON + outcomes.LOST + outcomes.PUSH, actual_selection_outcomes: outcomes,
+    scored_leg_count: outcomes.WON + outcomes.LOST + outcomes.PUSH + outcomes.VOID,
+    actual_selection_outcomes: outcomes,
     actual_leg_hit_rate_excluding_pushes: n ? Number((outcomes.WON / n).toFixed(4)) : null,
+    outcome_by_qualification_state: byQualification,
     line_adjustments: Object.fromEntries(Object.entries(lineAdjustments).sort()),
     desk_snapshot_timing: Object.fromEntries(Object.entries(deskTiming).sort()),
     desk_vs_actual_same_score_comparison: Object.fromEntries(Object.entries(comparisons).sort()),
-    exact_product_pick_line: exactLineSummary,
-    interpretation_guard: "Descriptive evidence from user-selected tickets only; selection-biased and not a standalone model-validation sample. Do not update model parameters from this summary alone."
+    exact_product_market_pick_line: exactLineSummary,
+    interpretation_guard: "Every user-played leg is evaluated independently of its accumulator outcome. These personal selections are selection-biased descriptive evidence, not an unbiased model backtest; never auto-update model weights or unlock a qualification gate from this summary alone."
   };
 }
 
