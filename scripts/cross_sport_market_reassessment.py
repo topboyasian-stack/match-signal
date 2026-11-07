@@ -894,7 +894,7 @@ def _make_audit_record(core: Any, row: dict[str, Any], now: datetime) -> dict[st
         status = "PASS_EXISTING_BUILDER_GATES"
     else:
         status = str(leg.get("status") or "REJECTED")
-    match = f"{row.get('player_1') or row.get('home_team') or ''} vs {row.get('player_2') or row.get('away_team') or ''}".strip()
+    match = f"{row.get('player_1') or row.get('home_team') or row.get('home') or ''} vs {row.get('player_2') or row.get('away_team') or row.get('away') or ''}".strip()
     market_assessment = row.get("market_reassessment") or {}
     sport = str(row.get("sport") or "").lower()
     if sport in {"efootball", "efootball_gt", "efootball_adriatic"}:
