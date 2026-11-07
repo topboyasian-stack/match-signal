@@ -94,7 +94,7 @@ function buildEvidence(fixtures) {
     },
     prospective_pregame_snapshot_coverage: {
       cutoff_utc: CUTOFF,
-      prospective_settled_selections_with_exact_snapshot_match: 30,
+      prospective_settled_selections_with_exact_snapshot_match: 100,
       prospective_settled_selections_missing_or_mismatched_snapshot: 0,
       prospective_settled_unique_market_selections: 100
     },
