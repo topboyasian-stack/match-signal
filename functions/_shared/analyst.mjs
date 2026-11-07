@@ -304,6 +304,90 @@ export function analyzeLeg(leg) {
   };
 }
 
+function summarizeUserSelectionCohorts(document) {
+  const tickets = Array.isArray(document.tickets) ? document.tickets : [];
+  const unique = new Map();
+  const ordered = [...tickets].sort((a, b) => String(a.captured_at || "").localeCompare(String(b.captured_at || "")));
+
+  for (const ticket of ordered) {
+    const capturedAt = String(ticket.captured_at || "");
+    const capturedMs = Date.parse(capturedAt);
+    for (const leg of ticket.legs || []) {
+      const analysis = analyzeLeg(leg);
+      if (!["WON", "LOST", "PUSH", "VOID"].includes(analysis.actual_result)) continue;
+      const eventIdentity = String(leg.event_id || leg.match || leg.leg_ref || "");
+      const identity = JSON.stringify([
+        analysis.qualification_state, analysis.product, eventIdentity,
+        leg.kickoff_at || "", analysis.market, analysis.actual_pick, analysis.actual_line
+      ]);
+      if (unique.has(identity)) continue;
+      const kickoffMs = Date.parse(String(leg.kickoff_at || ""));
+      unique.set(identity, {
+        qualification_state: analysis.qualification_state,
+        actual_result: analysis.actual_result,
+        odds: analysis.actual_odds,
+        captured_at: capturedAt,
+        pre_kickoff: Number.isFinite(capturedMs) && Number.isFinite(kickoffMs) && capturedMs <= kickoffMs
+      });
+    }
+  }
+
+  function cohort(state) {
+    const rows = [...unique.values()].filter(row => row.qualification_state === state);
+    const wins = rows.filter(row => row.actual_result === "WON").length;
+    const losses = rows.filter(row => row.actual_result === "LOST").length;
+    const pushes = rows.filter(row => row.actual_result === "PUSH").length;
+    const voids = rows.filter(row => row.actual_result === "VOID").length;
+    const scored = wins + losses;
+    const priced = rows.filter(row => ["WON", "LOST"].includes(row.actual_result) && Number.isFinite(row.odds) && row.odds > 1);
+    const net = priced.reduce((sum, row) => sum + (row.actual_result === "WON" ? row.odds - 1 : -1), 0);
+    const preKickoff = rows.filter(row => row.pre_kickoff && ["WON", "LOST"].includes(row.actual_result));
+    const preWins = preKickoff.filter(row => row.actual_result === "WON").length;
+    const preLosses = preKickoff.length - preWins;
+    const odds = priced.map(row => row.odds);
+    return {
+      unique_settled_selections: rows.length,
+      wins, losses, pushes, voids,
+      hit_rate_excluding_pushes: scored ? Number((wins / scored).toFixed(4)) : null,
+      odds_sample_n: odds.length,
+      average_decimal_odds: odds.length ? Number((odds.reduce((sum, value) => sum + value, 0) / odds.length).toFixed(4)) : null,
+      flat_stake_bets: priced.length,
+      flat_stake_net_units: Number(net.toFixed(4)),
+      flat_stake_roi: priced.length ? Number((net / priced.length).toFixed(4)) : null,
+      pre_kickoff: {
+        settled_non_push: preKickoff.length,
+        wins: preWins,
+        losses: preLosses,
+        hit_rate: preKickoff.length ? Number((preWins / preKickoff.length).toFixed(4)) : null
+      }
+    };
+  }
+
+  const recentTickets = [...tickets].sort((a, b) => String(b.captured_at || "").localeCompare(String(a.captured_at || ""))).slice(0, 12);
+  const alternativeWinningTickets = recentTickets.filter(ticket =>
+    String(ticket.reported_ticket_outcome || "").toUpperCase() === "WON" &&
+    (ticket.legs || []).some(leg => analyzeLeg(leg).qualification_state === "NOT_QUALIFIED")
+  ).map(ticket => ({
+    captured_at: ticket.captured_at || null,
+    date: String(ticket.captured_at || "").slice(0, 10) || null,
+    total_odds: ticket.total_odds == null ? null : ticket.total_odds,
+    leg_count: (ticket.legs || []).length,
+    alternative_leg_count: (ticket.legs || []).filter(leg => analyzeLeg(leg).qualification_state === "NOT_QUALIFIED").length,
+    reported_ticket_outcome: "WON"
+  }));
+
+  return {
+    user_selection_cohorts: {
+      QUALIFIED: cohort("QUALIFIED"),
+      NOT_QUALIFIED: cohort("NOT_QUALIFIED"),
+      UNKNOWN: cohort("UNKNOWN")
+    },
+    alternative_user_picks: cohort("NOT_QUALIFIED"),
+    alternative_winning_tickets: alternativeWinningTickets,
+    cohort_method: "Deduplicated by qualification state, product, fixture, kickoff, market, pick and line; first recorded selection retained. Hit rate excludes pushes; one-unit ROI uses captured decimal odds and is descriptive, not a whole-accumulator return. Pre-kickoff subset requires a recorded ticket capture time no later than kickoff."
+  };
+}
+
 export function summarizeReviewDocument(document) {
   const analyses = [];
   for (const ticket of document.tickets || []) for (const leg of ticket.legs || []) analyses.push(analyzeLeg(leg));
@@ -350,7 +434,8 @@ export function summarizeReviewDocument(document) {
     desk_snapshot_timing: Object.fromEntries(Object.entries(deskTiming).sort()),
     desk_vs_actual_same_score_comparison: Object.fromEntries(Object.entries(comparisons).sort()),
     exact_product_market_pick_line: exactLineSummary,
-    interpretation_guard: "Every user-played leg is evaluated independently of its accumulator outcome. These personal selections are selection-biased descriptive evidence, not an unbiased model backtest; never auto-update model weights or unlock a qualification gate from this summary alone."
+    ...summarizeUserSelectionCohorts(document),
+    interpretation_guard: "Every user-played leg is evaluated independently of its accumulator outcome. Alternative user picks are reported as a separate deduplicated cohort; small or selection-biased samples must not auto-update model weights or unlock qualification gates."
   };
 }
 
