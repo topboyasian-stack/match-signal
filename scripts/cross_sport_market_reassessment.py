@@ -260,6 +260,22 @@ def _record_options(options: list[dict[str, Any]]) -> None:
     _RUN_OPTIONS.extend(copy.deepcopy(options))
 
 
+def _record_live_primary_rows(rows: list[dict[str, Any]]) -> None:
+    """Include fresh live-fallback model rows in the private fixture-primary ledger."""
+    known = {
+        (str(row.get("sport") or ""), str(row.get("event_id") or ""))
+        for row in _RUN_PRIMARY if isinstance(row, dict)
+    }
+    for row in rows:
+        if not isinstance(row, dict) or str(row.get("source_engine") or "") != "unified_live_refresh":
+            continue
+        key = (str(row.get("sport") or ""), str(row.get("event_id") or ""))
+        if not key[1] or key in known:
+            continue
+        _RUN_PRIMARY.append(copy.deepcopy(row))
+        known.add(key)
+
+
 def _dedupe_candidates(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     indexed: dict[tuple[str, str, str, str, str], dict[str, Any]] = {}
     for row in rows:
@@ -1258,6 +1274,7 @@ def install(core: Any) -> None:
         base = _ORIGINALS["football_candidates"](now)
         active_rows = getattr(core, "ACTIVE_PREDICTION_ROWS", None)
         rows = active_rows if isinstance(active_rows, list) else core.load(core.PREDICTIONS, [])
+        _record_live_primary_rows(rows if isinstance(rows, list) else [])
         options, audit = _football_options(core, now, rows if isinstance(rows, list) else [])
         _record_options(audit)
         return _dedupe_candidates((base if isinstance(base, list) else []) + options)
@@ -1266,6 +1283,7 @@ def install(core: Any) -> None:
         base = _ORIGINALS["tennis_candidates"](now)
         active_rows = getattr(core, "ACTIVE_PREDICTION_ROWS", None)
         rows = active_rows if isinstance(active_rows, list) else core.load(core.PREDICTIONS, [])
+        _record_live_primary_rows(rows if isinstance(rows, list) else [])
         result, audit = _tennis_options(core, now, rows if isinstance(rows, list) else [], base if isinstance(base, list) else [])
         _record_options(audit)
         return result
