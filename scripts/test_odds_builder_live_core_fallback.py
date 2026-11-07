@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """Regression tests for fresh core-sport fallback in the Odds Builder."""
-import runpy
 import sys
 import unittest
 from datetime import datetime, timedelta, timezone
