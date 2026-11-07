@@ -115,6 +115,13 @@ assert.ok(
     cloudflare.includes("node --check functions/api/analyst/parse-ticket.js"),
   "The deployed artifact must contain and syntax-check the private Analyst UI and API",
 );
+assert.ok(
+  cloudflare.includes("'/analyst.js'") &&
+    cloudflare.includes("'/workspace-ui.css'") &&
+    cloudflare.includes("'/workspace-ui.js'") &&
+    cloudflare.includes("'/analyst.html'"),
+  "Production smoke tests must request the private Analyst page and all browser assets",
+);
 
 assert.ok(
   cloudflare.includes("|scripts/test_live_virtual_quote_coverage.mjs|") &&
