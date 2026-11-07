@@ -162,6 +162,50 @@ class CrossSportReassessmentTests(unittest.TestCase):
             self.assertTrue(candidate.get("sportybet_outcome_id"))
             self.assertTrue(candidate.get("reassessment_market_rows"))
 
+    def test_alternative_preview_covers_24h_without_expanding_ticket_builder(self):
+        row = sample_football(self.now)
+        row["start_time"] = (self.now + timedelta(hours=13)).isoformat()
+        self.assertTrue(reassessment._within_alternative_horizon(row, self.now))
+        self.assertFalse(FakeCore.within_builder_horizon(row, self.now))
+
+        active, audit = reassessment._football_options(FakeCore(), self.now, [row])
+        self.assertTrue(active, "fresh exact-quote alternatives should be evaluated for a 13-hour fixture")
+        self.assertTrue(audit)
+        self.assertEqual(reassessment._builder_horizon_candidates(FakeCore(), active, self.now), [],
+                         "the 12-hour accumulator Builder must not receive 13-hour candidates")
+
+    def test_outside_builder_horizon_alt_is_published_as_alternative_only(self):
+        row = sample_football(self.now)
+        row["start_time"] = (self.now + timedelta(hours=13)).isoformat()
+        row.update({
+            "builder_market": "total_goals",
+            "builder_pick": "under",
+            "builder_probability": 0.72,
+            "line": 2.5,
+            "sportybet_market_id": "18",
+            "sportybet_event_id": "sporty-event-1",
+            "sportybet_outcome_id": "under-id",
+            "reassessment_market_rows": [{"side": "over", "odds": 2.05}, {"side": "under", "odds": 1.75}],
+            "market_reassessment": {"status": "EXACT_CURRENT_MARKET_ALTERNATIVE"},
+        })
+
+        class AuditCore(FakeCore):
+            @staticmethod
+            def market_rows(candidate):
+                return candidate.get("reassessment_market_rows") or []
+
+            @staticmethod
+            def make_leg(candidate):
+                return {"builder_eligible": True, "status": "PASS_EXISTING_BUILDER_GATES"}
+
+        record = reassessment._make_audit_record(AuditCore(), row, self.now)
+        self.assertEqual(record["candidate_status"], "ALTERNATIVE_ONLY_OUTSIDE_BUILDER_HORIZON")
+        self.assertTrue(record["fresh_exact_quote"])
+        self.assertTrue(record["alternative_only"])
+        self.assertFalse(record["passed_builder_gates"])
+        self.assertFalse(record["in_builder_pool"])
+        self.assertEqual(record["primary_prediction_id"], reassessment.hashlib.sha256(b"football|football-test-1").hexdigest()[:24])
+
     def test_partial_1x2_price_pair_is_not_promoted_as_an_alternative(self):
         row = sample_football(self.now, include_btts=False, include_double_chance=False)
         row["sportybet_winner_odds"].pop("draw")
