@@ -2,18 +2,18 @@
   "status": "VERIFIED_WITH_DIAGNOSTIC_INCOMPLETE",
   "core_pages_status": "VERIFIED",
   "qualified_best_quote_coverage_status": "VALID_ZERO",
-  "qualified_best_candidate_pool_rows": 191,
+  "qualified_best_candidate_pool_rows": 183,
   "qualified_best_model_qualified_rows": 0,
   "booking_api_status": "NO_FUTURE_BATCH",
   "qualified_alternatives_status": "READY",
-  "qualified_alternatives_count": 89,
+  "qualified_alternatives_count": 104,
   "qualified_alternatives": {
-    "verified_at": "2026-11-07T07:49:28.048Z",
+    "verified_at": "2026-11-07T07:58:01.938Z",
     "endpoint": "/api/public/market-alternatives",
     "api_status": "OK",
     "status": "READY",
-    "alternative_count": 89,
-    "unique_fixture_count": 72,
+    "alternative_count": 104,
+    "unique_fixture_count": 71,
     "sports": [
       "efootball",
       "football",
@@ -84,10 +84,10 @@
   },
   "shared_ticket_drawer_status": "READY",
   "provider": "Cloudflare Pages",
-  "source_commit": "ab6a085de4078401509183c0fcbaad56e1ad6842",
-  "verified_at": "2026-11-07T07:50:20.193956+00:00",
+  "source_commit": "826641bc7803cd871fb1b54790d5ee1d6fbae984",
+  "verified_at": "2026-11-07T07:58:56.486294+00:00",
   "live_virtual_feed": {
-    "verified_at": "2026-11-07T07:50:19.027Z",
+    "verified_at": "2026-11-07T07:58:54.173Z",
     "status": "VALID_ZERO_QUALIFIED_CANDIDATES",
     "coverage_state": "VALID_ZERO",
     "scan_complete": true,
@@ -95,8 +95,8 @@
     "no_model_qualified_candidates": true,
     "paper_only": true,
     "candidate_artifact_rows": 224,
-    "candidate_pool_rows_in_next_7_days": 191,
-    "candidate_pool_unique_events_in_next_7_days": 122,
+    "candidate_pool_rows_in_next_7_days": 183,
+    "candidate_pool_unique_events_in_next_7_days": 118,
     "model_qualified_candidate_rows_in_next_7_days": 0,
     "virtual_candidate_rows_in_next_7_days": 0,
     "snapshot_gate_qualified_fixtures": 0,
@@ -113,7 +113,7 @@
       {
         "page": 1,
         "count": 100,
-        "fetched_at": "2026-11-07T07:50:19.008Z",
+        "fetched_at": "2026-11-07T07:58:54.158Z",
         "status": "LIVE"
       }
     ],
@@ -143,7 +143,7 @@
     "qualified_examples": []
   },
   "booking_api": {
-    "verified_at": "2026-11-07T07:50:12.146Z",
+    "verified_at": "2026-11-07T07:58:47.321Z",
     "status": "NO_FUTURE_BATCH",
     "http_status": null,
     "ok": false,
@@ -152,6 +152,34 @@
     "booking_code_available": false,
     "error": null,
     "message": null
+  },
+  "nba_ticket_gate_probe_status": "PASS",
+  "nba_ticket_gate_probe": {
+    "verified_at": "2026-11-07T07:58:51.837Z",
+    "status": "PASS",
+    "probe_type": "synthetic_nonexistent_market_225_legs",
+    "current_main_release_qualified": false,
+    "current_main_release_decision": "RESEARCH_ONLY",
+    "probes": [
+      {
+        "base": "https://match-signal.pages.dev",
+        "probe_type": "synthetic_nonexistent_market_225_legs",
+        "http_status": 423,
+        "error": "NBA_RELEASE_GATE_LOCKED",
+        "current_main_release_qualified": false,
+        "booking_code_withheld": true,
+        "booking_code_present": false
+      },
+      {
+        "base": "https://0ad56aa2.match-signal.pages.dev",
+        "probe_type": "synthetic_nonexistent_market_225_legs",
+        "http_status": 423,
+        "error": "NBA_RELEASE_GATE_LOCKED",
+        "current_main_release_qualified": false,
+        "booking_code_withheld": true,
+        "booking_code_present": false
+      }
+    ]
   },
   "checks": [
     "core_pages",
@@ -162,6 +190,7 @@
     "live_production_data",
     "booking_api_post_not_verified",
     "qualified_best_valid_zero",
+    "nba_ticket_gate_fail_closed",
     "qualified_alternatives_live"
   ]
 }
