@@ -193,3 +193,22 @@ assert.ok(sanitizedAnswer.includes("3 pipeline errors"));
 assert.ok(!sanitizedAnswer.includes("raw data"));
 assert.ok(sanitizedAnswer.includes("Raw JSON omitted"));
 console.log("AI Analyst module tests passed.");
+
+const withTimeline = makeDocument({
+  leg_ref: "leg_1", product: "football", match: "Alpha vs Beta",
+  actual_selection: { market: "total_goals_over_under", pick: "over", line: 1.5, odds: 1.4 },
+  match_observations: [
+    { observed_at: "2026-11-07T10:00:00Z", phase: "IN_PLAY", home: 0, away: 0, source: "user_reported" },
+    { observed_at: "2026-11-07T10:45:00Z", phase: "HALF_TIME", home: 0, away: 0, source: "user_reported" }
+  ]
+});
+assert.deepEqual(validateReviewDocument(withTimeline), []);
+const unorderedTimeline = makeDocument({
+  leg_ref: "leg_1", product: "football", match: "Alpha vs Beta",
+  actual_selection: { market: "total_goals_over_under", pick: "over", line: 1.5, odds: 1.4 },
+  match_observations: [
+    { observed_at: "2026-11-07T10:45:00Z", phase: "HALF_TIME", home: 0, away: 0, source: "user_reported" },
+    { observed_at: "2026-11-07T10:00:00Z", phase: "IN_PLAY", home: 0, away: 0, source: "user_reported" }
+  ]
+});
+assert.ok(validateReviewDocument(unorderedTimeline).some(error => error.includes("strictly increasing")));
