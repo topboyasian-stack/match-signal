@@ -33,11 +33,21 @@ def main():
     require('data-sport="basketball"' in basketball, "Basketball page lost its sport identity")
     require('data-sport="football"' in football, "Football page lost its sport identity")
     require('data-sport="tennis"' in tennis, "Tennis page lost its sport identity")
-    alternatives_script = "qualified-alternatives.js?v=20261107-qualified-picks4"
-    for page, source in (("football.html", football), ("tennis.html", tennis), ("basketball.html", basketball)):
+    alternatives_script = "qualified-alternatives.js?v=20261107-qualified-picks5"
+    for page in pages:
+        source = (ROOT / page).read_text(encoding="utf-8")
         require(alternatives_script in source, f"{page} does not load the live qualified-alternatives selector")
     require("../qualified-alternatives.js?v=20261107-qualified-picks5" in lab_html, "Virtual Lab must load the product-aware qualified-alternatives selector")
-    require('data-ticket-model-qualified="true"' in (ROOT / "qualified-alternatives.js").read_text(encoding="utf-8"), "Builder-gated alternatives must retain their qualification state when added to the shared ticket")
+    selector = (ROOT / "qualified-alternatives.js").read_text(encoding="utf-8")
+    require("querySelectorAll('[data-ms-fixture-id]')" in selector and "x.event_id===event&&x.sport===sport" in selector,
+            "Qualified alternatives must attach to the exact fixture card and sport, never a different event")
+    require('data-ticket-model-qualified="true"' in selector, "Builder-gated alternatives must retain their qualification state when added to the shared ticket")
+    unified_row = hub.split("function unifiedRow(group){", 1)[1].split("async function renderUnifiedBoard", 1)[0]
+    qualified_best_row = hub.split("function qualifiedBestRow(x){", 1)[1].split("// VFOOTBALL", 1)[0]
+    require('data-ms-fixture-id="\'+E(x.event_id)' in unified_row and 'data-ms-fixture-sport="\'+E(x.sport)' in unified_row,
+            "Upcoming rows must expose fixture identity so qualified alternatives can mount")
+    require('data-ms-fixture-id="\'+E(x.event_id)' in qualified_best_row and 'data-ms-fixture-sport="\'+E(x.sport)' in qualified_best_row,
+            "Qualified Best rows must expose fixture identity so qualified alternatives can mount")
     require("function ticketAddMarkup" in hub and "Add prediction to ticket" in hub,
             "Football/Tennis prediction cards must expose a selectable ticket action")
     require("ticketAddMarkup(x)" in hub and "ticketAddMarkup(p)" in hub,
