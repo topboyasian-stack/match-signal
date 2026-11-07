@@ -70,6 +70,8 @@ assert.ok(
     cloudflare.includes("      - 'api-access.html'") &&
     cloudflare.includes("      - 'live.html'") &&
     cloudflare.includes("|functions/api/odds-builder-data.js|") &&
+    cloudflare.includes("|functions/api/public/market-alternatives.js|") &&
+    cloudflare.includes("|qualified-alternatives.js|") &&
     cloudflare.includes("|functions/api/sportybet-virtual-results.js|") &&
     cloudflare.includes("      - 'functions/api/sportybet-virtual-results.js'"),
   "Builder refresh, the live odds-data endpoint, and deployment-guard regression paths must be explicitly approved by the direct-promotion guard.",
