@@ -4,6 +4,11 @@ on:
     branches: [main]
     paths:
       - 'scripts/odds_builder.py'
+      - 'scripts/odds_builder_core.py'
+      - 'scripts/cross_sport_market_reassessment.py'
+      - 'scripts/tennis_market_reassessment.py'
+      - 'scripts/test_odds_builder_live_core_fallback.py'
+      - 'scripts/test_upcoming_desk_policy.py'
       - 'scripts/test_compact_efootball_builder.py'
       - 'scripts/test_odds_builder_upcoming_desk_recent_losses.py'
       - 'scripts/predict_today.py'
@@ -28,7 +33,11 @@ jobs:
       - uses: actions/setup-python@v5
         with: {python-version: '3.12'}
       - run: python -m pip install --upgrade requests
-      - run: python -m py_compile scripts/odds_builder.py scripts/predict_today.py scripts/independent_football_model.py scripts/football_model_council.py scripts/build_football_team_history.py
+      - run: python -m py_compile scripts/odds_builder.py scripts/odds_builder_core.py scripts/cross_sport_market_reassessment.py scripts/tennis_market_reassessment.py scripts/unified_upcoming.py scripts/test_odds_builder_live_core_fallback.py scripts/test_upcoming_desk_policy.py scripts/predict_today.py scripts/independent_football_model.py scripts/football_model_council.py scripts/build_football_team_history.py
+      - name: Test stale core feed recovery for Football and Tennis alternatives
+        run: python scripts/test_odds_builder_live_core_fallback.py
+      - name: Test stale core feed refresh on Upcoming board
+        run: python scripts/test_upcoming_desk_policy.py
       - name: Test compact eFootball 2.00x ticket constructor
         run: python scripts/test_compact_efootball_builder.py
       - name: Test Upcoming Desk repeat-loss circuit breaker
