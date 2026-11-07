@@ -47,10 +47,12 @@ def main():
             "Qualified alternatives must pass the exact fixture, provider event, market ID and kickoff into the shared ticket")
     unified_row = hub.split("function unifiedRow(group){", 1)[1].split("async function renderUnifiedBoard", 1)[0]
     qualified_best_row = hub.split("function qualifiedBestRow(x){", 1)[1].split("// VFOOTBALL", 1)[0]
-    require("data-ms-fixture-id" in unified_row and "data-ms-fixture-sport" in unified_row,
-            "Upcoming rows must expose fixture identity so qualified alternatives can mount")
-    require("data-ms-fixture-id" in qualified_best_row and "data-ms-fixture-sport" in qualified_best_row,
-            "Qualified Best rows must expose fixture identity so qualified alternatives can mount")
+    require("data-ms-fixture-id" in unified_row and "alternativeFixtureSport(x)" in unified_row,
+            "Upcoming rows must expose canonical sport identity so eFootball alternatives can mount")
+    require("data-ms-fixture-id" in qualified_best_row and "alternativeFixtureSport(x)" in qualified_best_row,
+            "Qualified Best rows must expose canonical sport identity so eFootball alternatives can mount")
+    require("function alternativeFixtureSport(x)" in hub and 'return "efootball"' in hub,
+            "Active eFootball product cards must use the same efootball key returned by the public alternatives API")
     require("function ticketAddMarkup" in hub and "Add prediction to ticket" in hub,
             "Football/Tennis prediction cards must expose a selectable ticket action")
     require("ticketAddMarkup(x)" in hub and "ticketAddMarkup(p)" in hub,
