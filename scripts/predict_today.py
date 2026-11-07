@@ -405,6 +405,26 @@ def is_future_prematch_event(event, now=None, start_buffer_seconds=120):
     return start.astimezone(timezone.utc) > current.astimezone(timezone.utc) + timedelta(seconds=buffer_seconds)
 
 
+_FOOTBALL_TEAM_ALIASES = {
+    # Exact provider/display-name variants observed in the live SportyBet
+    # catalogue; keep this list narrow and do not normalize age/cohort markers.
+    "real betis": "betis",
+    "stade rennais": "rennes",
+}
+
+
+def _football_identity_team_label(value):
+    raw = str(value or "").strip()
+    normalized = re.sub(r"[^a-z0-9]+", " ", raw.lower()).strip()
+    # Never erase youth, gender, reserve, or virtual competition identity while
+    # applying club-name aliases. The strict shared matcher still checks these.
+    if re.search(r"\b(?:u\s*\d{2}|under\s*\d{2}|youth|junior|academy|reserves?|development league|boys|girls|women|srl)\b", normalized):
+        return raw
+    alias_key = re.sub(r"\b(?:fc|afc|sc|cf|ac|club|the)\b", " ", normalized)
+    alias_key = re.sub(r"\s+", " ", alias_key).strip()
+    return _FOOTBALL_TEAM_ALIASES.get(alias_key, raw)
+
+
 def _football_market_fixture_valid(pred, event, max_hours=3.0):
     """Require the right football competition and a near-identical kickoff."""
     if str(pred.get("sport") or "").lower() != "football":
@@ -413,9 +433,15 @@ def _football_market_fixture_valid(pred, event, max_hours=3.0):
         pred.get("league"),
         event.get("tournament"),
         market_category=event.get("category"),
-        prediction_teams=(pred.get("player_1") or pred.get("home_team"), pred.get("player_2") or pred.get("away_team")),
+        prediction_teams=(
+            _football_identity_team_label(pred.get("player_1") or pred.get("home_team")),
+            _football_identity_team_label(pred.get("player_2") or pred.get("away_team")),
+        ),
         market_metadata=event.get("identity_metadata") or football_market_identity_metadata(event),
-        market_teams=(event.get("home"), event.get("away")),
+        market_teams=(
+            _football_identity_team_label(event.get("home")),
+            _football_identity_team_label(event.get("away")),
+        ),
     ):
         return False
     predicted_start = _parse_dt(pred.get("start_time"))
