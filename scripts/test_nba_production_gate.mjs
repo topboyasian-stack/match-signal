@@ -63,8 +63,10 @@ for (const base of bases) {
     assert.ok(body.validation.every(item => item.ok === false));
   }
   const probe = {
-    base, http_status: response.status, error: body.error,
-    current_main_release_qualified: locallyQualified, booking_code_withheld: body.booking_code_withheld
+    base, probe_type: 'synthetic_nonexistent_market_225_legs',
+    http_status: response.status, error: body.error,
+    current_main_release_qualified: locallyQualified, booking_code_withheld: body.booking_code_withheld,
+    booking_code_present: Object.hasOwn(body, 'booking_code')
   };
   probeResults.push(probe);
   console.log('PASS: production NBA manual-ticket fail-closed probe', JSON.stringify(probe));
@@ -72,6 +74,7 @@ for (const base of bases) {
 writeFileSync('NBA-PRODUCTION-GATE-CHECK.json', JSON.stringify({
   verified_at: new Date().toISOString(),
   status: 'PASS',
+  probe_type: 'synthetic_nonexistent_market_225_legs',
   current_main_release_qualified: locallyQualified,
   current_main_release_decision: evidence.release_decision || 'UNSPECIFIED',
   probes: probeResults
