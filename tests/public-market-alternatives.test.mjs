@@ -25,7 +25,7 @@ async function call(records) {
   });
 }
 
-test("public endpoint returns only whitelisted qualified future alternatives", async () => {
+test("public endpoint returns model-scored alternatives with exact fresh prices", async () => {
   const response = await call([candidate()]);
   const payload = await response.json();
   assert.equal(response.status, 200);
@@ -42,7 +42,7 @@ test("fixture participants are split correctly for selectable winner alternative
   assert.equal(payload.alternatives[0].player_2, "Away FC");
 });
 
-test("stale, weak, unqualified and already-started alternatives are withheld", async () => {
+test("stale, weak, and already-started alternatives are withheld but Builder rejection alone is not", async () => {
   const response = await call([
     candidate({ model_probability: 0.64 }),
     candidate({ passed_builder_gates: false }),
@@ -50,7 +50,9 @@ test("stale, weak, unqualified and already-started alternatives are withheld", a
     candidate({ start_time: new Date(Date.now() - 1000).toISOString() })
   ]);
   const payload = await response.json();
-  assert.equal(payload.alternatives.length, 0);
+  assert.equal(payload.alternatives.length, 1, "the fresh 71% alternative remains visible even when the accumulator Builder gate rejected it");
+  assert.equal(payload.alternatives[0].event_id, "fixture-1");
+  assert.equal(payload.alternatives[0].probability, 0.71);
 });
 
 test("at most two distinct market alternatives are returned per fixture", async () => {
