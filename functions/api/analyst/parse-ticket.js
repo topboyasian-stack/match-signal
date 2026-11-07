@@ -55,6 +55,18 @@ function normalizeTicket(parsed) {
       item.leg_outcome_captured_at = now;
     }
     if (typeof leg.qualification_captured_at === "string" && Number.isFinite(Date.parse(leg.qualification_captured_at))) item.qualification_captured_at = leg.qualification_captured_at;
+    if (Array.isArray(leg.match_observations)) {
+      const observations = leg.match_observations.slice(0, 40).map(function(row) {
+        if (!row || typeof row !== "object" || !Number.isFinite(Date.parse(row.observed_at))) return null;
+        if (!["PRE_MATCH", "IN_PLAY", "HALF_TIME", "PERIOD_BREAK", "SET", "FINAL"].includes(row.phase)) return null;
+        if (!finite(row.home) || row.home < 0 || !finite(row.away) || row.away < 0) return null;
+        if (!["user_reported", "provider_feed"].includes(row.source)) return null;
+        const observation = { observed_at: new Date(row.observed_at).toISOString(), phase: row.phase, home: row.home, away: row.away, source: row.source };
+        if (typeof row.source_event_id === "string") observation.source_event_id = row.source_event_id.slice(0, 160);
+        return observation;
+      }).filter(Boolean).sort((a, b) => Date.parse(a.observed_at) - Date.parse(b.observed_at));
+      if (observations.length) item.match_observations = observations;
+    }
     const score = leg.final_score;
     if (score && typeof score === "object") {
       const normalizedScore = {};
