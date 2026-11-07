@@ -1,0 +1,38 @@
+name: Fixture primary prediction ledger tests
+
+on:
+  pull_request:
+    paths:
+      - "scripts/fixture_primary_prediction_ledger.py"
+      - "scripts/cross_sport_market_reassessment.py"
+      - "scripts/test_cross_sport_market_reassessment.py"
+      - "functions/api/analyst/market-evidence.js"
+      - ".github/workflows/fixture-primary-ledger-tests.yml"
+  push:
+    branches:
+      - main
+      - feature/fixture-primary-prediction-ledger
+    paths:
+      - "scripts/fixture_primary_prediction_ledger.py"
+      - "scripts/cross_sport_market_reassessment.py"
+      - "scripts/test_cross_sport_market_reassessment.py"
+      - "functions/api/analyst/market-evidence.js"
+      - ".github/workflows/fixture-primary-ledger-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile ledger and integration
+        run: python -m py_compile scripts/fixture_primary_prediction_ledger.py scripts/cross_sport_market_reassessment.py
+      - name: Run cross-sport and primary-ledger regressions
+        run: python -m unittest scripts/test_cross_sport_market_reassessment.py -v
+      - name: Check private evidence endpoint syntax
+        run: node --check functions/api/analyst/market-evidence.js
