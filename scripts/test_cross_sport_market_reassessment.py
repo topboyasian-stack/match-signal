@@ -10,6 +10,7 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import cross_sport_market_reassessment as reassessment
+import sync_cross_sport_private_evidence as evidence_sync
 from fixture_primary_prediction_ledger import build_fixture_ledger, merge_primary_ledger, primary_summary
 
 
@@ -233,6 +234,10 @@ class CrossSportReassessmentTests(unittest.TestCase):
                 reassessment._ORIGINALS.pop("virtual_candidates", None)
             else:
                 reassessment._ORIGINALS["virtual_candidates"] = old
+
+    def test_private_kv_capacity_stays_below_provider_value_limit(self):
+        self.assertEqual(evidence_sync.MAX_BYTES, 24 * 1024 * 1024)
+        self.assertLess(evidence_sync.MAX_BYTES, 25 * 1024 * 1024)
 
     def test_primary_ledger_rewrite_uses_real_newline_not_literal_backslash_n(self):
         source = (Path(reassessment.__file__)).read_text(encoding="utf-8")
