@@ -28,6 +28,7 @@ OUTPUT = PRIVATE_DIR / "cross_sport_market_reassessment_private.json"
 HISTORY_OUTPUT = PRIVATE_DIR / "cross_sport_market_reassessment_history.json"
 REVISION_PATH = PRIVATE_DIR / ".cross_sport_market_reassessment_revision"
 MAX_QUOTE_AGE_SECONDS = 900
+ALTERNATIVE_HORIZON_MINUTES = 24 * 60
 MAX_HISTORY_RECORDS = 12000
 MIN_NBA_EDGE = 0.04
 MIN_NBA_EXPECTED_VALUE = 0.03
@@ -56,6 +57,31 @@ def _dt(value: Any) -> datetime | None:
 
 def _norm(value: Any) -> str:
     return re.sub(r"[^a-z0-9]+", "", str(value or "").lower())
+
+
+def _within_alternative_horizon(row: dict[str, Any], now: datetime) -> bool:
+    """Allow a one-day alternative preview; accumulator eligibility stays at 12h."""
+    start = _dt(row.get("start_time"))
+    if start is None:
+        return False
+    minutes = (start - now).total_seconds() / 60.0
+    return 2.0 < minutes <= ALTERNATIVE_HORIZON_MINUTES
+
+
+def _within_builder_horizon(core: Any, row: dict[str, Any], now: datetime) -> bool:
+    """Fail closed when the existing Builder horizon cannot be evaluated."""
+    try:
+        return bool(core.within_builder_horizon(row, now))
+    except Exception:
+        return False
+
+
+def _builder_horizon_candidates(core: Any, rows: list[dict[str, Any]], now: datetime) -> list[dict[str, Any]]:
+    """Keep the existing Builder input restricted to its unchanged native horizon."""
+    return [
+        row for row in rows
+        if isinstance(row, dict) and _within_builder_horizon(core, row, now)
+    ]
 
 
 def _fresh_quote(row: dict[str, Any], now: datetime) -> tuple[bool, float | None, str | None]:
@@ -288,7 +314,7 @@ def _football_options(core: Any, now: datetime, rows: list[dict[str, Any]]) -> t
     active: list[dict[str, Any]] = []
     audit: list[dict[str, Any]] = []
     for row in rows:
-        if not isinstance(row, dict) or row.get("sport") != "football" or not core.within_builder_horizon(row, now):
+        if not isinstance(row, dict) or row.get("sport") != "football" or not _within_alternative_horizon(row, now):
             continue
         is_fresh, _, quote_stamp = _fresh_quote(row, now)
         snapshot = row.get("sportybet_market") or {}
@@ -450,7 +476,7 @@ def _tennis_options(core: Any, now: datetime, rows: list[dict[str, Any]], baseli
         predict_total_games = None
 
     for row in rows:
-        if not isinstance(row, dict) or row.get("sport") != "tennis" or not core.within_builder_horizon(row, now):
+        if not isinstance(row, dict) or row.get("sport") != "tennis" or not _within_alternative_horizon(row, now):
             continue
         # Forward-window watch projections are useful research visibility, but
         # are not the calibrated tennis prediction source for Builder reassessment.
@@ -561,7 +587,9 @@ def _tennis_options(core: Any, now: datetime, rows: list[dict[str, Any]], baseli
                 for x in audit
             ):
                 audit.append(candidate)
-    return [x for x in all_rows if x.get("sport") == "tennis"], audit
+    tennis_rows = [x for x in all_rows if x.get("sport") == "tennis"]
+    # The 24h list is for alternatives; only the original 12h window feeds tickets.
+    return _builder_horizon_candidates(core, tennis_rows, now), audit
 
 
 def _virtual_options(now: datetime):
@@ -888,13 +916,17 @@ def _make_audit_record(core: Any, row: dict[str, Any], now: datetime) -> dict[st
             and bool(row.get("sportybet_outcome_id"))
             and bool(row.get("sportybet_event_id"))
         )
+    in_builder_horizon = _within_builder_horizon(core, row, now)
+    in_alternative_horizon = _within_alternative_horizon(row, now)
     if not model_floor:
         status = "BELOW_MODEL_PROBABILITY_FLOOR"
     elif not quote_exact:
         status = "NO_EXACT_CURRENT_QUOTE"
     elif not fresh:
         status = "STALE_OR_UNTIMESTAMPED_QUOTE"
-    elif leg.get("builder_eligible") is True:
+    elif in_alternative_horizon and not in_builder_horizon:
+        status = "ALTERNATIVE_ONLY_OUTSIDE_BUILDER_HORIZON"
+    elif leg.get("builder_eligible") is True and in_builder_horizon:
         status = "PASS_EXISTING_BUILDER_GATES"
     else:
         status = str(leg.get("status") or "REJECTED")
@@ -938,8 +970,9 @@ def _make_audit_record(core: Any, row: dict[str, Any], now: datetime) -> dict[st
         "reassessment_status": market_assessment.get("status") or "EXISTING_EXACT_EVIDENCE_CANDIDATE",
         "candidate_status": status,
         "passed_model_floor": bool(model_floor),
-        "passed_builder_gates": bool(leg.get("builder_eligible")),
-        "in_builder_pool": bool(row.get("market_reassessment") or row.get("sport") == "virtual"),
+        "passed_builder_gates": bool(leg.get("builder_eligible") and in_builder_horizon),
+        "in_builder_pool": bool(in_builder_horizon and (row.get("market_reassessment") or row.get("sport") == "virtual")),
+        "alternative_only": bool(in_alternative_horizon and not in_builder_horizon),
         "evidence_source": row.get("evidence_source"),
         "evidence_sample_n": row.get("evidence_sample_n"),
         "paper_only": True,
@@ -1260,7 +1293,10 @@ def install(core: Any) -> None:
         rows = active_rows if isinstance(active_rows, list) else core.load(core.PREDICTIONS, [])
         options, audit = _football_options(core, now, rows if isinstance(rows, list) else [])
         _record_options(audit)
-        return _dedupe_candidates((base if isinstance(base, list) else []) + options)
+        # Expanded horizon feeds the alternative preview only; leave the native
+        # accumulator Builder input inside its original 12-hour window.
+        builder_options = _builder_horizon_candidates(core, options, now)
+        return _dedupe_candidates((base if isinstance(base, list) else []) + builder_options)
 
     def reassessed_tennis_candidates(now):
         base = _ORIGINALS["tennis_candidates"](now)
@@ -1268,7 +1304,7 @@ def install(core: Any) -> None:
         rows = active_rows if isinstance(active_rows, list) else core.load(core.PREDICTIONS, [])
         result, audit = _tennis_options(core, now, rows if isinstance(rows, list) else [], base if isinstance(base, list) else [])
         _record_options(audit)
-        return result
+        return _builder_horizon_candidates(core, result, now)
 
     def exact_market_rows(row):
         rows = row.get("reassessment_market_rows")
