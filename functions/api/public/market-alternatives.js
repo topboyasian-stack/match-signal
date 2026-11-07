@@ -20,7 +20,7 @@ function timestamp(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function publicAlternative(row) {
+export function publicAlternative(row) {
   const sourceSport = String(row.sport || "").toLowerCase();
   const product = String(row.product || "").toLowerCase();
   const sport = sourceSport === "virtual" && ["efootball_gt", "efootball_adriatic"].includes(product) ? "efootball" : sourceSport;
@@ -59,6 +59,55 @@ function publicAlternative(row) {
   };
 }
 
+function repeatsPrimaryPick(source, item) {
+  // A system alternative must not merely echo the primary winner selection.
+  // Other markets (especially totals) remain eligible to compete on the same fixture.
+  const originalPick = String(source.original_pick || "").toLowerCase();
+  return item.market === "winner" && originalPick && originalPick === item.pick;
+}
+
+export function buildPublicAlternatives(document, nowMs = Date.now()) {
+  const grouped = new Map();
+  for (const row of document.records) {
+    // Alternatives are evaluated beside the primary prediction. They do not
+    // need to pass the accumulator/Builder promotion gate first. Exact event,
+    // market and outcome IDs, a fresh quote, and the alternative probability
+    // floor still apply below.
+    if (!row || row.fresh_exact_quote !== true ||
+        row.prediction_role !== "ALTERNATIVE" || row.alternative_source !== "SYSTEM_RECOMMENDED") continue;
+    const start = timestamp(row.start_time);
+    const quote = timestamp(row.quote_timestamp);
+    if (start === null || start <= nowMs + 120000 || quote === null) continue;
+    const age = (nowMs - quote) / 1000;
+    if (age < 0 || age > MAX_QUOTE_AGE_SECONDS) continue;
+    const item = publicAlternative(row);
+    if (!item || repeatsPrimaryPick(row, item)) continue;
+    const key = item.sport + "|" + item.event_id;
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key).push(item);
+  }
+
+  const alternatives = [];
+  for (const rows of grouped.values()) {
+    rows.sort((a, b) => b.probability - a.probability || b.odds - a.odds);
+    // Show at most two distinct market/line options per fixture.
+    const selected = [];
+    for (const row of rows) {
+      if (selected.some(x => x.market === row.market && x.line === row.line)) continue;
+      selected.push(row);
+      if (selected.length === 2) break;
+    }
+    alternatives.push(...selected);
+  }
+  return {
+    status: "OK",
+    generated_at: document.updated_at || document.generated_at || null,
+    min_probability: MIN_RECOMMENDED_PROBABILITY,
+    max_per_fixture: 2,
+    alternatives
+  };
+}
+
 export async function onRequestGet({ request, env }) {
   if (request.method !== "GET") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
   try {
@@ -68,36 +117,7 @@ export async function onRequestGet({ request, env }) {
     if (!document || document.record_type !== "cross_sport_market_reassessment" || !Array.isArray(document.records)) {
       return json({ error: "EVIDENCE_UNAVAILABLE" }, 503);
     }
-    const now = Date.now();
-    const grouped = new Map();
-    for (const row of document.records) {
-      if (!row || row.passed_builder_gates !== true || row.fresh_exact_quote !== true ||
-          row.prediction_role !== "ALTERNATIVE" || row.alternative_source !== "SYSTEM_RECOMMENDED") continue;
-      const start = timestamp(row.start_time);
-      const quote = timestamp(row.quote_timestamp);
-      if (start === null || start <= now + 120000 || quote === null) continue;
-      const age = (now - quote) / 1000;
-      if (age < 0 || age > MAX_QUOTE_AGE_SECONDS) continue;
-      const item = publicAlternative(row);
-      if (!item) continue;
-      const key = item.sport + "|" + item.event_id;
-      if (!grouped.has(key)) grouped.set(key, []);
-      grouped.get(key).push(item);
-    }
-    const alternatives = [];
-    for (const rows of grouped.values()) {
-      rows.sort((a, b) => b.probability - a.probability || b.odds - a.odds);
-      // One or two only: a second option must be a genuinely distinct market/pick.
-      const selected = [];
-      for (const row of rows) {
-        if (selected.some(x => x.market === row.market && x.line === row.line)) continue;
-        selected.push(row);
-        if (selected.length === 2) break;
-      }
-      alternatives.push(...selected);
-    }
-    return json({ status: "OK", generated_at: document.updated_at || document.generated_at || null,
-      min_probability: MIN_RECOMMENDED_PROBABILITY, max_per_fixture: 2, alternatives });
+    return json(buildPublicAlternatives(document));
   } catch {
     return json({ error: "PUBLIC_ALTERNATIVES_UNAVAILABLE" }, 503);
   }
