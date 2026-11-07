@@ -231,7 +231,8 @@
     const input = type === "select" ? document.createElement("select") : document.createElement("input");
     if (type !== "select") input.type = type;
     if (type === "select") {
-      [["over", "Over"], ["under", "Under"]].forEach(function(item) {
+      const choices = options && Array.isArray(options.choices) ? options.choices : [["over", "Over"], ["under", "Under"]];
+      choices.forEach(function(item) {
         const option = document.createElement("option");
         option.value = item[0];
         option.textContent = item[1];
@@ -239,7 +240,11 @@
       });
     }
     input.value = value == null ? "" : String(value);
-    if (options) Object.keys(options).forEach(function(key) { input.setAttribute(key, options[key]); });
+    if (options) Object.keys(options).forEach(function(key) {
+      if (key === "choices" || key === "field") return;
+      input.setAttribute(key, options[key]);
+    });
+    if (options && options.field) input.dataset.field = options.field;
     const id = "deskField_" + Math.random().toString(36).slice(2, 10);
     input.id = id;
     label.htmlFor = id;
@@ -252,6 +257,7 @@
     root.replaceChildren();
     (ticket.legs || []).forEach(function(leg, index) {
       const snapshot = leg.desk_snapshot || {};
+      const actual = leg.actual_selection || {};
       const card = document.createElement("div");
       card.className = "leg-editor";
       card.setAttribute("data-leg-index", String(index));
@@ -260,17 +266,33 @@
       title.textContent = "Leg " + (index + 1) + " · " + String(leg.match || "Match to verify");
       const sub = document.createElement("p");
       sub.className = "small";
-      sub.textContent = "Actual slip pick: " + String(leg.actual_selection && leg.actual_selection.pick || "unknown").toUpperCase() +
-        " " + String(leg.actual_selection && leg.actual_selection.line != null ? leg.actual_selection.line : "line missing") +
-        " @ " + String(leg.actual_selection && leg.actual_selection.odds != null ? leg.actual_selection.odds : "odds missing");
+      sub.textContent = "Played selection: " + String(actual.market || "market unknown") + " · " +
+        String(actual.pick || "side unknown").toUpperCase() +
+        (actual.line != null ? " " + actual.line : "") +
+        (actual.odds != null ? " @ " + actual.odds : " · odds not captured") +
+        " · original qualification: " + String(leg.qualification_state || "UNKNOWN");
       const fields = document.createElement("div");
       fields.className = "desk-grid";
-      addDeskField(fields, "Desk side", "select", snapshot.pick || "over");
-      addDeskField(fields, "Desk goal line", "number", snapshot.line, { min: "0", step: "0.5", placeholder: "e.g. 2.5" });
-      addDeskField(fields, "Desk odds (optional)", "number", snapshot.odds, { min: "1.001", step: "0.01", placeholder: "e.g. 1.70" });
-      addDeskField(fields, "Desk model probability (optional)", "number", snapshot.model_probability, { min: "0", max: "1", step: "0.001", placeholder: "e.g. 0.83" });
-      addDeskField(fields, "Kickoff time (if known)", "datetime-local", toLocalDateTime(leg.kickoff_at), {});
-      addDeskField(fields, "When you saw this desk pick", "datetime-local", toLocalDateTime(snapshot.captured_at), {});
+      addDeskField(fields, "This leg's result", "select", leg.leg_outcome || "AUTO_FROM_SCORE", {
+        field: "leg_outcome",
+        choices: [["AUTO_FROM_SCORE", "Use final score if complete"], ["PENDING", "Pending / not confirmed"], ["WON", "Won"], ["LOST", "Lost"], ["PUSH", "Push"], ["VOID", "Void"]]
+      });
+      addDeskField(fields, "Qualification when selected", "select", leg.qualification_state || "UNKNOWN", {
+        field: "qualification_state",
+        choices: [["UNKNOWN", "Unknown / not captured"], ["QUALIFIED", "Qualified"], ["NOT_QUALIFIED", "Not qualified"]]
+      });
+      addDeskField(fields, "When qualification was observed", "datetime-local", toLocalDateTime(leg.qualification_captured_at), { field: "qualification_captured_at" });
+      addDeskField(fields, "Original Desk market (optional)", "select", snapshot.market || actual.market || "total_goals_over_under", {
+        field: "desk_market",
+        choices: [["total_goals_over_under", "Football/eFootball total goals"], ["total_games_over_under", "Tennis total games"], ["match_winner", "Match winner"], ["basketball_total_points", "Basketball total points"], ["other", "Other / unclear market"]]
+      });
+      const pickChoices = [["over", "Over"], ["under", "Under"], ["p1", "Participant 1"], ["p2", "Participant 2"], ["draw", "Draw"], ["other", "Other / unclear"]];
+      addDeskField(fields, "Original Desk side (optional)", "select", snapshot.pick || ((actual.market === "match_winner") ? "p1" : "over"), { field: "desk_pick", choices: pickChoices });
+      addDeskField(fields, "Original Desk line (totals only)", "number", snapshot.line, { field: "desk_line", min: "0", step: "0.5", placeholder: "e.g. 18.5 games or 2.5 goals" });
+      addDeskField(fields, "Original Desk odds (optional)", "number", snapshot.odds, { field: "desk_odds", min: "1.001", step: "0.01", placeholder: "e.g. 1.70" });
+      addDeskField(fields, "Desk model probability (optional)", "number", snapshot.model_probability, { field: "desk_probability", min: "0", max: "1", step: "0.001", placeholder: "e.g. 0.83" });
+      addDeskField(fields, "Kickoff time (if known)", "datetime-local", toLocalDateTime(leg.kickoff_at), { field: "kickoff_at" });
+      addDeskField(fields, "When you saw the original Desk selection", "datetime-local", toLocalDateTime(snapshot.captured_at), { field: "desk_captured_at" });
       card.append(title, sub, fields);
       root.appendChild(card);
     });
@@ -278,34 +300,61 @@
   function applyDeskFields(ticket) {
     const cards = $("draftFields").querySelectorAll("[data-leg-index]");
     cards.forEach(function(card) {
-      const fields = card.querySelectorAll("input,select");
-      const pick = fields[0] ? fields[0].value : "";
-      const lineText = fields[1] ? fields[1].value.trim() : "";
-      const oddsText = fields[2] ? fields[2].value.trim() : "";
-      const probabilityText = fields[3] ? fields[3].value.trim() : "";
-      const kickoffText = fields[4] ? fields[4].value : "";
-      const capturedText = fields[5] ? fields[5].value : "";
+      const field = function(name) { return card.querySelector('[data-field="' + name + '"]'); };
+      const value = function(name) { const control = field(name); return control ? control.value.trim() : ""; };
       const index = Number(card.getAttribute("data-leg-index"));
       const leg = ticket.legs[index];
       if (!leg) return;
+
+      const outcome = value("leg_outcome");
+      if (outcome === "AUTO_FROM_SCORE" || !outcome) {
+        delete leg.leg_outcome;
+        delete leg.leg_outcome_source;
+        delete leg.leg_outcome_captured_at;
+      } else {
+        leg.leg_outcome = outcome;
+        leg.leg_outcome_source = "user_reported";
+        leg.leg_outcome_captured_at = new Date().toISOString();
+      }
+
+      const qualification = value("qualification_state") || "UNKNOWN";
+      leg.qualification_state = ["QUALIFIED", "NOT_QUALIFIED", "UNKNOWN"].includes(qualification) ? qualification : "UNKNOWN";
+      const qualificationTime = value("qualification_captured_at");
+      if (qualificationTime) leg.qualification_captured_at = new Date(qualificationTime).toISOString();
+      else delete leg.qualification_captured_at;
+
+      const kickoffText = value("kickoff_at");
       if (kickoffText) leg.kickoff_at = new Date(kickoffText).toISOString();
       else delete leg.kickoff_at;
-      if (!lineText) {
+
+      const market = value("desk_market");
+      const pick = value("desk_pick");
+      const lineText = value("desk_line");
+      const oddsText = value("desk_odds");
+      const probabilityText = value("desk_probability");
+      const capturedText = value("desk_captured_at");
+      const hasDeskDetails = Boolean(lineText || oddsText || probabilityText || capturedText);
+      if (!hasDeskDetails) {
         delete leg.desk_snapshot;
         return;
       }
-      if (!capturedText) throw new Error("Leg " + (index + 1) + ": enter when you saw the original desk pick, or leave its desk line blank.");
-      const line = Number(lineText);
-      if (!Number.isFinite(line) || line < 0) throw new Error("Leg " + (index + 1) + ": the desk line is invalid.");
-      const snapshot = { market: "total_goals_over_under", pick: pick, line: line, captured_at: new Date(capturedText).toISOString(), provenance: "user_reported" };
+      const totalMarket = ["total_goals_over_under", "total_games_over_under", "basketball_total_points"].includes(market);
+      if (totalMarket && !lineText) throw new Error("Leg " + (index + 1) + ": enter the original Desk total line, or leave the entire Desk snapshot blank.");
+      if (!capturedText) throw new Error("Leg " + (index + 1) + ": enter when you saw the original Desk selection, or leave the Desk snapshot blank.");
+      const snapshot = { market: market, pick: pick, captured_at: new Date(capturedText).toISOString(), provenance: "user_reported" };
+      if (lineText) {
+        const line = Number(lineText);
+        if (!Number.isFinite(line) || line < 0) throw new Error("Leg " + (index + 1) + ": the Desk line is invalid.");
+        snapshot.line = line;
+      }
       if (oddsText) {
         const odds = Number(oddsText);
-        if (!Number.isFinite(odds) || odds <= 1) throw new Error("Leg " + (index + 1) + ": desk odds must be greater than 1.");
+        if (!Number.isFinite(odds) || odds <= 1) throw new Error("Leg " + (index + 1) + ": Desk odds must be greater than 1.");
         snapshot.odds = odds;
       }
       if (probabilityText) {
         const probability = Number(probabilityText);
-        if (!Number.isFinite(probability) || probability < 0 || probability > 1) throw new Error("Leg " + (index + 1) + ": desk model probability must be from 0 to 1.");
+        if (!Number.isFinite(probability) || probability < 0 || probability > 1) throw new Error("Leg " + (index + 1) + ": Desk model probability must be from 0 to 1.");
         snapshot.model_probability = probability;
       }
       leg.desk_snapshot = snapshot;
