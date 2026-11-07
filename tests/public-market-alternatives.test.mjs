@@ -61,6 +61,22 @@ test("at most two distinct market alternatives are returned per fixture", async 
   assert.equal(payload.alternatives.filter(x => x.event_id === "fixture-2").length, 1);
 });
 
+
+test("eFootball virtual_total audit records are published using exact product and ticket identity", async () => {
+  const response = await call([candidate({
+    sport: "virtual", product: "efootball_gt", market: "virtual_total", line: 8.5,
+    pick: "over", sportybet_event_id: "sporty-virtual-77", sportybet_market_id: "18",
+    match: "GT Home vs GT Away"
+  })]);
+  const payload = await response.json();
+  assert.equal(payload.alternatives.length, 1);
+  assert.equal(payload.alternatives[0].sport, "efootball");
+  assert.equal(payload.alternatives[0].market, "total");
+  assert.equal(payload.alternatives[0].market_id, "18");
+  assert.equal(payload.alternatives[0].sportybet_event_id, "sporty-virtual-77");
+  assert.equal(payload.alternatives[0].product, "efootball_gt");
+});
+
 test("qualified eFootball alternatives retain the exact product and ticket identity", async () => {
   const response = await call([candidate({
     sport: "virtual", product: "efootball_gt", market: "total_ou", line: 8.5,
