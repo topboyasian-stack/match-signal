@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { onRequestGet, onRequestPut, onRequestDelete } from "../functions/api/analyst/records.js";
+import { buildPublicAlternatives } from "../functions/api/public/market-alternatives.js";
 
 const token = "analyst-test-token-" + "a".repeat(48);
 const origin = "https://match-signal.test";
@@ -23,6 +24,69 @@ function context(method, body, headers, store) {
   };
 }
 async function payload(response) { return await response.json(); }
+
+const alternativesNow = Date.parse("2026-11-07T12:00:00.000Z");
+function alternativeRecord(overrides = {}) {
+  return {
+    sport: "football",
+    market: "total_goals",
+    pick: "under",
+    line: 3.5,
+    event_id: "fixture-alt-1",
+    sportybet_event_id: "sporty-event-1",
+    sportybet_market_id: "18",
+    start_time: new Date(alternativesNow + 3 * 60 * 60 * 1000).toISOString(),
+    match: "Home FC vs Away FC",
+    model_probability: 0.83,
+    bookmaker_odds: 1.42,
+    quote_timestamp: new Date(alternativesNow - 30 * 1000).toISOString(),
+    fresh_exact_quote: true,
+    passed_builder_gates: false,
+    prediction_role: "ALTERNATIVE",
+    alternative_source: "SYSTEM_RECOMMENDED",
+    original_pick: "p1",
+    ...overrides
+  };
+}
+
+const independentAlternatives = buildPublicAlternatives({
+  record_type: "cross_sport_market_reassessment",
+  generated_at: new Date(alternativesNow).toISOString(),
+  records: [
+    // The primary winner pick must not be repeated as an "alternative".
+    alternativeRecord({
+      market: "1X2", pick: "p1", line: null, sportybet_market_id: "1",
+      model_probability: 0.91, bookmaker_odds: 1.45, original_pick: "p1"
+    }),
+    alternativeRecord({ pick: "under", line: 3.5, model_probability: 0.83 }),
+    // Different line on the same event: retained as a separate viable option.
+    alternativeRecord({ pick: "over", line: 2.5, model_probability: 0.78, bookmaker_odds: 1.88 }),
+    // Exact same market/line should not displace the two distinct best options.
+    alternativeRecord({ pick: "over", line: 3.5, model_probability: 0.82, bookmaker_odds: 1.75 }),
+    // Never publish a stale quote, a fixture about to start, or a sub-floor probability.
+    alternativeRecord({
+      event_id: "stale-fixture",
+      quote_timestamp: new Date(alternativesNow - 901 * 1000).toISOString()
+    }),
+    alternativeRecord({
+      event_id: "started-fixture",
+      start_time: new Date(alternativesNow + 60 * 1000).toISOString()
+    }),
+    alternativeRecord({ event_id: "low-probability", model_probability: 0.64 })
+  ]
+}, alternativesNow);
+
+assert.equal(independentAlternatives.status, "OK");
+assert.equal(independentAlternatives.alternatives.length, 2);
+assert.deepEqual(
+  independentAlternatives.alternatives.map(row => [row.pick, row.line]),
+  [["under", 3.5], ["over", 2.5]],
+  "model-scored alternatives should appear without passing the accumulator gate, while exact duplicate, stale, started, and low-probability rows stay out"
+);
+assert.ok(
+  independentAlternatives.alternatives.every(row => row.event_id === "fixture-alt-1"),
+  "only valid upcoming alternatives should be public"
+);
 function documentWithTicket() {
   return {
     schema_version: 1,
