@@ -363,8 +363,7 @@ function summarizeUserSelectionCohorts(document) {
     };
   }
 
-  const recentTickets = [...tickets].sort((a, b) => String(b.captured_at || "").localeCompare(String(a.captured_at || ""))).slice(0, 12);
-  const alternativeWinningTickets = recentTickets.filter(ticket =>
+  const alternativeWinningTickets = [...tickets].sort((a, b) => String(b.captured_at || "").localeCompare(String(a.captured_at || ""))).filter(ticket =>
     String(ticket.reported_ticket_outcome || "").toUpperCase() === "WON" &&
     (ticket.legs || []).some(leg => analyzeLeg(leg).qualification_state === "NOT_QUALIFIED")
   ).map(ticket => ({
