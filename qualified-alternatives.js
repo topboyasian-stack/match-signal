@@ -3,7 +3,7 @@ const endpoint='/api/public/market-alternatives',escapeHtml=v=>String(v??'').rep
 let rows=[],busy=false;
 function key(s,e){return String(s||'').toLowerCase()+'|'+String(e||'');}
 function button(x){const total=x.market==='total',pick=String(x.pick||'').toLowerCase(),line=x.line;
-return '<div class="ms-alt-option"><div class="ms-alt-copy"><b>'+escapeHtml(total?(pick.toUpperCase()+' '+line):pick==='p1'?x.player_1:pick==='p2'?x.player_2:'Draw')+'</b><span>'+escapeHtml(x.market_label)+' · '+Math.round(x.probability*100)+'% model probability · '+Number(x.odds).toFixed(2)+' odds</span></div><button type="button" data-ms-ticket-add data-ticket-sport="'+escapeHtml(x.sport)+'" data-ticket-event="'+escapeHtml(x.event_id)+'" data-ticket-sportybet-event="'+escapeHtml(x.sportybet_event_id)+'" '+(x.sport==='efootball'?'data-ticket-product="'+escapeHtml(x.product)+'" ':'')+'data-ticket-model-qualified="true" data-ticket-market="'+escapeHtml(x.market)+'" data-ticket-pick="'+escapeHtml(pick)+'" data-ticket-line="'+(line==null?'':escapeHtml(line))+'" data-ticket-market-id="'+escapeHtml(x.market_id)+'" data-ticket-odds="'+escapeHtml(x.odds)+'" data-ticket-start="'+escapeHtml(x.start_time)+'" data-ticket-player1="'+escapeHtml(x.player_1)+'" data-ticket-player2="'+escapeHtml(x.player_2)+'" data-ticket-match="'+escapeHtml(x.match||x.player_1+' vs '+x.player_2)+'">Add to ticket</button></div>';}
+return '<div class="ms-alt-option"><div class="ms-alt-copy"><b>'+escapeHtml(total?(pick.toUpperCase()+' '+line):pick==='p1'?x.player_1:pick==='p2'?x.player_2:'Draw')+'</b><span>'+escapeHtml(x.market_label)+' · '+Math.round(x.probability*100)+'% model probability · '+Number(x.odds).toFixed(2)+' odds · '+(x.builder_qualified?'Builder-qualified':'Research only — Builder gate not passed')+'</span></div><button type="button" data-ms-ticket-add data-ticket-sport="'+escapeHtml(x.sport)+'" data-ticket-event="'+escapeHtml(x.event_id)+'" data-ticket-sportybet-event="'+escapeHtml(x.sportybet_event_id)+'" '+(x.sport==='efootball'?'data-ticket-product="'+escapeHtml(x.product)+'" ':'')+'data-ticket-model-qualified="'+String(x.builder_qualified===true)+'" data-ticket-market="'+escapeHtml(x.market)+'" data-ticket-pick="'+escapeHtml(pick)+'" data-ticket-line="'+(line==null?'':escapeHtml(line))+'" data-ticket-market-id="'+escapeHtml(x.market_id)+'" data-ticket-odds="'+escapeHtml(x.odds)+'" data-ticket-start="'+escapeHtml(x.start_time)+'" data-ticket-player1="'+escapeHtml(x.player_1)+'" data-ticket-player2="'+escapeHtml(x.player_2)+'" data-ticket-match="'+escapeHtml(x.match||x.player_1+' vs '+x.player_2)+'">Add to ticket</button></div>';}
 function attach(){
  const cards=document.querySelectorAll('[data-ms-fixture-id]');
  cards.forEach(card=>{
@@ -11,11 +11,11 @@ function attach(){
   let host=card.querySelector('.ms-qualified-alternatives');
   const found=rows.filter(x=>x.event_id===event&&x.sport===sport).slice(0,2);
   if(!found.length){if(host)host.remove();return;}
-  const signature=JSON.stringify(found.map(x=>[x.market,x.pick,x.line,x.probability,x.odds,x.quote_timestamp]));
+  const signature=JSON.stringify(found.map(x=>[x.market,x.pick,x.line,x.probability,x.odds,x.quote_timestamp,x.builder_qualified]));
   if(host&&host.dataset.signature===signature)return;
   if(!host){host=document.createElement('section');host.className='ms-qualified-alternatives';card.appendChild(host);}
   host.dataset.signature=signature;
-  host.innerHTML='<div class="ms-alt-heading"><b>Best qualified alternative'+(found.length>1?'s':'')+'</b><span>Fresh SportyBet quote · ≤15 min</span></div>'+found.map(button).join('');
+  host.innerHTML='<div class="ms-alt-heading"><b>System-recommended alternative'+(found.length>1?'s':'')+'</b><span>Fresh exact SportyBet quote · ≤15 min; qualification shown per pick</span></div>'+found.map(button).join('');
  });
 }
 async function load(){if(busy)return;busy=true;try{const response=await fetch(endpoint,{cache:'no-store'});if(!response.ok)throw Error('HTTP '+response.status);const payload=await response.json();rows=Array.isArray(payload.alternatives)?payload.alternatives:[];attach();}catch(error){/* Fail closed: no alternatives are displayed when evidence cannot be verified. */}finally{busy=false;}}
