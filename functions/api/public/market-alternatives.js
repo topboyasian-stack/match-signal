@@ -77,7 +77,7 @@ export function buildPublicAlternatives(document, nowMs = Date.now()) {
         row.prediction_role !== "ALTERNATIVE" || row.alternative_source !== "SYSTEM_RECOMMENDED") continue;
     // If Builder rejected this row, it must still be explicitly linked to the
     // primary pick for the same fixture; an unlinked row is not an alternative.
-    if (row.passed_builder_gates !== true && !String(row.original_pick || "").trim()) continue;
+    if (row.passed_builder_gates !== true && !String(row.original_pick || row.primary_prediction_id || "").trim()) continue;
     const start = timestamp(row.start_time);
     const quote = timestamp(row.quote_timestamp);
     if (start === null || start <= nowMs + 120000 || quote === null) continue;

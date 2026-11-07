@@ -87,6 +87,29 @@ assert.ok(
   independentAlternatives.alternatives.every(row => row.event_id === "fixture-alt-1"),
   "only valid upcoming alternatives should be public"
 );
+
+const primaryIdLinked = buildPublicAlternatives({
+  record_type: "cross_sport_market_reassessment",
+  generated_at: new Date(alternativesNow).toISOString(),
+  records: [
+    alternativeRecord({
+      event_id: "football-alt-with-primary-id",
+      market: "1X2",
+      pick: "p2",
+      line: null,
+      sportybet_market_id: "1",
+      original_pick: "",
+      primary_prediction_id: "primary-football-fixture-id",
+      model_probability: 0.71,
+      passed_builder_gates: false
+    })
+  ]
+}, alternativesNow);
+assert.equal(
+  primaryIdLinked.alternatives.length,
+  1,
+  "a market alternative linked to the primary prediction ID must appear even when original_pick is absent and the accumulator gate failed"
+);
 function documentWithTicket() {
   return {
     schema_version: 1,
