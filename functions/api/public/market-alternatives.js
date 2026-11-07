@@ -1,7 +1,7 @@
 const EVIDENCE_KEY = "private-cross-sport-market-reassessment-v1";
 const MAX_QUOTE_AGE_SECONDS = 900;
 const MIN_RECOMMENDED_PROBABILITY = 0.65;
-const SUPPORTED_MARKETS = new Set(["1X2", "winner", "total_goals", "total_games", "total_ou"]);
+const SUPPORTED_MARKETS = new Set(["1X2", "winner", "total_goals", "total_games", "total_ou", "virtual_total"]);
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -25,7 +25,7 @@ function publicAlternative(row) {
   const sport = sourceSport === "virtual" && ["efootball_gt", "efootball_adriatic"].includes(product) ? "efootball" : sourceSport;
   const market = String(row.market || "");
   const pick = String(row.pick || "").toLowerCase();
-  const total = ["total_goals", "total_games", "total_ou"].includes(market);
+  const total = ["total_goals", "total_games", "total_ou", "virtual_total"].includes(market);
   if (!["football", "tennis", "basketball", "efootball"].includes(sport) || !SUPPORTED_MARKETS.has(market)) return null;
   if (sport === "efootball" && (!["efootball_gt", "efootball_adriatic"].includes(product) || !total)) return null;
   if (total && !["over", "under"].includes(pick)) return null;
