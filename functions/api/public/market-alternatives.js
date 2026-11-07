@@ -41,8 +41,8 @@ function publicAlternative(row) {
   if (total && (!Number.isFinite(line) || line <= 0)) return null;
   return {
     sport, event_id: eventId, sportybet_event_id: sportybetEventId,
-    start_time: startTime, player_1: String(row.player_1 || row.home_team || ""),
-    player_2: String(row.player_2 || row.away_team || ""),
+    start_time: startTime, player_1: String(row.player_1 || row.home_team || row.match || "").split(/\\s+vs\\s+/i)[0].trim(),
+    player_2: String(row.player_2 || row.away_team || row.match || "").split(/\\s+vs\\s+/i)[1]?.trim() || "",
     match: String(row.match || ""), market: total ? "total" : "winner",
     market_label: total ? (market === "total_games" ? "Total games" : "Total goals") : "Winner",
     pick, line, market_id: marketId, odds,
