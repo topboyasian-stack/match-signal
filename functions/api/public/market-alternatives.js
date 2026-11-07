@@ -1,3 +1,4 @@
+// Production promotion: keep this endpoint on the guarded Cloudflare Pages deploy path.
 const EVIDENCE_KEY = "private-cross-sport-market-reassessment-v1";
 const MAX_QUOTE_AGE_SECONDS = 900;
 const MIN_RECOMMENDED_PROBABILITY = 0.65;
