@@ -970,11 +970,11 @@ jobs:
               sports:[...new Set(rows.map(x=>String(x.sport)))].sort(),
               sample:rows.slice(0,5).map(x=>({sport:x.sport,product:x.product||null,event_id:x.event_id,match:x.match,market:x.market,pick:x.pick,line:x.line,odds:x.odds,probability:x.probability,start_time:x.start_time}))
             };
-            writeFileSync('QUALIFIED-ALTERNATIVES-PRODUCTION-CHECK.json',JSON.stringify(qualifiedAlternativesCheck,null,2)+'\\n');
+            writeFileSync('QUALIFIED-ALTERNATIVES-PRODUCTION-CHECK.json',JSON.stringify(qualifiedAlternativesCheck,null,2)+'\n');
             console.log('Public qualified alternatives endpoint passed: '+rows.length+' selectable candidate(s) across '+qualifiedAlternativesCheck.unique_fixture_count+' fixture(s); status '+qualifiedAlternativesCheck.status+'.');
           } catch(e) {
             qualifiedAlternativesCheck = {verified_at:new Date().toISOString(),endpoint:'/api/public/market-alternatives',status:'ERROR',alternative_count:0,unique_fixture_count:0,sports:[],error:String(e.message||e)};
-            writeFileSync('QUALIFIED-ALTERNATIVES-PRODUCTION-CHECK.json',JSON.stringify(qualifiedAlternativesCheck,null,2)+'\\n');
+            writeFileSync('QUALIFIED-ALTERNATIVES-PRODUCTION-CHECK.json',JSON.stringify(qualifiedAlternativesCheck,null,2)+'\n');
             failures.push('/api/public/market-alternatives '+qualifiedAlternativesCheck.error);
           }
 
@@ -1357,6 +1357,12 @@ jobs:
           alternatives_ready = alternatives.get('status') == 'READY' and int(alternatives.get('alternative_count') or 0) > 0
           alternatives_valid_zero = alternatives.get('status') == 'VALID_ZERO'
           alternative_status = 'READY' if alternatives_ready else 'VALID_ZERO' if alternatives_valid_zero else str(alternatives.get('status') or 'NOT_RECORDED')
+          if alternatives_ready:
+              checks.append('qualified_alternatives_live')
+          elif alternatives_valid_zero:
+              checks.append('qualified_alternatives_valid_zero')
+          else:
+              checks.append('qualified_alternatives_not_verified')
           # Deployment can be healthy with zero picks, but the requested selectable-alternative
           # outcome is not complete until the live feed contains at least one approved row.
           verification_complete = (coverage_complete or valid_zero_coverage) and booking_verified and alternatives_ready
