@@ -171,6 +171,16 @@ class UserTicketReviewTests(unittest.TestCase):
         leg["desk_snapshot"]["captured_at"] = "2026-10-09T10:45:00Z"
         self.assertEqual(analyze_leg(leg)["desk_snapshot_timing"], "captured_after_kickoff")
 
+    def test_timestamped_match_observations_validate_and_reject_out_of_order_rows(self):
+        leg = make_leg()
+        leg["match_observations"] = [
+            {"observed_at": "2026-10-09T10:05:00Z", "phase": "IN_PLAY", "home": 0, "away": 0, "source": "user_reported"},
+            {"observed_at": "2026-10-09T10:45:00Z", "phase": "HALF_TIME", "home": 0, "away": 0, "source": "user_reported"},
+        ]
+        self.assertEqual(validate_document(make_document(leg)), [])
+        leg["match_observations"].reverse()
+        self.assertTrue(any("strictly increasing" in error for error in validate_document(make_document(leg))))
+
     def test_user_reported_provenance_is_validated(self):
         document = make_document(make_leg())
         document["tickets"][0]["legs"][0]["desk_snapshot"]["provenance"] = "captured_live"
