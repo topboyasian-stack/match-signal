@@ -68,11 +68,11 @@
         <h2>Capture an actual ticket</h2>
         <p class="sub">Paste copied slip text, not a screenshot. AI extracts a draft for review. Nothing is saved until you inspect and choose Save.</p>
         <div class="notice">Never paste your SportyBet password, account credentials, payment details, or verification codes. Excluding sensitive information before pasting is safer than relying on automatic redaction.</div>
-        <div class="field" style="margin-top:14px"><label for="receiptText">Copied ticket text</label><textarea id="receiptText" maxlength="20000" placeholder="Paste stake, odds, each match, selected Over/Under line, price, and final score if settled."></textarea></div>
+        <div class="field" style="margin-top:14px"><label for="receiptText">Copied ticket text</label><textarea id="receiptText" maxlength="20000" placeholder="Paste the full ticket or receipt: every match, market, selected side/line, decimal odds, and any final leg scores/results shown. Live legs should remain pending."></textarea></div>
         <div class="actions"><button id="parseButton" class="primary" type="button">Parse for review</button><span id="parseStatus" class="small" role="status"></span></div>
         <div id="draftSection" class="hidden">
-          <div class="divider"></div><h3>Original Prediction Desk snapshot</h3>
-          <p class="small">For each leg, enter the exact side/line the Desk displayed and when you saw it. Do not guess. A desk snapshot recorded after kickoff is historical context, not time-safe evidence of predictive skill.</p>
+          <div class="divider"></div><h3>Per-leg result and original Desk snapshot</h3>
+          <p class="small">Review each leg independently of the accumulator result. Confirm WON/LOST/PUSH/VOID only when known; otherwise use the final-score calculation or leave it pending. Record the qualification label and original Desk selection only if you actually observed them. Never guess. A snapshot recorded after kickoff is not time-safe evidence of predictive skill.</p>
           <div id="draftFields"></div>
           <details style="margin-top:12px"><summary class="small">Advanced ticket JSON (optional)</summary><label for="ticketDraft" style="display:block;margin-top:10px">Review/edit extracted ticket data</label><textarea id="ticketDraft" class="draft-box" rows="14" spellcheck="false"></textarea></details>
           <p id="draftStatus" class="small"></p>
@@ -91,6 +91,6 @@
   <p class="foot">No automated betting, no automatic model-weight changes, and no background AI loop. AI runs only when you ask a question or request parsing. The app limit is 25 AI requests per UTC day; Cloudflare usage limits and pricing still apply.</p>
 </main>
 <script src="./workspace-ui.js?v=20261011-logo-qualified-fix1"></script>
-<script src="./analyst.js?v=20261011-redesign2"></script>
+<script src="./analyst.js?v=20261107-mixed-leg-learning1"></script>
 </body>
 </html>
