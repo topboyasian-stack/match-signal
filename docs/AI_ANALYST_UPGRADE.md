@@ -82,7 +82,7 @@ User-selected legs are selection-biased evidence. Track them as a distinct cohor
 
 ### Current draft implementation
 
-The draft branch now contains a private token-protected KV ledger, an on-demand Workers AI analyst endpoint, a receipt parser that requires manual review before saving, and an analyst page with explicit desk snapshot capture. AI and KV bindings are intentionally required at runtime. Manual desk lines carry user_reported provenance, and the backend reports when kickoff is missing or the claimed snapshot timestamp is after kickoff. Nothing is active on production until configuration and endpoint/UX checks are completed.
+The private analyst includes a token-protected KV ledger, an on-demand Workers AI endpoint, and a receipt parser that creates a reviewed draft before saving. The mixed-market extension adds separate leg outcomes and qualification labels, supports tennis final set scores and match-winner selections, and keeps all records private. Manual desk snapshots retain user_reported provenance; claimed pre-kickoff timestamps remain unverified. Production availability still depends on merging the reviewed change and verifying deployment.
 
 ## Acceptance criteria before production rollout
 
