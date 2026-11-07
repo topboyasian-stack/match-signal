@@ -300,11 +300,10 @@ export async function collectEvents({
           found.set(normalized.eventId, normalized);
           if (targetIds.has(normalized.eventId)) matchedTargets.add(normalized.eventId);
           fixtureTargets.forEach((leg, index) => {
-            const expectedIds = [
-              String(leg?.sportybet_event_id || ''),
-              String(leg?.event_id || '')
-            ].filter(Boolean);
-            if (expectedIds.includes(normalized.eventId) || targetFixtureMatches(leg, normalized)) {
+            // A stale provider ID can still exist in the catalogue but point to a
+            // different event. It must not satisfy a manual target or stop paging
+            // before the real participant/kickoff/market match is found.
+            if (targetFixtureMatches(leg, normalized)) {
               matchedFixtureTargets.add(index);
             }
           });
