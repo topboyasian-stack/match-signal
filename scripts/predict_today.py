@@ -340,10 +340,16 @@ def _name_similarity(left, right):
 
 
 def _pair_match_score(pred, event):
-    p1 = pred.get("player_1") or ""
-    p2 = pred.get("player_2") or ""
-    e1 = event.get("home") or ""
-    e2 = event.get("away") or ""
+    p1_raw = pred.get("player_1") or ""
+    p2_raw = pred.get("player_2") or ""
+    e1_raw = event.get("home") or ""
+    e2_raw = event.get("away") or ""
+    # Score the same narrow senior club aliases used by the strict identity
+    # check; otherwise the candidate passes identity but fails the fuzzy rank.
+    p1 = _football_identity_team_label(p1_raw)
+    p2 = _football_identity_team_label(p2_raw)
+    e1 = _football_identity_team_label(e1_raw)
+    e2 = _football_identity_team_label(e2_raw)
     direct = (_name_similarity(p1, e1) + _name_similarity(p2, e2)) / 2
     reverse = (_name_similarity(p1, e2) + _name_similarity(p2, e1)) / 2
     name_score = max(direct, reverse)
