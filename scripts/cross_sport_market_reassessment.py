@@ -1147,7 +1147,7 @@ def _write_reassessment_artifact(core: Any, now: datetime) -> dict[str, Any]:
     history_payload["primary_predictions"] = primary_records
     history_payload["primary_summary"] = primary_summary(primary_records)
     history_payload["generated_at"] = now.isoformat()
-    HISTORY_OUTPUT.write_text(json.dumps(history_payload, indent=2, ensure_ascii=False) + "\\n", encoding="utf-8")
+    HISTORY_OUTPUT.write_text(json.dumps(history_payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
     sport_summary: dict[str, dict[str, int]] = {}
     for row in records:
