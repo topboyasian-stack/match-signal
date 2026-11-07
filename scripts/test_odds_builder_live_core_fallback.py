@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Regression tests for fresh core-sport fallback in the Odds Builder."""
 import runpy
+import sys
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
 ns = runpy.run_path(str(ROOT / "scripts" / "odds_builder_core.py"))
 UTC = timezone.utc
 
