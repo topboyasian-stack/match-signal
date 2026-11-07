@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { nbaTotalsReleaseQualified } from '../functions/api/sportybet-booking.js';
 
 const evidence = JSON.parse(readFileSync(new URL('../data/nba_totals_oos_value_test.json', import.meta.url), 'utf8'));
@@ -32,6 +32,7 @@ const legs = [
   }
 ];
 
+const probeResults = [];
 for (const base of bases) {
   const response = await fetch(base + '/api/sportybet-booking', {
     method: 'POST',
@@ -61,8 +62,17 @@ for (const base of bases) {
     assert.ok(Array.isArray(body.validation) && body.validation.length === 2);
     assert.ok(body.validation.every(item => item.ok === false));
   }
-  console.log('PASS: production NBA manual-ticket fail-closed probe', JSON.stringify({
+  const probe = {
     base, http_status: response.status, error: body.error,
     current_main_release_qualified: locallyQualified, booking_code_withheld: body.booking_code_withheld
-  }));
+  };
+  probeResults.push(probe);
+  console.log('PASS: production NBA manual-ticket fail-closed probe', JSON.stringify(probe));
 }
+writeFileSync('NBA-PRODUCTION-GATE-CHECK.json', JSON.stringify({
+  verified_at: new Date().toISOString(),
+  status: 'PASS',
+  current_main_release_qualified: locallyQualified,
+  current_main_release_decision: evidence.release_decision || 'UNSPECIFIED',
+  probes: probeResults
+}, null, 2) + '\n');
