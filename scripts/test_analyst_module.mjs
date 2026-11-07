@@ -91,7 +91,7 @@ assert.equal(mixedSummary.actual_selection_outcomes.PENDING, 1);
 assert.equal(mixedSummary.outcome_by_qualification_state.NOT_QUALIFIED.WON, 1);
 assert.equal(mixedSummary.outcome_by_qualification_state.NOT_QUALIFIED.LOST, 1);
 assert.equal(mixedSummary.outcome_by_qualification_state.UNKNOWN.PENDING, 1);
-assert.equal(mixedSummary.actual_leg_hit_rate_excluding_pushes, 1 / 3);
+assert.equal(mixedSummary.actual_leg_hit_rate_excluding_pushes, 0.3333);
 assert.ok(mixedSummary.interpretation_guard.includes("independently"));
 
 const missingDesk = makeLeg("over", 1.5, "over", 2.5, 1, 1);
