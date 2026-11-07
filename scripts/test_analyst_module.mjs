@@ -51,6 +51,49 @@ assert.equal(classifyLineAdjustment({ pick: "under", line: 8.5 }, { pick: "under
 assert.equal(classifyLineAdjustment({ pick: "over", line: 2.5 }, { pick: "under", line: 2.5 }), "side_changed");
 assert.equal(evaluatePick("over", 2, { home: 1, away: 1 }), "PUSH");
 assert.equal(evaluatePick("under", 2, { home: 1, away: 1 }), "PUSH");
+assert.equal(classifyLineAdjustment({ market: "total_goals_over_under", pick: "over", line: 2.5 }, { market: "total_games_over_under", pick: "over", line: 18.5 }), "market_changed");
+assert.equal(evaluatePick("over", 18.5, { sets: [{ home: 6, away: 4 }, { home: 6, away: 2 }] }, "total_games_over_under"), "LOST");
+assert.equal(evaluatePick("under", 18.5, { sets: [{ home: 6, away: 4 }, { home: 6, away: 2 }] }, "total_games_over_under"), "WON");
+assert.equal(evaluatePick("p2", null, { sets: [{ home: 6, away: 4 }, { home: 4, away: 6 }, { home: 6, away: 3 }] }, "match_winner"), "LOST");
+
+const mixedTicketDocument = makeDocument({
+  leg_ref: "leg_1", product: "tennis", match: "Wallin vs Sonego",
+  actual_selection: { market: "total_games_over_under", pick: "over", line: 18.5, odds: 1.46 },
+  final_score: { sets: [{ home: 6, away: 4 }, { home: 6, away: 2 }] },
+  qualification_state: "NOT_QUALIFIED"
+});
+mixedTicketDocument.tickets[0].reported_ticket_outcome = "LOST";
+mixedTicketDocument.tickets[0].legs.push({
+  leg_ref: "leg_2", product: "tennis", match: "Shelton vs Van Assche",
+  actual_selection: { market: "match_winner", pick: "p2", odds: 1.27 },
+  final_score: { sets: [{ home: 6, away: 4 }, { home: 4, away: 6 }, { home: 6, away: 3 }] },
+  qualification_state: "QUALIFIED"
+});
+mixedTicketDocument.tickets[0].legs.push({
+  leg_ref: "leg_3", product: "football", match: "Example FC vs Sample FC",
+  actual_selection: { market: "total_goals_over_under", pick: "over", line: 1.5, odds: 1.2 },
+  final_score: { home: 2, away: 1 },
+  qualification_state: "NOT_QUALIFIED"
+});
+mixedTicketDocument.tickets[0].legs.push({
+  leg_ref: "leg_4", product: "tennis", match: "Live match pending",
+  actual_selection: { market: "total_games_over_under", pick: "over", line: 18.5, odds: 1.4 },
+  leg_outcome: "PENDING", leg_outcome_source: "user_reported",
+  qualification_state: "UNKNOWN"
+});
+assert.deepEqual(validateReviewDocument(mixedTicketDocument), [], "mixed-market user tickets and independently tracked leg outcomes must validate");
+const mixedSummary = summarizeReviewDocument(mixedTicketDocument);
+assert.equal(mixedSummary.ticket_count, 1);
+assert.equal(mixedSummary.leg_count, 4);
+assert.equal(mixedSummary.actual_selection_outcomes.WON, 1);
+assert.equal(mixedSummary.actual_selection_outcomes.LOST, 2);
+assert.equal(mixedSummary.actual_selection_outcomes.PENDING, 1);
+assert.equal(mixedSummary.outcome_by_qualification_state.NOT_QUALIFIED.WON, 1);
+assert.equal(mixedSummary.outcome_by_qualification_state.NOT_QUALIFIED.LOST, 1);
+assert.equal(mixedSummary.outcome_by_qualification_state.UNKNOWN.PENDING, 1);
+assert.equal(mixedSummary.actual_leg_hit_rate_excluding_pushes, 0.3333);
+assert.ok(mixedSummary.interpretation_guard.includes("independently"));
+
 const missingDesk = makeLeg("over", 1.5, "over", 2.5, 1, 1);
 delete missingDesk.desk_snapshot;
 assert.equal(analyzeLeg(missingDesk).line_adjustment, "desk_snapshot_missing");

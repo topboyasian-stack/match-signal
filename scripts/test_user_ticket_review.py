@@ -88,6 +88,57 @@ class UserTicketReviewTests(unittest.TestCase):
         self.assertEqual(evaluate_pick("over", 2, {"home": 1, "away": 1}), "PUSH")
         self.assertEqual(evaluate_pick("under", 2, {"home": 1, "away": 1}), "PUSH")
 
+    def test_tennis_total_games_score_uses_all_final_sets(self):
+        score = {"sets": [{"home": 6, "away": 4}, {"home": 6, "away": 2}]}
+        self.assertEqual(evaluate_pick("over", 18.5, score, "total_games_over_under"), "LOST")
+        self.assertEqual(evaluate_pick("under", 18.5, score, "total_games_over_under"), "WON")
+
+    def test_match_winner_uses_set_wins(self):
+        score = {"sets": [{"home": 6, "away": 4}, {"home": 4, "away": 6}, {"home": 6, "away": 3}]}
+        self.assertEqual(evaluate_pick("p1", None, score, "match_winner"), "WON")
+        self.assertEqual(evaluate_pick("p2", None, score, "match_winner"), "LOST")
+
+    def test_mixed_market_legs_are_scored_independently_of_ticket_loss(self):
+        ticket = make_document(make_leg())
+        ticket["tickets"][0]["reported_ticket_outcome"] = "LOST"
+        ticket["tickets"][0]["legs"] = [
+            {
+                "leg_ref": "leg_1", "product": "tennis", "match": "Wallin vs Sonego",
+                "actual_selection": {"market": "total_games_over_under", "pick": "over", "line": 18.5, "odds": 1.46},
+                "final_score": {"sets": [{"home": 6, "away": 4}, {"home": 6, "away": 2}]},
+                "qualification_state": "NOT_QUALIFIED",
+            },
+            {
+                "leg_ref": "leg_2", "product": "tennis", "match": "Shelton vs Van Assche",
+                "actual_selection": {"market": "match_winner", "pick": "p2", "odds": 1.27},
+                "final_score": {"sets": [{"home": 6, "away": 4}, {"home": 4, "away": 6}, {"home": 6, "away": 3}]},
+                "qualification_state": "QUALIFIED",
+            },
+            {
+                "leg_ref": "leg_3", "product": "football", "match": "Example vs Sample",
+                "actual_selection": {"market": "total_goals_over_under", "pick": "over", "line": 1.5, "odds": 1.2},
+                "final_score": {"home": 2, "away": 1},
+                "qualification_state": "NOT_QUALIFIED",
+            },
+            {
+                "leg_ref": "leg_4", "product": "tennis", "match": "Live match pending",
+                "actual_selection": {"market": "total_games_over_under", "pick": "over", "line": 18.5, "odds": 1.4},
+                "leg_outcome": "PENDING", "leg_outcome_source": "user_reported",
+                "qualification_state": "UNKNOWN",
+            },
+        ]
+        self.assertEqual(validate_document(ticket), [])
+        summary = summarize_document(ticket)
+        self.assertEqual(summary["ticket_count"], 1)
+        self.assertEqual(summary["leg_count"], 4)
+        self.assertEqual(summary["actual_selection_outcomes"]["WON"], 1)
+        self.assertEqual(summary["actual_selection_outcomes"]["LOST"], 2)
+        self.assertEqual(summary["actual_selection_outcomes"]["PENDING"], 1)
+        self.assertEqual(summary["outcome_by_qualification_state"]["NOT_QUALIFIED"]["WON"], 1)
+        self.assertEqual(summary["outcome_by_qualification_state"]["NOT_QUALIFIED"]["LOST"], 1)
+        self.assertEqual(summary["outcome_by_qualification_state"]["UNKNOWN"]["PENDING"], 1)
+        self.assertEqual(ticket["tickets"][0]["reported_ticket_outcome"], "LOST")
+
     def test_missing_desk_snapshot_keeps_actual_result(self):
         leg = make_leg()
         leg.pop("desk_snapshot")

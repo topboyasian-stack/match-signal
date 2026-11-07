@@ -22,14 +22,14 @@ These are dated repository artifacts, not fresh guarantees about the live site. 
 
 ## Data boundary: desk snapshot versus actual ticket
 
-Each captured Over/Under leg must preserve two independent facts:
+Each captured ticket leg must preserve independent facts, regardless of the accumulator's result:
 
 1. The original desk snapshot, exactly as it was displayed at decision time: prediction ID if available, product/competition, event identity, kickoff, selected side, exact line, quoted odds, displayed model probability, model version, and snapshot time.
-2. The actual user selection: exact side, line and odds the user placed, plus the result/final score when settled.
+2. The actual user selection: exact market, side/participant, line where applicable, decimal odds, independently confirmed leg result or final score when settled, and the qualification state observed at selection time if known.
 
 A user may lower an Over line (for example, Over 2.5 to Over 1.5), raise an Under line (for example, Under 8.5 to Under 9.5), keep the same line, or change the side. Store the original and selected lines without overwriting either. The reviewer derives whether the user's line was easier or harder for that side.
 
-The same final score can then be used to calculate two distinct outcomes: what happened to the desk selection and what happened to the actual selection. This is a descriptive counterfactual for that fixture, not proof that the user's adjustment has a long-run predictive edge. Only broader, chronological, selection-aware evaluation can establish that.
+A complete match score can calculate a result for markets supported by that score (football goals, tennis total games from final set scores, match winners from final result, and basketball total points). Explicitly confirmed leg outcomes are recorded separately. A losing accumulator never overwrites a leg's individual result. This is a descriptive counterfactual for that fixture, not proof that the user's adjustment has a long-run predictive edge. Only broader, chronological, selection-aware evaluation can establish that.
 
 The first analyst interface allows the user to enter a desk snapshot, records its provenance as user_reported, and compares its claimed capture time with kickoff when known. A user-entered pre-kickoff timestamp is not independently verified. These records can support a transparent personal-selection review, but are not admitted as verified training observations. A future improvement should join an exact match/market to an immutable Match Signal snapshot captured before kickoff when such an archive exists.
 
@@ -47,7 +47,7 @@ The first analyst interface allows the user to enter a desk snapshot, records it
 ### A. Evidence and evaluation (this branch starts here)
 
 - Versioned JSON contract for private user-ticket review records.
-- Standard-library audit utility that validates records and compares exact desk vs actual Over/Under selections from the same final score.
+- Standard-library audit utility that validates records, scores supported mixed-sport markets, and compares an available original Desk snapshot against the user's selection.
 - Automated unit tests for lower/higher line adjustments, pushes, missing desk snapshots, invalid prices, and counterfactual outcome differences.
 - Aggregate-only default output: no fixture names, personal ticket references, or full private slip is emitted.
 
@@ -82,7 +82,7 @@ User-selected legs are selection-biased evidence. Track them as a distinct cohor
 
 ### Current draft implementation
 
-The draft branch now contains a private token-protected KV ledger, an on-demand Workers AI analyst endpoint, a receipt parser that requires manual review before saving, and an analyst page with explicit desk snapshot capture. AI and KV bindings are intentionally required at runtime. Manual desk lines carry user_reported provenance, and the backend reports when kickoff is missing or the claimed snapshot timestamp is after kickoff. Nothing is active on production until configuration and endpoint/UX checks are completed.
+The private analyst includes a token-protected KV ledger, an on-demand Workers AI endpoint, and a receipt parser that creates a reviewed draft before saving. The mixed-market extension adds separate leg outcomes and qualification labels, supports tennis final set scores and match-winner selections, and keeps all records private. Manual desk snapshots retain user_reported provenance; claimed pre-kickoff timestamps remain unverified. Production availability still depends on merging the reviewed change and verifying deployment.
 
 ## Acceptance criteria before production rollout
 
@@ -99,4 +99,4 @@ The draft branch now contains a private token-protected KV ledger, an on-demand 
 
 The first isolated patch added the private-data contract, aggregate-only Python audit utility, tests, and CI. The next commit in this draft branch adds a private KV-backed record API, a token-protected on-demand chat endpoint, an explicit-review ticket parser, a private analyst page, and module tests. These are not available on main or production until reviewed, and the API intentionally returns a setup error until the dedicated KV, Workers AI binding, and secret are configured in Cloudflare.
 
-No predictions, qualification gates, ticket construction, settlement records, engine logic, or model weights are changed. AI calls are user-initiated only, capped at 25 requests per UTC day in the app, and limited to read-only explanations or ticket draft extraction. Parsing never saves automatically. User ticket evidence remains separate from Builder evidence and model training. The PR must stay off main until the code, CI, private-storage configuration, and production behavior are reviewed.
+No public predictions, qualification gates, ticket construction, automated settlement records, engine logic, or model weights are changed. The private user-ticket review schema, parsing, and aggregate evidence analysis are extended. AI calls are user-initiated only, capped at 25 requests per UTC day in the app, and limited to read-only explanations or ticket draft extraction. Parsing never saves automatically. User ticket evidence remains separate from Builder evidence and model training. The PR must stay off main until the code, CI, private-storage configuration, and production behavior are reviewed.
