@@ -50,6 +50,13 @@ class UpcomingDeskPolicyTests(unittest.TestCase):
         self.assertFalse(report["efootball_gt|6.5|under"]["betting_qualified"])
         self.assertEqual(report["efootball_gt|6.5|under"]["qualification_status"], "MODEL_PROBABILITY_BELOW_0_65")
 
+    def test_stale_core_feed_refreshes_even_when_old_rows_are_present(self):
+        stale = ns["core_feed_stale"]
+        self.assertTrue(stale((self.now - timedelta(hours=4, seconds=1)).isoformat(), self.now))
+        self.assertFalse(stale((self.now - timedelta(hours=3, minutes=59)).isoformat(), self.now))
+        self.assertTrue(stale(None, self.now))
+        self.assertTrue(stale("not-a-timestamp", self.now))
+
     def test_timestamp_helper_supports_chronological_walk_forward_filtering(self):
         stamp = "2026-10-09T13:00:00+00:00"
         self.assertEqual(ns["ts"](stamp), datetime(2026, 10, 9, 13, 0, tzinfo=UTC).timestamp())
