@@ -1,6 +1,11 @@
 name: Live Qualified Alternatives Shared Drawer Smoke
 
 on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/test_public_alternatives_drawer.mjs'
+      - '.github/workflows/live-qualified-alternatives-drawer-smoke.yml'
   push:
     branches: [main]
     paths:
