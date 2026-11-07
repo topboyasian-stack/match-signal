@@ -47,7 +47,7 @@ The first analyst interface allows the user to enter a desk snapshot, records it
 ### A. Evidence and evaluation (this branch starts here)
 
 - Versioned JSON contract for private user-ticket review records.
-- Standard-library audit utility that validates records and compares exact desk vs actual Over/Under selections from the same final score.
+- Standard-library audit utility that validates records, scores supported mixed-sport markets, and compares an available original Desk snapshot against the user's selection.
 - Automated unit tests for lower/higher line adjustments, pushes, missing desk snapshots, invalid prices, and counterfactual outcome differences.
 - Aggregate-only default output: no fixture names, personal ticket references, or full private slip is emitted.
 
