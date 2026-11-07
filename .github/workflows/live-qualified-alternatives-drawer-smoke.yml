@@ -1,0 +1,38 @@
+name: Live Qualified Alternatives Shared Drawer Smoke
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/test_public_alternatives_drawer.mjs'
+      - '.github/workflows/live-qualified-alternatives-drawer-smoke.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/test_public_alternatives_drawer.mjs'
+      - '.github/workflows/live-qualified-alternatives-drawer-smoke.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: live-qualified-alternatives-drawer-smoke
+  cancel-in-progress: false
+
+jobs:
+  production-click-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install isolated Playwright dependency
+        run: npm install --no-save --package-lock=false playwright@1.55.0
+      - name: Install headless Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Click a live qualified alternative and verify the shared drawer
+        env:
+          MATCH_SIGNAL_BASE_URL: https://match-signal.pages.dev
+        run: node scripts/test_public_alternatives_drawer.mjs
