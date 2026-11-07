@@ -257,6 +257,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "expansion-odds-builder.js",
             "functions/api/sportybet-booking.js",
             "functions/api/odds-builder-data.js",
+            "functions/api/analyst/market-evidence.js",
             "functions/api/sportybet-virtual-results.js",
             "functions/api/espn.js",
             "match-signal-theme.css",
