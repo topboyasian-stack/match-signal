@@ -128,6 +128,27 @@ assert.equal(alternativeSummary.alternative_user_picks.pre_kickoff.hit_rate, 1);
 assert.deepEqual(alternativeSummary.alternative_winning_tickets.map(ticket => ticket.date), ["2026-11-07", "2026-11-06"]);
 assert.ok(alternativeSummary.cohort_method.includes("Deduplicated"));
 
+const fullAlternativeHistory = emptyReviewDocument(stamp);
+for (let index = 0; index < 13; index += 1) {
+  const day = String(index + 1).padStart(2, "0");
+  fullAlternativeHistory.tickets.push({
+    ticket_ref: "history_ticket_" + index,
+    captured_at: "2026-10-" + day + "T08:00:00Z",
+    reported_ticket_outcome: index === 0 ? "WON" : "LOST",
+    legs: [{
+      leg_ref: "history_leg_" + index, product: "football",
+      match: "History Team " + index + " vs Opponent " + index,
+      kickoff_at: "2026-10-" + day + "T09:00:00Z",
+      qualification_state: "NOT_QUALIFIED",
+      actual_selection: { market: "total_goals_over_under", pick: "over", line: 1.5, odds: 1.7 },
+      leg_outcome: index === 0 ? "WON" : "LOST", leg_outcome_source: "user_reported"
+    }]
+  });
+}
+const fullHistorySummary = summarizeReviewDocument(fullAlternativeHistory);
+assert.equal(fullHistorySummary.alternative_winning_tickets.length, 1, "Alternative winning-ticket dates must not be truncated to the latest 12 tickets");
+assert.equal(fullHistorySummary.alternative_winning_tickets[0].date, "2026-10-01");
+
 const missingDesk = makeLeg("over", 1.5, "over", 2.5, 1, 1);
 delete missingDesk.desk_snapshot;
 assert.equal(analyzeLeg(missingDesk).line_adjustment, "desk_snapshot_missing");
