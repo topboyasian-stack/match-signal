@@ -17,6 +17,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from fixture_primary_prediction_ledger import build_fixture_ledger, merge_primary_ledger, primary_summary
+
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
 PRIVATE_DIR = DATA / "calibration_private"
@@ -32,6 +34,7 @@ MIN_NBA_EXPECTED_VALUE = 0.03
 _INSTALLED = False
 _ORIGINALS: dict[str, Any] = {}
 _RUN_OPTIONS: list[dict[str, Any]] = []
+_RUN_PRIMARY: list[dict[str, Any]] = []
 _LAST_DIAGNOSTICS: dict[str, Any] = {}
 
 
@@ -564,6 +567,7 @@ def _virtual_options(now: datetime):
     rows = result[0] if isinstance(result, tuple) and result else result
     if isinstance(rows, list):
         _record_options([x for x in rows if isinstance(x, dict)])
+        _RUN_PRIMARY.extend(copy.deepcopy([x for x in rows if isinstance(x, dict)]))
     return result
 
 
@@ -892,10 +896,18 @@ def _make_audit_record(core: Any, row: dict[str, Any], now: datetime) -> dict[st
         status = str(leg.get("status") or "REJECTED")
     match = f"{row.get('player_1') or row.get('home_team') or ''} vs {row.get('player_2') or row.get('away_team') or ''}".strip()
     market_assessment = row.get("market_reassessment") or {}
+    sport = str(row.get("sport") or "").lower()
+    if sport in {"efootball", "efootball_gt", "efootball_adriatic"}:
+        sport = "virtual"
+    event_id = str(row.get("event_id") or "")
+    primary_id = hashlib.sha256((sport + "|" + event_id).encode("utf-8")).hexdigest()[:24] if sport and event_id else None
     return {
-        "sport": str(row.get("sport") or ""),
+        "sport": sport,
         "league": row.get("league"),
-        "event_id": str(row.get("event_id") or ""),
+        "event_id": event_id,
+        "prediction_role": "ALTERNATIVE",
+        "primary_prediction_id": primary_id,
+        "alternative_source": "SYSTEM_RECOMMENDED",
         "start_time": row.get("start_time"),
         "match": match,
         "market": market,
@@ -1084,7 +1096,13 @@ def _write_reassessment_artifact(core: Any, now: datetime) -> dict[str, Any]:
     nba_records = []
     for row in nba_rows:
         item = dict(row)
+        sport = str(row.get("sport") or "basketball").lower()
+        event_id = str(row.get("event_id") or "")
+        primary_id = hashlib.sha256((sport + "|" + event_id).encode("utf-8")).hexdigest()[:24] if event_id else None
         item.update({
+            "prediction_role": "ALTERNATIVE",
+            "primary_prediction_id": primary_id,
+            "alternative_source": "SYSTEM_RECOMMENDED",
             "match": f"{row.get('player_1')} vs {row.get('player_2')}",
             "market": "total_ou",
             "sport": "basketball",
@@ -1111,6 +1129,24 @@ def _write_reassessment_artifact(core: Any, now: datetime) -> dict[str, Any]:
     history_records = history_payload.get("records") if isinstance(history_payload, dict) else []
     if not isinstance(history_records, list):
         history_records = []
+
+    # One official primary is frozen per fixture. Ambiguous/missing source picks
+    # are explicitly unclassified; no alternative is promoted after the fact.
+    primary_sources = core.load(core.PREDICTIONS, [])
+    if not isinstance(primary_sources, list):
+        primary_sources = []
+    primary_sources = list(primary_sources) + list(_RUN_PRIMARY)
+    nba_primary_sources = _settled_rows(DATA / "nba_predictions.json")
+    primary_sources.extend(nba_primary_sources)
+    primary_existing = history_payload.get("primary_predictions", []) if isinstance(history_payload, dict) else []
+    if not isinstance(primary_existing, list):
+        primary_existing = []
+    primary_incoming = build_fixture_ledger(primary_sources, now)
+    primary_records = merge_primary_ledger(primary_existing, primary_incoming, _settle_result, _settlement_index(), now)
+    history_payload["primary_predictions"] = primary_records
+    history_payload["primary_summary"] = primary_summary(primary_records)
+    history_payload["generated_at"] = now.isoformat()
+    HISTORY_OUTPUT.write_text(json.dumps(history_payload, indent=2, ensure_ascii=False) + "\\n", encoding="utf-8")
 
     sport_summary: dict[str, dict[str, int]] = {}
     for row in records:
@@ -1158,6 +1194,7 @@ def _write_reassessment_artifact(core: Any, now: datetime) -> dict[str, Any]:
         "nba_dedicated_lane": nba_diag,
         "history": history_summary,
         "settled_evidence": _evidence_summary(history_records),
+        "primary_predictions": primary_summary(primary_records),
         "no_quote_substitution": True,
         "unvalidated_alternative_markets_are_flagged": True,
         "real_money_execution": False,
@@ -1173,6 +1210,7 @@ def _write_reassessment_artifact(core: Any, now: datetime) -> dict[str, Any]:
         "nba_dedicated_lane": nba_diag,
         "history": history_summary,
         "settled_evidence": _evidence_summary(history_records),
+        "primary_predictions": primary_summary(primary_records),
         "policy": {
             "exact_current_sportybet_prices_only": True,
             "max_quote_age_seconds": MAX_QUOTE_AGE_SECONDS,
@@ -1183,6 +1221,9 @@ def _write_reassessment_artifact(core: Any, now: datetime) -> dict[str, Any]:
             "nba_promotion_requires_dedicated_release_gate": True,
             "all_current_builder_gates_preserved": True,
             "append_only_pre_match_snapshots": True,
+            "one_frozen_primary_prediction_per_fixture": True,
+            "alternatives_settled_independently_and_never_promoted": True,
+            "missing_or_ambiguous_primary_is_unclassified": True,
             "settlement_join_is_event_scoped": True,
             "paper_only": True,
             "real_money_execution": False,
@@ -1251,6 +1292,7 @@ def install(core: Any) -> None:
 
     def audited_main():
         _RUN_OPTIONS.clear()
+        _RUN_PRIMARY.clear()
         result = _ORIGINALS["main"]()
         now = datetime.now(timezone.utc)
         try:
