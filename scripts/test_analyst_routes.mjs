@@ -40,6 +40,13 @@ function documentWithTicket() {
         actual_selection: { market: "total_goals_over_under", pick: "over", line: 1.5, odds: 1.5 },
         final_score: { home: 1, away: 1 },
         settled_at: "2026-10-09T10:10:00Z"
+      }, {
+        leg_ref: "leg_2",
+        product: "tennis",
+        match: "Wallin vs Sonego",
+        actual_selection: { market: "total_games_over_under", pick: "over", line: 18.5, odds: 1.46 },
+        final_score: { sets: [{ home: 6, away: 4 }, { home: 6, away: 2 }] },
+        qualification_state: "NOT_QUALIFIED"
       }]
     }]
   };
@@ -72,6 +79,9 @@ const saved = await payload(response);
 assert.equal(saved.status, "SAVED");
 assert.equal(saved.summary.ticket_count, 1);
 assert.equal(saved.summary.actual_selection_outcomes.WON, 1);
+assert.equal(saved.summary.leg_count, 2, "private storage preserves every leg from a lost accumulator");
+assert.equal(saved.summary.actual_selection_outcomes.LOST, 1, "the second tennis leg is independently scored");
+assert.equal(saved.summary.outcome_by_qualification_state.NOT_QUALIFIED.LOST, 1, "qualification label stays separate from the leg result");
 
 response = await onRequestPut(context("PUT", draft, { "If-Match": initialRevision }, store));
 assert.equal(response.status, 409, "stale revision should not overwrite an updated ledger");
@@ -81,6 +91,7 @@ assert.equal(response.status, 200);
 const persisted = await payload(response);
 assert.equal(persisted.document.tickets.length, 1);
 assert.equal(persisted.document.tickets[0].ticket_ref, "ticket_internal_1");
+assert.equal(persisted.document.tickets[0].legs.length, 2, "all mixed-sport legs are persisted independently");
 
 const invalid = documentWithTicket();
 invalid.tickets[0].unrecognised_verification_code = "MUST_NOT_STORE";
