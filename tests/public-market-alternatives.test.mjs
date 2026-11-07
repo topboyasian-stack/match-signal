@@ -60,3 +60,16 @@ test("at most two distinct market alternatives are returned per fixture", async 
     first.some(x => x.market === "total" && x.pick === "under" && x.line === 2.5), false);
   assert.equal(payload.alternatives.filter(x => x.event_id === "fixture-2").length, 1);
 });
+
+test("qualified eFootball alternatives retain the exact product and ticket identity", async () => {
+  const response = await call([candidate({
+    sport: "virtual", product: "efootball_gt", market: "total_ou", line: 8.5,
+    pick: "under", sportybet_event_id: undefined, sportybet_market_id: "18",
+    match: "GT Home vs GT Away"
+  })]);
+  const payload = await response.json();
+  assert.equal(payload.alternatives.length, 1);
+  assert.equal(payload.alternatives[0].sport, "efootball");
+  assert.equal(payload.alternatives[0].product, "efootball_gt");
+  assert.equal(payload.alternatives[0].sportybet_event_id, "fixture-1");
+});
