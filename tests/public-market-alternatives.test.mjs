@@ -35,6 +35,13 @@ test("public endpoint returns only whitelisted qualified future alternatives", a
   assert.equal("raw_probability_vector" in payload.alternatives[0], false);
 });
 
+test("fixture participants are split correctly for selectable winner alternatives", async () => {
+  const response = await call([candidate({ market: "winner", market_label: "Winner", pick: "p2", line: null })]);
+  const payload = await response.json();
+  assert.equal(payload.alternatives[0].player_1, "Home FC");
+  assert.equal(payload.alternatives[0].player_2, "Away FC");
+});
+
 test("stale, weak, unqualified and already-started alternatives are withheld", async () => {
   const response = await call([
     candidate({ model_probability: 0.64 }),
