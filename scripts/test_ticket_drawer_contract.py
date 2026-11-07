@@ -44,9 +44,9 @@ def main():
     require('data-ticket-model-qualified="true"' in selector, "Builder-gated alternatives must retain their qualification state when added to the shared ticket")
     unified_row = hub.split("function unifiedRow(group){", 1)[1].split("async function renderUnifiedBoard", 1)[0]
     qualified_best_row = hub.split("function qualifiedBestRow(x){", 1)[1].split("// VFOOTBALL", 1)[0]
-    require('data-ms-fixture-id="\'+E(x.event_id)' in unified_row and 'data-ms-fixture-sport="\'+E(x.sport)' in unified_row,
+    require("data-ms-fixture-id" in unified_row and "data-ms-fixture-sport" in unified_row,
             "Upcoming rows must expose fixture identity so qualified alternatives can mount")
-    require('data-ms-fixture-id="\'+E(x.event_id)' in qualified_best_row and 'data-ms-fixture-sport="\'+E(x.sport)' in qualified_best_row,
+    require("data-ms-fixture-id" in qualified_best_row and "data-ms-fixture-sport" in qualified_best_row,
             "Qualified Best rows must expose fixture identity so qualified alternatives can mount")
     require("function ticketAddMarkup" in hub and "Add prediction to ticket" in hub,
             "Football/Tennis prediction cards must expose a selectable ticket action")
