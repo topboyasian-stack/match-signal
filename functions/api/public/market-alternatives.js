@@ -20,16 +20,19 @@ function timestamp(value) {
 }
 
 function publicAlternative(row) {
-  const sport = String(row.sport || "").toLowerCase();
+  const sourceSport = String(row.sport || "").toLowerCase();
+  const product = String(row.product || "").toLowerCase();
+  const sport = sourceSport === "virtual" && ["efootball_gt", "efootball_adriatic"].includes(product) ? "efootball" : sourceSport;
   const market = String(row.market || "");
   const pick = String(row.pick || "").toLowerCase();
   const total = ["total_goals", "total_games", "total_ou"].includes(market);
-  if (!["football", "tennis", "basketball"].includes(sport) || !SUPPORTED_MARKETS.has(market)) return null;
+  if (!["football", "tennis", "basketball", "efootball"].includes(sport) || !SUPPORTED_MARKETS.has(market)) return null;
+  if (sport === "efootball" && (!["efootball_gt", "efootball_adriatic"].includes(product) || !total)) return null;
   if (total && !["over", "under"].includes(pick)) return null;
   if (!total && !["p1", "p2", "draw"].includes(pick)) return null;
   if (sport === "tennis" && pick === "draw") return null;
   const eventId = String(row.event_id || "");
-  const sportybetEventId = String(row.sportybet_event_id || "");
+  const sportybetEventId = String(row.sportybet_event_id || (sport === "efootball" ? row.event_id : ""));
   const marketId = String(row.sportybet_market_id || "");
   const startTime = String(row.start_time || "");
   const probability = Number(row.model_probability);
@@ -39,8 +42,10 @@ function publicAlternative(row) {
       probability < MIN_RECOMMENDED_PROBABILITY || probability > 1 ||
       !Number.isFinite(odds) || odds <= 1 || !timestamp(startTime)) return null;
   if (total && (!Number.isFinite(line) || line <= 0)) return null;
+  if (sport === "efootball" && !["18", "189"].includes(marketId)) return null;
   return {
-    sport, event_id: eventId, sportybet_event_id: sportybetEventId,
+    sport, product: sport === "efootball" ? product : null,
+    event_id: eventId, sportybet_event_id: sportybetEventId,
     start_time: startTime, player_1: String(row.player_1 || row.home_team || row.match || "").split(/\\s+vs\\s+/i)[0].trim(),
     player_2: String(row.player_2 || row.away_team || row.match || "").split(/\\s+vs\\s+/i)[1]?.trim() || "",
     match: String(row.match || ""), market: total ? "total" : "winner",
