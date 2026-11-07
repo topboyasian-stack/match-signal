@@ -288,6 +288,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "ticket-drawer.js",
             "ticket-drawer.css",
             "scripts/test_ticket_drawer_contract.py",
+            "scripts/test_nba_production_gate.mjs",
             ".github/workflows/ticket-drawer-contract.yml",
             "ms-design-system.css",
             "core-workspaces-design.css",
