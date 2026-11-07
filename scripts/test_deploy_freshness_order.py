@@ -311,6 +311,9 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertTrue(builder_owned_paths.isdisjoint(direct_paths),
                         "Builder data/code and Pages workflow changes must deploy only after a fresh Unified Upcoming board")
         self.assertIn("name: Guard cache-only direct promotion", PAGES_WORKFLOW)
+        allowed_line = next(line for line in PAGES_WORKFLOW.splitlines() if "allowed='|" in line)
+        self.assertIn("|scripts/test_nba_production_gate.mjs|", allowed_line,
+                      "The production gate smoke is a safe direct-deployment test path and must be admitted by the cache-only promotion guard.")
         self.assertIn("if: github.event_name == 'push'", PAGES_WORKFLOW)
         self.assertIn("compare/${BEFORE_SHA}...${PUSH_SHA}", PAGES_WORKFLOW)
         self.assertIn("const forcedRevalidation=cacheControl.includes('max-age=0')&&cacheControl.includes('must-revalidate')", PAGES_WORKFLOW)
