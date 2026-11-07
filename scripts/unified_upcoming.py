@@ -1666,6 +1666,41 @@ def merge_live_core_refresh(rows, refreshed_rows):
     return retained + [row for row in refreshed_rows if isinstance(row, dict)]
 
 
+def core_sports_missing_builder_window(source_rows, now, window_hours=12):
+    """Find core sports without any future fixture inside the Builder's 12-hour window."""
+    present = set()
+    end = now + timedelta(hours=window_hours)
+    for row in source_rows if isinstance(source_rows, list) else []:
+        if not isinstance(row, dict):
+            continue
+        sport = str(row.get("sport") or "").lower()
+        start = dt(row.get("start_time"))
+        if sport in {"football", "tennis"} and start is not None and now < start <= end:
+            present.add(sport)
+    return {"football", "tennis"} - present
+
+
+def live_core_refresh_due(previous_board, now, minimum_interval_minutes=30):
+    """Throttle repeated public schedule refreshes while keeping missing sports recoverable."""
+    summary = previous_board.get("summary") if isinstance(previous_board, dict) else {}
+    meta = summary.get("live_core_refresh") if isinstance(summary, dict) else {}
+    if not isinstance(meta, dict) or meta.get("attempted") is not True:
+        return True
+    stamp = dt(meta.get("last_attempt_at"))
+    if stamp is None:
+        stamp = dt(previous_board.get("generated_at"))
+    return stamp is None or stamp <= now - timedelta(minutes=minimum_interval_minutes)
+
+
+def collect_live_core_predictions(fetcher):
+    """Call predict_today's zero-argument source API and return its three-part result."""
+    result = fetcher()
+    if not isinstance(result, tuple) or len(result) != 3:
+        raise ValueError("live core prediction source must return (predictions, errors, diagnostics)")
+    predictions, errors, diagnostics = result
+    return predictions, errors, diagnostics
+
+
 def main():
     rows=[]
     for key in DESK_FILTER_STATS:
@@ -1676,6 +1711,7 @@ def main():
     participant_history_fresh, participant_freshness = virtual_participant_data_freshness(
         lifecycle, virtual_status, virtual_evaluation, NOW
     )
+    previous_board=load("unified_upcoming.json",{})
     core_source=load("predictions.json",[])
     selected_rows=load("selection_candidates.json",[])
     selection_map={}
@@ -1693,13 +1729,15 @@ def main():
         core_stale=core_feed_stale(core_generated_at,NOW)
     except Exception:
         core_stale=True
-    # A full but expired core feed is still unusable. Previously the row-count
-    # check suppressed the live Football/Tennis refresh whenever old fixtures
-    # remained in predictions.json, leaving Upcoming populated by virtual rows.
-    if core_stale or len(core_source)<10:
+    # Refresh when the canonical feed is stale/empty OR when either sport has
+    # no fixture inside the Builder's 12-hour window. The latter matters when
+    # tennis has near-term matches but football has only next-day fixtures.
+    missing_builder_sports=core_sports_missing_builder_window(core_source,NOW)
+    refresh_due=live_core_refresh_due(previous_board,NOW)
+    if core_stale or len(core_source)<10 or (missing_builder_sports and refresh_due):
         try:
             from predict_today import fetch_current_predictions
-            live_predictions, live_errors, _qc = fetch_current_predictions(include_watch=True)
+            live_predictions, live_errors, _qc = collect_live_core_predictions(fetch_current_predictions)
             refreshed_rows=[]
             for r in live_predictions:
                 x=dict(r)
@@ -1709,11 +1747,30 @@ def main():
                 x["paper_only"]=True
                 add(refreshed_rows,x)
             rows=merge_live_core_refresh(rows,refreshed_rows)
-            live_meta={"attempted":True,"rows":len(live_predictions),"refreshed_rows":len(refreshed_rows),"replaced_stale_core_rows":len(refreshed_rows),"errors":live_errors}
+            live_meta={
+                "attempted":True,
+                "last_attempt_at":NOW.isoformat(),
+                "rows":len(live_predictions),
+                "refreshed_rows":len(refreshed_rows),
+                "replaced_stale_core_rows":len(refreshed_rows),
+                "missing_builder_window_sports":sorted(missing_builder_sports),
+                "errors":live_errors,
+            }
         except Exception as exc:
-            live_meta={"attempted":True,"rows":0,"errors":[str(exc)]}
+            live_meta={
+                "attempted":True,
+                "last_attempt_at":NOW.isoformat(),
+                "rows":0,
+                "missing_builder_window_sports":sorted(missing_builder_sports),
+                "errors":[str(exc)],
+            }
     else:
-        live_meta={"attempted":False,"rows":0,"errors":[]}
+        live_meta={
+            "attempted":False,
+            "rows":0,
+            "missing_builder_window_sports":sorted(missing_builder_sports),
+            "errors":[],
+        }
 
     pdl_rows(rows,load("pdl_predictions.json",[]))
     # Darts-X and Table Tennis-X are retired from the active desk. Their
