@@ -329,7 +329,8 @@ def install(core: Any) -> None:
     original_main = core.main
 
     def reassessed_candidates(now):
-        raw = core.load(core.PREDICTIONS, [])
+        active_rows = getattr(core, "ACTIVE_PREDICTION_ROWS", None)
+        raw = active_rows if isinstance(active_rows, list) else core.load(core.PREDICTIONS, [])
         history = core.load(DATA / "tennis_prediction_archive.json", [])
         return _build_candidates(
             core,

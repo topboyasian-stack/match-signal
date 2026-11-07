@@ -50,6 +50,28 @@ class UpcomingDeskPolicyTests(unittest.TestCase):
         self.assertFalse(report["efootball_gt|6.5|under"]["betting_qualified"])
         self.assertEqual(report["efootball_gt|6.5|under"]["qualification_status"], "MODEL_PROBABILITY_BELOW_0_65")
 
+    def test_stale_core_feed_refreshes_even_when_old_rows_are_present(self):
+        stale = ns["core_feed_stale"]
+        self.assertTrue(stale((self.now - timedelta(hours=4, seconds=1)).isoformat(), self.now))
+        self.assertFalse(stale((self.now - timedelta(hours=3, minutes=59)).isoformat(), self.now))
+        self.assertTrue(stale(None, self.now))
+        self.assertTrue(stale("not-a-timestamp", self.now))
+
+    def test_live_refresh_replaces_stale_core_copy_for_same_fixture(self):
+        merge = ns["merge_live_core_refresh"]
+        rows = [
+            {"event_id": "same-fixture", "source_engine": "core_prediction_engine", "confidence": 0.61},
+            {"event_id": "same-fixture", "source_engine": "PDL-1.2", "confidence": 0.72},
+            {"event_id": "other-fixture", "source_engine": "core_prediction_engine", "confidence": 0.58},
+        ]
+        fresh = [
+            {"event_id": "same-fixture", "source_engine": "unified_live_refresh", "confidence": 0.69},
+        ]
+        result = merge(rows, fresh)
+        same = [row for row in result if row["event_id"] == "same-fixture"]
+        self.assertEqual([row["source_engine"] for row in same], ["PDL-1.2", "unified_live_refresh"])
+        self.assertIn("other-fixture", [row["event_id"] for row in result])
+
     def test_timestamp_helper_supports_chronological_walk_forward_filtering(self):
         stamp = "2026-10-09T13:00:00+00:00"
         self.assertEqual(ns["ts"](stamp), datetime(2026, 10, 9, 13, 0, tzinfo=UTC).timestamp())

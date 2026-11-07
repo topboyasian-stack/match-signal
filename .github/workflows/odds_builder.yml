@@ -15,6 +15,8 @@ on:
       - 'data/sportybet_odds_snapshot.json'
       - 'data/predictions.json'
       - 'scripts/odds_builder.py'
+      - 'scripts/odds_builder_core.py'
+      - 'scripts/test_odds_builder_live_core_fallback.py'
       - 'scripts/tennis_market_reassessment.py'
       - 'scripts/test_tennis_market_alternatives.py'
       - 'scripts/cross_sport_market_reassessment.py'
@@ -96,6 +98,10 @@ jobs:
         run: |
           python -m py_compile scripts/odds_builder.py scripts/tennis_market_reassessment.py scripts/test_tennis_market_alternatives.py
           python scripts/test_tennis_market_alternatives.py
+      - name: Regression-check stale core feed recovery for Football and Tennis alternatives
+        run: |
+          python -m py_compile scripts/odds_builder_core.py scripts/test_odds_builder_live_core_fallback.py
+          python scripts/test_odds_builder_live_core_fallback.py
       - name: Regression-check cross-sport market reassessment and evidence snapshots
         run: |
           python -m py_compile scripts/cross_sport_market_reassessment.py scripts/test_cross_sport_market_reassessment.py scripts/sync_cross_sport_private_evidence.py

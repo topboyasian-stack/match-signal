@@ -28,6 +28,7 @@ OUTPUT=DATA/"odds_builder.json"
 HISTORY=DATA/"prediction_history.json"
 SELECTION_GATE=DATA/"selection_gate.json"
 RISK_GATE=DATA/"risk_gate.json"
+ACTIVE_PREDICTION_ROWS=None  # Set by main() when a fresh Unified Upcoming fallback is used.
 
 MIN_PROB=0.60
 MIN_EDGE=0.025
@@ -341,7 +342,7 @@ def odds_age(x):
 
 def football_candidates(now):
     # Builder applies its own fresh market/value gates; candidate artifacts may be stale.
-    raw=load(PREDICTIONS,[])
+    raw=ACTIVE_PREDICTION_ROWS if isinstance(ACTIVE_PREDICTION_ROWS,list) else load(PREDICTIONS,[])
     out=[]
     if not isinstance(raw,list):return out
     for x in raw:
@@ -356,11 +357,13 @@ def football_candidates(now):
 
 
 def tennis_candidates(now):
-    raw=load(PREDICTIONS,[])
+    raw=ACTIVE_PREDICTION_ROWS if isinstance(ACTIVE_PREDICTION_ROWS,list) else load(PREDICTIONS,[])
     out=[]
     if not isinstance(raw,list):return out
     for x in raw:
         if not isinstance(x,dict) or x.get("sport")!="tennis" or not within_builder_horizon(x,now):continue
+        if str(x.get("prediction_status") or "")=="watch_projection" or str(x.get("qualification_status") or "")=="TENNIS_FORWARD_WATCH_NOT_QUALIFIED":
+            continue
         probs=x.get("calibrated_probabilities") or x.get("probabilities") or {}
         pick=x.get("pick")
         try:wp=float(probs.get(pick,x.get("calibrated_confidence",0)) or 0) if pick else 0.0
@@ -5503,7 +5506,53 @@ def recent_settled(history,now,known):
     return out[:4]
 
 
+def _builder_prediction_source(now):
+    """Use fresh Unified Upcoming model rows when the canonical feed has expired."""
+    canonical=load(PREDICTIONS,[])
+    canonical=canonical if isinstance(canonical,list) else []
+    canonical_future=[
+        row for row in canonical
+        if isinstance(row,dict)
+        and str(row.get("sport") or "").lower() in {"football","tennis"}
+        and within_builder_horizon(row,now)
+    ]
+    status=load(DATA/"pipeline_status.json",{})
+    stamp=None
+    try:
+        raw_stamp=status.get("updated_at")
+        stamp=datetime.fromisoformat(str(raw_stamp).replace("Z","+00:00")) if raw_stamp else None
+        if stamp and stamp.tzinfo is None:
+            stamp=stamp.replace(tzinfo=timezone.utc)
+        if stamp:
+            stamp=stamp.astimezone(timezone.utc)
+    except (TypeError,ValueError):
+        stamp=None
+    canonical_stale=stamp is None or stamp < now-timedelta(hours=4)
+    if canonical_future and not canonical_stale:
+        return canonical,"canonical_predictions"
+
+    board=load(DATA/"unified_upcoming.json",{})
+    events=board.get("events") if isinstance(board,dict) else []
+    fallback=[
+        dict(row) for row in events if isinstance(row,dict)
+        and str(row.get("sport") or "").lower() in {"football","tennis"}
+        and str(row.get("source_engine") or "")=="unified_live_refresh"
+        and within_builder_horizon(row,now)
+        and not (
+            str(row.get("sport") or "").lower()=="tennis"
+            and (
+                str(row.get("prediction_status") or "")=="watch_projection"
+                or str(row.get("qualification_status") or "")=="TENNIS_FORWARD_WATCH_NOT_QUALIFIED"
+            )
+        )
+    ] if isinstance(events,list) else []
+    if fallback:
+        return fallback,"unified_live_refresh_fallback"
+    return canonical,"canonical_predictions_stale_no_fallback"
+
+
 def main():
+    global ACTIVE_PREDICTION_ROWS
     now=datetime.now(timezone.utc)
     gate=load(SELECTION_GATE,{})
     risk=load(RISK_GATE,{})
@@ -5515,15 +5564,19 @@ def main():
     # PAPER qualification is independent from live-money risk.
     # Refresh SportyBet before applying the Builder's own value gates.
     market_refresh={"status":"not_run","error":None}
-    prediction_rows=load(PREDICTIONS,[])
+    prediction_rows,prediction_source=_builder_prediction_source(now)
+    ACTIVE_PREDICTION_ROWS=prediction_rows
     try:
         from predict_today import attach_sportybet_market_layer
         if isinstance(prediction_rows,list) and prediction_rows:
             market_stats = attach_sportybet_market_layer(prediction_rows)
-            PREDICTIONS.write_text(json.dumps(prediction_rows,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
-            market_refresh={"status":"ok","stats":market_stats}
+            # A live Unified Upcoming fallback is transient research input. Do not
+            # overwrite the canonical prediction/settlement ledger with it.
+            if prediction_source=="canonical_predictions":
+                PREDICTIONS.write_text(json.dumps(prediction_rows,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
+            market_refresh={"status":"ok","source":prediction_source,"stats":market_stats}
         else:
-            market_refresh={"status":"empty_predictions","stats":{}}
+            market_refresh={"status":"empty_predictions","source":prediction_source,"stats":{}}
     except Exception as exc:
         # Fail closed when the current SportyBet layer cannot be refreshed.
         market_refresh={"status":"failed","error":str(exc)[:240]}

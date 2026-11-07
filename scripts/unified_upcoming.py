@@ -1643,6 +1643,29 @@ def build_under_line_evidence(rows, minimum_line=6.5):
             grouped[key]=record
     return grouped
 
+def core_feed_stale(generated_at, now):
+    """Treat a missing or older-than-four-hours core prediction feed as stale."""
+    stamp = dt(generated_at)
+    return stamp is None or stamp < now - timedelta(hours=4)
+
+
+def merge_live_core_refresh(rows, refreshed_rows):
+    """Replace stale core copies with fresh model rows for the same fixture."""
+    refreshed_ids = {
+        str(row.get("event_id") or "")
+        for row in refreshed_rows if isinstance(row, dict) and row.get("event_id")
+    }
+    retained = [
+        row for row in rows
+        if not (
+            isinstance(row, dict)
+            and str(row.get("source_engine") or "") == "core_prediction_engine"
+            and str(row.get("event_id") or "") in refreshed_ids
+        )
+    ]
+    return retained + [row for row in refreshed_rows if isinstance(row, dict)]
+
+
 def main():
     rows=[]
     for key in DESK_FILTER_STATS:
@@ -1666,25 +1689,27 @@ def main():
     # from the public schedule/model engine for the unified board. This does not
     # replace the canonical production artifact; it keeps the forward desk alive.
     try:
-        core_generated_at=dt(load("pipeline_status.json",{}).get("updated_at"))
-        core_stale=(core_generated_at is None or core_generated_at<NOW-timedelta(hours=4))
+        core_generated_at=load("pipeline_status.json",{}).get("updated_at")
+        core_stale=core_feed_stale(core_generated_at,NOW)
     except Exception:
         core_stale=True
-    if len(core_source)<10:
+    # A full but expired core feed is still unusable. Previously the row-count
+    # check suppressed the live Football/Tennis refresh whenever old fixtures
+    # remained in predictions.json, leaving Upcoming populated by virtual rows.
+    if core_stale or len(core_source)<10:
         try:
             from predict_today import fetch_current_predictions
             live_predictions, live_errors, _qc = fetch_current_predictions(include_watch=True)
-            existing_ids={str(r.get("event_id") or "") for r in rows}
+            refreshed_rows=[]
             for r in live_predictions:
-                if str(r.get("event_id") or "") in existing_ids:continue
                 x=dict(r)
                 x["source_engine"]="unified_live_refresh"
                 x["projection_tier"]="deep_model"
                 x["evidence_depth"]="fresh_public_schedule_plus_model"
                 x["paper_only"]=True
-                add(rows,x)
-                existing_ids.add(str(x.get("event_id") or ""))
-            live_meta={"attempted":True,"rows":len(live_predictions),"errors":live_errors}
+                add(refreshed_rows,x)
+            rows=merge_live_core_refresh(rows,refreshed_rows)
+            live_meta={"attempted":True,"rows":len(live_predictions),"refreshed_rows":len(refreshed_rows),"replaced_stale_core_rows":len(refreshed_rows),"errors":live_errors}
         except Exception as exc:
             live_meta={"attempted":True,"rows":0,"errors":[str(exc)]}
     else:
