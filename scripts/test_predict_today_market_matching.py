@@ -217,6 +217,33 @@ class CompetitionSafeFootballMarketTests(unittest.TestCase):
             market_teams=("Fenerbahce", "Slavia Prague"),
         ))
 
+    def test_supported_senior_club_aliases_match_the_same_competition_and_kickoff(self):
+        pred = prediction()
+        pred.update({"league": "La Liga", "player_1": "Elche", "player_2": "Real Betis"})
+        fixture = sporty_event(
+            tournament="LaLiga", category="Spain", home="Elche CF", away="Betis",
+            event_id="sr:match:elche-betis",
+        )
+        found, _ = predict_today._find_sportybet_match(pred, [fixture])
+        self.assertIs(found, fixture)
+
+        pred.update({"league": "Ligue 1", "player_1": "Stade Rennais", "player_2": "Lille"})
+        fixture = sporty_event(
+            tournament="Ligue 1", category="France", home="Rennes", away="Lille",
+            event_id="sr:match:rennes-lille",
+        )
+        found, _ = predict_today._find_sportybet_match(pred, [fixture])
+        self.assertIs(found, fixture)
+
+    def test_club_aliases_do_not_strip_youth_or_gender_identity(self):
+        pred = prediction()
+        pred.update({"league": "La Liga", "player_1": "Real Betis", "player_2": "Sevilla"})
+        youth = sporty_event(
+            tournament="LaLiga", category="Spain Youth", home="Betis U19", away="Sevilla U19",
+            event_id="sr:match:betis-youth",
+        )
+        self.assertIsNone(predict_today._find_sportybet_match(pred, [youth])[0])
+
     def test_both_participants_must_match_not_just_one_exact_club(self):
         pred = prediction()
         # This same-competition, same-kickoff row has one exact participant and a
