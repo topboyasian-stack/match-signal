@@ -13,6 +13,7 @@ on:
       - 'scripts/test_basketball_booking_guard.mjs'
       - 'scripts/test_nba_ticket_guard.mjs'
       - 'scripts/test_basketball_desk_contract.mjs'
+      - 'scripts/test_ticket_drawer_contract.py'
       - '.github/workflows/nba-totals-price-capture.yml'
       - '.github/workflows/nba-totals-settlement.yml'
       - '.github/workflows/nba-totals-probability-value.yml'
@@ -61,3 +62,5 @@ jobs:
         run: node --test scripts/test_nba_ticket_guard.mjs scripts/test_basketball_booking_guard.mjs
       - name: Run Basketball page, live feed, odds-display and shared-ticket contract
         run: node scripts/test_basketball_desk_contract.mjs
+      - name: Run cross-sport ticket contract and NBA release-gate assertions
+        run: python scripts/test_ticket_drawer_contract.py
