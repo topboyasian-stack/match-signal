@@ -903,6 +903,7 @@ def _make_audit_record(core: Any, row: dict[str, Any], now: datetime) -> dict[st
     primary_id = hashlib.sha256((sport + "|" + event_id).encode("utf-8")).hexdigest()[:24] if sport and event_id else None
     return {
         "sport": sport,
+        "product": row.get("product"),
         "league": row.get("league"),
         "event_id": event_id,
         "prediction_role": "ALTERNATIVE",
