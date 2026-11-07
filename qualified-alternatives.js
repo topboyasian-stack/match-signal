@@ -8,12 +8,11 @@ function attach(){
  const cards=document.querySelectorAll('[data-ms-fixture-id]');
  cards.forEach(card=>{
   const event=card.getAttribute('data-ms-fixture-id'),sport=card.getAttribute('data-ms-fixture-sport');
-  if(!event||card.querySelector('.ms-qualified-alternatives'))return;
+  let host=card.querySelector('.ms-qualified-alternatives');
   const found=rows.filter(x=>x.event_id===event&&x.sport===sport).slice(0,2);
-  if(!found.length)return;
-  const host=document.createElement('section');host.className='ms-qualified-alternatives';
+  if(!found.length){if(host)host.remove();return;}
+  if(!host){host=document.createElement('section');host.className='ms-qualified-alternatives';card.appendChild(host);}
   host.innerHTML='<div class="ms-alt-heading"><b>Best qualified alternative'+(found.length>1?'s':'')+'</b><span>Fresh SportyBet quote · ≤15 min</span></div>'+found.map(button).join('');
-  card.appendChild(host);
  });
 }
 async function load(){if(busy)return;busy=true;try{const response=await fetch(endpoint,{cache:'no-store'});if(!response.ok)throw Error('HTTP '+response.status);const payload=await response.json();rows=Array.isArray(payload.alternatives)?payload.alternatives:[];attach();}catch(error){/* Fail closed: no alternatives are displayed when evidence cannot be verified. */}finally{busy=false;}}
