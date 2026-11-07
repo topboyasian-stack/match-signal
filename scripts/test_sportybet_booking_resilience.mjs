@@ -536,5 +536,78 @@ try {
   assert.equal(futureShareRequests[0].selections.length, 2);
   assert.ok(futureTicketPayload.selections.every(row => row.ok === true));
 
-  console.log('SportyBet booking resilience: PASS (bounded paging, share fallback, exact market-225 pair, and Football/Tennis/eFootball mixed ticket).');
+
+  // Stale provider IDs must not make catalogue pagination stop before the actual
+  // fixture is reached. This models older saved slip legs whose SportyBet IDs now
+  // point to unrelated events while their named fixtures and total lines remain live.
+  const staleIdKickoff = Date.now() + 6 * 60 * 60 * 1000;
+  const staleIdKickoffIso = new Date(staleIdKickoff).toISOString();
+  const staleIdLegs = [
+    { event_id:'prediction-malaga-racing', sportybet_event_id:'sr:match:stale-malaga-id', sport:'football', market:'total', pick:'over', line:1.5, market_id:'18', start_time:staleIdKickoffIso, player_1:'Málaga', player_2:'Racing Santander', match:'Málaga vs Racing Santander' },
+    { event_id:'prediction-dortmund-elversberg', sportybet_event_id:'sr:match:stale-dortmund-id', sport:'football', market:'total', pick:'under', line:5.5, market_id:'18', start_time:staleIdKickoffIso, player_1:'Borussia Dortmund', player_2:'SV Elversberg', match:'Borussia Dortmund vs SV Elversberg' }
+  ];
+  const totalMarket = (line, prefix) => ({
+    id:'18', desc:'Total Goals Over/Under', specifier:'total=' + line, status:'0',
+    outcomes:[
+      {id:prefix+'-over',desc:'Over ' + line,odds:1.21,isActive:1},
+      {id:prefix+'-under',desc:'Under ' + line,odds:1.17,isActive:1}
+    ]
+  });
+  const staleProviderPage = staleIdLegs.map((leg,index) => makeFixture(
+    leg.sportybet_event_id,
+    'Unrelated Home ' + index,
+    'Unrelated Away ' + index,
+    totalMarket(leg.line,'stale-'+index)
+  ));
+  while (staleProviderPage.length < 100) {
+    const index = staleProviderPage.length;
+    staleProviderPage.push(makeFixture(
+      'sr:match:stale-page-filler-' + index,
+      'Catalogue Filler Home ' + index,
+      'Catalogue Filler Away ' + index,
+      {id:'1',desc:'3 Way',status:'0',outcomes:[]}
+    ));
+  }
+  const currentFixturePage = [
+    makeFixture('sr:match:current-malaga-racing','Málaga','Racing Santander',totalMarket(1.5,'malaga')),
+    makeFixture('sr:match:current-dortmund-elversberg','Borussia Dortmund','SV Elversberg',totalMarket(5.5,'dortmund'))
+  ];
+  const staleIdPageRequests = [];
+  const staleIdShareRequests = [];
+  globalThis.fetch = async (input, options = {}) => {
+    const url = new URL(typeof input === 'string' ? input : input.url);
+    if (url.pathname === '/api/ng/orders/share') {
+      staleIdShareRequests.push(JSON.parse(options.body));
+      return jsonResponse({bizCode:10000,data:{
+        shareCode:'STALE-ID-RECOVERY-OK',
+        outcomes:[{odds:1.21},{odds:1.17}]
+      }});
+    }
+    if (url.pathname.endsWith('/pcUpcomingEvents') &&
+        url.searchParams.get('sportId') === 'sr:sport:1') {
+      const pageNum = Number(url.searchParams.get('pageNum') || 1);
+      staleIdPageRequests.push(pageNum);
+      const events = pageNum === 1 ? staleProviderPage : pageNum === 2 ? currentFixturePage : [];
+      return jsonResponse({bizCode:10000,data:{
+        tournaments:[{name:'Stale provider ID regression',events}]
+      }});
+    }
+    return jsonResponse({bizCode:10000,data:{tournaments:[]}});
+  };
+  const staleIdTicketResponse = await onRequest({request:new Request('https://match-signal.pages.dev/api/sportybet-booking',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({mode:'manual',manual_selections:staleIdLegs})
+  })});
+  const staleIdTicketPayload = await staleIdTicketResponse.json();
+  assert.equal(staleIdTicketResponse.status,200,JSON.stringify(staleIdTicketPayload));
+  assert.equal(staleIdTicketPayload.booking_code,'STALE-ID-RECOVERY-OK');
+  assert.ok(staleIdPageRequests.includes(2),'catalogue scan must continue past unrelated rows whose IDs are stale slip IDs');
+  assert.equal(staleIdShareRequests.length,1,'share generation must happen only after both current fixtures resolve');
+  assert.equal(staleIdShareRequests[0].selections.length,2);
+  assert.deepEqual(staleIdTicketPayload.selections.map(row=>row.resolved_event_id).sort(),[
+    'sr:match:current-dortmund-elversberg','sr:match:current-malaga-racing'
+  ]);
+  assert.ok(staleIdTicketPayload.selections.every(row=>row.ok===true));
+
+  console.log('SportyBet booking resilience: PASS (bounded paging, stale-ID recovery, share fallback, exact market-225 pair, and Football/Tennis/eFootball mixed ticket).');
 } finally { globalThis.fetch=originalFetch; }
