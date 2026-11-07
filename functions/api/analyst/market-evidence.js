@@ -102,6 +102,7 @@ export async function onRequestPut(context) {
   // Snapshot identity/quote/model fields are immutable. Only settlement fields,
   // the generated timestamp and the rolling evidence collection metadata can change.
   if (current) {
+    // Fixture-level primary identity is append-only; only its first valid settlement may be recorded.
     const incomingPrimary = new Map((incoming.primary_predictions || []).map(row => [row.fixture_id, row]));
     for (const oldRow of current.primary_predictions || []) {
       const next = incomingPrimary.get(oldRow.fixture_id);
