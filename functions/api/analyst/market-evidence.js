@@ -89,6 +89,7 @@ export async function onRequestPut(context) {
   const errors = validateDocument(incoming);
   if (errors.length) return jsonResponse({ error: "INVALID_PRIVATE_MARKET_EVIDENCE", validation_errors: errors.slice(0, 50) }, 400);
 
+  // Primary and alternative records share one revision-checked private evidence document.
   const expectedRevision = context.request.headers.get("If-Match");
   if (!expectedRevision) return jsonResponse({ error: "PRECONDITION_REQUIRED", message: "Restore the private evidence ledger before publishing updates." }, 428);
   let current;
