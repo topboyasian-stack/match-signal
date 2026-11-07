@@ -234,6 +234,11 @@ class CrossSportReassessmentTests(unittest.TestCase):
             else:
                 reassessment._ORIGINALS["virtual_candidates"] = old
 
+    def test_primary_ledger_rewrite_uses_real_newline_not_literal_backslash_n(self):
+        source = (Path(reassessment.__file__)).read_text(encoding="utf-8")
+        self.assertIn('HISTORY_OUTPUT.write_text(json.dumps(history_payload, indent=2, ensure_ascii=False) + "\\n", encoding="utf-8")', source)
+        self.assertNotIn('HISTORY_OUTPUT.write_text(json.dumps(history_payload, indent=2, ensure_ascii=False) + "\\\\n", encoding="utf-8")', source)
+
     def test_fingerprint_changes_when_price_or_model_probability_changes(self):
         base = {
             "sport": "football", "event_id": "evt", "market": "total_goals", "line": 2.5,
