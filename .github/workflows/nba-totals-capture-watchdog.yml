@@ -1,6 +1,13 @@
 name: NBA totals capture freshness watchdog
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/nba-totals-capture-watchdog.yml'
+      - '.github/workflows/nba-totals-price-capture.yml'
+      - '.github/workflows/nba-totals-settlement.yml'
+      - '.github/workflows/nba-totals-probability-value.yml'
   schedule:
     # Run five minutes after capture slots; recover only when the last exact
     # SportyBet market-225 capture is stale and no capture is active.
@@ -44,7 +51,7 @@ jobs:
           ref: main
 
       - name: Re-enable NBA research and capture schedules after delivery gaps
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_run'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
