@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-11-07T18:40:08.417621+00:00",
+  "updated_at": "2026-11-07T20:13:29.229949+00:00",
   "mode": "PAPER_RESEARCH_ONLY",
   "model_version": "FOOTBALL-STAT-COUNCIL-V2-DUAL-COMPETITION",
   "method": "competition-specific domestic form plus separately normalized Champions League form, venue-aware Poisson/Dixon-Coles",
@@ -7,7 +7,7 @@
   "production_pick_unchanged": true,
   "builder_eligibility_unchanged": true,
   "history_source": "football_team_history",
-  "history_rows_available": 4683,
+  "history_rows_available": 4704,
   "history_leagues": [
     "Austrian Bundesliga",
     "Azerbaijan Premier League",
@@ -30,14 +30,14 @@
     "Ukrainian Premier League"
   ],
   "overall": {
-    "settled_evaluated": 326,
+    "settled_evaluated": 327,
     "skipped": 0,
     "excluded_no_history": 170,
-    "published_accuracy": 0.5368,
-    "independent_accuracy": 0.5092,
-    "published_brier": 0.5859,
-    "independent_brier": 0.5953,
-    "pick_agreement_rate": 0.7393,
+    "published_accuracy": 0.5352,
+    "independent_accuracy": 0.5076,
+    "published_brier": 0.5874,
+    "independent_brier": 0.5959,
+    "pick_agreement_rate": 0.737,
     "independent_beats_published_accuracy": false,
     "independent_beats_published_brier": false
   },
@@ -67,12 +67,12 @@
       "pick_agreement_rate": 0.5556
     },
     "La Liga": {
-      "settled_evaluated": 67,
-      "published_accuracy": 0.5373,
-      "independent_accuracy": 0.5672,
-      "published_brier": 0.5588,
-      "independent_brier": 0.5742,
-      "pick_agreement_rate": 0.806
+      "settled_evaluated": 68,
+      "published_accuracy": 0.5294,
+      "independent_accuracy": 0.5588,
+      "published_brier": 0.5664,
+      "independent_brier": 0.5772,
+      "pick_agreement_rate": 0.7941
     },
     "Ligue 1": {
       "settled_evaluated": 55,
@@ -108,9 +108,9 @@
     },
     {
       "label": "55-60%",
-      "settled": 32,
+      "settled": 33,
       "correct": 15,
-      "accuracy": 0.4688
+      "accuracy": 0.4545
     },
     {
       "label": "60-65%",
@@ -188,24 +188,6 @@
     }
   ],
   "latest_evaluated": [
-    {
-      "league": "La Liga",
-      "event_id": "401882820",
-      "start_time": "2026-10-31T13:00Z",
-      "published_prob": 0.4273,
-      "independent_prob": 0.387715,
-      "published_pick": "p1",
-      "independent_pick": "p2",
-      "actual": "p2",
-      "published_correct": false,
-      "independent_correct": true,
-      "published_brier": 0.758301,
-      "independent_brier": 0.570516,
-      "independent_effective_sample": 6.927,
-      "independent_xg_home": 1.6505,
-      "independent_xg_away": 1.6926,
-      "agreement": false
-    },
     {
       "league": "Bundesliga",
       "event_id": "401884753",
@@ -1087,6 +1069,24 @@
       "independent_xg_home": 1.7053,
       "independent_xg_away": 1.1724,
       "agreement": true
+    },
+    {
+      "league": "La Liga",
+      "event_id": "401882813",
+      "start_time": "2026-11-07T15:15Z",
+      "published_prob": 0.5767,
+      "independent_prob": 0.360895,
+      "published_pick": "p1",
+      "independent_pick": "p2",
+      "actual": "draw",
+      "published_correct": false,
+      "independent_correct": false,
+      "published_brier": 1.076364,
+      "independent_brier": 0.777498,
+      "independent_effective_sample": 3.851,
+      "independent_xg_home": 1.2471,
+      "independent_xg_away": 1.251,
+      "agreement": false
     }
   ],
   "promotion_policy": "Do not let the independent model override production or Builder qualification until it demonstrates a stable walk-forward advantage on accuracy/Brier across multiple settled windows."
