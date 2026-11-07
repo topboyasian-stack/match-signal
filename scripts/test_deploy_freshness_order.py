@@ -374,6 +374,14 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn('"Match Signal Virtual Lab Collector"', workflow_run_block)
         self.assertNotIn("data/virtual_lab_live.json", board_paths)
 
+    def test_builder_promotion_requires_real_live_alternatives_and_drawer_readiness(self):
+        self.assertIn('verification_status" != "VERIFIED"', PROMOTION_WORKFLOW)
+        self.assertIn('alternatives_status" != "READY"', PROMOTION_WORKFLOW)
+        self.assertIn('alternatives_count" -le 0', PROMOTION_WORKFLOW)
+        self.assertIn('drawer_status" != "READY"', PROMOTION_WORKFLOW)
+        self.assertIn('booking_status" != "VERIFIED"', PROMOTION_WORKFLOW)
+        self.assertIn("Fresh Cloudflare deployment did not meet release readiness", PROMOTION_WORKFLOW)
+
     def test_builder_promotion_waits_for_each_board_triggered_builder_before_pages(self):
         self.assertIn("uses: actions/checkout@v4", PROMOTION_WORKFLOW)
         self.assertRegex(PROMOTION_WORKFLOW, r"group: builder-production-promotion-v\d+")

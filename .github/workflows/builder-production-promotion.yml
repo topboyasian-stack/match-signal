@@ -302,11 +302,19 @@ jobs:
               verification_source="$(printf '%s' "$payload" | jq -r '.source_commit // empty' 2>/dev/null || true)"
               verification_time="$(printf '%s' "$payload" | jq -r '.verified_at // empty' 2>/dev/null || true)"
               verification_status="$(printf '%s' "$payload" | jq -r '.status // empty' 2>/dev/null || true)"
-              if [ -n "$verification_source" ] && [ -n "$verification_time" ] && [[ "$verification_status" == VERIFIED* ]]; then
+              alternatives_status="$(printf '%s' "$payload" | jq -r '.qualified_alternatives_status // empty' 2>/dev/null || true)"
+              alternatives_count="$(printf '%s' "$payload" | jq -r '.qualified_alternatives_count // 0' 2>/dev/null || true)"
+              drawer_status="$(printf '%s' "$payload" | jq -r '.shared_ticket_drawer_status // empty' 2>/dev/null || true)"
+              booking_status="$(printf '%s' "$payload" | jq -r '.booking_api_status // empty' 2>/dev/null || true)"
+              if [ -n "$verification_source" ] && [ -n "$verification_time" ]; then
                 verified_epoch_us="$(python -c 'from datetime import datetime; import sys; print(int(datetime.fromisoformat(sys.argv[1].replace("Z", "+00:00")).timestamp() * 1000000))' "$verification_time" 2>/dev/null || echo 0)"
                 merge_base="$(gh api "repos/$GITHUB_REPOSITORY/compare/$deployment_source_sha...$verification_source" --jq '.merge_base_commit.sha' 2>/dev/null || true)"
                 if [ "$verified_epoch_us" -ge "$dispatched_epoch_us" ] && [ "$merge_base" = "$deployment_source_sha" ]; then
-                  echo "Cloudflare verification $verification_status for source $verification_source confirms post-build board $BOARD_RUN_ID and Builder run $BUILDER_RUN_ID."
+                  if [ "$verification_status" != "VERIFIED" ] || [ "$alternatives_status" != "READY" ] || ! [[ "$alternatives_count" =~ ^[0-9]+$ ]] || [ "$alternatives_count" -le 0 ] || [ "$drawer_status" != "READY" ] || [ "$booking_status" != "VERIFIED" ]; then
+                    echo "Fresh Cloudflare deployment did not meet release readiness: status=$verification_status alternatives=$alternatives_status count=$alternatives_count drawer=$drawer_status booking=$booking_status source=$verification_source." >&2
+                    exit 1
+                  fi
+                  echo "Cloudflare verification $verification_status confirms $alternatives_count live qualified alternative(s), shared drawer readiness and booking verification for source $verification_source; post-build board $BOARD_RUN_ID and Builder run $BUILDER_RUN_ID."
                   exit 0
                 fi
               fi
