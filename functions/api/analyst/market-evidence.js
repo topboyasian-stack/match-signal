@@ -29,6 +29,22 @@ function validateDocument(value) {
   if (!Array.isArray(value.records)) return errors.concat("records must be an array");
   if (value.records.length > MAX_RECORDS) errors.push("record limit exceeded");
   const ids = new Set();
+  if (value.primary_predictions !== undefined && !Array.isArray(value.primary_predictions)) errors.push("primary_predictions must be an array");
+  const primaryIds = new Set();
+  for (const [i, row] of (Array.isArray(value.primary_predictions) ? value.primary_predictions : []).entries()) {
+    const where = "primary_predictions[" + i + "]";
+    if (!row || typeof row !== "object" || Array.isArray(row)) { errors.push(where + " must be an object"); continue; }
+    if (typeof row.fixture_id !== "string" || !/^[a-f0-9]{24}$/.test(row.fixture_id)) errors.push(where + ".fixture_id is invalid");
+    else if (primaryIds.has(row.fixture_id)) errors.push(where + ".fixture_id is duplicated");
+    else primaryIds.add(row.fixture_id);
+    if (!SUPPORTED_SPORTS.has(row.sport)) errors.push(where + ".sport is unsupported");
+    if (typeof row.event_id !== "string" || !row.event_id.trim() || row.event_id.length > 200) errors.push(where + ".event_id is invalid");
+    if (row.prediction_role !== "PRIMARY") errors.push(where + ".prediction_role must be PRIMARY");
+    if (!["FROZEN", "UNCLASSIFIED"].includes(row.primary_status)) errors.push(where + ".primary_status is invalid");
+    if (row.primary_status === "FROZEN" && (!row.primary_market || !row.primary_pick)) errors.push(where + " frozen primary requires market and pick");
+    if (row.primary_probability !== null && row.primary_probability !== undefined && (typeof row.primary_probability !== "number" || !Number.isFinite(row.primary_probability) || row.primary_probability < 0 || row.primary_probability > 1)) errors.push(where + ".primary_probability is invalid");
+    if (row.settlement_status !== "PENDING" && row.settlement_status !== "SETTLED" && row.settlement_status !== "UNCLASSIFIED") errors.push(where + ".settlement_status is invalid");
+  }
   for (let i = 0; i < value.records.length; i += 1) {
     const row = value.records[i];
     const where = "records[" + i + "]";
@@ -86,6 +102,15 @@ export async function onRequestPut(context) {
   // Snapshot identity/quote/model fields are immutable. Only settlement fields,
   // the generated timestamp and the rolling evidence collection metadata can change.
   if (current) {
+    const incomingPrimary = new Map((incoming.primary_predictions || []).map(row => [row.fixture_id, row]));
+    for (const oldRow of current.primary_predictions || []) {
+      const next = incomingPrimary.get(oldRow.fixture_id);
+      if (!next) return jsonResponse({ error: "FROZEN_PRIMARY_REMOVED", fixture_id: oldRow.fixture_id }, 409);
+      for (const key of ["sport", "event_id", "start_time", "prediction_timestamp", "primary_status", "primary_market", "primary_pick", "primary_line", "primary_probability", "primary_source", "prediction_role"]) {
+        if (JSON.stringify(oldRow[key] ?? null) !== JSON.stringify(next[key] ?? null)) return jsonResponse({ error: "FROZEN_PRIMARY_CHANGED", fixture_id: oldRow.fixture_id, field: key }, 409);
+      }
+      if (oldRow.settlement_status === "SETTLED" && (oldRow.settlement_result !== next.settlement_result || oldRow.settled_at !== next.settled_at)) return jsonResponse({ error: "FROZEN_PRIMARY_SETTLEMENT_CHANGED", fixture_id: oldRow.fixture_id }, 409);
+    }
     const byId = new Map(incoming.records.map(row => [row.snapshot_id, row]));
     for (const oldRow of current.records) {
       const newRow = byId.get(oldRow.snapshot_id);
