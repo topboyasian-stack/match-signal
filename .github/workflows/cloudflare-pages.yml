@@ -511,7 +511,7 @@ jobs:
           const base = 'https://match-signal.pages.dev';
           const deploymentBase = String(process.env.CLOUDFLARE_DEPLOYMENT_URL || '').replace(/\/+$/, '');
           const pages = ['/', '/upcoming.html', '/qualified-best', '/qualified-best.html', '/odds-builder.html', '/football.html', '/tennis.html', '/basketball.html', '/darts.html', '/table-tennis.html', '/league.html?sport=football&league=England%20Amateur%20-%20U21%20Professional%20Development%20League', '/reports.html', '/live.html', '/api-access.html', '/expansion.html', '/virtual-lab/', '/virtual-lab', '/research.html', '/virtual-lab.html', '/analyst.html'];
-          const assets = ['/api/sportybet-virtual','/api/sportybet-darts','/api/sportybet-table-tennis','/api/virtual-lab-history','/expansion.js', '/expansion-odds-builder.js', '/live-analysis.js', '/live-data-worker.js', '/virtual-lab-app.js', '/virtual-lab-confirmed-watch.js', '/virtual-lab.css', '/_redirects', '/data/predictions.json', '/data/nba_predictions.json', '/data/unified_upcoming.json', '/data/selection_candidates.json', '/data/expansion_status.json', '/data/odds_builder.json', '/data/odds_ticket_tracker.json', '/data/system_health.json', '/data/tennis_forward_status.json', '/data/prediction_desk_health.json', '/data/results_first_evidence_report.json', '/data/virtual_lab_live.json','/data/virtual_lab_model_eval.json','/data/virtual_lab_eligibility.json','/data/virtual_lab_participants/registry.json','/data/virtual_lab_participant_lifecycle.json','/data/virtual_lab_participants/efootball_confirmed_watch.json','/data/efootball_desk_learning.json','/data/efootball_desk_prediction_history.json.gz','/data/efootball_market_research.json.gz','/data/club-logo-registry.json','/sport-hubs.js','/ticket-drawer.css','/ticket-drawer.js','/match-signal-ip.js','/basketball-live.js','/api/espn?path=%2Fapis%2Fsite%2Fv2%2Fsports%2Fbasketball%2Fnba%2Fscoreboard%3Fdates%3D20261031','/basketball-design.css','/api/sportybet-basketball','/league-logos.js','/sport-hubs.css','/ms-design-system.css','/core-workspaces-design.css','/qualified-best-design.css','/sport-hubs-design.css','/independent-sport-design.css','/odds-builder-design.css','/reports-design.css','/virtual-lab-terminal.css','/workspace-ui.js','/workspace-ui.css','/analyst.js'];
+          const assets = ['/api/sportybet-virtual','/api/sportybet-darts','/api/sportybet-table-tennis','/api/virtual-lab-history','/expansion.js', '/expansion-odds-builder.js', '/live-analysis.js', '/live-data-worker.js', '/virtual-lab-app.js', '/virtual-lab-confirmed-watch.js', '/virtual-lab.css', '/_redirects', '/data/predictions.json', '/data/nba_predictions.json', '/data/unified_upcoming.json', '/data/selection_candidates.json', '/data/expansion_status.json', '/data/odds_builder.json', '/data/odds_ticket_tracker.json', '/data/system_health.json', '/data/tennis_forward_status.json', '/data/prediction_desk_health.json', '/data/results_first_evidence_report.json', '/data/virtual_lab_live.json','/data/virtual_lab_model_eval.json','/data/virtual_lab_eligibility.json','/data/virtual_lab_participants/registry.json','/data/virtual_lab_participant_lifecycle.json','/data/virtual_lab_participants/efootball_confirmed_watch.json','/data/efootball_desk_learning.json','/data/efootball_desk_prediction_history.json.gz','/data/efootball_market_research.json.gz','/data/club-logo-registry.json','/sport-hubs.js','/ticket-drawer.css','/ticket-drawer.js','/qualified-alternatives.js','/api/public/market-alternatives','/match-signal-ip.js','/basketball-live.js','/api/espn?path=%2Fapis%2Fsite%2Fv2%2Fsports%2Fbasketball%2Fnba%2Fscoreboard%3Fdates%3D20261031','/basketball-design.css','/api/sportybet-basketball','/league-logos.js','/sport-hubs.css','/ms-design-system.css','/core-workspaces-design.css','/qualified-best-design.css','/sport-hubs-design.css','/independent-sport-design.css','/odds-builder-design.css','/reports-design.css','/virtual-lab-terminal.css','/workspace-ui.js','/workspace-ui.css','/analyst.js'];
           const failures = [];
           const sourceBuilderArtifact = JSON.parse(readFileSync('data/odds_builder.json', 'utf8'));
           const sourceBoardArtifact = JSON.parse(readFileSync('data/unified_upcoming.json', 'utf8'));
@@ -582,6 +582,7 @@ jobs:
             }
           }
           let verifiedProductionBoard = null;
+          let qualifiedAlternativesCheck = { status: 'NOT_CHECKED', alternative_count: 0, unique_fixture_count: 0, sports: [] };
           const get = async (path, timeoutMs = SMOKE_REQUEST_TIMEOUT_MS) => {
             if (path === '/data/unified_upcoming.json' && verifiedProductionBoard) return verifiedProductionBoard;
             return getFrom(base, path, timeoutMs);
@@ -591,14 +592,14 @@ jobs:
           // hostname a bounded propagation window. A successful upload alone is not proof
           // that the primary hostname is serving the uploaded HTML/CSS yet.
           const workspaceContracts = [
-            {path:'/', css:'/core-workspaces-design.css', markers:[rootBuildMarker,rootCssHref,'MS-DESK-2026.10.14-V1','core-workspaces-design.css?v=20261014-full-v1','class="cd-page-header"','class="cd-workspace-grid"','id="unifiedBoard"','id="qualifiedBestSummary"'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V1: CORE DESK / FOOTBALL / TENNIS'},
-            {path:'/football.html', css:'/core-workspaces-design.css', markers:['MS-FOOTBALL-DESK-2026.10.14-V1','core-workspaces-design.css?v=20261014-full-v1','class="cd-page-header"','id="leagueGrid"','data-sport="football"','league-logos.js?v=20261013-competition-logos2','sport-hubs.js?v=20261102-single-ticket1','ticket-drawer.css?v=20261102-single-ticket1','ticket-drawer.js?v=20261102-split-event-identifiers1'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V1: CORE DESK / FOOTBALL / TENNIS'},
-            {path:'/tennis.html', css:'/core-workspaces-design.css', markers:['MS-TENNIS-DESK-2026.10.14-V1','core-workspaces-design.css?v=20261014-full-v1','class="cd-page-header"','id="leagueGrid"','data-sport="tennis"','sport-hubs.js?v=20261102-single-ticket1','ticket-drawer.css?v=20261102-single-ticket1','ticket-drawer.js?v=20261102-split-event-identifiers1'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V1: CORE DESK / FOOTBALL / TENNIS'},
-            {path:'/basketball.html', css:'/basketball-design.css', markers:['MS-BASKETBALL-DESK-2026.10.24-V11','core-workspaces-design.css?v=20261014-full-v1','basketball-design.css?v=20261024-builder-dark-v3','basketball-live.js?v=20261104-nba-probability-cohort1','id="msNav"','workspace-ui.js?v=20261023-basketball-nav1','id="totalsBoard"','id="marketStatus"','ticket-drawer.css?v=20261102-single-ticket1','ticket-drawer.js?v=20261102-split-event-identifiers1'], cssMarker:'MATCH-SIGNAL-BASKETBALL-DESK-V1'},
-            {path:'/league.html?sport=football&league=England%20Amateur%20-%20U21%20Professional%20Development%20League', css:'/ticket-drawer.css', markers:['data-page="league"','sport-hubs.js?v=20261102-single-ticket1','ticket-drawer.css?v=20261102-single-ticket1','ticket-drawer.js?v=20261102-split-event-identifiers1'], cssMarker:'.ms-ticket-launcher'},
+            {path:'/', css:'/core-workspaces-design.css', markers:[rootBuildMarker,rootCssHref,'MS-DESK-2026.10.14-V1','core-workspaces-design.css?v=20261014-full-v1','class="cd-page-header"','class="cd-workspace-grid"','id="unifiedBoard"','id="qualifiedBestSummary"','./qualified-alternatives.js?v=20261107-qualified-picks5'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V1: CORE DESK / FOOTBALL / TENNIS'},
+            {path:'/football.html', css:'/core-workspaces-design.css', markers:['MS-FOOTBALL-DESK-2026.10.14-V1','core-workspaces-design.css?v=20261014-full-v1','class="cd-page-header"','id="leagueGrid"','data-sport="football"','league-logos.js?v=20261013-competition-logos2','sport-hubs.js?v=20261102-single-ticket1','ticket-drawer.css?v=20261102-single-ticket1','ticket-drawer.js?v=20261102-split-event-identifiers1','./qualified-alternatives.js?v=20261107-qualified-picks5'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V1: CORE DESK / FOOTBALL / TENNIS'},
+            {path:'/tennis.html', css:'/core-workspaces-design.css', markers:['MS-TENNIS-DESK-2026.10.14-V1','core-workspaces-design.css?v=20261014-full-v1','class="cd-page-header"','id="leagueGrid"','data-sport="tennis"','sport-hubs.js?v=20261102-single-ticket1','ticket-drawer.css?v=20261102-single-ticket1','ticket-drawer.js?v=20261102-split-event-identifiers1','./qualified-alternatives.js?v=20261107-qualified-picks5'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V1: CORE DESK / FOOTBALL / TENNIS'},
+            {path:'/basketball.html', css:'/basketball-design.css', markers:['MS-BASKETBALL-DESK-2026.10.24-V11','core-workspaces-design.css?v=20261014-full-v1','basketball-design.css?v=20261024-builder-dark-v3','basketball-live.js?v=20261104-nba-probability-cohort1','id="msNav"','workspace-ui.js?v=20261023-basketball-nav1','id="totalsBoard"','id="marketStatus"','ticket-drawer.css?v=20261102-single-ticket1','ticket-drawer.js?v=20261102-split-event-identifiers1','./qualified-alternatives.js?v=20261107-qualified-picks5'], cssMarker:'MATCH-SIGNAL-BASKETBALL-DESK-V1'},
+            {path:'/league.html?sport=football&league=England%20Amateur%20-%20U21%20Professional%20Development%20League', css:'/ticket-drawer.css', markers:['data-page="league"','sport-hubs.js?v=20261102-single-ticket1','ticket-drawer.css?v=20261102-single-ticket1','ticket-drawer.js?v=20261102-split-event-identifiers1','./qualified-alternatives.js?v=20261107-qualified-picks5'], cssMarker:'.ms-ticket-launcher'},
             {path:'/odds-builder.html', css:'/odds-builder-design.css', markers:[currentBuilderBuildMarker,currentBuilderCssHref.replace(/^\.\//,''),currentBuilderEngineSrc.replace(/^\.\//,''),'class="ob-page-header"','class="ob-section-nav"','class="ob-guide-grid"','id="oddsBuilder"'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V3: ODDS BUILDER PAGE LAYOUT'},
             {path:'/reports.html', css:'/reports-design.css', markers:['MS-REPORTS-2026.10.14-V3','reports-design.css?v=20261014-full-v3','class="rp-dashboard-grid"','id="report-scoreboard"','id="researchLabSummary"'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V3: REPORTS PAGE LAYOUT'},
-            {path:'/virtual-lab/', css:'/virtual-lab-terminal.css', markers:['MS-VIRTUAL-LAB-V1-2026.10.14-V3','../virtual-lab-terminal.css?v=20261031-recent-performance-guard1','../virtual-lab-app.js?v=20261102-product-evidence-gate2','class="vl-command-grid"','class="vl-command-rail"','class="vl-insights-grid"'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V3: VIRTUAL LAB PAGE LAYOUT'}
+            {path:'/virtual-lab/', css:'/virtual-lab-terminal.css', markers:['MS-VIRTUAL-LAB-V1-2026.10.14-V3','../virtual-lab-terminal.css?v=20261031-recent-performance-guard1','../virtual-lab-app.js?v=20261102-product-evidence-gate2','class="vl-command-grid"','class="vl-command-rail"','class="vl-insights-grid"','../qualified-alternatives.js?v=20261107-qualified-picks5'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V3: VIRTUAL LAB PAGE LAYOUT'}
           ];
           if (!deploymentBase.startsWith('https://') || !deploymentBase.endsWith('.pages.dev')) {
             failures.push('Cloudflare deployment step did not publish an immutable Pages URL.');
@@ -769,6 +770,12 @@ jobs:
                 for (const marker of [rootBuildMarker,rootCssHref])
                   if (!body.includes(marker)) failures.push(path+' missing current deployment marker: '+marker);
               }
+              if (['/','/upcoming.html','/qualified-best','/qualified-best.html','/football.html','/tennis.html','/basketball.html'].includes(path) || path.startsWith('/league.html?')) {
+                if (!body.includes('./qualified-alternatives.js?v=20261107-qualified-picks5')) failures.push(path+' missing the current qualified-alternatives selector');
+              }
+              if (path==='/virtual-lab/' || path==='/virtual-lab') {
+                if (!body.includes('../qualified-alternatives.js?v=20261107-qualified-picks5')) failures.push(path+' missing the current product-aware qualified-alternatives selector');
+              }
               if (path==='/' || path==='/upcoming.html') {
                 for (const marker of ['Qualified Best','qualified-best.html','id="qualifiedBestSummary"','Qualified fixtures'])
                   if (!body.includes(marker)) failures.push(path+' missing '+marker);
@@ -892,6 +899,7 @@ jobs:
               const {r,body}=await get(path);
               if (!r.ok) failures.push(path+' HTTP '+r.status);
               if (!body.trim()) failures.push(path+' empty response');
+              if (path==='/qualified-alternatives.js' && (!body.includes("querySelectorAll('[data-ms-fixture-id]')") || !body.includes('data-ticket-model-qualified="true"') || !body.includes('data-ticket-sportybet-event'))) failures.push('/qualified-alternatives.js missing exact-fixture mounting or qualified shared-ticket metadata');
               if (path==='/analyst.js' && (
                 !body.includes('VERIFIED SOURCE FACTS') ||
                 !body.includes('High-line Under exact-line evidence') ||
@@ -930,6 +938,46 @@ jobs:
               }
             } catch(e) { failures.push(path+' '+e.message); }
           }
+          // Verify the deployed public alternatives feed itself, not just the HTML and asset.
+          // A valid zero is recorded honestly; model/quote/ticket qualification gates remain authoritative.
+          try {
+            const {r,body}=await get('/api/public/market-alternatives');
+            if (!r.ok) throw new Error('HTTP '+r.status);
+            const payload=JSON.parse(body);
+            const rows=Array.isArray(payload?.alternatives)?payload.alternatives:null;
+            if (!['OK','EMPTY'].includes(String(payload?.status||'')) || !rows) throw new Error('invalid API response shape/status');
+            if (payload.status==='EMPTY' && rows.length) throw new Error('EMPTY response unexpectedly contains alternatives');
+            const now=Date.now();
+            for (const item of rows) {
+              const start=Date.parse(String(item?.start_time||''));
+              const probability=Number(item?.probability), odds=Number(item?.odds);
+              if (!['football','tennis','basketball','efootball'].includes(String(item?.sport||''))) throw new Error('unsupported sport in public alternatives');
+              if (!item?.event_id || !item?.sportybet_event_id || !item?.market_id) throw new Error('alternative missing exact provider/event/market identity');
+              if (item?.role!=='ALTERNATIVE' || item?.source!=='SYSTEM_RECOMMENDED') throw new Error('alternative lost its recommended role/source');
+              if (!Number.isFinite(start) || start<=now+120000) throw new Error('alternative is not safely pre-match');
+              if (!Number.isFinite(probability) || probability<0.65 || probability>1 || !Number.isFinite(odds) || odds<=1) throw new Error('alternative failed the public probability/odds floor');
+              if (item.market==='total' && (!['over','under'].includes(String(item.pick||'')) || !Number.isFinite(Number(item.line)) || Number(item.line)<=0)) throw new Error('total alternative lacks its exact line/side');
+              if (item.market==='winner' && !['p1','p2','draw'].includes(String(item.pick||''))) throw new Error('winner alternative has an invalid side');
+              if (item.sport==='efootball' && !['18','189'].includes(String(item.market_id))) throw new Error('eFootball alternative is outside the supported exact total markets');
+            }
+            qualifiedAlternativesCheck = {
+              verified_at:new Date().toISOString(),
+              endpoint:'/api/public/market-alternatives',
+              api_status:payload.status,
+              status:rows.length?'READY':'VALID_ZERO',
+              alternative_count:rows.length,
+              unique_fixture_count:new Set(rows.map(x=>String(x.sport)+'|'+String(x.event_id))).size,
+              sports:[...new Set(rows.map(x=>String(x.sport)))].sort(),
+              sample:rows.slice(0,5).map(x=>({sport:x.sport,product:x.product||null,event_id:x.event_id,match:x.match,market:x.market,pick:x.pick,line:x.line,odds:x.odds,probability:x.probability,start_time:x.start_time}))
+            };
+            writeFileSync('QUALIFIED-ALTERNATIVES-PRODUCTION-CHECK.json',JSON.stringify(qualifiedAlternativesCheck,null,2)+'\\n');
+            console.log('Public qualified alternatives endpoint passed: '+rows.length+' selectable candidate(s) across '+qualifiedAlternativesCheck.unique_fixture_count+' fixture(s); status '+qualifiedAlternativesCheck.status+'.');
+          } catch(e) {
+            qualifiedAlternativesCheck = {verified_at:new Date().toISOString(),endpoint:'/api/public/market-alternatives',status:'ERROR',alternative_count:0,unique_fixture_count:0,sports:[],error:String(e.message||e)};
+            writeFileSync('QUALIFIED-ALTERNATIVES-PRODUCTION-CHECK.json',JSON.stringify(qualifiedAlternativesCheck,null,2)+'\\n');
+            failures.push('/api/public/market-alternatives '+qualifiedAlternativesCheck.error);
+          }
+
           // Analyst-specific production check: its page must be present and the
           // private record API must reject an unauthenticated same-origin request.
           try {
@@ -1271,6 +1319,7 @@ jobs:
           set -euo pipefail
           cp LIVE-PRODUCTION-CHECK.json /tmp/live-production-check.json 2>/dev/null || true
           cp BOOKING-PRODUCTION-CHECK.json /tmp/booking-production-check.json 2>/dev/null || true
+          cp QUALIFIED-ALTERNATIVES-PRODUCTION-CHECK.json /tmp/qualified-alternatives-check.json 2>/dev/null || true
           for attempt in 1 2 3 4 5; do
             git fetch origin main
             git reset --hard origin/main
@@ -1280,12 +1329,16 @@ jobs:
           from pathlib import Path
           live={}
           booking={}
+          alternatives={}
           p=Path('/tmp/live-production-check.json')
           if p.exists():
               live=json.loads(p.read_text())
           b=Path('/tmp/booking-production-check.json')
           if b.exists():
               booking=json.loads(b.read_text())
+          q=Path('/tmp/qualified-alternatives-check.json')
+          if q.exists():
+              alternatives=json.loads(q.read_text())
           valid_zero_coverage = live.get('no_model_qualified_candidates') is True and live.get('scan_complete') is True
           coverage_complete = live.get('scan_complete') is True and not valid_zero_coverage
           booking_status = str(booking.get('status') or 'NOT_RECORDED')
@@ -1301,7 +1354,12 @@ jobs:
               checks.append('qualified_best_valid_zero')
           else:
               checks.append('qualified_best_shortlist' if coverage_complete else 'qualified_best_live_quote_diagnostic_incomplete')
-          verification_complete = (coverage_complete or valid_zero_coverage) and booking_verified
+          alternatives_ready = alternatives.get('status') == 'READY' and int(alternatives.get('alternative_count') or 0) > 0
+          alternatives_valid_zero = alternatives.get('status') == 'VALID_ZERO'
+          alternative_status = 'READY' if alternatives_ready else 'VALID_ZERO' if alternatives_valid_zero else str(alternatives.get('status') or 'NOT_RECORDED')
+          # Deployment can be healthy with zero picks, but the requested selectable-alternative
+          # outcome is not complete until the live feed contains at least one approved row.
+          verification_complete = (coverage_complete or valid_zero_coverage) and booking_verified and alternatives_ready
           Path('DEPLOY-VERIFY-CLOUDFLARE.json').write_text(json.dumps({
             'status':'VERIFIED' if verification_complete else 'VERIFIED_WITH_DIAGNOSTIC_INCOMPLETE',
             'core_pages_status':'VERIFIED',
@@ -1309,6 +1367,10 @@ jobs:
             'qualified_best_candidate_pool_rows':live.get('candidate_pool_rows_in_next_7_days',0),
             'qualified_best_model_qualified_rows':live.get('model_qualified_candidate_rows_in_next_7_days',live.get('virtual_candidate_rows_in_next_7_days',0)),
             'booking_api_status':'VERIFIED' if booking_verified else booking_status,
+            'qualified_alternatives_status':alternative_status,
+            'qualified_alternatives_count':int(alternatives.get('alternative_count') or 0),
+            'qualified_alternatives':alternatives,
+            'shared_ticket_drawer_status':'READY' if alternatives_ready else 'WIRED_NO_QUALIFIED_ROWS' if alternatives_valid_zero else 'NOT_VERIFIED',
             'provider':'Cloudflare Pages',
             'source_commit':os.environ['DEPLOY_SOURCE_COMMIT'],
             'verified_at':datetime.now(timezone.utc).isoformat(),
