@@ -36,6 +36,10 @@ function publicAlternative(row) {
   const sportybetEventId = String(row.sportybet_event_id || (sport === "efootball" ? row.event_id : ""));
   const marketId = String(row.sportybet_market_id || "");
   const startTime = String(row.start_time || "");
+  const match = String(row.match || "");
+  const matchParts = match.split(/\s+vs\s+/i);
+  const player1 = String(row.player_1 || row.home_team || matchParts[0] || "").trim();
+  const player2 = String(row.player_2 || row.away_team || matchParts[1] || "").trim();
   const probability = Number(row.model_probability);
   const odds = Number(row.bookmaker_odds);
   const line = row.line == null ? null : Number(row.line);
@@ -47,9 +51,8 @@ function publicAlternative(row) {
   return {
     sport, product: sport === "efootball" ? product : null,
     event_id: eventId, sportybet_event_id: sportybetEventId,
-    start_time: startTime, player_1: String(row.player_1 || row.home_team || row.match || "").split(/\\s+vs\\s+/i)[0].trim(),
-    player_2: String(row.player_2 || row.away_team || row.match || "").split(/\\s+vs\\s+/i)[1]?.trim() || "",
-    match: String(row.match || ""), market: total ? "total" : "winner",
+    start_time: startTime, player_1: player1, player_2: player2,
+    match, market: total ? "total" : "winner",
     market_label: total ? (market === "total_games" ? "Total games" : "Total goals") : "Winner",
     pick, line, market_id: marketId, odds,
     probability, role: "ALTERNATIVE", source: "SYSTEM_RECOMMENDED"
