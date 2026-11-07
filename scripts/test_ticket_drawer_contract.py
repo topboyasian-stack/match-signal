@@ -41,7 +41,10 @@ def main():
     selector = (ROOT / "qualified-alternatives.js").read_text(encoding="utf-8")
     require("querySelectorAll('[data-ms-fixture-id]')" in selector and "x.event_id===event&&x.sport===sport" in selector,
             "Qualified alternatives must attach to the exact fixture card and sport, never a different event")
-    require('data-ticket-model-qualified="true"' in selector, "Builder-gated alternatives must retain their qualification state when added to the shared ticket")
+    require('data-ticket-model-qualified="true"' in selector and "model_qualified:target.getAttribute('data-ticket-model-qualified')==='true'" in drawer,
+            "Builder-gated alternatives must retain their qualification state when added to the shared ticket")
+    require('data-ticket-event="' in selector and 'data-ticket-sportybet-event="' in selector and 'data-ticket-market-id="' in selector and 'data-ticket-start="' in selector,
+            "Qualified alternatives must pass the exact fixture, provider event, market ID and kickoff into the shared ticket")
     unified_row = hub.split("function unifiedRow(group){", 1)[1].split("async function renderUnifiedBoard", 1)[0]
     qualified_best_row = hub.split("function qualifiedBestRow(x){", 1)[1].split("// VFOOTBALL", 1)[0]
     require("data-ms-fixture-id" in unified_row and "data-ms-fixture-sport" in unified_row,
