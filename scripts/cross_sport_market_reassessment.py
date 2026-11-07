@@ -896,7 +896,9 @@ def _make_audit_record(core: Any, row: dict[str, Any], now: datetime) -> dict[st
         status = str(leg.get("status") or "REJECTED")
     match = f"{row.get('player_1') or row.get('home_team') or ''} vs {row.get('player_2') or row.get('away_team') or ''}".strip()
     market_assessment = row.get("market_reassessment") or {}
-    sport = str(row.get("sport") or "")
+    sport = str(row.get("sport") or "").lower()
+    if sport in {"efootball", "efootball_gt", "efootball_adriatic"}:
+        sport = "virtual"
     event_id = str(row.get("event_id") or "")
     primary_id = hashlib.sha256((sport + "|" + event_id).encode("utf-8")).hexdigest()[:24] if sport and event_id else None
     return {
@@ -1094,7 +1096,13 @@ def _write_reassessment_artifact(core: Any, now: datetime) -> dict[str, Any]:
     nba_records = []
     for row in nba_rows:
         item = dict(row)
+        sport = str(row.get("sport") or "basketball").lower()
+        event_id = str(row.get("event_id") or "")
+        primary_id = hashlib.sha256((sport + "|" + event_id).encode("utf-8")).hexdigest()[:24] if event_id else None
         item.update({
+            "prediction_role": "ALTERNATIVE",
+            "primary_prediction_id": primary_id,
+            "alternative_source": "SYSTEM_RECOMMENDED",
             "match": f"{row.get('player_1')} vs {row.get('player_2')}",
             "market": "total_ou",
             "sport": "basketball",
