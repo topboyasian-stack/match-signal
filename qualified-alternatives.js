@@ -11,7 +11,10 @@ function attach(){
   let host=card.querySelector('.ms-qualified-alternatives');
   const found=rows.filter(x=>x.event_id===event&&x.sport===sport).slice(0,2);
   if(!found.length){if(host)host.remove();return;}
+  const signature=JSON.stringify(found.map(x=>[x.market,x.pick,x.line,x.probability,x.odds,x.quote_timestamp]));
+  if(host&&host.dataset.signature===signature)return;
   if(!host){host=document.createElement('section');host.className='ms-qualified-alternatives';card.appendChild(host);}
+  host.dataset.signature=signature;
   host.innerHTML='<div class="ms-alt-heading"><b>Best qualified alternative'+(found.length>1?'s':'')+'</b><span>Fresh SportyBet quote · ≤15 min</span></div>'+found.map(button).join('');
  });
 }
