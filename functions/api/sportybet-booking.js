@@ -896,7 +896,9 @@ async function handlePost(context) {
     // Keep the lookup bounded by SportyBet's supported 30-day catalogue window.
     const catalogueTimeline = manualMode ? ticketCatalogueTimeline(legs) : 168;
     let nbaReleaseContext = null;
-    if (hasBasketballLeg && !manualMode) {
+    if (hasBasketballLeg) {
+      // Manual tickets share the same locked NBA gate as Builder batches. Client-provided
+      // model_qualified flags are untrusted and cannot bypass the global release evidence.
       try { nbaReleaseContext = await loadNbaReleaseContext(); }
       catch (error) { return json({ ok: false, error: 'NBA_RELEASE_EVIDENCE_UNAVAILABLE', message: 'NBA release evidence could not be verified. No ticket code was requested.' }, 503); }
       if (!nbaTotalsReleaseQualified(nbaReleaseContext.evidence, nbaReleaseContext.probability)) return json({ ok: false, error: 'NBA_RELEASE_GATE_LOCKED', message: 'The independent NBA totals release gate has not passed. No SportyBet ticket code was requested.' }, 423);
@@ -1044,7 +1046,7 @@ async function handlePost(context) {
         continue;
       }
       let nbaQualification = null;
-      if (!manualMode && String(leg?.sport || '').toLowerCase() === 'basketball') {
+      if (String(leg?.sport || '').toLowerCase() === 'basketball') {
         nbaQualification = nbaTotalTicketLegQualified(leg, selection, nbaReleaseContext);
         if (!nbaQualification.ok) { validation.push(validationFailure(leg, nbaQualification.reason)); continue; }
       }
