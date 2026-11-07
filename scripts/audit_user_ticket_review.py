@@ -1,8 +1,9 @@
-"""Validate and summarize private user-selected O/U evidence without changing it.
+"""Validate and summarize private mixed-sport user-ticket evidence without changing it.
 
-This audit keeps a user's actual selections separate from Match Signal's desk
-predictions and from model-training history. By default it emits aggregate counts
-only; it never writes the input file or returns fixture/ticket identifiers.
+This audit keeps every actual leg outcome separate from the accumulator result,
+Match Signal's original desk prediction, and model-training history. By default it
+emits aggregate counts only; it never writes the input file or returns fixture or
+ticket identifiers.
 """
 from __future__ import annotations
 
