@@ -10,6 +10,7 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import cross_sport_market_reassessment as reassessment
+from fixture_primary_prediction_ledger import build_fixture_ledger, merge_primary_ledger, primary_summary
 
 
 class FakeCore:
@@ -109,6 +110,27 @@ class CrossSportReassessmentTests(unittest.TestCase):
     def setUp(self):
         self.now = datetime(2026, 11, 6, 12, 0, tzinfo=timezone.utc)
         reassessment._RUN_OPTIONS.clear()
+
+    def test_fixture_primary_is_single_frozen_pick_and_alternatives_do_not_replace_it(self):
+        rows = [
+            {"sport": "football", "event_id": "evt-1", "pick": "p1", "probabilities": {"p1": 0.61}, "start_time": (self.now + timedelta(hours=1)).isoformat()},
+            {"sport": "football", "event_id": "evt-1", "primary_market": "total_goals", "primary_pick": "over", "primary_probability": 0.72, "start_time": (self.now + timedelta(hours=1)).isoformat()},
+            {"sport": "tennis", "event_id": "evt-2", "pick": "p1", "probabilities": {"p1": 0.66}, "start_time": (self.now + timedelta(hours=1)).isoformat()},
+            {"sport": "virtual", "event_id": "evt-3", "pick": "over", "start_time": (self.now + timedelta(hours=1)).isoformat()},
+        ]
+        ledger = build_fixture_ledger(rows, self.now)
+        by_event = {x["event_id"]: x for x in ledger}
+        self.assertEqual(by_event["evt-1"]["primary_status"], "UNCLASSIFIED")
+        self.assertEqual(by_event["evt-2"]["primary_market"], "winner")
+        self.assertEqual(by_event["evt-3"]["primary_status"], "UNCLASSIFIED")
+        self.assertEqual(primary_summary(ledger)["fixture_count"], 3)
+
+    def test_primary_ledger_never_overwrites_an_existing_frozen_prediction(self):
+        original = build_fixture_ledger([{"sport": "football", "event_id": "evt", "pick": "p1", "probabilities": {"p1": 0.7}}], self.now)
+        changed = build_fixture_ledger([{"sport": "football", "event_id": "evt", "pick": "p2", "probabilities": {"p2": 0.8}}], self.now)
+        merged = merge_primary_ledger(original, changed, lambda *_: None, {}, self.now)
+        self.assertEqual(merged[0]["primary_pick"], "p1")
+        self.assertEqual(merged[0]["primary_status"], "FROZEN")
 
     def test_raw_reassessment_artifacts_are_routed_to_ignored_private_store(self):
         private_dir = reassessment.DATA / "calibration_private"
