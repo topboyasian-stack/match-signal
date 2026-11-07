@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { onRequestGet, onRequestPut, onRequestDelete } from "../functions/api/analyst/records.js";
+import { validateDocument } from "../functions/api/analyst/market-evidence.js";
 import { buildPublicAlternatives } from "../functions/api/public/market-alternatives.js";
 
 const token = "analyst-test-token-" + "a".repeat(48);
@@ -143,6 +144,40 @@ function documentWithTicket() {
     }]
   };
 }
+
+
+const validAlternativeDoc = {
+  record_type: "cross_sport_market_reassessment",
+  mode: "PAPER_ONLY",
+  records: [{
+    snapshot_id: "a".repeat(24),
+    sport: "football",
+    event_id: "football-event-1",
+    market: "1X2",
+    pick: "p2",
+    quote_timestamp: "2026-11-07T23:40:00Z",
+    start_time: "2026-11-08T12:00:00Z",
+    model_probability: 0.71,
+    bookmaker_odds: 1.72,
+    settlement_status: "PENDING",
+    prediction_role: "ALTERNATIVE",
+    alternative_source: "SYSTEM_RECOMMENDED",
+    primary_prediction_id: "b".repeat(24)
+  }]
+};
+assert.deepEqual(validateDocument(validAlternativeDoc), [], "a same-fixture alternative linked by primary prediction ID is valid");
+const invalidPrimaryLink = structuredClone(validAlternativeDoc);
+invalidPrimaryLink.records[0].primary_prediction_id = "not-a-primary-id";
+assert.ok(
+  validateDocument(invalidPrimaryLink).includes("records[0].primary_prediction_id is invalid"),
+  "malformed primary prediction links must not be persisted"
+);
+const invalidRole = structuredClone(validAlternativeDoc);
+invalidRole.records[0].prediction_role = "PRIMARY";
+assert.ok(
+  validateDocument(invalidRole).includes("records[0].prediction_role is invalid"),
+  "only alternative records may be published in the alternatives evidence stream"
+);
 
 const store = new MemoryKV();
 let response = await onRequestGet(context("GET", undefined, { "Authorization": "Bearer wrong-token" }, store));

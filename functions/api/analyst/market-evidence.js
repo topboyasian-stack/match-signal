@@ -21,7 +21,7 @@ async function readDocument(env) {
   return value;
 }
 
-function validateDocument(value) {
+export function validateDocument(value) {
   const errors = [];
   if (!value || typeof value !== "object" || Array.isArray(value)) return ["root must be an object"];
   if (value.record_type !== "cross_sport_market_reassessment") errors.push("record_type is invalid");
@@ -61,6 +61,18 @@ function validateDocument(value) {
     if (typeof row.model_probability !== "number" || !Number.isFinite(row.model_probability) || row.model_probability < 0 || row.model_probability > 1) errors.push(where + ".model_probability is invalid");
     if (typeof row.bookmaker_odds !== "number" || !Number.isFinite(row.bookmaker_odds) || row.bookmaker_odds <= 1) errors.push(where + ".bookmaker_odds is invalid");
     if (row.settlement_status !== "PENDING" && row.settlement_status !== "SETTLED") errors.push(where + ".settlement_status is invalid");
+    // Preserve the primary-pick link that lets the public alternatives feed
+    // distinguish a true same-fixture alternative from an orphan candidate.
+    if (row.primary_prediction_id !== undefined && row.primary_prediction_id !== null && String(row.primary_prediction_id).trim() !== "" &&
+        (typeof row.primary_prediction_id !== "string" || !/^[a-f0-9]{24}$/.test(row.primary_prediction_id))) {
+      errors.push(where + ".primary_prediction_id is invalid");
+    }
+    if (row.prediction_role !== undefined && row.prediction_role !== "ALTERNATIVE") {
+      errors.push(where + ".prediction_role is invalid");
+    }
+    if (row.alternative_source !== undefined && row.alternative_source !== "SYSTEM_RECOMMENDED") {
+      errors.push(where + ".alternative_source is invalid");
+    }
   }
   return errors;
 }
