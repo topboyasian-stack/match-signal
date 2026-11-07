@@ -5507,15 +5507,18 @@ def recent_settled(history,now,known):
 
 
 def _builder_prediction_source(now):
-    """Use fresh Unified Upcoming model rows when the canonical feed has expired."""
+    """Combine canonical near-term rows with fresh live rows for sports the feed misses."""
     canonical=load(PREDICTIONS,[])
     canonical=canonical if isinstance(canonical,list) else []
-    canonical_future=[
-        row for row in canonical
-        if isinstance(row,dict)
-        and str(row.get("sport") or "").lower() in {"football","tennis"}
-        and within_builder_horizon(row,now)
-    ]
+    canonical_future={
+        sport:[
+            row for row in canonical
+            if isinstance(row,dict)
+            and str(row.get("sport") or "").lower()==sport
+            and within_builder_horizon(row,now)
+        ]
+        for sport in ("football","tennis")
+    }
     status=load(DATA/"pipeline_status.json",{})
     stamp=None
     try:
@@ -5528,27 +5531,50 @@ def _builder_prediction_source(now):
     except (TypeError,ValueError):
         stamp=None
     canonical_stale=stamp is None or stamp < now-timedelta(hours=4)
-    if canonical_future and not canonical_stale:
-        return canonical,"canonical_predictions"
 
     board=load(DATA/"unified_upcoming.json",{})
     events=board.get("events") if isinstance(board,dict) else []
-    fallback=[
-        dict(row) for row in events if isinstance(row,dict)
-        and str(row.get("sport") or "").lower() in {"football","tennis"}
-        and str(row.get("source_engine") or "")=="unified_live_refresh"
-        and within_builder_horizon(row,now)
-        and not (
-            str(row.get("sport") or "").lower()=="tennis"
-            and (
+    fallback_by_sport={"football":[],"tennis":[]}
+    if isinstance(events,list):
+        for row in events:
+            if not isinstance(row,dict):
+                continue
+            sport=str(row.get("sport") or "").lower()
+            if sport not in fallback_by_sport:
+                continue
+            if str(row.get("source_engine") or "")!="unified_live_refresh" or not within_builder_horizon(row,now):
+                continue
+            if sport=="tennis" and (
                 str(row.get("prediction_status") or "")=="watch_projection"
                 or str(row.get("qualification_status") or "")=="TENNIS_FORWARD_WATCH_NOT_QUALIFIED"
-            )
-        )
-    ] if isinstance(events,list) else []
-    if fallback:
-        return fallback,"unified_live_refresh_fallback"
-    return canonical,"canonical_predictions_stale_no_fallback"
+            ):
+                continue
+            fallback_by_sport[sport].append(dict(row))
+
+    chosen=[]
+    used_fallback=False
+    if canonical_stale:
+        # Do not use an aged model row just because it is still in the 12-hour
+        # window. Only fresh live-refresh rows can replace a stale feed.
+        for sport in ("football","tennis"):
+            chosen.extend(fallback_by_sport[sport])
+            used_fallback = used_fallback or bool(fallback_by_sport[sport])
+        if not chosen:
+            return [],"stale_canonical_no_live_fallback"
+        return chosen,"unified_live_refresh_fallback"
+
+    for sport in ("football","tennis"):
+        if canonical_future[sport]:
+            chosen.extend(canonical_future[sport])
+        elif fallback_by_sport[sport]:
+            chosen.extend(fallback_by_sport[sport])
+            used_fallback=True
+
+    if used_fallback:
+        return chosen,"mixed_canonical_unified_fallback"
+    if chosen:
+        return chosen,"canonical_predictions"
+    return [],"no_upcoming_core_fixtures"
 
 
 def main():
