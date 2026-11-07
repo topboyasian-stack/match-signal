@@ -56,6 +56,7 @@ on:
       - 'ticket-drawer.js'
       - 'ticket-drawer.css'
       - 'scripts/test_ticket_drawer_contract.py'
+      - 'scripts/test_nba_production_gate.mjs'
       - '.github/workflows/ticket-drawer-contract.yml'
       - 'ms-design-system.css'
       - 'core-workspaces-design.css'
@@ -1306,6 +1307,12 @@ jobs:
           if (failures.length) { console.error(failures.join('\n')); process.exit(1); }
           console.log('Production HTTP smoke tests passed: '+pages.length+' pages, '+assets.length+' assets, NBA ESPN proxy');
           NODE
+
+      - name: Verify NBA manual ticket gate on production and immutable artifact
+        timeout-minutes: 2
+        env:
+          CLOUDFLARE_DEPLOYMENT_URL: ${{ steps.pages-deployment.outputs.url }}
+        run: node scripts/test_nba_production_gate.mjs
 
       - name: Verify live eFootball quote coverage for Qualified Best
         timeout-minutes: 3
