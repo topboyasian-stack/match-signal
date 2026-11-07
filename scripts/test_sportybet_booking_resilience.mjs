@@ -501,7 +501,13 @@ try {
       {id:prefix+'-under',desc:'Under ' + line,odds:1.17,isActive:1}
     ]
   });
-  const staleProviderPage = staleIdLegs.map((leg,index) => makeFixture(
+  const makeStaleIdFixture = (eventId, homeTeamName, awayTeamName, market) => ({
+    eventId, homeTeamName, awayTeamName,
+    estimateStartTime:staleIdKickoff,
+    matchStatus:'Not start',
+    markets:[market]
+  });
+  const staleProviderPage = staleIdLegs.map((leg,index) => makeStaleIdFixture(
     leg.sportybet_event_id,
     'Unrelated Home ' + index,
     'Unrelated Away ' + index,
@@ -509,7 +515,7 @@ try {
   ));
   while (staleProviderPage.length < 100) {
     const index = staleProviderPage.length;
-    staleProviderPage.push(makeFixture(
+    staleProviderPage.push(makeStaleIdFixture(
       'sr:match:stale-page-filler-' + index,
       'Catalogue Filler Home ' + index,
       'Catalogue Filler Away ' + index,
@@ -517,8 +523,8 @@ try {
     ));
   }
   const currentFixturePage = [
-    makeFixture('sr:match:current-malaga-racing','Málaga','Racing Santander',totalMarket(1.5,'malaga')),
-    makeFixture('sr:match:current-dortmund-elversberg','Borussia Dortmund','SV Elversberg',totalMarket(5.5,'dortmund'))
+    makeStaleIdFixture('sr:match:current-malaga-racing','Málaga','Racing Santander',totalMarket(1.5,'malaga')),
+    makeStaleIdFixture('sr:match:current-dortmund-elversberg','Borussia Dortmund','SV Elversberg',totalMarket(5.5,'dortmund'))
   ];
   const staleIdPageRequests = [];
   const staleIdShareRequests = [];
