@@ -1,78 +1,163 @@
 {
-  "checked_at": "2026-11-07T04:52:53.280512+00:00",
+  "checked_at": "2026-11-07T04:58:44.088777+00:00",
   "paper_only": true,
   "model_version": "nba-total-v5.1-pace-efficiency-calibrated",
   "source": "SportyBet Nigeria public NBA feed via Match Signal regional proxy",
-  "feed_error": "SportyBet feed unavailable: page 1: 503 Server Error: Service Unavailable for url: https://match-signal.pages.dev/api/sportybet-basketball?pageSize=100&timeline=168&pageNum=1&tournamentId=sr%3Atournament%3A132",
-  "feed_diagnostics": [],
-  "feed_events": 0,
-  "feed_events_with_market_225": 0,
+  "feed_error": null,
+  "feed_diagnostics": [
+    {
+      "collector_page_num": 1,
+      "endpoint": "/api/ng/factsCenter/pcUpcomingEvents",
+      "market_id": "1,18,10,29,11,26,36,14,60100,186,189,202,204,210",
+      "page_num": 1,
+      "page_size": 100,
+      "timeline_hours": 168,
+      "source_origin": "https://match-signal-sportybet-proxy.topboyasian.workers.dev",
+      "http_status": 200,
+      "biz_code": 10000,
+      "top_level_keys": [
+        "bizCode",
+        "message",
+        "data"
+      ],
+      "data_keys": [
+        "totalNum",
+        "tournaments"
+      ],
+      "upstream_total_events": 462,
+      "tournament_count": 12,
+      "event_count": 100,
+      "response_shape": "TOURNAMENTS_PRESENT"
+    },
+    {
+      "collector_page_num": 1,
+      "endpoint": "/api/ng/factsCenter/pcUpcomingEvents",
+      "market_id": "225",
+      "page_num": 1,
+      "page_size": 100,
+      "timeline_hours": 168,
+      "source_origin": "https://match-signal-sportybet-proxy.topboyasian.workers.dev",
+      "http_status": 200,
+      "biz_code": 10000,
+      "top_level_keys": [
+        "bizCode",
+        "message",
+        "data"
+      ],
+      "data_keys": [
+        "totalNum",
+        "tournaments"
+      ],
+      "upstream_total_events": 462,
+      "tournament_count": 12,
+      "event_count": 100,
+      "response_shape": "TOURNAMENTS_PRESENT"
+    },
+    {
+      "collector_page_num": 1,
+      "endpoint": "/api/ng/factsCenter/wapConfigurableUpcomingEvents",
+      "market_id": null,
+      "page_num": 1,
+      "page_size": 100,
+      "timeline_hours": 168,
+      "source_origin": "https://match-signal-sportybet-proxy.topboyasian.workers.dev",
+      "http_status": 200,
+      "biz_code": 10000,
+      "top_level_keys": [
+        "bizCode",
+        "message",
+        "data"
+      ],
+      "data_keys": [],
+      "upstream_total_events": null,
+      "tournament_count": 1,
+      "event_count": 10,
+      "response_shape": "FLAT_EVENT_ARRAY_PRESENT"
+    },
+    {
+      "collector_page_num": 2,
+      "endpoint": "/api/ng/factsCenter/pcUpcomingEvents",
+      "market_id": "1,18,10,29,11,26,36,14,60100,186,189,202,204,210",
+      "page_num": 2,
+      "page_size": 100,
+      "timeline_hours": 168,
+      "source_origin": "https://match-signal-sportybet-proxy.topboyasian.workers.dev",
+      "http_status": 200,
+      "biz_code": 10000,
+      "top_level_keys": [
+        "bizCode",
+        "message",
+        "data"
+      ],
+      "data_keys": [
+        "totalNum",
+        "tournaments"
+      ],
+      "upstream_total_events": 462,
+      "tournament_count": 19,
+      "event_count": 100,
+      "response_shape": "TOURNAMENTS_PRESENT"
+    },
+    {
+      "collector_page_num": 2,
+      "endpoint": "/api/ng/factsCenter/pcUpcomingEvents",
+      "market_id": "225",
+      "page_num": 2,
+      "page_size": 100,
+      "timeline_hours": 168,
+      "source_origin": "https://match-signal-sportybet-proxy.topboyasian.workers.dev",
+      "http_status": 200,
+      "biz_code": 10000,
+      "top_level_keys": [
+        "bizCode",
+        "message",
+        "data"
+      ],
+      "data_keys": [
+        "totalNum",
+        "tournaments"
+      ],
+      "upstream_total_events": 462,
+      "tournament_count": 19,
+      "event_count": 100,
+      "response_shape": "TOURNAMENTS_PRESENT"
+    },
+    {
+      "collector_page_num": 2,
+      "endpoint": "/api/ng/factsCenter/wapConfigurableUpcomingEvents",
+      "market_id": null,
+      "page_num": 2,
+      "page_size": 100,
+      "timeline_hours": 168,
+      "source_origin": "https://match-signal-sportybet-proxy.topboyasian.workers.dev",
+      "http_status": 200,
+      "biz_code": 10000,
+      "top_level_keys": [
+        "bizCode",
+        "message",
+        "data"
+      ],
+      "data_keys": [],
+      "upstream_total_events": null,
+      "tournament_count": 1,
+      "event_count": 10,
+      "response_shape": "FLAT_EVENT_ARRAY_PRESENT"
+    }
+  ],
+  "feed_events": 7,
+  "feed_events_with_market_225": 7,
   "model_predictions_checked": 62,
   "upcoming_v5_predictions": 51,
-  "exact_fresh_market_matches": 0,
-  "prediction_price_updates": 0,
+  "exact_fresh_market_matches": 7,
+  "prediction_price_updates": 7,
   "started_or_finished_skipped": 11,
   "fresh_price_snapshots_considered": 7,
   "price_match_status_counts": {
-    "SPORTYBET_FIXTURE_NOT_LISTED_IN_FEED": 51
+    "MATCHED": 7,
+    "SPORTYBET_FIXTURE_NOT_LISTED_IN_FEED": 43,
+    "SPORTYBET_START_TIME_MISMATCH_OVER_45_MIN": 1
   },
   "unmatched_fixtures": [
-    {
-      "event_id": "401909938",
-      "home": "Indiana Pacers",
-      "away": "Denver Nuggets",
-      "start_time": "2026-11-07T22:00:00+00:00",
-      "reason": "SPORTYBET_FIXTURE_NOT_LISTED_IN_FEED",
-      "nearby_feed_candidates": []
-    },
-    {
-      "event_id": "401909939",
-      "home": "Atlanta Hawks",
-      "away": "Brooklyn Nets",
-      "start_time": "2026-11-08T00:30:00+00:00",
-      "reason": "SPORTYBET_FIXTURE_NOT_LISTED_IN_FEED",
-      "nearby_feed_candidates": []
-    },
-    {
-      "event_id": "401909940",
-      "home": "Cleveland Cavaliers",
-      "away": "New York Knicks",
-      "start_time": "2026-11-08T01:00:00+00:00",
-      "reason": "SPORTYBET_FIXTURE_NOT_LISTED_IN_FEED",
-      "nearby_feed_candidates": []
-    },
-    {
-      "event_id": "401909941",
-      "home": "Oklahoma City Thunder",
-      "away": "Washington Wizards",
-      "start_time": "2026-11-08T01:00:00+00:00",
-      "reason": "SPORTYBET_FIXTURE_NOT_LISTED_IN_FEED",
-      "nearby_feed_candidates": []
-    },
-    {
-      "event_id": "401909942",
-      "home": "Golden State Warriors",
-      "away": "Orlando Magic",
-      "start_time": "2026-11-08T01:30:00+00:00",
-      "reason": "SPORTYBET_FIXTURE_NOT_LISTED_IN_FEED",
-      "nearby_feed_candidates": []
-    },
-    {
-      "event_id": "401909943",
-      "home": "Phoenix Suns",
-      "away": "Houston Rockets",
-      "start_time": "2026-11-08T02:00:00+00:00",
-      "reason": "SPORTYBET_FIXTURE_NOT_LISTED_IN_FEED",
-      "nearby_feed_candidates": []
-    },
-    {
-      "event_id": "401909944",
-      "home": "Portland Trail Blazers",
-      "away": "San Antonio Spurs",
-      "start_time": "2026-11-08T03:00:00+00:00",
-      "reason": "SPORTYBET_FIXTURE_NOT_LISTED_IN_FEED",
-      "nearby_feed_candidates": []
-    },
     {
       "event_id": "401909945",
       "home": "Chicago Bulls",
@@ -254,7 +339,7 @@
       "home": "New York Knicks",
       "away": "Cleveland Cavaliers",
       "start_time": "2026-11-12T00:00:00+00:00",
-      "reason": "SPORTYBET_FIXTURE_NOT_LISTED_IN_FEED",
+      "reason": "SPORTYBET_START_TIME_MISMATCH_OVER_45_MIN",
       "nearby_feed_candidates": []
     },
     {
@@ -427,17 +512,17 @@
     }
   ],
   "immutable_snapshot_count_before": 3886,
-  "immutable_snapshot_count_after": 3886,
-  "immutable_snapshots_added": 0,
+  "immutable_snapshot_count_after": 3893,
+  "immutable_snapshots_added": 7,
   "publication_capture": {
     "model_version": "nba-total-v5.1-pace-efficiency-calibrated",
     "model_predictions": 62,
     "predictions_with_fresh_sportybet_market_225_pair": 7,
-    "immutable_fresh_publication_snapshots": 3615,
+    "immutable_fresh_publication_snapshots": 3622,
     "unique_events_with_immutable_snapshots": 18,
     "snapshot_coverage": 0.2903,
-    "directional_pick_snapshots": 1699,
-    "no_clear_lean_snapshots": 1916,
+    "directional_pick_snapshots": 1701,
+    "no_clear_lean_snapshots": 1921,
     "unpriced_or_unavailable_prediction_count": 55,
     "unmatched_fresh_market_predictions": 0,
     "capture_status": "PARTIAL"
