@@ -36,7 +36,7 @@ def main():
     alternatives_script = "qualified-alternatives.js?v=20261107-qualified-picks4"
     for page, source in (("football.html", football), ("tennis.html", tennis), ("basketball.html", basketball)):
         require(alternatives_script in source, f"{page} does not load the live qualified-alternatives selector")
-    require("../qualified-alternatives.js?v=20261107-qualified-picks3" in lab_html, "Virtual Lab must load the product-aware qualified-alternatives selector")
+    require("../qualified-alternatives.js?v=20261107-qualified-picks5" in lab_html, "Virtual Lab must load the product-aware qualified-alternatives selector")
     require('data-ticket-model-qualified="true"' in (ROOT / "qualified-alternatives.js").read_text(encoding="utf-8"), "Builder-gated alternatives must retain their qualification state when added to the shared ticket")
     require("function ticketAddMarkup" in hub and "Add prediction to ticket" in hub,
             "Football/Tennis prediction cards must expose a selectable ticket action")
