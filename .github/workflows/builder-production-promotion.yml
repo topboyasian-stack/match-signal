@@ -34,9 +34,9 @@ permissions:
   actions: write
   contents: read
 
-# Fresh concurrency namespace releases the v6 runs stranded before job allocation while preserving the ordered promotion sequence.
+# Fresh concurrency namespace releases runs waiting on the superseded Unified Upcoming publisher queue; preserve the ordered promotion sequence.
 concurrency:
-  group: builder-production-promotion-v7
+  group: builder-production-promotion-v8
   cancel-in-progress: false
 
 jobs:
