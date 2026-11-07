@@ -28,6 +28,9 @@ OUTPUT = PRIVATE_DIR / "cross_sport_market_reassessment_private.json"
 HISTORY_OUTPUT = PRIVATE_DIR / "cross_sport_market_reassessment_history.json"
 REVISION_PATH = PRIVATE_DIR / ".cross_sport_market_reassessment_revision"
 MAX_QUOTE_AGE_SECONDS = 900
+# Keep alternatives visible across the next two days; exact quote freshness and all
+# Builder eligibility checks remain mandatory before a candidate can qualify.
+ALTERNATIVE_HORIZON_MINUTES = 48 * 60
 MAX_HISTORY_RECORDS = 12000
 MIN_NBA_EDGE = 0.04
 MIN_NBA_EXPECTED_VALUE = 0.03
@@ -284,11 +287,20 @@ def _dedupe_candidates(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             indexed[key] = row
     return list(indexed.values())
 
+
+def _within_alternative_horizon(core: Any, row: dict[str, Any], now: datetime) -> bool:
+    """Broader discovery window for alternatives; never relaxes price/value gates."""
+    start = _dt(row.get("start_time"))
+    if start is None:
+        return False
+    minutes = (start - now).total_seconds() / 60.0
+    return 0.0 < minutes <= ALTERNATIVE_HORIZON_MINUTES
+
 def _football_options(core: Any, now: datetime, rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     active: list[dict[str, Any]] = []
     audit: list[dict[str, Any]] = []
     for row in rows:
-        if not isinstance(row, dict) or row.get("sport") != "football" or not core.within_builder_horizon(row, now):
+        if not isinstance(row, dict) or row.get("sport") != "football" or not _within_alternative_horizon(core, row, now):
             continue
         is_fresh, _, quote_stamp = _fresh_quote(row, now)
         snapshot = row.get("sportybet_market") or {}
@@ -450,7 +462,7 @@ def _tennis_options(core: Any, now: datetime, rows: list[dict[str, Any]], baseli
         predict_total_games = None
 
     for row in rows:
-        if not isinstance(row, dict) or row.get("sport") != "tennis" or not core.within_builder_horizon(row, now):
+        if not isinstance(row, dict) or row.get("sport") != "tennis" or not _within_alternative_horizon(core, row, now):
             continue
         is_fresh, _, _ = _fresh_quote(row, now)
         snapshot = row.get("sportybet_market") or {}
