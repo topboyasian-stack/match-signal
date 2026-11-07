@@ -1,0 +1,34 @@
+name: Qualified Alternative Publication Tests
+on:
+  pull_request:
+    paths:
+      - "functions/api/public/market-alternatives.js"
+      - "qualified-alternatives.js"
+      - "sport-hubs.js"
+      - "basketball-live.js"
+      - "tests/public-market-alternatives.test.mjs"
+      - ".github/workflows/qualified-alternative-publication-tests.yml"
+  push:
+    branches: [main]
+    paths:
+      - "functions/api/public/market-alternatives.js"
+      - "qualified-alternatives.js"
+      - "sport-hubs.js"
+      - "basketball-live.js"
+      - "tests/public-market-alternatives.test.mjs"
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Test public whitelist and recommendation gates
+        run: node --experimental-default-type=module --test tests/public-market-alternatives.test.mjs
+      - name: Check changed JavaScript syntax
+        run: |
+          node --experimental-default-type=module --check functions/api/public/market-alternatives.js
+          node --check qualified-alternatives.js
+          node --check sport-hubs.js
+          node --check basketball-live.js
