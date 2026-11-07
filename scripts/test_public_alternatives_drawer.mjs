@@ -20,13 +20,14 @@ const eligible = feed.alternatives.filter((row) => {
     row.event_id && row.sportybet_event_id && row.market_id &&
     row.role === "ALTERNATIVE" && row.source === "SYSTEM_RECOMMENDED" &&
     Number.isFinite(start) && start > now + 5 * 60 * 1000 &&
-    Number.isFinite(Number(row.probability)) && Number(row.probability) >= 0.65 &&
+    Number.isFinite(Number(row.probability)) && Number(row.probability) >= 0.55 &&
     Number.isFinite(Number(row.odds)) && Number(row.odds) > 1 &&
     (row.market === "total"
       ? ["over", "under"].includes(String(row.pick || "")) && Number.isFinite(Number(row.line)) && Number(row.line) > 0
       : row.market === "winner" && ["p1", "p2", "draw"].includes(String(row.pick || "")));
 });
-assert.ok(eligible.length, "At least one alternative must remain safely pre-match for a real click test");
+assert.ok(eligible.length, "At least one fresh exact-quote alternative must remain safely pre-match for a real click test");
+assert.ok(eligible.some(row => row.builder_qualified === false), "Research alternatives that miss a Builder gate must remain visible as unqualified alternatives");
 const byKey = new Map(eligible.map(row => [String(row.sport) + "|" + String(row.event_id), row]));
 
 const browser = await chromium.launch({ headless: true });
@@ -63,7 +64,7 @@ try {
 
     const matched = state.options.find(button => {
       const row = byKey.get(String(button.sport) + "|" + String(button.eventId));
-      return row && button.qualified === "true" &&
+      return row && button.qualified === String(row.builder_qualified === true) &&
         button.providerEventId === String(row.sportybet_event_id) &&
         button.market === String(row.market) &&
         button.marketId === String(row.market_id) &&
@@ -103,6 +104,7 @@ try {
     assert.equal(drawer.visible, true, "The shared drawer must open after the alternative is clicked");
     assert.equal(drawer.count, 1, "Exactly one selection must enter the shared ticket");
     assert.equal(drawer.persistedCount, 1, "The selected leg must persist in the shared ticket");
+    assert.equal(matched.qualified, String(byKey.get(String(matched.sport)+"|"+String(matched.eventId)).builder_qualified === true), "The alternative must not be mislabeled as Builder-qualified");
     assert.match(drawer.countLabel, /1 selection/i);
     assert.match(drawer.resultText, /Added to your single shared ticket/i);
     assert.ok(drawer.legText.includes(matched.match), "The shared drawer must display the clicked fixture");
@@ -117,6 +119,7 @@ try {
       pick: matched.pick,
       line: matched.line,
       market_id: matched.marketId,
+      builder_qualified: matched.qualified === "true",
       drawer_selection_count: drawer.count,
       persisted_selection_count: drawer.persistedCount,
       confirmation_text: drawer.resultText

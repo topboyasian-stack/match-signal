@@ -1,7 +1,7 @@
 // Production promotion: keep this endpoint on the guarded Cloudflare Pages deploy path.
 const EVIDENCE_KEY = "private-cross-sport-market-reassessment-v1";
 const MAX_QUOTE_AGE_SECONDS = 900;
-const MIN_RECOMMENDED_PROBABILITY = 0.65;
+const MIN_RECOMMENDED_PROBABILITY = 0.55;
 const SUPPORTED_MARKETS = new Set(["1X2", "winner", "total_goals", "total_games", "total_ou", "virtual_total"]);
 
 function json(body, status = 200) {
@@ -55,7 +55,9 @@ function publicAlternative(row) {
     match, market: total ? "total" : "winner",
     market_label: total ? (market === "total_games" ? "Total games" : "Total goals") : "Winner",
     pick, line, market_id: marketId, odds,
-    probability, role: "ALTERNATIVE", source: "SYSTEM_RECOMMENDED"
+    probability, builder_qualified: row.passed_builder_gates === true,
+    qualification_status: String(row.candidate_status || "RESEARCH_ONLY"),
+    role: "ALTERNATIVE", source: "SYSTEM_RECOMMENDED"
   };
 }
 
@@ -71,7 +73,7 @@ export async function onRequestGet({ request, env }) {
     const now = Date.now();
     const grouped = new Map();
     for (const row of document.records) {
-      if (!row || row.passed_builder_gates !== true || row.fresh_exact_quote !== true ||
+      if (!row || row.fresh_exact_quote !== true ||
           row.prediction_role !== "ALTERNATIVE" || row.alternative_source !== "SYSTEM_RECOMMENDED") continue;
       const start = timestamp(row.start_time);
       const quote = timestamp(row.quote_timestamp);
