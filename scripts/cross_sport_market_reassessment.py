@@ -452,6 +452,10 @@ def _tennis_options(core: Any, now: datetime, rows: list[dict[str, Any]], baseli
     for row in rows:
         if not isinstance(row, dict) or row.get("sport") != "tennis" or not core.within_builder_horizon(row, now):
             continue
+        # Forward-window watch projections are useful research visibility, but
+        # are not the calibrated tennis prediction source for Builder reassessment.
+        if str(row.get("prediction_status") or "") == "watch_projection" or str(row.get("qualification_status") or "") == "TENNIS_FORWARD_WATCH_NOT_QUALIFIED":
+            continue
         is_fresh, _, _ = _fresh_quote(row, now)
         snapshot = row.get("sportybet_market") or {}
         if snapshot.get("available") is not True:
@@ -1252,14 +1256,16 @@ def install(core: Any) -> None:
 
     def reassessed_football_candidates(now):
         base = _ORIGINALS["football_candidates"](now)
-        rows = core.load(core.PREDICTIONS, [])
+        active_rows = getattr(core, "ACTIVE_PREDICTION_ROWS", None)
+        rows = active_rows if isinstance(active_rows, list) else core.load(core.PREDICTIONS, [])
         options, audit = _football_options(core, now, rows if isinstance(rows, list) else [])
         _record_options(audit)
         return _dedupe_candidates((base if isinstance(base, list) else []) + options)
 
     def reassessed_tennis_candidates(now):
         base = _ORIGINALS["tennis_candidates"](now)
-        rows = core.load(core.PREDICTIONS, [])
+        active_rows = getattr(core, "ACTIVE_PREDICTION_ROWS", None)
+        rows = active_rows if isinstance(active_rows, list) else core.load(core.PREDICTIONS, [])
         result, audit = _tennis_options(core, now, rows if isinstance(rows, list) else [], base if isinstance(base, list) else [])
         _record_options(audit)
         return result
