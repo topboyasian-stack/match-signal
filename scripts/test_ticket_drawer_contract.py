@@ -33,6 +33,10 @@ def main():
     require('data-sport="basketball"' in basketball, "Basketball page lost its sport identity")
     require('data-sport="football"' in football, "Football page lost its sport identity")
     require('data-sport="tennis"' in tennis, "Tennis page lost its sport identity")
+    alternatives_script = "qualified-alternatives.js?v=20261107-qualified-picks2"
+    for page, source in (("football.html", football), ("tennis.html", tennis), ("basketball.html", basketball)):
+        require(alternatives_script in source, f"{page} does not load the live qualified-alternatives selector")
+    require("../qualified-alternatives.js?v=20261107-qualified-picks3" in lab_html, "Virtual Lab must load the product-aware qualified-alternatives selector")
     require("function ticketAddMarkup" in hub and "Add prediction to ticket" in hub,
             "Football/Tennis prediction cards must expose a selectable ticket action")
     require("ticketAddMarkup(x)" in hub and "ticketAddMarkup(p)" in hub,
