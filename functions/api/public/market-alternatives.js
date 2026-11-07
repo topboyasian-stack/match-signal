@@ -81,7 +81,7 @@ export async function onRequestGet({ request, env }) {
       // One or two only: a second option must be a genuinely distinct market/pick.
       const selected = [];
       for (const row of rows) {
-        if (selected.some(x => x.market === row.market && x.pick === row.pick && x.line === row.line)) continue;
+        if (selected.some(x => x.market === row.market && x.line === row.line)) continue;
         selected.push(row);
         if (selected.length === 2) break;
       }
