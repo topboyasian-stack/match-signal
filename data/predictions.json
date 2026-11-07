@@ -188,7 +188,8 @@
     "round": "Qualifying 1st Round",
     "rankings": {
       "p1": null,
-      "p2": 97
+      "p2": 97,
+      "gap": null
     },
     "form": {
       "p1": 0.5,
@@ -216,19 +217,40 @@
       "expected_games": 27.4,
       "total_games": {
         "line": 22.5,
-        "over": 0.8764,
-        "under": 0.1236,
+        "over": 0.7871,
+        "under": 0.2129,
         "pick": "over",
         "base_model_over": 0.8764,
         "base_model_under": 0.1236,
-        "source": "fixture-specific continuous set/game model"
+        "source": "continuous tennis model + walk-forward O/U calibration v4",
+        "pre_calibration_source": "walk-forward tennis set/game model",
+        "calibration_status": "PAPER_RESEARCH",
+        "calibration_features": {
+          "line": 22.5,
+          "three_sets_bin": "mid",
+          "confidence_bin": "low",
+          "tour": "ATP",
+          "empirical_over_rate": 0.4297,
+          "calibration_source": "line+three_sets+confidence+tour",
+          "empirical_weight": 0.2,
+          "prior_model_over": 0.8764,
+          "global_over_rate": 0.4492
+        }
       },
       "games_handicap": {
         "estimated_margin_p1": -0.02,
         "pick": "p2"
-      }
+      },
+      "elo": {
+        "p1": 1500.0,
+        "p2": 1511.2,
+        "p1_win_prob": 0.484,
+        "weight": 0.75
+      },
+      "walkforward_raw_p1": 0.483,
+      "walkforward_calibrated_p1": 0.48
     },
-    "model": "ESPN fixture + ATP/WTA ranking + recent form",
+    "model": "ESPN ATP base + prequential player Elo + chronological probability calibration",
     "prediction_status": "watch_projection",
     "projection_tier": "baseline_plus_enrichment",
     "evidence_depth": "tennis_forward_window_ranking_form_watch",
@@ -241,7 +263,8 @@
       "fixture_source": "ESPN public tennis scoreboard",
       "model_scope": "active ATP singles only; WTA retired",
       "qualification": "research watch only; canonical betting gates unchanged"
-    }
+    },
+    "model_version": "2026-11-05-atp-prequential-walkforward"
   },
   {
     "sport": "tennis",
@@ -256,7 +279,8 @@
     "round": "Qualifying 1st Round",
     "rankings": {
       "p1": null,
-      "p2": 108
+      "p2": 108,
+      "gap": null
     },
     "form": {
       "p1": 0.5,
@@ -265,11 +289,11 @@
       "p2_last10": "LLLWL"
     },
     "probabilities": {
-      "p1": 0.536,
-      "p2": 0.464
+      "p1": 0.4852,
+      "p2": 0.5148
     },
-    "pick": "p1",
-    "confidence": 0.536,
+    "pick": "p2",
+    "confidence": 0.5148,
     "analytics": {
       "set_win_prob": {
         "p1": 0.524,
@@ -284,19 +308,40 @@
       "expected_games": 27.31,
       "total_games": {
         "line": 22.5,
-        "over": 0.8725,
-        "under": 0.1275,
+        "over": 0.7839,
+        "under": 0.2161,
         "pick": "over",
         "base_model_over": 0.8725,
         "base_model_under": 0.1275,
-        "source": "fixture-specific continuous set/game model"
+        "source": "continuous tennis model + walk-forward O/U calibration v4",
+        "pre_calibration_source": "walk-forward tennis set/game model",
+        "calibration_status": "PAPER_RESEARCH",
+        "calibration_features": {
+          "line": 22.5,
+          "three_sets_bin": "mid",
+          "confidence_bin": "low",
+          "tour": "ATP",
+          "empirical_over_rate": 0.4297,
+          "calibration_source": "line+three_sets+confidence+tour",
+          "empirical_weight": 0.2,
+          "prior_model_over": 0.8725,
+          "global_over_rate": 0.4492
+        }
       },
       "games_handicap": {
         "estimated_margin_p1": 0.04,
         "pick": "p1"
-      }
+      },
+      "elo": {
+        "p1": 1500.0,
+        "p2": 1512.0,
+        "p1_win_prob": 0.4827,
+        "weight": 0.75
+      },
+      "walkforward_raw_p1": 0.4961,
+      "walkforward_calibrated_p1": 0.4852
     },
-    "model": "ESPN fixture + ATP/WTA ranking + recent form",
+    "model": "ESPN ATP base + prequential player Elo + chronological probability calibration",
     "prediction_status": "watch_projection",
     "projection_tier": "baseline_plus_enrichment",
     "evidence_depth": "tennis_forward_window_ranking_form_watch",
@@ -309,7 +354,8 @@
       "fixture_source": "ESPN public tennis scoreboard",
       "model_scope": "active ATP singles only; WTA retired",
       "qualification": "research watch only; canonical betting gates unchanged"
-    }
+    },
+    "model_version": "2026-11-05-atp-prequential-walkforward"
   },
   {
     "sport": "tennis",
@@ -325,7 +371,7 @@
     "rankings": {
       "p1": 47,
       "p2": 4,
-      "gap": 43.0
+      "gap": -43
     },
     "form": {
       "p1": 0.6,
@@ -334,11 +380,11 @@
       "p2_last10": "WWLWLWLWWW"
     },
     "probabilities": {
-      "p1": 0.2147,
-      "p2": 0.7853
+      "p1": 0.4679,
+      "p2": 0.5321
     },
     "pick": "p2",
-    "confidence": 0.7853,
+    "confidence": 0.5321,
     "analytics": {
       "set_win_prob": {
         "p1": 0.299,
@@ -421,9 +467,17 @@
       "games_handicap": {
         "estimated_margin_p1": -0.24,
         "pick": "p2"
-      }
+      },
+      "elo": {
+        "p1": 1522.4,
+        "p2": 1500.0,
+        "p1_win_prob": 0.5322,
+        "weight": 0.75
+      },
+      "walkforward_raw_p1": 0.4528,
+      "walkforward_calibrated_p1": 0.4679
     },
-    "model": "ATP/WTA ranking + recent form",
+    "model": "ESPN ATP base + prequential player Elo + chronological probability calibration",
     "signal_quality": {
       "components": 4,
       "max_components": 5,
@@ -461,7 +515,7 @@
       "empirical": 0.8011,
       "raw": 0.7848
     },
-    "model_version": "5.0 historical-calibrated",
+    "model_version": "2026-11-05-atp-prequential-walkforward",
     "calculated_at": "2026-11-07T14:53:25.972184+00:00",
     "architecture": "competition statistical model + current market benchmark + calibration + value",
     "decision": "PAPER ONLY",
@@ -1343,11 +1397,11 @@
       "p2_last10": ""
     },
     "probabilities": {
-      "p1": 0.558,
-      "p2": 0.442
+      "p1": 0.4818,
+      "p2": 0.5182
     },
-    "pick": "p1",
-    "confidence": 0.558,
+    "pick": "p2",
+    "confidence": 0.5182,
     "analytics": {
       "set_win_prob": {
         "p1": 0.5388,
@@ -1361,12 +1415,12 @@
       "expected_sets": 2.5,
       "total_games": {
         "line": 13.5,
-        "over": 0.5,
-        "under": 0.5,
-        "pick": null,
-        "base_model_over": 0.932862,
-        "base_model_under": 0.067138,
-        "source": "V5.1 matchup-conditioned empirical total-games distribution",
+        "over": 0.9329,
+        "under": 0.0671,
+        "pick": "over",
+        "base_model_over": 0.9329,
+        "base_model_under": 0.0671,
+        "source": "continuous tennis model + walk-forward O/U calibration v4",
         "model_version": "5.2",
         "v51": {
           "distribution": {
@@ -1437,14 +1491,34 @@
           19.5
         ],
         "market_alignment_updated_at": "2026-11-07T14:53:30.721526+00:00",
-        "confidence_floor_met": true
+        "confidence_floor_met": true,
+        "calibration_status": "PAPER_RESEARCH",
+        "calibration_features": {
+          "line": 13.5,
+          "three_sets_bin": "mid",
+          "confidence_bin": "low",
+          "tour": "ATP",
+          "empirical_over_rate": null,
+          "calibration_source": "upstream_only",
+          "empirical_weight": 0.0,
+          "prior_model_over": 0.9329,
+          "global_over_rate": 0.4492
+        }
       },
       "games_handicap": {
         "estimated_margin_p1": 0.0,
         "pick": null
-      }
+      },
+      "elo": {
+        "p1": 1475.0,
+        "p2": 1500.0,
+        "p1_win_prob": 0.4641,
+        "weight": 0.75
+      },
+      "walkforward_raw_p1": 0.4875,
+      "walkforward_calibrated_p1": 0.4818
     },
-    "model": "partial ranking + recent form",
+    "model": "ESPN ATP base + prequential player Elo + chronological probability calibration",
     "signal_quality": {
       "components": 2,
       "max_components": 5,
@@ -2336,7 +2410,7 @@
       "empirical": 0.8011,
       "raw": 0.8366
     },
-    "model_version": "5.0 historical-calibrated",
+    "model_version": "2026-11-05-atp-prequential-walkforward",
     "calculated_at": "2026-11-07T14:53:25.972184+00:00",
     "sportybet_market_snapshot": {
       "source": "SportyBet NG web API via Cloudflare proxy",
@@ -2632,7 +2706,8 @@
     "round": "Qualifying 1st Round",
     "rankings": {
       "p1": 90,
-      "p2": null
+      "p2": null,
+      "gap": null
     },
     "form": {
       "p1": 0.6,
@@ -2641,11 +2716,11 @@
       "p2_last10": ""
     },
     "probabilities": {
-      "p1": 0.512,
-      "p2": 0.488
+      "p1": 0.5196,
+      "p2": 0.4804
     },
     "pick": "p1",
-    "confidence": 0.512,
+    "confidence": 0.5196,
     "analytics": {
       "set_win_prob": {
         "p1": 0.508,
@@ -2660,19 +2735,40 @@
       "expected_games": 27.44,
       "total_games": {
         "line": 22.5,
-        "over": 0.8782,
-        "under": 0.1218,
+        "over": 0.7885,
+        "under": 0.2115,
         "pick": "over",
         "base_model_over": 0.8782,
         "base_model_under": 0.1218,
-        "source": "fixture-specific continuous set/game model"
+        "source": "continuous tennis model + walk-forward O/U calibration v4",
+        "pre_calibration_source": "walk-forward tennis set/game model",
+        "calibration_status": "PAPER_RESEARCH",
+        "calibration_features": {
+          "line": 22.5,
+          "three_sets_bin": "mid",
+          "confidence_bin": "low",
+          "tour": "ATP",
+          "empirical_over_rate": 0.4297,
+          "calibration_source": "line+three_sets+confidence+tour",
+          "empirical_weight": 0.2,
+          "prior_model_over": 0.8782,
+          "global_over_rate": 0.4492
+        }
       },
       "games_handicap": {
         "estimated_margin_p1": 0.01,
         "pick": "p1"
-      }
+      },
+      "elo": {
+        "p1": 1512.0,
+        "p2": 1500.0,
+        "p1_win_prob": 0.5172,
+        "weight": 0.75
+      },
+      "walkforward_raw_p1": 0.5159,
+      "walkforward_calibrated_p1": 0.5196
     },
-    "model": "ESPN fixture + ATP/WTA ranking + recent form",
+    "model": "ESPN ATP base + prequential player Elo + chronological probability calibration",
     "prediction_status": "watch_projection",
     "projection_tier": "baseline_plus_enrichment",
     "evidence_depth": "tennis_forward_window_ranking_form_watch",
@@ -2685,7 +2781,8 @@
       "fixture_source": "ESPN public tennis scoreboard",
       "model_scope": "active ATP singles only; WTA retired",
       "qualification": "research watch only; canonical betting gates unchanged"
-    }
+    },
+    "model_version": "2026-11-05-atp-prequential-walkforward"
   },
   {
     "sport": "football",
@@ -2877,7 +2974,7 @@
     "rankings": {
       "p1": 23,
       "p2": 3,
-      "gap": 20.0
+      "gap": -20
     },
     "form": {
       "p1": 0.8,
@@ -2886,11 +2983,11 @@
       "p2_last10": "WLWWWWWWWW"
     },
     "probabilities": {
-      "p1": 0.2692,
-      "p2": 0.7308
+      "p1": 0.5248,
+      "p2": 0.4752
     },
-    "pick": "p2",
-    "confidence": 0.7308,
+    "pick": "p1",
+    "confidence": 0.5248,
     "analytics": {
       "set_win_prob": {
         "p1": 0.3408,
@@ -2904,12 +3001,12 @@
       "expected_sets": 2.45,
       "total_games": {
         "line": 18.5,
-        "over": 0.6939,
-        "under": 0.3061,
+        "over": 0.748,
+        "under": 0.252,
         "pick": "over",
-        "base_model_over": 0.758521,
-        "base_model_under": 0.241479,
-        "source": "V5.1 matchup-conditioned empirical total-games distribution",
+        "base_model_over": 0.7585,
+        "base_model_under": 0.2415,
+        "source": "continuous tennis model + walk-forward O/U calibration v4",
         "model_version": "5.2",
         "v51": {
           "distribution": {
@@ -2980,14 +3077,34 @@
           24.5
         ],
         "market_alignment_updated_at": "2026-11-07T14:53:30.721526+00:00",
-        "confidence_floor_met": true
+        "confidence_floor_met": true,
+        "calibration_status": "PAPER_RESEARCH",
+        "calibration_features": {
+          "line": 18.5,
+          "three_sets_bin": "low",
+          "confidence_bin": "low",
+          "tour": "ATP",
+          "empirical_over_rate": 0.7059,
+          "calibration_source": "line_only",
+          "empirical_weight": 0.2,
+          "prior_model_over": 0.7585,
+          "global_over_rate": 0.4492
+        }
       },
       "games_handicap": {
         "estimated_margin_p1": -0.19,
         "pick": "p2"
-      }
+      },
+      "elo": {
+        "p1": 1512.0,
+        "p2": 1430.1,
+        "p1_win_prob": 0.6158,
+        "weight": 0.75
+      },
+      "walkforward_raw_p1": 0.5291,
+      "walkforward_calibrated_p1": 0.5248
     },
-    "model": "ATP/WTA ranking + recent form",
+    "model": "ESPN ATP base + prequential player Elo + chronological probability calibration",
     "signal_quality": {
       "components": 4,
       "max_components": 5,
@@ -3879,7 +3996,7 @@
       "empirical": 0.8011,
       "raw": 0.7927
     },
-    "model_version": "5.0 historical-calibrated",
+    "model_version": "2026-11-05-atp-prequential-walkforward",
     "calculated_at": "2026-11-07T14:53:25.972184+00:00",
     "sportybet_market_snapshot": {
       "source": "SportyBet NG web API via Cloudflare proxy",
@@ -8333,7 +8450,7 @@
     "rankings": {
       "p1": 87,
       "p2": 133,
-      "gap": 46.0
+      "gap": 46
     },
     "form": {
       "p1": 0.7,
@@ -8342,11 +8459,11 @@
       "p2_last10": "WLWWWL"
     },
     "probabilities": {
-      "p1": 0.5855,
-      "p2": 0.4145
+      "p1": 0.4781,
+      "p2": 0.5219
     },
-    "pick": "p1",
-    "confidence": 0.5855,
+    "pick": "p2",
+    "confidence": 0.5219,
     "analytics": {
       "set_win_prob": {
         "p1": 0.5573,
@@ -8429,9 +8546,17 @@
       "games_handicap": {
         "estimated_margin_p1": 0.07,
         "pick": "p1"
-      }
+      },
+      "elo": {
+        "p1": 1447.9,
+        "p2": 1488.0,
+        "p1_win_prob": 0.4426,
+        "weight": 0.75
+      },
+      "walkforward_raw_p1": 0.4783,
+      "walkforward_calibrated_p1": 0.4781
     },
-    "model": "ATP/WTA ranking + recent form",
+    "model": "ESPN ATP base + prequential player Elo + chronological probability calibration",
     "signal_quality": {
       "components": 4,
       "max_components": 5,
@@ -8469,7 +8594,7 @@
       "empirical": 0.8011,
       "raw": 0.8381
     },
-    "model_version": "5.0 historical-calibrated",
+    "model_version": "2026-11-05-atp-prequential-walkforward",
     "calculated_at": "2026-11-07T14:53:25.972184+00:00",
     "architecture": "competition statistical model + current market benchmark + calibration + value",
     "decision": "PAPER ONLY",
@@ -10179,11 +10304,11 @@
       "p2_last10": "LWLLWWLWWL"
     },
     "probabilities": {
-      "p1": 0.4229,
-      "p2": 0.5771
+      "p1": 0.5158,
+      "p2": 0.4842
     },
-    "pick": "p2",
-    "confidence": 0.5771,
+    "pick": "p1",
+    "confidence": 0.5158,
     "analytics": {
       "set_win_prob": {
         "p1": 0.4484,
@@ -10197,12 +10322,12 @@
       "expected_sets": 2.49,
       "total_games": {
         "line": 19.5,
-        "over": 0.5976,
-        "under": 0.4024,
+        "over": 0.6551,
+        "under": 0.3449,
         "pick": "over",
-        "base_model_over": 0.650207,
-        "base_model_under": 0.349793,
-        "source": "V5.1 matchup-conditioned empirical total-games distribution",
+        "base_model_over": 0.6502,
+        "base_model_under": 0.3498,
+        "source": "continuous tennis model + walk-forward O/U calibration v4",
         "model_version": "5.2",
         "v51": {
           "distribution": {
@@ -10271,14 +10396,34 @@
           23.5
         ],
         "market_alignment_updated_at": "2026-11-07T14:53:30.721526+00:00",
-        "confidence_floor_met": true
+        "confidence_floor_met": true,
+        "calibration_status": "PAPER_RESEARCH",
+        "calibration_features": {
+          "line": 19.5,
+          "three_sets_bin": "mid",
+          "confidence_bin": "low",
+          "tour": "ATP",
+          "empirical_over_rate": 0.6748,
+          "calibration_source": "line_only",
+          "empirical_weight": 0.2,
+          "prior_model_over": 0.6502,
+          "global_over_rate": 0.4492
+        }
       },
       "games_handicap": {
         "estimated_margin_p1": -0.05,
         "pick": "p2"
-      }
+      },
+      "elo": {
+        "p1": 1500.0,
+        "p2": 1476.0,
+        "p1_win_prob": 0.5345,
+        "weight": 0.75
+      },
+      "walkforward_raw_p1": 0.5066,
+      "walkforward_calibrated_p1": 0.5158
     },
-    "model": "partial ranking + recent form",
+    "model": "ESPN ATP base + prequential player Elo + chronological probability calibration",
     "signal_quality": {
       "components": 3,
       "max_components": 5,
@@ -11064,7 +11209,7 @@
       "empirical": 0.8011,
       "raw": 0.8034
     },
-    "model_version": "5.0 historical-calibrated",
+    "model_version": "2026-11-05-atp-prequential-walkforward",
     "calculated_at": "2026-11-07T14:53:25.972184+00:00",
     "sportybet_market_snapshot": {
       "source": "SportyBet NG web API via Cloudflare proxy",
@@ -18946,7 +19091,7 @@
     "rankings": {
       "p1": 53,
       "p2": 65,
-      "gap": 12.0
+      "gap": 12
     },
     "form": {
       "p1": 0.222,
@@ -18955,11 +19100,11 @@
       "p2_last10": "WWWWWLLWLL"
     },
     "probabilities": {
-      "p1": 0.5257,
-      "p2": 0.4743
+      "p1": 0.5258,
+      "p2": 0.4742
     },
     "pick": "p1",
-    "confidence": 0.5257,
+    "confidence": 0.5258,
     "analytics": {
       "set_win_prob": {
         "p1": 0.5172,
@@ -18973,12 +19118,12 @@
       "expected_sets": 2.5,
       "total_games": {
         "line": 20.5,
-        "over": 0.6243,
-        "under": 0.3757,
+        "over": 0.6657,
+        "under": 0.3343,
         "pick": "over",
-        "base_model_over": 0.665719,
-        "base_model_under": 0.334281,
-        "source": "V5.1 matchup-conditioned empirical total-games distribution",
+        "base_model_over": 0.6657,
+        "base_model_under": 0.3343,
+        "source": "continuous tennis model + walk-forward O/U calibration v4",
         "model_version": "5.2",
         "v51": {
           "distribution": {
@@ -19047,14 +19192,34 @@
           24.5
         ],
         "market_alignment_updated_at": "2026-11-07T14:53:30.721526+00:00",
-        "confidence_floor_met": true
+        "confidence_floor_met": true,
+        "calibration_status": "PAPER_RESEARCH",
+        "calibration_features": {
+          "line": 20.5,
+          "three_sets_bin": "mid",
+          "confidence_bin": "low",
+          "tour": "ATP",
+          "empirical_over_rate": null,
+          "calibration_source": "upstream_only",
+          "empirical_weight": 0.0,
+          "prior_model_over": 0.6657,
+          "global_over_rate": 0.4492
+        }
       },
       "games_handicap": {
         "estimated_margin_p1": 0.02,
         "pick": "p1"
-      }
+      },
+      "elo": {
+        "p1": 1500.4,
+        "p2": 1477.1,
+        "p1_win_prob": 0.5335,
+        "weight": 0.75
+      },
+      "walkforward_raw_p1": 0.5315,
+      "walkforward_calibrated_p1": 0.5258
     },
-    "model": "ATP/WTA ranking + recent form",
+    "model": "ESPN ATP base + prequential player Elo + chronological probability calibration",
     "signal_quality": {
       "components": 4,
       "max_components": 5,
@@ -19840,7 +20005,7 @@
       "empirical": 0.8011,
       "raw": 0.7889
     },
-    "model_version": "5.0 historical-calibrated",
+    "model_version": "2026-11-05-atp-prequential-walkforward",
     "calculated_at": "2026-11-07T14:53:25.972184+00:00",
     "sportybet_market_snapshot": {
       "source": "SportyBet NG web API via Cloudflare proxy",
@@ -24241,7 +24406,7 @@
     "rankings": {
       "p1": 56,
       "p2": 38,
-      "gap": 18.0
+      "gap": -18
     },
     "form": {
       "p1": 0.5,
@@ -24250,11 +24415,11 @@
       "p2_last10": "WLLLLWL"
     },
     "probabilities": {
-      "p1": 0.4349,
-      "p2": 0.5651
+      "p1": 0.4761,
+      "p2": 0.5239
     },
     "pick": "p2",
-    "confidence": 0.5651,
+    "confidence": 0.5239,
     "analytics": {
       "set_win_prob": {
         "p1": 0.4565,
@@ -24268,12 +24433,12 @@
       "expected_sets": 2.5,
       "total_games": {
         "line": 20.5,
-        "over": 0.5563,
-        "under": 0.4437,
+        "over": 0.5751,
+        "under": 0.4249,
         "pick": "over",
-        "base_model_over": 0.575121,
-        "base_model_under": 0.424879,
-        "source": "V5.1 matchup-conditioned empirical total-games distribution",
+        "base_model_over": 0.5751,
+        "base_model_under": 0.4249,
+        "source": "continuous tennis model + walk-forward O/U calibration v4",
         "model_version": "5.2",
         "v51": {
           "distribution": {
@@ -24342,14 +24507,34 @@
           24.5
         ],
         "market_alignment_updated_at": "2026-11-07T14:53:30.721526+00:00",
-        "confidence_floor_met": false
+        "confidence_floor_met": false,
+        "calibration_status": "PAPER_RESEARCH",
+        "calibration_features": {
+          "line": 20.5,
+          "three_sets_bin": "mid",
+          "confidence_bin": "low",
+          "tour": "ATP",
+          "empirical_over_rate": null,
+          "calibration_source": "upstream_only",
+          "empirical_weight": 0.0,
+          "prior_model_over": 0.5751,
+          "global_over_rate": 0.4492
+        }
       },
       "games_handicap": {
         "estimated_margin_p1": -0.05,
         "pick": "p2"
-      }
+      },
+      "elo": {
+        "p1": 1490.8,
+        "p2": 1500.4,
+        "p1_win_prob": 0.4861,
+        "weight": 0.75
+      },
+      "walkforward_raw_p1": 0.4733,
+      "walkforward_calibrated_p1": 0.4761
     },
-    "model": "ATP/WTA ranking + recent form",
+    "model": "ESPN ATP base + prequential player Elo + chronological probability calibration",
     "signal_quality": {
       "components": 4,
       "max_components": 5,
@@ -25135,7 +25320,7 @@
       "empirical": 0.8011,
       "raw": 0.7894
     },
-    "model_version": "5.0 historical-calibrated",
+    "model_version": "2026-11-05-atp-prequential-walkforward",
     "calculated_at": "2026-11-07T14:53:25.972184+00:00",
     "sportybet_market_snapshot": {
       "source": "SportyBet NG web API via Cloudflare proxy",
@@ -25396,7 +25581,7 @@
     "rankings": {
       "p1": 35,
       "p2": 58,
-      "gap": 23.0
+      "gap": 23
     },
     "form": {
       "p1": 0.4,
@@ -25405,11 +25590,11 @@
       "p2_last10": "LLWLLWWLWL"
     },
     "probabilities": {
-      "p1": 0.594,
-      "p2": 0.406
+      "p1": 0.5177,
+      "p2": 0.4823
     },
     "pick": "p1",
-    "confidence": 0.594,
+    "confidence": 0.5177,
     "analytics": {
       "set_win_prob": {
         "p1": 0.563,
@@ -25423,12 +25608,12 @@
       "expected_sets": 2.49,
       "total_games": {
         "line": 20.5,
-        "over": 0.5897,
-        "under": 0.4103,
+        "over": 0.6197,
+        "under": 0.3803,
         "pick": "over",
-        "base_model_over": 0.61965,
-        "base_model_under": 0.38035,
-        "source": "V5.1 matchup-conditioned empirical total-games distribution",
+        "base_model_over": 0.6197,
+        "base_model_under": 0.3803,
+        "source": "continuous tennis model + walk-forward O/U calibration v4",
         "model_version": "5.2",
         "v51": {
           "distribution": {
@@ -25497,14 +25682,34 @@
           24.5
         ],
         "market_alignment_updated_at": "2026-11-07T14:53:30.721526+00:00",
-        "confidence_floor_met": true
+        "confidence_floor_met": true,
+        "calibration_status": "PAPER_RESEARCH",
+        "calibration_features": {
+          "line": 20.5,
+          "three_sets_bin": "mid",
+          "confidence_bin": "low",
+          "tour": "ATP",
+          "empirical_over_rate": null,
+          "calibration_source": "upstream_only",
+          "empirical_weight": 0.0,
+          "prior_model_over": 0.6197,
+          "global_over_rate": 0.4492
+        }
       },
       "games_handicap": {
         "estimated_margin_p1": 0.08,
         "pick": "p1"
-      }
+      },
+      "elo": {
+        "p1": 1499.2,
+        "p2": 1510.5,
+        "p1_win_prob": 0.4837,
+        "weight": 0.75
+      },
+      "walkforward_raw_p1": 0.5113,
+      "walkforward_calibrated_p1": 0.5177
     },
-    "model": "ATP/WTA ranking + recent form",
+    "model": "ESPN ATP base + prequential player Elo + chronological probability calibration",
     "signal_quality": {
       "components": 4,
       "max_components": 5,
@@ -26290,7 +26495,7 @@
       "empirical": 0.8011,
       "raw": 0.8364
     },
-    "model_version": "5.0 historical-calibrated",
+    "model_version": "2026-11-05-atp-prequential-walkforward",
     "calculated_at": "2026-11-07T14:53:25.972184+00:00",
     "sportybet_market_snapshot": {
       "source": "SportyBet NG web API via Cloudflare proxy",
@@ -26550,7 +26755,8 @@
     "round": "Round 1",
     "rankings": {
       "p1": 68,
-      "p2": 60
+      "p2": 60,
+      "gap": -8
     },
     "form": {
       "p1": 0.571,
@@ -26559,11 +26765,11 @@
       "p2_last10": "LLLWLLLWL"
     },
     "probabilities": {
-      "p1": 0.507,
-      "p2": 0.493
+      "p1": 0.4779,
+      "p2": 0.5221
     },
-    "pick": "p1",
-    "confidence": 0.507,
+    "pick": "p2",
+    "confidence": 0.5221,
     "analytics": {
       "set_win_prob": {
         "p1": 0.5047,
@@ -26578,19 +26784,40 @@
       "expected_games": 27.46,
       "total_games": {
         "line": 22.5,
-        "over": 0.8793,
-        "under": 0.1207,
+        "over": 0.7894,
+        "under": 0.2106,
         "pick": "over",
         "base_model_over": 0.8793,
         "base_model_under": 0.1207,
-        "source": "fixture-specific continuous set/game model"
+        "source": "continuous tennis model + walk-forward O/U calibration v4",
+        "pre_calibration_source": "walk-forward tennis set/game model",
+        "calibration_status": "PAPER_RESEARCH",
+        "calibration_features": {
+          "line": 22.5,
+          "three_sets_bin": "mid",
+          "confidence_bin": "low",
+          "tour": "ATP",
+          "empirical_over_rate": 0.4297,
+          "calibration_source": "line+three_sets+confidence+tour",
+          "empirical_weight": 0.2,
+          "prior_model_over": 0.8793,
+          "global_over_rate": 0.4492
+        }
       },
       "games_handicap": {
         "estimated_margin_p1": 0.01,
         "pick": "p1"
-      }
+      },
+      "elo": {
+        "p1": 1500.0,
+        "p2": 1522.3,
+        "p1_win_prob": 0.4679,
+        "weight": 0.75
+      },
+      "walkforward_raw_p1": 0.4777,
+      "walkforward_calibrated_p1": 0.4779
     },
-    "model": "ESPN fixture + ATP/WTA ranking + recent form",
+    "model": "ESPN ATP base + prequential player Elo + chronological probability calibration",
     "prediction_status": "watch_projection",
     "projection_tier": "baseline_plus_enrichment",
     "evidence_depth": "tennis_forward_window_ranking_form_watch",
@@ -26603,7 +26830,8 @@
       "fixture_source": "ESPN public tennis scoreboard",
       "model_scope": "active ATP singles only; WTA retired",
       "qualification": "research watch only; canonical betting gates unchanged"
-    }
+    },
+    "model_version": "2026-11-05-atp-prequential-walkforward"
   },
   {
     "sport": "tennis",
@@ -26628,11 +26856,11 @@
       "p2_last10": "LWWWLWWLLL"
     },
     "probabilities": {
-      "p1": 0.4029,
-      "p2": 0.5971
+      "p1": 0.5288,
+      "p2": 0.4712
     },
-    "pick": "p2",
-    "confidence": 0.5971,
+    "pick": "p1",
+    "confidence": 0.5288,
     "analytics": {
       "set_win_prob": {
         "p1": 0.4349,
@@ -26646,12 +26874,12 @@
       "expected_sets": 2.49,
       "total_games": {
         "line": 25.5,
-        "over": 0.3714,
-        "under": 0.6286,
+        "over": 0.3021,
+        "under": 0.6979,
         "pick": "under",
-        "base_model_over": 0.302093,
-        "base_model_under": 0.697907,
-        "source": "V5.1 matchup-conditioned empirical total-games distribution",
+        "base_model_over": 0.3021,
+        "base_model_under": 0.6979,
+        "source": "continuous tennis model + walk-forward O/U calibration v4",
         "model_version": "5.2",
         "v51": {
           "distribution": {
@@ -26720,14 +26948,34 @@
           25.5
         ],
         "market_alignment_updated_at": "2026-11-07T14:53:30.721526+00:00",
-        "confidence_floor_met": true
+        "confidence_floor_met": true,
+        "calibration_status": "PAPER_RESEARCH",
+        "calibration_features": {
+          "line": 25.5,
+          "three_sets_bin": "mid",
+          "confidence_bin": "low",
+          "tour": "ATP",
+          "empirical_over_rate": null,
+          "calibration_source": "upstream_only",
+          "empirical_weight": 0.0,
+          "prior_model_over": 0.3021,
+          "global_over_rate": 0.4492
+        }
       },
       "games_handicap": {
         "estimated_margin_p1": -0.07,
         "pick": "p2"
-      }
+      },
+      "elo": {
+        "p1": 1512.4,
+        "p2": 1453.1,
+        "p1_win_prob": 0.5845,
+        "weight": 0.75
+      },
+      "walkforward_raw_p1": 0.5391,
+      "walkforward_calibrated_p1": 0.5288
     },
-    "model": "partial ranking + recent form",
+    "model": "ESPN ATP base + prequential player Elo + chronological probability calibration",
     "signal_quality": {
       "components": 3,
       "max_components": 5,
@@ -27513,7 +27761,7 @@
       "empirical": 0.8011,
       "raw": 0.8041
     },
-    "model_version": "5.0 historical-calibrated",
+    "model_version": "2026-11-05-atp-prequential-walkforward",
     "calculated_at": "2026-11-07T14:53:25.972184+00:00",
     "sportybet_market_snapshot": {
       "source": "SportyBet NG web API via Cloudflare proxy",
@@ -27774,7 +28022,7 @@
     "rankings": {
       "p1": 70,
       "p2": 45,
-      "gap": 25.0
+      "gap": -25
     },
     "form": {
       "p1": 0.333,
@@ -27783,11 +28031,11 @@
       "p2_last10": "LLLLWLWL"
     },
     "probabilities": {
-      "p1": 0.4188,
-      "p2": 0.5812
+      "p1": 0.5202,
+      "p2": 0.4798
     },
-    "pick": "p2",
-    "confidence": 0.5812,
+    "pick": "p1",
+    "confidence": 0.5202,
     "analytics": {
       "set_win_prob": {
         "p1": 0.4456,
@@ -27801,12 +28049,12 @@
       "expected_sets": 2.49,
       "total_games": {
         "line": 24.5,
-        "over": 0.3596,
-        "under": 0.6404,
+        "over": 0.3129,
+        "under": 0.6871,
         "pick": "under",
-        "base_model_over": 0.312859,
-        "base_model_under": 0.687141,
-        "source": "V5.1 matchup-conditioned empirical total-games distribution",
+        "base_model_over": 0.3129,
+        "base_model_under": 0.6871,
+        "source": "continuous tennis model + walk-forward O/U calibration v4",
         "model_version": "5.2",
         "v51": {
           "distribution": {
@@ -27875,14 +28123,34 @@
           24.5
         ],
         "market_alignment_updated_at": "2026-11-07T14:53:30.721526+00:00",
-        "confidence_floor_met": true
+        "confidence_floor_met": true,
+        "calibration_status": "PAPER_RESEARCH",
+        "calibration_features": {
+          "line": 24.5,
+          "three_sets_bin": "mid",
+          "confidence_bin": "low",
+          "tour": "ATP",
+          "empirical_over_rate": null,
+          "calibration_source": "upstream_only",
+          "empirical_weight": 0.0,
+          "prior_model_over": 0.3129,
+          "global_over_rate": 0.4492
+        }
       },
       "games_handicap": {
         "estimated_margin_p1": -0.07,
         "pick": "p2"
-      }
+      },
+      "elo": {
+        "p1": 1534.8,
+        "p2": 1499.6,
+        "p1_win_prob": 0.5504,
+        "weight": 0.75
+      },
+      "walkforward_raw_p1": 0.5175,
+      "walkforward_calibrated_p1": 0.5202
     },
-    "model": "ATP/WTA ranking + recent form",
+    "model": "ESPN ATP base + prequential player Elo + chronological probability calibration",
     "signal_quality": {
       "components": 4,
       "max_components": 5,
@@ -28668,7 +28936,7 @@
       "empirical": 0.8011,
       "raw": 0.8372
     },
-    "model_version": "5.0 historical-calibrated",
+    "model_version": "2026-11-05-atp-prequential-walkforward",
     "calculated_at": "2026-11-07T14:53:25.972184+00:00",
     "sportybet_market_snapshot": {
       "source": "SportyBet NG web API via Cloudflare proxy",
@@ -28938,11 +29206,11 @@
       "p2_last10": ""
     },
     "probabilities": {
-      "p1": 0.5905,
-      "p2": 0.4095
+      "p1": 0.5322,
+      "p2": 0.4678
     },
     "pick": "p1",
-    "confidence": 0.5905,
+    "confidence": 0.5322,
     "analytics": {
       "set_win_prob": {
         "p1": 0.5606,
@@ -28956,12 +29224,12 @@
       "expected_sets": 2.49,
       "total_games": {
         "line": 18.5,
-        "over": 0.5,
-        "under": 0.5,
-        "pick": null,
-        "base_model_over": 0.716969,
-        "base_model_under": 0.283031,
-        "source": "V5.1 matchup-conditioned empirical total-games distribution",
+        "over": 0.7196,
+        "under": 0.2804,
+        "pick": "over",
+        "base_model_over": 0.717,
+        "base_model_under": 0.283,
+        "source": "continuous tennis model + walk-forward O/U calibration v4",
         "model_version": "5.2",
         "v51": {
           "distribution": {
@@ -29031,14 +29299,34 @@
           23.5
         ],
         "market_alignment_updated_at": "2026-11-07T14:53:30.721526+00:00",
-        "confidence_floor_met": true
+        "confidence_floor_met": true,
+        "calibration_status": "PAPER_RESEARCH",
+        "calibration_features": {
+          "line": 18.5,
+          "three_sets_bin": "mid",
+          "confidence_bin": "low",
+          "tour": "ATP",
+          "empirical_over_rate": 0.7303,
+          "calibration_source": "line+three_sets+confidence+tour",
+          "empirical_weight": 0.2,
+          "prior_model_over": 0.717,
+          "global_over_rate": 0.4492
+        }
       },
       "games_handicap": {
         "estimated_margin_p1": 0.0,
         "pick": null
-      }
+      },
+      "elo": {
+        "p1": 1523.1,
+        "p2": 1500.0,
+        "p1_win_prob": 0.5332,
+        "weight": 0.75
+      },
+      "walkforward_raw_p1": 0.5476,
+      "walkforward_calibrated_p1": 0.5322
     },
-    "model": "partial ranking + recent form",
+    "model": "ESPN ATP base + prequential player Elo + chronological probability calibration",
     "signal_quality": {
       "components": 2,
       "max_components": 5,
@@ -29877,7 +30165,7 @@
       "empirical": 0.8011,
       "raw": 0.7854
     },
-    "model_version": "5.0 historical-calibrated",
+    "model_version": "2026-11-05-atp-prequential-walkforward",
     "calculated_at": "2026-11-07T14:53:25.972184+00:00",
     "sportybet_market_snapshot": {
       "source": "SportyBet NG web API via Cloudflare proxy",
