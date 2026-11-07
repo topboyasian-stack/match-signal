@@ -16,6 +16,7 @@ on:
       - 'functions/api/analyst/**'
       - 'scripts/test_analyst_module.mjs'
       - 'scripts/test_analyst_routes.mjs'
+      - 'scripts/test_analyst_parse_ticket.mjs'
       - 'scripts/unified_upcoming.py'
       - 'scripts/efootball_desk_learning.py'
       - 'scripts/test_upcoming_settlement_retention.py'
@@ -143,6 +144,8 @@ jobs:
         run: node scripts/test_analyst_module.mjs
       - name: Run protected API route tests
         run: node scripts/test_analyst_routes.mjs
+      - name: Run mixed-market private ticket parser tests
+        run: node scripts/test_analyst_parse_ticket.mjs
       - name: Check analyst JavaScript syntax
         run: |
           node --check analyst.js
