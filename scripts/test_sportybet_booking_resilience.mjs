@@ -485,14 +485,17 @@ try {
   assert.ok(futureTicketPayload.selections.every(row => row.ok === true));
 
 
-  // Stale provider IDs must not make catalogue pagination stop before the actual
-  // fixture is reached. This models older saved slip legs whose SportyBet IDs now
-  // point to unrelated events while their named fixtures and total lines remain live.
+  // Regression on the four real football catalogue aliases which previously
+  // all returned "Event is no longer present" despite current market evidence:
+  // Malaga CF, SV 07 Elversberg, Paderborn, and Stuttgart are valid aliases for
+  // the short names shown by the selected Match Signal legs.
   const staleIdKickoff = Date.now() + 6 * 60 * 60 * 1000;
   const staleIdKickoffIso = new Date(staleIdKickoff).toISOString();
   const staleIdLegs = [
-    { event_id:'prediction-malaga-racing', sportybet_event_id:'sr:match:stale-malaga-id', sport:'football', market:'total', pick:'over', line:1.5, market_id:'18', start_time:staleIdKickoffIso, player_1:'Málaga', player_2:'Racing Santander', match:'Málaga vs Racing Santander' },
-    { event_id:'prediction-dortmund-elversberg', sportybet_event_id:'sr:match:stale-dortmund-id', sport:'football', market:'total', pick:'under', line:5.5, market_id:'18', start_time:staleIdKickoffIso, player_1:'Borussia Dortmund', player_2:'SV Elversberg', match:'Borussia Dortmund vs SV Elversberg' }
+    { event_id:'401882812', sportybet_event_id:'sr:match:stale-malaga-id', sport:'football', market:'total', pick:'over', line:1.5, market_id:'18', start_time:staleIdKickoffIso, player_1:'Málaga', player_2:'Racing Santander', match:'Málaga vs Racing Santander' },
+    { event_id:'401884745', sportybet_event_id:'sr:match:stale-dortmund-id', sport:'football', market:'total', pick:'under', line:5.5, market_id:'18', start_time:staleIdKickoffIso, player_1:'Borussia Dortmund', player_2:'SV Elversberg', match:'Borussia Dortmund vs SV Elversberg' },
+    { event_id:'401884737', sportybet_event_id:'sr:match:stale-paderborn-id', sport:'football', market:'total', pick:'under', line:5.5, market_id:'18', start_time:staleIdKickoffIso, player_1:'SC Paderborn 07', player_2:'Eintracht Frankfurt', match:'SC Paderborn 07 vs Eintracht Frankfurt' },
+    { event_id:'401884743', sportybet_event_id:'sr:match:stale-stuttgart-id', sport:'football', market:'total', pick:'under', line:5.5, market_id:'18', start_time:staleIdKickoffIso, player_1:'VfB Stuttgart', player_2:'Werder Bremen', match:'VfB Stuttgart vs Werder Bremen' }
   ];
   const totalMarket = (line, prefix) => ({
     id:'18', desc:'Total Goals Over/Under', specifier:'total=' + line, status:'0',
@@ -523,8 +526,10 @@ try {
     ));
   }
   const currentFixturePage = [
-    makeStaleIdFixture('sr:match:current-malaga-racing','Málaga','Racing Santander',totalMarket(1.5,'malaga')),
-    makeStaleIdFixture('sr:match:current-dortmund-elversberg','Borussia Dortmund','SV Elversberg',totalMarket(5.5,'dortmund'))
+    makeStaleIdFixture('sr:match:72478694','Malaga CF','Racing Santander',totalMarket(1.5,'malaga')),
+    makeStaleIdFixture('sr:match:72513292','Borussia Dortmund','SV 07 Elversberg',totalMarket(5.5,'dortmund')),
+    makeStaleIdFixture('sr:match:72513308','Paderborn','Eintracht Frankfurt',totalMarket(5.5,'paderborn')),
+    makeStaleIdFixture('sr:match:72513296','Stuttgart','Werder Bremen',totalMarket(5.5,'stuttgart'))
   ];
   const staleIdPageRequests = [];
   const staleIdShareRequests = [];
@@ -533,8 +538,8 @@ try {
     if (url.pathname === '/api/ng/orders/share') {
       staleIdShareRequests.push(JSON.parse(options.body));
       return jsonResponse({bizCode:10000,data:{
-        shareCode:'STALE-ID-RECOVERY-OK',
-        outcomes:[{odds:1.21},{odds:1.17}]
+        shareCode:'FOOTBALL-CLUB-ALIAS-RECOVERY-OK',
+        outcomes:[{odds:1.21},{odds:1.17},{odds:1.13},{odds:1.19}]
       }});
     }
     if (url.pathname.endsWith('/pcUpcomingEvents') &&
@@ -543,7 +548,7 @@ try {
       staleIdPageRequests.push(pageNum);
       const events = pageNum === 1 ? staleProviderPage : pageNum === 2 ? currentFixturePage : [];
       return jsonResponse({bizCode:10000,data:{
-        tournaments:[{name:'Stale provider ID regression',events}]
+        tournaments:[{name:'Football club alias regression',events}]
       }});
     }
     return jsonResponse({bizCode:10000,data:{tournaments:[]}});
@@ -554,14 +559,13 @@ try {
   })});
   const staleIdTicketPayload = await staleIdTicketResponse.json();
   assert.equal(staleIdTicketResponse.status,200,JSON.stringify(staleIdTicketPayload));
-  assert.equal(staleIdTicketPayload.booking_code,'STALE-ID-RECOVERY-OK');
-  assert.ok(staleIdPageRequests.includes(2),'catalogue scan must continue past unrelated rows whose IDs are stale slip IDs');
-  assert.equal(staleIdShareRequests.length,1,'share generation must happen only after both current fixtures resolve');
-  assert.equal(staleIdShareRequests[0].selections.length,2);
+  assert.equal(staleIdTicketPayload.booking_code,'FOOTBALL-CLUB-ALIAS-RECOVERY-OK');
+  assert.ok(staleIdPageRequests.includes(2),'catalogue scan must continue past unrelated stale provider IDs to the current fixtures');
+  assert.equal(staleIdShareRequests.length,1,'share generation happens only after all four current fixtures and markets validate');
+  assert.equal(staleIdShareRequests[0].selections.length,4);
   assert.deepEqual(staleIdTicketPayload.selections.map(row=>row.resolved_event_id).sort(),[
-    'sr:match:current-dortmund-elversberg','sr:match:current-malaga-racing'
+    'sr:match:72478694','sr:match:72513292','sr:match:72513296','sr:match:72513308'
   ]);
   assert.ok(staleIdTicketPayload.selections.every(row=>row.ok===true));
-
   console.log('SportyBet booking resilience: PASS (bounded paging, stale-ID recovery, share fallback, exact market-225 pair, and Football/Tennis/eFootball mixed ticket).');
 } finally { globalThis.fetch=originalFetch; }
