@@ -94,6 +94,40 @@ assert.equal(mixedSummary.outcome_by_qualification_state.UNKNOWN.PENDING, 1);
 assert.equal(mixedSummary.actual_leg_hit_rate_excluding_pushes, 0.3333);
 assert.ok(mixedSummary.interpretation_guard.includes("independently"));
 
+const alternativeWinsDocument = emptyReviewDocument(stamp);
+alternativeWinsDocument.tickets = [
+  {
+    ticket_ref: "alternative_win_day_1", captured_at: "2026-11-06T09:00:00Z",
+    reported_ticket_outcome: "WON", total_odds: 2.1,
+    legs: [{
+      leg_ref: "alternative_leg_1", product: "tennis", match: "Player A vs Player B",
+      kickoff_at: "2026-11-06T10:00:00Z", qualification_state: "NOT_QUALIFIED",
+      actual_selection: { market: "total_games_over_under", pick: "over", line: 18.5, odds: 1.8 },
+      leg_outcome: "WON", leg_outcome_source: "user_reported"
+    }]
+  },
+  {
+    ticket_ref: "alternative_win_day_2", captured_at: "2026-11-07T11:00:00Z",
+    reported_ticket_outcome: "WON", total_odds: 1.9,
+    legs: [{
+      leg_ref: "alternative_leg_2", product: "football", match: "Team C vs Team D",
+      kickoff_at: "2026-11-07T12:00:00Z", qualification_state: "NOT_QUALIFIED",
+      actual_selection: { market: "total_goals_over_under", pick: "over", line: 1.5, odds: 1.6 },
+      leg_outcome: "WON", leg_outcome_source: "user_reported"
+    }]
+  }
+];
+const alternativeSummary = summarizeReviewDocument(alternativeWinsDocument);
+assert.equal(alternativeSummary.alternative_user_picks.unique_settled_selections, 2);
+assert.equal(alternativeSummary.alternative_user_picks.wins, 2);
+assert.equal(alternativeSummary.alternative_user_picks.losses, 0);
+assert.equal(alternativeSummary.alternative_user_picks.hit_rate_excluding_pushes, 1);
+assert.equal(alternativeSummary.alternative_user_picks.flat_stake_net_units, 1.4);
+assert.equal(alternativeSummary.alternative_user_picks.flat_stake_roi, 0.7);
+assert.equal(alternativeSummary.alternative_user_picks.pre_kickoff.hit_rate, 1);
+assert.deepEqual(alternativeSummary.alternative_winning_tickets.map(ticket => ticket.date), ["2026-11-07", "2026-11-06"]);
+assert.ok(alternativeSummary.cohort_method.includes("Deduplicated"));
+
 const missingDesk = makeLeg("over", 1.5, "over", 2.5, 1, 1);
 delete missingDesk.desk_snapshot;
 assert.equal(analyzeLeg(missingDesk).line_adjustment, "desk_snapshot_missing");
