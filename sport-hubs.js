@@ -618,7 +618,7 @@ function qualifiedBestRow(x){
   const status=qualificationState(x);
   const edge=Number.isFinite(status.edge)?(status.edge>=0?"+":"")+(status.edge*100).toFixed(1)+"%":"—";
   const ev=Number.isFinite(status.expectedReturn)?(status.expectedReturn>=0?"+":"")+(status.expectedReturn*100).toFixed(1)+"%":"—";
-  return '<article class="ms-up-row ms-fixture-card ms-qualified-best-row">'+
+  return '<article class="ms-up-row ms-fixture-card ms-qualified-best-row" data-ms-fixture-id="'+E(x.event_id)+'" data-ms-fixture-sport="'+E(x.sport)+'">'+
     '<div class="ms-up-time"><b>'+E(when)+'</b><span>'+E(String(x.start_time||"").slice(0,10))+'</span></div>'+
     '<div class="ms-up-event"><div class="ms-up-meta"><span class="ms-sport-pill">'+sportIcon(x.sport)+' '+E(x.sport==="table_tennis"?"Table Tennis":(x.sport||"Sport"))+'</span><span>'+E(x.league||x.competition||"Unclassified")+'</span><span class="ms-fixture-market-count">Qualified market</span></div>'+
     '<div class="ms-up-match">'+workspaceEntityLabel(x.player_1||x.home||"Participant 1",x.sport==="football"?"team":x.sport==="tennis"?"player":null)+' <span>vs</span> '+workspaceEntityLabel(x.player_2||x.away||"Participant 2",x.sport==="football"?"team":x.sport==="tennis"?"player":null)+'</div>'+
@@ -901,7 +901,7 @@ function unifiedRow(group){
     candidateBand==="MODEL_70_PLUS"?"MODEL ESTIMATE ≥70% · NOT QUALIFIED":
     (live?"LIVE RESEARCH · NOT QUALIFIED":"MODEL RESEARCH · NOT QUALIFIED"))));
   if(participantHistoryStale&&!settled)status="PARTICIPANT HISTORY STALE · NOT QUALIFIED";
-  return '<article class="ms-up-row ms-fixture-card">'+
+  return '<article class="ms-up-row ms-fixture-card" data-ms-fixture-id="'+E(x.event_id)+'" data-ms-fixture-sport="'+E(x.sport)+'">'+
     '<div class="ms-up-time"><b>'+E(when)+'</b><span>'+E(String(x.start_time||"").slice(0,10))+'</span></div>'+
     '<div class="ms-up-event"><div class="ms-up-meta"><span class="ms-sport-pill">'+sportIcon(x.sport)+' '+E(x.sport==="table_tennis"?"Table Tennis":(x.sport||"Sport"))+'</span><span>'+E(x.league||x.competition||"Unclassified")+'</span><span class="ms-fixture-market-count">1 prediction</span></div>'+
     '<div class="ms-up-match ws-fixture-match"><span class="ws-fixture-team">'+workspaceEntityLabel(x.player_1||x.home||"Participant 1",x.sport==="football"||x.sport==="basketball"?"team":x.sport==="tennis"?"player":null)+'</span><span class="ws-fixture-vs">vs</span><span class="ws-fixture-team">'+workspaceEntityLabel(x.player_2||x.away||"Participant 2",x.sport==="football"||x.sport==="basketball"?"team":x.sport==="tennis"?"player":null)+'</span></div>'+
