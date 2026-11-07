@@ -25,7 +25,7 @@ These are dated repository artifacts, not fresh guarantees about the live site. 
 Each captured ticket leg must preserve independent facts, regardless of the accumulator's result:
 
 1. The original desk snapshot, exactly as it was displayed at decision time: prediction ID if available, product/competition, event identity, kickoff, selected side, exact line, quoted odds, displayed model probability, model version, and snapshot time.
-2. The actual user selection: exact side, line and odds the user placed, plus the result/final score when settled.
+2. The actual user selection: exact market, side/participant, line where applicable, decimal odds, independently confirmed leg result or final score when settled, and the qualification state observed at selection time if known.
 
 A user may lower an Over line (for example, Over 2.5 to Over 1.5), raise an Under line (for example, Under 8.5 to Under 9.5), keep the same line, or change the side. Store the original and selected lines without overwriting either. The reviewer derives whether the user's line was easier or harder for that side.
 
