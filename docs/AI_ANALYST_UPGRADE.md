@@ -22,7 +22,7 @@ These are dated repository artifacts, not fresh guarantees about the live site. 
 
 ## Data boundary: desk snapshot versus actual ticket
 
-Each captured Over/Under leg must preserve two independent facts:
+Each captured ticket leg must preserve independent facts, regardless of the accumulator's result:
 
 1. The original desk snapshot, exactly as it was displayed at decision time: prediction ID if available, product/competition, event identity, kickoff, selected side, exact line, quoted odds, displayed model probability, model version, and snapshot time.
 2. The actual user selection: exact side, line and odds the user placed, plus the result/final score when settled.
