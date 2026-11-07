@@ -901,7 +901,7 @@ async function handlePost(context) {
       // model_qualified flags are untrusted and cannot bypass the global release evidence.
       try { nbaReleaseContext = await loadNbaReleaseContext(); }
       catch (error) { return json({ ok: false, error: 'NBA_RELEASE_EVIDENCE_UNAVAILABLE', message: 'NBA release evidence could not be verified. No ticket code was requested.' }, 503); }
-      if (!nbaTotalsReleaseQualified(nbaReleaseContext.evidence, nbaReleaseContext.probability)) return json({ ok: false, error: 'NBA_RELEASE_GATE_LOCKED', message: 'The independent NBA totals release gate has not passed. No SportyBet ticket code was requested.' }, 423);
+      if (!nbaTotalsReleaseQualified(nbaReleaseContext.evidence, nbaReleaseContext.probability)) return json({ ok: false, error: 'NBA_RELEASE_GATE_LOCKED', booking_code_withheld: true, message: 'The independent NBA totals release gate has not passed. No SportyBet ticket code was requested.' }, 423);
     }
     // Started selections cannot be pre-match bookable. Avoid looking them up
     // as upcoming fixtures; final validation reports the precise reason.
