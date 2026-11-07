@@ -247,7 +247,7 @@ function targetFixtureMatches(leg, event) {
     String(leg?.event_id || '')
   ].filter(Boolean);
   if (hasParticipants) {
-    if (!sameParticipantPair(participants, event)) return false;
+    if (!legParticipantPairMatches(leg, event)) return false;
   } else if (!expectedIds.includes(String(event?.eventId || ''))) {
     return false;
   }
@@ -532,6 +532,47 @@ function sameParticipantPair(first, event) {
      (participantNameMatches(a, away) && participantNameMatches(b, home))));
 }
 
+// SportyBet's football catalogue often uses official club names while the
+// Desk uses familiar short names (e.g. "Málaga" / "Malaga CF",
+// "VfB Stuttgart" / "Stuttgart", and "Paderborn" / "SC Paderborn 07").
+// Only remove standard club markers and the documented "07" suffix; keep the
+// kickoff-window and opposing-team checks as independent identity safeguards.
+const FOOTBALL_CLUB_MARKERS = new Set([
+  'afc', 'ac', 'cf', 'fc', 'sc', 'sv', 'vfb', 'vfl', 'tsv', 'ssv',
+  'fsv', 'ksc', 'bsc', 'ssc'
+]);
+function canonicalFootballClubName(value) {
+  const tokens = canonicalParticipant(value).split(' ').filter(Boolean);
+  const kept = tokens.filter((token, index) => {
+    if (FOOTBALL_CLUB_MARKERS.has(token) || token === '07') return false;
+    // "1. FC Köln" uses the leading 1 as part of the competition-style name,
+    // not as a distinguishing team token.
+    if (token === '1' && tokens[index + 1] === 'fc') return false;
+    return true;
+  });
+  return kept.join(' ');
+}
+function footballTeamNameMatches(first, second) {
+  if (participantNameMatches(first, second)) return true;
+  const a = canonicalFootballClubName(first);
+  const b = canonicalFootballClubName(second);
+  return Boolean(a && b && a.length >= 3 && a === b);
+}
+function sameFootballParticipantPair(first, event) {
+  const [a, b] = Array.isArray(first) ? first : [];
+  const home = event?.homeTeamName || '';
+  const away = event?.awayTeamName || '';
+  return Boolean(a && b && home && away &&
+    ((footballTeamNameMatches(a, home) && footballTeamNameMatches(b, away)) ||
+     (footballTeamNameMatches(a, away) && footballTeamNameMatches(b, home))));
+}
+function legParticipantPairMatches(leg, event) {
+  const participants = legParticipants(leg);
+  return String(leg?.sport || '').toLowerCase() === 'football'
+    ? sameFootballParticipantPair(participants, event)
+    : sameParticipantPair(participants, event);
+}
+
 function normalizeFixture(value) {
   return String(value || '')
     .toLowerCase()
@@ -548,7 +589,7 @@ function resolveCurrentEvent(leg, found) {
   const direct = directProvider || found.get(String(leg?.event_id || ''));
   // Resolve the current catalogue by the provider ID, but keep the ESPN ID
   // reserved for the prediction/settlement cohort. Verify participants either way.
-  if (direct && (!hasParticipants || sameParticipantPair([first, second], direct))) {
+  if (direct && (!hasParticipants || legParticipantPairMatches(leg, direct))) {
     return { event: direct, matched_by: directProvider ? 'sportybet_event_id' : 'event_id' };
   }
 
@@ -565,7 +606,7 @@ function resolveCurrentEvent(leg, found) {
 
   for (const event of found.values()) {
     const participantsMatch = hasParticipants
-      ? sameParticipantPair([first, second], event)
+      ? legParticipantPairMatches(leg, event)
       : normalizeFixture(String(event?.homeTeamName || '') + ' vs ' + String(event?.awayTeamName || '')) === targetMatch;
     if (!participantsMatch) continue;
 
@@ -739,8 +780,9 @@ function findWinnerSelection(leg, event) {
   const selected = canonicalParticipant(selectedName);
   const home = canonicalParticipant(event?.homeTeamName);
   const away = canonicalParticipant(event?.awayTeamName);
-  const selectedIsHome = selected ? participantNameMatches(selectedName, event?.homeTeamName) : pick === 'p1';
-  const selectedIsAway = selected ? participantNameMatches(selectedName, event?.awayTeamName) : pick === 'p2';
+  const participantMatches = sport === 'football' ? footballTeamNameMatches : participantNameMatches;
+  const selectedIsHome = selected ? participantMatches(selectedName, event?.homeTeamName) : pick === 'p1';
+  const selectedIsAway = selected ? participantMatches(selectedName, event?.awayTeamName) : pick === 'p2';
 
   if ((pick === 'p1' || pick === 'p2') && selected && !selectedIsHome && !selectedIsAway) {
     return { error: 'The selected tennis/football participant no longer matches the current SportyBet event.' };
@@ -1023,7 +1065,7 @@ async function handlePost(context) {
       if (manualMode) {
         const requestedStart = Date.parse(String(leg?.start_time || ''));
         const currentStart = Number(event?.estimateStartTime || 0);
-        const namesMatch = sameParticipantPair([leg.player_1, leg.player_2], event);
+        const namesMatch = legParticipantPairMatches(leg, event);
         if (!namesMatch || !leg.player_1 || !leg.player_2 || canonicalParticipant(leg.player_1) === canonicalParticipant(leg.player_2)) {
           validation.push(validationFailure(leg, 'Participant identity changed in SportyBet current catalogue.'));
           continue;
