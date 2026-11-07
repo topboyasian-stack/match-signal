@@ -1327,6 +1327,7 @@ jobs:
           cp LIVE-PRODUCTION-CHECK.json /tmp/live-production-check.json 2>/dev/null || true
           cp BOOKING-PRODUCTION-CHECK.json /tmp/booking-production-check.json 2>/dev/null || true
           cp QUALIFIED-ALTERNATIVES-PRODUCTION-CHECK.json /tmp/qualified-alternatives-check.json 2>/dev/null || true
+          cp NBA-PRODUCTION-GATE-CHECK.json /tmp/nba-production-gate-check.json 2>/dev/null || true
           for attempt in 1 2 3 4 5; do
             git fetch origin main
             git reset --hard origin/main
@@ -1337,6 +1338,7 @@ jobs:
           live={}
           booking={}
           alternatives={}
+          nba_gate={}
           p=Path('/tmp/live-production-check.json')
           if p.exists():
               live=json.loads(p.read_text())
@@ -1346,6 +1348,9 @@ jobs:
           q=Path('/tmp/qualified-alternatives-check.json')
           if q.exists():
               alternatives=json.loads(q.read_text())
+          ng=Path('/tmp/nba-production-gate-check.json')
+          if ng.exists():
+              nba_gate=json.loads(ng.read_text())
           valid_zero_coverage = live.get('no_model_qualified_candidates') is True and live.get('scan_complete') is True
           coverage_complete = live.get('scan_complete') is True and not valid_zero_coverage
           booking_status = str(booking.get('status') or 'NOT_RECORDED')
@@ -1361,6 +1366,11 @@ jobs:
               checks.append('qualified_best_valid_zero')
           else:
               checks.append('qualified_best_shortlist' if coverage_complete else 'qualified_best_live_quote_diagnostic_incomplete')
+          nba_gate_verified = nba_gate.get('status') == 'PASS' and len(nba_gate.get('probes') or []) >= 1
+          if nba_gate_verified:
+              checks.append('nba_ticket_gate_fail_closed')
+          else:
+              checks.append('nba_ticket_gate_probe_not_verified')
           alternatives_ready = alternatives.get('status') == 'READY' and int(alternatives.get('alternative_count') or 0) > 0
           alternatives_valid_zero = alternatives.get('status') == 'VALID_ZERO'
           alternative_status = 'READY' if alternatives_ready else 'VALID_ZERO' if alternatives_valid_zero else str(alternatives.get('status') or 'NOT_RECORDED')
@@ -1389,6 +1399,8 @@ jobs:
             'verified_at':datetime.now(timezone.utc).isoformat(),
             'live_virtual_feed':live,
             'booking_api':booking,
+            'nba_ticket_gate_probe_status':'PASS' if nba_gate_verified else str(nba_gate.get('status') or 'NOT_RECORDED'),
+            'nba_ticket_gate_probe':nba_gate,
             'checks':checks
           },indent=2)+'\n')
           PY
