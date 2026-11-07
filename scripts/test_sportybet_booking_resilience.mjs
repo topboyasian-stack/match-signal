@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { upstream, collectEvents, collectBasketballEvents, requestSportyBetShare, onRequest } from '../functions/api/sportybet-booking.js';
+import { upstream, collectEvents, collectBasketballEvents, requestSportyBetShare, nbaTotalsReleaseQualified, onRequest } from '../functions/api/sportybet-booking.js';
 const originalFetch=globalThis.fetch;
 const SPORTYBET='https://www.sportybet.com';
 const PROXY='https://match-signal-sportybet-proxy.topboyasian.workers.dev';
@@ -65,63 +65,11 @@ try {
   assert.deepEqual(market.outcomes.map(o=>Number(o.odds)).sort((a,b)=>a-b),[1.88,1.93]);
   assert.ok(requested.length>0&&requested.every(u=>u.origin===SPORTYBET||u.origin===PROXY));
 
-  // Recover NBA fixtures when SportyBet rotates provider event IDs and when
-  // page 1 is full upstream but contains no NBA rows after the feed's filter.
-  const nbaKickoffA=Date.now()+3*60*60*1000;
-  const nbaKickoffB=Date.now()+4*60*60*1000;
-  const nbaCurrentEvents=[
-    {eventId:'sr:match:current-phx-orl',homeTeamName:'Phoenix Suns',awayTeamName:'Orlando Magic',estimateStartTime:nbaKickoffA,matchStatus:'Not start',markets:[
-      {id:'225',desc:'Full Game Total incl. OT',specifier:'total=210.5',status:'0',outcomes:[
-        {id:'phx-over',desc:'Over 210.5',odds:1.91,isActive:1},{id:'phx-under',desc:'Under 210.5',odds:1.87,isActive:1}
-      ]}
-    ]},
-    {eventId:'sr:match:current-gsw-mia',homeTeamName:'Golden State Warriors',awayTeamName:'Miami Heat',estimateStartTime:nbaKickoffB,matchStatus:'Not start',markets:[
-      {id:'225',desc:'Full Game Total incl. OT',specifier:'total=224.5',status:'0',outcomes:[
-        {id:'gsw-over',desc:'Over 224.5',odds:1.93,isActive:1},{id:'gsw-under',desc:'Under 224.5',odds:1.89,isActive:1}
-      ]}
-    ]}
-  ];
-  const fullNonNbaPage=Array.from({length:100},(_,i)=>({
-    eventId:'sr:match:non-nba-'+i,homeTeamName:'Non NBA Home '+i,awayTeamName:'Non NBA Away '+i,
-    estimateStartTime:Date.now()+3600000,matchStatus:'Not start',markets:[]
-  }));
-  const nbaPageRequests=[];
-  globalThis.fetch=async(input,options={})=>{
-    const url=new URL(typeof input==='string'?input:input.url);
-    nbaPageRequests.push(url);
-    assert.ok(url.origin===SPORTYBET||url.origin===PROXY,'NBA live feed must use SportyBet source hosts');
-    if(url.pathname==='/api/ng/orders/share'){
-      return jsonResponse({bizCode:10000,data:{shareCode:'NBA-ROTATED-EVENT-ID-RECOVERY',outcomes:[{odds:1.91},{odds:1.93}]}});
-    }
-    const page=Number(url.searchParams.get('pageNum')||1);
-    return jsonResponse({bizCode:10000,data:{tournaments:[{
-      id:page===1?'sr:tournament:999':'sr:tournament:132',
-      name:page===1?'Other basketball':'NBA',
-      events:page===1?fullNonNbaPage:nbaCurrentEvents
-    }]}});
-  };
-  const nbaRecoveryResponse=await onRequest({request:new Request('https://match-signal.pages.dev/api/sportybet-booking',{
-    method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({mode:'manual',manual_selections:[
-      {event_id:'prediction-phx-orl',sportybet_event_id:'sr:match:old-phx-orl',sport:'basketball',market:'total',pick:'over',line:210.5,market_id:'225',start_time:new Date(nbaKickoffA).toISOString(),player_1:'Phoenix Suns',player_2:'Orlando Magic',match:'Phoenix Suns vs Orlando Magic'},
-      {event_id:'prediction-gsw-mia',sportybet_event_id:'sr:match:old-gsw-mia',sport:'basketball',market:'total',pick:'over',line:224.5,market_id:'225',start_time:new Date(nbaKickoffB).toISOString(),player_1:'Golden State Warriors',player_2:'Miami Heat',match:'Golden State Warriors vs Miami Heat'}
-    ]})
-  })});
-  const nbaRecoveryPayload=await nbaRecoveryResponse.json();
-  assert.equal(nbaRecoveryResponse.status,200,JSON.stringify(nbaRecoveryPayload));
-  assert.equal(nbaRecoveryPayload.ok,true,JSON.stringify(nbaRecoveryPayload));
-  assert.equal(nbaRecoveryPayload.booking_code,'NBA-ROTATED-EVENT-ID-RECOVERY');
-  assert.equal(nbaRecoveryPayload.selection_count,2);
-  assert.deepEqual(nbaRecoveryPayload.selections.map(x=>x.resolved_by),[
-    'fixture_participants_time','fixture_participants_time'
-  ]);
-  assert.deepEqual(nbaRecoveryPayload.selections.map(x=>x.resolved_event_id),[
-    'sr:match:current-phx-orl','sr:match:current-gsw-mia'
-  ]);
-  assert.ok(nbaPageRequests.some(u=>Number(u.searchParams.get('pageNum'))===1));
-  assert.ok(nbaPageRequests.some(u=>Number(u.searchParams.get('pageNum'))===2),
-    'the booking lookup must continue when page 1 is full upstream but has zero filtered NBA events');
-  assert.ok(nbaPageRequests.every(u=>Number(u.searchParams.get('pageNum'))<=5));
+  // The independent NBA gate must fail closed on absent/invalid release evidence.
+  // Full NBA booking rejection is covered by nba-ticket-guard-tests.yml; this
+  // generic catalogue resilience test does not mock the four remote evidence files.
+  assert.equal(nbaTotalsReleaseQualified({}, {}), false,
+    'missing independent NBA evidence must never qualify ticket booking');
 
   // Already-started selections are rejected explicitly and never trigger an
   // upcoming-catalogue lookup or a share-code request.
@@ -134,8 +82,8 @@ try {
   const staleTicketResponse=await onRequest({request:new Request('https://match-signal.pages.dev/api/sportybet-booking',{
     method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({mode:'manual',manual_selections:[
-      {event_id:'stale-phx',sportybet_event_id:'old-phx',sport:'basketball',market:'total',pick:'over',line:210.5,market_id:'225',start_time:staleStart,player_1:'Phoenix Suns',player_2:'Orlando Magic',match:'Phoenix Suns vs Orlando Magic'},
-      {event_id:'stale-gsw',sportybet_event_id:'old-gsw',sport:'basketball',market:'total',pick:'over',line:224.5,market_id:'225',start_time:staleStart,player_1:'Golden State Warriors',player_2:'Miami Heat',match:'Golden State Warriors vs Miami Heat'}
+      {event_id:'stale-malaga',sportybet_event_id:'old-malaga',sport:'football',market:'winner',pick:'p1',start_time:staleStart,player_1:'Málaga',player_2:'Racing Santander',match:'Málaga vs Racing Santander'},
+      {event_id:'stale-dortmund',sportybet_event_id:'old-dortmund',sport:'football',market:'winner',pick:'p1',start_time:staleStart,player_1:'Borussia Dortmund',player_2:'SV Elversberg',match:'Borussia Dortmund vs SV Elversberg'}
     ]})
   })});
   const staleTicketPayload=await staleTicketResponse.json();
@@ -536,5 +484,84 @@ try {
   assert.equal(futureShareRequests[0].selections.length, 2);
   assert.ok(futureTicketPayload.selections.every(row => row.ok === true));
 
-  console.log('SportyBet booking resilience: PASS (bounded paging, share fallback, exact market-225 pair, and Football/Tennis/eFootball mixed ticket).');
+
+  // Stale provider IDs must not make catalogue pagination stop before the actual
+  // fixture is reached. This models older saved slip legs whose SportyBet IDs now
+  // point to unrelated events while their named fixtures and total lines remain live.
+  const staleIdKickoff = Date.now() + 6 * 60 * 60 * 1000;
+  const staleIdKickoffIso = new Date(staleIdKickoff).toISOString();
+  const staleIdLegs = [
+    { event_id:'prediction-malaga-racing', sportybet_event_id:'sr:match:stale-malaga-id', sport:'football', market:'total', pick:'over', line:1.5, market_id:'18', start_time:staleIdKickoffIso, player_1:'Málaga', player_2:'Racing Santander', match:'Málaga vs Racing Santander' },
+    { event_id:'prediction-dortmund-elversberg', sportybet_event_id:'sr:match:stale-dortmund-id', sport:'football', market:'total', pick:'under', line:5.5, market_id:'18', start_time:staleIdKickoffIso, player_1:'Borussia Dortmund', player_2:'SV Elversberg', match:'Borussia Dortmund vs SV Elversberg' }
+  ];
+  const totalMarket = (line, prefix) => ({
+    id:'18', desc:'Total Goals Over/Under', specifier:'total=' + line, status:'0',
+    outcomes:[
+      {id:prefix+'-over',desc:'Over ' + line,odds:1.21,isActive:1},
+      {id:prefix+'-under',desc:'Under ' + line,odds:1.17,isActive:1}
+    ]
+  });
+  const makeStaleIdFixture = (eventId, homeTeamName, awayTeamName, market) => ({
+    eventId, homeTeamName, awayTeamName,
+    estimateStartTime:staleIdKickoff,
+    matchStatus:'Not start',
+    markets:[market]
+  });
+  const staleProviderPage = staleIdLegs.map((leg,index) => makeStaleIdFixture(
+    leg.sportybet_event_id,
+    'Unrelated Home ' + index,
+    'Unrelated Away ' + index,
+    totalMarket(leg.line,'stale-'+index)
+  ));
+  while (staleProviderPage.length < 100) {
+    const index = staleProviderPage.length;
+    staleProviderPage.push(makeStaleIdFixture(
+      'sr:match:stale-page-filler-' + index,
+      'Catalogue Filler Home ' + index,
+      'Catalogue Filler Away ' + index,
+      {id:'1',desc:'3 Way',status:'0',outcomes:[]}
+    ));
+  }
+  const currentFixturePage = [
+    makeStaleIdFixture('sr:match:current-malaga-racing','Málaga','Racing Santander',totalMarket(1.5,'malaga')),
+    makeStaleIdFixture('sr:match:current-dortmund-elversberg','Borussia Dortmund','SV Elversberg',totalMarket(5.5,'dortmund'))
+  ];
+  const staleIdPageRequests = [];
+  const staleIdShareRequests = [];
+  globalThis.fetch = async (input, options = {}) => {
+    const url = new URL(typeof input === 'string' ? input : input.url);
+    if (url.pathname === '/api/ng/orders/share') {
+      staleIdShareRequests.push(JSON.parse(options.body));
+      return jsonResponse({bizCode:10000,data:{
+        shareCode:'STALE-ID-RECOVERY-OK',
+        outcomes:[{odds:1.21},{odds:1.17}]
+      }});
+    }
+    if (url.pathname.endsWith('/pcUpcomingEvents') &&
+        url.searchParams.get('sportId') === 'sr:sport:1') {
+      const pageNum = Number(url.searchParams.get('pageNum') || 1);
+      staleIdPageRequests.push(pageNum);
+      const events = pageNum === 1 ? staleProviderPage : pageNum === 2 ? currentFixturePage : [];
+      return jsonResponse({bizCode:10000,data:{
+        tournaments:[{name:'Stale provider ID regression',events}]
+      }});
+    }
+    return jsonResponse({bizCode:10000,data:{tournaments:[]}});
+  };
+  const staleIdTicketResponse = await onRequest({request:new Request('https://match-signal.pages.dev/api/sportybet-booking',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({mode:'manual',manual_selections:staleIdLegs})
+  })});
+  const staleIdTicketPayload = await staleIdTicketResponse.json();
+  assert.equal(staleIdTicketResponse.status,200,JSON.stringify(staleIdTicketPayload));
+  assert.equal(staleIdTicketPayload.booking_code,'STALE-ID-RECOVERY-OK');
+  assert.ok(staleIdPageRequests.includes(2),'catalogue scan must continue past unrelated rows whose IDs are stale slip IDs');
+  assert.equal(staleIdShareRequests.length,1,'share generation must happen only after both current fixtures resolve');
+  assert.equal(staleIdShareRequests[0].selections.length,2);
+  assert.deepEqual(staleIdTicketPayload.selections.map(row=>row.resolved_event_id).sort(),[
+    'sr:match:current-dortmund-elversberg','sr:match:current-malaga-racing'
+  ]);
+  assert.ok(staleIdTicketPayload.selections.every(row=>row.ok===true));
+
+  console.log('SportyBet booking resilience: PASS (bounded paging, stale-ID recovery, share fallback, exact market-225 pair, and Football/Tennis/eFootball mixed ticket).');
 } finally { globalThis.fetch=originalFetch; }
