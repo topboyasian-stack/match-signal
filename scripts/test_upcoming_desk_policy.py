@@ -57,6 +57,46 @@ class UpcomingDeskPolicyTests(unittest.TestCase):
         self.assertTrue(stale(None, self.now))
         self.assertTrue(stale("not-a-timestamp", self.now))
 
+    def test_live_refresh_runs_when_either_core_sport_has_no_12_hour_fixture(self):
+        missing = ns["core_sports_missing_builder_window"]
+        future = self.now + timedelta(hours=3)
+        rows = [
+            {"sport": "tennis", "start_time": future.isoformat()},
+            {"sport": "football", "start_time": (self.now - timedelta(minutes=1)).isoformat()},
+        ]
+        self.assertEqual(missing(rows, self.now), {"football"})
+        self.assertEqual(missing([{"sport": "football", "start_time": future.isoformat()},
+                                  {"sport": "tennis", "start_time": future.isoformat()}], self.now), set())
+        self.assertEqual(missing([], self.now), {"football", "tennis"})
+
+    def test_live_core_refresh_is_throttled_for_30_minutes(self):
+        due = ns["live_core_refresh_due"]
+        recent = {
+            "generated_at": self.now.isoformat(),
+            "summary": {"live_core_refresh": {"attempted": True,
+                "last_attempt_at": (self.now - timedelta(minutes=10)).isoformat()}},
+        }
+        old = {
+            "generated_at": self.now.isoformat(),
+            "summary": {"live_core_refresh": {"attempted": True,
+                "last_attempt_at": (self.now - timedelta(minutes=31)).isoformat()}},
+        }
+        self.assertFalse(due(recent, self.now))
+        self.assertTrue(due(old, self.now))
+        self.assertTrue(due({"summary": {"live_core_refresh": {"attempted": False}}}, self.now))
+
+    def test_live_prediction_source_uses_zero_argument_api(self):
+        collect = ns["collect_live_core_predictions"]
+        calls = []
+        def fetcher():
+            calls.append("called")
+            return [{"event_id": "live-football"}], [], {"rejected_total": 0}
+        predictions, errors, diagnostics = collect(fetcher)
+        self.assertEqual(calls, ["called"])
+        self.assertEqual(predictions[0]["event_id"], "live-football")
+        self.assertEqual(errors, [])
+        self.assertEqual(diagnostics["rejected_total"], 0)
+
     def test_live_refresh_replaces_stale_core_copy_for_same_fixture(self):
         merge = ns["merge_live_core_refresh"]
         rows = [

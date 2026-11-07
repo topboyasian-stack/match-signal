@@ -133,6 +133,21 @@ class CrossSportReassessmentTests(unittest.TestCase):
         self.assertEqual(merged[0]["primary_pick"], "p1")
         self.assertEqual(merged[0]["primary_status"], "FROZEN")
 
+    def test_live_fallback_rows_are_recorded_once_as_private_primary_fixtures(self):
+        reassessment._RUN_PRIMARY.clear()
+        rows = [
+            {"sport": "football", "event_id": "live-football", "source_engine": "unified_live_refresh"},
+            {"sport": "tennis", "event_id": "live-tennis", "source_engine": "unified_live_refresh"},
+            {"sport": "football", "event_id": "canonical-football", "source_engine": "core_prediction_engine"},
+        ]
+        reassessment._record_live_primary_rows(rows)
+        reassessment._record_live_primary_rows(rows)
+        self.assertEqual(
+            {(row["sport"], row["event_id"]) for row in reassessment._RUN_PRIMARY},
+            {("football", "live-football"), ("tennis", "live-tennis")},
+        )
+        reassessment._RUN_PRIMARY.clear()
+
     def test_raw_reassessment_artifacts_are_routed_to_ignored_private_store(self):
         private_dir = reassessment.DATA / "calibration_private"
         self.assertEqual(reassessment.OUTPUT.parent, private_dir)
