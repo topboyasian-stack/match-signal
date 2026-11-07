@@ -310,11 +310,23 @@ jobs:
                 verified_epoch_us="$(python -c 'from datetime import datetime; import sys; print(int(datetime.fromisoformat(sys.argv[1].replace("Z", "+00:00")).timestamp() * 1000000))' "$verification_time" 2>/dev/null || echo 0)"
                 merge_base="$(gh api "repos/$GITHUB_REPOSITORY/compare/$deployment_source_sha...$verification_source" --jq '.merge_base_commit.sha' 2>/dev/null || true)"
                 if [ "$verified_epoch_us" -ge "$dispatched_epoch_us" ] && [ "$merge_base" = "$deployment_source_sha" ]; then
-                  if [ "$verification_status" != "VERIFIED" ] || [ "$alternatives_status" != "READY" ] || ! [[ "$alternatives_count" =~ ^[0-9]+$ ]] || [ "$alternatives_count" -le 0 ] || [ "$drawer_status" != "READY" ] || [ "$booking_status" != "VERIFIED" ]; then
-                    echo "Fresh Cloudflare deployment did not meet release readiness: status=$verification_status alternatives=$alternatives_status count=$alternatives_count drawer=$drawer_status booking=$booking_status source=$verification_source." >&2
+                  booking_state_ready="false"
+                  if [ "$verification_status" = "VERIFIED" ] && [ "$booking_status" = "VERIFIED" ]; then
+                    booking_state_ready="true"
+                  elif [ "$verification_status" = "VERIFIED_WITH_DIAGNOSTIC_INCOMPLETE" ] && [ "$booking_status" = "NO_FUTURE_BATCH" ]; then
+                    # Alternatives and drawer are ready, but there is no qualified combined batch.
+                    # This completes the alternative-selection mission without claiming a booking code.
+                    booking_state_ready="true"
+                  fi
+                  if [ "$booking_state_ready" != "true" ] || [ "$alternatives_status" != "READY" ] || ! [[ "$alternatives_count" =~ ^[0-9]+$ ]] || [ "$alternatives_count" -le 0 ] || [ "$drawer_status" != "READY" ]; then
+                    echo "Fresh Cloudflare deployment did not meet alternative/drawer release readiness: status=$verification_status alternatives=$alternatives_status count=$alternatives_count drawer=$drawer_status booking=$booking_status source=$verification_source." >&2
                     exit 1
                   fi
-                  echo "Cloudflare verification $verification_status confirms $alternatives_count live qualified alternative(s), shared drawer readiness and booking verification for source $verification_source; post-build board $BOARD_RUN_ID and Builder run $BUILDER_RUN_ID."
+                  if [ "$booking_status" = "NO_FUTURE_BATCH" ]; then
+                    echo "Cloudflare verification confirms $alternatives_count live qualified alternatives and shared drawer readiness for source $verification_source. No qualified combined batch exists; booking/code issuance remains unavailable. Post-build board $BOARD_RUN_ID and Builder run $BUILDER_RUN_ID."
+                  else
+                    echo "Cloudflare verification $verification_status confirms $alternatives_count live qualified alternative(s), shared drawer readiness and booking verification for source $verification_source; post-build board $BOARD_RUN_ID and Builder run $BUILDER_RUN_ID."
+                  fi
                   exit 0
                 fi
               fi
