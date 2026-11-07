@@ -8,6 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 import odds_builder_core as core
+import cross_sport_market_reassessment as reassessment
 UTC = timezone.utc
 
 
@@ -96,6 +97,21 @@ class BuilderLiveCoreFallbackTests(unittest.TestCase):
             core.load = original_load
         self.assertEqual(result, [])
         self.assertEqual(source, "stale_canonical_no_live_fallback")
+
+    def test_live_fallback_rows_are_registered_in_private_primary_ledger(self):
+        reassessment._RUN_PRIMARY.clear()
+        rows = [
+            {"sport": "football", "event_id": "fallback-football", "source_engine": "unified_live_refresh"},
+            {"sport": "tennis", "event_id": "fallback-tennis", "source_engine": "unified_live_refresh"},
+            {"sport": "football", "event_id": "canonical-football", "source_engine": "core_prediction_engine"},
+        ]
+        reassessment._record_live_primary_rows(rows)
+        reassessment._record_live_primary_rows(rows)
+        self.assertEqual(
+            {(row["sport"], row["event_id"]) for row in reassessment._RUN_PRIMARY},
+            {("football", "fallback-football"), ("tennis", "fallback-tennis")},
+        )
+        reassessment._RUN_PRIMARY.clear()
 
     def test_builder_candidates_use_active_fallback_but_never_tennis_watch_rows(self):
         future = (self.now + timedelta(hours=1)).isoformat()
