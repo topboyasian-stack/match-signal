@@ -86,6 +86,43 @@ assert.ok(
     cloudflare.includes("|functions/api/espn.js|"),
   "The ESPN summary proxy must trigger and be permitted in Cloudflare deployments when its implementation changes.",
 );
+
+const analystDeploymentPaths = [
+  "analyst.html",
+  "analyst.js",
+  "workspace-ui.css",
+  "functions/_shared/analyst.mjs",
+  "functions/api/analyst/chat.js",
+  "functions/api/analyst/market-evidence.js",
+  "functions/api/analyst/parse-ticket.js",
+  "functions/api/analyst/records.js",
+];
+for (const file of analystDeploymentPaths) {
+  assert.ok(cloudflare.includes("      - '" + file + "'"), file + " must trigger Cloudflare production deployment");
+  assert.ok(cloudflare.includes("|" + file + "|"), file + " must be approved by the direct-promotion guard");
+}
+assert.ok(
+  cloudflare.includes("      - 'functions/api/analyst/**'") &&
+    cloudflare.includes("      - 'scripts/test_analyst_module.mjs'") &&
+    cloudflare.includes("      - 'scripts/test_analyst_routes.mjs'") &&
+    cloudflare.includes("      - 'scripts/test_analyst_parse_ticket.mjs'"),
+  "Analyst changes and the independent-leg regression suite must activate the Cloudflare pull-request validator",
+);
+assert.ok(
+  cloudflare.includes("test -s analyst.html") &&
+    cloudflare.includes("test -s analyst.js") &&
+    cloudflare.includes("test -s functions/_shared/analyst.mjs") &&
+    cloudflare.includes("node --check functions/api/analyst/parse-ticket.js"),
+  "The deployed artifact must contain and syntax-check the private Analyst UI and API",
+);
+assert.ok(
+  cloudflare.includes("'/analyst.js'") &&
+    cloudflare.includes("'/workspace-ui.css'") &&
+    cloudflare.includes("'/workspace-ui.js'") &&
+    cloudflare.includes("'/analyst.html'"),
+  "Production smoke tests must request the private Analyst page and all browser assets",
+);
+
 assert.ok(
   cloudflare.includes("|scripts/test_live_virtual_quote_coverage.mjs|") &&
     cloudflare.includes("|scripts/test_nba_live_projection.mjs|") &&
