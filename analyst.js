@@ -42,12 +42,18 @@
   }
   function updateLedger(summary) {
     const count = summary || {};
+    const outcomes = count.actual_selection_outcomes || {};
+    const byQualification = count.outcome_by_qualification_state || {};
+    const qualified = byQualification.QUALIFIED || {};
+    const notQualified = byQualification.NOT_QUALIFIED || {};
     $("ledgerCounts").replaceChildren();
     const items = [
       ["Tickets", count.ticket_count || 0], ["Legs", count.leg_count || 0],
-      ["Scored", count.scored_leg_count || 0], ["Won", count.actual_selection_outcomes && count.actual_selection_outcomes.WON || 0],
-      ["Lost", count.actual_selection_outcomes && count.actual_selection_outcomes.LOST || 0],
-      ["Unsettled", count.actual_selection_outcomes && count.actual_selection_outcomes.UNSETTLED_OR_MISSING_SCORE || 0]
+      ["Scored", count.scored_leg_count || 0], ["Won", outcomes.WON || 0],
+      ["Lost", outcomes.LOST || 0], ["Pending", outcomes.PENDING || 0],
+      ["Unresolved", outcomes.UNSETTLED_OR_MISSING_SCORE || 0],
+      ["Qualified W/L", (qualified.WON || 0) + "/" + (qualified.LOST || 0)],
+      ["Unqualified W/L", (notQualified.WON || 0) + "/" + (notQualified.LOST || 0)]
     ];
     items.forEach(function(item) {
       const block = document.createElement("div");
@@ -61,8 +67,8 @@
     });
     const hit = count.actual_leg_hit_rate_excluding_pushes;
     $("ledgerStatus").textContent = count.ticket_count
-      ? "Private ledger loaded · actual-leg hit rate excluding pushes: " + (hit == null ? "not yet available" : (Number(hit) * 100).toFixed(1) + "%") + ". Selected-ticket evidence is not an unbiased model backtest."
-      : "Private ledger is empty. Parsed tickets remain drafts until you choose to save them.";
+      ? "Private ledger loaded · leg hit rate excluding pushes: " + (hit == null ? "not yet available" : (Number(hit) * 100).toFixed(1) + "%") + ". Each leg is counted independently of the accumulator result; user-selected evidence remains selection-biased and cannot by itself validate or unlock the model."
+      : "Private ledger is empty. Parsed tickets remain drafts until you review and explicitly save them.";
   }
   async function refreshLedger() {
     const payload = await api("./api/analyst/records");
