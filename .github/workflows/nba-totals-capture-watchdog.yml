@@ -8,6 +8,8 @@ on:
       - '.github/workflows/nba-totals-price-capture.yml'
       - '.github/workflows/nba-totals-settlement.yml'
       - '.github/workflows/nba-totals-probability-value.yml'
+      - 'scripts/nba_totals_capture_watchdog.py'
+      - 'scripts/test_nba_totals_capture_watchdog.py'
   schedule:
     # Run five minutes after capture slots; recover only when the last exact
     # SportyBet market-225 capture is stale and no capture is active.
@@ -22,13 +24,6 @@ on:
       - "NBA totals SportyBet market-225 price capture"
       - "NBA totals probability and value research"
     types: [completed]
-  push:
-    branches: [main]
-    paths:
-      - 'scripts/nba_totals_capture_watchdog.py'
-      - 'scripts/test_nba_totals_capture_watchdog.py'
-      - '.github/workflows/nba-totals-capture-watchdog.yml'
-
 permissions:
   actions: write
   contents: read
