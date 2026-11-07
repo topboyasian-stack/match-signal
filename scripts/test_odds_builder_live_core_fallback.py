@@ -47,6 +47,56 @@ class BuilderLiveCoreFallbackTests(unittest.TestCase):
         self.assertEqual(source, "unified_live_refresh_fallback")
         self.assertEqual({row["event_id"] for row in result}, {"fresh-football", "fresh-tennis"})
 
+    def test_fresh_tennis_does_not_block_live_football_fallback(self):
+        future = (self.now + timedelta(hours=2)).isoformat()
+        canonical_tennis = {
+            "event_id": "canonical-tennis", "sport": "tennis", "start_time": future,
+            "pick": "p1", "probabilities": {"p1": 0.64, "p2": 0.36},
+        }
+        live_rows = [
+            {"event_id": "live-football", "sport": "football", "source_engine": "unified_live_refresh", "start_time": future},
+            {"event_id": "live-tennis", "sport": "tennis", "source_engine": "unified_live_refresh", "start_time": future},
+            {"event_id": "watch-tennis", "sport": "tennis", "source_engine": "unified_live_refresh", "start_time": future,
+             "prediction_status": "watch_projection", "qualification_status": "TENNIS_FORWARD_WATCH_NOT_QUALIFIED"},
+        ]
+        original_load = core.load
+        def fake_load(path, default):
+            name = str(path)
+            if name.endswith("predictions.json"):
+                return [canonical_tennis]
+            if name.endswith("pipeline_status.json"):
+                return {"updated_at": (self.now - timedelta(minutes=20)).isoformat()}
+            if name.endswith("unified_upcoming.json"):
+                return {"events": live_rows}
+            return default
+        core.load = fake_load
+        try:
+            result, source = core._builder_prediction_source(self.now)
+        finally:
+            core.load = original_load
+        self.assertEqual(source, "mixed_canonical_unified_fallback")
+        self.assertEqual({row["event_id"] for row in result}, {"canonical-tennis", "live-football"})
+
+    def test_stale_canonical_rows_are_not_reused_when_no_live_fallback_exists(self):
+        original_load = core.load
+        def fake_load(path, default):
+            name = str(path)
+            if name.endswith("predictions.json"):
+                return [{"event_id": "stale-tennis", "sport": "tennis",
+                         "start_time": (self.now + timedelta(hours=1)).isoformat()}]
+            if name.endswith("pipeline_status.json"):
+                return {"updated_at": (self.now - timedelta(hours=5)).isoformat()}
+            if name.endswith("unified_upcoming.json"):
+                return {"events": []}
+            return default
+        core.load = fake_load
+        try:
+            result, source = core._builder_prediction_source(self.now)
+        finally:
+            core.load = original_load
+        self.assertEqual(result, [])
+        self.assertEqual(source, "stale_canonical_no_live_fallback")
+
     def test_builder_candidates_use_active_fallback_but_never_tennis_watch_rows(self):
         future = (self.now + timedelta(hours=1)).isoformat()
         core.ACTIVE_PREDICTION_ROWS = [
