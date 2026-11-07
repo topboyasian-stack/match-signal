@@ -1643,6 +1643,12 @@ def build_under_line_evidence(rows, minimum_line=6.5):
             grouped[key]=record
     return grouped
 
+def core_feed_stale(generated_at, now):
+    """Treat a missing or older-than-four-hours core prediction feed as stale."""
+    stamp = dt(generated_at)
+    return stamp is None or stamp < now - timedelta(hours=4)
+
+
 def main():
     rows=[]
     for key in DESK_FILTER_STATS:
@@ -1666,11 +1672,14 @@ def main():
     # from the public schedule/model engine for the unified board. This does not
     # replace the canonical production artifact; it keeps the forward desk alive.
     try:
-        core_generated_at=dt(load("pipeline_status.json",{}).get("updated_at"))
-        core_stale=(core_generated_at is None or core_generated_at<NOW-timedelta(hours=4))
+        core_generated_at=load("pipeline_status.json",{}).get("updated_at")
+        core_stale=core_feed_stale(core_generated_at,NOW)
     except Exception:
         core_stale=True
-    if len(core_source)<10:
+    # A full but expired core feed is still unusable. Previously the row-count
+    # check suppressed the live Football/Tennis refresh whenever old fixtures
+    # remained in predictions.json, leaving Upcoming populated by virtual rows.
+    if core_stale or len(core_source)<10:
         try:
             from predict_today import fetch_current_predictions
             live_predictions, live_errors, _qc = fetch_current_predictions(include_watch=True)
