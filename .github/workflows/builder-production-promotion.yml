@@ -34,9 +34,9 @@ permissions:
   actions: write
   contents: read
 
-# Fresh concurrency namespace releases the stalled v4 waiter that used the stale Builder-SHA match.
+# Fresh concurrency namespace releases the v6 runs stranded before job allocation while preserving the ordered promotion sequence.
 concurrency:
-  group: builder-production-promotion-v6
+  group: builder-production-promotion-v7
   cancel-in-progress: false
 
 jobs:
