@@ -246,6 +246,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         expected_direct_paths = {
             "_headers",
             "index.html",
+            "league.html",
             "upcoming.html",
             "qualified-best.html",
             "qualified-best-design.css",

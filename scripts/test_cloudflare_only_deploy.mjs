@@ -63,6 +63,7 @@ assert.ok(
     cloudflare.includes("|scripts/test_workflow_trigger_boundaries.py|") &&
     cloudflare.includes("|scripts/test_cloudflare_only_deploy.mjs|") &&
     cloudflare.includes("|scripts/test_sportybet_booking_resilience.mjs|") &&
+    cloudflare.includes("|league.html|") &&
     cloudflare.includes("|live.html|") &&
     cloudflare.includes("|match-signal-ip.js|") &&
     cloudflare.includes("|api-access.html|") &&
