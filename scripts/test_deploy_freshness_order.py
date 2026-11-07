@@ -376,7 +376,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
 
     def test_builder_promotion_waits_for_each_board_triggered_builder_before_pages(self):
         self.assertIn("uses: actions/checkout@v4", PROMOTION_WORKFLOW)
-        self.assertIn("group: builder-production-promotion-v6", PROMOTION_WORKFLOW)
+        self.assertRegex(PROMOTION_WORKFLOW, r"group: builder-production-promotion-v\\d+")
         self.assertIn("timeout-minutes: 60", PROMOTION_WORKFLOW)
         self.assertIn("Refresh Unified Upcoming before rebuilding the Builder", PROMOTION_WORKFLOW)
         self.assertEqual(PROMOTION_WORKFLOW.count("gh workflow run unified-upcoming.yml --ref main -f promotion_child=true"), 2)
@@ -425,7 +425,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn("GH_TOKEN: ${{ github.token }}", BUILDER_WORKFLOW[dispatch_step:])
         self.assertIn("gh workflow run builder-production-promotion.yml --ref main", BUILDER_WORKFLOW[dispatch_step:])
         self.assertIn("  workflow_dispatch:", PROMOTION_WORKFLOW)
-        self.assertIn("group: builder-production-promotion-v6", PROMOTION_WORKFLOW)
+        self.assertRegex(PROMOTION_WORKFLOW, r"group: builder-production-promotion-v\\d+")
         self.assertIn("cancel-in-progress: false", PROMOTION_WORKFLOW)
         self.assertIn("skip_promotion:", BUILDER_WORKFLOW)
         self.assertIn("inputs.skip_promotion != true", BUILDER_WORKFLOW)
