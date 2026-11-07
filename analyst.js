@@ -46,6 +46,7 @@
     const byQualification = count.outcome_by_qualification_state || {};
     const qualified = byQualification.QUALIFIED || {};
     const notQualified = byQualification.NOT_QUALIFIED || {};
+    const alternatives = count.alternative_user_picks || count.user_selection_cohorts?.NOT_QUALIFIED || {};
     $("ledgerCounts").replaceChildren();
     const items = [
       ["Tickets", count.ticket_count || 0], ["Legs", count.leg_count || 0],
@@ -53,6 +54,7 @@
       ["Lost", outcomes.LOST || 0], ["Pending", outcomes.PENDING || 0],
       ["Unresolved", outcomes.UNSETTLED_OR_MISSING_SCORE || 0],
       ["Qualified W/L", (qualified.WON || 0) + "/" + (qualified.LOST || 0)],
+      ["Alternative W/L", (alternatives.wins || 0) + "/" + (alternatives.losses || 0)],
       ["Unqualified W/L", (notQualified.WON || 0) + "/" + (notQualified.LOST || 0)]
     ];
     items.forEach(function(item) {
@@ -66,8 +68,16 @@
       $("ledgerCounts").appendChild(block);
     });
     const hit = count.actual_leg_hit_rate_excluding_pushes;
+    const alternativeHit = alternatives.hit_rate_excluding_pushes;
+    const alternativeRoi = alternatives.flat_stake_roi;
+    const winDays = [...new Set((count.alternative_winning_tickets || []).map(ticket => ticket.date).filter(Boolean))];
+    const alternativeText = " Alternative picks: " + (alternatives.wins || 0) + "W/" + (alternatives.losses || 0) + "L" +
+      " · " + (alternativeHit == null ? "hit rate pending" : (Number(alternativeHit) * 100).toFixed(1) + "% hit rate") +
+      " · " + (alternativeRoi == null ? "ROI pending" : (Number(alternativeRoi) * 100).toFixed(1) + "% one-unit leg ROI") +
+      (winDays.length ? " · winning alternative-ticket days: " + winDays.slice(0, 4).join(", ") : "");
     $("ledgerStatus").textContent = count.ticket_count
-      ? "Private ledger loaded · leg hit rate excluding pushes: " + (hit == null ? "not yet available" : (Number(hit) * 100).toFixed(1) + "%") + ". Each leg is counted independently of the accumulator result; user-selected evidence remains selection-biased and cannot by itself validate or unlock the model."
+      ? "Private ledger loaded · leg hit rate excluding pushes: " + (hit == null ? "not yet available" : (Number(hit) * 100).toFixed(1) + "%") + "." +
+        alternativeText + " Each leg is counted independently of the accumulator result; user-selected evidence remains selection-biased and cannot by itself validate or unlock the model."
       : "Private ledger is empty. Parsed tickets remain drafts until you review and explicitly save them.";
   }
   async function refreshLedger() {
