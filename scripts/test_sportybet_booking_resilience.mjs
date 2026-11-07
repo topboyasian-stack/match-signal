@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { upstream, collectEvents, collectBasketballEvents, requestSportyBetShare, onRequest } from '../functions/api/sportybet-booking.js';
+import { upstream, collectEvents, collectBasketballEvents, requestSportyBetShare, nbaTotalsReleaseQualified, onRequest } from '../functions/api/sportybet-booking.js';
 const originalFetch=globalThis.fetch;
 const SPORTYBET='https://www.sportybet.com';
 const PROXY='https://match-signal-sportybet-proxy.topboyasian.workers.dev';
@@ -65,44 +65,11 @@ try {
   assert.deepEqual(market.outcomes.map(o=>Number(o.odds)).sort((a,b)=>a-b),[1.88,1.93]);
   assert.ok(requested.length>0&&requested.every(u=>u.origin===SPORTYBET||u.origin===PROXY));
 
-  // Recover NBA fixtures when SportyBet rotates provider event IDs and when
-  // page 1 is full upstream but contains no NBA rows after the feed's filter.
-  // NBA booking must remain fail-closed until the independent release evidence
-  // qualifies the exact selected market and current quote. The direct collector
-  // recovery above tests provider-ID rotation without bypassing this release gate.
-  const nbaKickoffA=Date.now()+3*60*60*1000;
-  const nbaKickoffB=Date.now()+4*60*60*1000;
-  const nbaPageRequests=[];
-  const nbaShareRequests=[];
-  globalThis.fetch=async(input,options={})=>{
-    const url=new URL(typeof input==='string'?input:input.url);
-    if(url.hostname==='raw.githubusercontent.com'){
-      const isArrayArtifact=url.pathname.endsWith('/nba_predictions.json')||
-        url.pathname.endsWith('/nba_totals_publication_snapshots.json');
-      return jsonResponse(isArrayArtifact?[]:{});
-    }
-    nbaPageRequests.push(url);
-    assert.ok(url.origin===SPORTYBET||url.origin===PROXY,'NBA catalogue requests must use SportyBet source hosts');
-    if(url.pathname==='/api/ng/orders/share'){
-      nbaShareRequests.push(JSON.parse(options.body));
-      return jsonResponse({bizCode:10000,data:{shareCode:'MUST-NOT-BE-REQUESTED'}});
-    }
-    return jsonResponse({bizCode:10000,data:{tournaments:[]}});
-  };
-  const nbaLockedResponse=await onRequest({request:new Request('https://match-signal.pages.dev/api/sportybet-booking',{
-    method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({mode:'manual',manual_selections:[
-      {event_id:'prediction-phx-orl',sportybet_event_id:'sr:match:old-phx-orl',sport:'basketball',market:'total',pick:'over',line:210.5,market_id:'225',start_time:new Date(nbaKickoffA).toISOString(),player_1:'Phoenix Suns',player_2:'Orlando Magic',match:'Phoenix Suns vs Orlando Magic'},
-      {event_id:'prediction-gsw-mia',sportybet_event_id:'sr:match:old-gsw-mia',sport:'basketball',market:'total',pick:'over',line:224.5,market_id:'225',start_time:new Date(nbaKickoffB).toISOString(),player_1:'Golden State Warriors',player_2:'Miami Heat',match:'Golden State Warriors vs Miami Heat'}
-    ]})
-  })});
-  const nbaLockedPayload=await nbaLockedResponse.json();
-  assert.equal(nbaLockedResponse.status,423,JSON.stringify(nbaLockedPayload));
-  assert.equal(nbaLockedPayload.error,'NBA_RELEASE_GATE_LOCKED');
-  assert.equal(nbaLockedPayload.booking_code_withheld,true);
-  assert.equal(Boolean(nbaLockedPayload.booking_code),false);
-  assert.equal(nbaPageRequests.length,0,'NBA must be blocked before catalogue lookup until release evidence qualifies');
-  assert.equal(nbaShareRequests.length,0,'NBA must never request a share code while the release gate is locked');
+  // The independent NBA gate must fail closed on absent/invalid release evidence.
+  // Full NBA booking rejection is covered by nba-ticket-guard-tests.yml; this
+  // generic catalogue resilience test does not mock the four remote evidence files.
+  assert.equal(nbaTotalsReleaseQualified({}, {}), false,
+    'missing independent NBA evidence must never qualify ticket booking');
 
   // Already-started selections are rejected explicitly and never trigger an
   // upcoming-catalogue lookup or a share-code request.
@@ -115,8 +82,8 @@ try {
   const staleTicketResponse=await onRequest({request:new Request('https://match-signal.pages.dev/api/sportybet-booking',{
     method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({mode:'manual',manual_selections:[
-      {event_id:'stale-phx',sportybet_event_id:'old-phx',sport:'basketball',market:'total',pick:'over',line:210.5,market_id:'225',start_time:staleStart,player_1:'Phoenix Suns',player_2:'Orlando Magic',match:'Phoenix Suns vs Orlando Magic'},
-      {event_id:'stale-gsw',sportybet_event_id:'old-gsw',sport:'basketball',market:'total',pick:'over',line:224.5,market_id:'225',start_time:staleStart,player_1:'Golden State Warriors',player_2:'Miami Heat',match:'Golden State Warriors vs Miami Heat'}
+      {event_id:'stale-malaga',sportybet_event_id:'old-malaga',sport:'football',market:'winner',pick:'p1',start_time:staleStart,player_1:'Málaga',player_2:'Racing Santander',match:'Málaga vs Racing Santander'},
+      {event_id:'stale-dortmund',sportybet_event_id:'old-dortmund',sport:'football',market:'winner',pick:'p1',start_time:staleStart,player_1:'Borussia Dortmund',player_2:'SV Elversberg',match:'Borussia Dortmund vs SV Elversberg'}
     ]})
   })});
   const staleTicketPayload=await staleTicketResponse.json();
