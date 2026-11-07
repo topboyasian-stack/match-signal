@@ -166,6 +166,35 @@ def validate_document(document: Any) -> list[str]:
                 errors.append(f"{lw}.qualification_state is invalid")
             if leg.get("qualification_captured_at") is not None and not parse_datetime(leg.get("qualification_captured_at")):
                 errors.append(f"{lw}.qualification_captured_at must be an ISO date-time")
+            observations = leg.get("match_observations")
+            if observations is not None:
+                if not isinstance(observations, list) or len(observations) > 40:
+                    errors.append(f"{lw}.match_observations must contain at most 40 observations")
+                else:
+                    previous = float("-inf")
+                    for oi, observation in enumerate(observations):
+                        ow = f"{lw}.match_observations[{oi}]"
+                        if not isinstance(observation, dict):
+                            errors.append(f"{ow} must be an object")
+                            continue
+                        if set(observation) - {"observed_at", "phase", "home", "away", "source", "source_event_id"}:
+                            errors.append(f"{ow} contains unsupported properties")
+                        stamp = parse_timestamp(observation.get("observed_at"))
+                        if stamp is None:
+                            errors.append(f"{ow}.observed_at is invalid")
+                        elif stamp <= previous:
+                            errors.append(f"{ow}.observed_at must be strictly increasing")
+                        else:
+                            previous = stamp
+                        if observation.get("phase") not in {"PRE_MATCH", "IN_PLAY", "HALF_TIME", "PERIOD_BREAK", "SET", "FINAL"}:
+                            errors.append(f"{ow}.phase is invalid")
+                        for side in ("home", "away"):
+                            if not finite_number(observation.get(side)) or float(observation.get(side, -1)) < 0:
+                                errors.append(f"{ow}.{side} is invalid")
+                        if observation.get("source") not in {"user_reported", "provider_feed"}:
+                            errors.append(f"{ow}.source is invalid")
+                        if observation.get("source_event_id") is not None and (not isinstance(observation.get("source_event_id"), str) or len(observation["source_event_id"]) > 160):
+                            errors.append(f"{ow}.source_event_id is invalid")
             score = leg.get("final_score")
             if score is not None:
                 if not isinstance(score, dict):

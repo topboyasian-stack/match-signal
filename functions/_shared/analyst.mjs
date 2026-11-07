@@ -141,7 +141,7 @@ export function validateReviewDocument(document) {
         errors.push(lw + " must be an object");
         return;
       }
-      checkKnownKeys(leg, new Set(["leg_ref", "product", "competition", "match", "event_id", "kickoff_at", "desk_snapshot", "actual_selection", "final_score", "settled_at", "leg_outcome", "leg_outcome_source", "leg_outcome_captured_at", "qualification_state", "qualification_captured_at"]), lw, errors);
+      checkKnownKeys(leg, new Set(["leg_ref", "product", "competition", "match", "event_id", "kickoff_at", "desk_snapshot", "actual_selection", "match_observations", "final_score", "settled_at", "leg_outcome", "leg_outcome_source", "leg_outcome_captured_at", "qualification_state", "qualification_captured_at"]), lw, errors);
       if (!validRef(leg.leg_ref)) errors.push(lw + ".leg_ref is invalid");
       else if (legRefs.has(leg.leg_ref)) errors.push(lw + " has a duplicate leg_ref");
       else legRefs.add(leg.leg_ref);
@@ -166,6 +166,25 @@ export function validateReviewDocument(document) {
           if (desk.model_probability !== undefined && desk.model_probability !== null && (!finiteNumber(desk.model_probability) || desk.model_probability < 0 || desk.model_probability > 1)) errors.push(lw + ".desk_snapshot.model_probability is invalid");
           if (desk.prediction_id !== undefined && (typeof desk.prediction_id !== "string" || desk.prediction_id.length > 160)) errors.push(lw + ".desk_snapshot.prediction_id is invalid");
           if (desk.model_version !== undefined && (typeof desk.model_version !== "string" || desk.model_version.length > 100)) errors.push(lw + ".desk_snapshot.model_version is invalid");
+        }
+      }
+      if (leg.match_observations !== undefined) {
+        if (!Array.isArray(leg.match_observations) || leg.match_observations.length > 40) errors.push(lw + ".match_observations must contain at most 40 observations");
+        else {
+          let previous = -Infinity;
+          leg.match_observations.forEach(function(observation, oi) {
+            const ow = lw + ".match_observations[" + oi + "]";
+            if (!observation || typeof observation !== "object" || Array.isArray(observation)) { errors.push(ow + " must be an object"); return; }
+            checkKnownKeys(observation, new Set(["observed_at", "phase", "home", "away", "source", "source_event_id"]), ow, errors);
+            if (!validDateTime(observation.observed_at)) errors.push(ow + ".observed_at is invalid");
+            const timestamp = Date.parse(observation.observed_at);
+            if (Number.isFinite(timestamp) && timestamp <= previous) errors.push(ow + ".observed_at must be strictly increasing");
+            if (Number.isFinite(timestamp)) previous = timestamp;
+            if (!["PRE_MATCH", "IN_PLAY", "HALF_TIME", "PERIOD_BREAK", "SET", "FINAL"].includes(observation.phase)) errors.push(ow + ".phase is invalid");
+            for (const side of ["home", "away"]) if (!finiteNumber(observation[side]) || observation[side] < 0) errors.push(ow + "." + side + " is invalid");
+            if (!["user_reported", "provider_feed"].includes(observation.source)) errors.push(ow + ".source is invalid");
+            if (observation.source_event_id !== undefined && (typeof observation.source_event_id !== "string" || observation.source_event_id.length > 160)) errors.push(ow + ".source_event_id is invalid");
+          });
         }
       }
       if (leg.final_score !== undefined && leg.final_score !== null) {
