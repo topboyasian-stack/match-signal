@@ -349,7 +349,10 @@ export function privateModelTicketContext(document, limit = 8) {
           product: leg.product, competition: leg.competition || null, match: leg.match,
           kickoff_at: leg.kickoff_at || null, actual_selection: leg.actual_selection,
           desk_snapshot: leg.desk_snapshot || null, final_score: leg.final_score || null,
-          actual_result: analysis.actual_result, desk_result_on_same_score: analysis.desk_result,
+          leg_outcome_source: leg.leg_outcome_source || null,
+          qualification_state: analysis.qualification_state,
+          actual_result: analysis.actual_result, actual_result_source: analysis.actual_result_source,
+          desk_result_on_same_score: analysis.desk_result,
           line_adjustment: analysis.line_adjustment, desk_snapshot_timing: analysis.desk_snapshot_timing,
           counterfactual: analysis.counterfactual
         };
