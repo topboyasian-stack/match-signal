@@ -38,6 +38,11 @@ function documentWithTicket() {
         product: "vfootball",
         match: "Sample FC vs Example FC",
         actual_selection: { market: "total_goals_over_under", pick: "over", line: 1.5, odds: 1.5 },
+        match_observations: [
+          { observed_at: "2026-10-09T10:02:00Z", phase: "PRE_MATCH", home: 0, away: 0, source: "user_reported" },
+          { observed_at: "2026-10-09T10:05:00Z", phase: "IN_PLAY", home: 1, away: 0, source: "user_reported" },
+          { observed_at: "2026-10-09T10:07:00Z", phase: "HALF_TIME", home: 1, away: 1, source: "user_reported" }
+        ],
         final_score: { home: 1, away: 1 },
         settled_at: "2026-10-09T10:10:00Z"
       }, {
@@ -92,6 +97,10 @@ const persisted = await payload(response);
 assert.equal(persisted.document.tickets.length, 1);
 assert.equal(persisted.document.tickets[0].ticket_ref, "ticket_internal_1");
 assert.equal(persisted.document.tickets[0].legs.length, 2, "all mixed-sport legs are persisted independently");
+const persistedTimeline = persisted.document.tickets[0].legs[0].match_observations;
+assert.equal(persistedTimeline.length, 3, "timestamped match-state observations survive KV write/read");
+assert.deepEqual(persistedTimeline.map(item => item.phase), ["PRE_MATCH", "IN_PLAY", "HALF_TIME"]);
+assert.deepEqual(persisted.document.tickets[0].legs[0].final_score, { home: 1, away: 1 }, "final settlement remains separate from in-play observations");
 
 const invalid = documentWithTicket();
 invalid.tickets[0].unrecognised_verification_code = "MUST_NOT_STORE";
