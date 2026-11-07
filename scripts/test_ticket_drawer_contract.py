@@ -146,8 +146,11 @@ def main():
             "Football and Tennis catalogue scans must pass current legs for participant/time recovery")
     require("leg?.model_qualified!==true" in api and "leg?.market_id!=='225'" in api and
             "!leg.sportybet_event_id" in api and "NBA_RELEASE_GATE_LOCKED" in api and
-            "nbaTotalTicketLegQualified" in api and "if (hasBasketballLeg && !manualMode)" in api,
-            "Automated NBA batches must keep the release and snapshot gate while manual slips use live quote revalidation")
+            "nbaTotalTicketLegQualified" in api and "if (hasBasketballLeg)" in api and
+            "if (String(leg?.sport || '').toLowerCase() === 'basketball')" in api and
+            "if (hasBasketballLeg && !manualMode)" not in api and
+            "if (!manualMode && String(leg?.sport || '').toLowerCase() === 'basketball')" not in api,
+            "Manual and automated NBA tickets must share the same global release gate and exact per-leg snapshot/value revalidation")
     require("prospective_probability_fixture_coverage" in api and
             "valid_unique_settled_fixtures" in api and "binary_scored_unique_fixtures" in api and
             "snapshot_linkage_failure_count" in api and
