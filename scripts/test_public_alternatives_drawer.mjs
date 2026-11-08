@@ -17,13 +17,15 @@ assert.equal(Number(feed.min_probability), 0.55, "The research lane must declare
 assert.equal(Number(feed.builder_min_probability), 0.65, "Builder-qualified picks must retain the 65% floor");
 assert.ok(Array.isArray(feed.alternatives) && feed.alternatives.length, "Public alternatives must be non-empty");
 
+const diagnostics = feed.diagnostics || {};
+assert.ok(Number(diagnostics.quote_fresh_within_15_minutes) > 0, "The server must confirm fresh exact quotes exist");
+assert.equal(Number(diagnostics.selected_alternatives), feed.alternatives.length, "Aggregate selected count must match the public feed");
 const now = Date.now();
 const eligible = feed.alternatives.filter((row) => {
+  // Quote timestamps stay private; the API performs per-row freshness validation
+  // and publishes aggregate freshness counters for safe production verification.
   const start = Date.parse(String(row.start_time || ""));
-  const quote = Date.parse(String(row.quote_timestamp || ""));
-  const quoteAgeSeconds = (now - quote) / 1000;
-  return Number.isFinite(quote) && quoteAgeSeconds >= 0 && quoteAgeSeconds <= 900 &&
-    ["football", "tennis", "basketball", "efootball"].includes(String(row.sport || "")) &&
+  return ["football", "tennis", "basketball", "efootball"].includes(String(row.sport || "")) &&
     row.event_id && row.sportybet_event_id && row.market_id &&
     row.role === "ALTERNATIVE" && row.source === "SYSTEM_RECOMMENDED" &&
     Number.isFinite(start) && start > now + 5 * 60 * 1000 &&
