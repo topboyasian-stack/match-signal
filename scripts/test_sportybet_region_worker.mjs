@@ -74,6 +74,22 @@ try {
   assert.equal(fetchCount, 1);
   fetchCount = 0;
 
+  const singleEventId = "sr:match:BAaG1-6IhflmW86fjM|83vw";
+  const singleEvent = await worker.fetch(new Request(
+    "https://worker.test/api/ng/factsCenter/event?eventId=" + encodeURIComponent(singleEventId)
+  ));
+  assert.equal(singleEvent.status, 200, "bounded single-event detail lookup must use the regional proxy");
+  assert.equal(lastUrl.pathname, "/api/ng/factsCenter/event");
+  assert.equal(lastUrl.searchParams.get("eventId"), singleEventId);
+  assert.equal(fetchCount, 1, "the single-event endpoint should need only one upstream request");
+
+  fetchCount = 0;
+  const invalidEventId = await worker.fetch(new Request(
+    "https://worker.test/api/ng/factsCenter/event?eventId=" + encodeURIComponent("https://example.com/")
+  ));
+  assert.equal(invalidEventId.status, 400, "single-event lookup must reject non-SportyBet identifiers");
+  assert.equal(fetchCount, 0, "invalid event IDs must never reach the provider");
+
   const invalidMarket = await worker.fetch(new Request(
     "https://worker.test/api/ng/factsCenter/pcUpcomingEvents?sportId=sr%3Asport%3A1&pageSize=10&pageNum=1&timeline=168&marketId=9999"
   ));

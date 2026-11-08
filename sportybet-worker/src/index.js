@@ -3,8 +3,9 @@ const PLACEMENT_HINT = "aws:eu-west-1";
 const PC_ENDPOINT = "/api/ng/factsCenter/pcUpcomingEvents";
 const WAP_UPCOMING_ENDPOINT = "/api/ng/factsCenter/wapConfigurableUpcomingEvents";
 const WAP_LIVE_ENDPOINT = "/api/ng/factsCenter/wapConfigurableIndexLiveEvents";
+const EVENT_DETAILS_ENDPOINT = "/api/ng/factsCenter/event";
 const SHARE_ENDPOINT = "/api/ng/orders/share";
-const ALLOWED_ENDPOINTS = new Set([PC_ENDPOINT, WAP_UPCOMING_ENDPOINT, WAP_LIVE_ENDPOINT]);
+const ALLOWED_ENDPOINTS = new Set([PC_ENDPOINT, WAP_UPCOMING_ENDPOINT, WAP_LIVE_ENDPOINT, EVENT_DETAILS_ENDPOINT]);
 const ALLOWED_SPORTS = new Set(["sr:sport:1", "sr:sport:2", "sr:sport:5", "sr:sport:137", "sr:sport:202120001"]);
 const ALLOWED_TOURNAMENTS = new Set(["sr:tournament:132"]);
 const ALLOWED_MARKETS = new Set(["1","10","11","14","16","18","26","29","36","45","47","60100","186","187","188","189","202","203","204","210","219","223","225","227","228"]);
@@ -41,6 +42,13 @@ function ingressMetadata(request) {
 }
 
 function readSafeParams(url, path) {
+  if (path === EVENT_DETAILS_ENDPOINT) {
+    const eventId = String(url.searchParams.get("eventId") || "").trim();
+    if (!eventId.startsWith("sr:match:") || eventId.length > 128 || /[\r\n]/.test(eventId)) {
+      throw new Error("eventId must be a bounded SportyBet sr:match identifier");
+    }
+    return new URLSearchParams({ eventId, _t: String(Date.now()) });
+  }
   const sportId = String(url.searchParams.get("sportId") || "");
   if (!ALLOWED_SPORTS.has(sportId)) throw new Error("Unsupported sportId");
   const pageSize = Number(url.searchParams.get("pageSize") || 100);

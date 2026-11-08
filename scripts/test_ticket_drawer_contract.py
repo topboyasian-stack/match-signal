@@ -114,12 +114,17 @@ def main():
             "eFootball ticket actions must keep the existing product/model qualification gates and totals-only boundary")
     require("market === 'total' && ['football','tennis'].includes(sport)" in api and "leg.market === 'total'" in api and "leg.market_id !== requiredMarketId" in api,
             "Football/Tennis total selections must revalidate against exact SportyBet full-match O/U market IDs")
-    require("if (leg.sport === 'efootball')" in api and "productForLeg(leg) !== 'efootball'" in api and
+    require("const isEfootballLeg = leg.sport === 'efootball' ||" in api and
+            "(leg.sport === 'virtual' && productForLeg(leg) === 'efootball' && leg.market === 'virtual_total')" in api and
+            "productForLeg(leg) !== 'efootball'" in api and
             "!['efootball_gt', 'efootball_adriatic'].includes(leg.product)" in api and
+            "!['total', 'virtual_total'].includes(leg.market)" in api and
             "if (hasEfootballLeg && preExcluded.length > 0)" in api,
             "Manual eFootball O/U legs must be product-tagged and still fail closed when live SportyBet validation rejects any leg")
-    require("const requiredMarketId = sport === 'football' ? '18' : sport === 'tennis' ? '189' : sport === 'efootball' ? String(leg?.market_id || '')" in api,
-            "eFootball booking must revalidate the exact market ID passed by Virtual Lab")
+    require("const efootballProduct = productForLeg(leg) === 'efootball' || sport === 'efootball'" in api and
+            "const requiredMarketId = sport === 'football' ? '18' : sport === 'tennis' ? '189' : efootballProduct ? String(leg?.market_id || '')" in api and
+            "market === 'virtual_total'" in api and "['vfootball', 'efootball'].includes(product)" in api,
+            "eFootball booking must recognize Virtual Lab's virtual_total shape and revalidate its exact provider market ID")
     require("map(l => String(l.sportybet_event_id || l.event_id || '')).filter(Boolean)" in api and "const hasEfootballLeg" in api and "EFOOTBALL_SLIP_REJECTED_PARTIAL" in api,
             "eFootball revalidation must use the SportyBet provider ID and reject partial mixed slips")
     require("function collectBasketballEvents" in api and "function findBasketballSelection" in api,

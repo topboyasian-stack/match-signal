@@ -307,8 +307,14 @@ export async function requestSportyBetShare(selections, { deadlineAt = null, tim
 function currentSelectionForTarget(leg, event) {
   const sport = String(leg?.sport || '').toLowerCase();
   const market = String(leg?.market || '').toLowerCase();
+  const product = productForLeg(leg);
   if (sport === 'basketball') return findBasketballSelection(leg, event);
-  return market === 'total'
+  // Odds Builder's eFootball legs are serialized as sport="virtual",
+  // market="virtual_total", product="efootball_gt". Treat that shape as an
+  // exact totals market during direct-ID matching, not as a match-winner pick.
+  const isTotalsMarket = market === 'total' || market === 'virtual_total' ||
+    (['vfootball', 'efootball'].includes(product) && Boolean(pickVirtualSide(leg)));
+  return isTotalsMarket
     ? findVirtualSelection(leg, event)
     : findWinnerSelection(leg, event);
 }
@@ -931,8 +937,9 @@ function findVirtualSelection(leg, event) {
   const requestedLine = lineFromLeg(leg);
   const side = pickVirtualSide(leg);
   const sport = String(leg?.sport || '').toLowerCase();
-  const requiredMarketId = sport === 'football' ? '18' : sport === 'tennis' ? '189' : sport === 'efootball' ? String(leg?.market_id || '') : '';
-  if (sport === 'efootball' && !['18', '189'].includes(requiredMarketId)) return { error: 'Only an exact SportyBet eFootball totals market (18 or 189) is supported.' };
+  const efootballProduct = productForLeg(leg) === 'efootball' || sport === 'efootball';
+  const requiredMarketId = sport === 'football' ? '18' : sport === 'tennis' ? '189' : efootballProduct ? String(leg?.market_id || '') : '';
+  if (efootballProduct && !['18', '189'].includes(requiredMarketId)) return { error: 'Only an exact SportyBet eFootball totals market (18 or 189) is supported.' };
   if (!Number.isFinite(requestedLine) || !side) {
     return { error: 'Could not map the Builder O/U selection to an exact line and side.' };
   }
@@ -1088,12 +1095,14 @@ async function handlePost(context) {
               !Number.isFinite(Number(leg.line)) || Number(leg.line) < 100 || Number(leg.line) > 300 ||
               leg.market_id !== '225';
           }
-          if (leg.sport === 'efootball') {
+          const isEfootballLeg = leg.sport === 'efootball' ||
+            (leg.sport === 'virtual' && productForLeg(leg) === 'efootball' && leg.market === 'virtual_total');
+          if (isEfootballLeg) {
             return !['efootball_gt', 'efootball_adriatic'].includes(leg.product) ||
-              productForLeg(leg) !== 'efootball' || leg.market !== 'total' ||
+              productForLeg(leg) !== 'efootball' || !['total', 'virtual_total'].includes(leg.market) ||
               !['over', 'under'].includes(leg.pick) ||
               !Number.isFinite(Number(leg.line)) || Number(leg.line) <= 0 || Number(leg.line) > 1000 ||
-              !['18', '189'].includes(leg.market_id) || !leg.sportybet_event_id;
+              !['18', '189'].includes(String(leg.market_id)) || !leg.sportybet_event_id;
           }
           if (!['football', 'tennis'].includes(leg.sport)) return true;
           if (leg.market === 'total') {

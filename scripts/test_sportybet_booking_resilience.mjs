@@ -736,6 +736,89 @@ try {
     'sr:match:direct-man-utd-psg','sr:match:direct-west-ham-wolves'
   ]);
 
+  // Production Builder shape regression: eFootball GT totals are serialized
+  // as sport=virtual + product=efootball_gt + market=virtual_total. The direct
+  // event verifier must treat them as exact totals, not winner selections,
+  // or it falls back to slow 20-page scans and times out the booking POST.
+  const directVirtualKickoff = Date.now() + 6 * 60 * 60 * 1000;
+  const directVirtualStart = new Date(directVirtualKickoff).toISOString();
+  const directVirtualLegs = [
+    {
+      event_id:'sr:match:direct-gt-bayern-inter',
+      sportybet_event_id:'sr:match:direct-gt-bayern-inter',
+      sport:'virtual',product:'efootball_gt',market:'virtual_total',pick:'over',line:2.5,market_id:'18',
+      start_time:directVirtualStart,player_1:'Bayern Munchen (Virtual_10)',player_2:'Inter Milan (Virtual_12)',
+      match:'Bayern Munchen (Virtual_10) vs Inter Milan (Virtual_12)'
+    },
+    {
+      event_id:'sr:match:direct-gt-psg-real',
+      sportybet_event_id:'sr:match:direct-gt-psg-real',
+      sport:'virtual',product:'efootball_gt',market:'virtual_total',pick:'under',line:3.5,market_id:'18',
+      start_time:directVirtualStart,player_1:'Paris SG (Virtual_09)',player_2:'Real Madrid (Virtual_10)',
+      match:'Paris SG (Virtual_09) vs Real Madrid (Virtual_10)'
+    }
+  ];
+  const directVirtualDetails = new Map([
+    ['sr:match:direct-gt-bayern-inter',{
+      eventId:'sr:match:direct-gt-bayern-inter',estimateStartTime:directVirtualKickoff,matchStatus:'Not start',
+      homeTeamName:'FC Bayern Munchen (Virtual_10)',awayTeamName:'Internazionale (Virtual_12)',
+      sport:{id:'sr:sport:137',category:{tournament:{name:'eFootball GT'}}},
+      markets:[{id:'18',desc:'Over/Under',specifier:'total=2.5',status:0,outcomes:[
+        {id:'gt-bayern-over',desc:'Over 2.5',odds:1.91,isActive:1},
+        {id:'gt-bayern-under',desc:'Under 2.5',odds:1.88,isActive:1}
+      ]}]
+    }],
+    ['sr:match:direct-gt-psg-real',{
+      eventId:'sr:match:direct-gt-psg-real',estimateStartTime:directVirtualKickoff,matchStatus:'Not start',
+      homeTeamName:'Paris Saint-Germain (Virtual_09)',awayTeamName:'Real Madrid (Virtual_10)',
+      sport:{id:'sr:sport:137',category:{tournament:{name:'eFootball GT'}}},
+      markets:[{id:'18',desc:'Over/Under',specifier:'total=3.5',status:0,outcomes:[
+        {id:'gt-psg-over',desc:'Over 3.5',odds:1.97,isActive:1},
+        {id:'gt-psg-under',desc:'Under 3.5',odds:1.81,isActive:1}
+      ]}]
+    }]
+  ]);
+  const directVirtualCalls = [];
+  const directVirtualShareRequests = [];
+  globalThis.fetch = async (input, options = {}) => {
+    const url = new URL(typeof input === 'string' ? input : input.url);
+    if (url.pathname.endsWith('/factsCenter/event')) {
+      directVirtualCalls.push({eventId:url.searchParams.get('eventId'),origin:url.origin});
+      const event = directVirtualDetails.get(String(url.searchParams.get('eventId')));
+      return jsonResponse({bizCode:10000,data:event||{}});
+    }
+    if (/\/(?:pcUpcomingEvents|wapConfigurableUpcomingEvents)$/.test(url.pathname) || url.pathname==='/api/sportybet-virtual') {
+      directCatalogueLookups.push('virtual_total:'+url.pathname);
+      return jsonResponse({bizCode:10000,data:{tournaments:[]}});
+    }
+    if (url.pathname==='/api/ng/orders/share') {
+      directVirtualShareRequests.push(JSON.parse(options.body));
+      return jsonResponse({bizCode:10000,data:{
+        shareCode:'EFOOTBALL-VIRTUAL-TOTAL-DIRECT-LOOKUP-OK',
+        outcomes:[{odds:1.91},{odds:1.81}]
+      }});
+    }
+    throw new Error('Unexpected virtual-total direct lookup request: '+url.toString());
+  };
+  const directVirtualResponse = await onRequest({request:new Request('https://match-signal.pages.dev/api/sportybet-booking',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({mode:'manual',manual_selections:directVirtualLegs})
+  })});
+  const directVirtualPayload = await directVirtualResponse.json();
+  assert.equal(directVirtualResponse.status,200,JSON.stringify(directVirtualPayload));
+  assert.equal(directVirtualPayload.booking_code,'EFOOTBALL-VIRTUAL-TOTAL-DIRECT-LOOKUP-OK');
+  assert.equal(directVirtualPayload.fixture_matcher_version,'sportybet-alias-v1');
+  assert.equal(directVirtualPayload.selection_count,2);
+  assert.deepEqual(directVirtualCalls.map(item=>item.eventId).sort(),[
+    'sr:match:direct-gt-bayern-inter','sr:match:direct-gt-psg-real'
+  ]);
+  assert.equal(directCatalogueLookups.length,0,'valid virtual_total direct matches must not fall back to broad catalogue scans');
+  assert.equal(directVirtualShareRequests.length,1);
+  assert.deepEqual(directVirtualShareRequests[0].selections.map(s=>s.marketId),['18','18']);
+  assert.deepEqual(directVirtualPayload.selections.map(row=>row.resolved_by),[
+    'sportybet_event_id','sportybet_event_id'
+  ]);
+
   // Permanent display-name alias regression: current SportyBet IDs and labels
   // differ from the slip, but the fixture pair + kickoff + exact live total must
   // resolve before a share request is allowed.
