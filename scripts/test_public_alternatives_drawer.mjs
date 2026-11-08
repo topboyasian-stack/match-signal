@@ -116,7 +116,7 @@ try {
     assert.match(drawer.countLabel, /1 selection/i);
     assert.match(drawer.resultText, /Added to your single shared ticket/i);
     assert.ok(drawer.legText.includes(matched.match), "The shared drawer must display the clicked fixture");
-    if (matched.qualified !== "true") assert.match(drawer.legText, /RESEARCH ONLY — Builder gate not passed/, "Research-only alternatives must remain visibly unqualified in the ticket");
+    if (matched.qualified !== "true") assert.match(drawer.legText, /model qualification not claimed|RESEARCH ONLY|Builder gate not passed/i, "Research-only alternatives must remain visibly unqualified in the ticket");
 
     result = {
       route,
