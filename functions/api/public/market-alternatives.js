@@ -65,6 +65,36 @@ export function publicAlternative(row) {
   };
 }
 
+function publicAlternativeRejectReason(row) {
+  const sourceSport = String(row?.sport || "").toLowerCase();
+  const product = String(row?.product || "").toLowerCase();
+  const sport = sourceSport === "virtual" && ["efootball_gt", "efootball_adriatic"].includes(product) ? "efootball" : sourceSport;
+  const market = String(row?.market || "");
+  const pick = String(row?.pick || "").toLowerCase();
+  const total = ["total_goals", "total_games", "total_ou", "virtual_total"].includes(market);
+  if (!["football", "tennis", "basketball", "efootball"].includes(sport)) return "unsupported_sport";
+  if (!SUPPORTED_MARKETS.has(market)) return "unsupported_market";
+  if (sport === "efootball" && (!["efootball_gt", "efootball_adriatic"].includes(product) || !total)) return "unsupported_efootball_market";
+  if (total && !["over", "under"].includes(pick)) return "unsupported_total_pick";
+  if (!total && !["p1", "p2", "draw"].includes(pick)) return "unsupported_winner_pick";
+  if (sport === "tennis" && pick === "draw") return "tennis_draw_not_supported";
+  const eventId = String(row.event_id || "");
+  const sportybetEventId = String(row.sportybet_event_id || (sport === "efootball" ? row.event_id : ""));
+  const marketId = String(row.sportybet_market_id || "");
+  if (!eventId || !sportybetEventId || !marketId) return "missing_exact_market_identity";
+  const probability = Number(row.model_probability);
+  const builderQualified = row.passed_builder_gates === true;
+  const minimumProbability = builderQualified ? MIN_RECOMMENDED_PROBABILITY : MIN_RESEARCH_ALTERNATIVE_PROBABILITY;
+  if (!Number.isFinite(probability) || probability > 1 || probability < minimumProbability) return "below_probability_floor_or_invalid_probability";
+  const odds = Number(row.bookmaker_odds);
+  if (!Number.isFinite(odds) || odds <= 1) return "missing_or_invalid_bookmaker_odds";
+  if (!timestamp(row.start_time)) return "invalid_kickoff_time";
+  const line = row.line == null ? null : Number(row.line);
+  if (total && (!Number.isFinite(line) || line <= 0)) return "missing_or_invalid_total_line";
+  if (sport === "efootball" && !["18", "189"].includes(marketId)) return "unsupported_efootball_market_id";
+  return "other_public_validation_failure";
+}
+
 function repeatsPrimaryPick(source, item) {
   // A system alternative must not merely echo the primary winner selection.
   // Other markets (especially totals) remain eligible to compete on the same fixture.
@@ -74,23 +104,86 @@ function repeatsPrimaryPick(source, item) {
 
 export function buildPublicAlternatives(document, nowMs = Date.now()) {
   const grouped = new Map();
-  for (const row of document.records) {
-    // Alternatives are evaluated beside the primary prediction. They do not
-    // need to pass the accumulator/Builder promotion gate first. Exact event,
-    // market and outcome IDs, a fresh quote, and the alternative probability
-    // floor still apply below.
-    if (!row || row.fresh_exact_quote !== true ||
-        row.prediction_role !== "ALTERNATIVE" || row.alternative_source !== "SYSTEM_RECOMMENDED") continue;
-    // If Builder rejected this row, it must still be explicitly linked to the
-    // primary pick for the same fixture; an unlinked row is not an alternative.
-    if (row.passed_builder_gates !== true && !String(row.original_pick || row.primary_prediction_id || "").trim()) continue;
+  const diagnostics = {
+    records_seen: Array.isArray(document.records) ? document.records.length : 0,
+    role_source_match: 0,
+    marked_fresh_exact_quote: 0,
+    primary_link_present: 0,
+    kickoff_more_than_two_minutes_away: 0,
+    quote_fresh_within_15_minutes: 0,
+    public_schema_valid: 0,
+    different_from_primary_pick: 0,
+    candidates_before_fixture_limit: 0,
+    selected_alternatives: 0,
+    rejected_by_reason: {}
+  };
+  const reject = (reason) => {
+    diagnostics.rejected_by_reason[reason] = (diagnostics.rejected_by_reason[reason] || 0) + 1;
+  };
+
+  for (const row of Array.isArray(document.records) ? document.records : []) {
+    if (!row || typeof row !== "object" || Array.isArray(row)) {
+      reject("invalid_record");
+      continue;
+    }
+    if (row.prediction_role !== "ALTERNATIVE" || row.alternative_source !== "SYSTEM_RECOMMENDED") {
+      reject("not_system_alternative");
+      continue;
+    }
+    diagnostics.role_source_match++;
+
+    if (row.fresh_exact_quote !== true) {
+      reject("quote_not_marked_exact_fresh");
+      continue;
+    }
+    diagnostics.marked_fresh_exact_quote++;
+
+    if (row.passed_builder_gates !== true && !String(row.original_pick || row.primary_prediction_id || "").trim()) {
+      reject("missing_primary_link");
+      continue;
+    }
+    diagnostics.primary_link_present++;
+
     const start = timestamp(row.start_time);
+    if (start === null) {
+      reject("invalid_kickoff_time");
+      continue;
+    }
+    if (start <= nowMs + 120000) {
+      reject("kickoff_within_two_minutes_or_started");
+      continue;
+    }
+    diagnostics.kickoff_more_than_two_minutes_away++;
+
     const quote = timestamp(row.quote_timestamp);
-    if (start === null || start <= nowMs + 120000 || quote === null) continue;
+    if (quote === null) {
+      reject("missing_quote_timestamp");
+      continue;
+    }
     const age = (nowMs - quote) / 1000;
-    if (age < 0 || age > MAX_QUOTE_AGE_SECONDS) continue;
+    if (age < 0) {
+      reject("quote_timestamp_in_future");
+      continue;
+    }
+    if (age > MAX_QUOTE_AGE_SECONDS) {
+      reject("quote_older_than_15_minutes");
+      continue;
+    }
+    diagnostics.quote_fresh_within_15_minutes++;
+
     const item = publicAlternative(row);
-    if (!item || repeatsPrimaryPick(row, item)) continue;
+    if (!item) {
+      reject(publicAlternativeRejectReason(row));
+      continue;
+    }
+    diagnostics.public_schema_valid++;
+
+    if (repeatsPrimaryPick(row, item)) {
+      reject("repeats_primary_winner_pick");
+      continue;
+    }
+    diagnostics.different_from_primary_pick++;
+
     const key = item.sport + "|" + item.event_id;
     if (!grouped.has(key)) grouped.set(key, []);
     grouped.get(key).push(item);
@@ -108,12 +201,16 @@ export function buildPublicAlternatives(document, nowMs = Date.now()) {
     }
     alternatives.push(...selected);
   }
+  diagnostics.candidates_before_fixture_limit = [...grouped.values()].reduce((sum, rows) => sum + rows.length, 0);
+  diagnostics.selected_alternatives = alternatives.length;
+
   return {
-    status: "OK",
+    status: alternatives.length ? "OK" : "EMPTY",
     generated_at: document.updated_at || document.generated_at || null,
     min_probability: MIN_RESEARCH_ALTERNATIVE_PROBABILITY,
     builder_min_probability: MIN_RECOMMENDED_PROBABILITY,
     max_per_fixture: 2,
+    diagnostics,
     alternatives
   };
 }
