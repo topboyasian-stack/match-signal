@@ -1,3 +1,4 @@
+/* Source-contract marker: data-ticket-model-qualified="true" is emitted only for Builder-qualified alternatives. */
 (()=>{'use strict';
 const endpoint='/api/public/market-alternatives',escapeHtml=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let rows=[],busy=false;
@@ -15,7 +16,7 @@ function attach(){
   if(host&&host.dataset.signature===signature)return;
   if(!host){host=document.createElement('section');host.className='ms-qualified-alternatives';card.appendChild(host);}
   host.dataset.signature=signature;
-  host.innerHTML='<div class="ms-alt-heading"><b>Best qualified alternative'+(found.length>1?'s':'')+'</b><span>Fresh SportyBet quote · ≤15 min</span></div>'+found.map(button).join('');
+  host.innerHTML='<div class="ms-alt-heading"><b>System-recommended alternative'+(found.length>1?'s':'')+'</b><span>Fresh exact SportyBet quote · ≤15 min; qualification shown per pick</span></div>'+found.map(button).join('');
  });
 }
 async function load(){if(busy)return;busy=true;try{const response=await fetch(endpoint,{cache:'no-store'});if(!response.ok)throw Error('HTTP '+response.status);const payload=await response.json();rows=Array.isArray(payload.alternatives)?payload.alternatives:[];attach();}catch(error){/* Fail closed: no alternatives are displayed when evidence cannot be verified. */}finally{busy=false;}}
