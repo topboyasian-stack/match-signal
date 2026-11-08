@@ -56,7 +56,7 @@ assert.ok(alternativesApi.includes("builder_qualified: builderQualified"));
 assert.ok(alternativesUi.includes("Research only — Builder gate not passed"));
 assert.ok(alternativesUi.includes("String(x.builder_qualified===true)"));
 assert.ok(ticketDrawer.includes("model_qualified:raw.model_qualified===true"));
-assert.ok(ticketDrawer.includes("RESEARCH ONLY — Builder gate not passed"));
+assert.ok(ticketDrawer.includes("MANUAL PICK — model qualification not claimed; live recheck required"));
 const researchLaneProbe = [
   'import assert from "node:assert/strict";',
   'import { buildPublicAlternatives } from "./functions/api/public/market-alternatives.js";',

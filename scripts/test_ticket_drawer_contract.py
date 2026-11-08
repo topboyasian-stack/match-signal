@@ -12,7 +12,7 @@ def require(condition, message):
 
 def main():
     css_version = "ticket-drawer.css?v=20261102-single-ticket1"
-    js_version = "ticket-drawer.js?v=20261102-split-event-identifiers1"
+    js_version = "ticket-drawer.js?v=20261107-manual-ticket-booking1"
     pages = ("basketball.html", "football.html", "tennis.html", "league.html", "index.html", "upcoming.html", "qualified-best.html")
     for page in pages:
         source = (ROOT / page).read_text(encoding="utf-8")
@@ -81,6 +81,8 @@ def main():
             "if (manualMode && preExcluded.length > 0)" in api and
             "if (manualMode && (" in api,
             "Every manual sport must use the same all-or-nothing pre-validation and provider-acceptance contract")
+    require("MANUAL PICK — model qualification not claimed; live recheck required" in drawer,
+            "Research-only model status must not be misrepresented as a manual-ticket booking prohibition")
     require("manual_selections" in drawer and "/api/sportybet-booking" in drawer,
             "The shared ticket must submit all selections through the root-relative common revalidation API")
     require("AbortSignal.timeout(26000)" in drawer and "Your ticket is still saved; no code is assumed to exist." in drawer,
@@ -104,7 +106,7 @@ def main():
             "NBA current totals must be selectable into the same ticket")
     require("nbaTotalsReleaseQualified(S.totalsOos,S.totalsProbability)" in nba and "nbaTotalRowQualified(p,S.totalsOos,S.totalsProbability,S.totalSnapshots,fresh)" in nba,
             "NBA ticket generation must retain the independent release and per-row gates")
-    require("../ticket-drawer.css?v=20261102-efootball-shared-ticket1" in lab_html and "../ticket-drawer.js?v=20261102-efootball-shared-ticket1" in lab_html,
+    require("../ticket-drawer.css?v=20261102-efootball-shared-ticket1" in lab_html and "../ticket-drawer.js?v=20261107-manual-ticket-booking1" in lab_html,
             "Virtual Lab must load the shared floating ticket from its nested route")
     require("data-ms-ticket-add" in lab_app and 'data-ticket-sport="efootball"' in lab_app and "data-ticket-product" in lab_app and "efootballTicketReady" in lab_app,
             "Only qualified eFootball GT/eAdriatic exact-line prediction cards may add to the shared ticket")
@@ -146,11 +148,10 @@ def main():
             "Football and Tennis catalogue scans must pass current legs for participant/time recovery")
     require("leg?.model_qualified!==true" in api and "leg?.market_id!=='225'" in api and
             "!leg.sportybet_event_id" in api and "NBA_RELEASE_GATE_LOCKED" in api and
-            "nbaTotalTicketLegQualified" in api and "if (hasBasketballLeg)" in api and
-            "if (String(leg?.sport || '').toLowerCase() === 'basketball')" in api and
-            "if (hasBasketballLeg && !manualMode)" not in api and
-            "if (!manualMode && String(leg?.sport || '').toLowerCase() === 'basketball')" not in api,
-            "Manual and automated NBA tickets must share the same global release gate and exact per-leg snapshot/value revalidation")
+            "nbaTotalTicketLegQualified" in api and "if (hasBasketballLeg && !manualMode)" in api and
+            "if (basketballLeg && !manualMode)" in api and
+            "Current SportyBet market-225 quote is stale or incomplete" in api,
+            "Automated NBA Builder batches must keep the strict model-release gate; manual mixed-sport tickets may proceed only after fresh exact SportyBet validation")
     require("prospective_probability_fixture_coverage" in api and
             "valid_unique_settled_fixtures" in api and "binary_scored_unique_fixtures" in api and
             "snapshot_linkage_failure_count" in api and

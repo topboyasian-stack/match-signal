@@ -71,6 +71,84 @@ try {
   assert.equal(nbaTotalsReleaseQualified({}, {}), false,
     'missing independent NBA evidence must never qualify ticket booking');
 
+  // Manual shared tickets may include unqualified NBA legs when every leg passes
+  // exact, current SportyBet market checks. This must not call model-release artifacts.
+  const mixedBase = Date.now() + 6 * 60 * 60 * 1000;
+  const mixedFixtures = [
+    {id:'elche-betis',event_id:'espn:manual-elche-betis',provider_id:'sr:match:manual-elche-betis',sport:'football',market:'total',pick:'under',line:5.5,market_id:'18',player_1:'Elche',player_2:'Real Betis',match:'Elche vs Real Betis',start_ms:mixedBase,odds:1.09,over_odds:7.5,under_odds:1.09},
+    {id:'sociedad-rayo',event_id:'espn:manual-sociedad-rayo',provider_id:'sr:match:manual-sociedad-rayo',sport:'football',market:'total',pick:'under',line:5.5,market_id:'18',player_1:'Real Sociedad',player_2:'Rayo Vallecano',match:'Real Sociedad vs Rayo Vallecano',start_ms:mixedBase+60*60*1000,odds:1.10,over_odds:7.2,under_odds:1.10},
+    {id:'atletico-barcelona',event_id:'espn:manual-atletico-barcelona',provider_id:'sr:match:manual-atletico-barcelona',sport:'football',market:'total',pick:'under',line:5.5,market_id:'18',player_1:'Atlético Madrid',player_2:'Barcelona',match:'Atlético Madrid vs Barcelona',start_ms:mixedBase+2*60*60*1000,odds:1.21,over_odds:5.8,under_odds:1.21},
+    {id:'warriors-magic',event_id:'espn:manual-warriors-magic',provider_id:'sr:match:manual-warriors-magic',sport:'basketball',market:'total',pick:'over',line:207.5,market_id:'225',player_1:'Golden State Warriors',player_2:'Orlando Magic',match:'Golden State Warriors vs Orlando Magic',start_ms:mixedBase+3*60*60*1000,odds:1.25,over_odds:1.25,under_odds:3.7},
+    {id:'suns-rockets',event_id:'espn:manual-suns-rockets',provider_id:'sr:match:manual-suns-rockets',sport:'basketball',market:'total',pick:'over',line:215.5,market_id:'225',player_1:'Phoenix Suns',player_2:'Houston Rockets',match:'Phoenix Suns vs Houston Rockets',start_ms:mixedBase+4*60*60*1000,odds:1.42,over_odds:1.42,under_odds:2.8},
+    {id:'trailblazers-spurs',event_id:'espn:manual-trailblazers-spurs',provider_id:'sr:match:manual-trailblazers-spurs',sport:'basketball',market:'total',pick:'over',line:216.5,market_id:'225',player_1:'Portland Trail Blazers',player_2:'San Antonio Spurs',match:'Portland Trail Blazers vs San Antonio Spurs',start_ms:mixedBase+5*60*60*1000,odds:1.26,over_odds:1.26,under_odds:3.2}
+  ];
+  function mixedEvent(fixture) {
+    const basketball = fixture.sport === 'basketball';
+    return {
+      eventId:fixture.provider_id,
+      tournamentId:basketball?'sr:tournament:132':'sr:tournament:manual-test',
+      homeTeamName:fixture.player_1,
+      awayTeamName:fixture.player_2,
+      estimateStartTime:fixture.start_ms,
+      matchStatus:'Not start',
+      markets:[{
+        id:fixture.market_id,
+        desc:basketball?'Full Game Total incl. OT':'Total Goals Over/Under',
+        specifier:'total='+fixture.line,
+        status:'0',
+        outcomes:[
+          {id:'over-'+fixture.id,desc:'Over '+fixture.line,odds:fixture.over_odds,isActive:1},
+          {id:'under-'+fixture.id,desc:'Under '+fixture.line,odds:fixture.under_odds,isActive:1}
+        ]
+      }]
+    };
+  }
+  const mixedCalls = [];
+  globalThis.fetch = async input => {
+    const url = new URL(typeof input === 'string' ? input : input.url);
+    mixedCalls.push(url);
+    if (url.hostname === 'raw.githubusercontent.com') {
+      throw new Error('Manual booking must not load NBA model-release artifacts.');
+    }
+    if (url.pathname === '/api/ng/orders/share') {
+      return jsonResponse({bizCode:10000,data:{
+        shareCode:'MANUAL-MIXED-TICKET-OK',
+        outcomes:mixedFixtures.map(fixture=>({odds:fixture.pick==='over'?fixture.over_odds:fixture.under_odds}))
+      }});
+    }
+    if (/\/(?:pcUpcomingEvents|wapConfigurableUpcomingEvents)$/.test(url.pathname)) {
+      const sportId = url.searchParams.get('sportId');
+      const fixtures = sportId === 'sr:sport:1'
+        ? mixedFixtures.filter(fixture=>fixture.sport==='football')
+        : sportId === 'sr:sport:2'
+          ? mixedFixtures.filter(fixture=>fixture.sport==='basketball')
+          : [];
+      return jsonResponse({bizCode:10000,data:fixtures.map(mixedEvent)});
+    }
+    throw new Error('Unexpected manual-ticket request: '+url.toString());
+  };
+  const mixedRequest = await onRequest({request:new Request('https://match-signal.pages.dev/api/sportybet-booking',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({mode:'manual',manual_selections:mixedFixtures.map(fixture=>({
+      event_id:fixture.event_id,sportybet_event_id:fixture.provider_id,sport:fixture.sport,
+      market:fixture.market,pick:fixture.pick,line:fixture.line,market_id:fixture.market_id,
+      player_1:fixture.player_1,player_2:fixture.player_2,match:fixture.match,
+      start_time:new Date(fixture.start_ms).toISOString(),model_qualified:false
+    }))})
+  })});
+  const manualSixPayload = await mixedRequest.json();
+  assert.equal(mixedRequest.status,200,JSON.stringify(manualSixPayload));
+  assert.equal(manualSixPayload.ok,true,JSON.stringify(manualSixPayload));
+  assert.equal(manualSixPayload.booking_code,'MANUAL-MIXED-TICKET-OK');
+  assert.equal(manualSixPayload.initial_selection_count,6);
+  assert.equal(manualSixPayload.selection_count,6);
+  assert.equal(manualSixPayload.selections.length,6);
+  assert.ok(manualSixPayload.selections.every(selection=>selection.ok===true));
+  assert.equal(mixedCalls.some(url=>url.hostname==='raw.githubusercontent.com'),false,
+    'Manual mixed-sport tickets must not require NBA model-release evidence.');
+  assert.equal(mixedCalls.filter(url=>url.pathname==='/api/ng/orders/share').length,1,
+    'A successful mixed ticket must request exactly one SportyBet share code.');
+
   // Already-started selections are rejected explicitly and never trigger an
   // upcoming-catalogue lookup or a share-code request.
   const staleCatalogueRequests=[];
