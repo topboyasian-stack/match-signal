@@ -779,6 +779,14 @@ try {
         outcomes:[{odds:1.22},{odds:1.28}]
       }});
     }
+    if (url.pathname.endsWith('/factsCenter/event')) {
+      // The old provider ID still exists, but its details response exposes
+      // only a winner market. The current exact total must be found by alias.
+      const eventId = String(url.searchParams.get('eventId')||'');
+      return jsonResponse({bizCode:10000,data:eventId==='sr:match:old-man-utd-psg'
+        ? aliasCatalogue[0]
+        : {}});
+    }
     if (url.pathname.endsWith('/pcUpcomingEvents') && url.searchParams.get('sportId') === 'sr:sport:1') {
       return jsonResponse({bizCode:10000,data:{tournaments:[{name:'Club alias regression',events:aliasCatalogue}]}});
     }
