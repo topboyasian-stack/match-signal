@@ -73,7 +73,7 @@ const independentAlternatives = buildPublicAlternatives({
       event_id: "started-fixture",
       start_time: new Date(alternativesNow + 60 * 1000).toISOString()
     }),
-    alternativeRecord({ event_id: "low-probability", model_probability: 0.64 })
+    alternativeRecord({ event_id: "below-research-floor", model_probability: 0.54 })
   ]
 }, alternativesNow);
 
