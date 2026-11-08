@@ -17,9 +17,9 @@ assert.equal(Number(feed.min_probability), 0.55, "The research lane must declare
 assert.equal(Number(feed.builder_min_probability), 0.65, "Builder-qualified picks must retain the 65% floor");
 assert.ok(Array.isArray(feed.alternatives) && feed.alternatives.length, "Public alternatives must be non-empty");
 
-const diagnostics = feed.diagnostics || {};
-assert.ok(Number(diagnostics.quote_fresh_within_15_minutes) > 0, "The server must confirm fresh exact quotes exist");
-assert.equal(Number(diagnostics.selected_alternatives), feed.alternatives.length, "Aggregate selected count must match the public feed");
+const feedDiagnostics = feed.diagnostics || {};
+assert.ok(Number(feedDiagnostics.quote_fresh_within_15_minutes) > 0, "The server must confirm fresh exact quotes exist");
+assert.equal(Number(feedDiagnostics.selected_alternatives), feed.alternatives.length, "Aggregate selected count must match the public feed");
 const now = Date.now();
 const eligible = feed.alternatives.filter((row) => {
   // Quote timestamps stay private; the API performs per-row freshness validation
