@@ -787,7 +787,7 @@ try {
       const event = directVirtualDetails.get(String(url.searchParams.get('eventId')));
       return jsonResponse({bizCode:10000,data:event||{}});
     }
-    if (/\\/(?:pcUpcomingEvents|wapConfigurableUpcomingEvents)$/.test(url.pathname) || url.pathname==='/api/sportybet-virtual') {
+    if (/\/(?:pcUpcomingEvents|wapConfigurableUpcomingEvents)$/.test(url.pathname) || url.pathname==='/api/sportybet-virtual') {
       directCatalogueLookups.push('virtual_total:'+url.pathname);
       return jsonResponse({bizCode:10000,data:{tournaments:[]}});
     }
