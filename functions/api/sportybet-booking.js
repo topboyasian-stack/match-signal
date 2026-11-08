@@ -239,6 +239,15 @@ export async function requestSportyBetShare(selections, { deadlineAt = null, tim
   };
 }
 
+function currentSelectionForTarget(leg, event) {
+  const sport = String(leg?.sport || '').toLowerCase();
+  const market = String(leg?.market || '').toLowerCase();
+  if (sport === 'basketball') return findBasketballSelection(leg, event);
+  return market === 'total'
+    ? findVirtualSelection(leg, event)
+    : findWinnerSelection(leg, event);
+}
+
 function targetFixtureMatches(leg, event) {
   const participants = legParticipants(leg);
   const hasParticipants = Boolean(participants[0] && participants[1]);
@@ -257,11 +266,9 @@ function targetFixtureMatches(leg, event) {
   if (Number.isFinite(requestedStart) && currentStart &&
       Math.abs(requestedStart - currentStart) > 45 * 60 * 1000) return false;
 
-  // A fixture match alone is not enough to stop discovery: the exact requested
-  // market, line and active side must also be present in this catalogue record.
-  const selection = String(leg?.market || '').toLowerCase() === 'total'
-    ? findVirtualSelection(leg, event)
-    : findWinnerSelection(leg, event);
+  // A fixture match alone is not enough to stop discovery or accept an ID hit:
+  // the exact requested market, line and active side must also exist right now.
+  const selection = currentSelectionForTarget(leg, event);
   return Boolean(selection && !selection.error && selection.outcomeId &&
     Number.isFinite(Number(selection.odds)) && Number(selection.odds) > 1);
 }
@@ -662,9 +669,10 @@ function resolveCurrentEvent(leg, found) {
   const sportybetId = String(leg?.sportybet_event_id || '');
   const directProvider = sportybetId ? found.get(sportybetId) : null;
   const direct = directProvider || found.get(String(leg?.event_id || ''));
-  // Resolve the current catalogue by the provider ID, but keep the ESPN ID
-  // reserved for the prediction/settlement cohort. Verify participants either way.
-  if (direct && (!hasParticipants || legParticipantPairMatches(leg, direct))) {
+  // Resolve by ID only when the live record is also the exact requested
+  // fixture, kickoff and active market selection. A stale ID can remain present
+  // in SportyBet's catalogue but point at a variant with the wrong market.
+  if (direct && targetFixtureMatches(leg, direct)) {
     return { event: direct, matched_by: directProvider ? 'sportybet_event_id' : 'event_id' };
   }
 
@@ -685,6 +693,7 @@ function resolveCurrentEvent(leg, found) {
       : normalizeFixture(String(event?.homeTeamName || '') + ' vs ' + String(event?.awayTeamName || '')) === targetMatch;
     if (!participantsMatch) continue;
 
+    if (!targetFixtureMatches(leg, event)) continue;
     const candidateStart = Number(event?.estimateStartTime || 0);
     if (!candidateStart) {
       if (!best) best = event;
