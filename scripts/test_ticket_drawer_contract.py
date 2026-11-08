@@ -181,7 +181,7 @@ def main():
     require("function sameParticipantPair(first, event, sport = '')" in api and
             "teamNameMatches(a, home, sport) && teamNameMatches(b, away, sport)" in api and
             "teamNameMatches(a, away, sport) && teamNameMatches(b, home, sport)" in api and
-            "sameParticipantPair(participants, aliasSport)" in api,
+            "sameParticipantPair(participants, event, aliasSport)" in api,
             "Current Tennis and team-sport event matching must accept both participant orders with sport-scoped aliases")
     require("function participantNameMatches(first, second)" in api and
             "tokens[1].length === 1" in api and "tokens.reverse()" in api and
