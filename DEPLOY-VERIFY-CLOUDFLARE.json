@@ -1,37 +1,104 @@
 {
-  "status": "VERIFIED_WITH_DIAGNOSTIC_INCOMPLETE",
+  "status": "VERIFIED",
   "core_pages_status": "VERIFIED",
   "qualified_best_quote_coverage_status": "VALID_ZERO",
-  "qualified_best_candidate_pool_rows": 191,
+  "qualified_best_candidate_pool_rows": 238,
   "qualified_best_model_qualified_rows": 0,
   "booking_api_status": "VERIFIED",
-  "qualified_alternatives_status": "VALID_ZERO",
-  "qualified_alternatives_count": 0,
+  "qualified_alternatives_status": "READY",
+  "qualified_alternatives_count": 170,
   "qualified_alternatives": {
-    "verified_at": "2026-11-07T23:46:51.092Z",
+    "verified_at": "2026-11-08T01:36:53.197Z",
     "endpoint": "/api/public/market-alternatives",
     "api_status": "OK",
-    "status": "VALID_ZERO",
-    "alternative_count": 0,
-    "unique_fixture_count": 0,
-    "sports": [],
-    "sample": []
+    "status": "READY",
+    "alternative_count": 170,
+    "unique_fixture_count": 129,
+    "builder_qualified_count": 97,
+    "research_only_count": 73,
+    "sports": [
+      "efootball",
+      "football",
+      "tennis"
+    ],
+    "sample": [
+      {
+        "sport": "football",
+        "product": null,
+        "event_id": "401882814",
+        "match": "Elche vs Real Betis",
+        "market": "total",
+        "pick": "over",
+        "line": 0.5,
+        "odds": 1.03,
+        "probability": 0.940436,
+        "start_time": "2026-11-08T13:00Z"
+      },
+      {
+        "sport": "football",
+        "product": null,
+        "event_id": "401882814",
+        "match": "Elche vs Real Betis",
+        "market": "total",
+        "pick": "under",
+        "line": 5.5,
+        "odds": 1.08,
+        "probability": 0.93307,
+        "start_time": "2026-11-08T13:00Z"
+      },
+      {
+        "sport": "football",
+        "product": null,
+        "event_id": "401876406",
+        "match": "Stade Rennais vs Lille",
+        "market": "total",
+        "pick": "under",
+        "line": 5.5,
+        "odds": 1.07,
+        "probability": 0.947768,
+        "start_time": "2026-11-08T14:00Z"
+      },
+      {
+        "sport": "football",
+        "product": null,
+        "event_id": "401876406",
+        "match": "Stade Rennais vs Lille",
+        "market": "total",
+        "pick": "over",
+        "line": 0.5,
+        "odds": 1.03,
+        "probability": 0.928824,
+        "start_time": "2026-11-08T14:00Z"
+      },
+      {
+        "sport": "football",
+        "product": null,
+        "event_id": "401884738",
+        "match": "FC Cologne vs Bayer Leverkusen",
+        "market": "total",
+        "pick": "over",
+        "line": 0.5,
+        "odds": 1.01,
+        "probability": 0.964902,
+        "start_time": "2026-11-08T14:30Z"
+      }
+    ]
   },
-  "shared_ticket_drawer_status": "WIRED_NO_QUALIFIED_ROWS",
+  "shared_ticket_drawer_status": "READY",
   "provider": "Cloudflare Pages",
-  "source_commit": "e3982bf3b0f023f16e9e519e09d892f91e068ac6",
-  "verified_at": "2026-11-07T23:47:33.210600+00:00",
+  "source_commit": "4e02e56edef0803b577400cac7c91e4aa41dad4a",
+  "verified_at": "2026-11-08T01:37:55.610259+00:00",
   "live_virtual_feed": {
-    "verified_at": "2026-11-07T23:47:30.771Z",
+    "verified_at": "2026-11-08T01:37:51.664Z",
     "status": "VALID_ZERO_QUALIFIED_CANDIDATES",
     "coverage_state": "VALID_ZERO",
     "scan_complete": true,
     "scan_stop_reason": "no_model_qualified_candidates",
     "no_model_qualified_candidates": true,
     "paper_only": true,
-    "candidate_artifact_rows": 241,
-    "candidate_pool_rows_in_next_7_days": 191,
-    "candidate_pool_unique_events_in_next_7_days": 127,
+    "candidate_artifact_rows": 275,
+    "candidate_pool_rows_in_next_7_days": 238,
+    "candidate_pool_unique_events_in_next_7_days": 153,
     "model_qualified_candidate_rows_in_next_7_days": 0,
     "virtual_candidate_rows_in_next_7_days": 0,
     "snapshot_gate_qualified_fixtures": 0,
@@ -48,7 +115,7 @@
       {
         "page": 1,
         "count": 100,
-        "fetched_at": "2026-11-07T23:47:30.753Z",
+        "fetched_at": "2026-11-08T01:37:51.639Z",
         "status": "LIVE"
       }
     ],
@@ -78,7 +145,7 @@
     "qualified_examples": []
   },
   "booking_api": {
-    "verified_at": "2026-11-07T23:47:20.259Z",
+    "verified_at": "2026-11-08T01:37:29.015Z",
     "status": "PASS",
     "http_status": 200,
     "ok": true,
@@ -91,15 +158,23 @@
   },
   "nba_ticket_gate_probe_status": "PASS",
   "nba_ticket_gate_probe": {
-    "verified_at": "2026-11-07T23:47:29.788Z",
+    "verified_at": "2026-11-08T01:37:49.360Z",
     "status": "PASS",
-    "probe_type": "synthetic_nonexistent_market_225_legs",
+    "probe_type": "manual_live_validation_plus_automated_nba_release_gate",
     "current_main_release_qualified": false,
     "current_main_release_decision": "RESEARCH_ONLY",
     "probes": [
       {
         "base": "https://match-signal.pages.dev",
-        "probe_type": "synthetic_nonexistent_market_225_legs",
+        "endpoint_type": "manual_shared_ticket",
+        "http_status": 409,
+        "error": "MANUAL_TICKET_REJECTED_PARTIAL",
+        "booking_code_withheld": true,
+        "booking_code_present": false
+      },
+      {
+        "base": "https://match-signal.pages.dev",
+        "endpoint_type": "automated_basketball_builder",
         "http_status": 423,
         "error": "NBA_RELEASE_GATE_LOCKED",
         "current_main_release_qualified": false,
@@ -107,8 +182,16 @@
         "booking_code_present": false
       },
       {
-        "base": "https://802f4133.match-signal.pages.dev",
-        "probe_type": "synthetic_nonexistent_market_225_legs",
+        "base": "https://26612c06.match-signal.pages.dev",
+        "endpoint_type": "manual_shared_ticket",
+        "http_status": 409,
+        "error": "MANUAL_TICKET_REJECTED_PARTIAL",
+        "booking_code_withheld": true,
+        "booking_code_present": false
+      },
+      {
+        "base": "https://26612c06.match-signal.pages.dev",
+        "endpoint_type": "automated_basketball_builder",
         "http_status": 423,
         "error": "NBA_RELEASE_GATE_LOCKED",
         "current_main_release_qualified": false,
@@ -127,6 +210,6 @@
     "booking_api_post",
     "qualified_best_valid_zero",
     "nba_ticket_gate_fail_closed",
-    "qualified_alternatives_valid_zero"
+    "qualified_alternatives_live"
   ]
 }
