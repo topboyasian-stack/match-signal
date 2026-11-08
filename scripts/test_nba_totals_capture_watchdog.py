@@ -213,19 +213,22 @@ def run():
     assert '"NBA totals probability and value research"' in watchdog_workflow, (
         "A successful report refresh must also run the freshness watchdog so a missed capture schedule can recover."
     )
-    # Any completed NBA capture/settlement/report attempt is a recovery signal,
-    # including skipped/failed/cancelled attempts; stale checks prevent retry loops.
+    # Any completed watched source is a recovery signal, including failed,
+    # cancelled, or skipped runs; freshness checks suppress unnecessary retries.
     for workflow_name in (
+        "Match Signal Live Expansion",
+        "Match Signal Unified Upcoming Board",
+        "Deploy Match Signal to Cloudflare Pages",
         "NBA totals settlement ledger",
         "NBA totals SportyBet market-225 price capture",
         "NBA totals probability and value research",
     ):
         workflow_branch = f"github.event.workflow_run.name == '{workflow_name}'"
         assert workflow_branch in watchdog_workflow, (
-            f"Every NBA pipeline completion must wake freshness recovery: {workflow_name}."
+            f"Every watched workflow completion must wake freshness recovery: {workflow_name}."
         )
         assert f"{workflow_branch} && github.event.workflow_run.conclusion == 'success'" not in watchdog_workflow, (
-            f"Failed, cancelled, or skipped NBA attempts must not be filtered out: {workflow_name}."
+            f"Failed, cancelled, or skipped completions must not be filtered out: {workflow_name}."
         )
     assert "Dispatch stale official ESPN settlement recovery" in watchdog_workflow
     assert "gh workflow run nba-totals-settlement.yml --ref main" in watchdog_workflow
