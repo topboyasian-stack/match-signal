@@ -181,7 +181,7 @@ function requestFor(manualSelections) {
 
 function installFetchMock({ bundle, events, shareResponse }) {
   const originalFetch = globalThis.fetch;
-  const calls = { feed: 0, share: 0, raw: 0 };
+  const calls = { feed: 0, event: 0, share: 0, raw: 0 };
   globalThis.fetch = async (input, options = {}) => {
     const url = new URL(String(input));
     if (url.hostname === 'raw.githubusercontent.com') {
@@ -197,6 +197,32 @@ function installFetchMock({ bundle, events, shareResponse }) {
       return new Response(JSON.stringify(files[name]), {
         status: 200, headers: { 'Content-Type': 'application/json' }
       });
+    }
+    if (url.hostname === 'match-signal-sportybet-proxy.topboyasian.workers.dev' &&
+        url.pathname === '/api/ng/factsCenter/event') {
+      calls.event++;
+      const row = events.find(item => item.sportybetId === url.searchParams.get('eventId'));
+      if (!row) {
+        return new Response(JSON.stringify({bizCode:10000,data:{}}), {
+          status:200,headers:{'Content-Type':'application/json'}
+        });
+      }
+      const normalized = sportBetEvent(row);
+      return new Response(JSON.stringify({
+        bizCode:10000,
+        data:{
+          eventId:normalized.event_id,
+          homeTeamName:normalized.home,
+          awayTeamName:normalized.away,
+          estimateStartTime:Date.parse(normalized.start_time),
+          matchStatus:'Not start',
+          sport:{id:'sr:sport:2',category:{tournament:{id:'sr:tournament:132',name:'NBA'}}},
+          markets:normalized.markets.map(m=>({
+            id:m.id,desc:m.name,specifier:m.specifier,status:m.status,
+            outcomes:m.outcomes.map(o=>({id:o.id,desc:o.name,odds:o.odds,isActive:o.active?1:0}))
+          }))
+        }
+      }),{status:200,headers:{'Content-Type':'application/json'}});
     }
     if (url.hostname === 'match-signal-sportybet-proxy.topboyasian.workers.dev' &&
         url.pathname.startsWith('/api/ng/factsCenter/')) {
@@ -251,7 +277,8 @@ test('NBA ticket resolves SportyBet event ID separately from ESPN prediction ID 
     });
     const body = await response.json();
     assert.equal(mock.calls.raw, 0, 'manual NBA picks must not require model-release artifacts');
-    assert.equal(mock.calls.feed, 3, 'the three bounded NBA catalog queries must use the proxy source');
+    assert.equal(mock.calls.event, 2, 'each stored NBA provider ID must be checked through the single-event details endpoint');
+    assert.equal(mock.calls.feed, 3, 'only the missing NBA leg should fall back to the three bounded market catalog queries');
     assert.equal(mock.calls.share, 0, 'must not request a share code when any NBA leg is missing');
     assert.equal(response.status, 409);
     assert.equal(body.error, 'MANUAL_TICKET_REJECTED_PARTIAL');
@@ -330,7 +357,8 @@ test('manual NBA share-code preparation remains available when model evidence is
     assert.equal(body.booking_code, 'MANUALUNQUALIFIED');
     assert.equal(body.selection_count, 2);
     assert.equal(mock.calls.raw, 0, 'manual NBA picks must not depend on the model release decision');
-    assert.equal(mock.calls.feed, 3, 'manual NBA picks must still look up current SportyBet markets');
+    assert.equal(mock.calls.event, 2, 'manual NBA picks must verify both current provider IDs directly');
+    assert.equal(mock.calls.feed, 0, 'direct event details should avoid broad catalogue paging when both NBA legs are current');
     assert.equal(mock.calls.share, 1, 'the full manually selected ticket should be sent for share-code preparation');
     assert.ok(body.selections.every(row => row.ok === true));
   } finally {
@@ -361,7 +389,8 @@ test('manual NBA leg with a mismatched current market-225 line is rejected befor
     assert.equal(body.error, 'MANUAL_TICKET_REJECTED_PARTIAL');
     assert.equal(body.booking_code_withheld, true);
     assert.equal(mock.calls.raw, 0, 'manual NBA picks must not require model-release artifacts');
-    assert.equal(mock.calls.feed, 3);
+    assert.equal(mock.calls.event, 2);
+    assert.equal(mock.calls.feed, 3, 'only the mismatched-line leg should use catalogue fallback');
     assert.equal(mock.calls.share, 0, 'a leg with a stale SportyBet line must not reach the share endpoint');
     assert.equal(Object.hasOwn(body, 'booking_code'), false);
     assert.ok(body.validation.some(row => row.event_id === one.espnId && row.ok === false));
