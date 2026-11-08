@@ -701,6 +701,68 @@ try {
   assert.equal(aliasShareRequests.length,1);
   assert.equal(aliasShareRequests[0].selections.length,2);
 
+  // Tennis player formatting regression: SportyBet can display surname-first
+  // names with initials while the prediction stores full first+last names.
+  const tennisAliasLegs = [
+    {
+      event_id:'prediction-djokovic-sinner',sportybet_event_id:'sr:match:old-djokovic-sinner',
+      sport:'tennis',market:'winner',pick:'p1',market_id:'186',
+      start_time:aliasStart,player_1:'Novak Djokovic',player_2:'Jannik Sinner',
+      match:'Novak Djokovic vs Jannik Sinner'
+    },
+    {
+      event_id:'prediction-sabalenka-gauff',sportybet_event_id:'sr:match:old-sabalenka-gauff',
+      sport:'tennis',market:'winner',pick:'p2',market_id:'186',
+      start_time:aliasStart,player_1:'Aryna Sabalenka',player_2:'Coco Gauff',
+      match:'Aryna Sabalenka vs Coco Gauff'
+    }
+  ];
+  const tennisAliasCatalogue = [
+    makeStaleIdFixture('sr:match:current-djokovic-sinner','Djokovic N.','Sinner J.',{
+      id:'186',desc:'Match Winner',status:'0',outcomes:[
+        {id:'djokovic-home',desc:'Djokovic N.',odds:1.73,isActive:1},
+        {id:'sinner-away',desc:'Sinner J.',odds:2.12,isActive:1}
+      ]
+    }),
+    makeStaleIdFixture('sr:match:current-sabalenka-gauff','Sabalenka A.','Gauff C.',{
+      id:'186',desc:'Match Winner',status:'0',outcomes:[
+        {id:'sabalenka-home',desc:'Sabalenka A.',odds:1.66,isActive:1},
+        {id:'gauff-away',desc:'Gauff C.',odds:2.25,isActive:1}
+      ]
+    })
+  ];
+  const tennisAliasShareRequests = [];
+  globalThis.fetch = async (input, options = {}) => {
+    const url = new URL(typeof input === 'string' ? input : input.url);
+    if (url.pathname === '/api/ng/orders/share') {
+      tennisAliasShareRequests.push(JSON.parse(options.body));
+      return jsonResponse({bizCode:10000,data:{
+        shareCode:'TENNIS-SURNAME-FIRST-ALIAS-OK',
+        outcomes:[{odds:1.73},{odds:2.25}]
+      }});
+    }
+    if (url.pathname.endsWith('/pcUpcomingEvents') && url.searchParams.get('sportId') === 'sr:sport:5') {
+      return jsonResponse({bizCode:10000,data:{tournaments:[{name:'Tennis name-order regression',events:tennisAliasCatalogue}]}});
+    }
+    return jsonResponse({bizCode:10000,data:{tournaments:[]}});
+  };
+  const tennisAliasResponse = await onRequest({request:new Request('https://match-signal.pages.dev/api/sportybet-booking',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({mode:'manual',manual_selections:tennisAliasLegs})
+  })});
+  const tennisAliasPayload = await tennisAliasResponse.json();
+  assert.equal(tennisAliasResponse.status,200,JSON.stringify(tennisAliasPayload));
+  assert.equal(tennisAliasPayload.booking_code,'TENNIS-SURNAME-FIRST-ALIAS-OK');
+  assert.equal(tennisAliasPayload.selection_count,2);
+  assert.deepEqual(tennisAliasPayload.selections.map(row=>row.resolved_event_id),[
+    'sr:match:current-djokovic-sinner','sr:match:current-sabalenka-gauff'
+  ]);
+  assert.deepEqual(tennisAliasPayload.selections.map(row=>row.outcome_id),[
+    'djokovic-home','gauff-away'
+  ]);
+  assert.equal(tennisAliasShareRequests.length,1);
+  assert.equal(tennisAliasShareRequests[0].selections.length,2);
+
   // eFootball must also resolve a new provider event ID through the normalized
   // live feed, using club aliases while preserving the Virtual player slot.
   const virtualAliasLeg = {
