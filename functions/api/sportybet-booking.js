@@ -1582,3 +1582,4 @@ export async function onRequest(context) {
 }
 // Production rollout trigger: alias-aware, parallel current-catalogue booking lookup (2026-11-08).
 // Production rollout trigger: provider-ID-first direct market lookup is regression-tested (2026-11-08).
+// Production retry trigger: NBA projection artifact refreshed and passed six-hour guard (2026-11-08).
