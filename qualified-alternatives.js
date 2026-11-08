@@ -1,4 +1,3 @@
-/* Source-contract marker: data-ticket-model-qualified="true" is emitted only for Builder-qualified alternatives. */
 (()=>{'use strict';
 const endpoint='/api/public/market-alternatives',escapeHtml=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let rows=[],busy=false;
