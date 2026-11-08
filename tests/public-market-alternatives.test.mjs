@@ -33,6 +33,12 @@ test("public endpoint returns whitelisted Builder-qualified future alternatives"
   assert.equal(payload.alternatives[0].probability, 0.71);
   assert.equal(payload.alternatives[0].builder_qualified, true);
   assert.equal(payload.alternatives[0].qualification_status, "BUILDER_QUALIFIED");
+  assert.equal(payload.diagnostics.records_seen, 1);
+  assert.equal(payload.diagnostics.role_source_match, 1);
+  assert.equal(payload.diagnostics.marked_fresh_exact_quote, 1);
+  assert.equal(payload.diagnostics.quote_fresh_within_15_minutes, 1);
+  assert.equal(payload.diagnostics.public_schema_valid, 1);
+  assert.equal(payload.diagnostics.selected_alternatives, 1);
   assert.equal("private_model_detail" in payload.alternatives[0], false);
   assert.equal("raw_probability_vector" in payload.alternatives[0], false);
 });
@@ -83,6 +89,11 @@ test("Builder qualification keeps the 65% floor while linked research alternativ
   ]);
   const rejectedPayload = await rejected.json();
   assert.equal(rejectedPayload.alternatives.length, 0);
+  assert.equal(rejectedPayload.diagnostics.records_seen, 6);
+  assert.equal(rejectedPayload.diagnostics.rejected_by_reason.below_probability_floor_or_invalid_probability, 2);
+  assert.equal(rejectedPayload.diagnostics.rejected_by_reason.missing_primary_link, 1);
+  assert.equal(rejectedPayload.diagnostics.rejected_by_reason.quote_older_than_15_minutes, 1);
+  assert.equal(rejectedPayload.diagnostics.rejected_by_reason.kickoff_within_two_minutes_or_started, 1);
 });
 
 test("at most two distinct market alternatives are returned per fixture", async () => {
