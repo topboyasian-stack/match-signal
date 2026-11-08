@@ -645,5 +645,155 @@ try {
     'sr:match:72478694','sr:match:72513292','sr:match:72513296','sr:match:72513308'
   ]);
   assert.ok(staleIdTicketPayload.selections.every(row=>row.ok===true));
-  console.log('SportyBet booking resilience: PASS (bounded paging, stale-ID recovery, share fallback, exact market-225 pair, and Football/Tennis/eFootball mixed ticket).');
+
+  // Permanent display-name alias regression: current SportyBet IDs and labels
+  // differ from the slip, but the fixture pair + kickoff + exact live total must
+  // resolve before a share request is allowed.
+  const aliasKickoff = Date.now() + 6 * 60 * 60 * 1000;
+  const aliasStart = new Date(aliasKickoff).toISOString();
+  const aliasFixtures = [
+    {
+      event_id:'prediction-man-utd-psg',
+      sportybet_event_id:'sr:match:old-man-utd-psg',
+      sport:'football',market:'total',pick:'over',line:3.5,market_id:'18',
+      start_time:aliasStart,player_1:'Man Utd',player_2:'PSG',match:'Man Utd vs PSG'
+    },
+    {
+      event_id:'prediction-west-ham-wolves',
+      sportybet_event_id:'sr:match:old-west-ham-wolves',
+      sport:'football',market:'total',pick:'under',line:2.5,market_id:'18',
+      start_time:aliasStart,player_1:'West Ham',player_2:'Wolves',match:'West Ham vs Wolves'
+    }
+  ];
+  const aliasCatalogue = [
+    makeStaleIdFixture('sr:match:current-man-utd-psg','Manchester United','Paris Saint Germain',totalMarket(3.5,'alias-man-utd')),
+    makeStaleIdFixture('sr:match:current-west-ham-wolves','West Ham United','Wolverhampton Wanderers',totalMarket(2.5,'alias-west-ham'))
+  ];
+  const aliasShareRequests = [];
+  globalThis.fetch = async (input, options = {}) => {
+    const url = new URL(typeof input === 'string' ? input : input.url);
+    if (url.pathname === '/api/ng/orders/share') {
+      aliasShareRequests.push(JSON.parse(options.body));
+      return jsonResponse({bizCode:10000,data:{
+        shareCode:'FOOTBALL-DISPLAY-ALIAS-RECOVERY-OK',
+        outcomes:[{odds:1.22},{odds:1.28}]
+      }});
+    }
+    if (url.pathname.endsWith('/pcUpcomingEvents') && url.searchParams.get('sportId') === 'sr:sport:1') {
+      return jsonResponse({bizCode:10000,data:{tournaments:[{name:'Club alias regression',events:aliasCatalogue}]}});
+    }
+    return jsonResponse({bizCode:10000,data:{tournaments:[]}});
+  };
+  const aliasResponse = await onRequest({request:new Request('https://match-signal.pages.dev/api/sportybet-booking',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({mode:'manual',manual_selections:aliasFixtures})
+  })});
+  const aliasPayload = await aliasResponse.json();
+  assert.equal(aliasResponse.status,200,JSON.stringify(aliasPayload));
+  assert.equal(aliasPayload.booking_code,'FOOTBALL-DISPLAY-ALIAS-RECOVERY-OK');
+  assert.equal(aliasPayload.selection_count,2);
+  assert.deepEqual(aliasPayload.selections.map(row=>row.resolved_event_id),[
+    'sr:match:current-man-utd-psg','sr:match:current-west-ham-wolves'
+  ]);
+  assert.deepEqual(aliasPayload.selections.map(row=>row.resolved_by),[
+    'fixture_participants_time','fixture_participants_time'
+  ]);
+  assert.equal(aliasShareRequests.length,1);
+  assert.equal(aliasShareRequests[0].selections.length,2);
+
+  // eFootball must also resolve a new provider event ID through the normalized
+  // live feed, using club aliases while preserving the Virtual player slot.
+  const virtualAliasLeg = {
+    event_id:'sr:match:old-gt-bayern-inter',
+    sportybet_event_id:'sr:match:old-gt-bayern-inter',
+    sport:'efootball',product:'efootball_gt',market:'total',pick:'over',line:2.5,market_id:'18',
+    start_time:aliasStart,player_1:'Bayern Munich (Virtual_10)',player_2:'Inter Milan (Virtual_12)',
+    match:'Bayern Munich (Virtual_10) vs Inter Milan (Virtual_12)',model_qualified:false
+  };
+  const virtualAliasEvent = {
+    event_id:'sr:match:current-gt-bayern-inter',
+    team_1:'FC Bayern Munchen (Virtual_10)',
+    team_2:'Internazionale (Virtual_12)',
+    start_time_ms:aliasKickoff,
+    match_status:'Not start',
+    competition:'eFootball GT',
+    markets:[{
+      id:'18',name:'Total Goals Over/Under',specifier:'total=2.5',line:2.5,status:'0',
+      outcomes:[
+        {id:'gt-bayern-over',name:'Over 2.5',odds:1.91,active:true},
+        {id:'gt-bayern-under',name:'Under 2.5',odds:1.85,active:true}
+      ]
+    }]
+  };
+  const virtualAliasShareRequests = [];
+  globalThis.fetch = async (input, options = {}) => {
+    const url = new URL(typeof input === 'string' ? input : input.url);
+    if (url.pathname === '/api/ng/orders/share') {
+      virtualAliasShareRequests.push(JSON.parse(options.body));
+      return jsonResponse({bizCode:10000,data:{
+        shareCode:'EFOOTBALL-ALIAS-AND-NEW-ID-OK',
+        outcomes:[{odds:1.91},{odds:1.22}]
+      }});
+    }
+    if (url.pathname === '/api/sportybet-virtual') {
+      return jsonResponse({ok:true,events:[virtualAliasEvent]});
+    }
+    if (url.pathname.endsWith('/pcUpcomingEvents') && url.searchParams.get('sportId') === 'sr:sport:137') {
+      // The catalogue has no event under the old ID; the normalized feed has
+      // the same open fixture under its current provider ID.
+      return jsonResponse({bizCode:10000,data:{tournaments:[]}});
+    }
+    return jsonResponse({bizCode:10000,data:{tournaments:[]}});
+  };
+  const virtualAliasResponse = await onRequest({request:new Request('https://match-signal.pages.dev/api/sportybet-booking',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({mode:'manual',manual_selections:[
+      aliasFixtures[0],
+      virtualAliasLeg
+    ]})
+  })});
+  const virtualAliasPayload = await virtualAliasResponse.json();
+  assert.equal(virtualAliasResponse.status,200,JSON.stringify(virtualAliasPayload));
+  assert.equal(virtualAliasPayload.booking_code,'EFOOTBALL-ALIAS-AND-NEW-ID-OK');
+  assert.equal(virtualAliasPayload.selection_count,2);
+  assert.equal(virtualAliasPayload.selections.find(row=>row.sport==='efootball')?.resolved_event_id,
+    'sr:match:current-gt-bayern-inter');
+  assert.equal(virtualAliasPayload.selections.find(row=>row.sport==='efootball')?.resolved_by,
+    'fixture_participants_time');
+  assert.equal(virtualAliasShareRequests.length,1);
+  assert.ok(virtualAliasShareRequests[0].selections.some(row=>row.eventId==='sr:match:current-gt-bayern-inter'));
+
+  // Age-group identity must never be collapsed into the first team by an alias.
+  const ageGroupDoesNotMatch = [];
+  globalThis.fetch = async input => {
+    const url = new URL(typeof input === 'string' ? input : input.url);
+    if (url.pathname === '/api/ng/orders/share') {
+      ageGroupDoesNotMatch.push('share');
+      return jsonResponse({bizCode:10000,data:{shareCode:'MUST-NOT-BE-CREATED'}});
+    }
+    if (url.pathname.endsWith('/pcUpcomingEvents') && url.searchParams.get('sportId') === 'sr:sport:1') {
+      return jsonResponse({bizCode:10000,data:{tournaments:[{name:'Age group safeguard',events:[
+        makeStaleIdFixture('sr:match:first-team-man-utd','Manchester United','Paris Saint Germain',totalMarket(2.5,'first-team'))
+      ]}]}});
+    }
+    return jsonResponse({bizCode:10000,data:{tournaments:[]}});
+  };
+  const ageGroupResponse = await onRequest({request:new Request('https://match-signal.pages.dev/api/sportybet-booking',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({mode:'manual',manual_selections:[
+      {
+        event_id:'prediction-man-utd-u21',sportybet_event_id:'sr:match:old-man-utd-u21',
+        sport:'football',market:'total',pick:'over',line:2.5,market_id:'18',
+        start_time:aliasStart,player_1:'Man Utd U21',player_2:'PSG U21',match:'Man Utd U21 vs PSG U21'
+      },
+      aliasFixtures[0]
+    ]})
+  })});
+  const ageGroupPayload = await ageGroupResponse.json();
+  assert.equal(ageGroupResponse.status,409,JSON.stringify(ageGroupPayload));
+  assert.equal(ageGroupPayload.booking_code_withheld,true);
+  assert.ok(ageGroupPayload.validation.some(row=>row.event_id==='prediction-man-utd-u21'&&row.ok===false));
+  assert.equal(ageGroupDoesNotMatch.length,0,'a first-team alias must never satisfy an U21 ticket leg');
+
+  console.log('SportyBet booking resilience: PASS (bounded paging, stale-ID recovery, football and basketball aliases, virtual slot-aware eFootball aliases, exact live markets, and full-ticket safeguards).');
 } finally { globalThis.fetch=originalFetch; }
