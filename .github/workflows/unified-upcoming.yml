@@ -146,10 +146,11 @@ jobs:
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 35
-    # Serialize the actual publish job across event types while preserving the
-    # event-specific workflow queues below.
+    # One shared publisher lock is required: normal and promotion-child board jobs
+    # must not push generated artifacts concurrently. The outer workflow queues remain
+    # event-specific; this job-level lock serializes the actual build/publish phase.
     concurrency:
-      group: match-signal-unified-board-publisher-v7-${{ inputs.promotion_child == true && 'promotion' || 'normal' }}
+      group: match-signal-unified-board-publisher-v8
       cancel-in-progress: false
     steps:
       - name: Checkout latest main
@@ -192,7 +193,7 @@ jobs:
           assert "group: match-signal-unified-upcoming-" in concurrency and "'promotion'" in concurrency
           assert "github.event.workflow_run.name" in concurrency
           unified_job = source.split("\n  unified:\n", 1)[1]
-          assert "    concurrency:\n      group: match-signal-unified-board-publisher-v7-" in unified_job
+          assert "    concurrency:\n      group: match-signal-unified-board-publisher-v8\n      cancel-in-progress: false" in unified_job
           publish = source.rsplit('      - name: Publish unified board and health', 1)[1]
           assert 'Newer unified board already published; skipping stale candidate.' in publish
           assert publish.index('if ! git rebase origin/main; then') < publish.index('Newer unified board already published; skipping stale candidate.')
