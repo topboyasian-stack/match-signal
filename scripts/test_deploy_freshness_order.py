@@ -540,9 +540,9 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
 
     def test_publishing_refresh_is_not_cancelled_or_dispatched_twice(self):
         self.assertIn("cancel-in-progress: false", BOARD_WORKFLOW, "scheduled board refreshes must be allowed to publish before the next run")
-        self.assertIn("group: match-signal-unified-board-publisher-v7-${{ inputs.promotion_child == true", BOARD_WORKFLOW)
+        self.assertIn("group: match-signal-unified-board-publisher-v8", BOARD_WORKFLOW)
         self.assertIn(
-            "    concurrency:\n      group: match-signal-unified-board-publisher-v7-${{ inputs.promotion_child == true && 'promotion' || 'normal' }}\n      cancel-in-progress: false",
+            "    concurrency:\n      group: match-signal-unified-board-publisher-v8\n      cancel-in-progress: false",
             BOARD_WORKFLOW,
         )
         self.assertNotIn("gh workflow run cloudflare-pages.yml", BOARD_WORKFLOW)
