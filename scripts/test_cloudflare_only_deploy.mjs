@@ -95,6 +95,7 @@ assert.ok(
     cloudflare.includes("|scripts/test_workflow_trigger_boundaries.py|") &&
     cloudflare.includes("|scripts/test_cloudflare_only_deploy.mjs|") &&
     cloudflare.includes("|scripts/test_sportybet_booking_resilience.mjs|") &&
+    cloudflare.includes("|scripts/test_nba_ticket_guard.mjs|") &&
     cloudflare.includes("|.github/workflows/sportybet-booking-tests.yml|") &&
     cloudflare.includes("|league.html|") &&
     cloudflare.includes("|live.html|") &&
