@@ -138,7 +138,7 @@ concurrency:
   # the slower model + publication steps from ever updating the canonical board.
   # Promotion-child refreshes remain isolated from the normal schedule.
   # Queue generation 7 releases stale pending generation-6 board/publisher locks. Keep push, scheduled, manual-promotion, and each upstream completion in separate pending queues. GitHub retains only one pending run per concurrency group; shared normal groups silently replaced the prediction-pipeline board run with unrelated completion events.
-  group: match-signal-unified-upcoming-v7-${{ github.event_name }}-${{ github.event_name == 'workflow_run' && github.event.workflow_run.name || github.event_name == 'workflow_dispatch' && inputs.promotion_child && 'promotion' || 'normal' }}
+  group: match-signal-unified-upcoming-v8-${{ github.event_name }}-${{ github.event_name == 'workflow_run' && github.event.workflow_run.name || github.event_name == 'workflow_dispatch' && inputs.promotion_child && 'promotion' || 'normal' }}
   cancel-in-progress: false
 
 jobs:
