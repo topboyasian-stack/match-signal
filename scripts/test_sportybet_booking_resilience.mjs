@@ -702,6 +702,7 @@ try {
   assert.equal(aliasResponse.status,200,JSON.stringify(aliasPayload));
   assert.equal(aliasPayload.booking_code,'FOOTBALL-DISPLAY-ALIAS-RECOVERY-OK');
   assert.equal(aliasPayload.selection_count,2);
+  assert.equal(aliasPayload.fixture_matcher_version,'sportybet-alias-v1');
   assert.deepEqual(aliasPayload.selections.map(row=>row.resolved_event_id),[
     'sr:match:current-man-utd-psg','sr:match:current-west-ham-wolves'
   ]);
@@ -764,6 +765,7 @@ try {
   assert.equal(tennisAliasResponse.status,200,JSON.stringify(tennisAliasPayload));
   assert.equal(tennisAliasPayload.booking_code,'TENNIS-SURNAME-FIRST-ALIAS-OK');
   assert.equal(tennisAliasPayload.selection_count,2);
+  assert.equal(tennisAliasPayload.fixture_matcher_version,'sportybet-alias-v1');
   assert.deepEqual(tennisAliasPayload.selections.map(row=>row.resolved_event_id),[
     'sr:match:current-djokovic-sinner','sr:match:current-sabalenka-gauff'
   ]);
@@ -831,6 +833,7 @@ try {
   assert.equal(virtualAliasResponse.status,200,JSON.stringify(virtualAliasPayload));
   assert.equal(virtualAliasPayload.booking_code,'EFOOTBALL-ALIAS-AND-NEW-ID-OK');
   assert.equal(virtualAliasPayload.selection_count,2);
+  assert.equal(virtualAliasPayload.fixture_matcher_version,'sportybet-alias-v1');
   const virtualAliasValidation = virtualAliasPayload.selections.find(
     row=>row.event_id===virtualAliasLeg.event_id
   );
