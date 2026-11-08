@@ -122,7 +122,7 @@ export async function onRequestGet({ request, env }) {
   if (request.method !== "GET") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
   try {
     const raw = await env.MATCH_SIGNAL_ANALYST_STORE.get(EVIDENCE_KEY);
-    if (!raw) return json({ status: "EMPTY", alternatives: [] });
+    if (!raw) return json({ status: "EMPTY", min_probability: MIN_RESEARCH_ALTERNATIVE_PROBABILITY, builder_min_probability: MIN_RECOMMENDED_PROBABILITY, max_per_fixture: 2, alternatives: [] });
     const document = JSON.parse(raw);
     if (!document || document.record_type !== "cross_sport_market_reassessment" || !Array.isArray(document.records)) {
       return json({ error: "EVIDENCE_UNAVAILABLE" }, 503);
