@@ -821,10 +821,11 @@ try {
   assert.equal(virtualAliasResponse.status,200,JSON.stringify(virtualAliasPayload));
   assert.equal(virtualAliasPayload.booking_code,'EFOOTBALL-ALIAS-AND-NEW-ID-OK');
   assert.equal(virtualAliasPayload.selection_count,2);
-  assert.equal(virtualAliasPayload.selections.find(row=>row.sport==='efootball')?.resolved_event_id,
-    'sr:match:current-gt-bayern-inter');
-  assert.equal(virtualAliasPayload.selections.find(row=>row.sport==='efootball')?.resolved_by,
-    'fixture_participants_time');
+  const virtualAliasValidation = virtualAliasPayload.selections.find(
+    row=>row.event_id===virtualAliasLeg.event_id
+  );
+  assert.equal(virtualAliasValidation?.resolved_event_id,'sr:match:current-gt-bayern-inter');
+  assert.equal(virtualAliasValidation?.resolved_by,'fixture_participants_time');
   assert.equal(virtualAliasShareRequests.length,1);
   assert.ok(virtualAliasShareRequests[0].selections.some(row=>row.eventId==='sr:match:current-gt-bayern-inter'));
 
