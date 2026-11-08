@@ -234,13 +234,12 @@ def restore() -> int:
         }))
         return 0
     except Exception as exc:
-        if not HISTORY_PATH.exists():
-            _write_json(HISTORY_PATH, _default_document())
+        # Do not fabricate an empty ledger when the remote restore fails.
         REVISION_PATH.write_text("unavailable\n", encoding="utf-8")
         NAMESPACE_PATH.write_text("unavailable\n", encoding="utf-8")
-        _warning(f"Private cross-sport evidence could not be restored: {exc}. No raw evidence will be published publicly; durable accumulation is unavailable for this run.")
+        _warning(f"Private cross-sport evidence restore failed: {exc}. Failing this run so persistence outages cannot masquerade as successful refreshes.")
         print("PRIVATE_EVIDENCE_RESTORE_UNAVAILABLE")
-        return 0
+        return 1
 
 
 def publish() -> int:
@@ -251,9 +250,9 @@ def publish() -> int:
     except OSError:
         revision, namespace_id = "unavailable", "unavailable"
     if not revision or revision == "unavailable" or not namespace_id or namespace_id == "unavailable":
-        _warning("Private evidence was not restored, so this run cannot safely persist or overwrite the private ledger.")
+        _warning("Private evidence was not restored, so this run cannot safely persist or overwrite the private ledger. Failing the refresh.")
         print("PRIVATE_EVIDENCE_NOT_PERSISTED")
-        return 0
+        return 1
     try:
         # Re-read right before write to avoid overwriting another writer's newer ledger.
         current = _kv_get(namespace_id)
@@ -277,9 +276,9 @@ def publish() -> int:
         }))
         return 0
     except Exception as exc:
-        _warning(f"Private cross-sport evidence was not persisted: {exc}. The raw ledger remains runner-local and will not be added to public Git.")
+        _warning(f"Private cross-sport evidence was not persisted: {exc}. The raw ledger remains runner-local and will not be added to public Git. Failing the refresh so the failure is visible.")
         print("PRIVATE_EVIDENCE_SAVE_UNAVAILABLE")
-        return 0
+        return 1
 
 
 def main(argv: list[str]) -> int:
