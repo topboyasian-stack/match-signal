@@ -478,9 +478,7 @@ export async function collectBasketballEvents(context, targetIds, timeline = 168
           const predictionId = String(leg?.event_id || '');
           // An ID hit cannot complete a target unless the requested market,
           // line and active Over/Under side also exist in this current record.
-          return targetFixtureMatches(leg, event) ||
-            ((providerId && providerId === eventId) || (predictionId && predictionId === eventId)) &&
-              targetBasketballFixtureMatches(leg, event);
+          return targetFixtureMatches(leg, event);
         })
         .map(({ index }) => index);
       if (ids.has(eventId) || matchingIndexes.length) found.set(eventId, event);
@@ -1160,9 +1158,6 @@ async function handlePost(context) {
     for (const [id, event] of basketballEvents) found.set(id, event);
 
     const unresolvedVirtualLegs = allVirtualLegs.filter(leg => !sharedMatchedLegs.has(leg));
-    const unresolvedVirtualIds = new Set(unresolvedVirtualLegs.flatMap(leg => [
-      leg.event_id, leg.sportybet_event_id
-    ]).map(value => String(value || '')).filter(Boolean));
     const unresolvedVfootballLegs = unresolvedVirtualLegs.filter(leg => productForLeg(leg) === 'vfootball');
     const unresolvedEfootballLegs = unresolvedVirtualLegs.filter(leg => productForLeg(leg) === 'efootball');
 
