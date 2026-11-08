@@ -937,12 +937,14 @@ async function handlePost(context) {
     // Keep the lookup bounded by SportyBet's supported 30-day catalogue window.
     const catalogueTimeline = manualMode ? ticketCatalogueTimeline(legs) : 168;
     let nbaReleaseContext = null;
-    if (hasBasketballLeg) {
-      // Manual tickets share the same locked NBA gate as Builder batches. Client-provided
-      // model_qualified flags are untrusted and cannot bypass the global release evidence.
+    if (hasBasketballLeg && !manualMode) {
+      // The automated NBA Builder remains locked to independent model-release
+      // evidence. A user-created manual ticket is a different operation: it may
+      // include an explicitly unqualified NBA selection only after the exact
+      // current SportyBet event, market, line, both prices and kickoff are checked.
       try { nbaReleaseContext = await loadNbaReleaseContext(); }
-      catch (error) { return json({ ok: false, error: 'NBA_RELEASE_EVIDENCE_UNAVAILABLE', message: 'NBA release evidence could not be verified. No ticket code was requested.' }, 503); }
-      if (!nbaTotalsReleaseQualified(nbaReleaseContext.evidence, nbaReleaseContext.probability)) return json({ ok: false, error: 'NBA_RELEASE_GATE_LOCKED', booking_code_withheld: true, message: 'The independent NBA totals release gate has not passed. No SportyBet ticket code was requested.' }, 423);
+      catch (error) { return json({ ok: false, error: 'NBA_RELEASE_EVIDENCE_UNAVAILABLE', message: 'NBA release evidence could not be verified. No Builder ticket code was requested.' }, 503); }
+      if (!nbaTotalsReleaseQualified(nbaReleaseContext.evidence, nbaReleaseContext.probability)) return json({ ok: false, error: 'NBA_RELEASE_GATE_LOCKED', booking_code_withheld: true, message: 'The independent NBA totals release gate has not passed. No Builder ticket code was requested.' }, 423);
     }
     // Started selections cannot be pre-match bookable. Avoid looking them up
     // as upcoming fixtures; final validation reports the precise reason.
@@ -1087,9 +1089,26 @@ async function handlePost(context) {
         continue;
       }
       let nbaQualification = null;
-      if (String(leg?.sport || '').toLowerCase() === 'basketball') {
+      const basketballLeg = String(leg?.sport || '').toLowerCase() === 'basketball';
+      if (basketballLeg && !manualMode) {
         nbaQualification = nbaTotalTicketLegQualified(leg, selection, nbaReleaseContext);
         if (!nbaQualification.ok) { validation.push(validationFailure(leg, nbaQualification.reason)); continue; }
+      }
+      if (basketballLeg && manualMode) {
+        // Manual selections are not model-qualified by this path. They still
+        // require a fresh, pre-kickoff quote for market 225 with both active
+        // side prices and the exact current provider event ID.
+        const quoteAt = Date.parse(String(selection?.fetchedAt || ''));
+        const requestedStart = Date.parse(String(leg?.start_time || ''));
+        if (!Number.isFinite(quoteAt) || quoteAt > Date.now() + 120000 ||
+            Date.now() - quoteAt > 15 * 60 * 1000 || !Number.isFinite(requestedStart) ||
+            quoteAt >= requestedStart || String(selection?.marketId || '') !== '225' ||
+            String(selection?.sportybetEventId || selection?.eventId || '') !== String(event?.eventId || '') ||
+            !Number.isFinite(Number(selection?.overOdds)) || Number(selection.overOdds) <= 1 ||
+            !Number.isFinite(Number(selection?.underOdds)) || Number(selection.underOdds) <= 1) {
+          validation.push(validationFailure(leg, 'Current SportyBet market-225 quote is stale or incomplete; refresh this basketball selection.'));
+          continue;
+        }
       }
       selections.push(selection);
       validation.push({event_id:eventId,ok:true,resolved_by:resolved.matched_by,resolved_event_id:event.eventId,market_id:selection.marketId,outcome_id:selection.outcomeId,specifier:selection.specifier,outcome:selection.outcomeName,current_odds:selection.odds,current_line:selection.line??null,current_over_odds:selection.overOdds??null,current_under_odds:selection.underOdds??null,publication_snapshot_id:nbaQualification?.snapshot_id||null});
