@@ -1,6 +1,7 @@
 /* One shared Match Signal ticket slip for Football, Tennis and Basketball. */
 (function () {
   'use strict';
+  // Manual picks stay unqualified; the booking API must recheck every live SportyBet leg before returning a code.
   if (window.__MATCH_SIGNAL_SINGLE_TICKET__) return;
   window.__MATCH_SIGNAL_SINGLE_TICKET__ = true;
   var STORE_KEY='match-signal:sportybet-manual-ticket:v2',LEGACY_KEY='match-signal:sportybet-manual-ticket:v1',MAX_LEGS=8;
