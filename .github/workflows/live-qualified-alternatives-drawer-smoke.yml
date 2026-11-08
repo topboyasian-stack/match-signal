@@ -1,6 +1,14 @@
 name: Live Qualified Alternatives Shared Drawer Smoke
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/test_public_alternatives_drawer.mjs'
+      - '.github/workflows/live-qualified-alternatives-drawer-smoke.yml'
+      - 'qualified-alternatives.js'
+      - 'ticket-drawer.js'
+      - 'functions/api/public/market-alternatives.js'
   workflow_run:
     workflows: ["Deploy Match Signal to Cloudflare Pages"]
     types: [completed]
