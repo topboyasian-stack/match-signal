@@ -646,6 +646,96 @@ try {
   ]);
   assert.ok(staleIdTicketPayload.selections.every(row=>row.ok===true));
 
+  // Direct current-event lookup: an existing SportyBet provider ID should
+  // return the live event and exact markets in one request. Alias display names
+  // must still pass participant, kickoff, line, active-side and price checks.
+  const directKickoff = Date.now() + 6 * 60 * 60 * 1000;
+  const directStart = new Date(directKickoff).toISOString();
+  const directLegs = [
+    {
+      event_id:'prediction-direct-man-utd-psg',
+      sportybet_event_id:'sr:match:direct-man-utd-psg',
+      sport:'football',market:'total',pick:'over',line:3.5,market_id:'18',
+      start_time:directStart,player_1:'Man Utd',player_2:'PSG',match:'Man Utd vs PSG'
+    },
+    {
+      event_id:'prediction-direct-west-ham-wolves',
+      sportybet_event_id:'sr:match:direct-west-ham-wolves',
+      sport:'football',market:'total',pick:'under',line:2.5,market_id:'18',
+      start_time:directStart,player_1:'West Ham',player_2:'Wolves',match:'West Ham vs Wolves'
+    }
+  ];
+  const directEventDetails = new Map([
+    ['sr:match:direct-man-utd-psg',{
+      eventId:'sr:match:direct-man-utd-psg',
+      estimateStartTime:directKickoff,
+      matchStatus:'Not start',
+      homeTeamName:'Manchester United',
+      awayTeamName:'Paris Saint Germain',
+      sport:{id:'sr:sport:1',category:{tournament:{name:'Direct Event Alias Regression'}}},
+      markets:[{id:'18',desc:'Over/Under',specifier:'total=3.5',status:0,outcomes:[
+        {id:'direct-man-over',desc:'Over 3.5',odds:1.88,isActive:1},
+        {id:'direct-man-under',desc:'Under 3.5',odds:1.96,isActive:1}
+      ]}]
+    }],
+    ['sr:match:direct-west-ham-wolves',{
+      eventId:'sr:match:direct-west-ham-wolves',
+      estimateStartTime:directKickoff,
+      matchStatus:'Not start',
+      homeTeamName:'West Ham United',
+      awayTeamName:'Wolverhampton Wanderers',
+      sport:{id:'sr:sport:1',category:{tournament:{name:'Direct Event Alias Regression'}}},
+      markets:[{id:'18',desc:'Over/Under',specifier:'total=2.5',status:0,outcomes:[
+        {id:'direct-west-over',desc:'Over 2.5',odds:2.05,isActive:1},
+        {id:'direct-west-under',desc:'Under 2.5',odds:1.72,isActive:1}
+      ]}]
+    }]
+  ]);
+  const directLookups = [];
+  const directCatalogueLookups = [];
+  const directShareRequests = [];
+  globalThis.fetch = async (input, options = {}) => {
+    const url = new URL(typeof input === 'string' ? input : input.url);
+    if (url.pathname.endsWith('/factsCenter/event')) {
+      directLookups.push(url.searchParams.get('eventId'));
+      const event = directEventDetails.get(String(url.searchParams.get('eventId')));
+      return jsonResponse({bizCode:10000,data:event||{}});
+    }
+    if (/\/(?:pcUpcomingEvents|wapConfigurableUpcomingEvents)$/.test(url.pathname) || url.pathname==='/api/sportybet-virtual') {
+      directCatalogueLookups.push(url.pathname);
+      return jsonResponse({bizCode:10000,data:{tournaments:[]}});
+    }
+    if (url.pathname==='/api/ng/orders/share') {
+      directShareRequests.push(JSON.parse(options.body));
+      return jsonResponse({bizCode:10000,data:{
+        shareCode:'DIRECT-EVENT-ALIAS-LOOKUP-OK',
+        outcomes:[{odds:1.88},{odds:1.72}]
+      }});
+    }
+    throw new Error('Unexpected direct-event lookup request: '+url.toString());
+  };
+  const directResponse = await onRequest({request:new Request('https://match-signal.pages.dev/api/sportybet-booking',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({mode:'manual',manual_selections:directLegs})
+  })});
+  const directPayload = await directResponse.json();
+  assert.equal(directResponse.status,200,JSON.stringify(directPayload));
+  assert.equal(directPayload.booking_code,'DIRECT-EVENT-ALIAS-LOOKUP-OK');
+  assert.equal(directPayload.fixture_matcher_version,'sportybet-alias-v1');
+  assert.equal(directPayload.selection_count,2);
+  assert.deepEqual(directLookups.sort(),[
+    'sr:match:direct-man-utd-psg','sr:match:direct-west-ham-wolves'
+  ]);
+  assert.equal(directCatalogueLookups.length,0,'exact single-event matches must not trigger full catalogue paging');
+  assert.equal(directShareRequests.length,1);
+  assert.equal(directShareRequests[0].selections.length,2);
+  assert.deepEqual(directPayload.selections.map(row=>row.resolved_by),[
+    'sportybet_event_id','sportybet_event_id'
+  ]);
+  assert.deepEqual(directPayload.selections.map(row=>row.resolved_event_id),[
+    'sr:match:direct-man-utd-psg','sr:match:direct-west-ham-wolves'
+  ]);
+
   // Permanent display-name alias regression: current SportyBet IDs and labels
   // differ from the slip, but the fixture pair + kickoff + exact live total must
   // resolve before a share request is allowed.
@@ -688,6 +778,14 @@ try {
         shareCode:'FOOTBALL-DISPLAY-ALIAS-RECOVERY-OK',
         outcomes:[{odds:1.22},{odds:1.28}]
       }});
+    }
+    if (url.pathname.endsWith('/factsCenter/event')) {
+      // The old provider ID still exists, but its details response exposes
+      // only a winner market. The current exact total must be found by alias.
+      const eventId = String(url.searchParams.get('eventId')||'');
+      return jsonResponse({bizCode:10000,data:eventId==='sr:match:old-man-utd-psg'
+        ? aliasCatalogue[0]
+        : {}});
     }
     if (url.pathname.endsWith('/pcUpcomingEvents') && url.searchParams.get('sportId') === 'sr:sport:1') {
       return jsonResponse({bizCode:10000,data:{tournaments:[{name:'Club alias regression',events:aliasCatalogue}]}});
