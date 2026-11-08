@@ -170,7 +170,7 @@ def main():
             "An NBA-containing slip must be rejected whole if any leg fails live validation or SportyBet removes a selection")
     require("new Set(ids).size !== ids.length" in api,
             "The booking endpoint must reject duplicate fixtures")
-    tennis_resolver = api.split("if (tennisIds.size) {", 1)[1].split("if (basketballIds.size)", 1)[0]
+    tennis_resolver = api.split("tennisIds.size", 1)[1].split("basketballIds.size", 1)[0]
     require("fallbackPath: '/api/ng/factsCenter/wapConfigurableUpcomingEvents'" in tennis_resolver,
             "Tennis fixtures must be retried against SportyBet's alternate WAP upcoming catalogue")
     require("diff <= 45 * 60 * 1000" in api,
