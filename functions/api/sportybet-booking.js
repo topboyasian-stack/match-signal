@@ -471,18 +471,24 @@ export async function collectBasketballEvents(context, targetIds, timeline = 168
         fetchedAt: String(row?.fetched_at || payload?.fetched_at || ''),
         markets
       };
-      const matchingIndexes = targets
+      const identityMatches = targets
         .map((leg, index) => ({ leg, index }))
         .filter(({ leg }) => {
-          const providerId = String(leg?.sportybet_event_id || '');
-          const predictionId = String(leg?.event_id || '');
-          // An ID hit cannot complete a target unless the requested market,
-          // line and active Over/Under side also exist in this current record.
-          return targetFixtureMatches(leg, event);
+          // Discovery may retain an identity/time match so the final validator
+          // can explain a missing market accurately. It does not stop paging.
+          return targetBasketballFixtureMatches(leg, event);
         })
         .map(({ index }) => index);
-      if (ids.has(eventId) || matchingIndexes.length) found.set(eventId, event);
-      matchingIndexes.forEach(index => matchedTargets.add(index));
+      const exactSelectionMatches = targets
+        .map((leg, index) => ({ leg, index }))
+        .filter(({ leg }) => targetFixtureMatches(leg, event))
+        .map(({ index }) => index);
+      if (ids.has(eventId) || identityMatches.length || exactSelectionMatches.length) {
+        found.set(eventId, event);
+      }
+      // Only an exact active market-225 line + side + two prices completes
+      // discovery for this leg; an ID or team match alone never does.
+      exactSelectionMatches.forEach(index => matchedTargets.add(index));
     }
     if (payload.catalogue_page_has_more !== true) break;
   }
