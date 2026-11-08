@@ -645,5 +645,232 @@ try {
     'sr:match:72478694','sr:match:72513292','sr:match:72513296','sr:match:72513308'
   ]);
   assert.ok(staleIdTicketPayload.selections.every(row=>row.ok===true));
-  console.log('SportyBet booking resilience: PASS (bounded paging, stale-ID recovery, share fallback, exact market-225 pair, and Football/Tennis/eFootball mixed ticket).');
+
+  // Permanent display-name alias regression: current SportyBet IDs and labels
+  // differ from the slip, but the fixture pair + kickoff + exact live total must
+  // resolve before a share request is allowed.
+  const aliasKickoff = Date.now() + 6 * 60 * 60 * 1000;
+  const aliasStart = new Date(aliasKickoff).toISOString();
+  const aliasFixtures = [
+    {
+      event_id:'prediction-man-utd-psg',
+      sportybet_event_id:'sr:match:old-man-utd-psg',
+      sport:'football',market:'total',pick:'over',line:3.5,market_id:'18',
+      start_time:aliasStart,player_1:'Man Utd',player_2:'PSG',match:'Man Utd vs PSG'
+    },
+    {
+      event_id:'prediction-west-ham-wolves',
+      sportybet_event_id:'sr:match:old-west-ham-wolves',
+      sport:'football',market:'total',pick:'under',line:2.5,market_id:'18',
+      start_time:aliasStart,player_1:'West Ham',player_2:'Wolves',match:'West Ham vs Wolves'
+    }
+  ];
+  const staleIdWrongMarket = makeStaleIdFixture(
+    'sr:match:old-man-utd-psg','Manchester United','Paris Saint Germain',{
+      id:'1',desc:'3 Way',status:'0',outcomes:[
+        {id:'old-home',desc:'Manchester United',odds:1.8,isActive:1},
+        {id:'old-draw',desc:'Draw',odds:3.4,isActive:1},
+        {id:'old-away',desc:'Paris Saint Germain',odds:4.1,isActive:1}
+      ]
+    }
+  );
+  const aliasCatalogue = [
+    staleIdWrongMarket,
+    makeStaleIdFixture('sr:match:current-man-utd-psg','Manchester United','Paris Saint Germain',totalMarket(3.5,'alias-man-utd')),
+    makeStaleIdFixture('sr:match:current-west-ham-wolves','West Ham United','Wolverhampton Wanderers',totalMarket(2.5,'alias-west-ham'))
+  ];
+  const aliasShareRequests = [];
+  globalThis.fetch = async (input, options = {}) => {
+    const url = new URL(typeof input === 'string' ? input : input.url);
+    if (url.pathname === '/api/ng/orders/share') {
+      aliasShareRequests.push(JSON.parse(options.body));
+      return jsonResponse({bizCode:10000,data:{
+        shareCode:'FOOTBALL-DISPLAY-ALIAS-RECOVERY-OK',
+        outcomes:[{odds:1.22},{odds:1.28}]
+      }});
+    }
+    if (url.pathname.endsWith('/pcUpcomingEvents') && url.searchParams.get('sportId') === 'sr:sport:1') {
+      return jsonResponse({bizCode:10000,data:{tournaments:[{name:'Club alias regression',events:aliasCatalogue}]}});
+    }
+    return jsonResponse({bizCode:10000,data:{tournaments:[]}});
+  };
+  const aliasResponse = await onRequest({request:new Request('https://match-signal.pages.dev/api/sportybet-booking',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({mode:'manual',manual_selections:aliasFixtures})
+  })});
+  const aliasPayload = await aliasResponse.json();
+  assert.equal(aliasResponse.status,200,JSON.stringify(aliasPayload));
+  assert.equal(aliasPayload.booking_code,'FOOTBALL-DISPLAY-ALIAS-RECOVERY-OK');
+  assert.equal(aliasPayload.selection_count,2);
+  assert.deepEqual(aliasPayload.selections.map(row=>row.resolved_event_id),[
+    'sr:match:current-man-utd-psg','sr:match:current-west-ham-wolves'
+  ]);
+  assert.deepEqual(aliasPayload.selections.map(row=>row.resolved_by),[
+    'fixture_participants_time','fixture_participants_time'
+  ]);
+  assert.equal(aliasShareRequests.length,1);
+  assert.equal(aliasShareRequests[0].selections.length,2);
+
+  // Tennis player formatting regression: SportyBet can display surname-first
+  // names with initials while the prediction stores full first+last names.
+  const tennisAliasLegs = [
+    {
+      event_id:'prediction-djokovic-sinner',sportybet_event_id:'sr:match:old-djokovic-sinner',
+      sport:'tennis',market:'winner',pick:'p1',market_id:'186',
+      start_time:aliasStart,player_1:'Novak Djokovic',player_2:'Jannik Sinner',
+      match:'Novak Djokovic vs Jannik Sinner'
+    },
+    {
+      event_id:'prediction-sabalenka-gauff',sportybet_event_id:'sr:match:old-sabalenka-gauff',
+      sport:'tennis',market:'winner',pick:'p2',market_id:'186',
+      start_time:aliasStart,player_1:'Aryna Sabalenka',player_2:'Coco Gauff',
+      match:'Aryna Sabalenka vs Coco Gauff'
+    }
+  ];
+  const tennisAliasCatalogue = [
+    makeStaleIdFixture('sr:match:current-djokovic-sinner','Djokovic N.','Sinner J.',{
+      id:'186',desc:'Match Winner',status:'0',outcomes:[
+        {id:'djokovic-home',desc:'Djokovic N.',odds:1.73,isActive:1},
+        {id:'sinner-away',desc:'Sinner J.',odds:2.12,isActive:1}
+      ]
+    }),
+    makeStaleIdFixture('sr:match:current-sabalenka-gauff','Sabalenka A.','Gauff C.',{
+      id:'186',desc:'Match Winner',status:'0',outcomes:[
+        {id:'sabalenka-home',desc:'Sabalenka A.',odds:1.66,isActive:1},
+        {id:'gauff-away',desc:'Gauff C.',odds:2.25,isActive:1}
+      ]
+    })
+  ];
+  const tennisAliasShareRequests = [];
+  globalThis.fetch = async (input, options = {}) => {
+    const url = new URL(typeof input === 'string' ? input : input.url);
+    if (url.pathname === '/api/ng/orders/share') {
+      tennisAliasShareRequests.push(JSON.parse(options.body));
+      return jsonResponse({bizCode:10000,data:{
+        shareCode:'TENNIS-SURNAME-FIRST-ALIAS-OK',
+        outcomes:[{odds:1.73},{odds:2.25}]
+      }});
+    }
+    if (url.pathname.endsWith('/pcUpcomingEvents') && url.searchParams.get('sportId') === 'sr:sport:5') {
+      return jsonResponse({bizCode:10000,data:{tournaments:[{name:'Tennis name-order regression',events:tennisAliasCatalogue}]}});
+    }
+    return jsonResponse({bizCode:10000,data:{tournaments:[]}});
+  };
+  const tennisAliasResponse = await onRequest({request:new Request('https://match-signal.pages.dev/api/sportybet-booking',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({mode:'manual',manual_selections:tennisAliasLegs})
+  })});
+  const tennisAliasPayload = await tennisAliasResponse.json();
+  assert.equal(tennisAliasResponse.status,200,JSON.stringify(tennisAliasPayload));
+  assert.equal(tennisAliasPayload.booking_code,'TENNIS-SURNAME-FIRST-ALIAS-OK');
+  assert.equal(tennisAliasPayload.selection_count,2);
+  assert.deepEqual(tennisAliasPayload.selections.map(row=>row.resolved_event_id),[
+    'sr:match:current-djokovic-sinner','sr:match:current-sabalenka-gauff'
+  ]);
+  assert.deepEqual(tennisAliasPayload.selections.map(row=>row.outcome_id),[
+    'djokovic-home','gauff-away'
+  ]);
+  assert.equal(tennisAliasShareRequests.length,1);
+  assert.equal(tennisAliasShareRequests[0].selections.length,2);
+
+  // eFootball must also resolve a new provider event ID through the normalized
+  // live feed, using club aliases while preserving the Virtual player slot.
+  const virtualAliasLeg = {
+    event_id:'sr:match:old-gt-bayern-inter',
+    sportybet_event_id:'sr:match:old-gt-bayern-inter',
+    sport:'efootball',product:'efootball_gt',market:'total',pick:'over',line:2.5,market_id:'18',
+    start_time:aliasStart,player_1:'Bayern Munich (Virtual_10)',player_2:'Inter Milan (Virtual_12)',
+    match:'Bayern Munich (Virtual_10) vs Inter Milan (Virtual_12)',model_qualified:false
+  };
+  const virtualAliasEvent = {
+    event_id:'sr:match:current-gt-bayern-inter',
+    team_1:'FC Bayern Munchen (Virtual_10)',
+    team_2:'Internazionale (Virtual_12)',
+    start_time_ms:aliasKickoff,
+    match_status:'Not start',
+    competition:'eFootball GT',
+    markets:[{
+      id:'18',name:'Total Goals Over/Under',specifier:'total=2.5',line:2.5,status:'0',
+      outcomes:[
+        {id:'gt-bayern-over',name:'Over 2.5',odds:1.91,active:true},
+        {id:'gt-bayern-under',name:'Under 2.5',odds:1.85,active:true}
+      ]
+    }]
+  };
+  const virtualAliasShareRequests = [];
+  globalThis.fetch = async (input, options = {}) => {
+    const url = new URL(typeof input === 'string' ? input : input.url);
+    if (url.pathname === '/api/ng/orders/share') {
+      virtualAliasShareRequests.push(JSON.parse(options.body));
+      return jsonResponse({bizCode:10000,data:{
+        shareCode:'EFOOTBALL-ALIAS-AND-NEW-ID-OK',
+        outcomes:[{odds:1.91},{odds:1.22}]
+      }});
+    }
+    if (url.pathname === '/api/sportybet-virtual') {
+      return jsonResponse({ok:true,events:[virtualAliasEvent]});
+    }
+    if (url.pathname.endsWith('/pcUpcomingEvents') && url.searchParams.get('sportId') === 'sr:sport:137') {
+      // The catalogue has no event under the old ID; the normalized feed has
+      // the same open fixture under its current provider ID.
+      return jsonResponse({bizCode:10000,data:{tournaments:[]}});
+    }
+    if (url.pathname.endsWith('/pcUpcomingEvents') && url.searchParams.get('sportId') === 'sr:sport:1') {
+      return jsonResponse({bizCode:10000,data:{tournaments:[{name:'Club alias regression',events:[aliasCatalogue[1]]}]}});
+    }
+    return jsonResponse({bizCode:10000,data:{tournaments:[]}});
+  };
+  const virtualAliasResponse = await onRequest({request:new Request('https://match-signal.pages.dev/api/sportybet-booking',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({mode:'manual',manual_selections:[
+      aliasFixtures[0],
+      virtualAliasLeg
+    ]})
+  })});
+  const virtualAliasPayload = await virtualAliasResponse.json();
+  assert.equal(virtualAliasResponse.status,200,JSON.stringify(virtualAliasPayload));
+  assert.equal(virtualAliasPayload.booking_code,'EFOOTBALL-ALIAS-AND-NEW-ID-OK');
+  assert.equal(virtualAliasPayload.selection_count,2);
+  const virtualAliasValidation = virtualAliasPayload.selections.find(
+    row=>row.event_id===virtualAliasLeg.event_id
+  );
+  assert.equal(virtualAliasValidation?.resolved_event_id,'sr:match:current-gt-bayern-inter');
+  assert.equal(virtualAliasValidation?.resolved_by,'fixture_participants_time');
+  assert.equal(virtualAliasShareRequests.length,1);
+  assert.ok(virtualAliasShareRequests[0].selections.some(row=>row.eventId==='sr:match:current-gt-bayern-inter'));
+
+  // Age-group identity must never be collapsed into the first team by an alias.
+  const ageGroupDoesNotMatch = [];
+  globalThis.fetch = async input => {
+    const url = new URL(typeof input === 'string' ? input : input.url);
+    if (url.pathname === '/api/ng/orders/share') {
+      ageGroupDoesNotMatch.push('share');
+      return jsonResponse({bizCode:10000,data:{shareCode:'MUST-NOT-BE-CREATED'}});
+    }
+    if (url.pathname.endsWith('/pcUpcomingEvents') && url.searchParams.get('sportId') === 'sr:sport:1') {
+      return jsonResponse({bizCode:10000,data:{tournaments:[{name:'Age group safeguard',events:[
+        makeStaleIdFixture('sr:match:first-team-man-utd','Manchester United','Paris Saint Germain',totalMarket(2.5,'first-team')),
+        aliasCatalogue[1]
+      ]}]}});
+    }
+    return jsonResponse({bizCode:10000,data:{tournaments:[]}});
+  };
+  const ageGroupResponse = await onRequest({request:new Request('https://match-signal.pages.dev/api/sportybet-booking',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({mode:'manual',manual_selections:[
+      {
+        event_id:'prediction-man-utd-u21',sportybet_event_id:'sr:match:old-man-utd-u21',
+        sport:'football',market:'total',pick:'over',line:2.5,market_id:'18',
+        start_time:aliasStart,player_1:'Man Utd U21',player_2:'PSG U21',match:'Man Utd U21 vs PSG U21'
+      },
+      aliasFixtures[0]
+    ]})
+  })});
+  const ageGroupPayload = await ageGroupResponse.json();
+  assert.equal(ageGroupResponse.status,409,JSON.stringify(ageGroupPayload));
+  assert.equal(ageGroupPayload.booking_code_withheld,true);
+  assert.ok(ageGroupPayload.validation.some(row=>row.event_id==='prediction-man-utd-u21'&&row.ok===false));
+  assert.equal(ageGroupDoesNotMatch.length,0,'a first-team alias must never satisfy an U21 ticket leg');
+
+  console.log('SportyBet booking resilience: PASS (bounded paging, stale-ID recovery, football and basketball aliases, virtual slot-aware eFootball aliases, exact live markets, and full-ticket safeguards).');
 } finally { globalThis.fetch=originalFetch; }
