@@ -139,7 +139,7 @@ def main():
             "Share-code creation must try both SportyBet sources within the manual request deadline and return JSON failures")
     require("const lookupLegs = manualMode ? legs.filter" in api and "const basketballLegs = lookupLegs.filter" in api and
             "flatMap(l => [l.sportybet_event_id, l.event_id])" in api and
-            "collectBasketballEvents(context, basketballIds, catalogueTimeline, basketballLegs)" in api and
+            "collectBasketballEvents(context, basketballIds, catalogueTimeline, basketballLegs, manualDeadlineAt)" in api and
             "targetBasketballFixtureMatches" in api and "directProvider = sportybetId ? found.get(sportybetId) : null" in api,
             "Mixed-sport tickets must fetch current Basketball fixtures by provider ID or verified participants and kickoff, while excluding started legs from upcoming lookup")
     require("const footballIds = new Set(footballLegs.map" in api and
