@@ -41,7 +41,7 @@ def main():
     selector = (ROOT / "qualified-alternatives.js").read_text(encoding="utf-8")
     require("querySelectorAll('[data-ms-fixture-id]')" in selector and "x.event_id===event&&x.sport===sport" in selector,
             "Qualified alternatives must attach to the exact fixture card and sport, never a different event")
-    require('data-ticket-model-qualified="true"' in selector and "String(x.builder_qualified===true)" in selector and "model_qualified:target.getAttribute('data-ticket-model-qualified')==='true'" in drawer,
+    require("data-ticket-model-qualified=\"'+String(x.builder_qualified===true)+'\"" in selector and "String(x.builder_qualified===true)" in selector and "model_qualified:target.getAttribute('data-ticket-model-qualified')==='true'" in drawer,
             "Builder-gated alternatives must retain their qualification state when added to the shared ticket")
     require('data-ticket-event="' in selector and 'data-ticket-sportybet-event="' in selector and 'data-ticket-market-id="' in selector and 'data-ticket-start="' in selector,
             "Qualified alternatives must pass the exact fixture, provider event, market ID and kickoff into the shared ticket")
