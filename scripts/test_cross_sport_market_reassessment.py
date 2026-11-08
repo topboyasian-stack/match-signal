@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import math
+import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import sys
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import cross_sport_market_reassessment as reassessment
@@ -282,6 +284,54 @@ class CrossSportReassessmentTests(unittest.TestCase):
     def test_private_kv_capacity_stays_below_provider_value_limit(self):
         self.assertEqual(evidence_sync.MAX_BYTES, 24 * 1024 * 1024)
         self.assertLess(evidence_sync.MAX_BYTES, 25 * 1024 * 1024)
+
+    def test_private_evidence_restore_failure_is_fatal_and_does_not_fabricate_an_empty_ledger(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            history = root / "history.json"
+            revision = root / "revision"
+            namespace = root / "namespace"
+            with (
+                patch.object(evidence_sync, "PRIVATE_DIR", root),
+                patch.object(evidence_sync, "HISTORY_PATH", history),
+                patch.object(evidence_sync, "REVISION_PATH", revision),
+                patch.object(evidence_sync, "NAMESPACE_PATH", namespace),
+                patch.object(evidence_sync, "_resolve_namespace_id", side_effect=RuntimeError("simulated Cloudflare outage")),
+            ):
+                result = evidence_sync.restore()
+            self.assertEqual(result, 1, "a failed remote restore must fail the scheduled refresh")
+            self.assertEqual(revision.read_text(encoding="utf-8").strip(), "unavailable")
+            self.assertEqual(namespace.read_text(encoding="utf-8").strip(), "unavailable")
+            self.assertFalse(history.exists(), "a failed restore must not fabricate a valid-looking empty ledger")
+
+    def test_private_evidence_publish_without_restore_is_fatal(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            revision = root / "revision"
+            namespace = root / "namespace"
+            revision.write_text("unavailable\n", encoding="utf-8")
+            namespace.write_text("unavailable\n", encoding="utf-8")
+            with (
+                patch.object(evidence_sync, "PRIVATE_DIR", root),
+                patch.object(evidence_sync, "REVISION_PATH", revision),
+                patch.object(evidence_sync, "NAMESPACE_PATH", namespace),
+            ):
+                self.assertEqual(evidence_sync.publish(), 1)
+
+    def test_private_evidence_revision_conflict_is_fatal_instead_of_green(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            revision = root / "revision"
+            namespace = root / "namespace"
+            revision.write_text("expected-revision\n", encoding="utf-8")
+            namespace.write_text("test-namespace\n", encoding="utf-8")
+            with (
+                patch.object(evidence_sync, "PRIVATE_DIR", root),
+                patch.object(evidence_sync, "REVISION_PATH", revision),
+                patch.object(evidence_sync, "NAMESPACE_PATH", namespace),
+                patch.object(evidence_sync, "_kv_get", return_value={"updated_at": "newer-revision", "records": []}),
+            ):
+                self.assertEqual(evidence_sync.publish(), 1, "a revision conflict must fail and retry on a later scheduled run")
 
     def test_primary_ledger_rewrite_uses_real_newline_not_literal_backslash_n(self):
         source = (Path(reassessment.__file__)).read_text(encoding="utf-8")
