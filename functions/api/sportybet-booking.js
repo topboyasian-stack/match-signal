@@ -378,7 +378,7 @@ export async function collectEvents({
 
 function targetBasketballFixtureMatches(leg, event) {
   const [first, second] = legParticipants(leg);
-  if (!sameParticipantPair([first, second], event)) return false;
+  if (!sameParticipantPair([first, second], event, 'basketball')) return false;
   const requestedStart = Date.parse(String(leg?.start_time || ''));
   const currentStart = Number(event?.estimateStartTime || 0);
   return Number.isFinite(requestedStart) && currentStart > 0 &&
@@ -462,7 +462,7 @@ export async function collectBasketballEvents(context, targetIds, timeline = 168
 function findBasketballSelection(leg,event){
   const side=String(leg?.pick||'').toLowerCase(),line=Number(leg?.line);
   if(!['over','under'].includes(side)||!Number.isFinite(line)||line<100||line>300||String(leg?.market_id||'225')!=='225')return{error:'Only exact SportyBet market-225 full-game totals are supported.'};
-  if(!sameParticipantPair([leg?.player_1,leg?.player_2],event))return{error:'Basketball participants changed in the current SportyBet catalogue.'};
+  if(!sameParticipantPair([leg?.player_1,leg?.player_2],event,'basketball'))return{error:'Basketball participants changed in the current SportyBet catalogue.'};
   const rs=Date.parse(String(leg?.start_time||'')),es=Number(event?.estimateStartTime||0);if(Number.isFinite(rs)&&es&&Math.abs(rs-es)>2700000)return{error:'Basketball fixture start time changed; refresh the ticket.'};
   for(const market of (Array.isArray(event?.markets)?event.markets:[])){
     const status=String(market?.status||'').trim().toLowerCase();if(String(market?.id||'')!=='225'||/suspend|closed|inactive|settled|unavailable|stop/i.test(status)||(status!==''&&/^\d+$/.test(status)&&status!=='0'))continue;
@@ -523,13 +523,13 @@ function legParticipants(leg) {
   return [first, second];
 }
 
-function sameParticipantPair(first, event) {
+function sameParticipantPair(first, event, sport = '') {
   const [a, b] = Array.isArray(first) ? first : [];
   const home = event?.homeTeamName || '';
   const away = event?.awayTeamName || '';
   return Boolean(a && b && home && away &&
-    ((participantNameMatches(a, home) && participantNameMatches(b, away)) ||
-     (participantNameMatches(a, away) && participantNameMatches(b, home))));
+    ((teamNameMatches(a, home, sport) && teamNameMatches(b, away, sport)) ||
+     (teamNameMatches(a, away, sport) && teamNameMatches(b, home, sport))));
 }
 
 // SportyBet's football catalogue often uses official club names while the
@@ -552,25 +552,100 @@ function canonicalFootballClubName(value) {
   });
   return kept.join(' ');
 }
-function footballTeamNameMatches(first, second) {
+// SportyBet's catalogue and the prediction feeds use different display names
+// for the same clubs. Keep these aliases sport-scoped and exact: never infer a
+// fixture from a loose substring or from one participant alone.
+const FOOTBALL_TEAM_ALIAS_GROUPS = [
+  ['manchester united', 'man utd', 'man united', 'manchester utd'],
+  ['manchester city', 'man city'],
+  ['tottenham hotspur', 'tottenham', 'spurs'],
+  ['newcastle united', 'newcastle'],
+  ['west ham united', 'west ham'],
+  ['wolverhampton wanderers', 'wolverhampton', 'wolves'],
+  ['nottingham forest', 'nottm forest'],
+  ['brighton and hove albion', 'brighton', 'brighton hove albion'],
+  ['paris saint germain', 'paris sg', 'psg', 'paris st germain'],
+  ['bayern munich', 'bayern munchen', 'fc bayern munchen', 'bayern'],
+  ['borussia dortmund', 'dortmund', 'bvb', 'bvb 09'],
+  ['bayer leverkusen', 'leverkusen', 'bayer 04 leverkusen'],
+  ['rb leipzig', 'rasenballsport leipzig', 'leipzig'],
+  ['inter milan', 'internazionale', 'fc internazionale milano'],
+  ['ac milan', 'milan'],
+  ['as roma', 'roma'],
+  ['real betis', 'betis', 'real betis balompie'],
+  ['real sociedad', 'sociedad', 'real sociedad de futbol'],
+  ['olympique marseille', 'olympique de marseille', 'marseille'],
+  ['olympique lyonnais', 'olympique lyon', 'lyon'],
+  ['psv eindhoven', 'psv'],
+  ['sporting cp', 'sporting lisbon', 'sporting clube de portugal', 'sporting portugal'],
+  ['sl benfica', 'benfica', 'sport lisboa e benfica'],
+  ['fc porto', 'porto'],
+  ['galatasaray', 'galatasaray sk'],
+  ['fenerbahce', 'fenerbahce sk'],
+  ['besiktas', 'besiktas jk'],
+  ['celtic', 'celtic fc'],
+  ['rangers', 'rangers fc'],
+  ['ssc napoli', 'napoli']
+];
+
+const BASKETBALL_TEAM_ALIAS_GROUPS = [
+  ['los angeles lakers', 'la lakers'],
+  ['los angeles clippers', 'la clippers'],
+  ['golden state warriors', 'gs warriors', 'gsw'],
+  ['oklahoma city thunder', 'okc thunder', 'okc'],
+  ['new york knicks', 'ny knicks', 'nyk'],
+  ['san antonio spurs', 'sa spurs'],
+  ['portland trail blazers', 'portland trailblazers', 'portland blazers'],
+  ['minnesota timberwolves', 'minnesota timber wolves'],
+  ['new orleans pelicans', 'nola pelicans'],
+  ['brooklyn nets', 'bk nets']
+];
+
+function splitVirtualParticipant(value) {
+  const normalized = canonicalParticipant(value);
+  const match = normalized.match(/^(.*?)(?:\\s+(virtual|vfootball|efootball)\\s+([a-z0-9]+))$/);
+  return match
+    ? { base: match[1].trim(), suffix: match[2] + ' ' + match[3] }
+    : { base: normalized, suffix: '' };
+}
+
+function teamAliasKey(value, sport) {
+  const virtual = sport === 'efootball';
+  const split = virtual ? splitVirtualParticipant(value) : { base: String(value || ''), suffix: '' };
+  const normalized = sport === 'basketball'
+    ? canonicalParticipant(split.base)
+    : canonicalFootballClubName(split.base);
+  const groups = sport === 'basketball' ? BASKETBALL_TEAM_ALIAS_GROUPS : FOOTBALL_TEAM_ALIAS_GROUPS;
+  const group = groups.find(items => items.some(alias => {
+    const candidate = sport === 'basketball'
+      ? canonicalParticipant(alias)
+      : canonicalFootballClubName(alias);
+    return candidate === normalized;
+  }));
+  const base = group ? group[0] : normalized;
+  return split.suffix ? base + ' ' + split.suffix : base;
+}
+
+function teamNameMatches(first, second, sport = '') {
   if (participantNameMatches(first, second)) return true;
-  const a = canonicalFootballClubName(first);
-  const b = canonicalFootballClubName(second);
+  if (!['football', 'basketball', 'efootball'].includes(sport)) return false;
+  const a = teamAliasKey(first, sport);
+  const b = teamAliasKey(second, sport);
   return Boolean(a && b && a.length >= 3 && a === b);
 }
+
+function footballTeamNameMatches(first, second) {
+  return teamNameMatches(first, second, 'football');
+}
 function sameFootballParticipantPair(first, event) {
-  const [a, b] = Array.isArray(first) ? first : [];
-  const home = event?.homeTeamName || '';
-  const away = event?.awayTeamName || '';
-  return Boolean(a && b && home && away &&
-    ((footballTeamNameMatches(a, home) && footballTeamNameMatches(b, away)) ||
-     (footballTeamNameMatches(a, away) && footballTeamNameMatches(b, home))));
+  return sameParticipantPair(first, event, 'football');
 }
 function legParticipantPairMatches(leg, event) {
   const participants = legParticipants(leg);
-  return String(leg?.sport || '').toLowerCase() === 'football'
-    ? sameFootballParticipantPair(participants, event)
-    : sameParticipantPair(participants, event);
+  const sport = String(leg?.sport || '').toLowerCase();
+  const product = productForLeg(leg);
+  const aliasSport = product === 'vfootball' ? 'football' : product === 'efootball' ? 'efootball' : sport;
+  return sameParticipantPair(participants, event, aliasSport);
 }
 
 function normalizeFixture(value) {
@@ -628,42 +703,67 @@ function resolveCurrentEvent(leg, found) {
   return { event: best, matched_by: best ? 'fixture_participants_time' : 'none' };
 }
 
-async function collectVirtualEventsFromLiveFeed(context, targetIds, sources = 'efootball,vfootball', deadlineAt = null) {
+async function collectVirtualEventsFromLiveFeed(
+  context,
+  targetIds,
+  sources = 'efootball,vfootball',
+  deadlineAt = null,
+  targetLegs = [],
+  timeline = 168
+) {
   const found = new Map();
-  if (!targetIds || !targetIds.size) return found;
+  const ids = targetIds instanceof Set ? targetIds : new Set();
+  const targets = Array.isArray(targetLegs) ? targetLegs : [];
+  if (!ids.size && !targets.length) return found;
+  const matched = new Set();
+
   try {
-    const url = new URL('/api/sportybet-virtual', context.request.url);
-    url.searchParams.set('pageSize', '200');
-    url.searchParams.set('pageNum', '1');
-    url.searchParams.set('timeline', '168');
-    url.searchParams.set('sources', sources);
-    url.searchParams.set('_t', String(Date.now()));
-    const response = await fetch(url.toString(), {
-      headers: { 'Accept': 'application/json', 'Cache-Control': 'no-cache' },
-      cache: 'no-store',
-      signal: AbortSignal.timeout(Math.max(250, Math.min(5000, deadlineAt == null ? 15000 : deadlineAt - Date.now())))
-    });
-    if (!response.ok) return found;
-    const payload = await response.json();
-    const events = Array.isArray(payload?.events) ? payload.events : [];
-    for (const row of events) {
-      const eventId = String(row?.event_id || row?.eventId || '');
-      if (!eventId || !targetIds.has(eventId)) continue;
-      const rawStart = Number(row?.start_time_ms || 0);
-      let estimateStartTime = rawStart;
-      if (!estimateStartTime && row?.start_time) {
-        const parsed = Date.parse(String(row.start_time));
-        if (Number.isFinite(parsed)) estimateStartTime = parsed;
-      }
-      found.set(eventId, {
-        eventId,
-        homeTeamName: String(row?.team_1 || row?.participant_1 || ''),
-        awayTeamName: String(row?.team_2 || row?.participant_2 || ''),
-        estimateStartTime,
-        matchStatus: String(row?.match_status || 'Not start'),
-        tournament: String(row?.competition || ''),
-        markets: Array.isArray(row?.markets) ? row.markets : []
+    // This endpoint caps pageSize at 100. Search bounded subsequent pages too:
+    // the selected fixture can move to a new provider ID and sit beyond page 1.
+    for (let pageNum = 1; pageNum <= 5; pageNum++) {
+      const remainingMs = deadlineAt == null ? 5000 : deadlineAt - Date.now();
+      if (remainingMs < 250) break;
+      const url = new URL('/api/sportybet-virtual', context.request.url);
+      url.searchParams.set('pageSize', '100');
+      url.searchParams.set('pageNum', String(pageNum));
+      url.searchParams.set('timeline', String(timeline));
+      url.searchParams.set('sources', sources);
+      url.searchParams.set('_t', String(Date.now()));
+      const response = await fetch(url.toString(), {
+        headers: { 'Accept': 'application/json', 'Cache-Control': 'no-cache' },
+        cache: 'no-store',
+        signal: AbortSignal.timeout(Math.max(250, Math.min(5000, remainingMs)))
       });
+      if (!response.ok) break;
+      const payload = await response.json();
+      const events = Array.isArray(payload?.events) ? payload.events : [];
+      for (const row of events) {
+        const eventId = String(row?.event_id || row?.eventId || '');
+        if (!eventId) continue;
+        const rawStart = Number(row?.start_time_ms || 0);
+        let estimateStartTime = rawStart;
+        if (!estimateStartTime && row?.start_time) {
+          const parsed = Date.parse(String(row.start_time));
+          if (Number.isFinite(parsed)) estimateStartTime = parsed;
+        }
+        const event = {
+          eventId,
+          homeTeamName: String(row?.team_1 || row?.participant_1 || ''),
+          awayTeamName: String(row?.team_2 || row?.participant_2 || ''),
+          estimateStartTime,
+          matchStatus: String(row?.match_status || 'Not start'),
+          tournament: String(row?.competition || ''),
+          markets: Array.isArray(row?.markets) ? row.markets : []
+        };
+        const matchedIndexes = targets
+          .map((leg, index) => ({ leg, index }))
+          .filter(({ leg }) => targetFixtureMatches(leg, event))
+          .map(({ index }) => index);
+        if (ids.has(eventId) || matchedIndexes.length) found.set(eventId, event);
+        matchedIndexes.forEach(index => matched.add(index));
+      }
+      if (targets.length && matched.size >= targets.length) break;
+      if (events.length < 100) break;
     }
   } catch (error) {
     // Existing SportyBet catalogue lookup remains the primary path.
@@ -952,8 +1052,10 @@ async function handlePost(context) {
       const start = Date.parse(String(leg?.start_time || ''));
       return !Number.isFinite(start) || start > Date.now();
     }) : legs;
-    const virtualIds = new Set(lookupLegs.filter(l => productForLeg(l) === 'vfootball').map(l => String(l.event_id || '')));
-    const efootballIds = new Set(lookupLegs.filter(l => productForLeg(l) === 'efootball').map(l => String(l.sportybet_event_id || l.event_id || '')).filter(Boolean));
+    const virtualLegs = lookupLegs.filter(l => productForLeg(l) === 'vfootball');
+    const efootballLegs = lookupLegs.filter(l => productForLeg(l) === 'efootball');
+    const virtualIds = new Set(virtualLegs.map(l => String(l.event_id || '')).filter(Boolean));
+    const efootballIds = new Set(efootballLegs.flatMap(l => [l.sportybet_event_id, l.event_id]).map(String).filter(Boolean));
     const footballLegs = lookupLegs.filter(l => String(l?.sport || '').toLowerCase() === 'football');
     const tennisLegs = lookupLegs.filter(l => String(l?.sport || '').toLowerCase() === 'tennis');
     const basketballLegs = lookupLegs.filter(l => String(l?.sport || '').toLowerCase() === 'basketball');
@@ -970,9 +1072,10 @@ async function handlePost(context) {
         timeline: catalogueTimeline,
         primaryPath: '/api/ng/factsCenter/wapConfigurableUpcomingEvents',
         fallbackPath: '/api/ng/factsCenter/pcUpcomingEvents',
+        maxPages: manualMode ? 20 : 5,
         deadlineAt: manualDeadlineAt,
         requestTimeoutMs: manualMode ? 3500 : 6000
-      }, virtualIds);
+      }, virtualIds, virtualLegs);
       for (const [id, event] of events) found.set(id, event);
     }
 
@@ -981,9 +1084,10 @@ async function handlePost(context) {
         sportId: 'sr:sport:137',
         marketId: '1,18,10,29,11,26,36,14,60100,186,189,202,204,210',
         timeline: catalogueTimeline,
+        maxPages: manualMode ? 20 : 5,
         deadlineAt: manualDeadlineAt,
         requestTimeoutMs: manualMode ? 3500 : 6000
-      }, efootballIds);
+      }, efootballIds, efootballLegs);
       for (const [id, event] of events) found.set(id, event);
     }
 
@@ -993,8 +1097,11 @@ async function handlePost(context) {
     // stale/different virtual market variants. The catalogue remains the
     // fallback for events absent from the live normalized feed.
     const allVirtualIds = new Set([...virtualIds, ...efootballIds]);
-    if (allVirtualIds.size) {
-      const liveFeedEvents = await collectVirtualEventsFromLiveFeed(context, allVirtualIds, 'efootball,vfootball', manualDeadlineAt);
+    const allVirtualLegs = [...virtualLegs, ...efootballLegs];
+    if (allVirtualIds.size || allVirtualLegs.length) {
+      const liveFeedEvents = await collectVirtualEventsFromLiveFeed(
+        context, allVirtualIds, 'efootball,vfootball', manualDeadlineAt, allVirtualLegs, catalogueTimeline
+      );
       for (const [id, event] of liveFeedEvents) {
         const current = found.get(id);
         const hasOu = Array.isArray(event?.markets) && event.markets.some(m => {
@@ -1033,6 +1140,7 @@ async function handlePost(context) {
         marketId: '186,210,202,204,189,203,188,187',
         timeline: catalogueTimeline,
         fallbackPath: '/api/ng/factsCenter/wapConfigurableUpcomingEvents',
+        maxPages: manualMode ? 20 : 5,
         deadlineAt: manualDeadlineAt,
         requestTimeoutMs: manualMode ? 3500 : 6000
       }, tennisIds, tennisLegs);
