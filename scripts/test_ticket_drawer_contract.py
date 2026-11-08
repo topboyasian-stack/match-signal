@@ -149,7 +149,7 @@ def main():
     require("leg?.model_qualified!==true" in api and "leg?.market_id!=='225'" in api and
             "!leg.sportybet_event_id" in api and "NBA_RELEASE_GATE_LOCKED" in api and
             "nbaTotalTicketLegQualified" in api and "if (hasBasketballLeg && !manualMode)" in api and
-            "if (!manualMode && String(leg?.sport || '').toLowerCase() === 'basketball')" in api and
+            "if (basketballLeg && !manualMode)" in api and
             "Current SportyBet market-225 quote is stale or incomplete" in api,
             "Automated NBA Builder batches must keep the strict model-release gate; manual mixed-sport tickets may proceed only after fresh exact SportyBet validation")
     require("prospective_probability_fixture_coverage" in api and
