@@ -117,7 +117,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         # GitHub replaces older pending runs within one concurrency group. The Builder's
         # pre/post refresh must therefore use a dedicated group and exact dispatch filtering.
         self.assertIn(
-            "group: match-signal-unified-upcoming-v7-${{ github.event_name }}-",
+            "group: match-signal-unified-upcoming-v8-${{ github.event_name }}-",
             BOARD_WORKFLOW,
             "push/schedule/dispatch/upstream events must not compete for one pending board slot",
         )
