@@ -205,7 +205,7 @@ export function buildPublicAlternatives(document, nowMs = Date.now()) {
   diagnostics.selected_alternatives = alternatives.length;
 
   return {
-    status: "OK",
+    status: alternatives.length ? "OK" : "EMPTY",
     generated_at: document.updated_at || document.generated_at || null,
     min_probability: MIN_RESEARCH_ALTERNATIVE_PROBABILITY,
     builder_min_probability: MIN_RECOMMENDED_PROBABILITY,
