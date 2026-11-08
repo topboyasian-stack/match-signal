@@ -1095,12 +1095,14 @@ async function handlePost(context) {
               !Number.isFinite(Number(leg.line)) || Number(leg.line) < 100 || Number(leg.line) > 300 ||
               leg.market_id !== '225';
           }
-          if (leg.sport === 'efootball') {
+          const isEfootballLeg = leg.sport === 'efootball' ||
+            (leg.sport === 'virtual' && productForLeg(leg) === 'efootball' && leg.market === 'virtual_total');
+          if (isEfootballLeg) {
             return !['efootball_gt', 'efootball_adriatic'].includes(leg.product) ||
-              productForLeg(leg) !== 'efootball' || leg.market !== 'total' ||
+              productForLeg(leg) !== 'efootball' || !['total', 'virtual_total'].includes(leg.market) ||
               !['over', 'under'].includes(leg.pick) ||
               !Number.isFinite(Number(leg.line)) || Number(leg.line) <= 0 || Number(leg.line) > 1000 ||
-              !['18', '189'].includes(leg.market_id) || !leg.sportybet_event_id;
+              !['18', '189'].includes(String(leg.market_id)) || !leg.sportybet_event_id;
           }
           if (!['football', 'tennis'].includes(leg.sport)) return true;
           if (leg.market === 'total') {
