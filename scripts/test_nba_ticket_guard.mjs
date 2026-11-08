@@ -318,7 +318,8 @@ test('NBA ticket with a partial SportyBet acceptance withholds the provider shar
     });
     const body = await response.json();
     assert.equal(mock.calls.raw, 0, 'manual NBA picks must not require model-release artifacts');
-    assert.equal(mock.calls.feed, 3, 'the three bounded NBA catalog queries must use the proxy source');
+    assert.equal(mock.calls.event, 2, 'both stored NBA provider IDs must be checked directly');
+    assert.equal(mock.calls.feed, 0, 'current event details should avoid broad catalogue paging when both legs resolve');
     assert.equal(mock.calls.share, 1);
     assert.equal(response.status, 409);
     assert.equal(body.error, 'MANUAL_TICKET_REJECTED_PARTIAL');
