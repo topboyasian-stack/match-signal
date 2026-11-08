@@ -11,6 +11,8 @@ assert.equal(api.status, 200, "Public alternatives API must return HTTP 200");
 assert.match(String(api.headers.get("content-type") || ""), /application\/json/i);
 const feed = await api.json();
 assert.equal(feed.status, "OK", "Public alternatives feed must be ready");
+assert.equal(Number(feed.min_probability), 0.55, "The research lane must declare its 55% probability floor");
+assert.equal(Number(feed.builder_min_probability), 0.65, "Builder-qualified picks must retain the 65% floor");
 assert.ok(Array.isArray(feed.alternatives) && feed.alternatives.length, "Public alternatives must be non-empty");
 
 const now = Date.now();
@@ -20,7 +22,8 @@ const eligible = feed.alternatives.filter((row) => {
     row.event_id && row.sportybet_event_id && row.market_id &&
     row.role === "ALTERNATIVE" && row.source === "SYSTEM_RECOMMENDED" &&
     Number.isFinite(start) && start > now + 5 * 60 * 1000 &&
-    Number.isFinite(Number(row.probability)) && Number(row.probability) >= 0.65 &&
+    typeof row.builder_qualified === "boolean" &&
+    Number.isFinite(Number(row.probability)) && Number(row.probability) >= (row.builder_qualified ? 0.65 : 0.55) &&
     Number.isFinite(Number(row.odds)) && Number(row.odds) > 1 &&
     (row.market === "total"
       ? ["over", "under"].includes(String(row.pick || "")) && Number.isFinite(Number(row.line)) && Number(row.line) > 0
@@ -63,7 +66,7 @@ try {
 
     const matched = state.options.find(button => {
       const row = byKey.get(String(button.sport) + "|" + String(button.eventId));
-      return row && button.qualified === "true" &&
+      return row && button.qualified === String(row.builder_qualified === true) &&
         button.providerEventId === String(row.sportybet_event_id) &&
         button.market === String(row.market) &&
         button.marketId === String(row.market_id) &&
@@ -106,6 +109,7 @@ try {
     assert.match(drawer.countLabel, /1 selection/i);
     assert.match(drawer.resultText, /Added to your single shared ticket/i);
     assert.ok(drawer.legText.includes(matched.match), "The shared drawer must display the clicked fixture");
+    if (matched.qualified !== "true") assert.match(drawer.legText, /RESEARCH ONLY — Builder gate not passed/, "Research-only alternatives must remain visibly unqualified in the ticket");
 
     result = {
       route,
@@ -117,6 +121,7 @@ try {
       pick: matched.pick,
       line: matched.line,
       market_id: matched.marketId,
+      builder_qualified: matched.qualified === "true",
       drawer_selection_count: drawer.count,
       persisted_selection_count: drawer.persistedCount,
       confirmation_text: drawer.resultText

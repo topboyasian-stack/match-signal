@@ -33,15 +33,15 @@ def main():
     require('data-sport="basketball"' in basketball, "Basketball page lost its sport identity")
     require('data-sport="football"' in football, "Football page lost its sport identity")
     require('data-sport="tennis"' in tennis, "Tennis page lost its sport identity")
-    alternatives_script = "qualified-alternatives.js?v=20261107-qualified-picks5"
+    alternatives_script = "qualified-alternatives.js?v=20261108-research-alternatives2"
     for page in pages:
         source = (ROOT / page).read_text(encoding="utf-8")
         require(alternatives_script in source, f"{page} does not load the live qualified-alternatives selector")
-    require("../qualified-alternatives.js?v=20261107-qualified-picks5" in lab_html, "Virtual Lab must load the product-aware qualified-alternatives selector")
+    require("../qualified-alternatives.js?v=20261108-research-alternatives2" in lab_html, "Virtual Lab must load the product-aware qualified-alternatives selector")
     selector = (ROOT / "qualified-alternatives.js").read_text(encoding="utf-8")
     require("querySelectorAll('[data-ms-fixture-id]')" in selector and "x.event_id===event&&x.sport===sport" in selector,
             "Qualified alternatives must attach to the exact fixture card and sport, never a different event")
-    require('data-ticket-model-qualified="true"' in selector and "model_qualified:target.getAttribute('data-ticket-model-qualified')==='true'" in drawer,
+    require("data-ticket-model-qualified=\"'+String(x.builder_qualified===true)+'\"" in selector and "String(x.builder_qualified===true)" in selector and "model_qualified:target.getAttribute('data-ticket-model-qualified')==='true'" in drawer,
             "Builder-gated alternatives must retain their qualification state when added to the shared ticket")
     require('data-ticket-event="' in selector and 'data-ticket-sportybet-event="' in selector and 'data-ticket-market-id="' in selector and 'data-ticket-start="' in selector,
             "Qualified alternatives must pass the exact fixture, provider event, market ID and kickoff into the shared ticket")

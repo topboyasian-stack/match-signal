@@ -1,16 +1,11 @@
 name: Live Qualified Alternatives Shared Drawer Smoke
 
 on:
-  pull_request:
+  workflow_run:
+    workflows: ["Deploy Match Signal to Cloudflare Pages"]
+    types: [completed]
     branches: [main]
-    paths:
-      - 'scripts/test_public_alternatives_drawer.mjs'
-      - '.github/workflows/live-qualified-alternatives-drawer-smoke.yml'
-  push:
-    branches: [main]
-    paths:
-      - 'scripts/test_public_alternatives_drawer.mjs'
-      - '.github/workflows/live-qualified-alternatives-drawer-smoke.yml'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -21,6 +16,7 @@ concurrency:
 
 jobs:
   production-click-smoke:
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 12
     steps:

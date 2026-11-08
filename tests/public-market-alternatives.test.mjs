@@ -25,14 +25,29 @@ async function call(records) {
   });
 }
 
-test("public endpoint returns only whitelisted qualified future alternatives", async () => {
+test("public endpoint returns whitelisted Builder-qualified future alternatives", async () => {
   const response = await call([candidate()]);
   const payload = await response.json();
   assert.equal(response.status, 200);
   assert.equal(payload.alternatives.length, 1);
   assert.equal(payload.alternatives[0].probability, 0.71);
+  assert.equal(payload.alternatives[0].builder_qualified, true);
+  assert.equal(payload.alternatives[0].qualification_status, "BUILDER_QUALIFIED");
   assert.equal("private_model_detail" in payload.alternatives[0], false);
   assert.equal("raw_probability_vector" in payload.alternatives[0], false);
+});
+
+test("empty private evidence keeps the same public probability contract", async () => {
+  const response = await onRequestGet({
+    request: new Request("https://example.test/api/public/market-alternatives"),
+    env: { MATCH_SIGNAL_ANALYST_STORE: { get: async () => null } }
+  });
+  const payload = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(payload.status, "EMPTY");
+  assert.equal(payload.min_probability, 0.55);
+  assert.equal(payload.builder_min_probability, 0.65);
+  assert.deepEqual(payload.alternatives, []);
 });
 
 test("fixture participants are split correctly for selectable winner alternatives", async () => {
@@ -42,15 +57,32 @@ test("fixture participants are split correctly for selectable winner alternative
   assert.equal(payload.alternatives[0].player_2, "Away FC");
 });
 
-test("stale, weak, unqualified and already-started alternatives are withheld", async () => {
-  const response = await call([
-    candidate({ model_probability: 0.64 }),
-    candidate({ passed_builder_gates: false }),
-    candidate({ quote_timestamp: new Date(Date.now() - 16 * 60 * 1000).toISOString() }),
-    candidate({ start_time: new Date(Date.now() - 1000).toISOString() })
-  ]);
+test("Builder qualification keeps the 65% floor while linked research alternatives use 55%", async () => {
+  const base = candidate({
+    passed_builder_gates: false,
+    model_probability: 0.60,
+    original_pick: "p1",
+    primary_prediction_id: "fixture-primary",
+    candidate_status: "RESEARCH_ONLY"
+  });
+  const response = await call([base]);
   const payload = await response.json();
-  assert.equal(payload.alternatives.length, 0);
+  assert.equal(payload.min_probability, 0.55);
+  assert.equal(payload.builder_min_probability, 0.65);
+  assert.equal(payload.alternatives.length, 1);
+  assert.equal(payload.alternatives[0].builder_qualified, false);
+  assert.equal(payload.alternatives[0].qualification_status, "RESEARCH_ONLY");
+
+  const rejected = await call([
+    candidate({ model_probability: 0.64 }),
+    { ...base, original_pick: "", primary_prediction_id: "" },
+    { ...base, model_probability: 0.54 },
+    { ...base, quote_timestamp: new Date(Date.now() - 16 * 60 * 1000).toISOString() },
+    { ...base, start_time: new Date(Date.now() - 1000).toISOString() },
+    candidate({ passed_builder_gates: true, model_probability: 0.64 })
+  ]);
+  const rejectedPayload = await rejected.json();
+  assert.equal(rejectedPayload.alternatives.length, 0);
 });
 
 test("at most two distinct market alternatives are returned per fixture", async () => {

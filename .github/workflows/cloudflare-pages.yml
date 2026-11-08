@@ -131,7 +131,7 @@ jobs:
         run: python scripts/validate_virtual_lab_v1.py
 
   deploy:
-    if: ${{ github.event_name != 'pull_request' && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success') }}
+    if: ${{ github.event_name != 'pull_request' && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success') && !(github.event_name == 'push' && contains(github.event.head_commit.modified, '.github/workflows/cloudflare-pages.yml')) }}
     concurrency:
       group: cloudflare-pages-v3
       cancel-in-progress: false
@@ -622,14 +622,14 @@ jobs:
           // hostname a bounded propagation window. A successful upload alone is not proof
           // that the primary hostname is serving the uploaded HTML/CSS yet.
           const workspaceContracts = [
-            {path:'/', css:'/core-workspaces-design.css', markers:[rootBuildMarker,rootCssHref,'MS-DESK-2026.10.14-V1','core-workspaces-design.css?v=20261014-full-v1','class="cd-page-header"','class="cd-workspace-grid"','id="unifiedBoard"','id="qualifiedBestSummary"','./qualified-alternatives.js?v=20261107-qualified-picks5'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V1: CORE DESK / FOOTBALL / TENNIS'},
-            {path:'/football.html', css:'/core-workspaces-design.css', markers:['MS-FOOTBALL-DESK-2026.10.14-V1','core-workspaces-design.css?v=20261014-full-v1','class="cd-page-header"','id="leagueGrid"','data-sport="football"','league-logos.js?v=20261013-competition-logos2','sport-hubs.js?v=20261102-single-ticket1','ticket-drawer.css?v=20261102-single-ticket1','ticket-drawer.js?v=20261102-split-event-identifiers1','./qualified-alternatives.js?v=20261107-qualified-picks5'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V1: CORE DESK / FOOTBALL / TENNIS'},
-            {path:'/tennis.html', css:'/core-workspaces-design.css', markers:['MS-TENNIS-DESK-2026.10.14-V1','core-workspaces-design.css?v=20261014-full-v1','class="cd-page-header"','id="leagueGrid"','data-sport="tennis"','sport-hubs.js?v=20261102-single-ticket1','ticket-drawer.css?v=20261102-single-ticket1','ticket-drawer.js?v=20261102-split-event-identifiers1','./qualified-alternatives.js?v=20261107-qualified-picks5'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V1: CORE DESK / FOOTBALL / TENNIS'},
-            {path:'/basketball.html', css:'/basketball-design.css', markers:['MS-BASKETBALL-DESK-2026.10.24-V11','core-workspaces-design.css?v=20261014-full-v1','basketball-design.css?v=20261024-builder-dark-v3','basketball-live.js?v=20261104-nba-probability-cohort1','id="msNav"','workspace-ui.js?v=20261023-basketball-nav1','id="totalsBoard"','id="marketStatus"','ticket-drawer.css?v=20261102-single-ticket1','ticket-drawer.js?v=20261102-split-event-identifiers1','./qualified-alternatives.js?v=20261107-qualified-picks5'], cssMarker:'MATCH-SIGNAL-BASKETBALL-DESK-V1'},
-            {path:'/league.html?sport=football&league=England%20Amateur%20-%20U21%20Professional%20Development%20League', css:'/ticket-drawer.css', markers:['data-page="league"','sport-hubs.js?v=20261102-single-ticket1','ticket-drawer.css?v=20261102-single-ticket1','ticket-drawer.js?v=20261102-split-event-identifiers1','./qualified-alternatives.js?v=20261107-qualified-picks5'], cssMarker:'.ms-ticket-launcher'},
+            {path:'/', css:'/core-workspaces-design.css', markers:[rootBuildMarker,rootCssHref,'MS-DESK-2026.10.14-V1','core-workspaces-design.css?v=20261014-full-v1','class="cd-page-header"','class="cd-workspace-grid"','id="unifiedBoard"','id="qualifiedBestSummary"','./qualified-alternatives.js?v=20261108-research-alternatives2'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V1: CORE DESK / FOOTBALL / TENNIS'},
+            {path:'/football.html', css:'/core-workspaces-design.css', markers:['MS-FOOTBALL-DESK-2026.10.14-V1','core-workspaces-design.css?v=20261014-full-v1','class="cd-page-header"','id="leagueGrid"','data-sport="football"','league-logos.js?v=20261013-competition-logos2','sport-hubs.js?v=20261102-single-ticket1','ticket-drawer.css?v=20261102-single-ticket1','ticket-drawer.js?v=20261102-split-event-identifiers1','./qualified-alternatives.js?v=20261108-research-alternatives2'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V1: CORE DESK / FOOTBALL / TENNIS'},
+            {path:'/tennis.html', css:'/core-workspaces-design.css', markers:['MS-TENNIS-DESK-2026.10.14-V1','core-workspaces-design.css?v=20261014-full-v1','class="cd-page-header"','id="leagueGrid"','data-sport="tennis"','sport-hubs.js?v=20261102-single-ticket1','ticket-drawer.css?v=20261102-single-ticket1','ticket-drawer.js?v=20261102-split-event-identifiers1','./qualified-alternatives.js?v=20261108-research-alternatives2'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V1: CORE DESK / FOOTBALL / TENNIS'},
+            {path:'/basketball.html', css:'/basketball-design.css', markers:['MS-BASKETBALL-DESK-2026.10.24-V11','core-workspaces-design.css?v=20261014-full-v1','basketball-design.css?v=20261024-builder-dark-v3','basketball-live.js?v=20261104-nba-probability-cohort1','id="msNav"','workspace-ui.js?v=20261023-basketball-nav1','id="totalsBoard"','id="marketStatus"','ticket-drawer.css?v=20261102-single-ticket1','ticket-drawer.js?v=20261102-split-event-identifiers1','./qualified-alternatives.js?v=20261108-research-alternatives2'], cssMarker:'MATCH-SIGNAL-BASKETBALL-DESK-V1'},
+            {path:'/league.html?sport=football&league=England%20Amateur%20-%20U21%20Professional%20Development%20League', css:'/ticket-drawer.css', markers:['data-page="league"','sport-hubs.js?v=20261102-single-ticket1','ticket-drawer.css?v=20261102-single-ticket1','ticket-drawer.js?v=20261102-split-event-identifiers1','./qualified-alternatives.js?v=20261108-research-alternatives2'], cssMarker:'.ms-ticket-launcher'},
             {path:'/odds-builder.html', css:'/odds-builder-design.css', markers:[currentBuilderBuildMarker,currentBuilderCssHref.replace(/^\.\//,''),currentBuilderEngineSrc.replace(/^\.\//,''),'class="ob-page-header"','class="ob-section-nav"','class="ob-guide-grid"','id="oddsBuilder"'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V3: ODDS BUILDER PAGE LAYOUT'},
             {path:'/reports.html', css:'/reports-design.css', markers:['MS-REPORTS-2026.10.14-V3','reports-design.css?v=20261014-full-v3','class="rp-dashboard-grid"','id="report-scoreboard"','id="researchLabSummary"'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V3: REPORTS PAGE LAYOUT'},
-            {path:'/virtual-lab/', css:'/virtual-lab-terminal.css', markers:['MS-VIRTUAL-LAB-V1-2026.10.14-V3','../virtual-lab-terminal.css?v=20261031-recent-performance-guard1','../virtual-lab-app.js?v=20261102-product-evidence-gate2','class="vl-command-grid"','class="vl-command-rail"','class="vl-insights-grid"','../qualified-alternatives.js?v=20261107-qualified-picks5'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V3: VIRTUAL LAB PAGE LAYOUT'}
+            {path:'/virtual-lab/', css:'/virtual-lab-terminal.css', markers:['MS-VIRTUAL-LAB-V1-2026.10.14-V3','../virtual-lab-terminal.css?v=20261031-recent-performance-guard1','../virtual-lab-app.js?v=20261102-product-evidence-gate2','class="vl-command-grid"','class="vl-command-rail"','class="vl-insights-grid"','../qualified-alternatives.js?v=20261108-research-alternatives2'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V3: VIRTUAL LAB PAGE LAYOUT'}
           ];
           if (!deploymentBase.startsWith('https://') || !deploymentBase.endsWith('.pages.dev')) {
             failures.push('Cloudflare deployment step did not publish an immutable Pages URL.');
@@ -801,10 +801,10 @@ jobs:
                   if (!body.includes(marker)) failures.push(path+' missing current deployment marker: '+marker);
               }
               if (['/','/upcoming.html','/qualified-best','/qualified-best.html','/football.html','/tennis.html','/basketball.html'].includes(path) || path.startsWith('/league.html?')) {
-                if (!body.includes('./qualified-alternatives.js?v=20261107-qualified-picks5')) failures.push(path+' missing the current qualified-alternatives selector');
+                if (!body.includes('./qualified-alternatives.js?v=20261108-research-alternatives2')) failures.push(path+' missing the current qualified-alternatives selector');
               }
               if (path==='/virtual-lab/' || path==='/virtual-lab') {
-                if (!body.includes('../qualified-alternatives.js?v=20261107-qualified-picks5')) failures.push(path+' missing the current product-aware qualified-alternatives selector');
+                if (!body.includes('../qualified-alternatives.js?v=20261108-research-alternatives2')) failures.push(path+' missing the current product-aware qualified-alternatives selector');
               }
               if (path==='/' || path==='/upcoming.html') {
                 for (const marker of ['Qualified Best','qualified-best.html','id="qualifiedBestSummary"','Qualified fixtures'])
@@ -976,6 +976,7 @@ jobs:
             const payload=JSON.parse(body);
             const rows=Array.isArray(payload?.alternatives)?payload.alternatives:null;
             if (!['OK','EMPTY'].includes(String(payload?.status||'')) || !rows) throw new Error('invalid API response shape/status');
+            if (Number(payload.min_probability)!==0.55 || Number(payload.builder_min_probability)!==0.65) throw new Error('public API probability-lane contract mismatch');
             if (payload.status==='EMPTY' && rows.length) throw new Error('EMPTY response unexpectedly contains alternatives');
             const now=Date.now();
             for (const item of rows) {
@@ -985,7 +986,9 @@ jobs:
               if (!item?.event_id || !item?.sportybet_event_id || !item?.market_id) throw new Error('alternative missing exact provider/event/market identity');
               if (item?.role!=='ALTERNATIVE' || item?.source!=='SYSTEM_RECOMMENDED') throw new Error('alternative lost its recommended role/source');
               if (!Number.isFinite(start) || start<=now+120000) throw new Error('alternative is not safely pre-match');
-              if (!Number.isFinite(probability) || probability<0.65 || probability>1 || !Number.isFinite(odds) || odds<=1) throw new Error('alternative failed the public probability/odds floor');
+              if (typeof item?.builder_qualified !== 'boolean' || !String(item?.qualification_status||'').trim()) throw new Error('alternative missing explicit Builder qualification state');
+              const minimumProbability = item.builder_qualified === true ? 0.65 : 0.55;
+              if (!Number.isFinite(probability) || probability<minimumProbability || probability>1 || !Number.isFinite(odds) || odds<=1) throw new Error('alternative failed its labelled probability/odds floor');
               if (item.market==='total' && (!['over','under'].includes(String(item.pick||'')) || !Number.isFinite(Number(item.line)) || Number(item.line)<=0)) throw new Error('total alternative lacks its exact line/side');
               if (item.market==='winner' && !['p1','p2','draw'].includes(String(item.pick||''))) throw new Error('winner alternative has an invalid side');
               if (item.sport==='efootball' && !['18','189'].includes(String(item.market_id))) throw new Error('eFootball alternative is outside the supported exact total markets');
@@ -997,6 +1000,8 @@ jobs:
               status:rows.length?'READY':'VALID_ZERO',
               alternative_count:rows.length,
               unique_fixture_count:new Set(rows.map(x=>String(x.sport)+'|'+String(x.event_id))).size,
+              builder_qualified_count:rows.filter(x=>x.builder_qualified===true).length,
+              research_only_count:rows.filter(x=>x.builder_qualified===false).length,
               sports:[...new Set(rows.map(x=>String(x.sport)))].sort(),
               sample:rows.slice(0,5).map(x=>({sport:x.sport,product:x.product||null,event_id:x.event_id,match:x.match,market:x.market,pick:x.pick,line:x.line,odds:x.odds,probability:x.probability,start_time:x.start_time}))
             };
