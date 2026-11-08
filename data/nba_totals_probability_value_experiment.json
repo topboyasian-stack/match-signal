@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-08T04:33:35.066729+00:00",
+  "generated_at": "2026-11-08T05:54:24.086329+00:00",
   "paper_only": true,
   "experiment": "NBA_TOTALS_EMPIRICAL_RESIDUAL_VALUE_V3",
   "model_version": "nba-total-v5.1-pace-efficiency-calibrated",
@@ -1476,13 +1476,56 @@
       "calibration_check": "PASS",
       "decision": "NO BET",
       "decision_is_authorized_for_betting": false
+    },
+    {
+      "event_id": "401909944",
+      "matchup": "Portland Trail Blazers vs San Antonio Spurs",
+      "published_at": "2026-11-07T16:53:23.884157+00:00",
+      "settled_result": "over",
+      "won_by_original_point_edge_pick": true,
+      "research_value_signal_outcome": "WIN",
+      "forecast_total": 229.1331,
+      "sportybet_line": 225.5,
+      "over_odds": 1.87,
+      "under_odds": 1.94,
+      "model_probability": {
+        "over": 0.6186,
+        "under": 0.3814,
+        "push": 0.0
+      },
+      "market_no_vig_probability": {
+        "over": 0.5092,
+        "under": 0.4908
+      },
+      "model_probability_conditional_on_no_push": {
+        "over": 0.6186,
+        "under": 0.3814
+      },
+      "model_probability_edge": {
+        "over": 0.1094,
+        "under": -0.1094
+      },
+      "expected_value_per_unit": {
+        "over": 0.1567,
+        "under": -0.26
+      },
+      "bootstrap_95_lower_bound": {
+        "over_probability_edge": 0.0544,
+        "under_probability_edge": -0.1644,
+        "over_expected_value": 0.0539,
+        "under_expected_value": -0.3667,
+        "method": "deterministic paired empirical-residual bootstrap; 4,000 resamples"
+      },
+      "calibration_check": "PASS",
+      "decision": "OVER VALUE",
+      "decision_is_authorized_for_betting": false
     }
   ],
-  "settled_v5_market_count": 30,
+  "settled_v5_market_count": 31,
   "settled_v5_clv_diagnostics": {
     "definition": "Opening immutable v5.1 publication quote vs latest captured exact SportyBet market-225 pregame quote; near-close counts only if quote was observed within 45 minutes of tip. This is not an official bookmaker close.",
     "close_window_minutes": 45,
-    "settled_v5_fixtures_audited": 30,
+    "settled_v5_fixtures_audited": 31,
     "near_close_observations": 23,
     "positive_probability_clv_n": 10,
     "positive_line_clv_n": 8,
@@ -2328,17 +2371,45 @@
         "positive_probability_clv": false,
         "positive_line_clv": true,
         "is_official_bookmaker_close": false
+      },
+      {
+        "event_id": "401909944",
+        "matchup": "Portland Trail Blazers vs San Antonio Spurs",
+        "selected_side": "OVER",
+        "clv_status": "LATER_PREGAME_CAPTURE_OUTSIDE_CLOSE_WINDOW",
+        "opening": {
+          "snapshot_id": "nba-total-pub:1ab0a0df094a9e293c0dc572",
+          "quote_timestamp": "2026-11-07T16:53:21.540000+00:00",
+          "line": 225.5,
+          "over_odds": 1.87,
+          "under_odds": 1.94,
+          "selected_side_no_vig_probability": 0.509186
+        },
+        "latest_pregame": {
+          "snapshot_id": "nba-total-pub:981efc8b23da18aa022a761c",
+          "quote_timestamp": "2026-11-08T02:07:19.378000+00:00",
+          "minutes_before_start": 52.677,
+          "line": 229.5,
+          "over_odds": 1.96,
+          "under_odds": 1.89,
+          "selected_side_no_vig_probability": 0.490909
+        },
+        "selected_side_no_vig_probability_clv": -0.018277,
+        "selected_side_line_clv_points": -4.0,
+        "positive_probability_clv": false,
+        "positive_line_clv": false,
+        "is_official_bookmaker_close": false
       }
     ],
     "sample_is_sufficient_for_release": false
   },
   "settled_v5_probability_score_summary": {
-    "n": 30,
+    "n": 31,
     "pushes_excluded_from_binary_metrics": 0,
-    "model_brier": 0.252707,
-    "market_no_vig_brier": 0.248622,
-    "model_log_loss": 0.700692,
-    "market_no_vig_log_loss": 0.690391,
+    "model_brier": 0.249248,
+    "market_no_vig_brier": 0.248373,
+    "model_log_loss": 0.693582,
+    "market_no_vig_log_loss": 0.689892,
     "over_probability_buckets": [
       {
         "range": "0.3-0.4",
@@ -2354,9 +2425,9 @@
       },
       {
         "range": "0.6-0.7",
-        "n": 8,
-        "mean_model_over_probability": 0.6336,
-        "observed_over_rate": 0.625
+        "n": 9,
+        "mean_model_over_probability": 0.6319,
+        "observed_over_rate": 0.6667
       },
       {
         "range": "0.7-0.8",
@@ -2376,8 +2447,8 @@
     "prospective_unique_fixtures_with_any_snapshot": 53,
     "prospective_verified_fresh_market_225_snapshot_records": 4763,
     "prospective_unique_fixtures_with_verified_fresh_market_225_snapshot": 53,
-    "prospective_settled_unique_market_selections": 30,
-    "prospective_settled_selections_with_exact_snapshot_match": 30,
+    "prospective_settled_unique_market_selections": 31,
+    "prospective_settled_selections_with_exact_snapshot_match": 31,
     "prospective_settled_selections_missing_or_mismatched_snapshot": 0,
     "snapshot_linkage_failures": [],
     "target_unique_settled_selections_for_roi": 100,
@@ -2387,11 +2458,11 @@
   "prospective_probability_fixture_coverage": {
     "cutoff_utc": "2026-11-02T02:00:00+00:00",
     "source": "data/nba_totals_probability_settlements.json",
-    "candidate_unique_events": 46,
-    "valid_unique_settled_fixtures": 46,
-    "binary_scored_unique_fixtures": 46,
+    "candidate_unique_events": 47,
+    "valid_unique_settled_fixtures": 47,
+    "binary_scored_unique_fixtures": 47,
     "push_fixtures_excluded_from_binary_scores": 0,
-    "neutral_no_bet_fixtures_included": 25,
+    "neutral_no_bet_fixtures_included": 26,
     "directional_selection_fixtures_also_tracked_in_bet_ledger": 21,
     "snapshot_linkage_failures": [],
     "snapshot_linkage_failure_count": 0,
@@ -3180,15 +3251,32 @@
       "line": 220.5,
       "pick": "over",
       "probability_validation_only": true
+    },
+    {
+      "event_id": "401909944",
+      "settled_result": "over",
+      "model_probability": {
+        "over": 0.5601374570446735,
+        "under": 0.43986254295532645,
+        "push": 0.0
+      },
+      "market_no_vig_probability": {
+        "over": 0.5091863517060368,
+        "under": 0.49081364829396334
+      },
+      "publication_snapshot_id": "nba-total-pub:6178c6560d77eecb500b594d",
+      "line": 227.5,
+      "pick": null,
+      "probability_validation_only": true
     }
   ],
   "prospective_probability_score_summary": {
-    "n": 46,
+    "n": 47,
     "pushes_excluded_from_binary_metrics": 0,
-    "model_brier": 0.266009,
-    "market_no_vig_brier": 0.25023,
-    "model_log_loss": 0.726785,
-    "market_no_vig_log_loss": 0.693608,
+    "model_brier": 0.264466,
+    "market_no_vig_brier": 0.250032,
+    "model_log_loss": 0.723653,
+    "market_no_vig_log_loss": 0.693211,
     "over_probability_buckets": [
       {
         "range": "0.3-0.4",
@@ -3204,9 +3292,9 @@
       },
       {
         "range": "0.5-0.6",
-        "n": 23,
-        "mean_model_over_probability": 0.538,
-        "observed_over_rate": 0.3043
+        "n": 24,
+        "mean_model_over_probability": 0.5389,
+        "observed_over_rate": 0.3333
       },
       {
         "range": "0.6-0.7",
@@ -3228,7 +3316,7 @@
   "prospective_clv_diagnostics": {
     "definition": "Opening immutable v5.1 publication quote vs latest captured exact SportyBet market-225 pregame quote; near-close counts only if quote was observed within 45 minutes of tip. This is not an official bookmaker close.",
     "close_window_minutes": 45,
-    "settled_v5_fixtures_audited": 30,
+    "settled_v5_fixtures_audited": 31,
     "near_close_observations": 23,
     "positive_probability_clv_n": 10,
     "positive_line_clv_n": 8,
@@ -4074,6 +4162,34 @@
         "positive_probability_clv": false,
         "positive_line_clv": true,
         "is_official_bookmaker_close": false
+      },
+      {
+        "event_id": "401909944",
+        "matchup": "Portland Trail Blazers vs San Antonio Spurs",
+        "selected_side": "OVER",
+        "clv_status": "LATER_PREGAME_CAPTURE_OUTSIDE_CLOSE_WINDOW",
+        "opening": {
+          "snapshot_id": "nba-total-pub:1ab0a0df094a9e293c0dc572",
+          "quote_timestamp": "2026-11-07T16:53:21.540000+00:00",
+          "line": 225.5,
+          "over_odds": 1.87,
+          "under_odds": 1.94,
+          "selected_side_no_vig_probability": 0.509186
+        },
+        "latest_pregame": {
+          "snapshot_id": "nba-total-pub:981efc8b23da18aa022a761c",
+          "quote_timestamp": "2026-11-08T02:07:19.378000+00:00",
+          "minutes_before_start": 52.677,
+          "line": 229.5,
+          "over_odds": 1.96,
+          "under_odds": 1.89,
+          "selected_side_no_vig_probability": 0.490909
+        },
+        "selected_side_no_vig_probability_clv": -0.018277,
+        "selected_side_line_clv_points": -4.0,
+        "positive_probability_clv": false,
+        "positive_line_clv": false,
+        "is_official_bookmaker_close": false
       }
     ],
     "sample_is_sufficient_for_release": false,
@@ -4082,8 +4198,8 @@
   },
   "prospective_clv_release_check_passed": false,
   "historical_value_signal_summary": {
-    "n": 13,
-    "wins": 7,
+    "n": 14,
+    "wins": 8,
     "losses": 6,
     "insufficient_sample": true
   },
@@ -4092,10 +4208,10 @@
   "upcoming_exact_fresh_market_225_value_diagnostics": [],
   "upcoming_value_diagnostics_count": 0,
   "upcoming_predictions_without_exact_fresh_pair": 49,
-  "prospective_settled_market_bets_after_cutoff": 30,
+  "prospective_settled_market_bets_after_cutoff": 31,
   "prospective_minimum_sample_reached": false,
-  "prospective_probability_scored_unique_fixtures": 46,
-  "prospective_probability_settled_unique_fixtures": 46,
+  "prospective_probability_scored_unique_fixtures": 47,
+  "prospective_probability_settled_unique_fixtures": 47,
   "prospective_probability_validation_sample_met": true,
   "live_value_decisions_authorized": false,
   "release_decision": "RESEARCH_ONLY",
@@ -4104,9 +4220,9 @@
   "source_data_fingerprint": {
     "data/nba_history.json": "17d0f2b0084897f4c5677f2cc91be712fb9962f7f36ab60230075c6c05df855f",
     "data/nba_predictions.json": "a60a53178b97924b11ff9896e95bacfb68d72171ab53a7991156e341fa3defad",
-    "data/nba_totals_ledger.json": "996d34f4b0b84ba0e305e1241225db967dc71324191e5ef795d2941f25563ddf",
+    "data/nba_totals_ledger.json": "c82abb479beb589bed61c3dd1c1aa4280bd9c744058b6425b584bd869d3a2383",
     "data/nba_totals_publication_snapshots.json": "c631f6b35aa91ee75688faab40c8a6b8564a48b2224df74f15a69194be846f2b",
-    "data/nba_totals_probability_settlements.json": "ca68dd340c6152f8d377472ce218d9c33401dc96883d6ecc9e2b08a7eca70085",
+    "data/nba_totals_probability_settlements.json": "ff10386f8368714f3e530ee8f79b49e241bcc9896904f5dcefc2c143ca7d9c90",
     "data/nba_totals_price_capture_status.json": "70a56d6f8f39d4323e1a347ce6b45e9c3260385cf462aa3da95ec96eded4cd07",
     "data/nba_totals_oos_value_test.json": "1d30f776455a73c6faeea4b79f86d0ab7157510c7c10e4bd33b854f73fd8a91a"
   }
