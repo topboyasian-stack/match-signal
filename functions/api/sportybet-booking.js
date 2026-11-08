@@ -1513,3 +1513,4 @@ export async function onRequest(context) {
   }
   return handlePost(context);
 }
+// Production rollout trigger: alias-aware, parallel current-catalogue booking lookup (2026-11-08).
