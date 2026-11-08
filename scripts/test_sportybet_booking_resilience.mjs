@@ -136,14 +136,14 @@ try {
       start_time:new Date(fixture.start_ms).toISOString(),model_qualified:false
     }))})
   })});
-  const mixedPayload = await mixedRequest.json();
-  assert.equal(mixedRequest.status,200,JSON.stringify(mixedPayload));
-  assert.equal(mixedPayload.ok,true,JSON.stringify(mixedPayload));
-  assert.equal(mixedPayload.booking_code,'MANUAL-MIXED-TICKET-OK');
-  assert.equal(mixedPayload.initial_selection_count,6);
-  assert.equal(mixedPayload.selection_count,6);
-  assert.equal(mixedPayload.selections.length,6);
-  assert.ok(mixedPayload.selections.every(selection=>selection.ok===true));
+  const manualSixPayload = await mixedRequest.json();
+  assert.equal(mixedRequest.status,200,JSON.stringify(manualSixPayload));
+  assert.equal(manualSixPayload.ok,true,JSON.stringify(manualSixPayload));
+  assert.equal(manualSixPayload.booking_code,'MANUAL-MIXED-TICKET-OK');
+  assert.equal(manualSixPayload.initial_selection_count,6);
+  assert.equal(manualSixPayload.selection_count,6);
+  assert.equal(manualSixPayload.selections.length,6);
+  assert.ok(manualSixPayload.selections.every(selection=>selection.ok===true));
   assert.equal(mixedCalls.some(url=>url.hostname==='raw.githubusercontent.com'),false,
     'Manual mixed-sport tickets must not require NBA model-release evidence.');
   assert.equal(mixedCalls.filter(url=>url.pathname==='/api/ng/orders/share').length,1,
