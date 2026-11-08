@@ -178,9 +178,11 @@ def main():
             "Football/Tennis participants must be matched to current SportyBet event identity")
     require("function canonicalParticipant(value)" in api and ".normalize('NFD')" in api,
             "Participant matching must normalize accented player names")
-    require("function sameParticipantPair(first, event)" in api and
-            "sameParticipantPair([first, second], event)" in api,
-            "Current Tennis event matching must accept the same two players in either order")
+    require("function sameParticipantPair(first, event, sport = '')" in api and
+            "teamNameMatches(a, home, sport) && teamNameMatches(b, away, sport)" in api and
+            "teamNameMatches(a, away, sport) && teamNameMatches(b, home, sport)" in api and
+            "sameParticipantPair(participants, aliasSport)" in api,
+            "Current Tennis and team-sport event matching must accept both participant orders with sport-scoped aliases")
     require("function participantNameMatches(first, second)" in api and
             "tokens[1].length === 1" in api and "tokens.reverse()" in api and
             "left[0] === right[1] && left[1] === right[0]" in api,
