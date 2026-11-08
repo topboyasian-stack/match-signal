@@ -8,6 +8,10 @@ const JSON_HEADERS = {
   'Access-Control-Allow-Headers': 'Content-Type'
 };
 
+// Returned with every JSON response so production probes can identify the
+// exact fixture resolver version that is serving manual booking validation.
+const BOOKING_FIXTURE_MATCHER_VERSION = 'sportybet-alias-v1';
+
 const ORIGIN = 'https://www.sportybet.com';
 const SPORTYBET_PROXY_ORIGIN = 'https://match-signal-sportybet-proxy.topboyasian.workers.dev';
 const BROWSER_HEADERS = {
@@ -20,7 +24,17 @@ const BROWSER_HEADERS = {
 };
 
 function json(body, status = 200) {
-  return new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });
+  const payload = body && typeof body === 'object' && !Array.isArray(body)
+    ? { ...body, fixture_matcher_version: BOOKING_FIXTURE_MATCHER_VERSION }
+    : { value: body, fixture_matcher_version: BOOKING_FIXTURE_MATCHER_VERSION };
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: {
+      ...JSON_HEADERS,
+      'X-Match-Signal-Booking-Fixture-Matcher': BOOKING_FIXTURE_MATCHER_VERSION,
+      'Access-Control-Expose-Headers': 'X-Match-Signal-Booking-Fixture-Matcher'
+    }
+  });
 }
 
 export function ticketCatalogueTimeline(legs, now = Date.now(), maxHours = 720) {
