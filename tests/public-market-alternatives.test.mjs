@@ -31,8 +31,23 @@ test("public endpoint returns whitelisted Builder-qualified future alternatives"
   assert.equal(response.status, 200);
   assert.equal(payload.alternatives.length, 1);
   assert.equal(payload.alternatives[0].probability, 0.71);
+  assert.equal(payload.alternatives[0].builder_qualified, true);
+  assert.equal(payload.alternatives[0].qualification_status, "BUILDER_QUALIFIED");
   assert.equal("private_model_detail" in payload.alternatives[0], false);
   assert.equal("raw_probability_vector" in payload.alternatives[0], false);
+});
+
+test("empty private evidence keeps the same public probability contract", async () => {
+  const response = await onRequestGet({
+    request: new Request("https://example.test/api/public/market-alternatives"),
+    env: { MATCH_SIGNAL_ANALYST_STORE: { get: async () => null } }
+  });
+  const payload = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(payload.status, "EMPTY");
+  assert.equal(payload.min_probability, 0.55);
+  assert.equal(payload.builder_min_probability, 0.65);
+  assert.deepEqual(payload.alternatives, []);
 });
 
 test("fixture participants are split correctly for selectable winner alternatives", async () => {
