@@ -816,7 +816,7 @@ try {
       return jsonResponse({bizCode:10000,data:{tournaments:[]}});
     }
     if (url.pathname.endsWith('/pcUpcomingEvents') && url.searchParams.get('sportId') === 'sr:sport:1') {
-      return jsonResponse({bizCode:10000,data:{tournaments:[{name:'Club alias regression',events:[aliasCatalogue[0]]}]}});
+      return jsonResponse({bizCode:10000,data:{tournaments:[{name:'Club alias regression',events:[aliasCatalogue[1]]}]}});
     }
     return jsonResponse({bizCode:10000,data:{tournaments:[]}});
   };
@@ -850,7 +850,7 @@ try {
     if (url.pathname.endsWith('/pcUpcomingEvents') && url.searchParams.get('sportId') === 'sr:sport:1') {
       return jsonResponse({bizCode:10000,data:{tournaments:[{name:'Age group safeguard',events:[
         makeStaleIdFixture('sr:match:first-team-man-utd','Manchester United','Paris Saint Germain',totalMarket(2.5,'first-team')),
-        aliasCatalogue[0]
+        aliasCatalogue[1]
       ]}]}});
     }
     return jsonResponse({bizCode:10000,data:{tournaments:[]}});
