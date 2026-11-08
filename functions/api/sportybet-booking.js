@@ -141,6 +141,57 @@ function normalizeEvent(event, tournament) {
   };
 }
 
+// SportyBet's single-event endpoint returns full current markets for one
+// provider ID. Try these exact IDs first; only changed/missing IDs need the
+// slower participant/time catalogue search.
+async function collectCurrentEventsById(legs, deadlineAt = null, sharedMatchedLegs = null) {
+  const found = new Map();
+  const sharedMatches = sharedMatchedLegs instanceof Set ? sharedMatchedLegs : null;
+  const targets = Array.isArray(legs) ? legs : [];
+  const ids = new Set();
+
+  for (const leg of targets) {
+    for (const value of [leg?.sportybet_event_id, leg?.event_id]) {
+      const id = String(value || '').trim();
+      if (id.startsWith('sr:match:')) ids.add(id);
+    }
+  }
+  if (!ids.size) return found;
+
+  const results = await Promise.all([...ids].map(async eventId => {
+    try {
+      const payload = await upstream('/api/ng/factsCenter/event', {
+        eventId,
+        _t: Date.now()
+      }, {
+        timeoutMs: 3000,
+        deadlineAt
+      });
+      const raw = payload?.data?.event || payload?.data;
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+      const tournament = raw?.sport?.category?.tournament || {};
+      const event = normalizeEvent(raw, tournament);
+      // fetchedAt is this exact response observation time, not a prediction
+      // timestamp or a stale cached quote.
+      event.fetchedAt = new Date().toISOString();
+      return event.eventId ? event : null;
+    } catch (_) {
+      // An expired or changed provider ID is not a hard failure. The caller
+      // falls back to fixture aliases, participants and kickoff time.
+      return null;
+    }
+  }));
+
+  for (const event of results) {
+    if (!event) continue;
+    found.set(event.eventId, event);
+    for (const leg of targets) {
+      if (targetFixtureMatches(leg, event)) sharedMatches?.add(leg);
+    }
+  }
+  return found;
+}
+
 export async function upstream(path, params, { timeoutMs = 6000, deadlineAt = null } = {}) {
   const failures = [];
   // SportyBet sometimes answers JSON API requests with an HTML edge/challenge
@@ -1109,14 +1160,30 @@ async function handlePost(context) {
     const basketballIds = new Set(basketballLegs.flatMap(l => [l.sportybet_event_id, l.event_id]).map(String).filter(Boolean));
 
     const found = new Map();
-    const allVirtualIds = new Set([...virtualIds, ...efootballIds]);
-    const allVirtualLegs = [...virtualLegs, ...efootballLegs];
     const sharedMatchedLegs = new Set();
 
-    // Search every relevant current catalogue in parallel. The normalized
-    // virtual feed and its catalogue fallbacks share matched-leg state, so the
-    // first exact participant/kickoff/market match stops redundant paging in
-    // the other source without weakening any selection checks.
+    // First ask SportyBet for the exact stored provider event IDs. This is a
+    // single-event details request and returns the complete live market list;
+    // the expensive catalogue search is reserved for genuinely changed IDs.
+    const directEvents = await collectCurrentEventsById(lookupLegs, manualDeadlineAt, sharedMatchedLegs);
+    for (const [id, event] of directEvents) found.set(id, event);
+
+    const unresolvedLegs = lookupLegs.filter(leg => !sharedMatchedLegs.has(leg));
+    const unresolvedVirtualLegs = unresolvedLegs.filter(leg => productForLeg(leg) === 'vfootball');
+    const unresolvedEfootballLegs = unresolvedLegs.filter(leg => productForLeg(leg) === 'efootball');
+    const unresolvedFootballLegs = unresolvedLegs.filter(leg => String(leg?.sport || '').toLowerCase() === 'football');
+    const unresolvedTennisLegs = unresolvedLegs.filter(leg => String(leg?.sport || '').toLowerCase() === 'tennis');
+    const unresolvedBasketballLegs = unresolvedLegs.filter(leg => String(leg?.sport || '').toLowerCase() === 'basketball');
+    const unresolvedVirtualIds = new Set(unresolvedVirtualLegs.map(leg => String(leg.event_id || '')).filter(Boolean));
+    const unresolvedEfootballIds = new Set(unresolvedEfootballLegs.flatMap(leg => [leg.sportybet_event_id, leg.event_id]).map(String).filter(Boolean));
+    const unresolvedFootballIds = new Set(unresolvedFootballLegs.map(leg => String(leg.sportybet_event_id || leg.event_id || '')).filter(Boolean));
+    const unresolvedTennisIds = new Set(unresolvedTennisLegs.map(leg => String(leg.sportybet_event_id || leg.event_id || '')).filter(Boolean));
+    const unresolvedBasketballIds = new Set(unresolvedBasketballLegs.flatMap(leg => [leg.sportybet_event_id, leg.event_id]).map(String).filter(Boolean));
+
+    // Only changed/missing IDs go to the bounded alias search. Sources run in
+    // parallel and share exact-match state, preventing redundant page scans.
+    const allVirtualIds = new Set([...unresolvedVirtualIds, ...unresolvedEfootballIds]);
+    const allVirtualLegs = [...unresolvedVirtualLegs, ...unresolvedEfootballLegs];
     const fastVirtualFeedDeadline = manualMode
       ? Math.min(manualDeadlineAt, Date.now() + 8000)
       : manualDeadlineAt;
@@ -1129,7 +1196,7 @@ async function handlePost(context) {
       tennisEvents,
       basketballEvents
     ] = await Promise.all([
-      virtualLegs.length
+      unresolvedVirtualLegs.length
         ? collectEvents({
             sportId: 'sr:sport:202120001',
             marketId: '1,18,10,29,11,26,36,14,60100,186,189,202,204,210',
@@ -1141,9 +1208,9 @@ async function handlePost(context) {
             requestTimeoutMs: manualMode ? 3000 : 6000,
             pageBatchSize: manualMode ? 10 : 5,
             sharedMatchedLegs
-          }, virtualIds, virtualLegs)
+          }, unresolvedVirtualIds, unresolvedVirtualLegs)
         : Promise.resolve(new Map()),
-      efootballLegs.length
+      unresolvedEfootballLegs.length
         ? collectEvents({
             sportId: 'sr:sport:137',
             marketId: '1,18,10,29,11,26,36,14,60100,186,189,202,204,210',
@@ -1153,15 +1220,15 @@ async function handlePost(context) {
             requestTimeoutMs: manualMode ? 3000 : 6000,
             pageBatchSize: manualMode ? 10 : 5,
             sharedMatchedLegs
-          }, efootballIds, efootballLegs)
+          }, unresolvedEfootballIds, unresolvedEfootballLegs)
         : Promise.resolve(new Map()),
-      allVirtualIds.size || allVirtualLegs.length
+      allVirtualLegs.length
         ? collectVirtualEventsFromLiveFeed(
             context, allVirtualIds, 'efootball,vfootball',
             fastVirtualFeedDeadline, allVirtualLegs, catalogueTimeline, sharedMatchedLegs
           )
         : Promise.resolve(new Map()),
-      footballIds.size
+      unresolvedFootballLegs.length
         ? collectEvents({
             sportId: 'sr:sport:1',
             marketId: '1,18,10,14,16,29,45,47',
@@ -1173,9 +1240,9 @@ async function handlePost(context) {
             requestTimeoutMs: manualMode ? 3000 : 6000,
             pageBatchSize: manualMode ? 10 : 5,
             sharedMatchedLegs
-          }, footballIds, footballLegs)
+          }, unresolvedFootballIds, unresolvedFootballLegs)
         : Promise.resolve(new Map()),
-      tennisIds.size
+      unresolvedTennisLegs.length
         ? collectEvents({
             sportId: 'sr:sport:5',
             marketId: '186,210,202,204,189,203,188,187',
@@ -1186,10 +1253,10 @@ async function handlePost(context) {
             requestTimeoutMs: manualMode ? 3000 : 6000,
             pageBatchSize: manualMode ? 10 : 5,
             sharedMatchedLegs
-          }, tennisIds, tennisLegs)
+          }, unresolvedTennisIds, unresolvedTennisLegs)
         : Promise.resolve(new Map()),
-      basketballIds.size
-        ? collectBasketballEvents(context, basketballIds, catalogueTimeline, basketballLegs, manualDeadlineAt)
+      unresolvedBasketballLegs.length
+        ? collectBasketballEvents(context, unresolvedBasketballIds, catalogueTimeline, unresolvedBasketballLegs, manualDeadlineAt)
         : Promise.resolve(new Map())
     ]);
 
@@ -1202,7 +1269,7 @@ async function handlePost(context) {
       const current = found.get(id);
       const hasOu = Array.isArray(event?.markets) && event.markets.some(m => {
         const desc = String(m?.desc || m?.name || m?.title || m?.specifier || '').toLowerCase();
-        return String(m?.id || '') === '18' || String(m?.id || '') === '189' || /over.?under|total|\bou\b/.test(desc);
+        return String(m?.id || '') === '18' || String(m?.id || '') === '189' || /over.?under|total|\\bou\\b/.test(desc);
       });
       if (!current || hasOu) found.set(id, event);
     }
