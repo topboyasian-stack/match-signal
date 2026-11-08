@@ -1,3 +1,4 @@
+/* Compatibility contract: only Builder-qualified alternatives emit data-ticket-model-qualified="true"; research-only alternatives emit false. */
 (()=>{'use strict';
 const endpoint='/api/public/market-alternatives',escapeHtml=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let rows=[],busy=false;
