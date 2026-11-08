@@ -44,7 +44,7 @@ function ingressMetadata(request) {
 function readSafeParams(url, path) {
   if (path === EVENT_DETAILS_ENDPOINT) {
     const eventId = String(url.searchParams.get("eventId") || "").trim();
-    if (!eventId.startsWith("sr:match:") || eventId.length > 128 || /[\\r\\n]/.test(eventId)) {
+    if (!eventId.startsWith("sr:match:") || eventId.length > 128 || /[\r\n]/.test(eventId)) {
       throw new Error("eventId must be a bounded SportyBet sr:match identifier");
     }
     return new URLSearchParams({ eventId, _t: String(Date.now()) });
