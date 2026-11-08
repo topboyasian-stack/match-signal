@@ -36,7 +36,8 @@ concurrency:
 
 jobs:
   guard:
-    if: ${{ github.event_name != 'workflow_run' || (github.event.workflow_run.name == 'Match Signal Live Expansion' && github.event.workflow_run.conclusion == 'success') || (github.event.workflow_run.name == 'Match Signal Unified Upcoming Board' && github.event.workflow_run.conclusion == 'success') || github.event.workflow_run.name == 'Deploy Match Signal to Cloudflare Pages' || (github.event.workflow_run.name == 'NBA totals settlement ledger' && github.event.workflow_run.conclusion == 'success') || (github.event.workflow_run.name == 'NBA totals SportyBet market-225 price capture' && github.event.workflow_run.conclusion == 'success') || (github.event.workflow_run.name == 'NBA totals probability and value research' && github.event.workflow_run.conclusion == 'success') }}
+    # Failed, cancelled, or skipped NBA pipeline runs must still wake recovery; dispatches below are freshness-gated.
+    if: ${{ github.event_name != 'workflow_run' || (github.event.workflow_run.name == 'Match Signal Live Expansion' && github.event.workflow_run.conclusion == 'success') || (github.event.workflow_run.name == 'Match Signal Unified Upcoming Board' && github.event.workflow_run.conclusion == 'success') || github.event.workflow_run.name == 'Deploy Match Signal to Cloudflare Pages' || github.event.workflow_run.name == 'NBA totals settlement ledger' || github.event.workflow_run.name == 'NBA totals SportyBet market-225 price capture' || github.event.workflow_run.name == 'NBA totals probability and value research' }}
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
