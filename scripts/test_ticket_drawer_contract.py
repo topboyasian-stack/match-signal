@@ -37,7 +37,7 @@ def main():
     for page in pages:
         source = (ROOT / page).read_text(encoding="utf-8")
         require(alternatives_script in source, f"{page} does not load the live qualified-alternatives selector")
-    require("../qualified-alternatives.js?v=20261107-qualified-picks5" in lab_html, "Virtual Lab must load the product-aware qualified-alternatives selector")
+    require("../qualified-alternatives.js?v=20261108-research-alternatives2" in lab_html, "Virtual Lab must load the product-aware qualified-alternatives selector")
     selector = (ROOT / "qualified-alternatives.js").read_text(encoding="utf-8")
     require("querySelectorAll('[data-ms-fixture-id]')" in selector and "x.event_id===event&&x.sport===sport" in selector,
             "Qualified alternatives must attach to the exact fixture card and sport, never a different event")
