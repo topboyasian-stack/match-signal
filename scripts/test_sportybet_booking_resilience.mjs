@@ -665,7 +665,17 @@ try {
       start_time:aliasStart,player_1:'West Ham',player_2:'Wolves',match:'West Ham vs Wolves'
     }
   ];
+  const staleIdWrongMarket = makeStaleIdFixture(
+    'sr:match:old-man-utd-psg','Manchester United','Paris Saint Germain',{
+      id:'1',desc:'3 Way',status:'0',outcomes:[
+        {id:'old-home',desc:'Manchester United',odds:1.8,isActive:1},
+        {id:'old-draw',desc:'Draw',odds:3.4,isActive:1},
+        {id:'old-away',desc:'Paris Saint Germain',odds:4.1,isActive:1}
+      ]
+    }
+  );
   const aliasCatalogue = [
+    staleIdWrongMarket,
     makeStaleIdFixture('sr:match:current-man-utd-psg','Manchester United','Paris Saint Germain',totalMarket(3.5,'alias-man-utd')),
     makeStaleIdFixture('sr:match:current-west-ham-wolves','West Ham United','Wolverhampton Wanderers',totalMarket(2.5,'alias-west-ham'))
   ];
