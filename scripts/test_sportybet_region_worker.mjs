@@ -81,7 +81,7 @@ try {
   assert.equal(singleEvent.status, 200, "bounded single-event detail lookup must use the regional proxy");
   assert.equal(lastUrl.pathname, "/api/ng/factsCenter/event");
   assert.equal(lastUrl.searchParams.get("eventId"), singleEventId);
-  assert.equal(fetchCount, 2, "the single-event endpoint should need only one upstream request after the prior query");
+  assert.equal(fetchCount, 1, "the single-event endpoint should need only one upstream request");
 
   fetchCount = 0;
   const invalidEventId = await worker.fetch(new Request(
