@@ -148,11 +148,12 @@ def main():
             "collectBasketballEvents(context, unresolvedBasketballIds, catalogueTimeline, unresolvedBasketballLegs, manualDeadlineAt)" in api and
             "targetBasketballFixtureMatches" in api and "directProvider = sportybetId ? found.get(sportybetId) : null" in api,
             "Mixed-sport tickets must try direct SportyBet event details first, then resolve only unmatched Basketball fixtures by provider ID or verified participants and kickoff, while excluding started legs")
-    require("const footballIds = new Set(footballLegs.map" in api and
-            "const tennisIds = new Set(tennisLegs.map" in api and
-            "}, footballIds, footballLegs)" in api and "}, tennisIds, tennisLegs)" in api and
+    require("const unresolvedFootballLegs = unresolvedLegs.filter" in api and
+            "const unresolvedTennisLegs = unresolvedLegs.filter" in api and
+            "}, unresolvedFootballIds, unresolvedFootballLegs)" in api and
+            "}, unresolvedTennisIds, unresolvedTennisLegs)" in api and
             "const [\n      vfootballEvents" in api and "footballEvents,\n      tennisEvents" in api,
-            "Parallel Football and Tennis catalogue scans must pass current legs for participant/time recovery")
+            "Parallel Football and Tennis alias scans must only process legs not resolved by the direct event-details lookup")
     require("leg?.model_qualified!==true" in api and "leg?.market_id!=='225'" in api and
             "!leg.sportybet_event_id" in api and "NBA_RELEASE_GATE_LOCKED" in api and
             "nbaTotalTicketLegQualified" in api and "if (hasBasketballLeg && !manualMode)" in api and
