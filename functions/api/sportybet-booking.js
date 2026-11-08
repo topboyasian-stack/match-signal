@@ -749,11 +749,14 @@ async function collectVirtualEventsFromLiveFeed(
   if (!ids.size && !targets.length) return found;
   const matched = new Set();
   const sharedMatches = sharedMatchedLegs instanceof Set ? sharedMatchedLegs : null;
+  const targetsComplete = () => targets.length
+    ? targets.every((leg, index) => matched.has(index) || sharedMatches?.has(leg))
+    : [...ids].every(id => found.has(id));
 
   try {
     // This endpoint caps pageSize at 100. Search bounded subsequent pages too:
     // the selected fixture can move to a new provider ID and sit beyond page 1.
-    for (let pageNum = 1; pageNum <= 5; pageNum++) {
+    for (let pageNum = 1; pageNum <= 5 && !targetsComplete(); pageNum++) {
       const remainingMs = deadlineAt == null ? 5000 : deadlineAt - Date.now();
       if (remainingMs < 250) break;
       const url = new URL('/api/sportybet-virtual', context.request.url);
@@ -798,7 +801,7 @@ async function collectVirtualEventsFromLiveFeed(
           sharedMatches?.add(targets[index]);
         });
       }
-      if (targets.length && matched.size >= targets.length) break;
+      if (targetsComplete()) break;
       if (events.length < 100) break;
     }
   } catch (error) {
@@ -1104,14 +1107,48 @@ async function handlePost(context) {
     const allVirtualLegs = [...virtualLegs, ...efootballLegs];
     const sharedMatchedLegs = new Set();
 
-    // Search the normalized virtual feed, Football, Tennis and Basketball at
-    // the same time. Previously each sport could consume the entire manual
-    // request deadline before later legs even began catalogue lookup.
+    // Search every relevant current catalogue in parallel. The normalized
+    // virtual feed and its catalogue fallbacks share matched-leg state, so the
+    // first exact participant/kickoff/market match stops redundant paging in
+    // the other source without weakening any selection checks.
     const fastVirtualFeedDeadline = manualMode
       ? Math.min(manualDeadlineAt, Date.now() + 8000)
       : manualDeadlineAt;
 
-    const [liveFeedEvents, footballEvents, tennisEvents, basketballEvents] = await Promise.all([
+    const [
+      vfootballEvents,
+      efootballEvents,
+      liveFeedEvents,
+      footballEvents,
+      tennisEvents,
+      basketballEvents
+    ] = await Promise.all([
+      virtualLegs.length
+        ? collectEvents({
+            sportId: 'sr:sport:202120001',
+            marketId: '1,18,10,29,11,26,36,14,60100,186,189,202,204,210',
+            timeline: catalogueTimeline,
+            primaryPath: '/api/ng/factsCenter/wapConfigurableUpcomingEvents',
+            fallbackPath: '/api/ng/factsCenter/pcUpcomingEvents',
+            maxPages: manualMode ? 20 : 5,
+            deadlineAt: manualDeadlineAt,
+            requestTimeoutMs: manualMode ? 3000 : 6000,
+            pageBatchSize: manualMode ? 10 : 5,
+            sharedMatchedLegs
+          }, virtualIds, virtualLegs)
+        : Promise.resolve(new Map()),
+      efootballLegs.length
+        ? collectEvents({
+            sportId: 'sr:sport:137',
+            marketId: '1,18,10,29,11,26,36,14,60100,186,189,202,204,210',
+            timeline: catalogueTimeline,
+            maxPages: manualMode ? 20 : 5,
+            deadlineAt: manualDeadlineAt,
+            requestTimeoutMs: manualMode ? 3000 : 6000,
+            pageBatchSize: manualMode ? 10 : 5,
+            sharedMatchedLegs
+          }, efootballIds, efootballLegs)
+        : Promise.resolve(new Map()),
       allVirtualIds.size || allVirtualLegs.length
         ? collectVirtualEventsFromLiveFeed(
             context, allVirtualIds, 'efootball,vfootball',
@@ -1150,50 +1187,22 @@ async function handlePost(context) {
         : Promise.resolve(new Map())
     ]);
 
-    // Normalized virtual prices are preferred when they contain the exact O/U
-    // ladder. Catalogue pages are still searched for targets not found in feed.
-    for (const [id, event] of liveFeedEvents) found.set(id, event);
+    for (const [id, event] of vfootballEvents) found.set(id, event);
+    for (const [id, event] of efootballEvents) found.set(id, event);
+
+    // Prefer normalized virtual prices when the exact O/U ladder is present;
+    // retain catalogue rows only when the normalized representation lacks it.
+    for (const [id, event] of liveFeedEvents) {
+      const current = found.get(id);
+      const hasOu = Array.isArray(event?.markets) && event.markets.some(m => {
+        const desc = String(m?.desc || m?.name || m?.title || m?.specifier || '').toLowerCase();
+        return String(m?.id || '') === '18' || String(m?.id || '') === '189' || /over.?under|total|\bou\b/.test(desc);
+      });
+      if (!current || hasOu) found.set(id, event);
+    }
     for (const [id, event] of footballEvents) found.set(id, event);
     for (const [id, event] of tennisEvents) found.set(id, event);
     for (const [id, event] of basketballEvents) found.set(id, event);
-
-    const unresolvedVirtualLegs = allVirtualLegs.filter(leg => !sharedMatchedLegs.has(leg));
-    const unresolvedVfootballLegs = unresolvedVirtualLegs.filter(leg => productForLeg(leg) === 'vfootball');
-    const unresolvedEfootballLegs = unresolvedVirtualLegs.filter(leg => productForLeg(leg) === 'efootball');
-
-    // Only spend catalogue pages on Virtual/eFootball fixtures the fast feed
-    // could not resolve. Both fallbacks run in parallel and share the same
-    // deadline, preserving deep alias recovery without serially starving the slip.
-    const [vfootballEvents, efootballEvents] = await Promise.all([
-      unresolvedVfootballLegs.length
-        ? collectEvents({
-            sportId: 'sr:sport:202120001',
-            marketId: '1,18,10,29,11,26,36,14,60100,186,189,202,204,210',
-            timeline: catalogueTimeline,
-            primaryPath: '/api/ng/factsCenter/wapConfigurableUpcomingEvents',
-            fallbackPath: '/api/ng/factsCenter/pcUpcomingEvents',
-            maxPages: manualMode ? 20 : 5,
-            deadlineAt: manualDeadlineAt,
-            requestTimeoutMs: manualMode ? 3000 : 6000,
-            pageBatchSize: manualMode ? 10 : 5,
-            sharedMatchedLegs
-          }, new Set(unresolvedVfootballLegs.map(leg => String(leg.event_id || '')).filter(Boolean)), unresolvedVfootballLegs)
-        : Promise.resolve(new Map()),
-      unresolvedEfootballLegs.length
-        ? collectEvents({
-            sportId: 'sr:sport:137',
-            marketId: '1,18,10,29,11,26,36,14,60100,186,189,202,204,210',
-            timeline: catalogueTimeline,
-            maxPages: manualMode ? 20 : 5,
-            deadlineAt: manualDeadlineAt,
-            requestTimeoutMs: manualMode ? 3000 : 6000,
-            pageBatchSize: manualMode ? 10 : 5,
-            sharedMatchedLegs
-          }, new Set(unresolvedEfootballLegs.flatMap(leg => [leg.sportybet_event_id, leg.event_id]).map(String).filter(Boolean)), unresolvedEfootballLegs)
-        : Promise.resolve(new Map())
-    ]);
-    for (const [id, event] of vfootballEvents) found.set(id, event);
-    for (const [id, event] of efootballEvents) found.set(id, event);
     const selections = [];
     const validation = [];
     for (const leg of legs) {
