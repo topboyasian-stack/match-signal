@@ -2,6 +2,7 @@
 const EVIDENCE_KEY = "private-cross-sport-market-reassessment-v1";
 const MAX_QUOTE_AGE_SECONDS = 900;
 const MIN_RECOMMENDED_PROBABILITY = 0.65;
+const MIN_RESEARCH_ALTERNATIVE_PROBABILITY = 0.55;
 const SUPPORTED_MARKETS = new Set(["1X2", "winner", "total_goals", "total_games", "total_ou", "virtual_total"]);
 
 function json(body, status = 200) {
@@ -41,10 +42,12 @@ export function publicAlternative(row) {
   const player1 = String(row.player_1 || row.home_team || matchParts[0] || "").trim();
   const player2 = String(row.player_2 || row.away_team || matchParts[1] || "").trim();
   const probability = Number(row.model_probability);
+  const builderQualified = row.passed_builder_gates === true;
+  const minimumProbability = builderQualified ? MIN_RECOMMENDED_PROBABILITY : MIN_RESEARCH_ALTERNATIVE_PROBABILITY;
   const odds = Number(row.bookmaker_odds);
   const line = row.line == null ? null : Number(row.line);
   if (!eventId || !sportybetEventId || !marketId || !Number.isFinite(probability) ||
-      probability < MIN_RECOMMENDED_PROBABILITY || probability > 1 ||
+      probability < minimumProbability || probability > 1 ||
       !Number.isFinite(odds) || odds <= 1 || !timestamp(startTime)) return null;
   if (total && (!Number.isFinite(line) || line <= 0)) return null;
   if (sport === "efootball" && !["18", "189"].includes(marketId)) return null;
@@ -55,7 +58,10 @@ export function publicAlternative(row) {
     match, market: total ? "total" : "winner",
     market_label: total ? (market === "total_games" ? "Total games" : "Total goals") : "Winner",
     pick, line, market_id: marketId, odds,
-    probability, role: "ALTERNATIVE", source: "SYSTEM_RECOMMENDED"
+    probability,
+    builder_qualified: builderQualified,
+    qualification_status: String(row.candidate_status || (builderQualified ? "BUILDER_QUALIFIED" : "RESEARCH_ONLY")),
+    role: "ALTERNATIVE", source: "SYSTEM_RECOMMENDED"
   };
 }
 
@@ -105,7 +111,8 @@ export function buildPublicAlternatives(document, nowMs = Date.now()) {
   return {
     status: "OK",
     generated_at: document.updated_at || document.generated_at || null,
-    min_probability: MIN_RECOMMENDED_PROBABILITY,
+    min_probability: MIN_RESEARCH_ALTERNATIVE_PROBABILITY,
+    builder_min_probability: MIN_RECOMMENDED_PROBABILITY,
     max_per_fixture: 2,
     alternatives
   };
