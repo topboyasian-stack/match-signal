@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { chromium } from "playwright";
 
 const base = (process.env.MATCH_SIGNAL_BASE_URL || "https://match-signal.pages.dev").replace(/\/$/, "");
-const api = await fetch(base + "/api/public/market-alternatives", {
+// Cache-bust the public feed so the production test cannot mistake an edge-cached
+// pre-refresh EMPTY response for the current private-evidence refresh.
+const api = await fetch(base + "/api/public/market-alternatives?smoke=" + Date.now(), {
   cache: "no-store",
   headers: { Accept: "application/json", "Cache-Control": "no-cache" },
   signal: AbortSignal.timeout(20000)
@@ -18,7 +20,10 @@ assert.ok(Array.isArray(feed.alternatives) && feed.alternatives.length, "Public 
 const now = Date.now();
 const eligible = feed.alternatives.filter((row) => {
   const start = Date.parse(String(row.start_time || ""));
-  return ["football", "tennis", "basketball", "efootball"].includes(String(row.sport || "")) &&
+  const quote = Date.parse(String(row.quote_timestamp || ""));
+  const quoteAgeSeconds = (now - quote) / 1000;
+  return Number.isFinite(quote) && quoteAgeSeconds >= 0 && quoteAgeSeconds <= 900 &&
+    ["football", "tennis", "basketball", "efootball"].includes(String(row.sport || "")) &&
     row.event_id && row.sportybet_event_id && row.market_id &&
     row.role === "ALTERNATIVE" && row.source === "SYSTEM_RECOMMENDED" &&
     Number.isFinite(start) && start > now + 5 * 60 * 1000 &&
