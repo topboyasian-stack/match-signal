@@ -298,17 +298,19 @@ export async function collectEvents({
   fallbackParams = {},
   deadlineAt = null,
   requestTimeoutMs = 6000,
-  pageBatchSize = 5
+  pageBatchSize = 5,
+  sharedMatchedLegs = null
 }, targetIds, targetLegs = []) {
   const found = new Map();
   const matchedTargets = new Set();
   const fixtureTargets = Array.isArray(targetLegs) ? targetLegs : [];
   const matchedFixtureTargets = new Set();
+  const sharedMatches = sharedMatchedLegs instanceof Set ? sharedMatchedLegs : null;
 
-  // A prediction's source event ID is not always SportyBet's current event ID.
-  // In manual slips, resolve by exact provider ID or participant pair + kickoff.
+  // Other parallel catalogue sources may already have resolved one or more
+  // legs. Stop paging those targets as soon as an exact current selection exists.
   const targetsComplete = () => fixtureTargets.length
-    ? matchedFixtureTargets.size >= fixtureTargets.length
+    ? fixtureTargets.every((leg, index) => matchedFixtureTargets.has(index) || sharedMatches?.has(leg))
     : matchedTargets.size >= targetIds.size;
 
   function addCataloguePage(data) {
@@ -326,6 +328,7 @@ export async function collectEvents({
             // before the real participant/kickoff/market match is found.
             if (targetFixtureMatches(leg, normalized)) {
               matchedFixtureTargets.add(index);
+              sharedMatches?.add(leg);
             }
           });
         }
@@ -406,7 +409,7 @@ function targetBasketballFixtureMatches(leg, event) {
     Math.abs(requestedStart - currentStart) <= 45 * 60 * 1000;
 }
 
-export async function collectBasketballEvents(context, targetIds, timeline = 168, targetLegs = []) {
+export async function collectBasketballEvents(context, targetIds, timeline = 168, targetLegs = [], deadlineAt = null) {
   const found = new Map();
   const ids = targetIds instanceof Set ? targetIds : new Set();
   const targets = Array.isArray(targetLegs) ? targetLegs : [];
@@ -418,9 +421,14 @@ export async function collectBasketballEvents(context, targetIds, timeline = 168
     : [...ids].every(id => found.has(id));
 
   for (let page = 1; page <= 5 && !targetsComplete(); page++) {
+    const remainingMs = deadlineAt == null ? 10000 : deadlineAt - Date.now();
+    if (remainingMs < 250) break;
     const url = new URL('/api/sportybet-basketball?pageSize=100&timeline=' + encodeURIComponent(String(timeline)) + '&pageNum=' + page + '&_t=' + Date.now(), context.request.url);
     // Call the sibling Pages Function directly; do not HTTP self-fetch the public hostname.
-    const feedRequest = new Request(url.toString(), { headers: { 'Accept': 'application/json', 'Cache-Control': 'no-cache' } });
+    const feedRequest = new Request(url.toString(), {
+      headers: { 'Accept': 'application/json', 'Cache-Control': 'no-cache' },
+      signal: AbortSignal.timeout(Math.max(250, Math.min(4500, remainingMs)))
+    });
     const response=await getSportyBetBasketballFeed({request:feedRequest,env:context.env,params:context.params,data:context.data});
     const body = await response.text();
     if (!response.ok) throw new Error('Current SportyBet basketball feed HTTP ' + response.status);
@@ -463,18 +471,24 @@ export async function collectBasketballEvents(context, targetIds, timeline = 168
         fetchedAt: String(row?.fetched_at || payload?.fetched_at || ''),
         markets
       };
-      const matchingIndexes = targets
+      const identityMatches = targets
         .map((leg, index) => ({ leg, index }))
         .filter(({ leg }) => {
-          const providerId = String(leg?.sportybet_event_id || '');
-          const predictionId = String(leg?.event_id || '');
-          return (providerId && providerId === eventId) ||
-            (predictionId && predictionId === eventId) ||
-            targetBasketballFixtureMatches(leg, event);
+          // Discovery may retain an identity/time match so the final validator
+          // can explain a missing market accurately. It does not stop paging.
+          return targetBasketballFixtureMatches(leg, event);
         })
         .map(({ index }) => index);
-      if (ids.has(eventId) || matchingIndexes.length) found.set(eventId, event);
-      matchingIndexes.forEach(index => matchedTargets.add(index));
+      const exactSelectionMatches = targets
+        .map((leg, index) => ({ leg, index }))
+        .filter(({ leg }) => targetFixtureMatches(leg, event))
+        .map(({ index }) => index);
+      if (ids.has(eventId) || identityMatches.length || exactSelectionMatches.length) {
+        found.set(eventId, event);
+      }
+      // Only an exact active market-225 line + side + two prices completes
+      // discovery for this leg; an ID or team match alone never does.
+      exactSelectionMatches.forEach(index => matchedTargets.add(index));
     }
     if (payload.catalogue_page_has_more !== true) break;
   }
@@ -732,18 +746,23 @@ async function collectVirtualEventsFromLiveFeed(
   sources = 'efootball,vfootball',
   deadlineAt = null,
   targetLegs = [],
-  timeline = 168
+  timeline = 168,
+  sharedMatchedLegs = null
 ) {
   const found = new Map();
   const ids = targetIds instanceof Set ? targetIds : new Set();
   const targets = Array.isArray(targetLegs) ? targetLegs : [];
   if (!ids.size && !targets.length) return found;
   const matched = new Set();
+  const sharedMatches = sharedMatchedLegs instanceof Set ? sharedMatchedLegs : null;
+  const targetsComplete = () => targets.length
+    ? targets.every((leg, index) => matched.has(index) || sharedMatches?.has(leg))
+    : [...ids].every(id => found.has(id));
 
   try {
     // This endpoint caps pageSize at 100. Search bounded subsequent pages too:
     // the selected fixture can move to a new provider ID and sit beyond page 1.
-    for (let pageNum = 1; pageNum <= 5; pageNum++) {
+    for (let pageNum = 1; pageNum <= 5 && !targetsComplete(); pageNum++) {
       const remainingMs = deadlineAt == null ? 5000 : deadlineAt - Date.now();
       if (remainingMs < 250) break;
       const url = new URL('/api/sportybet-virtual', context.request.url);
@@ -783,9 +802,12 @@ async function collectVirtualEventsFromLiveFeed(
           .filter(({ leg }) => targetFixtureMatches(leg, event))
           .map(({ index }) => index);
         if (ids.has(eventId) || matchedIndexes.length) found.set(eventId, event);
-        matchedIndexes.forEach(index => matched.add(index));
+        matchedIndexes.forEach(index => {
+          matched.add(index);
+          sharedMatches?.add(targets[index]);
+        });
       }
-      if (targets.length && matched.size >= targets.length) break;
+      if (targetsComplete()) break;
       if (events.length < 100) break;
     }
   } catch (error) {
@@ -1087,93 +1109,106 @@ async function handlePost(context) {
     const basketballIds = new Set(basketballLegs.flatMap(l => [l.sportybet_event_id, l.event_id]).map(String).filter(Boolean));
 
     const found = new Map();
-
-    if (virtualIds.size) {
-      const events = await collectEvents({
-        sportId: 'sr:sport:202120001',
-        marketId: '1,18,10,29,11,26,36,14,60100,186,189,202,204,210',
-        timeline: catalogueTimeline,
-        primaryPath: '/api/ng/factsCenter/wapConfigurableUpcomingEvents',
-        fallbackPath: '/api/ng/factsCenter/pcUpcomingEvents',
-        maxPages: manualMode ? 20 : 5,
-        deadlineAt: manualDeadlineAt,
-        requestTimeoutMs: manualMode ? 3500 : 6000
-      }, virtualIds, virtualLegs);
-      for (const [id, event] of events) found.set(id, event);
-    }
-
-    if (efootballIds.size) {
-      const events = await collectEvents({
-        sportId: 'sr:sport:137',
-        marketId: '1,18,10,29,11,26,36,14,60100,186,189,202,204,210',
-        timeline: catalogueTimeline,
-        maxPages: manualMode ? 20 : 5,
-        deadlineAt: manualDeadlineAt,
-        requestTimeoutMs: manualMode ? 3500 : 6000
-      }, efootballIds, efootballLegs);
-      for (const [id, event] of events) found.set(id, event);
-    }
-
-    // The Builder's prices and exact O/U ladders come from the normalized
-    // read-only virtual feed. Prefer that representation whenever it is
-    // available, instead of trusting a separate catalogue that may expose
-    // stale/different virtual market variants. The catalogue remains the
-    // fallback for events absent from the live normalized feed.
     const allVirtualIds = new Set([...virtualIds, ...efootballIds]);
     const allVirtualLegs = [...virtualLegs, ...efootballLegs];
-    if (allVirtualIds.size || allVirtualLegs.length) {
-      const liveFeedEvents = await collectVirtualEventsFromLiveFeed(
-        context, allVirtualIds, 'efootball,vfootball', manualDeadlineAt, allVirtualLegs, catalogueTimeline
-      );
-      for (const [id, event] of liveFeedEvents) {
-        const current = found.get(id);
-        const hasOu = Array.isArray(event?.markets) && event.markets.some(m => {
-          const desc = String(m?.desc || m?.name || m?.title || m?.specifier || '').toLowerCase();
-          return String(m?.id || '') === '18' || String(m?.id || '') === '189' || /over.?under|total|\bou\b/.test(desc);
-        });
-        if (!current || hasOu) {
-          found.set(id, event);
-        }
-      }
-    }
+    const sharedMatchedLegs = new Set();
 
-    if (footballIds.size) {
-      // The configurable WAP catalogue is the first lookup for Football
-      // manual slips because academy/U21 fixtures can be absent from PC
-      // upcoming results. Searching five PC pages first can consume the
-      // 22-second manual request budget before the WAP fallback is reached.
-      // Keep PC as the fallback so mainstream fixtures remain supported.
-      const events = await collectEvents({
-        sportId: 'sr:sport:1',
-        marketId: '1,18,10,14,16,29,45,47',
-        timeline: catalogueTimeline,
-        maxPages: manualMode ? 20 : 5,
-        primaryPath: '/api/ng/factsCenter/pcUpcomingEvents',
-        fallbackPath: '/api/ng/factsCenter/wapConfigurableUpcomingEvents',
-        deadlineAt: manualDeadlineAt,
-        requestTimeoutMs: manualMode ? 3500 : 6000,
-        pageBatchSize: 5
-      }, footballIds, footballLegs);
-      for (const [id, event] of events) found.set(id, event);
-    }
+    // Search every relevant current catalogue in parallel. The normalized
+    // virtual feed and its catalogue fallbacks share matched-leg state, so the
+    // first exact participant/kickoff/market match stops redundant paging in
+    // the other source without weakening any selection checks.
+    const fastVirtualFeedDeadline = manualMode
+      ? Math.min(manualDeadlineAt, Date.now() + 8000)
+      : manualDeadlineAt;
 
-    if (tennisIds.size) {
-      const events = await collectEvents({
-        sportId: 'sr:sport:5',
-        marketId: '186,210,202,204,189,203,188,187',
-        timeline: catalogueTimeline,
-        fallbackPath: '/api/ng/factsCenter/wapConfigurableUpcomingEvents',
-        maxPages: manualMode ? 20 : 5,
-        deadlineAt: manualDeadlineAt,
-        requestTimeoutMs: manualMode ? 3500 : 6000
-      }, tennisIds, tennisLegs);
-      for (const [id, event] of events) found.set(id, event);
-    }
-    if (basketballIds.size) {
-      const events = await collectBasketballEvents(context, basketballIds, catalogueTimeline, basketballLegs);
-      for (const [id, event] of events) found.set(id, event);
-    }
+    const [
+      vfootballEvents,
+      efootballEvents,
+      liveFeedEvents,
+      footballEvents,
+      tennisEvents,
+      basketballEvents
+    ] = await Promise.all([
+      virtualLegs.length
+        ? collectEvents({
+            sportId: 'sr:sport:202120001',
+            marketId: '1,18,10,29,11,26,36,14,60100,186,189,202,204,210',
+            timeline: catalogueTimeline,
+            primaryPath: '/api/ng/factsCenter/wapConfigurableUpcomingEvents',
+            fallbackPath: '/api/ng/factsCenter/pcUpcomingEvents',
+            maxPages: manualMode ? 20 : 5,
+            deadlineAt: manualDeadlineAt,
+            requestTimeoutMs: manualMode ? 3000 : 6000,
+            pageBatchSize: manualMode ? 10 : 5,
+            sharedMatchedLegs
+          }, virtualIds, virtualLegs)
+        : Promise.resolve(new Map()),
+      efootballLegs.length
+        ? collectEvents({
+            sportId: 'sr:sport:137',
+            marketId: '1,18,10,29,11,26,36,14,60100,186,189,202,204,210',
+            timeline: catalogueTimeline,
+            maxPages: manualMode ? 20 : 5,
+            deadlineAt: manualDeadlineAt,
+            requestTimeoutMs: manualMode ? 3000 : 6000,
+            pageBatchSize: manualMode ? 10 : 5,
+            sharedMatchedLegs
+          }, efootballIds, efootballLegs)
+        : Promise.resolve(new Map()),
+      allVirtualIds.size || allVirtualLegs.length
+        ? collectVirtualEventsFromLiveFeed(
+            context, allVirtualIds, 'efootball,vfootball',
+            fastVirtualFeedDeadline, allVirtualLegs, catalogueTimeline, sharedMatchedLegs
+          )
+        : Promise.resolve(new Map()),
+      footballIds.size
+        ? collectEvents({
+            sportId: 'sr:sport:1',
+            marketId: '1,18,10,14,16,29,45,47',
+            timeline: catalogueTimeline,
+            maxPages: manualMode ? 20 : 5,
+            primaryPath: '/api/ng/factsCenter/pcUpcomingEvents',
+            fallbackPath: '/api/ng/factsCenter/wapConfigurableUpcomingEvents',
+            deadlineAt: manualDeadlineAt,
+            requestTimeoutMs: manualMode ? 3000 : 6000,
+            pageBatchSize: manualMode ? 10 : 5,
+            sharedMatchedLegs
+          }, footballIds, footballLegs)
+        : Promise.resolve(new Map()),
+      tennisIds.size
+        ? collectEvents({
+            sportId: 'sr:sport:5',
+            marketId: '186,210,202,204,189,203,188,187',
+            timeline: catalogueTimeline,
+            fallbackPath: '/api/ng/factsCenter/wapConfigurableUpcomingEvents',
+            maxPages: manualMode ? 20 : 5,
+            deadlineAt: manualDeadlineAt,
+            requestTimeoutMs: manualMode ? 3000 : 6000,
+            pageBatchSize: manualMode ? 10 : 5,
+            sharedMatchedLegs
+          }, tennisIds, tennisLegs)
+        : Promise.resolve(new Map()),
+      basketballIds.size
+        ? collectBasketballEvents(context, basketballIds, catalogueTimeline, basketballLegs, manualDeadlineAt)
+        : Promise.resolve(new Map())
+    ]);
 
+    for (const [id, event] of vfootballEvents) found.set(id, event);
+    for (const [id, event] of efootballEvents) found.set(id, event);
+
+    // Prefer normalized virtual prices when the exact O/U ladder is present;
+    // retain catalogue rows only when the normalized representation lacks it.
+    for (const [id, event] of liveFeedEvents) {
+      const current = found.get(id);
+      const hasOu = Array.isArray(event?.markets) && event.markets.some(m => {
+        const desc = String(m?.desc || m?.name || m?.title || m?.specifier || '').toLowerCase();
+        return String(m?.id || '') === '18' || String(m?.id || '') === '189' || /over.?under|total|\bou\b/.test(desc);
+      });
+      if (!current || hasOu) found.set(id, event);
+    }
+    for (const [id, event] of footballEvents) found.set(id, event);
+    for (const [id, event] of tennisEvents) found.set(id, event);
+    for (const [id, event] of basketballEvents) found.set(id, event);
     const selections = [];
     const validation = [];
     for (const leg of legs) {
