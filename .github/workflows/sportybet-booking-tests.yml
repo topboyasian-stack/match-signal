@@ -1,0 +1,34 @@
+name: SportyBet Booking Resolution Tests
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'functions/api/sportybet-booking.js'
+      - 'scripts/test_sportybet_booking_resilience.mjs'
+      - '.github/workflows/sportybet-booking-tests.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'functions/api/sportybet-booking.js'
+      - 'scripts/test_sportybet_booking_resilience.mjs'
+      - '.github/workflows/sportybet-booking-tests.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  booking-resolution:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check booking function syntax
+        run: node --check functions/api/sportybet-booking.js
+      - name: Run live-catalogue matching and all-or-nothing booking regressions
+        run: node scripts/test_sportybet_booking_resilience.mjs
