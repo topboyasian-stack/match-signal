@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 
 const workflowsDir = ".github/workflows";
 const workflowFiles = fs.readdirSync(workflowsDir).filter((name) => /\.(?:yml|yaml)$/i.test(name));
@@ -44,6 +45,37 @@ assert.deepEqual(
   "No other workflow should treat the retired GitHub Pages mirror as a production host.",
 );
 
+const alternativesApi = fs.readFileSync("functions/api/public/market-alternatives.js", "utf8");
+const alternativesUi = fs.readFileSync("qualified-alternatives.js", "utf8");
+const ticketDrawer = fs.readFileSync("ticket-drawer.js", "utf8");
+assert.ok(alternativesApi.includes("const MIN_RECOMMENDED_PROBABILITY = 0.65;"));
+assert.ok(alternativesApi.includes("const MIN_RESEARCH_ALTERNATIVE_PROBABILITY = 0.55;"));
+assert.ok(alternativesApi.includes("const minimumProbability = builderQualified ? MIN_RECOMMENDED_PROBABILITY : MIN_RESEARCH_ALTERNATIVE_PROBABILITY;"));
+assert.ok(alternativesApi.includes('row.passed_builder_gates !== true && !String(row.original_pick || row.primary_prediction_id || "").trim()'));
+assert.ok(alternativesApi.includes("builder_qualified: builderQualified"));
+assert.ok(alternativesUi.includes("Research only — Builder gate not passed"));
+assert.ok(alternativesUi.includes("String(x.builder_qualified===true)"));
+assert.ok(ticketDrawer.includes("model_qualified:raw.model_qualified===true"));
+assert.ok(ticketDrawer.includes("RESEARCH ONLY — Builder gate not passed"));
+const researchLaneProbe = [
+  'import assert from "node:assert/strict";',
+  'import { buildPublicAlternatives } from "./functions/api/public/market-alternatives.js";',
+  "const now = Date.now();",
+  "const future = new Date(now + 60 * 60 * 1000).toISOString();",
+  "const fresh = new Date(now - 60 * 1000).toISOString();",
+  'const base = { sport: "football", event_id: "fixture-research", start_time: future, match: "Home FC vs Away FC", market: "total_goals", line: 2.5, pick: "over", model_probability: 0.60, bookmaker_odds: 1.82, quote_timestamp: fresh, sportybet_event_id: "sr:match:research-123", sportybet_market_id: "18", prediction_role: "ALTERNATIVE", alternative_source: "SYSTEM_RECOMMENDED", passed_builder_gates: false, fresh_exact_quote: true, original_pick: "p1", primary_prediction_id: "fixture-research-primary", candidate_status: "RESEARCH_ONLY" };',
+  'const evaluate = row => buildPublicAlternatives({ record_type: "cross_sport_market_reassessment", records: [row] }, now).alternatives;',
+  "const research = evaluate(base);",
+  'assert.equal(research.length, 1, "A linked 55%+ research alternative with an exact fresh quote should be public");',
+  'assert.equal(research[0].builder_qualified, false);',
+  'assert.equal(research[0].qualification_status, "RESEARCH_ONLY");',
+  'assert.equal(evaluate({ ...base, primary_prediction_id: "", original_pick: "" }).length, 0, "Unlinked candidates must remain withheld");',
+  'assert.equal(evaluate({ ...base, model_probability: 0.54 }).length, 0, "Research alternatives below 55% must remain withheld");',
+  'assert.equal(evaluate({ ...base, passed_builder_gates: true, model_probability: 0.60 }).length, 0, "Builder-qualified candidates still require 65%");',
+  'console.log("Linked exact-quote research alternative lane passed.");'
+].join("\n");
+const laneProbe = spawnSync(process.execPath, ["--experimental-default-type=module", "--input-type=module", "-e", researchLaneProbe], { encoding: "utf8" });
+assert.equal(laneProbe.status, 0, "Research-alternative executable contract failed: " + (laneProbe.stdout || "") + (laneProbe.stderr || ""));
 const cloudflare = fs.readFileSync(path.join(workflowsDir, "cloudflare-pages.yml"), "utf8");
 assert.match(cloudflare, /name:\s*Deploy Match Signal to Cloudflare Pages/);
 assert.match(cloudflare, /https:\/\/match-signal\.pages\.dev/);
