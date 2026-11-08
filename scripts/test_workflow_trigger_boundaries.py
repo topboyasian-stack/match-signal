@@ -50,6 +50,9 @@ def main():
     collector_paths = push_paths("virtual-lab-collector.yml")
     autopilot_paths = push_paths("autopilot-refresh.yml")
     board_concurrency = board.split("\nconcurrency:\n", 1)[1].split("\njobs:\n", 1)[0]
+    assert "group: match-signal-unified-upcoming-v8-${{ github.event_name }}-" in board_concurrency, (
+        "Bump the board queue generation to release stale runs after publisher lock changes."
+    )
     assert "github.event_name" in board_concurrency, (
         "Push and upstream-completion board refreshes need separate pending queues."
     )
