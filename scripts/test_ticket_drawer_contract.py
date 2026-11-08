@@ -144,8 +144,9 @@ def main():
             "Mixed-sport tickets must fetch current Basketball fixtures by provider ID or verified participants and kickoff, while excluding started legs from upcoming lookup")
     require("const footballIds = new Set(footballLegs.map" in api and
             "const tennisIds = new Set(tennisLegs.map" in api and
-            "}, footballIds, footballLegs);" in api and "}, tennisIds, tennisLegs);" in api,
-            "Football and Tennis catalogue scans must pass current legs for participant/time recovery")
+            "}, footballIds, footballLegs)" in api and "}, tennisIds, tennisLegs)" in api and
+            "const [\n      vfootballEvents" in api and "footballEvents,\n      tennisEvents" in api,
+            "Parallel Football and Tennis catalogue scans must pass current legs for participant/time recovery")
     require("leg?.model_qualified!==true" in api and "leg?.market_id!=='225'" in api and
             "!leg.sportybet_event_id" in api and "NBA_RELEASE_GATE_LOCKED" in api and
             "nbaTotalTicketLegQualified" in api and "if (hasBasketballLeg && !manualMode)" in api and
