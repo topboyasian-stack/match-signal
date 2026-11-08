@@ -603,7 +603,7 @@ const BASKETBALL_TEAM_ALIAS_GROUPS = [
 
 function splitVirtualParticipant(value) {
   const normalized = canonicalParticipant(value);
-  const match = normalized.match(/^(.*?)(?:\\s+(virtual|vfootball|efootball)\\s+([a-z0-9]+))$/);
+  const match = normalized.match(/^(.*?)(?:\s+(virtual|vfootball|efootball)\s+([a-z0-9]+))$/);
   return match
     ? { base: match[1].trim(), suffix: match[2] + ' ' + match[3] }
     : { base: normalized, suffix: '' };
