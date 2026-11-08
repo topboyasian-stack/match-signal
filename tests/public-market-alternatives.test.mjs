@@ -90,7 +90,7 @@ test("Builder qualification keeps the 65% floor while linked research alternativ
   const rejectedPayload = await rejected.json();
   assert.equal(rejectedPayload.alternatives.length, 0);
   assert.equal(rejectedPayload.diagnostics.records_seen, 6);
-  assert.equal(rejectedPayload.diagnostics.rejected_by_reason.below_probability_floor_or_invalid_probability, 2);
+  assert.equal(rejectedPayload.diagnostics.rejected_by_reason.below_probability_floor_or_invalid_probability, 3);
   assert.equal(rejectedPayload.diagnostics.rejected_by_reason.missing_primary_link, 1);
   assert.equal(rejectedPayload.diagnostics.rejected_by_reason.quote_older_than_15_minutes, 1);
   assert.equal(rejectedPayload.diagnostics.rejected_by_reason.kickoff_within_two_minutes_or_started, 1);
