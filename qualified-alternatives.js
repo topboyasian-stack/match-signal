@@ -1,10 +1,48 @@
-/* Compatibility contract: only Builder-qualified alternatives emit data-ticket-model-qualified="true"; research-only alternatives emit false. */
+/* Research alternatives remain visible; only the existing ticket-supported markets expose an Add button. */
 (()=>{'use strict';
-const endpoint='/api/public/market-alternatives',escapeHtml=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let rows=[],busy=false;
-function key(s,e){return String(s||'').toLowerCase()+'|'+String(e||'');}
-function button(x){const total=x.market==='total',pick=String(x.pick||'').toLowerCase(),line=x.line;
-return '<div class="ms-alt-option"><div class="ms-alt-copy"><b>'+escapeHtml(total?(pick.toUpperCase()+' '+line):pick==='p1'?x.player_1:pick==='p2'?x.player_2:'Draw')+'</b><span>'+escapeHtml(x.market_label)+' · '+Math.round(x.probability*100)+'% model probability · '+Number(x.odds).toFixed(2)+' odds · '+(x.builder_qualified?'Builder-qualified':'Research only — Builder gate not passed')+'</span></div><button type="button" data-ms-ticket-add data-ticket-sport="'+escapeHtml(x.sport)+'" data-ticket-event="'+escapeHtml(x.event_id)+'" data-ticket-sportybet-event="'+escapeHtml(x.sportybet_event_id)+'" '+(x.sport==='efootball'?'data-ticket-product="'+escapeHtml(x.product)+'" ':'')+'data-ticket-model-qualified="'+String(x.builder_qualified===true)+'" data-ticket-market="'+escapeHtml(x.market)+'" data-ticket-pick="'+escapeHtml(pick)+'" data-ticket-line="'+(line==null?'':escapeHtml(line))+'" data-ticket-market-id="'+escapeHtml(x.market_id)+'" data-ticket-odds="'+escapeHtml(x.odds)+'" data-ticket-start="'+escapeHtml(x.start_time)+'" data-ticket-player1="'+escapeHtml(x.player_1)+'" data-ticket-player2="'+escapeHtml(x.player_2)+'" data-ticket-match="'+escapeHtml(x.match||x.player_1+' vs '+x.player_2)+'">Add to ticket</button></div>';}
+const endpoint='/api/public/market-alternatives';
+const escapeHtml=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let rows=[],busy=false,lastError='';
+function displayPick(x){
+ const pick=String(x.pick||'').toLowerCase();
+ if(x.market==='total')return pick.toUpperCase()+' '+(x.line==null?'':x.line);
+ if(x.market==='btts')return 'BTTS '+pick.toUpperCase();
+ if(x.market==='double_chance')return 'DOUBLE CHANCE '+pick.toUpperCase();
+ if(pick==='p1')return x.player_1||'Participant 1';
+ if(pick==='p2')return x.player_2||'Participant 2';
+ if(pick==='draw')return 'Draw';
+ return pick.toUpperCase();
+}
+function quoteLabel(x){
+ const status=String(x.quote_status||'UNVERIFIED');
+ if(status==='FRESH_EXACT')return 'Fresh exact quote · live recheck still required';
+ if(status==='STALE')return 'Last-seen quote is stale · live recheck required';
+ if(status==='INVALID_TIMESTAMP')return 'Quote timestamp invalid · live recheck required';
+ if(status==='NOT_VERIFIED_EXACT')return 'Exactness not verified · live recheck required';
+ if(status==='NOT_MARKED_EXACT')return 'Quote not verified as exact · live recheck required';
+ return 'No verified current quote · live recheck required';
+}
+function qualificationLabel(x){
+ if(x.builder_qualified===true)return 'Builder-qualified';
+ if(x.ticket_selectable!==true)return 'Research display only · ticket mapping not enabled';
+ if(x.quote_status!=='FRESH_EXACT')return 'Research only · current quote not verified';
+ if(x.below_research_baseline===true)return 'Research only · below the 55% display baseline';
+ return 'Research only · Builder gate not passed';
+}
+function ticketButton(x){
+ const pick=String(x.pick||'').toLowerCase(),line=x.line;
+ return '<button type="button" data-ms-ticket-add data-ticket-sport="'+escapeHtml(x.sport)+'" data-ticket-event="'+escapeHtml(x.event_id)+'" data-ticket-sportybet-event="'+escapeHtml(x.sportybet_event_id)+'" '+(x.sport==='efootball'?'data-ticket-product="'+escapeHtml(x.product)+'" ':'')+'data-ticket-model-qualified="'+String(x.builder_qualified===true)+'" data-ticket-market="'+escapeHtml(x.market)+'" data-ticket-pick="'+escapeHtml(pick)+'" data-ticket-line="'+(line==null?'':escapeHtml(line))+'" data-ticket-market-id="'+escapeHtml(x.market_id)+'" data-ticket-odds="'+(x.odds==null?'':escapeHtml(x.odds))+'" data-ticket-start="'+escapeHtml(x.start_time)+'" data-ticket-player1="'+escapeHtml(x.player_1)+'" data-ticket-player2="'+escapeHtml(x.player_2)+'" data-ticket-match="'+escapeHtml(x.match||((x.player_1||'')+' vs '+(x.player_2||'')))+'">Add to ticket</button>';
+}
+function optionMarkup(x){
+ const probability=Number(x.probability);
+ const odds=Number(x.odds);
+ const price=Number.isFinite(odds)&&odds>1
+   ? (x.quote_status==='FRESH_EXACT'?'SportyBet '+odds.toFixed(2):'Last-seen '+odds.toFixed(2))
+   : 'SportyBet price unavailable';
+ const probabilityText=Number.isFinite(probability)?Math.round(probability*100)+'% model probability':'Model probability unavailable';
+ const control=x.ticket_selectable===true?ticketButton(x):'<span class="ms-alt-research-note">Research display only · ticket mapping not enabled</span>';
+ return '<div class="ms-alt-option"><div class="ms-alt-copy"><b>'+escapeHtml(displayPick(x))+'</b><span>'+escapeHtml(x.market_label||x.market||'Market')+' · '+escapeHtml(probabilityText)+' · '+escapeHtml(price)+'</span><span>'+escapeHtml(quoteLabel(x))+'</span><span>'+escapeHtml(qualificationLabel(x))+'</span></div>'+control+'</div>';
+}
 function attach(){
  const cards=document.querySelectorAll('[data-ms-fixture-id]');
  cards.forEach(card=>{
@@ -12,15 +50,29 @@ function attach(){
   let host=card.querySelector('.ms-qualified-alternatives');
   const found=rows.filter(x=>x.event_id===event&&x.sport===sport).slice(0,2);
   if(!found.length){if(host)host.remove();return;}
-  const signature=JSON.stringify(found.map(x=>[x.market,x.pick,x.line,x.probability,x.odds,x.quote_timestamp,x.builder_qualified]));
+  const signature=JSON.stringify(found.map(x=>[x.market,x.pick,x.line,x.probability,x.odds,x.quote_status,x.builder_qualified,x.ticket_selectable,x.qualification_status,x.below_research_baseline]));
   if(host&&host.dataset.signature===signature)return;
   if(!host){host=document.createElement('section');host.className='ms-qualified-alternatives';card.appendChild(host);}
   host.dataset.signature=signature;
-  host.innerHTML='<div class="ms-alt-heading"><b>System-recommended alternative'+(found.length>1?'s':'')+'</b><span>Fresh exact SportyBet quote · ≤15 min; qualification shown per pick</span></div>'+found.map(button).join('');
+  host.innerHTML='<div class="ms-alt-heading"><b>System-recommended alternatives</b><span>Research candidates stay visible; SportyBet prices are rechecked before code generation.</span></div>'+found.map(optionMarkup).join('');
  });
 }
-async function load(){if(busy)return;busy=true;try{const response=await fetch(endpoint,{cache:'no-store'});if(!response.ok)throw Error('HTTP '+response.status);const payload=await response.json();rows=Array.isArray(payload.alternatives)?payload.alternatives:[];attach();}catch(error){/* Fail closed: no alternatives are displayed when evidence cannot be verified. */}finally{busy=false;}}
-const style=document.createElement('style');style.textContent='.ms-qualified-alternatives{margin-top:14px;padding:12px;border:1px solid rgba(16,185,129,.24);border-radius:12px;background:rgba(16,185,129,.045)}.ms-alt-heading{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:8px;font-size:12px}.ms-alt-heading span,.ms-alt-copy span{color:var(--muted,#87939d);font-size:11px}.ms-alt-option{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-top:1px solid rgba(130,150,160,.14)}.ms-alt-copy{display:grid;gap:3px;min-width:0}.ms-alt-option button{flex:none;border:1px solid rgba(16,185,129,.45);border-radius:8px;padding:7px 10px;background:rgba(16,185,129,.12);color:inherit;font:inherit;font-size:12px;font-weight:700;cursor:pointer}';
+async function load(){
+ if(busy)return;busy=true;
+ try{
+  const response=await fetch(endpoint,{cache:'no-store',headers:{'Accept':'application/json'}});
+  if(!response.ok)throw Error('HTTP '+response.status);
+  const payload=await response.json();
+  rows=Array.isArray(payload.alternatives)?payload.alternatives:[];
+  lastError='';
+  attach();
+ }catch(error){
+  lastError=String(error&&error.message||error);
+  /* Keep already-rendered rows; never replace a failed refresh with a false empty state. */
+ }finally{busy=false;}
+}
+const style=document.createElement('style');
+style.textContent='.ms-qualified-alternatives{margin-top:14px;padding:12px;border:1px solid rgba(16,185,129,.24);border-radius:12px;background:rgba(16,185,129,.045)}.ms-alt-heading{display:flex;justify-content:space-between;gap:8px;align-items:flex-start;margin-bottom:8px;font-size:12px}.ms-alt-heading span,.ms-alt-copy span{color:var(--muted,#87939d);font-size:11px}.ms-alt-option{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-top:1px solid rgba(130,150,160,.14)}.ms-alt-copy{display:grid;gap:3px;min-width:0}.ms-alt-option button{flex:none;border:1px solid rgba(16,185,129,.45);border-radius:8px;padding:7px 10px;background:rgba(16,185,129,.12);color:inherit;font:inherit;font-size:12px;font-weight:700;cursor:pointer}.ms-alt-research-note{flex:none;max-width:180px;text-align:right;color:var(--muted,#87939d);font-size:11px}';
 document.head.appendChild(style);
 new MutationObserver(attach).observe(document.body,{childList:true,subtree:true});
 load();setInterval(load,60000);
