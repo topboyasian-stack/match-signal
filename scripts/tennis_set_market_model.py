@@ -206,9 +206,9 @@ def _observations(row: dict[str, Any]) -> list[tuple[float, int]]:
 
 
 def _bin_key(probability: float) -> str:
-    # Five broad bins avoid overfitting the limited early ATP set-outcome sample.
-    index = min(4, max(0, int((float(probability) - 0.5) / 0.1)))
-    low = 0.5 + index * 0.1
+    # Ten broad bins cover the full 0..1 range, including very lopsided matches.
+    index = min(9, max(0, int(float(probability) * 10.0)))
+    low = index * 0.1
     return f"{low:.1f}-{low + 0.1:.1f}"
 
 
