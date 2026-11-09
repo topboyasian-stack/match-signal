@@ -268,7 +268,6 @@ class CrossSportReassessmentTests(unittest.TestCase):
 
     def test_decorated_alternative_preserves_primary_pick_market_and_probability(self):
         row = sample_football(self.now)
-        row["market"] = "winner"
         market = row["sportybet_market"]["markets"][0]
         candidate = reassessment._decorate_candidate(
             row, sport="football", market="total_goals", side="under",
