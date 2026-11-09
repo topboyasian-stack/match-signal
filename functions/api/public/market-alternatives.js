@@ -280,6 +280,7 @@ export function buildPublicAlternatives(document, nowMs = Date.now()) {
 
   return {
     status: alternatives.length ? "OK" : "EMPTY",
+    publication_policy_version: "research-visible-v2",
     generated_at: document.updated_at || document.generated_at || null,
     min_probability: 0,
     research_display_baseline: RESEARCH_DISPLAY_BASELINE,
@@ -294,7 +295,7 @@ export async function onRequestGet({ request, env }) {
   if (request.method !== "GET") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
   try {
     const raw = await env.MATCH_SIGNAL_ANALYST_STORE.get(EVIDENCE_KEY);
-    if (!raw) return json({ status: "EMPTY", min_probability: 0, research_display_baseline: RESEARCH_DISPLAY_BASELINE, builder_min_probability: MIN_RECOMMENDED_PROBABILITY, max_per_fixture: 2, alternatives: [] });
+    if (!raw) return json({ status: "EMPTY", publication_policy_version: "research-visible-v2", min_probability: 0, research_display_baseline: RESEARCH_DISPLAY_BASELINE, builder_min_probability: MIN_RECOMMENDED_PROBABILITY, max_per_fixture: 2, alternatives: [] });
     const document = JSON.parse(raw);
     if (!document || document.record_type !== "cross_sport_market_reassessment" || !Array.isArray(document.records)) {
       return json({ error: "EVIDENCE_UNAVAILABLE" }, 503);
