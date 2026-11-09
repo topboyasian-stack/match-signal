@@ -239,6 +239,20 @@ def _decorate_candidate(
     original_pick = str(row.get("builder_pick") or row.get("pick") or row.get("selection") or "").strip().lower()
     original_market = str(row.get("builder_market") or row.get("market") or "").strip()
     original_line = row.get("line")
+    if not original_market:
+        if original_pick in {"p1", "p2", "draw"}:
+            original_market = "winner"
+        elif original_pick in {"over", "under"}:
+            source_sport = str(row.get("sport") or sport).lower()
+            if source_sport == "virtual":
+                original_market = "virtual_total"
+            elif source_sport == "tennis":
+                original_market = "total_games"
+            elif source_sport == "football":
+                original_market = "total_goals"
+    if original_line is None and original_market in {"total_games", "total_goals", "total_ou", "virtual_total", "over_under"}:
+        original_total = ((row.get("analytics") or {}).get("total_games") or {})
+        original_line = original_total.get("line")
     original_probability = None
     original_probabilities = row.get("calibrated_probabilities") or row.get("probabilities") or {}
     if isinstance(original_probabilities, dict) and original_pick:
