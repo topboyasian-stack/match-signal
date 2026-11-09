@@ -232,6 +232,26 @@ def _decorate_candidate(
     exact_market_id: str | None = None,
 ) -> dict[str, Any]:
     candidate = dict(row)
+    # Preserve the original fixture pick before mutating builder_* fields for
+    # the alternative. The public publisher uses this to avoid labelling the
+    # primary as its own alternative and to verify the alternative is more
+    # likely than that primary when a comparable probability exists.
+    original_pick = str(row.get("builder_pick") or row.get("pick") or row.get("selection") or "").strip().lower()
+    original_market = str(row.get("builder_market") or row.get("market") or "").strip()
+    original_line = row.get("line")
+    original_probability = _num(row.get("builder_probability", row.get("model_probability", row.get("probability"))))
+    if original_probability is None:
+        original_probabilities = row.get("calibrated_probabilities") or row.get("probabilities") or {}
+        if isinstance(original_probabilities, dict) and original_pick:
+            original_probability = _num(original_probabilities.get(original_pick))
+    if original_pick:
+        candidate["original_primary_pick"] = original_pick
+    if original_market:
+        candidate["original_primary_market"] = original_market
+    if original_line is not None:
+        candidate["original_primary_line"] = original_line
+    if original_probability is not None:
+        candidate["original_primary_probability"] = round(float(original_probability), 6)
     candidate["builder_market"] = market
     candidate["builder_pick"] = side
     candidate["builder_probability"] = round(float(probability), 6)
@@ -950,7 +970,11 @@ def _make_audit_record(core: Any, row: dict[str, Any], now: datetime) -> dict[st
         "market": market,
         "line": line,
         "pick": side,
-        "original_pick": row.get("pick"),
+        "original_pick": row.get("original_primary_pick") or row.get("pick"),
+        "original_primary_pick": row.get("original_primary_pick"),
+        "original_primary_market": row.get("original_primary_market"),
+        "original_primary_line": row.get("original_primary_line"),
+        "original_primary_probability": row.get("original_primary_probability"),
         "model_probability": round(p, 6) if p is not None else None,
         "bookmaker_odds": price,
         "market_implied_probability": leg.get("market_implied_probability"),
