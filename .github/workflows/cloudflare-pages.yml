@@ -1038,7 +1038,7 @@ jobs:
             const payload=JSON.parse(body);
             const rows=Array.isArray(payload?.alternatives)?payload.alternatives:null;
             if (!['OK','EMPTY'].includes(String(payload?.status||'')) || !rows) throw new Error('invalid API response shape/status');
-            if (Number(payload.min_probability)!==0 || Number(payload.research_display_baseline)!==0.55 || Number(payload.builder_min_probability)!==0.65) throw new Error('public API research-visibility / qualification contract mismatch');
+            if (payload.publication_policy_version!=='research-visible-v2' || Number(payload.min_probability)!==0 || Number(payload.research_display_baseline)!==0.55 || Number(payload.builder_min_probability)!==0.65) throw new Error('public API research-visibility / qualification contract mismatch');
             if (payload.status==='EMPTY' && rows.length) throw new Error('EMPTY response unexpectedly contains alternatives');
             const now=Date.now();
             for (const item of rows) {
