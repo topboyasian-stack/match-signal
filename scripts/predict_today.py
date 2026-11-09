@@ -237,6 +237,7 @@ def _sportybet_market_snapshot(event, sport):
         all_markets.append({
             "id": mid,
             "name": fair["name"],
+            "specifier": market.get("specifier"),
             "line": fair["line"],
             "overround": round(fair["overround"], 6),
             "outcomes": fair["outcomes"],
@@ -302,6 +303,8 @@ def _sportybet_market_snapshot(event, sport):
     return {
         "provider": "SportyBet NG",
         "event_id": event["event_id"],
+        "home": event.get("home"),
+        "away": event.get("away"),
         "tournament": event["tournament"],
         "category": event["category"],
         "start_time": (
