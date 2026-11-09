@@ -29,6 +29,7 @@ test("public endpoint returns whitelisted Builder-qualified future alternatives"
   const response = await call([candidate()]);
   const payload = await response.json();
   assert.equal(response.status, 200);
+  assert.equal(payload.publication_policy_version, "research-visible-v2");
   assert.equal(payload.alternatives.length, 1);
   assert.equal(payload.alternatives[0].probability, 0.71);
   assert.equal(payload.alternatives[0].builder_qualified, true);
@@ -54,6 +55,7 @@ test("empty private evidence declares display baseline separately from qualifica
   const payload = await response.json();
   assert.equal(response.status, 200);
   assert.equal(payload.status, "EMPTY");
+  assert.equal(payload.publication_policy_version, "research-visible-v2");
   assert.equal(payload.min_probability, 0);
   assert.equal(payload.research_display_baseline, 0.55);
   assert.equal(payload.builder_min_probability, 0.65);
