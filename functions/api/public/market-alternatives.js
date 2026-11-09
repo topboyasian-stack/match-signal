@@ -242,8 +242,10 @@ export function buildPublicAlternatives(document, nowMs = Date.now()) {
         reject("not_more_likely_than_primary");
         continue;
       }
+      item.primary_comparison_status = "MORE_LIKELY_THAN_PRIMARY";
       diagnostics.more_likely_than_primary++;
     } else {
+      item.primary_comparison_status = "PRIMARY_PROBABILITY_UNAVAILABLE";
       diagnostics.primary_probability_unavailable++;
     }
 
