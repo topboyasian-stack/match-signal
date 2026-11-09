@@ -30,6 +30,10 @@ function qualificationLabel(x){
  if(x.below_research_baseline===true)return 'Research only · below the 55% display baseline';
  return 'Research only · Builder gate not passed';
 }
+function comparisonLabel(x){
+ if(x.primary_comparison_status==='MORE_LIKELY_THAN_PRIMARY')return 'Higher model probability than primary pick';
+ return 'Primary probability unavailable for direct comparison';
+}
 function ticketButton(x){
  const pick=String(x.pick||'').toLowerCase(),line=x.line;
  return '<button type="button" data-ms-ticket-add data-ticket-sport="'+escapeHtml(x.sport)+'" data-ticket-event="'+escapeHtml(x.event_id)+'" data-ticket-sportybet-event="'+escapeHtml(x.sportybet_event_id)+'" '+(x.sport==='efootball'?'data-ticket-product="'+escapeHtml(x.product)+'" ':'')+'data-ticket-model-qualified="'+String(x.builder_qualified===true)+'" data-ticket-market="'+escapeHtml(x.market)+'" data-ticket-pick="'+escapeHtml(pick)+'" data-ticket-line="'+(line==null?'':escapeHtml(line))+'" data-ticket-market-id="'+escapeHtml(x.market_id)+'" data-ticket-odds="'+(x.odds==null?'':escapeHtml(x.odds))+'" data-ticket-start="'+escapeHtml(x.start_time)+'" data-ticket-player1="'+escapeHtml(x.player_1)+'" data-ticket-player2="'+escapeHtml(x.player_2)+'" data-ticket-match="'+escapeHtml(x.match||((x.player_1||'')+' vs '+(x.player_2||'')))+'">Add to ticket</button>';
@@ -42,7 +46,7 @@ function optionMarkup(x){
    : 'SportyBet price unavailable';
  const probabilityText=Number.isFinite(probability)?Math.round(probability*100)+'% model probability':'Model probability unavailable';
  const control=x.ticket_selectable===true?ticketButton(x):'<span class="ms-alt-research-note">Research display only · ticket mapping not enabled</span>';
- return '<div class="ms-alt-option"><div class="ms-alt-copy"><b>'+escapeHtml(displayPick(x))+'</b><span>'+escapeHtml(x.market_label||x.market||'Market')+' · '+escapeHtml(probabilityText)+' · '+escapeHtml(price)+'</span><span>'+escapeHtml(quoteLabel(x))+'</span><span>'+escapeHtml(qualificationLabel(x))+'</span></div>'+control+'</div>';
+ return '<div class="ms-alt-option"><div class="ms-alt-copy"><b>'+escapeHtml(displayPick(x))+'</b><span>'+escapeHtml(x.market_label||x.market||'Market')+' · '+escapeHtml(probabilityText)+' · '+escapeHtml(price)+'</span><span>'+escapeHtml(quoteLabel(x))+'</span><span>'+escapeHtml(comparisonLabel(x))+'</span><span>'+escapeHtml(qualificationLabel(x))+'</span></div>'+control+'</div>';
 }
 function attach(){
  const cards=document.querySelectorAll('[data-ms-fixture-id]');
@@ -51,7 +55,7 @@ function attach(){
   let host=card.querySelector('.ms-qualified-alternatives');
   const found=rows.filter(x=>x.event_id===event&&x.sport===sport).slice(0,2);
   if(!found.length){if(host)host.remove();return;}
-  const signature=JSON.stringify(found.map(x=>[x.market,x.pick,x.line,x.probability,x.odds,x.quote_status,x.builder_qualified,x.ticket_selectable,x.qualification_status,x.below_research_baseline]));
+  const signature=JSON.stringify(found.map(x=>[x.market,x.pick,x.line,x.probability,x.odds,x.quote_status,x.builder_qualified,x.ticket_selectable,x.qualification_status,x.below_research_baseline,x.primary_comparison_status]));
   if(host&&host.dataset.signature===signature)return;
   if(!host){host=document.createElement('section');host.className='ms-qualified-alternatives';card.appendChild(host);}
   host.dataset.signature=signature;
