@@ -205,9 +205,9 @@ export function buildPublicAlternatives(document, nowMs = Date.now()) {
     }
     diagnostics.kickoff_more_than_two_minutes_away++;
 
-    // Visibility is not qualification. Keep otherwise valid research options
-    // visible when their recorded price is stale or unverified; the ticket layer
-    // independently rechecks the live event, market, line and current price.
+    // Visibility is not qualification. Missing primary-pick linkage, provider event/market IDs,
+    // and stale/unverified/missing prices are research metadata, not reasons to suppress a valid
+    // alternative. The ticket layer requires exact IDs plus a fresh current price before adding it.
     const quote = timestamp(row.quote_timestamp || row.market_odds_timestamp || row.odds_timestamp);
     const age = quote === null ? null : (nowMs - quote) / 1000;
     const oddsValue = Number(row.bookmaker_odds);
