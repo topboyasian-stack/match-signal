@@ -60,6 +60,7 @@ function attach(){
   if(host&&host.dataset.signature===signature)return;
   if(!host){host=document.createElement('section');host.className='ms-qualified-alternatives';card.appendChild(host);}
   host.dataset.signature=signature;
+  host.setAttribute('data-ms-alt-contract','research-visible-v2');
   host.innerHTML='<div class="ms-alt-heading"><b>System-recommended alternatives</b><span>Research candidates stay visible; SportyBet prices are rechecked before code generation.</span></div>'+found.map(optionMarkup).join('');
  });
 }
