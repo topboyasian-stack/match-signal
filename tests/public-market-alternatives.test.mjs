@@ -35,6 +35,7 @@ test("public endpoint returns whitelisted Builder-qualified future alternatives"
   assert.equal(payload.alternatives[0].ticket_selectable, true);
   assert.equal(payload.alternatives[0].quote_status, "FRESH_EXACT");
   assert.equal(payload.alternatives[0].qualification_status, "BUILDER_QUALIFIED");
+  assert.equal(payload.alternatives[0].primary_comparison_status, "PRIMARY_PROBABILITY_UNAVAILABLE");
   assert.equal(payload.diagnostics.records_seen, 1);
   assert.equal(payload.diagnostics.role_source_match, 1);
   assert.equal(payload.diagnostics.marked_fresh_exact_quote, 1);
@@ -135,6 +136,7 @@ test("alternatives must beat a known primary probability and must not echo the s
   });
   const payload = await (await call([better, worse, samePick])).json();
   assert.deepEqual(payload.alternatives.map(x => x.event_id), ["better"]);
+  assert.equal(payload.alternatives[0].primary_comparison_status, "MORE_LIKELY_THAN_PRIMARY");
   assert.equal(payload.diagnostics.rejected_by_reason.not_more_likely_than_primary, 1);
   assert.equal(payload.diagnostics.rejected_by_reason.repeats_primary_pick, 1);
 });
