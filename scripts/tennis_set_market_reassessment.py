@@ -352,7 +352,10 @@ def install(core: Any) -> None:
         player = detail.get("player_name") or "Player"
         result.update({
             "market": "player_to_win_set",
-            "pick": f"{row.get('player_1')} vs {row.get('player_2')} — {player} to win at least one set",
+            # Keep the participant side machine-readable for booking and settlement.
+            # The friendly label is separate and must never replace a provider ID.
+            "pick": str(detail.get("player_side") or "").lower(),
+            "selection_label": f"{player} to win at least one set",
             "line": None,
             "tennis_set_market": copy.deepcopy(detail),
             "sportybet_market_id": row.get("sportybet_market_id"),
