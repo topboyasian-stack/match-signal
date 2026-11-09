@@ -12,6 +12,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 import tennis_set_market_model as set_model
 import tennis_set_market_reassessment as reassessment
+import predict_today
 
 
 NOW = datetime(2026, 11, 9, 15, 0, tzinfo=timezone.utc)
@@ -70,6 +71,33 @@ class FakeCore:
 
 
 class TennisSetMarketReassessmentTests(unittest.TestCase):
+    def test_live_sportybet_snapshot_preserves_set_market_identity_and_specifier(self):
+        event = {
+            "event_id": "sr:match:101",
+            "home": "Alex Example",
+            "away": "Juan Example",
+            "tournament": "ATP Example Open",
+            "category": "Tennis",
+            "start_time_ms": int((NOW + timedelta(hours=2)).timestamp() * 1000),
+            "markets": [
+                {
+                    "id": "777",
+                    "desc": "Player to win at least one set",
+                    "specifier": "player=home",
+                    "outcomes": [
+                        {"id": "77701", "desc": "Yes", "odds": 1.22},
+                        {"id": "77702", "desc": "No", "odds": 3.70},
+                    ],
+                }
+            ],
+        }
+        self.assertIn("203", predict_today.SPORTYBET_MARKETS["tennis"].split(","))
+        snapshot = predict_today._sportybet_market_snapshot(event, "tennis")
+        self.assertEqual(snapshot["home"], "Alex Example")
+        self.assertEqual(snapshot["away"], "Juan Example")
+        self.assertEqual(snapshot["markets"][0]["specifier"], "player=home")
+        self.assertEqual(snapshot["markets"][0]["outcomes"][0]["id"], "77701")
+
     def test_home_and_away_yes_no_markets_map_to_prediction_sides(self):
         row = fixture()
         prediction = {
