@@ -16,6 +16,7 @@ from typing import Any, Callable
 DATA = Path(__file__).resolve().parents[1] / "data"
 MAX_QUOTE_AGE_SECONDS = 900
 MIN_PRIOR_MATCHES = 30
+MIN_SET_MARKET_PROBABILITY = 0.60
 _DIAGNOSTICS: dict[str, Any] = {}
 _INSTALLED = False
 
@@ -74,9 +75,10 @@ def _resolve_player(market: dict[str, Any], snapshot: dict[str, Any], prediction
         str(market.get("specifier") or ""),
     ))
     normalized = _norm(label)
-    if p1 and p1 in normalized:
+    padded_label = " " + normalized + " "
+    if p1 and (" " + p1 + " ") in padded_label:
         return "p1"
-    if p2 and p2 in normalized:
+    if p2 and (" " + p2 + " ") in padded_label:
         return "p2"
 
     # SportyBet sometimes scopes a generic Yes/No market by an explicit
@@ -180,6 +182,9 @@ def _market_candidates(
         except (TypeError, ValueError):
             continue
         if not 0.0 < probability < 1.0:
+            continue
+        if probability < MIN_SET_MARKET_PROBABILITY:
+            counts["below_probability_floor"] = counts.get("below_probability_floor", 0) + 1
             continue
         player_name = prediction.get("player_1" if player_side == "p1" else "player_2")
         candidate = dict(prediction)
