@@ -512,12 +512,10 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           PROJECT: ${{ steps.project.outputs.project }}
+          PRODUCTION_BRANCH: ${{ steps.project.outputs.production_branch }}
         run: |
           set -euo pipefail
-          # Do not pass --branch here: on Pages that creates/targets a branch preview alias.
-          # The project was verified to use main as its production branch above; an omitted
-          # branch deploy promotes the staged bundle to the project production hostname.
-          output="$(npx wrangler@latest pages deploy .pages-deploy --project-name="$PROJECT" --commit-hash="${{ steps.source.outputs.sha }}" 2>&1)" || {
+          output="$(npx wrangler@latest pages deploy .pages-deploy --project-name="$PROJECT" --branch="$PRODUCTION_BRANCH" --commit-hash="${{ steps.source.outputs.sha }}" 2>&1)" || {
             printf '%s\n' "$output"
             exit 1
           }
@@ -531,6 +529,19 @@ jobs:
           esac
           echo "url=$deployment_url" >> "$GITHUB_OUTPUT"
           echo "Immutable Cloudflare deployment URL: $deployment_url"
+
+      - name: Inspect Cloudflare Pages deployment environment and aliases
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PROJECT: ${{ steps.project.outputs.project }}
+          DEPLOYMENT_URL: ${{ steps.pages-deployment.outputs.url }}
+        run: |
+          set -euo pipefail
+          for environment in production preview; do
+            curl -fsSL -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$PROJECT/deployments?env=$environment&per_page=5" | ENVIRONMENT="$environment" python -c 'import json,os,sys; d=json.load(sys.stdin); print("DEPLOYMENT ENVIRONMENT", os.environ["ENVIRONMENT"], json.dumps([{"environment":p.get("environment"),"id":p.get("id"),"short_id":p.get("short_id"),"url":p.get("url"),"aliases":p.get("aliases") or [],"created_on":p.get("created_on"),"branch":((p.get("deployment_trigger") or {}).get("metadata") or {}).get("branch"),"commit_hash":((p.get("deployment_trigger") or {}).get("metadata") or {}).get("commit_hash"),"trigger_type":(p.get("deployment_trigger") or {}).get("type"),"stage":(p.get("latest_stage") or {}).get("status")} for p in d.get("result", [])], sort_keys=True)); sys.exit(0 if d.get("success") else 1)'
+          done
+          curl -fsSL -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$PROJECT" | python -c 'import json,sys; p=json.load(sys.stdin).get("result") or {}; s=p.get("source") or {}; c=s.get("config") or {}; print("CLOUDFLARE PROJECT CONFIG", json.dumps({"source_type":s.get("type"),"owner":c.get("owner"),"repo_name":c.get("repo_name"),"production_branch":p.get("production_branch"),"production_deployments_enabled":c.get("production_deployments_enabled"),"preview_deployment_setting":c.get("preview_deployment_setting")}, sort_keys=True))'
 
       - name: Run production HTTP and asset smoke tests
         timeout-minutes: 5
