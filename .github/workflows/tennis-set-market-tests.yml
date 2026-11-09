@@ -10,6 +10,19 @@ on:
       - 'scripts/tennis_set_market_reassessment.py'
       - 'scripts/test_tennis_set_market_model.py'
       - 'scripts/test_tennis_set_market_reassessment.py'
+      - 'scripts/test_tennis_set_market_settlement.py'
+      - 'scripts/test_tennis_set_market_booking_contract.py'
+      - 'scripts/test_tennis_set_market_booking.mjs'
+      - 'scripts/predict_today.py'
+      - 'scripts/settle_tennis_history.py'
+      - 'scripts/odds_ticket_tracker.py'
+      - 'scripts/odds_builder.py'
+      - 'functions/api/sportybet-booking.js'
+      - 'ticket-drawer.js'
+      - 'expansion-odds-builder.js'
+      - 'scripts/tennis_set_market_reassessment.py'
+      - 'scripts/test_tennis_set_market_model.py'
+      - 'scripts/test_tennis_set_market_reassessment.py'
       - 'scripts/predict_today.py'
       - 'scripts/settle_tennis_history.py'
       - 'scripts/odds_builder.py'
@@ -39,6 +52,7 @@ jobs:
           node --check functions/api/sportybet-booking.js
           node --check ticket-drawer.js
           node --check expansion-odds-builder.js
+          node --check scripts/test_tennis_set_market_booking.mjs
       - name: Run set-outcome model tests
         run: PYTHONPATH=scripts python scripts/test_tennis_set_market_model.py
       - name: Run exact SportyBet market-mapping tests
@@ -46,4 +60,8 @@ jobs:
       - name: Run set-market settlement tests
         run: PYTHONPATH=scripts python scripts/test_tennis_set_market_settlement.py
       - name: Run end-to-end booking contract tests
-        run: PYTHONPATH=scripts python scripts/test_tennis_set_market_booking_contract.py
+        run: |
+          PYTHONPATH=scripts python scripts/test_tennis_set_market_booking_contract.py
+          python scripts/test_ticket_drawer_contract.py
+      - name: Run live exact-quote booking regressions
+        run: node scripts/test_tennis_set_market_booking.mjs
