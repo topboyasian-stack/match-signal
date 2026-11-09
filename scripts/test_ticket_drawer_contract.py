@@ -12,7 +12,7 @@ def require(condition, message):
 
 def main():
     css_version = "ticket-drawer.css?v=20261102-single-ticket1"
-    js_version = "ticket-drawer.js?v=20261107-manual-ticket-booking1"
+    js_version = "ticket-drawer.js?v=20261109-tennis-set-market1"
     pages = ("basketball.html", "football.html", "tennis.html", "league.html", "index.html", "upcoming.html", "qualified-best.html")
     for page in pages:
         source = (ROOT / page).read_text(encoding="utf-8")
@@ -38,6 +38,10 @@ def main():
         source = (ROOT / page).read_text(encoding="utf-8")
         require(alternatives_script in source, f"{page} does not load the live qualified-alternatives selector")
     require("../qualified-alternatives.js?v=20261108-research-alternatives2" in lab_html, "Virtual Lab must load the product-aware qualified-alternatives selector")
+    odds_builder_page = (ROOT / "odds-builder.html").read_text(encoding="utf-8")
+    require("expansion-odds-builder.js?v=20261109-tennis-set-market1" in odds_builder_page and
+            "ticket-drawer.js?v=20261109-tennis-set-market1" in odds_builder_page,
+            "Odds Builder must load the current tennis set-market builder and shared ticket scripts")
     selector = (ROOT / "qualified-alternatives.js").read_text(encoding="utf-8")
     require("querySelectorAll('[data-ms-fixture-id]')" in selector and "x.event_id===event&&x.sport===sport" in selector,
             "Qualified alternatives must attach to the exact fixture card and sport, never a different event")
@@ -106,7 +110,7 @@ def main():
             "NBA current totals must be selectable into the same ticket")
     require("nbaTotalsReleaseQualified(S.totalsOos,S.totalsProbability)" in nba and "nbaTotalRowQualified(p,S.totalsOos,S.totalsProbability,S.totalSnapshots,fresh)" in nba,
             "NBA ticket generation must retain the independent release and per-row gates")
-    require("../ticket-drawer.css?v=20261102-efootball-shared-ticket1" in lab_html and "../ticket-drawer.js?v=20261107-manual-ticket-booking1" in lab_html,
+    require("../ticket-drawer.css?v=20261102-efootball-shared-ticket1" in lab_html and "../ticket-drawer.js?v=20261109-tennis-set-market1" in lab_html,
             "Virtual Lab must load the shared floating ticket from its nested route")
     require("data-ms-ticket-add" in lab_app and 'data-ticket-sport="efootball"' in lab_app and "data-ticket-product" in lab_app and "efootballTicketReady" in lab_app,
             "Only qualified eFootball GT/eAdriatic exact-line prediction cards may add to the shared ticket")
