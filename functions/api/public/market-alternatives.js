@@ -165,6 +165,7 @@ export function buildPublicAlternatives(document, nowMs = Date.now()) {
     kickoff_more_than_two_minutes_away: 0,
     quote_fresh_within_15_minutes: 0,
     quote_not_current: 0,
+    research_only_due_to_ticket_mapping: 0,
     public_schema_valid: 0,
     different_from_primary_pick: 0,
     more_likely_than_primary: 0,
@@ -229,6 +230,7 @@ export function buildPublicAlternatives(document, nowMs = Date.now()) {
       continue;
     }
     diagnostics.public_schema_valid++;
+    if (item.ticket_selectable !== true) diagnostics.research_only_due_to_ticket_mapping++;
 
     if (repeatsPrimaryPick(row, item)) {
       reject("repeats_primary_pick");
