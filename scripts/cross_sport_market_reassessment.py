@@ -239,11 +239,15 @@ def _decorate_candidate(
     original_pick = str(row.get("builder_pick") or row.get("pick") or row.get("selection") or "").strip().lower()
     original_market = str(row.get("builder_market") or row.get("market") or "").strip()
     original_line = row.get("line")
-    original_probability = _num(row.get("builder_probability", row.get("model_probability", row.get("probability"))))
+    original_probability = None
+    original_probabilities = row.get("calibrated_probabilities") or row.get("probabilities") or {}
+    if isinstance(original_probabilities, dict) and original_pick:
+        original_probability = _num(original_probabilities.get(original_pick))
+    if original_probability is None and original_pick in {"over", "under"}:
+        original_total = ((row.get("analytics") or {}).get("total_games") or {})
+        original_probability = _num(original_total.get("calibrated_" + original_pick, original_total.get(original_pick)))
     if original_probability is None:
-        original_probabilities = row.get("calibrated_probabilities") or row.get("probabilities") or {}
-        if isinstance(original_probabilities, dict) and original_pick:
-            original_probability = _num(original_probabilities.get(original_pick))
+        original_probability = _num(row.get("builder_probability", row.get("model_probability", row.get("probability"))))
     if original_pick:
         candidate["original_primary_pick"] = original_pick
     if original_market:
@@ -618,8 +622,26 @@ def _virtual_options(now: datetime):
     result = _ORIGINALS["virtual_candidates"](now)
     rows = result[0] if isinstance(result, tuple) and result else result
     if isinstance(rows, list):
-        _record_options([x for x in rows if isinstance(x, dict)])
-        _RUN_PRIMARY.extend(copy.deepcopy([x for x in rows if isinstance(x, dict)]))
+        alternatives = []
+        for source in rows:
+            if not isinstance(source, dict):
+                continue
+            row = copy.deepcopy(source)
+            # virtual_candidates emits explicit directional candidates for both
+            # eFootball O/U sides. Preserve the feed's original preferred side so
+            # the public lane can exclude the primary and compare probabilities.
+            primary_pick = str(row.get("source_model_pick") or row.get("pick") or "").strip().lower()
+            primary_probabilities = row.get("probabilities") if isinstance(row.get("probabilities"), dict) else {}
+            primary_probability = _num(primary_probabilities.get(primary_pick)) if primary_pick else None
+            if primary_pick:
+                row["original_primary_pick"] = primary_pick
+            row["original_primary_market"] = "virtual_total"
+            row["original_primary_line"] = row.get("line")
+            if primary_probability is not None:
+                row["original_primary_probability"] = round(float(primary_probability), 6)
+            alternatives.append(row)
+        _record_options(alternatives)
+        _RUN_PRIMARY.extend(copy.deepcopy(alternatives))
     return result
 
 
