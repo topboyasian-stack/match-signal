@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-09T17:59:06.873357+00:00",
+  "generated_at": "2026-11-09T18:05:35.929170+00:00",
   "status": "DEGRADED",
   "critical_issues": 0,
   "warning_issues": 1,
@@ -8,19 +8,19 @@
     {
       "engine": "core_prediction_pipeline",
       "status": "PASS",
-      "age_hours": 1.89,
+      "age_hours": 1.99,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.13,
+      "age_hours": 0.09,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 0.07,
+      "age_hours": 0.18,
       "threshold_hours": 4
     },
     {
@@ -32,27 +32,27 @@
     {
       "engine": "prediction_desk_health",
       "status": "PASS",
-      "age_hours": 0.03,
+      "age_hours": 0.02,
       "threshold_hours": 2
     },
     {
       "engine": "virtual_participant_history",
       "status": "PASS",
-      "max_input_age_minutes": 2.4,
-      "virtual_lab_status_age_minutes": 4.5,
+      "max_input_age_minutes": 9.5,
+      "virtual_lab_status_age_minutes": 10.9,
       "threshold_minutes": 30.0,
       "stale_inputs": []
     },
     {
       "engine": "tennis_forward_discovery",
       "status": "STALE",
-      "age_hours": 10.92,
+      "age_hours": 11.03,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 0.08,
+      "age_hours": 0.19,
       "threshold_hours": 0.5,
       "heartbeat_source": "virtual_lab_live.json",
       "events_count": 619
@@ -60,7 +60,7 @@
     {
       "engine": "nba_live_observation_recorder",
       "status": "PASS",
-      "age_hours": 0.09,
+      "age_hours": 0.2,
       "threshold_hours": 0.25,
       "heartbeat_source": "nba_live_observations.json.gz",
       "games_tracked": 75,
@@ -105,7 +105,7 @@
     {
       "code": "TENNIS_FORWARD_DISCOVERY_STALE",
       "severity": "warning",
-      "detail": "tennis_forward_status age 10.92h exceeds the 8h threshold; the discovery result is too old to confirm current fixture coverage"
+      "detail": "tennis_forward_status age 11.03h exceeds the 8h threshold; the discovery result is too old to confirm current fixture coverage"
     },
     {
       "code": "SELECTION_GATE_EMPTY",
@@ -116,11 +116,11 @@
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
   "paper_only": true,
   "prediction_desk_filters": {
-    "past_kickoff_rows_hidden": 12,
+    "past_kickoff_rows_hidden": 1,
     "stale_live_flags_hidden": 0,
     "expired_settled_rows_hidden": 0,
-    "virtual_market_rows_held_for_kickoff_window": 559,
+    "virtual_market_rows_held_for_kickoff_window": 560,
     "virtual_rows_held_for_stale_participant_history": 0,
-    "virtual_rows_held_for_recent_product_drawdown": 31
+    "virtual_rows_held_for_recent_product_drawdown": 27
   }
 }
