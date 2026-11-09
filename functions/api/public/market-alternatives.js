@@ -77,12 +77,15 @@ export function publicAlternative(row, quote = {}) {
   if (total && (!Number.isFinite(line) || line <= 0)) return null;
   if (sport === "efootball" && !["18", "189"].includes(marketId)) return null;
   const ticketSelectable = isTicketSelectable(sport, product, market, pick, line, marketId);
-  const builderQualified = row.passed_builder_gates === true && quote.quoteFresh === true &&
+  const quoteFresh = quote.quoteFresh === true && odds !== null;
+  const quoteStatus = odds === null && quote.quoteStatus === "FRESH_EXACT"
+    ? "PRICE_UNAVAILABLE" : (quote.quoteStatus || "UNVERIFIED");
+  const builderQualified = row.passed_builder_gates === true && quoteFresh &&
     probability >= MIN_RECOMMENDED_PROBABILITY && ticketSelectable;
   const belowBaseline = probability < RESEARCH_DISPLAY_BASELINE;
   const qualificationStatus = builderQualified ? "BUILDER_QUALIFIED" :
     !ticketSelectable ? "RESEARCH_ONLY_MARKET_NOT_TICKET_MAPPED" :
-    !quote.quoteFresh ? "RESEARCH_ONLY_QUOTE_NOT_CURRENT" :
+    !quoteFresh ? "RESEARCH_ONLY_QUOTE_NOT_CURRENT" :
     belowBaseline ? "RESEARCH_ONLY_BELOW_BASELINE" : "RESEARCH_ONLY";
   const marketLabel = total
     ? (sport === "tennis" ? "Total games" : sport === "basketball" ? "Full-game total" : "Total goals")
@@ -98,7 +101,7 @@ export function publicAlternative(row, quote = {}) {
     probability,
     builder_qualified: builderQualified,
     ticket_selectable: ticketSelectable,
-    quote_status: quote.quoteStatus || "UNVERIFIED",
+    quote_status: quoteStatus,
     below_research_baseline: belowBaseline,
     qualification_status: qualificationStatus,
     role: "ALTERNATIVE", source: "SYSTEM_RECOMMENDED"
@@ -207,11 +210,15 @@ export function buildPublicAlternatives(document, nowMs = Date.now()) {
     // independently rechecks the live event, market, line and current price.
     const quote = timestamp(row.quote_timestamp || row.market_odds_timestamp || row.odds_timestamp);
     const age = quote === null ? null : (nowMs - quote) / 1000;
-    const quoteFresh = row.fresh_exact_quote === true && age !== null && age >= 0 && age <= MAX_QUOTE_AGE_SECONDS;
+    const oddsValue = Number(row.bookmaker_odds);
+    const oddsAvailable = Number.isFinite(oddsValue) && oddsValue > 1;
+    const quoteFreshByTime = row.fresh_exact_quote === true && age !== null && age >= 0 && age <= MAX_QUOTE_AGE_SECONDS;
+    const quoteFresh = quoteFreshByTime && oddsAvailable;
     const quoteStatus = quoteFresh ? "FRESH_EXACT" :
       age === null ? "UNVERIFIED" :
       age < 0 ? "INVALID_TIMESTAMP" :
       age > MAX_QUOTE_AGE_SECONDS ? "STALE" :
+      !oddsAvailable ? "PRICE_UNAVAILABLE" :
       row.fresh_exact_quote === true ? "NOT_VERIFIED_EXACT" : "NOT_MARKED_EXACT";
     if (quoteFresh) diagnostics.quote_fresh_within_15_minutes++;
     else diagnostics.quote_not_current++;
