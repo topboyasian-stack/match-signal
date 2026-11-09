@@ -32,9 +32,18 @@ jobs:
           python-version: '3.12'
       - name: Install test dependencies
         run: python -m pip install --upgrade requests curl_cffi
-      - name: Compile set-market modules
-        run: python -m py_compile scripts/tennis_set_market_model.py scripts/tennis_set_market_reassessment.py scripts/predict_today.py scripts/settle_tennis_history.py
+      - name: Compile set-market Python modules
+        run: python -m py_compile scripts/tennis_set_market_model.py scripts/tennis_set_market_reassessment.py scripts/predict_today.py scripts/settle_tennis_history.py scripts/odds_ticket_tracker.py
+      - name: Check JavaScript integrations
+        run: |
+          node --check functions/api/sportybet-booking.js
+          node --check ticket-drawer.js
+          node --check expansion-odds-builder.js
       - name: Run set-outcome model tests
         run: PYTHONPATH=scripts python scripts/test_tennis_set_market_model.py
       - name: Run exact SportyBet market-mapping tests
         run: PYTHONPATH=scripts python scripts/test_tennis_set_market_reassessment.py
+      - name: Run set-market settlement tests
+        run: PYTHONPATH=scripts python scripts/test_tennis_set_market_settlement.py
+      - name: Run end-to-end booking contract tests
+        run: PYTHONPATH=scripts python scripts/test_tennis_set_market_booking_contract.py
