@@ -33,7 +33,7 @@ require("MANUAL_TICKET_REJECTED_PARTIAL" in api,
 
 require("item.market==='player_to_win_set'" in drawer,
         "Shared ticket persistence must whitelist only the supported tennis set market.")
-require("outcome_id:outcomeId" in drawer and "market_quote_timestamp:quoteTimestamp" in drawer,
+require("outcome_id:market==='player_to_win_set'?outcomeId:null" in drawer and "market_quote_timestamp:market==='player_to_win_set'?quoteTimestamp:null" in drawer,
         "Shared ticket must preserve outcome identity and original quote timestamp.")
 require("sportybet_outcome_id:item.outcome_id" in drawer and "market_quote_timestamp:item.market_quote_timestamp" in drawer,
         "Booking request must carry the exact outcome and quote snapshot.")
