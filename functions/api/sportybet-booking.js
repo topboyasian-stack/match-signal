@@ -1199,7 +1199,7 @@ async function handlePost(context) {
           }
           if (leg.market === 'player_to_win_set') {
             return leg.sport !== 'tennis' || !['p1', 'p2'].includes(leg.pick) ||
-              !leg.market_id || !leg.sportybet_specifier ||
+              !leg.market_id ||
               !leg.sportybet_outcome_id || !leg.sportybet_outcome_name ||
               !Number.isFinite(Number(leg.quoted_odds)) || Number(leg.quoted_odds) <= 1 ||
               !Number.isFinite(Date.parse(leg.market_quote_timestamp));
