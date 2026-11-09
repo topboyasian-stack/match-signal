@@ -25,6 +25,7 @@ function quoteLabel(x){
 }
 function qualificationLabel(x){
  if(x.builder_qualified===true)return 'Builder-qualified';
+ if(!x.sportybet_event_id||!x.market_id)return 'Research visible · SportyBet event/market mapping missing';
  if(x.ticket_selectable!==true)return 'Research display only · ticket mapping not enabled';
  if(x.quote_status!=='FRESH_EXACT')return 'Research only · current quote not verified';
  if(x.below_research_baseline===true)return 'Research only · below the 55% display baseline';
