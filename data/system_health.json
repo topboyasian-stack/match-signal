@@ -1,26 +1,26 @@
 {
-  "generated_at": "2026-11-09T10:45:27.676852+00:00",
-  "status": "HEALTHY",
+  "generated_at": "2026-11-09T10:54:12.770370+00:00",
+  "status": "DEGRADED",
   "critical_issues": 0,
-  "warning_issues": 0,
+  "warning_issues": 1,
   "info_issues": 1,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
       "status": "PASS",
-      "age_hours": 0.42,
+      "age_hours": 0.57,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.06,
+      "age_hours": 0.13,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 1.08,
+      "age_hours": 1.23,
       "threshold_hours": 4
     },
     {
@@ -32,27 +32,27 @@
     {
       "engine": "prediction_desk_health",
       "status": "PASS",
-      "age_hours": 0.03,
+      "age_hours": 0.05,
       "threshold_hours": 2
     },
     {
       "engine": "virtual_participant_history",
       "status": "PASS",
-      "max_input_age_minutes": 17.0,
-      "virtual_lab_status_age_minutes": 19.1,
+      "max_input_age_minutes": 24.7,
+      "virtual_lab_status_age_minutes": 27.8,
       "threshold_minutes": 30.0,
       "stale_inputs": []
     },
     {
       "engine": "tennis_forward_discovery",
       "status": "PASS",
-      "age_hours": 3.7,
+      "age_hours": 3.84,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
-      "status": "PASS",
-      "age_hours": 0.44,
+      "status": "STALE",
+      "age_hours": 0.59,
       "threshold_hours": 0.5,
       "heartbeat_source": "virtual_lab_live.json",
       "events_count": 699
@@ -60,7 +60,7 @@
     {
       "engine": "nba_live_observation_recorder",
       "status": "PASS",
-      "age_hours": 0.1,
+      "age_hours": 0.24,
       "threshold_hours": 0.25,
       "heartbeat_source": "nba_live_observations.json.gz",
       "games_tracked": 75,
@@ -103,6 +103,11 @@
   ],
   "issues": [
     {
+      "code": "VIRTUAL_LIVE_FEED_STALE",
+      "severity": "warning",
+      "detail": "virtual_lab_live.json age 0.59h exceeds 0.50h; a downstream Unified Upcoming refresh cannot substitute for a fresh source snapshot"
+    },
+    {
       "code": "SELECTION_GATE_EMPTY",
       "severity": "info",
       "detail": "Current prediction feed exists but the selected-candidate layer returned zero qualified selections; no gate was weakened"
@@ -114,8 +119,8 @@
     "past_kickoff_rows_hidden": 0,
     "stale_live_flags_hidden": 0,
     "expired_settled_rows_hidden": 0,
-    "virtual_market_rows_held_for_kickoff_window": 351,
+    "virtual_market_rows_held_for_kickoff_window": 344,
     "virtual_rows_held_for_stale_participant_history": 0,
-    "virtual_rows_held_for_recent_product_drawdown": 70
+    "virtual_rows_held_for_recent_product_drawdown": 69
   }
 }
