@@ -356,6 +356,9 @@ def install(core: Any) -> None:
             # The friendly label is separate and must never replace a provider ID.
             "pick": str(detail.get("player_side") or "").lower(),
             "selection_label": f"{player} to win at least one set",
+            "player_1": row.get("player_1"),
+            "player_2": row.get("player_2"),
+            "sportybet_event_id": row.get("sportybet_event_id"),
             "line": None,
             "tennis_set_market": copy.deepcopy(detail),
             "sportybet_market_id": row.get("sportybet_market_id"),
