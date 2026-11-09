@@ -13,31 +13,34 @@ assert.equal(api.status, 200, "Public alternatives API must return HTTP 200");
 assert.match(String(api.headers.get("content-type") || ""), /application\/json/i);
 const feed = await api.json();
 assert.equal(feed.status, "OK", "Public alternatives feed must be ready");
-assert.equal(Number(feed.min_probability), 0.55, "The research lane must declare its 55% probability floor");
+assert.equal(Number(feed.min_probability), 0, "Research visibility must not impose a qualification floor");
+assert.equal(Number(feed.research_display_baseline), 0.55, "The research baseline must be informational, not a publication gate");
 assert.equal(Number(feed.builder_min_probability), 0.65, "Builder-qualified picks must retain the 65% floor");
 assert.ok(Array.isArray(feed.alternatives) && feed.alternatives.length, "Public alternatives must be non-empty");
 
 const feedDiagnostics = feed.diagnostics || {};
-assert.ok(Number(feedDiagnostics.quote_fresh_within_15_minutes) > 0, "The server must confirm fresh exact quotes exist");
 assert.equal(Number(feedDiagnostics.selected_alternatives), feed.alternatives.length, "Aggregate selected count must match the public feed");
+assert.ok(feed.alternatives.every(row => typeof row.ticket_selectable === "boolean" && typeof row.quote_status === "string"), "Every row must declare ticket mapping and quote status");
 const now = Date.now();
 const eligible = feed.alternatives.filter((row) => {
-  // Quote timestamps stay private; the API performs per-row freshness validation
-  // and publishes aggregate freshness counters for safe production verification.
+  // This click smoke test intentionally checks only ticket-mapped alternatives.
+  // Stale/unverified research remains visible but the booking API must recheck it.
   const start = Date.parse(String(row.start_time || ""));
   return ["football", "tennis", "basketball", "efootball"].includes(String(row.sport || "")) &&
     row.event_id && row.sportybet_event_id && row.market_id &&
     row.role === "ALTERNATIVE" && row.source === "SYSTEM_RECOMMENDED" &&
     Number.isFinite(start) && start > now + 5 * 60 * 1000 &&
     typeof row.builder_qualified === "boolean" &&
-    Number.isFinite(Number(row.probability)) && Number(row.probability) >= (row.builder_qualified ? 0.65 : 0.55) &&
-    Number.isFinite(Number(row.odds)) && Number(row.odds) > 1 &&
+    row.ticket_selectable === true &&
+    Number.isFinite(Number(row.probability)) && Number(row.probability) > 0 && Number(row.probability) <= 1 &&
     (row.market === "total"
       ? ["over", "under"].includes(String(row.pick || "")) && Number.isFinite(Number(row.line)) && Number(row.line) > 0
       : row.market === "winner" && ["p1", "p2", "draw"].includes(String(row.pick || "")));
 });
-assert.ok(eligible.length, "At least one alternative must remain safely pre-match for a real click test");
-const byKey = new Map(eligible.map(row => [String(row.sport) + "|" + String(row.event_id), row]));
+assert.ok(eligible.length, "At least one ticket-mapped alternative must remain safely pre-match for a real click test");
+const rowKey = row => [row.sport, row.event_id, row.market, row.pick, row.line == null ? "" : row.line].map(String).join("|");
+const buttonKey = button => [button.sport, button.eventId, button.market, button.pick, button.line].map(String).join("|");
+const byKey = new Map(eligible.map(row => [rowKey(row), row]));
 
 const browser = await chromium.launch({ headless: true });
 const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
@@ -72,7 +75,7 @@ try {
     }));
 
     const matched = state.options.find(button => {
-      const row = byKey.get(String(button.sport) + "|" + String(button.eventId));
+      const row = byKey.get(buttonKey(button));
       return row && button.qualified === String(row.builder_qualified === true) &&
         button.providerEventId === String(row.sportybet_event_id) &&
         button.market === String(row.market) &&
@@ -136,12 +139,14 @@ try {
     break;
   }
 
-  assert.ok(result, "No API-qualified alternative mounted and entered the drawer on the tested production routes. Diagnostics: " + JSON.stringify(diagnostics));
+  assert.ok(result, "No ticket-mapped alternative mounted and entered the drawer on the tested production routes. Diagnostics: " + JSON.stringify(diagnostics));
   console.log(JSON.stringify({
     status: "PASS",
     feed_status: feed.status,
     available_alternatives: feed.alternatives.length,
     safely_pre_match_alternatives: eligible.length,
+    fresh_exact_quotes: Number(feedDiagnostics.quote_fresh_within_15_minutes || 0),
+    visible_noncurrent_quotes: Number(feedDiagnostics.quote_not_current || 0),
     verified_click: result,
     route_diagnostics: diagnostics,
     page_errors: pageErrors

@@ -232,6 +232,44 @@ def _decorate_candidate(
     exact_market_id: str | None = None,
 ) -> dict[str, Any]:
     candidate = dict(row)
+    # Preserve the original fixture pick before mutating builder_* fields for
+    # the alternative. The public publisher uses this to avoid labelling the
+    # primary as its own alternative and to verify the alternative is more
+    # likely than that primary when a comparable probability exists.
+    original_pick = str(row.get("builder_pick") or row.get("pick") or row.get("selection") or "").strip().lower()
+    original_market = str(row.get("builder_market") or row.get("market") or "").strip()
+    original_line = row.get("line")
+    if not original_market:
+        if original_pick in {"p1", "p2", "draw"}:
+            original_market = "winner"
+        elif original_pick in {"over", "under"}:
+            source_sport = str(row.get("sport") or sport).lower()
+            if source_sport == "virtual":
+                original_market = "virtual_total"
+            elif source_sport == "tennis":
+                original_market = "total_games"
+            elif source_sport == "football":
+                original_market = "total_goals"
+    if original_line is None and original_market in {"total_games", "total_goals", "total_ou", "virtual_total", "over_under"}:
+        original_total = ((row.get("analytics") or {}).get("total_games") or {})
+        original_line = original_total.get("line")
+    original_probability = None
+    original_probabilities = row.get("calibrated_probabilities") or row.get("probabilities") or {}
+    if isinstance(original_probabilities, dict) and original_pick:
+        original_probability = _num(original_probabilities.get(original_pick))
+    if original_probability is None and original_pick in {"over", "under"}:
+        original_total = ((row.get("analytics") or {}).get("total_games") or {})
+        original_probability = _num(original_total.get("calibrated_" + original_pick, original_total.get(original_pick)))
+    if original_probability is None:
+        original_probability = _num(row.get("builder_probability", row.get("model_probability", row.get("probability"))))
+    if original_pick:
+        candidate["original_primary_pick"] = original_pick
+    if original_market:
+        candidate["original_primary_market"] = original_market
+    if original_line is not None:
+        candidate["original_primary_line"] = original_line
+    if original_probability is not None:
+        candidate["original_primary_probability"] = round(float(original_probability), 6)
     candidate["builder_market"] = market
     candidate["builder_pick"] = side
     candidate["builder_probability"] = round(float(probability), 6)
@@ -598,8 +636,26 @@ def _virtual_options(now: datetime):
     result = _ORIGINALS["virtual_candidates"](now)
     rows = result[0] if isinstance(result, tuple) and result else result
     if isinstance(rows, list):
-        _record_options([x for x in rows if isinstance(x, dict)])
-        _RUN_PRIMARY.extend(copy.deepcopy([x for x in rows if isinstance(x, dict)]))
+        alternatives = []
+        for source in rows:
+            if not isinstance(source, dict):
+                continue
+            row = copy.deepcopy(source)
+            # virtual_candidates emits explicit directional candidates for both
+            # eFootball O/U sides. Preserve the feed's original preferred side so
+            # the public lane can exclude the primary and compare probabilities.
+            primary_pick = str(row.get("source_model_pick") or row.get("pick") or "").strip().lower()
+            primary_probabilities = row.get("probabilities") if isinstance(row.get("probabilities"), dict) else {}
+            primary_probability = _num(primary_probabilities.get(primary_pick)) if primary_pick else None
+            if primary_pick:
+                row["original_primary_pick"] = primary_pick
+            row["original_primary_market"] = "virtual_total"
+            row["original_primary_line"] = row.get("line")
+            if primary_probability is not None:
+                row["original_primary_probability"] = round(float(primary_probability), 6)
+            alternatives.append(row)
+        _record_options(alternatives)
+        _RUN_PRIMARY.extend(copy.deepcopy(alternatives))
     return result
 
 
@@ -950,7 +1006,11 @@ def _make_audit_record(core: Any, row: dict[str, Any], now: datetime) -> dict[st
         "market": market,
         "line": line,
         "pick": side,
-        "original_pick": row.get("pick"),
+        "original_pick": row.get("original_primary_pick") or row.get("pick"),
+        "original_primary_pick": row.get("original_primary_pick"),
+        "original_primary_market": row.get("original_primary_market"),
+        "original_primary_line": row.get("original_primary_line"),
+        "original_primary_probability": row.get("original_primary_probability"),
         "model_probability": round(p, 6) if p is not None else None,
         "bookmaker_odds": price,
         "market_implied_probability": leg.get("market_implied_probability"),

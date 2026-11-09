@@ -266,15 +266,42 @@ class CrossSportReassessmentTests(unittest.TestCase):
         self.assertEqual(age, 30.0)
         self.assertEqual(stamp, row["quote_timestamp"])
 
-    def test_virtual_wrapper_preserves_builder_signature_and_records_candidates(self):
+    def test_decorated_alternative_preserves_primary_pick_market_and_probability(self):
+        row = sample_football(self.now)
+        market = row["sportybet_market"]["markets"][0]
+        candidate = reassessment._decorate_candidate(
+            row, sport="football", market="total_goals", side="under",
+            probability=0.72, market_obj=market,
+            odds_rows=[{"side": "over", "odds": 2.05}, {"side": "under", "odds": 1.75}],
+            line=2.5, outcome={"id": "under-id", "name": "Under 2.5", "odds": 1.75},
+            model_source="test market alternative",
+        )
+        self.assertEqual(candidate["builder_pick"], "under")
+        self.assertEqual(candidate["original_primary_pick"], "p1")
+        self.assertEqual(candidate["original_primary_market"], "winner")
+        self.assertEqual(candidate["original_primary_probability"], 0.50)
+        self.assertEqual(candidate.get("original_primary_line"), row.get("line"))
+
+    def test_virtual_wrapper_preserves_builder_signature_and_primary_comparison_metadata(self):
         old = reassessment._ORIGINALS.get("virtual_candidates")
         try:
-            candidate = {"sport": "virtual", "event_id": "virtual-1", "builder_market": "virtual_total"}
+            candidate = {
+                "sport": "virtual", "event_id": "virtual-1",
+                "builder_market": "virtual_total", "pick": "over",
+                "source_model_pick": "over", "line": 8.5,
+                "probabilities": {"over": 0.57, "under": 0.43},
+            }
             reassessment._ORIGINALS["virtual_candidates"] = lambda now: [candidate]
             reassessment._RUN_OPTIONS.clear()
             result = reassessment._virtual_options(self.now)
-            self.assertEqual(result, [candidate])
-            self.assertEqual(reassessment._RUN_OPTIONS, [candidate])
+            self.assertEqual(result, [candidate], "the existing Builder-facing return shape must not change")
+            self.assertEqual(len(reassessment._RUN_OPTIONS), 1)
+            recorded = reassessment._RUN_OPTIONS[0]
+            self.assertEqual(recorded["original_primary_pick"], "over")
+            self.assertEqual(recorded["original_primary_market"], "virtual_total")
+            self.assertEqual(recorded["original_primary_line"], 8.5)
+            self.assertEqual(recorded["original_primary_probability"], 0.57)
+            self.assertEqual(candidate.get("original_primary_pick"), None, "metadata must not mutate the core candidate object")
         finally:
             if old is None:
                 reassessment._ORIGINALS.pop("virtual_candidates", None)
