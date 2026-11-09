@@ -154,6 +154,49 @@ test("a missing exact side price remains visible but cannot claim a fresh quote"
   assert.equal(payload.alternatives[0].builder_qualified, false);
 });
 
+test("research alternatives remain visible when SportyBet mapping and primary-pick metadata are missing", async () => {
+  const payload = await (await call([candidate({
+    event_id: "unmapped-research",
+    sportybet_event_id: "",
+    sportybet_market_id: "",
+    passed_builder_gates: false,
+    original_pick: undefined,
+    original_primary_pick: undefined,
+    primary_prediction_id: undefined,
+    fresh_exact_quote: false,
+    bookmaker_odds: null,
+    model_probability: 0.61
+  })])).json();
+  assert.equal(payload.alternatives.length, 1);
+  const row = payload.alternatives[0];
+  assert.equal(row.event_id, "unmapped-research");
+  assert.equal(row.sportybet_event_id, "");
+  assert.equal(row.market_id, "");
+  assert.equal(row.ticket_selectable, false);
+  assert.equal(row.builder_qualified, false);
+  assert.equal(row.primary_comparison_status, "PRIMARY_PROBABILITY_UNAVAILABLE");
+});
+
+test("eFootball alternatives outside current SportyBet market mapping remain research-visible", async () => {
+  const payload = await (await call([candidate({
+    sport: "virtual",
+    product: "efootball_gt",
+    market: "virtual_total",
+    line: 8.5,
+    pick: "under",
+    sportybet_event_id: "",
+    sportybet_market_id: "777",
+    passed_builder_gates: false,
+    fresh_exact_quote: false,
+    bookmaker_odds: null
+  })])).json();
+  assert.equal(payload.alternatives.length, 1);
+  assert.equal(payload.alternatives[0].sport, "efootball");
+  assert.equal(payload.alternatives[0].market_id, "777");
+  assert.equal(payload.alternatives[0].ticket_selectable, false);
+  assert.equal(payload.alternatives[0].builder_qualified, false);
+});
+
 test("BTTS and double-chance remain visible but are not offered as unsupported ticket buttons", async () => {
   const btts = candidate({
     event_id: "btts-fixture", market: "btts", line: null, pick: "yes",
