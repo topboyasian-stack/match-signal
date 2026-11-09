@@ -175,6 +175,7 @@ test("research alternatives remain visible when SportyBet mapping and primary-pi
   assert.equal(row.ticket_selectable, false);
   assert.equal(row.builder_qualified, false);
   assert.equal(row.primary_comparison_status, "PRIMARY_PROBABILITY_UNAVAILABLE");
+  assert.equal(payload.diagnostics.research_only_due_to_ticket_mapping, 1);
 });
 
 test("eFootball alternatives outside current SportyBet market mapping remain research-visible", async () => {
