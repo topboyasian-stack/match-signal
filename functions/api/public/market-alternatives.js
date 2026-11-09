@@ -74,11 +74,12 @@ export function publicAlternative(row, quote = {}) {
   const oddsValue = Number(row.bookmaker_odds);
   const odds = Number.isFinite(oddsValue) && oddsValue > 1 ? oddsValue : null;
   const line = row.line == null ? null : Number(row.line);
-  if (!eventId || !sportybetEventId || !marketId || !Number.isFinite(probability) ||
+  if (!eventId || !Number.isFinite(probability) ||
       probability <= 0 || probability > 1 || !timestamp(startTime)) return null;
   if (total && (!Number.isFinite(line) || line <= 0)) return null;
-  if (sport === "efootball" && !["18", "189"].includes(marketId)) return null;
-  const ticketSelectable = isTicketSelectable(sport, product, market, pick, line, marketId);
+  // Unsupported/missing provider market IDs remain visible as research-only candidates.
+  const ticketSelectable = Boolean(sportybetEventId && marketId) &&
+    isTicketSelectable(sport, product, market, pick, line, marketId);
   const quoteFresh = quote.quoteFresh === true && odds !== null;
   const quoteStatus = odds === null && quote.quoteStatus === "FRESH_EXACT"
     ? "PRICE_UNAVAILABLE" : (quote.quoteStatus || "UNVERIFIED");
@@ -128,13 +129,13 @@ function publicAlternativeRejectReason(row) {
   const eventId = String(row.event_id || "");
   const sportybetEventId = String(row.sportybet_event_id || (sport === "efootball" ? row.event_id : ""));
   const marketId = String(row.sportybet_market_id || "");
-  if (!eventId || !sportybetEventId || !marketId) return "missing_exact_market_identity";
+  if (!eventId) return "missing_fixture_identity";
   const probability = Number(row.model_probability);
   if (!Number.isFinite(probability) || probability <= 0 || probability > 1) return "invalid_model_probability";
   if (!timestamp(row.start_time)) return "invalid_kickoff_time";
   const line = row.line == null ? null : Number(row.line);
   if (kind === "total" && (!Number.isFinite(line) || line <= 0)) return "missing_or_invalid_total_line";
-  if (sport === "efootball" && !["18", "189"].includes(marketId)) return "unsupported_efootball_market_id";
+  // Provider market-ID support is enforced by isTicketSelectable, not research visibility.
   return "other_public_validation_failure";
 }
 
@@ -189,12 +190,9 @@ export function buildPublicAlternatives(document, nowMs = Date.now()) {
 
     if (row.fresh_exact_quote === true) diagnostics.marked_fresh_exact_quote++;
 
-    if (row.passed_builder_gates !== true &&
-        !String(row.original_primary_pick || row.original_pick || row.primary_prediction_id || "").trim()) {
-      reject("missing_primary_link");
-      continue;
+    if (String(row.original_primary_pick || row.original_pick || row.primary_prediction_id || "").trim()) {
+      diagnostics.primary_link_present++;
     }
-    diagnostics.primary_link_present++;
 
     const start = timestamp(row.start_time);
     if (start === null) {
