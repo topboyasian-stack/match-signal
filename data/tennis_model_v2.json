@@ -1,10 +1,10 @@
 {
-  "updated_at": "2026-11-07T14:57:48.791939+00:00",
+  "updated_at": "2026-11-09T18:47:57.212080+00:00",
   "model_version": "2026-11-05-atp-prequential-walkforward",
   "status": "PAPER_RESEARCH_ONLY",
   "active_scope": "ATP",
-  "training_records": 184,
-  "archived_valid_records_all_tours": 341,
+  "training_records": 194,
+  "archived_valid_records_all_tours": 351,
   "inactive_tours_retained_as_research": [
     "WTA"
   ],
@@ -15,33 +15,33 @@
       {
         "elo_weight": 0.0,
         "n": 80,
-        "accuracy": 0.425,
-        "brier": 0.28506
+        "accuracy": 0.3625,
+        "brier": 0.30319
       },
       {
         "elo_weight": 0.25,
         "n": 80,
-        "accuracy": 0.45,
-        "brier": 0.27252
+        "accuracy": 0.4,
+        "brier": 0.28638
       },
       {
         "elo_weight": 0.5,
         "n": 80,
-        "accuracy": 0.4875,
-        "brier": 0.26189
+        "accuracy": 0.4125,
+        "brier": 0.27141
       },
       {
         "elo_weight": 0.75,
         "n": 80,
-        "accuracy": 0.5,
-        "brier": 0.25317
+        "accuracy": 0.425,
+        "brier": 0.25828
       }
     ],
     "selected": {
       "elo_weight": 0.75,
       "n": 80,
-      "accuracy": 0.5,
-      "brier": 0.25317
+      "accuracy": 0.425,
+      "brier": 0.25828
     },
     "objective": "minimum chronological-window Brier; accuracy tie-breaker",
     "current_candidate_weight": 0.75,
@@ -52,14 +52,14 @@
   "prequential_walkforward": {
     "active_scope": "ATP",
     "prequential_model": {
-      "n": 184,
-      "accuracy": 0.5109,
-      "brier": 0.25479
+      "n": 194,
+      "accuracy": 0.5,
+      "brier": 0.25629
     },
     "raw_base_model": {
-      "n": 184,
-      "accuracy": 0.4402,
-      "brier": 0.28561
+      "n": 194,
+      "accuracy": 0.4278,
+      "brier": 0.2899
     },
     "brier_improved": true,
     "evaluation": "each fixture is forecast using only earlier ATP results; ELO weight is reselected from prior results only"
@@ -1352,28 +1352,98 @@
       "prior_records": 183,
       "elo_weight": 0.75,
       "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186468",
+      "start_time": "2026-11-02T11:30Z",
+      "prior_records": 184,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186448",
+      "start_time": "2026-11-02T13:00Z",
+      "prior_records": 185,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186469",
+      "start_time": "2026-11-02T13:00Z",
+      "prior_records": 186,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186460",
+      "start_time": "2026-11-02T14:30Z",
+      "prior_records": 187,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186447",
+      "start_time": "2026-11-02T14:30Z",
+      "prior_records": 188,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186491",
+      "start_time": "2026-11-04T19:45Z",
+      "prior_records": 189,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186498",
+      "start_time": "2026-11-05T13:00Z",
+      "prior_records": 190,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186495",
+      "start_time": "2026-11-05T19:30Z",
+      "prior_records": 191,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186500",
+      "start_time": "2026-11-06T13:00Z",
+      "prior_records": 192,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186493",
+      "start_time": "2026-11-06T21:30Z",
+      "prior_records": 193,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
     }
   ],
-  "players_in_elo": 149,
+  "players_in_elo": 150,
   "ranking_coverage": {
     "ATP": 150
   },
-  "current_predictions_with_rank_enrichment": 15,
-  "current_active_predictions_rewritten": 15,
+  "current_predictions_with_rank_enrichment": 9,
+  "current_active_predictions_rewritten": 9,
   "walkforward_probability_calibration": [
     {
       "low": 0.5,
       "high": 0.55,
-      "n": 136,
-      "accuracy": 0.5221,
-      "calibrated_confidence": 0.522
+      "n": 142,
+      "accuracy": 0.5211,
+      "calibrated_confidence": 0.5211
     },
     {
       "low": 0.55,
       "high": 0.6,
-      "n": 34,
-      "accuracy": 0.4706,
-      "calibrated_confidence": 0.4761
+      "n": 38,
+      "accuracy": 0.4211,
+      "calibrated_confidence": 0.4285
     },
     {
       "low": 0.6,
