@@ -308,7 +308,10 @@ function currentSelectionForTarget(leg, event) {
   const sport = String(leg?.sport || '').toLowerCase();
   const market = String(leg?.market || '').toLowerCase();
   const product = productForLeg(leg);
-  if (sport === 'basketball') return findBasketballSelection(leg, event);
+  if (sport === 'basketball') return findBasketballSelection(leg,event);
+  if (sport === 'tennis' && market === 'player_to_win_set') {
+    return findPlayerToWinSetSelection(leg, event);
+  }
   // Odds Builder's eFootball legs are serialized as sport="virtual",
   // market="virtual_total", product="efootball_gt". Treat that shape as an
   // exact totals market during direct-ID matching, not as a match-winner pick.
