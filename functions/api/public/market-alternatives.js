@@ -11,7 +11,8 @@ function json(body, status = 200) {
     status,
     headers: {
       "content-type": "application/json; charset=utf-8",
-      "cache-control": "public, max-age=30, stale-while-revalidate=30",
+      // The source ledger refreshes independently; never let an edge cache hide a newly published alternative snapshot.
+      "cache-control": "no-store, max-age=0",
       "x-content-type-options": "nosniff"
     }
   });
