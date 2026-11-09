@@ -552,7 +552,7 @@
         var settledAt=leg.settled_at?local(leg.settled_at):'';
         return '<div class="ticket-leg '+cls+'">'+
           '<div class="ticket-leg-index">LEG '+(i+1)+'</div>'+
-          '<div class="ticket-leg-core"><strong>'+esc2(leg.match||'Unknown fixture')+'</strong><span>'+esc2(leg.pick||'—')+'</span><small>'+esc2(String(leg.market||'SportyBet market'))+(leg.bookmaker_odds!=null?' · SportyBet '+esc2(leg.bookmaker_odds):'')+'</small></div>'+
+          '<div class="ticket-leg-core"><strong>'+esc2(leg.match||'Unknown fixture')+'</strong><span>'+esc2(leg.selection_label||leg.pick||'—')+'</span><small>'+esc2(String(leg.market||'SportyBet market'))+(leg.bookmaker_odds!=null?' · SportyBet '+esc2(leg.bookmaker_odds):'')+'</small></div>'+
           '<div class="ticket-leg-result">'+legStatus(leg)+'<small>'+esc2(result)+(settledAt?' · '+esc2(settledAt):'')+'</small></div>'+
         '</div>';
       }).join('');
