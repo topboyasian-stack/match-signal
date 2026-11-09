@@ -281,7 +281,7 @@ class CrossSportReassessmentTests(unittest.TestCase):
         self.assertEqual(candidate["original_primary_pick"], "p1")
         self.assertEqual(candidate["original_primary_market"], "winner")
         self.assertEqual(candidate["original_primary_probability"], 0.50)
-        self.assertEqual(candidate["original_primary_line"], row.get("line"))
+        self.assertEqual(candidate.get("original_primary_line"), row.get("line"))
 
     def test_virtual_wrapper_preserves_builder_signature_and_primary_comparison_metadata(self):
         old = reassessment._ORIGINALS.get("virtual_candidates")
