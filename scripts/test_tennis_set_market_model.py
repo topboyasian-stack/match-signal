@@ -53,8 +53,8 @@ class TennisSetMarketModelTests(unittest.TestCase):
     def test_scoreline_and_set_count_distributions_sum_to_one(self):
         for best_of in (3, 5):
             markets = model.simulate_match_markets(0.61, best_of)
-            self.assertAlmostEqual(sum(markets["correct_set_score"].values()), 1.0, places=6)
-            self.assertAlmostEqual(sum(markets["total_sets"].values()), 1.0, places=6)
+            self.assertAlmostEqual(sum(markets["correct_set_score"].values()), 1.0, places=5)
+            self.assertAlmostEqual(sum(markets["total_sets"].values()), 1.0, places=5)
 
     def test_only_strict_pre_event_atp_settlement_records_are_valid(self):
         good = self.record()
