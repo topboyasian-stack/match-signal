@@ -11,6 +11,7 @@ function json(body, status = 200) {
     status,
     headers: {
       "content-type": "application/json; charset=utf-8",
+      "x-match-signal-alternatives-contract": "research-visible-v2",
       // The source ledger refreshes independently; never let an edge cache hide a newly published alternative snapshot.
       "cache-control": "no-store, max-age=0",
       "x-content-type-options": "nosniff"
