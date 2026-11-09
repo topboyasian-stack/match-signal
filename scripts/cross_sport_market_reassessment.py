@@ -356,8 +356,10 @@ def _football_options(core: Any, now: datetime, rows: list[dict[str, Any]]) -> t
             continue
         is_fresh, _, quote_stamp = _fresh_quote(row, now)
         snapshot = row.get("sportybet_market") or {}
-        if snapshot.get("available") is not True:
-            continue
+        # Do not suppress model research just because the current bookmaker snapshot
+        # is unavailable. Existing model probabilities and archived market definitions
+        # may still support a clearly labelled research row; freshness and exact
+        # provider identity remain mandatory for the active/ticket lane below.
         probabilities = row.get("calibrated_probabilities") or row.get("probabilities") or {}
         winner_market = _find_market(row, lambda m: _market_is_winner(m, "football"))
         if winner_market:
@@ -522,8 +524,8 @@ def _tennis_options(core: Any, now: datetime, rows: list[dict[str, Any]], baseli
             continue
         is_fresh, _, _ = _fresh_quote(row, now)
         snapshot = row.get("sportybet_market") or {}
-        if snapshot.get("available") is not True:
-            continue
+        # Keep research alternatives visible when the live bookmaker snapshot is
+        # absent; exact quote freshness is still required before adding a leg.
         probs = row.get("calibrated_probabilities") or row.get("probabilities") or {}
         winner_market = _find_market(row, lambda m: _market_is_winner(m, "tennis"))
         if winner_market:
