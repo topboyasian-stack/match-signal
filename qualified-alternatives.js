@@ -20,6 +20,7 @@ function quoteLabel(x){
  if(status==='INVALID_TIMESTAMP')return 'Quote timestamp invalid · live recheck required';
  if(status==='NOT_VERIFIED_EXACT')return 'Exactness not verified · live recheck required';
  if(status==='NOT_MARKED_EXACT')return 'Quote not verified as exact · live recheck required';
+ if(status==='PRICE_UNAVAILABLE')return 'No exact side price in snapshot · live recheck required';
  return 'No verified current quote · live recheck required';
 }
 function qualificationLabel(x){
