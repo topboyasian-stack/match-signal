@@ -118,7 +118,7 @@ def settle_row(row, competition):
         line = float(ou.get("line", 22.5))
         total_games = s1 + s2
         actual_ou = "over" if total_games > line else "under" if total_games < line else "push"
-        row["actual_markets"] = {"total_games": total_games, "total_games_line": line, "total_games_result": actual_ou, "total_games_correct": ou.get("pick") in {"over", "under"} and actual_ou == ou.get("pick"), "sets": max(len(lines1), len(lines2)), "sets_won_p1": sum(float(x.get("value", 0)) > float(y.get("value", 0)) for x, y in zip(lines1, lines2)), "sets_won_p2": sum(float(y.get("value", 0)) > float(x.get("value", 0)) for x, y in zip(lines1, lines2))}
+        row["actual_markets"] = {"total_games": total_games, "total_games_line": line, "total_games_result": actual_ou, "total_games_correct": ou.get("pick") in {"over", "under"} and actual_ou == ou.get("pick"), "sets": max(len(lines1), len(lines2)), "set_scores": [{"p1": float(x.get("value", 0)), "p2": float(y.get("value", 0))} for x, y in zip(lines1, lines2)], "first_set_winner": ("p1" if float(lines1[0].get("value", 0)) > float(lines2[0].get("value", 0)) else "p2" if float(lines2[0].get("value", 0)) > float(lines1[0].get("value", 0)) else None), "sets_won_p1": sum(float(x.get("value", 0)) > float(y.get("value", 0)) for x, y in zip(lines1, lines2)), "sets_won_p2": sum(float(y.get("value", 0)) > float(x.get("value", 0)) for x, y in zip(lines1, lines2))}
         row["final_score"] = [s1, s2]
         row.update({"settled": True, "settled_at": datetime.now(timezone.utc).isoformat(), "actual": actual, "correct": row.get("pick") == actual, "brier": brier(row.get("probabilities", {}), actual), "settlement_source": "ESPN tennis/all scoreboard"})
         return True

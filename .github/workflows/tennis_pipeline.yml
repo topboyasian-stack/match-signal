@@ -24,6 +24,10 @@ on:
       - 'scripts/football_competition_match.py'
       - 'scripts/test_predict_today_market_matching.py'
       - 'scripts/test_workflow_trigger_boundaries.py'
+      - 'scripts/tennis_set_market_model.py'
+      - 'scripts/tennis_set_market_reassessment.py'
+      - 'scripts/test_tennis_set_market_model.py'
+      - 'scripts/test_tennis_set_market_reassessment.py'
       - 'scripts/calibrate_tennis_analytics.py'
       - 'scripts/build_football_performance.py'
       - 'scripts/calibrate_models.py'
@@ -80,6 +84,11 @@ jobs:
           git reset --hard origin/main
       - name: Test exact-line tennis SportyBet alignment
         run: python scripts/test_enrich_sportybet_odds.py
+      - name: Test independent tennis set-outcome markets
+        run: |
+          python -m py_compile scripts/tennis_set_market_model.py scripts/tennis_set_market_reassessment.py
+          python scripts/test_tennis_set_market_model.py
+          python scripts/test_tennis_set_market_reassessment.py
       - name: Test workflow trigger boundaries and optional source failure isolation
         run: python scripts/test_workflow_trigger_boundaries.py
       - name: Run football competition-safe market matching tests

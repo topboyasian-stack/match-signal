@@ -758,6 +758,32 @@ def settle_core_leg(leg, rows):
                     "final_score": row.get("final_score"),
                 }
 
+        elif sport == "tennis" and market in {
+            "player_to_win_set", "player to win set",
+            "player_to_win_a_set", "player_to_win_at_least_one_set",
+        }:
+            # The proposition is player-specific, not the binary market's
+            # builder_pick="yes". The structured participant side is p1 or p2.
+            side = norm(leg.get("pick"))
+            if side not in {"p1", "p2"}:
+                continue
+            actual_markets = row.get("actual_markets") or {}
+            raw_sets_won = actual_markets.get("sets_won_p1" if side == "p1" else "sets_won_p2")
+            try:
+                sets_won = int(raw_sets_won)
+            except (TypeError, ValueError):
+                continue
+            if sets_won < 0:
+                continue
+            correct = sets_won > 0
+            return {
+                "status": "WON" if correct else "LOST",
+                "correct": correct,
+                "settled_at": row.get("settled_at"),
+                "result": f"{leg.get('selection_label') or side} — {sets_won} sets won",
+                "final_score": row.get("final_score"),
+            }
+
         elif market in {"winner", "1x2"}:
             pick = norm(leg.get("builder_pick") or leg.get("pick"))
             row_pick = norm(row.get("pick"))

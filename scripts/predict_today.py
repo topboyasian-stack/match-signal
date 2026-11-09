@@ -85,7 +85,7 @@ SPORTYBET_HEADERS = {
 }
 SPORTYBET_MARKETS = {
     "football": "1,18,10,29,11,14,26,36,60100,186,189,202,204,210",
-    "tennis": "186,189,202,204,210",
+    "tennis": "186,187,188,189,202,203,204,210",
 }
 
 
@@ -237,6 +237,7 @@ def _sportybet_market_snapshot(event, sport):
         all_markets.append({
             "id": mid,
             "name": fair["name"],
+            "specifier": market.get("specifier"),
             "line": fair["line"],
             "overround": round(fair["overround"], 6),
             "outcomes": fair["outcomes"],
@@ -302,6 +303,8 @@ def _sportybet_market_snapshot(event, sport):
     return {
         "provider": "SportyBet NG",
         "event_id": event["event_id"],
+        "home": event.get("home"),
+        "away": event.get("away"),
         "tournament": event["tournament"],
         "category": event["category"],
         "start_time": (
