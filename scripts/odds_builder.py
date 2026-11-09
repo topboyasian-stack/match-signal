@@ -52,6 +52,8 @@ import tennis_market_reassessment as _tennis_market_reassessment
 _tennis_market_reassessment.install(_core)
 import cross_sport_market_reassessment as _cross_sport_market_reassessment
 _cross_sport_market_reassessment.install(_core)
+import tennis_set_market_reassessment as _tennis_set_market_reassessment
+_tennis_set_market_reassessment.install(_core)
 if __name__ == "__main__":
     raise SystemExit(_core.main())
 else:
