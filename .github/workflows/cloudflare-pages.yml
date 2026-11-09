@@ -986,7 +986,8 @@ jobs:
               const start=Date.parse(String(item?.start_time||''));
               const probability=Number(item?.probability), odds=Number(item?.odds);
               if (!['football','tennis','basketball','efootball'].includes(String(item?.sport||''))) throw new Error('unsupported sport in public alternatives');
-              if (!item?.event_id || !item?.sportybet_event_id || !item?.market_id) throw new Error('alternative missing exact provider/event/market identity');
+              if (!item?.event_id) throw new Error('alternative missing internal fixture identity');
+    if (item.ticket_selectable===true && (!item?.sportybet_event_id || !item?.market_id)) throw new Error('ticket-selectable alternative missing exact provider identity');
               if (item?.role!=='ALTERNATIVE' || item?.source!=='SYSTEM_RECOMMENDED') throw new Error('alternative lost its recommended role/source');
               if (!Number.isFinite(start) || start<=now+120000) throw new Error('alternative is not safely pre-match');
               if (typeof item?.builder_qualified !== 'boolean' || typeof item?.ticket_selectable !== 'boolean' || !String(item?.qualification_status||'').trim() || !String(item?.quote_status||'').trim()) throw new Error('alternative missing explicit ticket-mapping, quote or Builder status');
@@ -997,7 +998,7 @@ jobs:
               if (item.market==='winner' && !['p1','p2','draw'].includes(String(item.pick||''))) throw new Error('winner alternative has an invalid side');
               if (item.market==='btts' && !['yes','no'].includes(String(item.pick||''))) throw new Error('BTTS alternative has an invalid side');
               if (item.market==='double_chance' && !['1x','12','x2'].includes(String(item.pick||''))) throw new Error('Double Chance alternative has an invalid side');
-              if (item.sport==='efootball' && !['18','189'].includes(String(item.market_id))) throw new Error('eFootball alternative is outside the supported exact total markets');
+              if (item.ticket_selectable===true && item.sport==='efootball' && !['18','189'].includes(String(item.market_id))) throw new Error('ticket-selectable eFootball alternative is outside the supported exact total markets');
             }
             const selectableRows=rows.filter(x=>x.ticket_selectable===true);
             qualifiedAlternativesCheck = {
