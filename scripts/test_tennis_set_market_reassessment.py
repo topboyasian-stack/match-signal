@@ -168,6 +168,7 @@ class TennisSetMarketReassessmentTests(unittest.TestCase):
         self.assertEqual(counts["last_rejection"], "quote_older_than_15_minutes")
 
         row = fixture()
+        row["sportybet_market"]["markets"] = [row["sportybet_market"]["markets"][0]]
         row["sportybet_market"]["markets"][0]["outcomes"][0].pop("id")
         candidates, _ = reassessment._market_candidates(
             row,
