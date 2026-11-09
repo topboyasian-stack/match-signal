@@ -139,6 +139,19 @@ test("alternatives must beat a known primary probability and must not echo the s
   assert.equal(payload.diagnostics.rejected_by_reason.repeats_primary_pick, 1);
 });
 
+test("a missing exact side price remains visible but cannot claim a fresh quote", async () => {
+  const payload = await (await call([candidate({
+    event_id: "no-price",
+    bookmaker_odds: null,
+    passed_builder_gates: true
+  })])).json();
+  assert.equal(payload.alternatives.length, 1);
+  assert.equal(payload.alternatives[0].odds, null);
+  assert.equal(payload.alternatives[0].quote_status, "PRICE_UNAVAILABLE");
+  assert.equal(payload.alternatives[0].ticket_selectable, true);
+  assert.equal(payload.alternatives[0].builder_qualified, false);
+});
+
 test("BTTS and double-chance remain visible but are not offered as unsupported ticket buttons", async () => {
   const btts = candidate({
     event_id: "btts-fixture", market: "btts", line: null, pick: "yes",
