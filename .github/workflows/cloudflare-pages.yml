@@ -514,7 +514,10 @@ jobs:
           PROJECT: ${{ steps.project.outputs.project }}
         run: |
           set -euo pipefail
-          output="$(npx wrangler@latest pages deploy .pages-deploy --project-name="$PROJECT" --branch="${{ steps.project.outputs.production_branch }}" --commit-hash="${{ steps.source.outputs.sha }}" 2>&1)" || {
+          # Do not pass --branch here: on Pages that creates/targets a branch preview alias.
+          # The project was verified to use main as its production branch above; an omitted
+          # branch deploy promotes the staged bundle to the project production hostname.
+          output="$(npx wrangler@latest pages deploy .pages-deploy --project-name="$PROJECT" --commit-hash="${{ steps.source.outputs.sha }}" 2>&1)" || {
             printf '%s\n' "$output"
             exit 1
           }
