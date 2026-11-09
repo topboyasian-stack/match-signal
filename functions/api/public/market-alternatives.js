@@ -257,12 +257,16 @@ export function buildPublicAlternatives(document, nowMs = Date.now()) {
   const alternatives = [];
   for (const rows of grouped.values()) {
     rows.sort((a, b) => b.probability - a.probability || b.odds - a.odds);
-    // Show at most two distinct market/line options per fixture.
+    // Prefer ticket-mapped alternatives first so unsupported research markets
+    // cannot occupy both public slots and hide selections the user can add.
+    // If fewer than two mapped options exist, fill the remaining slot(s) with
+    // the highest-probability research-only options.
+    const ticketRows = rows.filter(row => row.ticket_selectable === true);
+    const researchRows = rows.filter(row => row.ticket_selectable !== true);
+    const rankedRows = ticketRows.length ? [...ticketRows, ...researchRows] : rows;
+    // Show at most two distinct market/line/side options per fixture.
     const selected = [];
-    for (const row of rows) {
-      // Opposite sides on the same total line are distinct predictions. Only
-      // collapse an exact market/line/side duplicate, not the Under alternative
-      // merely because an Over on that line was ranked first.
+    for (const row of rankedRows) {
       if (selected.some(x => x.market === row.market && x.line === row.line && x.pick === row.pick)) continue;
       selected.push(row);
       if (selected.length === 2) break;
