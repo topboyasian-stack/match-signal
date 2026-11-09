@@ -532,6 +532,65 @@ jobs:
           echo "url=$deployment_url" >> "$GITHUB_OUTPUT"
           echo "Immutable Cloudflare deployment URL: $deployment_url"
 
+      - name: Inspect Cloudflare Pages deployment environment and aliases
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PROJECT: ${{ steps.project.outputs.project }}
+          DEPLOYMENT_URL: ${{ steps.pages-deployment.outputs.url }}
+        run: |
+          set -euo pipefail
+          echo "Inspecting deployment metadata for immutable URL: $DEPLOYMENT_URL"
+          for environment in production preview; do
+            curl -fsSL \
+              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              -H "Content-Type: application/json" \
+              "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$PROJECT/deployments?env=$environment&per_page=5" |
+              DEPLOYMENT_URL="$DEPLOYMENT_URL" python -c '
+          import json, os, sys
+          d=json.load(sys.stdin)
+          print("Cloudflare "+os.environ.get("DEPLOYMENT_URL", "")+" list status:", "success" if d.get("success") else "error")
+          for p in d.get("result", []):
+              trigger=p.get("deployment_trigger") or {}
+              meta=trigger.get("metadata") or {}
+              stage=p.get("latest_stage") or {}
+              print(json.dumps({
+                  "environment":p.get("environment"),
+                  "id":p.get("id"),
+                  "short_id":p.get("short_id"),
+                  "url":p.get("url"),
+                  "aliases":p.get("aliases") or [],
+                  "created_on":p.get("created_on"),
+                  "branch":meta.get("branch"),
+                  "commit_hash":meta.get("commit_hash"),
+                  "trigger_type":trigger.get("type"),
+                  "stage":stage.get("status"),
+                  "uses_functions":p.get("uses_functions")
+              }, sort_keys=True))
+          if not d.get("success"):
+              raise SystemExit("Cloudflare deployment metadata request failed: "+repr(d.get("errors")))
+          '
+          done
+          curl -fsSL \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$PROJECT" |
+            python -c '
+          import json,sys
+          p=json.load(sys.stdin).get("result") or {}
+          source=p.get("source") or {}
+          config=source.get("config") or {}
+          print("Cloudflare Pages project source:", json.dumps({
+              "source_type":source.get("type"),
+              "owner":config.get("owner"),
+              "repo_name":config.get("repo_name"),
+              "production_branch":config.get("production_branch") or p.get("production_branch"),
+              "production_deployments_enabled":config.get("production_deployments_enabled"),
+              "preview_deployment_setting":config.get("preview_deployment_setting"),
+              "uses_functions":p.get("uses_functions")
+          }, sort_keys=True))
+          '
+
       - name: Run production HTTP and asset smoke tests
         timeout-minutes: 5
         env:
