@@ -205,7 +205,7 @@ def _validate_current_research_artifact(artifact: Any) -> tuple[list[dict[str, A
     if not generated_at:
         raise RuntimeError("Current research candidate array has no generation timestamp")
 
-    allowed_markets = {"1X2", "winner", "total_goals", "total_games", "btts", "double_chance"}
+    allowed_markets = {"1X2", "winner", "total_goals", "total_games", "btts", "double_chance", "set_winner"}
     price_fields = (
         "bookmaker_odds", "quote_timestamp", "market_odds_timestamp", "odds_timestamp",
         "sportybet_event_id", "sportybet_market_id", "sportybet_outcome_id",
@@ -223,6 +223,14 @@ def _validate_current_research_artifact(artifact: Any) -> tuple[list[dict[str, A
         if (
             row.get("sport") not in {"football", "tennis"}
             or row.get("market") not in allowed_markets
+            or (
+                row.get("market") == "set_winner"
+                and not (
+                    row.get("sport") == "tennis"
+                    and row.get("set_number") in (1, 2, "1", "2")
+                    and row.get("pick") in {"p1", "p2"}
+                )
+            )
             or row.get("prediction_role") != "ALTERNATIVE"
             or row.get("alternative_source") != "SYSTEM_RECOMMENDED"
             or row.get("candidate_status") != "RESEARCH_ONLY_NO_LIVE_QUOTE"
