@@ -9,6 +9,7 @@ on:
       - 'scripts/model_upgrade.py'
       - 'scripts/test_football_prequential_ensemble.py'
       - 'scripts/test_model_upgrade_football_ensemble.py'
+      - 'scripts/test_value_decision.py'
       - '.github/workflows/autopilot-refresh.yml'
       - '.github/workflows/tennis_pipeline.yml'
       - '.github/workflows/football-model-adoption-regression.yml'
@@ -49,9 +50,13 @@ jobs:
             scripts/value_decision.py \
             scripts/test_football_prequential_ensemble.py \
             scripts/test_model_upgrade_football_ensemble.py
+            scripts/test_value_decision.py
 
       - name: Test chronological Elo, Dixon-Coles and ensemble rules
         run: python scripts/test_football_prequential_ensemble.py
+
+      - name: Test explicit American and decimal odds value math
+        run: python scripts/test_value_decision.py
 
       - name: Test validated forecast application and protected ticket gates
         run: python scripts/test_model_upgrade_football_ensemble.py
