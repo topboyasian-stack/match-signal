@@ -289,6 +289,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "basketball-design.css",
             "functions/api/sportybet-basketball.js",
             "functions/api/sportybet-basketball-booking.js",
+            "wrangler.toml",
             "sport-hubs.css",
             "sport-hubs.js",
             "qualified-alternatives.js",
