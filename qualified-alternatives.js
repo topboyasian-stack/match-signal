@@ -1,4 +1,5 @@
 /* Research alternatives remain visible; only the existing ticket-supported markets expose an Add button. */
+/* Tennis set-winner alternatives: preserve exact Set 1/Set 2 market scope and route manual picks into the shared ticket drawer. */
 (()=>{'use strict';
 const endpoint='/api/public/market-alternatives';
 const escapeHtml=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
