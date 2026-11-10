@@ -9,6 +9,7 @@ on:
       - 'scripts/model_upgrade.py'
       - 'scripts/test_football_prequential_ensemble.py'
       - 'scripts/test_model_upgrade_football_ensemble.py'
+      - 'scripts/test_workflow_trigger_boundaries.py'
       - '.github/workflows/autopilot-refresh.yml'
       - '.github/workflows/football-model-adoption-regression.yml'
   push:
@@ -53,6 +54,9 @@ jobs:
 
       - name: Test validated forecast application and protected ticket gates
         run: python scripts/test_model_upgrade_football_ensemble.py
+
+      - name: Verify existing workflow trigger boundaries
+        run: python scripts/test_workflow_trigger_boundaries.py
 
       - name: Verify the scheduled publisher applies and publishes model outputs
         run: |
