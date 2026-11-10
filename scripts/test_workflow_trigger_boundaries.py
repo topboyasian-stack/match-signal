@@ -99,12 +99,21 @@ def main():
     # completed run before advancing to the deployment stage.
     promotion = (WORKFLOWS / "builder-production-promotion.yml").read_text(encoding="utf-8")
     escaped_quote = chr(92) + '"'
-    accepted_builder_events = (
-        f'.event == {escaped_quote}workflow_dispatch{escaped_quote} or '
-        f'.event == {escaped_quote}workflow_run{escaped_quote}'
+    dispatch_builder_filter = (
+        f'.event == {escaped_quote}workflow_dispatch{escaped_quote} and '
+        f'.head_branch == {escaped_quote}main{escaped_quote} and '
+        f'.created_at >= {escaped_quote}$BOARD_PUBLISHED_AT{escaped_quote}'
     )
-    assert promotion.count(accepted_builder_events) == 2, (
-        "Both pre-build and post-build promotion gates must accept dispatch and workflow_run Builder refreshes."
+    automatic_builder_filter = (
+        f'.event == {escaped_quote}workflow_run{escaped_quote} and '
+        f'.head_branch == {escaped_quote}main{escaped_quote} and '
+        f'.created_at >= {escaped_quote}$BOARD_PUBLISHED_AT{escaped_quote}'
+    )
+    assert promotion.count(dispatch_builder_filter) == 2, (
+        "Both pre-build and post-build stages must restrict dispatch Builder candidates to the relevant published board."
+    )
+    assert promotion.count(automatic_builder_filter) == 2, (
+        "Both pre-build and post-build stages must accept exact workflow_run Builder fallbacks after the relevant board."
     )
     assert "Ignoring superseded pre-build Builder run" in promotion
     assert "Ignoring superseded post-build Builder run" in promotion
