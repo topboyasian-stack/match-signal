@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-10T05:11:29.349547+00:00",
+  "generated_at": "2026-11-10T05:26:36.548761+00:00",
   "paper_only": true,
   "experiment": "NBA_TOTALS_EMPIRICAL_RESIDUAL_VALUE_V3",
   "model_version": "nba-total-v5.1-pace-efficiency-calibrated",
@@ -1822,6 +1822,49 @@
       "decision_is_authorized_for_betting": false
     },
     {
+      "event_id": "401909959",
+      "matchup": "Golden State Warriors vs New Orleans Pelicans",
+      "published_at": "2026-11-09T22:29:39.807796+00:00",
+      "settled_result": "under",
+      "won_by_original_point_edge_pick": false,
+      "research_value_signal_outcome": "LOSS",
+      "forecast_total": 232.542,
+      "sportybet_line": 229.5,
+      "over_odds": 1.92,
+      "under_odds": 1.89,
+      "model_probability": {
+        "over": 0.6117,
+        "under": 0.3883,
+        "push": 0.0
+      },
+      "market_no_vig_probability": {
+        "over": 0.4961,
+        "under": 0.5039
+      },
+      "model_probability_conditional_on_no_push": {
+        "over": 0.6117,
+        "under": 0.3883
+      },
+      "model_probability_edge": {
+        "over": 0.1156,
+        "under": -0.1156
+      },
+      "expected_value_per_unit": {
+        "over": 0.1744,
+        "under": -0.2661
+      },
+      "bootstrap_95_lower_bound": {
+        "over_probability_edge": 0.0606,
+        "under_probability_edge": -0.1706,
+        "over_expected_value": 0.0689,
+        "under_expected_value": -0.37,
+        "method": "deterministic paired empirical-residual bootstrap; 4,000 resamples"
+      },
+      "calibration_check": "PASS",
+      "decision": "OVER VALUE",
+      "decision_is_authorized_for_betting": false
+    },
+    {
       "event_id": "401909955",
       "matchup": "Toronto Raptors vs Memphis Grizzlies",
       "published_at": "2026-11-09T23:05:31.638741+00:00",
@@ -1908,16 +1951,16 @@
       "decision_is_authorized_for_betting": false
     }
   ],
-  "settled_v5_market_count": 40,
+  "settled_v5_market_count": 41,
   "settled_v5_clv_diagnostics": {
     "definition": "Opening immutable v5.1 publication quote vs latest captured exact SportyBet market-225 pregame quote; near-close counts only if quote was observed within 45 minutes of tip. This is not an official bookmaker close.",
     "close_window_minutes": 45,
-    "settled_v5_fixtures_audited": 40,
-    "near_close_observations": 31,
+    "settled_v5_fixtures_audited": 41,
+    "near_close_observations": 32,
     "positive_probability_clv_n": 14,
     "positive_line_clv_n": 10,
-    "mean_probability_clv": -0.001209,
-    "mean_line_clv_points": -0.6774,
+    "mean_probability_clv": -0.001211,
+    "mean_line_clv_points": -0.6562,
     "fixtures": [
       {
         "event_id": "401909907",
@@ -2984,6 +3027,34 @@
         "is_official_bookmaker_close": false
       },
       {
+        "event_id": "401909959",
+        "matchup": "Golden State Warriors vs New Orleans Pelicans",
+        "selected_side": "OVER",
+        "clv_status": "NEAR_CLOSE_CAPTURED",
+        "opening": {
+          "snapshot_id": "nba-total-pub:1b49ffd7e9ace146f207bcc6",
+          "quote_timestamp": "2026-11-09T22:29:39.511000+00:00",
+          "line": 229.5,
+          "over_odds": 1.92,
+          "under_odds": 1.89,
+          "selected_side_no_vig_probability": 0.496063
+        },
+        "latest_pregame": {
+          "snapshot_id": "nba-total-pub:ea0f03890ed2bc6b4dd66351",
+          "quote_timestamp": "2026-11-10T02:59:35.391000+00:00",
+          "minutes_before_start": 0.41,
+          "line": 229.5,
+          "over_odds": 1.94,
+          "under_odds": 1.9,
+          "selected_side_no_vig_probability": 0.494792
+        },
+        "selected_side_no_vig_probability_clv": -0.001271,
+        "selected_side_line_clv_points": 0.0,
+        "positive_probability_clv": false,
+        "positive_line_clv": false,
+        "is_official_bookmaker_close": false
+      },
+      {
         "event_id": "401909955",
         "matchup": "Toronto Raptors vs Memphis Grizzlies",
         "selected_side": "OVER",
@@ -3043,12 +3114,12 @@
     "sample_is_sufficient_for_release": false
   },
   "settled_v5_probability_score_summary": {
-    "n": 40,
+    "n": 41,
     "pushes_excluded_from_binary_metrics": 0,
-    "model_brier": 0.265257,
-    "market_no_vig_brier": 0.248122,
-    "model_log_loss": 0.726743,
-    "market_no_vig_log_loss": 0.689391,
+    "model_brier": 0.267914,
+    "market_no_vig_brier": 0.248073,
+    "model_log_loss": 0.73209,
+    "market_no_vig_log_loss": 0.689293,
     "over_probability_buckets": [
       {
         "range": "0.3-0.4",
@@ -3064,9 +3135,9 @@
       },
       {
         "range": "0.6-0.7",
-        "n": 12,
-        "mean_model_over_probability": 0.628,
-        "observed_over_rate": 0.5833
+        "n": 13,
+        "mean_model_over_probability": 0.6268,
+        "observed_over_rate": 0.5385
       },
       {
         "range": "0.7-0.8",
@@ -3086,8 +3157,8 @@
     "prospective_unique_fixtures_with_any_snapshot": 67,
     "prospective_verified_fresh_market_225_snapshot_records": 5987,
     "prospective_unique_fixtures_with_verified_fresh_market_225_snapshot": 67,
-    "prospective_settled_unique_market_selections": 40,
-    "prospective_settled_selections_with_exact_snapshot_match": 40,
+    "prospective_settled_unique_market_selections": 41,
+    "prospective_settled_selections_with_exact_snapshot_match": 41,
     "prospective_settled_selections_missing_or_mismatched_snapshot": 0,
     "snapshot_linkage_failures": [],
     "target_unique_settled_selections_for_roi": 100,
@@ -3097,11 +3168,11 @@
   "prospective_probability_fixture_coverage": {
     "cutoff_utc": "2026-11-02T02:00:00+00:00",
     "source": "data/nba_totals_probability_settlements.json",
-    "candidate_unique_events": 61,
-    "valid_unique_settled_fixtures": 61,
-    "binary_scored_unique_fixtures": 61,
+    "candidate_unique_events": 62,
+    "valid_unique_settled_fixtures": 62,
+    "binary_scored_unique_fixtures": 62,
     "push_fixtures_excluded_from_binary_scores": 0,
-    "neutral_no_bet_fixtures_included": 37,
+    "neutral_no_bet_fixtures_included": 38,
     "directional_selection_fixtures_also_tracked_in_bet_ledger": 24,
     "snapshot_linkage_failures": [],
     "snapshot_linkage_failure_count": 0,
@@ -4145,15 +4216,32 @@
       "line": 225.5,
       "pick": null,
       "probability_validation_only": true
+    },
+    {
+      "event_id": "401909959",
+      "settled_result": "under",
+      "model_probability": {
+        "over": 0.5463917525773195,
+        "under": 0.4536082474226804,
+        "push": 0.0
+      },
+      "market_no_vig_probability": {
+        "over": 0.5013123359580053,
+        "under": 0.49868766404199477
+      },
+      "publication_snapshot_id": "nba-total-pub:5ab7157eb244816423233d3b",
+      "line": 231.5,
+      "pick": null,
+      "probability_validation_only": true
     }
   ],
   "prospective_probability_score_summary": {
-    "n": 61,
+    "n": 62,
     "pushes_excluded_from_binary_metrics": 0,
-    "model_brier": 0.265299,
-    "market_no_vig_brier": 0.250033,
-    "model_log_loss": 0.725251,
-    "market_no_vig_log_loss": 0.693213,
+    "model_brier": 0.265835,
+    "market_no_vig_brier": 0.250054,
+    "model_log_loss": 0.726304,
+    "market_no_vig_log_loss": 0.693254,
     "over_probability_buckets": [
       {
         "range": "0.3-0.4",
@@ -4169,9 +4257,9 @@
       },
       {
         "range": "0.5-0.6",
-        "n": 35,
-        "mean_model_over_probability": 0.5438,
-        "observed_over_rate": 0.4
+        "n": 36,
+        "mean_model_over_probability": 0.5439,
+        "observed_over_rate": 0.3889
       },
       {
         "range": "0.6-0.7",
@@ -4193,12 +4281,12 @@
   "prospective_clv_diagnostics": {
     "definition": "Opening immutable v5.1 publication quote vs latest captured exact SportyBet market-225 pregame quote; near-close counts only if quote was observed within 45 minutes of tip. This is not an official bookmaker close.",
     "close_window_minutes": 45,
-    "settled_v5_fixtures_audited": 40,
-    "near_close_observations": 31,
+    "settled_v5_fixtures_audited": 41,
+    "near_close_observations": 32,
     "positive_probability_clv_n": 14,
     "positive_line_clv_n": 10,
-    "mean_probability_clv": -0.001209,
-    "mean_line_clv_points": -0.6774,
+    "mean_probability_clv": -0.001211,
+    "mean_line_clv_points": -0.6562,
     "fixtures": [
       {
         "event_id": "401909907",
@@ -5265,6 +5353,34 @@
         "is_official_bookmaker_close": false
       },
       {
+        "event_id": "401909959",
+        "matchup": "Golden State Warriors vs New Orleans Pelicans",
+        "selected_side": "OVER",
+        "clv_status": "NEAR_CLOSE_CAPTURED",
+        "opening": {
+          "snapshot_id": "nba-total-pub:1b49ffd7e9ace146f207bcc6",
+          "quote_timestamp": "2026-11-09T22:29:39.511000+00:00",
+          "line": 229.5,
+          "over_odds": 1.92,
+          "under_odds": 1.89,
+          "selected_side_no_vig_probability": 0.496063
+        },
+        "latest_pregame": {
+          "snapshot_id": "nba-total-pub:ea0f03890ed2bc6b4dd66351",
+          "quote_timestamp": "2026-11-10T02:59:35.391000+00:00",
+          "minutes_before_start": 0.41,
+          "line": 229.5,
+          "over_odds": 1.94,
+          "under_odds": 1.9,
+          "selected_side_no_vig_probability": 0.494792
+        },
+        "selected_side_no_vig_probability_clv": -0.001271,
+        "selected_side_line_clv_points": 0.0,
+        "positive_probability_clv": false,
+        "positive_line_clv": false,
+        "is_official_bookmaker_close": false
+      },
+      {
         "event_id": "401909955",
         "matchup": "Toronto Raptors vs Memphis Grizzlies",
         "selected_side": "OVER",
@@ -5327,9 +5443,9 @@
   },
   "prospective_clv_release_check_passed": false,
   "historical_value_signal_summary": {
-    "n": 19,
+    "n": 20,
     "wins": 9,
-    "losses": 10,
+    "losses": 11,
     "insufficient_sample": true
   },
   "archived_history_rows_with_any_market_data": 0,
@@ -5337,10 +5453,10 @@
   "upcoming_exact_fresh_market_225_value_diagnostics": [],
   "upcoming_value_diagnostics_count": 0,
   "upcoming_predictions_without_exact_fresh_pair": 51,
-  "prospective_settled_market_bets_after_cutoff": 40,
+  "prospective_settled_market_bets_after_cutoff": 41,
   "prospective_minimum_sample_reached": false,
-  "prospective_probability_scored_unique_fixtures": 61,
-  "prospective_probability_settled_unique_fixtures": 61,
+  "prospective_probability_scored_unique_fixtures": 62,
+  "prospective_probability_settled_unique_fixtures": 62,
   "prospective_probability_validation_sample_met": true,
   "live_value_decisions_authorized": false,
   "release_decision": "RESEARCH_ONLY",
@@ -5348,11 +5464,11 @@
   "market_prices_used_as_model_inputs": false,
   "source_data_fingerprint": {
     "data/nba_history.json": "7befa848fb7eb1d3ac58ec4b90ed4dac072777918674b02eed632744b289a37e",
-    "data/nba_predictions.json": "2741ac39b5d9a99c65238c224a9a65bf10ec3a576f46f08d9ecb4b5c7dfa07ae",
-    "data/nba_totals_ledger.json": "7ee08f71bccad9df2c6feb2829a74ce23b3aea9f4dd0241f7583c93a31d9520d",
+    "data/nba_predictions.json": "7c5f8ee111679307cc1e6dcbd2bd7e55d87d77d9c783c3e43ff3cd746d45c56f",
+    "data/nba_totals_ledger.json": "32686fc6450732683cd10176a31da99ae83c3f21366439f84d47fcae949f656b",
     "data/nba_totals_publication_snapshots.json": "c7b7be9783fd1c47941e72ef72500988ecd8ac9365db4f7adab2fbcdd67b8f55",
-    "data/nba_totals_probability_settlements.json": "6081bbc8db78f716abe255550806f25d3c241ae1d71f89e8b8ca03b82230ef39",
-    "data/nba_totals_price_capture_status.json": "7cafe2084e3f05f37cbb254d945d663aa539debdd2a3edbf0692d2f5f8a1f18e",
-    "data/nba_totals_oos_value_test.json": "047ecfa153112cf73f08113aabe2515b34a6974b7f1961b154bcfe0ec8cc074a"
+    "data/nba_totals_probability_settlements.json": "715551e21c051580f0b8ea81518012a02fe10034d2a6bacf242d87d8c16e6bd6",
+    "data/nba_totals_price_capture_status.json": "9a732cbf3999f3a0fda7b2ac8773f984c48ce8564fd9adf321dbc242dfef3ed2",
+    "data/nba_totals_oos_value_test.json": "510010524932446e2a186756147972c9a45569468f2e98e748c8f8c04fceba41"
   }
 }
