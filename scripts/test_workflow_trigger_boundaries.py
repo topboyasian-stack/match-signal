@@ -174,8 +174,8 @@ def main():
     assert "data/selection_candidates.json" not in autopilot_publish
     assert "data/system_health.json" not in autopilot_publish
     assert "git fetch origin main" in autopilot_publish
-    assert autopilot_publish.index("git fetch origin main") < autopilot_publish.index("git rebase origin/main") < autopilot_publish.index("git push origin main"), (
-        "Autopilot must rebase its owned readiness artifacts onto concurrent main updates before publishing."
+    assert autopilot_publish.index("git stash push --include-untracked") < autopilot_publish.index("git fetch origin main") < autopilot_publish.index("git rebase origin/main") < autopilot_publish.index("git push origin main"), (
+        "Autopilot must stash non-owned generated health files and rebase its readiness artifacts before publishing."
     )
     assert "Readiness/source artifacts changed concurrently; rebuild on latest main." in autopilot_publish
     assert "data/predictions.json" not in autopilot_publish
