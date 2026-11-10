@@ -114,6 +114,28 @@ def _market_name(market: dict[str, Any]) -> str:
     return str(market.get("name") or market.get("desc") or market.get("title") or "").strip().lower()
 
 
+def _market_specifier(market: dict[str, Any]) -> str:
+    for key in ("specifier", "specifiers", "marketSpecifier"):
+        value = market.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return ""
+
+
+def _set_number_from_market(market: dict[str, Any]) -> int | None:
+    match = re.search(r"(?:^|[|,;\\s])setnr\\s*=\\s*([12])(?=$|[|,;\\s])", _market_specifier(market), re.I)
+    return int(match.group(1)) if match else None
+
+
+def _market_is_set_winner(market: dict[str, Any], set_number: int) -> bool:
+    if str(market.get("id") or "") != "202":
+        return False
+    if _set_number_from_market(market) != set_number:
+        return False
+    label = _market_name(market)
+    return "winner" in label or "set" in label
+
+
 def _market_is_winner(market: dict[str, Any], sport: str) -> bool:
     label = _market_name(market)
     market_id = str(market.get("id") or "")
@@ -230,6 +252,8 @@ def _decorate_candidate(
     outcome: dict[str, Any] | None = None,
     model_source: str,
     exact_market_id: str | None = None,
+    set_number: int | None = None,
+    exact_specifier: str | None = None,
 ) -> dict[str, Any]:
     candidate = dict(row)
     # Preserve the original fixture pick before mutating builder_* fields for
@@ -292,10 +316,14 @@ def _decorate_candidate(
     # SportyBet's non-line markets are identified by market/outcome IDs; adding
     # a made-up specifier can make an otherwise valid selection unbookable.
     candidate["sportybet_specifier"] = (
-        f"total={line:g}"
-        if line is not None and market in {"total_goals", "total_games"}
-        else None
+        exact_specifier
+        if exact_specifier is not None
+        else (f"total={line:g}" if line is not None and market in {"total_goals", "total_games"} else None)
     )
+    if set_number is not None:
+        candidate["set_number"] = int(set_number)
+    else:
+        candidate.pop("set_number", None)
     candidate["sportybet_outcome_id"] = str((outcome or {}).get("id") or "") or None
     candidate["sportybet_outcome_name"] = str((outcome or {}).get("name") or "") or None
     candidate["market_source"] = "SportyBet NG exact live market"
@@ -330,6 +358,7 @@ def _research_only_candidate(
     probability: float,
     model_source: str,
     line: float | None = None,
+    set_number: int | None = None,
 ) -> dict[str, Any]:
     """Build a model-supported research option without creating bookmaker evidence."""
     candidate = _decorate_candidate(
@@ -343,6 +372,7 @@ def _research_only_candidate(
         line=line,
         outcome=None,
         model_source=model_source,
+        set_number=set_number,
     )
     # A copied fixture may contain old prices or provider aliases. Strip every
     # booking input from this research-only row instead of merely labelling it.
@@ -389,13 +419,15 @@ def _research_only_candidate(
     return candidate
 
 
-def _research_candidate_key(row: dict[str, Any]) -> tuple[str, str, str, str, str]:
+def _research_candidate_key(row: dict[str, Any]) -> tuple[str, str, str, str, str, str]:
     line = _num(row.get("line"))
+    set_number = row.get("set_number")
     return (
         str(row.get("sport") or ""),
         str(row.get("event_id") or ""),
         str(row.get("builder_market") or ""),
         "" if line is None else f"{line:g}",
+        "" if set_number is None else str(set_number),
         str(row.get("builder_pick") or ""),
     )
 
@@ -531,6 +563,26 @@ def _tennis_research_options(row: dict[str, Any]) -> list[dict[str, Any]]:
                     probability=probability, line=line,
                     model_source="existing published tennis total-games probability at a model reference line; line is not a verified live offer",
                 ))
+
+    # The published model derives one stationary per-set probability by solving
+    # its match-win probability. It is valid as a common set-level estimate,
+    # not as a separate conditional model for Set 1 versus Set 2.
+    set_probabilities = analytics.get("set_win_prob") or {}
+    p1_set = _num(set_probabilities.get("p1")) if isinstance(set_probabilities, dict) else None
+    p2_set = _num(set_probabilities.get("p2")) if isinstance(set_probabilities, dict) else None
+    if (
+        p1_set is not None and p2_set is not None
+        and 0 < p1_set < 1 and 0 < p2_set < 1
+        and abs((p1_set + p2_set) - 1.0) <= 0.02
+    ):
+        side = "p1" if p1_set >= p2_set else "p2"
+        probability = max(p1_set, p2_set)
+        for set_number in (1, 2):
+            options.append(_research_only_candidate(
+                row, sport="tennis", market="set_winner", side=side,
+                probability=probability, set_number=set_number,
+                model_source="published stationary per-set win probability derived from the tennis match model; same probability assumption for each set, not a set-specific conditional forecast",
+            ))
     return options
 
 
@@ -1230,6 +1282,7 @@ def _make_audit_record(core: Any, row: dict[str, Any], now: datetime) -> dict[st
         "match": match,
         "market": market,
         "line": line,
+        "set_number": int(row.get("set_number")) if row.get("set_number") in (1, 2, "1", "2") else None,
         "pick": side,
         "original_pick": row.get("original_primary_pick") or row.get("pick"),
         "original_primary_pick": row.get("original_primary_pick"),
@@ -1275,9 +1328,9 @@ def _make_audit_record(core: Any, row: dict[str, Any], now: datetime) -> dict[st
 
 def _fingerprint(row: dict[str, Any]) -> str:
     identity = "|".join(str(row.get(key) or "") for key in (
-        "sport", "event_id", "market", "line", "pick", "quote_timestamp",
+        "sport", "event_id", "market", "line", "set_number", "pick", "quote_timestamp",
         "bookmaker_odds", "model_probability", "model_source", "sportybet_market_id",
-        "sportybet_outcome_id",
+        "sportybet_specifier", "sportybet_outcome_id",
     ))
     return hashlib.sha256(identity.encode("utf-8")).hexdigest()[:24]
 
@@ -1424,7 +1477,10 @@ def _current_research_candidates(records: list[dict[str, Any]]) -> list[dict[str
         if sport not in {"football", "tennis"}:
             continue
         market = str(row.get("market") or "")
-        if market not in {"1X2", "winner", "total_goals", "total_games", "btts", "double_chance"}:
+        if market not in {"1X2", "winner", "total_goals", "total_games", "btts", "double_chance", "set_winner"}:
+            continue
+        set_number = row.get("set_number")
+        if market == "set_winner" and set_number not in (1, 2, "1", "2"):
             continue
         event_id = str(row.get("event_id") or "")
         start_time = str(row.get("start_time") or "")
@@ -1456,6 +1512,7 @@ def _current_research_candidates(records: list[dict[str, Any]]) -> list[dict[str
             "match": str(row.get("match") or ""),
             "market": market,
             "line": line,
+            "set_number": int(set_number) if market == "set_winner" else None,
             "pick": pick,
             "model_probability": round(float(probability), 6),
             "original_pick": row.get("original_pick"),
