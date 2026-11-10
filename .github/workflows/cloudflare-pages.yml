@@ -541,7 +541,13 @@ jobs:
           for environment in production preview; do
             curl -fsSL -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$PROJECT/deployments?env=$environment&per_page=5" | ENVIRONMENT="$environment" python -c 'import json,os,sys; d=json.load(sys.stdin); print("DEPLOYMENT ENVIRONMENT", os.environ["ENVIRONMENT"], json.dumps([{"environment":p.get("environment"),"id":p.get("id"),"short_id":p.get("short_id"),"url":p.get("url"),"aliases":p.get("aliases") or [],"created_on":p.get("created_on"),"branch":((p.get("deployment_trigger") or {}).get("metadata") or {}).get("branch"),"commit_hash":((p.get("deployment_trigger") or {}).get("metadata") or {}).get("commit_hash"),"trigger_type":(p.get("deployment_trigger") or {}).get("type"),"stage":(p.get("latest_stage") or {}).get("status")} for p in d.get("result", [])], sort_keys=True)); sys.exit(0 if d.get("success") else 1)'
           done
-          curl -fsSL -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$PROJECT" | python -c 'import json,sys; p=json.load(sys.stdin).get("result") or {}; s=p.get("source") or {}; c=s.get("config") or {}; print("CLOUDFLARE PROJECT CONFIG", json.dumps({"source_type":s.get("type"),"owner":c.get("owner"),"repo_name":c.get("repo_name"),"production_branch":p.get("production_branch"),"production_deployments_enabled":c.get("production_deployments_enabled"),"preview_deployment_setting":c.get("preview_deployment_setting")}, sort_keys=True))'
+          project_json="$(curl -fsSL -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$PROJECT")"
+          printf '%s' "$project_json" | python -c 'import json,sys; p=json.load(sys.stdin).get("result") or {}; s=p.get("source") or {}; c=s.get("config") or {}; dc=p.get("deployment_configs") or {}; b=lambda e:{k:(dc.get(e) or {}).get(k) for k in ("kv_namespaces","d1_databases","r2_buckets","services","durable_objects") if (dc.get(e) or {}).get(k)}; print("CLOUDFLARE PROJECT CONFIG", json.dumps({"source_type":s.get("type"),"owner":c.get("owner"),"repo_name":c.get("repo_name"),"production_branch":p.get("production_branch"),"production_deployments_enabled":c.get("production_deployments_enabled"),"preview_deployment_setting":c.get("preview_deployment_setting"),"production_bindings":b("production"),"preview_bindings":b("preview")}, sort_keys=True))'
+          if kv_namespaces="$(curl -fsSL -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/storage/kv/namespaces?per_page=1000" 2>/dev/null)"; then
+            printf '%s' "$kv_namespaces" | python -c 'import json,sys; d=json.load(sys.stdin); rows=[{"title":x.get("title"),"id":x.get("id")} for x in d.get("result",[]) if any(k in str(x.get("title") or "").lower() for k in ("match","signal","analyst","market"))]; print("MATCH SIGNAL KV NAMESPACE CANDIDATES", json.dumps(rows, sort_keys=True))'
+          else
+            echo "MATCH SIGNAL KV NAMESPACE LIST UNAVAILABLE (token may not have KV read permission)"
+          fi
 
       - name: Run production HTTP and asset smoke tests
         timeout-minutes: 5
@@ -636,15 +642,43 @@ jobs:
           // Verify the immutable deployment itself first, then give Cloudflare's production
           // hostname a bounded propagation window. A successful upload alone is not proof
           // that the primary hostname is serving the uploaded HTML/CSS yet.
+          const sourceScriptRef = (htmlPath, scriptName) => {
+            const html = readFileSync(htmlPath, 'utf8');
+            const marker = html.split('src="').map(part => part.split('"')[0]).find(src => src.includes(scriptName + '.js?v='));
+            if (!marker) throw new Error('Missing versioned ' + scriptName + '.js reference in ' + htmlPath);
+            return marker;
+          };
+          const scriptRefs = {
+            root: {qualifiedAlternatives: sourceScriptRef('index.html','qualified-alternatives')},
+            upcoming: {qualifiedAlternatives: sourceScriptRef('upcoming.html','qualified-alternatives')},
+            qualifiedBest: {qualifiedAlternatives: sourceScriptRef('qualified-best.html','qualified-alternatives')},
+            football: {ticketDrawer: sourceScriptRef('football.html','ticket-drawer'), qualifiedAlternatives: sourceScriptRef('football.html','qualified-alternatives')},
+            tennis: {ticketDrawer: sourceScriptRef('tennis.html','ticket-drawer'), qualifiedAlternatives: sourceScriptRef('tennis.html','qualified-alternatives')},
+            basketball: {ticketDrawer: sourceScriptRef('basketball.html','ticket-drawer'), qualifiedAlternatives: sourceScriptRef('basketball.html','qualified-alternatives')},
+            league: {ticketDrawer: sourceScriptRef('league.html','ticket-drawer'), qualifiedAlternatives: sourceScriptRef('league.html','qualified-alternatives')},
+            virtualLab: {qualifiedAlternatives: sourceScriptRef('virtual-lab/index.html','qualified-alternatives')}
+          };
+          const alternativesSourceByRoute = new Map([
+            ['/','root'],
+            ['/upcoming.html','upcoming'],
+            ['/qualified-best','qualifiedBest'],
+            ['/qualified-best.html','qualifiedBest'],
+            ['/football.html','football'],
+            ['/tennis.html','tennis'],
+            ['/basketball.html','basketball'],
+            ['/league.html','league'],
+            ['/virtual-lab/','virtualLab'],
+            ['/virtual-lab','virtualLab']
+          ]);
           const workspaceContracts = [
-            {path:'/', css:'/core-workspaces-design.css', markers:[rootBuildMarker,rootCssHref,'MS-DESK-2026.10.14-V1','core-workspaces-design.css?v=20261014-full-v1','class="cd-page-header"','class="cd-workspace-grid"','id="unifiedBoard"','id="qualifiedBestSummary"','./qualified-alternatives.js?v=20261108-research-alternatives2'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V1: CORE DESK / FOOTBALL / TENNIS'},
-            {path:'/football.html', css:'/core-workspaces-design.css', markers:['MS-FOOTBALL-DESK-2026.10.14-V1','core-workspaces-design.css?v=20261014-full-v1','class="cd-page-header"','id="leagueGrid"','data-sport="football"','league-logos.js?v=20261013-competition-logos2','sport-hubs.js?v=20261102-single-ticket1','ticket-drawer.css?v=20261102-single-ticket1','ticket-drawer.js?v=20261107-manual-ticket-booking1','./qualified-alternatives.js?v=20261108-research-alternatives2'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V1: CORE DESK / FOOTBALL / TENNIS'},
-            {path:'/tennis.html', css:'/core-workspaces-design.css', markers:['MS-TENNIS-DESK-2026.10.14-V1','core-workspaces-design.css?v=20261014-full-v1','class="cd-page-header"','id="leagueGrid"','data-sport="tennis"','sport-hubs.js?v=20261102-single-ticket1','ticket-drawer.css?v=20261102-single-ticket1','ticket-drawer.js?v=20261107-manual-ticket-booking1','./qualified-alternatives.js?v=20261108-research-alternatives2'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V1: CORE DESK / FOOTBALL / TENNIS'},
-            {path:'/basketball.html', css:'/basketball-design.css', markers:['MS-BASKETBALL-DESK-2026.10.24-V11','core-workspaces-design.css?v=20261014-full-v1','basketball-design.css?v=20261024-builder-dark-v3','basketball-live.js?v=20261104-nba-probability-cohort1','id="msNav"','workspace-ui.js?v=20261023-basketball-nav1','id="totalsBoard"','id="marketStatus"','ticket-drawer.css?v=20261102-single-ticket1','ticket-drawer.js?v=20261107-manual-ticket-booking1','./qualified-alternatives.js?v=20261108-research-alternatives2'], cssMarker:'MATCH-SIGNAL-BASKETBALL-DESK-V1'},
-            {path:'/league.html?sport=football&league=England%20Amateur%20-%20U21%20Professional%20Development%20League', css:'/ticket-drawer.css', markers:['data-page="league"','sport-hubs.js?v=20261102-single-ticket1','ticket-drawer.css?v=20261102-single-ticket1','ticket-drawer.js?v=20261107-manual-ticket-booking1','./qualified-alternatives.js?v=20261108-research-alternatives2'], cssMarker:'.ms-ticket-launcher'},
+            {path:'/', css:'/core-workspaces-design.css', markers:[rootBuildMarker,rootCssHref,'MS-DESK-2026.10.14-V1','core-workspaces-design.css?v=20261014-full-v1','class="cd-page-header"','class="cd-workspace-grid"','id="unifiedBoard"','id="qualifiedBestSummary"',scriptRefs.root.qualifiedAlternatives], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V1: CORE DESK / FOOTBALL / TENNIS'},
+            {path:'/football.html', css:'/core-workspaces-design.css', markers:['MS-FOOTBALL-DESK-2026.10.14-V1','core-workspaces-design.css?v=20261014-full-v1','class="cd-page-header"','id="leagueGrid"','data-sport="football"','league-logos.js?v=20261013-competition-logos2','sport-hubs.js?v=20261102-single-ticket1','ticket-drawer.css?v=20261102-single-ticket1',scriptRefs.football.ticketDrawer,scriptRefs.football.qualifiedAlternatives], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V1: CORE DESK / FOOTBALL / TENNIS'},
+            {path:'/tennis.html', css:'/core-workspaces-design.css', markers:['MS-TENNIS-DESK-2026.10.14-V1','core-workspaces-design.css?v=20261014-full-v1','class="cd-page-header"','id="leagueGrid"','data-sport="tennis"','sport-hubs.js?v=20261102-single-ticket1','ticket-drawer.css?v=20261102-single-ticket1',scriptRefs.tennis.ticketDrawer,scriptRefs.tennis.qualifiedAlternatives], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V1: CORE DESK / FOOTBALL / TENNIS'},
+            {path:'/basketball.html', css:'/basketball-design.css', markers:['MS-BASKETBALL-DESK-2026.10.24-V11','core-workspaces-design.css?v=20261014-full-v1','basketball-design.css?v=20261024-builder-dark-v3','basketball-live.js?v=20261104-nba-probability-cohort1','id="msNav"','workspace-ui.js?v=20261023-basketball-nav1','id="totalsBoard"','id="marketStatus"','ticket-drawer.css?v=20261102-single-ticket1',scriptRefs.basketball.ticketDrawer,scriptRefs.basketball.qualifiedAlternatives], cssMarker:'MATCH-SIGNAL-BASKETBALL-DESK-V1'},
+            {path:'/league.html?sport=football&league=England%20Amateur%20-%20U21%20Professional%20Development%20League', css:'/ticket-drawer.css', markers:['data-page="league"','sport-hubs.js?v=20261102-single-ticket1','ticket-drawer.css?v=20261102-single-ticket1',scriptRefs.league.ticketDrawer,scriptRefs.league.qualifiedAlternatives], cssMarker:'.ms-ticket-launcher'},
             {path:'/odds-builder.html', css:'/odds-builder-design.css', markers:[currentBuilderBuildMarker,currentBuilderCssHref.replace(/^\.\//,''),currentBuilderEngineSrc.replace(/^\.\//,''),'class="ob-page-header"','class="ob-section-nav"','class="ob-guide-grid"','id="oddsBuilder"'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V3: ODDS BUILDER PAGE LAYOUT'},
             {path:'/reports.html', css:'/reports-design.css', markers:['MS-REPORTS-2026.10.14-V3','reports-design.css?v=20261014-full-v3','class="rp-dashboard-grid"','id="report-scoreboard"','id="researchLabSummary"'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V3: REPORTS PAGE LAYOUT'},
-            {path:'/virtual-lab/', css:'/virtual-lab-terminal.css', markers:['MS-VIRTUAL-LAB-V1-2026.10.14-V3','../virtual-lab-terminal.css?v=20261031-recent-performance-guard1','../virtual-lab-app.js?v=20261102-product-evidence-gate2','class="vl-command-grid"','class="vl-command-rail"','class="vl-insights-grid"','../qualified-alternatives.js?v=20261108-research-alternatives2'], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V3: VIRTUAL LAB PAGE LAYOUT'}
+            {path:'/virtual-lab/', css:'/virtual-lab-terminal.css', markers:['MS-VIRTUAL-LAB-V1-2026.10.14-V3','../virtual-lab-terminal.css?v=20261031-recent-performance-guard1','../virtual-lab-app.js?v=20261102-product-evidence-gate2','class="vl-command-grid"','class="vl-command-rail"','class="vl-insights-grid"',scriptRefs.virtualLab.qualifiedAlternatives], cssMarker:'MATCH-SIGNAL-FULL-RECOMPOSITION-V3: VIRTUAL LAB PAGE LAYOUT'}
           ];
           if (!deploymentBase.startsWith('https://') || !deploymentBase.endsWith('.pages.dev')) {
             failures.push('Cloudflare deployment step did not publish an immutable Pages URL.');
@@ -815,11 +849,10 @@ jobs:
                 for (const marker of [rootBuildMarker,rootCssHref])
                   if (!body.includes(marker)) failures.push(path+' missing current deployment marker: '+marker);
               }
-              if (['/','/upcoming.html','/qualified-best','/qualified-best.html','/football.html','/tennis.html','/basketball.html'].includes(path) || path.startsWith('/league.html?')) {
-                if (!body.includes('./qualified-alternatives.js?v=20261108-research-alternatives2')) failures.push(path+' missing the current qualified-alternatives selector');
-              }
-              if (path==='/virtual-lab/' || path==='/virtual-lab') {
-                if (!body.includes('../qualified-alternatives.js?v=20261108-research-alternatives2')) failures.push(path+' missing the current product-aware qualified-alternatives selector');
+              const alternativeSourceKey = alternativesSourceByRoute.get(path.split('?')[0]);
+              if (alternativeSourceKey) {
+                const expectedAlternativeRef = scriptRefs[alternativeSourceKey].qualifiedAlternatives;
+                if (!body.includes(expectedAlternativeRef)) failures.push(path+' missing current qualified-alternatives selector '+expectedAlternativeRef);
               }
               if (path==='/' || path==='/upcoming.html') {
                 for (const marker of ['Qualified Best','qualified-best.html','id="qualifiedBestSummary"','Qualified fixtures'])
@@ -987,7 +1020,7 @@ jobs:
           // A valid zero is recorded honestly; model/quote/ticket qualification gates remain authoritative.
           try {
             const {r,body}=await get('/api/public/market-alternatives');
-            if (!r.ok) throw new Error('HTTP '+r.status);
+            if (!r.ok) throw new Error('HTTP '+r.status+' body='+String(body||'').replace(/\s+/g,' ').slice(0,240));
             const payload=JSON.parse(body);
             const rows=Array.isArray(payload?.alternatives)?payload.alternatives:null;
             if (!['OK','EMPTY'].includes(String(payload?.status||'')) || !rows) throw new Error('invalid API response shape/status');
@@ -1220,11 +1253,13 @@ jobs:
               }
               const rr = last.rr, raw = last.raw, payload = last.payload, batch = last.batch;
               const volatileUnavailable = Boolean(
+                !payload?.booking_code &&
+                payload?.booking_code_withheld === true &&
                 Array.isArray(payload?.validation) &&
                 payload.validation.length > 0 &&
                 payload.validation.every(v => (v?.ok === true) || (v?.ok === false && v?.excluded === true)) &&
-                payload.validation.some(v => v?.ok === false && v?.excluded === true && /exact SportyBet O\/U line or selected side is no longer available/i.test(String(v?.reason || ''))) &&
-                ['TOO_FEW_AVAILABLE_SELECTIONS','NO_AVAILABLE_SELECTIONS'].includes(String(payload?.error || ''))
+                payload.validation.some(v => v?.ok === false && v?.excluded === true && /exact SportyBet O\/U line or selected side is no longer available|Event is no longer present in SportyBet current catalogue/i.test(String(v?.reason || ''))) &&
+                ['TOO_FEW_AVAILABLE_SELECTIONS','NO_AVAILABLE_SELECTIONS','EFOOTBALL_SLIP_REJECTED_PARTIAL'].includes(String(payload?.error || ''))
               );
               smoke.status = payload?.ok === true ? 'PASS' : volatileUnavailable ? 'VOLATILE_MARKET' : 'FAIL';
               smoke.http_status = rr.status;
