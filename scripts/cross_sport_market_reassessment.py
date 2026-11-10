@@ -828,6 +828,52 @@ def _tennis_options(core: Any, now: datetime, rows: list[dict[str, Any]], baseli
                 ):
                     active.append(candidate)
 
+        # SportyBet market 202 identifies set winners. Keep these in the
+        # quote-backed research audit, but out of the automatic Builder pool:
+        # the per-set estimate is a stationary model output, not a separately
+        # validated set-specific value model.
+        analytics = row.get("analytics") if isinstance(row.get("analytics"), dict) else {}
+        set_probs = analytics.get("set_win_prob") or {}
+        set_p1 = _num(set_probs.get("p1")) if isinstance(set_probs, dict) else None
+        set_p2 = _num(set_probs.get("p2")) if isinstance(set_probs, dict) else None
+        if (
+            is_fresh and set_p1 is not None and set_p2 is not None
+            and 0 < set_p1 < 1 and 0 < set_p2 < 1
+            and abs((set_p1 + set_p2) - 1.0) <= 0.02
+        ):
+            for set_number in (1, 2):
+                market_obj = _find_market(
+                    row, lambda market, n=set_number: _market_is_set_winner(market, n),
+                    market_id="202",
+                )
+                if not market_obj:
+                    continue
+                outcomes = {side: _find_outcome(market_obj, side, row) for side in ("p1", "p2")}
+                if not all(outcomes.values()):
+                    continue
+                complete_rows = [
+                    {"side": side, "odds": outcomes[side]["odds"]}
+                    for side in ("p1", "p2")
+                ]
+                for side, probability in (("p1", set_p1), ("p2", set_p2)):
+                    candidate = _decorate_candidate(
+                        row, sport="tennis", market="set_winner", side=side,
+                        probability=probability, market_obj=market_obj,
+                        odds_rows=complete_rows, outcome=outcomes[side],
+                        model_source="published stationary per-set win probability; identical set-level estimate for each set",
+                        exact_market_id="202", set_number=set_number,
+                        exact_specifier=_market_specifier(market_obj),
+                    )
+                    candidate["reassessment_market_rows"] = complete_rows
+                    candidate["set_number"] = set_number
+                    candidate["market_reassessment"].update({
+                        "set_number": set_number,
+                        "specifier": _market_specifier(market_obj),
+                        "automatic_builder_enabled": False,
+                        "probability_scope": "stationary_per_set_not_set_specific_conditional",
+                    })
+                    audit.append(candidate)
+
         # Recalculate every current full-match half-line, not the model's legacy single line.
         if exact_full_match_total_quotes and predict_total_games:
             quotes = exact_full_match_total_quotes(row)
