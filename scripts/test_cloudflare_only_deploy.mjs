@@ -52,7 +52,9 @@ assert.ok(alternativesApi.includes("const MIN_RECOMMENDED_PROBABILITY = 0.65;"))
 assert.ok(alternativesApi.includes("const RESEARCH_DISPLAY_BASELINE = 0.55;"));
 assert.ok(alternativesApi.includes("const belowBaseline = probability < RESEARCH_DISPLAY_BASELINE;"));
 assert.ok(alternativesApi.includes("const builderQualified = row.passed_builder_gates === true && quoteFresh"));
-assert.ok(alternativesApi.includes('row.passed_builder_gates !== true && !String(row.original_pick || row.primary_prediction_id || "").trim()'));
+assert.ok(alternativesApi.includes('if (row.prediction_role !== "ALTERNATIVE" || row.alternative_source !== "SYSTEM_RECOMMENDED")'));
+assert.ok(alternativesApi.includes("diagnostics.primary_link_present++"));
+assert.ok(!alternativesApi.includes('!String(row.original_pick || row.primary_prediction_id || "").trim()'));
 assert.ok(alternativesApi.includes("builder_qualified: builderQualified"));
 assert.ok(alternativesUi.includes("Research only — Builder gate not passed"));
 assert.ok(alternativesUi.includes("String(x.builder_qualified===true)"));
@@ -70,7 +72,10 @@ const researchLaneProbe = [
   'assert.equal(research.length, 1, "A linked 55%+ research alternative with an exact fresh quote should be public");',
   'assert.equal(research[0].builder_qualified, false);',
   'assert.equal(research[0].qualification_status, "RESEARCH_ONLY");',
-  'assert.equal(evaluate({ ...base, primary_prediction_id: "", original_pick: "" }).length, 0, "Unlinked candidates must remain withheld");',
+  'const unlinked = evaluate({ ...base, primary_prediction_id: "", original_pick: "" });',
+  'assert.equal(unlinked.length, 1, "Missing primary linkage should not hide a valid model-supported research alternative");',
+  'assert.equal(unlinked[0].primary_comparison_status, "PRIMARY_PROBABILITY_UNAVAILABLE");',
+  'assert.equal(unlinked[0].builder_qualified, false);',
   'const lowProbability = evaluate({ ...base, model_probability: 0.54 });',
   'assert.equal(lowProbability.length, 1, "Candidates below the informational research baseline remain visible");',
   'assert.equal(lowProbability[0].below_research_baseline, true);',
