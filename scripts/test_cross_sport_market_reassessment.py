@@ -293,6 +293,37 @@ class CrossSportReassessmentTests(unittest.TestCase):
         self.assertFalse(record["bookable"])
         self.assertTrue(record["research_only"])
 
+        current_rows = reassessment._current_research_candidates([record])
+        self.assertEqual(len(current_rows), 1, "current model-only alternatives must be exported separately from quote history")
+        current = current_rows[0]
+        self.assertEqual(current["candidate_status"], "RESEARCH_ONLY_NO_LIVE_QUOTE")
+        self.assertEqual(current["sport"], "football")
+        self.assertFalse(current["bookable"])
+        self.assertFalse(current["qualification_allowed"])
+        self.assertFalse(current["fresh_exact_quote"])
+        for field in (
+            "bookmaker_odds", "quote_timestamp", "market_odds_timestamp", "odds_timestamp",
+            "sportybet_event_id", "sportybet_market_id", "sportybet_outcome_id",
+            "sportybet_outcome_name", "sportybet_specifier",
+        ):
+            self.assertIsNone(current[field], f"research export must strip {field}")
+
+        synced, revision = evidence_sync._validate_current_research_artifact({
+            "generated_at": self.now.isoformat(),
+            "current_research_candidates_generated_at": self.now.isoformat(),
+            "current_research_candidates": current_rows,
+        })
+        self.assertEqual(synced, current_rows)
+        self.assertEqual(revision, self.now.isoformat())
+        invalid = dict(current)
+        invalid["bookmaker_odds"] = 1.91
+        with self.assertRaisesRegex(RuntimeError, "Unsafe or malformed"):
+            evidence_sync._validate_current_research_artifact({
+                "generated_at": self.now.isoformat(),
+                "current_research_candidates_generated_at": self.now.isoformat(),
+                "current_research_candidates": [invalid],
+            })
+
     def test_tennis_winner_alternatives_survive_missing_live_market_definitions_but_cannot_be_booked(self):
         row = {
             "sport": "tennis",
