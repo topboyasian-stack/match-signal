@@ -237,6 +237,10 @@ def _sportybet_market_snapshot(event, sport):
         all_markets.append({
             "id": mid,
             "name": fair["name"],
+            # Keep provider qualifiers that distinguish markets sharing one ID.
+            # SportyBet uses market 202 for both Set 1 and Set 2; dropping
+            # setnr=1 / setnr=2 makes the two exact markets indistinguishable.
+            "specifier": str(market.get("specifier") or market.get("specifiers") or market.get("marketSpecifier") or ""),
             "line": fair["line"],
             "overround": round(fair["overround"], 6),
             "outcomes": fair["outcomes"],
