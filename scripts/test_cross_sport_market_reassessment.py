@@ -647,5 +647,66 @@ class CrossSportReassessmentTests(unittest.TestCase):
         self.assertEqual(reassessment._settle_result(base, by_event)["settlement_result"], "no")
 
 
+    def test_private_evidence_validator_accepts_unpriced_tennis_set_winner_research(self):
+        row = {
+            "sport": "tennis",
+            "event_id": "tennis-set-private-validator",
+            "start_time": "2026-11-10T12:00:00+00:00",
+            "market": "set_winner",
+            "set_number": 1,
+            "pick": "p1",
+            "model_probability": 0.5772,
+            "prediction_role": "ALTERNATIVE",
+            "alternative_source": "SYSTEM_RECOMMENDED",
+            "candidate_status": "RESEARCH_ONLY_NO_LIVE_QUOTE",
+            "research_only": True,
+            "bookable": False,
+            "qualification_allowed": False,
+            "passed_builder_gates": False,
+            "fresh_exact_quote": False,
+        }
+        candidates, generated_at = evidence_sync._validate_current_research_artifact({
+            "current_research_candidates_generated_at": "2026-11-10T04:00:00+00:00",
+            "current_research_candidates": [row],
+        })
+        self.assertEqual(generated_at, "2026-11-10T04:00:00+00:00")
+        self.assertEqual(len(candidates), 1)
+        self.assertEqual(candidates[0]["market"], "set_winner")
+        self.assertEqual(candidates[0]["set_number"], 1)
+        self.assertFalse(candidates[0]["bookable"])
+        self.assertNotIn("sportybet_market_id", candidates[0])
+
+    def test_private_evidence_validator_rejects_invalid_or_priced_set_winner_research(self):
+        base = {
+            "sport": "tennis",
+            "event_id": "tennis-set-private-validator",
+            "start_time": "2026-11-10T12:00:00+00:00",
+            "market": "set_winner",
+            "set_number": 2,
+            "pick": "p2",
+            "model_probability": 0.5772,
+            "prediction_role": "ALTERNATIVE",
+            "alternative_source": "SYSTEM_RECOMMENDED",
+            "candidate_status": "RESEARCH_ONLY_NO_LIVE_QUOTE",
+            "research_only": True,
+            "bookable": False,
+            "qualification_allowed": False,
+            "passed_builder_gates": False,
+            "fresh_exact_quote": False,
+        }
+        for bad_row in (
+            {**base, "set_number": 3},
+            {**base, "pick": "draw"},
+            {**base, "sport": "football"},
+            {**base, "sportybet_market_id": "202"},
+        ):
+            with self.subTest(bad_row=bad_row):
+                with self.assertRaisesRegex(RuntimeError, "Unsafe or malformed"):
+                    evidence_sync._validate_current_research_artifact({
+                        "current_research_candidates_generated_at": "2026-11-10T04:00:00+00:00",
+                        "current_research_candidates": [bad_row],
+                    })
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
