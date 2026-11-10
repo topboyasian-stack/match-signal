@@ -14,7 +14,7 @@ ARCHIVE_PATH = DATA / "tennis_prediction_archive.json"
 REPORT_PATH = DATA / "tennis_model_v2.json"
 PRECISION_PATH = DATA / "tennis_precision_gate.json"
 
-V2_VERSION = "2026-11-05-atp-prequential-walkforward"
+V2_VERSION = "2026-11-10-atp-prequential-set-win-sync"
 ACTIVE_TOUR = "ATP"
 INITIAL_ELO = 1500.0
 K_FACTOR = 24.0
@@ -357,6 +357,20 @@ def build_precision_gate(items):
     }
 
 
+def match_to_set_probability(match_probability):
+    """Invert best-of-three match-win probability into a stationary per-set probability."""
+    target = clamp(float(match_probability), low=0.001, high=0.999)
+    lo, hi = 0.001, 0.999
+    for _ in range(70):
+        q = (lo + hi) / 2.0
+        match_probability_from_set = 3.0 * q * q - 2.0 * q * q * q
+        if match_probability_from_set < target:
+            lo = q
+        else:
+            hi = q
+    return (lo + hi) / 2.0
+
+
 def apply_model(predictions, ratings, elo_weight, current_rankings, calibration):
     """Apply only the feature tested in the ATP prequential experiment."""
     changed = 0
@@ -385,6 +399,19 @@ def apply_model(predictions, ratings, elo_weight, current_rankings, calibration)
         updated = calibrate_probability(raw, calibration)
         row.setdefault("probabilities", {})["p1"] = round(updated, 4)
         row["probabilities"]["p2"] = round(1.0 - updated, 4)
+        # Set-winner alternatives must be derived from the same calibrated
+        # match probability used by the current ATP model, not the stale
+        # pre-Elo/pre-calibration value left by the original fixture generator.
+        set_p1 = match_to_set_probability(updated)
+        analytics = row.setdefault("analytics", {})
+        analytics["set_win_prob"] = {
+            "p1": round(set_p1, 4),
+            "p2": round(1.0 - set_p1, 4),
+        }
+        analytics["set_win_prob_source"] = (
+            "stationary per-set probability inverted from the current calibrated ATP match probability; "
+            "not conditional on set number or prior set outcomes"
+        )
         row["pick"] = "p1" if updated >= 0.5 else "p2"
         row["confidence"] = round(max(updated, 1.0 - updated), 4)
         row["rankings"] = {
