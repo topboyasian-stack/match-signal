@@ -12,7 +12,7 @@ def require(condition, message):
 
 def main():
     css_version = "ticket-drawer.css?v=20261102-single-ticket1"
-    js_version = "ticket-drawer.js?v=20261107-manual-ticket-booking1"
+    js_version = "ticket-drawer.js?v=20261109-tennis-set-winner1"
     pages = ("basketball.html", "football.html", "tennis.html", "league.html", "index.html", "upcoming.html", "qualified-best.html")
     for page in pages:
         source = (ROOT / page).read_text(encoding="utf-8")
@@ -33,11 +33,11 @@ def main():
     require('data-sport="basketball"' in basketball, "Basketball page lost its sport identity")
     require('data-sport="football"' in football, "Football page lost its sport identity")
     require('data-sport="tennis"' in tennis, "Tennis page lost its sport identity")
-    alternatives_script = "qualified-alternatives.js?v=20261108-research-alternatives2"
+    alternatives_script = "qualified-alternatives.js?v=20261109-tennis-set-winner1"
     for page in pages:
         source = (ROOT / page).read_text(encoding="utf-8")
         require(alternatives_script in source, f"{page} does not load the live qualified-alternatives selector")
-    require("../qualified-alternatives.js?v=20261108-research-alternatives2" in lab_html, "Virtual Lab must load the product-aware qualified-alternatives selector")
+    require("../qualified-alternatives.js?v=20261109-tennis-set-winner1" in lab_html, "Virtual Lab must load the product-aware qualified-alternatives selector")
     selector = (ROOT / "qualified-alternatives.js").read_text(encoding="utf-8")
     require("querySelectorAll('[data-ms-fixture-id]')" in selector and "x.event_id===event&&x.sport===sport" in selector,
             "Qualified alternatives must attach to the exact fixture card and sport, never a different event")
@@ -99,6 +99,13 @@ def main():
             "Selections must be removable individually and as a full ticket")
     require("data-ticket-market-id" in drawer and "model_qualified" in drawer and "sportybet_event_id" in drawer,
             "Basketball market identity and release status must travel with each ticket leg")
+    require("item.market==='set_winner'" in drawer and "set_number:item.set_number" in drawer and "data-ticket-set-number" in drawer,
+            "Tennis Set 1/Set 2 scope must persist through the shared ticket and manual booking request")
+    require("function findSetWinnerSelection(leg, event)" in api and
+            "marketId: '202'" in api and "specifier," in api and "leg.market_id !== '202'" in api,
+            "Tennis set winners must be revalidated against exact SportyBet market 202 and its literal setnr specifier")
+    require("data-ticket-set-number" in selector and "MARKET_SCOPE_NOT_COMPARABLE" in selector,
+            "Set-winner alternatives must display their set number and avoid comparing set probabilities to match probabilities")
     require("product:item.product||null" in drawer and "product:target.getAttribute('data-ticket-product')" in drawer,
             "Product-specific eFootball identity must survive add-to-ticket and server submission")
     require("efootball_gt" in drawer and "efootball_adriatic" in drawer and "item.sport==='efootball'" in drawer,
@@ -110,7 +117,7 @@ def main():
             "NBA current totals must be selectable into the same ticket")
     require("nbaTotalsReleaseQualified(S.totalsOos,S.totalsProbability)" in nba and "nbaTotalRowQualified(p,S.totalsOos,S.totalsProbability,S.totalSnapshots,fresh)" in nba,
             "NBA ticket generation must retain the independent release and per-row gates")
-    require("../ticket-drawer.css?v=20261102-efootball-shared-ticket1" in lab_html and "../ticket-drawer.js?v=20261107-manual-ticket-booking1" in lab_html,
+    require("../ticket-drawer.css?v=20261102-efootball-shared-ticket1" in lab_html and "../ticket-drawer.js?v=20261109-tennis-set-winner1" in lab_html,
             "Virtual Lab must load the shared floating ticket from its nested route")
     require("data-ms-ticket-add" in lab_app and 'data-ticket-sport="efootball"' in lab_app and "data-ticket-product" in lab_app and "efootballTicketReady" in lab_app,
             "Only qualified eFootball GT/eAdriatic exact-line prediction cards may add to the shared ticket")

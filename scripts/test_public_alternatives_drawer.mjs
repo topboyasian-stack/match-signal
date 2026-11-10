@@ -22,7 +22,7 @@ const feedDiagnostics = feed.diagnostics || {};
 assert.equal(Number(feedDiagnostics.selected_alternatives), feed.alternatives.length, "Aggregate selected count must match the public feed");
 assert.ok(feed.alternatives.every(row => typeof row.ticket_selectable === "boolean" && typeof row.quote_status === "string"), "Every row must declare ticket mapping and quote status");
 const now = Date.now();
-const eligible = feed.alternatives.filter((row) => {
+const eligibleAll = feed.alternatives.filter((row) => {
   // This click smoke test intentionally checks only ticket-mapped alternatives.
   // Stale/unverified research remains visible but the booking API must recheck it.
   const start = Date.parse(String(row.start_time || ""));
@@ -35,11 +35,16 @@ const eligible = feed.alternatives.filter((row) => {
     Number.isFinite(Number(row.probability)) && Number(row.probability) > 0 && Number(row.probability) <= 1 &&
     (row.market === "total"
       ? ["over", "under"].includes(String(row.pick || "")) && Number.isFinite(Number(row.line)) && Number(row.line) > 0
-      : row.market === "winner" && ["p1", "p2", "draw"].includes(String(row.pick || "")));
+      : row.market === "set_winner"
+        ? row.sport === "tennis" && ["p1", "p2"].includes(String(row.pick || "")) &&
+          [1, 2].includes(Number(row.set_number)) && String(row.market_id) === "202"
+        : row.market === "winner" && ["p1", "p2", "draw"].includes(String(row.pick || "")));
 });
+const tennisSetWinnerRows = eligibleAll.filter(row => row.market === "set_winner");
+const eligible = tennisSetWinnerRows.length ? tennisSetWinnerRows : eligibleAll;
 assert.ok(eligible.length, "At least one ticket-mapped alternative must remain safely pre-match for a real click test");
-const rowKey = row => [row.sport, row.event_id, row.market, row.pick, row.line == null ? "" : row.line].map(String).join("|");
-const buttonKey = button => [button.sport, button.eventId, button.market, button.pick, button.line].map(String).join("|");
+const rowKey = row => [row.sport, row.event_id, row.market, row.set_number == null ? "" : row.set_number, row.pick, row.line == null ? "" : row.line].map(String).join("|");
+const buttonKey = button => [button.sport, button.eventId, button.market, button.setNumber == null ? "" : button.setNumber, button.pick, button.line].map(String).join("|");
 const byKey = new Map(eligible.map(row => [rowKey(row), row]));
 
 const browser = await chromium.launch({ headless: true });
@@ -65,6 +70,7 @@ try {
         market: button.getAttribute("data-ticket-market"),
         pick: button.getAttribute("data-ticket-pick"),
         line: button.getAttribute("data-ticket-line"),
+        setNumber: button.getAttribute("data-ticket-set-number"),
         marketId: button.getAttribute("data-ticket-market-id"),
         startTime: button.getAttribute("data-ticket-start"),
         player1: button.getAttribute("data-ticket-player1"),
@@ -83,6 +89,7 @@ try {
         button.startTime === String(row.start_time) &&
         button.pick === String(row.pick) &&
         Number(button.line) === Number(row.line) &&
+        Number(button.setNumber) === Number(row.set_number) &&
         button.player1 && button.player2;
     });
     diagnostics.push({ route, fixtureCards: state.cards, renderedAlternativeButtons: state.options.length, matchedLiveFeedRow: Boolean(matched) });
@@ -91,6 +98,7 @@ try {
     const index = state.options.findIndex(button =>
       button.sport === matched.sport && button.eventId === matched.eventId &&
       button.market === matched.market && button.pick === matched.pick &&
+      Number(button.setNumber) === Number(matched.setNumber) &&
       button.marketId === matched.marketId && Number(button.line) === Number(matched.line));
     assert.ok(index >= 0, "Matched alternative button must be addressable in the live DOM");
     await page.locator(".ms-qualified-alternatives button[data-ms-ticket-add]").nth(index).click();
@@ -128,6 +136,7 @@ try {
       event_id: matched.eventId,
       match: matched.match,
       market: matched.market,
+      set_number: matched.setNumber == null ? null : Number(matched.setNumber),
       pick: matched.pick,
       line: matched.line,
       market_id: matched.marketId,
