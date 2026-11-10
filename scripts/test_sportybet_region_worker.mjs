@@ -117,7 +117,9 @@ try {
   assert.equal(lastUrl.searchParams.get("marketId"), "1,18");
   assert.equal(lastUrl.searchParams.has("untrusted"), false, "arbitrary query parameters must not be forwarded");
   assert.equal(lastOptions.headers["Current-Country"], "NG");
-  assert.equal(lastOptions.cache, "no-store");
+  assert.equal(lastOptions.cache, undefined, "Cloudflare Workers does not implement RequestInit.cache");
+  assert.equal(lastOptions.headers["Cache-Control"], "no-cache");
+  assert.equal(lastOptions.headers["Pragma"], "no-cache");
   assert.equal(fetchCount, 1);
 
   fetchCount = 0;
