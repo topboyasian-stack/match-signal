@@ -7,8 +7,10 @@ const { onRequestGet } = await import(moduleUrl);
 
 const originalFetch = globalThis.fetch;
 const upstreamRequests = [];
-globalThis.fetch = async (url) => {
+let upstreamOptions = null;
+globalThis.fetch = async (url, options = {}) => {
   upstreamRequests.push(String(url));
+  upstreamOptions = options;
   return new Response(JSON.stringify({ events: [], fixture: "ESPN summary test" }), {
     status: 200,
     headers: { "Content-Type": "application/json" }
@@ -31,6 +33,9 @@ try {
   assert.equal(target.searchParams.get("event"), "401909277");
   assert.equal(target.searchParams.get("region"), "us");
   assert.equal(target.searchParams.get("lang"), "en");
+  assert.equal(upstreamOptions.cache, undefined, "Cloudflare Workers does not implement RequestInit.cache");
+  assert.equal(upstreamOptions.headers["Cache-Control"], "no-cache");
+  assert.equal(upstreamOptions.headers["Pragma"], "no-cache");
 
   const beforeInvalid = upstreamRequests.length;
   const invalidRequest = new Request(
