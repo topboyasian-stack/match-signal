@@ -31,6 +31,7 @@ on:
       - "scripts/prediction_identity.py"
       - "scripts/predict_today.py"
       - "scripts/settle_same_day.py"
+      - "scripts/settle_tennis_history.py"
       - "scripts/verify_performance_ledger.py"
       - "scripts/test_prediction_history_identity.py"
       - "scripts/test_ucl_dual_competition_model.py"
@@ -139,4 +140,4 @@ jobs:
         run: python scripts/test_settlement_publication.py
 
       - name: Compile changed history and settlement modules
-        run: python -m py_compile scripts/prediction_identity.py scripts/predict_today.py scripts/settle_same_day.py scripts/verify_performance_ledger.py
+        run: python -m py_compile scripts/prediction_identity.py scripts/predict_today.py scripts/settle_same_day.py scripts/settle_tennis_history.py scripts/verify_performance_ledger.py

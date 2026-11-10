@@ -310,6 +310,7 @@ function currentSelectionForTarget(leg, event) {
   const market = String(leg?.market || '').toLowerCase();
   const product = productForLeg(leg);
   if (sport === 'basketball') return findBasketballSelection(leg, event);
+  if (sport === 'tennis' && market === 'set_winner') return findSetWinnerSelection(leg, event);
   // Odds Builder's eFootball legs are serialized as sport="virtual",
   // market="virtual_total", product="efootball_gt". Treat that shape as an
   // exact totals market during direct-ID matching, not as a match-winner pick.
@@ -976,6 +977,61 @@ function findVirtualSelection(leg, event) {
   return { error: 'The exact SportyBet O/U line or selected side is no longer available.' };
 }
 
+function findSetWinnerSelection(leg, event) {
+  const sport = String(leg?.sport || '').toLowerCase();
+  const setNumber = Number(leg?.set_number);
+  const pick = String(leg?.pick || '').toLowerCase();
+  if (sport !== 'tennis' || ![1, 2].includes(setNumber) ||
+      !['p1', 'p2'].includes(pick) || String(leg?.market_id || '') !== '202') {
+    return { error: 'Tennis set-winner selections require Set 1 or Set 2 and exact SportyBet market 202.' };
+  }
+  if (!sameParticipantPair([leg?.player_1, leg?.player_2], event, 'tennis')) {
+    return { error: 'Tennis participants changed in the current SportyBet event.' };
+  }
+  const requestedStart = Date.parse(String(leg?.start_time || ''));
+  const currentStart = Number(event?.estimateStartTime || 0);
+  if (Number.isFinite(requestedStart) && currentStart &&
+      Math.abs(requestedStart - currentStart) > 45 * 60 * 1000) {
+    return { error: 'Tennis fixture start time changed; refresh the ticket.' };
+  }
+  const selectedName = String(pick === 'p1' ? leg?.player_1 || '' : leg?.player_2 || '').trim();
+  if (!selectedName) return { error: 'The selected tennis player identity is missing.' };
+  const escapedSet = String(setNumber);
+  const markets = Array.isArray(event?.markets) ? event.markets : [];
+  for (const market of markets) {
+    if (String(market?.id || '') !== '202') continue;
+    const specifier = [market?.specifier, market?.specifiers, market?.marketSpecifier]
+      .find(value => typeof value === 'string' && value.trim())?.trim() || '';
+    const scope = specifier.match(/(?:^|[|,;\s])setnr\s*=\s*([12])(?=$|[|,;\s])/i);
+    if (!scope || scope[1] !== escapedSet) continue;
+    const desc = String(market?.desc || market?.name || market?.title || '').toLowerCase();
+    if (desc && !/winner/.test(desc)) continue;
+    const status = String(market?.status || '').trim().toLowerCase();
+    if (/suspend|closed|inactive|settled|unavailable|stop/i.test(status) ||
+        (status !== '' && /^\d+$/.test(status) && status !== '0')) continue;
+    const outcomes = Array.isArray(market?.outcomes) ? market.outcomes : [];
+    const outcome = outcomes.find(item => {
+      const rawName = String(item?.desc || item?.name || item?.title || '').trim();
+      const active = item?.isActive == null ? item?.active !== false :
+        Number(item.isActive) === 1 || item.isActive === true;
+      const odds = Number(item?.odds);
+      return active && Boolean(String(item?.id || '')) && Number.isFinite(odds) && odds > 1 &&
+        participantNameMatches(selectedName, rawName);
+    });
+    if (!outcome) continue;
+    return {
+      eventId: String(event.eventId || ''),
+      marketId: '202',
+      specifier,
+      outcomeId: String(outcome.id),
+      outcomeName: String(outcome.desc || outcome.name || outcome.title || ''),
+      odds: Number(outcome.odds),
+      fetchedAt: String(event?.fetchedAt || '')
+    };
+  }
+  return { error: 'The exact current SportyBet Set ' + setNumber + ' winner market (202), specifier and selected player outcome are unavailable.' };
+}
+
 function findWinnerSelection(leg, event) {
   const pick = String(leg?.pick || '').toLowerCase();
   const sport = String(leg?.sport || '').toLowerCase();
@@ -1045,6 +1101,7 @@ async function buildSelection(leg, event) {
   const sport = String(leg?.sport || '').toLowerCase();
   const market = String(leg?.market || '').toLowerCase();
   if (sport === 'basketball') return findBasketballSelection(leg,event);
+  if (sport === 'tennis' && market === 'set_winner') return findSetWinnerSelection(leg,event);
   if (market === 'total' && ['football','tennis'].includes(sport)) return findVirtualSelection(leg,event);
   if (sport === 'football' || market === '1x2' || market === 'winner') {
     return findWinnerSelection(leg, event);
@@ -1082,6 +1139,7 @@ async function handlePost(context) {
         pick: String(item?.pick || '').toLowerCase(),
         line: item?.line == null ? null : Number(item.line),
         market_id: String(item?.market_id || ''),
+        set_number: item?.set_number == null ? null : Number(item.set_number),
         model_qualified: item?.model_qualified === true,
         start_time: String(item?.start_time || ''),
         player_1: String(item?.player_1 || ''),
@@ -1107,6 +1165,11 @@ async function handlePost(context) {
               !['18', '189'].includes(String(leg.market_id)) || !leg.sportybet_event_id;
           }
           if (!['football', 'tennis'].includes(leg.sport)) return true;
+          if (leg.market === 'set_winner') {
+            return leg.sport !== 'tennis' || !['p1', 'p2'].includes(leg.pick) ||
+              ![1, 2].includes(Number(leg.set_number)) || leg.market_id !== '202' ||
+              !leg.sportybet_event_id;
+          }
           if (leg.market === 'total') {
             const requiredMarketId = leg.sport === 'football' ? '18' : '189';
             return !['over', 'under'].includes(leg.pick) ||
@@ -1118,7 +1181,7 @@ async function handlePost(context) {
             (leg.sport === 'tennis' && leg.pick === 'draw');
         }) ||
           ids.some(id => !id) || new Set(ids).size !== ids.length) {
-        return json({ ok: false, error: 'INVALID_MANUAL_SELECTION', message: 'Manual tickets support Football/Tennis winners and exact totals, plus experimental eFootball GT/eAdriatic and NBA market-225 totals. Every leg must still match a currently open SportyBet event, exact line and live odds.' }, 422);
+        return json({ ok: false, error: 'INVALID_MANUAL_SELECTION', message: 'Manual tickets support Football/Tennis match winners, Tennis Set 1/Set 2 winners, exact totals, experimental eFootball GT/eAdriatic and NBA market-225 totals. Every leg must still match a currently open SportyBet event, exact market scope, participant outcome and live odds.' }, 422);
       }
     } else {
       // Desk research batches remain subject to their existing Builder qualification gates.
