@@ -6,7 +6,7 @@ const MAX_QUOTE_AGE_SECONDS = 900;
 const MIN_RECOMMENDED_PROBABILITY = 0.65;
 const RESEARCH_DISPLAY_BASELINE = 0.55;
 const TOTAL_MARKETS = new Set(["total_goals", "total_games", "total_ou", "virtual_total", "over_under"]);
-const SUPPORTED_MARKETS = new Set(["1X2", "winner", "total_goals", "total_games", "total_ou", "virtual_total", "over_under", "btts", "double_chance"]);
+const SUPPORTED_MARKETS = new Set(["1X2", "winner", "set_winner", "total_goals", "total_games", "total_ou", "virtual_total", "over_under", "btts", "double_chance"]);
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -30,10 +30,17 @@ function marketKind(market) {
   if (TOTAL_MARKETS.has(String(market || ""))) return "total";
   if (String(market || "") === "btts") return "btts";
   if (String(market || "") === "double_chance") return "double_chance";
+  if (String(market || "") === "set_winner") return "set_winner";
   return "winner";
 }
 
-function isTicketSelectable(sport, product, market, pick, line, marketId) {
+function isTicketSelectable(sport, product, market, pick, line, marketId, setNumber, specifier) {
+  if (market === "set_winner") {
+    const match = String(specifier || "").match(/(?:^|[|,;\\s])setnr\\s*=\\s*([12])(?=$|[|,;\\s])/i);
+    return sport === "tennis" && marketId === "202" &&
+      ["p1", "p2"].includes(pick) && [1, 2].includes(Number(setNumber)) &&
+      Boolean(match) && Number(match[1]) === Number(setNumber);
+  }
   if (market === "total") {
     if (!["over", "under"].includes(pick) || !Number.isFinite(line) || line <= 0) return false;
     if (sport === "football") return marketId === "18";
@@ -56,13 +63,17 @@ export function publicAlternative(row, quote = {}) {
   const total = market === "total";
   const btts = market === "btts";
   const doubleChance = market === "double_chance";
+  const setWinner = market === "set_winner";
   const pick = String(row.pick || "").toLowerCase();
+  const setNumber = row.set_number == null ? null : Number(row.set_number);
+  const specifier = String(row.sportybet_specifier || "");
   if (!["football", "tennis", "basketball", "efootball"].includes(sport) || !SUPPORTED_MARKETS.has(sourceMarket)) return null;
   if (sport === "efootball" && (!["efootball_gt", "efootball_adriatic"].includes(product) || !total)) return null;
   if (total && !["over", "under"].includes(pick)) return null;
   if (btts && !["yes", "no"].includes(pick)) return null;
   if (doubleChance && !["1x", "12", "x2"].includes(pick)) return null;
-  if (!total && !btts && !doubleChance && !["p1", "p2", "draw"].includes(pick)) return null;
+  if (setWinner && (sport !== "tennis" || !["p1", "p2"].includes(pick) || ![1, 2].includes(setNumber))) return null;
+  if (!total && !btts && !doubleChance && !setWinner && !["p1", "p2", "draw"].includes(pick)) return null;
   if (sport === "tennis" && pick === "draw") return null;
   const eventId = String(row.event_id || "");
   const sportybetEventId = String(row.sportybet_event_id || (sport === "efootball" ? row.event_id : ""));
@@ -81,7 +92,7 @@ export function publicAlternative(row, quote = {}) {
   if (total && (!Number.isFinite(line) || line <= 0)) return null;
   // Unsupported/missing provider market IDs remain visible as research-only candidates.
   const ticketSelectable = Boolean(sportybetEventId && marketId) &&
-    isTicketSelectable(sport, product, market, pick, line, marketId);
+    isTicketSelectable(sport, product, market, pick, line, marketId, setNumber, specifier);
   const quoteFresh = quote.quoteFresh === true && odds !== null;
   const quoteStatus = odds === null && quote.quoteStatus === "FRESH_EXACT"
     ? "PRICE_UNAVAILABLE" : (quote.quoteStatus || "UNVERIFIED");
@@ -96,13 +107,14 @@ export function publicAlternative(row, quote = {}) {
     ? (sport === "tennis" ? "Total games" : sport === "basketball" ? "Full-game total" : "Total goals")
     : btts ? "Both teams to score"
     : doubleChance ? "Double chance"
+    : setWinner ? "Set " + setNumber + " winner"
     : "Winner";
   return {
     sport, product: sport === "efootball" ? product : null,
     event_id: eventId, sportybet_event_id: sportybetEventId,
     start_time: startTime, player_1: player1, player_2: player2,
     match, market, market_label: marketLabel,
-    pick, line, market_id: marketId, odds,
+    pick, line, set_number: setWinner ? setNumber : null, market_id: marketId, odds,
     probability,
     builder_qualified: builderQualified,
     ticket_selectable: ticketSelectable,
@@ -126,6 +138,7 @@ function publicAlternativeRejectReason(row) {
   if (kind === "total" && !["over", "under"].includes(pick)) return "unsupported_total_pick";
   if (kind === "btts" && !["yes", "no"].includes(pick)) return "unsupported_btts_pick";
   if (kind === "double_chance" && !["1x", "12", "x2"].includes(pick)) return "unsupported_double_chance_pick";
+  if (kind === "set_winner" && (sport !== "tennis" || !["p1", "p2"].includes(pick) || ![1, 2].includes(Number(row?.set_number)))) return "unsupported_set_winner_identity";
   if (kind === "winner" && !["p1", "p2", "draw"].includes(pick)) return "unsupported_winner_pick";
   if (sport === "tennis" && pick === "draw") return "tennis_draw_not_supported";
   const eventId = String(row.event_id || "");
@@ -249,7 +262,11 @@ export function buildPublicAlternatives(document, nowMs = Date.now()) {
     diagnostics.different_from_primary_pick++;
 
     const primaryProbability = Number(row.original_primary_probability ?? row.original_probability);
-    if (Number.isFinite(primaryProbability) && primaryProbability > 0 && primaryProbability <= 1) {
+    if (item.market === "set_winner") {
+      // A set-win probability and a match-win probability are different
+      // settlement scopes. Never compare or suppress one using the other.
+      item.primary_comparison_status = "MARKET_SCOPE_NOT_COMPARABLE";
+    } else if (Number.isFinite(primaryProbability) && primaryProbability > 0 && primaryProbability <= 1) {
       if (item.probability <= primaryProbability + 1e-9) {
         reject("not_more_likely_than_primary");
         continue;
@@ -278,12 +295,22 @@ export function buildPublicAlternatives(document, nowMs = Date.now()) {
     const rankedRows = ticketRows.length ? [...ticketRows, ...researchRows] : rows;
     // Show at most two distinct market/line/side options per fixture.
     const selected = [];
-    for (const row of rankedRows) {
-      if (selected.some(x => x.market === row.market && x.line === row.line && x.pick === row.pick)) continue;
-      selected.push(row);
-      if (selected.length === 2) break;
+    const hasSetWinners = rows.some(row => row.sport === "tennis" && row.market === "set_winner");
+    if (hasSetWinners) {
+      // Keep Set 1 and Set 2 independently visible; a generic two-row cap
+      // previously allowed one set market to hide the other.
+      const setRows = rankedRows.filter(row => row.market === "set_winner")
+        .sort((a, b) => Number(a.set_number) - Number(b.set_number) || b.probability - a.probability);
+      for (const row of setRows) {
+        if (!selected.some(x => x.market === row.market && x.set_number === row.set_number && x.pick === row.pick)) selected.push(row);
+      }
     }
-    alternatives.push(...selected);
+    for (const row of rankedRows) {
+      if (selected.some(x => x.market === row.market && x.set_number === row.set_number && x.line === row.line && x.pick === row.pick)) continue;
+      selected.push(row);
+      if (selected.length >= (hasSetWinners ? 4 : 2)) break;
+    }
+    alternatives.push(...selected.slice(0, hasSetWinners ? 4 : 2));
   }
   diagnostics.candidates_before_fixture_limit = [...grouped.values()].reduce((sum, rows) => sum + rows.length, 0);
   diagnostics.selected_alternatives = alternatives.length;
@@ -296,7 +323,8 @@ export function buildPublicAlternatives(document, nowMs = Date.now()) {
     min_probability: 0,
     research_display_baseline: RESEARCH_DISPLAY_BASELINE,
     builder_min_probability: MIN_RECOMMENDED_PROBABILITY,
-    max_per_fixture: 2,
+    max_per_fixture: 4,
+    default_max_per_fixture: 2,
     diagnostics,
     alternatives
   };
