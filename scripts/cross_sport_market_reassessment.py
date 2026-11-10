@@ -592,16 +592,18 @@ def _record_options(options: list[dict[str, Any]]) -> None:
 
 
 def _dedupe_candidates(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    indexed: dict[tuple[str, str, str, str, str], dict[str, Any]] = {}
+    indexed: dict[tuple[str, str, str, str, str, str], dict[str, Any]] = {}
     for row in rows:
         if not isinstance(row, dict):
             continue
         line = _num(row.get("line"))
+        set_number = row.get("set_number")
         key = (
             str(row.get("sport") or ""),
             str(row.get("event_id") or ""),
             str(row.get("builder_market") or ""),
             "" if line is None else f"{line:g}",
+            "" if set_number is None else str(set_number),
             str(row.get("builder_pick") or ""),
         )
         current = indexed.get(key)
