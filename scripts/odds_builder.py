@@ -1,4 +1,5 @@
 """Stable entry point for Match Signal Odds Builder."""
+# Refresh current tennis exact Set 1/Set 2 SportyBet evidence from the latest prediction snapshot.
 import sys
 import odds_builder_core as _core
 
