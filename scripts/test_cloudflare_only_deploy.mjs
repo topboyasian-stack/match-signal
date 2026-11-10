@@ -56,7 +56,7 @@ assert.ok(alternativesApi.includes('if (row.prediction_role !== "ALTERNATIVE" ||
 assert.ok(alternativesApi.includes("diagnostics.primary_link_present++"));
 assert.ok(!alternativesApi.includes('!String(row.original_pick || row.primary_prediction_id || "").trim()'));
 assert.ok(alternativesApi.includes("builder_qualified: builderQualified"));
-assert.ok(alternativesUi.includes("Research only — Builder gate not passed"));
+assert.ok(alternativesUi.includes("Research only · Builder gate not passed"));
 assert.ok(alternativesUi.includes("String(x.builder_qualified===true)"));
 assert.ok(ticketDrawer.includes("model_qualified:raw.model_qualified===true"));
 assert.ok(ticketDrawer.includes("MANUAL PICK — model qualification not claimed; live recheck required"));
