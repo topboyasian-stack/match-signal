@@ -13,6 +13,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import cross_sport_market_reassessment as reassessment
 import sync_cross_sport_private_evidence as evidence_sync
+import settle_tennis_history as tennis_settlement
 from fixture_primary_prediction_ledger import build_fixture_ledger, merge_primary_ledger, primary_summary
 
 
@@ -362,6 +363,148 @@ class CrossSportReassessmentTests(unittest.TestCase):
             self.assertFalse(item.get("bookable"))
             self.assertFalse(item.get("qualification_allowed"))
 
+
+    def test_tennis_set_winner_research_publishes_set_one_and_two_separately(self):
+        row = {
+            "sport": "tennis",
+            "event_id": "tennis-set-research",
+            "start_time": (self.now + timedelta(hours=2)).isoformat(),
+            "player_1": "Player Alpha",
+            "player_2": "Player Beta",
+            "analytics": {"set_win_prob": {"p1": 0.5772, "p2": 0.4228}},
+            "probabilities": {"p1": 0.6149, "p2": 0.3851},
+        }
+        options = reassessment._tennis_research_options(row)
+        set_rows = [item for item in options if item.get("builder_market") == "set_winner"]
+        self.assertEqual({item.get("set_number") for item in set_rows}, {1, 2})
+        self.assertEqual(
+            {item.get("set_number") for item in reassessment._dedupe_candidates(set_rows)},
+            {1, 2},
+            "generic candidate deduplication must not collapse Set 1 and Set 2",
+        )
+        self.assertEqual({item.get("builder_pick") for item in set_rows}, {"p1"})
+        self.assertTrue(all(abs(item["builder_probability"] - 0.5772) < 1e-9 for item in set_rows))
+        self.assertTrue(all("stationary" in item["market_reassessment"]["model_probability_source"] for item in set_rows))
+
+        records = [reassessment._make_audit_record(FakeCore(), item, self.now) for item in set_rows]
+        published = reassessment._current_research_candidates(records)
+        self.assertEqual({item.get("set_number") for item in published}, {1, 2})
+        self.assertTrue(all(item["market"] == "set_winner" for item in published))
+        self.assertTrue(all(item["bookmaker_odds"] is None and item["sportybet_market_id"] is None for item in published))
+
+    def test_tennis_set_winner_uses_exact_market_202_scope_without_qualifying_builder(self):
+        fetched = (self.now - timedelta(seconds=30)).isoformat()
+        row = {
+            "sport": "tennis",
+            "event_id": "tennis-set-live",
+            "start_time": (self.now + timedelta(hours=2)).isoformat(),
+            "player_1": "Player Alpha",
+            "player_2": "Player Beta",
+            "probabilities": {"p1": 0.6149, "p2": 0.3851},
+            "analytics": {"set_win_prob": {"p1": 0.5772, "p2": 0.4228}},
+            "sportybet_market": {
+                "available": True,
+                "event_id": "sr:match:tennis-set-live",
+                "fetched_at": fetched,
+                "markets": [
+                    {"id": "202", "desc": "1st Set Winner", "specifier": "setnr=1", "status": "0",
+                     "outcomes": [{"id": "s1-a", "name": "Player Alpha", "odds": 1.82, "isActive": 1},
+                                  {"id": "s1-b", "name": "Player Beta", "odds": 2.02, "isActive": 1}]},
+                    {"id": "202", "desc": "2nd Set Winner", "specifier": "setnr=2", "status": "0",
+                     "outcomes": [{"id": "s2-a", "name": "Player Alpha", "odds": 1.86, "isActive": 1},
+                                  {"id": "s2-b", "name": "Player Beta", "odds": 1.98, "isActive": 1}]},
+                ],
+            },
+            "sportybet_event_id": "sr:match:tennis-set-live",
+            "market_odds_timestamp": fetched,
+            "odds_timestamp": fetched,
+            "model": "test tennis model",
+        }
+        active, audit = reassessment._tennis_options(FakeCore(), self.now, [row], [])
+        self.assertEqual(active, [], "set winners must remain outside the automatic Builder pool")
+        set_rows = [item for item in audit if item.get("builder_market") == "set_winner"]
+        self.assertEqual({item.get("set_number") for item in set_rows}, {1, 2})
+        self.assertEqual(len(set_rows), 4, "both live player outcomes should be retained for both exact set markets")
+        by_scope = {(item["set_number"], item["builder_pick"]): item for item in set_rows}
+        self.assertEqual(by_scope[(1, "p1")]["sportybet_specifier"], "setnr=1")
+        self.assertEqual(by_scope[(2, "p1")]["sportybet_specifier"], "setnr=2")
+        self.assertEqual(by_scope[(1, "p1")]["sportybet_outcome_id"], "s1-a")
+        self.assertEqual(by_scope[(2, "p2")]["sportybet_outcome_id"], "s2-b")
+        class FakeTennisCore(FakeCore):
+            @staticmethod
+            def market_rows(candidate):
+                return candidate.get("reassessment_market_rows", [])
+
+            @staticmethod
+            def make_leg(candidate):
+                return {"builder_eligible": True, "status": "VALUE_RESEARCH_CANDIDATE"}
+
+        for item in set_rows:
+            record = reassessment._make_audit_record(FakeTennisCore(), item, self.now)
+            self.assertFalse(record["bookable"])
+            self.assertFalse(record["qualification_allowed"])
+            self.assertFalse(record["passed_builder_gates"])
+            self.assertTrue(record["fresh_exact_quote"])
+
+    def test_tennis_set_winner_never_borrows_the_other_sets_market_specifier(self):
+        fetched = self.now.isoformat()
+        row = {
+            "sport": "tennis", "event_id": "tennis-set-mismatch",
+            "start_time": (self.now + timedelta(hours=2)).isoformat(),
+            "player_1": "Player Alpha", "player_2": "Player Beta",
+            "analytics": {"set_win_prob": {"p1": 0.57, "p2": 0.43}},
+            "sportybet_market": {"available": True, "event_id": "sr:match:mismatch", "fetched_at": fetched,
+                "markets": [{"id": "202", "desc": "1st Set Winner", "specifier": "setnr=1", "status": "0",
+                    "outcomes": [{"id": "a", "name": "Player Alpha", "odds": 1.9},
+                                 {"id": "b", "name": "Player Beta", "odds": 1.9}]}]},
+            "sportybet_event_id": "sr:match:mismatch", "market_odds_timestamp": fetched,
+        }
+        _, audit = reassessment._tennis_options(FakeCore(), self.now, [row], [])
+        exact = [item for item in audit if item.get("builder_market") == "set_winner" and item.get("sportybet_outcome_id")]
+        self.assertEqual({item["set_number"] for item in exact}, {1})
+        self.assertFalse(any(item["set_number"] == 2 for item in exact))
+
+    def test_tennis_set_winner_settlement_uses_player_identity_not_competitor_order(self):
+        row = {
+            "player_1": "Player Two",
+            "player_2": "Player One",
+            "analytics": {"total_games": {"line": 22.5}, "pick": "over"},
+        }
+        competition = {
+            "status": {"type": {"completed": True}},
+            "competitors": [
+                {"athlete": {"displayName": "Player One"}, "winner": True,
+                 "linescores": [{"value": 6}, {"value": 4}]},
+                {"athlete": {"displayName": "Player Two"},
+                 "linescores": [{"value": 3}, {"value": 6}]},
+            ],
+        }
+        self.assertTrue(tennis_settlement.settle_row(row, competition))
+        self.assertEqual(row["actual_markets"]["set_winners"], [
+            {"set_number": 1, "winner": "p2"},
+            {"set_number": 2, "winner": "p1"},
+        ])
+
+    def test_set_winner_audit_settles_only_its_selected_set(self):
+        source = {
+            "actual_markets": {
+                "set_winners": [
+                    {"set_number": 1, "winner": "p1"},
+                    {"set_number": 2, "winner": "p2"},
+                ]
+            },
+            "settled_at": self.now.isoformat(),
+        }
+        first = reassessment._settle_result({
+            "sport": "tennis", "event_id": "tennis-set", "market": "set_winner",
+            "set_number": 1, "pick": "p1",
+        }, {("tennis", "tennis-set"): source})
+        second = reassessment._settle_result({
+            "sport": "tennis", "event_id": "tennis-set", "market": "set_winner",
+            "set_number": 2, "pick": "p1",
+        }, {("tennis", "tennis-set"): source})
+        self.assertEqual(first["settlement_result"], "yes")
+        self.assertEqual(second["settlement_result"], "no")
 
     def test_future_quote_timestamp_fails_closed(self):
         row = sample_football(self.now, quote_age_seconds=0)
