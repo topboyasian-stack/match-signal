@@ -113,19 +113,30 @@ jobs:
           test -n "$DISPATCHED_AT"
           test -n "$BOARD_PUBLISHED_AT"
           builder_run_id=""
+          builder_head_sha=""
           for attempt in $(seq 1 180); do
-            candidates="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/odds_builder.yml/runs?branch=main&event=workflow_dispatch&per_page=30" --jq ".workflow_runs[] | select(.event == \"workflow_dispatch\" and .head_branch == \"main\" and .created_at >= \"$BOARD_PUBLISHED_AT\") | [.id, .head_sha] | @tsv")"
+            # Unified Upcoming can produce both a workflow_dispatch Builder and an
+            # automatic workflow_run Builder. A queued dispatch can be superseded by
+            # the automatic run, so consider both event types after this board publish.
+            builder_run_id=""
+            builder_head_sha=""
+            candidates="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/odds_builder.yml/runs?branch=main&per_page=100" --jq ".workflow_runs[] | select(.event == \"workflow_dispatch\" and .head_branch == \"main\" and .created_at >= \"$BOARD_PUBLISHED_AT\" or .event == \"workflow_run\" and .head_branch == \"main\" and .created_at >= \"$BOARD_PUBLISHED_AT\") | [.id, .head_sha] | @tsv")"
             while IFS=$'\t' read -r candidate_id candidate_sha; do
               [ -n "$candidate_id" ] || continue
-              # Builder runs sync latest main before generation; event head_sha can lag
-              # concurrent commits even when this run starts after the board publication.
               builder_status="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$candidate_id" --jq '.status')"
               if [ "$builder_status" = "completed" ]; then
                 builder_conclusion="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$candidate_id" --jq '.conclusion')"
+                if [ "$builder_conclusion" = "cancelled" ] || [ "$builder_conclusion" = "skipped" ]; then
+                  echo "Ignoring superseded pre-build Builder run $candidate_id ($builder_conclusion); scanning the remaining refreshes."
+                  continue
+                fi
                 if [ "$builder_conclusion" != "success" ]; then
                   echo "Pre-build board's Builder refresh $candidate_id failed: $builder_conclusion" >&2
                   exit 1
                 fi
+                builder_run_id="$candidate_id"
+                builder_head_sha="$candidate_sha"
+                break
               fi
               builder_run_id="$candidate_id"
               builder_head_sha="$candidate_sha"
@@ -135,15 +146,20 @@ jobs:
               builder_status="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$builder_run_id" --jq '.status')"
               if [ "$builder_status" = "completed" ]; then
                 builder_conclusion="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$builder_run_id" --jq '.conclusion')"
-                if [ "$builder_conclusion" != "success" ]; then
-                  echo "Pre-build Builder refresh $builder_run_id failed: $builder_conclusion" >&2
+                if [ "$builder_conclusion" = "success" ]; then
+                  break
+                elif [ "$builder_conclusion" = "cancelled" ] || [ "$builder_conclusion" = "skipped" ]; then
+                  echo "Pre-build Builder run $builder_run_id was superseded ($builder_conclusion); re-scanning for the next eligible refresh."
+                  builder_run_id=""
+                  builder_head_sha=""
+                else
+                  echo "Pre-build board's Builder refresh $builder_run_id failed: $builder_conclusion" >&2
                   exit 1
                 fi
-                break
               fi
             fi
             if [ "$attempt" -eq 180 ]; then
-              echo "Timed out waiting for the Builder run triggered by the pre-build board." >&2
+              echo "Timed out waiting for a successful Builder refresh after the pre-build board." >&2
               exit 1
             fi
             sleep 5
@@ -152,7 +168,6 @@ jobs:
           echo "builder_run_id=$builder_run_id" >> "$GITHUB_OUTPUT"
           echo "builder_head_sha=$builder_head_sha" >> "$GITHUB_OUTPUT"
           echo "Pre-build board's Builder run $builder_run_id succeeded."
-
       - name: Publish the rebuilt Builder through Unified Upcoming
         id: post-build-board
         env:
@@ -212,19 +227,29 @@ jobs:
           test -n "$DISPATCHED_AT"
           test -n "$BOARD_PUBLISHED_AT"
           builder_run_id=""
+          builder_head_sha=""
           for attempt in $(seq 1 180); do
-            candidates="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/odds_builder.yml/runs?branch=main&event=workflow_dispatch&per_page=30" --jq ".workflow_runs[] | select(.event == \"workflow_dispatch\" and .head_branch == \"main\" and .created_at >= \"$BOARD_PUBLISHED_AT\") | [.id, .head_sha] | @tsv")"
+            # Include both manual dispatches and automatic workflow_run refreshes.
+            # If one run is superseded, re-scan rather than failing the promotion.
+            builder_run_id=""
+            builder_head_sha=""
+            candidates="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/odds_builder.yml/runs?branch=main&per_page=100" --jq ".workflow_runs[] | select(.event == \"workflow_dispatch\" and .head_branch == \"main\" and .created_at >= \"$BOARD_PUBLISHED_AT\" or .event == \"workflow_run\" and .head_branch == \"main\" and .created_at >= \"$BOARD_PUBLISHED_AT\") | [.id, .head_sha] | @tsv")"
             while IFS=$'\t' read -r candidate_id candidate_sha; do
               [ -n "$candidate_id" ] || continue
-              # Builder runs sync latest main before generation; event head_sha can lag
-              # concurrent commits even when this run starts after the board publication.
               builder_status="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$candidate_id" --jq '.status')"
               if [ "$builder_status" = "completed" ]; then
                 builder_conclusion="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$candidate_id" --jq '.conclusion')"
+                if [ "$builder_conclusion" = "cancelled" ] || [ "$builder_conclusion" = "skipped" ]; then
+                  echo "Ignoring superseded post-build Builder run $candidate_id ($builder_conclusion); scanning the remaining refreshes."
+                  continue
+                fi
                 if [ "$builder_conclusion" != "success" ]; then
                   echo "Post-build board's Builder refresh $candidate_id failed: $builder_conclusion" >&2
                   exit 1
                 fi
+                builder_run_id="$candidate_id"
+                builder_head_sha="$candidate_sha"
+                break
               fi
               builder_run_id="$candidate_id"
               builder_head_sha="$candidate_sha"
@@ -234,15 +259,20 @@ jobs:
               builder_status="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$builder_run_id" --jq '.status')"
               if [ "$builder_status" = "completed" ]; then
                 builder_conclusion="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$builder_run_id" --jq '.conclusion')"
-                if [ "$builder_conclusion" != "success" ]; then
-                  echo "Post-build Builder refresh $builder_run_id failed: $builder_conclusion" >&2
+                if [ "$builder_conclusion" = "success" ]; then
+                  break
+                elif [ "$builder_conclusion" = "cancelled" ] || [ "$builder_conclusion" = "skipped" ]; then
+                  echo "Post-build Builder run $builder_run_id was superseded ($builder_conclusion); re-scanning for the next eligible refresh."
+                  builder_run_id=""
+                  builder_head_sha=""
+                else
+                  echo "Post-build board's Builder refresh $builder_run_id failed: $builder_conclusion" >&2
                   exit 1
                 fi
-                break
               fi
             fi
             if [ "$attempt" -eq 180 ]; then
-              echo "Timed out waiting for the Builder run triggered by the post-build board." >&2
+              echo "Timed out waiting for a successful Builder refresh after the post-build board." >&2
               exit 1
             fi
             sleep 5
@@ -251,7 +281,6 @@ jobs:
           echo "builder_run_id=$builder_run_id" >> "$GITHUB_OUTPUT"
           echo "builder_head_sha=$builder_head_sha" >> "$GITHUB_OUTPUT"
           echo "Post-build board's Builder run $builder_run_id succeeded."
-
       - name: Dispatch Cloudflare Pages after post-build board and Builder publication
         env:
           GH_TOKEN: ${{ github.token }}
