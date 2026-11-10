@@ -48,6 +48,8 @@ assert.deepEqual(
 const alternativesApi = fs.readFileSync("functions/api/public/market-alternatives.js", "utf8");
 const alternativesUi = fs.readFileSync("qualified-alternatives.js", "utf8");
 const ticketDrawer = fs.readFileSync("ticket-drawer.js", "utf8");
+const reassessmentGenerator = fs.readFileSync("scripts/cross_sport_market_reassessment.py", "utf8");
+const privateEvidenceSync = fs.readFileSync("scripts/sync_cross_sport_private_evidence.py", "utf8");
 assert.ok(alternativesApi.includes("const MIN_RECOMMENDED_PROBABILITY = 0.65;"));
 assert.ok(alternativesApi.includes("const RESEARCH_DISPLAY_BASELINE = 0.55;"));
 assert.ok(alternativesApi.includes("const belowBaseline = probability < RESEARCH_DISPLAY_BASELINE;"));
@@ -56,6 +58,11 @@ assert.ok(alternativesApi.includes('if (row.prediction_role !== "ALTERNATIVE" ||
 assert.ok(alternativesApi.includes("diagnostics.primary_link_present++"));
 assert.ok(!alternativesApi.includes('!String(row.original_pick || row.primary_prediction_id || "").trim()'));
 assert.ok(alternativesApi.includes("builder_qualified: builderQualified"));
+assert.ok(alternativesApi.includes("Array.isArray(document.current_research_candidates)"));
+assert.ok(alternativesApi.includes("current_research_candidates_seen: currentResearchRows.length"));
+assert.ok(reassessmentGenerator.includes('"current_research_candidates": _current_research_candidates(records)'));
+assert.ok(privateEvidenceSync.includes('document["current_research_candidates"] = research_candidates'));
+assert.ok(privateEvidenceSync.includes('_validate_current_research_artifact'));
 assert.ok(alternativesUi.includes("Research only · Builder gate not passed"));
 assert.ok(alternativesUi.includes("String(x.builder_qualified===true)"));
 assert.ok(ticketDrawer.includes("model_qualified:raw.model_qualified===true"));
