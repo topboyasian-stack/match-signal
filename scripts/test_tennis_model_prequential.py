@@ -133,8 +133,17 @@ def test_elo_weight_selection_includes_unmodified_base_model():
     assert diagnostic["objective"].startswith("minimum chronological-window Brier")
 
 
-def test_apply_model_changes_atp_but_leaves_wta_untouched():
+def test_set_probability_inverts_the_best_of_three_match_probability():
+    for match_probability in (0.08, 0.35, 0.50, 0.635, 0.72, 0.93):
+        set_probability = MODEL["match_to_set_probability"](match_probability)
+        reconstructed = 3 * set_probability**2 - 2 * set_probability**3
+        assert abs(reconstructed - match_probability) < 1e-9
+        assert 0 < set_probability < 1
+
+
+def test_apply_model_changes_atp_and_syncs_set_probabilities_but_leaves_wta_untouched():
     atp = fixture(1, tour="ATP")
+    atp["analytics"] = {"set_win_prob": {"p1": 0.52, "p2": 0.48}}
     wta = fixture(2, tour="WTA")
     atp["settled"] = False
     wta["settled"] = False
@@ -149,6 +158,13 @@ def test_apply_model_changes_atp_but_leaves_wta_untouched():
     )
     assert changed == 1
     assert predictions[0]["model_version"] == MODEL["V2_VERSION"]
+    match_p1 = predictions[0]["probabilities"]["p1"]
+    set_p1 = predictions[0]["analytics"]["set_win_prob"]["p1"]
+    expected_set_p1 = MODEL["match_to_set_probability"](match_p1)
+    assert abs(set_p1 - round(expected_set_p1, 4)) < 1e-9
+    assert predictions[0]["analytics"]["set_win_prob"]["p2"] == round(1.0 - expected_set_p1, 4)
+    assert set_p1 != 0.52, "stale pre-calibration per-set probability must be replaced"
+    assert "current calibrated ATP match probability" in predictions[0]["analytics"]["set_win_prob_source"]
     assert predictions[1] == before_wta
 
 
@@ -158,6 +174,6 @@ test_current_fixture_outcome_cannot_change_its_own_forecast()
 test_future_outcomes_do_not_rewrite_earlier_forecasts()
 test_wta_history_is_not_pooled_into_active_atp_training()
 test_elo_weight_selection_includes_unmodified_base_model()
-test_apply_model_changes_atp_but_leaves_wta_untouched()
+test_set_probability_inverts_the_best_of_three_match_probability()\ntest_apply_model_changes_atp_and_syncs_set_probabilities_but_leaves_wta_untouched()
 
 print("ATP prequential walk-forward and tour-isolation regressions passed.")
