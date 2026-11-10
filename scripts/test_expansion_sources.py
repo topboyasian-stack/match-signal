@@ -141,7 +141,8 @@ def test_v4_uses_strictly_prior_scores_pace_and_efficiency():
                  "home":"Home Team","away":"Away Team"}
         forecast=p.nba_predict(fixture,base,pace_blend_weight=.5,bias_adjustment=1.25)
         assert forecast["totals_model_version"]==p.NBA_TOTALS_MODEL_VERSION
-        assert forecast["model"]==p.NBA_TOTALS_MODEL_LABEL
+        assert forecast["model"]==p.NBA_WINNER_MODEL_LABEL
+        assert forecast["totals_model"]==p.NBA_TOTALS_MODEL_LABEL
         assert forecast["total_model_features"]["recency_half_life_days"]==30
         assert forecast["total_model_features"]["recent_team_total_window"]==12
         assert forecast["total_model_features"]["pace_efficiency_available"] is True
