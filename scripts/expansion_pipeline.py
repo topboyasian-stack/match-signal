@@ -15,6 +15,7 @@ NBA_TOTALS_MODEL_LABEL="NBA totals v5.1: frozen 0.8 pace/efficiency blend minus 
 NBA_TOTALS_PACE_BLEND_WEIGHT=0.8
 NBA_TOTALS_BIAS_CORRECTION=0.3542
 NBA_WINNER_MODEL_VERSION = "nba-winner-elo-form-v1"
+NBA_WINNER_MODEL_LABEL = "NBA winner Elo + recent-form v1 (market-blind)"
 NBA_WINNER_MODEL_PATH = DATA / "nba_winner_model.json"
 NBA_WINNER_ELO_K = 25.0
 NBA_WINNER_ELO_HOME_ADVANTAGE = 70.0
@@ -584,7 +585,7 @@ def nba_predict(r,hist,pace_blend_weight=NBA_TOTALS_PACE_BLEND_WEIGHT,bias_adjus
    'home_expected_off_rating':components['home_expected_off_rating'],
    'away_expected_off_rating':components['away_expected_off_rating']
   },
-  'model':NBA_TOTALS_MODEL_LABEL,
+  'model':NBA_WINNER_MODEL_LABEL,'totals_model':NBA_TOTALS_MODEL_LABEL,
   'paper_only':True
  }
 def current(name):
@@ -630,7 +631,7 @@ def run():
        'probabilities':{'p1':round(probs['home'],6),'p2':round(probs['away'],6)},
        'pick':pick,'confidence':round(max(probs['home'],probs['away']),6),
        'expected_score':model['expected_score'],'expected_total':model['expected_total'],
-       'totals_model_version':model.get('totals_model_version'),'winner_model_version':model['winner_model']['version'],'winner_model_features':model['winner_model']['feature_values'],'model':model['model'],'market':r.get('markets') or {},
+       'totals_model_version':model.get('totals_model_version'),'winner_model_version':model['winner_model']['version'],'winner_model_features':model['winner_model']['feature_values'],'model':model['model'],'totals_model':model['totals_model'],'market':r.get('markets') or {},
        'signal_quality':{'status':'LIVE_EXPERIMENTAL','market_odds_available':False},
        'generated_at':NOW.isoformat(),'prediction_created_at':NOW.isoformat(),
        'accuracy_eligible':True,'prediction_status':'live_experimental',
