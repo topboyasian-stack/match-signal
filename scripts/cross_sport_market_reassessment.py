@@ -1523,7 +1523,7 @@ def _evidence_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
 def _current_research_candidates(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Export current unpriced football/tennis options separately from immutable quote history."""
     output: list[dict[str, Any]] = []
-    seen: set[tuple[str, str, str, str, str]] = set()
+    seen: set[tuple[str, str, str, str, str, str]] = set()
     for row in records:
         if not isinstance(row, dict):
             continue
@@ -1559,7 +1559,7 @@ def _current_research_candidates(records: list[dict[str, Any]]) -> list[dict[str
         )):
             continue
         line = _num(row.get("line"))
-        key = (sport, event_id, market, "" if line is None else f"{line:g}", pick)
+        key = (sport, event_id, market, "" if line is None else f"{line:g}", "" if set_number is None else str(set_number), pick)
         if key in seen:
             continue
         seen.add(key)
