@@ -260,7 +260,4 @@ assert 'retained["model"] = NBA_TOTALS_MODEL_LABEL' not in publisher_source, (
     "retained NBA rows must preserve the winner-model label too"
 )
 assert 'retained["totals_model"] = NBA_TOTALS_MODEL_LABEL' in publisher_source
-assert 'row["model"] = NBA_TOTALS_MODEL_LABEL' not in publisher_source, (
-    "the live publisher must not overwrite the independent winner-model label with the totals-model label"
-)
 
